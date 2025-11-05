@@ -4124,10 +4124,29 @@ return {
 
   // Fixed MLP marker at optimal 57.5° horizontal FOV position (or custom MLP if provided)
   // This marker uses mlpDotX_m_visual and mlpDotY_m_visual, which include the viewingDistanceOffsetM
-  const MLPMarker = useMemo(() => {
-    const [x, y] = toPx(mlpDotX_m, mlpDotY_m);
-    return <circle cx={x} cy={y} r="4" fill="#22c55e" stroke="white" strokeWidth="2" opacity="0.9" />;
-  }, [toPx, mlpDotX_m, mlpDotY_m]);
+/* START: MLP marker locked to seat centre */
+const MLPMarker = useMemo(() => {
+  // Pick the seat the MLP should sit on: primary seat if flagged, else the middle one
+  const seatsArr = Array.isArray(seatingPositions) ? seatingPositions : [];
+  const mlpSeat =
+    seatsArr.find(s => s.isPrimary) ||
+    seatsArr[Math.floor(seatsArr.length / 2)] ||
+    null;
+
+  // Fallback to the computed MLP coords if no seats exist
+  const baseX_m = mlpSeat ? Number(mlpSeat.x ?? mlpSeat.position?.x ?? mlpDotX_m) : mlpDotX_m;
+  const baseY_m = mlpSeat ? Number(mlpSeat.y ?? mlpSeat.position?.y ?? mlpDotY_m) : mlpDotY_m;
+
+  const [x, y] = toPx(baseX_m, baseY_m);
+
+  // Small green dot, centred exactly at the seat centre
+  return (
+    <g data-testid="mlp-marker">
+      <circle cx={x} cy={y} r="4" fill="#22c55e" stroke="white" strokeWidth="2" opacity="0.9" />
+    </g>
+  );
+}, [toPx, seatingPositions, mlpDotX_m, mlpDotY_m]);
+/* END: MLP marker locked to seat centre */
 
   const containerStyle = {
     position: 'relative',
