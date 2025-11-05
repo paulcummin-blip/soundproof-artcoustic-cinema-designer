@@ -408,6 +408,20 @@ useEffect(() => {
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
   const [hoveredSeat, setHoveredSeat] = useState(null);
+  // Move every seat straight forward/back with the Viewing Offset control (in metres)
+// Seats only; speakers are not touched here.
+useEffect(() => {
+  if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return;
+  const off = Number(viewingDistanceOffsetM) || 0;
+  if (off === 0) return;
+
+  onSetSeatingPositions?.((prev = []) =>
+    prev.map(s => ({
+      ...s,
+      y: Math.max(0.05, Math.min(lengthM - 0.05, (Number(s.y ?? s.position?.y ?? 0)) + off))
+    }))
+  );
+}, [viewingDistanceOffsetM]);
 
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
   const [hudHiddenWhenPinned, setHudHiddenWhenPinned] = useState(false);
