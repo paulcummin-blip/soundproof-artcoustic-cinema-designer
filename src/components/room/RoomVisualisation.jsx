@@ -209,15 +209,15 @@ import {
 // NEW: Helper function to compute yaw angle for a speaker
 const getYawForObject = (speaker, lcrAngles, aimAtMLP, dimensions, getModelDimsM) => {
   if (!speaker) return 0;
-  
+
   const canonicalRole = speaker.role?.toUpperCase();
-  
+
   // LCR speakers use their precomputed angles when aiming at MLP
   if (aimAtMLP) {
-    if (canonicalRole === 'FL' || canonicalRole === 'L') return lcrAngles.L || 0;
-    if (canonicalRole === 'FR' || canonicalRole === 'R') return lcrAngles.R || 0;
+    if (canonicalRole === 'FL' || canonicalRole === 'L') return -Math.abs(lcrAngles.L || 0);
+    if (canonicalRole === 'FR' || canonicalRole === 'R') return Math.abs(lcrAngles.R || 0);
   }
-  
+
   // All other speakers have 0 yaw
   return 0;
 };
