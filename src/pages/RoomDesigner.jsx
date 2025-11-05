@@ -879,10 +879,12 @@ function RoomDesignerWithState() {
     const screenVisibleWidthM = stableScreen?.visibleWidthInches 
       ? stableScreen.visibleWidthInches * 0.0254 
       : null;
-    const viewingOffsetM = Number(_seatingBlockOffset) || 0;
-    const rows = Number(_seatingRows) || 1;
-    const rowSpacing = Number(_rowSpacingM) || 1.8; // Use rowSpacingM from appState, default to 1.8m
-    const mlpReference = _mlpBasis; // 'front' | 'back' | 'average'
+    /* Y-only viewing offset (lock X to centre) */
+const viewingOffsetM = Number(_seatingBlockOffset) || 0;
+const rows = Number(_seatingRows) || 1;
+const rowSpacing = Number(_rowSpacingM) || 1.8; // default 1.8m
+const mlpReference = _mlpBasis; // 'front' | 'back' | 'average'
+const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y only
 
     // Must have screen plane and width
     if (!Number.isFinite(screenFrontPlaneM) || !Number.isFinite(screenVisibleWidthM)) {
