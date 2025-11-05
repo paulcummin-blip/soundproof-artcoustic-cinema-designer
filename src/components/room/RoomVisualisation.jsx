@@ -206,19 +206,21 @@ import {
   SpeakerRect,
 } from "@/components/room/rv/RenderPrimitives";
 
-// NEW: Helper function to compute yaw angle for a speaker
-const getYawForObject = (speaker, lcrAngles, aimAtMLP, dimensions, getModelDimsM) => {
+// Helper: yaw for speaker icons (keep surrounds flat; aim LCR at MLP)
+const getYawForObject = (speaker, lcrAngles, aimAtMLP) => {
   if (!speaker) return 0;
+  const role = String(speaker.role || '').toUpperCase();
 
-  const canonicalRole = speaker.role?.toUpperCase();
-
-  // LCR speakers use their precomputed angles when aiming at MLP
+  // Aim LCR at MLP using precomputed angles
   if (aimAtMLP) {
-    if (canonicalRole === 'FL' || canonicalRole === 'L') return -Math.abs(lcrAngles.L || 0);
-    if (canonicalRole === 'FR' || canonicalRole === 'R') return Math.abs(lcrAngles.R || 0);
+    if (role === 'FL' || role === 'L') return -Math.abs(lcrAngles?.L || 0); // left = clockwise
+    if (role === 'FR' || role === 'R') return  Math.abs(lcrAngles?.R || 0); // right = anti-clockwise
   }
 
-  // All other speakers have 0 yaw
+  // All surrounds & wides lie flat to the wall (no 90° twist)
+  if (['SL','SR','SBL','SBR','LW','RW','RS','LS','RSL','RSR'].includes(role)) return 0;
+
+  // Default
   return 0;
 };
 
