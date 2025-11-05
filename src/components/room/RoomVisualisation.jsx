@@ -206,21 +206,27 @@ import {
   SpeakerRect,
 } from "@/components/room/rv/RenderPrimitives";
 
-// Helper: yaw for speaker icons (keep surrounds flat; aim LCR at MLP)
+// Helper: yaw for speaker icons
+// - FL/FR aim to MLP using precomputed angles (left = negative, right = positive)
+// - Side-wall surrounds & wides sit vertical (long edge parallel to side wall) = ±90°
+// - Rear surrounds on the back wall stay flat (0°)
 const getYawForObject = (speaker, lcrAngles, aimAtMLP) => {
   if (!speaker) return 0;
   const role = String(speaker.role || '').toUpperCase();
 
-  // Aim LCR at MLP using precomputed angles
+  // LCR aim
   if (aimAtMLP) {
-    if (role === 'FL' || role === 'L') return -Math.abs(lcrAngles?.L || 0); // left = clockwise
-    if (role === 'FR' || role === 'R') return  Math.abs(lcrAngles?.R || 0); // right = anti-clockwise
+    if (role === 'FL' || role === 'L') return -Math.abs(lcrAngles?.L || 0);
+    if (role === 'FR' || role === 'R') return  Math.abs(lcrAngles?.R || 0);
   }
 
-  // All surrounds & wides lie flat to the wall (no 90° twist)
-  if (['SL','SR','SBL','SBR','LW','RW','RS','LS','RSL','RSR'].includes(role)) return 0;
+  // Side surrounds & wides: make the long edge vertical (on the wall)
+  if (role === 'SL' || role === 'LW') return  90;
+  if (role === 'SR' || role === 'RW') return -90;
 
-  // Default
+  // Rear surrounds on back wall: long edge horizontal
+  if (role === 'SBL' || role === 'SBR' || role === 'RL' || role === 'RR') return 0;
+
   return 0;
 };
 
