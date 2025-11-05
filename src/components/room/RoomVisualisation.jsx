@@ -351,32 +351,43 @@ const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
     return map[r] || r;
   }, []);
 
-  const MLP_calculated = useMemo(() => {
-    if (mlpPoint && Number.isFinite(mlpPoint.x) && Number.isFinite(mlpPoint.y)) {
-      return { x: centerX_m, y: clampY((Number(mlpPoint.y)) + (Number(viewingDistanceOffsetM) || 0)), z: Number(mlpPoint.z ?? 1.2) };
+const MLP_calculated = useMemo(() => {
+  // If an explicit MLP point exists, use it (no extra offset here)
+  if (mlpPoint && Number.isFinite(mlpPoint.x) && Number.isFinite(mlpPoint.y)) {
+    return {
+      x: centerX_m,
+      y: clampY(Number(mlpPoint.y)),
+      z: Number(mlpPoint.z ?? 1.2),
+    };
+  }
+
+  // Otherwise derive from seats (seats already include any viewing offset in their own Y)
+  if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
+    const seats = seatingPositions.map((s) => ({
+      x: Number(s?.position?.x ?? s?.x ?? 0),
+      y: clampY(Number(s?.position?.y ?? s?.y ?? 0)),
+      z: Number(s?.z ?? 1.2),
+      rowNumber: s?.rowNumber ?? 1,
+    }));
+
+    let picked = null;
+    try {
+      picked = pickMLP?.('all', seats);
+    } catch (e) {
+      console.error("Error calling pickMLP:", e);
+      picked = seats[Math.floor(seats.length / 2)] || { x: 0, y: lengthM * 0.58, z: 1.2 };
     }
-    if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
-      const seats = seatingPositions.map((s) => ({
-        x: Number(s?.position?.x ?? s?.x ?? 0),
-          y: clampY((Number(s?.position?.y ?? s?.y ?? 0)) + (Number(viewingDistanceOffsetM) || 0)),
-        z: Number(s?.z ?? 1.2),
-        rowNumber: s?.rowNumber ?? 1,
-      }));
-      let picked = null;
-      try { picked = pickMLP?.('all', seats); }
-      catch (e) {
-        console.error("Error calling pickMLP:", e);
-        const mid = seats[Math.floor(seats.length / 2)];
-        picked = mid || { x: 0, y: lengthM * 0.58, z: 1.2 };
-      }
-      return {
-        x: centerX_m,
-        y: clampY(((Number.isFinite(picked?.y) ? Number(picked.y) : (lengthM * 0.58))) + (Number(viewingDistanceOffsetM) || 0)),
-        z: Number.isFinite(picked?.z) ? Number(picked.z) : 1.2,
-      };
-    }
-    return { x: centerX_m, y: clampY((lengthM * 0.58) + (Number(viewingDistanceOffsetM) || 0)), z: 1.2 };
-  }, [mlpPoint, seatingPositions, lengthM, centerX_m]);
+
+    return {
+      x: centerX_m,
+      y: clampY(Number.isFinite(picked?.y) ? Number(picked.y) : (lengthM * 0.58)),
+      z: Number.isFinite(picked?.z) ? Number(picked.z) : 1.2,
+    };
+  }
+
+  // Fallback
+  return { x: centerX_m, y: clampY(lengthM * 0.58), z: 1.2 };
+}, [mlpPoint, seatingPositions, lengthM, centerX_m]);
 
   const mlp = MLP_calculated;
   const mlpDotX_m = mlp.x;
