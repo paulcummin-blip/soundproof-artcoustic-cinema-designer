@@ -382,26 +382,7 @@ const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
   const mlpDotX_m = mlp.x;
   const mlpDotY_m = mlp.y;
   const mlpDotZ_m = mlp.z;
-  // Apply Viewing Offset (m) to seats only — move along Y, never X; do not touch speakers
-useEffect(() => {
-  if (!Array.isArray(seatingPositions) || !onSetSeatingPositions) return;
-
-  // No change
-  const dy = Number(viewingDistanceOffsetM) || 0;
-  if (!dy) return;
-
-  // Shift seats along Y only, clamped to room [0 .. lengthM]
-  const L = Number(lengthM) || 0;
-  onSetSeatingPositions(prev => (prev || []).map(s => {
-    const x = Number(s.x ?? s.position?.x ?? 0);   // keep X unchanged
-    const y0 = Number(s.y ?? s.position?.y ?? 0);
-    const y = Math.max(0, Math.min(L, y0 + dy));
-    return { ...s, x, y };
-  }));
-  // NOTE: we do not call onSetSpeakers here, so L/R never move.
-  // MLP will update automatically from the changed seats.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [viewingDistanceOffsetM]);
+// Removed duplicate viewingDistanceOffsetM seat shift (handled in RoomDesigner)
 
   const [hoveredSpeaker, setHoveredSpeaker] = useState(null);
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
