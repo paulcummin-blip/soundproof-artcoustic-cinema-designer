@@ -206,27 +206,34 @@ import {
   SpeakerRect,
 } from "@/components/room/rv/RenderPrimitives";
 
-// Helper: yaw for speaker icons
-// - FL/FR aim to MLP using precomputed angles (left = negative, right = positive)
-// - Side-wall surrounds & wides sit vertical (long edge parallel to side wall) = ±90°
-// - Rear surrounds on the back wall stay flat (0°)
-const getYawForObject = (speaker, lcrAngles, aimAtMLP) => {
+// NEW: Helper function to compute yaw angle for a speaker
+const getYawForObject = (speaker, lcrAngles, aimAtMLP, dimensions, getModelDimsM) => {
   if (!speaker) return 0;
   const role = String(speaker.role || '').toUpperCase();
+  const W = Number(dimensions?.width) || 0;
+  const L = Number(dimensions?.length) || 0;
 
-  // LCR aim
-  if (aimAtMLP) {
-    if (role === 'FL' || role === 'L') return -Math.abs(lcrAngles?.L || 0);
-    if (role === 'FR' || role === 'R') return  Math.abs(lcrAngles?.R || 0);
-  }
+  // 1) LCR: use precomputed angles when aiming at MLP (rotation only, no position move)
+  if (aimAtMLP && (role === 'FL' || role === 'L')) return -(Number(lcrAngles?.L) || 0);
+  if (aimAtMLP && (role === 'FR' || role === 'R')) return -(Number(lcrAngles?.R) || 0);
+  if (role === 'FC' || role === 'C') return 0;
 
-  // Side surrounds & wides: make the long edge vertical (on the wall)
-  if (role === 'SL' || role === 'LW') return  90;
-  if (role === 'SR' || role === 'RW') return -90;
+  // 2) Side/Rear surrounds must sit FLAT to the wall
+  // Side wall: long edge vertical (±90). Back wall: long edge horizontal (0).
+  const pos = speaker.position || {};
+  const dims = getModelDimsM?.(speaker.model) || {};
+  const halfDepth = (Number(dims.depthM) || 0.082) / 2;
+  const leftX  = 0.05 + halfDepth;
+  const rightX = (W ? (W - 0.05 - halfDepth) : NaN);
+  const onLeftWall  = Number.isFinite(pos.x) && Math.abs(pos.x - leftX)  <= 0.035;
+  const onRightWall = Number.isFinite(pos.x) && Math.abs(pos.x - rightX) <= 0.035;
+  const onBackWall  = Number.isFinite(pos.y) && Math.abs(pos.y - (L - (0.05 + halfDepth))) <= 0.035;
 
-  // Rear surrounds on back wall: long edge horizontal
-  if (role === 'SBL' || role === 'SBR' || role === 'RL' || role === 'RR') return 0;
+  if (onBackWall) return 0;
+  if (onLeftWall)  return 90;
+  if (onRightWall) return -90;
 
+  // 3) Overheads/wides and anything else default to 0°
   return 0;
 };
 
