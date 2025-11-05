@@ -1685,44 +1685,55 @@ function RoomDesignerWithState() {
     const seatCount = Math.max(1, Number(_seatsPerRow) || 2);
     const spacing = Math.max(0, Number(_seatSpacing) || 0.8);
     
-    // Viewing offset for lateral shift (typically 0)
-    const viewingOffsetM = Number(_seatingBlockOffset) || 0;
-    const centerSeatX_m = Math.abs(viewingOffsetM) < EPS_M ? centerX_m : centerX_m + viewingOffsetM;
-    
-    const allSeats = [];
-    
-    appState.rowCentersM.forEach((rowY, rowIdx) => {
-      if (rowY === null || !Number.isFinite(rowY)) return;
-      
-      // Clamp to room bounds with clearance
-      const MIN_Y = 0.4;
-      const MAX_Y = lengthM - 0.4;
-      const clampedY = Math.max(MIN_Y, Math.min(MAX_Y, rowY));
-      
-      // Build seats across the row
-      for (let seatIdx = 0; seatIdx < seatCount; seatIdx++) {
-        const offsetFromCenter = (seatIdx - (seatCount - 1) / 2) * spacing;
-        const x = centerSeatX_m + offsetFromCenter;
-        
-        // Clamp X to room bounds
-        const MIN_X = 0.4;
-        const MAX_X = widthM - 0.4;
-        const clampedX = Math.max(MIN_X, Math.min(MAX_X, x));
-        
-        // Ear height varies by row
-        const z = 1.2 + rowIdx * 0.1;
-        
-        allSeats.push({
-          id: `R${rowIdx + 1}S${seatIdx + 1}`,
-          x: Number(clampedX.toFixed(3)),
-          y: Number(clampedY.toFixed(3)),
-          z: Number(z.toFixed(3)),
-          rowNumber: rowIdx + 1,
-          seatNumber: seatIdx + 1,
-          isPrimary: false,
-        });
-      }
+    /* START: Y-only viewing offset seat builder */
+
+// Viewing offset (Y-axis, forward/back). Keep X locked to centre.
+const viewingOffsetM = Number(_seatingBlockOffset) || 0;
+
+// X is always the room centre; do NOT add viewingOffsetM to X.
+const centerSeatX_m = centerX_m;
+
+const allSeats = [];
+
+appState.rowCentersM.forEach((rowY, rowIdx) => {
+  if (rowY === null || !Number.isFinite(rowY)) return;
+
+  // Apply the offset on Y only
+  const rawY = rowY + viewingOffsetM;
+
+  // Clamp Y to room bounds with clearance
+  const MIN_Y = 0.4;
+  const MAX_Y = lengthM - 0.4;
+  const clampedY = Math.max(MIN_Y, Math.min(MAX_Y, rawY));
+
+  // Build seats across the row
+  for (let seatIdx = 0; seatIdx < seatCount; seatIdx++) {
+    const offsetFromCenter = (seatIdx - (seatCount - 1) / 2) * spacing;
+
+    // X spans from centre; never include viewingOffsetM here
+    const x = centerSeatX_m + offsetFromCenter;
+
+    // Clamp X to room bounds with clearance
+    const MIN_X = 0.4;
+    const MAX_X = widthM - 0.4;
+    const clampedX = Math.max(MIN_X, Math.min(MAX_X, x));
+
+    // Ear height varies by row (unchanged)
+    const z = 1.2 + rowIdx * 0.1;
+
+    allSeats.push({
+      id: `R${rowIdx + 1}S${seatIdx + 1}`,
+      x: Number(clampedX.toFixed(3)),
+      y: Number(clampedY.toFixed(3)),
+      z: Number(z.toFixed(3)),
+      rowNumber: rowIdx + 1,
+      seatNumber: seatIdx + 1,
+      isPrimary: false,
     });
+  }
+});
+
+/* END: Y-only viewing offset seat builder */
     
     if (allSeats.length > 0 && typeof appState?.setSeatingPositions === 'function') {
       appState.setSeatingPositions(allSeats);
