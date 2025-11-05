@@ -319,7 +319,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const useRearGlobal  = appState?.useRearGlobal  ?? true;
 
   const centerX_m = widthM / 2;
-  const clampY = (y) => Math.max(SAFETY_MARGIN_M, Math.min(lengthM - SAFETY_MARGIN_M, Number(y) || 0));
+const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
   const EPS_M = 0.0005;
   const ALLOW_AUTO_DIMENSIONS = false;
 
