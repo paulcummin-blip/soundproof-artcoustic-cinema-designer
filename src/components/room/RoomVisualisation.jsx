@@ -394,7 +394,6 @@ const MLP_calculated = useMemo(() => {
   const mlpDotY_m = mlp.y;
   const mlpDotZ_m = mlp.z;
 // Removed duplicate viewingDistanceOffsetM seat shift (handled in RoomDesigner)
-
   const [hoveredSpeaker, setHoveredSpeaker] = useState(null);
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
   const [dragState, setDragState] = useState({ dragging: false, draggedItemId: null, dragType: null });
@@ -407,25 +406,9 @@ const MLP_calculated = useMemo(() => {
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
   const [hoveredSeat, setHoveredSeat] = useState(null);
-  // Move every seat straight forward/back with the Viewing Offset control (in metres)
-// Seats only; speakers are not touched here.
-useEffect(() => {
-  if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return;
-  const off = Number(viewingDistanceOffsetM) || 0;
-  if (off === 0) return;
-
-  onSetSeatingPositions?.((prev = []) =>
-    prev.map(s => ({
-      ...s,
-      y: Math.max(0.05, Math.min(lengthM - 0.05, (Number(s.y ?? s.position?.y ?? 0)) + off))
-    }))
-  );
-}, [viewingDistanceOffsetM]);
-
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
   const [hudHiddenWhenPinned, setHudHiddenWhenPinned] = useState(false);
   const [hudPinnedOffsetPx, setHudPinnedOffsetPx] = useState(null);
-
   const planBoundsRef = useRef(null);
   const svgRef = useRef(null);
   const slsrModeRef = React.useRef('side');
@@ -442,7 +425,6 @@ useEffect(() => {
   const lastSentRef = useRef(null);
   const hudDragRef = useRef(null);
   const hudElRef = useRef(null);
-
   const isHudPinned = Boolean(hudPinnedSeatId);
 
   useEffect(() => {
