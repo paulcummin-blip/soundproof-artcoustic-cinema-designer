@@ -89,3 +89,29 @@ export function ceilDb(db) {
   }
   return Math.ceil(db);
 }
+
+/**
+ * Safe number conversion - returns null if not a valid finite number
+ * @param {any} val - Value to convert to number
+ * @returns {number|null} Number or null
+ */
+export function safeNum(val) {
+  const num = Number(val);
+  return Number.isFinite(num) ? num : null;
+}
+
+/**
+ * Calculate SPL at a distance from 1m reference
+ * @param {number} spl1m_dB - SPL at 1 meter
+ * @param {number} distance_m - Distance in meters
+ * @returns {number|null} SPL at distance in dB
+ */
+export function splAtDistanceFrom1m(spl1m_dB, distance_m) {
+  if (typeof spl1m_dB !== 'number' || !Number.isFinite(spl1m_dB)) return null;
+  if (typeof distance_m !== 'number' || distance_m <= 0) return null;
+  
+  const loss = distanceLossDb(distance_m);
+  if (loss === null) return null;
+  
+  return spl1m_dB - loss;
+}
