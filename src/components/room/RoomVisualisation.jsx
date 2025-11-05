@@ -719,15 +719,27 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     return Math.max(0.10, Math.min(0.60, raw));
   }, [actualScreenFrontY]);
 
-  // Push live plane up to RoomDesigner when it changes
-  React.useEffect(() => {
-    if (typeof onScreenPlaneChange === 'function') {
-      if (Number.isFinite(actualScreenFrontY) && lastSentRef.current !== actualScreenFrontY) {
-        lastSentRef.current = actualScreenFrontY;
-        onScreenPlaneChange(actualScreenFrontY);
-      }
+  // Push live plane up to RoomDesigner when it changes (debounced + change guard)
+const screenSendTimerRef = React.useRef(null);
+
+React.useEffect(() => {
+  if (typeof onScreenPlaneChange !== 'function') return;
+  if (!Number.isFinite(actualScreenFrontY)) return;
+
+  // If unchanged, skip update
+  if (lastSentRef.current === actualScreenFrontY) return;
+
+  // Debounce updates to prevent API overload (1 second)
+  clearTimeout(screenSendTimerRef.current);
+  screenSendTimerRef.current = setTimeout(() => {
+    if (lastSentRef.current !== actualScreenFrontY) {
+      lastSentRef.current = actualScreenFrontY;
+      onScreenPlaneChange(actualScreenFrontY);
     }
-  }, [onScreenPlaneChange, actualScreenFrontY]);
+  }, 1000);
+
+  return () => clearTimeout(screenSendTimerRef.current);
+}, [actualScreenFrontY, onScreenPlaneChange]);
 
   const availW = (containerW || DEFAULT_W) - 2 * PADDING;
   const availH = (containerH || DEFAULT_H) - 2 * PADDING;
