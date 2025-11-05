@@ -345,12 +345,12 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   const MLP_calculated = useMemo(() => {
     if (mlpPoint && Number.isFinite(mlpPoint.x) && Number.isFinite(mlpPoint.y)) {
-      return { x: centerX_m, y: Number(mlpPoint.y), z: Number(mlpPoint.z ?? 1.2) };
+      return { x: centerX_m, y: clampY((Number(mlpPoint.y)) + (Number(viewingDistanceOffsetM) || 0)), z: Number(mlpPoint.z ?? 1.2) };
     }
     if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
       const seats = seatingPositions.map((s) => ({
         x: Number(s?.position?.x ?? s?.x ?? 0),
-        y: Number(s?.position?.y ?? s?.y ?? 0),
+          y: clampY((Number(s?.position?.y ?? s?.y ?? 0)) + (Number(viewingDistanceOffsetM) || 0)),
         z: Number(s?.z ?? 1.2),
         rowNumber: s?.rowNumber ?? 1,
       }));
@@ -363,11 +363,11 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       }
       return {
         x: centerX_m,
-        y: Number.isFinite(picked?.y) ? Number(picked.y) : lengthM * 0.58,
+        y: clampY(((Number.isFinite(picked?.y) ? Number(picked.y) : (lengthM * 0.58))) + (Number(viewingDistanceOffsetM) || 0)),
         z: Number.isFinite(picked?.z) ? Number(picked.z) : 1.2,
       };
     }
-    return { x: centerX_m, y: lengthM * 0.58, z: 1.2 };
+    return { x: centerX_m, y: clampY((lengthM * 0.58) + (Number(viewingDistanceOffsetM) || 0)), z: 1.2 };
   }, [mlpPoint, seatingPositions, lengthM, centerX_m]);
 
   const mlp = MLP_calculated;
@@ -1331,6 +1331,7 @@ React.useEffect(() => {
 
     const roomWidthM = widthM || 4.5;
     const screenCenterX_m = roomWidthM / 2;
+    const clampY = (y) => Math.max(SAFETY_MARGIN_M, Math.min(lengthM - SAFETY_MARGIN_M, y));
 
     return { BaffleAndScreen: component, screenPlaneY, screenCenterX_m, visibleWidthM: viewableWidthM };
   }, [screen?.visibleWidthInches, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M]);
