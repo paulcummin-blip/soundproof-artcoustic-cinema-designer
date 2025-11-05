@@ -206,6 +206,22 @@ import {
   SpeakerRect,
 } from "@/components/room/rv/RenderPrimitives";
 
+// NEW: Helper function to compute yaw angle for a speaker
+const getYawForObject = (speaker, lcrAngles, aimAtMLP, dimensions, getModelDimsM) => {
+  if (!speaker) return 0;
+  
+  const canonicalRole = speaker.role?.toUpperCase();
+  
+  // LCR speakers use their precomputed angles when aiming at MLP
+  if (aimAtMLP) {
+    if (canonicalRole === 'FL' || canonicalRole === 'L') return lcrAngles.L || 0;
+    if (canonicalRole === 'FR' || canonicalRole === 'R') return lcrAngles.R || 0;
+  }
+  
+  // All other speakers have 0 yaw
+  return 0;
+};
+
 // Physical (no stroke) half-extent along +/-Y for a rotated rectangle
 const _yHalfExtentM_physical = (depthM, widthM, yawDeg = 0) => {
   const t = Math.abs((yawDeg || 0) * Math.PI / 180);
