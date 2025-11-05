@@ -76,3 +76,16 @@ export function euclideanDistance(point1, point2) {
   
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
 }
+
+/**
+ * Ceiling function for decibel values
+ * Rounds up to nearest integer dB
+ * @param {number} db - Decibel value
+ * @returns {number|null} Rounded up dB value
+ */
+export function ceilDb(db) {
+  if (typeof db !== 'number' || !Number.isFinite(db)) {
+    return null;
+  }
+  return Math.ceil(db);
+}
