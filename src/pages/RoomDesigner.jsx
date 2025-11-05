@@ -1701,7 +1701,7 @@ appState.rowCentersM.forEach((rowY, rowIdx) => {
   if (rowY === null || !Number.isFinite(rowY)) return;
 
   // Apply the offset on Y only
-  const rawY = rowY + viewingOffsetM;
+  const rawY = rowY;
 
   // Clamp Y to room bounds with clearance
   const MIN_Y = 0.4;
