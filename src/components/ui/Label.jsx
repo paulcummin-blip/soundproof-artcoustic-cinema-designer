@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function Label({ children, className = "", htmlFor, ...props }) {
+export function Label({ children, className = "", htmlFor, ...props }) {
   return (
     <label 
       htmlFor={htmlFor}
@@ -11,3 +11,5 @@ export default function Label({ children, className = "", htmlFor, ...props }) {
     </label>
   );
 }
+
+export default Label;
