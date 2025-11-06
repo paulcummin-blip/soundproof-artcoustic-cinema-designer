@@ -71,6 +71,7 @@ function useDesignerState() {
   const [baselineSeatingPositions, setBaselineSeatingPositions] = useState([]);
   const [seatingRows, setSeatingRows] = useState(1);
   const [seatsPerRow, setSeatsPerRow] = useState(3);
+  const [seatsPerRowByRow, setSeatsPerRowByRow] = useState([]); // NEW: per-row seat counts
   const [seatingBlockOffset, setSeatingBlockOffset] = useState(0);
   const [seatSpacing, setSeatSpacing] = useState(0.8);
   const [rowSpacingM, setRowSpacingM] = useState(1.8); // NEW: centre-to-centre spacing between rows
@@ -355,7 +356,7 @@ function useDesignerState() {
         // Rear surrounds: drop only when "use FW instead of RS" is active
         if (role === 'SBL' || role === 'SBR') {
           if (useFWInsteadOfRS) {
-            prunedRoles.push(role);
+            pruedRoles.push(role);
             return false;
           } else {
             keptRoles.push(role);
@@ -396,7 +397,9 @@ function useDesignerState() {
     seatingPositions, setSeatingPositions, 
     baselineSeatingPositions, setBaselineSeatingPositions,
     seatingRows, setSeatingRows,
-    seatsPerRow, setSeatsPerRow, seatingBlockOffset, setSeatingBlockOffset,
+    seatsPerRow, setSeatsPerRow,
+    seatsPerRowByRow, setSeatsPerRowByRow, // NEW: per-row counts
+    seatingBlockOffset, setSeatingBlockOffset,
     seatSpacing, setSeatSpacing, 
     rowSpacingM, setRowSpacingM, // NEW
     mlpBasis, setMlpBasis, autoSeatByRP23, setAutoSeatByRP23,
@@ -443,7 +446,9 @@ function useDesignerState() {
     seatingPositions, setSeatingPositions, 
     baselineSeatingPositions, setBaselineSeatingPositions,
     seatingRows, setSeatingRows,
-    seatsPerRow, setSeatsPerRow, seatingBlockOffset, setSeatingBlockOffset,
+    seatsPerRow, setSeatsPerRow,
+    seatsPerRowByRow, setSeatsPerRowByRow, // NEW
+    seatingBlockOffset, setSeatingBlockOffset,
     seatSpacing, setSeatSpacing, 
     rowSpacingM, setRowSpacingM, // NEW
     mlpBasis, setMlpBasis, autoSeatByRP23, setAutoSeatByRP23,
