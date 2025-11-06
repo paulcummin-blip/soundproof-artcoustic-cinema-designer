@@ -481,10 +481,10 @@ export default function ScreenConfiguration(props) {
             min="0"
             max="50"
             value={inputBuffer['borderThicknessM'] !== undefined 
-              ? Math.round(inputBuffer['borderThicknessM'] * 100)
-              : Math.round(borderThicknessM * 100)}
+  ? Number((inputBuffer['borderThicknessM'] * 100).toFixed(1))
+  : Number((borderThicknessM * 100).toFixed(1))}
             onChange={(e) => {
-              const cm = Number(e.target.value);
+              const cm = parseFloat(e.target.value || '0');
               handleDebouncedInput('borderThicknessM', cm / 100);
             }}
             onBlur={() => {
