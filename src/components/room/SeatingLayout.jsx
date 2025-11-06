@@ -380,17 +380,24 @@ const rowCount = rowsArray.length;
             style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
           />
           <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              const next = rowsArray.slice();
-              next.splice(idx, 1);
-              setRowsArray(next.length ? next : [1]);
-            }}
-            disabled={disabled || rowCount <= 1}
-          >
-            Remove
-          </Button>
+  type="button"
+  variant="outline"
+  onClick={() => {
+    const next = rowsArray.slice();
+    next.splice(idx, 1);
+    const safeNext = next.length ? next : [1];
+    setRowsArray(safeNext);
+    // rebuild seats so everything closes up correctly
+    onGenerateSeating?.({
+      seatsPerRowByRow: safeNext,
+      seatSpacing,
+      rowSpacingM,
+    });
+  }}
+  disabled={disabled || rowCount <= 1}
+>
+  Remove
+</Button>
         </div>
       ))}
 
