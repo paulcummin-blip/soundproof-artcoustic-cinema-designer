@@ -253,253 +253,258 @@ const rowCount = rowsArray.length;
   }, [onGenerateSeating, seatsPerRow, seatingRows, seatSpacing, rowSpacingM]); // NEW: Add rowSpacingM dependency
 
   return (
-    <div className="space-y-6 seating-layout-sliders" data-rp22="seating">
-       <style>{`
-        .seating-layout-sliders .slider-track {
-          position: relative;
-          height: 6px;
-          width: 100%;
-          flex-grow: 1;
-          overflow: hidden;
-          border-radius: 9999px;
-          background-color: #DCDBD6;
-        }
-        .seating-layout-sliders .slider-range {
-          position: absolute;
-          height: 100%;
-          background-color: #213428;
-        }
-        .seating-layout-sliders .slider-thumb {
-          display: block;
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
-          background-color: #1B1A1A;
-          border: 2px solid #FFFFFF;
-          box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-        .seating-layout-sliders .slider-thumb:focus-visible {
-          outline: 2px solid #213428;
-          outline-offset: 2px;
-        }
-      `}</style>
-      {/* Current Layout Analysis - MOVED TO TOP */}
-      <div className="space-y-4 font-body">
-        <h3 className="text-base font-medium flex items-center gap-2" style={{color: '#1B1A1A', fontFamily: 'Futura PT Light, Century Gothic, sans-serif'}}>
-          <Eye className="w-5 h-5" style={{color: '#625143'}} />
-          Current Layout Analysis
-        </h3>
-        <div className="grid grid-cols-3 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold" style={{color: '#1B1A1A'}}>{totalSeats}</div>
-            <div className="text-xs" style={{color: '#625143'}}>Total Seats</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold" style={{color: '#213428'}}>{primarySeats}</div>
-            <div className="text-xs" style={{color: '#625143'}}>Primary</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold" style={{color: '#625143'}}>{secondarySeats}</div>
-            <div className="text-xs" style={{color: '#625143'}}>Secondary</div>
-          </div>
+  <div className="space-y-6 seating-layout-sliders" data-rp22="seating">
+    <style>{`
+      .seating-layout-sliders .slider-track {
+        position: relative;
+        height: 6px;
+        width: 100%;
+        flex-grow: 1;
+        overflow: hidden;
+        border-radius: 9999px;
+        background-color: #DCDBD6;
+      }
+      .seating-layout-sliders .slider-range {
+        position: absolute;
+        height: 100%;
+        background-color: #213428;
+      }
+      .seating-layout-sliders .slider-thumb {
+        display: block;
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        background-color: #1B1A1A;
+        border: 2px solid #FFFFFF;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      }
+      .seating-layout-sliders .slider-thumb:focus-visible {
+        outline: 2px solid #213428;
+        outline-offset: 2px;
+      }
+    `}</style>
+
+    {/* Current Layout Analysis */}
+    <div className="space-y-4 font-body">
+      <h3 className="text-base font-medium flex items-center gap-2" style={{color: '#1B1A1A', fontFamily: 'Futura PT Light, Century Gothic, sans-serif'}}>
+        <Eye className="w-5 h-5" style={{color: '#625143'}} />
+        Current Layout Analysis
+      </h3>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="text-center">
+          <div className="text-2xl font-bold" style={{color: '#1B1A1A'}}>{totalSeats}</div>
+          <div className="text-xs" style={{color: '#625143'}}>Total Seats</div>
         </div>
-
-        {primarySeat && (
-          <div className="p-3 rounded-lg" style={{border: '1px solid #C1B6AD', backgroundColor: '#F8F8F7'}}>
-            <div className="flex items-center gap-2 mb-2">
-              <Award className="w-4 h-4" style={{color: '#213428'}} />
-              <span className="text-sm font-medium" style={{color: '#1B1A1A'}}>Main Listening Position (MLP)</span>
-            </div>
-            <div className="text-xs space-y-1" style={{color: '#625143'}}>
-              <p>Position: ({primarySeat.x.toFixed(2)}m, {primarySeat.y.toFixed(2)}m)</p>
-              <p>Ear Height: {primarySeat.z.toFixed(2)}m</p>
-            </div>
-          </div>
-        )}
-
-        {seatingRows > 1 && (
-          <div className="space-y-2">
-            <Label className="text-sm font-medium flex items-center gap-2" style={{color: '#625143'}}>
-              <Ruler className="w-4 h-4" />
-              Row Heights (Ear Level)
-            </Label>
-            <div className="grid grid-cols-1 gap-2">
-              {Array.from({ length: seatingRows }, (_, i) => (
-                  <div key={i + 1} className="flex items-center justify-between p-2 rounded" style={{backgroundColor: '#F8F8F7', border: '1px solid #C1B6AD'}}>
-                    <span className="text-xs" style={{color: '#1B1A1A'}}>Row {i + 1}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs" style={{color: '#625143'}}>{getEarHeightForRow(i + 1).toFixed(1)}m ear height</span>
-                    </div>
-                  </div>
-              ))}
-            </div>
-          </div>
-        )}
+        <div className="text-center">
+          <div className="text-2xl font-bold" style={{color: '#213428'}}>{primarySeats}</div>
+          <div className="text-xs" style={{color: '#625143'}}>Primary</div>
+        </div>
+        <div className="text-center">
+          <div className="text-2xl font-bold" style={{color: '#625143'}}>{secondarySeats}</div>
+          <div className="text-xs" style={{color: '#625143'}}>Secondary</div>
+        </div>
       </div>
 
-      <div className="space-y-4 font-body">
-        
-        {/* Reset Position Button */}
-        <Button
-          onClick={handleResetPosition}
-          disabled={disabled}
-          variant="outline"
-          size="sm"
-          className="w-full"
-          style={{
-            borderColor: '#C1B6AD',
-            color: '#3E4349'
-          }}
-        >
-          <RotateCcw className="w-4 h-4 mr-2" />
-          Reset Position
-        </Button>
-        
-{/* 2x2 Grid for all seating parameters */}
-<div className="grid grid-cols-2 gap-4">
-  {/* START: Rows & Seats (per-row editor) */}
-  <div className="space-y-2 col-span-2">
-    <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Rows & Seats</Label>
-    <div className="space-y-2">
-      {rowsArray.map((count, idx) => (
-        <div key={`row-${idx}`} className="flex items-center gap-3">
-          <div className="w-24 text-sm" style={{color: '#3E4349'}}>Row {idx + 1}</div>
+      {primarySeat && (
+        <div className="p-3 rounded-lg" style={{border: '1px solid #C1B6AD', backgroundColor: '#F8F8F7'}}>
+          <div className="flex items-center gap-2 mb-2">
+            <Award className="w-4 h-4" style={{color: '#213428'}} />
+            <span className="text-sm font-medium" style={{color: '#1B1A1A'}}>Main Listening Position (MLP)</span>
+          </div>
+          <div className="text-xs space-y-1" style={{color: '#625143'}}>
+            <p>Position: ({primarySeat.x.toFixed(2)}m, {primarySeat.y.toFixed(2)}m)</p>
+            <p>Ear Height: {primarySeat.z.toFixed(2)}m</p>
+          </div>
+        </div>
+      )}
+
+      {seatingRows > 1 && (
+        <div className="space-y-2">
+          <Label className="text-sm font-medium flex items-center gap-2" style={{color: '#625143'}}>
+            <Ruler className="w-4 h-4" />
+            Row Heights (Ear Level)
+          </Label>
+          <div className="grid grid-cols-1 gap-2">
+            {Array.from({ length: seatingRows }, (_, i) => (
+              <div key={i + 1} className="flex items-center justify-between p-2 rounded" style={{backgroundColor: '#F8F8F7', border: '1px solid #C1B6AD'}}>
+                <span className="text-xs" style={{color: '#1B1A1A'}}>Row {i + 1}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs" style={{color: '#625143'}}>{getEarHeightForRow(i + 1).toFixed(1)}m ear height</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+
+    {/* Controls */}
+    <div className="space-y-4 font-body">
+
+      {/* Reset Position */}
+      <Button
+        onClick={handleResetPosition}
+        disabled={disabled}
+        variant="outline"
+        size="sm"
+        className="w-full"
+        style={{ borderColor: '#C1B6AD', color: '#3E4349' }}
+      >
+        <RotateCcw className="w-4 h-4 mr-2" />
+        Reset Position
+      </Button>
+
+      {/* All seating parameters */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Rows & Seats (per-row editor) */}
+        <div className="space-y-2 col-span-2">
+          <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Rows & Seats</Label>
+          <div className="space-y-2">
+            {rowsArray.map((count, idx) => (
+              <div key={`row-${idx}`} className="flex items-center gap-3">
+                <div className="w-24 text-sm" style={{color: '#3E4349'}}>Row {idx + 1}</div>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={count}
+                  onChange={(e) => {
+                    const n = Math.max(1, parseInt(e.target.value || '1', 10));
+                    const next = rowsArray.slice();
+                    next[idx] = n;
+                    setRowsArray(next);
+                    onGenerateSeating?.({
+                      seatsPerRowByRow: next,
+                      seatSpacing,
+                      rowSpacingM,
+                    });
+                  }}
+                  disabled={disabled}
+                  className="h-10 w-28"
+                  style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const next = rowsArray.slice();
+                    next.splice(idx, 1);
+                    const safe = next.length ? next : [1];
+                    setRowsArray(safe);
+                    onGenerateSeating?.({
+                      seatsPerRowByRow: safe,
+                      seatSpacing,
+                      rowSpacingM,
+                    });
+                  }}
+                  disabled={disabled || rowCount <= 1}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+
+            {/* Add Row */}
+            <Button
+              type="button"
+              onClick={() => {
+                const last = rowsArray[rowsArray.length - 1] ?? 1;
+                const next = [...rowsArray, Math.max(1, Number(last) || 1)];
+                setRowsArray(next);
+                onGenerateSeating?.({
+                  seatsPerRowByRow: next,
+                  seatSpacing,
+                  rowSpacingM,
+                });
+              }}
+              disabled={disabled}
+            >
+              Add Row
+            </Button>
+          </div>
+        </div>
+
+        {/* Seat Spacing (m) */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Seat Spacing (m)</Label>
           <Input
             type="number"
-            min="1"
-            step="1"
-            value={count}
-            onChange={(e) => {
-              const n = Math.max(1, parseInt(e.target.value || '1', 10));
-              const next = rowsArray.slice();
-              next[idx] = n;
-              setRowsArray(next);
-            }}
+            min="0.5"
+            max="1.2"
+            step="0.1"
+            value={seatSpacing}
+            onChange={(e) => onSeatSpacingChange?.(Math.max(0.5, Math.min(1.2, Number(e.target.value) || 0.8)))}
             disabled={disabled}
-            className="h-10 w-28"
+            className="h-10"
             style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
           />
-          <Button
-  type="button"
-  variant="outline"
-  onClick={() => {
-    const next = rowsArray.slice();
-    next.splice(idx, 1);
-    const safeNext = next.length ? next : [1];
-    setRowsArray(safeNext);
-    // rebuild seats so everything closes up correctly
-    onGenerateSeating?.({
-      seatsPerRowByRow: safeNext,
-      seatSpacing,
-      rowSpacingM,
-    });
-  }}
-  disabled={disabled || rowCount <= 1}
->
-  Remove
-</Button>
         </div>
-      ))}
 
-<Button
-  type="button"
-  onClick={() => {
-    const last = rowsArray[rowsArray.length - 1] ?? 1;
-    const next = [...rowsArray, Math.max(1, Number(last) || 1)];
-    setRowsArray(next);
-    // tell the parent to rebuild the rows — it will place the new row BEHIND
-    onGenerateSeating?.({
-      seatsPerRowByRow: next,
-      seatSpacing,
-      rowSpacingM,
-    });
-  }}
-  disabled={disabled}
->
-  Add Row
-</Button>
+        {/* Row Spacing (m) */}
+        <div className="space-y-2">
+          <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Row Spacing (m)</Label>
+          <Input
+            type="number"
+            min="0.8"
+            max="4.0"
+            step="0.1"
+            value={rowSpacingM}
+            onChange={(e) => onRowSpacingChange?.(Math.max(0.8, Math.min(4.0, Number(e.target.value) || 1.8)))}
+            disabled={disabled || rowCount <= 1}
+            className="h-10"
+            style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
+          />
+        </div>
+
+        {/* Viewing Offset (m) */}
+        <div className="space-y-2 col-span-2">
+          <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Viewing Offset (m)</Label>
+          <Input
+            type="number"
+            min="-2.0"
+            max="2.0"
+            step="0.1"
+            value={seatingBlockOffset}
+            onChange={(e) => onSeatingBlockOffsetChange?.(clampViewingOffset(Number(e.target.value) || 0))}
+            disabled={disabled}
+            className="h-10"
+            style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
+          />
+        </div>
+
+        {/* MLP Reference */}
+        <div className="space-y-2 col-span-2">
+          <Label className="text-sm font-medium" style={{color: '#3E4349'}}>MLP Reference</Label>
+          <Select
+            value={validMlpBasis}
+            onValueChange={handleMlpBasisChange}
+            disabled={disabled || rowCount <= 1}
+            modal={false}
+          >
+            <SelectTrigger style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper" sideOffset={6} className="z-[70]">
+              {mlpOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
     </div>
-  </div>
-  {/* END: Rows & Seats (per-row editor) */}
 
-  {/* Seat Spacing (m) */}
-  <div className="space-y-2">
-    <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Seat Spacing (m)</Label>
-    <Input
-      type="number"
-      min="0.5"
-      max="1.2"
-      step="0.1"
-      value={seatSpacing}
-      onChange={(e) => onSeatSpacingChange?.(Math.max(0.5, Math.min(1.2, Number(e.target.value) || 0.8)))}
-      disabled={disabled}
-      className="h-10"
-      style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
+    {/* Panel */}
+    <ViewingAnglePanel
+      screen={screen}
+      seatingPositions={seatingPositions}
+      viewingDistanceOffsetM={seatingBlockOffset}
+      mlpOverride={mlpOverride}
+      mlpDotOffsetM={seatingBlockOffset}
     />
   </div>
-
-  {/* Row Spacing (m) */}
-  <div className="space-y-2">
-    <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Row Spacing (m)</Label>
-    <Input
-      type="number"
-      min="0.8"
-      max="4.0"
-      step="0.1"
-      value={rowSpacingM}
-      onChange={(e) => onRowSpacingChange?.(Math.max(0.8, Math.min(4.0, Number(e.target.value) || 1.8)))}
-      disabled={disabled || rowCount <= 1}
-      className="h-10"
-      style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
-    />
-  </div>
-
-  {/* Viewing Offset (m) */}
-  <div className="space-y-2 col-span-2">
-    <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Viewing Offset (m)</Label>
-    <Input
-      type="number"
-      min="-2.0"
-      max="2.0"
-      step="0.1"
-      value={seatingBlockOffset}
-      onChange={(e) => onSeatingBlockOffsetChange?.(clampViewingOffset(Number(e.target.value) || 0))}
-      disabled={disabled}
-      className="h-10"
-      style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
-    />
-  </div>
-
-  {/* MLP Reference */}
-  <div className="space-y-2 col-span-2">
-    <Label className="text-sm font-medium" style={{color: '#3E4349'}}>MLP Reference</Label>
-    <Select
-      value={validMlpBasis}
-      onValueChange={handleMlpBasisChange}
-      disabled={disabled || rowCount <= 1}
-      modal={false}
-    >
-      <SelectTrigger style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent position="popper" sideOffset={6} className="z-[70]">
-        {mlpOptions.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
-  </div>
-</div>
-</div>
-  <ViewingAnglePanel
-    screen={screen}
-    seatingPositions={seatingPositions}
-    viewingDistanceOffsetM={seatingBlockOffset}
-    mlpOverride={mlpOverride}
-    mlpDotOffsetM={seatingBlockOffset}
-  />
-</div>
 );
 }
