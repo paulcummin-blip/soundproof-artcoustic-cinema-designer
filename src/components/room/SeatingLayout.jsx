@@ -112,10 +112,11 @@ const setRowsArray = useCallback((next) => {
   const safe = (Array.isArray(next) ? next : []).map(n =>
     Math.max(1, Number.isFinite(Number(n)) ? Math.floor(Number(n)) : 1)
   );
+  // update the new per-row list
   onSeatsPerRowByRowChange?.(safe);
+  // keep only the row count in sync for old code
   onSeatingRowsChange?.(safe.length || 1);
-  if (safe.length) onSeatsPerRowChange?.(safe[safe.length - 1]);
-}, [onSeatsPerRowByRowChange, onSeatingRowsChange, onSeatsPerRowChange]);
+}, [onSeatsPerRowByRowChange, onSeatingRowsChange]);
 
 // Use this everywhere instead of seatingRows for how many rows we have
 const rowCount = rowsArray.length;
