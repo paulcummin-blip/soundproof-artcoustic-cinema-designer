@@ -394,16 +394,23 @@ const rowCount = rowsArray.length;
         </div>
       ))}
 
-      <Button
-        type="button"
-        onClick={() => {
-          const last = rowsArray[rowsArray.length - 1] ?? 1;
-          setRowsArray([...rowsArray, Math.max(1, Number(last) || 1)]);
-        }}
-        disabled={disabled}
-      >
-        Add Row
-      </Button>
+<Button
+  type="button"
+  onClick={() => {
+    const last = rowsArray[rowsArray.length - 1] ?? 1;
+    const next = [...rowsArray, Math.max(1, Number(last) || 1)];
+    setRowsArray(next);
+    // tell the parent to rebuild the rows — it will place the new row BEHIND
+    onGenerateSeating?.({
+      seatsPerRowByRow: next,
+      seatSpacing,
+      rowSpacingM,
+    });
+  }}
+  disabled={disabled}
+>
+  Add Row
+</Button>
     </div>
   </div>
   {/* END: Rows & Seats (per-row editor) */}
