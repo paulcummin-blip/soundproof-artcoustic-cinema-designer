@@ -1718,41 +1718,46 @@ const centers = centersRaw.map(y => _clampY(y + off));
     const allSeats = [];
 
     // Build seats from row centers (rowY already includes viewing offset from the MLP calculation)
-    appState.rowCentersM.forEach((rowY, rowIdx) => {
-      if (rowY === null || !Number.isFinite(rowY)) return;
-      const rowSeatCount = perRowCounts[rowIdx] ?? perRowCounts[perRowCounts.length - 1];
+appState.rowCentersM.forEach((rowY, rowIdx) => {
+  if (rowY === null || !Number.isFinite(rowY)) return;
 
-      // Clamp Y to room bounds with clearance - rowY already has offset baked in
-      const MIN_Y = 0.4;
-      const MAX_Y = lengthM - 0.4;
-      const clampedY = Math.max(MIN_Y, Math.min(MAX_Y, rowY));
+  // How many seats in this specific row
+  const rowSeatCount = perRowCounts[rowIdx] ?? perRowCounts[perRowCounts.length - 1];
 
-      // Build seats across the row
-      for (let seatIdx = 0; seatIdx < rowSeatCount; seatIdx++) {
-        const offsetFromCenter = (seatIdx - (rowSeatCount - 1) / 2) * spacing;
+  // Canonical centreline for X — never include viewing offset here
+  const centerX_m = (Number(stableDimensions?.width) || Number(appState?.roomDims?.widthM) || 4.0) / 2;
 
-        // X spans from centre; NEVER include viewingOffsetM here - that's Y-axis only
-        const x = centerX_m + offsetFromCenter;
+  // Clamp Y to room bounds with clearance — rowY already has offset baked in
+  const MIN_Y = 0.4;
+  const MAX_Y = lengthM - 0.4;
+  const clampedY = Math.max(MIN_Y, Math.min(MAX_Y, rowY));
 
-        // Clamp X to room bounds with clearance
-        const MIN_X = 0.4;
-        const MAX_X = widthM - 0.4;
-        const clampedX = Math.max(MIN_X, Math.min(MAX_X, x));
+  // Build seats across this row
+  for (let seatIdx = 0; seatIdx < rowSeatCount; seatIdx++) {
+    const offsetFromCenter = (seatIdx - (rowSeatCount - 1) / 2) * spacing;
 
-        // Ear height varies by row (unchanged)
-        const z = 1.2 + rowIdx * 0.1;
+    // X spans from centre; NEVER include viewingOffsetM here — that's Y-axis only
+    const x = centerX_m + offsetFromCenter;
 
-        allSeats.push({
-          id: `R${rowIdx + 1}S${seatIdx + 1}`,
-          x: Number(clampedX.toFixed(3)),
-          y: Number(clampedY.toFixed(3)),
-          z: Number(z.toFixed(3)),
-          rowNumber: rowIdx + 1,
-          seatNumber: seatIdx + 1,
-          isPrimary: false,
-        });
-      }
+    // Clamp X to room bounds with clearance
+    const MIN_X = 0.4;
+    const MAX_X = widthM - 0.4;
+    const clampedX = Math.max(MIN_X, Math.min(MAX_X, x));
+
+    // Ear height varies by row (optional)
+    const z = 1.2 + rowIdx * 0.1;
+
+    allSeats.push({
+      id: `R${rowIdx + 1}S${seatIdx + 1}`,
+      x: Number(clampedX.toFixed(3)),
+      y: Number(clampedY.toFixed(3)),
+      z: Number(z.toFixed(3)),
+      rowNumber: rowIdx + 1,
+      seatNumber: seatIdx + 1,
+      isPrimary: false,
     });
+  }
+});
     
     if (allSeats.length > 0 && typeof appState?.setSeatingPositions === 'function') {
       appState.setSeatingPositions(allSeats);
