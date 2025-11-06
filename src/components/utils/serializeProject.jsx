@@ -1,3 +1,4 @@
+
 export function serializeProject(input) {
   const {
     name,
@@ -16,6 +17,7 @@ export function serializeProject(input) {
     speakerSelections = {},
     enableFrontWides = false,
     rowSpacingM = 1.8,
+    seatsPerRowByRow = [], // NEW
     overheadGlobalModel = null,
     overheadFrontOverride = null,
     overheadMidOverride = null,
@@ -59,6 +61,7 @@ export function serializeProject(input) {
     ),
     enable_front_wides: !!enableFrontWides,
     row_spacing_m: Number(rowSpacingM) || 1.8,
+    seats_per_row_by_row: JSON.stringify(Array.isArray(seatsPerRowByRow) ? seatsPerRowByRow : []), // NEW
     overhead_global_model: overheadGlobalModel,
     overhead_front_override: overheadFrontOverride,
     overhead_mid_override: overheadMidOverride,
