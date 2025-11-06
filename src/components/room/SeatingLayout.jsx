@@ -74,14 +74,18 @@ const getEarHeightForRow = (rowNumber) => {
 export default function SeatingLayout({
   seatingPositions = [],
   onGenerateSeating,
+  // NEW: per-row seat counts (array). If not provided, we’ll fall back to seatsPerRow + seatingRows.
+  seatsPerRowByRow,
+  onSeatsPerRowByRowChange,
+  // Keep old fields for now (fallbacks)
   seatsPerRow = 3,
   onSeatsPerRowChange,
   seatingRows = 1,
   onSeatingRowsChange,
   seatSpacing = 0.8,
   onSeatSpacingChange,
-  rowSpacingM = 1.8, // NEW prop
-  onRowSpacingChange, // NEW prop
+  rowSpacingM = 1.8,
+  onRowSpacingChange,
   seatingBlockOffset = 0,
   onSeatingBlockOffsetChange,
   mlpBasis = "front",
