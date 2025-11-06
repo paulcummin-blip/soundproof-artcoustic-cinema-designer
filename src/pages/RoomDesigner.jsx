@@ -1716,7 +1716,7 @@ appState.rowCentersM.forEach((rowY, rowIdx) => {
 
   // Build seats across the row
 for (let seatIdx = 0; seatIdx < rowSeatCount; seatIdx++) {
-    const offsetFromCenter = (seatIdx - (seatCount - 1) / 2) * spacing;
+const offsetFromCenter = (seatIdx - (rowSeatCount - 1) / 2) * spacing;
 
     // X spans from centre; never include viewingOffsetM here
     const x = centerSeatX_m + offsetFromCenter;
