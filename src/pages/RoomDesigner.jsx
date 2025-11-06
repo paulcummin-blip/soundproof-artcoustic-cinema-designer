@@ -822,6 +822,7 @@ function RoomDesignerWithState() {
   const setUseRearGlobal = appState?.setUseRearGlobal;
   const _rowSpacingM = appState?.rowSpacingM;
   const _setRowSpacingM = appState?.setRowSpacingM;
+  const [seatsPerRowByRow, setSeatsPerRowByRow] = React.useState(null);
 
 
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
