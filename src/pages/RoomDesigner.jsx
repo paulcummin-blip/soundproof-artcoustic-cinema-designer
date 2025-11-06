@@ -1685,8 +1685,12 @@ const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y o
     const centerX_m = widthM / 2;
     const EPS_M = 0.0005;
     
-    const seatCount = Math.max(1, Number(_seatsPerRow) || 2);
-    const spacing = Math.max(0, Number(_seatSpacing) || 0.8);
+const spacing = Math.max(0, Number(_seatSpacing) || 0.8);
+
+// Per-row seat counts: use seatsPerRowByRow if present, otherwise fall back to one number per row
+const perRowCounts = Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length
+  ? seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1))
+  : Array.from({ length: appState.rowCentersM.length }, () => Math.max(1, Number(_seatsPerRow) || 2));
     
     /* START: Y-only viewing offset seat builder */
 
