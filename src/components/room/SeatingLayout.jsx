@@ -411,22 +411,23 @@ const rowCount = rowsArray.length;
     {/* Always show Add Row */}
     <div className="pt-1">
       <Button
-        type="button"
-        onClick={() => {
-          const last = rowsArray[rowsArray.length - 1] ?? 1;
-          const next = [...rowsArray, Math.max(1, Number(last) || 1)];
-          setRowsArray(next);
-          onGenerateSeating?.({
-            seatsPerRowByRow: next,
-            seatSpacing,
-            rowSpacingM,
-          });
-        }}
-        disabled={!!disabled}
-        className="w-28"
-      >
-        Add Row
-      </Button>
+  type="button"
+  variant="outline"
+  onClick={() => {
+    const last = rowsArray[rowsArray.length - 1] ?? 1;
+    const next = [...rowsArray, Math.max(1, Number(last) || 1)];
+    setRowsArray(next);
+    onGenerateSeating?.({
+      seatsPerRowByRow: next,
+      seatSpacing,
+      rowSpacingM,
+    });
+  }}
+  disabled={!!disabled}
+  className="w-28"
+>
+  Add Row
+</Button>
     </div>
   </div>
 </div>
