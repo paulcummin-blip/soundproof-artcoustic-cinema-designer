@@ -1785,15 +1785,9 @@ const handleGenerateSeating = useCallback((overrides = {}) => {
   if (typeof setRowSpacingGuarded  === 'function') setRowSpacingGuarded(effectiveRowSpacing);
 
   //    – Store the per-row list so the generator uses it (pick the one that exists in your file)
-  if (typeof setSeatsPerRowByRowGuarded === 'function') {
-    setSeatsPerRowByRowGuarded(list);
-  } else if (typeof setAppState === 'function') {
-    // common pattern in this codebase
-    setAppState(prev => ({ ...prev, seatsPerRowByRow: list }));
-  } else if (typeof setConfig === 'function') {
-    // alternate pattern
-    setConfig(prev => ({ ...prev, seatsPerRowByRow: list }));
-  }
+if (typeof setAppState === 'function') {
+  setAppState(prev => ({ ...prev, seatsPerRowByRow: list }));
+}
 }, [
   _seatsPerRow,
   _seatingRows,
