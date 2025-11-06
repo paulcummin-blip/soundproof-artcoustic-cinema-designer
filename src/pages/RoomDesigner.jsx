@@ -1796,9 +1796,7 @@ const handleGenerateSeating = useCallback((overrides = {}) => {
   setSeatingRowsGuarded,
   setSeatSpacingGuarded,
   setRowSpacingGuarded,
-  // include whichever setter your file has; harmless if undefined
-  setAppState,
-  setConfig,
+  setSeatsPerRowByRow,   // keep this
 ]);
 
   // Normalise seat flags whenever seating or room size changes
