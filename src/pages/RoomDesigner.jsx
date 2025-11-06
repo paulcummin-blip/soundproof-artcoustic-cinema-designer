@@ -1681,67 +1681,54 @@ const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y o
     const widthM = stableDimensions.width;
     const lengthM = stableDimensions.length;
     
-    // Canonical centerline
+    // Canonical centerline (room center) - NEVER modify this with viewing offset
     const centerX_m = widthM / 2;
-    const EPS_M = 0.0005;
     
-const spacing = Math.max(0, Number(_seatSpacing) || 0.8);
+    const spacing = Math.max(0, Number(_seatSpacing) || 0.8);
 
-// Per-row seat counts: use seatsPerRowByRow if present, otherwise fall back to one number per row
-const perRowCounts = Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length
-  ? seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1))
-  : Array.from({ length: appState.rowCentersM.length }, () => Math.max(1, Number(_seatsPerRow) || 2));
+    // Per-row seat counts: use seatsPerRowByRow if present, otherwise fall back to one number per row
+    const perRowCounts = Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length
+      ? seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1))
+      : Array.from({ length: appState.rowCentersM.length }, () => Math.max(1, Number(_seatsPerRow) || 2));
     
-    /* START: Y-only viewing offset seat builder */
+    const allSeats = [];
 
-// Viewing offset (Y-axis, forward/back). Keep X locked to centre.
-const viewingOffsetM = Number(_seatingBlockOffset) || 0;
+    // Build seats from row centers (rowY already includes viewing offset from the MLP calculation)
+    appState.rowCentersM.forEach((rowY, rowIdx) => {
+      if (rowY === null || !Number.isFinite(rowY)) return;
+      const rowSeatCount = perRowCounts[rowIdx] ?? perRowCounts[perRowCounts.length - 1];
 
-// X is always the room centre; do NOT add viewingOffsetM to X.
-const centerSeatX_m = centerX_m;
+      // Clamp Y to room bounds with clearance - rowY already has offset baked in
+      const MIN_Y = 0.4;
+      const MAX_Y = lengthM - 0.4;
+      const clampedY = Math.max(MIN_Y, Math.min(MAX_Y, rowY));
 
-const allSeats = [];
+      // Build seats across the row
+      for (let seatIdx = 0; seatIdx < rowSeatCount; seatIdx++) {
+        const offsetFromCenter = (seatIdx - (rowSeatCount - 1) / 2) * spacing;
 
-appState.rowCentersM.forEach((rowY, rowIdx) => {
-  if (rowY === null || !Number.isFinite(rowY)) return;
-    const rowSeatCount = perRowCounts[rowIdx] ?? perRowCounts[perRowCounts.length - 1];
+        // X spans from centre; NEVER include viewingOffsetM here - that's Y-axis only
+        const x = centerX_m + offsetFromCenter;
 
-  // Apply the offset on Y only
-  const rawY = rowY;
+        // Clamp X to room bounds with clearance
+        const MIN_X = 0.4;
+        const MAX_X = widthM - 0.4;
+        const clampedX = Math.max(MIN_X, Math.min(MAX_X, x));
 
-  // Clamp Y to room bounds with clearance
-  const MIN_Y = 0.4;
-  const MAX_Y = lengthM - 0.4;
-  const clampedY = Math.max(MIN_Y, Math.min(MAX_Y, rawY));
+        // Ear height varies by row (unchanged)
+        const z = 1.2 + rowIdx * 0.1;
 
-  // Build seats across the row
-for (let seatIdx = 0; seatIdx < rowSeatCount; seatIdx++) {
-const offsetFromCenter = (seatIdx - (rowSeatCount - 1) / 2) * spacing;
-
-    // X spans from centre; never include viewingOffsetM here
-    const x = centerSeatX_m + offsetFromCenter;
-
-    // Clamp X to room bounds with clearance
-    const MIN_X = 0.4;
-    const MAX_X = widthM - 0.4;
-    const clampedX = Math.max(MIN_X, Math.min(MAX_X, x));
-
-    // Ear height varies by row (unchanged)
-    const z = 1.2 + rowIdx * 0.1;
-
-    allSeats.push({
-      id: `R${rowIdx + 1}S${seatIdx + 1}`,
-      x: Number(clampedX.toFixed(3)),
-      y: Number(clampedY.toFixed(3)),
-      z: Number(z.toFixed(3)),
-      rowNumber: rowIdx + 1,
-      seatNumber: seatIdx + 1,
-      isPrimary: false,
+        allSeats.push({
+          id: `R${rowIdx + 1}S${seatIdx + 1}`,
+          x: Number(clampedX.toFixed(3)),
+          y: Number(clampedY.toFixed(3)),
+          z: Number(z.toFixed(3)),
+          rowNumber: rowIdx + 1,
+          seatNumber: seatIdx + 1,
+          isPrimary: false,
+        });
+      }
     });
-  }
-});
-
-/* END: Y-only viewing offset seat builder */
     
     if (allSeats.length > 0 && typeof appState?.setSeatingPositions === 'function') {
       appState.setSeatingPositions(allSeats);
@@ -1750,7 +1737,6 @@ const offsetFromCenter = (seatIdx - (rowSeatCount - 1) / 2) * spacing;
     appState?.rowCentersM,
     _seatsPerRow,
     _seatSpacing,
-    _seatingBlockOffset,
     stableDimensions?.width,
     stableDimensions?.length,
     appState?.setSeatingPositions,
