@@ -1704,6 +1704,7 @@ const allSeats = [];
 
 appState.rowCentersM.forEach((rowY, rowIdx) => {
   if (rowY === null || !Number.isFinite(rowY)) return;
+    const rowSeatCount = perRowCounts[rowIdx] ?? perRowCounts[perRowCounts.length - 1];
 
   // Apply the offset on Y only
   const rawY = rowY;
@@ -1714,7 +1715,7 @@ appState.rowCentersM.forEach((rowY, rowIdx) => {
   const clampedY = Math.max(MIN_Y, Math.min(MAX_Y, rawY));
 
   // Build seats across the row
-  for (let seatIdx = 0; seatIdx < seatCount; seatIdx++) {
+    for (let seatIdx = 0; seatIdx < rowSeatCount; seatIdx++) {
     const offsetFromCenter = (seatIdx - (seatCount - 1) / 2) * spacing;
 
     // X spans from centre; never include viewingOffsetM here
