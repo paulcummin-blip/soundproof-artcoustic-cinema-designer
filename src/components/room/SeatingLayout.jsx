@@ -95,6 +95,28 @@ export default function SeatingLayout({
   screen,
   dimensions
 }) {
+    // Build a working rows array (Row 1 seats, Row 2 seats, …)
+  const rowsArray = useMemo(() => {
+    if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
+      return seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1));
+    }
+    // Fallback to old single-number model
+    const count = Math.max(1, Number(seatsPerRow) || 1);
+    const rows  = Math.max(1, Number(seatingRows) || 1);
+    return Array.from({ length: rows }, () => count);
+  }, [seatsPerRowByRow, seatsPerRow, seatingRows]);
+
+  // A simple “set” that updates the array and also keeps the old fields in sync for parent code
+  const setRowsArray = useCallback((next) => {
+    const safe = next.map(n => Math.max(1, Number(n) || 1));
+    onSeatsPerRowByRowChange?.(safe);
+    // Keep existing props coherent for any parent code that still reads them
+    onSeatingRowsChange?.(safe.length);
+    if (safe.length) onSeatsPerRowChange?.(safe[safe.length - 1]);
+  }, [onSeatsPerRowByRowChange, onSeatingRowsChange, onSeatsPerRowChange]);
+
+  // Wherever we used “seatingRows” for logic, use this derived count instead
+  const rowCount = rowsArray.length;
 
   // Logic to set primary seats based on MLP basis, now inside SeatingLayout
   useEffect(() => {
