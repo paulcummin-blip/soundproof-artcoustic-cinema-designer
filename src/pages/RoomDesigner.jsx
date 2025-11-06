@@ -174,6 +174,9 @@ function useProjectLoader(
   // NEW: Row Spacing
   rowSpacingM,
   setRowSpacingM,
+  // NEW: Seats Per Row By Row
+  seatsPerRowByRow,
+  setSeatsPerRowByRow,
 }) {
   const [projectIdState, setProjectIdState] = useState(projectIdFromUrl || null);
   const [projectNameState, setProjectNameState] = useState("Untitled Room"); // Internal projectName for loader
@@ -263,6 +266,9 @@ function useProjectLoader(
     // NEW: Hydrate Row Spacing
     if (typeof setRowSpacingM === "function") setRowSpacingM(Number(p?.row_spacing_m) || 1.8);
 
+    // NEW: Hydrate Seats Per Row By Row
+    if (typeof setSeatsPerRowByRow === "function") setSeatsPerRowByRow(parseProjectJson(p?.seatsPerRowByRow, null));
+
     // Hydrate screen front plane position
     if (typeof appState?.setScreenFrontPlaneM === 'function') {
       const savedPlaneM = Number(p?.screen_front_plane_m);
@@ -322,7 +328,7 @@ function useProjectLoader(
     setRoomElements, setOverlays, parseMaybe, setSpeakerSystem, setFrontSubsCfg, setRearSubsCfg, setLcrAimMode,
     setEnableFrontWides, setOverheadGlobalModel, setOverheadFrontOverride, setOverheadMidOverride,
     setOverheadRearOverride, setUseFrontGlobal, setUseMidGlobal, setUseRearGlobal, setRowSpacingM,
-    setSelectedSpeakersByRole, setSpeakerNodes, appState?.setScreenFrontPlaneM // Add screenFrontPlaneM setter
+    setSelectedSpeakersByRole, setSpeakerNodes, appState?.setScreenFrontPlaneM, setSeatsPerRowByRow // Add screenFrontPlaneM setter
   ]);
 
 
@@ -419,6 +425,7 @@ function useProjectLoader(
           useRearGlobal,
           row_spacing_m: rowSpacingM,
           screenFrontPlaneM: appState.screenFrontPlaneM,
+          seatsPerRowByRow: JSON.stringify(seatsPerRowByRow), // NEW: Add seatsPerRowByRow
         });
 
         let savedProject;
@@ -456,7 +463,7 @@ function useProjectLoader(
     appState.roomDims, appState.selectedSpeakersByRole, appState.speakerNodes, // NEW dependencies
     overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
     useFrontGlobal, useMidGlobal, useRearGlobal,
-    rowSpacingM, appState.screenFrontPlaneM // Add screenFrontPlaneM to dependencies
+    rowSpacingM, appState.screenFrontPlaneM, seatsPerRowByRow // Add screenFrontPlaneM and seatsPerRowByRow to dependencies
   ]);
 
   useEffect(() => {
@@ -507,6 +514,7 @@ function useProjectLoader(
         useRearGlobal,
         row_spacing_m: rowSpacingM,
         screenFrontPlaneM: appState.screenFrontPlaneM,
+        seatsPerRowByRow: JSON.stringify(seatsPerRowByRow), // NEW: Add seatsPerRowByRow
       });
 
       let savedProject;
@@ -541,7 +549,7 @@ function useProjectLoader(
     appState.roomDims, appState.selectedSpeakersByRole, appState.speakerNodes, // NEW dependencies
     overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
     useFrontGlobal, useMidGlobal, useRearGlobal,
-    rowSpacingM, appState.screenFrontPlaneM // Add screenFrontPlaneM to dependencies
+    rowSpacingM, appState.screenFrontPlaneM, seatsPerRowByRow // Add screenFrontPlaneM and seatsPerRowByRow to dependencies
   ]);
 
   return {
@@ -790,6 +798,8 @@ function RoomDesignerWithState() {
   const _setBaselineSeatingPositions = appState?.setBaselineSeatingPositions;
   const _seatingRows = appState?.seatingRows;
   const _seatsPerRow = appState?.seatsPerRow;
+  const _seatsPerRowByRow = appState?.seatsPerRowByRow; // NEW
+  const _setSeatsPerRowByRow = appState?.setSeatsPerRowByRow; // NEW
   const _seatingBlockOffset = appState?.seatingBlockOffset;
   const _seatSpacing = appState?.seatSpacing;
   const _mlpBasis = appState?.mlpBasis;
@@ -822,7 +832,6 @@ function RoomDesignerWithState() {
   const setUseRearGlobal = appState?.setUseRearGlobal;
   const _rowSpacingM = appState?.rowSpacingM;
   const _setRowSpacingM = appState?.setRowSpacingM;
-  const [seatsPerRowByRow, setSeatsPerRowByRow] = React.useState(null);
 
 
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
@@ -1374,6 +1383,7 @@ const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y o
   const setSeatingPositionsGuarded = useGuardedSetter(appState?.setSeatingPositions, 'seating');
   const setSeatingRowsGuarded = useGuardedSetter(appState?.setSeatingRows, 'seating');
   const setSeatsPerRowGuarded = useGuardedSetter(appState?.setSeatsPerRow, 'seating');
+  const setSeatsPerRowByRowGuarded = useGuardedSetter(_setSeatsPerRowByRow, 'seating'); // NEW: Guarded setter for seatsPerRowByRow
   const setSeatSpacingGuarded = useGuardedSetter(appState?.setSeatSpacing, 'seating');
   const setRowSpacingGuarded = useGuardedSetter(_setRowSpacingM, 'seating');
   const setSeatingBlockOffsetGuarded = useGuardedSetter(appState?.setSeatingBlockOffset, 'seating');
@@ -1434,6 +1444,8 @@ const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y o
     setUseRearGlobal: setUseRearGlobal,
     rowSpacingM: _rowSpacingM,
     setRowSpacingM: _setRowSpacingM,
+    seatsPerRowByRow: _seatsPerRowByRow, // NEW: Pass from appState
+    setSeatsPerRowByRow: _setSeatsPerRowByRow, // NEW: Pass setter for appState
   });
 
   useEffect(() => {
@@ -1686,9 +1698,9 @@ const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y o
     
     const spacing = Math.max(0, Number(_seatSpacing) || 0.8);
 
-    // Per-row seat counts: use seatsPerRowByRow if present, otherwise fall back to one number per row
-    const perRowCounts = Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length
-      ? seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1))
+    // Per-row seat counts: use _seatsPerRowByRow if present, otherwise fall back to one number per row
+    const perRowCounts = Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length
+      ? _seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1))
       : Array.from({ length: appState.rowCentersM.length }, () => Math.max(1, Number(_seatsPerRow) || 2));
     
     const allSeats = [];
@@ -1741,7 +1753,7 @@ const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y o
     stableDimensions?.length,
     appState?.setSeatingPositions,
     _isFrozen,
-    seatsPerRowByRow
+    _seatsPerRowByRow // NEW dependency
   ]);
 
   // Manual seating generation - now uses anchor-based positioning
@@ -1777,7 +1789,8 @@ const handleGenerateSeating = useCallback((overrides = {}) => {
   if (typeof setSeatSpacingGuarded === 'function') setSeatSpacingGuarded(effectiveSeatSpacing);
   if (typeof setRowSpacingGuarded  === 'function') setRowSpacingGuarded(effectiveRowSpacing);
 
-  setSeatsPerRowByRow(list);
+  // Use the appState setter for seatsPerRowByRow
+  if (typeof setSeatsPerRowByRowGuarded === 'function') setSeatsPerRowByRowGuarded(list);
 }, [
   _seatsPerRow,
   _seatingRows,
@@ -1788,7 +1801,7 @@ const handleGenerateSeating = useCallback((overrides = {}) => {
   setSeatingRowsGuarded,
   setSeatSpacingGuarded,
   setRowSpacingGuarded,
-  setSeatsPerRowByRow,   // keep this
+  setSeatsPerRowByRowGuarded, // Use the guarded appState setter
 ]);
 
   // Normalise seat flags whenever seating or room size changes
@@ -2181,6 +2194,8 @@ const handleGenerateSeating = useCallback((overrides = {}) => {
                       <SeatingLayout 
                         seatingPositions={seatingPositions} 
                         onGenerateSeating={handleGenerateSeating} 
+                        seatsPerRowByRow={_seatsPerRowByRow}
+                        onSeatsPerRowByRowChange={setSeatsPerRowByRowGuarded}
                         seatsPerRow={seatsPerRow} 
                         onSeatsPerRowChange={setSeatsPerRowGuarded} 
                         seatingRows={seatingRows} 
