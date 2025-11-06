@@ -1754,7 +1754,8 @@ appState.rowCentersM.forEach((rowY, rowIdx) => {
     stableDimensions?.width,
     stableDimensions?.length,
     appState?.setSeatingPositions,
-    _isFrozen
+    _isFrozen,
+    seatsPerRowByRow
   ]);
 
   // Manual seating generation - now uses anchor-based positioning
