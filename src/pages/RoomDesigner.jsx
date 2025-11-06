@@ -918,7 +918,19 @@ const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y o
     }
 
     // Build row centers from the MLP and publish (guarded)
-    const centers = buildRowCenters(mlpRounded, rows, rowSpacing, mlpReference);
+   // Build row centers from the MLP and publish (guarded) — apply viewing offset ONCE here
+const centersRaw = buildRowCenters(mlpRounded, rows, rowSpacing, mlpReference);
+const off = Number(appState?.seatingBlockOffset) || 0;
+
+// clamp helper (safe 0.40 m margins; adjust if you use a different guard)
+const _clampY = (y) => {
+  const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
+  const MIN = 0.40;
+  const MAX = len - 0.40;
+  return Math.max(MIN, Math.min(MAX, y));
+};
+
+const centers = centersRaw.map(y => _clampY(y + off));
     if (typeof appState?.setRowCentersM === 'function') {
       appState.setRowCentersM(prev => {
         if (!Array.isArray(prev) || prev.length !== centers.length) return centers;
