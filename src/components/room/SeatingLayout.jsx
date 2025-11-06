@@ -355,115 +355,137 @@ const rowCount = rowsArray.length;
           Reset Position
         </Button>
         
-        {/* 2x2 Grid for all seating parameters */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Seats per Row</Label>
-            <Input
-              type="number"
-              min="1"
-              max="12"
-              value={seatsPerRow}
-              onChange={(e) => onSeatsPerRowChange?.(Math.max(1, Number(e.target.value) || 3))}
-              disabled={disabled}
-              className="h-10"
-              style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Number of Rows</Label>
-            <Input
-              type="number"
-              min="1"
-              max="6"
-              value={seatingRows}
-              onChange={(e) => onSeatingRowsChange?.(Math.max(1, Number(e.target.value) || 1))}
-              disabled={disabled}
-              className="h-10"
-              style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Seat Spacing (m)</Label>
-            <Input
-              type="number"
-              min="0.5"
-              max="1.2"
-              step="0.1"
-              value={seatSpacing}
-              onChange={(e) => onSeatSpacingChange?.(Math.max(0.5, Math.min(1.2, Number(e.target.value) || 0.8)))}
-              disabled={disabled}
-              className="h-10"
-              style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Row Spacing (m)</Label>
-            <Input
-              type="number"
-              min="0.8"
-              max="4.0"
-              step="0.1"
-              value={rowSpacingM}
-              onChange={(e) => onRowSpacingChange?.(Math.max(0.8, Math.min(4.0, Number(e.target.value) || 1.8)))}
-              disabled={disabled || seatingRows <= 1}
-              className="h-10"
-              style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Viewing Offset (m)</Label>
+{/* 2x2 Grid for all seating parameters */}
+<div className="grid grid-cols-2 gap-4">
+  {/* START: Rows & Seats (per-row editor) */}
+  <div className="space-y-2 col-span-2">
+    <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Rows & Seats</Label>
+    <div className="space-y-2">
+      {rowsArray.map((count, idx) => (
+        <div key={`row-${idx}`} className="flex items-center gap-3">
+          <div className="w-24 text-sm" style={{color: '#3E4349'}}>Row {idx + 1}</div>
           <Input
             type="number"
-            min="-2.0"
-            max="2.0"
-            step="0.1"
-            value={seatingBlockOffset}
-            onChange={(e) => onSeatingBlockOffsetChange?.(clampViewingOffset(Number(e.target.value) || 0))}
+            min="1"
+            step="1"
+            value={count}
+            onChange={(e) => {
+              const n = Math.max(1, parseInt(e.target.value || '1', 10));
+              const next = rowsArray.slice();
+              next[idx] = n;
+              setRowsArray(next);
+            }}
             disabled={disabled}
-            className="h-10"
+            className="h-10 w-28"
             style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
           />
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-sm font-medium" style={{color: '#3E4349'}}>MLP Reference</Label>
-          <Select
-            value={validMlpBasis}
-            onValueChange={handleMlpBasisChange}
-            disabled={disabled || seatingRows <= 1}
-            modal={false}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              const next = rowsArray.slice();
+              next.splice(idx, 1);
+              setRowsArray(next.length ? next : [1]);
+            }}
+            disabled={disabled || rowCount <= 1}
           >
-            <SelectTrigger style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent 
-              position="popper" 
-              sideOffset={6}
-              className="z-[70]"
-            >
-              {mlpOptions.map(option => (
-                <SelectItem key={option.value} value={option.value}>
-                  {option.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            Remove
+          </Button>
         </div>
-      </div>
+      ))}
 
-      <ViewingAnglePanel 
-        screen={screen}
-        seatingPositions={seatingPositions}
-        viewingDistanceOffsetM={seatingBlockOffset}
-        mlpOverride={mlpOverride}
-        mlpDotOffsetM={seatingBlockOffset}
-      />
+      <Button
+        type="button"
+        onClick={() => {
+          const last = rowsArray[rowsArray.length - 1] ?? 1;
+          setRowsArray([...rowsArray, Math.max(1, Number(last) || 1)]);
+        }}
+        disabled={disabled}
+      >
+        Add Row
+      </Button>
     </div>
-  );
+  </div>
+  {/* END: Rows & Seats (per-row editor) */}
+
+  {/* Seat Spacing (m) */}
+  <div className="space-y-2">
+    <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Seat Spacing (m)</Label>
+    <Input
+      type="number"
+      min="0.5"
+      max="1.2"
+      step="0.1"
+      value={seatSpacing}
+      onChange={(e) => onSeatSpacingChange?.(Math.max(0.5, Math.min(1.2, Number(e.target.value) || 0.8)))}
+      disabled={disabled}
+      className="h-10"
+      style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
+    />
+  </div>
+
+  {/* Row Spacing (m) */}
+  <div className="space-y-2">
+    <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Row Spacing (m)</Label>
+    <Input
+      type="number"
+      min="0.8"
+      max="4.0"
+      step="0.1"
+      value={rowSpacingM}
+      onChange={(e) => onRowSpacingChange?.(Math.max(0.8, Math.min(4.0, Number(e.target.value) || 1.8)))}
+      disabled={disabled || rowCount <= 1}
+      className="h-10"
+      style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
+    />
+  </div>
+
+  {/* Viewing Offset (m) */}
+  <div className="space-y-2 col-span-2">
+    <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Viewing Offset (m)</Label>
+    <Input
+      type="number"
+      min="-2.0"
+      max="2.0"
+      step="0.1"
+      value={seatingBlockOffset}
+      onChange={(e) => onSeatingBlockOffsetChange?.(clampViewingOffset(Number(e.target.value) || 0))}
+      disabled={disabled}
+      className="h-10"
+      style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
+    />
+  </div>
+
+  {/* MLP Reference */}
+  <div className="space-y-2 col-span-2">
+    <Label className="text-sm font-medium" style={{color: '#3E4349'}}>MLP Reference</Label>
+    <Select
+      value={validMlpBasis}
+      onValueChange={handleMlpBasisChange}
+      disabled={disabled || rowCount <= 1}
+      modal={false}
+    >
+      <SelectTrigger style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent position="popper" sideOffset={6} className="z-[70]">
+        {mlpOptions.map((option) => (
+          <SelectItem key={option.value} value={option.value}>
+            {option.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  </div>
+</div>
+</div>
+  <ViewingAnglePanel
+    screen={screen}
+    seatingPositions={seatingPositions}
+    viewingDistanceOffsetM={seatingBlockOffset}
+    mlpOverride={mlpOverride}
+    mlpDotOffsetM={seatingBlockOffset}
+  />
+</div>
+);
 }
