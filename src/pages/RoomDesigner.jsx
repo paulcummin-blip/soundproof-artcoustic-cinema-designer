@@ -1799,7 +1799,6 @@ if (typeof setAppState === 'function') {
   setSeatSpacingGuarded,
   setRowSpacingGuarded,
   // include whichever setter your file has; harmless if undefined
-  setSeatsPerRowByRowGuarded,
   setAppState,
   setConfig,
 ]);
