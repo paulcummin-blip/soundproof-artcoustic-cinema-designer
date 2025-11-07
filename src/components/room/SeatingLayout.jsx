@@ -120,8 +120,7 @@ const setRowsArray = useCallback((next) => {
   onSeatingRowsChange?.(safe.length || 1);
 
   return safe;
-}, [onSeatsPerRowByRowChange, onSeatingRowsChange]); // Dependencies removed as updates are handled directly in event handlers now
-
+}, [onSeatsPerRowByRowChange, onSeatingRowsChange]);
 // Use this everywhere instead of seatingRows for how many rows we have
 const rowCount = rowsArray.length;
 
