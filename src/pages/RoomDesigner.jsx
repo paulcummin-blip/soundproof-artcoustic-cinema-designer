@@ -890,11 +890,11 @@ function RoomDesignerWithState() {
       ? stableScreen.visibleWidthInches * 0.0254 
       : null;
     /* Y-only viewing offset (lock X to centre) */
-const viewingOffsetM = Number(_seatingBlockOffset) || 0;
-const rows = Number(_seatingRows) || 1;
-const rowSpacing = Number(_rowSpacingM) || 1.8; // default 1.8m
-const mlpReference = _mlpBasis; // 'front' | 'back' | 'average'
-const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y only
+    const viewingOffsetM = Number(_seatingBlockOffset) || 0;
+    const rows = Number(_seatingRows) || 1;
+    const rowSpacing = Number(_rowSpacingM) || 1.8; // default 1.8m
+    const mlpReference = _mlpBasis; // 'front' | 'back' | 'average'
+    const off = viewingOffsetM; // for clarity
 
     // Must have screen plane and width
     if (!Number.isFinite(screenFrontPlaneM) || !Number.isFinite(screenVisibleWidthM)) {
@@ -904,11 +904,11 @@ const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y o
     // Compute ideal distance for 57.5° FOV
     const idealDistM = distanceFor57_5FromWidth(screenVisibleWidthM);
     
-    // Dot is ideal distance from the screen front plane, plus the viewing offset
-    const mlpY = screenFrontPlaneM + idealDistM + viewingOffsetM;
+    // Dot is ideal distance from the screen front plane (NO offset here - offset applied to rows)
+    const mlpY_base = screenFrontPlaneM + idealDistM;
 
-    // Publish MLP (guarded to 1 mm)
-    const mlpRounded = Math.round(mlpY * 1000) / 1000;
+    // Publish MLP (guarded to 1 mm) - this is the "front row" anchor WITHOUT offset
+    const mlpRounded = Math.round(mlpY_base * 1000) / 1000;
     if (typeof appState?.setMlpY_m === 'function') {
       appState.setMlpY_m(prev => {
         const prevRounded = prev ? Math.round(prev * 1000) : null;
@@ -917,27 +917,42 @@ const addOffsetY = (y) => Number((y + viewingOffsetM).toFixed(3)); // use on Y o
       });
     }
 
-    // Build row centers from the MLP and publish (guarded)
-   // Build row centers from the MLP and publish (guarded) — apply viewing offset ONCE here
-const centersRaw = buildRowCenters(mlpRounded, rows, rowSpacing, mlpReference);
-const off = Number(appState?.seatingBlockOffset) || 0;
+    // Build row centers from the MLP (NO offset yet)
+    let centersRaw = buildRowCenters?.(mlpRounded, rows, rowSpacing, mlpReference) || [];
 
-// clamp helper (safe 0.40 m margins; adjust if you use a different guard)
-const _clampY = (y) => {
-  const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
-  const MIN = 0.40;
-  const MAX = len - 0.40;
-  return Math.max(MIN, Math.min(MAX, y));
-};
+    // SAFETY: if buildRowCenters misbehaves or returns wrong length, force one centre per row
+    // Row 1 at mlpRounded; each extra row rowSpacing further back (towards rear wall)
+    if (!Array.isArray(centersRaw) || centersRaw.length !== rows) {
+      if (SHOW_DEBUG_LOGS) {
+        console.warn(`[Seats] buildRowCenters returned ${centersRaw?.length ?? 'null'} centers for ${rows} rows. Using fallback.`);
+      }
+      centersRaw = [];
+      for (let i = 0; i < rows; i++) {
+        centersRaw.push(mlpRounded + i * rowSpacing);
+      }
+    }
 
-const centers = centersRaw.map(y => _clampY(y + off));
+    // Apply viewing offset ONCE here, then clamp into room
+    const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
+    const MIN_Y = 0.40;
+    const MAX_Y = len - 0.40;
+    const _clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
+
+    const centers = centersRaw.map(y => _clampY(y + off));
+
     if (typeof appState?.setRowCentersM === 'function') {
       appState.setRowCentersM(prev => {
-        if (!Array.isArray(prev) || prev.length !== centers.length) return centers;
-        // shallow compare with 1 mm tolerance
-        for (let i = 0; i < centers.length; i++) {
-          if (Math.abs((prev[i] ?? NaN) - centers[i]) > 0.001) return centers;
+        // Always update if length changed (new row added/removed)
+        if (!Array.isArray(prev) || prev.length !== centers.length) {
+          return centers;
         }
+        // Or if any value moved more than 1mm
+        for (let i = 0; i < centers.length; i++) {
+          if (Math.abs((prev[i] ?? NaN) - centers[i]) > 0.001) {
+            return centers;
+          }
+        }
+        // No meaningful change; keep old to avoid useless renders
         return prev;
       });
     }
@@ -947,14 +962,15 @@ const centers = centersRaw.map(y => _clampY(y + off));
       console.log('[MLP]', {
         frontY: screenFrontPlaneM.toFixed(3),
         idealM: idealDistM.toFixed(3),
-        offset: viewingOffsetM.toFixed(3),
-        mlpY: mlpRounded.toFixed(3)
+        offset: off.toFixed(3),
+        mlpY_base: mlpRounded.toFixed(3)
       });
       console.log('[ROWS]', {
         mode: mlpReference,
+        count: rows,
+        spacing: rowSpacing.toFixed(3),
         frontY: centers[0]?.toFixed(3),
         backY: centers[centers.length - 1]?.toFixed(3),
-        spacing: rowSpacing.toFixed(3)
       });
     }
   }, [
@@ -966,6 +982,8 @@ const centers = centersRaw.map(y => _clampY(y + off));
     _rowSpacingM,
     appState?.setMlpY_m,
     appState?.setRowCentersM,
+    stableDimensions?.length,
+    appState?.roomDims?.lengthM,
   ]);
 
   // Use computed MLP as the effective anchor (for backwards compatibility)
