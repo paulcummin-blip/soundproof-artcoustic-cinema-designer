@@ -261,7 +261,7 @@ function useProjectLoader(
     if (typeof setOverheadRearOverride === "function") setOverheadRearOverride(p?.overheadRearOverride || null);
     if (typeof setUseFrontGlobal === "function") setUseFrontGlobal(p?.useFrontGlobal ?? true); // Default to true
     if (typeof setUseMidGlobal === "function") setUseMidGlobal(p?.useMidGlobal ?? true);     // Default to true
-    if (typeof setUseRearGlobal === "function") setUseRearGlobal(p?.useRearGlobal ?? true);     // Default to true
+    if (typeof setUseRearGlobal === "function") setUseUseRearGlobal(p?.useRearGlobal ?? true);     // Default to true
 
     // NEW: Hydrate Row Spacing
     if (typeof setRowSpacingM === "function") setRowSpacingM(Number(p?.row_spacing_m) || 1.8);
@@ -940,21 +940,9 @@ function RoomDesignerWithState() {
 
     const centers = centersRaw.map(y => _clampY(y + off));
 
+    // Simple direct update - no guard logic
     if (typeof appState?.setRowCentersM === 'function') {
-      appState.setRowCentersM(prev => {
-        // Always update if length changed (new row added/removed)
-        if (!Array.isArray(prev) || prev.length !== centers.length) {
-          return centers;
-        }
-        // Or if any value moved more than 1mm
-        for (let i = 0; i < centers.length; i++) {
-          if (Math.abs((prev[i] ?? NaN) - centers[i]) > 0.001) {
-            return centers;
-          }
-        }
-        // No meaningful change; keep old to avoid useless renders
-        return prev;
-      });
+      appState.setRowCentersM(centers);
     }
 
     // Temporary telemetry (remove after verify)
