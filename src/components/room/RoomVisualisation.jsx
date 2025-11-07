@@ -4088,15 +4088,27 @@ return {
     return <g data-layer="speaker-labels"></g>;
   }, []);
 
-  // Renders seating positions. This replaces the `SeatDots` useMemo.
-  const renderSeatingPositions = useCallback(() => {
-    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
-    const RX_M = 0.10, RY_M = 0.125;
+  // Renders seating positions directly from the latest seatingPositions prop
+  const renderSeatingPositions = () => {
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
+      return null;
+    }
+
+    const RX_M = 0.10;
+    const RY_M = 0.125;
+
+    // Temporary: sanity check that this fires on each change
+    console.log('RoomVisualisation: rendering seats =', seatingPositions.length);
+
     return (
       <g className="seats-layer" style={{ pointerEvents: 'auto' }}>
         {seatingPositions.map((seat) => {
-          const [seatX, seatY] = toPx(Number(seat.x) || 0, Number(seat.y) || 0);
+          const xM = Number(seat.x ?? seat.position?.x ?? 0);
+          const yM = Number(seat.y ?? seat.position?.y ?? 0);
+          const [seatX, seatY] = toPx(xM, yM);
+
           const isPinned = hudPinnedSeatId === seat.id;
+
           return (
             <ellipse
               key={seat.id}
@@ -4114,14 +4126,16 @@ return {
               onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
               onMouseEnter={() => handleSeatMouseEnter(seat)}
               onMouseLeave={handleSeatMouseLeave}
-              onClick={(e) => { e.stopPropagation(); handleSeatClick(seat); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSeatClick(seat);
+              }}
             />
           );
         })}
       </g>
     );
-  }, [seatingPositions, scale, toPx, handleMouseDown, handleSeatMouseEnter, handleSeatMouseLeave, hudPinnedSeatId]);
-
+  };
   // Fixed MLP marker at optimal 57.5° horizontal FOV position (or custom MLP if provided)
   // This marker uses mlpDotX_m_visual and mlpDotY_m_visual, which include the viewingDistanceOffsetM
 /* START: MLP marker locked to seat centre */
