@@ -1401,7 +1401,7 @@ function RoomDesignerWithState() {
   const setSeatingPositionsGuarded = useGuardedSetter(appState?.setSeatingPositions, 'seating');
   const setSeatingRowsGuarded = useGuardedSetter(appState?.setSeatingRows, 'seating');
   const setSeatsPerRowGuarded = useGuardedSetter(appState?.setSeatsPerRow, 'seating');
-  const setSeatsPerRowByRowGuarded = useGuardedSetter(_setSeatsPerRowByRow, 'seating'); // NEW: Guarded setter for seatsPerRowByRow
+const setSeatsPerRowByRowGuarded = useGuardedSetter(appState?.setSeatsPerRowByRow, 'seating');
   const setSeatSpacingGuarded = useGuardedSetter(appState?.setSeatSpacing, 'seating');
   const setRowSpacingGuarded = useGuardedSetter(_setRowSpacingM, 'seating');
   const setSeatingBlockOffsetGuarded = useGuardedSetter(appState?.setSeatingBlockOffset, 'seating');
