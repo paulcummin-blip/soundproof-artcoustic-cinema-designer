@@ -377,8 +377,11 @@ const rowCount = rowsArray.length;
             const next = rowsArray.slice();
             next[idx] = n;
             setRowsArray(next);
+            
+            // Regenerate so plan updates immediately
             onGenerateSeating?.({
               seatsPerRowByRow: next,
+              numberOfRows: next.length,
               seatSpacing,
               rowSpacingM,
             });
@@ -394,10 +397,18 @@ const rowCount = rowsArray.length;
           onClick={() => {
             const next = rowsArray.slice();
             next.splice(idx, 1);
-            const safe = next.length ? next : [1];
+            const safe = next.length ? next : [rowsArray[0] ?? 3];
+            
+            // 1) update editor list
             setRowsArray(safe);
+            
+            // 2) update row count for layout engine
+            onSeatingRowsChange?.(safe.length);
+            
+            // 3) regenerate seating so the plan view matches
             onGenerateSeating?.({
               seatsPerRowByRow: safe,
+              numberOfRows: safe.length,
               seatSpacing,
               rowSpacingM,
             });
@@ -417,9 +428,17 @@ const rowCount = rowsArray.length;
   onClick={() => {
     const last = rowsArray[rowsArray.length - 1] ?? 1;
     const next = [...rowsArray, Math.max(1, Number(last) || 1)];
+    
+    // 1) update the local editor list
     setRowsArray(next);
+    
+    // 2) tell the parent: we now have this many rows
+    onSeatingRowsChange?.(next.length);
+    
+    // 3) trigger a regenerate so the plan view draws the new row
     onGenerateSeating?.({
       seatsPerRowByRow: next,
+      numberOfRows: next.length,
       seatSpacing,
       rowSpacingM,
     });
