@@ -133,7 +133,18 @@ function useDesignerState() {
   const [mlpY_m, setMlpY_m] = useState(null);
   
   // NEW: Computed row centers (derived from MLP)
-  const [rowCentersM, setRowCentersM] = useState([]);
+  const [rowCentersM, _setRowCentersM] = useState([]);
+
+  // Simple, reliable setter. Accepts either an array or an updater fn.
+  const setRowCentersM = useCallback(
+    (next) => {
+      _setRowCentersM(prev => {
+        const value = typeof next === 'function' ? next(prev) : next;
+        return Array.isArray(value) ? value.slice() : prev;
+      });
+    },
+    []
+  );
 
   // NEW: Overhead channel selections (default to null = OFF)
   const [overheadGlobalModel, setOverheadGlobalModel] = useState(null);
@@ -356,7 +367,7 @@ function useDesignerState() {
         // Rear surrounds: drop only when "use FW instead of RS" is active
         if (role === 'SBL' || role === 'SBR') {
           if (useFWInsteadOfRS) {
-            pruedRoles.push(role);
+            prunedRoles.push(role); // Fix: Typo was 'pruedRoles'
             return false;
           } else {
             keptRoles.push(role);
