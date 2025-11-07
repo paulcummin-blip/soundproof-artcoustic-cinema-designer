@@ -360,13 +360,17 @@ const rowCount = rowsArray.length;
       <div className="grid grid-cols-2 gap-4">
 {/* Rows & Seats (per-row editor) */}
 <div className="space-y-2 col-span-2">
-  <Label className="text-sm font-medium" style={{color: '#3E4349'}}>Rows & Seats</Label>
-
+  <Label className="text-sm font-medium" style={{ color: '#3E4349' }}>
+    Rows & Seats
+  </Label>
   <div className="space-y-2">
     {rowsArray.map((count, idx) => (
       <div key={`row-${idx}`} className="flex items-center gap-3">
-        <div className="w-24 text-sm" style={{color: '#3E4349'}}>Row {idx + 1}</div>
+        <div className="w-24 text-sm" style={{ color: '#3E4349' }}>
+          Row {idx + 1}
+        </div>
 
+        {/* Seats in this row */}
         <Input
           type="number"
           min="1"
@@ -376,9 +380,11 @@ const rowCount = rowsArray.length;
             const n = Math.max(1, parseInt(e.target.value || '1', 10));
             const next = rowsArray.slice();
             next[idx] = n;
+
+            // update per-row counts + row count in app state
             setRowsArray(next);
-            
-            // Regenerate so plan updates immediately
+
+            // regenerate seats so plan updates immediately
             onGenerateSeating?.({
               seatsPerRowByRow: next,
               numberOfRows: next.length,
@@ -388,24 +394,25 @@ const rowCount = rowsArray.length;
           }}
           disabled={disabled}
           className="h-10 w-28"
-          style={{backgroundColor: '#ffffff', border: '1px solid #C1B6AD', color: '#1B1A1A'}}
+          style={{
+            backgroundColor: '#ffffff',
+            border: '1px solid #C1B6AD',
+            color: '#1B1A1A',
+          }}
         />
 
+        {/* Remove this row */}
         <Button
           type="button"
           variant="outline"
           onClick={() => {
             const next = rowsArray.slice();
             next.splice(idx, 1);
+
             const safe = next.length ? next : [rowsArray[0] ?? 3];
-            
-            // 1) update editor list
+
             setRowsArray(safe);
-            
-            // 2) update row count for layout engine
-            onSeatingRowsChange?.(safe.length);
-            
-            // 3) regenerate seating so the plan view matches
+
             onGenerateSeating?.({
               seatsPerRowByRow: safe,
               numberOfRows: safe.length,
@@ -420,34 +427,29 @@ const rowCount = rowsArray.length;
       </div>
     ))}
 
-    {/* Always show Add Row */}
+    {/* Add Row */}
     <div className="pt-1">
       <Button
-  type="button"
-  variant="outline"
-  onClick={() => {
-    const last = rowsArray[rowsArray.length - 1] ?? 1;
-    const next = [...rowsArray, Math.max(1, Number(last) || 1)];
-    
-    // 1) update the local editor list
-    setRowsArray(next);
-    
-    // 2) tell the parent: we now have this many rows
-    onSeatingRowsChange?.(next.length);
-    
-    // 3) trigger a regenerate so the plan view draws the new row
-    onGenerateSeating?.({
-      seatsPerRowByRow: next,
-      numberOfRows: next.length,
-      seatSpacing,
-      rowSpacingM,
-    });
-  }}
-  disabled={!!disabled}
-  className="w-28"
->
-  Add Row
-</Button>
+        type="button"
+        variant="outline"
+        onClick={() => {
+          const last = rowsArray[rowsArray.length - 1] ?? 3;
+          const next = [...rowsArray, Math.max(1, Number(last) || 1)];
+
+          setRowsArray(next);
+
+          onGenerateSeating?.({
+            seatsPerRowByRow: next,
+            numberOfRows: next.length,
+            seatSpacing,
+            rowSpacingM,
+          });
+        }}
+        disabled={disabled}
+        className="w-28"
+      >
+        Add Row
+      </Button>
     </div>
   </div>
 </div>
