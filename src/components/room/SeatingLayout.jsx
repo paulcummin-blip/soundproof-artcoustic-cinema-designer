@@ -113,10 +113,12 @@ const setRowsArray = useCallback((next) => {
     Math.max(1, Number.isFinite(Number(n)) ? Math.floor(Number(n)) : 1)
   );
   // update the new per-row list
-  onSeatsPerRowByRowChange?.(safe);
+  // Note: onSeatsPerRowByRowChange is now called within the individual row handlers
+  // onSeatsPerRowByRowChange?.(safe); 
   // keep only the row count in sync for old code
-  onSeatingRowsChange?.(safe.length || 1);
-}, [onSeatsPerRowByRowChange, onSeatingRowsChange]);
+  // Note: onSeatingRowsChange is now called within the individual row handlers
+  // onSeatingRowsChange?.(safe.length || 1);
+}, []); // Dependencies removed as updates are handled directly in event handlers now
 
 // Use this everywhere instead of seatingRows for how many rows we have
 const rowCount = rowsArray.length;
@@ -394,11 +396,14 @@ const rowCount = rowsArray.length;
                   const next = [...rowsArray];
                   next[idx] = n;
 
-                  // update per-row counts
+                  // 1) update per-row counts in local state
                   setRowsArray(next);
 
-                  // sync row count + regenerate seats
+                  // 2) sync to parent state BEFORE regenerating
+                  onSeatsPerRowByRowChange?.(next);
                   onSeatingRowsChange?.(next.length);
+
+                  // 3) regenerate seats so plan updates
                   onGenerateSeating?.({
                     seatsPerRowByRow: next,
                     numberOfRows: next.length,
@@ -415,20 +420,61 @@ const rowCount = rowsArray.length;
                 }}
               />
 
-              {/* Remove this row */}
+                {/* Remove this row */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (rowsArray.length <= 1) return;
+
+                    const next = rowsArray.filter(
+                      (_row, i) => i !== idx
+                    );
+
+                    // 1) update per-row counts in local state
+                    setRowsArray(next);
+
+                    // 2) sync to parent state BEFORE regenerating
+                    onSeatsPerRowByRowChange?.(next);
+                    onSeatingRowsChange?.(next.length);
+
+                    // 3) regenerate seats so plan updates
+                    onGenerateSeating?.({
+                      seatsPerRowByRow: next,
+                      numberOfRows: next.length,
+                      seatSpacing,
+                      rowSpacingM,
+                    });
+                  }}
+                  disabled={disabled || rowsArray.length <= 1}
+                >
+                  Remove
+                </Button>
+              </div>
+            ))}
+
+            {/* Add Row */}
+            <div className="pt-1">
               <Button
                 type="button"
                 variant="outline"
+                className="w-28"
+                disabled={disabled}
                 onClick={() => {
-                  if (rowsArray.length <= 1) return;
+                  const last = rowsArray[rowsArray.length - 1] ?? 3;
+                  const next = [
+                    ...rowsArray,
+                    Math.max(1, Number(last) || 3),
+                  ];
 
-                  const next = rowsArray.filter(
-                    (_row, i) => i !== idx
-                  );
-
+                  // 1) update per-row counts in local state
                   setRowsArray(next);
 
+                  // 2) sync to parent state BEFORE regenerating
+                  onSeatsPerRowByRowChange?.(next);
                   onSeatingRowsChange?.(next.length);
+
+                  // 3) regenerate seats so plan updates
                   onGenerateSeating?.({
                     seatsPerRowByRow: next,
                     numberOfRows: next.length,
@@ -436,43 +482,12 @@ const rowCount = rowsArray.length;
                     rowSpacingM,
                   });
                 }}
-                disabled={disabled || rowsArray.length <= 1}
               >
-                Remove
+                Add Row
               </Button>
             </div>
-          ))}
-
-          {/* Add Row */}
-          <div className="pt-1">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-28"
-              disabled={disabled}
-              onClick={() => {
-                const last = rowsArray[rowsArray.length - 1] ?? 3;
-                const next = [
-                  ...rowsArray,
-                  Math.max(1, Number(last) || 3),
-                ];
-
-                setRowsArray(next);
-
-                onSeatingRowsChange?.(next.length);
-                onGenerateSeating?.({
-                  seatsPerRowByRow: next,
-                  numberOfRows: next.length,
-                  seatSpacing,
-                  rowSpacingM,
-                });
-              }}
-            >
-              Add Row
-            </Button>
           </div>
         </div>
-      </div>
 
       {/* Seat Spacing (m) */}
       <div className="space-y-2">
