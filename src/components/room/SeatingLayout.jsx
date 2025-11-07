@@ -441,118 +441,118 @@ const rowCount = rowsArray.length;
           Reset Position
         </Button>
 
-        {/* All seating parameters */}
-        <div className="grid grid-cols-2 gap-4">
-          {/* Rows & Seats (per-row editor) */}
-          <div className="space-y-2 col-span-2">
-            <Label
-              className="text-sm font-medium"
-              style={{ color: '#3E4349' }}
-            >
-              Rows & Seats
-            </Label>
+{/* All seating parameters */}
+<div className="grid grid-cols-2 gap-4">
+  {/* Rows & Seats (per-row editor) */}
+  <div className="space-y-2 col-span-2">
+    <Label
+      className="text-sm font-medium"
+      style={{ color: '#3E4349' }}
+    >
+      Rows & Seats
+    </Label>
 
-            <div className="space-y-2">
-              {rowsArray.map((count, idx) => (
-                <div
-                  key={`row-${idx}`}
-                  className="flex items-center gap-3"
-                >
-                  <div
-                    className="w-24 text-sm"
-                    style={{ color: '#3E4349' }}
-                  >
-                    Row {idx + 1}
-                  </div>
-
-                  {/* Seats in this row */}
-                  <Input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={count}
-                    onChange={(e) => {
-                      if (disabled) return;
-
-                      const n = Math.max(
-                        1,
-                        parseInt(e.target.value || '1', 10)
-                      );
-
-                      const next = [...rowsArray];
-                      next[idx] = n;
-
-                      onGenerateSeating?.({
-                        seatsPerRowByRow: next,
-                        numberOfRows: next.length,
-                        seatSpacing,
-                        rowSpacingM,
-                      });
-                    }}
-                    disabled={disabled}
-                    className="h-10 w-28"
-                    style={{
-                      backgroundColor: '#ffffff',
-                      border: '1px solid #C1B6AD',
-                      color: '#1B1A1A',
-                    }}
-                  />
-
-                  {/* Remove this row */}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      if (disabled || rowsArray.length <= 1) return;
-
-                      const next = rowsArray.filter(
-                        (_row, i) => i !== idx
-                      );
-
-                      onGenerateSeating?.({
-                        seatsPerRowByRow: next,
-                        numberOfRows: next.length,
-                        seatSpacing,
-                        rowSpacingM,
-                      });
-                    }}
-                    disabled={disabled || rowsArray.length <= 1}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              ))}
-
-              {/* Add Row */}
-              <div className="pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-28"
-                  disabled={disabled}
-                  onClick={() => {
-                    if (disabled) return;
-
-                    const last =
-                      rowsArray[rowsArray.length - 1] ?? 3;
-                    const next = [
-                      ...rowsArray,
-                      Math.max(1, Number(last) || 3),
-                    ];
-
-                    onGenerateSeating?.({
-                      seatsPerRowByRow: next,
-                      numberOfRows: next.length,
-                      seatSpacing,
-                      rowSpacingM,
-                    });
-                  }}
-                >
-                  Add Row
-                </Button>
-              </div>
-            </div>
+    <div className="space-y-2">
+      {rowsArray.map((count, idx) => (
+        <div
+          key={`row-${idx}`}
+          className="flex items-center gap-3"
+        >
+          <div
+            className="w-24 text-sm"
+            style={{ color: '#3E4349' }}
+          >
+            Row {idx + 1}
           </div>
+
+          {/* Seats in this row */}
+<Input
+  type="number"
+  min="1"
+  step="1"
+  value={count}
+  onChange={(e) => {
+    if (disabled) return;
+
+    const n = Math.max(1, parseInt(e.target.value || '1', 10));
+    const next = [...rowsArray];
+    next[idx] = n;
+
+    const safe = setRowsArray(next) || next;
+
+    onGenerateSeating?.({
+      seatsPerRowByRow: safe,
+      numberOfRows: safe.length,
+      seatSpacing,
+      rowSpacingM,
+    });
+  }}
+  disabled={disabled}
+  className="h-10 w-28"
+  style={{
+    backgroundColor: '#ffffff',
+    border: '1px solid #C1B6AD',
+    color: '#1B1A1A',
+  }}
+/>
+
+          {/* Remove this row */}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              if (disabled || rowsArray.length <= 1) return;
+
+              const next = rowsArray.filter((_, i) => i !== idx);
+              const safe = setRowsArray(
+                next.length ? next : [rowsArray[0] ?? 3]
+              ) || (next.length ? next : [rowsArray[0] ?? 3]);
+
+              onGenerateSeating?.({
+                seatsPerRowByRow: safe,
+                numberOfRows: safe.length,
+                seatSpacing,
+                rowSpacingM,
+              });
+            }}
+            disabled={disabled || rowsArray.length <= 1}
+          >
+            Remove
+          </Button>
+        </div>
+      ))}
+
+      {/* Add Row */}
+      <div className="pt-1">
+        <Button
+          type="button"
+          variant="outline"
+          className="w-28"
+          disabled={disabled}
+          onClick={() => {
+            if (disabled) return;
+
+            const last = rowsArray[rowsArray.length - 1] ?? 3;
+            const next = [
+              ...rowsArray,
+              Math.max(1, Number(last) || 3),
+            ];
+
+            const safe = setRowsArray(next) || next;
+
+            onGenerateSeating?.({
+              seatsPerRowByRow: safe,
+              numberOfRows: safe.length,
+              seatSpacing,
+              rowSpacingM,
+            });
+          }}
+        >
+          Add Row
+        </Button>
+      </div>
+    </div>
+  </div>
 
           {/* Seat Spacing (m) */}
           <div className="space-y-2">
