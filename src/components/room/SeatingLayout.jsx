@@ -109,16 +109,18 @@ const rowsArray = useMemo(() => {
 
 // Save a new list and keep the old two numbers in step as a fallback
 const setRowsArray = useCallback((next) => {
-  const safe = (Array.isArray(next) ? next : []).map(n =>
+  const safe = (Array.isArray(next) ? next : []).map((n) =>
     Math.max(1, Number.isFinite(Number(n)) ? Math.floor(Number(n)) : 1)
   );
-  // update the new per-row list
-  // Note: onSeatsPerRowByRowChange is now called within the individual row handlers
-  // onSeatsPerRowByRowChange?.(safe); 
-  // keep only the row count in sync for old code
-  // Note: onSeatingRowsChange is now called within the individual row handlers
-  // onSeatingRowsChange?.(safe.length || 1);
-}, []); // Dependencies removed as updates are handled directly in event handlers now
+
+  // 1) push per-row counts into app state
+  onSeatsPerRowByRowChange?.(safe);
+
+  // 2) keep legacy seatingRows in sync
+  onSeatingRowsChange?.(safe.length || 1);
+
+  return safe;
+}, [onSeatsPerRowByRowChange, onSeatingRowsChange]); // Dependencies removed as updates are handled directly in event handlers now
 
 // Use this everywhere instead of seatingRows for how many rows we have
 const rowCount = rowsArray.length;
