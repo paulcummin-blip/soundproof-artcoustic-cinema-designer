@@ -369,7 +369,7 @@ const lengthM =
 // Fixed horizontal centreline for the room
 const centerX_m = widthM > 0 ? widthM / 2 : 0;
 
-// Clamp Y safely inside the room (tiny margins)
+// Clamp Y safely inside the room
 const clampY = (y) => {
   if (!Number.isFinite(y)) return 0.4;
   const MIN_Y = 0.4;
@@ -378,8 +378,7 @@ const clampY = (y) => {
 };
 
 const MLP_calculated = useMemo(() => {
-  // 1. If RoomDesigner supplies an MLP (it’s already based on 57.5° from the screen),
-  //    we trust its Y but force X onto the room centreline.
+  // 1. If RoomDesigner supplies an MLP: use its Y, force X to centreline
   if (mlpPoint && Number.isFinite(mlpPoint.y)) {
     return {
       x: centerX_m,
@@ -388,7 +387,7 @@ const MLP_calculated = useMemo(() => {
     };
   }
 
-  // 2. Legacy / fallback: derive Y from seats, but NEVER move X off centre.
+  // 2. If we have seats: use them for Y only, keep X on centreline
   if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
     const seats = seatingPositions.map((s) => ({
       x: Number(s?.position?.x ?? s?.x ?? 0),
@@ -401,8 +400,6 @@ const MLP_calculated = useMemo(() => {
 
     try {
       if (typeof pickMLP === 'function') {
-        // Use current mlpBasis, but this only informs Y;
-        // X is always overridden to centreline below.
         picked = pickMLP(mlpBasis || 'all', seats);
       }
     } catch (err) {
@@ -427,29 +424,19 @@ const MLP_calculated = useMemo(() => {
     };
   }
 
-  // 3. No mlpPoint and no seats: park it in a sensible central spot.
+  // 3. No mlpPoint and no seats: centre of room, sensible distance back
   return {
     x: centerX_m,
     y: clampY(lengthM * 0.58),
     z: 1.2,
   };
-}, [
-  mlpPoint,
-  seatingPositions,
-  mlpBasis,
-  centerX_m,
-  lengthM,
-]);
+}, [mlpPoint, seatingPositions, mlpBasis, centerX_m, lengthM]);
 
 const mlp = MLP_calculated;
 const mlpDotX_m = mlp.x;
 const mlpDotY_m = mlp.y;
 const mlpDotZ_m = mlp.z;
 
-  const mlp = MLP_calculated;
-  const mlpDotX_m = mlp.x;
-  const mlpDotY_m = mlp.y;
-  const mlpDotZ_m = mlp.z;
 // Removed duplicate viewingDistanceOffsetM seat shift (handled in RoomDesigner)
   const [hoveredSpeaker, setHoveredSpeaker] = useState(null);
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
