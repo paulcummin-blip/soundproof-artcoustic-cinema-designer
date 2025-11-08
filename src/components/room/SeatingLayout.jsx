@@ -97,28 +97,28 @@ export default function SeatingLayout({
 }) {
   // Local copy of "seats per row" for the editor.
   // This makes the form feel instant, and we tell the parent whenever it changes.
-  const [rowsArray, setRowsArray] = useState(() => {
+  const [rowsArray, setRowsArray] = React.useState(() => {
     if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
       return seatsPerRowByRow.map((n) =>
-        Math.max(1, parseInt(n || '1', 10))
+        Math.max(1, parseInt(n || 1, 10))
       );
     }
-    const rows = Math.max(1, parseInt(seatingRows || '1', 10));
-    const seats = Math.max(1, parseInt(seatsPerRow || '1', 10));
+    const rows = Math.max(1, parseInt(seatingRows || 1, 10));
+    const seats = Math.max(1, parseInt(seatsPerRow || 1, 10));
     return Array.from({ length: rows }, () => seats);
   });
 
   // Keep local rowsArray in sync if a project is loaded or state changes outside
-  useEffect(() => {
+  React.useEffect(() => {
     if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
       setRowsArray(
         seatsPerRowByRow.map((n) =>
-          Math.max(1, parseInt(n || '1', 10))
+          Math.max(1, parseInt(n || 1, 10))
         )
       );
     } else {
-      const rows = Math.max(1, parseInt(seatingRows || '1', 10));
-      const seats = Math.max(1, parseInt(seatsPerRow || '1', 10));
+      const rows = Math.max(1, parseInt(seatingRows || 1, 10));
+      const seats = Math.max(1, parseInt(seatsPerRow || 1, 10));
       setRowsArray(Array.from({ length: rows }, () => seats));
     }
   }, [seatsPerRowByRow, seatingRows, seatsPerRow]);
@@ -390,28 +390,6 @@ const rowCount = rowsArray.length;
                 min="1"
                 step="1"
                 value={count}
-                onChange={(e) => {
-                  if (disabled) return;
-
-                  const n = Math.max(
-                    1,
-                    parseInt(e.target.value || '1', 10)
-                  );
-
-                  const next = [...rowsArray];
-                  next[idx] = n;
-
-                  // Update local editor state
-                  setRowsArray(next);
-
-                  // Tell parent to rebuild seats from this list
-                  onGenerateSeating?.({
-                    seatsPerRowByRow: next,
-                    numberOfRows: next.length,
-                    seatSpacing,
-                    rowSpacingM,
-                  });
-                }}
                 disabled={disabled}
                 className="h-10 w-28"
                 style={{
@@ -419,12 +397,39 @@ const rowCount = rowsArray.length;
                   border: '1px solid #C1B6AD',
                   color: '#1B1A1A',
                 }}
+                onChange={(e) => {
+                  if (disabled) return;
+
+                  const n = Math.max(
+                    1,
+                    parseInt(e.target.value || 1, 10)
+                  );
+
+                  const next = [...rowsArray];
+                  next[idx] = n;
+
+                  // 1) update local editor list
+                  setRowsArray(next);
+
+                  // 2) sync parent's state
+                  onSeatsPerRowByRowChange?.(next);
+                  onSeatingRowsChange?.(next.length);
+
+                  // 3) ask parent to regenerate seats
+                  onGenerateSeating?.({
+                    seatsPerRowByRow: next,
+                    numberOfRows: next.length,
+                    seatSpacing,
+                    rowSpacingM,
+                  });
+                }}
               />
 
               {/* Remove this row */}
               <Button
                 type="button"
                 variant="outline"
+                disabled={disabled || rowsArray.length <= 1}
                 onClick={() => {
                   if (disabled || rowsArray.length <= 1) return;
 
@@ -432,10 +437,19 @@ const rowCount = rowsArray.length;
                     (_row, i) => i !== idx
                   );
 
-                  const safe = next.length ? next : [rowsArray[0] ?? 3];
+                  // Keep at least one row
+                  const safe = next.length
+                    ? next
+                    : [rowsArray[0] ?? 3];
 
+                  // 1) update local editor list
                   setRowsArray(safe);
 
+                  // 2) sync parent's state
+                  onSeatsPerRowByRowChange?.(safe);
+                  onSeatingRowsChange?.(safe.length);
+
+                  // 3) regenerate seats
                   onGenerateSeating?.({
                     seatsPerRowByRow: safe,
                     numberOfRows: safe.length,
@@ -443,7 +457,6 @@ const rowCount = rowsArray.length;
                     rowSpacingM,
                   });
                 }}
-                disabled={disabled || rowsArray.length <= 1}
               >
                 Remove
               </Button>
@@ -460,15 +473,20 @@ const rowCount = rowsArray.length;
               onClick={() => {
                 if (disabled) return;
 
-                const last =
-                  rowsArray[rowsArray.length - 1] ?? 3;
+                const last = rowsArray[rowsArray.length - 1] ?? 3;
                 const next = [
                   ...rowsArray,
                   Math.max(1, Number(last) || 3),
                 ];
 
+                // 1) update local editor list
                 setRowsArray(next);
 
+                // 2) sync parent's state
+                onSeatsPerRowByRowChange?.(next);
+                onSeatingRowsChange?.(next.length);
+
+                // 3) regenerate seats
                 onGenerateSeating?.({
                   seatsPerRowByRow: next,
                   numberOfRows: next.length,
