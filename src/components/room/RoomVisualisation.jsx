@@ -352,55 +352,86 @@ const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
   }, []);
 
 const MLP_calculated = useMemo(() => {
-  // If an explicit MLP point exists, use it (no extra offset here)
-if (mlpPoint && Number.isFinite(mlpPoint.y)) {
-  // Always lock MLP horizontally to the room centre,
-  // never to a specific seat.
+  // 1. Read room size (from new roomDims first, fall back to legacy)
   const widthM =
     Number(appState?.roomDims?.widthM) ||
     Number(appState?.dimensions?.widthM) ||
     Number(appState?.dimensions?.width) ||
     0;
 
-  const centerX_m =
-    widthM > 0
-      ? widthM / 2
-      : Number(mlpPoint.x) || 0; // fallback if width unknown
+  const lengthM =
+    Number(appState?.roomDims?.lengthM) ||
+    Number(appState?.dimensions?.lengthM) ||
+    Number(appState?.dimensions?.length) ||
+    6;
 
-  return {
-    x: centerX_m,
-    y: clampY(Number(mlpPoint.y)),   // keep 57.5°-based distance
-    z: Number(mlpPoint.z ?? 1.2),
-  };
-}
+  // Lock MLP horizontally to ROOM CENTRE only
+  const centerX_m = widthM > 0 ? widthM / 2 : 0;
 
-  // Otherwise derive from seats (seats already include any viewing offset in their own Y)
+  // 2. If RoomDesigner has given us an explicit MLP (57.5° calc), trust its Y
+  //    but snap X to the room centreline.
+  if (mlpPoint && Number.isFinite(mlpPoint.y)) {
+    return {
+      x: centerX_m,
+      y: clampY(Number(mlpPoint.y)),
+      z: Number.isFinite(mlpPoint.z) ? Number(mlpPoint.z) : 1.2,
+    };
+  }
+
+  // 3. Otherwise, derive from seats (for legacy / no-MLP cases),
+  //    but NEVER let seats move MLP off the centreline.
   if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
     const seats = seatingPositions.map((s) => ({
       x: Number(s?.position?.x ?? s?.x ?? 0),
       y: clampY(Number(s?.position?.y ?? s?.y ?? 0)),
-      z: Number(s?.z ?? 1.2),
+      z: Number.isFinite(s?.z) ? Number(s.z) : 1.2,
       rowNumber: s?.rowNumber ?? 1,
     }));
 
     let picked = null;
     try {
-      picked = pickMLP?.('all', seats);
+      if (typeof pickMLP === 'function') {
+        picked = pickMLP(mlpBasis || 'all', seats);
+      }
     } catch (e) {
-      console.error("Error calling pickMLP:", e);
-      picked = seats[Math.floor(seats.length / 2)] || { x: 0, y: lengthM * 0.58, z: 1.2 };
+      console.error('Error calling pickMLP:', e);
+      picked = null;
     }
+
+    const fallbackY = lengthM * 0.58;
+
+    const y = picked && Number.isFinite(picked.y)
+      ? Number(picked.y)
+      : fallbackY;
+
+    const z = picked && Number.isFinite(picked.z)
+      ? Number(picked.z)
+      : 1.2;
 
     return {
       x: centerX_m,
-      y: clampY(Number.isFinite(picked?.y) ? Number(picked.y) : (lengthM * 0.58)),
-      z: Number.isFinite(picked?.z) ? Number(picked.z) : 1.2,
+      y: clampY(y),
+      z,
     };
   }
 
-  // Fallback
-  return { x: centerX_m, y: clampY(lengthM * 0.58), z: 1.2 };
-}, [mlpPoint, seatingPositions, lengthM, centerX_m]);
+  // 4. Final fallback when no mlpPoint and no seats
+  return {
+    x: centerX_m,
+    y: clampY(lengthM * 0.58),
+    z: 1.2,
+  };
+}, [
+  mlpPoint,
+  seatingPositions,
+  mlpBasis,
+  appState?.roomDims?.widthM,
+  appState?.roomDims?.lengthM,
+  appState?.dimensions?.widthM,
+  appState?.dimensions?.lengthM,
+  appState?.dimensions?.width,
+  appState?.dimensions?.length,
+]);
 
   const mlp = MLP_calculated;
   const mlpDotX_m = mlp.x;
