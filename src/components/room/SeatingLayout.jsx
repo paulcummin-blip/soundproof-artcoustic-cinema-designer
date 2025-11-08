@@ -95,24 +95,31 @@ export default function SeatingLayout({
   screen,
   dimensions
 }) {
-  // Local list of seats per row that drives the controls
+  // Local copy of "seats per row" for the editor.
+  // This makes the form feel instant, and we tell the parent whenever it changes.
   const [rowsArray, setRowsArray] = useState(() => {
     if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
-      return seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1));
+      return seatsPerRowByRow.map((n) =>
+        Math.max(1, parseInt(n || '1', 10))
+      );
     }
-    const rows = Math.max(1, Number(seatingRows) || 1);
-    const count = Math.max(1, Number(seatsPerRow) || 1);
-    return Array.from({ length: rows }, () => count);
+    const rows = Math.max(1, parseInt(seatingRows || '1', 10));
+    const seats = Math.max(1, parseInt(seatsPerRow || '1', 10));
+    return Array.from({ length: rows }, () => seats);
   });
 
   // Keep local rowsArray in sync if a project is loaded or state changes outside
   useEffect(() => {
     if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
-      setRowsArray(seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1)));
+      setRowsArray(
+        seatsPerRowByRow.map((n) =>
+          Math.max(1, parseInt(n || '1', 10))
+        )
+      );
     } else {
-      const rows = Math.max(1, Number(seatingRows) || 1);
-      const count = Math.max(1, Number(seatsPerRow) || 1);
-      setRowsArray(Array.from({ length: rows }, () => count));
+      const rows = Math.max(1, parseInt(seatingRows || '1', 10));
+      const seats = Math.max(1, parseInt(seatsPerRow || '1', 10));
+      setRowsArray(Array.from({ length: rows }, () => seats));
     }
   }, [seatsPerRowByRow, seatingRows, seatsPerRow]);
 
@@ -394,11 +401,10 @@ const rowCount = rowsArray.length;
                   const next = [...rowsArray];
                   next[idx] = n;
 
-                  // 1) update local view
+                  // Update local editor state
                   setRowsArray(next);
-                  onSeatsPerRowByRowChange?.(next); // NEW: Notify parent of change
 
-                  // 2) tell RoomDesigner to rebuild all seats
+                  // Tell parent to rebuild seats from this list
                   onGenerateSeating?.({
                     seatsPerRowByRow: next,
                     numberOfRows: next.length,
@@ -428,11 +434,8 @@ const rowCount = rowsArray.length;
 
                   const safe = next.length ? next : [rowsArray[0] ?? 3];
 
-                  // 1) update local view
                   setRowsArray(safe);
-                  onSeatsPerRowByRowChange?.(safe); // NEW: Notify parent of change
 
-                  // 2) rebuild in RoomDesigner
                   onGenerateSeating?.({
                     seatsPerRowByRow: safe,
                     numberOfRows: safe.length,
@@ -457,17 +460,15 @@ const rowCount = rowsArray.length;
               onClick={() => {
                 if (disabled) return;
 
-                const last = rowsArray[rowsArray.length - 1] ?? 3;
+                const last =
+                  rowsArray[rowsArray.length - 1] ?? 3;
                 const next = [
                   ...rowsArray,
                   Math.max(1, Number(last) || 3),
                 ];
 
-                // 1) update local view
                 setRowsArray(next);
-                onSeatsPerRowByRowChange?.(next); // NEW: Notify parent of change
 
-                // 2) rebuild in RoomDesigner
                 onGenerateSeating?.({
                   seatsPerRowByRow: next,
                   numberOfRows: next.length,
