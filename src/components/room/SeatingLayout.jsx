@@ -95,17 +95,26 @@ export default function SeatingLayout({
   screen,
   dimensions
 }) {
-    // Build a working rows array (Row 1 seats, Row 2 seats, …)
-const rowsArray = useMemo(() => {
-  // If we already have a list per row, use it (each at least 1)
-  if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
-    return seatsPerRowByRow.map(n => Math.max(1, Number.isFinite(Number(n)) ? Math.floor(Number(n)) : 1));
-  }
-  // Otherwise make a list from the old two numbers
-  const count = Math.max(1, Number.isFinite(Number(seatsPerRow)) ? Math.floor(Number(seatsPerRow)) : 1);
-  const rows  = Math.max(1, Number.isFinite(Number(seatingRows)) ? Math.floor(Number(seatingRows)) : 1);
-  return Array.from({ length: rows }, () => count);
-}, [seatsPerRowByRow, seatsPerRow, seatingRows]);
+  // Local list of seats per row that drives the controls
+  const [rowsArray, setRowsArray] = useState(() => {
+    if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
+      return seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1));
+    }
+    const rows = Math.max(1, Number(seatingRows) || 1);
+    const count = Math.max(1, Number(seatsPerRow) || 1);
+    return Array.from({ length: rows }, () => count);
+  });
+
+  // Keep local rowsArray in sync if a project is loaded or state changes outside
+  useEffect(() => {
+    if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
+      setRowsArray(seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1)));
+    } else {
+      const rows = Math.max(1, Number(seatingRows) || 1);
+      const count = Math.max(1, Number(seatsPerRow) || 1);
+      setRowsArray(Array.from({ length: rows }, () => count));
+    }
+  }, [seatsPerRowByRow, seatingRows, seatsPerRow]);
 
 // Use this everywhere instead of seatingRows for how many rows we have
 const rowCount = rowsArray.length;
@@ -385,7 +394,8 @@ const rowCount = rowsArray.length;
                   const next = [...rowsArray];
                   next[idx] = n;
 
-                  // Direct call to parent - no local state
+                  setRowsArray(next);
+
                   onGenerateSeating?.({
                     seatsPerRowByRow: next,
                     numberOfRows: next.length,
@@ -413,10 +423,13 @@ const rowCount = rowsArray.length;
                     (_row, i) => i !== idx
                   );
 
-                  // Direct call to parent - no local state
+                  const safe = next.length ? next : [rowsArray[0] ?? 3];
+
+                  setRowsArray(safe);
+
                   onGenerateSeating?.({
-                    seatsPerRowByRow: next,
-                    numberOfRows: next.length,
+                    seatsPerRowByRow: safe,
+                    numberOfRows: safe.length,
                     seatSpacing,
                     rowSpacingM,
                   });
@@ -444,7 +457,8 @@ const rowCount = rowsArray.length;
                   Math.max(1, Number(last) || 3),
                 ];
 
-                // Direct call to parent - no local state
+                setRowsArray(next);
+
                 onGenerateSeating?.({
                   seatsPerRowByRow: next,
                   numberOfRows: next.length,

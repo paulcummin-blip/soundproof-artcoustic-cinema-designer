@@ -1779,52 +1779,89 @@ appState.rowCentersM.forEach((rowY, rowIdx) => {
     _seatsPerRowByRow // NEW dependency
   ]);
 
-  // Manual seating generation - now uses anchor-based positioning
+  // Manual seating generation - single source of truth
 const handleGenerateSeating = useCallback((overrides = {}) => {
   if (_isFrozen && _isFrozen('seating')) return;
 
-  // 1) Read incoming values or fall back to current state
-  const effectiveSeatSpacing = overrides.seatSpacing ?? (_seatSpacing ?? 0.8);
-  const effectiveRowSpacing  = overrides.rowSpacingM ?? (_rowSpacingM ?? 1.8);
+  //
+  // 1. Build per-row seat counts
+  //
+  let list = null;
 
-  // 2) Build a per-row list of seat counts
-  const fromList = Array.isArray(overrides.seatsPerRowByRow) && overrides.seatsPerRowByRow.length
-    ? overrides.seatsPerRowByRow.map(n => Math.max(1, Number(n) || 1))
-    : null;
+  if (Array.isArray(overrides.seatsPerRowByRow) && overrides.seatsPerRowByRow.length) {
+    // Use explicit per-row list from SeatingLayout
+    list = overrides.seatsPerRowByRow.map(n =>
+      Math.max(1, Number.isFinite(Number(n)) ? Math.floor(Number(n)) : 1)
+    );
+  } else {
+    // Fallback: uniform rows
+    const rows =
+      Math.max(
+        1,
+        Number(
+          overrides.numberOfRows ??
+          _seatingRows ??
+          1
+        ) || 1
+      );
 
-  const fallbackCount = overrides.seatsPerRow ?? (_seatsPerRow ?? 2);
-  const fallbackRows  = overrides.numberOfRows ?? (_seatingRows ?? 1);
+    const count =
+      Math.max(
+        1,
+        Number(
+          overrides.seatsPerRow ??
+          _seatsPerRow ??
+          3
+        ) || 1
+      );
 
-  const list = fromList
-    ? fromList
-    : Array.from({ length: Math.max(1, Number(fallbackRows) || 1) }, () => Math.max(1, Number(fallbackCount) || 1));
-
-  // 3) Push changes to state
-  //    – Always keep the row count in sync
-  if (typeof setSeatingRowsGuarded === 'function') setSeatingRowsGuarded(list.length);
-
-  //    – Only touch the old single “seatsPerRow” when we are NOT using a per-row list
-  if (!fromList && typeof setSeatsPerRowGuarded === 'function') {
-    setSeatsPerRowGuarded(Math.max(1, Number(fallbackCount) || 1));
+    list = Array.from({ length: rows }, () => count);
   }
 
-  //    – Save spacings
-  if (typeof setSeatSpacingGuarded === 'function') setSeatSpacingGuarded(effectiveSeatSpacing);
-  if (typeof setRowSpacingGuarded  === 'function') setRowSpacingGuarded(effectiveRowSpacing);
+  //
+  // 2. Spacing
+  //
+  const seatSpacing =
+    Number(overrides.seatSpacing ?? _seatSpacing ?? 0.8) || 0.8;
 
-  // Use the appState setter for seatsPerRowByRow
-  if (typeof setSeatsPerRowByRowGuarded === 'function') setSeatsPerRowByRowGuarded(list);
+  const rowSpacing =
+    Number(overrides.rowSpacingM ?? _rowSpacingM ?? 1.8) || 1.8;
+
+  //
+  // 3. Write into app state (this drives all effects)
+  //
+  if (typeof setSeatingRowsGuarded === 'function') {
+    setSeatingRowsGuarded(list.length);
+  }
+
+  if (typeof setSeatsPerRowByRowGuarded === 'function') {
+    setSeatsPerRowByRowGuarded(list);
+  }
+
+  // Keep legacy single value roughly in sync for any old code
+  if (typeof setSeatsPerRowGuarded === 'function') {
+    const first = list[0] ?? 3;
+    setSeatsPerRowGuarded(first);
+  }
+
+  if (typeof setSeatSpacingGuarded === 'function') {
+    setSeatSpacingGuarded(seatSpacing);
+  }
+
+  if (typeof setRowSpacingGuarded === 'function') {
+    setRowSpacingGuarded(rowSpacing);
+  }
 }, [
-  _seatsPerRow,
   _seatingRows,
+  _seatsPerRow,
   _seatSpacing,
   _rowSpacingM,
   _isFrozen,
-  setSeatsPerRowGuarded,
   setSeatingRowsGuarded,
+  setSeatsPerRowByRowGuarded,
+  setSeatsPerRowGuarded,
   setSeatSpacingGuarded,
   setRowSpacingGuarded,
-  setSeatsPerRowByRowGuarded, // Use the guarded appState setter
 ]);
 
   // Normalise seat flags whenever seating or room size changes
