@@ -394,8 +394,11 @@ const rowCount = rowsArray.length;
                   const next = [...rowsArray];
                   next[idx] = n;
 
+                  // 1) update local view
                   setRowsArray(next);
+                  onSeatsPerRowByRowChange?.(next); // NEW: Notify parent of change
 
+                  // 2) tell RoomDesigner to rebuild all seats
                   onGenerateSeating?.({
                     seatsPerRowByRow: next,
                     numberOfRows: next.length,
@@ -425,8 +428,11 @@ const rowCount = rowsArray.length;
 
                   const safe = next.length ? next : [rowsArray[0] ?? 3];
 
+                  // 1) update local view
                   setRowsArray(safe);
+                  onSeatsPerRowByRowChange?.(safe); // NEW: Notify parent of change
 
+                  // 2) rebuild in RoomDesigner
                   onGenerateSeating?.({
                     seatsPerRowByRow: safe,
                     numberOfRows: safe.length,
@@ -457,8 +463,11 @@ const rowCount = rowsArray.length;
                   Math.max(1, Number(last) || 3),
                 ];
 
+                // 1) update local view
                 setRowsArray(next);
+                onSeatsPerRowByRowChange?.(next); // NEW: Notify parent of change
 
+                // 2) rebuild in RoomDesigner
                 onGenerateSeating?.({
                   seatsPerRowByRow: next,
                   numberOfRows: next.length,
