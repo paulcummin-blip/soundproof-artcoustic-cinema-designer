@@ -353,10 +353,19 @@ const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
 
 const MLP_calculated = useMemo(() => {
   // If an explicit MLP point exists, use it (no extra offset here)
-if (mlpPoint && Number.isFinite(mlpPoint.x) && Number.isFinite(mlpPoint.y)) {
+if (mlpPoint && Number.isFinite(mlpPoint.y)) {
+  // Always lock MLP horizontally to the centre of the room, not to seats.
+  const widthM =
+    Number(dimensions?.width) ||
+    Number(dimensions?.widthM) ||
+    Number(appState?.roomDims?.widthM) ||
+    0;
+
+  const centerX_m = widthM > 0 ? widthM / 2 : (Number(mlpPoint.x) || 0);
+
   return {
-    x: centerX_m,
-    y: clampY(Number(mlpPoint.y)),
+    x: centerX_m,                        // geometric centreline
+    y: clampY(Number(mlpPoint.y)),       // Y still from 57.5° / screen logic
     z: Number(mlpPoint.z ?? 1.2),
   };
 }
