@@ -351,92 +351,48 @@ const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
     return map[r] || r;
   }, []);
 
-// --- MLP: lock to room centreline, never to seats -------------------------
-
-// Room size in metres (prefer new roomDims, fall back to legacy)
-const widthM =
-  Number(appState?.roomDims?.widthM) ||
-  Number(appState?.dimensions?.widthM) ||
-  Number(appState?.dimensions?.width) ||
-  0;
-
-const lengthM =
-  Number(appState?.roomDims?.lengthM) ||
-  Number(appState?.dimensions?.lengthM) ||
-  Number(appState?.dimensions?.length) ||
-  6;
-
-// Fixed horizontal centreline for the room
-const centerX_m = widthM > 0 ? widthM / 2 : 0;
-
-// Clamp Y safely inside the room
-const clampY = (y) => {
-  if (!Number.isFinite(y)) return 0.4;
-  const MIN_Y = 0.4;
-  const MAX_Y = Math.max(MIN_Y, lengthM - 0.4);
-  return Math.max(MIN_Y, Math.min(MAX_Y, y));
-};
-
 const MLP_calculated = useMemo(() => {
-  // 1. If RoomDesigner supplies an MLP: use its Y, force X to centreline
-  if (mlpPoint && Number.isFinite(mlpPoint.y)) {
+  // If an explicit MLP point exists, use it (no extra offset here)
+  if (mlpPoint && Number.isFinite(mlpPoint.x) && Number.isFinite(mlpPoint.y)) {
     return {
       x: centerX_m,
       y: clampY(Number(mlpPoint.y)),
-      z: Number.isFinite(mlpPoint.z) ? Number(mlpPoint.z) : 1.2,
+      z: Number(mlpPoint.z ?? 1.2),
     };
   }
 
-  // 2. If we have seats: use them for Y only, keep X on centreline
+  // Otherwise derive from seats (seats already include any viewing offset in their own Y)
   if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
     const seats = seatingPositions.map((s) => ({
       x: Number(s?.position?.x ?? s?.x ?? 0),
       y: clampY(Number(s?.position?.y ?? s?.y ?? 0)),
-      z: Number.isFinite(s?.z) ? Number(s.z) : 1.2,
+      z: Number(s?.z ?? 1.2),
       rowNumber: s?.rowNumber ?? 1,
     }));
 
     let picked = null;
-
     try {
-      if (typeof pickMLP === 'function') {
-        picked = pickMLP(mlpBasis || 'all', seats);
-      }
-    } catch (err) {
-      console.error('pickMLP failed in RoomVisualisation:', err);
-      picked = null;
+      picked = pickMLP?.('all', seats);
+    } catch (e) {
+      console.error("Error calling pickMLP:", e);
+      picked = seats[Math.floor(seats.length / 2)] || { x: 0, y: lengthM * 0.58, z: 1.2 };
     }
-
-    const fallbackY = lengthM * 0.58;
-
-    const y = picked && Number.isFinite(picked.y)
-      ? Number(picked.y)
-      : fallbackY;
-
-    const z = picked && Number.isFinite(picked.z)
-      ? Number(picked.z)
-      : 1.2;
 
     return {
       x: centerX_m,
-      y: clampY(y),
-      z,
+      y: clampY(Number.isFinite(picked?.y) ? Number(picked.y) : (lengthM * 0.58)),
+      z: Number.isFinite(picked?.z) ? Number(picked.z) : 1.2,
     };
   }
 
-  // 3. No mlpPoint and no seats: centre of room, sensible distance back
-  return {
-    x: centerX_m,
-    y: clampY(lengthM * 0.58),
-    z: 1.2,
-  };
-}, [mlpPoint, seatingPositions, mlpBasis, centerX_m, lengthM]);
+  // Fallback
+  return { x: centerX_m, y: clampY(lengthM * 0.58), z: 1.2 };
+}, [mlpPoint, seatingPositions, lengthM, centerX_m]);
 
-const mlp = MLP_calculated;
-const mlpDotX_m = mlp.x;
-const mlpDotY_m = mlp.y;
-const mlpDotZ_m = mlp.z;
-
+  const mlp = MLP_calculated;
+  const mlpDotX_m = mlp.x;
+  const mlpDotY_m = mlp.y;
+  const mlpDotZ_m = mlp.z;
 // Removed duplicate viewingDistanceOffsetM seat shift (handled in RoomDesigner)
   const [hoveredSpeaker, setHoveredSpeaker] = useState(null);
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
