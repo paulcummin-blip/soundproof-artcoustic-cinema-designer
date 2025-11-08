@@ -107,19 +107,6 @@ const rowsArray = useMemo(() => {
   return Array.from({ length: rows }, () => count);
 }, [seatsPerRowByRow, seatsPerRow, seatingRows]);
 
-// Save a new list and keep the old two numbers in step as a fallback
-const setRowsArray = useCallback((next) => {
-  const safe = (Array.isArray(next) ? next : []).map(n =>
-    Math.max(1, Number.isFinite(Number(n)) ? Math.floor(Number(n)) : 1)
-  );
-  // update the new per-row list
-  // Note: onSeatsPerRowByRowChange is now called within the individual row handlers
-  // onSeatsPerRowByRowChange?.(safe); 
-  // keep only the row count in sync for old code
-  // Note: onSeatingRowsChange is now called within the individual row handlers
-  // onSeatingRowsChange?.(safe.length || 1);
-}, []); // Dependencies removed as updates are handled directly in event handlers now
-
 // Use this everywhere instead of seatingRows for how many rows we have
 const rowCount = rowsArray.length;
 
@@ -146,11 +133,11 @@ const rowCount = rowsArray.length;
         targetRowNumbers = [rowNumbers[rowNumbers.length - 1]];
         break;
       case 'middle':
-        if (seatingRows >= 3) {
-          if (seatingRows % 2 !== 0) { // Odd number of rows
-            targetRowNumbers = [rowNumbers[Math.floor(seatingRows / 2)]];
+        if (rowCount >= 3) { // Changed seatingRows to rowCount
+          if (rowCount % 2 !== 0) { // Odd number of rows
+            targetRowNumbers = [rowNumbers[Math.floor(rowCount / 2)]];
           } else { // Even number of rows
-            targetRowNumbers = [rowNumbers[seatingRows / 2 - 1], rowNumbers[seatingRows / 2]];
+            targetRowNumbers = [rowNumbers[rowCount / 2 - 1], rowNumbers[rowCount / 2]];
           }
         } else { // Fallback for 2 rows
              targetRowNumbers = rowNumbers;
@@ -180,7 +167,7 @@ const rowCount = rowsArray.length;
     if (flagsChanged) {
       onSetSeatingPositions(newSeatsWithFlags);
     }
-  }, [seatingPositions, mlpBasis, seatingRows, onSetSeatingPositions]);
+  }, [seatingPositions, mlpBasis, rowCount, onSetSeatingPositions]); // Changed seatingRows to rowCount
 
   const totalSeats = seatingPositions.length;
   const primarySeats = seatingPositions.filter(s => s.isPrimary).length;
@@ -215,12 +202,12 @@ const rowCount = rowsArray.length;
       { value: 'all', label: 'All Rows (Average)' }
     ];
     
-    if (seatingRows >= 3) {
+    if (rowCount >= 3) { // Changed seatingRows to rowCount
       options.splice(1, 0, { value: 'middle', label: 'Middle Row Center' });
     }
     
     return options;
-  }, [seatingRows]);
+  }, [rowCount]); // Changed seatingRows to rowCount
 
   // Validate current mlpBasis against available options
   const validMlpBasis = useMemo(() => {
@@ -322,14 +309,14 @@ const rowCount = rowsArray.length;
         </div>
       )}
 
-      {seatingRows > 1 && (
+      {rowCount > 1 && ( // Changed seatingRows to rowCount
         <div className="space-y-2">
           <Label className="text-sm font-medium flex items-center gap-2" style={{color: '#625143'}}>
             <Ruler className="w-4 h-4" />
             Row Heights (Ear Level)
           </Label>
           <div className="grid grid-cols-1 gap-2">
-            {Array.from({ length: seatingRows }, (_, i) => (
+            {Array.from({ length: rowCount }, (_, i) => ( // Changed seatingRows to rowCount
               <div key={i + 1} className="flex items-center justify-between p-2 rounded" style={{backgroundColor: '#F8F8F7', border: '1px solid #C1B6AD'}}>
                 <span className="text-xs" style={{color: '#1B1A1A'}}>Row {i + 1}</span>
                 <div className="flex items-center gap-2">
@@ -388,6 +375,8 @@ const rowCount = rowsArray.length;
                 step="1"
                 value={count}
                 onChange={(e) => {
+                  if (disabled) return;
+
                   const n = Math.max(
                     1,
                     parseInt(e.target.value || '1', 10)
@@ -396,14 +385,7 @@ const rowCount = rowsArray.length;
                   const next = [...rowsArray];
                   next[idx] = n;
 
-                  // 1) update per-row counts in local state
-                  setRowsArray(next);
-
-                  // 2) sync to parent state BEFORE regenerating
-                  onSeatsPerRowByRowChange?.(next);
-                  onSeatingRowsChange?.(next.length);
-
-                  // 3) regenerate seats so plan updates
+                  // Direct call to parent - no local state
                   onGenerateSeating?.({
                     seatsPerRowByRow: next,
                     numberOfRows: next.length,
@@ -420,61 +402,18 @@ const rowCount = rowsArray.length;
                 }}
               />
 
-                {/* Remove this row */}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    if (rowsArray.length <= 1) return;
-
-                    const next = rowsArray.filter(
-                      (_row, i) => i !== idx
-                    );
-
-                    // 1) update per-row counts in local state
-                    setRowsArray(next);
-
-                    // 2) sync to parent state BEFORE regenerating
-                    onSeatsPerRowByRowChange?.(next);
-                    onSeatingRowsChange?.(next.length);
-
-                    // 3) regenerate seats so plan updates
-                    onGenerateSeating?.({
-                      seatsPerRowByRow: next,
-                      numberOfRows: next.length,
-                      seatSpacing,
-                      rowSpacingM,
-                    });
-                  }}
-                  disabled={disabled || rowsArray.length <= 1}
-                >
-                  Remove
-                </Button>
-              </div>
-            ))}
-
-            {/* Add Row */}
-            <div className="pt-1">
+              {/* Remove this row */}
               <Button
                 type="button"
                 variant="outline"
-                className="w-28"
-                disabled={disabled}
                 onClick={() => {
-                  const last = rowsArray[rowsArray.length - 1] ?? 3;
-                  const next = [
-                    ...rowsArray,
-                    Math.max(1, Number(last) || 3),
-                  ];
+                  if (disabled || rowsArray.length <= 1) return;
 
-                  // 1) update per-row counts in local state
-                  setRowsArray(next);
+                  const next = rowsArray.filter(
+                    (_row, i) => i !== idx
+                  );
 
-                  // 2) sync to parent state BEFORE regenerating
-                  onSeatsPerRowByRowChange?.(next);
-                  onSeatingRowsChange?.(next.length);
-
-                  // 3) regenerate seats so plan updates
+                  // Direct call to parent - no local state
                   onGenerateSeating?.({
                     seatsPerRowByRow: next,
                     numberOfRows: next.length,
@@ -482,12 +421,43 @@ const rowCount = rowsArray.length;
                     rowSpacingM,
                   });
                 }}
+                disabled={disabled || rowsArray.length <= 1}
               >
-                Add Row
+                Remove
               </Button>
             </div>
+          ))}
+
+          {/* Add Row */}
+          <div className="pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-28"
+              disabled={disabled}
+              onClick={() => {
+                if (disabled) return;
+
+                const last = rowsArray[rowsArray.length - 1] ?? 3;
+                const next = [
+                  ...rowsArray,
+                  Math.max(1, Number(last) || 3),
+                ];
+
+                // Direct call to parent - no local state
+                onGenerateSeating?.({
+                  seatsPerRowByRow: next,
+                  numberOfRows: next.length,
+                  seatSpacing,
+                  rowSpacingM,
+                });
+              }}
+            >
+              Add Row
+            </Button>
           </div>
         </div>
+      </div>
 
       {/* Seat Spacing (m) */}
       <div className="space-y-2">
