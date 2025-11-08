@@ -353,13 +353,13 @@ const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
 
 const MLP_calculated = useMemo(() => {
   // If an explicit MLP point exists, use it (no extra offset here)
-  if (mlpPoint && Number.isFinite(mlpPoint.x) && Number.isFinite(mlpPoint.y)) {
-    return {
-      x: centerX_m,
-      y: clampY(Number(mlpPoint.y)),
-      z: Number(mlpPoint.z ?? 1.2),
-    };
-  }
+if (mlpPoint && Number.isFinite(mlpPoint.x) && Number.isFinite(mlpPoint.y)) {
+  return {
+    x: centerX_m,
+    y: clampY(Number(mlpPoint.y)),
+    z: Number(mlpPoint.z ?? 1.2),
+  };
+}
 
   // Otherwise derive from seats (seats already include any viewing offset in their own Y)
   if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
