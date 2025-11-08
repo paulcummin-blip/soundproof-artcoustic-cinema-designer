@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
@@ -74,7 +73,7 @@ const getEarHeightForRow = (rowNumber) => {
 export default function SeatingLayout({
   seatingPositions = [],
   onGenerateSeating,
-  // NEW: per-row seat counts (array). If not provided, we’ll fall back to seatsPerRow + seatingRows.
+  // NEW: per-row seat counts (array). If not provided, we'll fall back to seatsPerRow + seatingRows.
   seatsPerRowByRow,
   onSeatsPerRowByRowChange,
   // Keep old fields for now (fallbacks)
@@ -95,36 +94,21 @@ export default function SeatingLayout({
   screen,
   dimensions
 }) {
-  // Local copy of "seats per row" for the editor.
-  // This makes the form feel instant, and we tell the parent whenever it changes.
-  const [rowsArray, setRowsArray] = React.useState(() => {
+  // Build rowsArray purely from props (parent is the source of truth)
+  const rowsArray = React.useMemo(() => {
     if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
       return seatsPerRowByRow.map((n) =>
         Math.max(1, parseInt(n || 1, 10))
       );
     }
+
     const rows = Math.max(1, parseInt(seatingRows || 1, 10));
     const seats = Math.max(1, parseInt(seatsPerRow || 1, 10));
     return Array.from({ length: rows }, () => seats);
-  });
+  }, [seatsPerRowByRow, seatsPerRow, seatingRows]);
 
-  // Keep local rowsArray in sync if a project is loaded or state changes outside
-  React.useEffect(() => {
-    if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
-      setRowsArray(
-        seatsPerRowByRow.map((n) =>
-          Math.max(1, parseInt(n || 1, 10))
-        )
-      );
-    } else {
-      const rows = Math.max(1, parseInt(seatingRows || 1, 10));
-      const seats = Math.max(1, parseInt(seatsPerRow || 1, 10));
-      setRowsArray(Array.from({ length: rows }, () => seats));
-    }
-  }, [seatsPerRowByRow, seatingRows, seatsPerRow]);
-
-// Use this everywhere instead of seatingRows for how many rows we have
-const rowCount = rowsArray.length;
+  // Use this everywhere instead of seatingRows for how many rows we have
+  const rowCount = rowsArray.length;
 
   // Logic to set primary seats based on MLP basis, now inside SeatingLayout
   useEffect(() => {
@@ -400,22 +384,10 @@ const rowCount = rowsArray.length;
                 onChange={(e) => {
                   if (disabled) return;
 
-                  const n = Math.max(
-                    1,
-                    parseInt(e.target.value || 1, 10)
-                  );
-
+                  const n = Math.max(1, parseInt(e.target.value || '1', 10));
                   const next = [...rowsArray];
                   next[idx] = n;
 
-                  // 1) update local editor list
-                  setRowsArray(next);
-
-                  // 2) sync parent's state
-                  onSeatsPerRowByRowChange?.(next);
-                  onSeatingRowsChange?.(next.length);
-
-                  // 3) ask parent to regenerate seats
                   onGenerateSeating?.({
                     seatsPerRowByRow: next,
                     numberOfRows: next.length,
@@ -437,19 +409,8 @@ const rowCount = rowsArray.length;
                     (_row, i) => i !== idx
                   );
 
-                  // Keep at least one row
-                  const safe = next.length
-                    ? next
-                    : [rowsArray[0] ?? 3];
+                  const safe = next.length ? next : [rowsArray[0] ?? 3];
 
-                  // 1) update local editor list
-                  setRowsArray(safe);
-
-                  // 2) sync parent's state
-                  onSeatsPerRowByRowChange?.(safe);
-                  onSeatingRowsChange?.(safe.length);
-
-                  // 3) regenerate seats
                   onGenerateSeating?.({
                     seatsPerRowByRow: safe,
                     numberOfRows: safe.length,
@@ -479,14 +440,6 @@ const rowCount = rowsArray.length;
                   Math.max(1, Number(last) || 3),
                 ];
 
-                // 1) update local editor list
-                setRowsArray(next);
-
-                // 2) sync parent's state
-                onSeatsPerRowByRowChange?.(next);
-                onSeatingRowsChange?.(next.length);
-
-                // 3) regenerate seats
                 onGenerateSeating?.({
                   seatsPerRowByRow: next,
                   numberOfRows: next.length,
