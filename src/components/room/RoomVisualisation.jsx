@@ -351,25 +351,35 @@ const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
     return map[r] || r;
   }, []);
 
+// --- MLP: lock to room centreline, never to seats -------------------------
+
+// Room size in metres (prefer new roomDims, fall back to legacy)
+const widthM =
+  Number(appState?.roomDims?.widthM) ||
+  Number(appState?.dimensions?.widthM) ||
+  Number(appState?.dimensions?.width) ||
+  0;
+
+const lengthM =
+  Number(appState?.roomDims?.lengthM) ||
+  Number(appState?.dimensions?.lengthM) ||
+  Number(appState?.dimensions?.length) ||
+  6;
+
+// Fixed horizontal centreline for the room
+const centerX_m = widthM > 0 ? widthM / 2 : 0;
+
+// Clamp Y safely inside the room (tiny margins)
+const clampY = (y) => {
+  if (!Number.isFinite(y)) return 0.4;
+  const MIN_Y = 0.4;
+  const MAX_Y = Math.max(MIN_Y, lengthM - 0.4);
+  return Math.max(MIN_Y, Math.min(MAX_Y, y));
+};
+
 const MLP_calculated = useMemo(() => {
-  // 1. Read room size (from new roomDims first, fall back to legacy)
-  const widthM =
-    Number(appState?.roomDims?.widthM) ||
-    Number(appState?.dimensions?.widthM) ||
-    Number(appState?.dimensions?.width) ||
-    0;
-
-  const lengthM =
-    Number(appState?.roomDims?.lengthM) ||
-    Number(appState?.dimensions?.lengthM) ||
-    Number(appState?.dimensions?.length) ||
-    6;
-
-  // Lock MLP horizontally to ROOM CENTRE only
-  const centerX_m = widthM > 0 ? widthM / 2 : 0;
-
-  // 2. If RoomDesigner has given us an explicit MLP (57.5° calc), trust its Y
-  //    but snap X to the room centreline.
+  // 1. If RoomDesigner supplies an MLP (it’s already based on 57.5° from the screen),
+  //    we trust its Y but force X onto the room centreline.
   if (mlpPoint && Number.isFinite(mlpPoint.y)) {
     return {
       x: centerX_m,
@@ -378,8 +388,7 @@ const MLP_calculated = useMemo(() => {
     };
   }
 
-  // 3. Otherwise, derive from seats (for legacy / no-MLP cases),
-  //    but NEVER let seats move MLP off the centreline.
+  // 2. Legacy / fallback: derive Y from seats, but NEVER move X off centre.
   if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
     const seats = seatingPositions.map((s) => ({
       x: Number(s?.position?.x ?? s?.x ?? 0),
@@ -389,12 +398,15 @@ const MLP_calculated = useMemo(() => {
     }));
 
     let picked = null;
+
     try {
       if (typeof pickMLP === 'function') {
+        // Use current mlpBasis, but this only informs Y;
+        // X is always overridden to centreline below.
         picked = pickMLP(mlpBasis || 'all', seats);
       }
-    } catch (e) {
-      console.error('Error calling pickMLP:', e);
+    } catch (err) {
+      console.error('pickMLP failed in RoomVisualisation:', err);
       picked = null;
     }
 
@@ -415,7 +427,7 @@ const MLP_calculated = useMemo(() => {
     };
   }
 
-  // 4. Final fallback when no mlpPoint and no seats
+  // 3. No mlpPoint and no seats: park it in a sensible central spot.
   return {
     x: centerX_m,
     y: clampY(lengthM * 0.58),
@@ -425,13 +437,14 @@ const MLP_calculated = useMemo(() => {
   mlpPoint,
   seatingPositions,
   mlpBasis,
-  appState?.roomDims?.widthM,
-  appState?.roomDims?.lengthM,
-  appState?.dimensions?.widthM,
-  appState?.dimensions?.lengthM,
-  appState?.dimensions?.width,
-  appState?.dimensions?.length,
+  centerX_m,
+  lengthM,
 ]);
+
+const mlp = MLP_calculated;
+const mlpDotX_m = mlp.x;
+const mlpDotY_m = mlp.y;
+const mlpDotZ_m = mlp.z;
 
   const mlp = MLP_calculated;
   const mlpDotX_m = mlp.x;
