@@ -261,7 +261,7 @@ function useProjectLoader(
     if (typeof setOverheadRearOverride === "function") setOverheadRearOverride(p?.overheadRearOverride || null);
     if (typeof setUseFrontGlobal === "function") setUseFrontGlobal(p?.useFrontGlobal ?? true); // Default to true
     if (typeof setUseMidGlobal === "function") setUseMidGlobal(p?.useMidGlobal ?? true);     // Default to true
-    if (typeof setUseRearGlobal === "function") setUseUseRearGlobal(p?.useRearGlobal ?? true);     // Default to true
+    if (typeof setUseRearGlobal === "function") setUseRearGlobal(p?.useRearGlobal ?? true);     // Default to true
 
     // NEW: Hydrate Row Spacing
     if (typeof setRowSpacingM === "function") setRowSpacingM(Number(p?.row_spacing_m) || 1.8);
@@ -1401,7 +1401,7 @@ function RoomDesignerWithState() {
   const setSeatingPositionsGuarded = useGuardedSetter(appState?.setSeatingPositions, 'seating');
   const setSeatingRowsGuarded = useGuardedSetter(appState?.setSeatingRows, 'seating');
   const setSeatsPerRowGuarded = useGuardedSetter(appState?.setSeatsPerRow, 'seating');
-  const setSeatsPerRowByRowGuarded = useGuardedSetter(_setSeatsPerRowByRow, 'seating'); // NEW: Guarded setter for seatsPerRowByRow
+  const setSeatsPerRowByRowGuarded = useGuardedSetter(appState?.setSeatsPerRowByRow, 'seating'); // NEW: Guarded setter for seatsPerRowByRow
   const setSeatSpacingGuarded = useGuardedSetter(appState?.setSeatSpacing, 'seating');
   const setRowSpacingGuarded = useGuardedSetter(_setRowSpacingM, 'seating');
   const setSeatingBlockOffsetGuarded = useGuardedSetter(appState?.setSeatingBlockOffset, 'seating');
