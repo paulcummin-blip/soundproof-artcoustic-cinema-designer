@@ -255,8 +255,7 @@ const rowCount = rowsArray.length;
       });
     }
   }, [onGenerateSeating, seatsPerRow, seatingRows, seatSpacing, rowSpacingM]); // NEW: Add rowSpacingM dependency
-
-      return (
+  return (
     <div className="space-y-6 seating-layout-sliders" data-rp22="seating">
       <style>{`
         .seating-layout-sliders .slider-track {
@@ -458,10 +457,12 @@ const rowCount = rowsArray.length;
                       const next = [...rowsArray];
                       next[idx] = n;
 
-                      // Single source of truth:
-                      // update per-row counts + row count in app state
-                      onSeatsPerRowByRowChange?.(next);
-                      onSeatingRowsChange?.(next.length);
+                      onGenerateSeating?.({
+                        seatsPerRowByRow: next,
+                        numberOfRows: next.length,
+                        seatSpacing,
+                        rowSpacingM,
+                      });
                     }}
                     disabled={disabled}
                     className="h-10 w-28"
@@ -483,8 +484,12 @@ const rowCount = rowsArray.length;
                         (_row, i) => i !== idx
                       );
 
-                      onSeatsPerRowByRowChange?.(next);
-                      onSeatingRowsChange?.(next.length);
+                      onGenerateSeating?.({
+                        seatsPerRowByRow: next,
+                        numberOfRows: next.length,
+                        seatSpacing,
+                        rowSpacingM,
+                      });
                     }}
                     disabled={disabled || rowsArray.length <= 1}
                   >
@@ -509,8 +514,12 @@ const rowCount = rowsArray.length;
                       Math.max(1, Number(last) || 3),
                     ];
 
-                    onSeatsPerRowByRowChange?.(next);
-                    onSeatingRowsChange?.(next.length);
+                    onGenerateSeating?.({
+                      seatsPerRowByRow: next,
+                      numberOfRows: next.length,
+                      seatSpacing,
+                      rowSpacingM,
+                    });
                   }}
                 >
                   Add Row
