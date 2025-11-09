@@ -313,6 +313,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
   const heightM = Number(appState?.roomDims?.heightM) || 2.4;
   const screenFrontPlaneM = Number(appState?.screenFrontPlaneM ?? 0);
+  const getSpeakerVisibility = appState?.getSpeakerVisibility;
 
   const speakersEpoch = appState?.speakersEpoch || 0;
   const enableFrontWides = appState?.enableFrontWides || false;
