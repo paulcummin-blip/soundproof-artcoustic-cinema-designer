@@ -222,29 +222,25 @@ function useDesignerState() {
     });
   }, [splConfig]);
 
-  // --- SPEAKER VISIBILITY (DEBUG-SAFE VERSION) ---
-  // For now: if it has a model, we draw it. No layout gating.
-  // This lets us see whether SBL/SBR/LW/RW are actually being created.
+  // --- SPEAKER VISIBILITY (FIXED: Now properly permissive) ---
+  // Only hide LFE icons and explicitly disabled speakers.
+  // Let layout logic and overlays handle conditional visibility.
   const getSpeakerVisibility = useCallback((role, model) => {
     const canon = String(role || "").toUpperCase();
 
-    // Always show core anchors
-    if (["FL", "FC", "FR", "LFE"].includes(canon)) {
-      return true;
+    // Always hide LFE icons (rendered separately as subwoofers)
+    if (canon === "LFE" || canon === "LFE1" || canon === "LFE2") {
+      return false;
     }
 
-    // Show any other speaker that actually has a real model string
-    if (
-      typeof model === "string" &&
-      model.trim() !== "" &&
-      model.toUpperCase() !== "OFF" &&
-      model.toUpperCase() !== "NONE"
-    ) {
-      return true;
+    // Hide explicitly disabled speakers
+    const modelStr = String(model || "").toLowerCase().trim();
+    if (modelStr === "off" || modelStr === "none" || modelStr === "") {
+      return false;
     }
 
-    // Hide unconfigured / empty roles
-    return false;
+    // Show everything else - let renderSpeakers and layout logic handle the rest
+    return true;
   }, []);
 
   const isFrozen = useCallback((tab) => !!frozenTabs[tab], [frozenTabs]);
