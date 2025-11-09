@@ -106,18 +106,6 @@ function useDesignerState() {
   
   const DBG_FW = typeof window !== 'undefined' && window.DBG_FW;
 
-  // --- SAFE SPEAKER VISIBILITY SELECTOR ---
-  const layoutStr = String(dolbyLayout || '5.1');
-  const widesFlag = !!useWidesInsteadOfRears;
-
-  // 2) Visibility helper used by RoomVisualisation to decide which roles to draw
-  const getSpeakerVisibility = useCallback((role) => {
-    return isRoleVisible(role, {
-      dolbyLayout: layoutStr,
-      useFrontWidesInsteadOfRear: widesFlag,
-    });
-  }, [layoutStr, widesFlag]);
-
   const [frozenTabs, setFrozenTabs] = useState({
     room: false, screen: false, seating: false, speakers: false,
     elements: false, bass: false, report: false,
@@ -201,6 +189,71 @@ function useDesignerState() {
     }));
   }, []);
 
+  // Detect if any surround model has been chosen.
+  // This is intentionally defensive: it looks in a few likely places on splConfig.
+  // If your real shape is splConfig.roles[role].model, this will pick it up.
+  const hasSurroundModelSelected = useMemo(() => {
+    if (!splConfig) return false;
+
+    const surroundRoles = ['SL', 'SR', 'SBL', 'SBR', 'LR', 'RR'];
+
+    // Try to find a non-empty model for any surround role
+    return surroundRoles.some((role) => {
+      const cfg =
+        splConfig.perRole?.[role] || // Corrected from splConfig.roles to splConfig.perRole
+        splConfig.byRole?.[role] ||
+        splConfig[role] ||
+        splConfig.surround || // e.g. a shared surround config
+        splConfig.surroundModel;
+
+      const model = cfg && (cfg.model || cfg);
+
+      return !!(
+        model &&
+        typeof model === 'string' &&
+        model.toUpperCase() !== 'NONE'
+      );
+    });
+  }, [splConfig]);
+
+  // --- SAFE SPEAKER VISIBILITY SELECTOR ---
+  const layoutStr = String(dolbyLayout || '5.1');
+  const widesFlag = !!useWidesInsteadOfRears;
+
+  // 2) Visibility helper used by RoomVisualisation to decide which roles to draw
+  const getSpeakerVisibility = useCallback(
+    (role) => {
+      const r = String(role || '').toUpperCase();
+
+      const surroundRoles = ['SL', 'SR', 'SBL', 'SBR', 'LR', 'RR'];
+
+      // Surrounds: only show if a surround model is selected,
+      // AND the layout says that role is valid.
+      if (surroundRoles.includes(r)) {
+        if (!hasSurroundModelSelected) return false;
+
+        if (typeof isRoleVisible === 'function') {
+          return isRoleVisible(r, {
+            dolbyLayout: layoutStr,
+            useFrontWidesInsteadOfRear: widesFlag,
+          });
+        }
+        // If we can't consult isRoleVisible, show them once a model is chosen.
+        return true;
+      }
+
+      // All other speakers: use existing rules so they still match the layout.
+      if (typeof isRoleVisible === 'function') {
+        return isRoleVisible(r, {
+          dolbyLayout: layoutStr,
+          useFrontWidesInsteadOfRear: widesFlag,
+        });
+      }
+
+      return true;
+    },
+    [hasSurroundModelSelected, layoutStr, widesFlag]
+  );
 
   const isFrozen = useCallback((tab) => !!frozenTabs[tab], [frozenTabs]);
   const freezeTab = useCallback((tab) => {
