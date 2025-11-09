@@ -222,37 +222,32 @@ function useDesignerState() {
 
   // 2) Visibility helper used by RoomVisualisation to decide which roles to draw
   const getSpeakerVisibility = useCallback(
-    (role) => {
-      const r = String(role || '').toUpperCase();
+    (role, model) => {
+      const canon = String(role || "").toUpperCase();
 
-      const surroundRoles = ['SL', 'SR', 'SBL', 'SBR', 'LR', 'RR'];
-
-      // Surrounds: only show if a surround model is selected,
-      // AND the layout says that role is valid.
-      if (surroundRoles.includes(r)) {
-        if (!hasSurroundModelSelected) return false;
-
-        if (typeof isRoleVisible === 'function') {
-          return isRoleVisible(r, {
-            dolbyLayout: layoutStr,
-            useFrontWidesInsteadOfRear: widesFlag,
-          });
-        }
-        // If we can't consult isRoleVisible, show them once a model is chosen.
+      // Always show core front + LFE
+      if (["FL", "FC", "FR", "LFE"].includes(canon)) {
         return true;
       }
 
-      // All other speakers: use existing rules so they still match the layout.
-      if (typeof isRoleVisible === 'function') {
-        return isRoleVisible(r, {
-          dolbyLayout: layoutStr,
-          useFrontWidesInsteadOfRear: widesFlag,
-        });
-      }
+      // Only show surrounds / wides / backs if:
+      // 1) They are allowed for this layout
+      // 2) They have a model selected (not empty / NONE)
+      const isAllowed = isRoleVisible(canon, {
+        dolbyLayout: layoutStr,
+        useFrontWidesInsteadOfRear: widesFlag, // Use the correct state variable name
+      });
 
-      return true;
+      if (!isAllowed) return false;
+
+      const hasModel =
+        !!model &&
+        typeof model === "string" &&
+        model.toUpperCase() !== "NONE";
+
+      return hasModel;
     },
-    [hasSurroundModelSelected, layoutStr, widesFlag]
+    [layoutStr, widesFlag]
   );
 
   const isFrozen = useCallback((tab) => !!frozenTabs[tab], [frozenTabs]);
@@ -382,7 +377,6 @@ function useDesignerState() {
 
 
   // Normalization wrapper with epoch increment
- // Normalization wrapper with epoch increment
 const setSpeakerSystem = useCallback((updater) => {
   _setSpeakerSystem(prev => {
     const next = typeof updater === 'function' ? updater(prev) : updater;

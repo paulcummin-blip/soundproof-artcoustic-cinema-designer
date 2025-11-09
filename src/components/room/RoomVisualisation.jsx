@@ -124,7 +124,7 @@ import {
   computeBackWallInnerEdges,
   computeRearVisualLanes,
   resolveSymmetricY,
-} from "@/components/room/rvPlanHelpers";
+} from "@/components/room/rv/RenderPrimitives";
 
 // SAFE ROLE ACCESSOR – works with Map or plain object; always returns an array
 function getByRoleArray(mapOrObj, role) {
@@ -313,7 +313,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
   const heightM = Number(appState?.roomDims?.heightM) || 2.4;
   const screenFrontPlaneM = Number(appState?.screenFrontPlaneM ?? 0);
-  const getSpeakerVisibility = appState?.getSpeakerVisibility;
+  const getSpeakerVisibility = appState?.getSpeakerVisibility || (() => true);
 
   const speakersEpoch = appState?.speakersEpoch || 0;
   const enableFrontWides = appState?.enableFrontWides || false;
@@ -4011,7 +4011,9 @@ return {
 
   const renderSpeakers = useCallback(() => {
     // This function specifically renders speakers from the `speakersToRender` memo
-    const speakersToRenderList = speakersToRender.filter(isRenderableSpeaker);
+    const speakersToRenderList = speakersToRender
+      .filter(isRenderableSpeaker)
+      .filter(spk => getSpeakerVisibility(spk.role, spk.model));
 
     return speakersToRenderList.map(speaker => {
       const { id, role, model, position } = speaker;
@@ -4064,14 +4066,15 @@ return {
     getModelDimsM,
     lcrAngleInfo,
     aimAtMLP,
-    widthM, lengthM, heightM, // Use new dimension variables
+    widthM, lengthM, heightM,
     meterToCanvasY,
     meterToCanvasX,
     toPx,
     scale,
     setHoveredSpeaker,
     handleMouseDown,
-    getCanonicalRole
+    getCanonicalRole,
+    getSpeakerVisibility,
   ]);
 
   // Renders rear subwoofers using SpeakerRect
