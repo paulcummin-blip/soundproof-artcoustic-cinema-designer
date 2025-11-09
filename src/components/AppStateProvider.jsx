@@ -235,7 +235,7 @@ function useDesignerState() {
       // 2) They have a model selected (not empty / NONE)
       const isAllowed = isRoleVisible(canon, {
         dolbyLayout: layoutStr,
-        useFrontWidesInsteadOfRear: widesFlag, // Use the correct state variable name
+        useFrontWidesInsteadOfRears: widesFlag, // ✅ FIXED: correct parameter name
       });
 
       if (!isAllowed) return false;
