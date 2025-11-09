@@ -3483,7 +3483,7 @@ return null;
           elements.push(
             <line
               key={`spoke-${si}-${ri}-${di}`}
-              x1={sx} y1={sy} x2={seatPx[0]} y2={seatPx[1]}
+              x1={sx} y1={sy} x2={ex} y2={ey} // Corrected x2 y2 to hit.x, hit.y converted to px
               stroke={spec.stroke}
               strokeWidth={1}
               strokeDasharray="3,6"
@@ -4166,31 +4166,31 @@ return {
       </g>
     );
   };
-  // Fixed MLP marker at optimal 57.5° horizontal FOV position (or custom MLP if provided)
-  // This marker uses mlpDotX_m_visual and mlpDotY_m_visual, which include the viewingDistanceOffsetM
-/* START: MLP marker locked to seat centre */
-const MLPMarker = useMemo(() => {
-  // Pick the seat the MLP should sit on: primary seat if flagged, else the middle one
-  const seatsArr = Array.isArray(seatingPositions) ? seatingPositions : [];
-  const mlpSeat =
-    seatsArr.find(s => s.isPrimary) ||
-    seatsArr[Math.floor(seatsArr.length / 2)] ||
-    null;
+  
+  // MLP marker: always draw at computed MLP (mlpDotX_m, mlpDotY_m),
+  // never snap horizontally to a specific seat.
+  const MLPMarker = useMemo(() => {
+    if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) {
+      return null;
+    }
 
-  // Fallback to the computed MLP coords if no seats exist
-  const baseX_m = mlpSeat ? Number(mlpSeat.x ?? mlpSeat.position?.x ?? mlpDotX_m) : mlpDotX_m;
-  const baseY_m = mlpSeat ? Number(mlpSeat.y ?? mlpSeat.position?.y ?? mlpDotY_m) : mlpDotY_m;
+    const [x, y] = toPx(mlpDotX_m, mlpDotY_m);
 
-  const [x, y] = toPx(baseX_m, baseY_m);
+    return (
+      <g data-testid="mlp-marker">
+        <circle
+          cx={x}
+          cy={y}
+          r={4}
+          fill="#22c55e"
+          stroke="#ffffff"
+          strokeWidth={2}
+          opacity={0.9}
+        />
+      </g>
+    );
+  }, [toPx, mlpDotX_m, mlpDotY_m]);
 
-  // Small green dot, centred exactly at the seat centre
-  return (
-    <g data-testid="mlp-marker">
-      <circle cx={x} cy={y} r="4" fill="#22c55e" stroke="white" strokeWidth="2" opacity="0.9" />
-    </g>
-  );
-}, [toPx, seatingPositions, mlpDotX_m, mlpDotY_m]);
-/* END: MLP marker locked to seat centre */
 
   const containerStyle = {
     position: 'relative',
