@@ -222,79 +222,30 @@ function useDesignerState() {
     });
   }, [splConfig]);
 
-  // --- SAFE SPEAKER VISIBILITY SELECTOR ---
-  const layoutStr = String(dolbyLayout || "5.1");
+  // --- SPEAKER VISIBILITY (DEBUG-SAFE VERSION) ---
+  // For now: if it has a model, we draw it. No layout gating.
+  // This lets us see whether SBL/SBR/LW/RW are actually being created.
+  const getSpeakerVisibility = useCallback((role, model) => {
+    const canon = String(role || "").toUpperCase();
 
-  const getSpeakerVisibility = useCallback(
-    (role, model) => {
-      const canon = String(role || "").toUpperCase();
+    // Always show core anchors
+    if (["FL", "FC", "FR", "LFE"].includes(canon)) {
+      return true;
+    }
 
-      // Always show core fronts + LFE
-      if (["FL", "FC", "FR", "LFE"].includes(canon)) {
-        return true;
-      }
+    // Show any other speaker that actually has a real model string
+    if (
+      typeof model === "string" &&
+      model.trim() !== "" &&
+      model.toUpperCase() !== "OFF" &&
+      model.toUpperCase() !== "NONE"
+    ) {
+      return true;
+    }
 
-      // Parse layout: "5.1", "7.1", "7.1.4", "9.1.6", etc.
-      const parts = layoutStr.split(".");
-      const major = parseInt(parts[0], 10) || 5;
-
-      const useWides = !!useWidesInsteadOfRears;
-
-      // Explicit allowed roles so we can't drift from UX expectations
-      const allowed = new Set();
-
-      // Sides always allowed
-      allowed.add("SL");
-      allowed.add("SR");
-
-      if (major >= 7) {
-        // 7-bed toggle: rears XOR wides
-        if (useWides) {
-          allowed.add("LW");
-          allowed.add("RW");
-        } else {
-          allowed.add("SBL");
-          allowed.add("SBR");
-        }
-      }
-
-      if (major >= 9) {
-        // 9-bed: both rears and wides
-        allowed.add("SBL");
-        allowed.add("SBR");
-        allowed.add("LW");
-        allowed.add("RW");
-      }
-
-      const isAllowed = allowed.has(canon);
-
-      // Debug so we can see decisions
-      try {
-        console.debug("[AS getSpeakerVisibility]", {
-          role: canon,
-          model,
-          layoutStr,
-          useWidesInsteadOfRears: useWides,
-          allowed: Array.from(allowed),
-          isAllowed,
-        });
-      } catch {}
-
-      if (!isAllowed) {
-        return false;
-      }
-
-      // Require a real model for surrounds/wides/rears
-      const hasModel =
-        !!model &&
-        typeof model === "string" &&
-        model.toUpperCase() !== "NONE" &&
-        model.toLowerCase() !== "off";
-
-      return hasModel;
-    },
-    [layoutStr, useWidesInsteadOfRears]
-  );
+    // Hide unconfigured / empty roles
+    return false;
+  }, []);
 
   const isFrozen = useCallback((tab) => !!frozenTabs[tab], [frozenTabs]);
   const freezeTab = useCallback((tab) => {
