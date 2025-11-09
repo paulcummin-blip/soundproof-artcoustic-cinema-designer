@@ -4010,88 +4010,128 @@ return {
   }, [applyLcrFromDetail]);
 
   const renderSpeakers = useCallback(() => {
-    // This function specifically renders speakers from the `speakersToRender` memo
-    const listAfterFlags = speakersToRender
-      .filter(isRenderableSpeaker)
-      .filter(spk => getSpeakerVisibility(spk.role, spk.model));
+  // Normalise input
+  const raw = Array.isArray(speakersToRender) ? speakersToRender : [];
 
-    // DEBUG: Log what RoomVisualisation is processing
-    console.log("[RV] speakersToRender(raw)",
-      (speakersToRender || []).map(s => ({
+  // 1) Basic structural filter (existing helper)
+  const afterRenderable = raw.filter(isRenderableSpeaker);
+
+  // 2) Visibility filter (layout + model) – but never hard-fail on errors
+  const afterVisibility = afterRenderable.filter((spk) => {
+    try {
+      return getSpeakerVisibility(spk.role, spk.model);
+    } catch (err) {
+      console.warn("[RV] getSpeakerVisibility error; allowing speaker through", {
+        role: spk.role,
+        model: spk.model,
+        err,
+      });
+      // On any error, show it rather than hide everything
+      return true;
+    }
+  });
+
+  // DEBUG: see exactly what RV thinks it should draw
+  try {
+    console.groupCollapsed("[RV] speakersToRender DEBUG");
+    console.table(
+      raw.map((s) => ({
+        id: s.id,
         role: s.role,
-        model: s.model || null
+        model: s.model || "(none)",
       }))
     );
-
-    console.log("[RV] speakersToRender(after visibility)",
-      (listAfterFlags || []).map(s => ({
+    console.table(
+      afterVisibility.map((s) => ({
+        id: s.id,
         role: s.role,
-        model: s.model || null
+        model: s.model || "(none)",
       }))
     );
+    console.groupEnd();
+  } catch (_) {
+    // ignore console errors in strange environments
+  }
 
-    return listAfterFlags.map(speaker => {
-      const { id, role, model, position } = speaker;
-      const canonicalRole = getCanonicalRole(role);
+  // 3) Map to icons
+  return afterVisibility.map((speaker) => {
+    const { id, role, model, position = {} } = speaker;
+    const canon = getCanonicalRole(role);
 
-      // RENDER-TIME FIX & QA: Force resolve model and get correct dimensions
-      const resolvedModel = resolveSurroundModel(model, canonicalRole);
+    // Resolve model & dimensions using your existing helpers
+    const resolvedModel = resolveSurroundModel(model, canon);
+    const dims = getSpeakerDims(resolvedModel);
+    const widthM_spk = dims.widthM || 0;
+    const depthM_spk = dims.depthM || 0;
 
-      const speakerMouseDownHandler = isDraggable(speaker) ? (e) => handleMouseDown(e, id, 'speaker') : undefined;
+    // Compute yaw with existing helper
+    const yawDeg = getYawForObject(
+      speaker,
+      { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
+      aimAtMLP,
+      { width: widthM, length: lengthM, height: heightM },
+      getModelDimsM
+    );
 
-      let finalCanvasX, finalCanvasY;
-      const dims = getSpeakerDims(resolvedModel);
-      const widthM_spk = dims.widthM || 0;
-      const depthM_spk = dims.depthM || 0;
+    // Position:
+    // - LCR: pinned to front wall using WALL_BUFFER_M
+    // - Everyone else: use their stored world coords
+    let canvasX, canvasY;
 
-      const yawDeg = getYawForObject(speaker, { L: lcrAngleInfo.L, R: lcrAngleInfo.R }, aimAtMLP, { width: widthM, length: lengthM, height: heightM }, getModelDimsM); // Pass room dims object
+    if (canon === "FL" || canon === "FC" || canon === "FR") {
+      const half = yHalfExtentM(depthM_spk, widthM_spk, yawDeg);
+      const y_m = WALL_BUFFER_M + half;
+      canvasX = meterToCanvasX(position.x ?? 0);
+      canvasY = meterToCanvasY(y_m);
+    } else {
+      const x_m = position.x ?? 0;
+      const y_m = position.y ?? 0;
+      [canvasX, canvasY] = toPx(x_m, y_m);
+    }
 
-      // LCR speakers get their Y fixed relative to the wall buffer
-      if (['FL', 'FC', 'FR'].includes(canonicalRole)) {
-        const half = yHalfExtentM(depthM_spk, widthM_spk, yawDeg);
-        const centerY_m = WALL_BUFFER_M + half;
+    const speakerMouseDownHandler = isDraggable(speaker)
+      ? (e) => handleMouseDown(e, id, "speaker")
+      : undefined;
 
-        finalCanvasY = meterToCanvasY(centerY_m);
-        finalCanvasX = meterToCanvasX(position.x);
-      }
-      // All other placed speakers (sides, rears, overheads, including LW/RW) use their actual x,y positions
-      else {
-        // The position for LW/RW (if they have a model) would have been set in speakersToRender memo
-        // They are already placed correctly in `placedSpeakers` by the drag handler or auto-follow useEffect.
-        [finalCanvasX, finalCanvasY] = toPx(position.x, position.y);
-      }
-
-      return (
-        <React.Fragment key={id}>
-          <SpeakerIcon
-            speaker={{ ...speaker, model: resolvedModel }}
-            canvasX={finalCanvasX}
-            canvasY_raw={finalCanvasY}
-            yawDeg={yawDeg}
-            widthM={widthM_spk}
-            depthM={depthM_spk}
-            scale={scale}
-            speakerMouseDownHandler={speakerMouseDownHandler}
-            setHoveredSpeaker={setHoveredSpeaker}
-          />
-        </React.Fragment>
-      );
-    });
-  }, [
-    speakersToRender,
-    getModelDimsM,
-    lcrAngleInfo,
-    aimAtMLP,
-    widthM, lengthM, heightM,
-    meterToCanvasY,
-    meterToCanvasX,
-    toPx,
-    scale,
-    setHoveredSpeaker,
-    handleMouseDown,
-    getCanonicalRole,
-    getSpeakerVisibility,
-  ]);
+    return (
+      <SpeakerIcon
+        key={id}
+        speaker={{ ...speaker, model: resolvedModel }}
+        canvasX={canvasX}
+        canvasY_raw={canvasY}
+        yawDeg={yawDeg}
+        widthM={widthM_spk}
+        depthM={depthM_spk}
+        scale={scale}
+        speakerMouseDownHandler={speakerMouseDownHandler}
+        setHoveredSpeaker={setHoveredSpeaker}
+      />
+    );
+  });
+}, [
+  speakersToRender,
+  isRenderableSpeaker,
+  getSpeakerVisibility,
+  getCanonicalRole,
+  resolveSurroundModel,
+  getSpeakerDims,
+  getYawForObject,
+  yHalfExtentM,
+  WALL_BUFFER_M,
+  meterToCanvasX,
+  meterToCanvasY,
+  toPx,
+  widthM,
+  lengthM,
+  heightM,
+  lcrAngleInfo,
+  aimAtMLP,
+  scale,
+  isDraggable,
+  handleMouseDown,
+  setHoveredSpeaker,
+  SpeakerIcon,
+]);
 
   // Renders rear subwoofers using SpeakerRect
   const renderSubwoofers = React.useCallback(() => {
