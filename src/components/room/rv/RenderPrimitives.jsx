@@ -12,25 +12,30 @@ export const isSubRole = (role) => {
 
 export const hasPos = (s) => (s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y));
 
-// FIXED: Now validates that the model exists in registry
+// FIXED: Stricter validation - no ghost speakers
 export const isRenderableSpeaker = (s) => {
-  if (!s || !s.role || !hasPos(s)) return false;
-  
-  // Allow speakers without explicit model (will use defaults)
-  if (!s.model) return true;
-  
-  // Reject known invalid model strings
-  const modelStr = String(s.model).toLowerCase().trim();
-  if (modelStr === 'undefined' || modelStr === 'null' || modelStr === 'off' || modelStr === 'none' || modelStr === '') {
+  if (!s) return false;
+
+  // Must have a role
+  const role = String(s.role || "").trim();
+  if (!role) return false;
+
+  // Must have a valid position
+  if (!hasPos(s)) return false;
+
+  // Model must be meaningful (not "off", "none", empty, etc.)
+  const model = String(s.model || "").trim().toLowerCase();
+  if (
+    !model ||
+    model === "off" ||
+    model === "none" ||
+    model === "null" ||
+    model === "undefined"
+  ) {
     return false;
   }
-  
-  // Validate model exists in registry (lenient: if lookup fails with notFound, we still allow it through
-  // because getSpeakerDims will provide safe defaults)
-  const meta = getSpeakerModelMeta(s.model);
-  // As long as we get SOME meta back (even with notFound flag), we allow it through
-  // This lets auto-seeded speakers with valid models render while blocking truly invalid ones
-  return !!meta;
+
+  return true;
 };
 
 export const getChannelColor = (role) => {

@@ -222,9 +222,7 @@ function useDesignerState() {
     });
   }, [splConfig]);
 
-  // --- SPEAKER VISIBILITY (FIXED: Now properly permissive) ---
-  // Only hide LFE icons and explicitly disabled speakers.
-  // Let layout logic and overlays handle conditional visibility.
+  // --- SPEAKER VISIBILITY (FIXED: Layout-aware surround rules) ---
   const getSpeakerVisibility = useCallback((role, model) => {
     const canon = String(role || "").toUpperCase();
 
@@ -239,9 +237,54 @@ function useDesignerState() {
       return false;
     }
 
-    // Show everything else - let renderSpeakers and layout logic handle the rest
+    // Parse layout to determine major channel count
+    const dolby = dolbyLayout || dolbyConfig || "5.1";
+    const major = parseInt(String(dolby).split(".")[0], 10) || 5;
+
+    // LCR always shown when model is valid
+    if (canon === "FL" || canon === "FC" || canon === "FR") {
+      return true;
+    }
+
+    // 5.x — sides only
+    if (major === 5) {
+      return canon === "SL" || canon === "SR";
+    }
+
+    // 7.x — sides + (rears XOR wides based on toggle)
+    if (major === 7) {
+      if (canon === "SL" || canon === "SR") return true;
+
+      // Check if using wides instead of rears for 7.x
+      if (useWidesInsteadOfRears) {
+        // Show wides, hide rears
+        if (canon === "LW" || canon === "RW") return true;
+        if (canon === "SBL" || canon === "SBR") return false;
+      } else {
+        // Show rears, hide wides (default 7.x)
+        if (canon === "SBL" || canon === "SBR") return true;
+        if (canon === "LW" || canon === "RW") return false;
+      }
+
+      return false;
+    }
+
+    // 9.x+ — sides + rears always; wides optional
+    if (major >= 9) {
+      if (canon === "SL" || canon === "SR") return true;
+      if (canon === "SBL" || canon === "SBR") return true;
+
+      // Wides: always show for 9.x+ (or: return enableFrontWides if you want toggle control)
+      if (canon === "LW" || canon === "RW") {
+        return true; // Always show wides in 9.x+ when they have a model
+      }
+
+      return false;
+    }
+
+    // Fallback: show if it has a valid model
     return true;
-  }, []);
+  }, [dolbyLayout, dolbyConfig, useWidesInsteadOfRears]);
 
   const isFrozen = useCallback((tab) => !!frozenTabs[tab], [frozenTabs]);
   const freezeTab = useCallback((tab) => {
