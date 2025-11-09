@@ -396,10 +396,8 @@ const setSpeakerSystem = useCallback((updater) => {
         ? [...prev.placedSpeakers]
         : [];
 
-    // READ FLAGS - never mutate them
-const enableFW = enableFrontWides === true;
-// use the SAME flag SpeakerPlacement & rolesForLayout use
-const useFWInsteadOfRS = useWidesInsteadOfRears === true;
+    // Use the real 7-bed toggle (the one SpeakerPlacement and rolesForLayout use)
+    const useFWInsteadOfRS = useWidesInsteadOfRears === true;
 
     const keptRoles = [];
     const prunedRoles = [];
@@ -407,15 +405,15 @@ const useFWInsteadOfRS = useWidesInsteadOfRears === true;
     speakers = speakers.filter(s => {
       const role = getCanonicalRole(s.role);
 
-      // Always keep core LCR and sides
+      // Always keep core LCR and classic sides
       if (['FL', 'FC', 'FR', 'SL', 'SR', 'LS', 'RS'].includes(role)) {
         keptRoles.push(role);
         return true;
       }
 
-      // Front-wide speakers: keep only when FW enabled AND they have a model
+      // Front-wide speakers: keep only when they have a model
       if (role === 'LW' || role === 'RW') {
-        if (enableFW && s.model && s.model !== 'undefined') {
+        if (s.model && s.model !== 'undefined') {
           keptRoles.push(role);
           return true;
         } else {
@@ -424,7 +422,7 @@ const useFWInsteadOfRS = useWidesInsteadOfRears === true;
         }
       }
 
-      // Rear surrounds: drop only when "use FW instead of RS" is active
+      // Rear surrounds: drop only when "use wides instead of rears" is active
       if (role === 'SBL' || role === 'SBR') {
         if (useFWInsteadOfRS) {
           prunedRoles.push(role);
@@ -444,7 +442,6 @@ const useFWInsteadOfRS = useWidesInsteadOfRears === true;
       console.log('[FW normalize]', {
         keptRoles,
         prunedRoles,
-        enableFW,
         useFWInsteadOfRS
       });
     }
@@ -459,7 +456,7 @@ const useFWInsteadOfRS = useWidesInsteadOfRears === true;
       placedSpeakers: speakers,
     };
   });
-}, [enableFrontWides, useWidesInsteadOfRears, DBG_FW]);
+}, [useWidesInsteadOfRears, DBG_FW]);
 
   const value = useMemo(() => ({
     // dimensions and setDimensions are now deprecated in favor of roomDims
