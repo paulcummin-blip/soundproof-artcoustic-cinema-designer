@@ -459,7 +459,7 @@ const useFWInsteadOfRS = useWidesInsteadOfRears === true;
       placedSpeakers: speakers,
     };
   });
-}, [enableFrontWides, useFrontWidesInsteadOfRear, DBG_FW]);
+}, [enableFrontWides, useWidesInsteadOfRears, DBG_FW]);
 
   const value = useMemo(() => ({
     // dimensions and setDimensions are now deprecated in favor of roomDims
