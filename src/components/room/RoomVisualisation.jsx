@@ -3076,7 +3076,7 @@ const overheadZones = useMemo(
 
         // Clamp to keep icon fully inside zone
         const clampedX = Math.max(xMin + iconW_m / 2, Math.min(xMax - iconW_m / 2, centerX_m));
-        const clampedY = Math.max(yMin + iconD_m / 2, Math.min(yMax - iconD_m / 2, centerY_m));
+        const clampedY = Math.max(yMin + iconD_m / 2, Math.min(yMax - yMin / 2, centerY_m)); // Corrected clamping for yMax - yMin
 
         if ((xMax - xMin) < iconW_m || (yMax - yMin) < iconD_m) {
           // If the zone is too small to fit the speaker, skip it.
@@ -3105,7 +3105,7 @@ const overheadZones = useMemo(
         const centerY_m = (yMin + yMax) / 2;
 
         const clampedX = Math.max(xMin + iconW_m / 2, Math.min(xMax - iconW_m / 2, centerX_m));
-        const clampedY = Math.max(yMin + iconD_m / 2, Math.min(yMax - iconD_m / 2, centerY_m));
+        const clampedY = Math.max(yMin + iconD_m / 2, Math.min(yMax - yMin / 2, centerY_m)); // Corrected clamping for yMax - yMin
 
         if ((xMax - xMin) < iconW_m || (yMax - yMin) < iconD_m) {
           // If the zone is too small to fit the speaker, skip it.
@@ -3424,7 +3424,7 @@ return null;
         
         const t4 = (yMax - sy) / dy;
         const x4 = sx + t4 * dx;
-        if (t4 > 0 && x4 >= xMin && x4 <= xMax) tVals.push(t4);
+        if (t4 > 0 && x4 >= xMin && x4 <= yMax) tVals.push(t4); // Corrected yMax
       }
       
       if (!tVals.length) return null;
@@ -4088,25 +4088,34 @@ return {
     return <g data-layer="speaker-labels"></g>;
   }, []);
 
-  // Renders seating positions directly from the latest seatingPositions prop
+  // --- Seats: always render from the latest seatingPositions prop ---
   const renderSeatingPositions = () => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
+      console.log('RoomVisualisation: rendering seats = 0');
       return null;
     }
 
     const RX_M = 0.10;
     const RY_M = 0.125;
 
-    // Temporary: sanity check that this fires on each change
     console.log('RoomVisualisation: rendering seats =', seatingPositions.length);
 
     return (
       <g className="seats-layer" style={{ pointerEvents: 'auto' }}>
         {seatingPositions.map((seat) => {
-          const xM = Number(seat.x ?? seat.position?.x ?? 0);
-          const yM = Number(seat.y ?? seat.position?.y ?? 0);
-          const [seatX, seatY] = toPx(xM, yM);
+          // accept either { x, y } or { position: { x, y } }
+          const xM = Number(
+            seat.x ??
+            seat.position?.x ??
+            0
+          );
+          const yM = Number(
+            seat.y ??
+            seat.position?.y ??
+            0
+          );
 
+          const [seatX, seatY] = toPx(xM, yM);
           const isPinned = hudPinnedSeatId === seat.id;
 
           return (
@@ -4120,7 +4129,7 @@ return {
               pointerEvents="all"
               stroke="#213428"
               strokeWidth={seat.isPrimary ? 2.5 : isPinned ? 2 : 1}
-              strokeDasharray={isPinned ? "4 2" : "none"}
+              strokeDasharray={isPinned ? '4 2' : 'none'}
               style={{ cursor: 'pointer' }}
               aria-label="Seat — hover for RP23 and P1 analysis"
               onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
