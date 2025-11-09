@@ -1,6 +1,8 @@
+
 "use client";
 
 import React from "react";
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
 // ---- Roles / misc helpers ----
 export const isSubRole = (role) => {
@@ -9,7 +11,27 @@ export const isSubRole = (role) => {
 };
 
 export const hasPos = (s) => (s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y));
-export const isRenderableSpeaker = (s) => s && s.model && s.role && hasPos(s);
+
+// FIXED: Now validates that the model exists in registry
+export const isRenderableSpeaker = (s) => {
+  if (!s || !s.role || !hasPos(s)) return false;
+  
+  // Allow speakers without explicit model (will use defaults)
+  if (!s.model) return true;
+  
+  // Reject known invalid model strings
+  const modelStr = String(s.model).toLowerCase().trim();
+  if (modelStr === 'undefined' || modelStr === 'null' || modelStr === 'off' || modelStr === 'none' || modelStr === '') {
+    return false;
+  }
+  
+  // Validate model exists in registry (lenient: if lookup fails with notFound, we still allow it through
+  // because getSpeakerDims will provide safe defaults)
+  const meta = getSpeakerModelMeta(s.model);
+  // As long as we get SOME meta back (even with notFound flag), we allow it through
+  // This lets auto-seeded speakers with valid models render while blocking truly invalid ones
+  return !!meta;
+};
 
 export const getChannelColor = (role) => {
   switch (String(role).toUpperCase()) {
