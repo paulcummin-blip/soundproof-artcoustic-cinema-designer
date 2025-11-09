@@ -397,8 +397,9 @@ const setSpeakerSystem = useCallback((updater) => {
         : [];
 
     // READ FLAGS - never mutate them
-    const enableFW = enableFrontWides === true;
-    const useFWInsteadOfRS = useFrontWidesInsteadOfRear === true;
+const enableFW = enableFrontWides === true;
+// use the SAME flag SpeakerPlacement & rolesForLayout use
+const useFWInsteadOfRS = useWidesInsteadOfRears === true;
 
     const keptRoles = [];
     const prunedRoles = [];
