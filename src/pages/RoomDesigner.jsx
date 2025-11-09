@@ -1704,113 +1704,83 @@ function RoomDesignerWithState() {
     useFrontGlobal, useMidGlobal, useRearGlobal
   ]);
 
-  // Effect to build seat positions from computed row centers (using centerline)
+  // Build or rebuild seating positions whenever seating config changes
   useEffect(() => {
-    // We need row centers to know where each row is.
-    if (!Array.isArray(appState?.rowCentersM) || appState.rowCentersM.length === 0) {
-      return;
+    const setSeats = appState?.setSeatingPositions;
+    if (typeof setSeats !== 'function') return;
+
+    // 1) Decide how many seats in each row
+    const list = Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length
+      ? _seatsPerRowByRow
+      : Array.from(
+          { length: Math.max(1, Number(_seatingRows) || 1) },
+          () => Math.max(1, Number(_seatsPerRow) || 1)
+        );
+
+    // 2) Row centre Y positions
+    //    Prefer appState.rowCentersM if it exists; otherwise make a simple fallback.
+    const baseRowSpacing = Number(_rowSpacingM) || 1.8;
+    const fallbackStartY = 2; // 2m from screen as a safe default
+
+    let centers = Array.isArray(appState?.rowCentersM) && appState.rowCentersM.length
+      ? appState.rowCentersM.slice(0, list.length)
+      : Array.from(
+          { length: list.length },
+          (_, i) => fallbackStartY + i * baseRowSpacing
+        );
+
+    // If we somehow have fewer centres than rows, extend with fallback values.
+    while (centers.length < list.length) {
+      const i = centers.length;
+      centers.push(fallbackStartY + i * baseRowSpacing);
     }
 
-    // Guard if frozen
-    if (_isFrozen && _isFrozen('seating')) return;
+    // 3) Basic geometry
+    const roomWidth = Number(stableDimensions?.width) || 4.5;
+    const centerX = roomWidth / 2;
+    const spacingX = Number(_seatSpacing) || 0.8;
 
-    // 1. Decide how many seats in each row.
-    let perRowCounts = [];
+    // 4) Build all seats
+    const seats = [];
 
-    // If we have an explicit list (from Add/Remove UI), use it.
-    if (Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length > 0) {
-      perRowCounts = _seatsPerRowByRow.map((n) =>
-        Math.max(1, parseInt(n || 1, 10))
-      );
-    } else {
-      // Fall back to old "seatingRows + seatsPerRow" if needed.
-      // Use appState.rowCentersM.length as the canonical number of rows.
-      // This ensures we always generate seats for the number of rows we have centers for.
-      const rows = appState.rowCentersM.length; 
-      const seats = Math.max(1, parseInt(_seatsPerRow || 3, 10));
-      perRowCounts = Array.from({ length: rows }, () => seats);
-    }
+    list.forEach((rawCount, rowIndex) => {
+      const count = Math.max(1, Number(rawCount) || 1);
+      const y = Number(centers[rowIndex]) || (fallbackStartY + rowIndex * baseRowSpacing);
 
-    // Safety: ensure perRowCounts is never empty
-    if (perRowCounts.length === 0) {
-      perRowCounts = [3]; // Default to 3 seats in one row
-    }
-
-    // 2. Build the seat objects.
-    const allSeats = [];
-    const spacing = Math.max(0, Number(_seatSpacing) || 0.8);
-    const roomW = Number(stableDimensions?.width) || (appState?.roomDims?.widthM || 4);
-    const roomL = Number(stableDimensions?.length) || (appState?.roomDims?.lengthM || 6);
-
-    const MIN_X_CL = 0.4; // 40cm clearance from side walls
-    const MAX_X_CL = roomW - 0.4;
-    const MIN_Y_CL = 0.4; // 40cm clearance from front/rear walls
-    const MAX_Y_CL = roomL - 0.4;
-
-    appState.rowCentersM.forEach((rowY_raw, rowIdx) => {
-      const rowNumber = rowIdx + 1;
-      const seatsInRow = perRowCounts[rowIdx] ?? perRowCounts[perRowCounts.length - 1] ?? 3;
-      const count = Math.max(1, parseInt(seatsInRow, 10));
-
-      // center the row in the room
-      const rowWidth = (count - 1) * spacing;
-      const startX = (roomW - rowWidth) / 2;
-
-      // The `rowY_raw` already includes the `_seatingBlockOffset` because `appState.setRowCentersM` stores Y values
-      // that have been offset. So, no need to add `offsetY` here again.
-      // Clamp Y to room bounds with clearance
-      const clampedY = Math.max(MIN_Y_CL, Math.min(MAX_Y_CL, rowY_raw));
+      const totalWidth = (count - 1) * spacingX;
+      const startX = centerX - totalWidth / 2;
 
       for (let i = 0; i < count; i++) {
-        const rawX = startX + i * spacing;
-        // Clamp X to room bounds with clearance
-        const clampedX = Math.max(MIN_X_CL, Math.min(MAX_X_CL, rawX));
-
-        // Ear height varies by row (optional)
-        const z = 1.2 + rowIdx * 0.1;
-
-        allSeats.push({
-          id: `R${rowIdx + 1}S${i + 1}`, // Consistent ID format
-          x: Number(clampedX.toFixed(3)),
-          y: Number(clampedY.toFixed(3)),
-          z: Number(z.toFixed(3)),
-          rowNumber: rowIdx + 1,
-          seatNumber: i + 1,
-          isPrimary: false, // This will be updated by normalize seat flags effect
+        seats.push({
+          id: `seat-r${rowIndex + 1}-c${i + 1}`,
+          x: startX + i * spacingX,
+          y,
+          z: 1.2,
+          rowNumber: rowIndex + 1,
         });
       }
     });
 
-    // 3. Push into shared state so RoomVisualisation sees it.
-    if (typeof appState?.setSeatingPositions === 'function') {
-      // Only update if there are actual changes to prevent unnecessary re-renders
-      const currentPositions = appState.seatingPositions || [];
-      const didChange = allSeats.length !== currentPositions.length ||
-                        allSeats.some((s, i) => 
-                            s.x !== currentPositions[i]?.x || 
-                            s.y !== currentPositions[i]?.y || 
-                            s.z !== currentPositions[i]?.z ||
-                            s.rowNumber !== currentPositions[i]?.rowNumber ||
-                            s.seatNumber !== currentPositions[i]?.seatNumber
-                        );
-      if (didChange) {
-        appState.setSeatingPositions(allSeats);
-      }
-    }
+    // 5) Commit to app state
+    setSeats(seats);
+
+    console.log(
+      '[RD] seating rebuilt: rows=',
+      list.length,
+      'seats=',
+      seats.length,
+      'list=',
+      list
+    );
   }, [
-    // When ANY of these change, rebuild seats:
-    appState?.rowCentersM, // Changes when row count, row spacing, mlp basis, screen front plane, or seatingBlockOffset changes.
-    _seatsPerRowByRow, // User explicit per-row seat counts.
-    _seatingRows, // User input for number of rows (fallback).
-    _seatsPerRow, // User input for seats per row (fallback).
-    _seatSpacing, // User input for horizontal seat spacing.
-    _seatingBlockOffset, // Affects appState?.rowCentersM.
-    stableDimensions?.width, // Room width, for X-centering and X-clamping.
-    stableDimensions?.length, // Room length, for Y-clamping.
-    appState?.setSeatingPositions, // The setter itself.
-    _isFrozen, // Prevents updates when frozen.
-    appState?.roomDims?.widthM, // Fallback source for room width.
-    appState?.roomDims?.lengthM, // Fallback source for room length.
+    appState?.setSeatingPositions,
+    _seatsPerRowByRow,
+    _seatingRows,
+    _seatsPerRow,
+    _seatSpacing,
+    _rowSpacingM,
+    appState?.rowCentersM,
+    stableDimensions?.width,
   ]);
 
   // Manual seating generation - single source of truth
