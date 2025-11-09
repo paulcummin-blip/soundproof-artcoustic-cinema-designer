@@ -326,7 +326,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const useRearGlobal  = appState?.useRearGlobal  ?? true;
 
   const centerX_m = widthM / 2;
-const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
+  const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
   const EPS_M = 0.0005;
   const ALLOW_AUTO_DIMENSIONS = false;
 
@@ -351,49 +351,70 @@ const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
     return map[r] || r;
   }, []);
 
-const MLP_calculated = useMemo(() => {
-  // If an explicit MLP point exists, use it (no extra offset here)
-  if (mlpPoint && Number.isFinite(mlpPoint.x) && Number.isFinite(mlpPoint.y)) {
-    return {
-      x: centerX_m,
-      y: clampY(Number(mlpPoint.y)),
-      z: Number(mlpPoint.z ?? 1.2),
-    };
-  }
+  // --- MLP: use RoomDesigner anchor if available; DO NOT stick to seats ---
 
-  // Otherwise derive from seats (seats already include any viewing offset in their own Y)
-  if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
-    const seats = seatingPositions.map((s) => ({
-      x: Number(s?.position?.x ?? s?.x ?? 0),
-      y: clampY(Number(s?.position?.y ?? s?.y ?? 0)),
-      z: Number(s?.z ?? 1.2),
-      rowNumber: s?.rowNumber ?? 1,
-    }));
+  // We assume widthM and lengthM are already defined earlier in this file.
+  // If not, you can safely use 0 as fallback.
+  const roomWidthM  = Number(widthM)  || 0;
+  const roomLengthM = Number(lengthM) || 0;
 
-    let picked = null;
-    try {
-      picked = pickMLP?.('all', seats);
-    } catch (e) {
-      console.error("Error calling pickMLP:", e);
-      picked = seats[Math.floor(seats.length / 2)] || { x: 0, y: lengthM * 0.58, z: 1.2 };
+  // Keep MLP Y safely inside the room
+  const clampMlpY = (y) => {
+    if (!Number.isFinite(y)) return roomLengthM > 0 ? roomLengthM * 0.58 : 3;
+    const margin = 0.4; // 40cm buffer from front/back walls
+    const minY = margin;
+    const maxY = roomLengthM > 0 ? Math.max(minY, roomLengthM - margin) : y;
+    return Math.max(minY, Math.min(maxY, y));
+  };
+
+  const MLP_calculated = React.useMemo(() => {
+    // 1. If RoomDesigner sends an mlpPoint, trust it.
+    //    That is your 57.5° / screen-based ideal.
+    if (
+      mlpPoint &&
+      Number.isFinite(mlpPoint.x) &&
+      Number.isFinite(mlpPoint.y)
+    ) {
+      return {
+        x: Number(mlpPoint.x), // Use mlpPoint.x directly
+        y: clampMlpY(Number(mlpPoint.y)),
+        z: Number.isFinite(mlpPoint.z) ? Number(mlpPoint.z) : 1.2,
+      };
     }
 
-    return {
-      x: centerX_m,
-      y: clampY(Number.isFinite(picked?.y) ? Number(picked.y) : (lengthM * 0.58)),
-      z: Number.isFinite(picked?.z) ? Number(picked.z) : 1.2,
-    };
-  }
+    // 2. If no mlpPoint, we FALL BACK to seats to choose something sensible.
+    if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
+      let picked = null;
 
-  // Fallback
-  return { x: centerX_m, y: clampY(lengthM * 0.58), z: 1.2 };
-}, [mlpPoint, seatingPositions, lengthM, centerX_m]);
+      try {
+        if (typeof pickMLP === 'function') {
+          picked = pickMLP(mlpBasis || 'all', seatingPositions);
+        }
+      } catch (err) {
+        console.error('pickMLP failed in RoomVisualisation:', err);
+        picked = null;
+      }
+
+      if (picked && Number.isFinite(picked.x) && Number.isFinite(picked.y)) {
+        return {
+          x: Number(picked.x), // Use picked.x directly
+          y: clampMlpY(Number(picked.y)),
+          z: Number.isFinite(picked.z) ? Number(picked.z) : 1.2,
+        };
+      }
+    }
+
+    // 3. Last-resort fallback: middle of room, ~60% back
+    const cx = roomWidthM > 0 ? roomWidthM / 2 : 0;
+    const fy = clampMlpY(roomLengthM > 0 ? roomLengthM * 0.58 : 3);
+    return { x: cx, y: fy, z: 1.2 };
+  }, [mlpPoint, seatingPositions, mlpBasis, roomWidthM, roomLengthM]);
 
   const mlp = MLP_calculated;
   const mlpDotX_m = mlp.x;
   const mlpDotY_m = mlp.y;
   const mlpDotZ_m = mlp.z;
-// Removed duplicate viewingDistanceOffsetM seat shift (handled in RoomDesigner)
+
   const [hoveredSpeaker, setHoveredSpeaker] = useState(null);
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
   const [dragState, setDragState] = useState({ dragging: false, draggedItemId: null, dragType: null });
@@ -3462,7 +3483,7 @@ return null;
           elements.push(
             <line
               key={`spoke-${si}-${ri}-${di}`}
-              x1={sx} y1={sy} x2={ex} y2={ey}
+              x1={sx} y1={sy} x2={seatPx[0]} y2={seatPx[1]}
               stroke={spec.stroke}
               strokeWidth={1}
               strokeDasharray="3,6"
