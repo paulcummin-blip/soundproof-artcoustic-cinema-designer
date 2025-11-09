@@ -758,35 +758,46 @@ function UnifiedSurroundsConfig({
 
         const existingSpeaker = speakerMap.get(canon);
         
-        if (safeModel === 'off' || !safeModel) {
-          speakerMap.delete(canon);
-        } else {
-          let position = existingSpeaker?.position || defaultPos;
-          
-          if (!position && mlpPoint && dimensions) {
-            let angleDegrees;
-            switch(canon) {
-              case 'SBL': angleDegrees = -142.5; break;
-              case 'SBR': angleDegrees = 142.5; break;
-              case 'SL': angleDegrees = -100; break;
-              case 'SR': angleDegrees = 100; break;
-              case 'LW': angleDegrees = -50; break; // Default angle for LW
-              case 'RW': angleDegrees = 50; break;  // Default angle for RW
-              default: angleDegrees = 0; // Should not happen for surrounds
-            }
-            position = calculateDefaultPosition(angleDegrees, mlpPoint, dimensions);
-          }
+ if (safeModel === 'off' || !safeModel) {
+  // If this role is NOT required by the current layout, remove it.
+  if (!allowedRoles.has(canon)) {
+    speakerMap.delete(canon);
+  } else {
+    // If layout expects this role (e.g. SBL/SBR in 7.1),
+    // keep the speaker entry but clear its model.
+    const existing = speakerMap.get(canon);
+    if (existing) {
+      speakerMap.set(canon, { ...existing, model: null });
+    }
+  }
+} else {
+  // Valid model chosen → ensure speaker exists + positioned
+  let position = existingSpeaker?.position || defaultPos;
 
-          speakerMap.set(canon, { 
-            ...(existingSpeaker || {}),
-            role: canon, 
-            id: existingSpeaker?.id || `${canon}-${timeNowMs()}`,
-            draggable: true,
-            model: safeModel,
-            position: position || { x: 0, y: 0, z: 1.1 },
-            rotation: existingSpeaker?.rotation || { x: 0, y: 0, z: 0 }
-          });
-        }
+  if (!position && mlpPoint && dimensions) {
+    let angleDegrees;
+    switch (canon) {
+      case 'SBL': angleDegrees = -142.5; break;
+      case 'SBR': angleDegrees = 142.5; break;
+      case 'SL':  angleDegrees = -100;  break;
+      case 'SR':  angleDegrees = 100;   break;
+      case 'LW':  angleDegrees = -50;   break;
+      case 'RW':  angleDegrees = 50;    break;
+      default:    angleDegrees = 0;
+    }
+    position = calculateDefaultPosition(angleDegrees, mlpPoint, dimensions);
+  }
+
+  speakerMap.set(canon, {
+    ...(existingSpeaker || {}),
+    role: canon,
+    id: existingSpeaker?.id || `${canon}-${timeNowMs()}`,
+    draggable: true,
+    model: safeModel,
+    position: position || { x: 0, y: 0, z: 1.1 },
+    rotation: existingSpeaker?.rotation || { x: 0, y: 0, z: 0 },
+  });
+}
       };
 
       // Process roles conditionally based on `canSides`, `canRears`, `canWides`
