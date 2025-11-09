@@ -124,7 +124,7 @@ import {
   computeBackWallInnerEdges,
   computeRearVisualLanes,
   resolveSymmetricY,
-} from "@/components/room/rv/RenderPrimitives";
+} from "@/components/room/rvPlanHelpers";
 
 // SAFE ROLE ACCESSOR – works with Map or plain object; always returns an array
 function getByRoleArray(mapOrObj, role) {
@@ -3103,7 +3103,7 @@ const overheadZones = useMemo(
         if ((xMax - xMin) < iconW_m || (yMax - yMin) < iconD_m) {
           // If the zone is too small to fit the speaker, skip it.
         } else {
-          const [canvasX, canvasY] = toPx(clampedX, clampedY);
+          const [canvasX, canvasY] = toPx(clampedX, centerY_m); // Changed clampedY to centerY_m here
           const radiusPx = (iconW_m / 2) * scale;
           icons.push(
             <circle
@@ -3132,7 +3132,7 @@ const overheadZones = useMemo(
         if ((xMax - xMin) < iconW_m || (yMax - yMin) < iconD_m) {
           // If the zone is too small to fit the speaker, skip it.
         } else {
-          const [canvasX, canvasY] = toPx(clampedX, clampedY);
+          const [canvasX, canvasY] = toPx(clampedX, centerY_m); // Changed clampedY to centerY_m here
           const radiusPx = (iconW_m / 2) * scale;
 
           icons.push(
@@ -3291,7 +3291,7 @@ if (frontWideZones?.status !== 'ok') {
         x1={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
         y1={roomRect.y + (approxMedian * scale)}
         x2={roomRect.x + roomRect.width - (WALL * scale)}
-        y2={roomRect.y + (approxMedian * scale)}
+        y2={roomRect.y + (rightZone.medianY * scale)}
         stroke="#213428"
         strokeWidth="1.5"
         strokeOpacity={0.4}
