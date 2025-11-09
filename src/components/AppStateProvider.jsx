@@ -7,11 +7,17 @@ import { isRoleVisible } from "@/components/utils/surroundRoleMap";
 
 function getCanonicalRole(role) {
   if (typeof role !== 'string') return role;
-  const upperRole = role.toUpperCase();
+  const upper = role.toUpperCase();
+
   const aliases = {
-    'SL': 'LS', 'SR': 'RS', 'LSR': 'LS', 'RSR': 'RS',
+    // Map legacy / odd labels TO the Dolby-style roles used everywhere else
+    'LS': 'SL',
+    'RS': 'SR',
+    'LSR': 'SL',
+    'RSR': 'SR',
   };
-  return aliases[upperRole] || upperRole;
+
+  return aliases[upper] || upper;
 }
 
 const AppStateContext = createContext(null);
