@@ -241,7 +241,7 @@ function useDesignerState() {
       // 2) They have a model selected (not empty / NONE)
       const isAllowed = isRoleVisible(canon, {
         dolbyLayout: layoutStr,
-        useFrontWidesInsteadOfRears: widesFlag, // ✅ FIXED: correct parameter name
+        useFrontWidesInsteadOfRear: widesFlag, // ✅ FIXED: correct parameter name
       });
 
       if (!isAllowed) return false;
@@ -406,7 +406,7 @@ const setSpeakerSystem = useCallback((updater) => {
       const role = getCanonicalRole(s.role);
 
       // Always keep core LCR and classic sides
-      if (['FL', 'FC', 'FR', 'SL', 'SR', 'LS', 'RS'].includes(role)) {
+      if (['FL', 'FC', 'FR', 'LFE', 'SL', 'SR', 'LS', 'RS'].includes(role)) { // LFE added here as well
         keptRoles.push(role);
         return true;
       }
@@ -444,6 +444,16 @@ const setSpeakerSystem = useCallback((updater) => {
         prunedRoles,
         useFWInsteadOfRS
       });
+    }
+
+    // DEBUG: Log what's being published from AppState
+    if (typeof window !== "undefined") {
+      window.__LAST_SPEAKERS__ = (speakers || []).map(s => ({
+        role: String(s.role),
+        model: s.model || null,
+      }));
+      console.log("[AS] placedSpeakers(normalized)",
+        window.__LAST_SPEAKERS__);
     }
 
     // Bump epoch so anything watching speakers refreshes

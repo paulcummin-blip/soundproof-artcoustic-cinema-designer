@@ -4011,11 +4011,26 @@ return {
 
   const renderSpeakers = useCallback(() => {
     // This function specifically renders speakers from the `speakersToRender` memo
-    const speakersToRenderList = speakersToRender
+    const listAfterFlags = speakersToRender
       .filter(isRenderableSpeaker)
       .filter(spk => getSpeakerVisibility(spk.role, spk.model));
 
-    return speakersToRenderList.map(speaker => {
+    // DEBUG: Log what RoomVisualisation is processing
+    console.log("[RV] speakersToRender(raw)",
+      (speakersToRender || []).map(s => ({
+        role: s.role,
+        model: s.model || null
+      }))
+    );
+
+    console.log("[RV] speakersToRender(after visibility)",
+      (listAfterFlags || []).map(s => ({
+        role: s.role,
+        model: s.model || null
+      }))
+    );
+
+    return listAfterFlags.map(speaker => {
       const { id, role, model, position } = speaker;
       const canonicalRole = getCanonicalRole(role);
 
