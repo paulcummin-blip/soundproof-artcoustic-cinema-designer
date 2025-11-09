@@ -223,37 +223,77 @@ function useDesignerState() {
   }, [splConfig]);
 
   // --- SAFE SPEAKER VISIBILITY SELECTOR ---
-  const layoutStr = String(dolbyLayout || '5.1');
-  const widesFlag = !!useWidesInsteadOfRears;
+  const layoutStr = String(dolbyLayout || "5.1");
 
-  // 2) Visibility helper used by RoomVisualisation to decide which roles to draw
   const getSpeakerVisibility = useCallback(
     (role, model) => {
       const canon = String(role || "").toUpperCase();
 
-      // Always show core front + LFE
+      // Always show core fronts + LFE
       if (["FL", "FC", "FR", "LFE"].includes(canon)) {
         return true;
       }
 
-      // Only show surrounds / wides / backs if:
-      // 1) They are allowed for this layout
-      // 2) They have a model selected (not empty / NONE)
-      const isAllowed = isRoleVisible(canon, {
-        dolbyLayout: layoutStr,
-        useFrontWidesInsteadOfRear: widesFlag, // ✅ FIXED: correct parameter name
-      });
+      // Parse layout: "5.1", "7.1", "7.1.4", "9.1.6", etc.
+      const parts = layoutStr.split(".");
+      const major = parseInt(parts[0], 10) || 5;
 
-      if (!isAllowed) return false;
+      const useWides = !!useWidesInsteadOfRears;
 
+      // Explicit allowed roles so we can't drift from UX expectations
+      const allowed = new Set();
+
+      // Sides always allowed
+      allowed.add("SL");
+      allowed.add("SR");
+
+      if (major >= 7) {
+        // 7-bed toggle: rears XOR wides
+        if (useWides) {
+          allowed.add("LW");
+          allowed.add("RW");
+        } else {
+          allowed.add("SBL");
+          allowed.add("SBR");
+        }
+      }
+
+      if (major >= 9) {
+        // 9-bed: both rears and wides
+        allowed.add("SBL");
+        allowed.add("SBR");
+        allowed.add("LW");
+        allowed.add("RW");
+      }
+
+      const isAllowed = allowed.has(canon);
+
+      // Debug so we can see decisions
+      try {
+        console.debug("[AS getSpeakerVisibility]", {
+          role: canon,
+          model,
+          layoutStr,
+          useWidesInsteadOfRears: useWides,
+          allowed: Array.from(allowed),
+          isAllowed,
+        });
+      } catch {}
+
+      if (!isAllowed) {
+        return false;
+      }
+
+      // Require a real model for surrounds/wides/rears
       const hasModel =
         !!model &&
         typeof model === "string" &&
-        model.toUpperCase() !== "NONE";
+        model.toUpperCase() !== "NONE" &&
+        model.toLowerCase() !== "off";
 
       return hasModel;
     },
-    [layoutStr, widesFlag]
+    [layoutStr, useWidesInsteadOfRears]
   );
 
   const isFrozen = useCallback((tab) => !!frozenTabs[tab], [frozenTabs]);
