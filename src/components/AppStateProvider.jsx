@@ -382,73 +382,83 @@ function useDesignerState() {
 
 
   // Normalization wrapper with epoch increment
-  const setSpeakerSystem = useCallback((updater) => {
-    _setSpeakerSystem(prev => {
-      const next = typeof updater === 'function' ? updater(prev) : updater;
-      
-      if (!next || !next.placedSpeakers) return next;
-      
-      let speakers = Array.isArray(next.placedSpeakers) ? [...next.placedSpeakers] : [];
-      
-      // READ FLAGS - never mutate them
-      const enableFW = enableFrontWides === true;
-      const useFWInsteadOfRS = useFrontWidesInsteadOfRear === true;
-      
-      const keptRoles = [];
-      const prunedRoles = [];
-      
-      speakers = speakers.filter(s => {
-        const role = getCanonicalRole(s.role);
-        
-        // Always keep core LCR and sides
-        if (['FL', 'FC', 'FR', 'SL', 'SR', 'LS', 'RS'].includes(role)) {
+ // Normalization wrapper with epoch increment
+const setSpeakerSystem = useCallback((updater) => {
+  _setSpeakerSystem(prev => {
+    const next = typeof updater === 'function' ? updater(prev) : updater;
+    if (!next) return next;
+
+    // If this update didn't bring its own speakers,
+    // keep whatever speakers we already had instead of dropping them.
+    let speakers = Array.isArray(next.placedSpeakers)
+      ? [...next.placedSpeakers]
+      : Array.isArray(prev?.placedSpeakers)
+        ? [...prev.placedSpeakers]
+        : [];
+
+    // READ FLAGS - never mutate them
+    const enableFW = enableFrontWides === true;
+    const useFWInsteadOfRS = useFrontWidesInsteadOfRear === true;
+
+    const keptRoles = [];
+    const prunedRoles = [];
+
+    speakers = speakers.filter(s => {
+      const role = getCanonicalRole(s.role);
+
+      // Always keep core LCR and sides
+      if (['FL', 'FC', 'FR', 'SL', 'SR', 'LS', 'RS'].includes(role)) {
+        keptRoles.push(role);
+        return true;
+      }
+
+      // Front-wide speakers: keep only when FW enabled AND they have a model
+      if (role === 'LW' || role === 'RW') {
+        if (enableFW && s.model && s.model !== 'undefined') {
+          keptRoles.push(role);
+          return true;
+        } else {
+          prunedRoles.push(role);
+          return false;
+        }
+      }
+
+      // Rear surrounds: drop only when "use FW instead of RS" is active
+      if (role === 'SBL' || role === 'SBR') {
+        if (useFWInsteadOfRS) {
+          prunedRoles.push(role);
+          return false;
+        } else {
           keptRoles.push(role);
           return true;
         }
-        
-        // Front-wide speakers: keep only when FW enabled AND they have a model
-        if (role === 'LW' || role === 'RW') {
-          if (enableFW && s.model && s.model !== 'undefined') {
-            keptRoles.push(role);
-            return true;
-          } else {
-            prunedRoles.push(role);
-            return false;
-          }
-        }
-        
-        // Rear surrounds: drop only when "use FW instead of RS" is active
-        if (role === 'SBL' || role === 'SBR') {
-          if (useFWInsteadOfRS) {
-            prunedRoles.push(role); // Fix: Typo was 'pruedRoles'
-            return false;
-          } else {
-            keptRoles.push(role);
-            return true;
-          }
-        }
-        
-        // Keep all other roles (overheads, LFE, etc.)
-        keptRoles.push(role);
-        return true;
-      });
-      
-      // Log normalization results
-      if (typeof window !== 'undefined' && DBG_FW) {
-        console.log('[FW normalize]', {
-          keptRoles,
-          prunedRoles,
-          enableFW,
-          useFWInsteadOfRS
-        });
       }
-      
-      // Increment epoch to trigger dependent effects (including screen depth calculation)
-      setSpeakersEpoch(prevEpoch => prevEpoch + 1);
-      
-      return { ...next, placedSpeakers: speakers };
+
+      // Keep all other roles (overheads, subs, etc.)
+      keptRoles.push(role);
+      return true;
     });
-  }, [enableFrontWides, useFrontWidesInsteadOfRear, DBG_FW]);
+
+    if (typeof window !== 'undefined' && DBG_FW) {
+      console.log('[FW normalize]', {
+        keptRoles,
+        prunedRoles,
+        enableFW,
+        useFWInsteadOfRS
+      });
+    }
+
+    // Bump epoch so anything watching speakers refreshes
+    setSpeakersEpoch(prevEpoch => prevEpoch + 1);
+
+    // Merge prev + next, but always use the normalised speakers array
+    return {
+      ...prev,
+      ...next,
+      placedSpeakers: speakers,
+    };
+  });
+}, [enableFrontWides, useFrontWidesInsteadOfRear, DBG_FW]);
 
   const value = useMemo(() => ({
     // dimensions and setDimensions are now deprecated in favor of roomDims
