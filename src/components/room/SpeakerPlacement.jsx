@@ -842,7 +842,7 @@ function UnifiedSurroundsConfig({
       const next = (Array.isArray(prev) ? prev : []).map(s => {
         const role = String(s?.role || "").toUpperCase();
         const canon = getCanonicalRole(role);
-        const isBedSurround = ALL_SURROUND_ROLES.has(canon); // Use the pre-defined ALL_SURROUND_ROLES
+        const isBedSurround = ALL_SURROUND_ROlasES.has(canon); // Use the pre-defined ALL_SURROUND_ROLES
         
         if (isBedSurround && !s.model && allowedRoles.has(canon)) { // Only apply if role is allowed
           changed = true;
@@ -1172,6 +1172,8 @@ function formatDolbyLabel(key) {
 }
 
 // Helper function to seed a single speaker with the full placement pipeline
+// NOTE: This function is not used by the new `resetSurroundPositions` implementation,
+// which now defines an internal helper to achieve the same result with more specific logic.
 const seedSingleSpeakerWithPipeline = (
   role,
   angleDegrees,
@@ -1545,99 +1547,140 @@ function SpeakerPlacementImpl(props) {
   }, [effectivePreset]);
 
   // Single function: RESET_SURROUND_POSITIONS with full pipeline: ANGLE → HUG → ZONE → CORNER → ROOM
-  const resetSurroundPositions = useCallback((mlp, dimensions, currentSpeakers) => {
-    if (!mlp || !dimensions || !Array.isArray(currentSpeakers)) {
+  const resetSurroundPositions = useCallback((mlp, dims, currentSpeakers) => {
+    if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
       return currentSpeakers || [];
     }
 
-    // Parse layout to determine major channels
-    const layoutString = String(effectivePreset || "").trim();
-    const majorChannels = parseInt(layoutString.split(".")[0], 10) || 5;
+    // --- 1) Work out major channel count from layout string ---
+    const layoutStr = String(effectivePreset || '').trim() || '5.1';
+    const major = parseInt(layoutStr.split('.')[0], 10) || 5;
 
-    // Determine layout key
     let layoutKey;
-    if (majorChannels === 5) {
-      layoutKey = "5.1";
-    } else if (majorChannels >= 9) {
-      layoutKey = "9.x";
+    if (major === 5) {
+      layoutKey = '5.1';
+    } else if (major === 7) {
+      layoutKey = '7.1';
     } else {
-      layoutKey = "7.1";
+      // 9 or higher → treat as 9-bed: sides + rears + wides
+      layoutKey = '9.x';
     }
 
-    // Helper to seed a single role using the existing pipeline
-    const seedRoleWithPipeline = (role, angleDegrees, inheritFrom = null) => {
-      // Try to get existing speaker for this role
-      const existing = currentSpeakers.find(s => getCanonicalRole(s.role) === role);
-      
-      // Determine model: use existing, or inherit from specified role, or 'off'
-      let model = existing?.model || 'off';
-      if (model === 'off' && inheritFrom) {
-        const inheritSpeaker = currentSpeakers.find(s => getCanonicalRole(s.role) === inheritFrom);
-        model = inheritSpeaker?.model || 'off';
+    // --- 2) Start from existing list, but strip old surround roles ---
+    const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+    const canonical = (r) => String(r || '').toUpperCase();
+
+    const existing = Array.isArray(currentSpeakers) ? currentSpeakers : [];
+    const byRole = new Map();
+
+    existing.forEach((s) => {
+      const c = canonical(s.role);
+      if (!surroundRoles.has(c)) {
+        // keep non-surrounds (LCR, subs, heights, etc.)
+        byRole.set(c, s);
       }
-
-      // Don't create speaker if model is 'off'
-      if (model === 'off') return null;
-
-      return seedSingleSpeakerWithPipeline(
-        role, angleDegrees, model, mlp, dimensions, zones,
-        placeSurroundByRayCast, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp,
-        existing
-      );
-    };
-
-    // Remove all existing surround roles
-    const surroundRoles = new Set(['SL','SR','SBL','SBR','LW','RW']);
-    let nextSpeakers = currentSpeakers.filter(s => {
-      const canonicalRole = getCanonicalRole(s.role);
-      return !surroundRoles.has(canonicalRole);
     });
 
-    // Seed speakers based on layout key
+    let nextSpeakers = existing.filter((s) => !surroundRoles.has(canonical(s.role)));
+
+    // Helper: full pipeline seeding for a role at a given angle
+    const seedRoleWithPipeline = (role, angleDegrees, inheritFromRole = null) => {
+      const cRole = canonical(role);
+      const existingSpk = currentSpeakers.find(
+        (s) => canonical(s.role) === cRole
+      );
+
+      // inherit model from existing of same role, or from another role if provided
+      let model = existingSpk?.model;
+      if (!model && inheritFromRole) {
+        const inherit = currentSpeakers.find(
+          (s) => canonical(s.role) === canonical(inheritFromRole)
+        );
+        if (inherit?.model) model = inherit.model;
+      }
+
+      // Don't create speaker if model is 'off' or missing
+      if (!model || model === 'off') return null;
+
+      // Step 1: ray-cast
+      let position = placeSurroundByRayCast(angleDegrees, mlp, dims);
+
+      // Step 2: hug wall lines
+      const hugging = getHuggingCenterLines(model, dims);
+
+      const absA = Math.abs(angleDegrees);
+      const isRear = absA > 130;
+      const isWide = absA > 40 && absA < 80;
+
+      if (isRear) {
+        // rear surrounds hug the back wall
+        position.y = hugging.backWallY;
+      } else if (isWide) {
+        // wides hug the side walls
+        position.x = angleDegrees < 0 ? hugging.leftWallX : hugging.rightWallX;
+      } else {
+        // normal sides hug the side walls
+        position.x = angleDegrees < 0 ? hugging.leftWallX : hugging.rightWallX;
+      }
+
+      // Step 3: corner clearance + room bounds
+      position = applyCornerClearance(position, cRole, model, dims, zones);
+      position = applyRoomBoundsClamp(position, model, dims);
+
+      const spk = {
+        id: existingSpk?.id || `${cRole}-${timeNowMs()}`,
+        role: cRole,
+        label: cRole,
+        model,
+        position,
+        defaultPosition: position,
+        draggable: true,
+        rotation: existingSpk?.rotation || { x: 0, y: 0, z: 0 },
+      };
+
+      // stash in maps
+      byRole.set(cRole, spk);
+      nextSpeakers.push(spk);
+      return spk;
+    };
+
+    // --- 3) Layout-specific seeding ---
+
     if (layoutKey === '5.1') {
-      // 5.1.x: SL/SR at ±120°, no rears, no wides
-      const sl = seedRoleWithPipeline('SL', -120);
-      const sr = seedRoleWithPipeline('SR',  120);
-      if (sl) nextSpeakers.push(sl);
-      if (sr) nextSpeakers.push(sr);
-    }
-    else if (layoutKey === '7.1') {
-      // 7.1.x: SL/SR at ±100°, SBL/SBR at ±142.5°, no wides
-      const sl = seedRoleWithPipeline('SL',  -100);
-      const sr = seedRoleWithPipeline('SR',   100);
-      const sbl = seedRoleWithPipeline('SBL', -142.5, 'SL'); // inherit model from SL
-      const sbr = seedRoleWithPipeline('SBR',  142.5, 'SR'); // inherit model from SR
-      
-      if (sl) nextSpeakers.push(sl);
-      if (sr) nextSpeakers.push(sr);
-      if (sbl) nextSpeakers.push(sbl);
-      if (sbr) nextSpeakers.push(sbr);
-    }
-    else if (layoutKey === '9.x') {
-      // 9.x+: SL/SR at ±100°, SBL/SBR at ±142.5°, LW/RW as front wides
+      // 5.1.x: sides only at ±120°
+      seedRoleWithPipeline('SL', -120);
+      seedRoleWithPipeline('SR', 120);
+    } else if (layoutKey === '7.1') {
+      // 7.1.x: sides at ±100°, rears at ±142.5°
+      seedRoleWithPipeline('SL', -100);
+      seedRoleWithPipeline('SR', 100);
+      seedRoleWithPipeline('SBL', -142.5, 'SL');
+      seedRoleWithPipeline('SBR', 142.5, 'SR');
+      // No wides in plain 7.x
+    } else {
+      // 9.x+: sides + rears + wides
       // Sides
-      const sl = seedRoleWithPipeline('SL',  -100);
-      const sr = seedRoleWithPipeline('SR',   100);
-      
-      // Rears: ON the back wall (1cm buffer) using the same pipeline
-      const sbl = seedRoleWithPipeline('SBL', -142.5, 'SL');
-      const sbr = seedRoleWithPipeline('SBR',  142.5, 'SR');
-      
-      // Front Wides: mid-wide angles (e.g. ±60°) using side models
-      const lw = seedRoleWithPipeline('LW',  -60, 'SL');
-      const rw = seedRoleWithPipeline('RW',   60, 'SR');
-      
-      if (sl) nextSpeakers.push(sl);
-      if (sr) nextSpeakers.push(sr);
-      if (sbl) nextSpeakers.push(sbl);
-      if (sbr) nextSpeakers.push(sbr);
-      if (lw) nextSpeakers.push(lw);
-      if (rw) nextSpeakers.push(rw);
+      seedRoleWithPipeline('SL', -100);
+      seedRoleWithPipeline('SR', 100);
+
+      // Rears: ±142.5°, on back wall (handled by pipeline)
+      seedRoleWithPipeline('SBL', -142.5, 'SL');
+      seedRoleWithPipeline('SBR', 142.5, 'SR');
+
+      // Front Wides: ±60°, on side walls (handled by pipeline)
+      seedRoleWithPipeline('LW', -60, 'SL');
+      seedRoleWithPipeline('RW', 60, 'SR');
     }
 
     return nextSpeakers;
-
-  }, [effectivePreset, zones, placeSurroundByRayCast, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp, seedSingleSpeakerWithPipeline]);
+  }, [
+    effectivePreset,
+    placeSurroundByRayCast,
+    getHuggingCenterLines,
+    applyCornerClearance,
+    applyRoomBoundsClamp,
+    zones,
+  ]);
 
   // Handler for reset button (full surround reset)
   const handleResetPositions = useCallback(() => { // Renamed from handleResetSpeakers
