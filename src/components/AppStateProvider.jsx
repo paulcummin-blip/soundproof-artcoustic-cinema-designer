@@ -226,47 +226,25 @@ function useDesignerState() {
   const getSpeakerVisibility = useCallback((role, model) => {
     const canon = String(role || "").toUpperCase();
 
-    // Always hide LFE icons (rendered separately as subwoofers)
-    if (canon === "LFE" || canon === "LFE1" || canon === "LFE2") {
-      return false;
-    }
-
-    // Hide explicitly disabled speakers
+    // Hide LFE + explicit off/none
+    if (canon === "LFE" || canon === "LFE1" || canon === "LFE2") return false;
     const modelStr = String(model || "").toLowerCase().trim();
-    if (modelStr === "off" || modelStr === "none" || modelStr === "") {
-      return false;
-    }
+    if (!modelStr || modelStr === "off" || modelStr === "none") return false;
 
-    // Normalize current layout into a simple string like "5.1" / "7.1" / "9.1.6"
+    // --- NORMALISE LAYOUT STRING ---
     const layoutString = (() => {
-      // Try dolbyLayout first (should be primary source)
-      if (typeof dolbyLayout === "string" && dolbyLayout.trim()) {
-        return dolbyLayout.trim();
-      }
+      if (typeof dolbyLayout === "string" && dolbyLayout.trim()) return dolbyLayout.trim();
+      if (typeof dolbyConfig === "string" && dolbyConfig.trim()) return dolbyConfig.trim();
 
-      // Try dolbyConfig as string
-      if (typeof dolbyConfig === "string" && dolbyConfig.trim()) {
-        return dolbyConfig.trim();
-      }
-
-      // If dolbyConfig is an object, try common property names
       if (dolbyConfig && typeof dolbyConfig === "object") {
-        if (typeof dolbyConfig.layout === "string" && dolbyConfig.layout.trim()) {
-          return dolbyConfig.layout.trim();
-        }
-        if (typeof dolbyConfig.preset === "string" && dolbyConfig.preset.trim()) {
-          return dolbyConfig.preset.trim();
-        }
-        if (typeof dolbyConfig.value === "string" && dolbyConfig.value.trim()) {
-          return dolbyConfig.value.trim();
-        }
+        if (typeof dolbyConfig.layout === "string" && dolbyConfig.layout.trim()) return dolbyConfig.layout.trim();
+        if (typeof dolbyConfig.preset === "string" && dolbyConfig.preset.trim()) return dolbyConfig.preset.trim();
+        if (typeof dolbyConfig.value === "string" && dolbyConfig.value.trim()) return dolbyConfig.value.trim();
       }
 
-      // Safe fallback
       return "5.1";
     })();
 
-    // Extract major channel count (handles "9.1.6", "9.1.6 Dolby Atmos", etc.)
     const major = parseInt(layoutString.split(".")[0], 10) || 5;
 
     // LCR always shown when model is valid
