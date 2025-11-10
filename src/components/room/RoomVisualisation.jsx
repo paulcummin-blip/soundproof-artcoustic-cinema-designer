@@ -4038,14 +4038,19 @@ return {
         model: spk.model,
         err,
       });
-      // On any error, show it rather than hide everything
       return true;
     }
   });
 
-  // DEBUG: see exactly what RV thinks it should draw
+  // DEBUG: Expose to window for manual inspection
+  if (typeof window !== 'undefined') {
+    window.__LAST_RV__ = { raw, afterVisibility };
+  }
+
+  // DEBUG: Table of afterVisibility with positions
   try {
     console.groupCollapsed("[RV] speakersToRender DEBUG");
+    console.log('Raw speakers:');
     console.table(
       raw.map((s) => ({
         id: s.id,
@@ -4053,11 +4058,14 @@ return {
         model: s.model || "(none)",
       }))
     );
+    console.log('After visibility:');
     console.table(
       afterVisibility.map((s) => ({
         id: s.id,
         role: s.role,
         model: s.model || "(none)",
+        posX: s.position?.x?.toFixed?.(3) || '—',
+        posY: s.position?.y?.toFixed?.(3) || '—',
       }))
     );
     console.groupEnd();
@@ -4099,6 +4107,23 @@ return {
       const x_m = position.x ?? 0;
       const y_m = position.y ?? 0;
       [canvasX, canvasY] = toPx(x_m, y_m);
+    }
+
+    // DEBUG: Log icon generation for rear/wide speakers
+    if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+      console.log('[RV icon]', {
+        id,
+        role,
+        canon,
+        model,
+        resolvedModel,
+        pos: position,
+        canvasX,
+        canvasY,
+        yawDeg,
+        widthM_spk,
+        depthM_spk,
+      });
     }
 
     const speakerMouseDownHandler = isDraggable(speaker)
