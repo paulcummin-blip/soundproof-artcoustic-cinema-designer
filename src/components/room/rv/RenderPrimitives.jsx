@@ -12,29 +12,21 @@ export const isSubRole = (role) => {
 
 export const hasPos = (s) => (s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y));
 
-// FIXED: Stricter validation - no ghost speakers
+// FIXED: Lenient validation - allows speakers without positions (they'll get defaults in render)
 export const isRenderableSpeaker = (s) => {
   if (!s) return false;
 
-  // Must have a role
-  const role = String(s.role || "").trim();
+  const role = String(s.role || "").trim().toUpperCase();
   if (!role) return false;
 
-  // Must have a valid position
-  if (!hasPos(s)) return false;
-
-  // Model must be meaningful (not "off", "none", empty, etc.)
-  const model = String(s.model || "").trim().toLowerCase();
-  if (
-    !model ||
-    model === "off" ||
-    model === "none" ||
-    model === "null" ||
-    model === "undefined"
-  ) {
+  // Optional: honour explicit "off" flags on model
+  const modelStr = String(s.model ?? "").trim().toLowerCase();
+  if (modelStr === "off" || modelStr === "none") {
     return false;
   }
 
+  // Do NOT require hasPos / position.x / position.y here.
+  // RoomVisualisation already has safe fallbacks for missing positions.
   return true;
 };
 

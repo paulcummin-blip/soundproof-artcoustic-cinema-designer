@@ -254,7 +254,6 @@ function useDesignerState() {
         model: modelStr,
         layoutString,
         major,
-        willReturn: '...' // Will be filled below
       });
     }
 
@@ -285,26 +284,24 @@ function useDesignerState() {
       return false;
     }
 
-    // 9.x+ — sides + rears always; wides always
+    // 9.x+ — sides + rears + wides all visible when they have models
     if (major >= 9) {
-      const result = (
-        canon === "SL" || canon === "SR" ||
-        canon === "SBL" || canon === "SBR" ||
-        canon === "LW" || canon === "RW"
-      );
+      if (canon === "SL" || canon === "SR") return true;
+      if (canon === "SBL" || canon === "SBR") return true;
+      if (canon === "LW" || canon === "RW") return true;
 
-      // TEMP DEBUG: Complete the log
+      // TEMP DEBUG: Log result
       if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
         console.log('[getSpeakerVisibility] 9.x+ result:', {
           role: canon,
           model: modelStr,
           layoutString,
           major,
-          result
+          result: true
         });
       }
 
-      return result;
+      return false; // Everything else not handled above
     }
 
     // Fallback: show if it has a valid model
