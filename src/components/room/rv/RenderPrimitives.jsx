@@ -29,50 +29,10 @@ export const isRenderableSpeaker = (s) => {
   return true;
 };
 
-export const getChannelColor = (role) => {
-  switch (String(role).toUpperCase()) {
-    case "FL":
-    case "FR":
-    case "L":
-    case "R":
-      return "#1B1A1A";       // Front L/R
-    case "FC":
-    case "C":
-      return "#3E4349";       // Center
-    case "SL":
-    case "SR":
-    case "LS":
-    case "RS":
-      return "#C1B6AD";       // Side surrounds
-    case "RL":
-    case "RR":
-    case "RSL":
-    case "RSR":
-    case "SBL":
-    case "SBR":
-      return "#625143";       // Rear surrounds
-    case "LW":
-    case "RW":
-      return "#625143";       // Front-wide surrounds (same as rears)
-    case "TSL":
-    case "TSR":
-    case "TBL":
-    case "TBR":
-    case "TFL":
-    case "TFR":
-    case "LTM":
-    case "RTM":
-      return "#A87A5B";       // Tops
-    case "SW1":
-    case "SW2":
-    case "SW":
-    case "SUB":
-    case "LFE":
-      return "#4A230F";       // Subs
-    default:
-      return "#999999";       // Fallback
-  }
-};
+// SIMPLIFIED: All speakers render black for now
+export function getChannelColor(/* role */) {
+  return "#000000";
+}
 
 export function normaliseModelKey(name = "") {
   const raw = String(name).trim().toLowerCase();
@@ -156,11 +116,15 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
 }) {
   const { model, role, id } = speaker || {};
   
-  // Get color based on role
-  const fill = getChannelColor(role);
+  // Safe fallbacks: ensure non-zero dimensions
+  const safeWidthM = (Number(widthM) > 0 ? Number(widthM) : 0.27);
+  const safeDepthM = (Number(depthM) > 0 ? Number(depthM) : 0.082);
+  const w = safeWidthM * (scale || 1);
+  const d = safeDepthM * (scale || 1);
   
-  const w = (widthM || 0) * (scale || 1);
-  const d = (depthM || 0) * (scale || 1);
+  // Get color (currently always black)
+  const color = getChannelColor(role);
+  
   const pathData = `M ${-w / 2},${-d / 2} L ${w / 2},${-d / 2} L ${w / 2},${d / 2} L ${-w / 2},${d / 2} Z`;
   const transform = `translate(${canvasX}, ${canvasY_raw}) rotate(${yawDeg || 0})`;
 
@@ -169,15 +133,17 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       transform={transform}
       pointerEvents="all"
       onMouseDown={speakerMouseDownHandler}
-      onMouseEnter={() => setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })}
+      onMouseEnter={() =>
+        setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
+      }
       onMouseLeave={() => setHoveredSpeaker?.(null)}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
-      <path 
-        d={pathData} 
-        fill={fill || '#000000'} 
-        stroke="#000000" 
-        strokeWidth={1} 
+      <path
+        d={pathData}
+        fill={color || "#000000"}
+        stroke="#000000"
+        strokeWidth={1}
         opacity={1}
       />
     </g>
