@@ -2019,7 +2019,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
     overlays, setOverlays, setSevenBedLayoutType,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
     enableFrontWides: appStateEnableFrontWides, setEnableFrontWides: appStateSetEnableFrontWides,
-    rowSpacingM, setRowSpacingM,
+    // Removed rowSpacingM, setRowSpacingM from here as they are declared above with '_' prefix.
   } = appState;
 
   return (
@@ -2260,10 +2260,10 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         onSeatingRowsChange={setSeatingRowsGuarded} 
                         seatSpacing={seatSpacing} 
                         onSeatSpacingChange={setSeatSpacingGuarded} 
-                        rowSpacingM={rowSpacingM || 1.8}
+                        rowSpacingM={_rowSpacingM || 1.8}
                         onRowSpacingChange={(val) => {
-                          if (!isFrozen('seating') && typeof setRowSpacingM === 'function') {
-                            setRowSpacingM(val);
+                          if (!isFrozen('seating') && typeof _setRowSpacingM === 'function') {
+                            _setRowSpacingM(val);
                           }
                         }}
                         seatingBlockOffset={_seatingBlockOffset} 
