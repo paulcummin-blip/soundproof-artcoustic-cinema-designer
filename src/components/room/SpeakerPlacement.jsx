@@ -95,7 +95,7 @@ function getByAnyRole(aliases, byRoleMap) {
 }
 
 // Apply a model to a set of speaker roles immutably, considering role aliases for matching.
-// `preferredRoles` are the roles that define the group (e.g., ["SL", "SR"]),
+// `preferredRoles` are the roles that define the group (e.g., ["SL", "SR"],
 // and the function will match any speaker whose role's canonical form matches one of these.
 function applyModelToAnyRoles(list, preferredRoles, model) {
   const targets = new Set(preferredRoles.map(getCanonicalRole));
