@@ -4019,7 +4019,19 @@ return {
   // 2) Visibility filter (layout + model) – but never hard-fail on errors
   const afterVisibility = afterRenderable.filter((spk) => {
     try {
-      return getSpeakerVisibility(spk.role, spk.model);
+      const result = getSpeakerVisibility(spk.role, spk.model);
+      
+      // TEMP DEBUG: Log each visibility check
+      const canon = String(spk.role || "").toUpperCase();
+      if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+        console.log('[RV filter]', {
+          role: canon,
+          model: spk.model,
+          visibilityResult: result
+        });
+      }
+      
+      return result;
     } catch (err) {
       console.warn("[RV] getSpeakerVisibility error; allowing speaker through", {
         role: spk.role,

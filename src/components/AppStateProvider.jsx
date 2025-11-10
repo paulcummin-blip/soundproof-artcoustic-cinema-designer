@@ -247,6 +247,17 @@ function useDesignerState() {
 
     const major = parseInt(layoutString.split(".")[0], 10) || 5;
 
+    // TEMP DEBUG: Log rear/wide role visibility checks
+    if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+      console.log('[getSpeakerVisibility]', {
+        role: canon,
+        model: modelStr,
+        layoutString,
+        major,
+        willReturn: '...' // Will be filled below
+      });
+    }
+
     // LCR always shown when model is valid
     if (canon === "FL" || canon === "FC" || canon === "FR") {
       return true;
@@ -261,7 +272,6 @@ function useDesignerState() {
     if (major === 7) {
       if (canon === "SL" || canon === "SR") return true;
 
-      // Check if using wides instead of rears for 7.x
       if (useWidesInsteadOfRears) {
         // Show wides, hide rears
         if (canon === "LW" || canon === "RW") return true;
@@ -275,17 +285,26 @@ function useDesignerState() {
       return false;
     }
 
-    // 9.x+ — sides + rears always; wides optional
+    // 9.x+ — sides + rears always; wides always
     if (major >= 9) {
-      if (canon === "SL" || canon === "SR") return true;
-      if (canon === "SBL" || canon === "SBR") return true;
+      const result = (
+        canon === "SL" || canon === "SR" ||
+        canon === "SBL" || canon === "SBR" ||
+        canon === "LW" || canon === "RW"
+      );
 
-      // Wides: always show for 9.x+ when they have a model
-      if (canon === "LW" || canon === "RW") {
-        return true; 
+      // TEMP DEBUG: Complete the log
+      if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+        console.log('[getSpeakerVisibility] 9.x+ result:', {
+          role: canon,
+          model: modelStr,
+          layoutString,
+          major,
+          result
+        });
       }
 
-      return false;
+      return result;
     }
 
     // Fallback: show if it has a valid model
