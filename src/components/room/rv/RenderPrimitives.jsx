@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from "react";
@@ -52,6 +51,9 @@ export const getChannelColor = (role) => {
     case "SBL":
     case "SBR":
       return "#625143";       // Rear surrounds
+    case "LW":
+    case "RW":
+      return "#625143";       // Front-wide surrounds (same as rears)
     case "TSL":
     case "TSR":
     case "TBL":
@@ -60,9 +62,7 @@ export const getChannelColor = (role) => {
     case "TFR":
     case "LTM":
     case "RTM":
-    case "LW":
-    case "RW":
-      return "#A87A5B";       // Tops / wides
+      return "#A87A5B";       // Tops
     case "SW1":
     case "SW2":
     case "SW":
@@ -155,6 +155,10 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   setHoveredSpeaker
 }) {
   const { model, role, id } = speaker || {};
+  
+  // Get color based on role
+  const fill = getChannelColor(role);
+  
   const w = (widthM || 0) * (scale || 1);
   const d = (depthM || 0) * (scale || 1);
   const pathData = `M ${-w / 2},${-d / 2} L ${w / 2},${-d / 2} L ${w / 2},${d / 2} L ${-w / 2},${d / 2} Z`;
@@ -169,7 +173,13 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       onMouseLeave={() => setHoveredSpeaker?.(null)}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
-      <path d={pathData} fill="#1a1a1a" stroke="none" strokeWidth={0} />
+      <path 
+        d={pathData} 
+        fill={fill || '#000000'} 
+        stroke="#000000" 
+        strokeWidth={1} 
+        opacity={1}
+      />
     </g>
   );
 });
