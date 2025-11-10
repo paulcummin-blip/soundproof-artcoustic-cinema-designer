@@ -3,6 +3,7 @@ import { debug } from "@/components/utils/consolePolyfill";
 
 const SURROUND_ROLES = new Set([
   "SL", "SR", "SBL", "SBR", 
+  "LW", "RW", // Front-wide surrounds
   "LS", "RS", "LRS", "RRS", "RL", "RR", // Legacy / Aliases
   "TSL", "TSR", "TML", "TMR", "TBL", "TBR" // Top surrounds also sometimes have surround variants
 ]);
@@ -27,8 +28,14 @@ export function resolveSurroundModel(baseModel, role) {
     return baseModel || "";
   }
 
-  const modelKey = String(baseModel).trim();
+  const modelKey = String(baseModel).trim().toLowerCase();
   const canonicalRole = String(role).toUpperCase();
+
+  // Never return "off" or "none" - these should be filtered earlier
+  if (modelKey === "off" || modelKey === "none" || modelKey === "") {
+    console.warn(`[resolver] Invalid model "${modelKey}" for role ${canonicalRole}`);
+    return modelKey;
+  }
 
   // If it's a surround role and the key doesn't already have the suffix, add it.
   if (isSurroundRole(canonicalRole) && !modelKey.endsWith('_s')) {
