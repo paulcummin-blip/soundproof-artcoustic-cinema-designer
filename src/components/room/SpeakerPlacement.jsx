@@ -750,7 +750,7 @@ function UnifiedSurroundsConfig({
         const safeModel = typeof nextModel === 'string' ? nextModel.trim() : String(nextModel || 'off').trim();
         
         const canon = getCanonicalRole(role);
-        // Only process if the role is *allowed* by the current layout configuration
+        // Only process if the role is NOT required by the current layout configuration
         if (!allowedRoles.has(canon)) {
           speakerMap.delete(canon); // Ensure it's removed if it somehow ended up there
           return;
@@ -1293,12 +1293,12 @@ function SpeakerPlacementImpl(props) {
     try {
       const arr = rolesForLayout({
         dolbyLayout: effectivePreset,
-        useFrontWidesInsteadOfRears: !!useWides,
+        useFrontWidesInsteadOfRear: !!useWides,
       });
       return new Set(arr);              // ✅ convert array → Set
     } catch (e) {
       console.warn("[SpeakerPlacement] rolesForLayout failed; falling back to 5.1", e);
-      return new Set(rolesForLayout({ dolbyLayout: "5.1", useFrontWidesInsteadOfRears: false }));
+      return new Set(rolesForLayout({ dolbyLayout: "5.1", useFrontWidesInsteadOfRear: false }));
     }
   }, [effectivePreset, useWides]);
 
@@ -1545,15 +1545,16 @@ function SpeakerPlacementImpl(props) {
   }, [effectivePreset]);
 
   // Single function: RESET_SURROUND_POSITIONS with full pipeline: ANGLE → HUG → ZONE → CORNER → ROOM
-  const resetSurroundPositions = useCallback((mlp, dimensions, currentSpeakers, currentAllowedRoles) => {
+  const resetSurroundPositions = useCallback((mlp, dimensions, currentSpeakers) => {
     if (!mlp || !dimensions || !Array.isArray(currentSpeakers)) {
       return currentSpeakers || [];
     }
 
-    // 1. Derive majorChannels and choose a layoutKey
+    // Parse layout to determine major channels
     const layoutString = String(effectivePreset || "").trim();
     const majorChannels = parseInt(layoutString.split(".")[0], 10) || 5;
 
+    // Determine layout key
     let layoutKey;
     if (majorChannels === 5) {
       layoutKey = "5.1";
@@ -1563,29 +1564,20 @@ function SpeakerPlacementImpl(props) {
       layoutKey = "7.1";
     }
 
-    console.log('[resetSurroundPositions] Layout:', {
-      layoutString,
-      majorChannels,
-      layoutKey,
-      allowedRoles: Array.from(currentAllowedRoles)
-    });
-
-    // Helper to seed a role with the pipeline
-    const seedRoleWithPipeline = (role, angleDegrees, inheritModelFromRole = null) => {
-      // Determine model
-      const existingSpeakersMap = new Map();
-      currentSpeakers.forEach(s => existingSpeakersMap.set(getCanonicalRole(s.role), s));
-
-      let model = existingSpeakersMap.get(role)?.model || 'off';
+    // Helper to seed a single role using the existing pipeline
+    const seedRoleWithPipeline = (role, angleDegrees, inheritFrom = null) => {
+      // Try to get existing speaker for this role
+      const existing = currentSpeakers.find(s => getCanonicalRole(s.role) === role);
       
-      // If no model and inheritModelFromRole is provided, inherit from that role
-      if (model === 'off' && inheritModelFromRole) {
-        model = existingSpeakersMap.get(inheritModelFromRole)?.model || 'off';
+      // Determine model: use existing, or inherit from specified role, or 'off'
+      let model = existing?.model || 'off';
+      if (model === 'off' && inheritFrom) {
+        const inheritSpeaker = currentSpeakers.find(s => getCanonicalRole(s.role) === inheritFrom);
+        model = inheritSpeaker?.model || 'off';
       }
 
+      // Don't create speaker if model is 'off'
       if (model === 'off') return null;
-
-      const existing = existingSpeakersMap.get(role);
 
       return seedSingleSpeakerWithPipeline(
         role, angleDegrees, model, mlp, dimensions, zones,
@@ -1594,14 +1586,14 @@ function SpeakerPlacementImpl(props) {
       );
     };
 
-    // 2. Remove disallowed roles for the chosen layout first
+    // Remove all existing surround roles
     const surroundRoles = new Set(['SL','SR','SBL','SBR','LW','RW']);
     let nextSpeakers = currentSpeakers.filter(s => {
       const canonicalRole = getCanonicalRole(s.role);
       return !surroundRoles.has(canonicalRole);
     });
 
-    // 3. Seed surrounds based on layoutKey
+    // Seed speakers based on layout key
     if (layoutKey === '5.1') {
       // 5.1.x: SL/SR at ±120°, no rears, no wides
       const sl = seedRoleWithPipeline('SL', -120);
@@ -1613,42 +1605,35 @@ function SpeakerPlacementImpl(props) {
       // 7.1.x: SL/SR at ±100°, SBL/SBR at ±142.5°, no wides
       const sl = seedRoleWithPipeline('SL',  -100);
       const sr = seedRoleWithPipeline('SR',   100);
-      if (sl) nextSpeakers.push(sl);
-      if (sr) nextSpeakers.push(sr);
-
       const sbl = seedRoleWithPipeline('SBL', -142.5, 'SL'); // inherit model from SL
       const sbr = seedRoleWithPipeline('SBR',  142.5, 'SR'); // inherit model from SR
+      
+      if (sl) nextSpeakers.push(sl);
+      if (sr) nextSpeakers.push(sr);
       if (sbl) nextSpeakers.push(sbl);
       if (sbr) nextSpeakers.push(sbr);
     }
     else if (layoutKey === '9.x') {
       // 9.x+: SL/SR at ±100°, SBL/SBR at ±142.5°, LW/RW as front wides
-      
       // Sides
       const sl = seedRoleWithPipeline('SL',  -100);
       const sr = seedRoleWithPipeline('SR',   100);
-      if (sl) nextSpeakers.push(sl);
-      if (sr) nextSpeakers.push(sr);
-
+      
       // Rears: ON the back wall (1cm buffer) using the same pipeline
       const sbl = seedRoleWithPipeline('SBL', -142.5, 'SL');
       const sbr = seedRoleWithPipeline('SBR',  142.5, 'SR');
-      if (sbl) nextSpeakers.push(sbl);
-      if (sbr) nextSpeakers.push(sbr);
-
+      
       // Front Wides: mid-wide angles (e.g. ±60°) using side models
       const lw = seedRoleWithPipeline('LW',  -60, 'SL');
       const rw = seedRoleWithPipeline('RW',   60, 'SR');
+      
+      if (sl) nextSpeakers.push(sl);
+      if (sr) nextSpeakers.push(sr);
+      if (sbl) nextSpeakers.push(sbl);
+      if (sbr) nextSpeakers.push(sbr);
       if (lw) nextSpeakers.push(lw);
       if (rw) nextSpeakers.push(rw);
     }
-
-    console.log('[resetSurroundPositions] Result:', {
-      layoutKey,
-      inputCount: currentSpeakers.length,
-      outputCount: nextSpeakers.length,
-      roles: nextSpeakers.map(s => s.role)
-    });
 
     return nextSpeakers;
 
@@ -1661,19 +1646,19 @@ function SpeakerPlacementImpl(props) {
       return;
     }
     
-    setSpeakers(currentSpeakers => resetSurroundPositions(mlpPoint, dimensions, currentSpeakers, allowedRoles));
+    setSpeakers(currentSpeakers => resetSurroundPositions(mlpPoint, dimensions, currentSpeakers));
     
     if (showToast) {
       const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : '7.1';
       showToast(`Speaker positions reset for ${layoutKey} layout with 50cm corner clearance.`, 'success');
     }
-  }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast, allowedRoles]);
+  }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast]);
 
   // Effect to auto-reset when layout changes (guarded by lastPresetRef)
   useEffect(() => {
     if (effectivePreset !== lastPresetRef.current) {
       if (mlpPoint && dimensions) {
-        setSpeakers(currentSpeakers => resetSurroundPositions(mlpPoint, dimensions, currentSpeakers, allowedRoles));
+        setSpeakers(currentSpeakers => resetSurroundPositions(mlpPoint, dimensions, currentSpeakers));
         
         if (showToast) {
           const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : '7.1';
@@ -1682,7 +1667,7 @@ function SpeakerPlacementImpl(props) {
       }
       lastPresetRef.current = effectivePreset;
     }
-  }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast, allowedRoles]);
+  }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast]);
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
@@ -1908,7 +1893,7 @@ function SpeakerPlacementImpl(props) {
               onRearOverrideChange={setOverheadRearOverride}
               useFrontGlobal={useFrontGlobal}
               useMidGlobal={useMidGlobal}
-              useRearGlobal={useRearGlobal}
+              useRearGlobal={useUseMidGlobal}
               onUseFrontGlobalChange={setUseFrontGlobal}
               onUseMidGlobalChange={setUseMidGlobal}
               onUseRearGlobalChange={setUseRearGlobal}
