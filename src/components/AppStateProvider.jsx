@@ -222,7 +222,7 @@ function useDesignerState() {
     });
   }, [splConfig]);
 
-  // --- SPEAKER VISIBILITY (FIXED: Layout-aware surround rules) ---
+  // --- SPEAKER VISIBILITY (FIXED: Robust layout parsing + layout-aware surround rules) ---
   const getSpeakerVisibility = useCallback((role, model) => {
     const canon = String(role || "").toUpperCase();
 
@@ -237,9 +237,37 @@ function useDesignerState() {
       return false;
     }
 
-    // Parse layout to determine major channel count
-    const dolby = dolbyLayout || dolbyConfig || "5.1";
-    const major = parseInt(String(dolby).split(".")[0], 10) || 5;
+    // Normalize current layout into a simple string like "5.1" / "7.1" / "9.1.6"
+    const layoutString = (() => {
+      // Try dolbyLayout first (should be primary source)
+      if (typeof dolbyLayout === "string" && dolbyLayout.trim()) {
+        return dolbyLayout.trim();
+      }
+
+      // Try dolbyConfig as string
+      if (typeof dolbyConfig === "string" && dolbyConfig.trim()) {
+        return dolbyConfig.trim();
+      }
+
+      // If dolbyConfig is an object, try common property names
+      if (dolbyConfig && typeof dolbyConfig === "object") {
+        if (typeof dolbyConfig.layout === "string" && dolbyConfig.layout.trim()) {
+          return dolbyConfig.layout.trim();
+        }
+        if (typeof dolbyConfig.preset === "string" && dolbyConfig.preset.trim()) {
+          return dolbyConfig.preset.trim();
+        }
+        if (typeof dolbyConfig.value === "string" && dolbyConfig.value.trim()) {
+          return dolbyConfig.value.trim();
+        }
+      }
+
+      // Safe fallback
+      return "5.1";
+    })();
+
+    // Extract major channel count (handles "9.1.6", "9.1.6 Dolby Atmos", etc.)
+    const major = parseInt(layoutString.split(".")[0], 10) || 5;
 
     // LCR always shown when model is valid
     if (canon === "FL" || canon === "FC" || canon === "FR") {
@@ -274,9 +302,9 @@ function useDesignerState() {
       if (canon === "SL" || canon === "SR") return true;
       if (canon === "SBL" || canon === "SBR") return true;
 
-      // Wides: always show for 9.x+ (or: return enableFrontWides if you want toggle control)
+      // Wides: always show for 9.x+ when they have a model
       if (canon === "LW" || canon === "RW") {
-        return true; // Always show wides in 9.x+ when they have a model
+        return true; 
       }
 
       return false;
