@@ -1893,7 +1893,7 @@ function SpeakerPlacementImpl(props) {
               onRearOverrideChange={setOverheadRearOverride}
               useFrontGlobal={useFrontGlobal}
               useMidGlobal={useMidGlobal}
-              useRearGlobal={useRearGlobal} {/* CORRECTED: Was `useUseMidGlobal` */}
+              useRearGlobal={useRearGlobal}
               onUseFrontGlobalChange={setUseFrontGlobal}
               onUseMidGlobalChange={setUseMidGlobal}
               onUseRearGlobalChange={setUseRearGlobal}
