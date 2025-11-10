@@ -4073,6 +4073,17 @@ return {
     // ignore console errors in strange environments
   }
 
+  // NaN-safe coordinate mappers
+  const toCanvasX = (xM) => {
+    const vx = Number.isFinite(xM) ? xM : 0;
+    return roomRect.x + (vx * scale);
+  };
+
+  const toCanvasY = (yM) => {
+    const vy = Number.isFinite(yM) ? yM : 0;
+    return roomRect.y + (vy * scale);
+  };
+
   // 3) Map to icons
   return afterVisibility.map((speaker) => {
     const { id, role, model, position = {} } = speaker;
@@ -4093,20 +4104,40 @@ return {
       getModelDimsM
     );
 
-    // Position:
-    // - LCR: pinned to front wall using WALL_BUFFER_M
-    // - Everyone else: use their stored world coords
+    // Position coordinates from speaker.position (with safe fallbacks)
+    const pos_x = position.x ?? 0;
+    const pos_y = position.y ?? 0;
+
+    // Convert to canvas coordinates
     let canvasX, canvasY;
 
     if (canon === "FL" || canon === "FC" || canon === "FR") {
+      // LCR: pinned to front wall using WALL_BUFFER_M
       const half = yHalfExtentM(depthM_spk, widthM_spk, yawDeg);
       const y_m = WALL_BUFFER_M + half;
-      canvasX = meterToCanvasX(position.x ?? 0);
-      canvasY = meterToCanvasY(y_m);
+      canvasX = toCanvasX(pos_x);
+      canvasY = toCanvasY(y_m);
     } else {
-      const x_m = position.x ?? 0;
-      const y_m = position.y ?? 0;
-      [canvasX, canvasY] = toPx(x_m, y_m);
+      // Everyone else: use their stored world coords directly
+      canvasX = toCanvasX(pos_x);
+      canvasY = toCanvasY(pos_y);
+    }
+
+    // NaN safety: ensure we never pass invalid coordinates
+    const safeCanvasX = Number.isFinite(canvasX) ? canvasX : 0;
+    const safeCanvasY = Number.isFinite(canvasY) ? canvasY : 0;
+
+    // Log any invalid coordinates
+    if (!Number.isFinite(canvasX) || !Number.isFinite(canvasY)) {
+      console.warn('[RV] INVALID CANVAS COORDS', {
+        id,
+        role,
+        pos: position,
+        pos_x,
+        pos_y,
+        canvasX,
+        canvasY,
+      });
     }
 
     // DEBUG: Log icon generation for rear/wide speakers
@@ -4118,8 +4149,10 @@ return {
         model,
         resolvedModel,
         pos: position,
-        canvasX,
-        canvasY,
+        pos_x,
+        pos_y,
+        canvasX: safeCanvasX,
+        canvasY: safeCanvasY,
         yawDeg,
         widthM_spk,
         depthM_spk,
@@ -4134,8 +4167,8 @@ return {
       <SpeakerIcon
         key={id}
         speaker={{ ...speaker, model: resolvedModel }}
-        canvasX={canvasX}
-        canvasY_raw={canvasY}
+        canvasX={safeCanvasX}
+        canvasY_raw={safeCanvasY}
         yawDeg={yawDeg}
         widthM={widthM_spk}
         depthM={depthM_spk}
@@ -4155,15 +4188,13 @@ return {
   getYawForObject,
   yHalfExtentM,
   WALL_BUFFER_M,
-  meterToCanvasX,
-  meterToCanvasY,
-  toPx,
+  roomRect,
+  scale,
   widthM,
   lengthM,
   heightM,
   lcrAngleInfo,
   aimAtMLP,
-  scale,
   isDraggable,
   handleMouseDown,
   setHoveredSpeaker,
