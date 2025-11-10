@@ -1550,72 +1550,109 @@ function SpeakerPlacementImpl(props) {
       return currentSpeakers || [];
     }
 
-    const major = Number(String(effectivePreset || "").split(".")[0]) || 5;
-    
-    // Define the angles for different surround roles (standard Dolby positions)
-    const surroundAngles = {
-      SBL: -142.5, SBR: 142.5, // Rear surrounds
-      LW: -50, RW: 50, // Front Wides (example angles)
-    };
-    // Sides are conditional
-    if (major >= 7 || currentAllowedRoles.has('LW')) { // If 7.x or higher, or if wides are active (implies 7.x config for sides)
-      surroundAngles.SL = -100;
-      surroundAngles.SR = 100;
-    } else { // 5.x without FW
-      surroundAngles.SL = -120;
-      surroundAngles.SR = 120;
+    // 1. Derive majorChannels and choose a layoutKey
+    const layoutString = String(effectivePreset || "").trim();
+    const majorChannels = parseInt(layoutString.split(".")[0], 10) || 5;
+
+    let layoutKey;
+    if (majorChannels === 5) {
+      layoutKey = "5.1";
+    } else if (majorChannels >= 9) {
+      layoutKey = "9.x";
+    } else {
+      layoutKey = "7.1";
     }
 
-    // Determine which roles are *active* for the current layout and flags
-    const desiredSurroundRoles = new Set(Array.from(currentAllowedRoles).filter(r => ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r)));
-    
-    // Index existing speakers by canonical role
-    const existingSurroundsMap = new Map();
-    const otherSpeakers = []; // Non-surround speakers (LCR, overheads, non-surround bed speakers)
-    currentSpeakers.forEach(s => {
-      const canonicalRole = getCanonicalRole(s.role);
-      if (['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(canonicalRole)) {
-        existingSurroundsMap.set(canonicalRole, s);
-      } else {
-        otherSpeakers.push(s);
-      }
+    console.log('[resetSurroundPositions] Layout:', {
+      layoutString,
+      majorChannels,
+      layoutKey,
+      allowedRoles: Array.from(currentAllowedRoles)
     });
 
-    const newSurrounds = [];
+    // Helper to seed a role with the pipeline
+    const seedRoleWithPipeline = (role, angleDegrees, inheritModelFromRole = null) => {
+      // Determine model
+      const existingSpeakersMap = new Map();
+      currentSpeakers.forEach(s => existingSpeakersMap.set(getCanonicalRole(s.role), s));
 
-    // Process each desired surround role
-    desiredSurroundRoles.forEach(role => {
-      const existing = existingSurroundsMap.get(role);
-      let model = existing?.model || 'off'; // Keep existing model, or 'off' if none
-
-      // If no specific model and it's a surround, try to inherit from SL/SR
-      if (model === 'off') {
-        if (role === 'SBL' && existingSurroundsMap.has('SL')) { model = existingSurroundsMap.get('SL').model; }
-        else if (role === 'SBR' && existingSurroundsMap.has('SR')) { model = existingSurroundsMap.get('SR').model; }
-        else if (role === 'LW' && existingSurroundsMap.has('SL')) { model = existingSurroundsMap.get('SL').model; }
-        else if (role === 'RW' && existingSurroundsMap.has('SR')) { model = existingSurroundsMap.get('SR').model; }
+      let model = existingSpeakersMap.get(role)?.model || 'off';
+      
+      // If no model and inheritModelFromRole is provided, inherit from that role
+      if (model === 'off' && inheritModelFromRole) {
+        model = existingSpeakersMap.get(inheritModelFromRole)?.model || 'off';
       }
 
-      // If the model is still 'off', don't place this speaker
-      if (model === 'off') return;
+      if (model === 'off') return null;
 
-      const angle = surroundAngles[role];
-      if (typeof angle === 'undefined') {
-        console.warn(`[resetSurroundPositions] No angle defined for role: ${role}`);
-        return;
-      }
+      const existing = existingSpeakersMap.get(role);
 
-      const seededSpeaker = seedSingleSpeakerWithPipeline(
-          role, angle, model, mlp, dimensions, zones,
-          placeSurroundByRayCast, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp,
-          existing
+      return seedSingleSpeakerWithPipeline(
+        role, angleDegrees, model, mlp, dimensions, zones,
+        placeSurroundByRayCast, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp,
+        existing
       );
-      if (seededSpeaker) newSurrounds.push(seededSpeaker);
+    };
+
+    // 2. Remove disallowed roles for the chosen layout first
+    const surroundRoles = new Set(['SL','SR','SBL','SBR','LW','RW']);
+    let nextSpeakers = currentSpeakers.filter(s => {
+      const canonicalRole = getCanonicalRole(s.role);
+      return !surroundRoles.has(canonicalRole);
     });
 
-    return [...otherSpeakers, ...newSurrounds];
+    // 3. Seed surrounds based on layoutKey
+    if (layoutKey === '5.1') {
+      // 5.1.x: SL/SR at ±120°, no rears, no wides
+      const sl = seedRoleWithPipeline('SL', -120);
+      const sr = seedRoleWithPipeline('SR',  120);
+      if (sl) nextSpeakers.push(sl);
+      if (sr) nextSpeakers.push(sr);
+    }
+    else if (layoutKey === '7.1') {
+      // 7.1.x: SL/SR at ±100°, SBL/SBR at ±142.5°, no wides
+      const sl = seedRoleWithPipeline('SL',  -100);
+      const sr = seedRoleWithPipeline('SR',   100);
+      if (sl) nextSpeakers.push(sl);
+      if (sr) nextSpeakers.push(sr);
 
-  }, [effectivePreset, zones, placeSurroundByRayCast, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp]);
+      const sbl = seedRoleWithPipeline('SBL', -142.5, 'SL'); // inherit model from SL
+      const sbr = seedRoleWithPipeline('SBR',  142.5, 'SR'); // inherit model from SR
+      if (sbl) nextSpeakers.push(sbl);
+      if (sbr) nextSpeakers.push(sbr);
+    }
+    else if (layoutKey === '9.x') {
+      // 9.x+: SL/SR at ±100°, SBL/SBR at ±142.5°, LW/RW as front wides
+      
+      // Sides
+      const sl = seedRoleWithPipeline('SL',  -100);
+      const sr = seedRoleWithPipeline('SR',   100);
+      if (sl) nextSpeakers.push(sl);
+      if (sr) nextSpeakers.push(sr);
+
+      // Rears: ON the back wall (1cm buffer) using the same pipeline
+      const sbl = seedRoleWithPipeline('SBL', -142.5, 'SL');
+      const sbr = seedRoleWithPipeline('SBR',  142.5, 'SR');
+      if (sbl) nextSpeakers.push(sbl);
+      if (sbr) nextSpeakers.push(sbr);
+
+      // Front Wides: mid-wide angles (e.g. ±60°) using side models
+      const lw = seedRoleWithPipeline('LW',  -60, 'SL');
+      const rw = seedRoleWithPipeline('RW',   60, 'SR');
+      if (lw) nextSpeakers.push(lw);
+      if (rw) nextSpeakers.push(rw);
+    }
+
+    console.log('[resetSurroundPositions] Result:', {
+      layoutKey,
+      inputCount: currentSpeakers.length,
+      outputCount: nextSpeakers.length,
+      roles: nextSpeakers.map(s => s.role)
+    });
+
+    return nextSpeakers;
+
+  }, [effectivePreset, zones, placeSurroundByRayCast, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp, seedSingleSpeakerWithPipeline]);
 
   // Handler for reset button (full surround reset)
   const handleResetPositions = useCallback(() => { // Renamed from handleResetSpeakers
