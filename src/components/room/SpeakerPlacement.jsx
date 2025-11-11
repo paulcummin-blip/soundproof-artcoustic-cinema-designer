@@ -1544,7 +1544,6 @@ function SpeakerPlacementImpl(props) {
         return currentSpeakers || [];
       }
 
-      // Normalize layout string
       const layoutNormalized = (typeof layoutString === "string" && layoutString.trim()) 
         ? layoutString.trim()
         : (typeof dolbyConfig === "string" && dolbyConfig.trim()) 
@@ -1553,12 +1552,10 @@ function SpeakerPlacementImpl(props) {
             ? dolbyConfig.layout.trim()
             : "5.1";
 
-      // Extract major channel count, e.g. "9.1.6" -> 9, "7.1" -> 7
       const major = parseInt(layoutNormalized.split(".")[0], 10) || 5;
 
       const { width: W, length: L } = dims;
 
-      // Define room bounds for projectToWallFromMLP helper
       const room = {
         left: 0,
         right: W,
@@ -1566,26 +1563,22 @@ function SpeakerPlacementImpl(props) {
         back: L
       };
 
-      // Map existing by canonical role so we can reuse ids/models
       const byRole = new Map();
       currentSpeakers.forEach((s) => {
         const canon = getCanonicalRole(s.role);
         byRole.set(canon, s);
       });
 
-      // Start from all non-surround-bed speakers (LCR, heights, subs, etc)
       const next = currentSpeakers.filter(
         (s) => !SURROUND_BED_ROLES.has(getCanonicalRole(s.role))
       );
 
-      // Utility: snap to walls using existing hugging / clearance helpers
       const finalisePos = (pos, canon, model) => {
         const safeModel = model || 'evolve-2-1_s';
         let p = { x: pos.x, y: pos.y, z: 1.1 };
 
         const hug = getHuggingCenterLines(safeModel, dims);
         
-        // LEFT / RIGHT wall snapping for surrounds & wides
         if (canon === "SL" || canon === "LW") {
           p.x = hug.leftWallX;
         }
@@ -1593,47 +1586,38 @@ function SpeakerPlacementImpl(props) {
           p.x = hug.rightWallX;
         }
 
-        // Rear surrounds must be on back wall
         if (canon === "SBL" || canon === "SBR") {
           p.y = hug.backWallY;
         }
 
-        // Corner clearance + bounds
-        p = applyCornerClearance(p, canon, safeModel, dims, zones);
+        p = applyCornerClearance(p, canon, safeModel, dims, {});
         p = applyRoomBoundsClamp(p, safeModel, dims);
 
-        // Ensure finite numbers; fall back to MLP if something went wrong
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           p.x = mlp.x;
           p.y = mlp.y;
         }
 
-        // keep existing z if present, else ear height / generic
         const z = Number.isFinite(pos.z) ? pos.z : (mlp.z || 1.1);
 
         return { x: p.x, y: p.y, z };
       };
 
-      // Reverting `seed` function parameter and angle conversion to maintain geometric correctness,
-      // while adopting the outline's model fallback and yaw logic.
-      const seed = (role, dolbyAngleDeg) => { // dolbyAngleDeg: 0=front, +CCW
+      const seed = (role, dolbyAngleDeg) => {
         const canon = getCanonicalRole(role);
         const existing = byRole.get(canon);
-        
-        // NEW FALLBACK MODEL LOGIC from outline
+
         const fallbackModel = byRole.get("SL")?.model || byRole.get("SR")?.model || existing?.model;
         const model = existing?.model || fallbackModel;
 
         if (!model || model === "off" || model === "none") return;
         if (!allowedRoles.has(canon)) return;
 
-        // Convert Dolby angle (0=front, +CCW) to projectToWallFromMLP angle (0=+X, 90=+Y)
         const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
         const base = projectToWallFromMLP(mlp.x, mlp.y, projectAngleDeg, room);
         const position = finalisePos(base, canon, model);
 
         let yawDeg = 0;
-        // NEW YAW LOGIC from outline (rears now face sideways as per outline)
         if (canon === "SL" || canon === "SBL" || canon === "LW") yawDeg = 90;
         else if (canon === "SR" || canon === "SBR" || canon === "RW") yawDeg = -90;
 
@@ -1647,18 +1631,16 @@ function SpeakerPlacementImpl(props) {
         });
       };
 
-      // --- Layout-specific seeding with Dolby-compliant angles ----------------------------------------
-      // Using Dolby standard angles: 0=front, +CCW. Reverting seed angles to original correct Dolby angles.
       if (major === 5) {
-        seed("SL", 90);  // Dolby 90 deg CCW (left side)
-        seed("SR", -90); // Dolby 90 deg CW (right side)
+        seed("SL", 90);
+        seed("SR", -90);
       }
 
       if (major === 7) {
         seed("SL", 90);
         seed("SR", -90);
-        seed("SBL", 142.5); // Dolby 142.5 deg CCW (left rear)
-        seed("SBR", -142.5); // Dolby 142.5 deg CW (right rear)
+        seed("SBL", 142.5);
+        seed("SBR", -142.5);
       }
 
       if (major >= 9) {
@@ -1666,13 +1648,13 @@ function SpeakerPlacementImpl(props) {
         seed("SR", -90);
         seed("SBL", 142.5);
         seed("SBR", -142.5);
-        seed("LW", 60);  // Dolby 60 deg CCW (left wide)
-        seed("RW", -60); // Dolby 60 deg CW (right wide)
+        seed("LW", 60);
+        seed("RW", -60);
       }
 
       return next;
     },
-    [zones, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp, allowedRoles, dolbyConfig]
+    [getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp, allowedRoles, dolbyConfig]
   );
 
   // Handler for reset button (full surround reset)
