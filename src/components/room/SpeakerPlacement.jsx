@@ -1568,127 +1568,141 @@ function SpeakerPlacementImpl(props) {
         return currentSpeakers || [];
       }
 
-      // --- 1) Parse layout: "5.1", "7.1", "9.1.6", etc. ---
-      const layoutStr = (String(layoutString || '').trim() || '5.1');
-      const major = parseInt(layoutStr.split('.')[0], 10) || 5;
-      const layoutKey = major === 5 ? '5.1' : major === 7 ? '7.1' : '9.x';
+      const layout = String(layoutString || '').trim() || '5.1';
+      const major = parseInt(layout.split('.')[0], 10) || 5;
 
-      // We only strip / reseed these roles
-      const canonical = (r) => String(r || '').toUpperCase();
+      const { width: W, length: L } = dims;
 
-      const source = Array.isArray(currentSpeakers) ? currentSpeakers : [];
-
-      // Keep everything that is NOT one of our bed-surround roles
-      let nextSpeakers = source.filter(
-        (s) => !SURROUND_BED_ROLES.has(canonical(s.role))
-      );
-
-      // Map of *all* existing by canonical role (before reset)
-      const allByRole = new Map();
-      source.forEach((s) => {
-        allByRole.set(canonical(s.role), s);
+      // Map existing by canonical role so we can reuse ids/models
+      const byRole = new Map();
+      currentSpeakers.forEach((s) => {
+        const canon = getCanonicalRole(s.role);
+        byRole.set(canon, s);
       });
 
-      // --- Helper: full pipeline seeding for a role at a given angle ---
-      const seedRoleWithPipeline = (role, angleDegrees, inheritFromRole) => {
-        const cRole = canonical(role);
-        // NEW: Only proceed if this role is allowed by the current layout configuration
-        if (!allowedRoles.has(cRole)) {
-            return;
+      // Start from all non-surround-bed speakers (LCR, heights, subs, etc)
+      const next = currentSpeakers.filter(
+        (s) => !SURROUND_BED_ROLES.has(getCanonicalRole(s.role))
+      );
+
+      // Utility: robust ray-cast
+      const castToWall = (angleDeg) => {
+        const a = (angleDeg * Math.PI) / 180;
+        const dx = Math.sin(a);
+        const dy = -Math.cos(a);
+
+        let t = Infinity;
+
+        // Left wall
+        if (dx < 0) {
+          const v = (0.01 - mlp.x) / dx;
+          if (v > 0) t = Math.min(t, v);
         }
-        const existingSpk = allByRole.get(cRole);
-
-        // Inherit model: existing role, or a sibling role if requested
-        let model = existingSpk && existingSpk.model;
-        if (!model && inheritFromRole) {
-          const inherit = allByRole.get(canonical(inheritFromRole));
-          if (inherit && inherit.model) {
-            model = inherit.model;
-          }
+        // Right wall
+        if (dx > 0) {
+          const v = (W - 0.01 - mlp.x) / dx;
+          if (v > 0) t = Math.min(t, v);
         }
-
-        // NEW: If model is still off/null, don't create the speaker.
-        if (!model || model === 'off') {
-            return;
+        // Front wall
+        if (dy < 0) {
+          const v = (0.01 - mlp.y) / dy;
+          if (v > 0) t = Math.min(t, v);
         }
-
-        // 1) Ray-cast to wall from MLP
-        let position = placeSurroundByRayCast(angleDegrees, mlp, dims);
-
-        // 2) Hug appropriate wall
-        const hugging = getHuggingCenterLines(model, dims);
-        const absA = Math.abs(angleDegrees);
-        const isRear = absA > 130; // Use angle for 'rear' classification
-
-        if (isRear) {
-          // Rear surrounds: on back wall
-          position.y = hugging.backWallY;
-        } else {
-          // Sides + wides: on side walls
-          const sideX = angleDegrees < 0 ? hugging.leftWallX : hugging.rightWallX;
-          position.x = sideX;
+        // Back wall
+        if (dy > 0) {
+          const v = (L - 0.01 - mlp.y) / dy;
+          if (v > 0) t = Math.min(t, v);
         }
 
-        // 3) Corner clearance + room bounds
-        position = applyCornerClearance(position, cRole, model, dims, zones);
-        position = applyRoomBoundsClamp(position, model, dims);
+        if (!Number.isFinite(t) || t <= 0) {
+          // Failsafe: return MLP so we never generate NaNs
+          return { x: mlp.x, y: mlp.y, z: 1.1 };
+        }
 
-        // 🔐 clamp out any NaNs
-        position = safePos(position, mlp);
-
-        const spk = {
-          id: (existingSpk && existingSpk.id) || cRole,
-          role: cRole,
-          label: cRole,
-          model,
-          position,
-          defaultPosition: position,
-          draggable: true,
-          rotation: (existingSpk && existingSpk.rotation) || { x: 0, y: 0, z: 0 },
+        return {
+          x: mlp.x + dx * t,
+          y: mlp.y + dy * t,
+          z: 1.1,
         };
-
-        nextSpeakers.push(spk);
-        allByRole.set(cRole, spk);
       };
 
-      // --- 3) Layout-specific rules ---
+      // Utility: snap to walls using existing hugging / clearance helpers
+      const finalisePos = (pos, role, model) => {
+        const safeModel = model || 'evolve-2-1_s'; // harmless default
+        let p = { ...pos };
 
-      if (layoutKey === '5.1') {
-        // 5.1.x: SL/SR at ±120°
-        seedRoleWithPipeline('SL', -120);
-        seedRoleWithPipeline('SR', 120);
-      } else if (layoutKey === '7.1') {
-        // 7.1.x: SL/SR at ±100°, SBL/SBR at ±142.5°
-        seedRoleWithPipeline('SL', -100);
-        seedRoleWithPipeline('SR', 100);
-        seedRoleWithPipeline('SBL', -142.5, 'SL');
-        seedRoleWithPipeline('SBR', 142.5, 'SR');
+        // Snap to specific walls for intended roles
+        const hug = getHuggingCenterLines(safeModel, dims);
+
+        const canon = getCanonicalRole(role);
+        if (canon === 'SL' || canon === 'LW') {
+          p.x = hug.leftWallX;
+        }
+        if (canon === 'SR' || canon === 'RW') {
+          p.x = hug.rightWallX;
+        }
+        if (canon === 'SBL' || canon === 'SBR') {
+          p.y = hug.backWallY;
+        }
+
+        // Apply proper clearance + clamp
+        p = applyCornerClearance(p, canon, safeModel, dims, zones);
+        p = applyRoomBoundsClamp(p, safeModel, dims);
+
+        // Failsafe: never NaN
+        if (!Number.isFinite(p.x)) p.x = mlp.x;
+        if (!Number.isFinite(p.y)) p.y = mlp.y;
+        if (!Number.isFinite(p.z)) p.z = 1.1;
+
+        return p;
+      };
+
+      const seed = (role, angleDeg) => {
+        const canon = getCanonicalRole(role);
+        const existing = byRole.get(canon);
+        const model = existing?.model || byRole.get('SL')?.model || byRole.get('SR')?.model;
+
+        // Only seed if we actually have a surround model selected AND the role is allowed
+        if (!model || model === 'off' || model === 'none' || !allowedRoles.has(canon)) return;
+
+        const base = castToWall(angleDeg);
+        const position = finalisePos(base, canon, model);
+
+        next.push({
+          id: existing?.id || `${canon}-${Date.now()}`,
+          role: canon,
+          model,
+          position,
+          draggable: true,
+          rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
+        });
+      };
+
+      // --- Layout-specific seeding ----------------------------------------
+
+      if (major === 5) {
+        // 5.x: sides only at ±120°
+        seed('SL', -120);
+        seed('SR', 120);
+      } else if (major === 7) {
+        // 7.x: sides ±100°, rears ±142.5°
+        seed('SL', -100);
+        seed('SR', 100);
+        seed('SBL', -142.5);
+        seed('SBR', 142.5);
       } else {
-        // 9.x+ : SL/SR + SBL/SBR + LW/RW
-        // Sides
-        seedRoleWithPipeline('SL', -100);
-        seedRoleWithPipeline('SR', 100);
-
-        // Rears on back wall at ±142.5°
-        seedRoleWithPipeline('SBL', -142.5, 'SL');
-        seedRoleWithPipeline('SBR', 142.5, 'SR');
-
-        // Front wides on side walls at ±60°
-        seedRoleWithPipeline('LW', -60, 'SL');
-        seedRoleWithPipeline('RW', 60, 'SR');
+        // 9.x and up: sides ±100°, rears ±142.5° on back wall, wides ±60° on side walls
+        seed('SL', -100);
+        seed('SR', 100);
+        seed('SBL', -142.5);
+        seed('SBR', 142.5);
+        seed('LW', -60);
+        seed('RW', 60);
       }
 
-      return nextSpeakers;
+      return next;
     },
-    [
-      placeSurroundByRayCast,
-      getHuggingCenterLines,
-      applyCornerClearance,
-      applyRoomBoundsClamp,
-      zones,
-      allowedRoles,
-      safePos, // Add safePos to dependencies
-    ]
+    [zones, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp, allowedRoles]
   );
 
   // Handler for reset button (full surround reset)
@@ -1946,7 +1960,6 @@ function SpeakerPlacementImpl(props) {
               onRearOverrideChange={setOverheadRearOverride}
               useFrontGlobal={useFrontGlobal}
               useMidGlobal={useMidGlobal}
-              useRearGlobal={useRearGlobal}
               onUseFrontGlobalChange={setUseFrontGlobal}
               onUseMidGlobalChange={setUseMidGlobal}
               onUseRearGlobalChange={setUseRearGlobal}
