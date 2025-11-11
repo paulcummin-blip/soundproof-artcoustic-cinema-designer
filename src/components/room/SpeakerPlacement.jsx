@@ -1676,7 +1676,29 @@ function SpeakerPlacementImpl(props) {
   useEffect(() => {
     if (effectivePreset !== lastPresetRef.current) {
       if (mlpPoint && dimensions) {
-        setSpeakers(currentSpeakers => resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers));
+        setSpeakers(prev => {
+          const prevPlaced =
+            (prev && Array.isArray(prev.placedSpeakers))
+              ? prev.placedSpeakers
+              : Array.isArray(prev)
+                ? prev
+                : [];
+
+          const nextPlaced = resetSurroundPositions(
+            effectivePreset,
+            mlpPoint,
+            dimensions,
+            prevPlaced
+          );
+
+          // DEBUG (keep if helpful)
+          console.log("[Speakers] preset re-seed merge check", nextPlaced);
+
+          return {
+            ...(typeof prev === "object" && prev !== null ? prev : {}),
+            placedSpeakers: nextPlaced,
+          };
+        });
         
         if (showToast) {
           const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : effectivePreset.startsWith('9.') ? '9.x' : '7.1';

@@ -460,9 +460,19 @@ function useDesignerState() {
         const major = parseInt(layoutString.split(".")[0], 10) || 5;
         const isSevenDotX = major === 7;
 
+        // Filter speakers: keep LCR even without models, filter off/none for others
         speakers = speakers.filter((spk) => {
-          const model = String(spk.model || "").toLowerCase();
+          const role = String(spk.role || "").toUpperCase();
+          const model = String(spk.model || "").toLowerCase().trim();
+          
+          // LCR: always keep if role is FL/FC/FR (even without model for initial state)
+          if (role === "FL" || role === "FC" || role === "FR") {
+            return true;
+          }
+          
+          // Others: drop only explicit "off"/"none" or empty
           if (!model || model === "off" || model === "none") return false;
+          
           return true;
         });
 
@@ -516,7 +526,7 @@ function useDesignerState() {
     baselineSeatingPositions, setBaselineSeatingPositions,
     seatingRows, setSeatingRows,
     seatsPerRow, setSeatsPerRow,
-    seatsPerRowByRow, setSeatsPerRowByRow, // NEW: per-row counts
+    seatsPerRowByRow, setSeatsPerRowByRow, // NEW: per-row seat counts
     seatingBlockOffset, setSeatingBlockOffset,
     seatSpacing, setSeatSpacing, 
     rowSpacingM, setRowSpacingM, // NEW
