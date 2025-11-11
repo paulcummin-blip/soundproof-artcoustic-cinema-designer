@@ -81,7 +81,7 @@ for (const alias in CANONICAL_ROLE_MAP) {
 // Function to get all known aliases for a given role (canonical or alias).
 // Returns an array including the canonical role and all its defined synonyms.
 function allAliases(role) {
-    const canonical = getCanonicalRole(role);
+    const canonical = getCanonical_Role(role);
     return Array.from(CANONICAL_TO_ALIASES_MAP.get(canonical) || new Set([String(role || "").toUpperCase()]));
 }
 
@@ -139,6 +139,44 @@ function buildRoleMap(list) {
     m.set(canon, s); // Also map by canonical role, without redundant `if (canon)`
   });
   return m;
+}
+
+// Helper angle conversion
+const degToRad = (deg) => (deg * Math.PI) / 180;
+
+// Cast a ray from MLP at angleDeg and find first intersection with room rectangle
+function projectToWallFromMLP(mlpX, mlpY, angleDeg, room) {
+  const angle = degToRad(angleDeg);
+  const dx = Math.cos(angle);
+  const dy = Math.sin(angle);
+  const margin = 0.01;
+
+  let t = Infinity;
+
+  // left wall
+  if (dx < 0) t = Math.min(t, (room.left + margin - mlpX) / dx);
+  // right wall
+  if (dx > 0) t = Math.min(t, (room.right - margin - mlpX) / dx);
+  // front wall (screen)
+  if (dy < 0) t = Math.min(t, (room.front + margin - mlpY) / dy);
+  // back wall
+  if (dy > 0) t = Math.min(t, (room.back - margin - mlpY) / dy);
+
+  if (!isFinite(t) || t <= 0) {
+    return { x: mlpX, y: mlpY }; // safe fallback
+  }
+
+  return {
+    x: mlpX + dx * t,
+    y: mlpY + dy * t,
+  };
+}
+
+// Helper to ensure a speaker object exists for a role
+function ensureSpeaker(spk, role) {
+  return spk && spk.role === role
+    ? spk
+    : { id: `${role}-${Date.now()}`, role };
 }
 
 // Proper angle calculation for LCR aiming
