@@ -1540,7 +1540,19 @@ function SpeakerPlacementImpl(props) {
   // Single function: RESET_SURROUND_POSITIONS with full pipeline: ANGLE → HUG → ZONE → CORNER → ROOM
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers) => {
+      console.log('[SP] resetSurroundPositions START', { 
+        layoutString, 
+        mlp, 
+        dims,
+        currentSpeakersCount: currentSpeakers?.length 
+      });
+
       if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
+        console.warn('[SP] resetSurroundPositions ABORT: missing data', {
+          hasMlp: !!mlp,
+          hasDims: !!dims,
+          isArray: Array.isArray(currentSpeakers)
+        });
         return currentSpeakers || [];
       }
 
@@ -1553,6 +1565,12 @@ function SpeakerPlacementImpl(props) {
             : "5.1";
 
       const major = parseInt(layoutNormalized.split(".")[0], 10) || 5;
+
+      console.log('[SP] resetSurroundPositions CONFIG', {
+        layoutNormalized,
+        major,
+        allowedRoles: Array.from(allowedRoles)
+      });
 
       const { width: W, length: L } = dims;
 
@@ -1620,15 +1638,39 @@ function SpeakerPlacementImpl(props) {
 
       const globalSurroundModel = findAnySurroundModel();
 
+      console.log('[SP] resetSurroundPositions MODEL RESOLUTION', {
+        globalSurroundModel,
+        existingModels: Array.from(byRole.entries())
+          .filter(([r, s]) => SURROUND_BED_ROLES.has(getCanonicalRole(r)))
+          .map(([r, s]) => ({ role: r, model: s?.model }))
+      });
+
       const seed = (role, dolbyAngleDeg) => {
         const canon = getCanonicalRole(role);
-        if (!allowedRoles.has(canon)) return;
+        
+        console.log('[SP] seed ATTEMPT', {
+          role,
+          canon,
+          dolbyAngleDeg,
+          allowed: allowedRoles.has(canon)
+        });
+
+        if (!allowedRoles.has(canon)) {
+          console.log('[SP] seed SKIP: role not allowed', { canon });
+          return;
+        }
 
         const existing = byRole.get(canon);
         // Use existing model if valid, otherwise use global surround model
         const model = (existing?.model && existing.model !== "off" && existing.model !== "none") 
           ? existing.model 
           : globalSurroundModel;
+
+        console.log('[SP] seed MODEL', {
+          canon,
+          existingModel: existing?.model,
+          resolvedModel: model
+        });
 
         const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
         const base = projectToWallFromMLP(mlp.x, mlp.y, projectAngleDeg, room);
@@ -1638,6 +1680,15 @@ function SpeakerPlacementImpl(props) {
         if (canon === "SL" || canon === "SR") yawDeg = (canon === "SL" ? 90 : -90);
         else if (canon === "LW" || canon === "RW") yawDeg = (canon === "LW" ? 90 : -90);
         else if (canon === "SBL" || canon === "SBR") yawDeg = 0; // Face into room from back wall
+
+        console.log('[SP] seed PUSH', {
+          canon,
+          model,
+          position,
+          yawDeg,
+          projectAngleDeg,
+          base
+        });
 
         next.push({
           id: existing?.id || `${canon}-${Date.now()}`,
@@ -1650,11 +1701,13 @@ function SpeakerPlacementImpl(props) {
       };
 
       if (major === 5) {
+        console.log('[SP] SEEDING 5.x layout');
         seed("SL", 90);
         seed("SR", -90);
       }
 
       if (major === 7) {
+        console.log('[SP] SEEDING 7.x layout');
         seed("SL", 90);
         seed("SR", -90);
         seed("SBL", 142.5);
@@ -1662,6 +1715,7 @@ function SpeakerPlacementImpl(props) {
       }
 
       if (major >= 9) {
+        console.log('[SP] SEEDING 9.x layout');
         seed("SL", 90);
         seed("SR", -90);
         seed("SBL", 142.5);
@@ -1671,6 +1725,7 @@ function SpeakerPlacementImpl(props) {
       }
 
       // DEBUG: Log what we're about to return
+      console.log('[SP] resetSurroundPositions FINAL RESULT');
       console.table(next.filter(s => SURROUND_BED_ROLES.has(getCanonicalRole(s.role))).map(s => ({
         role: s.role,
         model: s.model,

@@ -447,6 +447,11 @@ function useDesignerState() {
           ? prev.placedSpeakers.slice()
           : [];
 
+        console.log('[AS] setSpeakerSystem BEFORE normalization', {
+          count: speakers.length,
+          roles: speakers.map(s => ({ role: s.role, model: s.model }))
+        });
+
         const layoutStringRaw =
           (typeof next.dolbyLayout === "string" && next.dolbyLayout) ||
           (typeof prev.dolbyLayout === "string" && prev.dolbyLayout) ||
@@ -460,6 +465,13 @@ function useDesignerState() {
         const major = parseInt(layoutString.split(".")[0], 10) || 5;
         const isSevenDotX = major === 7;
 
+        console.log('[AS] setSpeakerSystem LAYOUT', {
+          layoutString,
+          major,
+          isSevenDotX,
+          useWidesInsteadOfRears
+        });
+
         // Filter speakers: keep LCR even without models, filter off/none for others
         speakers = speakers.filter((spk) => {
           const role = String(spk.role || "").toUpperCase();
@@ -471,24 +483,43 @@ function useDesignerState() {
           }
           
           // Others: drop only explicit "off"/"none" or empty
-          if (!model || model === "off" || model === "none") return false;
+          if (!model || model === "off" || model === "none") {
+            console.log('[AS] Filtering out speaker with off/none model', { role, model });
+            return false;
+          }
           
           return true;
         });
 
         if (isSevenDotX) {
+          console.log('[AS] Applying 7.x XOR logic', { useWidesInsteadOfRears });
+          
           if (useWidesInsteadOfRears) {
+            const beforeCount = speakers.length;
             speakers = speakers.filter((spk) => {
               const r = String(spk.role || "").toUpperCase();
               return r !== "SBL" && r !== "SBR";
             });
+            console.log('[AS] Filtered out SBL/SBR', { before: beforeCount, after: speakers.length });
           } else {
+            const beforeCount = speakers.length;
             speakers = speakers.filter((spk) => {
               const r = String(spk.role || "").toUpperCase();
               return r !== "LW" && r !== "RW";
             });
+            console.log('[AS] Filtered out LW/RW', { before: beforeCount, after: speakers.length });
           }
+        } else {
+          console.log('[AS] NOT 7.x - no XOR filtering applied', { major });
         }
+
+        console.log('[AS] setSpeakerSystem AFTER normalization');
+        console.table(speakers.map(s => ({
+          role: s.role,
+          model: s.model,
+          x: s.position?.x?.toFixed(3),
+          y: s.position?.y?.toFixed(3)
+        })));
 
         // DEBUG: Log what's being published from AppState
         if (typeof window !== "undefined") {
@@ -561,7 +592,7 @@ function useDesignerState() {
     updateGlobalSpl,
     updateRoleSpl,
     getSpeakerVisibility, // ADDED
-  }), [
+  ]), [
     // dimensions and setDimensions are now deprecated in favor of roomDims
     dimensions, setDimensions, // keeping for now for backward compatibility
     roomDims, setRoomDims, // NEW
