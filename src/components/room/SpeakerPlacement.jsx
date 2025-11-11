@@ -1509,27 +1509,6 @@ function SpeakerPlacementImpl(props) {
     return { x, y, z };
   }
 
-  // Get zones for corner clearance (try to access from analysis or create basic fallback)
-  const zones = useMemo(() => {
-    // Try to get zones from analysis result if available
-    if (app?.analysisResult?.zones) {
-      return app.analysisResult.zones;
-    }
-    
-    // Fallback: create basic zone boundaries
-    if (!dimensions) return {};
-    
-    const { width: W, length: L } = dimensions;
-    const margin = 0.3; // 30cm buffer for basic zones
-    
-    return {
-      SL: { xMin: margin, xMax: W * 0.5, yMin: margin, yMax: L - margin }, // Left half, excluding corners
-      SR: { xMin: W * 0.5, xMax: W - margin, yMin: margin, yMax: L - margin }, // Right half, excluding corners
-      SBL: { xMin: margin, xMax: W * 0.5, yMin: L * 0.7, yMax: L - margin }, // Back left quadrant
-      SBR: { xMin: W * 0.5, xMax: W - margin, yMin: L * 0.7, yMax: L - margin } // Back right quadrant
-    };
-  }, [app?.analysisResult?.zones, dimensions]);
-
   // CENTRALIZED MLP CALCULATION
   const mlpPoint = useMemo(() => {
     return computeMLPAndPrimary(
@@ -2084,7 +2063,7 @@ function SpeakerPlacementImpl(props) {
               </p>
             </div>
           </div>
-        </CollapsiblePanel>
+        </div>
       </CollapsiblePanel>
     </div>
   );
