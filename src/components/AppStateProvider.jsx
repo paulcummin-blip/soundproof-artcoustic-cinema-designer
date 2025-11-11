@@ -435,106 +435,74 @@ function useDesignerState() {
 
 
   // Normalization wrapper with epoch increment
-const setSpeakerSystem = useCallback((updater) => {
-  _setSpeakerSystem(prev => {
-    const next = typeof updater === 'function' ? updater(prev) : updater;
-    if (!next) return next;
+  const setSpeakerSystem = useCallback(
+    (updater) => {
+      _setSpeakerSystem((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        if (!next) return next;
 
-    // If this update didn't bring its own speakers,
-    // keep whatever speakers we already had instead of dropping them.
-    let speakers = Array.isArray(next.placedSpeakers)
-      ? [...next.placedSpeakers]
-      : Array.isArray(prev?.placedSpeakers)
-        ? [...prev.placedSpeakers]
-        : [];
+        let speakers = Array.isArray(next.placedSpeakers)
+          ? next.placedSpeakers.slice()
+          : Array.isArray(prev.placedSpeakers)
+          ? prev.placedSpeakers.slice()
+          : [];
 
-    // Normalize layout string to determine major version
-    const layoutString =
-      (typeof dolbyLayout === "string" && dolbyLayout) ||
-      (typeof dolbyConfig === "string" && dolbyConfig) ||
-      (dolbyConfig && typeof dolbyConfig.layout === "string" && dolbyConfig.layout) ||
-      "5.1";
+        const layoutStringRaw =
+          (typeof next.dolbyLayout === "string" && next.dolbyLayout) ||
+          (typeof prev.dolbyLayout === "string" && prev.dolbyLayout) ||
+          (typeof dolbyLayout === "string" && dolbyLayout) ||
+          (dolbyConfig &&
+            typeof dolbyConfig.layout === "string" &&
+            dolbyConfig.layout) ||
+          "";
 
-    const major = parseInt(String(layoutString).split(".")[0], 10) || 5;
-    const isSevenDotX = major === 7;
+        const layoutString = (layoutStringRaw || "").trim() || "5.1";
+        const major = parseInt(layoutString.split(".")[0], 10) || 5;
+        const isSevenDotX = major === 7;
 
-    // Use the real 7-bed toggle (the one SpeakerPlacement and rolesForLayout use)
-    const useFWInsteadOfRS = useWidesInsteadOfRears === true;
+        speakers = speakers.filter((spk) => {
+          const model = String(spk.model || "").toLowerCase();
+          if (!model || model === "off" || model === "none") return false;
+          return true;
+        });
 
-    const keptRoles = [];
-    const prunedRoles = [];
-
-    // Filter speakers based on model validity and layout-specific rules
-    speakers = speakers.filter(s => {
-      const role = getCanonicalRole(s.role);
-
-      // Never keep explicit OFF/NONE/undefined models
-      const model = String(s.model || "").toLowerCase();
-      if (!model || model === "off" || model === "none") {
-        prunedRoles.push(role);
-        return false;
-      }
-
-      // Always keep core LCR and classic sides
-      if (['FL', 'FC', 'FR', 'LFE', 'SL', 'SR', 'LS', 'RS'].includes(role)) {
-        keptRoles.push(role);
-        return true;
-      }
-
-      // Wides vs rears toggle is ONLY meaningful for 7.x
-      if (isSevenDotX) {
-        if (useFWInsteadOfRS) {
-          // 7.x with wides instead of rears: drop SBL/SBR, keep LW/RW
-          if (role === 'SBL' || role === 'SBR') {
-            prunedRoles.push(role);
-            return false;
-          }
-        } else {
-          // 7.x standard: drop LW/RW, keep SBL/SBR
-          if (role === 'LW' || role === 'RW') {
-            prunedRoles.push(role);
-            return false;
+        if (isSevenDotX) {
+          if (useWidesInsteadOfRears) {
+            speakers = speakers.filter((spk) => {
+              const r = String(spk.role || "").toUpperCase();
+              return r !== "SBL" && r !== "SBR";
+            });
+          } else {
+            speakers = speakers.filter((spk) => {
+              const r = String(spk.role || "").toUpperCase();
+              return r !== "LW" && r !== "RW";
+            });
           }
         }
-      }
 
-      // For 9.x+ we KEEP SL/SR + SBL/SBR + LW/RW — no XOR rule
-      // Keep all other roles (overheads, subs, etc.)
-      keptRoles.push(role);
-      return true;
-    });
+        // DEBUG: Log what's being published from AppState
+        if (typeof window !== "undefined") {
+          window.__LAST_SPEAKERS__ = (speakers || []).map(s => ({
+            role: String(s.role),
+            model: s.model || null,
+          }));
+          if (DBG_FW) {
+            console.log("[AS] placedSpeakers(normalized)",
+              window.__LAST_SPEAKERS__);
+          }
+        }
 
-    if (typeof window !== 'undefined' && DBG_FW) {
-      console.log('[FW normalize]', {
-        major,
-        isSevenDotX,
-        useFWInsteadOfRS,
-        keptRoles,
-        prunedRoles
+        setSpeakersEpoch(prevEpoch => prevEpoch + 1);
+
+        return {
+          ...prev,
+          ...next,
+          placedSpeakers: speakers,
+        };
       });
-    }
-
-    // DEBUG: Log what's being published from AppState
-    if (typeof window !== "undefined") {
-      window.__LAST_SPEAKERS__ = (speakers || []).map(s => ({
-        role: String(s.role),
-        model: s.model || null,
-      }));
-      console.log("[AS] placedSpeakers(normalized)",
-        window.__LAST_SPEAKERS__);
-    }
-
-    // Bump epoch so anything watching speakers refreshes
-    setSpeakersEpoch(prevEpoch => prevEpoch + 1);
-
-    // Merge prev + next, but always use the normalised speakers array
-    return {
-      ...prev,
-      ...next,
-      placedSpeakers: speakers,
-    };
-  });
-}, [useWidesInsteadOfRears, dolbyLayout, dolbyConfig, DBG_FW]);
+    },
+    [useWidesInsteadOfRears, dolbyLayout, dolbyConfig, DBG_FW]
+  );
 
   const value = useMemo(() => ({
     // dimensions and setDimensions are now deprecated in favor of roomDims

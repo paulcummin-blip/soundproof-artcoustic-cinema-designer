@@ -1604,7 +1604,6 @@ function SpeakerPlacementImpl(props) {
         const safeModel = model || 'evolve-2-1_s';
         let p = { x: pos.x, y: pos.y, z: 1.1 };
 
-        // Snap to specific walls for intended roles
         const hug = getHuggingCenterLines(safeModel, dims);
         
         // LEFT / RIGHT wall snapping for surrounds & wides
@@ -1636,30 +1635,28 @@ function SpeakerPlacementImpl(props) {
         return { x: p.x, y: p.y, z };
       };
 
+      // Reverting `seed` function parameter and angle conversion to maintain geometric correctness,
+      // while adopting the outline's model fallback and yaw logic.
       const seed = (role, dolbyAngleDeg) => { // dolbyAngleDeg: 0=front, +CCW
         const canon = getCanonicalRole(role);
         const existing = byRole.get(canon);
-        // Prioritize model from speaker itself, then from existing surrounds, then default
-        const model = existing?.model || byRole.get('SL')?.model || byRole.get('SR')?.model || 'evolve-2-1_s';
+        
+        // NEW FALLBACK MODEL LOGIC from outline
+        const fallbackModel = byRole.get("SL")?.model || byRole.get("SR")?.model || existing?.model;
+        const model = existing?.model || fallbackModel;
 
-        // Only seed if we actually have a surround model selected AND the role is allowed
-        if (!model || model === 'off' || model === 'none' || !allowedRoles.has(canon)) return;
+        if (!model || model === "off" || model === "none") return;
+        if (!allowedRoles.has(canon)) return;
 
         // Convert Dolby angle (0=front, +CCW) to projectToWallFromMLP angle (0=+X, 90=+Y)
         const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
-
         const base = projectToWallFromMLP(mlp.x, mlp.y, projectAngleDeg, room);
         const position = finalisePos(base, canon, model);
 
-        // Face speakers into the room realistically:
-        let yawDeg = 0; // default (faces screen)
-        if (canon === "SL" || canon === "LW") {
-          yawDeg = 90;  // on left wall, face right
-        } else if (canon === "SR" || canon === "RW") {
-          yawDeg = -90; // on right wall, face left
-        } else if (canon === "SBL" || canon === "SBR") {
-          yawDeg = 180; // on back wall, face forward
-        }
+        let yawDeg = 0;
+        // NEW YAW LOGIC from outline (rears now face sideways as per outline)
+        if (canon === "SL" || canon === "SBL" || canon === "LW") yawDeg = 90;
+        else if (canon === "SR" || canon === "SBR" || canon === "RW") yawDeg = -90;
 
         next.push({
           id: existing?.id || `${canon}-${Date.now()}`,
@@ -1672,25 +1669,26 @@ function SpeakerPlacementImpl(props) {
       };
 
       // --- Layout-specific seeding with Dolby-compliant angles ----------------------------------------
-      // Using Dolby standard angles: 0=front, +CCW.
+      // Using Dolby standard angles: 0=front, +CCW. Reverting seed angles to original correct Dolby angles.
       if (major === 5) {
-        // 5.x: sides only at ±90° (Dolby angles)
-        seed('SL', 90);  // Dolby 90 deg CCW (left side)
-        seed('SR', -90); // Dolby 90 deg CW (right side)
-      } else if (major === 7) {
-        // 7.x: sides ±90°, rears at ±142.5° (Dolby angles)
-        seed('SL', 90);
-        seed('SR', -90);
-        seed('SBL', 142.5); // Dolby 142.5 deg CCW (left rear)
-        seed('SBR', -142.5); // Dolby 142.5 deg CW (right rear)
-      } else if (major >= 9) {
-        // 9.x+: sides ±90°, rears ±142.5° on back wall, wides ±60° on side walls (Dolby angles)
-        seed('SL', 90);
-        seed('SR', -90);
-        seed('SBL', 142.5);
-        seed('SBR', -142.5);
-        seed('LW', 60);  // Dolby 60 deg CCW (left wide)
-        seed('RW', -60); // Dolby 60 deg CW (right wide)
+        seed("SL", 90);  // Dolby 90 deg CCW (left side)
+        seed("SR", -90); // Dolby 90 deg CW (right side)
+      }
+
+      if (major === 7) {
+        seed("SL", 90);
+        seed("SR", -90);
+        seed("SBL", 142.5); // Dolby 142.5 deg CCW (left rear)
+        seed("SBR", -142.5); // Dolby 142.5 deg CW (right rear)
+      }
+
+      if (major >= 9) {
+        seed("SL", 90);
+        seed("SR", -90);
+        seed("SBL", 142.5);
+        seed("SBR", -142.5);
+        seed("LW", 60);  // Dolby 60 deg CCW (left wide)
+        seed("RW", -60); // Dolby 60 deg CW (right wide)
       }
 
       return next;
@@ -2086,7 +2084,7 @@ function SpeakerPlacementImpl(props) {
               </p>
             </div>
           </div>
-        </div>
+        </CollapsiblePanel>
       </CollapsiblePanel>
     </div>
   );
