@@ -1497,6 +1497,14 @@ function SpeakerPlacementImpl(props) {
     return { x, y, z };
   }, [getHuggingCenterLines]);
 
+  // NEW: Safety helper to ensure positions are never NaN
+  function safePos(pos, mlp, fallbackZ = 1.1) {
+    const x = Number.isFinite(pos?.x) ? pos.x : (Number.isFinite(mlp?.x) ? mlp.x : 0.5);
+    const y = Number.isFinite(pos?.y) ? pos.y : (Number.isFinite(mlp?.y) ? mlp.y : 0.5);
+    const z = Number.isFinite(pos?.z) ? pos.z : fallbackZ;
+    return { x, y, z };
+  }
+
   // Get zones for corner clearance (try to access from analysis or create basic fallback)
   const zones = useMemo(() => {
     // Try to get zones from analysis result if available
