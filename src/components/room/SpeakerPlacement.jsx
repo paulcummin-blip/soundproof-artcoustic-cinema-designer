@@ -1577,6 +1577,11 @@ function SpeakerPlacementImpl(props) {
         const safeModel = model || 'evolve-2-1_s';
         let p = { x: pos.x, y: pos.y, z: 1.1 };
 
+        // First apply bounds/clearance to get a safe starting point
+        p = applyCornerClearance(p, canon, safeModel, dims, {});
+        p = applyRoomBoundsClamp(p, safeModel, dims);
+
+        // THEN apply wall snapping (this must be last to override any drift)
         const hug = getHuggingCenterLines(safeModel, dims);
         
         if (canon === "SL" || canon === "LW") {
@@ -1590,9 +1595,7 @@ function SpeakerPlacementImpl(props) {
           p.y = hug.backWallY;
         }
 
-        p = applyCornerClearance(p, canon, safeModel, dims, {});
-        p = applyRoomBoundsClamp(p, safeModel, dims);
-
+        // Final safety: ensure finite coordinates
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           p.x = mlp.x;
           p.y = mlp.y;
@@ -1618,8 +1621,9 @@ function SpeakerPlacementImpl(props) {
         const position = finalisePos(base, canon, model);
 
         let yawDeg = 0;
-        if (canon === "SL" || canon === "SBL" || canon === "LW") yawDeg = 90;
-        else if (canon === "SR" || canon === "SBR" || canon === "RW") yawDeg = -90;
+        if (canon === "SL" || canon === "SR") yawDeg = (canon === "SL" ? 90 : -90);
+        else if (canon === "LW" || canon === "RW") yawDeg = (canon === "LW" ? 90 : -90);
+        else if (canon === "SBL" || canon === "SBR") yawDeg = 0; // Face into room from back wall
 
         next.push({
           id: existing?.id || `${canon}-${Date.now()}`,
@@ -1651,6 +1655,15 @@ function SpeakerPlacementImpl(props) {
         seed("LW", 60);
         seed("RW", -60);
       }
+
+      // DEBUG: Log what we're about to return
+      console.table(next.filter(s => SURROUND_BED_ROLES.has(getCanonicalRole(s.role))).map(s => ({
+        role: s.role,
+        model: s.model,
+        x: s.position?.x?.toFixed(3),
+        y: s.position?.y?.toFixed(3),
+        yaw: s.rotation?.y
+      })));
 
       return next;
     },
