@@ -81,7 +81,7 @@ for (const alias in CANONICAL_ROLE_MAP) {
 // Function to get all known aliases for a given role (canonical or alias).
 // Returns an array including the canonical role and all its defined synonyms.
 function allAliases(role) {
-    const canonical = getCanonical_Role(role);
+    const canonical = getCanonicalRole(role); // Use getCanonicalRole here
     return Array.from(CANONICAL_TO_ALIASES_MAP.get(canonical) || new Set([String(role || "").toUpperCase()]));
 }
 
@@ -589,7 +589,7 @@ function UnifiedSurroundsConfig({
   }, [allowedRoles]);
 
   // Log on render
-  console.log('[FW UI]', { canSides, canRears, canWides, allowedRoles: Array.from(allowedRoles), activeRoles });
+  // console.log('[FW UI]', { canSides, canRears, canWides, allowedRoles: Array.from(allowedRoles), activeRoles });
 
   // Helper to index speakers by canonical role
   const indexByCanonicalRole = useCallback((speakers) => {
@@ -660,55 +660,35 @@ function UnifiedSurroundsConfig({
   const getRearSurroundDefaultPositions = useCallback(() => {
     if (!dimensions || !mlpPoint) return {};
 
-    const sblAngle = -142.5;
-    const sbrAngle = 142.5;
+    // These angles should now be Dolby angles (0=front, +CCW)
+    const sblDolbyAngle = 142.5; // Rear Left
+    const sbrDolbyAngle = -142.5; // Rear Right
     
     const defaultModel = 'off'; // A dummy model to get dimensions/hugging for calculation
     const WALL_BUFFER_M = 0.01;
 
-    const simpleRayCast = (angle, mlpPt, roomDims) => {
-      const { width: W, length: L } = roomDims;
-      const { x: xm, y: ym } = mlpPt;
-
-      const a = angle * (Math.PI / 180);
-      const dx = Math.sin(a);
-      const dy = -Math.cos(a);
-
-      let t = Infinity;
-      
-      if (dx < 0) {
-        const tL = (WALL_BUFFER_M - xm) / dx;
-        if (tL > 0) t = Math.min(t, tL);
-      }
-      if (dx > 0) {
-        const tR = (W - WALL_BUFFER_M - xm) / dx;
-        if (tR > 0) t = Math.min(t, tR);
-      }
-      if (dy < 0) {
-        const tF = (WALL_BUFFER_M - ym) / dy;
-        if (tF > 0) t = Math.min(t, tF);
-      }
-      if (dy > 0) {
-        const tB = (L - WALL_BUFFER_M - ym) / dy;
-        if (tB > 0) t = Math.min(t, tB);
-      }
-
-      if (t === Infinity || t <= 0) {
-        return { x: xm, y: ym, z: 1.1 };
-      }
-
-      return { x: xm + dx * t, y: ym + dy * t, z: 1.1 }; // Corrected: was `xm + dy * t` before
+    // This internal rayCast needs to use the projectToWallFromMLP logic now
+    const internalRayCast = (dolbyAngle, mlpPt, roomDims) => {
+        // Convert Dolby angle (0=front, +CCW) to projectToWallFromMLP angle (0=+X, 90=+Y)
+        const projectAngleDeg = (270 - dolbyAngle + 360) % 360;
+        const room = {
+            left: 0,
+            right: roomDims.width,
+            front: 0,
+            back: roomDims.length
+        };
+        return projectToWallFromMLP(mlpPt.x, mlpPt.y, projectAngleDeg, room);
     };
     
-    let sblPos = simpleRayCast(sblAngle, mlpPoint, dimensions);
+    let sblPos = internalRayCast(sblDolbyAngle, mlpPoint, dimensions);
     const hugging = getHuggingCenterLines(defaultModel, dimensions);
-    sblPos.y = hugging.backWallY;
+    sblPos.y = hugging.backWallY; // Snap to back wall
     sblPos = applyCornerClearance(sblPos, 'SBL', defaultModel, dimensions, {});
-    sblPos = applyRoomBoundsClamp(sblPos, defaultModel, dimensions); // Pass role for applyCornerClearance
+    sblPos = applyRoomBoundsClamp(sblPos, defaultModel, dimensions); 
 
-    let sbrPos = simpleRayCast(sbrAngle, mlpPoint, dimensions);
-    sbrPos.y = hugging.backWallY;
-    sbrPos = applyCornerClearance(sbrPos, 'SBR', defaultModel, dimensions, {}); // Pass role for applyCornerClearance
+    let sbrPos = internalRayCast(sbrDolbyAngle, mlpPoint, dimensions);
+    sbrPos.y = hugging.backWallY; // Snap to back wall
+    sbrPos = applyCornerClearance(sbrPos, 'SBR', defaultModel, dimensions, {}); 
     sbrPos = applyRoomBoundsClamp(sbrPos, defaultModel, dimensions);
 
     return {
@@ -733,7 +713,7 @@ function UnifiedSurroundsConfig({
       }
     };
 
-    console.log('[FW UI] onChange ->', safeConfig);
+    // console.log('[FW UI] onChange ->', safeConfig);
     setSurroundConfig(safeConfig);
     
     const { value, override } = safeConfig;
@@ -746,43 +726,22 @@ function UnifiedSurroundsConfig({
     const effectiveWideSelectedByUser = override.wide ? value.wide : value.master;
 
     setSpeakers(prev => {
-      console.log('[FW UI] onChange before=', prev);
+      // console.log('[FW UI] onChange before=', prev);
       
       const speakerMap = new Map((prev || []).map(s => [getCanonicalRole(s.role), s]));
       const WALL_BUFFER_M = 0.01;
 
-      const calculateDefaultPosition = (angleDegrees, mlpPt, roomDims) => {
-        const { width: W, length: L } = roomDims;
-        const { x: xm, y: ym } = mlpPt;
-
-        const a = angleDegrees * (Math.PI / 180);
-        const dx = Math.sin(a);
-        const dy = -Math.cos(a);
-
-        let t = Infinity;
-        
-        if (dx < 0) {
-          const tL = (WALL_BUFFER_M - xm) / dx;
-          if (tL > 0) t = Math.min(t, tL);
-        }
-        if (dx > 0) {
-          const tR = (W - WALL_BUFFER_M - xm) / dx;
-          if (tR > 0) t = Math.min(t, tR);
-        }
-        if (dy < 0) {
-          const tF = (WALL_BUFFER_M - ym) / dy;
-          if (tF > 0) t = Math.min(t, tF);
-        }
-        if (dy > 0) {
-          const tB = (L - WALL_BUFFER_M - ym) / dy;
-          if (tB > 0) t = Math.min(t, tB);
-        }
-
-        if (t === Infinity || t <= 0) {
-          return { x: xm, y: ym, z: 1.1 };
-        }
-
-        return { x: xm + dx * t, y: ym + dy * t, z: 1.1 };
+      // This internal calculateDefaultPosition now uses projectToWallFromMLP
+      const calculateDefaultPosition = (dolbyAngleDegrees, mlpPt, roomDims) => {
+        // Convert Dolby angle (0=front, +CCW) to projectToWallFromMLP angle (0=+X, 90=+Y)
+        const projectAngleDeg = (270 - dolbyAngleDegrees + 360) % 360;
+        const room = {
+            left: 0,
+            right: roomDims.width,
+            front: 0,
+            back: roomDims.length
+        };
+        return projectToWallFromMLP(mlpPt.x, mlpPt.y, projectAngleDeg, room);
       };
 
       const processRole = (role, nextModel, defaultPos = null) => {
@@ -814,17 +773,17 @@ function UnifiedSurroundsConfig({
           let position = existingSpeaker?.position || defaultPos;
 
           if (!position && mlpPoint && dimensions) {
-            let angleDegrees;
+            let dolbyAngleDegrees; // Use Dolby angles here (0=front, +CCW)
             switch (canon) {
-              case 'SBL': angleDegrees = -142.5; break;
-              case 'SBR': angleDegrees = 142.5; break;
-              case 'SL':  angleDegrees = -100;  break;
-              case 'SR':  angleDegrees = 100;   break;
-              case 'LW':  angleDegrees = -60;   break; // Changed from -50
-              case 'RW':  angleDegrees = 60;    break; // Changed from 50
-              default:    angleDegrees = 0;
+              case 'SBL': dolbyAngleDegrees = 142.5; break;
+              case 'SBR': dolbyAngleDegrees = -142.5; break;
+              case 'SL':  dolbyAngleDegrees = 90;  break; // Dolby side left
+              case 'SR':  dolbyAngleDegrees = -90;   break; // Dolby side right
+              case 'LW':  dolbyAngleDegrees = 60;   break; // Dolby front wide left
+              case 'RW':  dolbyAngleDegrees = -60;    break; // Dolby front wide right
+              default:    dolbyAngleDegrees = 0; // Should not happen for these roles
             }
-            position = calculateDefaultPosition(angleDegrees, mlpPoint, dimensions);
+            position = calculateDefaultPosition(dolbyAngleDegrees, mlpPoint, dimensions);
           }
 
           // 🔐 clamp out any NaNs
@@ -869,7 +828,7 @@ function UnifiedSurroundsConfig({
       }
 
       const next = Array.from(speakerMap.values());
-      console.log('[FW UI] onChange after=', next);
+      // console.log('[FW UI] onChange after=', next);
       return next;
     });
   }, [setSurroundConfig, setSpeakers, getRearSurroundDefaultPositions, mlpPoint, dimensions, allowedRoles, canSides, canRears, canWides, safePos]); // Added safePos to dependencies
@@ -1351,9 +1310,9 @@ function SpeakerPlacementImpl(props) {
 
   // Debug line
   try {
-    console.debug("[SpeakerPlacement] preset:", effectivePreset, 
-                  "useWides:", !!useWides, 
-                  "allowedRoles:", allowedRoles); // Changed to log the Set directly as requested
+    // console.debug("[SpeakerPlacement] preset:", effectivePreset, 
+    //               "useWides:", !!useWides, 
+    //               "allowedRoles:", allowedRoles); // Changed to log the Set directly as requested
   } catch {}
 
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
@@ -1606,10 +1565,27 @@ function SpeakerPlacementImpl(props) {
         return currentSpeakers || [];
       }
 
-      const layout = String(layoutString || '').trim() || '5.1';
-      const major = parseInt(layout.split('.')[0], 10) || 5;
+      // Normalize layout string
+      const layoutNormalized = (typeof layoutString === "string" && layoutString.trim()) 
+        ? layoutString.trim()
+        : (typeof dolbyConfig === "string" && dolbyConfig.trim()) 
+          ? dolbyConfig.trim()
+          : (dolbyConfig && typeof dolbyConfig === "object" && typeof dolbyConfig.layout === "string")
+            ? dolbyConfig.layout.trim()
+            : "5.1";
+
+      // Extract major channel count, e.g. "9.1.6" -> 9, "7.1" -> 7
+      const major = parseInt(layoutNormalized.split(".")[0], 10) || 5;
 
       const { width: W, length: L } = dims;
+
+      // Define room bounds for projectToWallFromMLP helper
+      const room = {
+        left: 0,
+        right: W,
+        front: 0,
+        back: L
+      };
 
       // Map existing by canonical role so we can reuse ids/models
       const byRole = new Map();
@@ -1623,56 +1599,15 @@ function SpeakerPlacementImpl(props) {
         (s) => !SURROUND_BED_ROLES.has(getCanonicalRole(s.role))
       );
 
-      // Utility: robust ray-cast
-      const castToWall = (angleDeg) => {
-        const a = (angleDeg * Math.PI) / 180;
-        const dx = Math.sin(a);
-        const dy = -Math.cos(a);
-
-        let t = Infinity;
-
-        // Left wall
-        if (dx < 0) {
-          const v = (0.01 - mlp.x) / dx;
-          if (v > 0) t = Math.min(t, v);
-        }
-        // Right wall
-        if (dx > 0) {
-          const v = (W - 0.01 - mlp.x) / dx;
-          if (v > 0) t = Math.min(t, v);
-        }
-        // Front wall
-        if (dy < 0) {
-          const v = (0.01 - mlp.y) / dy;
-          if (v > 0) t = Math.min(t, v);
-        }
-        // Back wall
-        if (dy > 0) {
-          const v = (L - 0.01 - mlp.y) / dy;
-          if (v > 0) t = Math.min(t, v);
-        }
-
-        if (!Number.isFinite(t) || t <= 0) {
-          // Failsafe: return MLP so we never generate NaNs
-          return { x: mlp.x, y: mlp.y, z: 1.1 };
-        }
-
-        return {
-          x: mlp.x + dx * t,
-          y: mlp.y + dy * t,
-          z: 1.1,
-        };
-      };
-
       // Utility: snap to walls using existing hugging / clearance helpers
       const finalisePos = (pos, role, model) => {
-        const safeModel = model || 'evolve-2-1_s'; // harmless default
-        let p = { ...pos };
+        const safeModel = model || 'evolve-2-1_s';
+        let p = { x: pos.x, y: pos.y, z: 1.1 };
 
         // Snap to specific walls for intended roles
         const hug = getHuggingCenterLines(safeModel, dims);
-
         const canon = getCanonicalRole(role);
+        
         if (canon === 'SL' || canon === 'LW') {
           p.x = hug.leftWallX;
         }
@@ -1695,19 +1630,23 @@ function SpeakerPlacementImpl(props) {
         return p;
       };
 
-      const seed = (role, angleDeg) => {
+      const seed = (role, dolbyAngleDeg) => { // dolbyAngleDeg: 0=front, +CCW
         const canon = getCanonicalRole(role);
         const existing = byRole.get(canon);
-        const model = existing?.model || byRole.get('SL')?.model || byRole.get('SR')?.model;
+        // Prioritize model from speaker itself, then from existing surrounds, then default
+        const model = existing?.model || byRole.get('SL')?.model || byRole.get('SR')?.model || 'evolve-2-1_s';
 
         // Only seed if we actually have a surround model selected AND the role is allowed
         if (!model || model === 'off' || model === 'none' || !allowedRoles.has(canon)) return;
 
-        const base = castToWall(angleDeg);
+        // Convert Dolby angle (0=front, +CCW) to projectToWallFromMLP angle (0=+X, 90=+Y)
+        const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
+
+        const base = projectToWallFromMLP(mlp.x, mlp.y, projectAngleDeg, room);
         const position = finalisePos(base, canon, model);
 
         next.push({
-          id: existing?.id || `${canon}-${Date.now()}`,
+          id: existing?.id || `${canon}-${timeNowMs()}`,
           role: canon,
           model,
           position,
@@ -1716,31 +1655,31 @@ function SpeakerPlacementImpl(props) {
         });
       };
 
-      // --- Layout-specific seeding ----------------------------------------
+      // --- Layout-specific seeding with Dolby-compliant angles ----------------------------------------
 
       if (major === 5) {
-        // 5.x: sides only at ±120°
-        seed('SL', -120);
-        seed('SR', 120);
+        // 5.x: sides only at ±90° (Dolby angles)
+        seed('SL', 90);  // Dolby 90 deg CCW (left side)
+        seed('SR', -90); // Dolby 90 deg CW (right side)
       } else if (major === 7) {
-        // 7.x: sides ±100°, rears ±142.5°
-        seed('SL', -100);
-        seed('SR', 100);
-        seed('SBL', -142.5);
-        seed('SBR', 142.5);
-      } else {
-        // 9.x and up: sides ±100°, rears ±142.5° on back wall, wides ±60° on side walls
-        seed('SL', -100);
-        seed('SR', 100);
-        seed('SBL', -142.5);
-        seed('SBR', 142.5);
-        seed('LW', -60);
-        seed('RW', 60);
+        // 7.x: sides ±90°, rears at ±142.5° (Dolby angles)
+        seed('SL', 90);
+        seed('SR', -90);
+        seed('SBL', 142.5); // Dolby 142.5 deg CCW (left rear)
+        seed('SBR', -142.5); // Dolby 142.5 deg CW (right rear)
+      } else if (major >= 9) {
+        // 9.x+: sides ±90°, rears ±142.5° on back wall, wides ±60° on side walls (Dolby angles)
+        seed('SL', 90);
+        seed('SR', -90);
+        seed('SBL', 142.5);
+        seed('SBR', -142.5);
+        seed('LW', 60);  // Dolby 60 deg CCW (left wide)
+        seed('RW', -60); // Dolby 60 deg CW (right wide)
       }
 
       return next;
     },
-    [zones, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp, allowedRoles]
+    [zones, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp, allowedRoles, dolbyConfig]
   );
 
   // Handler for reset button (full surround reset)
@@ -1799,7 +1738,7 @@ function SpeakerPlacementImpl(props) {
 
         const W = Number(dimensions?.width) || 4.5;
         const L = Number(dimensions?.length) || 6.0;
-        const WALL_BUFFER = 0.02;
+        // const WALL_BUFFER = 0.02; // Not directly used in this snippet, but kept for context
 
         fwRoles.forEach(role => {
             const existing = existingSpeakersMap.get(role);
@@ -1809,7 +1748,7 @@ function SpeakerPlacementImpl(props) {
             if (model === 'off') return; // Don't place if no model
 
             // Get model dimensions
-            const modelDims = getModelDimsM(model) || {};
+            // const modelDims = getModelDimsM(model) || {}; // Not used directly in this specific calculation
             // const halfDepth = (Number(modelDims.depthM) || 0.082) / 2; // Not directly used in final calculation
             // const halfWidth = (Number(modelDims.widthM) || 0.27) / 2; // Not directly used in final calculation
 
