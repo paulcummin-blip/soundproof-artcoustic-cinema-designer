@@ -1586,11 +1586,10 @@ function SpeakerPlacementImpl(props) {
       // --- Helper: full pipeline seeding for a role at a given angle ---
       const seedRoleWithPipeline = (role, angleDegrees, inheritFromRole) => {
         const cRole = canonical(role);
-        // Only proceed if this role is allowed by the current layout configuration
+        // NEW: Only proceed if this role is allowed by the current layout configuration
         if (!allowedRoles.has(cRole)) {
             return;
         }
-
         const existingSpk = allByRole.get(cRole);
 
         // Inherit model: existing role, or a sibling role if requested
@@ -1601,8 +1600,8 @@ function SpeakerPlacementImpl(props) {
             model = inherit.model;
           }
         }
-        
-        // If model is still off/null, don't create the speaker.
+
+        // NEW: If model is still off/null, don't create the speaker.
         if (!model || model === 'off') {
             return;
         }
@@ -1612,11 +1611,10 @@ function SpeakerPlacementImpl(props) {
 
         // 2) Hug appropriate wall
         const hugging = getHuggingCenterLines(model, dims);
-        
-        // Determine if it's a rear surround based on canonical role
-        const isRearSurround = ['SBL', 'SBR'].includes(cRole);
+        const absA = Math.abs(angleDegrees);
+        const isRear = absA > 130; // Use angle for 'rear' classification
 
-        if (isRearSurround) {
+        if (isRear) {
           // Rear surrounds: on back wall
           position.y = hugging.backWallY;
         } else {
@@ -1629,8 +1627,11 @@ function SpeakerPlacementImpl(props) {
         position = applyCornerClearance(position, cRole, model, dims, zones);
         position = applyRoomBoundsClamp(position, model, dims);
 
+        // 🔐 clamp out any NaNs
+        position = safePos(position, mlp);
+
         const spk = {
-          id: (existingSpk && existingSpk.id) || `${cRole}-${timeNowMs()}`,
+          id: (existingSpk && existingSpk.id) || cRole,
           role: cRole,
           label: cRole,
           model,
@@ -1680,6 +1681,7 @@ function SpeakerPlacementImpl(props) {
       applyRoomBoundsClamp,
       zones,
       allowedRoles,
+      safePos, // Add safePos to dependencies
     ]
   );
 
@@ -1930,7 +1932,7 @@ function SpeakerPlacementImpl(props) {
               globalModel={overheadGlobalModel}
               onGlobalModelChange={setOverheadGlobalModel}
               frontOverride={overheadFrontOverride}
-              midOverride={overheadMidOverride}
+              midOverride={midOverride}
               rearOverride={overheadRearOverride}
               onFrontOverrideChange={setOverheadFrontOverride}
               onMidOverrideChange={setOverheadMidOverride}
