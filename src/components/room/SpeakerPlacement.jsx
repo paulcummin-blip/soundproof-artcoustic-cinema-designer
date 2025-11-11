@@ -1286,9 +1286,6 @@ function SpeakerPlacementImpl(props) {
     || "5.1";
 
   // Accept either naming; normalise to boolean
-  // `app?.useFrontWidesInsteadOfRear` was not destructured from `app` in the original file,
-  // making its evaluation `undefined` and `!!undefined` to `false`.
-  // Consolidating to use the explicitly managed `useWidesInsteadOfRears`.
   const useWides = (
     (typeof sevenBedLayoutType === "string" && sevenBedLayoutType.toLowerCase() === "wides") ||
     !!app?.useWidesInsteadOfRears
@@ -1317,6 +1314,22 @@ function SpeakerPlacementImpl(props) {
 
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
   const lastPresetRef = useRef(effectivePreset);
+  const lastGlobalModelRef = useRef(null);
+
+  // NEW: Extract global surround model from current speakers
+  const globalSurroundModel = useMemo(() => {
+    if (!Array.isArray(placedSpeakers)) return null;
+    
+    // Try to find a valid surround model from any existing bed surround
+    for (const spk of placedSpeakers) {
+      const canon = getCanonicalRole(spk.role);
+      if (SURROUND_BED_ROLES.has(canon) && spk.model && spk.model !== "off" && spk.model !== "none") {
+        return spk.model;
+      }
+    }
+    
+    return null;
+  }, [placedSpeakers, SURROUND_BED_ROLES]);
 
   // NEW: Overhead count from dolbyPreset
   const overheadCount = useMemo(() => {
@@ -1539,12 +1552,13 @@ function SpeakerPlacementImpl(props) {
 
   // Single function: RESET_SURROUND_POSITIONS with full pipeline: ANGLE → HUG → ZONE → CORNER → ROOM
   const resetSurroundPositions = useCallback(
-    (layoutString, mlp, dims, currentSpeakers) => {
+    (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
       console.log('[SP] resetSurroundPositions START', { 
         layoutString, 
         mlp, 
         dims,
-        currentSpeakersCount: currentSpeakers?.length 
+        currentSpeakersCount: currentSpeakers?.length,
+        globalSurroundModelParam
       });
 
       if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
@@ -1569,7 +1583,8 @@ function SpeakerPlacementImpl(props) {
       console.log('[SP] resetSurroundPositions CONFIG', {
         layoutNormalized,
         major,
-        allowedRoles: Array.from(allowedRoles)
+        allowedRoles: Array.from(allowedRoles),
+        globalSurroundModel: globalSurroundModelParam
       });
 
       const { width: W, length: L } = dims;
@@ -1625,26 +1640,8 @@ function SpeakerPlacementImpl(props) {
       };
 
       // Helper to find any valid surround model from existing speakers
-      const findAnySurroundModel = () => {
-        // First try to find from any existing surround speaker
-        for (const [role, speaker] of byRole.entries()) {
-          if (SURROUND_BED_ROLES.has(getCanonicalRole(role)) && speaker?.model && speaker.model !== "off" && speaker.model !== "none") {
-            return speaker.model;
-          }
-        }
-        // Fallback to default surround model
-        return "evolve-2-1_s";
-      };
-
-      const globalSurroundModel = findAnySurroundModel();
-
-      console.log('[SP] resetSurroundPositions MODEL RESOLUTION', {
-        globalSurroundModel,
-        existingModels: Array.from(byRole.entries())
-          .filter(([r, s]) => SURROUND_BED_ROLES.has(getCanonicalRole(r)))
-          .map(([r, s]) => ({ role: r, model: s?.model }))
-      });
-
+      // This is now `globalSurroundModelParam`
+      
       const seed = (role, dolbyAngleDeg) => {
         const canon = getCanonicalRole(role);
         
@@ -1661,16 +1658,22 @@ function SpeakerPlacementImpl(props) {
         }
 
         const existing = byRole.get(canon);
-        // Use existing model if valid, otherwise use global surround model
+        // Use existing model if valid, otherwise use global surround model param
         const model = (existing?.model && existing.model !== "off" && existing.model !== "none") 
           ? existing.model 
-          : globalSurroundModel;
+          : globalSurroundModelParam || "evolve-2-1_s";
 
         console.log('[SP] seed MODEL', {
           canon,
           existingModel: existing?.model,
+          globalSurroundModel: globalSurroundModelParam,
           resolvedModel: model
         });
+
+        if (!model || model === 'off' || model === 'none') {
+          console.log('[SP] seed SKIP: no valid model', { canon, model });
+          return;
+        }
 
         const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
         const base = projectToWallFromMLP(mlp.x, mlp.y, projectAngleDeg, room);
@@ -1746,50 +1749,55 @@ function SpeakerPlacementImpl(props) {
       return;
     }
     
-    setSpeakers(currentSpeakers => resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers));
+    setSpeakers(currentSpeakers => resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, globalSurroundModel));
     
     if (showToast) {
       const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : effectivePreset.startsWith('9.') ? '9.x' : '7.1';
       showToast(`Speaker positions reset for ${layoutKey} layout with 50cm corner clearance.`, 'success');
     }
-  }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast]);
+  }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast, globalSurroundModel]);
 
   // Effect to auto-reset when layout changes (guarded by lastPresetRef)
   useEffect(() => {
-    if (effectivePreset !== lastPresetRef.current) {
-      if (mlpPoint && dimensions) {
-        setSpeakers(prev => {
-          const prevPlaced =
-            (prev && Array.isArray(prev.placedSpeakers))
-              ? prev.placedSpeakers
-              : Array.isArray(prev)
-                ? prev
-                : [];
+    if (!mlpPoint || !dimensions || !effectivePreset) return;
 
-          const nextPlaced = resetSurroundPositions(
-            effectivePreset,
-            mlpPoint,
-            dimensions,
-            prevPlaced
-          );
+    const layoutStr = String(effectivePreset);
+    const major = parseInt(layoutStr.split(".")[0], 10) || 5;
 
-          // DEBUG (keep if helpful)
-          console.log("[Speakers] preset re-seed merge check", nextPlaced);
+    const layoutChanged = effectivePreset !== lastPresetRef.current;
+    const globalModel = globalSurroundModel && String(globalSurroundModel).trim().toLowerCase();
+    const hasValidGlobal = !!globalModel && globalModel !== "off" && globalModel !== "none";
 
-          return {
-            ...(typeof prev === "object" && prev !== null ? prev : {}),
-            placedSpeakers: nextPlaced,
-          };
-        });
-        
-        if (showToast) {
-          const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : effectivePreset.startsWith('9.') ? '9.x' : '7.1';
-          showToast(`Layout changed to ${layoutKey} - speakers repositioned with corner clearance.`, 'success');
-        }
-      }
-      lastPresetRef.current = effectivePreset;
+    // --- 5.x & 7.x: only reseed on layout change (keep legacy)
+    if ((major === 5 || major === 7) && !layoutChanged) {
+      return;
     }
-  }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast]);
+
+    // --- 9.x+: reseed on layout change OR first time we get a valid global model
+    if (major >= 9) {
+      const globalModelChanged = hasValidGlobal && globalModel !== lastGlobalModelRef.current;
+
+      if (!layoutChanged && !globalModelChanged) {
+        return; // nothing interesting happened
+      }
+
+      if (hasValidGlobal) {
+        lastGlobalModelRef.current = globalModel;
+      }
+    }
+
+    setSpeakers((currentSpeakers) =>
+      resetSurroundPositions(
+        effectivePreset,
+        mlpPoint,
+        dimensions,
+        currentSpeakers,
+        globalSurroundModel 
+      )
+    );
+
+    lastPresetRef.current = effectivePreset;
+  }, [effectivePreset, mlpPoint, dimensions, globalSurroundModel, resetSurroundPositions, setSpeakers]);
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
