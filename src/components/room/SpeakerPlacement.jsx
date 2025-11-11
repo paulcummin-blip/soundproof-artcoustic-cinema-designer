@@ -538,6 +538,7 @@ function UnifiedSurroundsConfig({
   canRears,     // NEW
   canWides,     // NEW
   is7xOrHigher, // NEW, passed from parent
+  safePos,      // NEW: passed from parent
 }) {
   // `activeRoles` should represent what speaker *types* are conceptually active for this layout.
   // This is now directly derived from `allowedRoles`.
@@ -758,46 +759,49 @@ function UnifiedSurroundsConfig({
 
         const existingSpeaker = speakerMap.get(canon);
         
- if (safeModel === 'off' || !safeModel) {
-  // If this role is NOT required by the current layout, remove it.
-  if (!allowedRoles.has(canon)) {
-    speakerMap.delete(canon);
-  } else {
-    // If layout expects this role (e.g. SBL/SBR in 7.1),
-    // keep the speaker entry but clear its model.
-    const existing = speakerMap.get(canon);
-    if (existing) {
-      speakerMap.set(canon, { ...existing, model: null });
-    }
-  }
-} else {
-  // Valid model chosen → ensure speaker exists + positioned
-  let position = existingSpeaker?.position || defaultPos;
+        if (safeModel === 'off' || !safeModel) {
+          // If this role is NOT required by the current layout, remove it.
+          if (!allowedRoles.has(canon)) {
+            speakerMap.delete(canon);
+          } else {
+            // If layout expects this role (e.g. SBL/SBR in 7.1),
+            // keep the speaker entry but clear its model.
+            const existing = speakerMap.get(canon);
+            if (existing) {
+              speakerMap.set(canon, { ...existing, model: null });
+            }
+          }
+        } else {
+          // Valid model chosen → ensure speaker exists + positioned
+          let position = existingSpeaker?.position || defaultPos;
 
-  if (!position && mlpPoint && dimensions) {
-    let angleDegrees;
-    switch (canon) {
-      case 'SBL': angleDegrees = -142.5; break;
-      case 'SBR': angleDegrees = 142.5; break;
-      case 'SL':  angleDegrees = -100;  break;
-      case 'SR':  angleDegrees = 100;   break;
-      case 'LW':  angleDegrees = -50;   break;
-      case 'RW':  angleDegrees = 50;    break;
-      default:    angleDegrees = 0;
-    }
-    position = calculateDefaultPosition(angleDegrees, mlpPoint, dimensions);
-  }
+          if (!position && mlpPoint && dimensions) {
+            let angleDegrees;
+            switch (canon) {
+              case 'SBL': angleDegrees = -142.5; break;
+              case 'SBR': angleDegrees = 142.5; break;
+              case 'SL':  angleDegrees = -100;  break;
+              case 'SR':  angleDegrees = 100;   break;
+              case 'LW':  angleDegrees = -60;   break; // Changed from -50
+              case 'RW':  angleDegrees = 60;    break; // Changed from 50
+              default:    angleDegrees = 0;
+            }
+            position = calculateDefaultPosition(angleDegrees, mlpPoint, dimensions);
+          }
 
-  speakerMap.set(canon, {
-    ...(existingSpeaker || {}),
-    role: canon,
-    id: existingSpeaker?.id || `${canon}-${timeNowMs()}`,
-    draggable: true,
-    model: safeModel,
-    position: position || { x: 0, y: 0, z: 1.1 },
-    rotation: existingSpeaker?.rotation || { x: 0, y: 0, z: 0 },
-  });
-}
+          // 🔐 clamp out any NaNs
+          position = safePos(position, mlpPoint);
+
+          speakerMap.set(canon, {
+            ...(existingSpeaker || {}),
+            role: canon,
+            id: existingSpeaker?.id || `${canon}-${timeNowMs()}`,
+            draggable: true,
+            model: safeModel,
+            position,
+            rotation: existingSpeaker?.rotation || { x: 0, y: 0, z: 0 },
+          });
+        }
       };
 
       // Process roles conditionally based on `canSides`, `canRears`, `canWides`
@@ -830,7 +834,7 @@ function UnifiedSurroundsConfig({
       console.log('[FW UI] onChange after=', next);
       return next;
     });
-  }, [setSurroundConfig, setSpeakers, getRearSurroundDefaultPositions, mlpPoint, dimensions, allowedRoles, canSides, canRears, canWides]);
+  }, [setSurroundConfig, setSpeakers, getRearSurroundDefaultPositions, mlpPoint, dimensions, allowedRoles, canSides, canRears, canWides, safePos]); // Added safePos to dependencies
 
   // Auto-apply master surround model to new surrounds without a model
   useEffect(() => {
@@ -1904,6 +1908,7 @@ function SpeakerPlacementImpl(props) {
           canRears={canRears}
           canWides={canWides}
           is7xOrHigher={is7xOrHigher} // ADDED
+          safePos={safePos} // NEW: Pass safePos to UnifiedSurroundsConfig
         />
 
         {canWides && (
@@ -1932,7 +1937,7 @@ function SpeakerPlacementImpl(props) {
               globalModel={overheadGlobalModel}
               onGlobalModelChange={setOverheadGlobalModel}
               frontOverride={overheadFrontOverride}
-              midOverride={midOverride}
+              midOverride={overheadMidOverride} // Corrected: was `midOverride`
               rearOverride={overheadRearOverride}
               onFrontOverrideChange={setOverheadFrontOverride}
               onMidOverrideChange={setOverheadMidOverride}
