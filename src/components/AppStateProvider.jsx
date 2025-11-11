@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { timeNowMs } from "@/components/utils/timeNow";
 import { safeTable } from '@/components/utils/safeLog';
@@ -394,45 +393,29 @@ function useDesignerState() {
 
   // Effect to compute and set screenCentreDepthM
   useEffect(() => {
-    // Placeholder computation for actualScreenFrontY and screenThicknessM
-    // In a real application, these would be derived from more complex logic
-    // involving screen and room dimensions, mount mode, etc.
-
-    // Convert screen width from inches to meters
     const screenWidthM = screen.visibleWidthInches * 0.0254;
-
-    // A rough estimation for screen thickness. Could be from speaker model data.
-    const screenThicknessM = 0.05; // 5cm default thickness
-
-    let actualScreenFrontY = 0; // Distance from the front wall to the *front* face of the screen
+    const screenThicknessM = 0.05;
+    let actualScreenFrontY = 0;
 
     if (screen.mountMode === "floating") {
       actualScreenFrontY = screen.floatDepthM || 0;
     } else if (screen.mountMode === "recessed") {
-      // Example: If recessed, it might be set to a fixed depth or derived from room geometry
-      actualScreenFrontY = 0.15; // 15cm recess as an example
+      actualScreenFrontY = 0.15;
     }
-    // For "baffle" mode, actualScreenFrontY remains 0
 
-    // Add speaker clearance if present
     actualScreenFrontY += screen.speakerClearanceM || 0;
-
     const computedScreenCentreDepthM = actualScreenFrontY + screenThicknessM / 2;
-    
-    // Set the state
     setScreenCentreDepthM(computedScreenCentreDepthM);
-
   }, [
     screen.visibleWidthInches,
     screen.aspectRatio,
     screen.mountMode,
     screen.floatDepthM,
     screen.speakerClearanceM,
-    roomDims.lengthM, // Now using roomDims.lengthM instead of dimensions.roomDepthM
-    speakersEpoch, // If speaker system changes could influence screen depth calculations
-    screenWall, // If screenWall affects the reference point for depth
+    roomDims.lengthM,
+    speakersEpoch,
+    screenWall,
   ]);
-
 
   // Normalization wrapper with epoch increment
   const setSpeakerSystem = useCallback(
@@ -472,17 +455,14 @@ function useDesignerState() {
           useWidesInsteadOfRears
         });
 
-        // Filter speakers: keep LCR even without models, filter off/none for others
         speakers = speakers.filter((spk) => {
           const role = String(spk.role || "").toUpperCase();
           const model = String(spk.model || "").toLowerCase().trim();
           
-          // LCR: always keep if role is FL/FC/FR (even without model for initial state)
           if (role === "FL" || role === "FC" || role === "FR") {
             return true;
           }
           
-          // Others: drop only explicit "off"/"none" or empty
           if (!model || model === "off" || model === "none") {
             console.log('[AS] Filtering out speaker with off/none model', { role, model });
             return false;
@@ -521,7 +501,6 @@ function useDesignerState() {
           y: s.position?.y?.toFixed(3)
         })));
 
-        // DEBUG: Log what's being published from AppState
         if (typeof window !== "undefined") {
           window.__LAST_SPEAKERS__ = (speakers || []).map(s => ({
             role: String(s.role),
@@ -546,10 +525,9 @@ function useDesignerState() {
   );
 
   const value = useMemo(() => ({
-    // dimensions and setDimensions are now deprecated in favor of roomDims
     dimensions, setDimensions, 
-    roomDims, setRoomDims, // NEW
-    setRoomWidthM, setRoomLengthM, setRoomHeightM, // NEW
+    roomDims, setRoomDims,
+    setRoomWidthM, setRoomLengthM, setRoomHeightM,
     screen, setScreen, screenHeight, setScreenHeight,
     screenWall, setScreenWall, dolbyConfig, setDolbyConfig, dolbyLayout, setDolbyLayout,
     seededChannels, setSeededChannels, sevenBedLayoutType, setSevenBedLayoutType,
@@ -557,10 +535,10 @@ function useDesignerState() {
     baselineSeatingPositions, setBaselineSeatingPositions,
     seatingRows, setSeatingRows,
     seatsPerRow, setSeatsPerRow,
-    seatsPerRowByRow, setSeatsPerRowByRow, // NEW: per-row seat counts
+    seatsPerRowByRow, setSeatsPerRowByRow,
     seatingBlockOffset, setSeatingBlockOffset,
     seatSpacing, setSeatSpacing, 
-    rowSpacingM, setRowSpacingM, // NEW
+    rowSpacingM, setRowSpacingM,
     mlpBasis, setMlpBasis, autoSeatByRP23, setAutoSeatByRP23,
     roomElements, setRoomElements, subwoofers, setSubwoofers,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
@@ -573,12 +551,12 @@ function useDesignerState() {
     enableLayoutSPLWidget, setEnableLayoutSPLWidget,
     enableFrontWides, setEnableFrontWides,
     useFrontWidesInsteadOfRear, setUseFrontWidesInsteadOfRear,
-    useWidesInsteadOfRears, setUseWidesInsteadOfRears, // NEW
+    useWidesInsteadOfRears, setUseWidesInsteadOfRears,
     DBG_FW, frozenTabs, isFrozen, freezeTab, unfreezeTab, showToast,
     screenCentreDepthM, setScreenCentreDepthM,
-    screenFrontPlaneM, setScreenFrontPlaneM, // NEW
-    mlpY_m, setMlpY_m, // NEW
-    rowCentersM, setRowCentersM, // NEW
+    screenFrontPlaneM, setScreenFrontPlaneM,
+    mlpY_m, setMlpY_m,
+    rowCentersM, setRowCentersM,
     overheadGlobalModel, setOverheadGlobalModel,
     overheadFrontOverride, setOverheadFrontOverride,
     overheadMidOverride, setOverheadMidOverride,
@@ -587,16 +565,15 @@ function useDesignerState() {
     useMidGlobal, setUseMidGlobal,
     useRearGlobal, setUseRearGlobal,
     splConfig,
-    setSplConfig, // Keeping this for direct state updates if needed, though updateGlobalSpl/updateRoleSpl are preferred
+    setSplConfig,
     getEffectiveSplInputs,
     updateGlobalSpl,
     updateRoleSpl,
-    getSpeakerVisibility, // ADDED
+    getSpeakerVisibility,
   }), [
-    // dimensions and setDimensions are now deprecated in favor of roomDims
-    dimensions, setDimensions, // keeping for now for backward compatibility
-    roomDims, setRoomDims, // NEW
-    setRoomWidthM, setRoomLengthM, setRoomHeightM, // NEW
+    dimensions, setDimensions,
+    roomDims, setRoomDims,
+    setRoomWidthM, setRoomLengthM, setRoomHeightM,
     screen, setScreen, 
     screenHeight, setScreenHeight,
     screenWall, setScreenWall, dolbyConfig, setDolbyConfig, 
@@ -606,10 +583,10 @@ function useDesignerState() {
     baselineSeatingPositions, setBaselineSeatingPositions,
     seatingRows, setSeatingRows,
     seatsPerRow, setSeatsPerRow,
-    seatsPerRowByRow, setSeatsPerRowByRow, // NEW
+    seatsPerRowByRow, setSeatsPerRowByRow,
     seatingBlockOffset, setSeatingBlockOffset,
     seatSpacing, setSeatSpacing, 
-    rowSpacingM, setRowSpacingM, // NEW
+    rowSpacingM, setRowSpacingM,
     mlpBasis, setMlpBasis, autoSeatByRP23, setAutoSeatByRP23,
     roomElements, setRoomElements, subwoofers, setSubwoofers,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
@@ -621,12 +598,12 @@ function useDesignerState() {
     enableLayoutSPLWidget, setEnableLayoutSPLWidget,
     enableFrontWides, setEnableFrontWides,
     useFrontWidesInsteadOfRear, setUseFrontWidesInsteadOfRear,
-    useWidesInsteadOfRears, setUseWidesInsteadOfRears, // NEW
+    useWidesInsteadOfRears, setUseWidesInsteadOfRears,
     DBG_FW, frozenTabs, isFrozen, freezeTab, unfreezeTab, showToast,
     screenCentreDepthM,
-    screenFrontPlaneM, setScreenFrontPlaneM, // NEW
-    mlpY_m, setMlpY_m, // NEW
-    rowCentersM, setRowCentersM, // NEW
+    screenFrontPlaneM, setScreenFrontPlaneM,
+    mlpY_m, setMlpY_m,
+    rowCentersM, setRowCentersM,
     overheadGlobalModel, setOverheadGlobalModel,
     overheadFrontOverride, setOverheadFrontOverride,
     overheadMidOverride, setOverheadMidOverride,
@@ -638,7 +615,7 @@ function useDesignerState() {
     getEffectiveSplInputs,
     updateGlobalSpl,
     updateRoleSpl,
-    getSpeakerVisibility, // ADDED
+    getSpeakerVisibility,
   ]);
 
   return value;
@@ -655,19 +632,15 @@ export default function AppStateProvider({ children }) {
 
 export function useScreenFrontPlaneY() {
   const { screen, screenCentreDepthM } = useAppState() || {};
-  const SCREEN_HALF_THICKNESS_M = 0.025; // This should ideally come from screen model or be a derived state
+  const SCREEN_HALF_THICKNESS_M = 0.025;
 
-  // Priority 1: Use floatDepthM if in floating mode (this is the front face)
   if (screen?.mountMode === 'floating' && Number.isFinite(screen?.floatDepthM)) {
     return screen.floatDepthM;
   }
   
-  // Priority 2: Calculate from centre depth
-  // Note: screenCentreDepthM is calculated in useDesignerState's useEffect
   if (Number.isFinite(screenCentreDepthM)) {
     return Math.max(0, screenCentreDepthM - SCREEN_HALF_THICKNESS_M);
   }
   
-  // Fallback: assume screen is at front wall (Y=0)
   return 0;
 }
