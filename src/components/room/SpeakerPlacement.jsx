@@ -1606,15 +1606,29 @@ function SpeakerPlacementImpl(props) {
         return { x: p.x, y: p.y, z };
       };
 
+      // Helper to find any valid surround model from existing speakers
+      const findAnySurroundModel = () => {
+        // First try to find from any existing surround speaker
+        for (const [role, speaker] of byRole.entries()) {
+          if (SURROUND_BED_ROLES.has(getCanonicalRole(role)) && speaker?.model && speaker.model !== "off" && speaker.model !== "none") {
+            return speaker.model;
+          }
+        }
+        // Fallback to default surround model
+        return "evolve-2-1_s";
+      };
+
+      const globalSurroundModel = findAnySurroundModel();
+
       const seed = (role, dolbyAngleDeg) => {
         const canon = getCanonicalRole(role);
-        const existing = byRole.get(canon);
-
-        const fallbackModel = byRole.get("SL")?.model || byRole.get("SR")?.model || existing?.model;
-        const model = existing?.model || fallbackModel;
-
-        if (!model || model === "off" || model === "none") return;
         if (!allowedRoles.has(canon)) return;
+
+        const existing = byRole.get(canon);
+        // Use existing model if valid, otherwise use global surround model
+        const model = (existing?.model && existing.model !== "off" && existing.model !== "none") 
+          ? existing.model 
+          : globalSurroundModel;
 
         const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
         const base = projectToWallFromMLP(mlp.x, mlp.y, projectAngleDeg, room);
@@ -1667,7 +1681,7 @@ function SpeakerPlacementImpl(props) {
 
       return next;
     },
-    [getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp, allowedRoles, dolbyConfig]
+    [getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp, allowedRoles, dolbyConfig, SURROUND_BED_ROLES]
   );
 
   // Handler for reset button (full surround reset)
