@@ -1280,6 +1280,9 @@ function SpeakerPlacementImpl(props) {
 
   const subWarnings = app?.subWarnings || { front: [], rear: [] };
 
+  // All bed-layer surrounds we control here
+  const SURROUND_BED_ROLES = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+
   // --- Canonical layout + toggle resolution (Set-based) ---
   const effectivePreset = (typeof dolbyPreset === "string" && dolbyPreset) 
     || (typeof app?.dolbyLayout === "string" && app.dolbyLayout) 
@@ -1571,14 +1574,13 @@ function SpeakerPlacementImpl(props) {
       const layoutKey = major === 5 ? '5.1' : major === 7 ? '7.1' : '9.x';
 
       // We only strip / reseed these roles
-      const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
       const canonical = (r) => String(r || '').toUpperCase();
 
       const source = Array.isArray(currentSpeakers) ? currentSpeakers : [];
 
       // Keep everything that is NOT one of our bed-surround roles
       let nextSpeakers = source.filter(
-        (s) => !surroundRoles.has(canonical(s.role))
+        (s) => !SURROUND_BED_ROLES.has(canonical(s.role))
       );
 
       // Map of *all* existing by canonical role (before reset)
