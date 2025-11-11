@@ -592,7 +592,7 @@ function useDesignerState() {
     updateGlobalSpl,
     updateRoleSpl,
     getSpeakerVisibility, // ADDED
-  ]), [
+  }), [
     // dimensions and setDimensions are now deprecated in favor of roomDims
     dimensions, setDimensions, // keeping for now for backward compatibility
     roomDims, setRoomDims, // NEW
