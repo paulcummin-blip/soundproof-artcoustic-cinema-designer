@@ -1600,34 +1600,40 @@ function SpeakerPlacementImpl(props) {
       );
 
       // Utility: snap to walls using existing hugging / clearance helpers
-      const finalisePos = (pos, role, model) => {
+      const finalisePos = (pos, canon, model) => {
         const safeModel = model || 'evolve-2-1_s';
         let p = { x: pos.x, y: pos.y, z: 1.1 };
 
         // Snap to specific walls for intended roles
         const hug = getHuggingCenterLines(safeModel, dims);
-        const canon = getCanonicalRole(role);
         
-        if (canon === 'SL' || canon === 'LW') {
+        // LEFT / RIGHT wall snapping for surrounds & wides
+        if (canon === "SL" || canon === "LW") {
           p.x = hug.leftWallX;
         }
-        if (canon === 'SR' || canon === 'RW') {
+        if (canon === "SR" || canon === "RW") {
           p.x = hug.rightWallX;
         }
-        if (canon === 'SBL' || canon === 'SBR') {
+
+        // Rear surrounds must be on back wall
+        if (canon === "SBL" || canon === "SBR") {
           p.y = hug.backWallY;
         }
 
-        // Apply proper clearance + clamp
+        // Corner clearance + bounds
         p = applyCornerClearance(p, canon, safeModel, dims, zones);
         p = applyRoomBoundsClamp(p, safeModel, dims);
 
-        // Failsafe: never NaN
-        if (!Number.isFinite(p.x)) p.x = mlp.x;
-        if (!Number.isFinite(p.y)) p.y = mlp.y;
-        if (!Number.isFinite(p.z)) p.z = 1.1;
+        // Ensure finite numbers; fall back to MLP if something went wrong
+        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+          p.x = mlp.x;
+          p.y = mlp.y;
+        }
 
-        return p;
+        // keep existing z if present, else ear height / generic
+        const z = Number.isFinite(pos.z) ? pos.z : (mlp.z || 1.1);
+
+        return { x: p.x, y: p.y, z };
       };
 
       const seed = (role, dolbyAngleDeg) => { // dolbyAngleDeg: 0=front, +CCW
@@ -1645,18 +1651,28 @@ function SpeakerPlacementImpl(props) {
         const base = projectToWallFromMLP(mlp.x, mlp.y, projectAngleDeg, room);
         const position = finalisePos(base, canon, model);
 
+        // Face speakers into the room realistically:
+        let yawDeg = 0; // default (faces screen)
+        if (canon === "SL" || canon === "LW") {
+          yawDeg = 90;  // on left wall, face right
+        } else if (canon === "SR" || canon === "RW") {
+          yawDeg = -90; // on right wall, face left
+        } else if (canon === "SBL" || canon === "SBR") {
+          yawDeg = 180; // on back wall, face forward
+        }
+
         next.push({
-          id: existing?.id || `${canon}-${timeNowMs()}`,
+          id: existing?.id || `${canon}-${Date.now()}`,
           role: canon,
           model,
           position,
           draggable: true,
-          rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
+          rotation: existing?.rotation || { x: 0, y: yawDeg, z: 0 },
         });
       };
 
       // --- Layout-specific seeding with Dolby-compliant angles ----------------------------------------
-
+      // Using Dolby standard angles: 0=front, +CCW.
       if (major === 5) {
         // 5.x: sides only at ±90° (Dolby angles)
         seed('SL', 90);  // Dolby 90 deg CCW (left side)
@@ -1749,8 +1765,8 @@ function SpeakerPlacementImpl(props) {
 
             // Get model dimensions
             // const modelDims = getModelDimsM(model) || {}; // Not used directly in this specific calculation
-            // const halfDepth = (Number(modelDims.depthM) || 0.082) / 2; // Not directly used in final calculation
-            // const halfWidth = (Number(modelDims.widthM) || 0.27) / 2; // Not directly used in final calculation
+            // const halfDepth = (Number(modelDims.depthM) || 0.082) / 2; // Not used directly in final calculation
+            // const halfWidth = (Number(modelDims.widthM) || 0.27) / 2; // Not used directly in final calculation
 
             let xAtWall;
             // The median Y is relative to the room length.

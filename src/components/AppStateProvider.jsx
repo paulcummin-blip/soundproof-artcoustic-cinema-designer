@@ -448,43 +448,57 @@ const setSpeakerSystem = useCallback((updater) => {
         ? [...prev.placedSpeakers]
         : [];
 
+    // Normalize layout string to determine major version
+    const layoutString =
+      (typeof dolbyLayout === "string" && dolbyLayout) ||
+      (typeof dolbyConfig === "string" && dolbyConfig) ||
+      (dolbyConfig && typeof dolbyConfig.layout === "string" && dolbyConfig.layout) ||
+      "5.1";
+
+    const major = parseInt(String(layoutString).split(".")[0], 10) || 5;
+    const isSevenDotX = major === 7;
+
     // Use the real 7-bed toggle (the one SpeakerPlacement and rolesForLayout use)
     const useFWInsteadOfRS = useWidesInsteadOfRears === true;
 
     const keptRoles = [];
     const prunedRoles = [];
 
+    // Filter speakers based on model validity and layout-specific rules
     speakers = speakers.filter(s => {
       const role = getCanonicalRole(s.role);
 
+      // Never keep explicit OFF/NONE/undefined models
+      const model = String(s.model || "").toLowerCase();
+      if (!model || model === "off" || model === "none") {
+        prunedRoles.push(role);
+        return false;
+      }
+
       // Always keep core LCR and classic sides
-      if (['FL', 'FC', 'FR', 'LFE', 'SL', 'SR', 'LS', 'RS'].includes(role)) { // LFE added here as well
+      if (['FL', 'FC', 'FR', 'LFE', 'SL', 'SR', 'LS', 'RS'].includes(role)) {
         keptRoles.push(role);
         return true;
       }
 
-      // Front-wide speakers: keep only when they have a model
-      if (role === 'LW' || role === 'RW') {
-        if (s.model && s.model !== 'undefined') {
-          keptRoles.push(role);
-          return true;
-        } else {
-          prunedRoles.push(role);
-          return false;
-        }
-      }
-
-      // Rear surrounds: drop only when "use wides instead of rears" is active
-      if (role === 'SBL' || role === 'SBR') {
+      // Wides vs rears toggle is ONLY meaningful for 7.x
+      if (isSevenDotX) {
         if (useFWInsteadOfRS) {
-          prunedRoles.push(role);
-          return false;
+          // 7.x with wides instead of rears: drop SBL/SBR, keep LW/RW
+          if (role === 'SBL' || role === 'SBR') {
+            prunedRoles.push(role);
+            return false;
+          }
         } else {
-          keptRoles.push(role);
-          return true;
+          // 7.x standard: drop LW/RW, keep SBL/SBR
+          if (role === 'LW' || role === 'RW') {
+            prunedRoles.push(role);
+            return false;
+          }
         }
       }
 
+      // For 9.x+ we KEEP SL/SR + SBL/SBR + LW/RW — no XOR rule
       // Keep all other roles (overheads, subs, etc.)
       keptRoles.push(role);
       return true;
@@ -492,9 +506,11 @@ const setSpeakerSystem = useCallback((updater) => {
 
     if (typeof window !== 'undefined' && DBG_FW) {
       console.log('[FW normalize]', {
+        major,
+        isSevenDotX,
+        useFWInsteadOfRS,
         keptRoles,
-        prunedRoles,
-        useFWInsteadOfRS
+        prunedRoles
       });
     }
 
@@ -518,7 +534,7 @@ const setSpeakerSystem = useCallback((updater) => {
       placedSpeakers: speakers,
     };
   });
-}, [useWidesInsteadOfRears, DBG_FW]);
+}, [useWidesInsteadOfRears, dolbyLayout, dolbyConfig, DBG_FW]);
 
   const value = useMemo(() => ({
     // dimensions and setDimensions are now deprecated in favor of roomDims
