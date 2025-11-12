@@ -577,6 +577,10 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     }
   }, [placedSpeakers, onSetSpeakers, getCanonicalRole]);
 
+  // [B44] Bed surrounds are now seeded by SpeakerPlacement only.
+  // RoomVisualisation is a READ-ONLY renderer for these roles.
+  const BED_SURROUND_ROLES = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+
   // Unified "on side wall" test - used throughout the component
   const isOnSideWall = useCallback((side, spk, roomW, wallBufferM = WALL_BUFFER_M, tolM = 0.035) => {
     if (!spk || !spk.position || !spk.model) return false;
@@ -4113,6 +4117,16 @@ return {
     const safeY = Number.isFinite(yM) ? yM : 0;
     return roomRect.y + (safeY * scale);
   };
+
+  // [B44] Debug log to confirm bed-surround positions are not mutated by RV
+  console.log('[RV] speakers BEFORE icon-map',
+    afterVisibility.map(s => ({
+      role: s.role,
+      canon: getCanonicalRole(s.role),
+      x: s.position?.x?.toFixed(3),
+      y: s.position?.y?.toFixed(3),
+    }))
+  );
 
   // [B44] Debug log to confirm bed-surround positions are not mutated by RV
   console.log('[RV] speakers BEFORE icon-map',
