@@ -5,11 +5,11 @@ import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, use
 import { Layers3, Compass } from 'lucide-react';
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import {
-  rp23HorizontalAngleForSeat, // This is no longer used for the HUD, but may be used elsewhere. Keep for now.
-  verticalViewingAngleDeg, // This is no longer used for the HUD, but may be used elsewhere. Keep for now.
+  rp23HorizontalAngleForSeat,
+  verticalViewingAngleDeg,
 } from '@/components/utils/seatHover';
-import { buildRoleMap, isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils"; // Consolidated imports
-import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath"; // These are no longer used for the HUD, but may be used elsewhere. Keep for now.
+import { buildRoleMap, isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils";
+import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
 import { calculateLcrConstraints } from '../room/constraints/lcrConstraints';
 import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
 import RP22ZonesOverlay from '@/components/room/RP22ZonesOverlay';
@@ -440,7 +440,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const dragStartCanvasPosRef = useRef(null);
   const dragStartRoomPosRef = useRef(null);
   const dragStartSpeakerPosRef = useRef(null);
-  const rsDragLockRef = React.useRef(null);
+  rsDragLockRef.current = null;
   const fwOffsetRef = React.useRef({ L: 0, R: 0 });
   const isDraggingFW = React.useRef(false);
   const isDraggingRearRef = React.useRef(0);
