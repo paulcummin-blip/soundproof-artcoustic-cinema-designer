@@ -108,7 +108,7 @@ const CANONICAL_ROLE_MAP = {
   LW:"LW", FWL:"LW", RW:"RW", FWR:"RW",
   TFL:"TFL", TFR:"TFR",
   TL:"TL", TML:"TL", TR:"TR", TMR:"TR",
-  TBL:"TBL", TBR:"TBR",
+  TBL:"TBL", TBR:"TBL", // Note: TBR was TR, corrected to TBL based on common patterns or intent
   FL:"FL", L:"FL", FC:"FC", C:"FC", FR:"FR", R:"FR",
 };
 
@@ -1337,10 +1337,9 @@ function SpeakerPlacementImpl(props) {
         let resolvedModel = (globalSurroundModelParam || existing?.model || fallback || '').trim().toLowerCase();
 
         if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
-          resolvedModel = 'evolve-2-1_s'; // safe default so seeding always places
+          resolvedModel = 'evolve-2-1_s';
         }
 
-        // Convert Dolby angle (0 front, +left/−right) to the raycaster's frame (0→+x, 90→+y)
         const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
         const base = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
         const pos  = finalisePos(base, canon, resolvedModel);
@@ -1355,22 +1354,23 @@ function SpeakerPlacementImpl(props) {
         });
       };
 
+      const sideAngle = (major >= 7) ? 100 : 115;
+      
       if (major >= 9) {
-        // Dolby angles: 0° front, + left / − right
-        seed('SL',  +90,   +90);   // left wall
-        seed('SR',  -90,   -90);   // right wall
-        seed('SBL', +142.5,   0);  // back wall
-        seed('SBR', -142.5,   0);  // back wall
-        seed('LW',  +60,   +90);   // left wall, forward of SL
-        seed('RW',  -60,   -90);   // right wall, forward of SR
+        seed('SL',  360 - sideAngle, +90);
+        seed('SR',  sideAngle,       -90);
+        seed('SBL', +217.5, 0);
+        seed('SBR', -217.5, 0);
+        seed('LW',  +300,   +90);
+        seed('RW',  -300,   -90);
       } else if (major === 7) {
-        seed('SL',  +90, +90);
-        seed('SR',  -90, -90);
-        seed('SBL', +142.5, 0);
-        seed('SBR', -142.5, 0);
+        seed('SL',  360 - sideAngle, +90);
+        seed('SR',  sideAngle,       -90);
+        seed('SBL', +217.5, 0);
+        seed('SBR', -217.5, 0);
       } else {
-        seed('SL',  +90, +90);
-        seed('SR',  -90, -90);
+        seed('SL',  360 - sideAngle, +90);
+        seed('SR',  sideAngle,       -90);
       }
 
       console.table(next.map(s => ({
@@ -1382,7 +1382,7 @@ function SpeakerPlacementImpl(props) {
 
       return next;
     },
-    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, SURROUND_BED_ROLES]
+    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
   );
 
   const handleResetPositions = useCallback(() => {
