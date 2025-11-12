@@ -67,6 +67,54 @@ function speakersShallowEqual(a = [], b = []) {
   return true;
 }
 
+// ---- robust ray -> wall projector (no MLP fallbacks) -----------------------
+function projectToWallFromMLP_xy(mlp, angleDeg, room) {
+  // angle 0° = +X (to the right), 90° = +Y (toward back wall)
+  const a = (angleDeg % 360 + 360) % 360; // Normalize angle to 0-359
+  const rad = (a * Math.PI) / 180;
+  const dx = Math.cos(rad);
+  const dy = Math.sin(rad);
+
+  const EPS_LOCAL = 1e-6; // Small epsilon for floating point comparisons
+  const ts = [];
+
+  // Check intersection with vertical walls (left/right)
+  if (Math.abs(dx) > EPS_LOCAL) {
+    const tL = (room.left  - mlp.x) / dx;
+    const tR = (room.right - mlp.x) / dx;
+    if (tL > EPS_LOCAL) ts.push({ t: tL, wall: 'L' });
+    if (tR > EPS_LOCAL) ts.push({ t: tR, wall: 'R' });
+  }
+  // Check intersection with horizontal walls (front/back)
+  if (Math.abs(dy) > EPS_LOCAL) {
+    const tF = (room.front - mlp.y) / dy;
+    const tB = (room.back  - mlp.y) / dy;
+    if (tF > EPS_LOCAL) ts.push({ t: tF, wall: 'F' });
+    if (tB > EPS_LOCAL) ts.push({ t: tB, wall: 'B' });
+  }
+
+  // If no intersections found (e.g., ray is parallel to all walls in a 2D sense, or inside a tiny room),
+  // return a safe fallback, e.g., extending to the back wall at mlp's x.
+  if (!ts.length) {
+    return { x: mlp.x, y: room.back, wall: 'B' };
+  }
+
+  // Find the smallest positive 't' (first intersection point)
+  ts.sort((a, b) => a.t - b.t);
+  const hit = ts[0];
+  
+  // Calculate the intersection coordinates
+  const x = mlp.x + hit.t * dx;
+  const y = mlp.y + hit.t * dy;
+
+  // Clamp results to room boundaries (within a small margin)
+  const margin = 0.001; // Small margin to account for floating point inaccuracies near boundaries
+  const clampedX = Math.max(room.left + margin, Math.min(room.right - margin, x));
+  const clampedY = Math.max(room.front + margin, Math.min(room.back - margin, y));
+
+  return { x: clampedX, y: clampedY, wall: hit.wall };
+}
+
 // --- Canonical role mapping + helpers ---
 const CANONICAL_ROLE_MAP = {
   // Sides
@@ -241,6 +289,8 @@ function applyLcrAim(placedSpeakers, mlpPoint, mode /* "flat"|"angled" */) {
 
 // Canonical list of surround roles (no heights, no LCR)
 const ALL_SURROUND_ROLES = new Set(["SL","SR","SBL","SBR","LW","RW"]);
+const LCR_ROLES = new Set(["FL", "FC", "FR"]);
+
 
 // Convert const helpers to function declarations (fixes TDZ/hoisting issues)
 function rp22P12Level(db) {
