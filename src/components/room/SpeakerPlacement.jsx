@@ -18,7 +18,8 @@ import { artcousticSpeakers } from '@/components/data/speakerData';
 import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 import { safeGroup, safeTable, safeGroupEnd } from "@/components/utils/safeLog";
 import { getSpeakerModelMeta, getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
-import { safeComputeLcrSpl } from '@/components/utils/splMathSafe';
+import { safeComputeLcrSpl }
+ from '@/components/utils/splMathSafe';
 import SurroundsSelector from '../speakers/SurroundsSelector';
 import OverheadChannelSelector from '@/components/speakers/OverheadChannelSelector';
 import { calibratedSplAtSeat, euclideanDistance } from "@/components/utils/splMath";
@@ -621,24 +622,6 @@ export function applyLcrModel(placed, model) {
 
 // optional alias if a different casing was used elsewhere
 export const applyLCRModel = applyLcrModel;
-
-// Move ROLE_TO_KEY outside component since it's constant
-const ROLE_TO_KEY = new Map([
-  ["FL", "L"],
-  ["FC", "C"],
-  ["FR", "R"],
-]);
-
-// --- rear-only canonical + alias matchers
-const REAR_CANON = new Set(["SBL", "SBR"]);
-const REAR_ALIASES = new Set([
-  "SBL","SBR","RL","RR","RSL","RSR","LR","LRS","RRS","LB","RB"
-]);
-
-const isRearByAnyRole = (role) => {
-  const r = String(role||"").toUpperCase();
-  return REAR_ALIASES.has(r) || REAR_CANON.has(getCanonicalRole(r));
-};
 
 /* === Unified Surrounds Configuration === */
 function UnifiedSurroundsConfig({
