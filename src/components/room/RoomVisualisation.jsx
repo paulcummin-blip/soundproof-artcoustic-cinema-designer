@@ -2474,6 +2474,7 @@ React.useEffect(() => {
   }, [placedSpeakers, widthM, lengthM, heightM, screen, visualConstraintZones, getModelDimsM]); // Use new dimension variables
 
   // Auto-adjust LCR speakers on screen/zone changes
+  // [B44] This effect is LCR-only; bed surrounds are not touched
   useEffect(() => {
     if (!onSetSpeakers || !constraintZones?.FL || !constraintZones?.FR) {
       return;
@@ -2538,8 +2539,14 @@ React.useEffect(() => {
     if (needsFix) onSetSpeakers(next);
   }, [placedSpeakers, onSetSpeakers, centerX_m, getCanonicalRole]);
 
-  // Live reset for SL/SR on room/screen/zone changes
+  // [B44] DISABLED: SL/SR positions now come from SpeakerPlacement only
+  // This effect has been disabled to prevent RV from overwriting state-driven positions
   useEffect(() => {
+    // [B44] Legacy corridor/constraint logic for SL/SR disabled.
+    // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
+    return; // Early exit - effect is now a no-op
+    
+    /* ORIGINAL LOGIC DISABLED:
     if (!onSetSpeakers) return;
     if (isDraggingRearRef.current > 0) return;
     if (timeNowMs() - lastInteractionEpoch.current < 500) return;
@@ -2720,8 +2727,14 @@ React.useEffect(() => {
     }));
   }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
 
-  // LIVE RESET FOR SBL/SBR (gentle, mirrors, keeps center-in-band and SS clearance)
+  // [B44] DISABLED: SBL/SBR positions now come from SpeakerPlacement only
+  // This effect has been disabled to prevent RV from overwriting state-driven positions
   React.useEffect(() => {
+    // [B44] Legacy corridor/constraint logic for SBL/SBR disabled.
+    // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
+    return; // Early exit - effect is now a no-op
+    
+    /* ORIGINAL LOGIC DISABLED:
     if (isDraggingRearRef.current > 0) {
       return;
     }
@@ -2934,6 +2947,7 @@ React.useEffect(() => {
       if (r === 'SBR') return { ...s, position: { ...(s.position||{}), x: xR_star, y: yBack } };
       return s;
     }));
+    */
   }, [placedSpeakers, onSetSpeakers, widthM, lengthM, sideSurroundVisualSpanM, rearSurroundVisualLanes, rearModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
 
   // A) Hard-gate the legacy front-wide ribbon generation
@@ -4099,6 +4113,16 @@ return {
     const safeY = Number.isFinite(yM) ? yM : 0;
     return roomRect.y + (safeY * scale);
   };
+
+  // [B44] Debug log to confirm bed-surround positions are not mutated by RV
+  console.log('[RV] speakers BEFORE icon-map',
+    afterVisibility.map(s => ({
+      role: s.role,
+      canon: getCanonicalRole(s.role),
+      x: s.position?.x?.toFixed(3),
+      y: s.position?.y?.toFixed(3),
+    }))
+  );
 
   // 3) Map to icons
   return afterVisibility.map((speaker) => {
