@@ -52,16 +52,19 @@ function speakersShallowEqual(a = [], b = []) {
   for (const [role, sa] of A) {
     const sb = B.get(role);
     if (!sb) return false;
-    if ((sa.model || 'off') !== (sb.model || 'off')) false;
+    if ((sa.model || 'off') !== (sb.model || 'off')) return false; // Fixed: returned false
+    if ((sa.id || '') !== (sb.id || '')) return false; // Added ID check for stability in comparisons
+    if (sa.draggable !== sb.draggable) return false;
 
     const pa = sa.position || {}, pb = sb.position || {};
     if (!almostEq(pa.x, pb.x) || !almostEq(pa.y, pb.y) || !almostEq(pa.z, pb.z)) return false;
 
-    const ya = sa.rotation?.z ?? 0, yb = sb.rotation?.z ?? 0;
-    if (!almostEq(ya, yb)) return false;
+    const ra = sa.rotation || {}, rb = sb.rotation || {};
+    if (!almostEq(ra.x, rb.x) || !almostEq(ra.y, rb.y) || !almostEq(ra.z, rb.z)) return false;
   }
   return true;
 }
+
 
 // ---- robust ray -> wall projector (no MLP fallbacks) -----------------------
 function projectToWallFromMLP_xy(mlp, angleDeg, room) {
@@ -1331,10 +1334,10 @@ function SpeakerPlacementImpl(props) {
 
         const existing = byRole.get(canon);
         const fallback = byRole.get('SL')?.model || byRole.get('SR')?.model;
-        const resolvedModel = (globalSurroundModelParam || existing?.model || fallback || '').trim().toLowerCase();
+        let resolvedModel = (globalSurroundModelParam || existing?.model || fallback || '').trim().toLowerCase();
 
         if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
-          return;
+          resolvedModel = 'evolve-2-1_s'; // safe default so seeding always places
         }
 
         // Convert Dolby angle (0 front, +left/−right) to the raycaster's frame (0→+x, 90→+y)
@@ -1353,13 +1356,13 @@ function SpeakerPlacementImpl(props) {
       };
 
       if (major >= 9) {
-        // Dolby angle convention: 0° forward to screen; + left / – right
-        seed('SL',  +90, +90);     // left wall
-        seed('SR',  -90, -90);     // right wall
-        seed('SBL', +142.5, 0);    // back wall
-        seed('SBR', -142.5, 0);    // back wall
-        seed('LW',  +60,  +90);    // left wall (forward of SL)
-        seed('RW',  -60,  -90);    // right wall (forward of SR)
+        // Dolby angles: 0° front, + left / − right
+        seed('SL',  +90,   +90);   // left wall
+        seed('SR',  -90,   -90);   // right wall
+        seed('SBL', +142.5,   0);  // back wall
+        seed('SBR', -142.5,   0);  // back wall
+        seed('LW',  +60,   +90);   // left wall, forward of SL
+        seed('RW',  -60,   -90);   // right wall, forward of SR
       } else if (major === 7) {
         seed('SL',  +90, +90);
         seed('SR',  -90, -90);
@@ -1379,7 +1382,7 @@ function SpeakerPlacementImpl(props) {
 
       return next;
     },
-    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
+    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, SURROUND_BED_ROLES]
   );
 
   const handleResetPositions = useCallback(() => {
@@ -1396,7 +1399,6 @@ function SpeakerPlacementImpl(props) {
     }
   }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast, globalSurroundModel]);
 
-  // ✅ UPDATED: Idempotent with shallow equality check + globalSurroundModel dep
   useEffect(() => {
     if (!mlpPoint || !dimensions) return;
 
@@ -1408,21 +1410,16 @@ function SpeakerPlacementImpl(props) {
         prev,
         globalSurroundModel
       );
-
-      if (speakersShallowEqual(prev, next)) {
-        return prev;
-      }
-      return next;
+      return speakersShallowEqual(prev, next) ? prev : next;
     });
 
     lastPresetRef.current = effectivePreset;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     effectivePreset,
     globalSurroundModel,
     mlpPoint?.x, mlpPoint?.y,
-    dimensions?.width, dimensions?.length,
-    setSpeakers,
-    resetSurroundPositions
+    dimensions?.width, dimensions?.length
   ]);
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
