@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } from 'react';
@@ -1353,6 +1352,14 @@ function SpeakerPlacementImpl(props) {
           rotation: existing?.rotation || { x: 0, y: 0, z: yawDeg ?? 0 },
         });
       };
+
+      console.log('[SP] resetSurroundPositions ACTIVE SOURCE OF TRUTH', {
+        layout: layoutNormalized,
+        major,
+        rolesSeeded: next
+          .filter(s => ['SL','SR','SBL','SBR','LW','RW'].includes(getCanonicalRole(s.role)))
+          .map(s => ({ role: s.role, x: s.position?.x?.toFixed(3), y: s.position?.y?.toFixed(3), model: s.model }))
+      });
 
       const sideAngle = (major >= 7) ? 100 : 115;
       
