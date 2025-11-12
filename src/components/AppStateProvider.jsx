@@ -18,6 +18,22 @@ function getCanonicalRole(role) {
   return aliases[upper] || upper;
 }
 
+// --- SINGLE SOURCE OF TRUTH FOR VISIBILITY -----------------------------
+export function getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears) {
+  const major = parseInt(String(layoutString).split('.')[0] || '5', 10);
+  const showSides = major >= 5;
+  const showRears = major >= 7 && !useWidesInsteadOfRears;
+  const showWides = (major >= 7 && useWidesInsteadOfRears) || major >= 9;
+
+  return new Set([
+    ...(showSides ? ['SL','SR'] : []),
+    ...(showRears ? ['SBL','SBR'] : []),
+    ...(showWides ? ['LW','RW'] : []),
+    // always: LCR
+    'FL','FC','FR'
+  ]);
+}
+
 // --- idempotence helper -----------------------------------------------------
 const EPS = 1e-4;
 const almostEq = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) <= EPS;
@@ -44,8 +60,8 @@ function speakersShallowEqual(a = [], b = []) {
     const pa = sa.position || {}, pb = sb.position || {};
     if (!almostEq(pa.x, pb.x) || !almostEq(pa.y, pb.y) || !almostEq(pa.z, pb.z)) return false;
 
-    const ya = sa.rotation?.z ?? 0, yb = sb.rotation?.z ?? 0;
-    if (!almostEq(ya, yb)) return false;
+    const ra = sa.rotation || {}, rb = sb.rotation || {};
+    if (!almostEq(ra.x, rb.x) || !almostEq(ra.y, rb.y) || !almostEq(ra.z, rb.z)) return false;
   }
   return true;
 }
@@ -226,6 +242,12 @@ function useDesignerState() {
     });
   }, [splConfig]);
 
+  // --- CANONICAL VISIBILITY HELPER (used everywhere) ---------------------
+  const visibleRoles = useMemo(
+    () => getSpeakerVisibilityFor(dolbyLayout || '5.1', useWidesInsteadOfRears),
+    [dolbyLayout, useWidesInsteadOfRears]
+  );
+
   const getSpeakerVisibility = useCallback((role, model) => {
     const canon = String(role || "").toUpperCase();
 
@@ -233,49 +255,8 @@ function useDesignerState() {
     const modelStr = String(model || "").toLowerCase().trim();
     if (!modelStr || modelStr === "off" || modelStr === "none") return false;
 
-    const layoutString = (() => {
-      if (typeof dolbyLayout === "string" && dolbyLayout.trim()) return dolbyLayout.trim();
-      if (typeof dolbyConfig === "string" && dolbyConfig.trim()) return dolbyConfig.trim();
-
-      if (dolbyConfig && typeof dolbyConfig === "object") {
-        if (typeof dolbyConfig.layout === "string" && dolbyConfig.layout.trim()) return dolbyConfig.layout.trim();
-        if (typeof dolbyConfig.preset === "string" && dolbyConfig.preset.trim()) return dolbyConfig.preset.trim();
-        if (typeof dolbyConfig.value === "string" && dolbyConfig.value.trim()) return dolbyConfig.value.trim();
-      }
-
-      return "5.1";
-    })();
-
-    const major = parseInt(layoutString.split(".")[0], 10) || 5;
-
-    if (major >= 9) {
-      return ['FL','FC','FR','SL','SR','SBL','SBR','LW','RW'].includes(canon);
-    }
-
-    if (canon === "FL" || canon === "FC" || canon === "FR") {
-      return true;
-    }
-
-    if (major === 5) {
-      return canon === "SL" || canon === "SR";
-    }
-
-    if (major === 7) {
-      if (canon === "SL" || canon === "SR") return true;
-
-      if (useWidesInsteadOfRears) {
-        if (canon === "LW" || canon === "RW") return true;
-        if (canon === "SBL" || canon === "SBR") return false;
-      } else {
-        if (canon === "SBL" || canon === "SBR") return true;
-        if (canon === "LW" || canon === "RW") return false;
-      }
-
-      return false;
-    }
-
-    return true;
-  }, [dolbyLayout, dolbyConfig, useWidesInsteadOfRears]);
+    return visibleRoles.has(canon);
+  }, [visibleRoles]);
 
   const isFrozen = useCallback((tab) => !!frozenTabs[tab], [frozenTabs]);
   const freezeTab = useCallback((tab) => {
@@ -409,61 +390,45 @@ function useDesignerState() {
           "";
 
         const layoutString = (layoutStringRaw || "").trim() || "5.1";
-        const major = parseInt(layoutString.split(".")[0], 10) || 5;
-        const isSevenDotX = major === 7;
 
-        console.log('[AS] setSpeakerSystem LAYOUT', {
+        // Use canonical visibility helper
+        const visible = getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears);
+
+        console.log('[AS] setSpeakerSystem VISIBILITY', {
           layoutString,
-          major,
-          isSevenDotX,
-          useWidesInsteadOfRears
+          useWidesInsteadOfRears,
+          visibleRoles: Array.from(visible)
         });
 
-        speakers = speakers.filter((spk) => {
+        // Keep all speakers, but set model=null if invisible or model='off'
+        speakers = speakers.map(spk => {
           const role = String(spk.role || "").toUpperCase();
+          const canon = getCanonicalRole(role);
+          const isVisible = visible.has(canon);
           const model = String(spk.model || "").toLowerCase().trim();
           
-          if (role === "FL" || role === "FC" || role === "FR") {
-            return true;
+          // Never invent models
+          if (!isVisible) {
+            return spk; // RV will not render it
+          }
+
+          if (!model || model === 'off' || model === 'none') {
+            return { ...spk, model: null }; // keep position if any, but it's "off"
           }
           
-          if (!model || model === "off" || model === "none") {
-            console.log('[AS] Filtering out speaker with off/none model', { role, model });
-            return false;
-          }
-          
-          return true;
+          return spk;
         });
 
-        if (isSevenDotX) {
-          console.log('[AS] Applying 7.x XOR logic', { useWidesInsteadOfRears });
-          
-          if (useWidesInsteadOfRears) {
-            const beforeCount = speakers.length;
-            speakers = speakers.filter((spk) => {
-              const r = String(spk.role || "").toUpperCase();
-              return r !== "SBL" && r !== "SBR";
-            });
-            console.log('[AS] Filtered out SBL/SBR', { before: beforeCount, after: speakers.length });
-          } else {
-            const beforeCount = speakers.length;
-            speakers = speakers.filter((spk) => {
-              const r = String(spk.role || "").toUpperCase();
-              return r !== "LW" && r !== "RW";
-            });
-            console.log('[AS] Filtered out LW/RW', { before: beforeCount, after: speakers.length });
-          }
-        } else {
-          console.log('[AS] NOT 7.x - no XOR filtering applied', { major });
-        }
-
         console.log('[AS] setSpeakerSystem AFTER normalization');
+        console.group('[STATE] placedSpeakers(final)');
         console.table(speakers.map(s => ({
           role: s.role,
           model: s.model,
           x: s.position?.x?.toFixed(3),
-          y: s.position?.y?.toFixed(3)
+          y: s.position?.y?.toFixed(3),
+          yaw: s.rotation?.z
         })));
+        console.groupEnd();
 
         // ✅ If speakers didn't actually change, return prev to avoid churn
         if (speakersShallowEqual(prev.placedSpeakers, speakers)) {
@@ -511,8 +476,7 @@ function useDesignerState() {
     mlpBasis, setMlpBasis, autoSeatByRP23, setAutoSeatByRP23,
     roomElements, setRoomElements, subwoofers, setSubwoofers,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
-    subWarnings, setSubWarnings,
-    setFrontSubWarning: (msg) => setSubWarnings(prev => ({ ...prev, front: msg ? [msg] : [] })),
+    subWarnings, setSubWarnings, 
     aimAtMLP, setAimAtMLP, overheadOffsetM, setOverheadOffsetM,
     overheadMode, setOverheadMode, rowTarget, setRowTarget,
     overlays, setOverlays, speakerSystem, setSpeakerSystem,
@@ -539,6 +503,7 @@ function useDesignerState() {
     updateGlobalSpl,
     updateRoleSpl,
     getSpeakerVisibility,
+    visibleRoles, // export for RV
   }), [
     dimensions, setDimensions,
     roomDims, setRoomDims,
@@ -585,6 +550,7 @@ function useDesignerState() {
     updateGlobalSpl,
     updateRoleSpl,
     getSpeakerVisibility,
+    visibleRoles,
   ]);
 
   return value;

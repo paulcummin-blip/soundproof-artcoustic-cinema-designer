@@ -124,7 +124,7 @@ import {
   computeBackWallInnerEdges,
   computeRearVisualLanes,
   resolveSymmetricY,
-} from "@/components/room/rvPlanHelpers";
+} from "@/components/room/rv/rvPlanHelpers";
 
 // SAFE ROLE ACCESSOR – works with Map or plain object; always returns an array
 function getByRoleArray(mapOrObj, role) {
@@ -2997,23 +2997,38 @@ React.useEffect(() => {
 
   // Filter and position speakers for rendering
   const speakersToRender = React.useMemo(() => {
-    return (placedSpeakers || [])
+    const vis = appState?.visibleRoles; // from Provider
+    if (!vis || !(vis instanceof Set)) {
+      console.warn('[RV] visibleRoles not ready from provider');
+      return (placedSpeakers || [])
+        .filter(spk => {
+          const canonicalRole = getCanonicalRole(spk.role);
+          if (canonicalRole === 'LFE') return false;
+          return true;
+        });
+    }
+
+    const filtered = (placedSpeakers || [])
       .filter(spk => {
         const canonicalRole = getCanonicalRole(spk.role);
-
-        // Filter out LFE - it's handled separately
         if (canonicalRole === 'LFE') return false;
-
-        // Render all other speakers. LW/RW are managed by other effects and drag handlers.
-        // They should always be rendered if they are in placedSpeakers.
-        return true;
-      })
-      .map(spk => {
-        // No need to override positions here for LW/RW.
-        // Their positions are already finalized in `placedSpeakers` by drag handler or auto-follow useEffect.
-        return spk;
+        return vis.has(canonicalRole);
       });
-  }, [placedSpeakers, getCanonicalRole]);
+
+    // DEBUG: Log what we're about to render
+    console.group('[RV] speakersToRender');
+    console.table(filtered.map(s => ({
+      role: s.role,
+      model: s.model,
+      x: s.position?.x?.toFixed(3),
+      y: s.position?.y?.toFixed(3),
+      yaw: s.rotation?.z
+    })));
+    console.groupEnd();
+
+    return filtered;
+  }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
+
 
   // Light diagnostics (temporary)
   if (appState_DBG_FW) {
