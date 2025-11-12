@@ -27,6 +27,7 @@ import { computeOverheadZones, renderOverheadBandsSVG } from '@/components/room/
 import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
 import PlanMessages from '@/components/room/PlanMessages';
 import SvgDefs from '@/components/room/SvgDefs';
+
 // local shim for fixedSideX — guaranteed available in this file
 const fixedSideX = (roomWidth, dims, side, wallBufferM = WALL_BUFFER_M) => {
   const halfDepth = (dims?.depthM ?? 0.082) / 2;
@@ -34,6 +35,7 @@ const fixedSideX = (roomWidth, dims, side, wallBufferM = WALL_BUFFER_M) => {
   if (side === 'R') return roomWidth - (wallBufferM + halfDepth);
   return 0;
 };
+
 // local sideSegmentAtX — safe fallback if polygons are missing
 function sideSegmentAtX(zonePolygonPoints, x, roomLength = 6.0) {
   const safeMinY = 0.5;
@@ -124,7 +126,8 @@ import {
   computeBackWallInnerEdges,
   computeRearVisualLanes,
   resolveSymmetricY,
-} from "@/components/room/rv/rvPlanHelpers";
+} from "@/components/room/rvPlanHelpers";
+
 
 // SAFE ROLE ACCESSOR – works with Map or plain object; always returns an array
 function getByRoleArray(mapOrObj, role) {
@@ -440,6 +443,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const dragStartCanvasPosRef = useRef(null);
   const dragStartRoomPosRef = useRef(null);
   const dragStartSpeakerPosRef = useRef(null);
+  const rsDragLockRef = useRef(null); // Declare rsDragLockRef here
   rsDragLockRef.current = null;
   const fwOffsetRef = React.useRef({ L: 0, R: 0 });
   const isDraggingFW = React.useRef(false);
@@ -547,9 +551,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     const minY = canvasRect.y + padding;
     const maxY = canvasRect.y + canvasRect.height - padding - hudH_px;
 
-    const x = Math.max(minX, Math.min(maxX, targetX));
-    const y = Math.max(minY, Math.min(maxY, targetY));
-    return { x, y };
+    return { x: Math.max(minX, Math.min(maxX, targetX)), y: Math.max(minY, Math.min(maxY, targetY)) };
   }, []);
 
   // Safe value formatter for HUD
@@ -1352,7 +1354,7 @@ React.useEffect(() => {
     const clampY = (y) => Math.max(SAFETY_MARGIN_M, Math.min(lengthM - SAFETY_MARGIN_M, y));
 
     return { BaffleAndScreen: component, screenPlaneY, screenCenterX_m, visibleWidthM: viewableWidthM };
-  }, [screen?.visibleWidthInches, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M]);
+  }, [screen?.visibleWidthInches, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M, lengthM]);
 
 
   // Compute LCR zone blocks with ZONE_DEPTH_M
@@ -4095,7 +4097,7 @@ return {
   };
 
   const toCanvasY = (yM) => {
-    const vy = Number.isFinite(yM) ? yM : 0;
+    const vy = Number.isFinite(yM) ? vy : 0;
     return roomRect.y + (vy * scale);
   };
 
