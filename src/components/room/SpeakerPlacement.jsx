@@ -34,6 +34,39 @@ const P12_THRESHOLDS = { L1: 102, L2: 105, L3: 108, L4: 111 };
 // RP22 P13 thresholds (strict)
 const P13_THRESHOLDS = { L1: 99, L2: 102, L3: 105, L4: 108 };
 
+// --- idempotence helpers -----------------------------------------------------
+const EPS = 1e-4;
+const almostEq = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) <= EPS;
+
+function speakersShallowEqual(a = [], b = []) {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+
+  // Compare by role + model + pos (x,y,z) + yaw
+  const byRole = (arr) => {
+    const m = new Map();
+    arr.forEach(s => m.set(String(s.role).toUpperCase(), s));
+    return m;
+  };
+  const A = byRole(a), B = byRole(b);
+
+  if (A.size !== B.size) return false;
+
+  for (const [role, sa] of A) {
+    const sb = B.get(role);
+    if (!sb) return false;
+    if ((sa.model || 'off') !== (sb.model || 'off')) return false;
+
+    const pa = sa.position || {}, pb = sb.position || {};
+    if (!almostEq(pa.x, pb.x) || !almostEq(pa.y, pb.y) || !almostEq(pa.z, pb.z)) return false;
+
+    const ya = sa.rotation?.z ?? 0, yb = sb.rotation?.z ?? 0;
+    if (!almostEq(ya, yb)) return false;
+  }
+  return true;
+}
+
 // --- Canonical role mapping + helpers ---
 const CANONICAL_ROLE_MAP = {
   // Sides
@@ -1314,7 +1347,6 @@ function SpeakerPlacementImpl(props) {
 
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
   const lastPresetRef = useRef(effectivePreset);
-  const lastGlobalModelRef = useRef(null);
 
   // NEW: Extract global surround model from current speakers
   const globalSurroundModel = useMemo(() => {
@@ -1694,16 +1726,34 @@ function SpeakerPlacementImpl(props) {
     }
   }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast, globalSurroundModel]);
 
-  // ✅ UPDATED: Watch both layout and globalSurroundModel
+  // ✅ UPDATED: Idempotent with shallow equality check
   useEffect(() => {
     if (!mlpPoint || !dimensions) return;
-    
-    setSpeakers(prev => 
-      resetSurroundPositions(effectivePreset, mlpPoint, dimensions, prev, globalSurroundModel)
-    );
-    
+
+    setSpeakers(prev => {
+      const next = resetSurroundPositions(
+        effectivePreset,
+        mlpPoint,
+        dimensions,
+        prev,
+        globalSurroundModel
+      );
+
+      if (speakersShallowEqual(prev, next)) {
+        return prev;
+      }
+      return next;
+    });
+
     lastPresetRef.current = effectivePreset;
-  }, [effectivePreset, globalSurroundModel, mlpPoint, dimensions, setSpeakers, resetSurroundPositions]);
+  }, [
+    effectivePreset,
+    globalSurroundModel,
+    mlpPoint?.x, mlpPoint?.y,
+    dimensions?.width, dimensions?.length,
+    setSpeakers,
+    resetSurroundPositions
+  ]);
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 

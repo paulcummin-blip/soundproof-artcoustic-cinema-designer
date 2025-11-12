@@ -18,6 +18,38 @@ function getCanonicalRole(role) {
   return aliases[upper] || upper;
 }
 
+// --- idempotence helper -----------------------------------------------------
+const EPS = 1e-4;
+const almostEq = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) <= EPS;
+
+function speakersShallowEqual(a = [], b = []) {
+  if (a === b) return true;
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
+  if (a.length !== b.length) return false;
+
+  const byRole = (arr) => {
+    const m = new Map();
+    arr.forEach(s => m.set(String(s.role).toUpperCase(), s));
+    return m;
+  };
+  const A = byRole(a), B = byRole(b);
+
+  if (A.size !== B.size) return false;
+
+  for (const [role, sa] of A) {
+    const sb = B.get(role);
+    if (!sb) return false;
+    if ((sa.model || 'off') !== (sb.model || 'off')) return false;
+
+    const pa = sa.position || {}, pb = sb.position || {};
+    if (!almostEq(pa.x, pb.x) || !almostEq(pa.y, pb.y) || !almostEq(pa.z, pb.z)) return false;
+
+    const ya = sa.rotation?.z ?? 0, yb = sb.rotation?.z ?? 0;
+    if (!almostEq(ya, yb)) return false;
+  }
+  return true;
+}
+
 const AppStateContext = createContext(null);
 
 export function useAppState() {
@@ -432,6 +464,11 @@ function useDesignerState() {
           x: s.position?.x?.toFixed(3),
           y: s.position?.y?.toFixed(3)
         })));
+
+        // ✅ If speakers didn't actually change, return prev to avoid churn
+        if (speakersShallowEqual(prev.placedSpeakers, speakers)) {
+          return prev;
+        }
 
         if (typeof window !== "undefined") {
           window.__LAST_SPEAKERS__ = (speakers || []).map(s => ({
