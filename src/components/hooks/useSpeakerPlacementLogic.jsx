@@ -85,30 +85,10 @@ export function useSpeakerPlacementLogic(initialSpeakers = [], dimensionsOverrid
                 { id: "R", role: "R", label: "R", position: { x: Rx, y: screenY, z: EAR_Z } },
             );
 
-            // Side Surrounds (Anchored to side walls at MLP depth)
-            if (flags.sides) {
-                nextSpeakers.push(
-                    { id: "LS", role: "LS", label: "LS", position: { x: wallAnchorX('left', dimensions), y: mlp.y, z: EAR_Z } },
-                    { id: "RS", role: "RS", label: "RS", position: { x: wallAnchorX('right', dimensions), y: mlp.y, z: EAR_Z } },
-                );
-            }
-
-            // Rear Surrounds (Anchored to back wall corners)
-            if (flags.rears) {
-                nextSpeakers.push(
-                    { id: "LRS", role: "LRS", label: "LRS", position: { x: wallAnchorX('left', dimensions), y: wallAnchorY('rear', dimensions), z: EAR_Z } },
-                    { id: "RRS", role: "RRS", label: "RRS", position: { x: wallAnchorX('right', dimensions), y: wallAnchorY('rear', dimensions), z: EAR_Z } },
-                );
-            }
-
-            // Wides (Anchored to side walls, halfway between front wall and MLP depth)
-            if (flags.wides) {
-                const y_wide = (wallAnchorY('front', dimensions) + mlp.y) / 2;
-                nextSpeakers.push(
-                    { id: "LW", role: "LW", label: "LW", position: { x: wallAnchorX('left', dimensions), y: y_wide, z: EAR_Z } },
-                    { id: "RW", role: "RW", label: "RW", position: { x: wallAnchorX('right', dimensions), y: y_wide, z: EAR_Z } },
-                );
-            }
+            // [B44] Legacy bed-surround placement disabled.
+            // Bed-layer geometry (SL/SR/SBL/SBR/LW/RW) is fully handled by SpeakerPlacement / resetSurroundPositions.
+            // Side Surrounds, Rear Surrounds, and Wides are NO LONGER auto-placed here.
+            // (Removed original code blocks for sides, rears, and wides placement)
 
             const config = audioConfigurations[dolbyConfig];
             if (config?.speakers) {
@@ -178,19 +158,45 @@ export function useSpeakerPlacementLogic(initialSpeakers = [], dimensionsOverrid
             });
         }
 
-        // Apply final position clamping and default Z, adapted from original return map
+        // [B44] Apply final position clamping - NO room-center fallback for surrounds
         nextSpeakers = nextSpeakers.map((s, i) => {
             const role = s?.role ?? `SPK${i + 1}`;
             const p = s?.position ?? {};
-            const x = Math.max(0.08, Math.min(w - 0.08, Number(p.x ?? w / 2)));
-            const y = Math.max(0.08, Math.min(l - 0.08, Number(p.y ?? l / 2)));
-            // Using EAR_Z from within useEffect for consistency with speaker generation
-            const z = Number.isFinite(p.z) ? p.z : (String(role).startsWith('T') ? h - 0.3 : 1.2);
+
+            const isOverhead = String(role).startsWith('T');
+            const isLCR = ['L', 'C', 'R'].includes(String(role).toUpperCase());
+
+            const hasFiniteXY = Number.isFinite(p.x) && Number.isFinite(p.y);
+
+            // For LCR + overheads we can safely invent a centred fallback
+            if (!hasFiniteXY && (isLCR || isOverhead)) {
+                const fallbackX = w / 2;
+                const fallbackY = isOverhead ? (l / 2) : (l * 0.58);
+                const z = Number.isFinite(p.z) ? p.z : (isOverhead ? h - 0.3 : 1.2);
+                return {
+                    ...s,
+                    role,
+                    position: {
+                        x: Math.max(0.08, Math.min(w - 0.08, fallbackX)),
+                        y: Math.max(0.08, Math.min(l - 0.08, fallbackY)),
+                        z,
+                    },
+                };
+            }
+
+            // For all other roles (surrounds, subs, etc.) we NEVER invent a centre position.
+            // If x/y are missing, leave them as-is so downstream logic (SpeakerPlacement)
+            // can decide what to do.
+            const x = hasFiniteXY ? Math.max(0.08, Math.min(w - 0.08, Number(p.x))) : p.x;
+            const y = hasFiniteXY ? Math.max(0.08, Math.min(l - 0.08, Number(p.y))) : p.y;
+            const z = Number.isFinite(p.z) ? p.z : (isOverhead ? h - 0.3 : 1.2);
+
             return { ...s, role, position: { x, y, z } };
         });
 
-        // Subwoofer logic (placeholder from outline, not present in original file, so just proceed)
-        // ... keep existing code (subwoofer logic and return) ...
+        // Subwoofer logic remains here - it was not explicitly in the original provided code for this section,
+        // but the placeholder implies it might exist elsewhere or is to be added.
+        // For now, we proceed as if the outline refers to the surrounding context for `setPlacedSpeakers`.
 
         setPlacedSpeakers(nextSpeakers);
 
