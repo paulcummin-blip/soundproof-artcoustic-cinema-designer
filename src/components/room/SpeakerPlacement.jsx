@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } from 'react';
@@ -64,7 +65,6 @@ function speakersShallowEqual(a = [], b = []) {
 
 // ---- robust ray -> wall projector (no MLP fallbacks) -----------------------
 function projectToWallFromMLP_xy(mlp, angleDeg, room) {
-  // angle 0° = +X (to the right), 90° = +Y (toward back wall)
   const a = (angleDeg % 360 + 360) % 360;
   const rad = (a * Math.PI) / 180;
   const dx = Math.cos(rad);
@@ -205,6 +205,17 @@ function yawDegToMLP(spkPos, mlpPos) {
   return yawRad * 180 / Math.PI;
 }
 
+const ALL_SURROUND_ROLES = new Set(["SL","SR","SBL","SBR","LW","RW"]);
+const LCR_ROLES = new Set(["FL", "FC", "FR"]);
+const ROLE_TO_KEY = new Map([["FL", "L"], ["FC", "C"], ["FR", "R"]]);
+const REAR_CANON = new Set(["SBL", "SBR"]);
+const REAR_ALIASES = new Set(["SBL","SBR","RL","RR","RSL","RSR","LR","LRS","RRS","LB","RB"]);
+
+const isRearByAnyRole = (role) => {
+  const r = String(role||"").toUpperCase();
+  return REAR_ALIASES.has(r) || REAR_CANON.has(getCanonicalRole(r));
+};
+
 function applyLcrAim(placedSpeakers, mlpPoint, mode) {
   const speakers = Array.isArray(placedSpeakers) ? [...placedSpeakers] : [];
   if (!mlpPoint) return speakers;
@@ -221,17 +232,6 @@ function applyLcrAim(placedSpeakers, mlpPoint, mode) {
     return { ...s, rotation: { ...(s.rotation||{}), y: angle } };
   });
 }
-
-const ALL_SURROUND_ROLES = new Set(["SL","SR","SBL","SBR","LW","RW"]);
-const LCR_ROLES = new Set(["FL", "FC", "FR"]);
-const ROLE_TO_KEY = new Map([["FL", "L"], ["FC", "C"], ["FR", "R"]]);
-const REAR_CANON = new Set(["SBL", "SBR"]);
-const REAR_ALIASES = new Set(["SBL","SBR","RL","RR","RSL","RSR","LR","LRS","RRS","LB","RB"]);
-
-const isRearByAnyRole = (role) => {
-  const r = String(role||"").toUpperCase();
-  return REAR_ALIASES.has(r) || REAR_CANON.has(getCanonicalRole(r));
-};
 
 function rp22P12Level(db) {
   if (!db || db <= 102) return 1;
