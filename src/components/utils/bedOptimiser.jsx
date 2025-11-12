@@ -1,3 +1,9 @@
+// [B44] NOTE:
+// These utilities are now **analysis-only** for RP22 (angles, gaps, etc.).
+// Bed-layer geometry (SL/SR/SBL/SBR/LW/RW) is driven exclusively by
+// SpeakerPlacement / resetSurroundPositions in SpeakerPlacement.jsx.
+// DO NOT use these functions to mutate placedSpeakers directly.
+
 // utils/bedOptimiser.jsx
 const asArr = (x)=>Array.isArray(x)?x:[];
 const toDeg = (r)=>r*180/Math.PI;
@@ -8,6 +14,9 @@ function azimuthAtSeat(sp, seat) {
   return Math.abs(toDeg(Math.atan2(dy, dx)));
 }
 
+/**
+ * [B44 NOTE] ANALYSIS ONLY: safe to keep for RP22 reporting
+ */
 export function computeP5Angles({ speakers, seat }) {
   // Surround order (listener-level only; skip L/C/R, subs, wides, heights)
   const order = ['LS','LSS','LRS','LBS','RBS','RRS','RSS','RS'];
@@ -28,6 +37,9 @@ export function computeP5Angles({ speakers, seat }) {
   return spans;
 }
 
+/**
+ * [B44 NOTE] ANALYSIS ONLY: safe to keep
+ */
 export function levelForP5MaxSpan(maxSpanDeg){
   if (maxSpanDeg <= 50) return 4;
   if (maxSpanDeg <= 60) return 3;
@@ -35,7 +47,9 @@ export function levelForP5MaxSpan(maxSpanDeg){
   return 1;
 }
 
-// --- very rough placeholder until your SPL engine feeds real values ---
+/**
+ * [B44 NOTE] ANALYSIS ONLY: safe to keep
+ */
 export function estimateP6SpanDb({ speakers, seat }) {
   const isBed = (r)=>!/^T/.test(r) && !['L','C','R','LW','RW','SUB','SUB1','SUB2'].includes(r);
   const beds = asArr(speakers).filter(s => isBed(s.role) && s.position);
@@ -50,6 +64,9 @@ export function estimateP6SpanDb({ speakers, seat }) {
   const vals = beds.map(estAt);
   return Math.max(...vals) - Math.min(...vals);
 }
+/**
+ * [B44 NOTE] ANALYSIS ONLY: safe to keep
+ */
 export function levelForP6SpanDb(span){
   if (span <= 2) return 4;
   if (span <= 4) return 3;
@@ -63,6 +80,8 @@ export function levelForP6SpanDb(span){
  * Optimises bed-layer (listener-level) surrounds with tiny fore/aft nudges
  * to minimise worst P5 span (and secondarily P6 span) on target rows.
  * It never moves L/C/R, Wides or Heights. Respects wall/corner keep-outs.
+ * [B44 NOTE] DISABLED FOR BED SURROUNDS: Do not call this to mutate placedSpeakers.
+ * Bed-layer geometry is now driven by SpeakerPlacement / resetSurroundPositions.
  */
 export function optimiseBedLayer({
   speakers,

@@ -1,3 +1,9 @@
+// [B44] NOTE:
+// This utility is now **analysis-only** for RP22 angle optimization proposals.
+// Bed-layer geometry (SL/SR/SBL/SBR/LW/RW) is driven exclusively by
+// SpeakerPlacement / resetSurroundPositions in SpeakerPlacement.jsx.
+// DO NOT use the return value to mutate placedSpeakers directly.
+
 /**
  * Equalise bed-layer azimuth spacing by sliding speakers along their pad axes.
  * Pure and side-effect free.
@@ -11,6 +17,7 @@
  */
 
 /**
+ * [B44 NOTE] ANALYSIS ONLY: Do not call this to mutate placedSpeakers.
  * @param {{dimensions:Dims, mlp:{x:number;y:number}, speakers:BedSpeaker[], pads:PadsMap, targets?:number[], weights?:{evenness?:number; pad?:number; target?:number}, steps?:number}} opts
  * @returns {BedSpeaker[]}
  */

@@ -1,6 +1,12 @@
+// [B44] NOTE:
+// These utilities are now **analysis-only** for RP22 (angles, gaps, etc.).
+// Bed-layer geometry (SL/SR/SBL/SBR/LW/RW) is driven exclusively by
+// SpeakerPlacement / resetSurroundPositions in SpeakerPlacement.jsx.
+
 /**
  * Calculates the horizontal (azimuth) angle between a speaker and a seat in degrees.
  * Returns positive angle for clockwise from forward-facing.
+ * [B44 NOTE] ANALYSIS ONLY: safe to keep
  */
 export function calculateAzimuth(speakerPos, seatPos) {
   if (!speakerPos || !seatPos) return 0;
@@ -12,6 +18,7 @@ export function calculateAzimuth(speakerPos, seatPos) {
 
 /**
  * Returns the maximum angle gap between any two adjacent surround speakers for a seat.
+ * [B44 NOTE] ANALYSIS ONLY: safe to keep
  */
 export function getMaxSurroundAngleGap(seat, speakers) {
   const surroundRoles = ["LS", "RS", "LSS", "RSS", "LBS", "RBS", "LRS", "RRS"];
@@ -39,6 +46,7 @@ export function getMaxSurroundAngleGap(seat, speakers) {
 
 /**
  * Classifies RP22 Param 5 based on max surround angle gap.
+ * [B44 NOTE] ANALYSIS ONLY: safe to keep
  */
 export function classifyParam5Level(gapDeg) {
   if (gapDeg <= 50) return { level: 4, grade: 'pass' };
@@ -50,8 +58,17 @@ export function classifyParam5Level(gapDeg) {
 /**
  * Tries to optimise surround speaker placement for a target max angle gap.
  * Returns the full speaker list with updated positions.
+ * [B44 NOTE] DISABLED FOR BED SURROUNDS: Do not call this to mutate placedSpeakers.
+ * Bed-layer geometry is now driven by SpeakerPlacement / resetSurroundPositions.
+ * This function uses legacy roles (LS/RS/etc.) and conflicts with Dolby ray-casting.
  */
 export function optimiseSurroundAngles(allSpeakers, seats) {
+    // [B44] Legacy bed-surround placement disabled.
+    // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
+    console.warn('[aimingUtils] optimiseSurroundAngles is analysis-only; returning speakers unchanged.');
+    return allSpeakers;
+
+    /* ORIGINAL LOGIC DISABLED:
     const MLP = seats.find(s => s.isPrimary) || seats[0];
     if (!MLP) return null;
 
@@ -103,4 +120,5 @@ export function optimiseSurroundAngles(allSpeakers, seats) {
     }
     
     return null; // Could not optimize
+    */
 }
