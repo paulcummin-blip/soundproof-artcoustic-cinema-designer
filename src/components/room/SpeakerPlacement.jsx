@@ -1550,196 +1550,133 @@ function SpeakerPlacementImpl(props) {
     return major >= 7;
   }, [effectivePreset]);
 
-  // Single function: RESET_SURROUND_POSITIONS with full pipeline: ANGLE → HUG → ZONE → CORNER → ROOM
+  // ✅ REPLACED: Single function: RESET_SURROUND_POSITIONS with full pipeline
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
-      console.log('[SP] resetSurroundPositions START', { 
-        layoutString, 
-        mlp, 
-        dims,
+      console.log('[SP] resetSurroundPositions START', {
+        layoutString, mlp, dims,
         currentSpeakersCount: currentSpeakers?.length,
         globalSurroundModelParam
       });
 
       if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
         console.warn('[SP] resetSurroundPositions ABORT: missing data', {
-          hasMlp: !!mlp,
-          hasDims: !!dims,
-          isArray: Array.isArray(currentSpeakers)
+          hasMlp: !!mlp, hasDims: !!dims, isArray: Array.isArray(currentSpeakers)
         });
         return currentSpeakers || [];
       }
 
-      const layoutNormalized = (typeof layoutString === "string" && layoutString.trim()) 
-        ? layoutString.trim()
-        : (typeof dolbyConfig === "string" && dolbyConfig.trim()) 
-          ? dolbyConfig.trim()
-          : (dolbyConfig && typeof dolbyConfig === "object" && typeof dolbyConfig.layout === "string")
-            ? dolbyConfig.layout.trim()
-            : "5.1";
+      // --- Layout parsing (local, deterministic for this call)
+      const layoutNormalized =
+        (typeof layoutString === 'string' && layoutString.trim()) ? layoutString.trim() :
+        (typeof dolbyConfig === 'string' && dolbyConfig.trim()) ? dolbyConfig.trim() :
+        (dolbyConfig && typeof dolbyConfig === 'object' && typeof dolbyConfig.layout === 'string')
+          ? dolbyConfig.layout.trim()
+          : '5.1';
 
-      const major = parseInt(layoutNormalized.split(".")[0], 10) || 5;
+      const major = parseInt(layoutNormalized.split('.')[0], 10) || 5;
+
+      // Compute roles locally so we don't race the context's allowedRoles
+      const localRolesForLayout = (() => {
+        if (major >= 9) return new Set(['SL','SR','SBL','SBR','LW','RW']);
+        if (major === 7) return new Set(['SL','SR','SBL','SBR']);
+        return new Set(['SL','SR']); // 5.x
+      })();
+
+      // Dolby angles (deg)
+      const ANGLES_9X = { SL: 270, SR: 90, SBL: 217.5, SBR: 142.5, LW: 300, RW: 60 };
+      const ANGLES_7X = { SL: 270, SR: 90, SBL: 217.5, SBR: 142.5 };
+      const ANGLES_5X = { SL: 270, SR: 90 };
 
       console.log('[SP] resetSurroundPositions CONFIG', {
-        layoutNormalized,
-        major,
-        allowedRoles: Array.from(allowedRoles),
+        layoutNormalized, major,
+        ctxAllowedRoles: Array.from(allowedRoles || []),
+        localRoles: Array.from(localRolesForLayout),
         globalSurroundModel: globalSurroundModelParam
       });
 
-      const { width: W, length: L } = dims;
-
-      const room = {
-        left: 0,
-        right: W,
-        front: 0,
-        back: L
-      };
-
-      const byRole = new Map();
-      currentSpeakers.forEach((s) => {
-        const canon = getCanonicalRole(s.role);
-        byRole.set(canon, s);
-      });
-
+      // Keep everything that's NOT a bed-surround
       const next = currentSpeakers.filter(
-        (s) => !SURROUND_BED_ROLES.has(getCanonicalRole(s.role))
+        s => !SURROUND_BED_ROLES.has(getCanonicalRole(s.role))
       );
 
+      // Finalise with corner/bounds then snap to wall lines (snap LAST)
       const finalisePos = (pos, canon, model) => {
         const safeModel = model || 'evolve-2-1_s';
-        let p = { x: pos.x, y: pos.y, z: 1.1 };
+        const hug = getHuggingCenterLines(safeModel, dims);
+        let p = { x: pos.x, y: pos.y, z: Number.isFinite(pos.z) ? pos.z : (mlp.z || 1.1) };
 
-        // First apply bounds/clearance to get a safe starting point
+        // Bounds first
         p = applyCornerClearance(p, canon, safeModel, dims, {});
         p = applyRoomBoundsClamp(p, safeModel, dims);
 
-        // THEN apply wall snapping (this must be last to override any drift)
-        const hug = getHuggingCenterLines(safeModel, dims);
-        
-        if (canon === "SL" || canon === "LW") {
-          p.x = hug.leftWallX;
-        }
-        if (canon === "SR" || canon === "RW") {
-          p.x = hug.rightWallX;
-        }
+        // Snap to walls (override drift)
+        if (canon === 'SL' || canon === 'LW')   p.x = hug.leftWallX;
+        if (canon === 'SR' || canon === 'RW')   p.x = hug.rightWallX;
+        if (canon === 'SBL' || canon === 'SBR') p.y = hug.backWallY;
 
-        if (canon === "SBL" || canon === "SBR") {
-          p.y = hug.backWallY;
-        }
-
-        // Final safety: ensure finite coordinates
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-          p.x = mlp.x;
-          p.y = mlp.y;
+          p.x = mlp.x; p.y = mlp.y;
         }
-
-        const z = Number.isFinite(pos.z) ? pos.z : (mlp.z || 1.1);
-
-        return { x: p.x, y: p.y, z };
+        return p;
       };
 
-      // Helper to find any valid surround model from existing speakers
-      // This is now `globalSurroundModelParam`
-      
+      // Seed helper
       const seed = (role, dolbyAngleDeg) => {
         const canon = getCanonicalRole(role);
-        
+        const existing = null; // purposely ignore existing bed models to avoid half-seeds
+        const resolvedModel = (existing?.model ?? globalSurroundModelParam) || null;
+
         console.log('[SP] seed ATTEMPT', {
-          role,
-          canon,
-          dolbyAngleDeg,
-          allowed: allowedRoles.has(canon)
+          role, canon, dolbyAngleDeg,
+          inLocalRoles: localRolesForLayout.has(canon),
+          resolvedModel
         });
 
-        if (!allowedRoles.has(canon)) {
-          console.log('[SP] seed SKIP: role not allowed', { canon });
-          return;
-        }
+        // only seed roles defined for this layout; require a model
+        if (!localRolesForLayout.has(canon) || !resolvedModel) return;
 
-        const existing = byRole.get(canon);
-        // Use existing model if valid, otherwise use global surround model param
-        const model = (existing?.model && existing.model !== "off" && existing.model !== "none") 
-          ? existing.model 
-          : globalSurroundModelParam || "evolve-2-1_s";
+        // Project to wall along the Dolby angle from MLP, then finalise
+        const base = projectToWallFromMLP(mlp.x, mlp.y, dolbyAngleDeg, { left:0, right:dims.width, front:0, back:dims.length });
+        const position = finalisePos(base, canon, resolvedModel);
 
-        console.log('[SP] seed MODEL', {
-          canon,
-          existingModel: existing?.model,
-          globalSurroundModel: globalSurroundModelParam,
-          resolvedModel: model
-        });
+        // Yaw: side-walls face room centre; back wall faces forward
+        const yawDeg =
+          (canon === 'SL' || canon === 'LW') ?  90 :
+          (canon === 'SR' || canon === 'RW') ? -90 : 0;
 
-        if (!model || model === 'off' || model === 'none') {
-          console.log('[SP] seed SKIP: no valid model', { canon, model });
-          return;
-        }
-
-        const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
-        const base = projectToWallFromMLP(mlp.x, mlp.y, projectAngleDeg, room);
-        const position = finalisePos(base, canon, model);
-
-        let yawDeg = 0;
-        if (canon === "SL" || canon === "SR") yawDeg = (canon === "SL" ? 90 : -90);
-        else if (canon === "LW" || canon === "RW") yawDeg = (canon === "LW" ? 90 : -90);
-        else if (canon === "SBL" || canon === "SBR") yawDeg = 0; // Face into room from back wall
-
-        console.log('[SP] seed PUSH', {
-          canon,
-          model,
-          position,
-          yawDeg,
-          projectAngleDeg,
-          base
-        });
-
-        next.push({
-          id: existing?.id || `${canon}-${Date.now()}`,
+        const spk = {
+          id: `${canon}-${Date.now()}`,
           role: canon,
-          model,
+          model: resolvedModel,
           position,
           draggable: true,
-          rotation: existing?.rotation || { x: 0, y: yawDeg, z: 0 },
-        });
+          rotation: { x:0, y:0, z: yawDeg }
+        };
+        console.log('[SP] seed PUSH', spk);
+        next.push(spk);
       };
 
-      if (major === 5) {
-        console.log('[SP] SEEDING 5.x layout');
-        seed("SL", 90);
-        seed("SR", -90);
-      }
-
-      if (major === 7) {
-        console.log('[SP] SEEDING 7.x layout');
-        seed("SL", 90);
-        seed("SR", -90);
-        seed("SBL", 142.5);
-        seed("SBR", -142.5);
-      }
-
+      // Layout branches using fixed angle tables
       if (major >= 9) {
-        console.log('[SP] SEEDING 9.x layout');
-        seed("SL", 90);
-        seed("SR", -90);
-        seed("SBL", 142.5);
-        seed("SBR", -142.5);
-        seed("LW", 60);
-        seed("RW", -60);
+        ['SL','SR','SBL','SBR','LW','RW'].forEach(r => seed(r, ANGLES_9X[r]));
+      } else if (major === 7) {
+        ['SL','SR','SBL','SBR'].forEach(r => seed(r, ANGLES_7X[r]));
+      } else {
+        ['SL','SR'].forEach(r => seed(r, ANGLES_5X[r]));
       }
 
-      // DEBUG: Log what we're about to return
-      console.log('[SP] resetSurroundPositions FINAL RESULT');
-      console.table(next.filter(s => SURROUND_BED_ROLES.has(getCanonicalRole(s.role))).map(s => ({
-        role: s.role,
-        model: s.model,
+      // Debug table
+      console.table(next.map(s => ({
+        role: s.role, model: s.model,
         x: s.position?.x?.toFixed(3),
         y: s.position?.y?.toFixed(3),
-        yaw: s.rotation?.y
+        yaw: s.rotation?.z
       })));
 
       return next;
     },
-    [getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp, allowedRoles, dolbyConfig, SURROUND_BED_ROLES]
+    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, projectToWallFromMLP, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
   );
 
   // Handler for reset button (full surround reset)
@@ -1757,47 +1694,16 @@ function SpeakerPlacementImpl(props) {
     }
   }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast, globalSurroundModel]);
 
-  // Effect to auto-reset when layout changes (guarded by lastPresetRef)
+  // ✅ UPDATED: Watch both layout and globalSurroundModel
   useEffect(() => {
-    if (!mlpPoint || !dimensions || !effectivePreset) return;
-
-    const layoutStr = String(effectivePreset);
-    const major = parseInt(layoutStr.split(".")[0], 10) || 5;
-
-    const layoutChanged = effectivePreset !== lastPresetRef.current;
-    const globalModel = globalSurroundModel && String(globalSurroundModel).trim().toLowerCase();
-    const hasValidGlobal = !!globalModel && globalModel !== "off" && globalModel !== "none";
-
-    // --- 5.x & 7.x: only reseed on layout change (keep legacy)
-    if ((major === 5 || major === 7) && !layoutChanged) {
-      return;
-    }
-
-    // --- 9.x+: reseed on layout change OR first time we get a valid global model
-    if (major >= 9) {
-      const globalModelChanged = hasValidGlobal && globalModel !== lastGlobalModelRef.current;
-
-      if (!layoutChanged && !globalModelChanged) {
-        return; // nothing interesting happened
-      }
-
-      if (hasValidGlobal) {
-        lastGlobalModelRef.current = globalModel;
-      }
-    }
-
-    setSpeakers((currentSpeakers) =>
-      resetSurroundPositions(
-        effectivePreset,
-        mlpPoint,
-        dimensions,
-        currentSpeakers,
-        globalSurroundModel 
-      )
+    if (!mlpPoint || !dimensions) return;
+    
+    setSpeakers(prev => 
+      resetSurroundPositions(effectivePreset, mlpPoint, dimensions, prev, globalSurroundModel)
     );
-
+    
     lastPresetRef.current = effectivePreset;
-  }, [effectivePreset, mlpPoint, dimensions, globalSurroundModel, resetSurroundPositions, setSpeakers]);
+  }, [effectivePreset, globalSurroundModel, mlpPoint, dimensions, setSpeakers, resetSurroundPositions]);
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 

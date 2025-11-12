@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { timeNowMs } from "@/components/utils/timeNow";
 import { safeTable } from '@/components/utils/safeLog';
@@ -222,6 +223,7 @@ function useDesignerState() {
   }, [splConfig]);
 
   // --- SPEAKER VISIBILITY (FIXED: Robust layout parsing + layout-aware surround rules) ---
+  // ✅ UPDATED: Ensure 9.x shows all 6 bed surrounds
   const getSpeakerVisibility = useCallback((role, model) => {
     const canon = String(role || "").toUpperCase();
 
@@ -246,14 +248,9 @@ function useDesignerState() {
 
     const major = parseInt(layoutString.split(".")[0], 10) || 5;
 
-    // TEMP DEBUG: Log rear/wide role visibility checks
-    if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-      console.log('[getSpeakerVisibility]', {
-        role: canon,
-        model: modelStr,
-        layoutString,
-        major,
-      });
+    // ✅ 9.x: All six bed surrounds + LCR visible
+    if (major >= 9) {
+      return ['FL','FC','FR','SL','SR','SBL','SBR','LW','RW'].includes(canon);
     }
 
     // LCR always shown when model is valid
@@ -281,26 +278,6 @@ function useDesignerState() {
       }
 
       return false;
-    }
-
-    // 9.x+ — sides + rears + wides all visible when they have models
-    if (major >= 9) {
-      if (canon === "SL" || canon === "SR") return true;
-      if (canon === "SBL" || canon === "SBR") return true;
-      if (canon === "LW" || canon === "RW") return true;
-
-      // TEMP DEBUG: Log result
-      if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-        console.log('[getSpeakerVisibility] 9.x+ result:', {
-          role: canon,
-          model: modelStr,
-          layoutString,
-          major,
-          result: true
-        });
-      }
-
-      return false; // Everything else not handled above
     }
 
     // Fallback: show if it has a valid model
@@ -471,6 +448,7 @@ function useDesignerState() {
           return true;
         });
 
+        // ✅ FENCE: Only apply 7.x XOR filtering; 9.x passes through untouched
         if (isSevenDotX) {
           console.log('[AS] Applying 7.x XOR logic', { useWidesInsteadOfRears });
           
@@ -570,7 +548,7 @@ function useDesignerState() {
     updateGlobalSpl,
     updateRoleSpl,
     getSpeakerVisibility,
-  }), [
+  ]), [
     dimensions, setDimensions,
     roomDims, setRoomDims,
     setRoomWidthM, setRoomLengthM, setRoomHeightM,
