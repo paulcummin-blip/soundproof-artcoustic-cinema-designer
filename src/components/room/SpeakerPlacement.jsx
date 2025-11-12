@@ -107,12 +107,10 @@ function projectToWallFromMLP_xy(mlp, angleDeg, room) {
   const x = mlp.x + hit.t * dx;
   const y = mlp.y + hit.t * dy;
 
-  // Clamp results to room boundaries (within a small margin)
-  const margin = 0.001; // Small margin to account for floating point inaccuracies near boundaries
-  const clampedX = Math.max(room.left + margin, Math.min(room.right - margin, x));
-  const clampedY = Math.max(room.front + margin, Math.min(room.back - margin, y));
-
-  return { x: clampedX, y: clampedY, wall: hit.wall };
+  // The previous clamping logic was problematic for certain angles near boundaries,
+  // potentially causing speakers to not reach their wall.
+  // We should trust the ray intersection calculation directly for the wall-hit point.
+  return { x, y, wall: hit.wall };
 }
 
 // --- Canonical role mapping + helpers ---
@@ -760,7 +758,7 @@ function UnifiedSurroundsConfig({
             front: 0,
             back: roomDims.length
         };
-        return projectToWallFromMLP(mlpPt.x, mlpPt.y, projectAngleDeg, room);
+        return projectToWallFromMLP_xy(mlpPt, projectAngleDeg, room);
     };
     
     let sblPos = internalRayCast(sblDolbyAngle, mlpPoint, dimensions);
@@ -775,7 +773,7 @@ function UnifiedSurroundsConfig({
     sbrPos = applyRoomBoundsClamp(sbrPos, defaultModel, dimensions);
 
     return {
-      SBL: { x: sblPos.x, y: sblPos.y, z: 1.1 },
+      SBL: { x: sblPos.x, y: sbrPos.y, z: 1.1 }, // Corrected to sbrPos.y
       SBR: { x: sbrPos.x, y: sbrPos.y, z: 1.1 }
     };
   }, [dimensions, mlpPoint, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp]);
@@ -814,7 +812,7 @@ function UnifiedSurroundsConfig({
       const speakerMap = new Map((prev || []).map(s => [getCanonicalRole(s.role), s]));
       const WALL_BUFFER_M = 0.01;
 
-      // This internal calculateDefaultPosition now uses projectToWallFromMLP
+      // This internal calculateDefaultPosition now uses projectToWallFromMLP_xy
       const calculateDefaultPosition = (dolbyAngleDegrees, mlpPt, roomDims) => {
         // Convert Dolby angle (0=front, +CCW) to projectToWallFromMLP angle (0=+X, 90=+Y)
         const projectAngleDeg = (270 - dolbyAngleDegrees + 360) % 360;
@@ -824,7 +822,7 @@ function UnifiedSurroundsConfig({
             front: 0,
             back: roomDims.length
         };
-        return projectToWallFromMLP(mlpPt.x, mlpPt.y, projectAngleDeg, room);
+        return projectToWallFromMLP_xy(mlpPt, projectAngleDeg, room);
       };
 
       const processRole = (role, nextModel, defaultPos = null) => {
@@ -1719,7 +1717,7 @@ function SpeakerPlacementImpl(props) {
         if (!localRolesForLayout.has(canon) || !resolvedModel) return;
 
         // Project to wall along the Dolby angle from MLP, then finalise
-        const base = projectToWallFromMLP(mlp.x, mlp.y, dolbyAngleDeg, { left:0, right:dims.width, front:0, back:dims.length });
+        const base = projectToWallFromMLP_xy(mlp, dolbyAngleDeg, { left:0, right:dims.width, front:0, back:dims.length });
         const position = finalisePos(base, canon, resolvedModel);
 
         // Yaw: side-walls face room centre; back wall faces forward
@@ -1758,7 +1756,7 @@ function SpeakerPlacementImpl(props) {
 
       return next;
     },
-    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, projectToWallFromMLP, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
+    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
   );
 
   // Handler for reset button (full surround reset)
