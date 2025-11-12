@@ -12,18 +12,25 @@ export default function SurroundsSelector({
   activeRoles,
   disabled
 }) {
+  // Guard: don’t render until roles/options are ready (prevents early seeding)
+  if (!Array.isArray(activeRoles) || activeRoles.length === 0 || !Array.isArray(choices) || choices.length === 0) {
+    return null;
+  }
+
   const showSides = activeRoles.includes('SL');
   const showRears = activeRoles.includes('SBL');
   const showWides = activeRoles.includes('LW');
 
-  const masterModel = value?.master || 'off';
-  const sideModel = value?.side || masterModel;
-  const rearModel = value?.rear || masterModel;
-  const wideModel = value?.wide || masterModel;
+  // Default to true Off unless the stored value is a real model
+  const isReal = (m) => !!m && m !== '(none)' && m !== 'off' && m !== 'none';
+  const masterModel = isReal(value?.master) ? value.master : 'off';
+  const sideModel   = isReal(value?.side)   ? value.side   : masterModel;
+  const rearModel   = isReal(value?.rear)   ? value.rear   : masterModel;
+  const wideModel   = isReal(value?.wide)   ? value.wide   : masterModel;
 
-  const sideOverride = override?.side || false;
-  const rearOverride = override?.rear || false;
-  const wideOverride = override?.wide || false;
+  const sideOverride = !!override?.side;
+  const rearOverride = !!override?.rear;
+  const wideOverride = !!override?.wide;
 
   const getModelLabel = (modelKey) => {
     const choice = choices.find(c => c.value === modelKey);
@@ -32,14 +39,16 @@ export default function SurroundsSelector({
 
   return (
     <div className="space-y-4">
-      {/* Global/Master selector - matches Overhead panel */}
+      {/* Global/Master selector */}
       <div className="space-y-2">
         <Label className="text-sm font-medium text-[#3E4349]">Surround Model (All)</Label>
         <Select
           value={masterModel}
           onValueChange={(newMaster) => {
+            // Guard: explicitly store "off" or a concrete model; never implicit truthy
+            const next = (!newMaster || newMaster === 'off') ? 'off' : newMaster;
             onChange({
-              value: { ...value, master: newMaster },
+              value: { ...value, master: next },
               override
             });
           }}
@@ -50,8 +59,8 @@ export default function SurroundsSelector({
           </SelectTrigger>
           <SelectContent className="bg-white border-[#DCDBD6]">
             {choices.map((choice) => (
-              <SelectItem 
-                key={choice.value} 
+              <SelectItem
+                key={choice.value}
                 value={choice.value}
                 className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]"
               >
@@ -60,15 +69,11 @@ export default function SurroundsSelector({
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-[#625143]">
-          Applies to all surrounds unless overridden.
-        </p>
+        <p className="text-xs text-[#625143]">Applies to all surrounds unless overridden.</p>
       </div>
 
-      {/* Divider - matches Overhead */}
       <div className="border-t border-[#E5E5E5]" />
 
-      {/* Position-specific rows - matches Overhead structure */}
       <div className="space-y-3">
         {/* Side Surrounds */}
         {showSides && (
@@ -89,12 +94,12 @@ export default function SurroundsSelector({
                 />
               </div>
             </div>
-            {sideOverride && (
+            {sideOverride ? (
               <Select
                 value={sideModel}
                 onValueChange={(newSide) => {
                   onChange({
-                    value: { ...value, side: newSide },
+                    value: { ...value, side: (!newSide || newSide === 'off') ? 'off' : newSide },
                     override
                   });
                 }}
@@ -105,21 +110,14 @@ export default function SurroundsSelector({
                 </SelectTrigger>
                 <SelectContent className="bg-white border-[#DCDBD6]">
                   {choices.map((choice) => (
-                    <SelectItem 
-                      key={choice.value} 
-                      value={choice.value}
-                      className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]"
-                    >
+                    <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                       {choice.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            )}
-            {!sideOverride && (
-              <div className="text-xs text-[#625143] italic">
-                Using: {getModelLabel(masterModel)}
-              </div>
+            ) : (
+              <div className="text-xs text-[#625143] italic">Using: {getModelLabel(masterModel)}</div>
             )}
           </div>
         )}
@@ -143,12 +141,12 @@ export default function SurroundsSelector({
                 />
               </div>
             </div>
-            {rearOverride && (
+            {rearOverride ? (
               <Select
                 value={rearModel}
                 onValueChange={(newRear) => {
                   onChange({
-                    value: { ...value, rear: newRear },
+                    value: { ...value, rear: (!newRear || newRear === 'off') ? 'off' : newRear },
                     override
                   });
                 }}
@@ -159,21 +157,14 @@ export default function SurroundsSelector({
                 </SelectTrigger>
                 <SelectContent className="bg-white border-[#DCDBD6]">
                   {choices.map((choice) => (
-                    <SelectItem 
-                      key={choice.value} 
-                      value={choice.value}
-                      className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]"
-                    >
+                    <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                       {choice.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            )}
-            {!rearOverride && (
-              <div className="text-xs text-[#625143] italic">
-                Using: {getModelLabel(masterModel)}
-              </div>
+            ) : (
+              <div className="text-xs text-[#625143] italic">Using: {getModelLabel(masterModel)}</div>
             )}
           </div>
         )}
@@ -197,12 +188,12 @@ export default function SurroundsSelector({
                 />
               </div>
             </div>
-            {wideOverride && (
+            {wideOverride ? (
               <Select
                 value={wideModel}
                 onValueChange={(newWide) => {
                   onChange({
-                    value: { ...value, wide: newWide },
+                    value: { ...value, wide: (!newWide || newWide === 'off') ? 'off' : newWide },
                     override
                   });
                 }}
@@ -213,21 +204,14 @@ export default function SurroundsSelector({
                 </SelectTrigger>
                 <SelectContent className="bg-white border-[#DCDBD6]">
                   {choices.map((choice) => (
-                    <SelectItem 
-                      key={choice.value} 
-                      value={choice.value}
-                      className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]"
-                    >
+                    <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                       {choice.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            )}
-            {!wideOverride && (
-              <div className="text-xs text-[#625143] italic">
-                Using: {getModelLabel(masterModel)}
-              </div>
+            ) : (
+              <div className="text-xs text-[#625143] italic">Using: {getModelLabel(masterModel)}</div>
             )}
           </div>
         )}
