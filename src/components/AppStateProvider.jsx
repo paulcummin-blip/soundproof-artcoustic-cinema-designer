@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { timeNowMs } from "@/components/utils/timeNow";
 import { safeTable } from '@/components/utils/safeLog';
@@ -10,7 +9,6 @@ function getCanonicalRole(role) {
   const upper = role.toUpperCase();
 
   const aliases = {
-    // Map legacy / odd labels TO the Dolby-style roles used everywhere else
     'LS': 'SL',
     'RS': 'SR',
     'LSR': 'SL',
@@ -28,14 +26,12 @@ export function useAppState() {
 }
 
 function useDesignerState() {
-  // [ROOMDIMS_SOT] — Single source of truth for room dimensions
   const [roomDims, setRoomDims] = useState({
     widthM: 4.5,
     lengthM: 6.0,
     heightM: 2.4,
   });
 
-  // Stable setters
   const setRoomWidthM = useCallback((v) => {
     setRoomDims(d => ({ ...d, widthM: Number(v) }));
   }, []);
@@ -48,10 +44,6 @@ function useDesignerState() {
     setRoomDims(d => ({ ...d, heightM: Number(v) }));
   }, []);
 
-  // Changed: don't initialize with hardcoded defaults that clobber hydrated values
-  // The 'dimensions' state is being phased out in favor of 'roomDims' for core room dimensions.
-  // Kept temporarily if other parts of the app still rely on it, but should eventually be removed.
-  // For now, it will be an empty object to avoid conflicts.
   const [dimensions, setDimensions] = useState({}); 
 
   const [screen, setScreen] = useState({
@@ -77,10 +69,10 @@ function useDesignerState() {
   const [baselineSeatingPositions, setBaselineSeatingPositions] = useState([]);
   const [seatingRows, setSeatingRows] = useState(1);
   const [seatsPerRow, setSeatsPerRow] = useState(3);
-  const [seatsPerRowByRow, setSeatsPerRowByRow] = useState([]); // NEW: per-row seat counts
+  const [seatsPerRowByRow, setSeatsPerRowByRow] = useState([]);
   const [seatingBlockOffset, setSeatingBlockOffset] = useState(0);
   const [seatSpacing, setSeatSpacing] = useState(0.8);
-  const [rowSpacingM, setRowSpacingM] = useState(1.8); // NEW: centre-to-centre spacing between rows
+  const [rowSpacingM, setRowSpacingM] = useState(1.8);
   const [mlpBasis, setMlpBasis] = useState("front");
   const [autoSeatByRP23, setAutoSeatByRP23] = useState(true);
   const [roomElements, setRoomElements] = useState([]);
@@ -103,11 +95,8 @@ function useDesignerState() {
   const [speakersEpoch, setSpeakersEpoch] = useState(0);
   const [enableLayoutSPLWidget, setEnableLayoutSPLWidget] = useState(true);
   
-  // Single source of truth for Front-Wide feature
   const [enableFrontWides, setEnableFrontWides] = useState(false);
   const [useFrontWidesInsteadOfRear, setUseFrontWidesInsteadOfRear] = useState(false);
-  
-  // NEW: 7-bed XOR switch for rears vs wides
   const [useWidesInsteadOfRears, setUseWidesInsteadOfRears] = useState(false);
   
   const DBG_FW = typeof window !== 'undefined' && window.DBG_FW;
@@ -117,19 +106,11 @@ function useDesignerState() {
     elements: false, bass: false, report: false,
   });
 
-  // Screen centre depth from front wall - starts null until computed
   const [screenCentreDepthM, setScreenCentreDepthM] = useState(null);
-
-  // NEW: Screen front plane Y (published from RoomVisualisation)
   const [screenFrontPlaneM, _setScreenFrontPlaneM] = useState(null);
-  
-  // NEW: Computed MLP Y (derived from screen plane)
   const [mlpY_m, setMlpY_m] = useState(null);
-  
-  // NEW: Computed row centers (derived from MLP)
   const [rowCentersM, _setRowCentersM] = useState([]);
 
-  // Simple, reliable setter. Accepts either an array or an updater fn.
   const setRowCentersM = useCallback(
     (next) => {
       _setRowCentersM(prev => {
@@ -140,23 +121,20 @@ function useDesignerState() {
     []
   );
 
-  // NEW: Overhead channel selections (default to null = OFF)
   const [overheadGlobalModel, setOverheadGlobalModel] = useState(null);
   const [overheadFrontOverride, setOverheadFrontOverride] = useState(null);
   const [overheadMidOverride, setOverheadMidOverride] = useState(null);
   const [overheadRearOverride, setOverheadRearOverride] = useState(null);
   const [useFrontGlobal, setUseFrontGlobal] = useState(true);
-  const [useMidGlobal, setUseMidGlobal] = useState(true); // Fixed: was missing useState
+  const [useMidGlobal, setUseMidGlobal] = useState(true);
   const [useRearGlobal, setUseRearGlobal] = useState(true);
 
-  // NEW: SPL configuration state
   const [splConfig, setSplConfig] = useState({
     globalPowerW: 100,
     globalEqHeadroomDb: 0,
     perRole: {}
   });
 
-  // NEW: Get effective SPL inputs for a role
   const getEffectiveSplInputs = useCallback((role) => {
     const roleConfig = splConfig.perRole[role];
     
@@ -173,7 +151,6 @@ function useDesignerState() {
     };
   }, [splConfig]);
 
-  // NEW: Update global SPL settings
   const updateGlobalSpl = useCallback((updates) => {
     setSplConfig(prev => ({
       ...prev,
@@ -181,7 +158,6 @@ function useDesignerState() {
     }));
   }, []);
 
-  // NEW: Update per-role SPL settings
   const updateRoleSpl = useCallback((role, updates) => {
     setSplConfig(prev => ({
       ...prev,
@@ -195,21 +171,17 @@ function useDesignerState() {
     }));
   }, []);
 
-  // Detect if any surround model has been chosen.
-  // This is intentionally defensive: it looks in a few likely places on splConfig.
-  // If your real shape is splConfig.roles[role].model, this will pick it up.
   const hasSurroundModelSelected = useMemo(() => {
     if (!splConfig) return false;
 
     const surroundRoles = ['SL', 'SR', 'SBL', 'SBR', 'LR', 'RR'];
 
-    // Try to find a non-empty model for any surround role
     return surroundRoles.some((role) => {
       const cfg =
-        splConfig.perRole?.[role] || // Corrected from splConfig.roles to splConfig.perRole
+        splConfig.perRole?.[role] ||
         splConfig.byRole?.[role] ||
         splConfig[role] ||
-        splConfig.surround || // e.g. a shared surround config
+        splConfig.surround ||
         splConfig.surroundModel;
 
       const model = cfg && (cfg.model || cfg);
@@ -222,17 +194,13 @@ function useDesignerState() {
     });
   }, [splConfig]);
 
-  // --- SPEAKER VISIBILITY (FIXED: Robust layout parsing + layout-aware surround rules) ---
-  // ✅ UPDATED: Ensure 9.x shows all 6 bed surrounds
   const getSpeakerVisibility = useCallback((role, model) => {
     const canon = String(role || "").toUpperCase();
 
-    // Hide LFE + explicit off/none
     if (canon === "LFE" || canon === "LFE1" || canon === "LFE2") return false;
     const modelStr = String(model || "").toLowerCase().trim();
     if (!modelStr || modelStr === "off" || modelStr === "none") return false;
 
-    // --- NORMALISE LAYOUT STRING ---
     const layoutString = (() => {
       if (typeof dolbyLayout === "string" && dolbyLayout.trim()) return dolbyLayout.trim();
       if (typeof dolbyConfig === "string" && dolbyConfig.trim()) return dolbyConfig.trim();
@@ -248,31 +216,25 @@ function useDesignerState() {
 
     const major = parseInt(layoutString.split(".")[0], 10) || 5;
 
-    // ✅ 9.x: All six bed surrounds + LCR visible
     if (major >= 9) {
       return ['FL','FC','FR','SL','SR','SBL','SBR','LW','RW'].includes(canon);
     }
 
-    // LCR always shown when model is valid
     if (canon === "FL" || canon === "FC" || canon === "FR") {
       return true;
     }
 
-    // 5.x — sides only
     if (major === 5) {
       return canon === "SL" || canon === "SR";
     }
 
-    // 7.x — sides + (rears XOR wides based on toggle)
     if (major === 7) {
       if (canon === "SL" || canon === "SR") return true;
 
       if (useWidesInsteadOfRears) {
-        // Show wides, hide rears
         if (canon === "LW" || canon === "RW") return true;
         if (canon === "SBL" || canon === "SBR") return false;
       } else {
-        // Show rears, hide wides (default 7.x)
         if (canon === "SBL" || canon === "SBR") return true;
         if (canon === "LW" || canon === "RW") return false;
       }
@@ -280,7 +242,6 @@ function useDesignerState() {
       return false;
     }
 
-    // Fallback: show if it has a valid model
     return true;
   }, [dolbyLayout, dolbyConfig, useWidesInsteadOfRears]);
 
@@ -292,11 +253,9 @@ function useDesignerState() {
     setFrozenTabs(prev => ({ ...prev, [tab]: false }));
   }, []);
 
-  // Guarded setter to avoid loops
   const setScreenFrontPlaneM = useCallback((m) => {
     if (!Number.isFinite(m)) return;
     _setScreenFrontPlaneM(prev => {
-      // Only update if changed (rounded to mm)
       const prevRounded = prev ? Math.round(prev * 1000) : null;
       const newRounded = Math.round(m * 1000);
       return prevRounded === newRounded ? prev : m;
@@ -309,7 +268,6 @@ function useDesignerState() {
     }
   }, []);
 
-  // Dev hooks for console access
   useEffect(() => {
     if (typeof window !== "undefined") {
       window.__APPSTATE__ = window.__APPSTATE__ || {};
@@ -329,7 +287,6 @@ function useDesignerState() {
       setScreen((prev) => ({ ...(prev || {}), splModels: obj }));
       try { window.__SPL_MODELS__ = obj; } catch (e) {}
       
-      // Silence this log unless debug is enabled:
       if (SHOW_DEBUG_LOGS) {
         try {
           window.__APP_DEBUG = window.__APP_DEBUG || [];
@@ -368,7 +325,6 @@ function useDesignerState() {
     };
   }, []);
 
-  // Effect to compute and set screenCentreDepthM
   useEffect(() => {
     const screenWidthM = screen.visibleWidthInches * 0.0254;
     const screenThicknessM = 0.05;
@@ -394,7 +350,6 @@ function useDesignerState() {
     screenWall,
   ]);
 
-  // Normalization wrapper with epoch increment
   const setSpeakerSystem = useCallback(
     (updater) => {
       _setSpeakerSystem((prev) => {
@@ -448,7 +403,6 @@ function useDesignerState() {
           return true;
         });
 
-        // ✅ FENCE: Only apply 7.x XOR filtering; 9.x passes through untouched
         if (isSevenDotX) {
           console.log('[AS] Applying 7.x XOR logic', { useWidesInsteadOfRears });
           
@@ -548,7 +502,7 @@ function useDesignerState() {
     updateGlobalSpl,
     updateRoleSpl,
     getSpeakerVisibility,
-  ]), [
+  }), [
     dimensions, setDimensions,
     roomDims, setRoomDims,
     setRoomWidthM, setRoomLengthM, setRoomHeightM,
