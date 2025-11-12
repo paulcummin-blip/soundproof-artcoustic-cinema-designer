@@ -4089,22 +4089,19 @@ return {
     // ignore console errors in strange environments
   }
 
-  // NaN-safe coordinate mappers for speaker world coords (metres) → canvas pixels
+  // Local NaN-safe coordinate mappers (must be inside this loop)
   const toCanvasX = (xM) => {
-    const vx = Number.isFinite(xM) ? xM : 0;
-    return roomRect.x + vx * scale;
+    const safeX = Number.isFinite(xM) ? xM : 0;
+    return roomRect.x + (safeX * scale);
   };
 
   const toCanvasY = (yM) => {
-    const vy = Number.isFinite(yM) ? yM : 0;
-    return roomRect.y + vy * scale;
+    const safeY = Number.isFinite(yM) ? yM : 0;
+    return roomRect.y + (safeY * scale);
   };
 
-  // Set of bed surround roles (canonical uppercase)
-  const BED_SURROUND_ROLES = new Set(['SL','SR','SBL','SBR','LW','RW']);
-
   // 3) Map to icons
-  const icons = afterVisibility.map((speaker) => {
+  return afterVisibility.map((speaker) => {
     const { id, role, model, position = {} } = speaker;
     const canon = getCanonicalRole(role);
 
@@ -4114,44 +4111,46 @@ return {
     const widthM_spk = dims.widthM || 0;
     const depthM_spk = dims.depthM || 0;
 
+    // Compute yaw with existing helper
+    const yawDeg = getYawForObject(
+      speaker,
+      { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
+      aimAtMLP,
+      { width: widthM, length: lengthM, height: heightM },
+      getModelDimsM
+    );
+
     // Position coordinates from speaker.position (with safe fallbacks)
-    let worldX = Number.isFinite(position.x) ? position.x : 0;
-    let worldY = Number.isFinite(position.y) ? position.y : 0;
+    const pos_x = position.x ?? 0;
+    const pos_y = position.y ?? 0;
 
-    // Preserve yaw from state
-    const yawDeg = Number.isFinite(speaker.rotation?.z) ? speaker.rotation.z : 0;
+    // Convert to canvas coordinates
+    let canvasX, canvasY;
 
-    // [B44] BED SURROUNDS: bypass all repositioning logic, use state position directly
-    if (BED_SURROUND_ROLES.has(canon)) {
-      // Use speaker.position directly - no corridor logic, no movement helpers
-      // worldX and worldY already set from position above
-    } else if (canon === "FL" || canon === "FC" || canon === "FR") {
-      // LCR: keep special-case front wall pinning
+    if (canon === "FL" || canon === "FC" || canon === "FR") {
+      // LCR: pinned to front wall using WALL_BUFFER_M
       const half = yHalfExtentM(depthM_spk, widthM_spk, yawDeg);
-      worldY = WALL_BUFFER_M + half;
-      // worldX already correct from position
+      const y_m = WALL_BUFFER_M + half;
+      canvasX = toCanvasX(pos_x);
+      canvasY = toCanvasY(y_m);
     } else {
-      // Other speakers (overheads, etc.): use position directly
-      // worldX and worldY already set from position above
+      // Everyone else: use their stored world coords directly
+      canvasX = toCanvasX(pos_x);
+      canvasY = toCanvasY(pos_y);
     }
 
-    // Convert world → canvas
-    const canvasX = toCanvasX(worldX);
-    const canvasY = toCanvasY(worldY);
-
-    // NaN safety guard (final line of defense)
-    const safeCanvasX = Number.isFinite(canvasX) ? canvasX : toCanvasX(0);
-    const safeCanvasY = Number.isFinite(canvasY) ? canvasY : toCanvasY(0);
+    // NaN safety: ensure we never pass invalid coordinates
+    const safeCanvasX = Number.isFinite(canvasX) ? canvasX : 0;
+    const safeCanvasY = Number.isFinite(canvasY) ? canvasY : 0;
 
     // Log any invalid coordinates
     if (!Number.isFinite(canvasX) || !Number.isFinite(canvasY)) {
       console.warn('[RV] INVALID CANVAS COORDS', {
         id,
         role,
-        canon,
         pos: position,
-        worldX,
-        worldY,
+        pos_x,
+        pos_y,
         canvasX,
         canvasY,
       });
@@ -4166,8 +4165,8 @@ return {
         model,
         resolvedModel,
         pos: position,
-        worldX,
-        worldY,
+        pos_x,
+        pos_y,
         canvasX: safeCanvasX,
         canvasY: safeCanvasY,
         yawDeg,
@@ -4180,52 +4179,21 @@ return {
       ? (e) => handleMouseDown(e, id, "speaker")
       : undefined;
 
-    return {
-      id,
-      role,
-      canon,
-      model: resolvedModel,
-      worldX,
-      worldY,
-      x: safeCanvasX,
-      y: safeCanvasY,
-      yawDeg,
-      widthM: widthM_spk,
-      depthM: depthM_spk,
-      speaker,
-      speakerMouseDownHandler,
-    };
+    return (
+      <SpeakerIcon
+        key={id}
+        speaker={{ ...speaker, model: resolvedModel }}
+        canvasX={safeCanvasX}
+        canvasY_raw={safeCanvasY}
+        yawDeg={yawDeg}
+        widthM={widthM_spk}
+        depthM={depthM_spk}
+        scale={scale}
+        speakerMouseDownHandler={speakerMouseDownHandler}
+        setHoveredSpeaker={setHoveredSpeaker}
+      />
+    );
   });
-
-  // [B44] DEBUG: Final positions table
-  console.log('[RV] speakersToRender FINAL');
-  console.table(
-    icons.map(i => ({
-      role: i.role,
-      model: i.model,
-      worldX: i.worldX?.toFixed(3),
-      worldY: i.worldY?.toFixed(3),
-      x: Math.round(i.x),
-      y: Math.round(i.y),
-      yaw: i.yawDeg,
-    }))
-  );
-
-  // Render the icons
-  return icons.map((icon) => (
-    <SpeakerIcon
-      key={icon.id}
-      speaker={{ ...icon.speaker, model: icon.model }}
-      canvasX={icon.x}
-      canvasY_raw={icon.y}
-      yawDeg={icon.yawDeg}
-      widthM={icon.widthM}
-      depthM={icon.depthM}
-      scale={scale}
-      speakerMouseDownHandler={icon.speakerMouseDownHandler}
-      setHoveredSpeaker={setHoveredSpeaker}
-    />
-  ));
 }, [
   speakersToRender,
   isRenderableSpeaker,
