@@ -72,38 +72,35 @@ export function ensureSpeakersForRoles(prev = [], requiredRoles = [], makeDefaul
   return next;
 }
 
+// Bed-surround roles we never want auto-placed here
+const BED_SURROUND_ROLES = new Set(["SL","SR","SBL","SBR","LW","RW"]);
+
 /**
- * Generate default speaker position for a role
+ * Generate default speaker object for a role *without* imposing geometry
+ * For bed surrounds, we now return a stub and let SpeakerPlacement /
+ * resetSurroundPositions handle all coordinates and Dolby angles.
  * @param {string} role - Speaker role (uppercase)
  * @param {Object} dims - Room dimensions {width, length, height}
  * @param {Object} mlp - MLP point {x, y, z} for reference
  * @returns {Object|null} Speaker object or null if role unknown
  */
 export function defaultSpeakerForRole(role, dims, mlp) {
-  const W = Number(dims?.width) || 4.5;
-  const L = Number(dims?.length) || 6.0;
+  const R = String(role || "").toUpperCase();
 
-  // Simple geometry: sides at edges, around MLP Y; rears/wides forward/back
-  const baseY = Number(mlp?.y) || (L * 0.45);
-  const earZ = 1.1; // Standard ear height for bed speakers
+  // 🔒 IMPORTANT:
+  // Do NOT drive geometry for bed surrounds from here.
+  // We only create a stub entry if some caller insists on "ensuring" the role exists.
+  if (BED_SURROUND_ROLES.has(R)) {
+    return {
+      id: `${R}-${Math.random().toString(36).slice(2, 7)}`,
+      role: R,
+      label: R,
+      position: null,       // SpeakerPlacement will decide real x/y/z
+      model: undefined,     // User / SurroundsSelector chooses model
+    };
+  }
 
-  const map = {
-    SL:  { x: W * 0.10, y: baseY, z: earZ },
-    SR:  { x: W * 0.90, y: baseY, z: earZ },
-    SBL: { x: W * 0.18, y: baseY + Math.min(1.2, L * 0.18), z: earZ },
-    SBR: { x: W * 0.82, y: baseY + Math.min(1.2, L * 0.18), z: earZ },
-    LW:  { x: W * 0.25, y: baseY - Math.min(1.2, L * 0.18), z: earZ },
-    RW:  { x: W * 0.75, y: baseY - Math.min(1.2, L * 0.18), z: earZ },
-  };
-  
-  const p = map[role];
-  if (!p) return null;
-  
-  return {
-    id: `${role}-${Math.random().toString(36).slice(2,7)}`,
-    role,
-    label: role,
-    position: { x: p.x, y: p.y, z: p.z },
-    model: undefined, // Will be set by user/selector
-  };
+  // For all other roles (e.g. overheads, if ever used here), we currently
+  // don't auto-generate anything. Callers can extend this later if needed.
+  return null;
 }
