@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
@@ -4090,10 +4089,16 @@ return {
     // ignore console errors in strange environments
   }
 
+  // Local NaN-safe coordinate mappers (must be inside this loop)
+  const toCanvasX = (xM) => {
+    const safeX = Number.isFinite(xM) ? xM : 0;
+    return roomRect.x + (safeX * scale);
+  };
+
   const toCanvasY = (yM) => {
-  const safeY = Number.isFinite(yM) ? yM : 0;
-  return roomRect.y + (safeY * scale);
-};
+    const safeY = Number.isFinite(yM) ? yM : 0;
+    return roomRect.y + (safeY * scale);
+  };
 
   // 3) Map to icons
   return afterVisibility.map((speaker) => {
