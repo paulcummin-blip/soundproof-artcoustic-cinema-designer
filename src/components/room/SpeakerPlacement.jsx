@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } from 'react';
@@ -18,8 +17,7 @@ import { artcousticSpeakers } from '@/components/data/speakerData';
 import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 import { safeGroup, safeTable, safeGroupEnd } from "@/components/utils/safeLog";
 import { getSpeakerModelMeta, getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
-import { safeComputeLcrSpl }
- from '@/components/utils/splMathSafe';
+import { safeComputeLcrSpl } from '@/components/utils/splMathSafe';
 import SurroundsSelector from '../speakers/SurroundsSelector';
 import OverheadChannelSelector from '@/components/speakers/OverheadChannelSelector';
 import { calibratedSplAtSeat, euclideanDistance } from "@/components/utils/splMath";
@@ -29,10 +27,7 @@ import EqHeadroomSelector from '@/components/spl/EqHeadroomSelector';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 
-// RP22 P12 thresholds (strict)
 const P12_THRESHOLDS = { L1: 102, L2: 105, L3: 108, L4: 111 };
-
-// RP22 P13 thresholds (strict)
 const P13_THRESHOLDS = { L1: 99, L2: 102, L3: 105, L4: 108 };
 
 // --- idempotence helpers -----------------------------------------------------
@@ -44,7 +39,6 @@ function speakersShallowEqual(a = [], b = []) {
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
 
-  // Compare by role + model + pos (x,y,z) + yaw
   const byRole = (arr) => {
     const m = new Map();
     arr.forEach(s => m.set(String(s.role).toUpperCase(), s));
@@ -71,22 +65,20 @@ function speakersShallowEqual(a = [], b = []) {
 // ---- robust ray -> wall projector (no MLP fallbacks) -----------------------
 function projectToWallFromMLP_xy(mlp, angleDeg, room) {
   // angle 0° = +X (to the right), 90° = +Y (toward back wall)
-  const a = (angleDeg % 360 + 360) % 360; // Normalize angle to 0-359
+  const a = (angleDeg % 360 + 360) % 360;
   const rad = (a * Math.PI) / 180;
   const dx = Math.cos(rad);
   const dy = Math.sin(rad);
 
-  const EPS_LOCAL = 1e-6; // Small epsilon for floating point comparisons
+  const EPS_LOCAL = 1e-6;
   const ts = [];
 
-  // Check intersection with vertical walls (left/right)
   if (Math.abs(dx) > EPS_LOCAL) {
     const tL = (room.left  - mlp.x) / dx;
     const tR = (room.right - mlp.x) / dx;
     if (tL > EPS_LOCAL) ts.push({ t: tL, wall: 'L' });
     if (tR > EPS_LOCAL) ts.push({ t: tR, wall: 'R' });
   }
-  // Check intersection with horizontal walls (front/back)
   if (Math.abs(dy) > EPS_LOCAL) {
     const tF = (room.front - mlp.y) / dy;
     const tB = (room.back  - mlp.y) / dy;
@@ -94,61 +86,33 @@ function projectToWallFromMLP_xy(mlp, angleDeg, room) {
     if (tB > EPS_LOCAL) ts.push({ t: tB, wall: 'B' });
   }
 
-  // If no intersections found (e.g., ray is parallel to all walls in a 2D sense, or inside a tiny room),
-  // return a safe fallback, e.g., extending to the back wall at mlp's x.
   if (!ts.length) {
     return { x: mlp.x, y: room.back, wall: 'B' };
   }
 
-  // Find the smallest positive 't' (first intersection point)
   ts.sort((a, b) => a.t - b.t);
   const hit = ts[0];
-  
-  // Calculate the intersection coordinates
   const x = mlp.x + hit.t * dx;
   const y = mlp.y + hit.t * dy;
-
-  // The previous clamping logic was problematic for certain angles near boundaries,
-  // potentially causing speakers to not reach their wall.
-  // We should trust the ray intersection calculation directly for the wall-hit point.
   return { x, y, wall: hit.wall };
 }
 
 // --- Canonical role mapping + helpers ---
 const CANONICAL_ROLE_MAP = {
-  // Sides
-  SL:"SL", LS:"SL",
-
-  SR:"SR", RS:"SR",
-
-  // Rears
+  SL:"SL", LS:"SL", SR:"SR", RS:"SR",
   SBL:"SBL", RL:"SBL", RSL:"SBL", LR:"SBL", LRS:"SBL",
   SBR:"SBR", RR:"SBR", RSR:"SBR", RRS:"SBR",
-
-  // Wides
-  LW:"LW", FWL:"LW",
-  RW:"RW", FWR:"RW",
-
-  // Overheads
-  TFL:"TFL",
-  TFR:"TFR",
-  TL:"TL", TML:"TL", // Top Middle Left
-  TR:"TR", TMR:"TR", // Top Middle Right
-  TBL:"TBL",
-  TBR:"TBR",
-
-  // LCR
-  FL:"FL", L:"FL",
-  FC:"FC", C:"FC",
-  FR:"FR", R:"FR",
+  LW:"LW", FWL:"LW", RW:"RW", FWR:"RW",
+  TFL:"TFL", TFR:"TFR",
+  TL:"TL", TML:"TL", TR:"TR", TMR:"TR",
+  TBL:"TBL", TBR:"TBR",
+  FL:"FL", L:"FL", FC:"FC", C:"FC", FR:"FR", R:"FR",
 };
 
-// Function to get the canonical role for any given role string (alias or canonical).
 function getCanonicalRole(role) {
   return CANONICAL_ROLE_MAP[String(role || "").toUpperCase()] || String(role || "").toUpperCase();
 }
 
-// Build a reverse map from canonical role to all its aliases for easy lookup.
 const CANONICAL_TO_ALIASES_MAP = new Map();
 for (const alias in CANONICAL_ROLE_MAP) {
     const canonical = CANONICAL_ROLE_MAP[alias];
@@ -158,14 +122,11 @@ for (const alias in CANONICAL_ROLE_MAP) {
     CANONICAL_TO_ALIASES_MAP.get(canonical).add(alias);
 }
 
-// Function to get all known aliases for a given role (canonical or alias).
-// Returns an array including the canonical role and all its defined synonyms.
 function allAliases(role) {
-    const canonical = getCanonicalRole(role); // Use getCanonicalRole here
+    const canonical = getCanonicalRole(role);
     return Array.from(CANONICAL_TO_ALIASES_MAP.get(canonical) || new Set([String(role || "").toUpperCase()]));
 }
 
-// Helper to find a speaker object from a `byRoleMap` using any of its potential aliased roles.
 function getByAnyRole(aliases, byRoleMap) {
     for (const alias of aliases) {
         const speaker = byRoleMap.get(alias);
@@ -174,9 +135,6 @@ function getByAnyRole(aliases, byRoleMap) {
     return null;
 }
 
-// Apply a model to a set of speaker roles immutably, considering role aliases for matching.
-// `preferredRoles` are the roles that define the group (e.g., ["SL", "SR"],
-// and the function will match any speaker whose role's canonical form matches one of these.
 function applyModelToAnyRoles(list, preferredRoles, model) {
   const targets = new Set(preferredRoles.map(getCanonicalRole));
   return (Array.isArray(list) ? list : []).map(s => {
@@ -185,8 +143,6 @@ function applyModelToAnyRoles(list, preferredRoles, model) {
   });
 }
 
-// Apply a model to ALL bed-surrounds (SL, SR, SBL, SBR, LW, RW)
-// This function might become less used if controls are more granular, but useful for broad resets.
 function applyToAllSurrounds(prev, model) {
   const BED_SURROUND = new Set(["SL","SR","SBL","SBR","LW","RW"]);
   return (Array.isArray(prev)? prev: []).map(s => {
@@ -195,36 +151,30 @@ function applyToAllSurrounds(prev, model) {
   });
 }
 
-// Safe debug logging function
 function logPlacedSpeakers(message, speakers) {
   const rows = (speakers || []).map(s => ({
     roleRaw: s.role,
     roleCanon: getCanonicalRole(s.role),
     model: s.model || "(none)"
   }));
-
   safeGroup(message);
   safeTable(rows);
   safeGroupEnd();
 }
-// --- END GLOBAL UTILITY FUNCTIONS ---
 
-// Helper to build role map that indexes both raw and canonical
 function buildRoleMap(list) {
   const m = new Map();
   (Array.isArray(list) ? list : []).forEach((s) => {
     const raw = String(s.role || "").toUpperCase();
     const canon = getCanonicalRole(raw);
     m.set(raw, s);
-    m.set(canon, s); // Also map by canonical role, without redundant `if (canon)`
+    m.set(canon, s);
   });
   return m;
 }
 
-// Helper angle conversion
 const degToRad = (deg) => (deg * Math.PI) / 180;
 
-// Cast a ray from MLP at angleDeg and find first intersection with room rectangle
 function projectToWallFromMLP(mlpX, mlpY, angleDeg, room) {
   const angle = degToRad(angleDeg);
   const dx = Math.cos(angle);
@@ -232,43 +182,30 @@ function projectToWallFromMLP(mlpX, mlpY, angleDeg, room) {
   const margin = 0.01;
 
   let t = Infinity;
-
-  // left wall
   if (dx < 0) t = Math.min(t, (room.left + margin - mlpX) / dx);
-  // right wall
   if (dx > 0) t = Math.min(t, (room.right - margin - mlpX) / dx);
-  // front wall (screen)
   if (dy < 0) t = Math.min(t, (room.front + margin - mlpY) / dy);
-  // back wall
   if (dy > 0) t = Math.min(t, (room.back - margin - mlpY) / dy);
 
   if (!isFinite(t) || t <= 0) {
-    return { x: mlpX, y: mlpY }; // safe fallback
+    return { x: mlpX, y: mlpY };
   }
 
-  return {
-    x: mlpX + dx * t,
-    y: mlpY + dy * t,
-  };
+  return { x: mlpX + dx * t, y: mlpY + dy * t };
 }
 
-// Helper to ensure a speaker object exists for a role
 function ensureSpeaker(spk, role) {
-  return spk && spk.role === role
-    ? spk
-    : { id: `${role}-${Date.now()}`, role };
+  return spk && spk.role === role ? spk : { id: `${role}-${Date.now()}`, role };
 }
 
-// Proper angle calculation for LCR aiming
 function yawDegToMLP(spkPos, mlpPos) {
   const dx = mlpPos.x - spkPos.x;
-  const dy = mlpPos.y - spkPos.y; // MLP deeper (+y)
-  const yawRad = Math.atan2(dx, dy); // reference is -Y
-  return yawRad * 180 / Math.PI;     // +ve turns *inwards* on the left, -ve on the right
+  const dy = mlpPos.y - spkPos.y;
+  const yawRad = Math.atan2(dx, dy);
+  return yawRad * 180 / Math.PI;
 }
 
-// Apply LCR aiming rotation
-function applyLcrAim(placedSpeakers, mlpPoint, mode /* "flat"|"angled" */) {
+function applyLcrAim(placedSpeakers, mlpPoint, mode) {
   const speakers = Array.isArray(placedSpeakers) ? [...placedSpeakers] : [];
   if (!mlpPoint) return speakers;
 
@@ -281,17 +218,21 @@ function applyLcrAim(placedSpeakers, mlpPoint, mode /* "flat"|"angled" */) {
     if (!LCR_ROLES.has(getCanonicalRole(s.role))) return s;
     if (!s.position) return s;
     const angle = yawDegToMLP(s.position, mlpPoint);
-    // use Y for yaw in a right-handed XYZ
     return { ...s, rotation: { ...(s.rotation||{}), y: angle } };
   });
 }
 
-// Canonical list of surround roles (no heights, no LCR)
 const ALL_SURROUND_ROLES = new Set(["SL","SR","SBL","SBR","LW","RW"]);
 const LCR_ROLES = new Set(["FL", "FC", "FR"]);
+const ROLE_TO_KEY = new Map([["FL", "L"], ["FC", "C"], ["FR", "R"]]);
+const REAR_CANON = new Set(["SBL", "SBR"]);
+const REAR_ALIASES = new Set(["SBL","SBR","RL","RR","RSL","RSR","LR","LRS","RRS","LB","RB"]);
 
+const isRearByAnyRole = (role) => {
+  const r = String(role||"").toUpperCase();
+  return REAR_ALIASES.has(r) || REAR_CANON.has(getCanonicalRole(r));
+};
 
-// Convert const helpers to function declarations (fixes TDZ/hoisting issues)
 function rp22P12Level(db) {
   if (!db || db <= 102) return 1;
   if (db <= 105) return 2;
@@ -304,7 +245,7 @@ function rp22P13Level(db) {
   if (db <= 102) return 2;
   if (db <= 105) return 3;
   if (db <= 108) return 4;
-  return 4; // Should not happen for valid inputs
+  return 4;
 }
 
 function normalizeName(s) {
@@ -324,7 +265,6 @@ function prettyChannel(ch) {
   return m[String(ch).toUpperCase()] || ch;
 }
 
-// Safe console helper for logging
 function safeLog(label, data) {
   if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
     console.groupCollapsed(label);
@@ -335,8 +275,6 @@ function safeLog(label, data) {
   }
 }
 
-// Helper function to calculate the best possible max SPL at 1m.
-// It considers sensitivity, max power handling, and any excursion-limited SPL.
 function bestMaxSPL1m({ sensitivity_dB_1W1m, max_power_W, excursionMax1m }) {
   const sens = safeNum(sensitivity_dB_1W1m);
   const maxW = safeNum(max_power_W);
@@ -347,49 +285,36 @@ function bestMaxSPL1m({ sensitivity_dB_1W1m, max_power_W, excursionMax1m }) {
     powerCalc = sens + 10 * Math.log10(maxW);
   }
 
-  // If excursion limit is provided and it's lower than the power calculation, it's the true limit.
   if (xMax > 0 && (xMax < powerCalc || powerCalc === 0)) {
     return xMax;
   }
   return powerCalc;
 }
 
-// --- Stable, sticky whole-dB readout for SPL cards.
-// – median window
-// – exponential smoothing
-// – symmetric hysteresis (up + down)
-// – consecutive confirmations before committing a step
 function useStickyDb(rawValue, opts = {}) {
-  const windowSize = opts.windowSize ?? 9;            // odd number for median
-  const alpha = opts.alpha ?? 0.35;                   // 0..1 (higher = more responsive)
-  const upMargin = opts.upMargin ?? 0.40;             // need this much above next integer to step up
-  const downMargin = opts.downMargin ?? 0.60;         // need this much below prev integer to step down
-  const upConsecutive = opts.upConsecutive ?? 2;      // consecutive frames to confirm an up step
-  const downConsecutive = opts.downConsecutive ?? 3;  // consecutive frames to confirm a down step
+  const windowSize = opts.windowSize ?? 9;
+  const alpha = opts.alpha ?? 0.35;
+  const upMargin = opts.upMargin ?? 0.40;
+  const downMargin = opts.downMargin ?? 0.60;
+  const upConsecutive = opts.upConsecutive ?? 2;
+  const downConsecutive = opts.downConsecutive ?? 3;
 
-  const bufRef = useRef([]); // Buffer for raw values
-  const smoothRef = useRef(0); // Ref for the exponentially smoothed value
-  const shownRef = useRef(0); // Ref for the final stable dB value that is displayed
-  const upCountRef = useRef(0); // Counter for upward confirmations
-  const downCountRef = useRef(0); // Counter for downward confirmations
-
-  // State to hold the current median value calculated from the buffer.
+  const bufRef = useRef([]);
+  const smoothRef = useRef(0);
+  const shownRef = useRef(0);
+  const upCountRef = useRef(0);
+  const downCountRef = useRef(0);
   const [currentMedian, setCurrentMedian] = useState(0);
 
-  // Effect to manage the buffer (pushing rawValue) and compute current median.
   useEffect(() => {
     const b = bufRef.current;
-
-    // Only push if finite; otherwise, ignore for median calculation
     if (Number.isFinite(rawValue)) {
       b.push(rawValue);
     }
-    // Maintain window size
     if (b.length > windowSize) {
       b.shift();
     }
 
-    // Compute median from the current buffer
     const sortedBuffer = b.slice().sort((a, b) => a - b);
     const n = sortedBuffer.length;
     let newMedian = 0;
@@ -397,29 +322,24 @@ function useStickyDb(rawValue, opts = {}) {
       const mid = Math.floor(n / 2);
       newMedian = n % 2 ? sortedBuffer[mid] : (sortedBuffer[mid - 1] + sortedBuffer[mid]) / 2;
     }
-    setCurrentMedian(newMedian); // Update state
-  }, [rawValue, windowSize]); // Dependencies for buffer management and median calculation
+    setCurrentMedian(newMedian);
+  }, [rawValue, windowSize]);
 
-  // Exponential smoothing calculation based on `currentMedian`.
   const smoothed = useMemo(() => {
-    // If rawValue is not finite, reset smoothing and median for a clean start when valid data returns.
     if (!Number.isFinite(rawValue)) {
-        smoothRef.current = 0; // Reset smoothing accumulator
-        return 0; // Return 0, which SplBox will render as "—"
+        smoothRef.current = 0;
+        return 0;
     }
     const prev = smoothRef.current;
-    // Initialize smoothing if it's the first valid median or reset needed.
     const next = (prev === 0 && currentMedian === 0) ? 0 : (prev === 0 ? currentMedian : (alpha * currentMedian + (1 - alpha) * prev));
-    smoothRef.current = next; // Update the ref for the next iteration
+    smoothRef.current = next;
     return next;
-  }, [currentMedian, alpha, rawValue]); // rawValue as dependency to reset smoothing if it becomes invalid
+  }, [currentMedian, alpha, rawValue]);
 
-  // Candidate using CEIL, derived from `smoothed`.
   const candidate = useMemo(() => Math.ceil(smoothed), [smoothed]);
 
-  // Effect to apply hysteresis and update the final stable displayed value.
   useEffect(() => {
-    const currentShown = shownRef.current; // Get current displayed value from ref for comparison
+    const currentShown = shownRef.current;
 
     if (!Number.isFinite(rawValue) || smoothed === 0) {
         if (shownRef.current !== 0) shownRef.current = 0;
@@ -428,28 +348,26 @@ function useStickyDb(rawValue, opts = {}) {
         return;
     }
 
-    // STEP UP: only if clearly beyond next integer + margin, for enough frames
     if (smoothed >= (currentShown + 1) + upMargin) {
       upCountRef.current += 1;
       if (upCountRef.current >= upConsecutive) {
-        shownRef.current = Math.max(currentShown + 1, candidate); // Ensure non-decreasing jump, but no more than candidate
+        shownRef.current = Math.max(currentShown + 1, candidate);
         upCountRef.current = 0;
         downCountRef.current = 0;
       }
     } else {
-      upCountRef.current = 0; // Reset counter if condition not met
+      upCountRef.current = 0;
     }
 
-    // STEP DOWN: only if clearly below previous integer − margin, for enough frames
     if (smoothed <= (currentShown - 1) - downMargin) {
       downCountRef.current += 1;
       if (downCountRef.current >= downConsecutive) {
-        shownRef.current = Math.min(currentShown - 1, candidate); // Ensure non-decreasing jump, but no less than candidate
+        shownRef.current = Math.min(currentShown - 1, candidate);
         downCountRef.current = 0;
         upCountRef.current = 0;
       }
     } else {
-      downCountRef.current = 0; // Reset counter if condition not met
+      downCountRef.current = 0;
     }
 
   }, [smoothed, candidate, upMargin, downMargin, upConsecutive, downConsecutive, rawValue]);
@@ -457,74 +375,33 @@ function useStickyDb(rawValue, opts = {}) {
   return shownRef.current;
 }
 
-
 const splCardStyles = {
-  card: {
-    border: "1px solid #E6E4DD",
-    borderRadius: 12,
-    padding: 16,
-    background: "#fff",
-  },
-  title: {
-    fontSize: 16,
-    lineHeight: "22px",
-    color: "#3E4349",
-    marginBottom: 6,
-  },
-  value: {
-    fontSize: 40,
-    lineHeight: "40px",
-    fontWeight: 700,
-    color: "#1B1A1A",
-  },
-  foot: {
-    fontSize: 12, // same as footnote text
-    lineHeight: "16px",
-    color: "#61656B",
-    marginTop: 6,
-  },
-  boldFoot: {
-    fontSize: 12,
-    lineHeight: "16px",
-    color: "#1B1A1A",
-    marginTop: 6,
-    fontWeight: 700, // requested BOLD for the RP22 reference line
-  },
+  card: { border: "1px solid #E6E4DD", borderRadius: 12, padding: 16, background: "#fff" },
+  title: { fontSize: 16, lineHeight: "22px", color: "#3E4349", marginBottom: 6 },
+  value: { fontSize: 40, lineHeight: "40px", fontWeight: 700, color: "#1B1A1A" },
+  foot: { fontSize: 12, lineHeight: "16px", color: "#61656B", marginTop: 6 },
+  boldFoot: { fontSize: 12, lineHeight: "16px", color: "#1B1A1A", marginTop: 6, fontWeight: 700 },
 };
 
 export function SplBox({ channel, rawDb }) {
-  // rawDb is the full-calculation result (unchanged math)
-  const fullDb = useStickyDb(rawDb);        // stable WHOLE-dB as before
-  const displayDb = Math.max(0, fullDb - 6); // headline shows -6 dB
-
-  const level = rp22P12Level(displayDb); // RP22 level is based on the -6 dB working number
+  const fullDb = useStickyDb(rawDb);
+  const displayDb = Math.max(0, fullDb - 6);
+  const level = rp22P12Level(displayDb);
 
   return (
     <div style={splCardStyles.card}>
       <div style={splCardStyles.title}>{prettyChannel(channel)}</div>
-
-      {/* HEADLINE: minus 6 dB */}
       <div style={splCardStyles.value}>{displayDb > 0 ? `${displayDb} dB` : '—'}</div>
-
-      {/* MOVE CURRENT READING UNDER THE NUMBER */}
-      <div style={splCardStyles.foot}>
-        Maximum SPL @ MLP: {fullDb > 0 ? `${fullDb} dB` : '—'}
-      </div>
-
-      {/* RP22 P12 REFERENCE + LEVEL */}
+      <div style={splCardStyles.foot}>Maximum SPL @ MLP: {fullDb > 0 ? `${fullDb} dB` : '—'}</div>
       <div style={splCardStyles.boldFoot}>RP22 P12 Level {level > 0 ? level : "—"}</div>
-
-      {/* Full RP22 text with "post calibration EQ" in bold only */}
       <div style={splCardStyles.foot}>
-        12. Screen speakers SPL capability at RSP (
-        <span style={{ fontWeight: 700 }}>post calibration EQ</span>, within assigned bandwidth)
+        12. Screen speakers SPL capability at RSP (<span style={{ fontWeight: 700 }}>post calibration EQ</span>, within assigned bandwidth)
         without clipping — dB SPL (C). Thresholds: L1 102, L2 105, L3 108, L4 111
       </div>
     </div>
   );
 }
 
-// RP22 P13 SPL card (stable readout, -6 dB headline)
 export function SplBoxP13({ title, rawDbFull }) {
   const fullDb = useStickyDb(rawDbFull);
   const displayDb = Math.max(0, fullDb - 6);
@@ -536,8 +413,7 @@ export function SplBoxP13({ title, rawDbFull }) {
       <div style={splCardStyles.foot}>Maximum SPL @ MLP: {fullDb > 0 ? `${fullDb} dB` : '—'}</div>
       <div style={splCardStyles.boldFoot}>RP22 P13 Level {level > 0 ? level : "—"}</div>
       <div style={splCardStyles.foot}>
-        RP22 P13. Non-screen speakers SPL capability at RSP (
-        <span style={{ fontWeight: 700 }}>post calibration EQ</span> within assigned bandwidth) without clipping
+        RP22 P13. Non-screen speakers SPL capability at RSP (<span style={{ fontWeight: 700 }}>post calibration EQ</span> within assigned bandwidth) without clipping
         (includes amplifier headroom) — dB SPL (C). Thresholds: L1 99, L2 102, L3 105, L4 108
       </div>
     </div>
@@ -546,35 +422,26 @@ export function SplBoxP13({ title, rawDbFull }) {
 
 function getSurroundGroups(dolbyPreset) {
   const major = Number(String(dolbyPreset || "5.1").split(".")[0]) || 5;
-
   const groups = [
     { key: "wides", label: "Front Wides", roles: ["LW", "RW"], required: false },
     { key: "sides", label: "Side Surrounds", roles: ["SL", "SR"], required: false },
     { key: "rears", label: "Rear Surrounds", roles: ["SBL", "SBR"], required: false },
   ];
 
-  // 5.x: only sides required
-  if (major === 5) return groups.map(g =>
-    g.key === "sides" ? { ...g, required: true } : { ...g, required: false });
-
-  // 7.x: either rears OR wides depending on toggle
+  if (major === 5) return groups.map(g => g.key === "sides" ? { ...g, required: true } : { ...g, required: false });
   if (major === 7) {
-    const wantWides = false; // This was a hardcoded `false` before, now it's derived from `useWidesInsteadOfRears` in parent
+    const wantWides = false;
     return groups.map(g => {
-      if (g.key === "sides") return { ...g, required: true }; // Sides always required for 7.x
+      if (g.key === "sides") return { ...g, required: true };
       if (g.key === "rears") return { ...g, required: !wantWides };
       if (g.key === "wides") return { ...g, required: wantWides };
       return g;
     });
   }
-
-  // 9.x+: sides + rears + wides all required
   if (major >= 9) return groups.map(g => ({ ...g, required: true }));
-
   return groups;
 }
 
-// Overhead groups by .2 / .4 / .6 (always visible; mark required accordingly)
 function getOverheadGroups(dolbyPreset) {
   const parts = String(dolbyPreset || "").split(".");
   const overheadCount = Number(parts[2] || 0);
@@ -585,31 +452,15 @@ function getOverheadGroups(dolbyPreset) {
     { key: "oh-rear",   label: "Rear Overhead",   roles: ["TBL", "TBR"], required: false },
   ];
 
-  if (overheadCount >= 6) {
-    return base.map(g => ({ ...g, required: true }));
-  }
-  if (overheadCount === 4) {
-    return base.map(g =>
-      g.key === "oh-front" || g.key === "oh-rear"
-        ? { ...g, required: true }
-        : { ...g, required: false }
-    );
-  }
-  if (overheadCount === 2) {
-    return base.map(g =>
-      g.key === "oh-middle" ? { ...g, required: true } : { ...g, required: false }
-    );
-  }
-  return base; // none required, all shown as not required
+  if (overheadCount >= 6) return base.map(g => ({ ...g, required: true }));
+  if (overheadCount === 4) return base.map(g => g.key === "oh-front" || g.key === "oh-rear" ? { ...g, required: true } : { ...g, required: false });
+  if (overheadCount === 2) return base.map(g => g.key === "oh-middle" ? { ...g, required: true } : { ...g, required: false });
+  return base;
 }
 
-// Small inline UI bits
 const groupHeaderStyle = { display: "flex", alignItems: "center", justifyContent: "space-between", margin: "8px 0" };
 const noteStyle = { fontSize: 12, color: "#8a8e93", marginLeft: 8 };
 const rowStyle = { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 16, marginBottom: 12 };
-
-// applyLcrModel — single model applied across FL/FC/FR
-const LCR_ROLES = new Set(["FL", "FC", "FR"]);
 
 export function applyLcrModel(placed, model) {
   if (!Array.isArray(placed)) return Array.isArray(placed) ? placed : [];
@@ -620,30 +471,26 @@ export function applyLcrModel(placed, model) {
   });
 }
 
-// optional alias if a different casing was used elsewhere
 export const applyLCRModel = applyLcrModel;
 
-/* === Unified Surrounds Configuration === */
 function UnifiedSurroundsConfig({
   placedSpeakers,
   setSpeakers,
-  mlpPoint, // USE THIS PROP INSTEAD OF COMPUTING
+  mlpPoint,
   dolbyPreset,
-  sevenBedLayoutType, // ADDED PROP
+  sevenBedLayoutType,
   dimensions,
   getHuggingCenterLines,
   applyCornerClearance,
   applyRoomBoundsClamp,
   disabled,
-  allowedRoles, // NEW
-  canSides,     // NEW
-  canRears,     // NEW
-  canWides,     // NEW
-  is7xOrHigher, // NEW, passed from parent
-  safePos,      // NEW: passed from parent
+  allowedRoles,
+  canSides,
+  canRears,
+  canWides,
+  is7xOrHigher,
+  safePos,
 }) {
-  // `activeRoles` should represent what speaker *types* are conceptually active for this layout.
-  // This is now directly derived from `allowedRoles`.
   const activeRoles = useMemo(() => {
     const roles = [];
     if (allowedRoles.has('SL')) roles.push('SL', 'SR');
@@ -652,10 +499,6 @@ function UnifiedSurroundsConfig({
     return roles;
   }, [allowedRoles]);
 
-  // Log on render
-  // console.log('[FW UI]', { canSides, canRears, canWides, allowedRoles: Array.from(allowedRoles), activeRoles });
-
-  // Helper to index speakers by canonical role
   const indexByCanonicalRole = useCallback((speakers) => {
     const map = {};
     (speakers || []).forEach(s => {
@@ -668,7 +511,6 @@ function UnifiedSurroundsConfig({
   const speakersByRole = useMemo(() => indexByCanonicalRole(placedSpeakers), [placedSpeakers, indexByCanonicalRole]);
   const modelOf = useCallback((r) => speakersByRole[r]?.model ?? 'off', [speakersByRole]);
 
-  // Helper to get current models from speaker list with canonical role mapping
   const getCurrentSurroundModels = useCallback(() => {
     let currentSideModel = 'off';
     let currentRearModel = 'off';
@@ -684,7 +526,6 @@ function UnifiedSurroundsConfig({
       currentWideModel = modelOf('LW');
     }
 
-    // Master model should be the most prevalent or the side one if others are off
     const masterModel = currentSideModel !== 'off' ? currentSideModel :
                         (currentRearModel !== 'off' ? currentRearModel :
                         (currentWideModel !== 'off' ? currentWideModel : 'off'));
@@ -697,7 +538,6 @@ function UnifiedSurroundsConfig({
     };
   }, [modelOf, canSides, canRears, canWides]);
   
-  // Initialize surroundConfig state
   const [surroundConfig, setSurroundConfig] = useState(() => {
     const models = getCurrentSurroundModels();
     return {
@@ -706,7 +546,6 @@ function UnifiedSurroundsConfig({
     };
   });
   
-  // Update state when underlying speakers or config changes
   useEffect(() => {
     const models = getCurrentSurroundModels();
     if (surroundConfig.value.side !== models.side ||
@@ -720,20 +559,15 @@ function UnifiedSurroundsConfig({
     }
   }, [getCurrentSurroundModels, surroundConfig.value]);
 
-  // Helper to get default positions for rear surrounds using the new pipeline
   const getRearSurroundDefaultPositions = useCallback(() => {
     if (!dimensions || !mlpPoint) return {};
 
-    // These angles should now be Dolby angles (0=front, +CCW)
-    const sblDolbyAngle = 142.5; // Rear Left
-    const sbrDolbyAngle = -142.5; // Rear Right
+    const sblDolbyAngle = 142.5;
+    const sbrDolbyAngle = -142.5;
     
-    const defaultModel = 'off'; // A dummy model to get dimensions/hugging for calculation
-    const WALL_BUFFER_M = 0.01;
+    const defaultModel = 'off';
 
-    // This internal rayCast needs to use the projectToWallFromMLP logic now
     const internalRayCast = (dolbyAngle, mlpPt, roomDims) => {
-        // Convert Dolby angle (0=front, +CCW) to projectToWallFromMLP angle (0=+X, 90=+Y)
         const projectAngleDeg = (270 - dolbyAngle + 360) % 360;
         const room = {
             left: 0,
@@ -746,22 +580,21 @@ function UnifiedSurroundsConfig({
     
     let sblPos = internalRayCast(sblDolbyAngle, mlpPoint, dimensions);
     const hugging = getHuggingCenterLines(defaultModel, dimensions);
-    sblPos.y = hugging.backWallY; // Snap to back wall
+    sblPos.y = hugging.backWallY;
     sblPos = applyCornerClearance(sblPos, 'SBL', defaultModel, dimensions, {});
     sblPos = applyRoomBoundsClamp(sblPos, defaultModel, dimensions); 
 
     let sbrPos = internalRayCast(sbrDolbyAngle, mlpPoint, dimensions);
-    sbrPos.y = hugging.backWallY; // Snap to back wall
+    sbrPos.y = hugging.backWallY;
     sbrPos = applyCornerClearance(sbrPos, 'SBR', defaultModel, dimensions, {}); 
     sbrPos = applyRoomBoundsClamp(sbrPos, defaultModel, dimensions);
 
     return {
-      SBL: { x: sblPos.x, y: sbrPos.y, z: 1.1 }, // Corrected to sbrPos.y
+      SBL: { x: sblPos.x, y: sblPos.y, z: 1.1 },
       SBR: { x: sbrPos.x, y: sbrPos.y, z: 1.1 }
     };
   }, [dimensions, mlpPoint, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp]);
   
-  // Handler for SurroundsSelector onChange
   const handleSurroundModelChange = useCallback((config) => {
     const safeConfig = {
       value: {
@@ -777,27 +610,18 @@ function UnifiedSurroundsConfig({
       }
     };
 
-    // console.log('[FW UI] onChange ->', safeConfig);
     setSurroundConfig(safeConfig);
     
     const { value, override } = safeConfig;
-
-    // No longer manipulating enableFrontWides directly from here.
-    // The parent component's `useWidesInsteadOfRears` switch drives `allowedRoles`.
     
     const effectiveSide = override.side ? value.side : value.master;
     const effectiveRearSelectedByUser = override.rear ? value.rear : value.master;
     const effectiveWideSelectedByUser = override.wide ? value.wide : value.master;
 
     setSpeakers(prev => {
-      // console.log('[FW UI] onChange before=', prev);
-      
       const speakerMap = new Map((prev || []).map(s => [getCanonicalRole(s.role), s]));
-      const WALL_BUFFER_M = 0.01;
 
-      // This internal calculateDefaultPosition now uses projectToWallFromMLP_xy
       const calculateDefaultPosition = (dolbyAngleDegrees, mlpPt, roomDims) => {
-        // Convert Dolby angle (0=front, +CCW) to projectToWallFromMLP angle (0=+X, 90=+Y)
         const projectAngleDeg = (270 - dolbyAngleDegrees + 360) % 360;
         const room = {
             left: 0,
@@ -812,45 +636,39 @@ function UnifiedSurroundsConfig({
         const safeModel = typeof nextModel === 'string' ? nextModel.trim() : String(nextModel || 'off').trim();
         
         const canon = getCanonicalRole(role);
-        // Only process if the role is NOT required by the current layout configuration
         if (!allowedRoles.has(canon)) {
-          speakerMap.delete(canon); // Ensure it's removed if it somehow ended up there
+          speakerMap.delete(canon);
           return;
         }
 
         const existingSpeaker = speakerMap.get(canon);
         
         if (safeModel === 'off' || !safeModel) {
-          // If this role is NOT required by the current layout, remove it.
           if (!allowedRoles.has(canon)) {
             speakerMap.delete(canon);
           } else {
-            // If layout expects this role (e.g. SBL/SBR in 7.1),
-            // keep the speaker entry but clear its model.
             const existing = speakerMap.get(canon);
             if (existing) {
               speakerMap.set(canon, { ...existing, model: null });
             }
           }
         } else {
-          // Valid model chosen → ensure speaker exists + positioned
           let position = existingSpeaker?.position || defaultPos;
 
           if (!position && mlpPoint && dimensions) {
-            let dolbyAngleDegrees; // Use Dolby angles here (0=front, +CCW)
+            let dolbyAngleDegrees;
             switch (canon) {
               case 'SBL': dolbyAngleDegrees = 142.5; break;
               case 'SBR': dolbyAngleDegrees = -142.5; break;
-              case 'SL':  dolbyAngleDegrees = 90;  break; // Dolby side left
-              case 'SR':  dolbyAngleDegrees = -90;   break; // Dolby side right
-              case 'LW':  dolbyAngleDegrees = 60;   break; // Dolby front wide left
-              case 'RW':  dolbyAngleDegrees = -60;    break; // Dolby front wide right
-              default:    dolbyAngleDegrees = 0; // Should not happen for these roles
+              case 'SL':  dolbyAngleDegrees = 90;  break;
+              case 'SR':  dolbyAngleDegrees = -90;   break;
+              case 'LW':  dolbyAngleDegrees = 60;   break;
+              case 'RW':  dolbyAngleDegrees = -60;    break;
+              default:    dolbyAngleDegrees = 0;
             }
             position = calculateDefaultPosition(dolbyAngleDegrees, mlpPoint, dimensions);
           }
 
-          // 🔐 clamp out any NaNs
           position = safePos(position, mlpPoint);
 
           speakerMap.set(canon, {
@@ -865,7 +683,6 @@ function UnifiedSurroundsConfig({
         }
       };
 
-      // Process roles conditionally based on `canSides`, `canRears`, `canWides`
       if (canSides) {
         processRole('SL', effectiveSide);
         processRole('SR', effectiveSide);
@@ -892,12 +709,10 @@ function UnifiedSurroundsConfig({
       }
 
       const next = Array.from(speakerMap.values());
-      // console.log('[FW UI] onChange after=', next);
       return next;
     });
-  }, [setSurroundConfig, setSpeakers, getRearSurroundDefaultPositions, mlpPoint, dimensions, allowedRoles, canSides, canRears, canWides, safePos]); // Added safePos to dependencies
+  }, [setSurroundConfig, setSpeakers, getRearSurroundDefaultPositions, mlpPoint, dimensions, allowedRoles, canSides, canRears, canWides, safePos]);
 
-  // Auto-apply master surround model to new surrounds without a model
   useEffect(() => {
     const master = surroundConfig?.value?.master;
     if (!master || master === 'off') return;
@@ -907,9 +722,9 @@ function UnifiedSurroundsConfig({
       const next = (Array.isArray(prev) ? prev : []).map(s => {
         const role = String(s?.role || "").toUpperCase();
         const canon = getCanonicalRole(role);
-        const isBedSurround = ALL_SURROUND_ROLES.has(canon); // Use the pre-defined ALL_SURROUND_ROLES
+        const isBedSurround = ALL_SURROUND_ROLES.has(canon);
         
-        if (isBedSurround && !s.model && allowedRoles.has(canon)) { // Only apply if role is allowed
+        if (isBedSurround && !s.model && allowedRoles.has(canon)) {
           changed = true;
           return { ...s, model: master };
         }
@@ -931,15 +746,12 @@ function UnifiedSurroundsConfig({
   return (
     <div className="space-y-3 p-2">
       <SurroundsSelector
-        layout={dolbyPreset} // Pass original dolbyPreset
+        layout={dolbyPreset}
         choices={surroundChoices}
         value={surroundConfig.value}
         override={surroundConfig.override}
         onChange={handleSurroundModelChange}
-        activeRoles={activeRoles} // This is used by SurroundsSelector internally to highlight active selectors.
-        canSides={canSides} // NEW
-        canRears={canRears} // NEW
-        canWides={canWides} // NEW
+        activeRoles={activeRoles}
         disabled={disabled}
       />
     </div>
@@ -948,20 +760,10 @@ function UnifiedSurroundsConfig({
 
 const MemoizedUnifiedSurroundsConfig = React.memo(UnifiedSurroundsConfig);
 
-
-/* === OVERHEADS (RP22 P13) === */
-function OverheadsSection({
-  placedSpeakers,
-  setSpeakers,
-  mlpPoint,
-  dolbyPreset,
-}) {
+function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset }) {
   const { ARCHITECT: architectModelOptions } = getModelsByCategoryOrdered();
 
-  const groups = React.useMemo(
-    () => getOverheadGroups(dolbyPreset),
-    [dolbyPreset]
-  );
+  const groups = React.useMemo(() => getOverheadGroups(dolbyPreset), [dolbyPreset]);
 
   const byRole = React.useMemo(() => {
     const m = new Map();
@@ -978,9 +780,8 @@ function OverheadsSection({
       const modelMeta = getSpeakerModelMeta(spk.model);
       
       let ceiling1m;
-      // If it's an Architect model and metadata doesn't provide max_spl, use fallback
       if (architectModelOptions.some(m => m.label === spk.model) && (!modelMeta || !Number.isFinite(modelMeta.max_spl))) {
-        ceiling1m = 105; // Placeholder SPL for Architect models, as per original logic
+        ceiling1m = 105;
       } else if (modelMeta) {
         const sens = safeNum(modelMeta.sensitivity);
         const maxW = safeNum(modelMeta.max_power);
@@ -992,7 +793,7 @@ function OverheadsSection({
           excursionMax1m: xMax1m
         });
       } else {
-        return null; // No metadata and not a special Architect fallback case
+        return null;
       }
 
       const dz = Number.isFinite(spk.position?.z) && Number.isFinite(mlpPoint.z) ? (spk.position.z - mlpPoint.z) : 0;
@@ -1006,8 +807,7 @@ function OverheadsSection({
     <div style={{ marginTop: 8 }}>
       <div style={{ fontSize: 16, fontWeight: 700, color: "#1B1A1A", marginBottom: 6 }}>Overheads</div>
 
-      {groups.map((g) => { // SHOW ALL; disable when not required
-        // Use getByAnyRole and allAliases to robustly infer the current model
+      {groups.map((g) => {
         const leftModel  = getByAnyRole(allAliases(g.roles[0]), byRole)?.model || "";
         const rightModel = getByAnyRole(allAliases(g.roles[1]), byRole)?.model || "";
         const currentModel = leftModel && rightModel && leftModel === rightModel ? leftModel : "";
@@ -1022,7 +822,6 @@ function OverheadsSection({
                   <Select
                     value={currentModel || undefined}
                     onValueChange={(v) => {
-                      // Use the alias-aware applyModelToAnyRoles here
                       setSpeakers(prev => applyModelToAnyRoles(prev, g.roles, v));
                     }}
                     disabled={!g.required}
@@ -1047,7 +846,6 @@ function OverheadsSection({
             </div>
 
             <div style={rowStyle}>
-              {/* Use getByAnyRole and allAliases for SPL calculation */}
               <SplBoxP13 title={`${g.label} — Left`}  rawDbFull={calc(getByAnyRole(allAliases(g.roles[0]), byRole))} />
               <SplBoxP13 title={`${g.label} — Right`} rawDbFull={calc(getByAnyRole(allAliases(g.roles[1]), byRole))} />
             </div>
@@ -1058,25 +856,21 @@ function OverheadsSection({
   );
 }
 
-// Ensure LCR speakers exist when selecting a model - atomic and unique
 function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
   setSpeakers(prev => {
     const list = Array.isArray(prev) ? prev : [];
     const by   = buildRoleMap(list);
 
-    // Remove ALL existing LCR (raw & any dupes) first
-    const LCR_ROLES_SET = new Set(["FL","FC","FR"]); // Using a local set for clarity
+    const LCR_ROLES_SET = new Set(["FL","FC","FR"]);
     const filtered = list.filter(s => !LCR_ROLES_SET.has(getCanonicalRole(s.role)));
 
     const roomW = Number(dimensions?.width)  || 4.5;
     const roomH = Number(dimensions?.height) || 2.8;
 
-    // Basic geometry defaults (front wall at y=0; speakers face +y when flat)
-    const defaultY = 0.20;         // baffle ~ to front wall
-    const defaultZ = roomH * 0.5;  // mid height
-    const spread   = Math.min(1.2, roomW * 0.22); // 1.2m or ~22% width
+    const defaultY = 0.20;
+    const defaultZ = roomH * 0.5;
+    const spread   = Math.min(1.2, roomW * 0.22);
 
-    // Keep prior positions if present; otherwise seed deterministic ones
     const FL = by.get("FL") || { role:"FL", id:"FL-1", draggable:true };
     const FC = by.get("FC") || { role:"FC", id:"FC-1", draggable:true };
     const FR = by.get("FR") || { role:"FR", id:"FR-1", draggable:true };
@@ -1114,7 +908,6 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
   });
 }
 
-// Drop-in replacement LCR component
 function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled }) {
   const { speakerSystem, setScreen, splConfig, updateGlobalSpl } = useAppState();
   const { LCR: lcrModelOptions } = getModelsByCategoryOrdered();
@@ -1136,7 +929,6 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
   }, [getByRole, LCR_CANONICAL_ROLES, lcrModelOptions]);
 
   const [lcrModel, setLcrModel] = useState(initialModel);
-  // Removed selectedLcrRole state as it's no longer used for individual card selection
 
   useEffect(() => {
     if (initialModel && initialModel !== lcrModel) setLcrModel(initialModel);
@@ -1148,15 +940,10 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
     ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers);
   }, [dimensions, setSpeakers, lcrModelOptions]);
 
-  // Removed lcrSplAtMlp useMemo and its useEffect that calls setScreen,
-  // as SPL calculation and display are now handled by LcrSplCard and
-  // global screen state P12/P4 values should be derived upstream if needed.
-
   const angled = lcrAimMode === "angled";
 
   return (
     <div className="space-y-2 p-2">
-      {/* Global SPL Controls */}
       <div className="space-y-3 p-3 rounded-lg border border-[#E6E4DD] bg-[#F8F8F7]">
         <h4 className="text-sm font-medium text-[#1B1A1A]">Global Settings</h4>
         
@@ -1191,11 +978,8 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         </SelectContent>
       </Select>
 
-      {/* NEW: Flat / Angled toggle */}
       <div className="mt-2 flex items-center justify-between">
-        <Label htmlFor="lcr-angle-toggle" className="text-sm text-[#3E4349] font-medium">
-          Orientation
-        </Label>
+        <Label htmlFor="lcr-angle-toggle" className="text-sm text-[#3E4349] font-medium">Orientation</Label>
         <div className="flex items-center gap-3">
           <span className={`text-xs ${!angled ? "text-[#1B1A1A]" : "text-[#625143]"}`}>Flat</span>
           <Switch
@@ -1208,12 +992,10 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         </div>
       </div>
 
-      {/* Angle readout */}
       <p className="text-xs text-[#625143] mt-1">
         Angle to MLP: <span className="font-semibold text-[#1B1A1A]">{Math.round(lcrAngleDeg)}°</span>
       </p>
 
-      {/* NEW LCR Cards from outline */}
       <div className="grid grid-cols-3 gap-3 mt-4">
         {lcrRoles.map((role) => (
           <LcrSplCard
@@ -1229,67 +1011,13 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
   );
 }
 
-
 function formatDolbyLabel(key) {
   const [a = "5", b = "1", c = "0"] = String(key).split(".");
   const overheads = Number(c) || 0;
   return overheads > 0 ? `${a}.${b}.${overheads} Dolby Atmos` : `${a}.${b} Surround`;
 }
 
-// Helper function to seed a single speaker with the full placement pipeline
-// NOTE: This function is not used by the new `resetSurroundPositions` implementation,
-// which now defines an internal helper to achieve the same result with more specific logic.
-const seedSingleSpeakerWithPipeline = (
-  role,
-  angleDegrees,
-  model,
-  mlp,
-  dims,
-  zones,
-  placeSurroundByRayCast,
-  getHuggingCenterLines,
-  applyCornerClearance,
-  applyRoomBoundsClamp,
-  existingSpeaker = null
-) => {
-  if (!model || model === 'off') return null;
-
-  // Step 1: ANGLE - Ray-cast to get initial position
-  let position = placeSurroundByRayCast(angleDegrees, mlp, dims);
-  
-  // Step 2: HUG - Snap to target wall center line
-  const hugging = getHuggingCenterLines(model, dims);
-  const absAngle = Math.abs(angleDegrees);
-
-  // Apply hugging logic based on wall proximity and angle
-  if (absAngle >= 130) { // Rear surrounds (SBL/SBR) typically hug back wall
-      position.y = hugging.backWallY;
-  } else if (absAngle >= 70 && absAngle < 130) { // Side surrounds (SL/SR) typically hug side walls
-      position.x = angleDegrees < 0 ? hugging.leftWallX : hugging.rightWallX;
-  } else if (absAngle < 70 && absAngle > 0) { // Front Wides (LW/RW) typically hug side walls
-      position.x = angleDegrees < 0 ? hugging.leftWallX : hugging.rightWallX;
-  }
-  
-  // Step 3: ZONE & CORNER
-  position = applyCornerClearance(position, role, model, dims, zones);
-  
-  // Step 4: ROOM
-  position = applyRoomBoundsClamp(position, model, dims);
-  
-  return {
-    id: existingSpeaker?.id || `${role}-${timeNowMs()}`,
-    role,
-    label: role,
-    model,
-    position,
-    defaultPosition: position,
-    draggable: true,
-    rotation: existingSpeaker?.rotation || { x: 0, y: 0, z: 0 }
-  };
-};
-
 function SpeakerPlacementImpl(props) {
-  // Safe destructuring inside the function body
   const {
     disabled = false,
     sevenBedLayoutType,
@@ -1301,7 +1029,6 @@ function SpeakerPlacementImpl(props) {
     lcrAngleDeg = 0,
   } = props;
 
-  // NEW: safe access to app state (always call the hook)
   const app = useAppState();
 
   const {
@@ -1326,64 +1053,45 @@ function SpeakerPlacementImpl(props) {
   } = app || {};
 
   const frontSubsCfg = app?.frontSubsCfg || props?.frontSubsCfg || { 
-    enabled: false, 
-    count: 0, 
-    model: null, 
-    placement: "front" 
+    enabled: false, count: 0, model: null, placement: "front" 
   };
 
   const rearSubsCfg = app?.rearSubsCfg || props?.rearSubsCfg || { 
-    enabled: false, 
-    count: 0, 
-    model: null, 
-    placement: "rear" 
+    enabled: false, count: 0, model: null, placement: "rear" 
   };
 
   const subWarnings = app?.subWarnings || { front: [], rear: [] };
 
-  // All bed-layer surrounds we control here
   const SURROUND_BED_ROLES = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
 
-  // --- Canonical layout + toggle resolution (Set-based) ---
   const effectivePreset = (typeof dolbyPreset === "string" && dolbyPreset) 
     || (typeof app?.dolbyLayout === "string" && app.dolbyLayout) 
     || "5.1";
 
-  // Accept either naming; normalise to boolean
   const useWides = (
     (typeof sevenBedLayoutType === "string" && sevenBedLayoutType.toLowerCase() === "wides") ||
     !!app?.useWidesInsteadOfRears
   );
 
-  // Allowed roles for the current preset/toggle (returns Set for .has() compatibility)
   const allowedRoles = React.useMemo(() => {
     try {
       const arr = rolesForLayout({
         dolbyLayout: effectivePreset,
         useFrontWidesInsteadOfRear: !!useWides,
       });
-      return new Set(arr);              // ✅ convert array → Set
+      return new Set(arr);
     } catch (e) {
       console.warn("[SpeakerPlacement] rolesForLayout failed; falling back to 5.1", e);
       return new Set(rolesForLayout({ dolbyLayout: "5.1", useFrontWidesInsteadOfRear: false }));
     }
   }, [effectivePreset, useWides]);
 
-  // Debug line
-  try {
-    // console.debug("[SpeakerPlacement] preset:", effectivePreset, 
-    //               "useWides:", !!useWides, 
-    //               "allowedRoles:", allowedRoles); // Changed to log the Set directly as requested
-  } catch {}
-
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
   const lastPresetRef = useRef(effectivePreset);
 
-  // NEW: Extract global surround model from current speakers
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
     
-    // Try to find a valid surround model from any existing bed surround
     for (const spk of placedSpeakers) {
       const canon = getCanonicalRole(spk.role);
       if (SURROUND_BED_ROLES.has(canon) && spk.model && spk.model !== "off" && spk.model !== "none") {
@@ -1394,7 +1102,6 @@ function SpeakerPlacementImpl(props) {
     return null;
   }, [placedSpeakers, SURROUND_BED_ROLES]);
 
-  // NEW: Overhead count from dolbyPreset
   const overheadCount = useMemo(() => {
     if (!effectivePreset) return 0;
     const parts = effectivePreset.split('.');
@@ -1402,29 +1109,23 @@ function SpeakerPlacementImpl(props) {
     return parseInt(parts[2]) || 0;
   }, [effectivePreset]);
 
-  // Constants
   const CORNER_CLEARANCE_M = 0.50;
   const WALL_BUFFER_M = 0.01;
 
-  // Helper to get speaker dimensions
   const getModelDimsM = useCallback((speakerModel) => {
-    // Default fallback, e.g., for 'off' or unknown models
     if (!speakerModel || speakerModel === 'off') return { widthM: 0.27, depthM: 0.082 };
-    
     const meta = getSpeakerModelMeta(speakerModel);
     if (!meta) return { widthM: 0.27, depthM: 0.082 };
-
     return {
       widthM: meta.widthM || 0.27,
       depthM: meta.depthM || 0.082
     };
   }, []);
 
-  // Helper to compute hugging positions (centre lines)
   const getHuggingCenterLines = useCallback((speakerModel, roomDimensions) => {
     const { width: W, length: L } = roomDimensions;
     const { widthM, depthM } = getModelDimsM(speakerModel);
-    const shortEdge = Math.min(widthM, depthM); // The dimension that determines how close to wall it can be.
+    const shortEdge = Math.min(widthM, depthM);
     const longEdge = Math.max(widthM, depthM);
 
     return {
@@ -1434,150 +1135,104 @@ function SpeakerPlacementImpl(props) {
       shortEdge,
       longEdge
     };
-  }, [getModelDimsM]); // WALL_BUFFER_M is a constant, no need to list
+  }, [getModelDimsM]);
 
-  // Ray-cast placement function - exact implementation per specification
   const placeSurroundByRayCast = useCallback((angleDegrees, mlpPoint, roomDimensions) => {
     const { width: W, length: L } = roomDimensions;
     const { x: xm, y: ym } = mlpPoint;
-
-    // Angle is relative to MLP forward axis. 0 deg is typically front (+Y in our system)
-    // Positive angles are counter-clockwise from the +Y axis.
-    // If 0 deg is front/-Y, and angles increase CCW, this setup is common:
-    // dx = sin(angle), dy = -cos(angle)
-    // If 0 deg is +Y, and angles increase CCW, then:
-    // dx = sin(angle), dy = cos(angle)
-    // The previous implementation used dy = -cos(a), implying 0 deg is front/-Y,
-    // and angles were -120, -100, etc. (CW from -Y). Let's keep that convention for consistency.
     const a = angleDegrees * (Math.PI / 180);
     const dx = Math.sin(a);
-    const dy = -Math.cos(a); // Keeps consistency with prior logic interpretation
+    const dy = -Math.cos(a);
 
-    let t = Infinity; // Parameter t for the ray equation P = P_mlp + t * V
+    let t = Infinity;
 
-    // Left wall (x = WALL_BUFFER_M)
-    // Ray moving left (towards 0 on X axis, so dx < 0)
     if (dx < 0) {
       const tL = (WALL_BUFFER_M - xm) / dx;
       if (tL > 0) t = Math.min(t, tL);
     }
-    
-    // Right wall (x = W - WALL_BUFFER_M)
-    // Ray moving right (towards W on X axis, so dx > 0)
     if (dx > 0) {
       const tR = (W - WALL_BUFFER_M - xm) / dx;
       if (tR > 0) t = Math.min(t, tR);
     }
-    
-    // Front wall (y = WALL_BUFFER_M)
-    // Ray moving front (towards 0 on Y axis, so dy < 0)
     if (dy < 0) {
       const tF = (WALL_BUFFER_M - ym) / dy;
       if (tF > 0) t = Math.min(t, tF);
     }
-    
-    // Rear wall (y = L - WALL_BUFFER_M)
-    // Ray moving back (towards L on Y axis, so dy > 0)
     if (dy > 0) {
       const tB = (L - WALL_BUFFER_M - ym) / dy;
       if (tB > 0) t = Math.min(t, tB);
     }
 
-    // Choose smallest positive t (first wall hit)
     if (t === Infinity || t <= 0) {
-      return { x: xm, y: ym, z: 1.1 }; // Failsafe: return MLP coords at 1.1m height
+      return { x: xm, y: ym, z: 1.1 };
     }
 
-    // Final coordinates at wall
     return {
       x: xm + dx * t,
       y: ym + dy * t,
       z: 1.1
     };
-  }, []); // WALL_BUFFER_M is a constant, no need to list
+  }, []);
 
-  // Apply corner clearance after zone clamp - exact specification
   const applyCornerClearance = useCallback((position, role, speakerModel, roomDimensions, zones) => {
     const { width: W, length: L } = roomDimensions;
     const hugging = getHuggingCenterLines(speakerModel, roomDimensions);
-    const { shortEdge, longEdge } = hugging; // Use longEdge for side walls if speaker is deep
+    const { shortEdge, longEdge } = hugging;
     
     let { x, y, z } = position;
     
-    // Determine which wall the speaker is hugging (check against the computed hugging lines)
-    const isOnLeftWall = Math.abs(x - hugging.leftWallX) < 0.001; // Small epsilon for float comparison
+    const isOnLeftWall = Math.abs(x - hugging.leftWallX) < 0.001;
     const isOnRightWall = Math.abs(x - hugging.rightWallX) < 0.001;
     const isOnBackWall = Math.abs(y - hugging.backWallY) < 0.001;
     
-    // Get zone for this role
     const zone = zones?.[role] || {};
     
     if (isOnBackWall) {
-      // REAR SURROUNDS (SBL, SBR) — BACK WALL
-      // Y is already fixed to the back-wall centre-line by 'hugging' step, if speaker is facing 'forward'.
-      // If speaker is placed against the wall, its actual center is at 'hugging.backWallY'.
-      
-      // Determine allowed X span with zone and corner clearance
       const zoneXMin = zone.xMin || 0;
       const zoneXMax = zone.xMax || W;
       
-      // Shrink both ends by CORNER_CLEARANCE_M from back corners
-      // Speaker's horizontal extent from its center is shortEdge / 2.
       const xMinWithClearance = Math.max(
         zoneXMin,
-        CORNER_CLEARANCE_M + (shortEdge / 2), // 50cm from wall end, plus speaker half-width
-        shortEdge / 2 // Ensure not sticking out past room origin
+        CORNER_CLEARANCE_M + (shortEdge / 2),
+        shortEdge / 2
       );
       const xMaxWithClearance = Math.min(
         zoneXMax,
-        W - (CORNER_CLEARANCE_M + (shortEdge / 2)), // 50cm from wall end, plus speaker half-width
-        W - (shortEdge / 2) // Ensure not sticking out past room end
+        W - (CORNER_CLEARANCE_M + (shortEdge / 2)),
+        W - (shortEdge / 2)
       );
       
-      // Clamp X to effective bounds
       x = Math.max(xMinWithClearance, Math.min(xMaxWithClearance, x));
       
     } else if (isOnLeftWall || isOnRightWall) {
-      // SIDE SURROUNDS (SL, SR, LW, RW) — SIDE WALLS
-      // X is already fixed to the side-wall centre-line by 'hugging' step.
-      
-      // Determine allowed Y span with zone and rear corner clearance
       const zoneYMin = zone.yMin || 0;
       const zoneYMax = zone.yMax || L;
       
-      // Shrink REAR end by CORNER_CLEARANCE_M (back corner only)
-      // Speaker's vertical extent from its center is longEdge / 2 (assuming speaker points forward).
-      const yMinFromZone = Math.max(zoneYMin, longEdge / 2); // Ensure not sticking out past room origin
+      const yMinFromZone = Math.max(zoneYMin, longEdge / 2);
       const yMaxWithRearClearance = Math.min(
         zoneYMax,
-        L - (CORNER_CLEARANCE_M + (longEdge / 2)), // 50cm from back wall, plus speaker half-depth
-        L - (longEdge / 2) // Ensure not sticking out past room end
+        L - (CORNER_CLEARANCE_M + (longEdge / 2)),
+        L - (longEdge / 2)
       );
       
-      // Clamp Y to effective bounds
       y = Math.max(yMinFromZone, Math.min(yMaxWithRearClearance, y));
     }
     
     return { x, y, z };
-  }, [getHuggingCenterLines]); // CORNER_CLEARANCE_M is a constant, no need to list
+  }, [getHuggingCenterLines]);
 
-  // Apply room bounds clamp (for drag behavior)
   const applyRoomBoundsClamp = useCallback((position, speakerModel, roomDimensions) => {
     const { width: W, length: L } = roomDimensions;
     const { shortEdge } = getHuggingCenterLines(speakerModel, roomDimensions);
     
     let { x, y, z } = position;
     
-    // Inside room clamp: speaker's rectangle never crosses a wall
-    // This assumes the speaker's 'width' for horizontal clamping and 'depth' for vertical.
-    // Given 'shortEdge' is the min of width/depth, it's used for the buffer.
     x = Math.max(shortEdge / 2, Math.min(W - shortEdge / 2, x));
     y = Math.max(shortEdge / 2, Math.min(L - shortEdge / 2, y));
     
     return { x, y, z };
   }, [getHuggingCenterLines]);
 
-  // NEW: Safety helper to ensure positions are never NaN
   function safePos(pos, mlp, fallbackZ = 1.1) {
     const x = Number.isFinite(pos?.x) ? pos.x : (Number.isFinite(mlp?.x) ? mlp.x : 0.5);
     const y = Number.isFinite(pos?.y) ? pos.y : (Number.isFinite(mlp?.y) ? mlp.y : 0.5);
@@ -1585,7 +1240,6 @@ function SpeakerPlacementImpl(props) {
     return { x, y, z };
   }
 
-  // CENTRALIZED MLP CALCULATION
   const mlpPoint = useMemo(() => {
     return computeMLPAndPrimary(
       seatingPositions || [], 
@@ -1602,18 +1256,16 @@ function SpeakerPlacementImpl(props) {
     }));
   }, [setSpeakerSystem]);
 
-  // The `canSides`, `canRears`, `canWides` variables now use the new `allowedRoles`
   const canSides = allowedRoles.has('SL') && allowedRoles.has('SR');
   const canRears = allowedRoles.has('SBL') && allowedRoles.has('SBR');
   const canWides = allowedRoles.has('LW') && allowedRoles.has('RW');
-  const isNineBed = canRears && canWides; // This is now a more precise definition for 9-bed.
+  const isNineBed = canRears && canWides;
 
   const is7xOrHigher = useMemo(() => {
     const major = Number(String(effectivePreset).split(".")[0]) || 5;
     return major >= 7;
   }, [effectivePreset]);
 
-  // ✅ REPLACED: Single function: RESET_SURROUND_POSITIONS with full pipeline
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
       console.log('[SP] resetSurroundPositions START', {
@@ -1623,13 +1275,10 @@ function SpeakerPlacementImpl(props) {
       });
 
       if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
-        console.warn('[SP] resetSurroundPositions ABORT: missing data', {
-          hasMlp: !!mlp, hasDims: !!dims, isArray: Array.isArray(currentSpeakers)
-        });
+        console.warn('[SP] resetSurroundPositions ABORT: missing data');
         return currentSpeakers || [];
       }
 
-      // --- Layout parsing (local, deterministic for this call)
       const layoutNormalized =
         (typeof layoutString === 'string' && layoutString.trim()) ? layoutString.trim() :
         (typeof dolbyConfig === 'string' && dolbyConfig.trim()) ? dolbyConfig.trim() :
@@ -1639,97 +1288,88 @@ function SpeakerPlacementImpl(props) {
 
       const major = parseInt(layoutNormalized.split('.')[0], 10) || 5;
 
-      // Compute roles locally so we don't race the context's allowedRoles
       const localRolesForLayout = (() => {
         if (major >= 9) return new Set(['SL','SR','SBL','SBR','LW','RW']);
         if (major === 7) return new Set(['SL','SR','SBL','SBR']);
-        return new Set(['SL','SR']); // 5.x
+        return new Set(['SL','SR']);
       })();
-
-      // Dolby angles (deg)
-      const ANGLES_9X = { SL: 270, SR: 90, SBL: 217.5, SBR: 142.5, LW: 300, RW: 60 };
-      const ANGLES_7X = { SL: 270, SR: 90, SBL: 217.5, SBR: 142.5 };
-      const ANGLES_5X = { SL: 270, SR: 90 };
 
       console.log('[SP] resetSurroundPositions CONFIG', {
         layoutNormalized, major,
-        ctxAllowedRoles: Array.from(allowedRoles || []),
         localRoles: Array.from(localRolesForLayout),
         globalSurroundModel: globalSurroundModelParam
       });
 
-      // Keep everything that's NOT a bed-surround
       const next = currentSpeakers.filter(
         s => !SURROUND_BED_ROLES.has(getCanonicalRole(s.role))
       );
 
-      // Finalise with corner/bounds then snap to wall lines (snap LAST)
-      const finalisePos = (pos, canon, model) => {
+      const byRole = buildRoleMap(currentSpeakers);
+      const room = { left: 0, right: dims.width, front: 0, back: dims.length };
+
+      // ✅ UPDATED: finalisePos never returns MLP fallback
+      const finalisePos = (base, canon, model) => {
         const safeModel = model || 'evolve-2-1_s';
         const hug = getHuggingCenterLines(safeModel, dims);
-        let p = { x: pos.x, y: pos.y, z: Number.isFinite(pos.z) ? pos.z : (mlp.z || 1.1) };
+        let p = { x: base.x, y: base.y, z: 1.1 };
 
-        // Bounds first
         p = applyCornerClearance(p, canon, safeModel, dims, {});
         p = applyRoomBoundsClamp(p, safeModel, dims);
 
-        // Snap to walls (override drift)
-        if (canon === 'SL' || canon === 'LW')   p.x = hug.leftWallX;
-        if (canon === 'SR' || canon === 'RW')   p.x = hug.rightWallX;
-        if (canon === 'SBL' || canon === 'SBR') p.y = hug.backWallY;
+        const R = String(canon).toUpperCase();
+        if (R === 'SL' || R === 'LW')   p.x = hug.leftWallX;
+        if (R === 'SR' || R === 'RW')   p.x = hug.rightWallX;
+        if (R === 'SBL' || R === 'SBR') p.y = hug.backWallY;
 
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-          p.x = mlp.x; p.y = mlp.y;
+          p = { x: mlp.x, y: mlp.y, z: 1.1 };
         }
         return p;
       };
 
-      // Seed helper
-      const seed = (role, dolbyAngleDeg) => {
+      // ✅ UPDATED: seed never spawns off/none, uses globalSurroundModelParam, correct yaw
+      const seed = (role, dolbyAngleDeg, yawDeg) => {
         const canon = getCanonicalRole(role);
-        const existing = null; // purposely ignore existing bed models to avoid half-seeds
-        const resolvedModel = (existing?.model ?? globalSurroundModelParam) || null;
 
-        console.log('[SP] seed ATTEMPT', {
-          role, canon, dolbyAngleDeg,
-          inLocalRoles: localRolesForLayout.has(canon),
-          resolvedModel
-        });
+        const existing = byRole.get(canon);
+        const fallback = byRole.get('SL')?.model || byRole.get('SR')?.model;
+        const resolvedModel = (globalSurroundModelParam || existing?.model || fallback || '').trim().toLowerCase();
 
-        // only seed roles defined for this layout; require a model
-        if (!localRolesForLayout.has(canon) || !resolvedModel) return;
+        if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
+          return;
+        }
 
-        // Project to wall along the Dolby angle from MLP, then finalise
-        const base = projectToWallFromMLP_xy(mlp, dolbyAngleDeg, { left:0, right:dims.width, front:0, back:dims.length });
-        const position = finalisePos(base, canon, resolvedModel);
+        const base = projectToWallFromMLP_xy(mlp, dolbyAngleDeg, room);
+        const pos  = finalisePos(base, canon, resolvedModel);
 
-        // Yaw: side-walls face room centre; back wall faces forward
-        const yawDeg =
-          (canon === 'SL' || canon === 'LW') ?  90 :
-          (canon === 'SR' || canon === 'RW') ? -90 : 0;
-
-        const spk = {
-          id: `${canon}-${Date.now()}`,
+        next.push({
+          id: existing?.id || `${canon}-${Date.now()}`,
           role: canon,
           model: resolvedModel,
-          position,
+          position: pos,
           draggable: true,
-          rotation: { x:0, y:0, z: yawDeg }
-        };
-        console.log('[SP] seed PUSH', spk);
-        next.push(spk);
+          rotation: existing?.rotation || { x: 0, y: 0, z: yawDeg ?? 0 },
+        });
       };
 
-      // Layout branches using fixed angle tables
+      // ✅ UPDATED: 9.x seeds all six bed surrounds with correct angles and yaw
       if (major >= 9) {
-        ['SL','SR','SBL','SBR','LW','RW'].forEach(r => seed(r, ANGLES_9X[r]));
+        seed('SL', 270, +90);
+        seed('SR',  90, -90);
+        seed('SBL', 217.5, 0);
+        seed('SBR', 142.5, 0);
+        seed('LW', 300, +90);
+        seed('RW',  60, -90);
       } else if (major === 7) {
-        ['SL','SR','SBL','SBR'].forEach(r => seed(r, ANGLES_7X[r]));
+        seed('SL', 270, +90);
+        seed('SR',  90, -90);
+        seed('SBL', 217.5, 0);
+        seed('SBR', 142.5, 0);
       } else {
-        ['SL','SR'].forEach(r => seed(r, ANGLES_5X[r]));
+        seed('SL', 270, +90);
+        seed('SR',  90, -90);
       }
 
-      // Debug table
       console.table(next.map(s => ({
         role: s.role, model: s.model,
         x: s.position?.x?.toFixed(3),
@@ -1742,7 +1382,6 @@ function SpeakerPlacementImpl(props) {
     [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
   );
 
-  // Handler for reset button (full surround reset)
   const handleResetPositions = useCallback(() => {
     if (!mlpPoint || !dimensions) {
       if (showToast) showToast('Cannot reset speakers: Room dimensions or MLP not set.', 'error');
@@ -1757,7 +1396,7 @@ function SpeakerPlacementImpl(props) {
     }
   }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast, globalSurroundModel]);
 
-  // ✅ UPDATED: Idempotent with shallow equality check
+  // ✅ UPDATED: Idempotent with shallow equality check + globalSurroundModel dep
   useEffect(() => {
     if (!mlpPoint || !dimensions) return;
 
@@ -1788,22 +1427,18 @@ function SpeakerPlacementImpl(props) {
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
-  // Dedicated reset for Front Wides (triggered by custom event)
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
-    // Only reset if Front Wides are logically active in the current configuration
     if (!mlpPoint || !dimensions || !canWides) {
         if (showToast) showToast('Front-Wide speakers are not enabled or room data missing.', 'info');
         return;
     }
 
     setSpeakers(currentSpeakers => {
-        // Filter out existing LW/RW speakers, keep others
         const otherSpeakers = currentSpeakers.filter(s => {
             const canonicalRole = getCanonicalRole(s.role);
             return !['LW', 'RW'].includes(canonicalRole);
         });
 
-        // Get current models for potential inheritance or to re-apply
         const existingSpeakersMap = new Map();
         currentSpeakers.forEach(s => existingSpeakersMap.set(getCanonicalRole(s.role), s));
 
@@ -1812,32 +1447,24 @@ function SpeakerPlacementImpl(props) {
 
         const W = Number(dimensions?.width) || 4.5;
         const L = Number(dimensions?.length) || 6.0;
-        // const WALL_BUFFER = 0.02; // Not directly used in this snippet, but kept for context
 
         fwRoles.forEach(role => {
             const existing = existingSpeakersMap.get(role);
-            // Inherit model from existing LW/RW, or if none, from SL/SR
             let model = existing?.model || existingSpeakersMap.get(role === 'LW' ? 'SL' : 'SR')?.model || 'off';
             
-            if (model === 'off') return; // Don't place if no model
-
-            // Get model dimensions
-            // const modelDims = getModelDimsM(model) || {}; // Not used directly in this specific calculation
-            // const halfDepth = (Number(modelDims.depthM) || 0.082) / 2; // Not used directly in final calculation
-            // const halfWidth = (Number(modelDims.widthM) || 0.27) / 2; // Not used directly in final calculation
+            if (model === 'off') return;
 
             let xAtWall;
-            // The median Y is relative to the room length.
             const medianY = L / 2;
 
             if (role === 'LW') {
                 const hugging = getHuggingCenterLines(model, dimensions);
-                xAtWall = hugging.leftWallX; // Use the hugging line for X
+                xAtWall = hugging.leftWallX;
             } else if (role === 'RW') {
                 const hugging = getHuggingCenterLines(model, dimensions);
-                xAtWall = hugging.rightWallX; // Use the hugging line for X
+                xAtWall = hugging.rightWallX;
             } else {
-                return; // Should not happen
+                return;
             }
 
             newFWSpeakers.push({
@@ -1846,7 +1473,7 @@ function SpeakerPlacementImpl(props) {
                 model,
                 position: {
                     x: xAtWall,
-                    y: medianY, // Place at median Y for simplicity
+                    y: medianY,
                     z: 1.1
                 },
                 rotation: { x: 0, y: 0, z: 0 },
@@ -1857,9 +1484,8 @@ function SpeakerPlacementImpl(props) {
         return [...otherSpeakers, ...newFWSpeakers];
     });
     if (showToast) showToast('Front-Wide speakers reset to median positions.', 'success');
-  }, [mlpPoint, dimensions, canWides, setSpeakers, showToast, getModelDimsM, getHuggingCenterLines]);
+  }, [mlpPoint, dimensions, canWides, setSpeakers, showToast, getHuggingCenterLines]);
 
-  // Custom event listener for Front-Wide reset button
   useEffect(() => {
     const handler = () => {
       resetOnlyFrontWidesToDefaults();
@@ -1870,10 +1496,8 @@ function SpeakerPlacementImpl(props) {
     };
   }, [resetOnlyFrontWidesToDefaults]);
 
-
   return (
     <div className="space-y-4 font-sans" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
-
       <div className="space-y-3">
         <Label htmlFor="system-config" className="text-[#1B1A1A] font-bold text-base block">System Configuration</Label>
         <Select 
@@ -1881,7 +1505,6 @@ function SpeakerPlacementImpl(props) {
           onValueChange={(v) => { 
             if (setDolbyConfig) setDolbyConfig(v); 
             if (onDolbyPresetChange) onDolbyPresetChange(v);
-            // The useEffect will catch this change and trigger the reset
           }}
           disabled={disabled}
         >
@@ -1905,7 +1528,6 @@ function SpeakerPlacementImpl(props) {
           size="sm"
           disabled={disabled || !mlpPoint || !dimensions}
           className="flex-1 border-[#DCDBD6] text-[#1B1A1A] hover:bg-[#F8F8F7]"
-          aria-label="Reset speaker positions to layout defaults"
           title="Re-position surrounds for the current layout. 5.1.x = ±120°. 7.1.x = ±100° sides and ±142.5° rears."
         >
           <RotateCcw className="w-4 h-4 mr-2" />
@@ -1933,12 +1555,7 @@ function SpeakerPlacementImpl(props) {
         />
       </CollapsiblePanel>
 
-      <CollapsiblePanel
-        title="Surround Channels"
-        icon={<Speaker className="w-5 h-5 text-[#625143]" />}
-        defaultOpen={false}
-      >
-        {/* 7-bed XOR switch - only show for 7.x layouts, hide for 9-bed */}
+      <CollapsiblePanel title="Surround Channels" icon={<Speaker className="w-5 h-5 text-[#625143]" />} defaultOpen={false}>
         {!isNineBed && is7xOrHigher && (
           <div className="mb-4 p-3 rounded-lg border border-[#E6E4DD] bg-[#F8F8F7]">
             <div className="flex items-center justify-between">
@@ -1964,7 +1581,7 @@ function SpeakerPlacementImpl(props) {
           setSpeakers={setSpeakers}
           mlpPoint={mlpPoint}
           dolbyPreset={effectivePreset}
-          sevenBedLayoutType={sevenBedLayoutType} // ADDED
+          sevenBedLayoutType={sevenBedLayoutType}
           dimensions={dimensions}
           getHuggingCenterLines={getHuggingCenterLines}
           applyCornerClearance={applyCornerClearance}
@@ -1974,8 +1591,8 @@ function SpeakerPlacementImpl(props) {
           canSides={canSides}
           canRears={canRears}
           canWides={canWides}
-          is7xOrHigher={is7xOrHigher} // ADDED
-          safePos={safePos} // NEW: Pass safePos to UnifiedSurroundsConfig
+          is7xOrHigher={is7xOrHigher}
+          safePos={safePos}
         />
 
         {canWides && (
@@ -2004,7 +1621,7 @@ function SpeakerPlacementImpl(props) {
               globalModel={overheadGlobalModel}
               onGlobalModelChange={setOverheadGlobalModel}
               frontOverride={overheadFrontOverride}
-              midOverride={overheadMidOverride} // Corrected: was `midOverride`
+              midOverride={overheadMidOverride}
               rearOverride={overheadRearOverride}
               onFrontOverrideChange={setOverheadFrontOverride}
               onMidOverrideChange={setOverheadMidOverride}
@@ -2020,10 +1637,7 @@ function SpeakerPlacementImpl(props) {
         </CollapsiblePanel>
       )}
 
-      <CollapsiblePanel
-        title="Subwoofers"
-        defaultOpen={false}
-      >
+      <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
         <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
           <div className="grid grid-cols-12 gap-x-4 gap-y-3">
             <div className="col-span-12 md:col-span-6">
@@ -2150,7 +1764,6 @@ function SpeakerPlacementImpl(props) {
   );
 }
 
-// Parse-proof default export
 export default function SpeakerPlacement(props) {
   return <SpeakerPlacementImpl {...props} />;
 }
