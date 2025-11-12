@@ -592,7 +592,7 @@ function UnifiedSurroundsConfig({
     sbrPos = applyRoomBoundsClamp(sbrPos, defaultModel, dimensions);
 
     return {
-      SBL: { x: sblPos.x, y: sbrPos.y, z: 1.1 },
+      SBL: { x: sblPos.x, y: sblPos.y, z: 1.1 },
       SBR: { x: sbrPos.x, y: sbrPos.y, z: 1.1 }
     };
   }, [dimensions, mlpPoint, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp]);
@@ -1330,6 +1330,7 @@ function SpeakerPlacementImpl(props) {
         const hug = getHuggingCenterLines(safeModel, dims);
         let p = { x: base.x, y: base.y, z: 1.1 };
 
+        // Apply corner clearance + room bounds clamp
         p = applyCornerClearance(p, canon, safeModel, dims, {});
         p = applyRoomBoundsClamp(p, safeModel, dims);
 
@@ -1338,9 +1339,17 @@ function SpeakerPlacementImpl(props) {
         if (R === 'SR' || R === 'RW')   p.x = hug.rightWallX;
         if (R === 'SBL' || R === 'SBR') p.y = hug.backWallY;
 
+        // If we *still* don't have a valid X/Y, drop this speaker instead of snapping to MLP
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-          p = { x: mlp.x, y: mlp.y, z: 1.1 };
+          console.warn('[SP resetSurroundPositions] dropping surround with invalid position', {
+            base,
+            canon,
+            safeModel,
+            p,
+          });
+          return null;
         }
+
         return p;
       };
 
@@ -1358,6 +1367,11 @@ function SpeakerPlacementImpl(props) {
         const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
         const base = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
         const pos  = finalisePos(base, canon, resolvedModel);
+
+        if (!pos) {
+          // finalisePos logged a warning; do not create this speaker
+          return;
+        }
 
         next.push({
           id: existing?.id || `${canon}-${Date.now()}`,
