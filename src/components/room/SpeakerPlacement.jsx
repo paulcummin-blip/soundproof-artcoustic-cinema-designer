@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } from 'react';
@@ -1137,7 +1138,7 @@ function SpeakerPlacementImpl(props) {
       shortEdge,
       longEdge
     };
-  }, [getModelDimsM]);
+  }, [getModelDimsM, WALL_BUFFER_M]);
 
   const placeSurroundByRayCast = useCallback((angleDegrees, mlpPoint, roomDimensions) => {
     const { width: W, length: L } = roomDimensions;
@@ -1183,6 +1184,13 @@ function SpeakerPlacementImpl(props) {
     
     let { x, y, z } = position;
     
+    // [B44] Defensive check: if inputs are not finite, return position as-is
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(W) || !Number.isFinite(L) ||
+        !Number.isFinite(shortEdge) || !Number.isFinite(longEdge)) {
+      console.warn('[applyCornerClearance] Non-finite input detected', { x, y, W, L, shortEdge, longEdge });
+      return { x, y, z };
+    }
+    
     const isOnLeftWall = Math.abs(x - hugging.leftWallX) < 0.001;
     const isOnRightWall = Math.abs(x - hugging.rightWallX) < 0.001;
     const isOnBackWall = Math.abs(y - hugging.backWallY) < 0.001;
@@ -1190,38 +1198,96 @@ function SpeakerPlacementImpl(props) {
     const zone = zones?.[role] || {};
     
     if (isOnBackWall) {
-      const zoneXMin = zone.xMin || 0;
-      const zoneXMax = zone.xMax || W;
+      // Zone boundaries (default to full room width if not specified)
+      const zoneXMin = Number.isFinite(zone.xMin) ? zone.xMin : 0;
+      const zoneXMax = Number.isFinite(zone.xMax) ? zone.xMax : W;
       
+      // Calculate clearance bounds
+      const cornerClearanceLeft = CORNER_CLEARANCE_M + (shortEdge / 2);
+      const cornerClearanceRight = W - (CORNER_CLEARANCE_M + (shortEdge / 2));
+      
+      // Minimum X (furthest right we can push from left edge)
       const xMinWithClearance = Math.max(
         zoneXMin,
-        CORNER_CLEARANCE_M + (shortEdge / 2),
-        shortEdge / 2
+        cornerClearanceLeft,
+        shortEdge / 2  // minimum room bounds
       );
+      
+      // Maximum X (furthest left we can push from right edge)
       const xMaxWithClearance = Math.min(
         zoneXMax,
-        W - (CORNER_CLEARANCE_M + (shortEdge / 2)),
-        W - (shortEdge / 2)
+        cornerClearanceRight,
+        W - (shortEdge / 2)  // maximum room bounds
       );
       
-      x = Math.max(xMinWithClearance, Math.min(xMaxWithClearance, x));
+      // [B44] If constraints are impossible (min > max), use safe mid-zone position
+      if (xMinWithClearance >= xMaxWithClearance) {
+        console.warn(`[applyCornerClearance] Impossible X range for ${role} on back wall. Using safe center.`, {
+          xMinWithClearance,
+          xMaxWithClearance,
+          W,
+          shortEdge,
+          CORNER_CLEARANCE_M
+        });
+        x = (xMinWithClearance + xMaxWithClearance) / 2;
+        // Ensure x is still finite
+        if (!Number.isFinite(x)) {
+          x = W / 2;  // Ultimate fallback
+        }
+      } else {
+        // Normal clamping
+        x = Math.max(xMinWithClearance, Math.min(xMaxWithClearance, x));
+      }
       
     } else if (isOnLeftWall || isOnRightWall) {
-      const zoneYMin = zone.yMin || 0;
-      const zoneYMax = zone.yMax || L;
+      // Zone boundaries (default to full room length if not specified)
+      const zoneYMin = Number.isFinite(zone.yMin) ? zone.yMin : 0;
+      const zoneYMax = Number.isFinite(zone.yMax) ? zone.yMax : L;
       
-      const yMinFromZone = Math.max(zoneYMin, longEdge / 2);
-      const yMaxWithRearClearance = Math.min(
-        zoneYMax,
-        L - (CORNER_CLEARANCE_M + (longEdge / 2)),
-        L - (longEdge / 2)
+      // Calculate clearance bounds
+      const cornerClearanceRear = L - (CORNER_CLEARANCE_M + (longEdge / 2));
+      
+      // Minimum Y (furthest back we can push from front edge)
+      const yMinFromZone = Math.max(
+        zoneYMin,
+        longEdge / 2  // minimum room bounds
       );
       
-      y = Math.max(yMinFromZone, Math.min(yMaxWithRearClearance, y));
+      // Maximum Y (furthest forward we can push from rear edge)
+      const yMaxWithRearClearance = Math.min(
+        zoneYMax,
+        cornerClearanceRear,
+        L - (longEdge / 2)  // maximum room bounds
+      );
+      
+      // [B44] If constraints are impossible (min > max), use safe mid-zone position
+      if (yMinFromZone >= yMaxWithRearClearance) {
+        console.warn(`[applyCornerClearance] Impossible Y range for ${role} on side wall. Using safe center.`, {
+          yMinFromZone,
+          yMaxWithRearClearance,
+          L,
+          longEdge,
+          CORNER_CLEARANCE_M
+        });
+        y = (yMinFromZone + yMaxWithRearClearance) / 2;
+        // Ensure y is still finite
+        if (!Number.isFinite(y)) {
+          y = L / 2;  // Ultimate fallback
+        }
+      } else {
+        // Normal clamping
+        y = Math.max(yMinFromZone, Math.min(yMaxWithRearClearance, y));
+      }
+    }
+    
+    // [B44] Final safety check
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      console.error('[applyCornerClearance] FINAL NaN DETECTED. Using room center fallback.', { x, y, role });
+      return { x: W / 2, y: L / 2, z };
     }
     
     return { x, y, z };
-  }, [getHuggingCenterLines]);
+  }, [getHuggingCenterLines, CORNER_CLEARANCE_M]);
 
   const applyRoomBoundsClamp = useCallback((position, speakerModel, roomDimensions) => {
     const { width: W, length: L } = roomDimensions;
@@ -1229,8 +1295,35 @@ function SpeakerPlacementImpl(props) {
     
     let { x, y, z } = position;
     
-    x = Math.max(shortEdge / 2, Math.min(W - shortEdge / 2, x));
-    y = Math.max(shortEdge / 2, Math.min(L - shortEdge / 2, y));
+    // [B44] Defensive check: ensure all values are finite
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(W) || 
+        !Number.isFinite(L) || !Number.isFinite(shortEdge)) {
+      console.warn('[applyRoomBoundsClamp] Non-finite input detected', { x, y, W, L, shortEdge });
+      // Return unclamped position to preserve any partial validity
+      return { x, y, z };
+    }
+    
+    const minX = shortEdge / 2;
+    const maxX = W - shortEdge / 2;
+    const minY = shortEdge / 2;
+    const maxY = L - shortEdge / 2;
+    
+    // [B44] Safety check: if room is too small for speaker, use room center
+    if (minX >= maxX || minY >= maxY) {
+      console.warn('[applyRoomBoundsClamp] Room too small for speaker dimensions', {
+        W, L, shortEdge, minX, maxX, minY, maxY
+      });
+      return { x: W / 2, y: L / 2, z };
+    }
+    
+    x = Math.max(minX, Math.min(maxX, x));
+    y = Math.max(minY, Math.min(maxY, y));
+    
+    // [B44] Final safety check
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      console.error('[applyRoomBoundsClamp] FINAL NaN DETECTED after clamping', { x, y });
+      return { x: W / 2, y: L / 2, z };
+    }
     
     return { x, y, z };
   }, [getHuggingCenterLines]);
@@ -1328,18 +1421,60 @@ function SpeakerPlacementImpl(props) {
       const finalisePos = (base, canon, model) => {
         const safeModel = model || 'evolve-2-1_s';
         const hug = getHuggingCenterLines(safeModel, dims);
+        
+        // [B44] Start with base, ensuring it's finite
+        if (!Number.isFinite(base.x) || !Number.isFinite(base.y)) {
+          console.warn('[finalisePos] Non-finite base coordinates', { base, canon });
+          return null;
+        }
+        
         let p = { x: base.x, y: base.y, z: 1.1 };
 
-        // Apply corner clearance + room bounds clamp
+        // [B44] Apply corner clearance + room bounds clamp (now with NaN protection)
         p = applyCornerClearance(p, canon, safeModel, dims, {});
+        
+        // Check for NaN after corner clearance
+        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+          console.warn('[finalisePos] NaN after applyCornerClearance', { p, canon, base });
+          return null;
+        }
+        
         p = applyRoomBoundsClamp(p, safeModel, dims);
+        
+        // Check for NaN after room bounds clamp
+        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+          console.warn('[finalisePos] NaN after applyRoomBoundsClamp', { p, canon, base });
+          return null;
+        }
 
+        // [B44] Apply wall-hugging logic
         const R = String(canon).toUpperCase();
-        if (R === 'SL' || R === 'LW')   p.x = hug.leftWallX;
-        if (R === 'SR' || R === 'RW')   p.x = hug.rightWallX;
-        if (R === 'SBL' || R === 'SBR') p.y = hug.backWallY;
+        if (R === 'SL' || R === 'LW') {
+          if (Number.isFinite(hug.leftWallX)) {
+            p.x = hug.leftWallX;
+          } else {
+            console.warn('[finalisePos] Non-finite hug.leftWallX', { hug, canon });
+            return null;
+          }
+        }
+        if (R === 'SR' || R === 'RW') {
+          if (Number.isFinite(hug.rightWallX)) {
+            p.x = hug.rightWallX;
+          } else {
+            console.warn('[finalisePos] Non-finite hug.rightWallX', { hug, canon });
+            return null;
+          }
+        }
+        if (R === 'SBL' || R === 'SBR') {
+          if (Number.isFinite(hug.backWallY)) {
+            p.y = hug.backWallY;
+          } else {
+            console.warn('[finalisePos] Non-finite hug.backWallY', { hug, canon });
+            return null;
+          }
+        }
 
-        // If we *still* don't have a valid X/Y, drop this speaker instead of snapping to MLP
+        // [B44] Final validation before returning
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[SP resetSurroundPositions] dropping surround with invalid position', {
             base,
@@ -1419,7 +1554,7 @@ function SpeakerPlacementImpl(props) {
 
       return next;
     },
-    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
+    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, SURROUND_BED_ROLES]
   );
 
   const handleResetPositions = useCallback(() => {
