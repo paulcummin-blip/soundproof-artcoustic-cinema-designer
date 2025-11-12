@@ -1235,10 +1235,26 @@ function SpeakerPlacementImpl(props) {
     return { x, y, z };
   }, [getHuggingCenterLines]);
 
+  // [B44] CRITICAL: Do NOT snap surrounds to MLP when x/y are missing.
+  // Let bad coordinates stay bad so we can debug why ray-casting failed,
+  // rather than silently teleporting speakers to the MLP.
   function safePos(pos, mlp, fallbackZ = 1.1) {
-    const x = Number.isFinite(pos?.x) ? pos.x : (Number.isFinite(mlp?.x) ? mlp.x : 0.5);
-    const y = Number.isFinite(pos?.y) ? pos.y : (Number.isFinite(mlp?.y) ? mlp.y : 0.5);
-    const z = Number.isFinite(pos?.z) ? pos.z : fallbackZ;
+    const p = pos || {};
+
+    const x = Number.isFinite(p.x) ? p.x : p.x; // pass through, even if undefined/NaN
+    const y = Number.isFinite(p.y) ? p.y : p.y;
+    const z = Number.isFinite(p.z) ? p.z : fallbackZ;
+
+    // Debug warning when coordinates are invalid (temporary)
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      console.warn('[SP safePos] Non-finite coordinates detected (will NOT fallback to MLP):', {
+        pos: p,
+        x,
+        y,
+        z
+      });
+    }
+
     return { x, y, z };
   }
 
