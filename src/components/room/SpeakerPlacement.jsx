@@ -52,7 +52,7 @@ function speakersShallowEqual(a = [], b = []) {
   for (const [role, sa] of A) {
     const sb = B.get(role);
     if (!sb) return false;
-    if ((sa.model || 'off') !== (sb.model || 'off')) return false;
+    if ((sa.model || 'off') !== (sb.model || 'off')) false;
 
     const pa = sa.position || {}, pb = sb.position || {};
     if (!almostEq(pa.x, pb.x) || !almostEq(pa.y, pb.y) || !almostEq(pa.z, pb.z)) return false;
@@ -590,7 +590,7 @@ function UnifiedSurroundsConfig({
     sbrPos = applyRoomBoundsClamp(sbrPos, defaultModel, dimensions);
 
     return {
-      SBL: { x: sblPos.x, y: sblPos.y, z: 1.1 },
+      SBL: { x: sblPos.x, y: sbrPos.y, z: 1.1 },
       SBR: { x: sbrPos.x, y: sbrPos.y, z: 1.1 }
     };
   }, [dimensions, mlpPoint, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp]);
@@ -1307,7 +1307,6 @@ function SpeakerPlacementImpl(props) {
       const byRole = buildRoleMap(currentSpeakers);
       const room = { left: 0, right: dims.width, front: 0, back: dims.length };
 
-      // ✅ UPDATED: finalisePos never returns MLP fallback
       const finalisePos = (base, canon, model) => {
         const safeModel = model || 'evolve-2-1_s';
         const hug = getHuggingCenterLines(safeModel, dims);
@@ -1327,7 +1326,6 @@ function SpeakerPlacementImpl(props) {
         return p;
       };
 
-      // ✅ UPDATED: seed never spawns off/none, uses globalSurroundModelParam, correct yaw
       const seed = (role, dolbyAngleDeg, yawDeg) => {
         const canon = getCanonicalRole(role);
 
@@ -1339,7 +1337,9 @@ function SpeakerPlacementImpl(props) {
           return;
         }
 
-        const base = projectToWallFromMLP_xy(mlp, dolbyAngleDeg, room);
+        // Convert Dolby angle (0 front, +left/−right) to the raycaster's frame (0→+x, 90→+y)
+        const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
+        const base = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
         const pos  = finalisePos(base, canon, resolvedModel);
 
         next.push({
@@ -1352,22 +1352,22 @@ function SpeakerPlacementImpl(props) {
         });
       };
 
-      // ✅ UPDATED: 9.x seeds all six bed surrounds with correct angles and yaw
       if (major >= 9) {
-        seed('SL', 270, +90);
-        seed('SR',  90, -90);
-        seed('SBL', 217.5, 0);
-        seed('SBR', 142.5, 0);
-        seed('LW', 300, +90);
-        seed('RW',  60, -90);
+        // Dolby angle convention: 0° forward to screen; + left / – right
+        seed('SL',  +90, +90);     // left wall
+        seed('SR',  -90, -90);     // right wall
+        seed('SBL', +142.5, 0);    // back wall
+        seed('SBR', -142.5, 0);    // back wall
+        seed('LW',  +60,  +90);    // left wall (forward of SL)
+        seed('RW',  -60,  -90);    // right wall (forward of SR)
       } else if (major === 7) {
-        seed('SL', 270, +90);
-        seed('SR',  90, -90);
-        seed('SBL', 217.5, 0);
-        seed('SBR', 142.5, 0);
+        seed('SL',  +90, +90);
+        seed('SR',  -90, -90);
+        seed('SBL', +142.5, 0);
+        seed('SBR', -142.5, 0);
       } else {
-        seed('SL', 270, +90);
-        seed('SR',  90, -90);
+        seed('SL',  +90, +90);
+        seed('SR',  -90, -90);
       }
 
       console.table(next.map(s => ({
@@ -1488,7 +1488,7 @@ function SpeakerPlacementImpl(props) {
 
   useEffect(() => {
     const handler = () => {
-      resetOnlyFrontWidesToDefaults();
+      window.dispatchEvent(new CustomEvent('b44:fw:resetToMedian'));
     };
     window.addEventListener('b44:fw:resetToMedian', handler);
     return () => {
