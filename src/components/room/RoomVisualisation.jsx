@@ -4090,16 +4090,10 @@ return {
     // ignore console errors in strange environments
   }
 
-  // NaN-safe coordinate mappers
-  const toCanvasX = (xM) => {
-    const vx = Number.isFinite(xM) ? xM : 0;
-    return roomRect.x + (vx * scale);
-  };
-
   const toCanvasY = (yM) => {
-    const vy = Number.isFinite(yM) ? vy : 0;
-    return roomRect.y + (vy * scale);
-  };
+  const safeY = Number.isFinite(yM) ? yM : 0;
+  return roomRect.y + (safeY * scale);
+};
 
   // 3) Map to icons
   return afterVisibility.map((speaker) => {
