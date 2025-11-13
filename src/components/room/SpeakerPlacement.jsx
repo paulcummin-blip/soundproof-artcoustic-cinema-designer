@@ -1412,17 +1412,17 @@ function SpeakerPlacementImpl(props) {
 
       const major = parseInt(layoutNormalized.split('.')[0], 10) || 5;
 
-      // [B44 FIX] Use the canonical rolesForLayout from the helper
-      const currentUseWides = useWides; // From the newly defined useWides memo
-      
-      const localAllowedRoles = rolesForLayout({ // Use the helper function here
+      // [B44 FIX] Use rolesForLayout and convert to Set for .has() compatibility
+      const localAllowedRolesArray = rolesForLayout({
         dolbyLayout: layoutNormalized,
-        useWidesInsteadOfRears: currentUseWides
+        useWidesInsteadOfRears: useWides
       }).filter(r => ["SL","SR","SBL","SBR","LW","RW"].includes(r));
+      
+      const localAllowedRoles = new Set(localAllowedRolesArray.map(getCanonicalRole));
 
       console.log('[SP] resetSurroundPositions CONFIG', {
         layoutNormalized, major,
-        useWidesInsteadOfRear: currentUseWides,
+        useWidesInsteadOfRear: useWides,
         localRoles: Array.from(localAllowedRoles),
         globalSurroundModel: globalSurroundModelParam
       });
