@@ -103,6 +103,15 @@ export function rolesForLayout({ dolbyLayout = "5.1", useWidesInsteadOfRears = f
   return Array.from(roles);
 }
 
+// TEMP: debug helper
+export function debugRolesForLayout(layout, useWides) {
+  const roles = rolesForLayout({ dolbyLayout: layout, useWidesInsteadOfRears: !!useWides });
+  if (typeof console !== "undefined") {
+    console.log("[B44 DEBUG] rolesForLayout", { layout, useWidesInsteadOfRears: !!useWides, roles });
+  }
+  return roles;
+}
+
 /**
  * Check if a role should be visible in current layout
  * @param {string} role - Speaker role

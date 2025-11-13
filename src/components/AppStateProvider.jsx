@@ -1,19 +1,22 @@
+
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { timeNowMs } from "@/components/utils/timeNow";
 import { safeTable } from '@/components/utils/safeLog';
 import { SHOW_DEBUG_LOGS } from '@/components/utils/diagnostics';
-import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRoleMap";
+import { getCanonicalRole, rolesForLayout, debugRolesForLayout } from "@/components/utils/surroundRoleMap";
 
 // --- SINGLE SOURCE OF TRUTH FOR VISIBILITY -----------------------------
 // This function now delegates to the canonical rolesForLayout from surroundRoleMap.js
 export function getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears) {
-  const canonRoles = rolesForLayout({
-    dolbyLayout: layoutString || "5.1",
-    useWidesInsteadOfRears: !!useWidesInsteadOfRears,
-  });
-
-  // Normalise via getCanonicalRole for safety
-  return new Set(canonRoles.map(getCanonicalRole));
+  const roles = debugRolesForLayout(layoutString || "5.1", useWidesInsteadOfRears);
+  const canon = roles.map(getCanonicalRole);
+  if (typeof console !== "undefined") {
+    console.log("[B44 DEBUG] visibleRoles for layout", layoutString, {
+      useWidesInsteadOfRears,
+      canon,
+    });
+  }
+  return new Set(canon);
 }
 
 // --- idempotence helper -----------------------------------------------------
@@ -264,7 +267,7 @@ function useDesignerState() {
   }, []);
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== 'undefined') {
       window.__APPSTATE__ = window.__APPSTATE__ || {};
       window.__APPSTATE__.getEnableFrontWides = () => enableFrontWides;
       window.__APPSTATE__.setEnableFrontWides = (v) => {
