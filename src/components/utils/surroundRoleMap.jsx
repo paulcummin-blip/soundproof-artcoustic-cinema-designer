@@ -2,6 +2,57 @@
 // Pure helpers for layout-based role visibility and hydration
 // No React imports - safe for use anywhere
 
+// --- Canonical role mapping + helpers ---
+// This map contains a comprehensive list of aliases for common speaker roles.
+// Any role not explicitly mapped will return its uppercase version.
+const CANONICAL_ROLE_MAP = {
+  // LCR
+  FL: "FL", L: "FL",
+  FC: "FC", C: "FC",
+  FR: "FR", R: "FR",
+
+  // Side surrounds
+  SL: "SL", LS: "SL",
+  SR: "SR", RS: "SR",
+
+  // Rear surrounds
+  SBL: "SBL", RL: "SBL", RSL: "SBL", LR: "SBL", LRS: "SBL", BL: "SBL", LB: "SBL",
+  SBR: "SBR", RR: "SBR", RSR: "SBR", RRS: "SBR", BR: "SBR", RB: "SBR",
+
+  // Wides
+  LW: "LW", FWL: "LW",
+  RW: "RW", FWR: "RW",
+
+  // Height / Atmos - Front
+  TFL: "TFL", TF: "TFL",
+  TFR: "TFR",
+
+  // Height / Atmos - Middle/Side
+  TL: "TL", TML: "TL", TSL: "TL",
+  TR: "TR", TMR: "TR", TSR: "TR",
+
+  // Height / Atmos - Rear
+  TBL: "TBL", TRL: "TBL",
+  TBR: "TBR", TRR: "TBR",
+
+  // Up-firing (if used)
+  UFL: "UFL",
+  UFR: "UFR",
+  UBL: "UBL",
+  UBR: "UBR",
+};
+
+/**
+ * Returns the canonical (standardized) role for a given speaker role string.
+ * E.g., 'LS' becomes 'SL', 'RL' becomes 'SBL'.
+ * If no mapping exists, returns the uppercase version of the input role.
+ * @param {string} role - The raw speaker role string.
+ * @returns {string} The canonical speaker role.
+ */
+export function getCanonicalRole(role) {
+  return CANONICAL_ROLE_MAP[String(role || "").toUpperCase()] || String(role || "").toUpperCase();
+}
+
 /**
  * Get required speaker roles for a given layout and config.
  * This is the SINGLE SOURCE OF TRUTH for bed-layer surround existence.
