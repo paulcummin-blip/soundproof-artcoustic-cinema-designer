@@ -52,8 +52,8 @@ function speakersShallowEqual(a = [], b = []) {
   for (const [role, sa] of A) {
     const sb = B.get(role);
     if (!sb) return false;
-    if ((sa.model || 'off') !== (sb.model || 'off')) return false; // Fixed: returned false
-    if ((sa.id || '') !== (sb.id || '')) return false; // Added ID check for stability in comparisons
+    if ((sa.model || 'off') !== (sb.model || 'off')) return false;
+    if ((sa.id || '') !== (sb.id || '')) return false;
     if (sa.draggable !== sb.draggable) return false;
 
     const pa = sa.position || {}, pb = sb.position || {};
@@ -108,7 +108,7 @@ const CANONICAL_ROLE_MAP = {
   LW:"LW", FWL:"LW", RW:"RW", FWR:"RW",
   TFL:"TFL", TFR:"TFR",
   TL:"TL", TML:"TL", TR:"TR", TMR:"TR",
-  TBL:"TBL", TBR:"TBL", // Note: TBR was TR, corrected to TBL based on common patterns or intent
+  TBL:"TBL", TBR:"TBL",
   FL:"FL", L:"FL", FC:"FC", C:"FC", FR:"FR", R:"FR",
 };
 
@@ -562,42 +562,6 @@ function UnifiedSurroundsConfig({
     }
   }, [getCurrentSurroundModels, surroundConfig.value]);
 
-  const getRearSurroundDefaultPositions = useCallback(() => {
-    if (!dimensions || !mlpPoint) return {};
-
-    const sblDolbyAngle = 142.5;
-    const sbrDolbyAngle = -142.5;
-    
-    const defaultModel = 'off';
-
-    const internalRayCast = (dolbyAngle, mlpPt, roomDims) => {
-        const projectAngleDeg = (270 - dolbyAngle + 360) % 360;
-        const room = {
-            left: 0,
-            right: roomDims.width,
-            front: 0,
-            back: roomDims.length
-        };
-        return projectToWallFromMLP_xy(mlpPt, projectAngleDeg, room);
-    };
-    
-    let sblPos = internalRayCast(sblDolbyAngle, mlpPoint, dimensions);
-    const hugging = getHuggingCenterLines(defaultModel, dimensions);
-    sblPos.y = hugging.backWallY;
-    sblPos = applyCornerClearance(sblPos, 'SBL', defaultModel, dimensions, {});
-    sblPos = applyRoomBoundsClamp(sblPos, defaultModel, dimensions); 
-
-    let sbrPos = internalRayCast(sbrDolbyAngle, mlpPoint, dimensions);
-    sbrPos.y = hugging.backWallY;
-    sbrPos = applyCornerClearance(sbrPos, 'SBR', defaultModel, dimensions, {}); 
-    sbrPos = applyRoomBoundsClamp(sbrPos, defaultModel, dimensions);
-
-    return {
-      SBL: { x: sblPos.x, y: sblPos.y, z: 1.1 },
-      SBR: { x: sbrPos.x, y: sbrPos.y, z: 1.1 }
-    };
-  }, [dimensions, mlpPoint, getHuggingCenterLines, applyCornerClearance, applyRoomBoundsClamp]);
-  
   const handleSurroundModelChange = useCallback((config) => {
     const safeConfig = {
       value: {
@@ -621,21 +585,11 @@ function UnifiedSurroundsConfig({
     const effectiveRearSelectedByUser = override.rear ? value.rear : value.master;
     const effectiveWideSelectedByUser = override.wide ? value.wide : value.master;
 
+    // [B44 FIX A] Only set MODEL, not position. resetSurroundPositions owns placement.
     setSpeakers(prev => {
       const speakerMap = new Map((prev || []).map(s => [getCanonicalRole(s.role), s]));
 
-      const calculateDefaultPosition = (dolbyAngleDegrees, mlpPt, roomDims) => {
-        const projectAngleDeg = (270 - dolbyAngleDegrees + 360) % 360;
-        const room = {
-            left: 0,
-            right: roomDims.width,
-            front: 0,
-            back: roomDims.length
-        };
-        return projectToWallFromMLP_xy(mlpPt, projectAngleDeg, room);
-      };
-
-      const processRole = (role, nextModel, defaultPos = null) => {
+      const processRole = (role, nextModel) => {
         const safeModel = typeof nextModel === 'string' ? nextModel.trim() : String(nextModel || 'off').trim();
         
         const canon = getCanonicalRole(role);
@@ -656,31 +610,16 @@ function UnifiedSurroundsConfig({
             }
           }
         } else {
-          let position = existingSpeaker?.position || defaultPos;
-
-          if (!position && mlpPoint && dimensions) {
-            let dolbyAngleDegrees;
-            switch (canon) {
-              case 'SBL': dolbyAngleDegrees = 142.5; break;
-              case 'SBR': dolbyAngleDegrees = -142.5; break;
-              case 'SL':  dolbyAngleDegrees = 90;  break;
-              case 'SR':  dolbyAngleDegrees = -90;   break;
-              case 'LW':  dolbyAngleDegrees = 60;   break;
-              case 'RW':  dolbyAngleDegrees = -60;    break;
-              default:    dolbyAngleDegrees = 0;
-            }
-            position = calculateDefaultPosition(dolbyAngleDegrees, mlpPoint, dimensions);
-          }
-
-          position = safePos(position, mlpPoint);
-
+          // [B44 FIX A] Do NOT calculate or set position here.
+          // resetSurroundPositions will handle ALL surround positioning.
           speakerMap.set(canon, {
             ...(existingSpeaker || {}),
             role: canon,
             id: existingSpeaker?.id || `${canon}-${timeNowMs()}`,
             draggable: true,
             model: safeModel,
-            position,
+            // Keep existing position if any, or leave undefined for resetSurroundPositions to calculate
+            position: existingSpeaker?.position || undefined,
             rotation: existingSpeaker?.rotation || { x: 0, y: 0, z: 0 },
           });
         }
@@ -695,9 +634,8 @@ function UnifiedSurroundsConfig({
       }
       
       if (canRears) {
-        const defaultPositions = getRearSurroundDefaultPositions();
-        processRole('SBL', effectiveRearSelectedByUser, defaultPositions?.SBL);
-        processRole('SBR', effectiveRearSelectedByUser, defaultPositions?.SBR);
+        processRole('SBL', effectiveRearSelectedByUser);
+        processRole('SBR', effectiveRearSelectedByUser);
       } else {
         speakerMap.delete('SBL');
         speakerMap.delete('SBR');
@@ -714,7 +652,7 @@ function UnifiedSurroundsConfig({
       const next = Array.from(speakerMap.values());
       return next;
     });
-  }, [setSurroundConfig, setSpeakers, getRearSurroundDefaultPositions, mlpPoint, dimensions, allowedRoles, canSides, canRears, canWides, safePos]);
+  }, [setSurroundConfig, setSpeakers, allowedRoles, canSides, canRears, canWides]); // Removed mlpPoint, dimensions, safePos from deps.
 
   useEffect(() => {
     const master = surroundConfig?.value?.master;
@@ -1418,11 +1356,13 @@ function SpeakerPlacementImpl(props) {
       const byRole = buildRoleMap(currentSpeakers);
       const room = { left: 0, right: dims.width, front: 0, back: dims.length };
 
-      const finalisePos = (base, canon, model) => {
+      // [B44 FIX B] finalisePos now takes hitWall parameter
+      const finalisePos = (base, canon, model, hitWall) => {
+        console.log(`[finalisePos] ENTRY: canon=${canon}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}, W=${dims.width}, L=${dims.length}`);
+        
         const safeModel = model || 'evolve-2-1_s';
         const hug = getHuggingCenterLines(safeModel, dims);
         
-        // [B44] Start with base, ensuring it's finite
         if (!Number.isFinite(base.x) || !Number.isFinite(base.y)) {
           console.warn('[finalisePos] Non-finite base coordinates', { base, canon });
           return null;
@@ -1430,26 +1370,27 @@ function SpeakerPlacementImpl(props) {
         
         let p = { x: base.x, y: base.y, z: 1.1 };
 
-        // [B44] Apply corner clearance + room bounds clamp (now with NaN protection)
         p = applyCornerClearance(p, canon, safeModel, dims, {});
+        console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
-        // Check for NaN after corner clearance
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[finalisePos] NaN after applyCornerClearance', { p, canon, base });
           return null;
         }
         
         p = applyRoomBoundsClamp(p, safeModel, dims);
+        console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
-        // Check for NaN after room bounds clamp
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[finalisePos] NaN after applyRoomBoundsClamp', { p, canon, base });
           return null;
         }
 
-        // [B44] Apply wall-hugging logic
+        // [B44 FIX B] Wall-hugging now respects hitWall
         const R = String(canon).toUpperCase();
-        if (R === 'SL' || R === 'LW') {
+        
+        // Only hug the wall that the ray actually hit
+        if (hitWall === 'L' && R === 'SL' || R === 'LW') {
           if (Number.isFinite(hug.leftWallX)) {
             p.x = hug.leftWallX;
           } else {
@@ -1457,7 +1398,8 @@ function SpeakerPlacementImpl(props) {
             return null;
           }
         }
-        if (R === 'SR' || R === 'RW') {
+        
+        if (hitWall === 'R' && (R === 'SR' || R === 'RW')) {
           if (Number.isFinite(hug.rightWallX)) {
             p.x = hug.rightWallX;
           } else {
@@ -1465,7 +1407,8 @@ function SpeakerPlacementImpl(props) {
             return null;
           }
         }
-        if (R === 'SBL' || R === 'SBR') {
+        
+        if (hitWall === 'B' && (R === 'SBL' || R === 'SBR')) {
           if (Number.isFinite(hug.backWallY)) {
             p.y = hug.backWallY;
           } else {
@@ -1474,12 +1417,14 @@ function SpeakerPlacementImpl(props) {
           }
         }
 
-        // [B44] Final validation before returning
+        console.log(`[finalisePos] EXIT: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}, finite=${Number.isFinite(p.x) && Number.isFinite(p.y)}`);
+
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[SP resetSurroundPositions] dropping surround with invalid position', {
             base,
             canon,
             safeModel,
+            hitWall,
             p,
           });
           return null;
@@ -1490,26 +1435,32 @@ function SpeakerPlacementImpl(props) {
 
       const seed = (role, dolbyAngleDeg, yawDeg) => {
         const canon = getCanonicalRole(role);
+        // Only seed if the role is allowed in the current layout
+        if (!allowedRoles.has(canon)) return;
 
         const existing = byRole.get(canon);
-        const fallback = byRole.get('SL')?.model || byRole.get('SR')?.model;
-        let resolvedModel = (globalSurroundModelParam || existing?.model || fallback || '').trim().toLowerCase();
-
-        if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
-          resolvedModel = 'evolve-2-1_s';
-        }
+        // Fallback model resolution logic
+        let resolvedModel = existing?.model || globalSurroundModel || 'evolve-2-1_s';
+        if (resolvedModel === 'off' || resolvedModel === 'none') resolvedModel = 'evolve-2-1_s';
+        resolvedModel = resolvedModel.trim().toLowerCase();
 
         const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
-        const base = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
-        const pos  = finalisePos(base, canon, resolvedModel);
+        
+        // [B44 FIX B] Capture wall hit from projectToWallFromMLP_xy
+        const baseWithWall = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
+        const base = { x: baseWithWall.x, y: baseWithWall.y };
+        const hitWall = baseWithWall.wall;
+        
+        console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
+        
+        const pos  = finalisePos(base, canon, resolvedModel, hitWall);
 
         if (!pos) {
-          // finalisePos logged a warning; do not create this speaker
           return;
         }
 
         next.push({
-          id: existing?.id || `${canon}-${Date.now()}`,
+          id: existing?.id || `${canon}-${timeNowMs()}`,
           role: canon,
           model: resolvedModel,
           position: pos,
@@ -1554,7 +1505,7 @@ function SpeakerPlacementImpl(props) {
 
       return next;
     },
-    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, SURROUND_BED_ROLES]
+    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
   );
 
   const handleResetPositions = useCallback(() => {
@@ -1591,7 +1542,8 @@ function SpeakerPlacementImpl(props) {
     effectivePreset,
     globalSurroundModel,
     mlpPoint?.x, mlpPoint?.y,
-    dimensions?.width, dimensions?.length
+    dimensions?.width, dimensions?.length,
+    allowedRoles // Dependency added to re-evaluate on layout change
   ]);
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
