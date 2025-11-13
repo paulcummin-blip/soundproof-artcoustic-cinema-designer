@@ -112,7 +112,7 @@ const CANONICAL_ROLE_MAP = {
   SR: "SR", RS: "SR",
   
   // Rear surrounds
-  SBL: "SBL", RL: "SBL", RSL: "SBL", LR: "SBL", LRS: "SBL", BL: "SBL", LB: "SBL",
+  SBL: "SBL", RL: "SBL", RSL: "SBL", LR: "SBL", LRS: "SBL", BL: "SBL",
   SBR: "SBR", RR: "SBR", RSR: "SBR", RRS: "SBR", BR: "SBR", RB: "SBR",
   
   // Wides
@@ -717,7 +717,7 @@ function UnifiedSurroundsConfig({
   //     const next = (Array.isArray(prev) ? prev : []).map(s => {
   //       const role = String(s?.role || "").toUpperCase();
   //       const canon = getCanonicalRole(role);
-  //       const isBedSurround = ALL_SURROUND_ROLES.has(canon);
+  //       const isBedSurround = ALL_SURROUND_ROHAS(canon);
   //       
   //       if (isBedSurround && !s.model && allowedRoles.has(canon)) {
   //         changed = true;
@@ -1044,6 +1044,14 @@ function SpeakerPlacementImpl(props) {
     useRearGlobal,
     setUseRearGlobal,
   } = app || {};
+
+  console.log("[B44] DIMENSIONS CHECK", {
+    raw: dimensions,
+    width: dimensions?.width,
+    length: dimensions?.length,
+    height: dimensions?.height,
+    keys: dimensions ? Object.keys(dimensions) : null
+  });
 
   const frontSubsCfg = app?.frontSubsCfg || props?.frontSubsCfg || { 
     enabled: false, count: 0, model: null, placement: "front" 
