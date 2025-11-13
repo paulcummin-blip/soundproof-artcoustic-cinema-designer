@@ -52,8 +52,8 @@ function speakersShallowEqual(a = [], b = []) {
   for (const [role, sa] of A) {
     const sb = B.get(role);
     if (!sb) return false;
-    if ((sa.model || 'off') !== (sb.model || 'off')) return false;
-    if ((sa.id || '') !== (sb.id || '')) return false;
+    if ((sa.model || 'off') !== (sb.model || 'off')) false;
+    if ((sa.id || '') !== (sb.id || '')) false;
     if (sa.draggable !== sb.draggable) return false;
 
     const pa = sa.position || {}, pb = sb.position || {};
@@ -102,14 +102,40 @@ function projectToWallFromMLP_xy(mlp, angleDeg, room) {
 
 // --- Canonical role mapping + helpers ---
 const CANONICAL_ROLE_MAP = {
-  SL:"SL", LS:"SL", SR:"SR", RS:"SR",
-  SBL:"SBL", RL:"SBL", RSL:"SBL", LR:"SBL", LRS:"SBL",
-  SBR:"SBR", RR:"SBR", RSR:"SBR", RRS:"SBR",
-  LW:"LW", FWL:"LW", RW:"RW", FWR:"RW",
-  TFL:"TFL", TFR:"TFR",
-  TL:"TL", TML:"TL", TR:"TR", TMR:"TR",
-  TBL:"TBL", TBR:"TBL",
-  FL:"FL", L:"FL", FC:"FC", C:"FC", FR:"FR", R:"FR",
+  // LCR
+  FL: "FL", L: "FL",
+  FC: "FC", C: "FC",
+  FR: "FR", R: "FR",
+  
+  // Side surrounds
+  SL: "SL", LS: "SL",
+  SR: "SR", RS: "SR",
+  
+  // Rear surrounds
+  SBL: "SBL", RL: "SBL", RSL: "SBL", LR: "SBL", LRS: "SBL", BL: "SBL", LB: "SBL",
+  SBR: "SBR", RR: "SBR", RSR: "SBR", RRS: "SBR", BR: "SBR", RB: "SBR",
+  
+  // Wides
+  LW: "LW", FWL: "LW",
+  RW: "RW", FWR: "RW",
+  
+  // Height / Atmos - Front
+  TFL: "TFL", TF: "TFL",
+  TFR: "TFR",
+  
+  // Height / Atmos - Middle/Side
+  TL: "TL", TML: "TL", TSL: "TL",
+  TR: "TR", TMR: "TR", TSR: "TR",
+  
+  // Height / Atmos - Rear
+  TBL: "TBL", TRL: "TBL",
+  TBR: "TBR", TRR: "TBR",
+  
+  // Up-firing (if used)
+  UFL: "UFL",
+  UFR: "UFR",
+  UBL: "UBL",
+  UBR: "UBR",
 };
 
 function getCanonicalRole(role) {
@@ -1390,7 +1416,7 @@ function SpeakerPlacementImpl(props) {
         const R = String(canon).toUpperCase();
         
         // Only hug the wall that the ray actually hit
-        if (hitWall === 'L' && R === 'SL' || R === 'LW') {
+        if (hitWall === 'L' && (R === 'SL' || R === 'LW')) {
           if (Number.isFinite(hug.leftWallX)) {
             p.x = hug.leftWallX;
           } else {
@@ -1440,7 +1466,7 @@ function SpeakerPlacementImpl(props) {
 
         const existing = byRole.get(canon);
         // Fallback model resolution logic
-        let resolvedModel = existing?.model || globalSurroundModel || 'evolve-2-1_s';
+        let resolvedModel = existing?.model || globalSurroundModelParam || 'evolve-2-1_s';
         if (resolvedModel === 'off' || resolvedModel === 'none') resolvedModel = 'evolve-2-1_s';
         resolvedModel = resolvedModel.trim().toLowerCase();
 
@@ -1469,13 +1495,12 @@ function SpeakerPlacementImpl(props) {
         });
       };
 
-      console.log('[SP] resetSurroundPositions ACTIVE SOURCE OF TRUTH', {
-        layout: layoutNormalized,
-        major,
-        rolesSeeded: next
-          .filter(s => ['SL','SR','SBL','SBR','LW','RW'].includes(getCanonicalRole(s.role)))
-          .map(s => ({ role: s.role, x: s.position?.x?.toFixed(3), y: s.position?.y?.toFixed(3), model: s.model }))
-      });
+      console.table(next.map(s => ({
+        role: s.role, model: s.model,
+        x: s.position?.x?.toFixed(3),
+        y: s.position?.y?.toFixed(3),
+        yaw: s.rotation?.z
+      })));
 
       const sideAngle = (major >= 7) ? 100 : 115;
       
@@ -1496,6 +1521,7 @@ function SpeakerPlacementImpl(props) {
         seed('SR',  sideAngle,       -90);
       }
 
+      console.log('[SP] resetSurroundPositions END. Final Speakers:');
       console.table(next.map(s => ({
         role: s.role, model: s.model,
         x: s.position?.x?.toFixed(3),
