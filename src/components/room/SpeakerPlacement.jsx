@@ -620,32 +620,41 @@ function UnifiedSurroundsConfig({
         const safeModel = typeof nextModel === 'string' ? nextModel.trim() : String(nextModel || 'off').trim();
         
         const canon = getCanonicalRole(role);
+        
+        // [B44 FIX] CRITICAL: If role is not in allowedRoles for current layout, delete it
+        // BUT if it IS in allowedRoles, always preserve the speaker entry (even if model is 'off')
         if (!allowedRoles.has(canon)) {
           speakerMap.delete(canon);
           return;
         }
 
+        // Role IS allowed in current layout - preserve speaker entry
         const existingSpeaker = speakerMap.get(canon);
         
         if (safeModel === 'off' || !safeModel) {
-          if (!allowedRoles.has(canon)) {
-            speakerMap.delete(canon);
+          // User set to "Off" - keep speaker entry but null the model
+          // This prevents the dropdown from snapping back
+          if (existingSpeaker) {
+            speakerMap.set(canon, { ...existingSpeaker, model: null });
           } else {
-            const existing = speakerMap.get(canon);
-            if (existing) {
-              speakerMap.set(canon, { ...existing, model: null });
-            }
+            // Create entry even for 'off' so dropdown doesn't snap back
+            speakerMap.set(canon, {
+              role: canon,
+              id: `${canon}-${timeNowMs()}`,
+              draggable: true,
+              model: null,
+              position: undefined,
+              rotation: { x: 0, y: 0, z: 0 },
+            });
           }
         } else {
-          // [B44 FIX A] Do NOT calculate or set position here.
-          // resetSurroundPositions will handle ALL surround positioning.
+          // User selected a real model - create/update speaker with that model
           speakerMap.set(canon, {
             ...(existingSpeaker || {}),
             role: canon,
             id: existingSpeaker?.id || `${canon}-${timeNowMs()}`,
             draggable: true,
             model: safeModel,
-            // Keep existing position if any, or leave undefined for resetSurroundPositions to calculate
             position: existingSpeaker?.position || undefined,
             rotation: existingSpeaker?.rotation || { x: 0, y: 0, z: 0 },
           });
@@ -677,10 +686,17 @@ function UnifiedSurroundsConfig({
       }
 
       const next = Array.from(speakerMap.values());
+      
+      // [B44 DIAGNOSTIC] Log surround speakers before returning
+      console.log('[B44] handleSurroundModelChange OUTPUT:', next
+        .filter(s => ALL_SURROUND_ROLES.has(getCanonicalRole(s.role)))
+        .map(s => ({ role: s.role, exists: true, model: s.model || '(null)' }))
+      );
+      
       return next;
     });
-  }, [setSurroundConfig, setSpeakers, allowedRoles, canSides, canRears, canWides]); // Removed mlpPoint, dimensions, safePos from deps.
-
+  }, [setSurroundConfig, setSpeakers, allowedRoles, canSides, canRears, canWides]);
+  
   useEffect(() => {
     const master = surroundConfig?.value?.master;
     if (!master || master === 'off') return;
@@ -1048,7 +1064,7 @@ function SpeakerPlacementImpl(props) {
     return String(sevenBedLayoutType || "").toLowerCase() === "wides";
   }, [is7xBed, sevenBedLayoutType]);
 
-  // Keep global app.useWidesInsteadOfRears in sync with the 7.x layout toggle
+  // Keep global app.setUseWidesInsteadOfRears in sync with the 7.x layout toggle
   React.useEffect(() => {
     if (!app || typeof app.setUseWidesInsteadOfRears !== "function") return;
     if (!is7xBed) {

@@ -402,22 +402,26 @@ function useDesignerState() {
           visibleRoles: Array.from(visible)
         });
 
-        // Keep all speakers, but set model=null if invisible or model='off'
+        // [B44 FIX] Keep all speakers, preserve surround entries even with null model
         speakers = speakers.map(spk => {
           const role = String(spk.role || "").toUpperCase();
           const canon = getCanonicalRole(role);
           const isVisible = visible.has(canon);
           const model = String(spk.model || "").toLowerCase().trim();
           
-          // Never invent models
+          // [B44 FIX] If role is NOT visible in current layout, return unchanged
+          // (RV will filter it out during render)
           if (!isVisible) {
-            return spk; // RV will not render it
+            return spk;
           }
 
+          // Role IS visible - preserve entry even if model is null/'off'
+          // This prevents dropdown snap-back
           if (!model || model === 'off' || model === 'none') {
-            return { ...spk, model: null }; // keep position if any, but it's "off"
+            return { ...spk, model: null };
           }
           
+          // Has a real model - return unchanged
           return spk;
         });
 
