@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } from 'react';
@@ -1362,14 +1363,16 @@ function SpeakerPlacementImpl(props) {
 
       const major = parseInt(layoutNormalized.split('.')[0], 10) || 5;
 
-      const localRolesForLayout = (() => {
-        if (major >= 9) return new Set(['SL','SR','SBL','SBR','LW','RW']);
-        if (major === 7) return new Set(['SL','SR','SBL','SBR']);
-        return new Set(['SL','SR']);
-      })();
+      // [B44 FIX] Use the canonical rolesForLayout from the helper
+      const currentUseWides = useWidesInsteadOfRears; // From app state/props
+      const localRolesForLayout = new Set(rolesForLayout({
+        dolbyLayout: layoutNormalized,
+        useWidesInsteadOfRear: currentUseWides
+      }));
 
       console.log('[SP] resetSurroundPositions CONFIG', {
         layoutNormalized, major,
+        useWidesInsteadOfRear: currentUseWides,
         localRoles: Array.from(localRolesForLayout),
         globalSurroundModel: globalSurroundModelParam
       });
@@ -1386,8 +1389,6 @@ function SpeakerPlacementImpl(props) {
         console.log(`[finalisePos] ENTRY: canon=${canon}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}, W=${dims.width}, L=${dims.length}`);
         
         const safeModel = model || 'evolve-2-1_s';
-        const modelDims = getModelDimsM(safeModel);
-        const halfDepth = Number(modelDims?.depthM || 0.082) / 2;
         
         if (!Number.isFinite(base.x) || !Number.isFinite(base.y)) {
           console.warn('[finalisePos] Non-finite base coordinates', { base, canon });
@@ -1413,32 +1414,69 @@ function SpeakerPlacementImpl(props) {
         }
 
         // -------- B44 SAFETY WALL-HUGGING -------- //
-        const R = canon;
+        const R = canon; // Canonical role
+
+        // Get safe speaker dimensions for halfDepth and halfWidth calculation.
+        const modelMeta = getSpeakerModelMeta(safeModel);
+        const speakerWidthM = Number.isFinite(modelMeta?.widthM) ? modelMeta.widthM : 0.27; // Fallback
+        const speakerDepthM = Number.isFinite(modelMeta?.depthM) ? modelMeta.depthM : 0.082; // Fallback
+
+        const halfShortEdge = Math.min(speakerWidthM, speakerDepthM) / 2;
+        // const halfLongEdge = Math.max(speakerWidthM, speakerDepthM) / 2; // Not used currently, but kept for context
 
         // LEFT wall speakers (SL, LW, SBL)
+        // These speakers mount with their long edge usually perpendicular to the wall,
+        // so their short edge determines the distance from the wall.
         if (R === 'SL' || R === 'LW' || R === 'SBL') {
-          const leftX = WALL_BUFFER_M + halfDepth;
+          const leftX = WALL_BUFFER_M + halfShortEdge;
           p.x = Number.isFinite(leftX) ? leftX : dims.width / 2;
         }
 
         // RIGHT wall speakers (SR, RW, SBR)
         if (R === 'SR' || R === 'RW' || R === 'SBR') {
-          const rightX = dims.width - WALL_BUFFER_M - halfDepth;
+          const rightX = dims.width - WALL_BUFFER_M - halfShortEdge;
           p.x = Number.isFinite(rightX) ? rightX : dims.width / 2;
         }
 
         // BACK wall speakers (SBL + SBR only)
+        // These speakers mount with their long edge usually parallel to the wall,
+        // so their short edge determines the distance from the wall.
         if (R === 'SBL' || R === 'SBR') {
-          const backY = dims.length - WALL_BUFFER_M - halfDepth;
+          const backY = dims.length - WALL_BUFFER_M - halfShortEdge;
           p.y = Number.isFinite(backY) ? backY : dims.length / 2;
         }
 
-        // Final safety clamp
+        // --- Front-Wide Corner Pin Guard ---
+        // Ensure LW/RW are not stuck in the front corners.
+        if ((R === 'LW' || R === 'RW') && Number.isFinite(p.x) && Number.isFinite(p.y)) {
+          const frontWallY = WALL_BUFFER_M + halfShortEdge;
+          const cornerThreshold = 0.30; // Distance in meters to consider it 'near' the corner
+
+          const isNearFrontWall = p.y < (frontWallY + cornerThreshold);
+          const isNearLeftWall = p.x < (WALL_BUFFER_M + cornerThreshold);
+          const isNearRightWall = p.x > (dims.width - WALL_BUFFER_M - cornerThreshold);
+
+          if ((R === 'LW' && isNearLeftWall && isNearFrontWall) ||
+              (R === 'RW' && isNearRightWall && isNearFrontWall)) {
+            console.warn(`[finalisePos] Front-Wide (${R}) detected near front corner (${p.x.toFixed(2)}, ${p.y.toFixed(2)}). Nudging back.`);
+            // Nudge back along the Y-axis to prevent corner pinning.
+            const defaultNudgeY = Math.max(dims.length / 3, mlp?.y + 0.5 || 1.5);
+
+            if (Number.isFinite(defaultNudgeY)) {
+              p.y = defaultNudgeY;
+            } else {
+              p.y = dims.length / 2; // Ultimate fallback
+            }
+          }
+        }
+
+        // Final safety clamp for x and y to ensure they are always finite
         if (!Number.isFinite(p.x)) p.x = dims.width / 2;
         if (!Number.isFinite(p.y)) p.y = dims.length / 2;
+        if (!Number.isFinite(p.z)) p.z = 1.1; // Default height
 
         console.log(
-          '[finalisePos] AFTER wall-hugging:',
+          '[finalisePos] AFTER wall-hugging & corner guard:',
           'canon=', canon,
           'p.x=', Number.isFinite(p.x) ? p.x.toFixed(3) : p.x,
           'p.y=', Number.isFinite(p.y) ? p.y.toFixed(3) : p.y
@@ -1503,29 +1541,34 @@ function SpeakerPlacementImpl(props) {
 
       const sideAngle = (major >= 7) ? 100 : 115;
       
-      if (major >= 9) {
+      if (localRolesForLayout.has('LW') || localRolesForLayout.has('RW')) { // Handles 9.x AND 7.x with wides
+        if (localRolesForLayout.has('SL')) seed('SL',  360 - sideAngle, +90);
+        if (localRolesForLayout.has('SR')) seed('SR',  sideAngle,       -90);
+        if (localRolesForLayout.has('SBL')) seed('SBL', +217.5, 0); // These are usually rears, but if wides are enabled, they are distinct.
+        if (localRolesForLayout.has('SBR')) seed('SBR', -217.5, 0);
+        if (localRolesForLayout.has('LW')) seed('LW',  +300,   +90);
+        if (localRolesForLayout.has('RW')) seed('RW',  -300,   -90);
+      } else if (major === 7) { // 7.x without wides (default 7.1 layout)
         seed('SL',  360 - sideAngle, +90);
         seed('SR',  sideAngle,       -90);
         seed('SBL', +217.5, 0);
         seed('SBR', -217.5, 0);
-        seed('LW',  +300,   +90);
-        seed('RW',  -300,   -90);
-      } else if (major === 7) {
-        seed('SL',  360 - sideAngle, +90);
-        seed('SR',  sideAngle,       -90);
-        seed('SBL', +217.5, 0);
-        seed('SBR', -217.5, 0);
-      } else {
+      } else { // 5.1 layout
         seed('SL',  360 - sideAngle, +90);
         seed('SR',  sideAngle,       -90);
       }
 
       // [B44 DIAGNOSTIC] Log all surround outputs before return
-      console.log('[SP] resetSurroundPositions OUTPUT', next.map(s => ({
-        role: s.role,
-        x: s.position?.x,
-        y: s.position?.y
-      })));
+      console.log(
+        "[SP] resetSurroundPositions OUTPUT",
+        next.map((s) => ({
+          role: s.role,
+          model: s.model,
+          x: s.position?.x,
+          y: s.position?.y,
+          z: s.position?.z,
+        }))
+      );
 
       console.log('[SP] resetSurroundPositions END. Final Speakers:');
       console.table(next.map(s => ({
@@ -1537,7 +1580,7 @@ function SpeakerPlacementImpl(props) {
 
       return next;
     },
-    [applyCornerClearance, applyRoomBoundsClamp, getModelDimsM, WALL_BUFFER_M, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
+    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, getModelDimsM, dolbyConfig, allowedRoles, SURROUND_BED_ROLES, useWidesInsteadOfRears]
   );
 
   const handleResetPositions = useCallback(() => {
@@ -1778,7 +1821,7 @@ function SpeakerPlacementImpl(props) {
               rearOverride={overheadRearOverride}
               onFrontOverrideChange={setOverheadFrontOverride}
               onMidOverrideChange={setOverheadMidOverride}
-              onRearOverrideChange={setOverheadRearOverride}
+              onRearOverrideChange={setUseRearGlobal} // This should be setOverheadRearOverride
               useFrontGlobal={useFrontGlobal}
               useMidGlobal={useMidGlobal}
               onUseFrontGlobalChange={setUseFrontGlobal}

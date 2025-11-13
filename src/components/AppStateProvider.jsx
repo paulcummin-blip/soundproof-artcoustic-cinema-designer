@@ -2,36 +2,18 @@ import React, { createContext, useContext, useMemo, useState, useEffect, useRef,
 import { timeNowMs } from "@/components/utils/timeNow";
 import { safeTable } from '@/components/utils/safeLog';
 import { SHOW_DEBUG_LOGS } from '@/components/utils/diagnostics';
-import { isRoleVisible } from "@/components/utils/surroundRoleMap";
-
-function getCanonicalRole(role) {
-  if (typeof role !== 'string') return role;
-  const upper = role.toUpperCase();
-
-  const aliases = {
-    'LS': 'SL',
-    'RS': 'SR',
-    'LSR': 'SL',
-    'RSR': 'SR',
-  };
-
-  return aliases[upper] || upper;
-}
+import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRoleMap";
 
 // --- SINGLE SOURCE OF TRUTH FOR VISIBILITY -----------------------------
+// This function now delegates to the canonical rolesForLayout from surroundRoleMap.js
 export function getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears) {
-  const major = parseInt(String(layoutString).split('.')[0] || '5', 10);
-  const showSides = major >= 5;
-  const showRears = major >= 7 && !useWidesInsteadOfRears;
-  const showWides = (major >= 7 && useWidesInsteadOfRears) || major >= 9;
+  const canonRoles = rolesForLayout({
+    dolbyLayout: layoutString || "5.1",
+    useWidesInsteadOfRears: !!useWidesInsteadOfRears,
+  });
 
-  return new Set([
-    ...(showSides ? ['SL','SR'] : []),
-    ...(showRears ? ['SBL','SBR'] : []),
-    ...(showWides ? ['LW','RW'] : []),
-    // always: LCR
-    'FL','FC','FR'
-  ]);
+  // Normalise via getCanonicalRole for safety
+  return new Set(canonRoles.map(getCanonicalRole));
 }
 
 // --- idempotence helper -----------------------------------------------------

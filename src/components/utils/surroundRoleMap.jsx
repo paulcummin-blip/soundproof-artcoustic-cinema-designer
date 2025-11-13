@@ -3,36 +3,49 @@
 // No React imports - safe for use anywhere
 
 /**
- * Get required speaker roles for a given layout and config
+ * Get required speaker roles for a given layout and config.
+ * This is the SINGLE SOURCE OF TRUTH for bed-layer surround existence.
+ *
  * @param {Object} config
- * @param {string} config.dolbyLayout - e.g., "5.1", "7.1", "9.1.4"
- * @param {boolean} config.useFrontWidesInsteadOfRears - 7.1 toggle
- * @returns {string[]} Array of required role strings (uppercase)
+ * @param {string} config.dolbyLayout - e.g. "5.1", "7.1", "9.1.4"
+ * @param {boolean} config.useWidesInsteadOfRears - for 7.x layouts, LW/RW vs SBL/SBR
+ * @returns {string[]} canonical bed-layer roles (uppercase)
  */
-export function rolesForLayout({ dolbyLayout = "5.1", useFrontWidesInsteadOfRears = false }) {
-  const roles = new Set(["FL","FC","FR"]); // LCR always present
+export function rolesForLayout({ dolbyLayout = "5.1", useWidesInsteadOfRears = false } = {}) {
+  const roles = new Set();
 
-  // Side surrounds always present for 5.1, 7.1, 9-ch
-  roles.add("SL"); 
-  roles.add("SR");
+  const parts = String(dolbyLayout).split(".");
+  const major = parseInt(parts[0], 10) || 5;
 
-  const is7 = /^7\./.test(dolbyLayout);
-  const is9 = /^9\./.test(dolbyLayout);
+  // LCR always present
+  roles.add("FL");
+  roles.add("FC");
+  roles.add("FR");
 
-  if (is7) {
-    if (useFrontWidesInsteadOfRears) {
-      roles.add("LW"); 
+  // 5.x+ → side surrounds
+  if (major >= 5) {
+    roles.add("SL");
+    roles.add("SR");
+  }
+
+  // 7.x → either rears or wides
+  if (major === 7) {
+    if (useWidesInsteadOfRears) {
+      roles.add("LW");
       roles.add("RW");
     } else {
-      roles.add("SBL"); 
+      roles.add("SBL");
       roles.add("SBR");
     }
   }
 
-  if (is9) {
-    roles.add("SBL"); 
+  // 9.x+ → sides + rears + wides
+  if (major >= 9) {
+    roles.add("SL");
+    roles.add("SR");
+    roles.add("SBL");
     roles.add("SBR");
-    roles.add("LW");  
+    roles.add("LW");
     roles.add("RW");
   }
 
@@ -45,8 +58,8 @@ export function rolesForLayout({ dolbyLayout = "5.1", useFrontWidesInsteadOfRear
  * @param {Object} config - Layout config (same as rolesForLayout)
  * @returns {boolean}
  */
-export function isRoleVisible(role, { dolbyLayout = "5.1", useFrontWidesInsteadOfRears = false }) {
-  const req = rolesForLayout({ dolbyLayout, useFrontWidesInsteadOfRears });
+export function isRoleVisible(role, { dolbyLayout = "5.1", useWidesInsteadOfRears = false } = {}) {
+  const req = rolesForLayout({ dolbyLayout, useWidesInsteadOfRears });
   return req.includes(String(role).toUpperCase());
 }
 
