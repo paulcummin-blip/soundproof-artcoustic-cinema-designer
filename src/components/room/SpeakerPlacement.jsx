@@ -736,7 +736,7 @@ function UnifiedSurroundsConfig({
       { value: 'off', label: 'Off' },
       ...surrounds.map(s => ({ value: s.key, label: s.label }))
     ];
-  }, []);
+  }, [getModelsByCategoryOrdered]);
 
   return (
     <div className="space-y-3 p-2">
@@ -1584,10 +1584,16 @@ function SpeakerPlacementImpl(props) {
         if (!localAllowedRoles.has(canon)) return;
 
         const existing = byRole.get(canon);
-        // Fallback model resolution logic
-        let resolvedModel = existing?.model || globalSurroundModelParam || 'evolve-2-1_s';
-        if (resolvedModel === 'off' || resolvedModel === 'none') resolvedModel = 'evolve-2-1_s';
-        resolvedModel = resolvedModel.trim().toLowerCase();
+        
+        // B44 FIX: only create surrounds when a real model is chosen
+        let resolvedModel = existing?.model || globalSurroundModelParam;
+
+        // If there is still no model (dropdown "Off"), do not seed this role
+        if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
+          return;
+        }
+
+        resolvedModel = String(resolvedModel);
 
         const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
         
@@ -1610,7 +1616,8 @@ function SpeakerPlacementImpl(props) {
           model: resolvedModel,
           position: pos,
           draggable: true,
-          rotation: existing?.rotation || { x: 0, y: 0, z: yawDeg ?? 0 },
+          // B44: keep surrounds flat to wall; yaw handled visually by RV
+          rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
         });
       };
 
