@@ -1361,7 +1361,7 @@ function SpeakerPlacementImpl(props) {
     return { x, y, z };
   }, [getHuggingCenterLines]);
 
-  // [B44] CRITICAL: Do NOT snap surrounds to MLP when x/y are missing.
+  // [B44 CRITICAL]: Do NOT snap surrounds to MLP when x/y are missing.
   // Let bad coordinates stay bad so we can debug why ray-casting failed,
   // rather than silently teleporting speakers to the MLP.
   function safePos(pos, mlp, fallbackZ = 1.1) {
@@ -1412,6 +1412,20 @@ function SpeakerPlacementImpl(props) {
 
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
+      // --- B44 FIX: ensure dims is always valid ---
+      const widthSafe  = Number.isFinite(dims?.width)  ? dims.width  : 4.5;
+      const lengthSafe = Number.isFinite(dims?.length) ? dims.length : 6.0;
+      const heightSafe = Number.isFinite(dims?.height) ? dims.height : 2.7;
+
+      const safeDims = {
+        width:  widthSafe,
+        length: lengthSafe,
+        height: heightSafe
+      };
+
+      console.log("[B44] resetSurroundPositions using safeDims", safeDims);
+      dims = safeDims;
+
       console.log('[SP] resetSurroundPositions START', {
         layoutString, mlp, dims,
         currentSpeakersCount: currentSpeakers?.length,
