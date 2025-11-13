@@ -578,18 +578,20 @@ function UnifiedSurroundsConfig({
     };
   });
   
-  useEffect(() => {
-    const models = getCurrentSurroundModels();
-    if (surroundConfig.value.side !== models.side ||
-        surroundConfig.value.rear !== models.rear ||
-        surroundConfig.value.wide !== models.wide ||
-        surroundConfig.value.master !== models.master) {
-        setSurroundConfig(prev => ({
-            ...prev,
-            value: models
-        }));
-    }
-  }, [getCurrentSurroundModels, surroundConfig.value]);
+  // [B44 FIX] REMOVED: This useEffect was causing dropdown snap-back by immediately
+  // overwriting user selection with old speaker state before update propagated.
+  // useEffect(() => {
+  //   const models = getCurrentSurroundModels();
+  //   if (surroundConfig.value.side !== models.side ||
+  //       surroundConfig.value.rear !== models.rear ||
+  //       surroundConfig.value.wide !== models.wide ||
+  //       surroundConfig.value.master !== models.master) {
+  //       setSurroundConfig(prev => ({
+  //           ...prev,
+  //           value: models
+  //       }));
+  //   }
+  // }, [getCurrentSurroundModels, surroundConfig.value]);
 
   const handleSurroundModelChange = useCallback((config) => {
     const safeConfig = {
@@ -625,6 +627,15 @@ function UnifiedSurroundsConfig({
         useWides,
         layoutRoles
       });
+
+      // [B44 FIX] Guard against empty layoutRoles
+      if (!Array.isArray(layoutRoles) || layoutRoles.length === 0) {
+        console.warn('[B44] handleSurroundModelChange: no bed surround roles for layout', {
+          layout,
+          useWides
+        });
+        return prev || [];
+      }
 
       // Build map of existing speakers
       const byRole = new Map();
@@ -695,26 +706,28 @@ function UnifiedSurroundsConfig({
     });
   }, [setSurroundConfig, setSpeakers, effectivePreset, useWides]);
   
-  useEffect(() => {
-    const master = surroundConfig?.value?.master;
-    if (!master || master === 'off') return;
-
-    setSpeakers(prev => {
-      let changed = false;
-      const next = (Array.isArray(prev) ? prev : []).map(s => {
-        const role = String(s?.role || "").toUpperCase();
-        const canon = getCanonicalRole(role);
-        const isBedSurround = ALL_SURROUND_ROLES.has(canon);
-        
-        if (isBedSurround && !s.model && allowedRoles.has(canon)) {
-          changed = true;
-          return { ...s, model: master };
-        }
-        return s;
-      });
-      return changed ? next : prev;
-    });
-  }, [surroundConfig?.value?.master, setSpeakers, allowedRoles]);
+  // [B44 FIX] REMOVED: Removed the backfill effect that was setting master model on null speakers.
+  // This effect was redundant and could conflict with user selections.
+  // useEffect(() => {
+  //   const master = surroundConfig?.value?.master;
+  //   if (!master || master === 'off') return;
+  //
+  //   setSpeakers(prev => {
+  //     let changed = false;
+  //     const next = (Array.isArray(prev) ? prev : []).map(s => {
+  //       const role = String(s?.role || "").toUpperCase();
+  //       const canon = getCanonicalRole(role);
+  //       const isBedSurround = ALL_SURROUND_ROLES.has(canon);
+  //       
+  //       if (isBedSurround && !s.model && allowedRoles.has(canon)) {
+  //         changed = true;
+  //         return { ...s, model: master };
+  //       }
+  //       return s;
+  //     });
+  //     return changed ? next : prev;
+  //   });
+  // }, [surroundConfig?.value?.master, setSpeakers, allowedRoles]);
   
   const surroundChoices = useMemo(() => {
     const byCat = getModelsByCategoryOrdered();
@@ -982,7 +995,6 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         {lcrRoles.map((role) => (
           <LcrSplCard
             key={role}
-            role={role}
             speaker={getByRole(role)}
             mlpPoint={mlpPoint}
             disabled={disabled}
