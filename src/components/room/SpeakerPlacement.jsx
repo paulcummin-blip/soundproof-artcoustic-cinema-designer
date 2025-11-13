@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } from 'react';
@@ -1382,12 +1381,13 @@ function SpeakerPlacementImpl(props) {
       const byRole = buildRoleMap(currentSpeakers);
       const room = { left: 0, right: dims.width, front: 0, back: dims.length };
 
-      // [B44 FIX B] finalisePos now takes hitWall parameter
+      // [B44 FIX] finalisePos with safety fallbacks
       const finalisePos = (base, canon, model, hitWall) => {
         console.log(`[finalisePos] ENTRY: canon=${canon}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}, W=${dims.width}, L=${dims.length}`);
         
         const safeModel = model || 'evolve-2-1_s';
-        const hug = getHuggingCenterLines(safeModel, dims);
+        const modelDims = getModelDimsM(safeModel);
+        const halfDepth = Number(modelDims?.depthM || 0.082) / 2;
         
         if (!Number.isFinite(base.x) || !Number.isFinite(base.y)) {
           console.warn('[finalisePos] Non-finite base coordinates', { base, canon });
@@ -1412,42 +1412,30 @@ function SpeakerPlacementImpl(props) {
           return null;
         }
 
-        // [B44 FIX] Wall-hugging: always snap to canonical wall for the role.
-        // The raycast gives us a rough position, but the role decides which wall it belongs on.
-        const R = String(canon).toUpperCase();
+        // -------- B44 SAFETY WALL-HUGGING -------- //
+        const R = canon;
 
-        // Left-side roles (side / rear-left / wide-left) hug the left wall
+        // LEFT wall speakers (SL, LW, SBL)
         if (R === 'SL' || R === 'LW' || R === 'SBL') {
-          if (Number.isFinite(hug.leftWallX)) {
-            p.x = hug.leftWallX;
-          } else {
-            console.warn('[finalisePos] Non-finite hug.leftWallX for left-side speaker', { hug, canon });
-            // Fallback: put it in the horizontal centre if the hug value is broken
-            p.x = dims.width / 2;
-          }
+          const leftX = WALL_BUFFER_M + halfDepth;
+          p.x = Number.isFinite(leftX) ? leftX : dims.width / 2;
         }
 
-        // Right-side roles (side / rear-right / wide-right) hug the right wall
+        // RIGHT wall speakers (SR, RW, SBR)
         if (R === 'SR' || R === 'RW' || R === 'SBR') {
-          if (Number.isFinite(hug.rightWallX)) {
-            p.x = hug.rightWallX;
-          } else {
-            console.warn('[finalisePos] Non-finite hug.rightWallX for right-side speaker', { hug, canon });
-            // Fallback: put it in the horizontal centre if the hug value is broken
-            p.x = dims.width / 2;
-          }
+          const rightX = dims.width - WALL_BUFFER_M - halfDepth;
+          p.x = Number.isFinite(rightX) ? rightX : dims.width / 2;
         }
 
-        // Rear surrounds always hug the back wall in Y
+        // BACK wall speakers (SBL + SBR only)
         if (R === 'SBL' || R === 'SBR') {
-          if (Number.isFinite(hug.backWallY)) {
-            p.y = hug.backWallY;
-          } else {
-            console.warn('[finalisePos] Non-finite hug.backWallY for back-mounted speaker', { hug, canon });
-            // Fallback: centre of room length if hug value is broken
-            p.y = dims.length / 2;
-          }
+          const backY = dims.length - WALL_BUFFER_M - halfDepth;
+          p.y = Number.isFinite(backY) ? backY : dims.length / 2;
         }
+
+        // Final safety clamp
+        if (!Number.isFinite(p.x)) p.x = dims.width / 2;
+        if (!Number.isFinite(p.y)) p.y = dims.length / 2;
 
         console.log(
           '[finalisePos] AFTER wall-hugging:',
@@ -1532,6 +1520,13 @@ function SpeakerPlacementImpl(props) {
         seed('SR',  sideAngle,       -90);
       }
 
+      // [B44 DIAGNOSTIC] Log all surround outputs before return
+      console.log('[SP] resetSurroundPositions OUTPUT', next.map(s => ({
+        role: s.role,
+        x: s.position?.x,
+        y: s.position?.y
+      })));
+
       console.log('[SP] resetSurroundPositions END. Final Speakers:');
       console.table(next.map(s => ({
         role: s.role, model: s.model,
@@ -1542,7 +1537,7 @@ function SpeakerPlacementImpl(props) {
 
       return next;
     },
-    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
+    [applyCornerClearance, applyRoomBoundsClamp, getModelDimsM, WALL_BUFFER_M, dolbyConfig, allowedRoles, SURROUND_BED_ROLES]
   );
 
   const handleResetPositions = useCallback(() => {
