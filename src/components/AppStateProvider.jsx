@@ -3,20 +3,37 @@ import React, { createContext, useContext, useMemo, useState, useEffect, useRef,
 import { timeNowMs } from "@/components/utils/timeNow";
 import { safeTable } from '@/components/utils/safeLog';
 import { SHOW_DEBUG_LOGS } from '@/components/utils/diagnostics';
-import { getCanonicalRole, rolesForLayout, debugRolesForLayout } from "@/components/utils/surroundRoleMap";
+import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 
 // --- SINGLE SOURCE OF TRUTH FOR VISIBILITY -----------------------------
-// This function now delegates to the canonical rolesForLayout from surroundRoleMap.js
+// Simple, explicit visibility rules for bed-layer channels
 export function getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears) {
-  const roles = debugRolesForLayout(layoutString || "5.1", useWidesInsteadOfRears);
-  const canon = roles.map(getCanonicalRole);
-  if (typeof console !== "undefined") {
-    console.log("[B44 DEBUG] visibleRoles for layout", layoutString, {
-      useWidesInsteadOfRears,
-      canon,
-    });
+  const layout = String(layoutString || "5.1");
+  const major = parseInt(layout.split(".")[0], 10) || 5;
+
+  // LCR are always visible
+  const roles = new Set(["FL", "FC", "FR"]);
+
+  const showSides = major >= 5;
+  const showRears = major >= 7 && !useWidesInsteadOfRears;
+  const showWides = (major >= 7 && !!useWidesInsteadOfRears) || major >= 9;
+
+  if (showSides) {
+    roles.add("SL");
+    roles.add("SR");
   }
-  return new Set(canon);
+
+  if (showRears) {
+    roles.add("SBL");
+    roles.add("SBR");
+  }
+
+  if (showWides) {
+    roles.add("LW");
+    roles.add("RW");
+  }
+
+  return roles;
 }
 
 // --- idempotence helper -----------------------------------------------------

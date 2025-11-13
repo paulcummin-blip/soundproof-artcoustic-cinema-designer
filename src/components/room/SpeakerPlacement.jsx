@@ -26,7 +26,7 @@ import { timeNowMs } from "@/components/utils/timeNow";
 import AmplifierPowerSelector from '@/components/spl/AmplifierPowerSelector';
 import EqHeadroomSelector from '@/components/spl/EqHeadroomSelector';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
-import { rolesForLayout } from "@/components/utils/surroundRoleMap";
+import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 
 const P12_THRESHOLDS = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P13_THRESHOLDS = { L1: 99, L2: 102, L3: 105, L4: 108 };
@@ -138,9 +138,10 @@ const CANONICAL_ROLE_MAP = {
   UBR: "UBR",
 };
 
-function getCanonicalRole(role) {
-  return CANONICAL_ROLE_MAP[String(role || "").toUpperCase()] || String(role || "").toUpperCase();
-}
+// getCanonicalRole is imported from "@/components/utils/surroundRoleMap";
+// function getCanonicalRole(role) {
+//   return CANONICAL_ROLE_MAP[String(role || "").toUpperCase()] || String(role || "").toUpperCase();
+// }
 
 const CANONICAL_TO_ALIASES_MAP = new Map();
 for (const alias in CANONICAL_ROLE_MAP) {
@@ -1001,7 +1002,7 @@ function SpeakerPlacementImpl(props) {
   const {
     speakerSystem, setSpeakerSystem, dimensions, seatingPositions, setDolbyConfig, dolbyConfig,
     showToast,
-    setUseWidesInsteadOfRears, // This will be used in the new useEffect
+    setUseWidesInsteadOfRears, 
     overheadGlobalModel,
     setOverheadGlobalModel,
     overheadFrontOverride,
@@ -1059,23 +1060,32 @@ function SpeakerPlacementImpl(props) {
   }, [app, is7xBed, useWides]);
 
   const allowedRoles = React.useMemo(() => {
-    try {
-      const roles = rolesForLayout({
-        dolbyLayout: effectivePreset || "5.1",
-        useWidesInsteadOfRears: useWides,
-      });
-      return new Set(roles.map((r) => r.toUpperCase()));
-    } catch (err) {
-      console.warn(
-        "[SpeakerPlacement] rolesForLayout failed, falling back to 5.1",
-        err
-      );
-      const fallback = rolesForLayout({
-        dolbyLayout: "5.1",
-        useWidesInsteadOfRears: false,
-      });
-      return new Set(fallback.map((r) => r.toUpperCase()));
+    const layout = String(effectivePreset || "5.1");
+    const major = parseInt(layout.split(".")[0], 10) || 5;
+
+    // Sides exist for any 5.x / 7.x / 9.x bed layout
+    const roles = new Set();
+
+    if (major >= 5) {
+      roles.add("SL");
+      roles.add("SR");
     }
+
+    // 7.x – either rears OR wides, depending on useWides
+    const showRears = major === 7 && !useWides;
+    const showWides7 = major === 7 && !!useWides;
+
+    if (showRears || major >= 9) {
+      roles.add("SBL");
+      roles.add("SBR");
+    }
+
+    if (showWides7 || major >= 9) {
+      roles.add("LW");
+      roles.add("RW");
+    }
+
+    return roles;
   }, [effectivePreset, useWides]);
 
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
@@ -1390,15 +1400,27 @@ function SpeakerPlacementImpl(props) {
 
       // [B44 FIX] Use the canonical rolesForLayout from the helper
       const currentUseWides = useWides; // From the newly defined useWides memo
-      const localRolesForLayout = new Set(rolesForLayout({
-        dolbyLayout: layoutNormalized,
-        useWidesInsteadOfRear: currentUseWides
-      }).map(r => r.toUpperCase())); // Ensure roles are uppercase
+      
+      const localAllowedRoles = new Set();
+      if (major >= 5) {
+        localAllowedRoles.add("SL");
+        localAllowedRoles.add("SR");
+      }
+      const showRears = major === 7 && !currentUseWides;
+      const showWides7 = major === 7 && !!currentUseWides;
+      if (showRears || major >= 9) {
+        localAllowedRoles.add("SBL");
+        localAllowedRoles.add("SBR");
+      }
+      if (showWides7 || major >= 9) {
+        localAllowedRoles.add("LW");
+        localAllowedRoles.add("RW");
+      }
 
       console.log('[SP] resetSurroundPositions CONFIG', {
         layoutNormalized, major,
         useWidesInsteadOfRear: currentUseWides,
-        localRoles: Array.from(localRolesForLayout),
+        localRoles: Array.from(localAllowedRoles),
         globalSurroundModel: globalSurroundModelParam
       });
 
@@ -1524,7 +1546,7 @@ function SpeakerPlacementImpl(props) {
       const seed = (role, dolbyAngleDeg, yawDeg) => {
         const canon = getCanonicalRole(role);
         // Only seed if the role is allowed in the current layout
-        if (!localRolesForLayout.has(canon)) return;
+        if (!localAllowedRoles.has(canon)) return;
 
         const existing = byRole.get(canon);
         // Fallback model resolution logic
@@ -1566,13 +1588,13 @@ function SpeakerPlacementImpl(props) {
 
       const sideAngle = (major >= 7) ? 100 : 115;
       
-      if (localRolesForLayout.has('LW') || localRolesForLayout.has('RW')) { // Handles 9.x AND 7.x with wides
-        if (localRolesForLayout.has('SL')) seed('SL',  360 - sideAngle, +90);
-        if (localRolesForLayout.has('SR')) seed('SR',  sideAngle,       -90);
-        if (localRolesForLayout.has('SBL')) seed('SBL', +217.5, 0); // These are usually rears, but if wides are enabled, they are distinct.
-        if (localRolesForLayout.has('SBR')) seed('SBR', -217.5, 0);
-        if (localRolesForLayout.has('LW')) seed('LW',  +300,   +90);
-        if (localRolesForLayout.has('RW')) seed('RW',  -300,   -90);
+      if (localAllowedRoles.has('LW') || localAllowedRoles.has('RW')) { // Handles 9.x AND 7.x with wides
+        if (localAllowedRoles.has('SL')) seed('SL',  360 - sideAngle, +90);
+        if (localAllowedRoles.has('SR')) seed('SR',  sideAngle,       -90);
+        if (localAllowedRoles.has('SBL')) seed('SBL', +217.5, 0); // These are usually rears, but if wides are enabled, they are distinct.
+        if (localAllowedRoles.has('SBR')) seed('SBR', -217.5, 0);
+        if (localAllowedRoles.has('LW')) seed('LW',  +300,   +90);
+        if (localAllowedRoles.has('RW')) seed('RW',  -300,   -90);
       } else if (major === 7) { // 7.x without wides (default 7.1 layout)
         seed('SL',  360 - sideAngle, +90);
         seed('SR',  sideAngle,       -90);
@@ -1777,7 +1799,7 @@ function SpeakerPlacementImpl(props) {
       </CollapsiblePanel>
 
       <CollapsiblePanel title="Surround Channels" icon={<Speaker className="w-5 h-5 text-[#625143]" />} defaultOpen={false}>
-        {!isNineBed && is7xBed && ( // Changed is7xOrHigher to is7xBed
+        {!isNineBed && is7xBed && ( 
           <div className="mb-4 p-3 rounded-lg border border-[#E6E4DD] bg-[#F8F8F7]">
             <div className="flex items-center justify-between">
               <div>
@@ -1785,7 +1807,7 @@ function SpeakerPlacementImpl(props) {
                 <p className="text-xs text-[#625143] mt-1">Toggles the 7-bed layer between SBL/SBR and LW/RW.</p>
               </div>
               <Switch
-                checked={useWides} // Changed from app?.useWidesInsteadOfRears
+                checked={useWides} 
                 onCheckedChange={(v) => {
                   if (onSevenBedLayoutTypeChange) {
                     onSevenBedLayoutTypeChange(v ? "wides" : "rears");
@@ -1846,7 +1868,7 @@ function SpeakerPlacementImpl(props) {
               rearOverride={overheadRearOverride}
               onFrontOverrideChange={setOverheadFrontOverride}
               onMidOverrideChange={setOverheadMidOverride}
-              onRearOverrideChange={setOverheadRearOverride} // This was a bug, changed to setOverheadRearOverride
+              onRearOverrideChange={setOverheadRearOverride}
               useFrontGlobal={useFrontGlobal}
               useMidGlobal={useMidGlobal}
               onUseFrontGlobalChange={setUseFrontGlobal}
