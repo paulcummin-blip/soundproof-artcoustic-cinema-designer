@@ -1412,38 +1412,49 @@ function SpeakerPlacementImpl(props) {
           return null;
         }
 
-        // [B44 FIX B] Wall-hugging now respects hitWall
+        // [B44 FIX] Wall-hugging: always snap to canonical wall for the role.
+        // The raycast gives us a rough position, but the role decides which wall it belongs on.
         const R = String(canon).toUpperCase();
-        
-        // Only hug the wall that the ray actually hit
-        if (hitWall === 'L' && (R === 'SL' || R === 'LW')) {
+
+        // Left-side roles (side / rear-left / wide-left) hug the left wall
+        if (R === 'SL' || R === 'LW' || R === 'SBL') {
           if (Number.isFinite(hug.leftWallX)) {
             p.x = hug.leftWallX;
           } else {
-            console.warn('[finalisePos] Non-finite hug.leftWallX', { hug, canon });
-            return null;
-          }
-        }
-        
-        if (hitWall === 'R' && (R === 'SR' || R === 'RW')) {
-          if (Number.isFinite(hug.rightWallX)) {
-            p.x = hug.rightWallX;
-          } else {
-            console.warn('[finalisePos] Non-finite hug.rightWallX', { hug, canon });
-            return null;
-          }
-        }
-        
-        if (hitWall === 'B' && (R === 'SBL' || R === 'SBR')) {
-          if (Number.isFinite(hug.backWallY)) {
-            p.y = hug.backWallY;
-          } else {
-            console.warn('[finalisePos] Non-finite hug.backWallY', { hug, canon });
-            return null;
+            console.warn('[finalisePos] Non-finite hug.leftWallX for left-side speaker', { hug, canon });
+            // Fallback: put it in the horizontal centre if the hug value is broken
+            p.x = dims.width / 2;
           }
         }
 
-        console.log(`[finalisePos] EXIT: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}, finite=${Number.isFinite(p.x) && Number.isFinite(p.y)}`);
+        // Right-side roles (side / rear-right / wide-right) hug the right wall
+        if (R === 'SR' || R === 'RW' || R === 'SBR') {
+          if (Number.isFinite(hug.rightWallX)) {
+            p.x = hug.rightWallX;
+          } else {
+            console.warn('[finalisePos] Non-finite hug.rightWallX for right-side speaker', { hug, canon });
+            // Fallback: put it in the horizontal centre if the hug value is broken
+            p.x = dims.width / 2;
+          }
+        }
+
+        // Rear surrounds always hug the back wall in Y
+        if (R === 'SBL' || R === 'SBR') {
+          if (Number.isFinite(hug.backWallY)) {
+            p.y = hug.backWallY;
+          } else {
+            console.warn('[finalisePos] Non-finite hug.backWallY for back-mounted speaker', { hug, canon });
+            // Fallback: centre of room length if hug value is broken
+            p.y = dims.length / 2;
+          }
+        }
+
+        console.log(
+          '[finalisePos] AFTER wall-hugging:',
+          'canon=', canon,
+          'p.x=', Number.isFinite(p.x) ? p.x.toFixed(3) : p.x,
+          'p.y=', Number.isFinite(p.y) ? p.y.toFixed(3) : p.y
+        );
 
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[SP resetSurroundPositions] dropping surround with invalid position', {
