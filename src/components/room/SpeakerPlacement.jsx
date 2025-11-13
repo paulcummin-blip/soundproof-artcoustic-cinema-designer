@@ -26,7 +26,7 @@ import { timeNowMs } from "@/components/utils/timeNow";
 import AmplifierPowerSelector from '@/components/spl/AmplifierPowerSelector';
 import EqHeadroomSelector from '@/components/spl/EqHeadroomSelector';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
-import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
+import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRoleMap";
 
 const P12_THRESHOLDS = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P13_THRESHOLDS = { L1: 99, L2: 102, L3: 105, L4: 108 };
@@ -608,90 +608,92 @@ function UnifiedSurroundsConfig({
 
     setSurroundConfig(safeConfig);
     
-    const { value, override } = safeConfig;
-    const newModelKey = value.master;
+    const modelKey = safeConfig.value.master;
     
     setSpeakers(prev => {
-      const layoutString = effectivePreset || "5.1";
+      const layout = effectivePreset || "5.1";
 
-      // 1) Work out which bed-layer surround roles should exist for this layout
-      const surroundRolesForLayout = Array.from(allowedRoles).filter(r =>
-        ["SL","SR","SBL","SBR","LW","RW"].includes(r)
-      );
+      // Determine which surround roles MUST exist for this layout
+      const layoutRoles = rolesForLayout({
+        dolbyLayout: layout,
+        useWidesInsteadOfRears: !!useWides
+      }).filter(r => ["SL","SR","SBL","SBR","LW","RW"].includes(r));
 
       console.log('[B44] handleSurroundModelChange', {
-        newModelKey,
-        layoutString,
+        modelKey,
+        layout,
         useWides,
-        surroundRolesForLayout
+        layoutRoles
       });
 
-      // 2) Start from all existing speakers (LCR, subs, overheads, etc)
+      // Build map of existing speakers
       const byRole = new Map();
       for (const s of prev || []) {
-        const canon = getCanonicalRole(s.role);
-        byRole.set(canon, { ...s, role: canon });
+        byRole.set(getCanonicalRole(s.role), { ...s });
       }
 
-      // If user selects "Off", set models to null for surround roles but keep entries
-      if (!newModelKey || String(newModelKey).toLowerCase() === "off") {
-        for (const role of ["SL","SR","SBL","SBR","LW","RW"]) {
-          const existing = byRole.get(role);
-          if (existing) {
-            byRole.set(role, { ...existing, model: null });
+      // If user selected "Off", clear models on surround roles but keep entries
+      if (!modelKey || modelKey.toLowerCase() === "off") {
+        layoutRoles.forEach(role => {
+          if (byRole.has(role)) {
+            byRole.set(role, { ...byRole.get(role), model: null });
+          } else {
+            // Create entry even for "off" so dropdown doesn't snap back
+            byRole.set(role, {
+              id: `${role.toLowerCase()}-${timeNowMs()}`,
+              role,
+              model: null,
+              position: undefined,
+              rotation: { x:0, y:0, z:0 },
+              draggable: true
+            });
           }
-        }
+        });
         
         const result = Array.from(byRole.values());
         console.log('[B44] handleSurroundModelChange OUTPUT (OFF):', result
           .filter(s => ALL_SURROUND_ROLES.has(getCanonicalRole(s.role)))
-          .map(s => ({ role: s.role, exists: true, model: s.model || '(null)' }))
+          .map(s => ({ role: s.role, model: s.model || '(null)' }))
         );
         return result;
       }
 
-      // 3) Ensure every required surround role exists with the chosen model
-      for (const role of surroundRolesForLayout) {
+      // Otherwise: force-create / update ALL required surround speakers
+      layoutRoles.forEach(role => {
         const existing = byRole.get(role);
-
         if (existing) {
-          // Update existing surround speaker
-          byRole.set(role, {
-            ...existing,
-            model: newModelKey
-          });
+          byRole.set(role, { ...existing, model: modelKey });
         } else {
-          // Create a new surround speaker with this role + model.
-          // Position will be resolved by resetSurroundPositions later.
           byRole.set(role, {
             id: `${role.toLowerCase()}-${timeNowMs()}`,
             role,
-            model: newModelKey,
+            model: modelKey,
             position: undefined,
-            rotation: { x: 0, y: 0, z: 0 },
+            rotation: { x:0, y:0, z:0 },
             draggable: true
           });
         }
-      }
+      });
 
-      // 4) Remove surround roles that are NOT in surroundRolesForLayout
+      // Remove surround roles that are NOT in layoutRoles for this layout
       for (const role of ["SL","SR","SBL","SBR","LW","RW"]) {
-        if (!surroundRolesForLayout.includes(role)) {
+        if (!layoutRoles.includes(role)) {
           byRole.delete(role);
         }
       }
 
-      const nextArray = Array.from(byRole.values());
+      const updated = Array.from(byRole.values());
       
-      console.log('[B44] handleSurroundModelChange OUTPUT:', nextArray
+      console.log('[B44] handleSurroundModelChange OUTPUT (before reset):', updated
         .filter(s => ALL_SURROUND_ROLES.has(getCanonicalRole(s.role)))
-        .map(s => ({ role: s.role, exists: true, model: s.model || '(null)' }))
+        .map(s => ({ role: s.role, model: s.model || '(null)', hasPosition: !!s.position }))
       );
 
-      // 5) Return final list - resetSurroundPositions will run via useEffect
-      return nextArray;
+      // Let resetSurroundPositions compute coordinates
+      // Note: resetSurroundPositions will run via useEffect after this state update
+      return updated;
     });
-  }, [setSurroundConfig, setSpeakers, allowedRoles, effectivePreset, useWides]);
+  }, [setSurroundConfig, setSpeakers, effectivePreset, useWides]);
   
   useEffect(() => {
     const master = surroundConfig?.value?.master;
@@ -1413,21 +1415,10 @@ function SpeakerPlacementImpl(props) {
       // [B44 FIX] Use the canonical rolesForLayout from the helper
       const currentUseWides = useWides; // From the newly defined useWides memo
       
-      const localAllowedRoles = new Set();
-      if (major >= 5) {
-        localAllowedRoles.add("SL");
-        localAllowedRoles.add("SR");
-      }
-      const showRears = major === 7 && !currentUseWides;
-      const showWides7 = major === 7 && !!currentUseWides;
-      if (showRears || major >= 9) {
-        localAllowedRoles.add("SBL");
-        localAllowedRoles.add("SBR");
-      }
-      if (showWides7 || major >= 9) {
-        localAllowedRoles.add("LW");
-        localAllowedRoles.add("RW");
-      }
+      const localAllowedRoles = rolesForLayout({ // Use the helper function here
+        dolbyLayout: layoutNormalized,
+        useWidesInsteadOfRears: currentUseWides
+      }).filter(r => ["SL","SR","SBL","SBR","LW","RW"].includes(r));
 
       console.log('[SP] resetSurroundPositions CONFIG', {
         layoutNormalized, major,
@@ -1675,7 +1666,7 @@ function SpeakerPlacementImpl(props) {
     globalSurroundModel,
     mlpPoint?.x, mlpPoint?.y,
     dimensions?.width, dimensions?.length,
-    allowedRoles // Dependency added to re-evaluate on layout change
+    allowedRoles // Dependency added to re-evaluate on layout change (NOTE: This dependency is okay for general reruns, but was made explicit by the previous change to `allowedRoles` logic.)
   ]);
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
