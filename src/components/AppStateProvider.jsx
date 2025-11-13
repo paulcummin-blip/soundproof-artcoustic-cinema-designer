@@ -425,16 +425,10 @@ function useDesignerState() {
           return spk;
         });
 
-        console.log('[AS] setSpeakerSystem AFTER normalization');
-        console.group('[STATE] placedSpeakers(final)');
-        console.table(speakers.map(s => ({
-          role: s.role,
-          model: s.model,
-          x: s.position?.x?.toFixed(3),
-          y: s.position?.y?.toFixed(3),
-          yaw: s.rotation?.z
+        console.log('[AS] setSpeakerSystem AFTER normalization', speakers.map(s => ({
+          role: getCanonicalRole(s.role),
+          model: s.model
         })));
-        console.groupEnd();
 
         // ✅ If speakers didn't actually change, return prev to avoid churn
         if (speakersShallowEqual(prev.placedSpeakers, speakers)) {
