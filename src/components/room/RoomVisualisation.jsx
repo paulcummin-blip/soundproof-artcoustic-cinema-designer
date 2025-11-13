@@ -3016,36 +3016,23 @@ React.useEffect(() => {
 
   // Filter and position speakers for rendering
   const speakersToRender = React.useMemo(() => {
-    const vis = appState?.visibleRoles; // from Provider
+    // Make sure we always have an array
+    const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+
+    // Always skip LFE – it’s not drawn as a normal speaker
+    const withoutLfe = base.filter((spk) => {
+      const canonicalRole = getCanonicalRole(spk.role);
+      return canonicalRole !== "LFE";
+    });
+
+    // Respect visibleRoles from appState if it exists
+    const vis = appState?.visibleRoles;
     if (!vis || !(vis instanceof Set)) {
-      console.warn('[RV] visibleRoles not ready from provider');
-      return (placedSpeakers || [])
-        .filter(spk => {
-          const canonicalRole = getCanonicalRole(spk.role);
-          if (canonicalRole === 'LFE') return false;
-          return true;
-        });
+      return withoutLfe;
     }
 
-    const filtered = (placedSpeakers || [])
-      .filter(spk => {
-        const canonicalRole = getCanonicalRole(spk.role);
-        if (canonicalRole === 'LFE') return false;
-        return vis.has(canonicalRole);
-      });
-
-    // DEBUG: Log what we're about to render
-    console.group('[RV] speakersToRender');
-    console.table(filtered.map(s => ({
-      role: s.role,
-      model: s.model,
-      x: s.position?.x?.toFixed(3),
-      y: s.position?.y?.toFixed(3),
-      yaw: s.rotation?.z
-    })));
-    console.groupEnd();
-
-    return filtered;
+    // Only keep speakers whose canonical role is in the visibleRoles set
+    return withoutLfe.filter((spk) => vis.has(getCanonicalRole(spk.role)));
   }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
 
 
