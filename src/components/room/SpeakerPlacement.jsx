@@ -1610,16 +1610,16 @@ function SpeakerPlacementImpl(props) {
           return;
         }
 
-        next.push({
-          id: existing?.id || `${canon}-${timeNowMs()}`,
-          role: canon,
-          model: resolvedModel,
-          position: pos,
-          draggable: true,
-          // B44: rotate surrounds by yawDeg (e.g. ±90° for SL/SR) so long edge faces into room
-          rotation: existing?.rotation || { x: 0, y: 0, z: yawDeg ?? 0 },
-        });
-      };
+      next.push({
+        id: existing?.id || `${canon}-${timeNowMs()}`,
+        role: canon,
+        model: resolvedModel,
+        position: pos,
+        draggable: true,
+        // Let RoomVisualisation decide wall orientation; start at 0°
+        rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
+      });
+    };
 
       console.table(next.map(s => ({
         role: s.role, model: s.model,
