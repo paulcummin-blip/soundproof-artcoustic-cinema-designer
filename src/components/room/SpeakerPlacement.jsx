@@ -1583,15 +1583,6 @@ function SpeakerPlacementImpl(props) {
           // Only seed if the role is allowed in the current layout
           if (!localAllowedRoles.has(canon)) return;
 
-          // Decide initial plan-view yaw so speakers start flat to the wall.
-          // Left wall speakers: +90°, right wall speakers: -90°.
-          let initialYaw = 0;
-          if (canon === 'SL' || canon === 'SBL' || canon === 'LW') {
-            initialYaw = 90;
-          } else if (canon === 'SR' || canon === 'SBR' || canon === 'RW') {
-            initialYaw = -90;
-          }
-
           const existing = byRole.get(canon);
           
           // B44 FIX: only create surrounds when a real model is chosen
@@ -1619,20 +1610,20 @@ function SpeakerPlacementImpl(props) {
             return;
           }
 
+          const initialYaw = Number.isFinite(yawDeg) ? yawDeg : 0;
+
           next.push({
             id: existing?.id || `${canon}-${timeNowMs()}`,
             role: canon,
             model: resolvedModel,
-            // position object for any code that uses it
             position: pos,
-            // top-level x/y so AppState normalisation and RV can see them directly
-            x: pos.x,
-            y: pos.y,
-            // seed yaw so the icon is immediately drawn flat to the wall
-            yaw: typeof existing?.yaw === 'number' ? existing.yaw : initialYaw,
             draggable: true,
-            // keep rotation in sync with yaw for any 3D / future logic
-            rotation: existing?.rotation || { x: 0, y: 0, z: initialYaw },
+
+            // CRITICAL: seed yaw explicitly so RV uses this on first render
+            yaw: initialYaw,
+
+            // Keep rotation neutral – RV / drag code can manage its own internals
+            rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
           });
         };
 
