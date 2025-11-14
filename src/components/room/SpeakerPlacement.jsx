@@ -1033,7 +1033,7 @@ function SpeakerPlacementImpl(props) {
     setOverheadGlobalModel,
     overheadFrontOverride,
     setOverheadFrontOverride,
-    overheadMidOverride,
+    overheadMidOverride, // Corrected prop name
     setOverheadMidOverride,
     overheadRearOverride,
     setOverheadRearOverride,
@@ -1922,7 +1922,7 @@ function SpeakerPlacementImpl(props) {
               globalModel={overheadGlobalModel}
               onGlobalModelChange={setOverheadGlobalModel}
               frontOverride={overheadFrontOverride}
-              midOverride={midOverride}
+              midOverride={overheadMidOverride}
               rearOverride={overheadRearOverride}
               onFrontOverrideChange={setOverheadFrontOverride}
               onMidOverrideChange={setOverheadMidOverride}
