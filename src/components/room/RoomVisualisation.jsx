@@ -232,9 +232,14 @@ const getYawForObject = (speaker, lcrAngles, aimAtMLP, dimensions, getModelDimsM
   const onRightWall = Number.isFinite(pos.x) && Math.abs(pos.x - rightX) <= 0.035;
   const onBackWall  = Number.isFinite(pos.y) && Math.abs(pos.y - (L - (0.05 + halfDepth))) <= 0.035;
 
-  if (onBackWall) return 0;
-  if (onLeftWall)  return 90;
-  if (onRightWall) return -90;
+  if (['SL', 'SR', 'LW', 'RW', 'SBL', 'SBR'].includes(role)) {
+    // Side walls: speaker long edge along the wall, facing into room
+    if (onLeftWall)  return +90;
+    if (onRightWall) return -90;
+
+    // Back wall: long edge across the back wall, facing forward
+    if (onBackWall)  return 0;
+  }
 
   // 3) Overheads/wides and anything else default to 0°
   return 0;
@@ -2730,6 +2735,7 @@ React.useEffect(() => {
       if (r === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_star, y: yR } };
       return s;
     }));
+    */
   }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
 
   // [B44] DISABLED: SBL/SBR positions now come from SpeakerPlacement only

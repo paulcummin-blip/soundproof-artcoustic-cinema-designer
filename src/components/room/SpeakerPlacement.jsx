@@ -1635,24 +1635,32 @@ function SpeakerPlacementImpl(props) {
         yaw: s.rotation?.z
       })));
 
-      const sideAngle = (major >= 7) ? 100 : 115;
-      
-      if (localAllowedRoles.has('LW') || localAllowedRoles.has('RW')) { // Handles 9.x AND 7.x with wides
-        if (localAllowedRoles.has('SL')) seed('SL',  360 - sideAngle, +90);
-        if (localAllowedRoles.has('SR')) seed('SR',  sideAngle,       -90);
-        if (localAllowedRoles.has('SBL')) seed('SBL', +217.5, 0); // These are usually rears, but if wides are enabled, they are distinct.
-        if (localAllowedRoles.has('SBR')) seed('SBR', -217.5, 0);
-        if (localAllowedRoles.has('LW')) seed('LW',  +300,   +90);
-        if (localAllowedRoles.has('RW')) seed('RW',  -300,   -90);
-      } else if (major === 7) { // 7.x without wides (default 7.1 layout)
-        seed('SL',  360 - sideAngle, +90);
-        seed('SR',  sideAngle,       -90);
-        seed('SBL', +217.5, 0);
-        seed('SBR', -217.5, 0);
-      } else { // 5.1 layout
-        seed('SL',  360 - sideAngle, +90);
-        seed('SR',  sideAngle,       -90);
-      }
+        const sideAngle = (major >= 7) ? 100 : 115;
+
+        // Rear surround centre of Dolby zone: 142.5°
+        const rearCentreAngle = 142.5;
+        const rearRightDolby  = rearCentreAngle;           // SBR  (back-right)
+        const rearLeftDolby   = 360 - rearCentreAngle;     // SBL  (back-left)
+
+        if (localAllowedRoles.has('LW') || localAllowedRoles.has('RW')) { 
+          // 9.x AND 7.x-with-wides: sides, rears AND wides can all exist
+          if (localAllowedRoles.has('SL'))  seed('SL',  360 - sideAngle, +90);
+          if (localAllowedRoles.has('SR'))  seed('SR',  sideAngle,       -90);
+          if (localAllowedRoles.has('SBL')) seed('SBL', rearLeftDolby,   0);
+          if (localAllowedRoles.has('SBR')) seed('SBR', rearRightDolby,  0);
+          if (localAllowedRoles.has('LW'))  seed('LW',  +300,            +90);
+          if (localAllowedRoles.has('RW'))  seed('RW',  -300,            -90);
+        } else if (major === 7) { 
+          // 7.x without wides: sides + rears only
+          seed('SL',  360 - sideAngle, +90);
+          seed('SR',  sideAngle,       -90);
+          seed('SBL', rearLeftDolby,   0);
+          seed('SBR', rearRightDolby,  0);
+        } else { 
+          // 5.1 layout: sides only
+          seed('SL',  360 - sideAngle, +90);
+          seed('SR',  sideAngle,       -90);
+        }
 
       // [B44 DIAGNOSTIC] Log all surround outputs before return
       console.log(
