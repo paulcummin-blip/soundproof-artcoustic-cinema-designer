@@ -1583,14 +1583,13 @@ function SpeakerPlacementImpl(props) {
           // Only seed if the role is allowed in the current layout
           if (!localAllowedRoles.has(canon)) return;
 
-          // Decide initial plan-view rotation so speakers start flat to the wall
-          let initialZ = 0;
+          // Decide initial plan-view yaw so speakers start flat to the wall.
+          // Left wall speakers: +90°, right wall speakers: -90°.
+          let initialYaw = 0;
           if (canon === 'SL' || canon === 'SBL' || canon === 'LW') {
-            // Left wall speakers – long edge vertical, facing into room
-            initialZ = 90;
+            initialYaw = 90;
           } else if (canon === 'SR' || canon === 'SBR' || canon === 'RW') {
-            // Right wall speakers – long edge vertical, facing into room
-            initialZ = -90;
+            initialYaw = -90;
           }
 
           const existing = byRole.get(canon);
@@ -1624,10 +1623,16 @@ function SpeakerPlacementImpl(props) {
             id: existing?.id || `${canon}-${timeNowMs()}`,
             role: canon,
             model: resolvedModel,
+            // position object for any code that uses it
             position: pos,
+            // top-level x/y so AppState normalisation and RV can see them directly
+            x: pos.x,
+            y: pos.y,
+            // seed yaw so the icon is immediately drawn flat to the wall
+            yaw: typeof existing?.yaw === 'number' ? existing.yaw : initialYaw,
             draggable: true,
-            // Seed with correct wall-facing orientation; drag logic can still override later
-            rotation: existing?.rotation || { x: 0, y: 0, z: initialZ },
+            // keep rotation in sync with yaw for any 3D / future logic
+            rotation: existing?.rotation || { x: 0, y: 0, z: initialYaw },
           });
         };
 
@@ -1918,7 +1923,7 @@ function SpeakerPlacementImpl(props) {
               globalModel={overheadGlobalModel}
               onGlobalModelChange={setOverheadGlobalModel}
               frontOverride={overheadFrontOverride}
-              midOverride={overheadMidOverride}
+              midOverride={midOverride}
               rearOverride={overheadRearOverride}
               onFrontOverrideChange={setOverheadFrontOverride}
               onMidOverrideChange={setOverheadMidOverride}
