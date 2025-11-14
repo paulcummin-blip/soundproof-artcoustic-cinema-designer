@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
@@ -4136,14 +4137,21 @@ return {
     const widthM_spk = dims.widthM || 0;
     const depthM_spk = dims.depthM || 0;
 
-    // Compute yaw with existing helper
-    const yawDeg = getYawForObject(
-      speaker,
-      { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
-      aimAtMLP,
-      { width: widthM, length: lengthM, height: heightM },
-      getModelDimsM
-    );
+    // Compute yaw: prefer explicit speaker.yaw (seeded by SpeakerPlacement)
+    // and fall back to the existing helper if it's not set / not finite.
+    let yawDeg;
+
+    if (Number.isFinite(speaker?.yaw)) {
+      yawDeg = Number(speaker.yaw);
+    } else {
+      yawDeg = getYawForObject(
+        speaker,
+        { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
+        aimAtMLP,
+        { width: widthM, length: lengthM, height: heightM },
+        getModelDimsM
+      );
+    }
 
     // Position coordinates from speaker.position (with safe fallbacks)
     const pos_x = position.x ?? 0;
