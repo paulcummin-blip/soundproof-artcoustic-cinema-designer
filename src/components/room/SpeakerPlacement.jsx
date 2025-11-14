@@ -1616,8 +1616,8 @@ function SpeakerPlacementImpl(props) {
           model: resolvedModel,
           position: pos,
           draggable: true,
-          // B44: keep surrounds flat to wall; yaw handled visually by RV
-          rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
+          // B44: rotate surrounds by yawDeg (e.g. ±90° for SL/SR) so long edge faces into room
+          rotation: existing?.rotation || { x: 0, y: 0, z: yawDeg ?? 0 },
         });
       };
 
