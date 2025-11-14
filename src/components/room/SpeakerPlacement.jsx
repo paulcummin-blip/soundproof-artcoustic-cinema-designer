@@ -1508,16 +1508,15 @@ function SpeakerPlacementImpl(props) {
         const halfShortEdge = Math.min(speakerWidthM, speakerDepthM) / 2;
         // const halfLongEdge = Math.max(speakerWidthM, speakerDepthM) / 2; // Not used currently, but kept for context
 
-        // LEFT wall speakers (SL, LW, SBL)
-        // These speakers mount with their long edge usually perpendicular to the wall,
-        // so their short edge determines the distance from the wall.
-        if (R === 'SL' || R === 'LW' || R === 'SBL') {
+        // LEFT wall speakers (SL, LW)
+        // Rear surrounds (SBL/SBR) are treated as BACK wall only, not side walls.
+        if (R === 'SL' || R === 'LW') {
           const leftX = WALL_BUFFER_M + halfShortEdge;
           p.x = Number.isFinite(leftX) ? leftX : dims.width / 2;
         }
 
-        // RIGHT wall speakers (SR, RW, SBR)
-        if (R === 'SR' || R === 'RW' || R === 'SBR') {
+        // RIGHT wall speakers (SR, RW)
+        if (R === 'SR' || R === 'RW') {
           const rightX = dims.width - WALL_BUFFER_M - halfShortEdge;
           p.x = Number.isFinite(rightX) ? rightX : dims.width / 2;
         }
