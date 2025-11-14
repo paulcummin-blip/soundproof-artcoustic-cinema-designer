@@ -1619,11 +1619,12 @@ function SpeakerPlacementImpl(props) {
             position: pos,
             draggable: true,
 
-            // CRITICAL: seed yaw explicitly so RV uses this on first render
+            // Keep yaw for labels / analysis
             yaw: initialYaw,
 
-            // Keep rotation neutral – RV / drag code can manage its own internals
-            rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
+            // CRITICAL: drive the icon orientation from rotation.z
+            // so the speaker starts flat to the wall.
+            rotation: existing?.rotation || { x: 0, y: 0, z: initialYaw },
           });
         };
 
