@@ -1578,48 +1578,58 @@ function SpeakerPlacementImpl(props) {
         return p;
       };
 
-      const seed = (role, dolbyAngleDeg, yawDeg) => {
-        const canon = getCanonicalRole(role);
-        // Only seed if the role is allowed in the current layout
-        if (!localAllowedRoles.has(canon)) return;
+        const seed = (role, dolbyAngleDeg, yawDeg) => {
+          const canon = getCanonicalRole(role);
+          // Only seed if the role is allowed in the current layout
+          if (!localAllowedRoles.has(canon)) return;
 
-        const existing = byRole.get(canon);
-        
-        // B44 FIX: only create surrounds when a real model is chosen
-        let resolvedModel = existing?.model || globalSurroundModelParam;
+          // Decide initial plan-view rotation so speakers start flat to the wall
+          let initialZ = 0;
+          if (canon === 'SL' || canon === 'SBL' || canon === 'LW') {
+            // Left wall speakers – long edge vertical, facing into room
+            initialZ = 90;
+          } else if (canon === 'SR' || canon === 'SBR' || canon === 'RW') {
+            // Right wall speakers – long edge vertical, facing into room
+            initialZ = -90;
+          }
 
-        // If there is still no model (dropdown "Off"), do not seed this role
-        if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
-          return;
-        }
+          const existing = byRole.get(canon);
+          
+          // B44 FIX: only create surrounds when a real model is chosen
+          let resolvedModel = existing?.model || globalSurroundModelParam;
 
-        resolvedModel = String(resolvedModel);
+          // If there is still no model (dropdown "Off"), do not seed this role
+          if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
+            return;
+          }
 
-        const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
-        
-        // [B44 FIX B] Capture wall hit from projectToWallFromMLP_xy
-        const baseWithWall = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
-        const base = { x: baseWithWall.x, y: baseWithWall.y };
-        const hitWall = baseWithWall.wall;
-        
-        console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
-        
-        const pos  = finalisePos(base, canon, resolvedModel, hitWall);
+          resolvedModel = String(resolvedModel);
 
-        if (!pos) {
-          return;
-        }
+          const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
+          
+          // [B44 FIX B] Capture wall hit from projectToWallFromMLP_xy
+          const baseWithWall = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
+          const base = { x: baseWithWall.x, y: baseWithWall.y };
+          const hitWall = baseWithWall.wall;
+          
+          console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
+          
+          const pos  = finalisePos(base, canon, resolvedModel, hitWall);
 
-      next.push({
-        id: existing?.id || `${canon}-${timeNowMs()}`,
-        role: canon,
-        model: resolvedModel,
-        position: pos,
-        draggable: true,
-        // Let RoomVisualisation decide wall orientation; start at 0°
-        rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
-      });
-    };
+          if (!pos) {
+            return;
+          }
+
+          next.push({
+            id: existing?.id || `${canon}-${timeNowMs()}`,
+            role: canon,
+            model: resolvedModel,
+            position: pos,
+            draggable: true,
+            // Seed with correct wall-facing orientation; drag logic can still override later
+            rotation: existing?.rotation || { x: 0, y: 0, z: initialZ },
+          });
+        };
 
       console.table(next.map(s => ({
         role: s.role, model: s.model,
