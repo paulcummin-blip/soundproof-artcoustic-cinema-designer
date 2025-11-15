@@ -321,6 +321,23 @@ function applyFrontWideMedianPositions(list, dimensions, applyCornerClearance, a
 
   let changed = false;
 
+  // Helper: get hugging center lines (defined in parent scope, we receive via closure or re-implement)
+  const getHugging = (model, dims) => {
+    const WALL_BUFFER_M = 0.01;
+    const meta = typeof window !== 'undefined' && window.__GET_SPEAKER_META 
+      ? window.__GET_SPEAKER_META(model) 
+      : null;
+    
+    const widthM = meta?.widthM || 0.27;
+    const depthM = meta?.depthM || 0.082;
+    const shortEdge = Math.min(widthM, depthM);
+    
+    return {
+      leftWallX: shortEdge / 2 + WALL_BUFFER_M,
+      rightWallX: dims.width - shortEdge / 2 - WALL_BUFFER_M,
+    };
+  };
+
   const updated = speakers.map((s) => {
     const canon = getCanonicalRole(s.role);
     if (canon !== "LW" && canon !== "RW") return s;
@@ -333,14 +350,21 @@ function applyFrontWideMedianPositions(list, dimensions, applyCornerClearance, a
     const sx = side.position.x;
     const sy = side.position.y;
 
-    // Median point between FL/FR and SL/SR
+    // 1) Median Y (front-back): halfway between front and side surround
+    const medianY = (fy + sy) / 2;
+    const medianX = (fx + sx) / 2;
+
+    // 2) Pin X to the side wall using hugging logic
+    const hugging = getHugging(s.model, dimensions);
+    const sideWallX = canon === "LW" ? hugging.leftWallX : hugging.rightWallX;
+
     let pos = {
-      x: (fx + sx) / 2,
-      y: (fy + sy) / 2,
+      x: Number.isFinite(sideWallX) ? sideWallX : medianX,
+      y: medianY,
       z: Number.isFinite(s.position?.z) ? s.position.z : 1.1,
     };
 
-    // Respect corner clearance and room bounds
+    // 3) Respect corner clearance and room bounds
     pos = applyCornerClearance(pos, canon, s.model, dimensions, {});
     pos = applyRoomBoundsClamp(pos, s.model, dimensions);
 
@@ -1242,6 +1266,18 @@ function SpeakerPlacementImpl(props) {
       longEdge
     };
   }, [getModelDimsM, WALL_BUFFER_M]);
+
+  // Expose getModelDimsM to window for applyFrontWideMedianPositions helper
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__GET_SPEAKER_META = getModelDimsM;
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.__GET_SPEAKER_META;
+      }
+    };
+  }, [getModelDimsM]);
 
   const placeSurroundByRayCast = useCallback((angleDegrees, mlpPoint, roomDimensions) => {
     const { width: W, length: L } = roomDimensions;
