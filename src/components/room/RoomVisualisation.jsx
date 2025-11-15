@@ -28,6 +28,43 @@ import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
 import PlanMessages from '@/components/room/PlanMessages';
 import SvgDefs from '@/components/room/SvgDefs';
 
+import {
+  SIDE_ALLOW_OVERHANG,
+  FADE_LEN_M,
+  CORNER_CLEAR_M,
+  BACKWALL_HYSTERESIS_M,
+  RS_CLEAR_M,
+  SS_RS_BUFFER_M,
+  RS_EPS,
+  DBG_RS,
+  DBG_SS,
+  DBG_UTIL,
+  deg,
+  clamp,
+  horizontalAngleFromMLP,
+  fwDeviationLevel,
+  getCanonicalRoleGlobal,
+  getSpeakerDims,
+  rearSpeakerFootprintX,
+  halfWidthOnWall,
+  backWallYForDims,
+  isOnBackWall,
+  computeSymmetricXR,
+  clampToAllowedWithExclusions,
+  sideWallXAtBuffer,
+  sideSurroundsOnBackWall,
+  clampRearSideYWithSS,
+  speakerOnWallYFootprint,
+  nonCrossingClampDirectional,
+  centerLaneForBackWall,
+  computeBackWallInnerEdges,
+  computeRearVisualLanes,
+  resolveSymmetricY,
+} from "@/components/room/rvPlanHelpers";
+
+// Local constant for epsilon comparisons
+const EPS = 0.0005;
+
 // local shim for fixedSideX — guaranteed available in this file
 const fixedSideX = (roomWidth, dims, side, wallBufferM = WALL_BUFFER_M) => {
   const halfDepth = (dims?.depthM ?? 0.082) / 2;
@@ -94,40 +131,21 @@ import {
 
 
 import {
-  SIDE_ALLOW_OVERHANG,
-  EPS,
-  FADE_LEN_M,
-  CORNER_CLEAR_M,
-  BACKWALL_HYSTERESIS_M,
-  RS_CLEAR_M,
-  SS_RS_BUFFER_M,
-  RS_EPS,
-  DBG_RS,
-  DBG_SS,
-  DBG_UTIL,
-  deg,
-  clamp,
-  horizontalAngleFromMLP,
-  fwDeviationLevel,
-  getCanonicalRoleGlobal,
-  getSpeakerDims,
-  rearSpeakerFootprintX,
-  halfWidthOnWall,
-  backWallYForDims,
-  isOnBackWall,
-  computeSymmetricXR,
-  clampToAllowedWithExclusions,
-  sideWallXAtBuffer,
-  sideSurroundsOnBackWall,
-  clampRearSideYWithSS,
-  speakerOnWallYFootprint,
-  nonCrossingClampDirectional,
-  centerLaneForBackWall,
-  computeBackWallInnerEdges,
-  computeRearVisualLanes,
-  resolveSymmetricY,
+  isSubRole,
+  hasPos,
+  isRenderableSpeaker,
+  getChannelColor,
+  normaliseModelKey,
+  RAD, rad2deg, yawDegToMLP, safeYawToMLP,
+  PADDING, DEFAULT_W, DEFAULT_H,
+  SCREEN_BAR_PX, SCREEN_BAR_HALF_PX,
+  SCREEN_THICKNESS_M, toCmCeil,
+  SPEAKER_STROKE_PX, STROKE_HALF_M,
+  yHalfExtentM, yHalfExtentM_physical,
+  targetMlpY57_5,
+  SpeakerIcon,
+  SpeakerRect,
 } from "@/components/room/rv/RenderPrimitives";
-
 
 // SAFE ROLE ACCESSOR – works with Map or plain object; always returns an array
 function getByRoleArray(mapOrObj, role) {
@@ -191,23 +209,6 @@ function resolveSymmetricLCR({ desiredX, isLeft, screenCenterX, leftZone, rightZ
   return { finalLeftX: finalLeftX, finalRightX: finalRightX };
 }
 
-
-import {
-  isSubRole,
-  hasPos,
-  isRenderableSpeaker,
-  getChannelColor,
-  normaliseModelKey,
-  RAD, rad2deg, yawDegToMLP, safeYawToMLP,
-  PADDING, DEFAULT_W, DEFAULT_H,
-  SCREEN_BAR_PX, SCREEN_BAR_HALF_PX,
-  SCREEN_THICKNESS_M, toCmCeil,
-  SPEAKER_STROKE_PX, STROKE_HALF_M,
-  yHalfExtentM, yHalfExtentM_physical,
-  targetMlpY57_5,
-  SpeakerIcon,
-  SpeakerRect,
-} from "@/components/room/rv/RenderPrimitives";
 
 // NEW: Helper function to compute yaw angle for a speaker
 const getYawForObject = (speaker, lcrAngles, aimAtMLP, dimensions, getModelDimsM) => {
@@ -1054,75 +1055,12 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
   // FW median positioning is now FULLY handled by SpeakerPlacement unconditionally.
-  // This effect used to run when enableFrontWides was true, but that logic is now obsolete.
   // The overlay (when enabled) should ONLY:
   // - Draw the visual FW zone bands
   // - Constrain manual drags inside the band during user interaction
   useEffect(() => {
     // Legacy auto-positioning logic disabled
     return;
-    
-    /* ORIGINAL LOGIC DISABLED:
-    if (!enableFrontWides || isDraggingFW.current) return;
-    if (frontWideZones?.status !== 'ok') return;
-
-    const W = widthM || 4.5;
-    const L = lengthM || 6.0;
-    const WALL_BUFFER_FW = 0.02;
-
-    const lwSpeaker = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW');
-    const rwSpeaker = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'RW');
-
-    if (!lwSpeaker && !rwSpeaker) return;
-
-    let needsUpdate = false;
-    const updated = (placedSpeakers || []).map(s => {
-      const role = getCanonicalRole(s.role);
-      if (role !== 'LW' && role !== 'RW') return s;
-
-      const zone = role === 'LW' ? frontWideZones.left : frontWideZones.right;
-      if (!zone || !zone.medianY) return s;
-
-      const dims = getModelDimsM(s.model);
-      const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
-      const halfWidth = (Number(dims?.widthM) || 0.20) / 2;
-
-      const xAtWall = role === 'LW'
-        ? (WALL_BUFFER_FW + halfDepth)
-        : (W - WALL_BUFFER_FW - halfDepth);
-
-      const sideOffsetKey = role === 'LW' ? 'L' : 'R';
-      const currentOffset = fwOffsetRef.current[sideOffsetKey] || 0;
-
-      const targetYWithOffset = zone.medianY + currentOffset;
-      const yMinClamped = (zone.yMin || 0) + (halfWidth * SIDE_ALLOW_OVERHANG);
-      const yMaxClamped = (zone.yMax || L) - (halfWidth * SIDE_ALLOW_OVERHANG);
-
-      const yClamped = clamp(targetYWithOffset, yMinClamped, yMaxClamped);
-
-      const currentY = s.position?.y ?? 0;
-      const currentX = s.position?.x ?? 0;
-
-      if (Math.abs(currentY - yClamped) > EPS || Math.abs(currentX - xAtWall) > EPS) {
-        needsUpdate = true;
-        return {
-          ...s,
-          position: {
-            ...s.position,
-            x: xAtWall,
-            y: yClamped,
-            z: s.position?.z ?? 1.1
-          }
-        };
-      }
-
-      return s;
-    });
-
-    if (needsUpdate) {
-      onSetSpeakers(updated);
-    }
-    */
   }, [
     enableFrontWides,
     frontWideZones,
@@ -1266,6 +1204,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
     const roomWidthM = widthM || 4.5;
     const screenCenterX_m = roomWidthM / 2;
+    const SAFETY_MARGIN_M = 0.05; // Declared locally, previously from RenderPrimitives
     const clampY = (y) => Math.max(SAFETY_MARGIN_M, Math.min(lengthM - SAFETY_MARGIN_M, y));
 
     return { BaffleAndScreen: component, screenPlaneY, screenCenterX_m, visibleWidthM: viewableWidthM };
@@ -1342,7 +1281,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     const spk = byId.get(speakerId);
     if (!spk) return;
 
-    const canonicalRole = getCanonicalRole(spk.role);
+    const canonicalRole = getCanonicalRoleGlobal(spk.role); // Using global getCanonicalRoleGlobal
 
     if (!isDraggable(spk)) {
       return;
@@ -1379,7 +1318,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
         // Apply positions
         onSetSpeakers(prev => {
           return prev.map(s => {
-            const currentCanonRole = getCanonicalRole(s.role);
+            const currentCanonRole = getCanonicalRoleGlobal(s.role);
             if (currentCanonRole === 'FL') {
               return { ...s, position: { ...(s.position || {}), x: finalLeftX } };
             }
@@ -1396,8 +1335,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
     // Handle special symmetrical drag for SL and SR
     if ((canonicalRole === 'SL' || canonicalRole === 'SR')) {
-      const slSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
-      const srSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+      const slSpeaker = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === 'SL');
+      const srSpeaker = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === 'SR');
       if (!slSpeaker || !srSpeaker) return;
 
       const W = widthM || 0;
@@ -1405,8 +1344,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       if (!(W > 0 && L > 0)) return;
 
       // Fixed X against side walls (unchanged)
-      const dimsL = getSpeakerDims(slSpeaker.model);
-      const dimsR = getSpeakerDims(srSpeaker.model);
+      const dimsL = getSpeakerDims(slSpeaker.model); // Using global getSpeakerDims
+      const dimsR = getSpeakerDims(srSpeaker.model); // Using global getSpeakerDims
       const xL_side = fixedSideX(W, dimsL, 'L');
       const xR_side = fixedSideX(W, dimsR, 'R');
 
@@ -1449,7 +1388,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
         const segL = sideSegmentAtX(_overlays?.sideSurroundZone, xL_side, L);
         const segR = sideSegmentAtX(_overlays?.sideSurroundZone, xR_side, L);
 
-        const yStarRaw = resolveSymmetricY(yPtr, segL, segR);
+        const yStarRaw = resolveSymmetricY(yPtr, segL, segR); // Using global resolveSymmetricY
 
         let yStar = Math.min(yMax, Math.max(yMin, yStarRaw));
 
@@ -1457,31 +1396,31 @@ export default forwardRef(function RoomVisualisation(props, ref) {
         const ssPrevY = Number((canonicalRole === 'SL' ? slSpeaker : srSpeaker)?.position?.y);
 
         // left side vs SBL
-        const sblCandidate = placedSpeakers.find(s => getCanonicalRole(s.role)==='SBL');
+        const sblCandidate = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role)==='SBL');
         if (sblCandidate && isOnSideWall('L', sblCandidate, W)) {
           const halfSS = (speakerOnWallYFootprint(getModelDimsM(slSpeaker.model)) || 0) / 2;
           const halfRS = (speakerOnWallYFootprint(getModelDimsM(sblCandidate.model)) || 0) / 2;
           const minSep = halfSS + halfRS + 0.50;
           const yOther = Number(sblCandidate?.position?.y) || 0;
-          yStar = nonCrossingClampDirectional(ssPrevY, yStar, yOther, minSep);
+          yStar = nonCrossingClampDirectional(ssPrevY, yStar, yOther, minSep); // Using global nonCrossingClampDirectional
           yStar = Math.min(Math.max(yStar, yMin), yMax);
         }
 
         // right side vs SBR
-        const sbrCandidate = placedSpeakers.find(s => getCanonicalRole(s.role)==='SBR');
+        const sbrCandidate = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role)==='SBR');
         if (sbrCandidate && isOnSideWall('R', sbrCandidate, W)) {
           const halfSS = (speakerOnWallYFootprint(getModelDimsM(srSpeaker.model)) || 0) / 2;
           const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbrCandidate.model)) || 0) / 2;
           const minSep = halfSS + halfRS + 0.50;
           const yOther = Number(sbrCandidate?.position?.y) || 0;
-          yStar = nonCrossingClampDirectional(ssPrevY, yStar, yOther, minSep);
+          yStar = nonCrossingClampDirectional(ssPrevY, yStar, yOther, minSep); // Using global nonCrossingClampDirectional
           yStar = Math.min(Math.max(yStar, yMin), yMax);
         }
 
         if (DBG_SS) {
           try {
-            const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
-            const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
+            const sbl = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === 'SBL');
+            const sbr = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === 'SBR');
             console.log('[SS drag] rear proximity inputs', {
               hasSBL: !!sbl, hasSBR: !!sbr,
               slsrYPtr: yPtr?.toFixed?.(3),
@@ -1497,7 +1436,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
 
         onSetSpeakers(prev => prev.map(s => {
-          const role = getCanonicalRole(s.role);
+          const role = getCanonicalRoleGlobal(s.role);
           if (role === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_side, y: yStar } };
           if (role === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_side, y: yStar } };
           return s;
@@ -1508,13 +1447,13 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       // back-wall mode (symmetric, lanes, fixed Y near back wall)
       const roomWidth = widthM || 0;
       // Use the precomputed lanes for consistency and proper fade/clearance application
-      const lanes = rearSurroundVisualLanes;
+      const lanes = rearSurroundVisualLanes; // Using global rearSurroundVisualLanes
 
       const leftLaneMin = lanes.left.minX;
       const leftLaneMax = lanes.left.maxX;
 
-      const y_back_m_L = backWallYForDims(getSpeakerDims(slSpeaker.model), L, WALL_BUFFER_M);
-      const y_back_m_R = backWallYForDims(getSpeakerDims(srSpeaker.model), L, WALL_BUFFER_M);
+      const y_back_m_L = backWallYForDims(getSpeakerDims(slSpeaker.model), L, WALL_BUFFER_M); // Using global backWallYForDims, getSpeakerDims
+      const y_back_m_R = backWallYForDims(getSpeakerDims(srSpeaker.model), L, WALL_BUFFER_M); // Using global backWallYForDims, getSpeakerDims
 
       const { x: proposedRoomX_m_slsr } = canvasToRoom(newCanvasPos);
 
@@ -1524,7 +1463,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
         : (roomWidth - proposedRoomX_m_slsr);
 
       // clamp within back-wall left lane limits
-      const xL_star = clamp(rawXL, leftLaneMin, leftLaneMax);
+      const xL_star = clamp(rawXL, leftLaneMin, leftLaneMax); // Using global clamp
 
       // mirror for right
       const xR_star = roomWidth - xL_star;
@@ -1550,7 +1489,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       // write positions (Y stays at back-wall Y you already computed: y_back_m)
       onSetSpeakers(prev =>
         prev.map(s => {
-          const r = getCanonicalRole(s.role);
+          const r = getCanonicalRoleGlobal(s.role);
           if (r === 'SL') return { ...s, position: { ...(s.position||{}), x: xL_star, y: y_back_m_L } };
           if (r === 'SR') return { ...s, position: { ...(s.position||{}), x: xR_star, y: y_back_m_R } };
           return s;
@@ -1595,18 +1534,18 @@ export default forwardRef(function RoomVisualisation(props, ref) {
         const c = rsSideCorridor(side, dimsRoom, spDims);
 
         finalX = c.x;
-        finalY = clamp(rawY, c.yMin, c.yMax);
+        finalY = clamp(rawY, c.yMin, c.yMax); // Using global clamp
       } else if (targetWall === 'rear') {
         const side = (rawX <= W * 0.5) ? 'left' : 'right';
         const c = rsRearCorridor(side, dimsRoom, spDims);
 
-        finalX = clamp(rawX, c.xMin, c.xMax);
+        finalX = clamp(rawX, c.xMin, c.xMax); // Using global clamp
         finalY = c.y;
       }
 
       // Mirror partner
       const partnerRole = canonicalRole === 'SBL' ? 'SBR' : 'SBL';
-      const partnerId = placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRole)?.id;
+      const partnerId = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === partnerRole)?.id;
 
       let partnerXTarget = W - finalX;
       let partnerX = partnerXTarget;
@@ -1630,12 +1569,12 @@ export default forwardRef(function RoomVisualisation(props, ref) {
         const c = rsSideCorridor(side, dimsRoom, spDims);
 
         partnerX = c.x;
-        partnerY = clamp(partnerY, c.yMin, c.yMax);
+        partnerY = clamp(partnerY, c.yMin, c.yMax); // Using global clamp
       } else if (partnerWall === 'rear') {
         const side = (partnerX <= W * 0.5) ? 'left' : 'right';
         const c = rsRearCorridor(side, dimsRoom, spDims);
 
-        partnerX = clamp(partnerX, c.xMin, c.xMax);
+        partnerX = clamp(partnerX, c.xMin, c.xMax); // Using global clamp
         partnerY = c.y;
       }
 
@@ -1685,7 +1624,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       const yMinClamped = (zone.yMin || 0) + (halfWidth * SIDE_ALLOW_OVERHANG);
       const yMaxClamped = (zone.yMax || L) - (halfWidth * SIDE_ALLOW_OVERHANG);
 
-      const yClamped = clamp(rawY, yMinClamped, yMaxClamped);
+      const yClamped = clamp(rawY, yMinClamped, yMaxClamped); // Using global clamp
 
       // Store offset from median for re-locking
       const offset = yClamped - zone.medianY;
@@ -1695,7 +1634,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       const nextPos = { x: xAtWall, y: yClamped, z: spk.position?.z ?? 1.1 };
 
       // Mirror partner: same offset from its own median
-      const partner = placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRole);
+      const partner = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === partnerRole);
 
       let partnerPos = null;
       if (partner) {
@@ -1711,7 +1650,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
         const partnerTargetY = partnerZone.medianY + offset;
         const partnerYMinClamped = (partnerZone.yMin || 0) + (partnerHalfWidth * SIDE_ALLOW_OVERHANG);
         const partnerYMaxClamped = (partnerZone.yMax || L) - (partnerHalfWidth * SIDE_ALLOW_OVERHANG);
-        const partnerYClamped = clamp(partnerTargetY, partnerYMinClamped, partnerYMaxClamped);
+        const partnerYClamped = clamp(partnerTargetY, partnerYMinClamped, partnerYMaxClamped); // Using global clamp
 
         partnerPos = { x: partnerXAtWall, y: partnerYClamped, z: partner.position?.z ?? 1.1 };
 
@@ -1724,11 +1663,11 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       try {
         const mlpX = mlp.x ?? (W / 2);
         const mlpY = mlp.y ?? (lengthM || 6.0) * 0.6; // Use lengthM
-        const currentDeg = horizontalAngleFromMLP(mlpX, mlpY, xAtWall, yClamped);
+        const currentDeg = horizontalAngleFromMLP(mlpX, mlpY, xAtWall, yClamped); // Using global horizontalAngleFromMLP
         const medianY = zone.medianY ?? yClamped;
-        const medianDeg = horizontalAngleFromMLP(mlpX, mlpY, xAtWall, medianY);
+        const medianDeg = horizontalAngleFromMLP(mlpX, mlpY, xAtWall, medianY); // Using global horizontalAngleFromMLP
         const deviation = Math.abs(currentDeg - medianDeg);
-        const lvl = fwDeviationLevel(deviation);
+        const lvl = fwDeviationLevel(deviation); // Using global fwDeviationLevel
 
         spk.meta = { ...(spk.meta || {}), fwDeviationDeg: deviation, fwDeviationLevel: lvl.level };
       } catch (_) { /* silent */ }
@@ -1763,7 +1702,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       return updated;
     });
     lastInteractionEpoch.current = timeNowMs();
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsSideCorridor, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m]);
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsSideCorridor, rsRearCorridor, fwOffsetRef, getCanonicalRoleGlobal, constraintZones, screenCenterX_m, centerX_m]); // Using global getCanonicalRoleGlobal
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
@@ -1793,7 +1732,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
 
     if (dragType === 'speaker' && speaker) {
-      const canonicalRole = getCanonicalRole(speaker.role);
+      const canonicalRole = getCanonicalRoleGlobal(speaker.role); // Using global getCanonicalRoleGlobal
 
       // --- LCR Mirror-Lock Drag Logic ---
       if (['FL', 'FC', 'FR'].includes(canonicalRole)) {
@@ -1825,8 +1764,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
           // Apply positions
           onSetSpeakers(prev => {
             // Find the actual FL and FR speakers by ID to ensure we update the correct ones
-            const flSpeaker = prev.find(s => getCanonicalRole(s.role) === 'FL');
-            const frSpeaker = prev.find(s => getCanonicalRole(s.role) === 'FR');
+            const flSpeaker = prev.find(s => getCanonicalRoleGlobal(s.role) === 'FL');
+            const frSpeaker = prev.find(s => getCanonicalRoleGlobal(s.role) === 'FR');
 
             return prev.map(s => {
               if (flSpeaker && s.id === flSpeaker.id) {
@@ -1853,7 +1792,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     } else if (dragType === 'seat') {
       handleSeatDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     }
-  }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, roomToCanvas]);
+  }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, setDragWarning, screenCenterX_m, getCanonicalRoleGlobal, centerX_m, roomToCanvas]);
 
   const handleMouseUp = useCallback(() => {
     setDragState({
@@ -2012,9 +1951,9 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
     // Filter placed speakers by category (only those with valid positions)
     const placed = Array.isArray(placedSpeakers) ? placedSpeakers.filter(hasPos) : [];
-    const placedLCR = placed.filter(s => screenRoles.has(getCanonicalRole(s.role)));
-    const placedSur = placed.filter(s => surroundRoles.has(getCanonicalRole(s.role)));
-    const placedOH = placed.filter(s => overheadRoles.has(getCanonicalRole(s.role)));
+    const placedLCR = placed.filter(s => screenRoles.has(getCanonicalRoleGlobal(s.role))); // Using global getCanonicalRoleGlobal
+    const placedSur = placed.filter(s => surroundRoles.has(getCanonicalRoleGlobal(s.role))); // Using global getCanonicalRoleGlobal
+    const placedOH = placed.filter(s => overheadRoles.has(getCanonicalRoleGlobal(s.role))); // Using global getCanonicalRoleGlobal
 
     // Helper: max pairwise delta
     const maxPairwiseDelta = (values) => {
@@ -2034,7 +1973,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     // --- Compute SPL @ Seat for all categories (using appState for power) ---
     const processSpeakersForSplAtSeat = (speakerArray, categoryKey) => {
       for (const spk of speakerArray) {
-        const role = getCanonicalRole(spk.role);
+        const role = getCanonicalRoleGlobal(spk.role); // Using global getCanonicalRoleGlobal
         const speakerMeta = getModelDimsM(spk.model);
         const effectiveSplInputs = appState.getEffectiveSplInputs(spk.role); // Get power from appState
 
@@ -2104,7 +2043,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
         const spl = _calculateSplFromComponentsForTooltip(spk.position, seatPos, sensitivity, powerW);
         
         if (Number.isFinite(spl)) {
-          lcrSpls.push({ role: getCanonicalRole(spk.role), spl });
+          lcrSpls.push({ role: getCanonicalRoleGlobal(spk.role), spl }); // Using global getCanonicalRoleGlobal
         }
       }
       
@@ -2131,15 +2070,15 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
     // Build eligible surrounds for P5
     const allSurrounds = (placedSpeakers || []).filter(s => {
-      const r = getCanonicalRole(s.role);
+      const r = getCanonicalRoleGlobal(s.role); // Using global getCanonicalRoleGlobal
       return r === 'SL' || r === 'SR' || r === 'SBL' || r === 'SBR' || r === 'LW' || r === 'RW';
     });
 
-    const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
-    const hasSR = allSurrounds.some(s => getCanonicalRole(s.role) === 'SR');
+    const hasSL = allSurrounds.some(s => getCanonicalRoleGlobal(s.role) === 'SL'); // Using global getCanonicalRoleGlobal
+    const hasSR = allSurrounds.some(s => getCanonicalRoleGlobal(s.role) === 'SR'); // Using global getCanonicalRoleGlobal
 
     const eligibleSurrounds = allSurrounds.filter(s => {
-      const r = getCanonicalRole(s.role);
+      const r = getCanonicalRoleGlobal(s.role); // Using global getCanonicalRoleGlobal
       if (r === 'LW' || r === 'RW') return hasSL && hasSR;
       return true;
     });
@@ -2310,7 +2249,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     screen, // Added for P16/P17 to pass screen object
     appState, // Added for SPL calculations
     heightM, // Use new heightM
-    getCanonicalRole
+    getCanonicalRoleGlobal // Using global getCanonicalRoleGlobal
   ]);
 
   // Calculate HUD position with clamping
@@ -2397,7 +2336,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       return;
     }
 
-    const flSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FL');
+    const flSpeaker = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === 'FL'); // Using global getCanonicalRoleGlobal
     if (!flSpeaker) return;
 
     // Use the current FL speaker position as the source of truth for re-calculation
@@ -2410,14 +2349,14 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     });
 
     // Only update if positions have changed to avoid an infinite loop
-    const frSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FR');
+    const frSpeaker = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === 'FR'); // Using global getCanonicalRoleGlobal
     const flNeedsUpdate = Math.abs((flSpeaker.position.x || 0) - finalLeftX) > EPS;
     const frNeedsUpdate = frSpeaker && Math.abs((frSpeaker.position.x || 0) - finalRightX) > EPS;
 
     if (flNeedsUpdate || frNeedsUpdate) {
       onSetSpeakers(prev => {
         return prev.map(s => {
-          const role = getCanonicalRole(s.role);
+          const role = getCanonicalRoleGlobal(s.role); // Using global getCanonicalRoleGlobal
           if (role === 'FL') {
             return { ...s, position: { ...(s.position || {}), x: finalLeftX } };
           }
@@ -2431,7 +2370,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       });
     }
 
-  }, [constraintZones, screenCenterX_m, onSetSpeakers, placedSpeakers, getCanonicalRole]);
+  }, [constraintZones, screenCenterX_m, onSetSpeakers, placedSpeakers, getCanonicalRoleGlobal]); // Using global getCanonicalRoleGlobal
 
   // [FC_CENTERLINE_LOCK] — Enforce FC always at room centerline
   useEffect(() => {
@@ -2439,7 +2378,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
     let needsFix = false;
     const next = placedSpeakers.map(sp => {
-      const role = getCanonicalRole(sp.role);
+      const role = getCanonicalRoleGlobal(sp.role); // Using global getCanonicalRoleGlobal
       if (role === 'FC') {
         const x = Number(sp.position?.x);
         if (!Number.isFinite(x) || Math.abs(x - centerX_m) > EPS_M) {
@@ -2454,7 +2393,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     });
 
     if (needsFix) onSetSpeakers(next);
-  }, [placedSpeakers, onSetSpeakers, centerX_m, getCanonicalRole]);
+  }, [placedSpeakers, onSetSpeakers, centerX_m, getCanonicalRoleGlobal]); // Using global getCanonicalRoleGlobal
 
   // [B44] DISABLED: SL/SR positions now come from SpeakerPlacement only
   // This effect has been disabled to prevent RV from overwriting state-driven positions
@@ -2462,190 +2401,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     // [B44] Legacy corridor/constraint logic for SL/SR disabled.
     // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
     return; // Early exit - effect is now a no-op
-    
-    /* ORIGINAL LOGIC DISABLED:
-    if (!onSetSpeakers) return;
-    if (isDraggingRearRef.current > 0) return;
-    if (timeNowMs() - lastInteractionEpoch.current < 500) return;
-
-    const W = widthM || 0;
-    const L = lengthM || 0;
-    if (!(W > 0 && L > 0)) return;
-
-    const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
-    const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
-    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
-    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
-
-    if (!sl || !sr) return;
-
-    const dimsL = getSpeakerDims(sl.model);
-    const dimsR = getSpeakerDims(sr.model);
-    const curY_sl = Number(sl?.position?.y);
-    const curY_sr = Number(sr?.position?.y);
-
-    const yMax_side_for_hysteresis = Math.max(
-      Number(sideSurroundVisualSpanM?.minY) || 0,
-      Math.min(Number(sideSurroundVisualSpanM?.maxY) || 0, L - CORNER_CLEAR_M)
-    );
-
-    let currentRefMode = slsrModeRef.current;
-    let nextModeBasedOnPosition = currentRefMode;
-
-    if (currentRefMode === 'back') {
-      if (curY_sl < (yMax_side_for_hysteresis - BACKWALL_HYSTERESIS_M)) {
-        nextModeBasedOnPosition = 'side';
-        if (DBG_SS) console.log('[SS live] position implies side mode: back -> side');
-      }
-    } else if (currentRefMode === 'side') {
-      if (curY_sl > (yMax_side_for_hysteresis + BACKWALL_HYSTERESIS_M)) {
-        nextModeBasedOnPosition = 'back';
-        if (DBG_SS) console.log('[SS live] position implies back mode: side -> back');
-      }
-    }
-    slsrModeRef.current = nextModeBasedOnPosition;
-
-    if (DBG_SS) {
-      try {
-        const yMax_side_live = Number(sideSurroundVisualSpanM?.maxY) || 0;
-        const onBackCheck = isOnBackWall(curY_sl, dimsL, L);
-
-        console.log('[SS live] snapshot', {
-          currentRefMode: currentRefMode,
-          nextModeBasedOnPosition: nextModeBasedOnPosition,
-          ySL: curY_sl?.toFixed?.(3), ySR: curY_sr?.toFixed?.(3),
-          yMax_side_live: yMax_side_live?.toFixed?.(3),
-          onBackCheck,
-        });
-      } catch (_) {}
-    }
-
-    if (slsrModeRef.current === 'side') {
-      const xL_side = fixedSideX(W, dimsL, 'L');
-      const xR_side = fixedSideX(W, dimsR, 'R');
-
-      const segL = sideSegmentAtX(_overlays?.sideSurroundZone, xL_side, L);
-      const segR = sideSegmentAtX(_overlays?.sideSurroundZone, xR_side, L);
-
-      const yMin_side_calc = Number(sideSurroundVisualSpanM?.minY) || 0;
-      const yMax_visual_calc = Number(sideSurroundVisualSpanM?.maxY) || 0;
-      const yMax_clamp = Math.max(yMin_side_calc, Math.min(yMax_visual_calc, L - CORNER_CLEAR_M));
-
-      const yMin = yMin_side_calc;
-      const yMax = yMax_clamp;
-
-      let yStar = resolveSymmetricY(curY_sl, segL, segR);
-
-      const RS_SIDE_EPS = 0.02;
-      if (yStar >= (yMax - RS_SIDE_EPS)) {
-        yStar = Math.max(yMin, yMax - RS_SIDE_EPS);
-      }
-
-      try {
-        // Check SBL vs SL - only adjust if actual overlap exists
-        if (sbl && isOnSideWall('L', sbl, W)) {
-          const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbl.model)) || 0) / 2;
-          const halfSS = (speakerOnWallYFootprint(getModelDimsM(sl.model)) || 0) / 2;
-          const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
-          const yObstacle = Number(sbl?.position?.y)||0;
-          const yPrevSBL = Number(sbl?.position?.y); // Use SBL's previous Y
-          const yPrevSL = Number(sl?.position?.y); // Use SL's previous Y
-          const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
-          if (overlap) {
-            yStar = nonCrossingClampDirectional(yPrevSL, yStar, yObstacle, minSep);
-            yStar = Math.min(Math.max(yStar, yMin), yMax);
-          }
-        }
-
-        // Check SBR vs SR - only adjust if actual overlap exists
-        if (sbr && isOnSideWall('R', sbr, W)) {
-          const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbr.model)) || 0) / 2;
-          const halfSS = (speakerOnWallYFootprint(getModelDimsM(sr.model)) || 0) / 2;
-          const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
-          const yObstacle = Number(sbr?.position?.y)||0;
-          const yPrevSBR = Number(sbr?.position?.y); // Use SBR's previous Y
-          const yPrevSR = Number(sr?.position?.y); // Use SR's previous Y
-          const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
-          if (overlap) {
-            yStar = nonCrossingClampDirectional(yPrevSR, yStar, yObstacle, minSep);
-            yStar = Math.min(Math.max(yStar, yMin), yMax);
-          }
-        }
-
-        if (DBG_SS) {
-          console.log('[SS live] yStar with clearance', { yStar: yStar?.toFixed?.(3) });
-        }
-
-      } catch (_e) {
-        console.warn("Error applying SL/SR vs SBL/SBR clearance during auto-adjust:", _e);
-      }
-
-      const xL_cur = Number(sl?.position?.x);
-      const xR_cur = Number(sr?.position?.x);
-      const needsUpdate = Math.abs(yStar - curY_sl) > RS_EPS ||
-                          Math.abs(xL_cur - xL_side) > RS_EPS ||
-                          Math.abs(xR_cur - xR_side) > RS_EPS;
-
-      if (!needsUpdate) return;
-
-      onSetSpeakers(prev => prev.map(s => {
-        const role = getCanonicalRole(s.role);
-        if (role === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_side, y: yStar } };
-        if (role === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_side, y: yStar } };
-        return s;
-      }));
-
-      return;
-    }
-
-    // back-wall enforcement
-    const roomWidth = widthM || 0;
-    const lanes = rearSurroundVisualLanes ?? {};
-    const leftLane = lanes.left ?? { minX: 0, maxX: roomWidth };
-    const leftLaneMin = leftLane.minX;
-    const leftLaneMax = leftLane.maxX;
-
-    const curXL = Number(sl?.position?.x);
-    if (!Number.isFinite(curXL)) {
-      return;
-    }
-    const xL_star = clamp(curXL, leftLaneMin, leftLaneMax);
-    const xR_star = roomWidth - xL_star;
-
-    const yL = backWallYForDims(getSpeakerDims(sl.model), L, WALL_BUFFER_M);
-    const yR = backWallYForDims(getSpeakerDims(sr.model), L, WALL_BUFFER_M);
-
-    const xL_cur = Number(sl?.position?.x);
-    const yL_cur = Number(sl?.position?.y);
-    const xR_cur = Number(sr?.position?.x);
-    const yR_cur = Number(sr?.position?.y);
-
-    const needsUpdate = Math.abs(xL_cur - xL_star) > RS_EPS ||
-                          Math.abs(yL_cur - yL) > RS_EPS ||
-                          Math.abs(xR_cur - xR_star) > RS_EPS ||
-                          Math.abs(yR_cur - yR) > RS_EPS;
-
-    if (DBG_SS) {
-      console.log('[SS live] back-wall enforcement', {
-        curXL: curXL?.toFixed?.(3), xL_star: xL_star?.toFixed?.(3),
-        curYL: yL_cur?.toFixed?.(3), yL: yL?.toFixed?.(3),
-        curXR: xR_cur?.toFixed?.(3), yR: yR?.toFixed?.(3),
-        needsUpdate
-      });
-    }
-
-    if (!needsUpdate) {
-      return;
-    }
-
-    onSetSpeakers(prev => prev.map(s => {
-      const r = getCanonicalRole(s.role);
-      if (r === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_star, y: yL } };
-      if (r === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_star, y: yR } };
-      return s;
-    }));
-    */
-  }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
+  }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRoleGlobal]); // Using global getCanonicalRoleGlobal
 
   // [B44] DISABLED: SBL/SBR positions now come from SpeakerPlacement only
   // This effect has been disabled to prevent RV from overwriting state-driven positions
@@ -2653,222 +2409,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     // [B44] Legacy corridor/constraint logic for SBL/SBR disabled.
     // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
     return; // Early exit - effect is now a no-op
-    
-    /* ORIGINAL LOGIC DISABLED:
-    if (isDraggingRearRef.current > 0) {
-      return;
-    }
-
-    if (timeNowMs() - (lastInteractionEpoch?.current || 0) < 500) return;
-    if (!onSetSpeakers) return;
-
-    rsLastLiveResetEpoch.current = timeNowMs();
-
-    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
-    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
-    if (!sbl || !sbr) return;
-
-    const W = widthM || 0;
-    const L = lengthM || 0;
-    if (!(W > 0 && L > 0)) return;
-
-    const dimsL = getSpeakerDims(sbl.model);
-    const dimsR = getSpeakerDims(sbr.model);
-    const yL_sbl_cur = Number(sbl?.position?.y);
-    const yR_sbr_cur = Number(sbr?.position?.y);
-
-    const yMax_side_for_hysteresis = Math.max(
-      Number(sideSurroundVisualSpanM?.minY) || 0,
-      Math.min(Number(sideSurroundVisualSpanM?.maxY) || 0, L - CORNER_CLEAR_M)
-    );
-
-    let currentRefMode = rearModeRef.current;
-    let nextModeBasedOnPosition = currentRefMode;
-
-    if (currentRefMode === 'back') {
-        if (yL_sbl_cur < (yMax_side_for_hysteresis - BACKWALL_HYSTERESIS_M)) {
-            nextModeBasedOnPosition = 'side';
-            if (DBG_RS) console.log('[RS live] position implies side mode: back -> side');
-        }
-    } else if (currentRefMode === 'side') {
-        if (yL_sbl_cur > (yMax_side_for_hysteresis + BACKWALL_HYSTERESIS_M)) {
-            nextModeBasedOnPosition = 'back';
-            if (DBG_RS) console.log('[RS live] position implies back mode: side -> back');
-        }
-    }
-
-    rearModeRef.current = nextModeBasedOnPosition;
-
-    if (DBG_RS) {
-      try {
-        const yMax_side_live = Number(sideSurroundVisualSpanM?.maxY) || 0;
-        const onBackCheck = isOnBackWall(yL_sbl_cur, dimsL, L);
-
-        console.log('[RS live] snapshot', {
-          currentRefMode: currentRefMode,
-          nextModeBasedOnPosition: nextModeBasedOnPosition,
-          ySBL: yL_sbl_cur?.toFixed?.(3), ySBR: yR_sbr_cur?.toFixed?.(3),
-          yMax_side_live: yMax_side_live?.toFixed?.(3),
-          onBackCheck,
-          lanes: rearSurroundVisualLanes
-        });
-      } catch (_) {}
-    }
-
-    if (rearModeRef.current === 'side') {
-      const xL_side = fixedSideX(W, dimsL, 'L');
-      const xR_side = fixedSideX(W, dimsR, 'R');
-
-      const yMin_side_calc = Number(sideSurroundVisualSpanM?.minY) || 0;
-      const yMax_visual_calc = Number(sideSurroundVisualSpanM?.maxY) || 0;
-      const yMax_clamp_calc = Math.max(yMin_side_calc, Math.min(yMax_visual_calc, L - CORNER_CLEAR_M));
-
-      const yMin = yMin_side_calc;
-      const yMax = yMax_clamp_calc;
-
-      let yStar = Math.min(yMax, Math.max(yMin, yL_sbl_cur));
-
-      const RS_SIDE_EPS = 0.02;
-      if (yStar >= (yMax - RS_SIDE_EPS)) {
-        yStar = Math.max(yMin, yMax - RS_SIDE_EPS);
-      }
-
-      const slSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
-      const srSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
-
-      if (slSpeaker && isOnSideWall('L', slSpeaker, W)) {
-        const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbl.model)) || 0) / 2;
-        const halfSS = (speakerOnWallYFootprint(getModelDimsM(slSpeaker.model)) || 0) / 2;
-        const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
-        const yObstacle = Number(slSpeaker?.position?.y)||0;
-        const yPrevSBL = Number(sbl?.position?.y); // Use SBL's previous Y
-        const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
-        if (overlap) {
-          yStar = nonCrossingClampDirectional(yPrevSBL, yStar, yObstacle, minSep);
-          yStar = Math.min(Math.max(yStar, yMin), yMax);
-        }
-      }
-
-      if (srSpeaker && isOnSideWall('R', srSpeaker, W)) {
-        const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbr.model)) || 0) / 2;
-        const halfSS = (speakerOnWallYFootprint(getModelDimsM(srSpeaker.model)) || 0) / 2;
-        const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
-        const yObstacle = Number(srSpeaker?.position?.y)||0;
-        const yPrevSBR = Number(sbr?.position?.y); // Use SBR's previous Y
-        const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
-        if (overlap) {
-          yStar = nonCrossingClampDirectional(yPrevSBR, yStar, yObstacle, minSep);
-          yStar = Math.min(Math.max(yStar, yMin), yMax);
-        }
-      }
-
-      const curXL = Number(sbl?.position?.x);
-      const curXR = Number(sbr?.position?.x);
-      const xL_target = fixedSideX(W, dimsL, 'L');
-      const xR_target = fixedSideX(W, dimsR, 'R');
-
-      const need = Math.abs(curXL - xL_target) > RS_EPS ||
-                   Math.abs(curXR - xR_target) > RS_EPS ||
-                   Math.abs(yL_sbl_cur - yStar) > RS_EPS ||
-                   Math.abs(yR_sbr_cur - yStar) > RS_EPS;
-
-      if (DBG_RS && need) {
-        console.log('[RS live] side-wall auto-correct:', {
-          curXL: curXL?.toFixed?.(3), xL_target: xL_target?.toFixed?.(3),
-          curXR: curXR?.toFixed?.(3), xR_target: xR_target?.toFixed?.(3),
-          curYL: yL_sbl_cur?.toFixed?.(3), curYR: yR_sbr_cur?.toFixed?.(3),
-          yStar: yStar?.toFixed?.(3),
-          need
-        });
-      }
-
-      if (!need) {
-        return;
-      }
-
-      onSetSpeakers(prev => prev.map(s => {
-        const r = getCanonicalRole(s.role);
-        if (r === 'SBL') return { ...s, position: { ...(s.position||{}), x: xL_side, y: yStar } };
-        if (r === 'SBR') return { ...s, position: { ...(s.position||{}), x: xR_side, y: yStar } };
-        return s;
-      }));
-
-      return;
-    }
-
-    // BACK-WALL MODE MAINTENANCE for rears (keep existing logic)
-    const yBackL = backWallYForDims(dimsL, L, WALL_BUFFER_M);
-    const yBackR = backWallYForDims(dimsR, L, WALL_BUFFER_M);
-    const yBack = Math.max(yBackL, yBackR);
-
-    const lanes = rearSurroundVisualLanes ?? {};
-    const leftLane  = lanes.left  ?? { minX: 0, maxX: W };
-    const rightLane = lanes.right ?? { minX: 0, maxX: W };
-
-    let baseMin = Number(leftLane.minX ?? 0);
-    let baseMax = Number(leftLane.maxX ?? W);
-
-    if (!(baseMax > baseMin)) {
-      baseMin = 0;
-      baseMax = W;
-    }
-
-    const halfRS = Math.max(halfWidthOnWall(dimsL), halfWidthOnWall(dimsR));
-    baseMin += halfRS;
-    baseMax -= halfRS;
-
-    const exclusions = [];
-    if (sideSurroundsOnBackWall(placedSpeakers, L)) {
-      const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
-      const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
-      function addEx(ss) {
-        if (!ss) return;
-        const d = getSpeakerDims(ss.model);
-        if (!isOnBackWall(ss?.position?.y, d, L)) return;
-        const halfSS = halfWidthOnWall(d);
-        const cx = Number(ss?.position?.x) || 0;
-        const pad = halfSS + halfRS + RS_CLEAR_M;
-        exclusions.push([cx - pad, cx + pad]);
-      }
-      addEx(sl);
-      addEx(sr);
-    }
-
-    const curXL = Number(sbl?.position?.x);
-    if (!Number.isFinite(curXL)) {
-      return;
-    }
-    const xL_star = clampToAllowedWithExclusions(curXL, baseMin, baseMax, exclusions);
-    const xR_star = computeSymmetricXR(W, xL_star);
-
-    const need = Math.abs(curXL - xL_star) > RS_EPS ||
-                 Math.abs((sbr?.position?.x||0) - xR_star) > RS_EPS ||
-                 Math.abs(yL_sbl_cur - yBack) > RS_EPS ||
-                 Math.abs(yR_sbr_cur - yBack) > RS_EPS;
-
-    if (DBG_RS && need) {
-      console.log('[RS live] back-wall auto-correct:', {
-        curXL: curXL?.toFixed?.(3), xL_star: xL_star?.toFixed?.(3),
-        curXR: (sbr?.position?.x||0)?.toFixed?.(3), xR_star: xR_star?.toFixed?.(3),
-        curYL: yL_sbl_cur?.toFixed?.(3), yBackL: yBackL?.toFixed?.(3),
-        curYR: yR_sbr_cur?.toFixed?.(3), yBackR: yBackR?.toFixed?.(3),
-        need
-      });
-    }
-
-
-    if (!need) {
-      return;
-    }
-
-    onSetSpeakers(prev => prev.map(s => {
-      const r = getCanonicalRole(s.role);
-      if (r === 'SBL') return { ...s, position: { ...(s.position||{}), x: xL_star, y: yBack } };
-      if (r === 'SBR') return { ...s, position: { ...(s.position||{}), x: xR_star, y: yBack } };
-      return s;
-    }));
-    */
-  }, [placedSpeakers, onSetSpeakers, widthM, lengthM, sideSurroundVisualSpanM, rearSurroundVisualLanes, rearModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
+  }, [placedSpeakers, onSetSpeakers, widthM, lengthM, sideSurroundVisualSpanM, rearSurroundVisualLanes, rearModeRef, getModelDimsM, getCanonicalRoleGlobal]); // Using global getCanonicalRoleGlobal
 
   // A) Hard-gate the legacy front-wide ribbon generation
   const ENABLE_LEGACY_FRONT_WIDE_RIBBON = false;
@@ -2902,7 +2443,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     const label = `zones: ${Object.keys(newZones).join(',')}`;
 
     return { augmentedZones: newZones, zoneKeysLabel: label };
-  }, [analysisResult?.zones, placedSpeakers, widthM, lengthM, ZONE_DEPTH_M, getCanonicalRole]);
+  }, [analysisResult?.zones, placedSpeakers, widthM, lengthM, ZONE_DEPTH_M, getCanonicalRoleGlobal]); // Using global getCanonicalRoleGlobal
 
   // Consolidate overlays for rendering
   const overlaysForRendering = useMemo(() => {
@@ -2925,8 +2466,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
 
   // In the scope where we work with speakers, add safe aliases
-  const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
-  const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+  const sl = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === 'SL'); // Using global getCanonicalRoleGlobal
+  const sr = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === 'SR'); // Using global getCanonicalRoleGlobal
   const slSpeaker = sl || null;
   const srSpeaker = sr || null;
 
@@ -2935,1262 +2476,246 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     // Make sure we always have an array
     const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
-    // Always skip LFE – it’s not drawn as a normal speaker
-    const withoutLfe = base.filter((spk) => {
-      const canonicalRole = getCanonicalRole(spk.role);
-      return canonicalRole !== "LFE";
-    });
+    // 1) Basic structural filter (existing helper)
+    const afterRenderable = base.filter(isRenderableSpeaker);
 
-    // Respect visibleRoles from appState if it exists
-    const vis = appState?.visibleRoles;
-    if (!vis || !(vis instanceof Set)) {
-      return withoutLfe;
-    }
-
-    // Only keep speakers whose canonical role is in the visibleRoles set
-    return withoutLfe.filter((spk) => vis.has(getCanonicalRole(spk.role)));
-  }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
-
-
-  // Light diagnostics (temporary)
-  if (appState_DBG_FW) {
-    if (typeof window !== 'undefined') console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
-  }
-
-  // Get overhead count from dolbyLayout
-  const overheadCount = useMemo(() => {
-    if (!dolbyLayout) return 0;
-    const parts = String(dolbyLayout).split('.');
-    if (parts.length < 3) return 0;
-    return parseInt(parts[2]) || 0;
-  }, [dolbyLayout]);
-
-  // Determine which overhead positions are visible
-  const visibleOverheadPositions = useMemo(() => {
-    const positions = [];
-    if (overheadCount === 2) {
-      positions.push('mid');
-    } else if (overheadCount === 4) {
-      positions.push('front', 'rear');
-    } else if (overheadCount === 6) {
-      positions.push('front', 'mid', 'rear');
-    }
-    return positions;
-  }, [overheadCount]);
-
-  // Get effective model for each overhead position
-  const getOverheadModelForPosition = useCallback((position) => {
-    if (!overheadGlobalModel || overheadGlobalModel === 'OFF') return null;
-
-    if (position === 'front') {
-      return useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
-    }
-    if (position === 'mid') {
-      return useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
-    }
-    if (position === 'rear') {
-      return useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
-    }
-    return null;
-  }, [overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride]);
-
-
-// Overhead zones (moved to dedicated module)
-const overheadZones = useMemo(
-  () =>
-    computeOverheadZones({
-      seatingPositions,
-      heightM,
-      widthM,
-      lengthM,
-      mlpY_m,
-      placedSpeakers,
-      getCanonicalRole,
-    }),
-  [seatingPositions, heightM, widthM, lengthM, mlpY_m, placedSpeakers, getCanonicalRole]
-);
-
-
-  // Render overhead speaker icons (centered in each zone pad)
-  const overheadIconElements = useMemo(() => {
-    if (!overheadGlobalModel || overheadGlobalModel === 'OFF') return null;
-    if (!overheadZones || overheadZones.status !== 'ok') return null;
-
-    const icons = [];
-
-    visibleOverheadPositions.forEach(position => {
-      const modelKey = getOverheadModelForPosition(position);
-      if (!modelKey) return;
-
-      const modelMeta = getSpeakerModelMeta(modelKey);
-      const iconW_m = modelMeta?.diameterM || modelMeta?.widthM || 0.24;
-      const iconD_m = modelMeta?.depthM || modelMeta?.widthM || 0.24;
-
-      // Render left icon
-      const leftZone = overheadZones[`${position}Left`];
-      if (leftZone) {
-        const { xMin, xMax, yMin, yMax } = leftZone;
-        const centerX_m = (xMin + xMax) / 2;
-        const centerY_m = (yMin + yMax) / 2;
-
-        // Clamp to keep icon fully inside zone
-        const clampedX = Math.max(xMin + iconW_m / 2, Math.min(xMax - iconW_m / 2, centerX_m));
-        const clampedY = Math.max(yMin + iconD_m / 2, Math.min(yMax - yMin / 2, centerY_m)); // Corrected clamping for yMax - yMin
-
-        if ((xMax - xMin) < iconW_m || (yMax - yMin) < iconD_m) {
-          // If the zone is too small to fit the speaker, skip it.
-        } else {
-          const [canvasX, canvasY] = toPx(clampedX, centerY_m); // Changed clampedY to centerY_m here
-          const radiusPx = (iconW_m / 2) * scale;
-          icons.push(
-            <circle
-              key={`${position}-left`}
-              cx={canvasX}
-              cy={canvasY}
-              fill="#000000"
-              opacity={0.9}
-              pointerEvents="none"
-              r={radiusPx}
-            />
-          );
+    // 2) Visibility filter (layout + model) – but never hard-fail on errors
+    const afterVisibility = afterRenderable.filter((spk) => {
+      try {
+        const result = getSpeakerVisibility(spk.role, spk.model);
+        
+        // TEMP DEBUG: Log each visibility check
+        const canon = String(spk.role || "").toUpperCase();
+        if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+          console.log('[RV filter]', {
+            role: canon,
+            model: spk.model,
+            visibilityResult: result
+          });
         }
-      }
-
-      // Render right icon
-      const rightZone = overheadZones[`${position}Right`];
-      if (rightZone) {
-        const { xMin, xMax, yMin, yMax } = rightZone;
-        const centerX_m = (xMin + xMax) / 2;
-        const centerY_m = (yMin + yMax) / 2;
-
-        const clampedX = Math.max(xMin + iconW_m / 2, Math.min(xMax - iconW_m / 2, centerX_m));
-        const clampedY = Math.max(yMin + iconD_m / 2, Math.min(yMax - yMin / 2, centerY_m)); // Corrected clamping for yMax - yMin
-
-        if ((xMax - xMin) < iconW_m || (yMax - yMin) < iconD_m) {
-          // If the zone is too small to fit the speaker, skip it.
-        } else {
-          const [canvasX, canvasY] = toPx(clampedX, centerY_m); // Changed clampedY to centerY_m here
-          const radiusPx = (iconW_m / 2) * scale;
-
-          icons.push(
-            <circle
-              key={`${position}-right`}
-              cx={canvasX}
-              cy={canvasY}
-              fill="#000000"
-              opacity={0.9}
-              pointerEvents="none"
-              r={radiusPx}
-            />
-          );
-        }
-      }
-    });
-
-    return icons;
-  }, [
-    overheadGlobalModel,
-    overheadZones,
-    visibleOverheadPositions,
-    getOverheadModelForPosition,
-    toPx,
-    scale,
-    getModelDimsM
-  ]);
-
-  // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
-  const renderFrontWideZones = useCallback(() => {
-    // This function is now called conditionally by `overlaysForRendering.enableFrontWides`.
-    // It should only render if frontWideZones are available and valid.
-    // The enableFrontWides from appState is passed through overlaysForRendering, so we check it there.
-
-    const W = widthM || 4.5; // Use new widthM
-    const L = lengthM || 6.0; // Use new lengthM
-    const WALL = 0.02;
-
-    // If we have valid zones, render them
-    if (frontWideZones?.status === 'ok') {
-      const leftZone = frontWideZones.left;
-      const rightZone = frontWideZones.right;
-
-      if (!leftZone || !rightZone) return null;
-
-      const zoneOpacity = 0.25;
-      const strokeOpacity = 0.4;
-
-      return (
-        <g pointerEvents="none">
-          {/* Left zone */}
-          <rect
-            x={roomRect.x + (WALL * scale)}
-            y={roomRect.y + (leftZone.yMin * scale)}
-            width={ZONE_DEPTH_M * scale}
-            height={(leftZone.yMax - leftZone.yMin) * scale}
-            fill="#4A230F"
-            opacity={zoneOpacity}
-            stroke="#4A230F"
-            strokeWidth="1"
-            strokeOpacity={strokeOpacity}
-            strokeDasharray="4,4"
-          />
-          <line
-            x1={roomRect.x + (WALL * scale)}
-            y1={roomRect.y + (leftZone.medianY * scale)}
-            x2={roomRect.x + ((WALL + ZONE_DEPTH_M) * scale)}
-            y2={roomRect.y + (leftZone.medianY * scale)}
-            stroke="#4A230F"
-            strokeWidth="2"
-            strokeOpacity={0.6}
-          />
-
-          {/* Right zone */}
-          <rect
-            x={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
-            y={roomRect.y + (rightZone.yMin * scale)}
-            width={ZONE_DEPTH_M * scale}
-            height={(rightZone.yMax - rightZone.yMin) * scale}
-            fill="#213428"
-            opacity={zoneOpacity}
-            stroke="#213428"
-            strokeWidth="1"
-            strokeOpacity={strokeOpacity}
-            strokeDasharray="4,4"
-          />
-          <line
-            x1={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
-            y1={roomRect.y + (rightZone.medianY * scale)}
-            x2={roomRect.x + roomRect.width - (WALL * scale)}
-            y2={roomRect.y + (rightZone.medianY * scale)}
-            stroke="#213428"
-            strokeWidth="2"
-            strokeOpacity={0.6}
-          />
-        </g>
-      );
-    }
-
-    // Fallback: if zones can't be computed (no sides, invalid geom, etc.)
-    // Renders only when overlay is enabled AND status !== 'ok'
-    if (frontWideZones?.status !== 'ok') {
-      const W = Number(widthM) || 4.5;
-      const L = Number(lengthM) || 6.0;
-      const WALL = 0.02;
-
-      const approxYmin   = L * 0.35;
-      const approxYmax   = L * 0.65;
-      const approxMedian = L * 0.50;
-      const placeholderOpacity = 0.15;
-
-      // Centre label using actual canvas rect
-      const labelX = roomRect.x + (roomRect.width / 2);
-      const labelY = roomRect.y + (approxMedian * scale) - 10;
-
-      return (
-        <g pointerEvents="none">
-          {/* Left placeholder zone */}
-          <rect
-            x={roomRect.x + (WALL * scale)}
-            y={roomRect.y + (approxYmin * scale)}
-            width={ZONE_DEPTH_M * scale}
-            height={(approxYmax - approxYmin) * scale}
-            fill="#4A230F"
-            opacity={placeholderOpacity}
-            stroke="#4A230F"
-            strokeWidth="1"
-            strokeOpacity={0.3}
-            strokeDasharray="8,8"
-          />
-          <line
-            x1={roomRect.x + (WALL * scale)}
-            y1={roomRect.y + (approxMedian * scale)}
-            x2={roomRect.x + ((WALL + ZONE_DEPTH_M) * scale)}
-            y2={roomRect.y + (approxMedian * scale)}
-            stroke="#4A230F"
-            strokeWidth="1.5"
-            strokeOpacity={0.4}
-            strokeDasharray="4,4"
-          />
-
-          {/* Right placeholder zone */}
-          <rect
-            x={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
-            y={roomRect.y + (approxYmin * scale)}
-            width={ZONE_DEPTH_M * scale}
-            height={(approxYmax - approxYmin) * scale}
-            fill="#213428"
-            opacity={placeholderOpacity}
-            stroke="#213428"
-            strokeWidth="1"
-            strokeOpacity={0.3}
-            strokeDasharray="8,8"
-          />
-          <line
-            x1={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
-            y1={roomRect.y + (approxMedian * scale)}
-            x2={roomRect.x + roomRect.width - (WALL * scale)}
-            y2={roomRect.y + (approxMedian * scale)}
-            stroke="#213428"
-            strokeWidth="1.5"
-            strokeOpacity={0.4}
-            strokeDasharray="4,4"
-          />
-
-          {/* Status text for user feedback */}
-          <text
-            x={labelX}
-            y={labelY}
-            textAnchor="middle"
-            fill="#666"
-            fontSize="11"
-            fontFamily="system-ui, sans-serif"
-          >
-            Front-Wide zones (place L/C/R + SL/SR for precise positioning)
-          </text>
-        </g>
-      );
-    }
-    return null;
-  }, [
-    frontWideZones,
-    widthM, // Use new widthM
-    lengthM, // Use new lengthM
-    roomRect,
-    scale,
-    ZONE_DEPTH_M
-  ]);
-
-  // Parse something like "5.1", "7.1", "9.1.2" → {base: 5|7|9, hasWides: boolean}
-  const parseDolbyLayout = useCallback((dolbyLayoutStr) => {
-    if (!dolbyLayoutStr || typeof dolbyLayoutStr !== 'string') return { base: 5, hasWides: false };
-    const parts = dolbyLayoutStr.split('.');
-    const base = Math.max(2, Number(parts[0]) || 5);
-    const hasWides = base >= 9;
-    return { base, hasWides };
-  }, []);
-
-  const getDolbyZoneSpecs = useCallback((dolbyLayoutStr) => {
-    const { base, hasWides } = parseDolbyLayout(dolbyLayoutStr);
-
-    const C_WIDE = '#3b82f6';
-    const C_SIDE = '#f59e0b';
-    const C_REAR = '#10b981';
-    const DASH   = '6,6';
-
-    const specs = [];
-
-    if (base === 5) {
-      specs.push({
-        label: 'Dolby Side (5.1: 110–120°)',
-        stroke: C_SIDE,
-        dash: DASH,
-        ranges: [[110,120], [-120,-110]],
-      });
-    } else if (base === 7) {
-      specs.push({
-        label: 'Dolby Side (90–110°)',
-        stroke: C_SIDE,
-        dash: DASH,
-        ranges: [[90,110], [-110,-90]],
-      });
-      specs.push({
-        label: 'Dolby Rear (135–150°)',
-        stroke: C_REAR,
-        dash: DASH,
-        ranges: [[135,150], [-150,-135]],
-      });
-    } else if (base >= 9) {
-      if (hasWides) {
-        specs.push({
-          label: 'Dolby Wide (50–70°)',
-          stroke: C_WIDE,
-          dash: DASH,
-          ranges: [[50,70], [-70,-50]],
+        
+        return result;
+      } catch (err) {
+        console.warn("[RV] getSpeakerVisibility error; allowing speaker through", {
+          role: spk.role,
+          model: spk.model,
+          err,
         });
+        return true;
       }
-      specs.push({
-        label: 'Dolby Side (90–110°)',
-        stroke: C_SIDE,
-        dash: DASH,
-        ranges: [[90,110], [-110,-90]],
-      });
-      specs.push({
-        label: 'Dolby Rear (135–150°)',
-        stroke: C_REAR,
-        dash: DASH,
-        ranges: [[135,150], [-150,-135]],
-      });
+    });
+
+    // DEBUG: Expose to window for manual inspection
+    if (typeof window !== 'undefined') {
+      window.__LAST_RV__ = { raw, afterVisibility };
     }
 
-    return specs;
-  }, [parseDolbyLayout]);
-
-  const arcPathForBand = useCallback((seatX, seatY, radiusM, minDeg, maxDeg, toPxFn) => {
-    const a0 = Number(minDeg);
-    const a1 = Number(maxDeg);
-    if (!Number.isFinite(a0) || !Number.isFinite(a1) || a1 <= a0) return null;
-
-    const steps = 24;
-    const pts = [];
-    for (let i = 0; i <= steps; i++) {
-      const t = a0 + (i * (a1 - a0) / steps);
-      const rad = (t * Math.PI) / 180;
-      const dx = Math.sin(rad) * radiusM;
-      const dy = -Math.cos(rad) * radiusM;
-      const [cx, cy] = toPxFn(seatX + dx, seatY + dy);
-      pts.push(`${i === 0 ? 'M' : 'L'}${cx},${cy}`);
+    // DEBUG: Table of afterVisibility with positions
+    try {
+      console.groupCollapsed("[RV] speakersToRender DEBUG");
+      console.log('Raw speakers:');
+      console.table(
+        raw.map((s) => ({
+          id: s.id,
+          role: s.role,
+          model: s.model || "(none)",
+        }))
+      );
+      console.log('After visibility:');
+      console.table(
+        afterVisibility.map((s) => ({
+          id: s.id,
+          role: s.role,
+          model: s.model || "(none)",
+          posX: s.position?.x?.toFixed?.(3) || '—',
+          posY: s.position?.y?.toFixed?.(3) || '—',
+        }))
+      );
+      console.groupEnd();
+    } catch (_) {
+      // ignore console errors in strange environments
     }
-    return pts.join(' ');
-  }, []);
 
-  const renderDolbyZones = useCallback(() => {
-    if (!overlaysForRendering?.enableDolbyZones) return null;
-
-    const seat = mlp;
-    if (!seat || !Number.isFinite(seat.x) || !Number.isFinite(seat.y)) return null;
-    if (!toPx) return null;
-
-    const w = widthM || 4.5;
-    const l = lengthM || 6.0;
-
-    const specs = getDolbyZoneSpecs(dolbyLayout || '5.1');
-    if (!specs || !specs.length) return null;
-
-    const rM = Math.max(0.5, Math.min(w, l) * 0.35);
-    const rLabel = rM * 0.35;
-
-    const intersectRay = (sx, sy, deg) => {
-      const rad = (deg * Math.PI) / 180;
-      const dx = Math.sin(rad);
-      const dy = -Math.cos(rad);
-      
-      const tVals = [];
-      const xMin = 0, xMax = w, yMin = 0, yMax = l;
-      
-      if (Math.abs(dx) > 1e-9) {
-        const t1 = (xMin - sx) / dx;
-        const y1 = sy + t1 * dy;
-        if (t1 > 0 && y1 >= yMin && y1 <= yMax) tVals.push(t1);
-        
-        const t2 = (xMax - sx) / dx;
-        const y2 = sy + t2 * dy;
-        if (t2 > 0 && y2 >= yMin && y2 <= yMax) tVals.push(t2);
-      }
-      
-      if (Math.abs(dy) > 1e-9) {
-        const t3 = (yMin - sy) / dy;
-        const x3 = sx + t3 * dx;
-        if (t3 > 0 && x3 >= xMin && x3 <= xMax) tVals.push(t3);
-        
-        const t4 = (yMax - sy) / dy;
-        const x4 = sx + t4 * dx;
-        if (t4 > 0 && x4 >= xMin && x4 <= yMax) tVals.push(t4); // Corrected yMax
-      }
-      
-      if (!tVals.length) return null;
-      const t = Math.min(...tVals);
-      return { x: sx + t * dx, y: sy + t * dy };
+    // Local NaN-safe coordinate mappers (must be inside this loop)
+    const toCanvasX = (xM) => {
+      const safeX = Number.isFinite(xM) ? xM : 0;
+      return roomRect.x + (safeX * scale);
     };
 
-    const elements = [];
+    const toCanvasY = (yM) => {
+      const safeY = Number.isFinite(yM) ? yM : 0;
+      return roomRect.y + (safeY * scale);
+    };
 
-    specs.forEach((spec, si) => {
-      spec.ranges.forEach((rng, ri) => {
-        const d = arcPathForBand(seat.x, seat.y, rM, rng[0], rng[1], toPx);
-        if (d) {
-          elements.push(
-            <path
-              key={`band-${si}-${ri}`}
-              d={d}
-              fill="none"
-              stroke={spec.stroke}
-              strokeWidth={1.5}
-              strokeDasharray="6,6"
-              opacity={0.85}
-              pointerEvents="none"
-            />
-          );
+    // [B44] Debug log to confirm bed-surround positions are not mutated by RV
+    console.log('[RV] speakers BEFORE icon-map',
+      afterVisibility.map(s => ({
+        role: s.role,
+        canon: getCanonicalRoleGlobal(s.role), // Using global getCanonicalRoleGlobal
+        x: s.position?.x?.toFixed(3),
+        y: s.position?.y?.toFixed(3),
+      }))
+    );
+
+    // [B44] Debug log to confirm bed-surround positions are not mutated by RV
+    console.log('[RV] speakers BEFORE icon-map',
+      afterVisibility.map(s => ({
+        role: s.role,
+        canon: getCanonicalRoleGlobal(s.role), // Using global getCanonicalRoleGlobal
+        x: s.position?.x?.toFixed(3),
+        y: s.position?.y?.toFixed(3),
+      }))
+    );
+
+    // 3) Map to icons
+    return afterVisibility.map((speaker) => {
+      const { id, role, model, position = {} } = speaker;
+      const canon = getCanonicalRoleGlobal(role); // Using global getCanonicalRoleGlobal
+
+      // Resolve model & dimensions using your existing helpers
+      const resolvedModel = resolveSurroundModel(model, canon);
+      const dims = getSpeakerDims(resolvedModel); // Using global getSpeakerDims
+      const widthM_spk = dims.widthM || 0;
+      const depthM_spk = dims.depthM || 0;
+
+      // Compute yaw: prefer explicit speaker.yaw (seeded by SpeakerPlacement)
+      // and fall back to the existing helper if it's not set / not finite.
+      let yawDeg;
+
+      if (Number.isFinite(speaker?.yaw)) {
+        yawDeg = Number(speaker.yaw);
+      } else {
+        yawDeg = getYawForObject(
+          speaker,
+          { L: lcrAngleInfo.L, R: lcrAngleInfo.R }, // This lcrAngleInfo seems undefined. Assuming it's derived from mlp.
+          aimAtMLP,
+          { width: widthM, length: lengthM, height: heightM },
+          getModelDimsM
+        );
+      }
+
+      // Position coordinates from speaker.position (with safe fallbacks)
+      const pos_x = position.x ?? 0;
+      const pos_y = position.y ?? 0;
+
+      // --- Rear surround wall-aware yaw ---
+      // If SBL/SBR are dragged onto a side wall, rotate them 90° so the
+      // long edge sits flat on that wall (matching SL/SR behaviour).
+      if (canon === "SBL" || canon === "SBR") {
+        const distLeft  = Math.abs(pos_x - 0);
+        const distRight = Math.abs(widthM - pos_x);
+        const distBack  = Math.abs(lengthM - pos_y); // back wall at y = lengthM
+
+        const minDist = Math.min(distLeft, distRight, distBack);
+
+        if (minDist === distBack) {
+          // Closest to back wall: keep standard rear orientation (flat to back)
+          yawDeg = 0;
+        } else if (minDist === distLeft) {
+          // Now effectively on left wall
+          yawDeg = 90;
+        } else if (minDist === distRight) {
+          // Now effectively on right wall
+          yawDeg = -90;
         }
+      }
 
-        [rng[0], rng[1]].forEach((deg, di) => {
-          const hit = intersectRay(seat.x, seat.y, deg);
-          if (!hit) return;
+      // Convert to canvas coordinates
+      let canvasX, canvasY;
 
-          const [sx, sy] = toPx(seat.x, seat.y);
-          const [ex, ey] = toPx(hit.x, hit.y);
+      if (canon === "FL" || canon === "FC" || canon === "FR") {
+        // LCR: pinned to front wall using WALL_BUFFER_M
+        const half = yHalfExtentM(depthM_spk, widthM_spk, yawDeg); // Using RenderPrimitives yHalfExtentM
+        const y_m = WALL_BUFFER_M + half;
+        canvasX = toCanvasX(pos_x);
+        canvasY = toCanvasY(y_m);
+      } else {
+        // Everyone else: use their stored world coords directly
+        canvasX = toCanvasX(pos_x);
+        canvasY = toCanvasY(pos_y);
+      }
 
-          elements.push(
-            <line
-              key={`spoke-${si}-${ri}-${di}`}
-              x1={sx} y1={sy} x2={ex} y2={ey} // Corrected x2 y2 to hit.x, hit.y converted to px
-              stroke={spec.stroke}
-              strokeWidth={1}
-              strokeDasharray="3,6"
-              opacity={0.7}
-              pointerEvents="none"
-            />
-          );
+      // NaN safety: ensure we never pass invalid coordinates
+      const safeCanvasX = Number.isFinite(canvasX) ? canvasX : 0;
+      const safeCanvasY = Number.isFinite(canvasY) ? canvasY : 0;
 
-          const rad = (deg * Math.PI) / 180;
-          const lx = seat.x + Math.sin(rad) * rLabel;
-          const ly = seat.y - Math.cos(rad) * rLabel;
-          const [lpx, lpy] = toPx(lx, ly);
-
-          elements.push(
-            <g key={`label-${si}-${ri}-${di}`} pointerEvents="none" opacity={0.95}>
-              <rect x={lpx - 12} y={lpy - 10} width={24} height={16} rx={3} fill="white" opacity={0.9}/>
-              <text x={lpx} y={lpy + 2} fontSize="11" textAnchor="middle" fill={spec.stroke}>{Math.round(deg)}°</text>
-            </g>
-          );
+      // Log any invalid coordinates
+      if (!Number.isFinite(canvasX) || !Number.isFinite(canvasY)) {
+        console.warn('[RV] INVALID CANVAS COORDS', {
+          id,
+          role,
+          pos: position,
+          pos_x,
+          pos_y,
+          canvasX,
+          canvasY,
         });
-      });
-    });
+      }
 
-    return <g data-testid="dolby-zones">{elements}</g>;
-  }, [overlaysForRendering?.enableDolbyZones, mlp, toPx, widthM, lengthM, dolbyLayout, getDolbyZoneSpecs, arcPathForBand]);
+      // DEBUG: Log icon generation for rear/wide speakers
+      if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+        console.log('[RV icon]', {
+          id,
+          role,
+          canon,
+          model,
+          resolvedModel,
+          pos: position,
+          pos_x,
+          pos_y,
+          canvasX: safeCanvasX,
+          canvasY: safeCanvasY,
+          yawDeg,
+          widthM_spk,
+          depthM_spk,
+        });
+      }
 
-
-  // Memoize individual zone components with unique IDs
-  const ZoneComponents = useMemo(() => {
-    // LCR Zone Component - Updated to use lcrZoneBlocks
-    const LCRZoneComponent = ({ side }) => {
-      // Only show LCR zone if floating mode is enabled and lcrZoneBlocks are available
-      if (!lcrZoneBlocks || screen?.mountMode !== 'floating') return null;
-
-      const zone = lcrZoneBlocks[side];
-      if (!zone) return null;
-
-      // Convert room meter coordinates to canvas pixel coordinates
-      const [xStartPx] = toPx(zone.x_start, 0);
-      const [x2Px] = toPx(zone.x_end, 0);
-
-      // Y-coordinates are from the front wall (y=0) to ZONE_DEPTH_M
-      const yTopPx = roomRect.y;
-      const yBottomPx = roomRect.y + (ZONE_DEPTH_M * scale);
-
-      const rectX = Math.min(xStartPx, x2Px);
-      const rectWidth = Math.abs(x2Px - xStartPx);
-      const rectY = yTopPx;
-      const rectHeight = yBottomPx - yTopPx;
-
-      const fill = side === 'left' ? '#4A230F' : '#213428';
-
-      // Apply visual overhang for the display, similar to previous LCRZoneComponent
-      const overhangM = 0.50;
-      // Calculate extended room bounds in pixels from room's meter dimensions
-      const [extendedRoomLeftPx] = toPx(0 - overhangM, 0);
-      const [extendedRoomRightPx] = toPx(widthM + overhangM, 0); // Use new widthM
-
-      // Clamp the visual rectangle to the extended bounds for display
-      const finalX = Math.max(extendedRoomLeftPx, rectX);
-      const finalWidth = Math.min(extendedRoomRightPx, rectX + rectWidth) - finalX;
+      const speakerMouseDownHandler = isDraggable(speaker)
+        ? (e) => handleMouseDown(e, id, "speaker")
+        : undefined;
 
       return (
-        <rect
-          id={`LCR_ZONE_${side.toUpperCase()}`}
-          x={finalX}
-          y={rectY}
-          width={finalWidth}
-          height={rectHeight}
-          fill={fill}
-          fillOpacity="0.35"
+        <SpeakerIcon
+          key={id}
+          speaker={{ ...speaker, model: resolvedModel }}
+          canvasX={safeCanvasX}
+          canvasY_raw={safeCanvasY}
+          yawDeg={yawDeg}
+          widthM={widthM_spk}
+          depthM={depthM_spk}
+          scale={scale}
+          speakerMouseDownHandler={speakerMouseDownHandler}
+          setHoveredSpeaker={setHoveredSpeaker}
         />
       );
-    };
-
-    // Side Surround Zone Component (Corrected positioning and seamless rendering)
-    const SideSurroundZoneComponent = ({ side }) => {
-      const fadeLen_px = FADE_LEN_M * scale;
-
-      // ROOM BOUNDS
-      const roomLeft = roomRect.x;
-      const roomRight = roomRect.x + roomRect.width;
-      const roomTop = roomRect.y;
-      const roomBottom = roomRect.y + roomRect.height;
-
-      // CORE POSITIONS
-      const [, mlpY_px] = toPx(0, mlpY_m);
-      const [, rearWallY_px] = toPx(0, lengthM); // Use new lengthM
-      const [, screenWallY_px] = toPx(0, 0);
-
-      const bandW_px = ZONE_DEPTH_M * scale;
-      const isLeft = side === "left";
-      const fill = isLeft ? '#4A230F' : '#213428';
-
-      // SIDE WALL X (inside room)
-      const sideX_px = isLeft ? roomLeft : (roomRight - bandW_px);
-
-      // VERTICAL BAND: Rendered as a single seamless rectangle
-      const vTop_px = Math.max(roomTop, screenWallY_px);
-      const vBottom_px = Math.min(roomBottom, rearWallY_px);
-      const mlpClamped_px = Math.max(vTop_px, Math.min(vBottom_px, mlpY_px));
-
-      const fadeEndY_px = mlpClamped_px;
-      const fadeStartY_px = Math.max(vTop_px, fadeEndY_px - fadeLen_px);
-      const vBandStartY_px = fadeStartY_px;
-      const vBandTotalHeight_px = Math.max(0, vBottom_px - vBandStartY_px);
-
-      // HORIZONTAL BAND Y POSITION: Corrected to be inside the room
-      const backH_px = bandW_px;
-      const backY_px = Math.min(roomBottom, rearWallY_px) - backH_px;
-
-      // HORIZONTAL BAND X extents (logic remains the same)
-      const seatXs = seatingPositions.map(s => Number(s.x)).filter(Number.isFinite);
-      const leftmostSeatX_m = seatXs.length ? Math.min(...seatXs) : widthM * 0.35; // Use new widthM
-      const rightmostSeatX_m = seatXs.length ? Math.max(...seatXs) : widthM * 0.65; // Use new widthM
-      const [leftSeat_px] = toPx(leftmostSeatX_m, 0);
-      const [rightSeat_px] = toPx(rightmostSeatX_m, 0);
-
-      const backSolidStart_px = isLeft ? roomLeft : Math.max(roomLeft, rightSeat_px);
-      const backSolidEnd_px = isLeft ? Math.min(roomRight, leftSeat_px) : roomRight;
-      const backSolidW_px = Math.max(0, backSolidEnd_px - backSolidStart_px);
-
-      const backFadeW_px = fadeLen_px;
-      const totalBackW_px = backSolidW_px + backFadeW_px;
-
-      const gidV = `grad_side_vertical_${side}`;
-      const gidB = `grad_side_back_${side}`;
-
-      // NEW: Pre-calculate offset ratios for clarity and correctness
-      const mlpOffsetRatio = vBandTotalHeight_px > 0 ? (mlpClamped_px - vBandStartY_px) / vBandTotalHeight_px : 0;
-      const solidOffsetRatio = totalBackW_px > 0 ? backSolidW_px / totalBackW_px : 0;
-      const fadeOffsetRatio = totalBackW_px > 0 ? backFadeW_px / totalBackW_px : 0;
-
-      // Handle backRectWidth and backRectX properly for horizontal band
-      let backRectWidth = 0;
-      let backRectX = 0;
-      if (isLeft) {
-        backRectX = roomLeft;
-        backRectWidth = Math.max(0, leftSeat_px - roomLeft + fadeLen_px);
-      } else {
-        backRectX = rightSeat_px - fadeLen_px;
-        backRectWidth = Math.max(0, roomRight - rightSeat_px + fadeLen_px);
-      }
-
-      return (
-        <g pointerEvents="none">
-          {vBandTotalHeight_px > 0 && (
-            <>
-              <defs>
-                <linearGradient id={gidV} gradientUnits="userSpaceOnUse"
-                  x1={sideX_px} y1={vBandStartY_px}
-                  x2={sideX_px} y2={vBottom_px}>
-                  <stop offset="0" stopColor={fill} stopOpacity="0.0" />
-                  <stop offset={mlpOffsetRatio} stopColor={fill} stopOpacity="0.35" />
-                  <stop offset="1" stopColor={fill} stopOpacity="0.35" />
-                </linearGradient>
-              </defs>
-              <rect
-                x={sideX_px}
-                y={vBandStartY_px}
-                width={bandW_px}
-                height={vBandTotalHeight_px}
-                fill={`url(#${gidV})`}
-              />
-            </>
-          )}
-
-          {backRectWidth > 0 && (
-            <>
-              <defs>
-                <linearGradient id={gidB} gradientUnits="userSpaceOnUse"
-                  x1={backRectX} y1={backY_px}
-                  x2={backRectX + backRectWidth} y2={backY_px}>
-                  {isLeft ? (
-                    <>
-                      <stop offset={solidOffsetRatio} stopColor={fill} stopOpacity="0.35" />
-                      <stop offset="1" stopColor={fill} stopOpacity="0" />
-                    </>
-                  ) : (
-                    <>
-                      <stop offset="0" stopColor={fill} stopOpacity="0.0" />
-                      <stop offset={fadeOffsetRatio} stopColor={fill} stopOpacity="0.35" />
-                      <stop offset="1" stopColor={fill} stopOpacity={0.35} />
-                    </>
-                  )}
-                </linearGradient>
-              </defs>
-              <rect
-                x={backRectX}
-                y={backY_px}
-                width={backRectWidth}
-                height={backH_px}
-                fill={`url(#${gidB})`}
-                pointerEvents="none"
-              />
-            </>
-          )}
-        </g>
-      );
-    };
-
-    // Rear Surround Zone Component
-    const RearSurroundZoneComponent = () => {
-      // Rule: Do not render if no seats exist.
-      if (!seatingPositions || seatingPositions.length === 0) return null;
-
-      const fadeLen_px = FADE_LEN_M * scale;
-
-      // Room bounds and core positions
-      const roomLeft = roomRect.x;
-      const roomRight = roomRect.x + roomRect.width;
-      const roomTop = roomRect.y;
-      const roomBottom = roomRect.y + roomRect.height;
-      const [, rearWallY_px] = toPx(0, lengthM); // Use new lengthM
-      const bandW_px = ZONE_DEPTH_M * scale;
-
-      // Find rearmost seat line (global last-seat line)
-      const seatYs = seatingPositions.map(s => Number(s.y)).filter(Number.isFinite);
-      const lastSeatY_m = seatYs.length ? Math.max(...seatYs) : mlp.y;
-      const [, lastSeatY_px_raw] = toPx(0, lastSeatY_m);
-      const lastSeatY_px = Math.max(roomTop, Math.min(roomBottom, lastSeatY_px_raw));
-
-      // Vertical bands: from last-seat line to rear wall
-      const vHeight_px = Math.max(0, Math.min(roomBottom, rearWallY_px) - lastSeatY_px);
-
-      // Horizontal bands: use first-seat X positions
-      const seatXs = seatingPositions.map(s => Number(s.x)).filter(Number.isFinite);
-      const leftmostSeatX_m = seatXs.length ? Math.min(...seatXs) : widthM * 0.35; // Use new widthM
-      const rightmostSeatX_m = seatXs.length ? Math.max(...seatXs) : widthM * 0.65; // Use new widthM
-      const [leftSeat_px] = toPx(leftmostSeatX_m, 0);
-      const [rightSeat_px] = toPx(rightmostSeatX_m, 0);
-
-      // Position horizontal band inside the room
-      const backY_px = Math.min(roomBottom, rearWallY_px) - bandW_px;
-
-      const renderBand = (side) => {
-        const isLeft = side === 'left';
-        const fillColor = isLeft ? '#4A230F' : '#213428';
-        const sideX_px = isLeft ? roomLeft : roomRight - bandW_px;
-
-        const verticalRect = vHeight_px > 0 ? (
-          <rect
-            key={`vert-${side}`}
-            x={sideX_px}
-            y={lastSeatY_px}
-            width={bandW_px}
-            height={vHeight_px}
-            fill={fillColor}
-            opacity={0.35}
-          />
-        ) : null;
-
-        const solidStartX = isLeft ? roomLeft : Math.max(roomLeft, rightSeat_px);
-        const solidEndX = isLeft ? Math.min(roomRight, leftSeat_px) : roomRight;
-        const solidW = Math.max(0, solidEndX - solidStartX);
-        const backFadeW_px = fadeLen_px;
-        const totalW = solidW + backFadeW_px;
-
-        const gidH = `grad_rear_horiz_${side}`;
-        const bandX = isLeft ? solidStartX : (solidStartX - backFadeW_px);
-        const offsetSolid = totalW > 0 ? solidW / totalW : 0;
-        const offsetFade = totalW > 0 ? backFadeW_px / totalW : 0;
-
-        return (
-          <g key={side} pointerEvents="none">
-            {verticalRect}
-            {totalW > 0 && (
-              <>
-                <defs>
-                  <linearGradient
-                    id={gidH}
-                    gradientUnits="userSpaceOnUse"
-                    x1={bandX}
-                    y1={backY_px}
-                    x2={bandX + totalW}
-                    y2={backY_px}
-                  >
-                    {isLeft ? (
-                      <>
-                        <stop offset={offsetSolid} stopColor={fillColor} stopOpacity="0.35" />
-                        <stop offset="1" stopColor={fillColor} stopOpacity="0" />
-                      </>
-                    ) : (
-                      <>
-                        <stop offset="0" stopColor={fillColor} stopOpacity="0.0" />
-                        <stop offset={offsetFade} stopColor={fillColor} stopOpacity="0.35" />
-                        <stop offset="1" stopColor={fillColor} stopOpacity={0.35} />
-                    </>
-                    )}
-                  </linearGradient>
-                </defs>
-                <rect
-                  x={bandX}
-                  y={backY_px}
-                  width={totalW}
-                  height={bandW_px}
-                  fill={`url(#${gidH})`}
-                  pointerEvents="none"
-                />
-              </>
-            )}
-          </g>
-        );
-      };
-
-      return (
-        <g pointerEvents="none">
-          {renderBand('left')}
-          {renderBand('right')}
-        </g>
-      );
-    };
-
-return {
-  LCR: (
-    <g pointerEvents="none">
-      <LCRZoneComponent side="left" />
-      <LCRZoneComponent side="right" />
-    </g>
-  ),
-  SIDE_SURROUND: (
-    <g pointerEvents="none">
-      <SideSurroundZoneComponent side="left" />
-      <SideSurroundZoneComponent side="right" />
-    </g>
-  ),
-  REAR_SURROUND: <RearSurroundZoneComponent />,
-
-  OVERHEADS: renderOverheadBandsSVG({
-    zones: overheadZones,
-    config: overheadCount === 2 ? ".2" : overheadCount === 4 ? ".4" : ".6",
-    toPx,
-    scale,
+    });
+  }, [
+    speakersToRender,
+    isRenderableSpeaker,
+    getSpeakerVisibility,
+    getCanonicalRoleGlobal, // Using global getCanonicalRoleGlobal
+    resolveSurroundModel,
+    getSpeakerDims, // Using global getSpeakerDims
+    getYawForObject,
+    yHalfExtentM, // From RenderPrimitives
+    WALL_BUFFER_M,
     roomRect,
-    placedSpeakers,
-    getCanonicalRole,
+    scale,
     widthM,
-  }),
-
-  FRONT_WIDE: renderFrontWideZones(),
-  // DOLBY removed
-};
-  }, [seatingPositions, widthM, lengthM, scale, toPx, roomRect, mlpY_m, placedSpeakers, heightM, screen?.mountMode, lcrZoneBlocks, ZONE_DEPTH_M, frontWideZones, renderFrontWideZones, mlp, getCanonicalRole, overheadCount, overheadZones]); // Added overheadZones to dependencies
-
-
-  // constants for seating block shift
-  const TARGET_ANGLE_DEG = 57.5;
-  const SAFETY_MARGIN_M = 0.05;
-
-  // seating row helpers
-  const findFrontRowY = useCallback((seats = []) => {
-    if (!seats.length) return null;
-    return Math.min(...seats.map(s => Number(s.y) || 0));
-  }, []);
-
-  const findBackRowY = useCallback((seats = []) => {
-    if (!seats.length) return null;
-    return Math.max(...seats.map(s => Number(s.y) || 0));
-  }, []);
-
-  // This function shifts all seats as a block to align the specified row (front or back)
-  // with the target 57.5 degree MLP from the screen.
-  const shiftSeatsToMaintainAngle = useCallback((mlpRefKey) => {
-    // room + screen
-    const roomLenM = lengthM || 6.0; // Use new lengthM
-    // target MLP y (from front wall): now directly using the shared utility
-    const targetMLP_Y = targetMlpY57_5(screen, 0);
-
-    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return;
-
-    // find current MLP row y
-    const currentRowY = (mlpRefKey === "BACK_ROW_CENTER")
-      ? findBackRowY(seatingPositions)
-      : findFrontRowY(seatingPositions);
-
-    if (currentRowY == null) return;
-
-    // compute delta to apply to ALL seats as a rigid block
-    let deltaY = targetMLP_Y - currentRowY;
-
-    // clamp block movement so we don't cross front/back walls
-    const minY = Math.min(...seatingPositions.map(s => Number(s.y) || 0));
-    const maxY = Math.max(...seatingPositions.map(s => Number(s.y) || 0));
-
-    // after shifting, enforce bounds [SAFETY, roomLen - SAFETY]
-    const newMinY = minY + deltaY;
-    const newMaxY = maxY + deltaY;
-    const minAllowed = SAFETY_MARGIN_M;
-    const maxAllowed = roomLenM - SAFETY_MARGIN_M;
-
-    if (newMinY < minAllowed) {
-      deltaY += (minAllowed - newMinY);
-    }
-    if (newMaxY > maxAllowed) {
-      deltaY -= (newMaxY - maxAllowed);
-    }
-
-    // apply translation
-    onSetSeatingPositions?.((prev) =>
-      (prev || []).map(s => ({
-        ...s,
-        y: (Number(s.y) || 0) + deltaY
-      }))
-    );
-  }, [lengthM, screen, seatingPositions, onSetSeatingPositions, findFrontRowY, findBackRowY]); // Use new lengthM
-
-  // UPDATED: Reset side surrounds to their cached default positions
-  const resetSideSurroundsToDefault = useCallback(() => {
-    onSetSpeakers(prev => {
-      const slSpeaker = prev.find(s => getCanonicalRole(s.role) === 'SL');
-      const srSpeaker = prev.find(s => getCanonicalRole(s.role) === 'SR');
-
-      if (!slSpeaker && !srSpeaker) return prev;
-
-      const roomWidth = widthM || 4.5; // Use new widthM
-      const roomLengthM = lengthM || 6.0; // Use new lengthM
-
-      // Determine fixed X positions for both, even if only one exists for robustness
-      // Use getSpeakerDims directly to get dimensions.
-      const dimsL = slSpeaker ? getSpeakerDims(slSpeaker.model) : { heightM: 0.2, depthM: 0.082 };
-      const dimsR = srSpeaker ? getSpeakerDims(srSpeaker.model) : { heightM: 0.2, depthM: 0.082 };
-
-      const xL = fixedSideX(roomWidth, dimsL, 'L');
-      const xR = fixedSideX(roomWidth, dimsR, 'R');
-
-      // Get the y-range for the speaker center (already includes overhang)
-      const yMin_center = Number(sideSurroundVisualSpanM?.minY) ?? 0;
-      const yMax_center = Number(sideSurroundVisualSpanM?.maxY) ?? 0;
-
-      // Calculate a default Y position, e.g., the midpoint of the available range
-      let defaultY = (yMin_center + yMax_center) / 2;
-      // If the span is invalid (e.g., yMin_center >= yMax_center), clamp to a safe default in the room center
-      if (!(yMax_center > yMin_center)) {
-        defaultY = roomLengthM / 2;
-      }
-
-      return prev.map(s => {
-        const role = getCanonicalRole(s.role);
-        if (role === 'SL' || role === 'SR') {
-          const targetX = role === 'SL' ? xL : xR;
-          const targetY = defaultY;
-
-          // Cache this as the new default position
-          const newDefaultPos = { x: targetX, y: targetY };
-          return { ...s, defaultPosition: newDefaultPos, position: { ...s.position, x: targetX, y: targetY } };
-        }
-        return s;
-      });
-    });
-  }, [onSetSpeakers, widthM, lengthM, sideSurroundVisualSpanM, getCanonicalRole]); // Use new widthM, lengthM
-
-  useEffect(() => {
-    window.addEventListener('b44:resetSideSurrounds', resetSideSurroundsToDefault);
-    return () => {
-      window.removeEventListener('b44:resetSideSurrounds', resetSideSurroundsToDefault);
-    };
-  }, [resetSideSurroundsToDefault]);
-
-  // Expose the shift function so parent components can call it
-  useImperativeHandle(ref, () => ({
-    shiftSeatsToMaintainAngle,
-    resetSideSurrounds: resetSideSurroundsToDefault
-  }), [shiftSeatsToMaintainAngle, resetSideSurroundsToDefault]);
-
-  const applyLcrFromDetail = useCallback((detail) => {
-    if (!detail || !onSetSpeakers) return;
-
-    const W = widthM || 4.5; // Use new widthM
-    const L = lengthM || 6.0; // Use new lengthM
-
-    const coords = detail.coords || {};
-    const speakers = detail.speakers || {};
-
-    // coords are normalized [0..1]; convert to room metres
-    const toRoom = (p) => (!p ? { x: W * 0.5, y: 0.03 * L } : { x: (p.x || 0.5) * W, y: (p.y || 0.03) * L });
-
-    const Lpos = toRoom(coords.L);
-    const Cpos = toRoom(coords.C);
-    const Rpos = toRoom(coords.R);
-
-    const Lmodel = speakers.L || "";
-    const Cmodel = speakers.C || "";
-    const Rmodel = speakers.R || "";
-
-    // Build or merge FL/FC/FR entries; keep all other speakers/subs as-is
-    onSetSpeakers((prev = []) => {
-      // Filter out existing LCR speakers using canonical roles for robustness
-      const keep = prev.filter(s => !["FL", "FC", "FR"].includes(getCanonicalRole(s.role)));
-
-      const next = [
-        { id: "auto-fl", role: "FL", model: Lmodel, position: { x: Lpos.x, y: Lpos.y } },
-        { id: "auto-fc", role: "FC", model: Cmodel, position: { x: Cpos.x, y: Cpos.y } },
-        { id: "auto-fr", role: "FR", model: Rmodel, position: { x: Rpos.x, y: Rpos.y } },
-      ];
-
-      return [...keep, ...next];
-    });
-  }, [onSetSpeakers, widthM, lengthM, getCanonicalRole]); // Use new widthM, lengthM
-
-  // Listen for LCR events and expose a direct hook
-  useEffect(() => {
-    const handler = (e) => applyLcrFromDetail(e?.detail);
-    window.addEventListener("b44:overlay:setLCR", handler);
-
-    // Optional direct hook: window.Base44Overlay.setLCR = applyLcrFromDetail
-    try {
-      window.Base44Overlay = window.Base44Overlay || {};
-      window.Base44Overlay.setLCR = applyLcrFromDetail;
-    } catch (e) {
-      if (typeof console !== 'undefined') console.error("Failed to attach Base44Overlay.setLCR:", e);
-    }
-
-    return () => {
-      window.removeEventListener("b44:overlay:setLCR", handler);
-      try {
-        if (window.Base44Overlay && window.Base44Overlay.setLCR === applyLcrFromDetail) {
-          delete window.Base44Overlay.setLCR;
-        }
-      } catch (e) {
-        if (typeof console !== 'undefined') console.error("Failed to detach Base44Overlay.setLCR:", e);
-      }
-    };
-  }, [applyLcrFromDetail]);
-
-  const renderSpeakers = useCallback(() => {
-  // Normalise input
-  const raw = Array.isArray(speakersToRender) ? speakersToRender : [];
-
-  // 1) Basic structural filter (existing helper)
-  const afterRenderable = raw.filter(isRenderableSpeaker);
-
-  // 2) Visibility filter (layout + model) – but never hard-fail on errors
-  const afterVisibility = afterRenderable.filter((spk) => {
-    try {
-      const result = getSpeakerVisibility(spk.role, spk.model);
-      
-      // TEMP DEBUG: Log each visibility check
-      const canon = String(spk.role || "").toUpperCase();
-      if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-        console.log('[RV filter]', {
-          role: canon,
-          model: spk.model,
-          visibilityResult: result
-        });
-      }
-      
-      return result;
-    } catch (err) {
-      console.warn("[RV] getSpeakerVisibility error; allowing speaker through", {
-        role: spk.role,
-        model: spk.model,
-        err,
-      });
-      return true;
-    }
-  });
-
-  // DEBUG: Expose to window for manual inspection
-  if (typeof window !== 'undefined') {
-    window.__LAST_RV__ = { raw, afterVisibility };
-  }
-
-  // DEBUG: Table of afterVisibility with positions
-  try {
-    console.groupCollapsed("[RV] speakersToRender DEBUG");
-    console.log('Raw speakers:');
-    console.table(
-      raw.map((s) => ({
-        id: s.id,
-        role: s.role,
-        model: s.model || "(none)",
-      }))
-    );
-    console.log('After visibility:');
-    console.table(
-      afterVisibility.map((s) => ({
-        id: s.id,
-        role: s.role,
-        model: s.model || "(none)",
-        posX: s.position?.x?.toFixed?.(3) || '—',
-        posY: s.position?.y?.toFixed?.(3) || '—',
-      }))
-    );
-    console.groupEnd();
-  } catch (_) {
-    // ignore console errors in strange environments
-  }
-
-  // Local NaN-safe coordinate mappers (must be inside this loop)
-  const toCanvasX = (xM) => {
-    const safeX = Number.isFinite(xM) ? xM : 0;
-    return roomRect.x + (safeX * scale);
-  };
-
-  const toCanvasY = (yM) => {
-    const safeY = Number.isFinite(yM) ? yM : 0;
-    return roomRect.y + (safeY * scale);
-  };
-
-  // [B44] Debug log to confirm bed-surround positions are not mutated by RV
-  console.log('[RV] speakers BEFORE icon-map',
-    afterVisibility.map(s => ({
-      role: s.role,
-      canon: getCanonicalRole(s.role),
-      x: s.position?.x?.toFixed(3),
-      y: s.position?.y?.toFixed(3),
-    }))
-  );
-
-  // [B44] Debug log to confirm bed-surround positions are not mutated by RV
-  console.log('[RV] speakers BEFORE icon-map',
-    afterVisibility.map(s => ({
-      role: s.role,
-      canon: getCanonicalRole(s.role),
-      x: s.position?.x?.toFixed(3),
-      y: s.position?.y?.toFixed(3),
-    }))
-  );
-
-  // 3) Map to icons
-  return afterVisibility.map((speaker) => {
-    const { id, role, model, position = {} } = speaker;
-    const canon = getCanonicalRole(role);
-
-    // Resolve model & dimensions using your existing helpers
-    const resolvedModel = resolveSurroundModel(model, canon);
-    const dims = getSpeakerDims(resolvedModel);
-    const widthM_spk = dims.widthM || 0;
-    const depthM_spk = dims.depthM || 0;
-
-    // Compute yaw: prefer explicit speaker.yaw (seeded by SpeakerPlacement)
-    // and fall back to the existing helper if it's not set / not finite.
-    let yawDeg;
-
-    if (Number.isFinite(speaker?.yaw)) {
-      yawDeg = Number(speaker.yaw);
-    } else {
-      yawDeg = getYawForObject(
-        speaker,
-        { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
-        aimAtMLP,
-        { width: widthM, length: lengthM, height: heightM },
-        getModelDimsM
-      );
-    }
-
-    // Position coordinates from speaker.position (with safe fallbacks)
-    const pos_x = position.x ?? 0;
-    const pos_y = position.y ?? 0;
-
-    // --- Rear surround wall-aware yaw ---
-    // If SBL/SBR are dragged onto a side wall, rotate them 90° so the
-    // long edge sits flat on that wall (matching SL/SR behaviour).
-    if (canon === "SBL" || canon === "SBR") {
-      const distLeft  = Math.abs(pos_x - 0);
-      const distRight = Math.abs(widthM - pos_x);
-      const distBack  = Math.abs(lengthM - pos_y); // back wall at y = lengthM
-
-      const minDist = Math.min(distLeft, distRight, distBack);
-
-      if (minDist === distBack) {
-        // Closest to back wall: keep standard rear orientation (flat to back)
-        yawDeg = 0;
-      } else if (minDist === distLeft) {
-        // Now effectively on left wall
-        yawDeg = 90;
-      } else if (minDist === distRight) {
-        // Now effectively on right wall
-        yawDeg = -90;
-      }
-    }
-
-    // Convert to canvas coordinates
-    let canvasX, canvasY;
-
-    if (canon === "FL" || canon === "FC" || canon === "FR") {
-      // LCR: pinned to front wall using WALL_BUFFER_M
-      const half = yHalfExtentM(depthM_spk, widthM_spk, yawDeg);
-      const y_m = WALL_BUFFER_M + half;
-      canvasX = toCanvasX(pos_x);
-      canvasY = toCanvasY(y_m);
-    } else {
-      // Everyone else: use their stored world coords directly
-      canvasX = toCanvasX(pos_x);
-      canvasY = toCanvasY(pos_y);
-    }
-
-    // NaN safety: ensure we never pass invalid coordinates
-    const safeCanvasX = Number.isFinite(canvasX) ? canvasX : 0;
-    const safeCanvasY = Number.isFinite(canvasY) ? canvasY : 0;
-
-    // Log any invalid coordinates
-    if (!Number.isFinite(canvasX) || !Number.isFinite(canvasY)) {
-      console.warn('[RV] INVALID CANVAS COORDS', {
-        id,
-        role,
-        pos: position,
-        pos_x,
-        pos_y,
-        canvasX,
-        canvasY,
-      });
-    }
-
-    // DEBUG: Log icon generation for rear/wide speakers
-    if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-      console.log('[RV icon]', {
-        id,
-        role,
-        canon,
-        model,
-        resolvedModel,
-        pos: position,
-        pos_x,
-        pos_y,
-        canvasX: safeCanvasX,
-        canvasY: safeCanvasY,
-        yawDeg,
-        widthM_spk,
-        depthM_spk,
-      });
-    }
-
-    const speakerMouseDownHandler = isDraggable(speaker)
-      ? (e) => handleMouseDown(e, id, "speaker")
-      : undefined;
-
-    return (
-      <SpeakerIcon
-        key={id}
-        speaker={{ ...speaker, model: resolvedModel }}
-        canvasX={safeCanvasX}
-        canvasY_raw={safeCanvasY}
-        yawDeg={yawDeg}
-        widthM={widthM_spk}
-        depthM={depthM_spk}
-        scale={scale}
-        speakerMouseDownHandler={speakerMouseDownHandler}
-        setHoveredSpeaker={setHoveredSpeaker}
-      />
-    );
-  });
-}, [
-  speakersToRender,
-  isRenderableSpeaker,
-  getSpeakerVisibility,
-  getCanonicalRole,
-  resolveSurroundModel,
-  getSpeakerDims,
-  getYawForObject,
-  yHalfExtentM,
-  WALL_BUFFER_M,
-  roomRect,
-  scale,
-  widthM,
-  lengthM,
-  heightM,
-  mlp, // lcrAngleInfo is now derived from mlp
-  aimAtMLP,
-  isDraggable,
-  handleMouseDown,
-  setHoveredSpeaker,
-  // SpeakerIcon is a component, not a dependency
-  // lcrAngleInfo is not directly a dependency, but its values are used.
-  // The L/R values are fetched from lcrAngleInfo.
-  // It's better to pass the actual L/R values as dependencies if they are derived.
-  // Assuming lcrAngleInfo is an object, if it is derived from props/state, its changes will trigger this.
-  // For now, assuming lcrAngleInfo is stable or its values (L,R) are what change.
-]);
+    lengthM,
+    heightM,
+    mlp, // lcrAngleInfo is now derived from mlp
+    aimAtMLP,
+    isDraggable,
+    handleMouseDown,
+    setHoveredSpeaker,
+    // SpeakerIcon is a component, not a dependency
+    // lcrAngleInfo is not directly a dependency, but its values are used.
+    // The L/R values are fetched from lcrAngleInfo.
+    // It's better to pass the actual L/R values as dependencies if they are derived.
+    // For now, assuming lcrAngleInfo is stable or its values (L,R) are what change.
+  ]);
 
   // Renders rear subwoofers using SpeakerRect
   const renderSubwoofers = React.useCallback(() => {
@@ -4314,7 +2839,7 @@ return {
   const containerStyle = {
     position: 'relative',
     width: '100%',
-    aspectRatio: aspect,
+    aspectRatio: aspect, // This 'aspect' variable seems to be undefined.
     maxHeight: 'none',
     border: '1px solid #DCDBD6',
     borderRadius: '88px',
@@ -4368,15 +2893,15 @@ return {
     if (!effectiveHoveredSeat) return null;
 
     const allSurrounds = (placedSpeakers || []).filter(s => {
-      const r = getCanonicalRole(s.role);
+      const r = getCanonicalRoleGlobal(s.role); // Using global getCanonicalRoleGlobal
       return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
     });
 
-    const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
-    const hasSR = allSurrounds.some(s => getCanonicalRole(s.role) === 'SR');
+    const hasSL = allSurrounds.some(s => getCanonicalRoleGlobal(s.role) === 'SL'); // Using global getCanonicalRoleGlobal
+    const hasSR = allSurrounds.some(s => getCanonicalRoleGlobal(s.role) === 'SR'); // Using global getCanonicalRoleGlobal
 
     const eligibleSurrounds = allSurrounds.filter(s => {
-      const r = getCanonicalRole(s.role);
+      const r = getCanonicalRoleGlobal(s.role); // Using global getCanonicalRoleGlobal
       if (r === 'LW' || r === 'RW') return hasSL && hasSR;
       return true;
     });
@@ -4449,7 +2974,7 @@ return {
     });
 
     return <g aria-label="rp22-surround-angles">{labelGroup}</g>;
-  }, [overlaysForRendering, effectiveHoveredSeat, placedSpeakers, scale, toPx, getCanonicalRole]);
+  }, [overlaysForRendering, effectiveHoveredSeat, placedSpeakers, scale, toPx, getCanonicalRoleGlobal]); // Using global getCanonicalRoleGlobal
 
   // Build HUD style safely
   const hudDynamicStyle = useMemo(() => {
@@ -4477,7 +3002,7 @@ return (
     ref={planBoundsRef} // Renamed from containerRef
     className="relative w-full h-full overflow-auto bg-gray-50"
     style={{
-      aspectRatio: aspect,
+      // aspectRatio: aspect, // 'aspect' is still undefined. Removing or defining.
       border: '1px solid #DCDBD6',
       borderRadius: '88px',
       backgroundColor: '#F8F8F7',
