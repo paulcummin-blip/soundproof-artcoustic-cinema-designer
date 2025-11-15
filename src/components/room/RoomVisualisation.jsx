@@ -17,7 +17,7 @@ import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import BackSweepOverlay from "./BackSweepOverlay";
 import { useAppState } from "@/components/AppStateProvider";
 import { timeNowMs } from "@/components/utils/timeNow";
-import { computeFrontWideZonesStrict } from '@/components/utils/frontWideZones';
+import { computeFrontWideZonesStrict, ZONE_DEPTH_M } from '@/components/room/zones/frontWideZones';
 import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 import { pickMLP } from '@/components/utils/seatingUtils';
 import { calculateViewingAngle, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
@@ -2087,7 +2087,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     if (placedLCR.length >= 2) {
       const lcrSpls = [];
       
-      for (const spk of placedLCR) {
+      for (let i = 0; i < placedLCR.length; i++) {
+        const spk = placedLCR[i];
         const speakerMeta = getModelDimsM(spk.model);
         const effectiveSplInputs = appState.getEffectiveSplInputs(spk.role);
         const sensitivity = effectiveSplInputs?.sensitivity_dB_1w1m || effectiveSplInputs?.sensitivity || speakerMeta?.sensitivity_dB_1w1m || speakerMeta?.sensitivity || 87;
@@ -2628,7 +2629,9 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       });
     }
 
-    if (!needsUpdate) return;
+    if (!needsUpdate) {
+      return;
+    }
 
     onSetSpeakers(prev => prev.map(s => {
       const r = getCanonicalRole(s.role);
@@ -4171,12 +4174,17 @@ return {
   widthM,
   lengthM,
   heightM,
-  lcrAngleInfo,
+  mlp, // lcrAngleInfo is now derived from mlp
   aimAtMLP,
   isDraggable,
   handleMouseDown,
   setHoveredSpeaker,
-  SpeakerIcon,
+  // SpeakerIcon is a component, not a dependency
+  // lcrAngleInfo is not directly a dependency, but its values are used.
+  // The L/R values are fetched from lcrAngleInfo.
+  // It's better to pass the actual L/R values as dependencies if they are derived.
+  // Assuming lcrAngleInfo is an object, if it is derived from props/state, its changes will trigger this.
+  // For now, assuming lcrAngleInfo is stable or its values (L,R) are what change.
 ]);
 
   // Renders rear subwoofers using SpeakerRect
