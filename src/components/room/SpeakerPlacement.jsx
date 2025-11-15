@@ -1727,7 +1727,7 @@ function SpeakerPlacementImpl(props) {
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
   // Keep front-wides (LW/RW) at the median between front and side surrounds.
-  // LW tracks midpoint of FL + SL, RW tracks midpoint of FR + SR.
+  // Runs after every render so it stays in sync regardless of overlays.
   useEffect(() => {
     if (!canWides || !dimensions) return;
 
@@ -1735,13 +1735,10 @@ function SpeakerPlacementImpl(props) {
       const list = Array.isArray(prev) ? prev : [];
       if (!list.length) return prev;
 
-      // Only bother if we actually have any front-wides
-      const hasFW = list.some(
-        (s) => {
-          const canon = getCanonicalRole(s.role);
-          return canon === "LW" || canon === "RW";
-        }
-      );
+      const hasFW = list.some((s) => {
+        const canon = getCanonicalRole(s.role);
+        return canon === "LW" || canon === "RW";
+      });
       if (!hasFW) return prev;
 
       const W = Number(dimensions.width) || 0;
@@ -1759,7 +1756,6 @@ function SpeakerPlacementImpl(props) {
         const canon = getCanonicalRole(s.role);
         if (canon !== "LW" && canon !== "RW") return s;
 
-        // Anchors: front L/R + side L/R
         const frontRole = canon === "LW" ? "FL" : "FR";
         const sideRole  = canon === "LW" ? "SL" : "SR";
 
@@ -1771,22 +1767,21 @@ function SpeakerPlacementImpl(props) {
         const sx = side?.position?.x;
         const sy = side?.position?.y;
 
+        // If anchors aren't properly placed, leave FW where it is.
         if (
           !Number.isFinite(fx) || !Number.isFinite(fy) ||
           !Number.isFinite(sx) || !Number.isFinite(sy)
         ) {
-          // If anchors are missing or not placed, leave FW where it is.
           return s;
         }
 
-        // Simple midpoint between front and side surround
         let pos = {
           x: (fx + sx) / 2,
           y: (fy + sy) / 2,
           z: Number.isFinite(s.position?.z) ? s.position.z : 1.1,
         };
 
-        // Re-apply wall-hugging and room bounds, using the existing helpers.
+        // Use existing helpers to respect buffers / corner rules
         pos = applyCornerClearance(pos, canon, s.model, dimensions, {});
         pos = applyRoomBoundsClamp(pos, s.model, dimensions);
 
@@ -1807,16 +1802,10 @@ function SpeakerPlacementImpl(props) {
         return { ...s, position: pos };
       });
 
+      // If nothing changed, keep the old array reference so React treats it as a no-op
       return changed ? updated : prev;
     });
-  }, [
-    canWides,
-    dimensions,
-    applyCornerClearance,
-    applyRoomBoundsClamp,
-    setSpeakers,
-    placedSpeakers,
-  ]);
+  }); // no dependency array: run after every render
 
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
     if (!mlpPoint || !dimensions || !canWides) {
