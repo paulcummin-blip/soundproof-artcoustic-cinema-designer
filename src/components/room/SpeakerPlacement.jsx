@@ -1798,7 +1798,7 @@ function SpeakerPlacementImpl(props) {
       return;
     }
     
-    setSpeakers(currentSpeakers => resetSurroundPositions(effectivePreset, mlpPoint, dimensions, globalSurroundModel));
+    setSpeakers(currentSpeakers => resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, globalSurroundModel));
     
     if (showToast) {
       const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : effectivePreset.startsWith('9.') ? '9.x' : '7.1';
@@ -1869,13 +1869,89 @@ function SpeakerPlacementImpl(props) {
 
       console.log('[SP FW MEDIAN] Applying median positions...');
       
-      const { list: next, changed } = applyFrontWideMedianPositions(
-        list,
-        dimensions,
-        applyCornerClearance,
-        applyRoomBoundsClamp,
-        getCanonicalRole
-      );
+      const byCanon = new Map();
+      list.forEach((s) => {
+        byCanon.set(getCanonicalRole(s.role), s);
+      });
+
+      const FL = byCanon.get("FL");
+      const FR = byCanon.get("FR");
+      const SL = byCanon.get("SL");
+      const SR = byCanon.get("SR");
+
+      // We need all anchors with valid positions
+      const anchorsOk =
+        Number.isFinite(FL?.position?.x) && Number.isFinite(FL?.position?.y) &&
+        Number.isFinite(FR?.position?.x) && Number.isFinite(FR?.position?.y) &&
+        Number.isFinite(SL?.position?.x) && Number.isFinite(SL?.position?.y) &&
+        Number.isFinite(SR?.position?.x) && Number.isFinite(SR?.position?.y);
+
+      if (!anchorsOk) {
+        console.log('[SP FW MEDIAN] SKIP: anchors not valid');
+        return prev;
+      }
+
+      let changed = false;
+
+      const updated = list.map((s) => {
+        const canon = getCanonicalRole(s.role);
+        if (canon !== "LW" && canon !== "RW") return s;
+
+        const frontRole = canon === "LW" ? "FL" : "FR";
+        const sideRole  = canon === "LW" ? "SL" : "SR";
+
+        const front = byCanon.get(frontRole);
+        const side  = byCanon.get(sideRole);
+
+        const fx = front?.position?.x;
+        const fy = front?.position?.y;
+        const sx = side?.position?.x;
+        const sy = side?.position?.y;
+
+        // If anchors aren't properly placed, leave FW where it is.
+        if (
+          !Number.isFinite(fx) || !Number.isFinite(fy) ||
+          !Number.isFinite(sx) || !Number.isFinite(sy)
+        ) {
+          return s;
+        }
+
+        // Median Y between front and side surround centres
+        const medianY = (fy + sy) / 2;
+
+        // Hug X to the side wall, same as resetOnlyFrontWidesToDefaults
+        const hugging = getHuggingCenterLines(s.model, dimensions);
+        const wallX =
+          canon === "LW"
+            ? hugging.leftWallX
+            : hugging.rightWallX;
+
+        let pos = {
+          x: wallX,
+          y: medianY,
+          z: Number.isFinite(s.position?.z) ? s.position.z : 1.1,
+        };
+
+        // Respect corner / room bounds, but starting from the wall
+        pos = applyCornerClearance(pos, canon, s.model, dimensions, {});
+        pos = applyRoomBoundsClamp(pos, s.model, dimensions);
+
+        if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
+          return s;
+        }
+
+        const old = s.position || {};
+        const dx = Math.abs((old.x ?? 0) - pos.x);
+        const dy = Math.abs((old.y ?? 0) - pos.y);
+
+        // Avoid tiny float churn
+        if (dx < 0.001 && dy < 0.001) {
+          return s;
+        }
+
+        changed = true;
+        return { ...s, position: pos };
+      });
 
       if (changed) {
         console.log('[SP FW MEDIAN] ✅ FW positions UPDATED');
@@ -1883,7 +1959,7 @@ function SpeakerPlacementImpl(props) {
         console.log('[SP FW MEDIAN] No change needed (already at median)');
       }
 
-      return changed ? next : prev;
+      return changed ? updated : prev;
     });
   }, [
     canWides,
@@ -1892,6 +1968,7 @@ function SpeakerPlacementImpl(props) {
     // Removed enableFrontWides from deps - now runs unconditionally
     applyCornerClearance,
     applyRoomBoundsClamp,
+    getHuggingCenterLines,
     setSpeakers,
     // React to changes in FL/FR/SL/SR positions
     placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.x,
