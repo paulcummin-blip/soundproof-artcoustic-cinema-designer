@@ -3,6 +3,33 @@ import { Label } from "@/components/ui/Label";
 import { Input } from "@/components/ui/input";
 import { useAppState } from "@/components/AppStateProvider";
 
+const roundToCm = (num) => {
+  if (!Number.isFinite(num)) return null;
+  // round to centimetres (2 decimal places in metres)
+  return Math.round(num * 100) / 100;
+};
+
+const parseDimensionInput = (raw) => {
+  if (raw == null) return null;
+  const str = String(raw).trim();
+  if (!str) return null;
+
+  // Allow commas as decimal separators
+  const normalised = str.replace(',', '.');
+  const num = parseFloat(normalised);
+  if (!Number.isFinite(num) || num <= 0) return null;
+
+  return roundToCm(num);
+};
+
+const formatDimension = (value) => {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return '';
+  // show up to 2 decimal places, removing trailing zeros
+  const fixed = num.toFixed(2);
+  return fixed.replace(/\.?0+$/, '');
+};
+
 export default function RoomDimensions({ disabled }) {
   const { roomDims, setRoomWidthM, setRoomLengthM, setRoomHeightM } = useAppState();
 
@@ -15,10 +42,27 @@ export default function RoomDimensions({ disabled }) {
     fontSize: "14px",
   };
 
-  const handleChange = (setter, value) => {
-    const numValue = value === "" ? 0 : parseFloat(value) || 0;
-    if (Number.isFinite(numValue) && numValue > 0) {
-      setter(numValue);
+  const handleDimensionChange = (key, raw) => {
+    const parsed = parseDimensionInput(raw);
+
+    if (key === 'width') {
+      if (parsed === null) {
+        setRoomWidthM('');
+      } else {
+        setRoomWidthM(parsed);
+      }
+    } else if (key === 'length') {
+      if (parsed === null) {
+        setRoomLengthM('');
+      } else {
+        setRoomLengthM(parsed);
+      }
+    } else if (key === 'height') {
+      if (parsed === null) {
+        setRoomHeightM('');
+      } else {
+        setRoomHeightM(parsed);
+      }
     }
   };
 
@@ -28,12 +72,10 @@ export default function RoomDimensions({ disabled }) {
         <Label htmlFor="room-width" className="block mb-2">Width (m)</Label>
         <Input
           id="room-width"
-          type="number"
-          step="0.01"
-          min="1"
-          max="30"
-          value={roomDims.widthM === 0 ? "" : roomDims.widthM}
-          onChange={(e) => handleChange(setRoomWidthM, e.target.value)}
+          type="text"
+          inputMode="decimal"
+          value={formatDimension(roomDims.widthM)}
+          onChange={(e) => handleDimensionChange('width', e.target.value)}
           disabled={disabled}
           style={inputStyle}
           placeholder="e.g. 4.55"
@@ -44,12 +86,10 @@ export default function RoomDimensions({ disabled }) {
         <Label htmlFor="room-length" className="block mb-2">Length (m)</Label>
         <Input
           id="room-length"
-          type="number"
-          step="0.01"
-          min="1"
-          max="30"
-          value={roomDims.lengthM === 0 ? "" : roomDims.lengthM}
-          onChange={(e) => handleChange(setRoomLengthM, e.target.value)}
+          type="text"
+          inputMode="decimal"
+          value={formatDimension(roomDims.lengthM)}
+          onChange={(e) => handleDimensionChange('length', e.target.value)}
           disabled={disabled}
           style={inputStyle}
           placeholder="e.g. 6.20"
@@ -60,12 +100,10 @@ export default function RoomDimensions({ disabled }) {
         <Label htmlFor="room-height" className="block mb-2">Height (m)</Label>
         <Input
           id="room-height"
-          type="number"
-          step="0.01"
-          min="1"
-          max="10"
-          value={roomDims.heightM === 0 ? "" : roomDims.heightM}
-          onChange={(e) => handleChange(setRoomHeightM, e.target.value)}
+          type="text"
+          inputMode="decimal"
+          value={formatDimension(roomDims.heightM)}
+          onChange={(e) => handleDimensionChange('height', e.target.value)}
           disabled={disabled}
           style={inputStyle}
           placeholder="e.g. 2.80"
