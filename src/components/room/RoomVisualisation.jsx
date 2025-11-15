@@ -1274,6 +1274,23 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     };
   }, [seatingPositions, lengthM]);
 
+  // Define LCR angles for rendering, fixing the `lcrAngleInfo` bug
+  const lcrAngles = useMemo(() => {
+    const fl = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === 'FL');
+    const fr = placedSpeakers.find(s => getCanonicalRoleGlobal(s.role) === 'FR');
+
+    let angleL = 0;
+    let angleR = 0;
+
+    if (fl?.position && mlp) {
+      angleL = horizontalAngleFromMLP(mlp.x, mlp.y, fl.position.x, fl.position.y);
+    }
+    if (fr?.position && mlp) {
+      angleR = horizontalAngleFromMLP(mlp.x, mlp.y, fr.position.x, fr.position.y);
+    }
+    return { L: angleL, R: angleR };
+  }, [placedSpeakers, mlp, horizontalAngleFromMLP]);
+
   // Drag state management
   const handleSpeakerDrag = useCallback((speakerId, newCanvasPos) => {
     if (!onSetSpeakers) return;
@@ -1702,7 +1719,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       return updated;
     });
     lastInteractionEpoch.current = timeNowMs();
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsSideCorridor, rsRearCorridor, fwOffsetRef, getCanonicalRoleGlobal, constraintZones, screenCenterX_m, centerX_m]); // Using global getCanonicalRoleGlobal
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsSideCorridor, rsRearCorridor, fwOffsetRef, getCanonicalRoleGlobal, constraintZones, screenCenterX_m, centerX_m, horizontalAngleFromMLP, fwDeviationLevel]);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
@@ -2507,7 +2524,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
     // DEBUG: Expose to window for manual inspection
     if (typeof window !== 'undefined') {
-      window.__LAST_RV__ = { raw, afterVisibility };
+      window.__LAST_RV__ = { raw: placedSpeakers, afterVisibility };
     }
 
     // DEBUG: Table of afterVisibility with positions
@@ -2515,7 +2532,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       console.groupCollapsed("[RV] speakersToRender DEBUG");
       console.log('Raw speakers:');
       console.table(
-        raw.map((s) => ({
+        placedSpeakers.map((s) => ({
           id: s.id,
           role: s.role,
           model: s.model || "(none)",
@@ -2587,7 +2604,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       } else {
         yawDeg = getYawForObject(
           speaker,
-          { L: lcrAngleInfo.L, R: lcrAngleInfo.R }, // This lcrAngleInfo seems undefined. Assuming it's derived from mlp.
+          lcrAngles, // Use the memoized lcrAngles
           aimAtMLP,
           { width: widthM, length: lengthM, height: heightM },
           getModelDimsM
@@ -2691,30 +2708,28 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       );
     });
   }, [
-    speakersToRender,
+    placedSpeakers,
+    appState?.visibleRoles, // As requested by user in outline
+    getCanonicalRoleGlobal,
     isRenderableSpeaker,
     getSpeakerVisibility,
-    getCanonicalRoleGlobal, // Using global getCanonicalRoleGlobal
     resolveSurroundModel,
-    getSpeakerDims, // Using global getSpeakerDims
+    getSpeakerDims,
     getYawForObject,
-    yHalfExtentM, // From RenderPrimitives
+    yHalfExtentM,
     WALL_BUFFER_M,
     roomRect,
     scale,
     widthM,
     lengthM,
     heightM,
-    mlp, // lcrAngleInfo is now derived from mlp
     aimAtMLP,
     isDraggable,
     handleMouseDown,
     setHoveredSpeaker,
-    // SpeakerIcon is a component, not a dependency
-    // lcrAngleInfo is not directly a dependency, but its values are used.
-    // The L/R values are fetched from lcrAngleInfo.
-    // It's better to pass the actual L/R values as dependencies if they are derived.
-    // For now, assuming lcrAngleInfo is stable or its values (L,R) are what change.
+    mlp,
+    getModelDimsM,
+    lcrAngles, // Added derived value for LCR angles
   ]);
 
   // Renders rear subwoofers using SpeakerRect
@@ -2839,7 +2854,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const containerStyle = {
     position: 'relative',
     width: '100%',
-    aspectRatio: aspect, // This 'aspect' variable seems to be undefined.
+    // aspectRatio: aspect, // This 'aspect' variable seems to be undefined.
     maxHeight: 'none',
     border: '1px solid #DCDBD6',
     borderRadius: '88px',
@@ -2974,7 +2989,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     });
 
     return <g aria-label="rp22-surround-angles">{labelGroup}</g>;
-  }, [overlaysForRendering, effectiveHoveredSeat, placedSpeakers, scale, toPx, getCanonicalRoleGlobal]); // Using global getCanonicalRoleGlobal
+  }, [overlaysForRendering, effectiveHoveredSeat, placedSpeakers, scale, toPx, getCanonicalRoleGlobal, azimuthDegFromSeat]);
 
   // Build HUD style safely
   const hudDynamicStyle = useMemo(() => {
@@ -2988,6 +3003,30 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     }
     return s;
   }, [isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned]);
+
+  // Render overhead icons (placeholder for future implementation if needed)
+  const overheadIconElements = useMemo(() => {
+    return <g data-layer="overhead-icons"></g>;
+  }, []);
+
+  // Render speakers from the memoized list
+  const renderSpeakers = useCallback(() => {
+    return speakersToRender;
+  }, [speakersToRender]);
+
+  // Placeholder for Dolby zones, assumes a function like `renderDolbyZones` exists.
+  const renderDolbyZones = useCallback(() => {
+    return <g data-layer="dolby-zones"></g>;
+  }, []);
+
+  // Placeholder for ZoneComponents
+  const ZoneComponents = useMemo(() => ({
+    LCR: <g data-layer="lcr-zones"></g>,
+    SIDE_SURROUND: <g data-layer="side-surround-zones"></g>,
+    REAR_SURROUND: <g data-layer="rear-surround-zones"></g>,
+    OVERHEADS: <g data-layer="overhead-zones"></g>,
+    FRONT_WIDE: <g data-layer="front-wide-zones"></g>,
+  }), []);
 
 
 // --- Main render ---
