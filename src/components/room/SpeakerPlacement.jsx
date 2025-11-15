@@ -1726,33 +1726,31 @@ function SpeakerPlacementImpl(props) {
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
-  // Keep front-wides (LW/RW) at the median between front and side surrounds.
-  // Runs after every render so it stays in sync regardless of overlays.
+  // Keep front-wides (LW/RW) at the median between front and side surrounds,
+  // independent of any overlay toggles. This runs after relevant state changes
+  // (layout, room size, speaker positions) and only nudges LW/RW, never LCR/SL/SR.
   useEffect(() => {
     if (!canWides || !dimensions) return;
 
-    setSpeakers((prev) => {
+    setSpeakers(prev => {
       const list = Array.isArray(prev) ? prev : [];
       if (!list.length) return prev;
 
-      const hasFW = list.some((s) => {
+      // Do nothing if there are no front wides at all
+      const hasFW = list.some(s => {
         const canon = getCanonicalRole(s.role);
         return canon === "LW" || canon === "RW";
       });
       if (!hasFW) return prev;
 
-      const W = Number(dimensions.width) || 0;
-      const L = Number(dimensions.length) || 0;
-      if (!W || !L) return prev;
-
       const byCanon = new Map();
-      list.forEach((s) => {
+      list.forEach(s => {
         byCanon.set(getCanonicalRole(s.role), s);
       });
 
       let changed = false;
 
-      const updated = list.map((s) => {
+      const updated = list.map(s => {
         const canon = getCanonicalRole(s.role);
         if (canon !== "LW" && canon !== "RW") return s;
 
@@ -1767,7 +1765,7 @@ function SpeakerPlacementImpl(props) {
         const sx = side?.position?.x;
         const sy = side?.position?.y;
 
-        // If anchors aren't properly placed, leave FW where it is.
+        // If anchors aren't properly placed, leave FW exactly where it is.
         if (
           !Number.isFinite(fx) || !Number.isFinite(fy) ||
           !Number.isFinite(sx) || !Number.isFinite(sy)
@@ -1781,7 +1779,7 @@ function SpeakerPlacementImpl(props) {
           z: Number.isFinite(s.position?.z) ? s.position.z : 1.1,
         };
 
-        // Use existing helpers to respect buffers / corner rules
+        // Respect buffers / corner rules using the same helpers as surrounds
         pos = applyCornerClearance(pos, canon, s.model, dimensions, {});
         pos = applyRoomBoundsClamp(pos, s.model, dimensions);
 
@@ -1793,7 +1791,7 @@ function SpeakerPlacementImpl(props) {
         const dx = Math.abs((old.x ?? 0) - pos.x);
         const dy = Math.abs((old.y ?? 0) - pos.y);
 
-        // Avoid tiny float churn
+        // Skip tiny float differences to avoid churn
         if (dx < 0.001 && dy < 0.001) {
           return s;
         }
@@ -1802,10 +1800,9 @@ function SpeakerPlacementImpl(props) {
         return { ...s, position: pos };
       });
 
-      // If nothing changed, keep the old array reference so React treats it as a no-op
       return changed ? updated : prev;
     });
-  }); // no dependency array: run after every render
+  }, [canWides, dimensions, applyCornerClearance, applyRoomBoundsClamp, setSpeakers]);
 
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
     if (!mlpPoint || !dimensions || !canWides) {
