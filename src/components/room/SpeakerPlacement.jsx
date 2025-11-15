@@ -295,6 +295,75 @@ function prettyChannel(ch) {
   return m[String(ch).toUpperCase()] || ch;
 }
 
+// Pure helper: compute FW median positions without side effects
+function applyFrontWideMedianPositions(list, dimensions, applyCornerClearance, applyRoomBoundsClamp, getCanonicalRole) {
+  const speakers = Array.isArray(list) ? list : [];
+  if (!speakers.length) return { list: speakers, changed: false };
+
+  const byCanon = new Map();
+  speakers.forEach((s) => {
+    byCanon.set(getCanonicalRole(s.role), s);
+  });
+
+  const FL = byCanon.get("FL");
+  const FR = byCanon.get("FR");
+  const SL = byCanon.get("SL");
+  const SR = byCanon.get("SR");
+
+  // We need all anchors with valid positions
+  const anchorsOk =
+    Number.isFinite(FL?.position?.x) && Number.isFinite(FL?.position?.y) &&
+    Number.isFinite(FR?.position?.x) && Number.isFinite(FR?.position?.y) &&
+    Number.isFinite(SL?.position?.x) && Number.isFinite(SL?.position?.y) &&
+    Number.isFinite(SR?.position?.x) && Number.isFinite(SR?.position?.y);
+
+  if (!anchorsOk) return { list: speakers, changed: false };
+
+  let changed = false;
+
+  const updated = speakers.map((s) => {
+    const canon = getCanonicalRole(s.role);
+    if (canon !== "LW" && canon !== "RW") return s;
+
+    const front = canon === "LW" ? FL : FR;
+    const side  = canon === "LW" ? SL : SR;
+
+    const fx = front.position.x;
+    const fy = front.position.y;
+    const sx = side.position.x;
+    const sy = side.position.y;
+
+    // Median point between FL/FR and SL/SR
+    let pos = {
+      x: (fx + sx) / 2,
+      y: (fy + sy) / 2,
+      z: Number.isFinite(s.position?.z) ? s.position.z : 1.1,
+    };
+
+    // Respect corner clearance and room bounds
+    pos = applyCornerClearance(pos, canon, s.model, dimensions, {});
+    pos = applyRoomBoundsClamp(pos, s.model, dimensions);
+
+    if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
+      return s;
+    }
+
+    const old = s.position || {};
+    const dx = Math.abs((old.x ?? 0) - pos.x);
+    const dy = Math.abs((old.y ?? 0) - pos.y);
+
+    // Avoid tiny float churn
+    if (dx < 0.001 && dy < 0.001) {
+      return s;
+    }
+
+    changed = true;
+    return { ...s, position: pos };
+  });
+
+  return { list: updated, changed };
+}
+
 function safeLog(label, data) {
   if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
     console.groupCollapsed(label);
@@ -1732,82 +1801,13 @@ function SpeakerPlacementImpl(props) {
     if (!canWides || !dimensions) return;
 
     setSpeakers((prev) => {
-      const list = Array.isArray(prev) ? prev : [];
-      if (!list.length) return prev;
-
-      // Only bother if we actually have LW/RW in the layout
-      const hasFW = list.some((s) => {
-        const canon = getCanonicalRole(s.role);
-        return canon === "LW" || canon === "RW";
-      });
-      if (!hasFW) return prev;
-
-      const byCanon = new Map();
-      list.forEach((s) => {
-        byCanon.set(getCanonicalRole(s.role), s);
-      });
-
-      const FL = byCanon.get("FL");
-      const FR = byCanon.get("FR");
-      const SL = byCanon.get("SL");
-      const SR = byCanon.get("SR");
-
-      // We need anchors with valid positions for both sides
-      const anchorsOk =
-        Number.isFinite(FL?.position?.x) && Number.isFinite(FL?.position?.y) &&
-        Number.isFinite(FR?.position?.x) && Number.isFinite(FR?.position?.y) &&
-        Number.isFinite(SL?.position?.x) && Number.isFinite(SL?.position?.y) &&
-        Number.isFinite(SR?.position?.x) && Number.isFinite(SR?.position?.y);
-
-      if (!anchorsOk) return prev;
-
-      let changed = false;
-
-      const updated = list.map((s) => {
-        const canon = getCanonicalRole(s.role);
-        if (canon !== "LW" && canon !== "RW") return s;
-
-        // OPTIONAL: if you later add a "pinned" flag when user drags FW,
-        // you can short-circuit here:
-        // if (s.meta?.fwPinned) return s;
-
-        const front = canon === "LW" ? FL : FR;
-        const side  = canon === "LW" ? SL : SR;
-
-        const fx = front.position.x;
-        const fy = front.position.y;
-        const sx = side.position.x;
-        const sy = side.position.y;
-
-        // Median point between FL/FR and SL/SR (RP22 "median angle" approach in XY)
-        let pos = {
-          x: (fx + sx) / 2,
-          y: (fy + sy) / 2,
-          z: Number.isFinite(s.position?.z) ? s.position.z : 1.1,
-        };
-
-        // Respect corner clearance and room bounds (same helpers as surrounds)
-        pos = applyCornerClearance(pos, canon, s.model, dimensions, {});
-        pos = applyRoomBoundsClamp(pos, s.model, dimensions);
-
-        if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
-          return s;
-        }
-
-        const old = s.position || {};
-        const dx = Math.abs((old.x ?? 0) - pos.x);
-        const dy = Math.abs((old.y ?? 0) - pos.y);
-
-        // Avoid tiny float churn
-        if (dx < 0.001 && dy < 0.001) {
-          return s;
-        }
-
-        changed = true;
-        return { ...s, position: pos };
-      });
-
-      // If nothing changed, keep the old array reference
+      const { list: updated, changed } = applyFrontWideMedianPositions(
+        prev,
+        dimensions,
+        applyCornerClearance,
+        applyRoomBoundsClamp,
+        getCanonicalRole
+      );
       return changed ? updated : prev;
     });
   }, [
@@ -1817,6 +1817,7 @@ function SpeakerPlacementImpl(props) {
     applyCornerClearance,
     applyRoomBoundsClamp,
     setSpeakers,
+    getCanonicalRole,
   ]);
 
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
