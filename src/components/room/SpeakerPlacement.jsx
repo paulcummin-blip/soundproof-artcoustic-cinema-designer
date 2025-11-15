@@ -52,8 +52,8 @@ function speakersShallowEqual(a = [], b = []) {
   for (const [role, sa] of A) {
     const sb = B.get(role);
     if (!sb) return false;
-    if ((sa.model || 'off') !== (sb.model || 'off')) false;
-    if ((sa.id || '') !== (sb.id || '')) false;
+    if ((sa.model || 'off') !== (sb.model || 'off')) return false;
+    if ((sa.id || '') !== (sb.id || '')) return false;
     if (sa.draggable !== sb.draggable) return false;
 
     const pa = sa.position || {}, pb = sb.position || {};
@@ -170,7 +170,7 @@ function applyModelToAnyRoles(list, preferredRoles, model) {
   return (Array.isArray(list) ? list : []).map(s => {
     const canon = getCanonicalRole(s.role);
     return targets.has(canon) ? { ...s, model } : s;
-  `);
+  });
 }
 
 function applyToAllSurrounds(prev, model) {
@@ -1811,7 +1811,7 @@ function SpeakerPlacementImpl(props) {
       canWides,
       dimensionsW: dimensions?.width,
       dimensionsL: dimensions?.length,
-      enableFrontWides
+      enableFrontWides // This variable is now intentionally unused in deps
     });
 
     setSpeakers((prev) => {
@@ -1853,6 +1853,7 @@ function SpeakerPlacementImpl(props) {
     canWides,
     dimensions?.width,
     dimensions?.length,
+    // Removed enableFrontWides from deps - now runs unconditionally
     applyCornerClearance,
     applyRoomBoundsClamp,
     setSpeakers,
