@@ -4,7 +4,7 @@
 
 export const ZONE_DEPTH_M = 0.30; // Zone depth for speaker overlays (meters)
 
-import { getCanonicalRole } from '@/components/utils/roles';
+import { getCanonicalRole } from '@/components/utils/surroundRoleMap';
 
 const DEG = Math.PI / 180;
 
