@@ -1726,60 +1726,67 @@ function SpeakerPlacementImpl(props) {
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
-  // Keep front-wides (LW/RW) at the median between front and side surrounds,
-  // independent of any overlay toggles. This runs after relevant state changes
-  // (layout, room size, speaker positions) and only nudges LW/RW, never LCR/SL/SR.
+  // Keep front-wides (LW/RW) at the median between front and side surrounds.
+  // This runs regardless of whether the FW zone overlay is visible.
   useEffect(() => {
     if (!canWides || !dimensions) return;
 
-    setSpeakers(prev => {
+    setSpeakers((prev) => {
       const list = Array.isArray(prev) ? prev : [];
       if (!list.length) return prev;
 
-      // Do nothing if there are no front wides at all
-      const hasFW = list.some(s => {
+      // Only bother if we actually have LW/RW in the layout
+      const hasFW = list.some((s) => {
         const canon = getCanonicalRole(s.role);
         return canon === "LW" || canon === "RW";
       });
       if (!hasFW) return prev;
 
       const byCanon = new Map();
-      list.forEach(s => {
+      list.forEach((s) => {
         byCanon.set(getCanonicalRole(s.role), s);
       });
 
+      const FL = byCanon.get("FL");
+      const FR = byCanon.get("FR");
+      const SL = byCanon.get("SL");
+      const SR = byCanon.get("SR");
+
+      // We need anchors with valid positions for both sides
+      const anchorsOk =
+        Number.isFinite(FL?.position?.x) && Number.isFinite(FL?.position?.y) &&
+        Number.isFinite(FR?.position?.x) && Number.isFinite(FR?.position?.y) &&
+        Number.isFinite(SL?.position?.x) && Number.isFinite(SL?.position?.y) &&
+        Number.isFinite(SR?.position?.x) && Number.isFinite(SR?.position?.y);
+
+      if (!anchorsOk) return prev;
+
       let changed = false;
 
-      const updated = list.map(s => {
+      const updated = list.map((s) => {
         const canon = getCanonicalRole(s.role);
         if (canon !== "LW" && canon !== "RW") return s;
 
-        const frontRole = canon === "LW" ? "FL" : "FR";
-        const sideRole  = canon === "LW" ? "SL" : "SR";
+        // OPTIONAL: if you later add a "pinned" flag when user drags FW,
+        // you can short-circuit here:
+        // if (s.meta?.fwPinned) return s;
 
-        const front = byCanon.get(frontRole);
-        const side  = byCanon.get(sideRole);
+        const front = canon === "LW" ? FL : FR;
+        const side  = canon === "LW" ? SL : SR;
 
-        const fx = front?.position?.x;
-        const fy = front?.position?.y;
-        const sx = side?.position?.x;
-        const sy = side?.position?.y;
+        const fx = front.position.x;
+        const fy = front.position.y;
+        const sx = side.position.x;
+        const sy = side.position.y;
 
-        // If anchors aren't properly placed, leave FW exactly where it is.
-        if (
-          !Number.isFinite(fx) || !Number.isFinite(fy) ||
-          !Number.isFinite(sx) || !Number.isFinite(sy)
-        ) {
-          return s;
-        }
-
+        // Median point between FL/FR and SL/SR (RP22 "median angle" approach in XY)
         let pos = {
           x: (fx + sx) / 2,
           y: (fy + sy) / 2,
           z: Number.isFinite(s.position?.z) ? s.position.z : 1.1,
         };
 
-        // Respect buffers / corner rules using the same helpers as surrounds
+        // Respect corner clearance and room bounds (same helpers as surrounds)
         pos = applyCornerClearance(pos, canon, s.model, dimensions, {});
         pos = applyRoomBoundsClamp(pos, s.model, dimensions);
 
@@ -1791,7 +1798,7 @@ function SpeakerPlacementImpl(props) {
         const dx = Math.abs((old.x ?? 0) - pos.x);
         const dy = Math.abs((old.y ?? 0) - pos.y);
 
-        // Skip tiny float differences to avoid churn
+        // Avoid tiny float churn
         if (dx < 0.001 && dy < 0.001) {
           return s;
         }
@@ -1800,9 +1807,17 @@ function SpeakerPlacementImpl(props) {
         return { ...s, position: pos };
       });
 
+      // If nothing changed, keep the old array reference
       return changed ? updated : prev;
     });
-  }, [canWides, dimensions, applyCornerClearance, applyRoomBoundsClamp, setSpeakers]);
+  }, [
+    canWides,
+    dimensions?.width,
+    dimensions?.length,
+    applyCornerClearance,
+    applyRoomBoundsClamp,
+    setSpeakers,
+  ]);
 
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
     if (!mlpPoint || !dimensions || !canWides) {
