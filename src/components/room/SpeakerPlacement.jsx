@@ -1852,44 +1852,23 @@ function SpeakerPlacementImpl(props) {
 
     setSpeakers((prev) => {
       const list = Array.isArray(prev) ? prev : [];
-      if (!list.length) {
-        console.log('[SP FW MEDIAN] SKIP: empty list');
-        return prev;
-      }
+      if (!list.length) return prev;
 
-      // Only run if we actually have LW/RW in the layout
+      // Only bother if there are front-wides in the system
       const hasFW = list.some((s) => {
         const canon = getCanonicalRole(s.role);
         return canon === "LW" || canon === "RW";
       });
-      if (!hasFW) {
-        console.log('[SP FW MEDIAN] SKIP: no FW speakers in layout');
-        return prev;
-      }
+      if (!hasFW) return prev;
 
-      console.log('[SP FW MEDIAN] Applying median positions...');
-      
+      const W = Number(dimensions.width) || 0;
+      const L = Number(dimensions.length) || 0;
+      if (!W || !L) return prev;
+
       const byCanon = new Map();
       list.forEach((s) => {
         byCanon.set(getCanonicalRole(s.role), s);
       });
-
-      const FL = byCanon.get("FL");
-      const FR = byCanon.get("FR");
-      const SL = byCanon.get("SL");
-      const SR = byCanon.get("SR");
-
-      // We need all anchors with valid positions
-      const anchorsOk =
-        Number.isFinite(FL?.position?.x) && Number.isFinite(FL?.position?.y) &&
-        Number.isFinite(FR?.position?.x) && Number.isFinite(FR?.position?.y) &&
-        Number.isFinite(SL?.position?.x) && Number.isFinite(SL?.position?.y) &&
-        Number.isFinite(SR?.position?.x) && Number.isFinite(SR?.position?.y);
-
-      if (!anchorsOk) {
-        console.log('[SP FW MEDIAN] SKIP: anchors not valid');
-        return prev;
-      }
 
       let changed = false;
 
@@ -1908,7 +1887,7 @@ function SpeakerPlacementImpl(props) {
         const sx = side?.position?.x;
         const sy = side?.position?.y;
 
-        // If anchors aren't properly placed, leave FW where it is.
+        // If anchors aren't both valid, leave this FW alone
         if (
           !Number.isFinite(fx) || !Number.isFinite(fy) ||
           !Number.isFinite(sx) || !Number.isFinite(sy)
@@ -1916,10 +1895,10 @@ function SpeakerPlacementImpl(props) {
           return s;
         }
 
-        // Median Y between front and side surround centres
+        // RP22 "median distance" along the listening plane: midpoint of Y
         const medianY = (fy + sy) / 2;
 
-        // Hug X to the side wall, same as resetOnlyFrontWidesToDefaults
+        // X is pinned to the side wall using the hugging helpers
         const hugging = getHuggingCenterLines(s.model, dimensions);
         const wallX =
           canon === "LW"
@@ -1932,7 +1911,7 @@ function SpeakerPlacementImpl(props) {
           z: Number.isFinite(s.position?.z) ? s.position.z : 1.1,
         };
 
-        // Respect corner / room bounds, but starting from the wall
+        // Respect buffer / corners but keep it on the wall
         pos = applyCornerClearance(pos, canon, s.model, dimensions, {});
         pos = applyRoomBoundsClamp(pos, s.model, dimensions);
 
@@ -1944,7 +1923,6 @@ function SpeakerPlacementImpl(props) {
         const dx = Math.abs((old.x ?? 0) - pos.x);
         const dy = Math.abs((old.y ?? 0) - pos.y);
 
-        // Avoid tiny float churn
         if (dx < 0.001 && dy < 0.001) {
           return s;
         }
@@ -1952,12 +1930,6 @@ function SpeakerPlacementImpl(props) {
         changed = true;
         return { ...s, position: pos };
       });
-
-      if (changed) {
-        console.log('[SP FW MEDIAN] ✅ FW positions UPDATED');
-      } else {
-        console.log('[SP FW MEDIAN] No change needed (already at median)');
-      }
 
       return changed ? updated : prev;
     });
