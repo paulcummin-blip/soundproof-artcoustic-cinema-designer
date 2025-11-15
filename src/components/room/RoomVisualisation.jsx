@@ -673,130 +673,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     });
     ro.observe(planBoundsRef.current); // Changed from containerRef
     return () => ro.disconnect();
-  }, [planBoundsRef]); // Changed from containerRef
+  }, [planBoundsRef]);
 
-
-  const aspect = `${Math.max(0.1, widthM)} / ${Math.max(0.1, lengthM)}`;
-
-  // ANGLE HELPERS — always aim at the current green-dot MLP (no other logic changed)
-  const lcrAngleInfo = useMemo(() => {
-    if (!aimAtMLP) return { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
-
-    // Use the green dot as the live MLP target
-    const mlpTarget = { x: mlpDotX_m, y: mlpDotY_m };
-
-    const flSpeaker = placedSpeakers?.find(s => getCanonicalRole(s.role) === "FL" && isRenderableSpeaker(s));
-    const frSpeaker = placedSpeakers?.find(s => getCanonicalRole(s.role) === "FR" && isRenderableSpeaker(s));
-
-    const angleL = flSpeaker?.position ? safeYawToMLP(flSpeaker.position, mlpTarget) : 0;
-    const angleR = frSpeaker?.position ? safeYawToMLP(frSpeaker.position, mlpTarget) : 0;
-
-    const avg = (Math.abs(angleL) + Math.abs(angleR)) / 2;
-    const averageAngle = Number.isFinite(avg) ? avg : 0;
-    const maxAbs = Math.max(Math.abs(angleL), Math.abs(angleR));
-
-    if (typeof onLcrAngleComputed === "function") onLcrAngleComputed(averageAngle);
-
-    return { L: angleL, R: angleR, averageAngle, maxAbs };
-  }, [aimAtMLP, placedSpeakers, mlpDotX_m, mlpDotY_m, onLcrAngleComputed, getCanonicalRole]);
-
-  // LIVE EMIT: recompute minimum screen depth whenever anything relevant changes
-  useEffect(() => {
-    // Filter and map front objects for the pure calculation function
-    // Only include placedSpeakers (LCR) and frontSubs for screen depth calculation
-    const frontObjectsToCalculate = [...(placedSpeakers || []), ...(frontSubs || [])]
-      .filter(s => {
-        const r = getCanonicalRole(s.role);
-        return r === 'FL' || r === 'FC' || r === 'FR' || isSubRole(r);
-      })
-      .map(s => ({ // Map to relevant properties for the pure function
-        model: s.model,
-        role: s.role,
-        position: s.position
-      }));
-
-    const calculatedValue = computeMinimumScreenDepthM({
-      frontObjects: frontObjectsToCalculate,
-      getDims: getModelDimsM,
-      lcrAngles: { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
-      aimAtMLP: aimAtMLP,
-    });
-
-    setCalculatedMinScreenDepthM(calculatedValue);
-
-  }, [
-    placedSpeakers,
-    frontSubs,
-    aimAtMLP,
-    lcrAngleInfo.L,
-    lcrAngleInfo.R,
-    screen?.visibleWidthInches,
-    screen?.floatDepthM,
-    getModelDimsM,
-    mlpDotY_m,
-    getCanonicalRole
-  ]);
-
-  // actualScreenFrontY declaration and calculation
-  const actualScreenFrontY = React.useMemo(() => {
-    const floatDepthM = Number(screen?.floatDepthM) || 0.0;
-    const speakerClearanceM = Number(screen?.speakerClearanceM) || 0.02;
-
-    const minDepthForSpeakersToClear = calculatedMinScreenDepthM + speakerClearanceM;
-
-    if (screenPlaneMode === 'autoTight') {
-      return minDepthForSpeakersToClear;
-    } else {
-      return Math.max(floatDepthM, minDepthForSpeakersToClear);
-    }
-  }, [
-    calculatedMinScreenDepthM,
-    screen?.floatDepthM,
-    screen?.speakerClearanceM,
-    screenPlaneMode
-  ]);
-
-  // Publish screen front plane to AppState with guards (rounded to mm)
-  useEffect(() => {
-    if (!appState?.setScreenFrontPlaneM) return;
-    if (!Number.isFinite(actualScreenFrontY)) return;
-
-    // Round to mm to avoid jitter/loops
-    const v = Math.round(actualScreenFrontY * 1000) / 1000;
-    appState.setScreenFrontPlaneM(v);
-  }, [actualScreenFrontY, appState?.setScreenFrontPlaneM]);
-
-
-  // Define ZONE_DEPTH_M from live screen plane (component scope)
-  const ZONE_DEPTH_M = useMemo(() => {
-    const y = Number(actualScreenFrontY);
-    const fallback = 0.30;
-    const raw = Number.isFinite(y) ? y : fallback;
-    // clamp between 0.10 m and 0.60 m to avoid absurd values but keep existing visuals
-    return Math.max(0.10, Math.min(0.60, raw));
-  }, [actualScreenFrontY]);
-
-  // Push live plane up to RoomDesigner when it changes (debounced + change guard)
-const screenSendTimerRef = React.useRef(null);
-
-React.useEffect(() => {
-  if (typeof onScreenPlaneChange !== 'function') return;
-  if (!Number.isFinite(actualScreenFrontY)) return;
-
-  // If unchanged, skip update
-  if (lastSentRef.current === actualScreenFrontY) return;
-
-  // Debounce updates to prevent API overload (1 second)
-  clearTimeout(screenSendTimerRef.current);
-  screenSendTimerRef.current = setTimeout(() => {
-    if (lastSentRef.current !== actualScreenFrontY) {
-      lastSentRef.current = actualScreenFrontY;
-      onScreenPlaneChange(actualScreenFrontY);
-    }
-  }, 1000);
-
-  return () => clearTimeout(screenSendTimerRef.current);
-}, [actualScreenFrontY, onScreenPlaneChange]);
 
   const availW = (containerW || DEFAULT_W) - 2 * PADDING;
   const availH = (containerH || DEFAULT_H) - 2 * PADDING;
@@ -804,10 +682,24 @@ React.useEffect(() => {
     Math.min(availW / widthM, availH / lengthM),
     [availW, availH, widthM, lengthM]);
 
+  // Calculate room dimensions in pixels
+  const roomWidthPx = widthM * scale;
+  const roomLengthPx = lengthM * scale;
+
+  // Center the room in the available canvas space
+  const canvasWidth = containerW || DEFAULT_W;
+  const canvasHeight = containerH || DEFAULT_H;
+  
+  const originX = (canvasWidth - roomWidthPx) / 2;
+  const originY = (canvasHeight - roomLengthPx) / 2;
+
   const roomRect = useMemo(() => ({
-    x: PADDING, y: PADDING,
-    width: widthM * scale, height: lengthM * scale
-  }), [widthM, lengthM, scale]);
+    x: originX,
+    y: originY,
+    width: roomWidthPx,
+    height: roomLengthPx
+  }), [originX, originY, roomWidthPx, roomLengthPx]);
+
 
   // Update toPx for pixel-perfect rendering
   const toPx = useCallback((x_m, y_m) => {
