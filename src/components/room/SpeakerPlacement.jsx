@@ -1102,7 +1102,7 @@ function SpeakerPlacementImpl(props) {
     setOverheadGlobalModel,
     overheadFrontOverride,
     setOverheadFrontOverride,
-    overheadMidOverride, // Corrected prop name
+    overheadMidOverride,
     setOverheadMidOverride,
     overheadRearOverride,
     setOverheadRearOverride,
@@ -1112,6 +1112,7 @@ function SpeakerPlacementImpl(props) {
     setUseMidGlobal,
     useRearGlobal,
     setUseRearGlobal,
+    enableFrontWides, // <-- FW overlay state
   } = app || {};
 
   console.log("[B44] DIMENSIONS CHECK", {
@@ -1796,28 +1797,44 @@ function SpeakerPlacementImpl(props) {
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
   // Keep front-wides (LW/RW) at the median between front and side surrounds.
-  // This runs regardless of whether the FW zone overlay is visible.
+  // This runs ONLY when the FW zone overlay is OFF.
   useEffect(() => {
     if (!canWides || !dimensions) return;
+    if (enableFrontWides) {
+      // When FW zones are ON, do NOT auto-move LW/RW.
+      // Designers are allowed to override within the zone.
+      return;
+    }
 
     setSpeakers((prev) => {
-      const { list: updated, changed } = applyFrontWideMedianPositions(
-        prev,
+      const list = Array.isArray(prev) ? prev : [];
+      if (!list.length) return prev;
+
+      // Only run if we actually have LW/RW in the layout
+      const hasFW = list.some((s) => {
+        const canon = getCanonicalRole(s.role);
+        return canon === "LW" || canon === "RW";
+      });
+      if (!hasFW) return prev;
+
+      const { list: next, changed } = applyFrontWideMedianPositions(
+        list,
         dimensions,
         applyCornerClearance,
         applyRoomBoundsClamp,
         getCanonicalRole
       );
-      return changed ? updated : prev;
+
+      return changed ? next : prev;
     });
   }, [
     canWides,
     dimensions?.width,
     dimensions?.length,
+    enableFrontWides,
     applyCornerClearance,
     applyRoomBoundsClamp,
     setSpeakers,
-    getCanonicalRole,
   ]);
 
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
