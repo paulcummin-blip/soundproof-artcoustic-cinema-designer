@@ -170,7 +170,7 @@ function applyModelToAnyRoles(list, preferredRoles, model) {
   return (Array.isArray(list) ? list : []).map(s => {
     const canon = getCanonicalRole(s.role);
     return targets.has(canon) ? { ...s, model } : s;
-  });
+  `);
 }
 
 function applyToAllSurrounds(prev, model) {
@@ -1762,7 +1762,7 @@ function SpeakerPlacementImpl(props) {
       return;
     }
     
-    setSpeakers(currentSpeakers => resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, globalSurroundModel));
+    setSpeakers(currentSpeakers => resetSurroundPositions(effectivePreset, mlpPoint, dimensions, globalSurroundModel));
     
     if (showToast) {
       const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : effectivePreset.startsWith('9.') ? '9.x' : '7.1';
@@ -1796,27 +1796,43 @@ function SpeakerPlacementImpl(props) {
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
-  // Keep front-wides (LW/RW) at the median between front and side surrounds.
-  // This runs ONLY when the FW zone overlay is OFF.
+  // ---------------------------------------------------------------------------
+  // FRONT-WIDE AUTO MEDIAN (RP22 - UNCONDITIONAL)
+  // LW / RW sit at the midpoint between FL/SL and FR/SR respectively.
+  // This runs whenever speakers or dimensions change, independent of overlay state.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!canWides || !dimensions) return;
-    if (enableFrontWides) {
-      // When FW zones are ON, do NOT auto-move LW/RW.
-      // Designers are allowed to override within the zone.
+    if (!canWides || !dimensions) {
+      console.log('[SP FW MEDIAN] SKIP: no wides or dimensions', { canWides, dimensions: !!dimensions });
       return;
     }
 
+    console.log('[SP FW MEDIAN] RUNNING (unconditional)', {
+      canWides,
+      dimensionsW: dimensions?.width,
+      dimensionsL: dimensions?.length,
+      enableFrontWides
+    });
+
     setSpeakers((prev) => {
       const list = Array.isArray(prev) ? prev : [];
-      if (!list.length) return prev;
+      if (!list.length) {
+        console.log('[SP FW MEDIAN] SKIP: empty list');
+        return prev;
+      }
 
       // Only run if we actually have LW/RW in the layout
       const hasFW = list.some((s) => {
         const canon = getCanonicalRole(s.role);
         return canon === "LW" || canon === "RW";
       });
-      if (!hasFW) return prev;
+      if (!hasFW) {
+        console.log('[SP FW MEDIAN] SKIP: no FW speakers in layout');
+        return prev;
+      }
 
+      console.log('[SP FW MEDIAN] Applying median positions...');
+      
       const { list: next, changed } = applyFrontWideMedianPositions(
         list,
         dimensions,
@@ -1825,16 +1841,30 @@ function SpeakerPlacementImpl(props) {
         getCanonicalRole
       );
 
+      if (changed) {
+        console.log('[SP FW MEDIAN] ✅ FW positions UPDATED');
+      } else {
+        console.log('[SP FW MEDIAN] No change needed (already at median)');
+      }
+
       return changed ? next : prev;
     });
   }, [
     canWides,
     dimensions?.width,
     dimensions?.length,
-    enableFrontWides,
     applyCornerClearance,
     applyRoomBoundsClamp,
     setSpeakers,
+    // React to changes in FL/FR/SL/SR positions
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.x,
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.y,
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.x,
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.y,
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.x,
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.y,
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.x,
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.y,
   ]);
 
   const resetOnlyFrontWidesToDefaults = useCallback(() => {

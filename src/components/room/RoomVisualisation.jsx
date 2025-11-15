@@ -1053,8 +1053,8 @@ React.useEffect(() => {
       return { status: 'invalid-geom', reason: 'room dims' };
     }
 
-    const sl = placedSpeakers?.find(s => getCanonicalRole(s?.role) === 'SL');
-    const sr = placedSpeakers?.find(s => getCanonicalRole(s?.role) === 'SR');
+    const sl = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL');
+    const sr = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR');
 
     if (!sl || !sr) {
       return { status: 'no-sides' };
@@ -1160,13 +1160,22 @@ React.useEffect(() => {
     }
   }, [enableFrontWides, frontWideZones, placedSpeakers, widthM, getModelDimsM, onSetSpeakers, getCanonicalRole]);
 
-  // Re-lock FW to zone when not dragging (follow zone shifts, apply stored offset)
+  // [B44 DISABLED] Auto-positioning of FW based on zones
+  // FW median positioning is now FULLY handled by SpeakerPlacement.jsx unconditionally.
+  // This effect used to run when enableFrontWides was true, but that logic is now obsolete.
+  // The overlay (when enabled) should ONLY:
+  // - Draw the visual FW zone bands
+  // - Constrain manual drags inside the band during user interaction
   useEffect(() => {
+    // Legacy auto-positioning logic disabled
+    return;
+    
+    /* ORIGINAL LOGIC DISABLED:
     if (!enableFrontWides || isDraggingFW.current) return;
     if (frontWideZones?.status !== 'ok') return;
 
     const W = widthM || 4.5;
-    const L = lengthM || 6.0; // Added for yMaxClamped
+    const L = lengthM || 6.0;
     const WALL_BUFFER_FW = 0.02;
 
     const lwSpeaker = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW');
@@ -1194,7 +1203,6 @@ React.useEffect(() => {
       const currentOffset = fwOffsetRef.current[sideOffsetKey] || 0;
 
       const targetYWithOffset = zone.medianY + currentOffset;
-      // Allow 50% overhang, so clamp center Y within zone.yMin + halfWidth and zone.yMax - halfWidth
       const yMinClamped = (zone.yMin || 0) + (halfWidth * SIDE_ALLOW_OVERHANG);
       const yMaxClamped = (zone.yMax || L) - (halfWidth * SIDE_ALLOW_OVERHANG);
 
@@ -1222,12 +1230,13 @@ React.useEffect(() => {
     if (needsUpdate) {
       onSetSpeakers(updated);
     }
+    */
   }, [
     enableFrontWides,
     frontWideZones,
     placedSpeakers,
     widthM,
-    lengthM, // Added as dependency
+    lengthM,
     speakersEpoch,
     getModelDimsM,
     onSetSpeakers,
