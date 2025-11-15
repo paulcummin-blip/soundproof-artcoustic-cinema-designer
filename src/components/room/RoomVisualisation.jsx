@@ -4163,6 +4163,28 @@ return {
     const pos_x = position.x ?? 0;
     const pos_y = position.y ?? 0;
 
+    // --- Rear surround wall-aware yaw ---
+    // If SBL/SBR are dragged onto a side wall, rotate them 90° so the
+    // long edge sits flat on that wall (matching SL/SR behaviour).
+    if (canon === "SBL" || canon === "SBR") {
+      const distLeft  = Math.abs(pos_x - 0);
+      const distRight = Math.abs(widthM - pos_x);
+      const distBack  = Math.abs(lengthM - pos_y); // back wall at y = lengthM
+
+      const minDist = Math.min(distLeft, distRight, distBack);
+
+      if (minDist === distBack) {
+        // Closest to back wall: keep standard rear orientation (flat to back)
+        yawDeg = 0;
+      } else if (minDist === distLeft) {
+        // Now effectively on left wall
+        yawDeg = 90;
+      } else if (minDist === distRight) {
+        // Now effectively on right wall
+        yawDeg = -90;
+      }
+    }
+
     // Convert to canvas coordinates
     let canvasX, canvasY;
 
@@ -4691,7 +4713,7 @@ return (
               border: '1px solid #DCDBD6',
               borderRadius: 8,
               padding: 12,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              boxShadow: '0 44px 12px rgba(0,0,0,0.15)',
               pointerEvents: isHudPinned ? 'auto' : 'none', // Allow interaction when pinned
               zIndex: 1000,
               minWidth: 260,
