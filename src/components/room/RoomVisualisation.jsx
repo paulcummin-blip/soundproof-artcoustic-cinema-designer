@@ -126,7 +126,7 @@ import {
   computeBackWallInnerEdges,
   computeRearVisualLanes,
   resolveSymmetricY,
-} from "@/components/room/rvPlanHelpers";
+} from "@/components/room/rv/RenderPrimitives";
 
 
 // SAFE ROLE ACCESSOR – works with Map or plain object; always returns an array
@@ -1053,7 +1053,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   }, [enableFrontWides, frontWideZones, placedSpeakers, widthM, getModelDimsM, onSetSpeakers, getCanonicalRole]);
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
-  // FW median positioning is now FULLY handled by SpeakerPlacement.jsx unconditionally.
+  // FW median positioning is now FULLY handled by SpeakerPlacement unconditionally.
   // This effect used to run when enableFrontWides was true, but that logic is now obsolete.
   // The overlay (when enabled) should ONLY:
   // - Draw the visual FW zone bands
@@ -1223,6 +1223,11 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   const handleZoomIn = () => setZoom(prev => Math.min(2.0, prev + 0.1));
   const handleZoomOut = () => setZoom(prev => Math.max(0.5, prev - 0.1));
+
+  // Fallback for actualScreenFrontY (used by baffle/screen rendering)
+  const actualScreenFrontY = typeof screenFrontPlaneM === "number"
+    ? screenFrontPlaneM
+    : 0;
 
   // Memoize baffle and screen calculations for performance
   const { BaffleAndScreen, screenPlaneY, screenCenterX_m, visibleWidthM } = useMemo(() => {
@@ -2949,7 +2954,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   // Light diagnostics (temporary)
   if (appState_DBG_FW) {
-    if (typeof console !== 'undefined') console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
+    if (typeof window !== 'undefined') console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
   }
 
   // Get overhead count from dolbyLayout
