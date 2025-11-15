@@ -1,5 +1,8 @@
+
 // components/room/zones/frontWideZones.js
 // RP22 Front-Wide lane: median angle ±10° from MLP to side walls
+
+export const ZONE_DEPTH_M = 0.30; // Zone depth for speaker overlays (meters)
 
 import { getCanonicalRole } from '@/components/utils/roles';
 
