@@ -485,28 +485,77 @@ export default function SeatingLayout({
         >
           Seat Spacing (m)
         </Label>
-        <Input
-          type="number"
-          min="0.5"
-          max="1.2"
-          step="0.1"
-          value={seatSpacing}
-          onChange={(e) =>
-            onSeatSpacingChange?.(
-              Math.max(
-                0.5,
-                Math.min(1.2, Number(e.target.value) || 0.8)
-              )
-            )
-          }
-          disabled={disabled}
-          className="h-10"
-          style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #C1B6AD',
-            color: '#1B1A1A',
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled}
+            onClick={() => {
+              if (disabled) return;
+              const base = Number.isFinite(seatSpacing) ? seatSpacing : 0.8;
+              const next = Math.max(0.5, Math.min(3.0, Math.round((base - 0.1) * 100) / 100));
+              onSeatSpacingChange?.(next);
+            }}
+            style={{
+              minWidth: 32,
+              padding: 0,
+              border: '1px solid #C1B6AD',
+              backgroundColor: '#ffffff',
+              color: '#1B1A1A',
+            }}
+          >
+            –
+          </Button>
+
+          <Input
+            type="number"
+            inputMode="decimal"
+            min="0.5"
+            max="3.0"
+            step="0.1"
+            value={seatSpacing}
+            onChange={(e) => {
+              if (disabled) return;
+              const raw = e.target.value;
+              if (raw === '') return;
+              const num = Number(raw);
+              if (Number.isFinite(num)) {
+                const clamped = Math.max(0.5, Math.min(3.0, Math.round(num * 100) / 100));
+                onSeatSpacingChange?.(clamped);
+              }
+            }}
+            disabled={disabled}
+            className="h-10 flex-1 text-center"
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #C1B6AD',
+              color: '#1B1A1A',
+            }}
+          />
+
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled}
+            onClick={() => {
+              if (disabled) return;
+              const base = Number.isFinite(seatSpacing) ? seatSpacing : 0.8;
+              const next = Math.max(0.5, Math.min(3.0, Math.round((base + 0.1) * 100) / 100));
+              onSeatSpacingChange?.(next);
+            }}
+            style={{
+              minWidth: 32,
+              padding: 0,
+              border: '1px solid #C1B6AD',
+              backgroundColor: '#ffffff',
+              color: '#1B1A1A',
+            }}
+          >
+            +
+          </Button>
+        </div>
       </div>
 
       {/* Row Spacing (m) */}
@@ -517,20 +566,16 @@ export default function SeatingLayout({
         >
           Row Spacing (m)
         </Label>
-
         <div className="flex items-center gap-2">
-          {/* – button */}
           <Button
             type="button"
             variant="outline"
+            size="icon"
             disabled={disabled || rowCount <= 1}
             onClick={() => {
               if (disabled || rowCount <= 1) return;
-
-              // Always start from the live numeric prop
               const base = Number.isFinite(rowSpacingM) ? rowSpacingM : 1.8;
               const next = Math.max(0.8, Math.min(4.0, Math.round((base - 0.1) * 10) / 10));
-
               onRowSpacingChange?.(next);
             }}
             style={{
@@ -544,7 +589,6 @@ export default function SeatingLayout({
             –
           </Button>
 
-          {/* Numeric input */}
           <Input
             type="number"
             inputMode="decimal"
@@ -554,14 +598,8 @@ export default function SeatingLayout({
             value={safeRowSpacingValue}
             onChange={(e) => {
               if (disabled || rowCount <= 1) return;
-
               const raw = e.target.value;
-
-              // Allow empty while typing
-              if (raw === '') {
-                return;
-              }
-
+              if (raw === '') return;
               const normalized = normaliseRowSpacing(raw);
               if (normalized !== '') {
                 onRowSpacingChange?.(normalized);
@@ -569,36 +607,30 @@ export default function SeatingLayout({
             }}
             onBlur={(e) => {
               if (disabled || rowCount <= 1) return;
-
               const raw = e.target.value;
               const normalized = normaliseRowSpacing(raw);
-
-              // Snap back to clean, clamped value
               if (normalized !== '') {
                 onRowSpacingChange?.(normalized);
               }
             }}
             disabled={disabled || rowCount <= 1}
-            className="h-10 flex-1"
+            className="h-10 flex-1 text-center"
             style={{
               backgroundColor: '#ffffff',
               border: '1px solid #C1B6AD',
               color: '#1B1A1A',
-              textAlign: 'center',
             }}
           />
 
-          {/* + button */}
           <Button
             type="button"
             variant="outline"
+            size="icon"
             disabled={disabled || rowCount <= 1}
             onClick={() => {
               if (disabled || rowCount <= 1) return;
-
               const base = Number.isFinite(rowSpacingM) ? rowSpacingM : 1.8;
               const next = Math.max(0.8, Math.min(4.0, Math.round((base + 0.1) * 10) / 10));
-
               onRowSpacingChange?.(next);
             }}
             style={{
@@ -615,38 +647,87 @@ export default function SeatingLayout({
       </div>
 
       {/* Viewing Offset (m) */}
-      <div className="space-y-2 col-span-2">
+      <div className="space-y-2">
         <Label
           className="text-sm font-medium"
           style={{ color: '#3E4349' }}
         >
           Viewing Offset (m)
         </Label>
-        <Input
-          type="number"
-          min="-2.0"
-          max="2.0"
-          step="0.1"
-          value={seatingBlockOffset}
-          onChange={(e) =>
-            onSeatingBlockOffsetChange?.(
-              clampViewingOffset(
-                Number(e.target.value) || 0
-              )
-            )
-          }
-          disabled={disabled}
-          className="h-10"
-          style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #C1B6AD',
-            color: '#1B1A1A',
-          }}
-        />
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled}
+            onClick={() => {
+              if (disabled) return;
+              const base = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
+              const next = Math.round((base - 0.1) * 100) / 100;
+              onSeatingBlockOffsetChange?.(clampViewingOffset(next));
+            }}
+            style={{
+              minWidth: 32,
+              padding: 0,
+              border: '1px solid #C1B6AD',
+              backgroundColor: '#ffffff',
+              color: '#1B1A1A',
+            }}
+          >
+            –
+          </Button>
+
+          <Input
+            type="number"
+            inputMode="decimal"
+            min="-2.0"
+            max="2.0"
+            step="0.1"
+            value={seatingBlockOffset}
+            onChange={(e) => {
+              if (disabled) return;
+              const raw = e.target.value;
+              if (raw === '') return;
+              const num = Number(raw);
+              if (Number.isFinite(num)) {
+                onSeatingBlockOffsetChange?.(clampViewingOffset(num));
+              }
+            }}
+            disabled={disabled}
+            className="h-10 flex-1 text-center"
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #C1B6AD',
+              color: '#1B1A1A',
+            }}
+          />
+
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled}
+            onClick={() => {
+              if (disabled) return;
+              const base = Number.isFinite(seatingBlockOffset) ? seatingBlockOffset : 0;
+              const next = Math.round((base + 0.1) * 100) / 100;
+              onSeatingBlockOffsetChange?.(clampViewingOffset(next));
+            }}
+            style={{
+              minWidth: 32,
+              padding: 0,
+              border: '1px solid #C1B6AD',
+              backgroundColor: '#ffffff',
+              color: '#1B1A1A',
+            }}
+          >
+            +
+          </Button>
+        </div>
       </div>
 
       {/* MLP Reference */}
-      <div className="space-y-2 col-span-2">
+      <div className="space-y-2">
         <Label
           className="text-sm font-medium"
           style={{ color: '#3E4349' }}
