@@ -2535,6 +2535,47 @@ React.useEffect(() => {
 
   }, [constraintZones, screenCenterX_m, onSetSpeakers, placedSpeakers, getCanonicalRole]);
 
+  // [NEW] Auto-hug surrounds to walls when room dimensions change
+  useEffect(() => {
+    if (!onSetSpeakers || !placedSpeakers?.length) return;
+
+    const W = widthM || 0;
+    const L = lengthM || 0;
+    if (!(W > 0 && L > 0)) return;
+
+    let needsUpdate = false;
+    const updated = placedSpeakers.map(spk => {
+      const canon = getCanonicalRole(spk.role);
+      
+      // Only process wall-mounted surround roles
+      if (!['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(canon)) return spk;
+      if (!spk.position || !spk.model) return spk;
+
+      const dims = getModelDimsM(spk.model);
+      const isLeft = ['SL', 'SBL', 'LW'].includes(canon);
+      const side = isLeft ? 'L' : 'R';
+
+      // Calculate correct wall-hugged X using same helper as drag code
+      const targetX = fixedSideX(W, dims, side, WALL_BUFFER_M);
+      const currentX = Number(spk.position.x) || 0;
+
+      // Only update if position has actually changed
+      if (Math.abs(currentX - targetX) > 0.001) {
+        needsUpdate = true;
+        return {
+          ...spk,
+          position: { ...spk.position, x: targetX }
+        };
+      }
+
+      return spk;
+    });
+
+    if (needsUpdate) {
+      onSetSpeakers(updated);
+    }
+  }, [widthM, lengthM, placedSpeakers, onSetSpeakers, getModelDimsM, getCanonicalRole]);
+
   // [FC_CENTERLINE_LOCK] — Enforce FC always at room centerline
   useEffect(() => {
     if (!placedSpeakers?.length || !onSetSpeakers) return;
@@ -2631,10 +2672,10 @@ React.useEffect(() => {
 
       const yMin_side_calc = Number(sideSurroundVisualSpanM?.minY) || 0;
       const yMax_visual_calc = Number(sideSurroundVisualSpanM?.maxY) || 0;
-      const yMax_clamp = Math.max(yMin_side_calc, Math.min(yMax_visual_calc, L - CORNER_CLEAR_M));
+      const yMax_clamp_calc = Math.max(yMin_side_calc, Math.min(yMax_visual_calc, L - CORNER_CLEAR_M));
 
       const yMin = yMin_side_calc;
-      const yMax = yMax_clamp;
+      const yMax = yMax_clamp_calc;
 
       let yStar = resolveSymmetricY(curY_sl, segL, segR);
 
