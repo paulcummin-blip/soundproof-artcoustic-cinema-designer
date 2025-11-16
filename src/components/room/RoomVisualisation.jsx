@@ -1160,6 +1160,21 @@ React.useEffect(() => {
     }
   }, [enableFrontWides, frontWideZones, placedSpeakers, widthM, getModelDimsM, onSetSpeakers, getCanonicalRole]);
 
+  // --- OVERHEAD ZONES (must be declared EARLY, before handleSpeakerDrag) ---
+  const overheadZones = useMemo(
+    () =>
+      computeOverheadZones({
+        seatingPositions,
+        heightM,
+        widthM,
+        lengthM,
+        mlpY_m,
+        placedSpeakers,
+        getCanonicalRole,
+      }),
+    [seatingPositions, heightM, widthM, lengthM, mlpY_m, placedSpeakers, getCanonicalRole]
+  );
+
   // [B44 DISABLED] Auto-positioning of FW based on zones
   // FW median positioning is now FULLY handled by SpeakerPlacement only.
   // This effect used to run when enableFrontWides was true, but that logic is now obsolete.
@@ -3126,23 +3141,7 @@ React.useEffect(() => {
   }, [overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride]);
 
 
-// Overhead zones (moved to dedicated module)
-const overheadZones = useMemo(
-  () =>
-    computeOverheadZones({
-      seatingPositions,
-      heightM,
-      widthM,
-      lengthM,
-      mlpY_m,
-      placedSpeakers,
-      getCanonicalRole,
-    }),
-  [seatingPositions, heightM, widthM, lengthM, mlpY_m, placedSpeakers, getCanonicalRole]
-);
-
-
-  // Render overhead speaker icons (centered in each zone pad)
+// Render overhead speaker icons (centered in each zone pad)
   const overheadIconElements = useMemo(() => {
     if (!overheadGlobalModel || overheadGlobalModel === 'OFF') return null;
     if (!overheadZones || overheadZones.status !== 'ok') return null;
