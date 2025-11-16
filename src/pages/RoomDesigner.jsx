@@ -1446,13 +1446,13 @@ function RoomDesignerWithState() {
     setSelectedSpeakersByRole: _setSelectedSpeakersByRole, // Pass setter for appState
     speakerNodes: _speakerNodes, // Pass from appState
     setSpeakerNodes: _setSpeakerNodes, // Pass setter for appState
-    overheadGlobalModel: overheadGlobalModel,
-    overheadFrontOverride: overheadFrontOverride,
-    overheadMidOverride: overheadMidOverride,
-    overheadRearOverride: overheadRearOverride,
-    useFrontGlobal: useFrontGlobal,
-    useMidGlobal: useMidGlobal,
-    useRearGlobal: useRearGlobal,
+    overheadGlobalModel,
+    overheadFrontOverride,
+    overheadMidOverride,
+    overheadRearOverride,
+    useFrontGlobal,
+    useMidGlobal,
+    useRearGlobal,
     setOverheadGlobalModel: setOverheadGlobalModel,
     setOverheadFrontOverride: setOverheadFrontOverride,
     setOverheadMidOverride: setOverheadMidOverride,
@@ -1717,22 +1717,20 @@ function RoomDesignerWithState() {
           () => Math.max(1, Number(_seatsPerRow) || 1)
         );
 
-    // 2) Row centre Y positions
-    //    Prefer appState.rowCentersM if it exists; otherwise make a simple fallback.
-    const baseRowSpacing = Number(_rowSpacingM) || 1.8;
-    const fallbackStartY = 2; // 2m from screen as a safe default
-
+    // 2) Row centre Y positions - ALWAYS use pre-computed row centers from first effect
+    //    Do NOT recalculate from _rowSpacingM here.
     let centers = Array.isArray(appState?.rowCentersM) && appState.rowCentersM.length
       ? appState.rowCentersM.slice(0, list.length)
-      : Array.from(
-          { length: list.length },
-          (_, i) => fallbackStartY + i * baseRowSpacing
-        );
+      : [];
 
-    // If we somehow have fewer centres than rows, extend with fallback values.
+    // If we have no centers yet (e.g. first render before MLP effect runs), use a safe fallback
+    // This fallback does NOT depend on _rowSpacingM - it's just a placeholder until the first effect runs.
+    const fallbackStartY = 2; // 2m from screen as a safe default
+    const fallbackSpacing = 1.8; // fixed fallback, not from state
+    
     while (centers.length < list.length) {
       const i = centers.length;
-      centers.push(fallbackStartY + i * baseRowSpacing);
+      centers.push(fallbackStartY + i * fallbackSpacing);
     }
 
     // 3) Basic geometry
@@ -1745,7 +1743,7 @@ function RoomDesignerWithState() {
 
     list.forEach((rawCount, rowIndex) => {
       const count = Math.max(1, Number(rawCount) || 1);
-      const y = Number(centers[rowIndex]) || (fallbackStartY + rowIndex * baseRowSpacing);
+      const y = Number(centers[rowIndex]) || (fallbackStartY + rowIndex * fallbackSpacing);
 
       const totalWidth = (count - 1) * spacingX;
       const startX = centerX - totalWidth / 2;
@@ -1778,7 +1776,7 @@ function RoomDesignerWithState() {
     _seatingRows,
     _seatsPerRow,
     _seatSpacing,
-    _rowSpacingM,
+    // REMOVED: _rowSpacingM (row Y positions come from rowCentersM now)
     appState?.rowCentersM,
     stableDimensions?.width,
   ]);
