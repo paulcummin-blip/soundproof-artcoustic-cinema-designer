@@ -893,21 +893,22 @@ function RoomDesignerWithState() {
     const viewingOffsetM = Number(_seatingBlockOffset) || 0;
     const rows = Number(_seatingRows) || 1;
     const rowSpacing = Number(_rowSpacingM) || 1.8; // default 1.8m
-    const mlpReference = _mlpBasis; // 'front' | 'back' | 'average'
+    const mlpReference = _mlpBasis; // 'front' | 'back' | 'all'
 
     // Must have screen plane and width
     if (!Number.isFinite(screenFrontPlaneM) || !Number.isFinite(screenVisibleWidthM)) {
       return;
     }
 
-    // Compute ideal distance for 57.5° FOV
+    // 1. Compute ideal distance for 57.5° FOV (base position)
     const idealDistM = distanceFor57_5FromWidth(screenVisibleWidthM);
-    
-    // Base MLP Y (ideal front row position WITHOUT offset)
     const mlpY_base = screenFrontPlaneM + idealDistM;
 
-    // Build row centers from the base MLP WITHOUT offset
-    let centersRaw = buildRowCenters?.(mlpY_base, rows, rowSpacing, mlpReference) || [];
+    // 2. Apply viewing offset to get FIXED MLP position (green dot)
+    const fixedMlpY = mlpY_base + viewingOffsetM;
+
+    // 3. Build row centers around the FIXED MLP according to reference mode
+    let centersRaw = buildRowCenters?.(fixedMlpY, rows, rowSpacing, mlpReference) || [];
 
     // SAFETY: if buildRowCenters misbehaves or returns wrong length, force one centre per row
     if (!Array.isArray(centersRaw) || centersRaw.length !== rows) {
@@ -916,26 +917,25 @@ function RoomDesignerWithState() {
       }
       centersRaw = [];
       for (let i = 0; i < rows; i++) {
-        centersRaw.push(mlpY_base + i * rowSpacing);
+        centersRaw.push(fixedMlpY + i * rowSpacing);
       }
     }
 
-    // Apply viewing offset ONCE here, then clamp into room
+    // 4. Clamp row centers to room bounds
     const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
     const MIN_Y = 0.40;
     const MAX_Y = len - 0.40;
     const _clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
 
-    const centers = centersRaw.map(y => _clampY(y + viewingOffsetM));
+    const centers = centersRaw.map(y => _clampY(y));
 
-    // Store the offsetted centers
+    // Store the clamped row centers
     if (typeof appState?.setRowCentersM === 'function') {
       appState.setRowCentersM(centers);
     }
 
-    // The MLP for display and surrounds comes from the offsetted front row center
-    const mlpY_offsetted = centers[0];
-    const mlpRounded = Math.round(mlpY_offsetted * 1000) / 1000;
+    // 5. Store the FIXED MLP position (for green dot and speaker placement)
+    const mlpRounded = Math.round(fixedMlpY * 1000) / 1000;
 
     if (typeof appState?.setMlpY_m === 'function') {
       appState.setMlpY_m(prev => {
@@ -951,7 +951,7 @@ function RoomDesignerWithState() {
         frontY: screenFrontPlaneM.toFixed(3),
         idealM: idealDistM.toFixed(3),
         offset: viewingOffsetM.toFixed(3),
-        mlpY_offsetted: mlpRounded.toFixed(3)
+        fixedMlpY: mlpRounded.toFixed(3)
       });
       console.log('[ROWS]', {
         mode: mlpReference,
