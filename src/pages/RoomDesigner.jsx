@@ -2262,8 +2262,13 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         onSeatSpacingChange={setSeatSpacingGuarded} 
                         rowSpacingM={_rowSpacingM || 1.8}
                         onRowSpacingChange={(val) => {
-                          if (!isFrozen('seating') && typeof _setRowSpacingM === 'function') {
-                            _setRowSpacingM(val);
+                          // Hard guard: only accept finite numbers
+                          const next = Number(val);
+                          if (!Number.isFinite(next)) return;
+
+                          // Use guarded setter (respects frozen state)
+                          if (typeof setRowSpacingGuarded === 'function') {
+                            setRowSpacingGuarded(next);
                           }
                         }}
                         seatingBlockOffset={_seatingBlockOffset} 
