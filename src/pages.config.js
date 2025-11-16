@@ -7,7 +7,7 @@ import SpeakerDatabase from './pages/SpeakerDatabase';
 import SPLCalculator from './pages/SPLCalculator';
 import SPLCalculatorV2 from './pages/SPLCalculatorV2';
 import CinemaAgent from './pages/CinemaAgent';
-import Layout from './Layout.jsx';
+import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
@@ -25,5 +25,5 @@ export const PAGES = {
 export const pagesConfig = {
     mainPage: "RoomDesigner",
     Pages: PAGES,
-    Layout: Layout,
+    Layout: __Layout,
 };

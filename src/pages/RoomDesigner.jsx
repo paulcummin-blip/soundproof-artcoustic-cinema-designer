@@ -1997,6 +1997,9 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
     // AND if it should show the HUD for front wides.
     base.enableFrontWides = _enableFrontWides;
     
+    // Map overhead toggle flags to a single OVERHEADS boolean for the zone renderer
+    base.OVERHEADS = !!(base.OVERHEADS_2 || base.OVERHEADS_4 || base.OVERHEADS_6);
+    
     return base;
   }, [_overlays, frontWideZones, _enableFrontWides]);
 
