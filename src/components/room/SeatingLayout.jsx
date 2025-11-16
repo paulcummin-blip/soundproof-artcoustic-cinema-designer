@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
@@ -70,6 +71,22 @@ const getEarHeightForRow = (rowNumber) => {
   }
 };
 
+// Normalise row spacing to a sane, monotonic numeric value in metres.
+const normaliseRowSpacing = (raw) => {
+  if (raw === '' || raw == null) return '';
+
+  let n = typeof raw === 'number' ? raw : parseFloat(String(raw).replace(',', '.'));
+  if (!Number.isFinite(n)) return '';
+
+  // Clamp between 0.8 m and 4.0 m
+  const min = 0.8;
+  const max = 4.0;
+  n = Math.max(min, Math.min(max, n));
+
+  // Round to cm resolution
+  return Number(n.toFixed(2));
+};
+
 export default function SeatingLayout({
   seatingPositions = [],
   onGenerateSeating,
@@ -94,6 +111,20 @@ export default function SeatingLayout({
   screen,
   dimensions
 }) {
+  // Draft state for row spacing input (prevents external updates from causing jumps)
+  const [rowSpacingDraft, setRowSpacingDraft] = useState('');
+
+  // Sync draft with prop when prop changes externally (not from this input)
+  useEffect(() => {
+    // Only update the draft state if the input is not currently focused.
+    // This prevents the draft from being overwritten by external prop changes
+    // while the user is actively typing in the field.
+    if (document.activeElement?.getAttribute('data-row-spacing-input') !== 'true') {
+      const normalized = normaliseRowSpacing(rowSpacingM);
+      setRowSpacingDraft(normalized === '' ? '' : String(normalized));
+    }
+  }, [rowSpacingM]); // Dependency on rowSpacingM to react to external changes
+
   // Build rowsArray purely from props (parent is the source of truth)
   const rowsArray = React.useMemo(() => {
     if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
@@ -496,18 +527,41 @@ export default function SeatingLayout({
         </Label>
         <Input
           type="number"
+          inputMode="decimal"
           min="0.8"
           max="4.0"
           step="0.1"
-          value={rowSpacingM}
-          onChange={(e) =>
-            onRowSpacingChange?.(
-              Math.max(
-                0.8,
-                Math.min(4.0, Number(e.target.value) || 1.8)
-              )
-            )
-          }
+          value={rowSpacingDraft || normaliseRowSpacing(rowSpacingM)}
+          data-row-spacing-input="true"
+          onChange={(e) => {
+            if (disabled || rowCount <= 1) return;
+            
+            const raw = e.target.value;
+            
+            // Allow temporary empty while typing
+            if (raw === '') {
+              setRowSpacingDraft('');
+              return;
+            }
+            
+            // Store draft as-is (allows partial decimals like "1.")
+            setRowSpacingDraft(raw);
+            
+            // Parse and update parent if valid
+            const normalized = normaliseRowSpacing(raw);
+            if (normalized !== '') {
+              onRowSpacingChange?.(normalized);
+            }
+          }}
+          onBlur={() => {
+            if (disabled || rowCount <= 1) return;
+            
+            const normalized = normaliseRowSpacing(rowSpacingDraft || rowSpacingM);
+            if (normalized !== '') {
+              setRowSpacingDraft(String(normalized));
+              onRowSpacingChange?.(normalized);
+            }
+          }}
           disabled={disabled || rowCount <= 1}
           className="h-10"
           style={{
