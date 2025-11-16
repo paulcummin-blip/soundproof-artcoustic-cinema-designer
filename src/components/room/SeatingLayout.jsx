@@ -517,7 +517,7 @@ export default function SeatingLayout({
           min="0.8"
           max="4.0"
           step="0.1"
-          value={Number(rowSpacingM).toFixed(2)}
+          value={rowSpacingM}
           onChange={(e) => {
             if (disabled || rowCount <= 1) return;
             
