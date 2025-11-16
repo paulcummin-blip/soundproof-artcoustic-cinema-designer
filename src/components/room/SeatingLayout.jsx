@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
@@ -259,6 +258,12 @@ export default function SeatingLayout({
     }
   }, [onGenerateSeating, seatsPerRow, seatingRows, seatSpacing, rowSpacingM]); // NEW: Add rowSpacingM dependency
 
+  // Safe row spacing value for the input
+  const safeRowSpacingValue =
+    typeof rowSpacingM === 'number' && Number.isFinite(rowSpacingM)
+      ? rowSpacingM
+      : 1.8;
+
   return (
   <div className="space-y-6 seating-layout-sliders" data-rp22="seating">
     <style>{`
@@ -517,11 +522,30 @@ export default function SeatingLayout({
           min="0.8"
           max="4.0"
           step="0.1"
-          value={rowSpacingM}
+          value={safeRowSpacingValue}
           onChange={(e) => {
             if (disabled || rowCount <= 1) return;
-            
-            const normalized = normaliseRowSpacing(e.target.value);
+
+            const raw = e.target.value;
+
+            // Let the browser handle temporary empty / partial states
+            if (raw === '') {
+              // Don't push anything back to state yet
+              return;
+            }
+
+            const normalized = normaliseRowSpacing(raw);
+            if (normalized !== '') {
+              onRowSpacingChange?.(normalized);
+            }
+          }}
+          onBlur={(e) => {
+            if (disabled || rowCount <= 1) return;
+
+            const raw = e.target.value;
+            const normalized = normaliseRowSpacing(raw);
+
+            // On blur, snap back to a clean, clamped value
             if (normalized !== '') {
               onRowSpacingChange?.(normalized);
             }
