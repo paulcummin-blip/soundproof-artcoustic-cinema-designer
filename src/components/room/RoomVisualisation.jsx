@@ -1161,7 +1161,7 @@ React.useEffect(() => {
   }, [enableFrontWides, frontWideZones, placedSpeakers, widthM, getModelDimsM, onSetSpeakers, getCanonicalRole]);
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
-  // FW median positioning is now FULLY handled by SpeakerPlacement.jsx unconditionally.
+  // FW median positioning is now FULLY handled by SpeakerPlacement only.
   // This effect used to run when enableFrontWides was true, but that logic is now obsolete.
   // The overlay (when enabled) should ONLY:
   // - Draw the visual FW zone bands
@@ -4617,8 +4617,97 @@ return (
     `translate(${-svgWSafe / 2}, ${-(roomRect.y || 0)})`
   }
           >
-            {/* Layer 1: Grid Backdrop (Bottom Layer) */}
-            <rect x={roomRect.x} y={roomRect.y} width={roomRect.width} height={roomRect.height} fill={`url(#${ids.grid})`} />
+            {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
+            <g data-layer="grid">
+              {/* Draw vertical grid lines (centre-anchored) */}
+              {(() => {
+                const GRID_STEP_M = 0.5;
+                const centreXM = widthM / 2;
+                const verticalLines = [];
+
+                // Centre line
+                const centreXCanvas = meterToCanvasX(centreXM);
+                verticalLines.push(
+                  <line
+                    key="grid-x-centre"
+                    x1={centreXCanvas}
+                    y1={roomRect.y}
+                    x2={centreXCanvas}
+                    y2={roomRect.y + roomRect.height}
+                    stroke="#E6E4DD"
+                    strokeWidth="0.5"
+                  />
+                );
+
+                // Step outwards from centre
+                let offsetIndex = 1;
+                while (true) {
+                  const leftXM = centreXM - offsetIndex * GRID_STEP_M;
+                  const rightXM = centreXM + offsetIndex * GRID_STEP_M;
+                  let anyDrawn = false;
+
+                  if (leftXM >= 0) {
+                    const xCanvas = meterToCanvasX(leftXM);
+                    verticalLines.push(
+                      <line
+                        key={`grid-x-left-${offsetIndex}`}
+                        x1={xCanvas}
+                        y1={roomRect.y}
+                        x2={xCanvas}
+                        y2={roomRect.y + roomRect.height}
+                        stroke="#E6E4DD"
+                        strokeWidth="0.5"
+                      />
+                    );
+                    anyDrawn = true;
+                  }
+
+                  if (rightXM <= widthM) {
+                    const xCanvas = meterToCanvasX(rightXM);
+                    verticalLines.push(
+                      <line
+                        key={`grid-x-right-${offsetIndex}`}
+                        x1={xCanvas}
+                        y1={roomRect.y}
+                        x2={xCanvas}
+                        y2={roomRect.y + roomRect.height}
+                        stroke="#E6E4DD"
+                        strokeWidth="0.5"
+                      />
+                    );
+                    anyDrawn = true;
+                  }
+
+                  if (!anyDrawn) break;
+                  offsetIndex += 1;
+                }
+
+                return verticalLines;
+              })()}
+
+              {/* Draw horizontal grid lines (front-anchored, unchanged) */}
+              {(() => {
+                const GRID_STEP_M = 0.5;
+                const horizontalLines = [];
+
+                for (let yM = 0; yM <= lengthM + 1e-6; yM += GRID_STEP_M) {
+                  const yCanvas = meterToCanvasY(yM);
+                  horizontalLines.push(
+                    <line
+                      key={`grid-y-${yM}`}
+                      x1={roomRect.x}
+                      y1={yCanvas}
+                      x2={roomRect.x + roomRect.width}
+                      y2={yCanvas}
+                      stroke="#E6E4DD"
+                      strokeWidth="0.5"
+                    />
+                  );
+                }
+
+                return horizontalLines;
+              })()}
+            </g>
 
             {/* Layer 2: Room Outline and Furniture */}
             <rect
