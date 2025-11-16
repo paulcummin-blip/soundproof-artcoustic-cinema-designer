@@ -261,7 +261,7 @@ function useProjectLoader(
     if (typeof setOverheadRearOverride === "function") setOverheadRearOverride(p?.overheadRearOverride || null);
     if (typeof setUseFrontGlobal === "function") setUseFrontGlobal(p?.useFrontGlobal ?? true); // Default to true
     if (typeof setUseMidGlobal === "function") setUseMidGlobal(p?.useMidGlobal ?? true);     // Default to true
-    if (typeof setUseRearGlobal === "function") setUseRearGlobal(p?.useUseRearGlobal ?? true);     // Default to true
+    if (typeof setUseRearGlobal === "function") setUseUseRearGlobal(p?.useUseRearGlobal ?? true);     // Default to true
 
     // NEW: Hydrate Row Spacing
     if (typeof setRowSpacingM === "function") setRowSpacingM(Number(p?.row_spacing_m) || 1.8);
@@ -327,7 +327,7 @@ function useProjectLoader(
     appState?.setRoomDims, setScreen, setDolbyConfig, setDolbyPreset, setSevenBedLayoutType, setSeatingPositions,
     setRoomElements, setOverlays, parseMaybe, setSpeakerSystem, setFrontSubsCfg, setRearSubsCfg, setLcrAimMode,
     setEnableFrontWides, setOverheadGlobalModel, setOverheadFrontOverride, setOverheadMidOverride,
-    setOverheadRearOverride, setUseFrontGlobal, setUseMidGlobal, setUseRearGlobal, setRowSpacingM,
+    setOverheadRearOverride, setUseFrontGlobal, setUseMidGlobal, setUseUseRearGlobal, setRowSpacingM,
     setSelectedSpeakersByRole, setSpeakerNodes, appState?.setScreenFrontPlaneM, setSeatsPerRowByRow
   ]);
 
@@ -686,6 +686,7 @@ export function seedSpeakersFromPreset({
     label: role,
     model: undefined, // Neutralized default model seeding
     position: posForRole(role),
+    draggable: true, // Mark all speakers as draggable
   }));
 }
 
@@ -1659,8 +1660,8 @@ function RoomDesignerWithState() {
          seededSpeakers = seededSpeakers
            .filter(s => s.role !== 'SBL' && s.role !== 'SBR')
            .concat([
-             { id: 'LW', role: 'LW', label: 'LW', model: undefined, position: { x: stableDimensions.width * 0.15, y: stableDimensions.length * 0.4, z: 1.1 } },
-             { id: 'RW', role: 'RW', label: 'RW', model: undefined, position: { x: stableDimensions.width * 0.85, y: stableDimensions.length * 0.4, z: 1.1 } },
+             { id: 'LW', role: 'LW', label: 'LW', model: undefined, position: { x: stableDimensions.width * 0.15, y: stableDimensions.length * 0.4, z: 1.1 }, draggable: true },
+             { id: 'RW', role: 'RW', label: 'RW', model: undefined, position: { x: stableDimensions.width * 0.85, y: stableDimensions.length * 0.4, z: 1.1 }, draggable: true },
            ]);
        }
        

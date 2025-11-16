@@ -1177,7 +1177,6 @@ React.useEffect(() => {
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
   // FW median positioning is now FULLY handled by SpeakerPlacement only.
-  // This effect used to run when enableFrontWides was true, but that logic is now obsolete.
   // The overlay (when enabled) should ONLY:
   // - Draw the visual FW zone bands
   // - Constrain manual drags inside the band during user interaction
@@ -3143,90 +3142,10 @@ React.useEffect(() => {
 
 // Render overhead speaker icons (centered in each zone pad)
   const overheadIconElements = useMemo(() => {
-    if (!overheadGlobalModel || overheadGlobalModel === 'OFF') return null;
-    if (!overheadZones || overheadZones.status !== 'ok') return null;
-
-    const icons = [];
-
-    visibleOverheadPositions.forEach(position => {
-      const modelKey = getOverheadModelForPosition(position);
-      if (!modelKey) return;
-
-      const modelMeta = getSpeakerModelMeta(modelKey);
-      const iconW_m = modelMeta?.diameterM || modelMeta?.widthM || 0.24;
-      const iconD_m = modelMeta?.depthM || modelMeta?.widthM || 0.24;
-
-      // Render left icon
-      const leftZone = overheadZones[`${position}Left`];
-      if (leftZone) {
-        const { xMin, xMax, yMin, yMax } = leftZone;
-        const centerX_m = (xMin + xMax) / 2;
-        const centerY_m = (yMin + yMax) / 2;
-
-        // Clamp to keep icon fully inside zone
-        const clampedX = Math.max(xMin + iconW_m / 2, Math.min(xMax - iconW_m / 2, centerX_m));
-        const clampedY = Math.max(yMin + iconD_m / 2, Math.min(yMax - yMin / 2, centerY_m)); // Corrected clamping for yMax - yMin
-
-        if ((xMax - xMin) < iconW_m || (yMax - yMin) < iconD_m) {
-          // If the zone is too small to fit the speaker, skip it.
-        } else {
-          const [canvasX, canvasY] = toPx(clampedX, centerY_m); // Changed clampedY to centerY_m here
-          const radiusPx = (iconW_m / 2) * scale;
-          icons.push(
-            <circle
-              key={`${position}-left`}
-              cx={canvasX}
-              cy={canvasY}
-              fill="#000000"
-              opacity={0.9}
-              pointerEvents="none"
-              r={radiusPx}
-            />
-          );
-        }
-      }
-
-      // Render right icon
-      const rightZone = overheadZones[`${position}Right`];
-      if (rightZone) {
-        const { xMin, xMax, yMin, yMax } = rightZone;
-        const centerX_m = (xMin + xMax) / 2;
-        const centerY_m = (yMin + yMax) / 2;
-
-        const clampedX = Math.max(xMin + iconW_m / 2, Math.min(xMax - iconW_m / 2, centerX_m));
-        const clampedY = Math.max(yMin + iconD_m / 2, Math.min(yMax - yMin / 2, centerY_m)); // Corrected clamping for yMax - yMin
-
-        if ((xMax - xMin) < iconW_m || (yMax - yMin) < iconD_m) {
-          // If the zone is too small to fit the speaker, skip it.
-        } else {
-          const [canvasX, canvasY] = toPx(clampedX, centerY_m); // Changed clampedY to centerY_m here
-          const radiusPx = (iconW_m / 2) * scale;
-
-          icons.push(
-            <circle
-              key={`${position}-right`}
-              cx={canvasX}
-              cy={canvasY}
-              fill="#000000"
-              opacity={0.9}
-              pointerEvents="none"
-              r={radiusPx}
-            />
-          );
-        }
-      }
-    });
-
-    return icons;
-  }, [
-    overheadGlobalModel,
-    overheadZones,
-    visibleOverheadPositions,
-    getOverheadModelForPosition,
-    toPx,
-    scale,
-    getModelDimsM
-  ]);
+    // Icons are now rendered through normal renderSpeakers path, not as static overlays
+    // This avoids blocking drag interactions
+    return null;
+  }, []);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
   const renderFrontWideZones = useCallback(() => {
@@ -4091,11 +4010,11 @@ return {
       // TEMP DEBUG: Log each visibility check
       const canon = String(spk.role || "").toUpperCase();
       if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-        console.log('[RV filter]', {
-          role: canon,
-          model: spk.model,
-          visibilityResult: result
-        });
+        // console.log('[RV filter]', {
+        //   role: canon,
+        //   model: spk.model,
+        //   visibilityResult: result
+        // });
       }
       
       return result;
@@ -4116,26 +4035,26 @@ return {
 
   // DEBUG: Table of afterVisibility with positions
   try {
-    console.groupCollapsed("[RV] speakersToRender DEBUG");
-    console.log('Raw speakers:');
-    console.table(
-      raw.map((s) => ({
-        id: s.id,
-        role: s.role,
-        model: s.model || "(none)",
-      }))
-    );
-    console.log('After visibility:');
-    console.table(
-      afterVisibility.map((s) => ({
-        id: s.id,
-        role: s.role,
-        model: s.model || "(none)",
-        posX: s.position?.x?.toFixed?.(3) || '—',
-        posY: s.position?.y?.toFixed?.(3) || '—',
-      }))
-    );
-    console.groupEnd();
+    // console.groupCollapsed("[RV] speakersToRender DEBUG");
+    // console.log('Raw speakers:');
+    // console.table(
+    //   raw.map((s) => ({
+    //     id: s.id,
+    //     role: s.role,
+    //     model: s.model || "(none)",
+    //   }))
+    // );
+    // console.log('After visibility:');
+    // console.table(
+    //   afterVisibility.map((s) => ({
+    //     id: s.id,
+    //     role: s.role,
+    //     model: s.model || "(none)",
+    //     posX: s.position?.x?.toFixed?.(3) || '—',
+    //     posY: s.position?.y?.toFixed?.(3) || '—',
+    //   }))
+    // );
+    // console.groupEnd();
   } catch (_) {
     // ignore console errors in strange environments
   }
@@ -4152,24 +4071,24 @@ return {
   };
 
   // [B44] Debug log to confirm bed-surround positions are not mutated by RV
-  console.log('[RV] speakers BEFORE icon-map',
-    afterVisibility.map(s => ({
-      role: s.role,
-      canon: getCanonicalRole(s.role),
-      x: s.position?.x?.toFixed(3),
-      y: s.position?.y?.toFixed(3),
-    }))
-  );
+  // console.log('[RV] speakers BEFORE icon-map',
+  //   afterVisibility.map(s => ({
+  //     role: s.role,
+  //     canon: getCanonicalRole(s.role),
+  //     x: s.position?.x?.toFixed(3),
+  //     y: s.position?.y?.toFixed(3),
+  //   }))
+  // );
 
   // [B44] Debug log to confirm bed-surround positions are not mutated by RV
-  console.log('[RV] speakers BEFORE icon-map',
-    afterVisibility.map(s => ({
-      role: s.role,
-      canon: getCanonicalRole(s.role),
-      x: s.position?.x?.toFixed(3),
-      y: s.position?.y?.toFixed(3),
-    }))
-  );
+  // console.log('[RV] speakers BEFORE icon-map',
+  //   afterVisibility.map(s => ({
+  //     role: s.role,
+  //     canon: getCanonicalRole(s.role),
+  //     x: s.position?.x?.toFixed(3),
+  //     y: s.position?.y?.toFixed(3),
+  //   }))
+  // );
 
   // 3) Map to icons
   return afterVisibility.map((speaker) => {
@@ -4258,21 +4177,21 @@ return {
 
     // DEBUG: Log icon generation for rear/wide speakers
     if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-      console.log('[RV icon]', {
-        id,
-        role,
-        canon,
-        model,
-        resolvedModel,
-        pos: position,
-        pos_x,
-        pos_y,
-        canvasX: safeCanvasX,
-        canvasY: safeCanvasY,
-        yawDeg,
-        widthM_spk,
-        depthM_spk,
-      });
+      // console.log('[RV icon]', {
+      //   id,
+      //   role,
+      //   canon,
+      //   model,
+      //   resolvedModel,
+      //   pos: position,
+      //   pos_x,
+      //   pos_y,
+      //   canvasX: safeCanvasX,
+      //   canvasY: safeCanvasY,
+      //   yawDeg,
+      //   widthM_spk,
+      //   depthM_spk,
+      // });
     }
 
     const speakerMouseDownHandler = isDraggable(speaker)
@@ -4356,14 +4275,14 @@ return {
   // --- Seats: always render from the latest seatingPositions prop ---
   const renderSeatingPositions = () => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
-      console.log('RoomVisualisation: rendering seats = 0');
+      // console.log('RoomVisualisation: rendering seats = 0');
       return null;
     }
 
     const RX_M = 0.10;
     const RY_M = 0.125;
 
-    console.log('RoomVisualisation: rendering seats =', seatingPositions.length);
+    // console.log('RoomVisualisation: rendering seats =', seatingPositions.length);
 
     return (
       <g className="seats-layer" style={{ pointerEvents: 'auto' }}>
@@ -4806,10 +4725,7 @@ return (
             {/* Layer 9: Draggable Seating Positions */}
             {renderSeatingPositions()}
 
-            {/* NEW: Render overhead icons */}
-            {overheadIconElements}
-
-            {/* Layer 10: Draggable Speakers (now on top of overheads) */}
+            {/* Layer 10: Draggable Speakers (includes overheads) */}
             {renderSpeakers()}
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
