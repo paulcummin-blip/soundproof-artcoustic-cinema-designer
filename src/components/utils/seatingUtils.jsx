@@ -1,4 +1,3 @@
-
 /**
  * Groups seats by their row (front to back).
  * Assumes each seat has seat.rowNumber OR y-position can be used to infer row.
@@ -204,4 +203,49 @@ export function computeRowCentersAroundAnchor({
   // 'all' or default: ALL_ROWS_AVERAGE - symmetric around the anchor
   const mid = (rowCount - 1) / 2;
   return Array.from({ length: rowCount }, (_, i) => anchorY + (i - mid) * rowSpacingM);
+}
+
+/**
+ * Compute ideal viewing distance for 57.5° horizontal FOV
+ * @param {number} screenWidthM - visible screen width in metres
+ * @returns {number} - distance in metres from screen to MLP
+ */
+export function distanceFor57_5FromWidth(screenWidthM) {
+  if (!Number.isFinite(screenWidthM) || screenWidthM <= 0) return 2.5;
+  const targetAngleRad = (57.5 * Math.PI) / 180;
+  return (screenWidthM / 2) / Math.tan(targetAngleRad / 2);
+}
+
+/**
+ * Compute row centers from a base MLP Y position
+ * @param {number} baseMlpY - base Y position before offset
+ * @param {number} rowCount - number of rows
+ * @param {number} rowSpacingM - spacing between rows in metres
+ * @param {string} mlpReference - 'front' | 'back' | 'all' (average)
+ * @returns {number[]} - array of row center Y positions
+ */
+export function buildRowCenters(baseMlpY, rowCount, rowSpacingM, mlpReference) {
+  if (!Number.isFinite(baseMlpY) || !Number.isFinite(rowSpacingM) || rowCount < 1) {
+    return [];
+  }
+
+  const count = Math.max(1, Math.floor(rowCount));
+  
+  if (count === 1) {
+    return [baseMlpY];
+  }
+
+  if (mlpReference === 'front') {
+    // Front row at baseMlpY, others behind
+    return Array.from({ length: count }, (_, i) => baseMlpY + i * rowSpacingM);
+  }
+
+  if (mlpReference === 'back') {
+    // Back row at baseMlpY, others in front
+    return Array.from({ length: count }, (_, i) => baseMlpY - (count - 1 - i) * rowSpacingM);
+  }
+
+  // 'all' (average) - symmetric around baseMlpY
+  const mid = (count - 1) / 2;
+  return Array.from({ length: count }, (_, i) => baseMlpY + (i - mid) * rowSpacingM);
 }
