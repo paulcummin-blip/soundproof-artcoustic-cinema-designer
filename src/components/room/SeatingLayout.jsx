@@ -516,48 +516,96 @@ export default function SeatingLayout({
         >
           Row Spacing (m)
         </Label>
-        <Input
-          type="number"
-          inputMode="decimal"
-          min="0.8"
-          max="4.0"
-          step="0.1"
-          value={safeRowSpacingValue}
-          onChange={(e) => {
-            if (disabled || rowCount <= 1) return;
 
-            const raw = e.target.value;
+        <div className="flex items-center gap-2">
+          {/* – button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled || rowCount <= 1}
+            onClick={() => {
+              if (disabled || rowCount <= 1) return;
 
-            // Let the browser handle temporary empty / partial states
-            if (raw === '') {
-              // Don't push anything back to state yet
-              return;
+              const base = Number.isFinite(rowSpacingM) ? rowSpacingM : 1.8;
+              const target = base - 0.1;
+              const normalized = normaliseRowSpacing(target);
+
+              if (normalized !== '') {
+                onRowSpacingChange?.(normalized);
+              }
+            }}
+            className="h-10 w-10 border-[#C1B6AD] text-[#1B1A1A]"
+          >
+            –
+          </Button>
+
+          {/* Main input (no native stepper) */}
+          <Input
+            type="text"
+            inputMode="decimal"
+            value={
+              Number.isFinite(rowSpacingM)
+                ? rowSpacingM.toFixed(2)
+                : ''
             }
+            onChange={(e) => {
+              if (disabled || rowCount <= 1) return;
 
-            const normalized = normaliseRowSpacing(raw);
-            if (normalized !== '') {
-              onRowSpacingChange?.(normalized);
-            }
-          }}
-          onBlur={(e) => {
-            if (disabled || rowCount <= 1) return;
+              const raw = e.target.value;
 
-            const raw = e.target.value;
-            const normalized = normaliseRowSpacing(raw);
+              // Allow temporary partial input like "1." or "2"
+              if (raw.trim() === '') {
+                return;
+              }
 
-            // On blur, snap back to a clean, clamped value
-            if (normalized !== '') {
-              onRowSpacingChange?.(normalized);
-            }
-          }}
-          disabled={disabled || rowCount <= 1}
-          className="h-10"
-          style={{
-            backgroundColor: '#ffffff',
-            border: '1px solid #C1B6AD',
-            color: '#1B1A1A',
-          }}
-        />
+              const normalized = normaliseRowSpacing(raw);
+              if (normalized !== '') {
+                onRowSpacingChange?.(normalized);
+              }
+            }}
+            onBlur={(e) => {
+              if (disabled || rowCount <= 1) return;
+
+              const raw = e.target.value;
+              const normalized = normaliseRowSpacing(raw);
+
+              if (normalized !== '') {
+                onRowSpacingChange?.(normalized);
+              }
+            }}
+            disabled={disabled || rowCount <= 1}
+            className="h-10 flex-1"
+            style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #C1B6AD',
+              color: '#1B1A1A',
+              textAlign: 'center',
+            }}
+          />
+
+          {/* + button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            disabled={disabled || rowCount <= 1}
+            onClick={() => {
+              if (disabled || rowCount <= 1) return;
+
+              const base = Number.isFinite(rowSpacingM) ? rowSpacingM : 1.8;
+              const target = base + 0.1;
+              const normalized = normaliseRowSpacing(target);
+
+              if (normalized !== '') {
+                onRowSpacingChange?.(normalized);
+              }
+            }}
+            className="h-10 w-10 border-[#C1B6AD] text-[#1B1A1A]"
+          >
+            +
+          </Button>
+        </div>
       </div>
 
       {/* Viewing Offset (m) */}
