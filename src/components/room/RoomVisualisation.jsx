@@ -148,7 +148,7 @@ const isFrontObject = (role = "") => {
 
 // New mirror-lock helpers for LCR
 const mirrorX = (x, cx) => 2 * cx - x;
-const clampToSegment = (x, seg) => Math.max(seg.minX, Math.min(seg.maxX, x));
+const clampToSegment = (x, seg) => Math.max(seg.minX, seg.maxX === undefined ? x : Math.min(seg.maxX, x));
 
 /**
  * Orchestrates the symmetrical clamping of LCR speakers.
@@ -1369,6 +1369,7 @@ React.useEffect(() => {
 
     const roomWidthM = widthM || 4.5;
     const screenCenterX_m = roomWidthM / 2;
+    const SAFETY_MARGIN_M = 0.05; // Declared here for local use if not globally defined
     const clampY = (y) => Math.max(SAFETY_MARGIN_M, Math.min(lengthM - SAFETY_MARGIN_M, y));
 
     return { BaffleAndScreen: component, screenPlaneY, screenCenterX_m, visibleWidthM: viewableWidthM };
@@ -2500,12 +2501,13 @@ React.useEffect(() => {
     const updated = placedSpeakers.map(spk => {
       const canon = getCanonicalRole(spk.role);
       
-      // Only process wall-mounted surround roles
-      if (!['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(canon)) return spk;
+      // [B44 REAR FIX] Only process SIDE wall speakers (SL/SR/LW/RW)
+      // SBL/SBR are handled by SpeakerPlacement and should NOT be auto-hugged to side walls
+      if (!['SL', 'SR', 'LW', 'RW'].includes(canon)) return spk;
       if (!spk.position || !spk.model) return spk;
 
       const dims = getModelDimsM(spk.model);
-      const isLeft = ['SL', 'SBL', 'LW'].includes(canon);
+      const isLeft = ['SL', 'LW'].includes(canon);
       const side = isLeft ? 'L' : 'R';
 
       // Calculate correct wall-hugged X using same helper as drag code
