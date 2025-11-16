@@ -261,7 +261,7 @@ function useProjectLoader(
     if (typeof setOverheadRearOverride === "function") setOverheadRearOverride(p?.overheadRearOverride || null);
     if (typeof setUseFrontGlobal === "function") setUseFrontGlobal(p?.useFrontGlobal ?? true); // Default to true
     if (typeof setUseMidGlobal === "function") setUseMidGlobal(p?.useMidGlobal ?? true);     // Default to true
-    if (typeof setUseRearGlobal === "function") setUseRearGlobal(p?.useRearGlobal ?? true);     // Default to true
+    if (typeof setUseRearGlobal === "function") setUseRearGlobal(p?.useUseRearGlobal ?? true);     // Default to true
 
     // NEW: Hydrate Row Spacing
     if (typeof setRowSpacingM === "function") setRowSpacingM(Number(p?.row_spacing_m) || 1.8);
@@ -328,7 +328,7 @@ function useProjectLoader(
     setRoomElements, setOverlays, parseMaybe, setSpeakerSystem, setFrontSubsCfg, setRearSubsCfg, setLcrAimMode,
     setEnableFrontWides, setOverheadGlobalModel, setOverheadFrontOverride, setOverheadMidOverride,
     setOverheadRearOverride, setUseFrontGlobal, setUseMidGlobal, setUseRearGlobal, setRowSpacingM,
-    setSelectedSpeakersByRole, setSpeakerNodes, appState?.setScreenFrontPlaneM, setSeatsPerRowByRow // Add screenFrontPlaneM setter
+    setSelectedSpeakersByRole, setSpeakerNodes, appState?.setScreenFrontPlaneM, setSeatsPerRowByRow
   ]);
 
 
@@ -1841,9 +1841,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
     setSeatSpacingGuarded(seatSpacingVal);
   }
 
-  if (typeof setRowSpacingGuarded === 'function') {
-    setRowSpacingGuarded(rowSpacingVal);
-  }
+  // REMOVED: Do not write rowSpacingM here. Let the control be the only writer.
+  // The spacing value is already in state and will be used by the seat-builder effect.
 
   // NEW: per-row list used by the seat-builder effect
   if (typeof setSeatsPerRowByRowGuarded === 'function') {
@@ -1852,14 +1851,12 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
 }, [
   _isFrozen,
   _seatSpacing,
-  _rowSpacingM,
   _seatingRows,
   _seatsPerRow,
   setSeatingRowsGuarded,
   setSeatsPerRowGuarded,
   setSeatsPerRowByRowGuarded,
   setSeatSpacingGuarded,
-  setRowSpacingGuarded,
 ]);
 
   // Normalise seat flags whenever seating or room size changes
