@@ -111,20 +111,6 @@ export default function SeatingLayout({
   screen,
   dimensions
 }) {
-  // Draft state for row spacing input (prevents external updates from causing jumps)
-  const [rowSpacingDraft, setRowSpacingDraft] = useState('');
-
-  // Sync draft with prop when prop changes externally (not from this input)
-  useEffect(() => {
-    // Only update the draft state if the input is not currently focused.
-    // This prevents the draft from being overwritten by external prop changes
-    // while the user is actively typing in the field.
-    if (document.activeElement?.getAttribute('data-row-spacing-input') !== 'true') {
-      const normalized = normaliseRowSpacing(rowSpacingM);
-      setRowSpacingDraft(normalized === '' ? '' : String(normalized));
-    }
-  }, [rowSpacingM]); // Dependency on rowSpacingM to react to external changes
-
   // Build rowsArray purely from props (parent is the source of truth)
   const rowsArray = React.useMemo(() => {
     if (Array.isArray(seatsPerRowByRow) && seatsPerRowByRow.length) {
@@ -531,34 +517,12 @@ export default function SeatingLayout({
           min="0.8"
           max="4.0"
           step="0.1"
-          value={rowSpacingDraft || normaliseRowSpacing(rowSpacingM)}
-          data-row-spacing-input="true"
+          value={Number(rowSpacingM).toFixed(2)}
           onChange={(e) => {
             if (disabled || rowCount <= 1) return;
             
-            const raw = e.target.value;
-            
-            // Allow temporary empty while typing
-            if (raw === '') {
-              setRowSpacingDraft('');
-              return;
-            }
-            
-            // Store draft as-is (allows partial decimals like "1.")
-            setRowSpacingDraft(raw);
-            
-            // Parse and update parent if valid
-            const normalized = normaliseRowSpacing(raw);
+            const normalized = normaliseRowSpacing(e.target.value);
             if (normalized !== '') {
-              onRowSpacingChange?.(normalized);
-            }
-          }}
-          onBlur={() => {
-            if (disabled || rowCount <= 1) return;
-            
-            const normalized = normaliseRowSpacing(rowSpacingDraft || rowSpacingM);
-            if (normalized !== '') {
-              setRowSpacingDraft(String(normalized));
               onRowSpacingChange?.(normalized);
             }
           }}
