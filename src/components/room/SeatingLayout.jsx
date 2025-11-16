@@ -566,40 +566,51 @@ export default function SeatingLayout({
         >
           Row Spacing (m)
         </Label>
-        <div className="flex items-center gap-2">
-          <Button
+
+        <div style={{ display: 'flex', gap: 8 }}>
+          {/* – button */}
+          <button
             type="button"
-            variant="outline"
-            size="icon"
-            disabled={disabled || rowCount <= 1}
             onClick={() => {
               if (disabled || rowCount <= 1) return;
-              const base = Number.isFinite(rowSpacingM) ? rowSpacingM : 1.8;
-              const next = Math.max(0.8, Math.min(4.0, Math.round((base - 0.1) * 10) / 10));
-              onRowSpacingChange?.(next);
+
+              const current = Number.isFinite(rowSpacingM)
+                ? Number(rowSpacingM)
+                : 1.8;
+
+              const next = normaliseRowSpacing(String(current - 0.1));
+              if (next !== '') {
+                onRowSpacingChange?.(next);
+              }
             }}
+            disabled={disabled || rowCount <= 1}
             style={{
-              minWidth: 32,
-              padding: 0,
+              width: 40,
+              height: 40,
+              borderRadius: 8,
               border: '1px solid #C1B6AD',
               backgroundColor: '#ffffff',
-              color: '#1B1A1A',
+              fontSize: 18,
+              cursor: disabled || rowCount <= 1 ? 'not-allowed' : 'pointer',
+              opacity: disabled || rowCount <= 1 ? 0.5 : 1,
             }}
           >
             –
-          </Button>
+          </button>
 
+          {/* central value input – no spinner arrows */}
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
-            min="0.8"
-            max="4.0"
-            step="0.1"
             value={safeRowSpacingValue}
             onChange={(e) => {
               if (disabled || rowCount <= 1) return;
+
               const raw = e.target.value;
-              if (raw === '') return;
+              if (raw === '') {
+                return;
+              }
+
               const normalized = normaliseRowSpacing(raw);
               if (normalized !== '') {
                 onRowSpacingChange?.(normalized);
@@ -607,6 +618,7 @@ export default function SeatingLayout({
             }}
             onBlur={(e) => {
               if (disabled || rowCount <= 1) return;
+
               const raw = e.target.value;
               const normalized = normaliseRowSpacing(raw);
               if (normalized !== '') {
@@ -614,35 +626,45 @@ export default function SeatingLayout({
               }
             }}
             disabled={disabled || rowCount <= 1}
-            className="h-10 flex-1 text-center"
+            className="h-10"
             style={{
+              flex: 1,
               backgroundColor: '#ffffff',
               border: '1px solid #C1B6AD',
               color: '#1B1A1A',
+              textAlign: 'center',
             }}
           />
 
-          <Button
+          {/* + button */}
+          <button
             type="button"
-            variant="outline"
-            size="icon"
-            disabled={disabled || rowCount <= 1}
             onClick={() => {
               if (disabled || rowCount <= 1) return;
-              const base = Number.isFinite(rowSpacingM) ? rowSpacingM : 1.8;
-              const next = Math.max(0.8, Math.min(4.0, Math.round((base + 0.1) * 10) / 10));
-              onRowSpacingChange?.(next);
+
+              const current = Number.isFinite(rowSpacingM)
+                ? Number(rowSpacingM)
+                : 1.8;
+
+              const next = normaliseRowSpacing(String(current + 0.1));
+              if (next !== '') {
+                onRowSpacingChange?.(next);
+              }
             }}
+            disabled={disabled || rowCount <= 1}
             style={{
-              minWidth: 32,
-              padding: 0,
+              width: 40,
+              height: 40,
+              borderRadius: 8,
               border: '1px solid #C1B6AD',
               backgroundColor: '#ffffff',
-              color: '#1B1A1A',
+              fontSize: 18,
+              cursor: disabled || rowCount <= 1 ? 'not-allowed' : 'pointer',
+              opacity: disabled || rowCount <= 1 ? 0.5 : 1,
             }}
           >
             +
-          </Button>
+          </button>
         </div>
       </div>
 
