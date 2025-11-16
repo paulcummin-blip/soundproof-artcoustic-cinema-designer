@@ -1953,6 +1953,78 @@ function SpeakerPlacementImpl(props) {
     placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.y,
   ]);
 
+  // --- FINAL FRONT-WIDE Y CORRECTION -----------------------------------------
+  // Ensures LW and RW always sit at the true median between front and side
+  // surrounds on their own side. We only touch the Y position; X is already
+  // wall-pinned by the hugging logic.
+  useEffect(() => {
+    setSpeakers(prev => {
+      if (!Array.isArray(prev) || prev.length === 0) return prev;
+
+      const get = (role) =>
+        prev.find(s => s && s.role === role && s.position);
+
+      const FL = get('FL');
+      const FR = get('FR');
+      const SL = get('SL');
+      const SR = get('SR');
+      const LW = get('LW');
+      const RW = get('RW');
+
+      // If any of the anchors are missing, do nothing.
+      if (!FL || !FR || !SL || !SR || !LW || !RW) return prev;
+
+      const targetYL = (FL.position.y + SL.position.y) / 2;
+      const targetYR = (FR.position.y + SR.position.y) / 2;
+
+      const EPS = 0.001;
+      const needsLeftAdjust  = Math.abs(LW.position.y - targetYL) > EPS;
+      const needsRightAdjust = Math.abs(RW.position.y - targetYR) > EPS;
+
+      if (!needsLeftAdjust && !needsRightAdjust) {
+        return prev; // already correct — avoid infinite loops
+      }
+
+      return prev.map(sp => {
+        if (!sp || !sp.position) return sp;
+
+        if (sp.role === 'LW' && needsLeftAdjust) {
+          return {
+            ...sp,
+            position: {
+              ...sp.position,
+              y: targetYL,   // keep existing x (already wall-pinned)
+            },
+          };
+        }
+
+        if (sp.role === 'RW' && needsRightAdjust) {
+          return {
+            ...sp,
+            position: {
+              ...sp.position,
+              y: targetYR,
+            },
+          };
+        }
+
+        return sp;
+      });
+    });
+    // Depend on room geometry / toggles so this runs when things change,
+    // but the EPS guard above prevents unnecessary setState loops.
+  }, [
+    dimensions?.width, 
+    dimensions?.length, 
+    enableFrontWides,
+    setSpeakers,
+    // React to FL/FR/SL/SR position changes
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.y,
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.y,
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.y,
+    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.y,
+  ]);
+
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
     if (!mlpPoint || !dimensions || !canWides) {
         if (showToast) showToast('Front-Wide speakers are not enabled or room data missing.', 'info');
