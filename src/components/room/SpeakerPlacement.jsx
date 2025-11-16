@@ -100,6 +100,43 @@ function projectToWallFromMLP_xy(mlp, angleDeg, room) {
   return { x, y, wall: hit.wall };
 }
 
+// --- NEW: Force rear surrounds to always project to the BACK wall ---------
+function projectToBackWallFromMLP_xy(mlp, angleDeg, room, speakerModel, getModelDimsM, WALL_BUFFER_M) {
+  const rad = (angleDeg * Math.PI) / 180;
+  const dx = Math.cos(rad);
+  const dy = Math.sin(rad);
+
+  const dims = getModelDimsM?.(speakerModel) || { depthM: 0.082, widthM: 0.20 };
+  const halfShortEdge = Math.min(dims.widthM, dims.depthM) / 2;
+  const backWallY = room.back - (WALL_BUFFER_M + halfShortEdge);
+
+  const EPS = 1e-6;
+  
+  // Check if ray actually intersects back wall (dy must be positive)
+  if (dy < EPS) { // Check if dy is negative or near zero. If so, ray is not pointing towards back.
+    // Ray is horizontal or pointing away from back wall - use generic projector as fallback
+    return projectToWallFromMLP_xy(mlp, angleDeg, room);
+  }
+
+  // Calculate t for back wall intersection
+  const t = (backWallY - mlp.y) / dy;
+
+  // If t is negative or zero, ray points away from back wall - use fallback
+  if (t <= EPS) {
+    return projectToWallFromMLP_xy(mlp, angleDeg, room);
+  }
+
+  // Calculate X at back wall intersection
+  let x = mlp.x + t * dx;
+
+  // Clamp X to stay within room and away from side walls
+  const minX = WALL_BUFFER_M + halfShortEdge;
+  const maxX = room.right - (WALL_BUFFER_M + halfShortEdge);
+  x = Math.max(minX, Math.min(maxX, x));
+
+  return { x, y: backWallY, wall: 'B' };
+}
+
 // --- Canonical role mapping + helpers ---
 const CANONICAL_ROLE_MAP = {
   // LCR
@@ -1702,8 +1739,14 @@ function SpeakerPlacementImpl(props) {
 
           const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
           
-          // [B44 FIX B] Capture wall hit from projectToWallFromMLP_xy
-          const baseWithWall = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
+          // [B44 REAR FIX] Use back-wall projector for SBL/SBR
+          let baseWithWall;
+          if (canon === 'SBL' || canon === 'SBR') {
+            baseWithWall = projectToBackWallFromMLP_xy(mlp, projectAngleDeg, room, resolvedModel, getModelDimsM, WALL_BUFFER_M);
+          } else {
+            baseWithWall = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
+          }
+          
           const base = { x: baseWithWall.x, y: baseWithWall.y };
           const hitWall = baseWithWall.wall;
           
@@ -1789,7 +1832,7 @@ function SpeakerPlacementImpl(props) {
 
       return next;
     },
-    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, getModelDimsM, dolbyConfig, SURROUND_BED_ROLES, useWides]
+    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, getModelDimsM, dolbyConfig, SURROUND_BED_ROLES, useWides, WALL_BUFFER_M]
   );
 
   const handleResetPositions = useCallback(() => {

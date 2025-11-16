@@ -1662,7 +1662,7 @@ React.useEffect(() => {
       return;
     }
 
-    // Handle SBL/SBR rear surrounds with exact corridor constraints
+    // Handle SBL/SBR rear surrounds - ALWAYS keep them on back wall
     if (canonicalRole === 'SBL' || canonicalRole === 'SBR') {
       const isLeft = canonicalRole === 'SBL';
       const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
@@ -1676,71 +1676,24 @@ React.useEffect(() => {
         widthM: speakerMeta?.widthM || 0.20,
         depthM: speakerMeta?.depthM || 0.082
       };
-      const dimsRoom = { widthM: W, lengthM: L };
 
-      // Determine which wall is closest
-      const distToLeft = Math.abs(rawX - 0);
-      const distToRight = Math.abs(rawX - W);
-      const distToRear = Math.abs(rawY - L);
+      // [B44 REAR FIX] Always use rear corridor - ignore side wall proximity
+      const side = (rawX <= W * 0.5) ? 'left' : 'right';
+      const c = rsRearCorridor(side, { widthM: W, lengthM: L }, spDims);
 
-      let targetWall = 'rear';
-      if (distToLeft < distToRight && distToLeft < distToRear) {
-        targetWall = 'left';
-      } else if (distToRight < distToLeft && distToRight < distToRear) {
-        targetWall = 'right';
-      }
-
-      let finalX = rawX;
-      let finalY = rawY;
-
-      if (targetWall === 'left' || targetWall === 'right') {
-        const side = targetWall;
-        const c = rsSideCorridor(side, dimsRoom, spDims);
-
-        finalX = c.x;
-        finalY = clamp(rawY, c.yMin, c.yMax);
-      } else if (targetWall === 'rear') {
-        const side = (rawX <= W * 0.5) ? 'left' : 'right';
-        const c = rsRearCorridor(side, dimsRoom, spDims);
-
-        finalX = clamp(rawX, c.xMin, c.xMax);
-        finalY = c.y;
-      }
+      const finalX = clamp(rawX, c.xMin, c.xMax);
+      const finalY = c.y; // Always back wall Y
 
       // Mirror partner
       const partnerRole = canonicalRole === 'SBL' ? 'SBR' : 'SBL';
       const partnerId = placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRole)?.id;
 
-      let partnerXTarget = W - finalX;
-      let partnerX = partnerXTarget;
-      let partnerY = finalY;
+      const partnerX = W - finalX;
+      const partnerSide = (partnerX <= W * 0.5) ? 'left' : 'right';
+      const cPartner = rsRearCorridor(partnerSide, { widthM: W, lengthM: L }, spDims);
 
-      // Determine partner wall for clamping (based on partnerXTarget and partnerY)
-      const partnerDistToLeft = Math.abs(partnerX - 0);
-      const partnerDistToRight = Math.abs(partnerX - W);
-      const partnerDistToRear = Math.abs(partnerY - L);
-
-      let partnerWall = 'rear';
-      if (partnerDistToLeft < partnerDistToRight && partnerDistToLeft < partnerDistToRear) {
-        partnerWall = 'left';
-      } else if (partnerDistToRight < partnerDistToLeft && partnerDistToRight < partnerDistToRear) {
-        partnerWall = 'right';
-      }
-
-      // Apply same corridor clamp to partner (symmetrically)
-      if (partnerWall === 'left' || partnerWall === 'right') {
-        const side = partnerWall;
-        const c = rsSideCorridor(side, dimsRoom, spDims);
-
-        partnerX = c.x;
-        partnerY = clamp(partnerY, c.yMin, c.yMax);
-      } else if (partnerWall === 'rear') {
-        const side = (partnerX <= W * 0.5) ? 'left' : 'right';
-        const c = rsRearCorridor(side, dimsRoom, spDims);
-
-        partnerX = clamp(partnerX, c.xMin, c.xMax);
-        partnerY = c.y;
-      }
+      const partnerXClamped = clamp(partnerX, cPartner.xMin, cPartner.xMax);
+      const partnerY = cPartner.y; // Always back wall Y
 
       // Update both speakers
       onSetSpeakers(prev => prev.map(s => {
@@ -1748,7 +1701,7 @@ React.useEffect(() => {
           return { ...s, position: { ...s.position, x: finalX, y: finalY } };
         }
         if (partnerId && s.id === partnerId) {
-          return { ...s, position: { ...s.position, x: partnerX, y: partnerY } };
+          return { ...s, position: { ...s.position, x: partnerXClamped, y: partnerY } };
         }
         return s;
       }));
@@ -1866,7 +1819,7 @@ React.useEffect(() => {
       return updated;
     });
     lastInteractionEpoch.current = timeNowMs();
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsSideCorridor, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m]);
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m]);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
