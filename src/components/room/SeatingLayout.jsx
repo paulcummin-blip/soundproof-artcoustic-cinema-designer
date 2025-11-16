@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
@@ -522,40 +523,42 @@ export default function SeatingLayout({
           <Button
             type="button"
             variant="outline"
-            size="icon"
             disabled={disabled || rowCount <= 1}
             onClick={() => {
               if (disabled || rowCount <= 1) return;
 
+              // Always start from the live numeric prop
               const base = Number.isFinite(rowSpacingM) ? rowSpacingM : 1.8;
-              const target = base - 0.1;
-              const normalized = normaliseRowSpacing(target);
+              const next = Math.max(0.8, Math.min(4.0, Math.round((base - 0.1) * 10) / 10));
 
-              if (normalized !== '') {
-                onRowSpacingChange?.(normalized);
-              }
+              onRowSpacingChange?.(next);
             }}
-            className="h-10 w-10 border-[#C1B6AD] text-[#1B1A1A]"
+            style={{
+              minWidth: 32,
+              padding: 0,
+              border: '1px solid #C1B6AD',
+              backgroundColor: '#ffffff',
+              color: '#1B1A1A',
+            }}
           >
             –
           </Button>
 
-          {/* Main input (no native stepper) */}
+          {/* Numeric input */}
           <Input
-            type="text"
+            type="number"
             inputMode="decimal"
-            value={
-              Number.isFinite(rowSpacingM)
-                ? rowSpacingM.toFixed(2)
-                : ''
-            }
+            min="0.8"
+            max="4.0"
+            step="0.1"
+            value={safeRowSpacingValue}
             onChange={(e) => {
               if (disabled || rowCount <= 1) return;
 
               const raw = e.target.value;
 
-              // Allow temporary partial input like "1." or "2"
-              if (raw.trim() === '') {
+              // Allow empty while typing
+              if (raw === '') {
                 return;
               }
 
@@ -570,6 +573,7 @@ export default function SeatingLayout({
               const raw = e.target.value;
               const normalized = normaliseRowSpacing(raw);
 
+              // Snap back to clean, clamped value
               if (normalized !== '') {
                 onRowSpacingChange?.(normalized);
               }
@@ -588,20 +592,22 @@ export default function SeatingLayout({
           <Button
             type="button"
             variant="outline"
-            size="icon"
             disabled={disabled || rowCount <= 1}
             onClick={() => {
               if (disabled || rowCount <= 1) return;
 
               const base = Number.isFinite(rowSpacingM) ? rowSpacingM : 1.8;
-              const target = base + 0.1;
-              const normalized = normaliseRowSpacing(target);
+              const next = Math.max(0.8, Math.min(4.0, Math.round((base + 0.1) * 10) / 10));
 
-              if (normalized !== '') {
-                onRowSpacingChange?.(normalized);
-              }
+              onRowSpacingChange?.(next);
             }}
-            className="h-10 w-10 border-[#C1B6AD] text-[#1B1A1A]"
+            style={{
+              minWidth: 32,
+              padding: 0,
+              border: '1px solid #C1B6AD',
+              backgroundColor: '#ffffff',
+              color: '#1B1A1A',
+            }}
           >
             +
           </Button>
