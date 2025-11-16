@@ -271,7 +271,7 @@ export default function ScreenConfiguration(props) {
                   sideOffset={6}
                   className="z-[70] bg-white border-[#DCDBD6]"
                 >
-                  {[80, 90, 100, 110, 120, 130, 140, 150, 160, 180, 200].map((width) => (
+                  {[80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190, 200, 210, 220, 230, 240, 250].map((width) => (
                     <SelectItem 
                       key={width} 
                       value={String(width)} 
