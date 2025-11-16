@@ -509,7 +509,7 @@ export default function SeatingLayout({
           </Button>
 
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
             min="0.5"
             max="3.0"
@@ -700,7 +700,7 @@ export default function SeatingLayout({
           </Button>
 
           <Input
-            type="number"
+            type="text"
             inputMode="decimal"
             min="-2.0"
             max="2.0"
