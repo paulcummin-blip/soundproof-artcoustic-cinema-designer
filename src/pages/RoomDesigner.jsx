@@ -1678,7 +1678,7 @@ function RoomDesignerWithState() {
 
                if (['TFL', 'TFR', 'TFC'].includes(canonRole)) { // Front Overheads
                    modelFromOverrides = useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
-               } else if (['TL', 'TR'].includes(canonRole)) { // Mid Overheads (e.g. 5.1.2, 7.1.2)
+               } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonRole)) { // Mid Overheads (e.g. 5.1.2, 7.1.2)
                    modelFromOverrides = useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
                } else if (['TBL', 'TBR', 'TBC'].includes(canonRole)) { // Rear Overheads
                    modelFromOverrides = useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
@@ -1689,7 +1689,7 @@ function RoomDesignerWithState() {
            // Fallback for non-overhead speakers if no model yet
            if (!finalModel) finalModel = seed.model; // seed.model is undefined, so this only matters if seedSpeakersFromPreset changes
            
-           return { ...seed, model: finalModel };
+           return { ...seed, model: finalModel, draggable: true }; // Mark all speakers as draggable
          });
 
          safeGroup('[Speakers] preset re-seed merge check', () => {

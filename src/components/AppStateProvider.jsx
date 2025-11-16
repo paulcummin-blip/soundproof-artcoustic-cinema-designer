@@ -6,10 +6,12 @@ import { SHOW_DEBUG_LOGS } from '@/components/utils/diagnostics';
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 
 // --- SINGLE SOURCE OF TRUTH FOR VISIBILITY -----------------------------
-// Simple, explicit visibility rules for bed-layer channels
+// Simple, explicit visibility rules for bed-layer channels + overhead channels
 export function getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears) {
   const layout = String(layoutString || "5.1");
-  const major = parseInt(layout.split(".")[0], 10) || 5;
+  const parts = layout.split(".");
+  const major = parseInt(parts[0], 10) || 5;
+  const heights = parseInt(parts[2], 10) || 0; // e.g., "5.1.2" → 2, "7.1.4" → 4
 
   // LCR are always visible
   const roles = new Set(["FL", "FC", "FR"]);
@@ -31,6 +33,24 @@ export function getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears) {
   if (showWides) {
     roles.add("LW");
     roles.add("RW");
+  }
+
+  // Add overhead channels based on height count
+  if (heights === 2) {
+    roles.add("TL");
+    roles.add("TR");
+  } else if (heights === 4) {
+    roles.add("TFL");
+    roles.add("TFR");
+    roles.add("TBL");
+    roles.add("TBR");
+  } else if (heights === 6) {
+    roles.add("TFL");
+    roles.add("TFR");
+    roles.add("TL");
+    roles.add("TR");
+    roles.add("TBL");
+    roles.add("TBR");
   }
 
   return roles;

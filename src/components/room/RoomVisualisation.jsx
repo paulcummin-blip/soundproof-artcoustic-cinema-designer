@@ -1807,20 +1807,55 @@ React.useEffect(() => {
       return;
     }
 
-    // Fallback for all other draggable speakers
-    const { x: finalRoomX_m, y: finalRoomY_m } = canvasToRoom(newCanvasPos);
+    // Fallback for all other draggable speakers (including overheads)
+    const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
 
+    // Special handling for overhead speakers - constrain within their zones
+    if (canonicalRole.startsWith('T')) {
+      if (!overheadZones || overheadZones.status !== 'ok') return;
+
+      // Determine which zone this overhead belongs to
+      let zoneName = null;
+      if (['TFL', 'TFR'].includes(canonicalRole)) {
+        zoneName = canonicalRole === 'TFL' ? 'frontLeft' : 'frontRight';
+      } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
+        zoneName = (canonicalRole === 'TL' || canonicalRole === 'TML') ? 'midLeft' : 'midRight';
+      } else if (['TBL', 'TBR'].includes(canonicalRole)) {
+        zoneName = canonicalRole === 'TBL' ? 'rearLeft' : 'rearRight';
+      }
+
+      if (!zoneName || !overheadZones[zoneName]) return;
+
+      const zone = overheadZones[zoneName];
+      const { xMin, xMax, yMin, yMax } = zone;
+
+      // Clamp to zone bounds
+      const clampedX = Math.max(xMin, Math.min(xMax, rawX));
+      const clampedY = Math.max(yMin, Math.min(yMax, rawY));
+
+      onSetSpeakers(prev => prev.map(s => {
+        if (s.id === speakerId) {
+          return { ...s, position: { ...s.position, x: clampedX, y: clampedY } };
+        }
+        return s;
+      }));
+
+      lastInteractionEpoch.current = timeNowMs();
+      return;
+    }
+
+    // Generic fallback for any other speakers
     onSetSpeakers(prev => {
       let updated = prev.map(s => {
         if (s.id === speakerId) {
-          return { ...s, position: { ...s.position, x: finalRoomX_m, y: finalRoomY_m } };
+          return { ...s, position: { ...s.position, x: rawX, y: rawY } };
         }
         return s;
       });
       return updated;
     });
     lastInteractionEpoch.current = timeNowMs();
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m]);
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones]);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
