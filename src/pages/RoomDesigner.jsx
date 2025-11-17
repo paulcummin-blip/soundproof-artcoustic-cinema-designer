@@ -2173,7 +2173,6 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   viewingDistanceOffsetM={_seatingBlockOffset}
                   mlpBasis={_mlpBasis}
                   rp22AnglesEnabled={_overlays?.RP22_ANGLES}
-                  overheadCount={overheadCount}
                 />
               </Suspense>
             </ErrorBoundary>
