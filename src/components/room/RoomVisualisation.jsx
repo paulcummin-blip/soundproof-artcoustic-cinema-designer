@@ -1177,7 +1177,6 @@ React.useEffect(() => {
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
   // FW median positioning is now FULLY handled by SpeakerPlacement only.
-  // This effect used to run when enableFrontWides was true, but that logic is now obsolete.
   // The overlay (when enabled) should ONLY:
   // - Draw the visual FW zone bands
   // - Constrain manual drags inside the band during user interaction
@@ -2794,7 +2793,7 @@ React.useEffect(() => {
   }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
 
   // [B44] DISABLED: SBL/SBR positions now come from SpeakerPlacement only
-  // This effect has been disabled to prevent RV from overwriting state-driven positions
+  // This effect has has been disabled to prevent RV from overwriting state-driven positions
   React.useEffect(() => {
     // [B44] Legacy corridor/constraint logic for SBL/SBR disabled.
     // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
@@ -3153,8 +3152,19 @@ React.useEffect(() => {
       if (!modelKey) return;
 
       const modelMeta = getSpeakerModelMeta(modelKey);
-      const iconW_m = modelMeta?.diameterM || modelMeta?.widthM || 0.24;
-      const iconD_m = modelMeta?.depthM || modelMeta?.widthM || 0.24;
+      
+      // Log warning if model not found
+      if (modelMeta?.notFound && typeof console !== 'undefined') {
+        console.warn(`[RoomVisualisation] Overhead model "${modelKey}" not found in registry, using defaults`);
+      }
+      
+      // Determine if this should render as a circle or rectangle
+      const isRound = modelMeta?.round === true || (!!modelMeta?.diameterM && modelMeta?.round !== false);
+      
+      // Get dimensions
+      const widthM = modelMeta?.widthM || 0.24;
+      const depthM = modelMeta?.depthM || 0.24;
+      const diameterM = modelMeta?.diameterM || 0.24;
 
       // Render left icon
       const leftZone = overheadZones[`${position}Left`];
@@ -3163,26 +3173,50 @@ React.useEffect(() => {
         const centerX_m = (xMin + xMax) / 2;
         const centerY_m = (yMin + yMax) / 2;
 
-        // Clamp to keep icon fully inside zone
-        const clampedX = Math.max(xMin + iconW_m / 2, Math.min(xMax - iconW_m / 2, centerX_m));
-        const clampedY = Math.max(yMin + iconD_m / 2, Math.min(yMax - yMin / 2, centerY_m)); // Corrected clamping for yMax - yMin
+        if (isRound) {
+          // Circular overhead (existing Architect 2-1, 4-2, PAS2-2)
+          const iconSize = diameterM;
+          const clampedX = Math.max(xMin + iconSize / 2, Math.min(xMax - iconSize / 2, centerX_m));
+          const clampedY = Math.max(yMin + iconSize / 2, Math.min(yMax - iconSize / 2, centerY_m));
 
-        if ((xMax - xMin) < iconW_m || (yMax - yMin) < iconD_m) {
-          // If the zone is too small to fit the speaker, skip it.
+          if ((xMax - xMin) >= iconSize && (yMax - yMin) >= iconSize) {
+            const [canvasX, canvasY] = toPx(clampedX, centerY_m);
+            const radiusPx = (iconSize / 2) * scale;
+            icons.push(
+              <circle
+                key={`${position}-left`}
+                cx={canvasX}
+                cy={canvasY}
+                fill="#000000"
+                opacity={0.9}
+                pointerEvents="none"
+                r={radiusPx}
+              />
+            );
+          }
         } else {
-          const [canvasX, canvasY] = toPx(clampedX, centerY_m); // Changed clampedY to centerY_m here
-          const radiusPx = (iconW_m / 2) * scale;
-          icons.push(
-            <circle
-              key={`${position}-left`}
-              cx={canvasX}
-              cy={canvasY}
-              fill="#000000"
-              opacity={0.9}
-              pointerEvents="none"
-              r={radiusPx}
-            />
-          );
+          // Rectangular overhead (Architect Mikro)
+          const clampedX = Math.max(xMin + widthM / 2, Math.min(xMax - widthM / 2, centerX_m));
+          const clampedY = Math.max(yMin + depthM / 2, Math.min(yMax - depthM / 2, centerY_m));
+
+          if ((xMax - xMin) >= widthM && (yMax - yMin) >= depthM) {
+            const [canvasX, canvasY] = toPx(clampedX, clampedY);
+            const w_px = widthM * scale;
+            const d_px = depthM * scale;
+            
+            icons.push(
+              <rect
+                key={`${position}-left`}
+                x={canvasX - w_px / 2}
+                y={canvasY - d_px / 2}
+                width={w_px}
+                height={d_px}
+                fill="#000000"
+                opacity={0.9}
+                pointerEvents="none"
+              />
+            );
+          }
         }
       }
 
@@ -3193,26 +3227,51 @@ React.useEffect(() => {
         const centerX_m = (xMin + xMax) / 2;
         const centerY_m = (yMin + yMax) / 2;
 
-        const clampedX = Math.max(xMin + iconW_m / 2, Math.min(xMax - iconW_m / 2, centerX_m));
-        const clampedY = Math.max(yMin + iconD_m / 2, Math.min(yMax - yMin / 2, centerY_m)); // Corrected clamping for yMax - yMin
+        if (isRound) {
+          // Circular overhead
+          const iconSize = diameterM;
+          const clampedX = Math.max(xMin + iconSize / 2, Math.min(xMax - iconSize / 2, centerX_m));
+          const clampedY = Math.max(yMin + iconSize / 2, Math.min(yMax - iconSize / 2, centerY_m));
 
-        if ((xMax - xMin) < iconW_m || (yMax - yMin) < iconD_m) {
-          // If the zone is too small to fit the speaker, skip it.
+          if ((xMax - xMin) >= iconSize && (yMax - yMin) >= iconSize) {
+            const [canvasX, canvasY] = toPx(clampedX, centerY_m);
+            const radiusPx = (iconSize / 2) * scale;
+
+            icons.push(
+              <circle
+                key={`${position}-right`}
+                cx={canvasX}
+                cy={canvasY}
+                fill="#000000"
+                opacity={0.9}
+                pointerEvents="none"
+                r={radiusPx}
+              />
+            );
+          }
         } else {
-          const [canvasX, canvasY] = toPx(clampedX, centerY_m); // Changed clampedY to centerY_m here
-          const radiusPx = (iconW_m / 2) * scale;
+          // Rectangular overhead
+          const clampedX = Math.max(xMin + widthM / 2, Math.min(xMax - widthM / 2, centerX_m));
+          const clampedY = Math.max(yMin + depthM / 2, Math.min(yMax - depthM / 2, centerY_m));
 
-          icons.push(
-            <circle
-              key={`${position}-right`}
-              cx={canvasX}
-              cy={canvasY}
-              fill="#000000"
-              opacity={0.9}
-              pointerEvents="none"
-              r={radiusPx}
-            />
-          );
+          if ((xMax - xMin) >= widthM && (yMax - yMin) >= depthM) {
+            const [canvasX, canvasY] = toPx(clampedX, clampedY);
+            const w_px = widthM * scale;
+            const d_px = depthM * scale;
+            
+            icons.push(
+              <rect
+                key={`${position}-right`}
+                x={canvasX - w_px / 2}
+                y={canvasY - d_px / 2}
+                width={w_px}
+                height={d_px}
+                fill="#000000"
+                opacity={0.9}
+                pointerEvents="none"
+              />
+            );
+          }
         }
       }
     });
