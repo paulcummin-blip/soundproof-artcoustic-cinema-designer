@@ -35,10 +35,10 @@ export const MODELS = [
     key: "architect-mikro",
     label: "ARCHITECT Mikro",
     category: "ARCHITECT",
-    // Plan view: widthMm = short edge (left–right), depthMm = long edge (front–back)
-    widthMm: 54,
-    depthMm: 138,
-    heightMm: 26,          // for reporting only
+    widthMm: 54,     // short edge (left/right)
+    depthMm: 138,    // long edge (front/back)
+    heightMm: 26,    // physical depth only for reporting
+    round: false,    // MUST be explicitly false
     sensitivity_dB_1w1m: 86,
     sensitivity_dB_2p83: 86,
     nominalOhms: 8,
