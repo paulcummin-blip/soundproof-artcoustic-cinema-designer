@@ -437,8 +437,16 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [containerH, setContainerH] = useState(0);
   const [hoveredSeat, setHoveredSeat] = useState(null);
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
+  const [seatPanelPos, setSeatPanelPos] = useState(null); // { x, y } in pixels, or null for default
+  const seatPanelDragRef = useRef({
+    dragging: false,
+    startX: 0,
+    startY: 0,
+    origX: 0,
+    origY: 0,
+  });
   const [hudHiddenWhenPinned, setHudHiddenWhenPinned] = useState(false);
-  const [hudPinnedOffsetPx, setHudPinnedOffsetPx] = useState(null);
+  const [planBoundsRect, setPlanBoundsRect] = useState(null);
   const planBoundsRef = useRef(null);
   const svgRef = useRef(null);
   const slsrModeRef = React.useRef('side');
@@ -474,16 +482,15 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   useEffect(() => {
     if (!isHudPinned) {
-      setHudPinnedOffsetPx(null);
       setHudHiddenWhenPinned(false);
     }
   }, [isHudPinned]);
 
-  useEffect(() => {
-    if (isHudPinned && hudPinnedOffsetPx == null) {
-      setHudPinnedOffsetPx({ x: 24, y: 24 });
-    }
-  }, [isHudPinned, hudPinnedOffsetPx]);
+  React.useLayoutEffect(() => {
+    if (!planBoundsRef.current) return;
+    const rect = planBoundsRef.current.getBoundingClientRect();
+    setPlanBoundsRect(rect);
+  }, [containerW, containerH]);
 
   /* …rest of the component continues below… */
 
@@ -517,30 +524,57 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   // Drag handlers (defined BEFORE they're used in JSX)
   const onHudHeaderMouseDown = useCallback((e) => {
-    if (!isHudPinned) return;
-    const origX = hudPinnedOffsetPx?.x ?? 0;
-    const origY = hudPinnedOffsetPx?.y ?? 0;
-    hudDragRef.current = { startX: e.clientX, startY: e.clientY, origX, origY };
-
-    const onHudMouseMove = (e) => {
-      const s = hudDragRef.current;
-      if (!s) return;
-      const dx = e.clientX - s.startX;
-      const dy = e.clientY - s.startY;
-      const next = clampHudOffset(s.origX + dx, s.origY + dy);
-      setHudPinnedOffsetPx(next);
-    };
-
-    const onHudMouseUp = () => {
-      hudDragRef.current = null;
-      window.removeEventListener('mousemove', onHudMouseMove);
-      window.removeEventListener('mouseup', onHudMouseUp);
-    };
-
-    window.addEventListener('mousemove', onHudMouseMove);
-    window.addEventListener('mouseup', onHudMouseUp);
+    if (!planBoundsRect) return;
     e.preventDefault();
-  }, [isHudPinned, hudPinnedOffsetPx, clampHudOffset]);
+
+    const currentPos = seatPanelPos || {
+      x: hudPosition?.x || (planBoundsRect.width / 2) - 140,
+      y: hudPosition?.y || 20,
+    };
+
+    seatPanelDragRef.current = {
+      dragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: currentPos.x,
+      origY: currentPos.y,
+    };
+
+    window.addEventListener("mousemove", handleHudMouseMove);
+    window.addEventListener("mouseup", handleHudMouseUp);
+  }, [planBoundsRect, seatPanelPos, hudPosition]);
+
+  const handleHudMouseMove = useCallback((e) => {
+    const state = seatPanelDragRef.current;
+    if (!state.dragging || !planBoundsRect) return;
+
+    const dx = e.clientX - state.startX;
+    const dy = e.clientY - state.startY;
+
+    let newX = state.origX + dx;
+    let newY = state.origY + dy;
+
+    // These values are estimates for the HUD panel size
+    // A more robust solution would measure the actual rendered HUD size.
+    const panelWidth = 320;
+    const panelHeight = 450;
+
+    const minX = 0;
+    const minY = 0;
+    const maxX = planBoundsRect.width - panelWidth;
+    const maxY = planBoundsRect.height - panelHeight;
+
+    newX = Math.max(minX, Math.min(maxX, newX));
+    newY = Math.max(minY, Math.min(maxY, newY));
+
+    setSeatPanelPos({ x: newX, y: newY });
+  }, [planBoundsRect]);
+
+  const handleHudMouseUp = useCallback(() => {
+    seatPanelDragRef.current.dragging = false;
+    window.removeEventListener("mousemove", handleHudMouseMove);
+    window.removeEventListener("mouseup", handleHudMouseUp);
+  }, [handleHudMouseMove]);
 
 
   // Helper to clamp HUD within canvas, pick side dynamically
@@ -1823,9 +1857,6 @@ React.useEffect(() => {
     }
 
     // Fallback for all other draggable speakers (including overheads)
-    const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
-
-    // Special handling for overhead speakers - constrain within their zones
     if (canonicalRole.startsWith('T')) {
       if (!overheadZones || overheadZones.status !== 'ok') {
         // Allow free placement within room if zones not ready
@@ -1875,6 +1906,7 @@ React.useEffect(() => {
 
       // Clamp to zone bounds (RP22-compliant)
       const { x1, x2, y1, y2 } = targetZone;
+      const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos); // Redeclared
       const clampedY = Math.max(y1, Math.min(y2, rawY));
       const outOfZone = rawY < y1 || rawY > y2;
 
@@ -1942,6 +1974,7 @@ React.useEffect(() => {
     }
 
     // Generic fallback for any other speakers
+    const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos); // Redeclared
     onSetSpeakers(prev => {
       let updated = prev.map(s => {
         if (s.id === speakerId) {
@@ -2067,6 +2100,7 @@ React.useEffect(() => {
   // NEW: Seat hover handlers
   const handleSeatClick = useCallback((seat) => {
     setHudPinnedSeatId(prev => (prev === seat.id ? null : seat.id));
+    setSeatPanelPos(null); // Reset panel position when pin state changes
   }, []);
 
   const handleSeatMouseEnter = useCallback((seat) => {
@@ -4673,16 +4707,29 @@ return {
 
   // Build HUD style safely
   const hudDynamicStyle = useMemo(() => {
-    const s = {};
-    if (isHudPinned && hudPinnedOffsetPx) {
-      s.transform = `translate3d(${hudPinnedOffsetPx.x}px, ${hudPinnedOffsetPx.y}px, 0)`;
+    if (seatPanelPos) {
+      return {
+        left: seatPanelPos.x,
+        top: seatPanelPos.y,
+      };
     }
+    
+    // Default positioning when not dragged
+    return {
+      left: hudPosition?.x || 20,
+      top: hudPosition?.y || 20,
+    };
+  }, [seatPanelPos, hudPosition]);
+
+  const hudVisibilityStyle = useMemo(() => {
     if (isHudPinned && hudHiddenWhenPinned) {
-      s.visibility = 'hidden';
-      s.pointerEvents = 'none';
+      return {
+        visibility: 'hidden',
+        pointerEvents: 'none',
+      };
     }
-    return s;
-  }, [isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned]);
+    return {};
+  }, [isHudPinned, hudHiddenWhenPinned]);
 
 
 // --- Main render ---
@@ -4699,7 +4746,7 @@ return (
     style={{
       aspectRatio: aspect,
       border: '1px solid #DCDBD6',
-      borderRadius: '88px',
+      borderRadius: 0,
       backgroundColor: '#F8F8F7',
     }}
   >
@@ -4930,14 +4977,7 @@ return (
             className="seat-hud"
             style={{
               position: 'absolute',
-              left: hudPosition?.x || 20,
-              top: hudPosition?.y || 20,
-              background: 'white',
-              border: '1px solid #DCDBD6',
-              borderRadius: 8,
-              padding: 12,
-              boxShadow: '0 44px 12px rgba(0,0,0,0.15)',
-              pointerEvents: isHudPinned ? 'auto' : 'none', // Allow interaction when pinned
+              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               zIndex: 1000,
               minWidth: 260,
               maxWidth: 320,
@@ -4948,7 +4988,13 @@ return (
               display: 'flex',
               flexDirection: 'column',
               gap: 4,
-              ...hudDynamicStyle
+              background: 'white',
+              border: '1px solid #DCDBD6',
+              borderRadius: 8,
+              padding: 12,
+              ...hudDynamicStyle,
+              ...hudVisibilityStyle,
+              pointerEvents: isHudPinned ? 'auto' : 'none', // Allow interaction when pinned
             }}
           >
             {/* Header with drag handle and eye icon */}
@@ -4961,7 +5007,7 @@ return (
                 marginBottom: 4,
                 paddingBottom: 4,
                 borderBottom: '1px solid #E6E4DD',
-                cursor: isHudPinned ? 'move' : 'default',
+                cursor: 'move',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
@@ -5098,3 +5144,4 @@ return (
     </div>
   );
 });
+
