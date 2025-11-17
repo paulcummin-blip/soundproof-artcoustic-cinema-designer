@@ -1,4 +1,3 @@
-
 // This function must be defined before it's used by buildRoleMap, or be hoisted.
 // Placing it first is the safest approach.
 export function getCanonicalRole(role) {
@@ -40,11 +39,18 @@ export function buildRoleMap(speakers) {
 export function isDraggable(speaker) {
   if (!speaker || !speaker.role) return false;
   const canonicalRole = getCanonicalRole(speaker.role);
+  
   // Center speaker is fixed
   if (canonicalRole === 'FC') return false;
+  
   // Subwoofers are fixed
   if (String(speaker.role).toUpperCase().includes("SUB")) return false;
-  // Other speakers are draggable
+  if (canonicalRole === 'LFE') return false;
+  
+  // All other speakers (including overheads T*) are draggable if they have a valid model
+  const modelStr = String(speaker.model || "").trim().toLowerCase();
+  if (!modelStr || modelStr === "off" || modelStr === "none") return false;
+  
   return true;
 }
 
