@@ -116,14 +116,48 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
 }) {
   const { model, role, id } = speaker || {};
   
+  // Check if this is a round overhead speaker
+  const modelMeta = getSpeakerModelMeta(model);
+  const isRound = !!modelMeta?.round;
+  
   // Safe fallbacks: ensure non-zero dimensions
   const safeWidthM = (Number(widthM) > 0 ? Number(widthM) : 0.27);
   const safeDepthM = (Number(depthM) > 0 ? Number(depthM) : 0.082);
-  const w = safeWidthM * (scale || 1);
-  const d = safeDepthM * (scale || 1);
   
   // Get color (currently always black)
   const color = getChannelColor(role);
+  
+  // For round speakers (overheads), render as circle
+  if (isRound) {
+    const diameter = modelMeta?.diameterM || safeWidthM;
+    const radiusPx = (diameter / 2) * (scale || 1);
+    
+    return (
+      <g
+        pointerEvents="all"
+        onMouseDown={speakerMouseDownHandler}
+        onMouseEnter={() =>
+          setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
+        }
+        onMouseLeave={() => setHoveredSpeaker?.(null)}
+        className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
+      >
+        <circle
+          cx={canvasX}
+          cy={canvasY_raw}
+          r={radiusPx}
+          fill={color || "#000000"}
+          stroke="#000000"
+          strokeWidth={1}
+          opacity={1}
+        />
+      </g>
+    );
+  }
+  
+  // For rectangular speakers, render as rotated rectangle
+  const w = safeWidthM * (scale || 1);
+  const d = safeDepthM * (scale || 1);
   
   const pathData = `M ${-w / 2},${-d / 2} L ${w / 2},${-d / 2} L ${w / 2},${d / 2} L ${-w / 2},${d / 2} Z`;
   const transform = `translate(${canvasX}, ${canvasY_raw}) rotate(${yawDeg || 0})`;
