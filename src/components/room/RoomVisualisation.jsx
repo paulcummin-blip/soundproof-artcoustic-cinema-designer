@@ -1827,19 +1827,8 @@ React.useEffect(() => {
 
     // Special handling for overhead speakers - constrain within their zones
     if (canonicalRole.startsWith('T')) {
-      // Determine which *general* zone this overhead belongs to based on RP22 convention
-      let targetZone = null;
-      if (['TFL', 'TFR'].includes(canonicalRole)) {
-        targetZone = overheadZones?.frontZone;
-      } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
-        targetZone = overheadZones?.midZone;
-      } else if (['TBL', 'TBR'].includes(canonicalRole)) {
-        targetZone = overheadZones?.backZone;
-      }
-
-      if (!overheadZones || overheadZones.status !== 'ok' || !targetZone || !targetZone.active) {
-        // If zones are not ready/valid, or the specific target zone is not active,
-        // allow free placement within room bounds.
+      if (!overheadZones || overheadZones.status !== 'ok') {
+        // Allow free placement within room if zones not ready
         const clampedX = Math.max(0, Math.min(widthM, rawX));
         const clampedY = Math.max(0, Math.min(lengthM, rawY));
         
@@ -1854,17 +1843,98 @@ React.useEffect(() => {
         return;
       }
 
+      // Map overhead role to zone
+      let targetZone = null;
+      let rowKey = null;
+      if (['TFL', 'TFR'].includes(canonicalRole)) {
+        targetZone = overheadZones.frontZone;
+        rowKey = 'front';
+      } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
+        targetZone = overheadZones.midZone;
+        rowKey = 'mid';
+      } else if (['TBL', 'TBR'].includes(canonicalRole)) {
+        targetZone = overheadZones.backZone;
+        rowKey = 'back';
+      }
+
+      if (!targetZone || !targetZone.active) {
+        // Zone not active, allow free placement
+        const clampedX = Math.max(0, Math.min(widthM, rawX));
+        const clampedY = Math.max(0, Math.min(lengthM, rawY));
+        
+        onSetSpeakers(prev => prev.map(s => {
+          if (s.id === speakerId) {
+            return { ...s, position: { ...s.position, x: clampedX, y: clampedY, outOfZone: false } };
+          }
+          return s;
+        }));
+        
+        lastInteractionEpoch.current = timeNowMs();
+        return;
+      }
+
       // Clamp to zone bounds (RP22-compliant)
       const { x1, x2, y1, y2 } = targetZone;
-      const clampedX = Math.max(x1, Math.min(x2, rawX));
       const clampedY = Math.max(y1, Math.min(y2, rawY));
+      const outOfZone = rawY < y1 || rawY > y2;
 
-      onSetSpeakers(prev => prev.map(s => {
-        if (s.id === speakerId) {
-          return { ...s, position: { ...s.position, x: clampedX, y: clampedY } };
-        }
-        return s;
-      }));
+      // Determine if this is .4 or .6 layout (requires pair snapping)
+      const requiresPairSnapping = overheadCount === 4 || overheadCount === 6;
+
+      if (requiresPairSnapping && rowKey) {
+        // Find partner in the same row
+        const isLeft = ['TFL', 'TL', 'TBL'].includes(canonicalRole);
+        const partnerRole = isLeft 
+          ? (rowKey === 'front' ? 'TFR' : rowKey === 'mid' ? 'TR' : 'TBR')
+          : (rowKey === 'front' ? 'TFL' : rowKey === 'mid' ? 'TL' : 'TBL');
+
+        const partner = placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRole);
+
+        // Update both speakers in the row with same Y, keep their X on overhead lines
+        onSetSpeakers(prev => prev.map(s => {
+          const sRole = getCanonicalRole(s.role);
+          if (sRole === canonicalRole) {
+            return { 
+              ...s, 
+              position: { 
+                ...s.position, 
+                x: isLeft ? x1 : x2, 
+                y: clampedY 
+              },
+              outOfZone 
+            };
+          }
+          if (partner && sRole === partnerRole) {
+            return { 
+              ...s, 
+              position: { 
+                ...s.position, 
+                x: isLeft ? x2 : x1, 
+                y: clampedY 
+              },
+              outOfZone 
+            };
+          }
+          return s;
+        }));
+      } else {
+        // .2 or single speaker: just clamp to zone
+        const isLeft = ['TFL', 'TL', 'TBL'].includes(canonicalRole);
+        onSetSpeakers(prev => prev.map(s => {
+          if (s.id === speakerId) {
+            return { 
+              ...s, 
+              position: { 
+                ...s.position, 
+                x: isLeft ? x1 : x2, 
+                y: clampedY 
+              },
+              outOfZone 
+            };
+          }
+          return s;
+        }));
+      }
 
       lastInteractionEpoch.current = timeNowMs();
       return;
@@ -1881,7 +1951,7 @@ React.useEffect(() => {
       return updated;
     });
     lastInteractionEpoch.current = timeNowMs();
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones]);
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, overheadCount]);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
