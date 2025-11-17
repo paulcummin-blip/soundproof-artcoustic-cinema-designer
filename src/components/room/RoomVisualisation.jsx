@@ -1169,10 +1169,11 @@ React.useEffect(() => {
         widthM,
         lengthM,
         mlpY_m,
+        mlpPoint: mlp,
         placedSpeakers,
         getCanonicalRole,
       }),
-    [seatingPositions, heightM, widthM, lengthM, mlpY_m, placedSpeakers, getCanonicalRole]
+    [seatingPositions, heightM, widthM, lengthM, mlpY_m, mlp, placedSpeakers, getCanonicalRole]
   );
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
@@ -1826,26 +1827,37 @@ React.useEffect(() => {
 
     // Special handling for overhead speakers - constrain within their zones
     if (canonicalRole.startsWith('T')) {
-      if (!overheadZones || overheadZones.status !== 'ok') return;
-
-      // Determine which zone this overhead belongs to
-      let zoneName = null;
+      // Determine which *general* zone this overhead belongs to based on RP22 convention
+      let targetZone = null;
       if (['TFL', 'TFR'].includes(canonicalRole)) {
-        zoneName = canonicalRole === 'TFL' ? 'frontLeft' : 'frontRight';
+        targetZone = overheadZones?.frontZone;
       } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
-        zoneName = (canonicalRole === 'TL' || canonicalRole === 'TML') ? 'midLeft' : 'midRight';
+        targetZone = overheadZones?.midZone;
       } else if (['TBL', 'TBR'].includes(canonicalRole)) {
-        zoneName = canonicalRole === 'TBL' ? 'rearLeft' : 'rearRight';
+        targetZone = overheadZones?.backZone;
       }
 
-      if (!zoneName || !overheadZones[zoneName]) return;
+      if (!overheadZones || overheadZones.status !== 'ok' || !targetZone || !targetZone.active) {
+        // If zones are not ready/valid, or the specific target zone is not active,
+        // allow free placement within room bounds.
+        const clampedX = Math.max(0, Math.min(widthM, rawX));
+        const clampedY = Math.max(0, Math.min(lengthM, rawY));
+        
+        onSetSpeakers(prev => prev.map(s => {
+          if (s.id === speakerId) {
+            return { ...s, position: { ...s.position, x: clampedX, y: clampedY } };
+          }
+          return s;
+        }));
+        
+        lastInteractionEpoch.current = timeNowMs();
+        return;
+      }
 
-      const zone = overheadZones[zoneName];
-      const { xMin, xMax, yMin, yMax } = zone;
-
-      // Clamp to zone bounds
-      const clampedX = Math.max(xMin, Math.min(xMax, rawX));
-      const clampedY = Math.max(yMin, Math.min(yMax, rawY));
+      // Clamp to zone bounds (RP22-compliant)
+      const { x1, x2, y1, y2 } = targetZone;
+      const clampedX = Math.max(x1, Math.min(x2, rawX));
+      const clampedY = Math.max(y1, Math.min(y2, rawY));
 
       onSetSpeakers(prev => prev.map(s => {
         if (s.id === speakerId) {
@@ -2237,7 +2249,7 @@ React.useEffect(() => {
     // Build eligible surrounds for P5
     const allSurrounds = (placedSpeakers || []).filter(s => {
       const r = getCanonicalRole(s.role);
-      return r === 'SL' || r === 'SR' || r === 'SBL' || r === 'SBR' || r === 'LW' || r === 'RW';
+      return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
     });
 
     const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
@@ -3162,116 +3174,69 @@ React.useEffect(() => {
       const isRound = modelMeta?.round === true || (!!modelMeta?.diameterM && modelMeta?.round !== false);
       
       // Get dimensions
-      const widthM = modelMeta?.widthM || 0.24;
-      const depthM = modelMeta?.depthM || 0.24;
+      const widthM_oh = modelMeta?.widthM || 0.24;
+      const depthM_oh = modelMeta?.depthM || 0.24;
       const diameterM = modelMeta?.diameterM || 0.24;
 
-      // Render left icon
-      const leftZone = overheadZones[`${position}Left`];
-      if (leftZone) {
-        const { xMin, xMax, yMin, yMax } = leftZone;
-        const centerX_m = (xMin + xMax) / 2;
-        const centerY_m = (yMin + yMax) / 2;
-
-        if (isRound) {
-          // Circular overhead (existing Architect 2-1, 4-2, PAS2-2)
-          const iconSize = diameterM;
-          const clampedX = Math.max(xMin + iconSize / 2, Math.min(xMax - iconSize / 2, centerX_m));
-          const clampedY = Math.max(yMin + iconSize / 2, Math.min(yMax - iconSize / 2, centerY_m));
-
-          if ((xMax - xMin) >= iconSize && (yMax - yMin) >= iconSize) {
-            const [canvasX, canvasY] = toPx(clampedX, centerY_m);
-            const radiusPx = (iconSize / 2) * scale;
-            icons.push(
-              <circle
-                key={`${position}-left`}
-                cx={canvasX}
-                cy={canvasY}
-                fill="#000000"
-                opacity={0.9}
-                pointerEvents="none"
-                r={radiusPx}
-              />
-            );
-          }
-        } else {
-          // Rectangular overhead (Architect Mikro)
-          const clampedX = Math.max(xMin + widthM / 2, Math.min(xMax - widthM / 2, centerX_m));
-          const clampedY = Math.max(yMin + depthM / 2, Math.min(yMax - depthM / 2, centerY_m));
-
-          if ((xMax - xMin) >= widthM && (yMax - yMin) >= depthM) {
-            const [canvasX, canvasY] = toPx(clampedX, clampedY);
-            const w_px = widthM * scale;
-            const d_px = depthM * scale;
-            
-            icons.push(
-              <rect
-                key={`${position}-left`}
-                x={canvasX - w_px / 2}
-                y={canvasY - d_px / 2}
-                width={w_px}
-                height={d_px}
-                fill="#000000"
-                opacity={0.9}
-                pointerEvents="none"
-              />
-            );
-          }
-        }
+      // Map position to zone
+      let zone = null;
+      if (position === 'front') {
+        zone = overheadZones.frontZone;
+      } else if (position === 'mid') {
+        zone = overheadZones.midZone;
+      } else if (position === 'rear') {
+        zone = overheadZones.backZone;
       }
 
-      // Render right icon
-      const rightZone = overheadZones[`${position}Right`];
-      if (rightZone) {
-        const { xMin, xMax, yMin, yMax } = rightZone;
-        const centerX_m = (xMin + xMax) / 2;
-        const centerY_m = (yMin + yMax) / 2;
+      if (!zone || !zone.active) return;
 
-        if (isRound) {
-          // Circular overhead
-          const iconSize = diameterM;
-          const clampedX = Math.max(xMin + iconSize / 2, Math.min(xMax - iconSize / 2, centerX_m));
-          const clampedY = Math.max(yMin + iconSize / 2, Math.min(yMax - iconSize / 2, centerY_m));
+      const { x1, x2, y1, y2 } = zone;
+      const centerX_m = (x1 + x2) / 2;
+      const centerY_m = (y1 + y2) / 2;
 
-          if ((xMax - xMin) >= iconSize && (yMax - yMin) >= iconSize) {
-            const [canvasX, canvasY] = toPx(clampedX, centerY_m);
-            const radiusPx = (iconSize / 2) * scale;
+      if (isRound) {
+        // Circular overhead (existing Architect 2-1, 4-2, PAS2-2)
+        const iconSize = diameterM;
+        const clampedX = Math.max(x1 + iconSize / 2, Math.min(x2 - iconSize / 2, centerX_m));
+        const clampedY = Math.max(y1 + iconSize / 2, Math.min(y2 - iconSize / 2, centerY_m));
 
-            icons.push(
-              <circle
-                key={`${position}-right`}
-                cx={canvasX}
-                cy={canvasY}
-                fill="#000000"
-                opacity={0.9}
-                pointerEvents="none"
-                r={radiusPx}
-              />
-            );
-          }
-        } else {
-          // Rectangular overhead
-          const clampedX = Math.max(xMin + widthM / 2, Math.min(xMax - widthM / 2, centerX_m));
-          const clampedY = Math.max(yMin + depthM / 2, Math.min(yMax - depthM / 2, centerY_m));
+        if ((x2 - x1) >= iconSize && (y2 - y1) >= iconSize) {
+          const [canvasX, canvasY] = toPx(clampedX, clampedY);
+          const radiusPx = (iconSize / 2) * scale;
+          icons.push(
+            <circle
+              key={`${position}-oh`}
+              cx={canvasX}
+              cy={canvasY}
+              fill="#000000"
+              opacity={0.9}
+              pointerEvents="none"
+              r={radiusPx}
+            />
+          );
+        }
+      } else {
+        // Rectangular overhead (Architect Mikro)
+        const clampedX = Math.max(x1 + widthM_oh / 2, Math.min(x2 - widthM_oh / 2, centerX_m));
+        const clampedY = Math.max(y1 + depthM_oh / 2, Math.min(y2 - depthM_oh / 2, centerY_m));
 
-          if ((xMax - xMin) >= widthM && (yMax - yMin) >= depthM) {
-            const [canvasX, canvasY] = toPx(clampedX, clampedY);
-            const w_px = widthM * scale;
-            const d_px = depthM * scale;
-            
-            icons.push(
-              <rect
-                key={`${position}-right`}
-                x={canvasX - w_px / 2}
-                y={canvasY - d_px / 2}
-                width={w_px}
-                height={d_px}
-                fill="#000000"
-                opacity={0.9}
-                pointerEvents="none"
-              />
-            );
-          }
+        if ((x2 - x1) >= widthM_oh && (y2 - y1) >= depthM_oh) {
+          const [canvasX, canvasY] = toPx(clampedX, clampedY);
+          const w_px = widthM_oh * scale;
+          const d_px = depthM_oh * scale;
+          
+          icons.push(
+            <rect
+              key={`${position}-oh`}
+              x={canvasX - w_px / 2}
+              y={canvasY - d_px / 2}
+              width={w_px}
+              height={d_px}
+              fill="#000000"
+              opacity={0.9}
+              pointerEvents="none"
+            />
+          );
         }
       }
     });
