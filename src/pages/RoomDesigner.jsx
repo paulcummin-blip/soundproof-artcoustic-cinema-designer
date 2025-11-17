@@ -1704,6 +1704,15 @@ function RoomDesignerWithState() {
     useFrontGlobal, useMidGlobal, useRearGlobal
   ]);
 
+  // Calculate overhead count from dolbyPreset
+  const overheadCount = useMemo(() => {
+    if (!dolbyPreset) return 0;
+    const parts = String(dolbyPreset).split('.');
+    if (parts.length < 3) return 0;
+    return parseInt(parts[2]) || 0;
+  }, [dolbyPreset]);
+
+
   // Build or rebuild seating positions whenever seating config changes
   useEffect(() => {
     const setSeats = appState?.setSeatingPositions;
@@ -2173,6 +2182,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   viewingDistanceOffsetM={_seatingBlockOffset}
                   mlpBasis={_mlpBasis}
                   rp22AnglesEnabled={_overlays?.RP22_ANGLES}
+                  overheadCount={overheadCount}
                 />
               </Suspense>
             </ErrorBoundary>
