@@ -30,8 +30,8 @@ export const MODELS = [
   { key: "q4-5_s", label: "Q4-5", category: "SURROUNDS", widthMm: 500, heightMm: 400, depthMm: 160, sensitivity_dB_1w1m: 99, sensitivity_dB_2p83: 99, nominalOhms: 8, max_power: 400 },
   { key: "q8-5_s", label: "Q8-5", category: "SURROUNDS", widthMm: 500, heightMm: 600, depthMm: 160, sensitivity_dB_1w1m: 103, sensitivity_dB_2p83: 106, nominalOhms: 4, max_power: 800 },
 
-  // ARCHITECT (OVERHEAD) — EXACT ORDER (round plan)
-  { key: "architect-mikro", label: "ARCHITECT Mikro", category: "ARCHITECT", diameterMm: 120, depthMm: 80, round: true, sensitivity_dB_1w1m: 86, sensitivity_dB_2p83: 86, nominalOhms: 8, max_power: 15 },
+  // ARCHITECT (OVERHEAD) — EXACT ORDER
+  { key: "architect-mikro", label: "ARCHITECT Mikro", category: "ARCHITECT", widthMm: 54, heightMm: 138, depthMm: 26, sensitivity_dB_1w1m: 86, sensitivity_dB_2p83: 86, nominalOhms: 8, max_power: 15 },
   { key: "architect-2-1", label: "ARCHITECT 2-1", category: "ARCHITECT", diameterMm: 240, depthMm: 120, round: true, sensitivity_dB_1w1m: 97, sensitivity_dB_2p83: 100, nominalOhms: 4, max_power: 60 },
   { key: "architect-4-2", label: "ARCHITECT 4-2", category: "ARCHITECT", diameterMm: 300, depthMm: 120, round: true, sensitivity_dB_1w1m: 97, sensitivity_dB_2p83: 97, nominalOhms: 4, max_power: 120 },
   { key: "architect-pas2-2", label: "ARCHITECT PAS2-2", category: "ARCHITECT", diameterMm: 300, depthMm: 150, round: true, sensitivity_dB_1w1m: 97, sensitivity_dB_2p83: 97, nominalOhms: 4, max_power: 120 },
