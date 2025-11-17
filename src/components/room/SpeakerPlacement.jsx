@@ -2237,23 +2237,6 @@ function SpeakerPlacementImpl(props) {
           effectivePreset={effectivePreset} 
           useWides={useWides}
         />
-
-        {canWides && (
-          <div className="mt-4 pt-4 border-t border-[#E5E5E5]">
-            <Button
-              onClick={() => {
-                window.dispatchEvent(new CustomEvent('b44:fw:resetToMedian'));
-              }}
-              variant="outline"
-              size="sm"
-              className="w-full border-[#DCDBD6] text-[#1B1A1A] hover:bg-[#F8F8F7]"
-              disabled={disabled || !mlpPoint || !dimensions}
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Reset Front-Wide to Median
-            </Button>
-          </div>
-        )}
       </CollapsiblePanel>
 
       {overheadCount > 0 && (
