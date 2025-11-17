@@ -1644,7 +1644,7 @@ function RoomDesignerWithState() {
         if (role === 'SBL') return 'LW';
         if (role === 'SBR') return 'RW';
         return role;
-      `);
+      });
     }
 
     const currentRolesSet = new Set(placedSpeakers.map(s => s.role));
