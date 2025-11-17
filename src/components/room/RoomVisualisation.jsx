@@ -1834,7 +1834,7 @@ React.useEffect(() => {
         
         onSetSpeakers(prev => prev.map(s => {
           if (s.id === speakerId) {
-            return { ...s, position: { ...s.position, x: clampedX, y: clampedY } };
+            return { ...s, position: { ...s.position, x: clampedX, y: clampedY, outOfZone: false } };
           }
           return s;
         }));
@@ -1879,7 +1879,8 @@ React.useEffect(() => {
       const outOfZone = rawY < y1 || rawY > y2;
 
       // Determine if this is .4 or .6 layout (requires pair snapping)
-      const requiresPairSnapping = overheadCount === 4 || overheadCount === 6;
+      const requiresPairSnapping = dolbyLayout?.split('.')?.[2] && 
+        (parseInt(dolbyLayout.split('.')[2]) === 4 || parseInt(dolbyLayout.split('.')[2]) === 6);
 
       if (requiresPairSnapping && rowKey) {
         // Find partner in the same row
@@ -1951,7 +1952,7 @@ React.useEffect(() => {
       return updated;
     });
     lastInteractionEpoch.current = timeNowMs();
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, overheadCount]);
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, dolbyLayout]);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
@@ -2280,7 +2281,7 @@ React.useEffect(() => {
     if (placedLCR.length >= 2) {
       const lcrSpls = [];
       
-      for (const spk of placedLCR) {
+      for (let spk of placedLCR) {
         const speakerMeta = getModelDimsM(spk.model);
         const effectiveSplInputs = appState.getEffectiveSplInputs(spk.role);
         const sensitivity = effectiveSplInputs?.sensitivity_dB_1w1m || effectiveSplInputs?.sensitivity || speakerMeta?.sensitivity_dB_1w1m || speakerMeta?.sensitivity || 87;
