@@ -862,6 +862,15 @@ function RoomDesignerWithState() {
   const lastPresetRef = React.useRef(dolbyPreset);
   useEffect(() => { lastPresetRef.current = dolbyPreset; }, [dolbyPreset]);
 
+  // Normalised overhead speaker count based on layout (.2 / .4 / .6 / OFF)
+  // MUST be declared early, before any code that references it
+  const overheadCount = (() => {
+    if (!dolbyPreset) return 0;
+    const parts = String(dolbyPreset).split('.');
+    if (parts.length < 3) return 0;
+    return parseInt(parts[2]) || 0;
+  })();
+
   // ⚠️ Hoisted memos so they’re initialized before any effects that depend on them
   // `stableDimensions` now directly depends on `appState.roomDims` (the source of truth)
   const stableDimensions = useMemo(() => ({
@@ -1703,15 +1712,6 @@ function RoomDesignerWithState() {
     overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
     useFrontGlobal, useMidGlobal, useRearGlobal
   ]);
-
-  // Calculate overhead count from dolbyPreset
-  const overheadCount = useMemo(() => {
-    if (!dolbyPreset) return 0;
-    const parts = String(dolbyPreset).split('.');
-    if (parts.length < 3) return 0;
-    return parseInt(parts[2]) || 0;
-  }, [dolbyPreset]);
-
 
   // Build or rebuild seating positions whenever seating config changes
   useEffect(() => {
