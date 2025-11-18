@@ -494,19 +494,21 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   // Clamp helper (keeps HUD within the plan; safe fallback = window)
   const clampHudOffset = useCallback((x, y) => {
     const hud = hudElRef.current;
-    // If we can't measure, return unchanged (safe)
-    if (!hud) return { x, y };
+    const host = planBoundsRef.current;
 
-    const hudRect  = hud.getBoundingClientRect();
-    const hostRect = planBoundsRef.current?.getBoundingClientRect?.() ?? {
-      left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight
-    };
+    // If we can't measure, just return the requested offset (no crash)
+    if (!hud || !host) {
+      return { x, y };
+    }
 
-    // Compute allowed range so HUD stays fully inside host
-    const minX = - (hudRect.left  - hostRect.left);
-    const minY = - (hudRect.top   - hostRect.top);
-    const maxX =  (hostRect.right - hudRect.right);
-    const maxY =  (hostRect.bottom - hudRect.bottom);
+    const hudRect = hud.getBoundingClientRect();
+    const hostRect = host.getBoundingClientRect();
+
+    // Keep HUD fully inside the plan canvas (hostRect)
+    const minX = -(hudRect.left - hostRect.left);
+    const maxX = hostRect.right - hudRect.right;
+    const minY = -(hudRect.top - hostRect.top);
+    const maxY = hostRect.bottom - hudRect.bottom;
 
     return {
       x: Math.max(minX, Math.min(maxX, x)),
