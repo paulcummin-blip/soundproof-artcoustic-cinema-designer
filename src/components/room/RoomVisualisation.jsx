@@ -520,31 +520,37 @@ const clampHudOffset = useCallback((x, y) => {
 }, []);
 
   // Drag handlers (defined BEFORE they're used in JSX)
-  const onHudHeaderMouseDown = useCallback((e) => {
-    if (!isHudPinned) return;
-    const origX = hudPinnedOffsetPx?.x ?? 0;
-    const origY = hudPinnedOffsetPx?.y ?? 0;
-    hudDragRef.current = { startX: e.clientX, startY: e.clientY, origX, origY };
+const onHudHeaderMouseDown = useCallback((event) => {
+  if (!planBoundsRef.current) return;
+  if (!hudBasePosPx && !hudPosition) return;
 
-    const onHudMouseMove = (e) => {
-      const s = hudDragRef.current;
-      if (!s) return;
-      const dx = e.clientX - s.startX;
-      const dy = e.clientY - s.startY;
-      const next = clampHudOffset(s.origX + dx, s.origY + dy);
-      setHudPinnedOffsetPx(next);
+  event.preventDefault();
+
+  const startBase = hudBasePosPx || hudPosition || { x: 20, y: 20 };
+  const startMouseX = event.clientX;
+  const startMouseY = event.clientY;
+
+  const handleMove = (moveEvent) => {
+    const dx = moveEvent.clientX - startMouseX;
+    const dy = moveEvent.clientY - startMouseY;
+
+    const unclamped = {
+      x: startBase.x + dx,
+      y: startBase.y + dy,
     };
 
-    const onHudMouseUp = () => {
-      hudDragRef.current = null;
-      window.removeEventListener('mousemove', onHudMouseMove);
-      window.removeEventListener('mouseup', onHudMouseUp);
-    };
+    const clamped = clampHudOffset(unclamped.x, unclamped.y);
+    setHudBasePosPx(clamped);
+  };
 
-    window.addEventListener('mousemove', onHudMouseMove);
-    window.addEventListener('mouseup', onHudMouseUp);
-    e.preventDefault();
-  }, [isHudPinned, hudPinnedOffsetPx, clampHudOffset]);
+  const handleUp = () => {
+    window.removeEventListener("mousemove", handleMove);
+    window.removeEventListener("mouseup", handleUp);
+  };
+
+  window.addEventListener("mousemove", handleMove);
+  window.addEventListener("mouseup", handleUp);
+}, [clampHudOffset, hudBasePosPx, hudPosition]);
 
 
   // Helper to clamp HUD within canvas, pick side dynamically
