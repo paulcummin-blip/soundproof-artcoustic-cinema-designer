@@ -64,7 +64,17 @@ export default function SeatHud({
     >
       {/* Header */}
       <div
-        onMouseDown={isHudPinned ? onHudHeaderMouseDown : undefined}
+        onMouseDown={(e) => {
+          if (isHudPinned && onHudHeaderMouseDown) {
+            e.currentTarget.style.cursor = "grabbing";
+            onHudHeaderMouseDown(e);
+          }
+        }}
+        onMouseUp={(e) => {
+          if (isHudPinned) {
+            e.currentTarget.style.cursor = "grab";
+          }
+        }}
         style={{
           fontSize: 13,
           fontWeight: 600,
@@ -76,16 +86,6 @@ export default function SeatHud({
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-        }}
-        onMouseDown={(e) => {
-          if (isHudPinned && onHudHeaderMouseDown) {
-            e.currentTarget.style.cursor = "grabbing";
-          }
-        }}
-        onMouseUp={(e) => {
-          if (isHudPinned) {
-            e.currentTarget.style.cursor = "grab";
-          }
         }}
       >
         <div>
