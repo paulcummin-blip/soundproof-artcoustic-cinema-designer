@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
@@ -2501,37 +2500,43 @@ React.useEffect(() => {
     getCanonicalRole
   ]);
 
-  // Calculate HUD position with clamping
+  // Calculate HUD position with clamping to PLAN CANVAS (not just room)
   const hudPosition = useMemo(() => {
-    if (!effectiveHoveredSeat || !toPx || !roomRect) return null;
+    if (!effectiveHoveredSeat || !toPx) return null;
 
     const [seatX_px, seatY_px] = toPx(Number(effectiveHoveredSeat.x || effectiveHoveredSeat.position?.x || 0), Number(effectiveHoveredSeat.y || effectiveHoveredSeat.position?.y || 0));
     
-    const HUD_EST_W = 280;
-    const HUD_EST_H = 340; // Increased for all RP22 metrics
-
+    const HUD_EST_W = 320; // Slightly wider estimate
+    const HUD_EST_H = 520; // Taller for all RP22 metrics
     const pad = 8;
+
+    // Get plan canvas bounds (full SVG viewport, not just room rect)
+    const planLeft = 0;
+    const planRight = containerW || 1200;
+    const planTop = 0;
+    const planBottom = containerH || 800;
+
     let preferredX = seatX_px + 16;
     let preferredY = seatY_px - HUD_EST_H / 2;
 
     // Flip to left if not enough space on right
-    if (preferredX + HUD_EST_W + pad > roomRect.x + roomRect.width) {
+    if (preferredX + HUD_EST_W + pad > planRight) {
       preferredX = seatX_px - HUD_EST_W - 16;
     }
 
-    // Clamp to canvas bounds
+    // Clamp to PLAN CANVAS bounds (allows HUD in empty space to the right of room)
     const clampedX = Math.min(
-      roomRect.x + roomRect.width - HUD_EST_W - pad,
-      Math.max(roomRect.x + pad, preferredX)
+      planRight - HUD_EST_W - pad,
+      Math.max(planLeft + pad, preferredX)
     );
 
     const clampedY = Math.min(
-      roomRect.y + roomRect.height - HUD_EST_H - pad,
-      Math.max(roomRect.y + pad, preferredY)
+      planBottom - HUD_EST_H - pad,
+      Math.max(planTop + pad, preferredY)
     );
 
     return { x: clampedX, y: clampedY };
-  }, [effectiveHoveredSeat, toPx, roomRect]);
+  }, [effectiveHoveredSeat, toPx, containerW, containerH]);
 
 
   // Phase 1: Calculate and log LCR constraints, and store them in state
@@ -4699,7 +4704,7 @@ return (
     style={{
       aspectRatio: aspect,
       border: '1px solid #DCDBD6',
-      borderRadius: '88px',
+      borderRadius: '0px', // Square corners - no rounded edges
       backgroundColor: '#F8F8F7',
     }}
   >
