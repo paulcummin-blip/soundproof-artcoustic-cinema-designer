@@ -492,29 +492,26 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   // ---------------------------------------------------------------------------
 
   // Clamp helper (keeps HUD within the plan; safe fallback = window)
-  const clampHudOffset = useCallback((x, y) => {
-    const hud = hudElRef.current;
-    const host = planBoundsRef.current;
+const clampHudOffset = useCallback((x, y) => {
+  const hud = hudElRef.current;
+  // If we can't measure, return unchanged (safe)
+  if (!hud) return { x, y };
 
-    // If we can't measure, just return the requested offset (no crash)
-    if (!hud || !host) {
-      return { x, y };
-    }
+  const hudRect  = hud.getBoundingClientRect();
+  const hostRect = planBoundsRef.current?.getBoundingClientRect?.() ?? {
+    left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight
+  };
 
-    const hudRect = hud.getBoundingClientRect();
-    const hostRect = host.getBoundingClientRect();
+  // We now only clamp VERTICALLY so the HUD stays on the canvas,
+  // but we allow full freedom left/right across the plan area.
+  const minY = -(hudRect.top - hostRect.top);
+  const maxY = hostRect.bottom - hudRect.bottom;
 
-    // Keep HUD fully inside the plan canvas (hostRect)
-    const minX = -(hudRect.left - hostRect.left);
-    const maxX = hostRect.right - hudRect.right;
-    const minY = -(hudRect.top - hostRect.top);
-    const maxY = hostRect.bottom - hudRect.bottom;
-
-    return {
-      x: Math.max(minX, Math.min(maxX, x)),
-      y: Math.max(minY, Math.min(maxY, y)),
-    };
-  }, []);
+  return {
+    x, // no horizontal clamp – free to move across the canvas
+    y: Math.max(minY, Math.min(maxY, y)),
+  };
+}, []);
 
   // Drag handlers (defined BEFORE they're used in JSX)
   const onHudHeaderMouseDown = useCallback((e) => {
