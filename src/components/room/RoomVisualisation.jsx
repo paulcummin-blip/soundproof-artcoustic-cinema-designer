@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
@@ -496,82 +495,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   // HELPER FUNCTIONS (declare early to avoid TDZ)
   // ---------------------------------------------------------------------------
 
-  // Clamp helper (keeps HUD within the plan; safe fallback = window)
-  const clampHudOffset = useCallback((x, y) => {
-    const hud = hudElRef.current;
-    // If we can't measure, return unchanged (safe)
-    if (!hud) return { x, y };
 
-    const hudRect  = hud.getBoundingClientRect();
-    const hostRect = planBoundsRef.current?.getBoundingClientRect?.() ?? {
-      left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight
-    };
-
-    // Compute allowed range so HUD stays fully inside host
-    const minX = - (hudRect.left  - hostRect.left);
-    const minY = - (hudRect.top   - hostRect.top);
-    const maxX =  (hostRect.right - hudRect.right);
-    const maxY =  (hostRect.bottom - hudRect.bottom);
-
-    return {
-      x: Math.max(minX, Math.min(maxX, x)),
-      y: Math.max(minY, Math.min(maxY, y)),
-    };
-  }, []);
-
-  // Drag handlers (defined BEFORE they're used in JSX)
-  const onHudHeaderMouseDown = useCallback((e) => {
-    if (!planBoundsRect) return;
-    e.preventDefault();
-
-    const currentPos = seatPanelPos || {
-      x: hudPosition?.x || (planBoundsRect.width / 2) - 140,
-      y: hudPosition?.y || 20,
-    };
-
-    seatPanelDragRef.current = {
-      dragging: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: currentPos.x,
-      origY: currentPos.y,
-    };
-
-    window.addEventListener("mousemove", handleHudMouseMove);
-    window.addEventListener("mouseup", handleHudMouseUp);
-  }, [planBoundsRect, seatPanelPos, hudPosition]);
-
-  const handleHudMouseMove = useCallback((e) => {
-    const state = seatPanelDragRef.current;
-    if (!state.dragging || !planBoundsRect) return;
-
-    const dx = e.clientX - state.startX;
-    const dy = e.clientY - state.startY;
-
-    let newX = state.origX + dx;
-    let newY = state.origY + dy;
-
-    // These values are estimates for the HUD panel size
-    // A more robust solution would measure the actual rendered HUD size.
-    const panelWidth = 320;
-    const panelHeight = 450;
-
-    const minX = 0;
-    const minY = 0;
-    const maxX = planBoundsRect.width - panelWidth;
-    const maxY = planBoundsRect.height - panelHeight;
-
-    newX = Math.max(minX, Math.min(maxX, newX));
-    newY = Math.max(minY, Math.min(maxY, newY));
-
-    setSeatPanelPos({ x: newX, y: newY });
-  }, [planBoundsRect]);
-
-  const handleHudMouseUp = useCallback(() => {
-    seatPanelDragRef.current.dragging = false;
-    window.removeEventListener("mousemove", handleHudMouseMove);
-    window.removeEventListener("mouseup", handleHudMouseUp);
-  }, [handleHudMouseMove]);
 
 
   // Helper to clamp HUD within canvas, pick side dynamically
@@ -2137,7 +2061,7 @@ React.useEffect(() => {
   // NEW: Seat hover handlers
   const handleSeatClick = useCallback((seat) => {
     setHudPinnedSeatId(prev => (prev === seat.id ? null : seat.id));
-    setSeatPanelPos(null); // Reset panel position when pin state changes
+    setSeatPanelPos(null);
   }, []);
 
   const handleSeatMouseEnter = useCallback((seat) => {
@@ -2147,6 +2071,58 @@ React.useEffect(() => {
   const handleSeatMouseLeave = useCallback(() => {
     if (!hudPinnedSeatId) setHoveredSeat(null);
   }, [hudPinnedSeatId]);
+
+  // Drag handlers for seat panel (defined after hudPosition)
+  const onHudHeaderMouseDown = useCallback((e) => {
+    if (!planBoundsRect) return;
+    e.preventDefault();
+
+    const currentPos = seatPanelPos || {
+      x: hudPosition?.x || (planBoundsRect.width / 2) - 140,
+      y: hudPosition?.y || 20,
+    };
+
+    seatPanelDragRef.current = {
+      dragging: true,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: currentPos.x,
+      origY: currentPos.y,
+    };
+
+    window.addEventListener("mousemove", handleHudMouseMove);
+    window.addEventListener("mouseup", handleHudMouseUp);
+  }, [planBoundsRect, seatPanelPos, hudPosition]);
+
+  const handleHudMouseMove = useCallback((e) => {
+    const state = seatPanelDragRef.current;
+    if (!state.dragging || !planBoundsRect) return;
+
+    const dx = e.clientX - state.startX;
+    const dy = e.clientY - state.startY;
+
+    let newX = state.origX + dx;
+    let newY = state.origY + dy;
+
+    const panelWidth = 320;
+    const panelHeight = 450;
+
+    const minX = 0;
+    const minY = 0;
+    const maxX = planBoundsRect.width - panelWidth;
+    const maxY = planBoundsRect.height - panelHeight;
+
+    newX = Math.max(minX, Math.min(maxX, newX));
+    newY = Math.max(minY, Math.min(maxY, newY));
+
+    setSeatPanelPos({ x: newX, y: newY });
+  }, [planBoundsRect]);
+
+  const handleHudMouseUp = useCallback(() => {
+    seatPanelDragRef.current.dragging = false;
+    window.removeEventListener("mousemove", handleHudMouseMove);
+    window.removeEventListener("mouseup", handleHudMouseUp);
+  }, [handleHudMouseMove]);
 
   const mlpAnchorEffective = mlp;
 
