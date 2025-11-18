@@ -4625,19 +4625,23 @@ const renderLevelBadge = useCallback((level) => {
 
     const segments = [];
     for (let i = 0; i < sortedItems.length; i++) {
-        const current = sortedItems[i];
-        const next = sortedItems[(i + 1) % sortedItems.length]; // Wrap around for the last speaker
-        
-        let angle1 = current.a;
-        let angle2 = next.a;
+      const current = sortedItems[i];
+      const next = sortedItems[(i + 1) % sortedItems.length]; // Wrap around for last → first
 
-        // If next is "smaller" than current (due to wrap-around from +180 to -180),
-        // adjust angle2 by adding 360 to get the correct positive sweep.
-        if (angle2 < angle1) {
-            angle2 += 360;
-        }
+      let angle1 = current.a;
+      let angle2 = next.a;
 
-        segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2 });
+      // Fix wrap-around: if next crosses through -180 to 180 boundary
+      if (angle2 < angle1) {
+        angle2 += 360;
+      }
+
+      segments.push({
+        sp1: current.sp,
+        sp2: next.sp,
+        angleA: angle1,
+        angleB: angle2
+      });
     }
 
     const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
@@ -4649,26 +4653,59 @@ const renderLevelBadge = useCallback((level) => {
 
       // Lines from seat to speakers
       labelGroup.push(
-        <line key={`rp22-angle-line1-${idx}`} x1={x1} y1={y1} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
+        <line
+          key={`rp22-angle-line1-${idx}`}
+          x1={x1}
+          y1={y1}
+          x2={seatPx[0]}
+          y2={seatPx[1]}
+          stroke="#888"
+          strokeWidth="1"
+          opacity="0.6"
+        />
       );
       labelGroup.push(
-        <line key={`rp22-angle-line2-${idx}`} x1={x2} y1={y2} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
+        <line
+          key={`rp22-angle-line2-${idx}`}
+          x1={x2}
+          y1={y2}
+          x2={seatPx[0]}
+          y2={seatPx[1]}
+          stroke="#888"
+          strokeWidth="1"
+          opacity="0.6"
+        />
       );
 
       // Angle text
       const midAngle = (angleA + angleB) / 2;
-      const R = 0.6; // Meters offset from seat for the text
-      
+      const R = 0.6; // offset for label placement
+
       const [px, py] = toPx(
-        effectiveHoveredSeat.x + R * Math.sin(midAngle * Math.PI / 180),
-        effectiveHoveredSeat.y - R * Math.cos(midAngle * Math.PI / 180)
+        effectiveHoveredSeat.x + R * Math.sin((midAngle * Math.PI) / 180),
+        effectiveHoveredSeat.y - R * Math.cos((midAngle * Math.PI) / 180)
       );
 
-      const deg = angleB - angleA; // This is the positive difference
+      const deg = angleB - angleA;
+
+      // ❌ Skip huge wrap-around spans (e.g. 200.5°)
+      // Keeps only real, meaningful inter-speaker angles
+      if (!Number.isFinite(deg) || deg <= 0 || deg > 180) {
+        return;
+      }
+
       const text = `${deg.toFixed(1)}°`;
-      
+
       labelGroup.push(
-        <text key={`rp22-angle-text-${idx}`} x={px} y={py} fill="#666" fontSize="11" textAnchor="middle" dominantBaseline="middle">
+        <text
+          key={`rp22-angle-text-${idx}`}
+          x={px}
+          y={py}
+          fill="#666"
+          fontSize="11"
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
           {text}
         </text>
       );
