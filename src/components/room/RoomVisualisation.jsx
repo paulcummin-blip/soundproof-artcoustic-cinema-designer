@@ -503,18 +503,16 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     };
 
     // Compute allowed range so HUD stays fully inside host
-  const pad = 8;
-  const minX = hostRect.left - hudRect.left + pad;
-  const maxX = hostRect.right - hudRect.right - pad;
-  const minY = hostRect.top - hudRect.top + pad;
-  const maxY = hostRect.bottom - hudRect.bottom - pad;
+    const minX = - (hudRect.left  - hostRect.left);
+    const minY = - (hudRect.top   - hostRect.top);
+    const maxX =  (hostRect.right - hudRect.right);
+    const maxY =  (hostRect.bottom - hudRect.bottom);
 
-  return {
-    // allow full horizontal freedom; rely on the canvas width instead of clamping here
-    x,
-    y: Math.max(minY, Math.min(maxY, y)),
-  };
-}, []);
+    return {
+      x: Math.max(minX, Math.min(maxX, x)),
+      y: Math.max(minY, Math.min(maxY, y)),
+    };
+  }, []);
 
   // Drag handlers (defined BEFORE they're used in JSX)
   const onHudHeaderMouseDown = useCallback((e) => {
@@ -2502,11 +2500,6 @@ React.useEffect(() => {
     getCanonicalRole
   ]);
 
-  // Get plan canvas bounding rect for HUD positioning
-  const planBoundsRect = useMemo(() => {
-    return planBoundsRef.current?.getBoundingClientRect();
-  }, [containerW, containerH]);
-
   // Calculate HUD position with clamping to PLAN CANVAS (not just room)
   const hudPosition = useMemo(() => {
     if (!effectiveHoveredSeat || !toPx) return null;
@@ -2518,13 +2511,10 @@ React.useEffect(() => {
     const pad = 8;
 
     // Get plan canvas bounds (full SVG viewport, not just room rect)
-    const planWidth  = planBoundsRect?.width  ?? containerW ?? 1200;
-    const planHeight = planBoundsRect?.height ?? containerH ?? 800;
-
     const planLeft = 0;
-    const planRight = planWidth;
+    const planRight = containerW || 1200;
     const planTop = 0;
-    const planBottom = planHeight;
+    const planBottom = containerH || 800;
 
     let preferredX = seatX_px + 16;
     let preferredY = seatY_px - HUD_EST_H / 2;
@@ -2546,7 +2536,7 @@ React.useEffect(() => {
     );
 
     return { x: clampedX, y: clampedY };
-  }, [effectiveHoveredSeat, toPx, containerW, containerH, planBoundsRect]);
+  }, [effectiveHoveredSeat, toPx, containerW, containerH]);
 
 
   // Phase 1: Calculate and log LCR constraints, and store them in state
