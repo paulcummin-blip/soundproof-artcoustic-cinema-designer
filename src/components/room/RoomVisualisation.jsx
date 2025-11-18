@@ -440,6 +440,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [hudPinnedOffsetPx, setHudPinnedOffsetPx] = useState(null);
   // Absolute HUD position in canvas pixels (top-left of the HUD card)
 const [hudBasePosPx, setHudBasePosPx] = useState(null);
+  const hudPosition = hudBasePosPx;
   const planBoundsRef = useRef(null);
   const svgRef = useRef(null);
   const slsrModeRef = React.useRef('side');
@@ -2543,9 +2544,6 @@ useEffect(() => {
 
   setHudBasePosPx(clamped);
 }, [effectiveHoveredSeat, toPx, containerW, containerH, hudBasePosPx]);
-
-// 2) Expose HUD position for SeatHud: always the absolute base position
-const hudPosition = hudBasePosPx;
 
 
   // Phase 1: Calculate and log LCR constraints, and store them in state
