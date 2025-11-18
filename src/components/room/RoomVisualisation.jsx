@@ -4678,19 +4678,25 @@ const renderLevelBadge = useCallback((level) => {
       );
 
       // Angle text
-      const midAngle = (angleA + angleB) / 2;
-      const R = 0.6; // offset for label placement
+           const midAngle = (angleA + angleB) / 2;
+      const R = 0.6; // metres offset from seat for the text
 
       const [px, py] = toPx(
         effectiveHoveredSeat.x + R * Math.sin((midAngle * Math.PI) / 180),
         effectiveHoveredSeat.y - R * Math.cos((midAngle * Math.PI) / 180)
       );
 
-      const deg = angleB - angleA;
+      // Raw span between the two speakers
+      let deg = angleB - angleA;
 
-      // ❌ Skip huge wrap-around spans (e.g. 200.5°)
-      // Keeps only real, meaningful inter-speaker angles
-      if (!Number.isFinite(deg) || deg <= 0 || deg > 180) {
+      // If we picked the long way round (> 180°), flip to the smaller arc.
+      // This removes the "200.5°" style outer span without killing the overlay.
+      if (deg > 180) {
+        deg = 360 - deg;
+      }
+
+      // Only skip truly invalid / degenerate spans
+      if (!Number.isFinite(deg) || deg <= 0) {
         return;
       }
 
