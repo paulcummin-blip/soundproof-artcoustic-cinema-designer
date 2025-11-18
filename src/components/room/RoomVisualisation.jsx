@@ -2587,6 +2587,122 @@ React.useEffect(() => {
     overheadZones,
   };
 
+  // Render functions
+  const renderRoomElements = () => null;
+  const renderSubwoofers = () => null;
+  const renderSeatingPositions = () => {
+    return seatingPositions.map(seat => {
+      const [x, y] = toPx(seat.x, seat.y);
+      return (
+        <circle
+          key={seat.id}
+          cx={x}
+          cy={y}
+          r={8}
+          fill={seat.isPrimary ? '#10B981' : '#3B82F6'}
+          stroke="white"
+          strokeWidth="2"
+          style={{ cursor: 'pointer' }}
+          onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
+          onMouseEnter={() => handleSeatMouseEnter(seat)}
+          onMouseLeave={handleSeatMouseLeave}
+          onClick={() => handleSeatClick(seat)}
+        />
+      );
+    });
+  };
+  
+  const overheadIconElements = null;
+  const renderSpeakers = () => {
+    return placedSpeakers.filter(isRenderableSpeaker).map(spk => {
+      const [x, y] = toPx(spk.position.x, spk.position.y);
+      const dims = getModelDimsM(spk.model);
+      const yawDeg = getYawForObject(spk, lcrAngleInfo, aimAtMLP, { width: widthM, length: lengthM }, getModelDimsM);
+      
+      return (
+        <SpeakerIcon
+          key={spk.id}
+          speaker={spk}
+          x={x}
+          y={y}
+          dims={dims}
+          scale={scale}
+          yawDeg={yawDeg}
+          onMouseDown={(e) => handleMouseDown(e, spk.id, 'speaker')}
+          onMouseEnter={() => setHoveredSpeaker(spk)}
+          onMouseLeave={() => setHoveredSpeaker(null)}
+        />
+      );
+    });
+  };
+  
+  const renderSpeakerLabels = () => {
+    return placedSpeakers.filter(isRenderableSpeaker).map(spk => {
+      const [x, y] = toPx(spk.position.x, spk.position.y);
+      return (
+        <text
+          key={`label-${spk.id}`}
+          x={x}
+          y={y - 20}
+          fontSize="10"
+          textAnchor="middle"
+          fill="#625143"
+          pointerEvents="none"
+        >
+          {getCanonicalRole(spk.role)}
+        </text>
+      );
+    });
+  };
+  
+  const renderRp22AnglesOverlay = () => null;
+  const renderDolbyZones = () => null;
+  
+  const ZoneComponents = {
+    LCR: null,
+    SIDE_SURROUND: null,
+    REAR_SURROUND: null,
+    OVERHEADS: null,
+    FRONT_WIDE: null,
+  };
+  
+  const MLPMarker = mlp ? (
+    <circle
+      cx={mlpPxX}
+      cy={mlpPxY}
+      r={6}
+      fill="#10B981"
+      stroke="white"
+      strokeWidth="2"
+      pointerEvents="none"
+    />
+  ) : null;
+
+  const renderLevelBadge = useCallback((level) => {
+    if (!level || level === 'N/A' || level === '—' || level === 'Below L1') {
+      return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
+    }
+    
+    const bgColor = level === 'L4' ? '#10B981' :
+                    level === 'L3' ? '#FBBF24' :
+                    level === 'L2' ? '#F97316' : '#EF4444';
+    
+    return (
+      <span 
+        style={{
+          fontWeight: 600, 
+          fontSize: 10,
+          padding: '2px 6px',
+          borderRadius: 4,
+          background: bgColor,
+          color: 'white'
+        }}
+      >
+        {level}
+      </span>
+    );
+  }, []);
+
 // --- Main render ---
 // SAFETY: local fallbacks in case parent metrics/ids are not initialised yet
 const svgWSafe = Number(svgW) || Math.max(1, Number(roomRect?.width)  || 1200);
