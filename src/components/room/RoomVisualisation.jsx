@@ -4664,7 +4664,7 @@ return {
         <line key={`rp22-angle-line2-${idx}`} x1={x2} y1={y2} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
       );
 
-      // Angle text for each segment
+      // Angle text
       const midAngle = (angleA + angleB) / 2;
       const R = 0.6; // Meters offset from seat for the text
       
