@@ -2500,6 +2500,11 @@ React.useEffect(() => {
     getCanonicalRole
   ]);
 
+  // Get plan canvas bounding rect for HUD positioning
+  const planBoundsRect = useMemo(() => {
+    return planBoundsRef.current?.getBoundingClientRect();
+  }, [containerW, containerH]);
+
   // Calculate HUD position with clamping to PLAN CANVAS (not just room)
   const hudPosition = useMemo(() => {
     if (!effectiveHoveredSeat || !toPx) return null;
@@ -2511,10 +2516,13 @@ React.useEffect(() => {
     const pad = 8;
 
     // Get plan canvas bounds (full SVG viewport, not just room rect)
+    const planWidth  = planBoundsRect?.width  ?? containerW ?? 1200;
+    const planHeight = planBoundsRect?.height ?? containerH ?? 800;
+
     const planLeft = 0;
-    const planRight = containerW || 1200;
+    const planRight = planWidth;
     const planTop = 0;
-    const planBottom = containerH || 800;
+    const planBottom = planHeight;
 
     let preferredX = seatX_px + 16;
     let preferredY = seatY_px - HUD_EST_H / 2;
@@ -2536,7 +2544,7 @@ React.useEffect(() => {
     );
 
     return { x: clampedX, y: clampedY };
-  }, [effectiveHoveredSeat, toPx, containerW, containerH]);
+  }, [effectiveHoveredSeat, toPx, containerW, containerH, planBoundsRect]);
 
 
   // Phase 1: Calculate and log LCR constraints, and store them in state
