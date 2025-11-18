@@ -4674,24 +4674,10 @@ return {
       );
 
       const deg = angleB - angleA; // This is the positive difference
-
-      // If this is the huge wrap-around gap (like 200.5°), skip the label
-      if (deg > 180) {
-        return;
-      }
-
       const text = `${deg.toFixed(1)}°`;
       
       labelGroup.push(
-        <text
-          key={`rp22-angle-text-${idx}`}
-          x={px}
-          y={py}
-          fill="#666"
-          fontSize="11"
-          textAnchor="middle"
-          dominantBaseline="middle"
-        >
+        <text key={`rp22-angle-text-${idx}`} x={px} y={py} fill="#666" fontSize="11" textAnchor="middle" dominantBaseline="middle">
           {text}
         </text>
       );
