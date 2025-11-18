@@ -2502,31 +2502,37 @@ React.useEffect(() => {
     getCanonicalRole
   ]);
 
-  // Calculate HUD position with clamping to PLAN CANVAS (not just room)
+  // Calculate HUD default position – clamped to full PLAN CANVAS, not just room
   const hudPosition = useMemo(() => {
     if (!effectiveHoveredSeat || !toPx) return null;
 
-    const [seatX_px, seatY_px] = toPx(Number(effectiveHoveredSeat.x || effectiveHoveredSeat.position?.x || 0), Number(effectiveHoveredSeat.y || effectiveHoveredSeat.position?.y || 0));
-    
-    const HUD_EST_W = 320; // Slightly wider estimate
-    const HUD_EST_H = 520; // Taller for all RP22 metrics
+    // Seat in pixels
+    const [seatX_px, seatY_px] = toPx(
+      Number(effectiveHoveredSeat.x ?? effectiveHoveredSeat.position?.x ?? 0),
+      Number(effectiveHoveredSeat.y ?? effectiveHoveredSeat.position?.y ?? 0)
+    );
+
+    // Estimated HUD size (in px)
+    const HUD_EST_W = 320;
+    const HUD_EST_H = 520;
     const pad = 8;
 
-    // Get plan canvas bounds (full SVG viewport, not just room rect)
+    // Full plan canvas bounds (RoomVisualisation root)
     const planLeft = 0;
-    const planRight = containerW || 1200;
     const planTop = 0;
-    const planBottom = containerH || 800;
+    const planRight = (containerW || 1200);
+    const planBottom = (containerH || 800);
 
+    // Default: to the right of the seat
     let preferredX = seatX_px + 16;
     let preferredY = seatY_px - HUD_EST_H / 2;
 
-    // Flip to left if not enough space on right
+    // Flip to left if it would run out of space on the right
     if (preferredX + HUD_EST_W + pad > planRight) {
       preferredX = seatX_px - HUD_EST_W - 16;
     }
 
-    // Clamp to PLAN CANVAS bounds (allows HUD in empty space to the right of room)
+    // Clamp inside the FULL canvas (not just room bounds)
     const clampedX = Math.min(
       planRight - HUD_EST_W - pad,
       Math.max(planLeft + pad, preferredX)
