@@ -2126,7 +2126,6 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                 { key: 'OVERHEADS_2',   label: 'Overheads .2' },
                 { key: 'OVERHEADS_4',   label: 'Overheads .4' },
                 { key: 'OVERHEADS_6',   label: 'Overheads .6' },
-                { key: 'RP22_ANGLES',   label: 'RP22 Angles' },
                 { key: 'enableDolbyZones', label: 'Dolby Zones' },
               ]
                 .filter(({ key }) => overlayRelevance[key] !== false)
