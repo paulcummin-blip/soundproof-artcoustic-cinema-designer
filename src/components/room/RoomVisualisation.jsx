@@ -2577,6 +2577,8 @@ React.useEffect(() => {
     height: '100%',
   };
 
+  const overlaysForRendering = _overlays || {};
+
 // --- Main render ---
 // SAFETY: local fallbacks in case parent metrics/ids are not initialised yet
 const svgWSafe = Number(svgW) || Math.max(1, Number(roomRect?.width)  || 1200);
