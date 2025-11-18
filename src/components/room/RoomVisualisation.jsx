@@ -503,16 +503,18 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     };
 
     // Compute allowed range so HUD stays fully inside host
-    const minX = - (hudRect.left  - hostRect.left);
-    const minY = - (hudRect.top   - hostRect.top);
-    const maxX =  (hostRect.right - hudRect.right);
-    const maxY =  (hostRect.bottom - hudRect.bottom);
+  const pad = 8;
+  const minX = hostRect.left - hudRect.left + pad;
+  const maxX = hostRect.right - hudRect.right - pad;
+  const minY = hostRect.top - hudRect.top + pad;
+  const maxY = hostRect.bottom - hudRect.bottom - pad;
 
-    return {
-      x: Math.max(minX, Math.min(maxX, x)),
-      y: Math.max(minY, Math.min(maxY, y)),
-    };
-  }, []);
+  return {
+    // allow full horizontal freedom; rely on the canvas width instead of clamping here
+    x,
+    y: Math.max(minY, Math.min(maxY, y)),
+  };
+}, []);
 
   // Drag handlers (defined BEFORE they're used in JSX)
   const onHudHeaderMouseDown = useCallback((e) => {
