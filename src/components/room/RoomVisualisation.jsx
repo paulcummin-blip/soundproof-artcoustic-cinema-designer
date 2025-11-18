@@ -496,21 +496,25 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   // Clamp helper (keeps HUD within the plan; safe fallback = window)
 const clampHudOffset = useCallback((x, y) => {
   const hud = hudElRef.current;
-  // If we can't measure, return unchanged (safe)
-  if (!hud) return { x, y };
+  const host = planBoundsRef.current;
+  if (!hud || !host) {
+    return { x, y };
+  }
 
-  const hudRect  = hud.getBoundingClientRect();
-  const hostRect = planBoundsRef.current?.getBoundingClientRect?.() ?? {
-    left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight
-  };
+  const hudRect = hud.getBoundingClientRect();
+  const hostRect = host.getBoundingClientRect();
 
-  // We now only clamp VERTICALLY so the HUD stays on the canvas,
-  // but we allow full freedom left/right across the plan area.
-  const minY = -(hudRect.top - hostRect.top);
-  const maxY = hostRect.bottom - hudRect.bottom;
+  const hudW = hudRect.width;
+  const hudH = hudRect.height;
+
+  // Allowed range so the HUD card stays fully inside the canvas
+  const minX = 0;
+  const minY = 0;
+  const maxX = Math.max(0, hostRect.width  - hudW);
+  const maxY = Math.max(0, hostRect.height - hudH);
 
   return {
-    x, // no horizontal clamp – free to move across the canvas
+    x: Math.max(minX, Math.min(maxX, x)),
     y: Math.max(minY, Math.min(maxY, y)),
   };
 }, []);
