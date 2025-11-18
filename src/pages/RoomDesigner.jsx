@@ -2102,14 +2102,17 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <strong style={{
-                fontSize: 16,
-                fontWeight: 700,
-                display: "flex",
-                alignItems: "center",
-                height: "100%",
-                marginLeft: "12px"
-              }}>
+              <strong
+                style={{
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: "#213428",
+                  display: "flex",
+                  alignItems: "center",
+                  height: "100%",
+                  marginLeft: "12px",
+                }}
+              >
                 {(dolbyPreset || "").split(" ")[0] || ""}
               </strong>
             </div>
