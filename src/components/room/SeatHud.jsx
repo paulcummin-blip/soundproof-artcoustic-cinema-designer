@@ -15,8 +15,11 @@ export default function SeatHud({
 }) {
   if (!tooltipData) return null;
 
-  const left = (hudPosition?.x ?? 20);
-  const top  = (hudPosition?.y ?? 20);
+  const left = hudPosition?.x ?? 20;
+  const top  = hudPosition?.y ?? 20;
+
+  // Remove transform from hudDynamicStyle but keep visibility / pointer settings
+  const { transform, ...restHudDynamicStyle } = hudDynamicStyle || {};
 
   const rp23 = tooltipData.rp23 ?? {};
   const splAtSeat = tooltipData.splAtSeat ?? {};
@@ -59,7 +62,7 @@ export default function SeatHud({
         display: "flex",
         flexDirection: "column",
         gap: 4,
-        ...hudDynamicStyle,
+        ...restHudDynamicStyle, // IMPORTANT: no transform, just visibility
       }}
     >
       {/* Header */}
