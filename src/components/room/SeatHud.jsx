@@ -45,7 +45,7 @@ export default function SeatHud({
         top,
         background: "white",
         border: "1px solid #DCDBD6",
-        borderRadius: 8,
+        borderRadius: 4,
         padding: 12,
         boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
         pointerEvents: isHudPinned ? "auto" : "none",
@@ -72,10 +72,20 @@ export default function SeatHud({
           marginBottom: 4,
           paddingBottom: 4,
           borderBottom: "1px solid #E6E4DD",
-          cursor: isHudPinned ? "move" : "default",
+          cursor: isHudPinned ? "grab" : "default",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+        }}
+        onMouseDown={(e) => {
+          if (isHudPinned && onHudHeaderMouseDown) {
+            e.currentTarget.style.cursor = "grabbing";
+          }
+        }}
+        onMouseUp={(e) => {
+          if (isHudPinned) {
+            e.currentTarget.style.cursor = "grab";
+          }
         }}
       >
         <div>
