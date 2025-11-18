@@ -4571,32 +4571,31 @@ return {
   const svgW = containerW;
   const svgH = containerH;
 
- // Helper to render level badge
-const renderLevelBadge = useCallback((level) => {
-  if (!level || level === 'N/A' || level === '—' || level === 'Below L1') {
-    return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
-  }
-
-  const bgColor = level === 'L4' ? '#213428' :
-                  level === 'L3' ? '#3E4349' :
-                  level === 'L2' ? '#625143' :
-                  '#4A230F';
-
-  return (
-    <span 
-      style={{
-        fontWeight: 600, 
-        fontSize: 10,
-        padding: '2px 6px',
-        borderRadius: 4,
-        background: bgColor,
-        color: 'white'
-      }}
-    >
-      {level}
-    </span>
-  );
-}, []);
+  // Helper to render level badge
+  const renderLevelBadge = useCallback((level) => {
+    if (!level || level === 'N/A' || level === '—' || level === 'Below L1') {
+      return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
+    }
+    
+    const bgColor = level === 'L4' ? '#10B981' :
+                    level === 'L3' ? '#FBBF24' :
+                    level === 'L2' ? '#F97316' : '#EF4444';
+    
+    return (
+      <span 
+        style={{
+          fontWeight: 600, 
+          fontSize: 10,
+          padding: '2px 6px',
+          borderRadius: 4,
+          background: bgColor,
+          color: 'white'
+        }}
+      >
+        {level}
+      </span>
+    );
+  }, []);
 
   const renderRp22AnglesOverlay = useCallback(() => {
     if (!overlaysForRendering?.enableRp22Angles) return null;
@@ -4631,105 +4630,60 @@ const renderLevelBadge = useCallback((level) => {
     // Atan2 returns -180 to 180. We need to handle the wrap-around.
     // Example: -170 is adjacent to +170.
     // Sorting by raw angle and then detecting segments is robust.
-// Sort speakers to get a continuous sweep around the seat
-// Start with positive angles (right) then negative angles (left), assuming forward (0 deg) is +Y.
-// Atan2 returns -180 to 180. We need to handle the wrap-around.
-// Example: -170 is adjacent to +170.
-// Sorting by raw angle and then detecting segments is robust.
-const sortedItems = az.sort((a, b) => a.a - b.a);
+    const sortedItems = az.sort((a, b) => a.a - b.a);
 
-const segments = [];
-for (let i = 0; i < sortedItems.length; i++) {
-  const current = sortedItems[i];
-  const next = sortedItems[(i + 1) % sortedItems.length]; // Wrap around for the last speaker
+    const segments = [];
+    for (let i = 0; i < sortedItems.length; i++) {
+        const current = sortedItems[i];
+        const next = sortedItems[(i + 1) % sortedItems.length]; // Wrap around for the last speaker
+        
+        let angle1 = current.a;
+        let angle2 = next.a;
 
-  let angle1 = current.a;
-  let angle2 = next.a;
+        // If next is "smaller" than current (due to wrap-around from +180 to -180),
+        // adjust angle2 by adding 360 to get the correct positive sweep.
+        if (angle2 < angle1) {
+            angle2 += 360;
+        }
 
-  // If next is "smaller" than current (due to wrap-around from +180 to -180),
-  // adjust angle2 by adding 360 to get the correct positive sweep.
-  if (angle2 < angle1) {
-    angle2 += 360;
-  }
+        segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2 });
+    }
 
-  segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2 });
-}
+    const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
+    const labelGroup = [];
 
-// --- NEW: work out which segment is the big "back gap" and don't label it ---
-const segmentsWithDeg = segments.map(seg => {
-  const deg = seg.angleB - seg.angleA; // positive difference
-  return { ...seg, deg };
-});
+    segments.forEach(({ sp1, sp2, angleA, angleB }, idx) => {
+      const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
+      const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
 
-const maxDeg = segmentsWithDeg.reduce((max, seg) => (
-  seg.deg > max ? seg.deg : max
-), 0);
+      // Lines from seat to speakers
+      labelGroup.push(
+        <line key={`rp22-angle-line1-${idx}`} x1={x1} y1={y1} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
+      );
+      labelGroup.push(
+        <line key={`rp22-angle-line2-${idx}`} x1={x2} y1={y2} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
+      );
 
-const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
-const labelGroup = [];
+      // Angle text
+      const midAngle = (angleA + angleB) / 2;
+      const R = 0.6; // Meters offset from seat for the text
+      
+      const [px, py] = toPx(
+        effectiveHoveredSeat.x + R * Math.sin(midAngle * Math.PI / 180),
+        effectiveHoveredSeat.y - R * Math.cos(midAngle * Math.PI / 180)
+      );
 
-segmentsWithDeg.forEach(({ sp1, sp2, angleA, angleB, deg }, idx) => {
-  const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
-  const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
+      const deg = angleB - angleA; // This is the positive difference
+      const text = `${deg.toFixed(1)}°`;
+      
+      labelGroup.push(
+        <text key={`rp22-angle-text-${idx}`} x={px} y={py} fill="#666" fontSize="11" textAnchor="middle" dominantBaseline="middle">
+          {text}
+        </text>
+      );
+    });
 
-  // Lines from seat to speakers (always keep these)
-  labelGroup.push(
-    <line
-      key={`rp22-angle-line1-${idx}`}
-      x1={x1}
-      y1={y1}
-      x2={seatPx[0]}
-      y2={seatPx[1]}
-      stroke="#888"
-      strokeWidth="1"
-      opacity="0.6"
-    />
-  );
-  labelGroup.push(
-    <line
-      key={`rp22-angle-line2-${idx}`}
-      x1={x2}
-      y1={y2}
-      x2={seatPx[0]}
-      y2={seatPx[1]}
-      stroke="#888"
-      strokeWidth="1"
-      opacity="0.6"
-    />
-  );
-
-  // Skip the single largest gap (this is where the 200.5° comes from)
-  if (deg >= maxDeg - 0.01) {
-    return;
-  }
-
-  // Angle text for the useful gaps
-  const midAngle = (angleA + angleB) / 2;
-  const R = 0.6; // Meters offset from seat for the text
-
-  const [px, py] = toPx(
-    effectiveHoveredSeat.x + R * Math.sin((midAngle * Math.PI) / 180),
-    effectiveHoveredSeat.y - R * Math.cos((midAngle * Math.PI) / 180)
-  );
-
-  const text = `${deg.toFixed(1)}°`;
-
-  labelGroup.push(
-    <text
-      key={`rp22-angle-text-${idx}`}
-      x={px}
-      y={py}
-      fill="#666"
-      fontSize="11"
-      textAnchor="middle"
-      dominantBaseline="middle"
-    >
-      {text}
-    </text>
-  );
-});
-
-return <g aria-label="rp22-surround-angles">{labelGroup}</g>;
+    return <g aria-label="rp22-surround-angles">{labelGroup}</g>;
   }, [overlaysForRendering, effectiveHoveredSeat, placedSpeakers, scale, toPx, getCanonicalRole]);
 
   // Build HUD style safely
