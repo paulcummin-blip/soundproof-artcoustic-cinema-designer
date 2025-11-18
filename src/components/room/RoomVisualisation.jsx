@@ -4643,31 +4643,63 @@ const renderRp22AnglesOverlay = useCallback(() => {
   const labelGroup = [];
 
   segments.forEach(({ sp1, sp2, angleA, angleB }, idx) => {
-    const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
-    const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
+    // 1) Work out the mid-angle of this segment
+    const rawMid = (angleA + angleB) / 2;
 
-    // Lines from seat to each speaker
-    labelGroup.push(
-      <line key={`rp22-angle-line1-${idx}`} x1={x1} y1={y1} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
-    );
-    labelGroup.push(
-      <line key={`rp22-angle-line2-${idx}`} x1={x2} y1={y2} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
-    );
+    // Normalise mid-angle to range -180..+180 (0° = straight ahead to screen)
+    const midNorm = ((rawMid + 540) % 360) - 180;
 
-    // Determine label position
-    const midAngle = (angleA + angleB) / 2;
-    const R = 0.6;
+    // 2) Skip segments whose midpoint is in front of the listener
+    //    RP22 P5 cares about the surround field, not a gap across the screen.
+    //    Anything within ±60° of straight ahead is treated as "front" and ignored.
+    if (Math.abs(midNorm) < 60) {
+      return;
+    }
 
-    const [px, py] = toPx(
-      effectiveHoveredSeat.x + R * Math.sin((midAngle * Math.PI) / 180),
-      effectiveHoveredSeat.y - R * Math.cos((midAngle * Math.PI) / 180)
-    );
-
-    // Compute smaller arc angle
+    // 3) Compute the smaller arc angle between the two speakers
     let deg = angleB - angleA;
     if (deg > 180) deg = 360 - deg;
 
-    if (!Number.isFinite(deg) || deg <= 0) return;
+    if (!Number.isFinite(deg) || deg <= 0) {
+      return;
+    }
+
+    // 4) Draw lines from seat to each speaker
+    const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
+    const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
+
+    labelGroup.push(
+      <line
+        key={`rp22-angle-line1-${idx}`}
+        x1={x1}
+        y1={y1}
+        x2={seatPx[0]}
+        y2={seatPx[1]}
+        stroke="#888"
+        strokeWidth="1"
+        opacity="0.6"
+      />
+    );
+    labelGroup.push(
+      <line
+        key={`rp22-angle-line2-${idx}`}
+        x1={x2}
+        y1={y2}
+        x2={seatPx[0]}
+        y2={seatPx[1]}
+        stroke="#888"
+        strokeWidth="1"
+        opacity="0.6"
+      />
+    );
+
+    // 5) Position the label slightly away from the seat along the segment midpoint
+    const R = 0.6; // metres offset from seat for the text
+
+    const [px, py] = toPx(
+      effectiveHoveredSeat.x + R * Math.sin((rawMid * Math.PI) / 180),
+      effectiveHoveredSeat.y - R * Math.cos((rawMid * Math.PI) / 180)
+    );
 
     const text = `${deg.toFixed(1)}°`;
 
