@@ -4652,13 +4652,6 @@ return {
     const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
     const labelGroup = [];
 
-    // Calculate total arc span for central label
-    const firstAngle = sortedItems[0].a;
-    const lastAngle = sortedItems[sortedItems.length - 1].a;
-    let totalSpan = lastAngle - firstAngle;
-    // Adjust for wrap-around if needed
-    if (totalSpan < 0) totalSpan += 360;
-
     segments.forEach(({ sp1, sp2, angleA, angleB }, idx) => {
       const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
       const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
@@ -4671,7 +4664,7 @@ return {
         <line key={`rp22-angle-line2-${idx}`} x1={x2} y1={y2} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
       );
 
-      // Angle text (per-segment labels)
+      // Angle text
       const midAngle = (angleA + angleB) / 2;
       const R = 0.6; // Meters offset from seat for the text
       
@@ -4689,10 +4682,6 @@ return {
         </text>
       );
     });
-
-    // REMOVED: Central total angle label
-    // The total span is calculated but not rendered
-    // Users can see the individual segment angles instead
 
     return <g aria-label="rp22-surround-angles">{labelGroup}</g>;
   }, [overlaysForRendering, effectiveHoveredSeat, placedSpeakers, scale, toPx, getCanonicalRole]);
