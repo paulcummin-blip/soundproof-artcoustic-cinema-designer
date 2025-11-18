@@ -4561,31 +4561,32 @@ return {
   const svgW = containerW;
   const svgH = containerH;
 
-  // Helper to render level badge
-  const renderLevelBadge = useCallback((level) => {
-    if (!level || level === 'N/A' || level === '—' || level === 'Below L1') {
-      return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
-    }
-    
-    const bgColor = level === 'L4' ? '#10B981' :
-                    level === 'L3' ? '#FBBF24' :
-                    level === 'L2' ? '#F97316' : '#EF4444';
-    
-    return (
-      <span 
-        style={{
-          fontWeight: 600, 
-          fontSize: 10,
-          padding: '2px 6px',
-          borderRadius: 4,
-          background: bgColor,
-          color: 'white'
-        }}
-      >
-        {level}
-      </span>
-    );
-  }, []);
+// Helper to render level badge
+const renderLevelBadge = useCallback((level) => {
+  if (!level || level === 'N/A' || level === '—' || level === 'Below L1') {
+    return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
+  }
+
+  const bgColor = level === 'L4' ? '#213428' :
+                  level === 'L3' ? '#3E4349' :
+                  level === 'L2' ? '#625143' :
+                  '#4A230F';
+
+  return (
+    <span 
+      style={{
+        fontWeight: 600, 
+        fontSize: 10,
+        padding: '2px 6px',
+        borderRadius: 4,
+        background: bgColor,
+        color: 'white'
+      }}
+    >
+      {level}
+    </span>
+  );
+}, []);
 
   const renderRp22AnglesOverlay = useCallback(() => {
     if (!overlaysForRendering?.enableRp22Angles) return null;
