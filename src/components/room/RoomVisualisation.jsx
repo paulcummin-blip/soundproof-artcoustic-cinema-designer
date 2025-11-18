@@ -4588,137 +4588,108 @@ const renderLevelBadge = useCallback((level) => {
   );
 }, []);
 
-  const renderRp22AnglesOverlay = useCallback(() => {
-    if (!overlaysForRendering?.enableRp22Angles) return null;
-    if (!Number.isFinite(scale)) return null;
-    if (!effectiveHoveredSeat) return null;
+const renderRp22AnglesOverlay = useCallback(() => {
+  // For now, always try to render when a seat is hovered.
+  if (!Number.isFinite(scale)) return null;
+  if (!effectiveHoveredSeat) return null;
 
-    const allSurrounds = (placedSpeakers || []).filter(s => {
-      const r = getCanonicalRole(s.role);
-      return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
-    });
+  // 1) Collect all surround-type speakers around this seat
+  const allSurrounds = (placedSpeakers || []).filter((s) => {
+    const r = getCanonicalRole(s.role);
+    return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r);
+  });
 
-    const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
-    const hasSR = allSurrounds.some(s => getCanonicalRole(s.role) === 'SR');
+  if (allSurrounds.length < 2) return null;
 
-    const eligibleSurrounds = allSurrounds.filter(s => {
-      const r = getCanonicalRole(s.role);
-      if (r === 'LW' || r === 'RW') return hasSL && hasSR;
-      return true;
-    });
+  // 2) Wides only count if proper SL/SR exist
+  const hasSL = allSurrounds.some((s) => getCanonicalRole(s.role) === "SL");
+  const hasSR = allSurrounds.some((s) => getCanonicalRole(s.role) === "SR");
 
-    if (eligibleSurrounds.length < 2) return null;
+  const eligibleSurrounds = allSurrounds.filter((s) => {
+    const r = getCanonicalRole(s.role);
+    if (r === "LW" || r === "RW") return hasSL && hasSR;
+    return true;
+  });
 
-    const az = [];
-    for (const sp of eligibleSurrounds) {
-      const a = azimuthDegFromSeat(effectiveHoveredSeat, sp.position);
-      if (Number.isFinite(a)) az.push({ a, sp });
-    }
-    if (az.length < 2) return null;
+  if (eligibleSurrounds.length < 2) return null;
 
-    // Sort speakers to get a continuous sweep around the seat
-    // Start with positive angles (right) then negative angles (left), assuming forward (0 deg) is +Y.
-    // Atan2 returns -180 to 180. We need to handle the wrap-around.
-    // Example: -170 is adjacent to +170.
-    // Sorting by raw angle and then detecting segments is robust.
-    const sortedItems = az.sort((a, b) => a.a - b.a);
+  // 3) Compute azimuth of each surround from this seat
+  const az = [];
+  for (const sp of eligibleSurrounds) {
+    const a = azimuthDegFromSeat(effectiveHoveredSeat, sp.position);
+    if (Number.isFinite(a)) az.push({ a, sp });
+  }
 
-    const segments = [];
-    for (let i = 0; i < sortedItems.length; i++) {
-      const current = sortedItems[i];
-      const next = sortedItems[(i + 1) % sortedItems.length]; // Wrap around for last → first
+  if (az.length < 2) return null;
 
-      let angle1 = current.a;
-      let angle2 = next.a;
+  // 4) Sort by raw angle (-180..+180)
+  const sortedItems = az.sort((a, b) => a.a - b.a);
 
-      // Fix wrap-around: if next crosses through -180 to 180 boundary
-      if (angle2 < angle1) {
-        angle2 += 360;
-      }
+  // 5) Build segments between each neighbour
+  const segments = [];
+  for (let i = 0; i < sortedItems.length; i++) {
+    const current = sortedItems[i];
+    const next = sortedItems[(i + 1) % sortedItems.length];
 
-      segments.push({
-        sp1: current.sp,
-        sp2: next.sp,
-        angleA: angle1,
-        angleB: angle2
-      });
-    }
+    let angle1 = current.a;
+    let angle2 = next.a;
 
-    const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
-    const labelGroup = [];
+    if (angle2 < angle1) angle2 += 360;
 
-    segments.forEach(({ sp1, sp2, angleA, angleB }, idx) => {
-      const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
-      const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
+    segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2 });
+  }
 
-      // Lines from seat to speakers
-      labelGroup.push(
-        <line
-          key={`rp22-angle-line1-${idx}`}
-          x1={x1}
-          y1={y1}
-          x2={seatPx[0]}
-          y2={seatPx[1]}
-          stroke="#888"
-          strokeWidth="1"
-          opacity="0.6"
-        />
-      );
-      labelGroup.push(
-        <line
-          key={`rp22-angle-line2-${idx}`}
-          x1={x2}
-          y1={y2}
-          x2={seatPx[0]}
-          y2={seatPx[1]}
-          stroke="#888"
-          strokeWidth="1"
-          opacity="0.6"
-        />
-      );
+  const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
+  const labelGroup = [];
 
-      // Angle text
-           const midAngle = (angleA + angleB) / 2;
-      const R = 0.6; // metres offset from seat for the text
+  segments.forEach(({ sp1, sp2, angleA, angleB }, idx) => {
+    const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
+    const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
 
-      const [px, py] = toPx(
-        effectiveHoveredSeat.x + R * Math.sin((midAngle * Math.PI) / 180),
-        effectiveHoveredSeat.y - R * Math.cos((midAngle * Math.PI) / 180)
-      );
+    // Lines from seat to each speaker
+    labelGroup.push(
+      <line key={`rp22-angle-line1-${idx}`} x1={x1} y1={y1} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
+    );
+    labelGroup.push(
+      <line key={`rp22-angle-line2-${idx}`} x1={x2} y1={y2} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
+    );
 
-      // Raw span between the two speakers
-      let deg = angleB - angleA;
+    // Determine label position
+    const midAngle = (angleA + angleB) / 2;
+    const R = 0.6;
 
-      // If we picked the long way round (> 180°), flip to the smaller arc.
-      // This removes the "200.5°" style outer span without killing the overlay.
-      if (deg > 180) {
-        deg = 360 - deg;
-      }
+    const [px, py] = toPx(
+      effectiveHoveredSeat.x + R * Math.sin((midAngle * Math.PI) / 180),
+      effectiveHoveredSeat.y - R * Math.cos((midAngle * Math.PI) / 180)
+    );
 
-      // Only skip truly invalid / degenerate spans
-      if (!Number.isFinite(deg) || deg <= 0) {
-        return;
-      }
+    // Compute smaller arc angle
+    let deg = angleB - angleA;
+    if (deg > 180) deg = 360 - deg;
 
-      const text = `${deg.toFixed(1)}°`;
+    if (!Number.isFinite(deg) || deg <= 0) return;
 
-      labelGroup.push(
-        <text
-          key={`rp22-angle-text-${idx}`}
-          x={px}
-          y={py}
-          fill="#666"
-          fontSize="11"
-          textAnchor="middle"
-          dominantBaseline="middle"
-        >
-          {text}
-        </text>
-      );
-    });
+    const text = `${deg.toFixed(1)}°`;
 
-    return <g aria-label="rp22-surround-angles">{labelGroup}</g>;
-  }, [overlaysForRendering, effectiveHoveredSeat, placedSpeakers, scale, toPx, getCanonicalRole]);
+    labelGroup.push(
+      <text
+        key={`rp22-angle-text-${idx}`}
+        x={px}
+        y={py}
+        fill="#666"
+        fontSize="11"
+        textAnchor="middle"
+        dominantBaseline="middle"
+      >
+        {text}
+      </text>
+    );
+  });
+
+  if (!labelGroup.length) return null;
+
+  return <g aria-label="rp22-surround-angles">{labelGroup}</g>;
+}, [effectiveHoveredSeat, placedSpeakers, scale, toPx, getCanonicalRole]);
 
   // Build HUD style safely
   const hudDynamicStyle = useMemo(() => {
