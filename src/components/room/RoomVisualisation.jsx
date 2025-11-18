@@ -437,7 +437,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [containerH, setContainerH] = useState(0);
   const [hoveredSeat, setHoveredSeat] = useState(null);
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
-  const [seatPanelPos, setSeatPanelPos] = useState(null); // { x, y } in pixels, or null for default
+  const [seatPanelPos, setSeatPanelPos] = useState(null);
   const seatPanelDragRef = useRef({
     dragging: false,
     startX: 0,
@@ -456,7 +456,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const dragStartCanvasPosRef = useRef(null);
   const dragStartRoomPosRef = useRef(null);
   const dragStartSpeakerPosRef = useRef(null);
-  const rsDragLockRef = useRef(null); // Declare rsDragLockRef here
+  const rsDragLockRef = useRef(null);
   rsDragLockRef.current = null;
   const fwOffsetRef = React.useRef({ L: 0, R: 0 });
   const isDraggingFW = React.useRef(false);
@@ -491,38 +491,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     const rect = planBoundsRef.current.getBoundingClientRect();
     setPlanBoundsRect(rect);
   }, [containerW, containerH]);
-
-  // Calculate HUD position BEFORE drag handlers (to avoid TDZ)
-  const hudPosition = useMemo(() => {
-    if (!effectiveHoveredSeat || !toPx || !roomRect) return null;
-
-    const [seatX_px, seatY_px] = toPx(Number(effectiveHoveredSeat.x || effectiveHoveredSeat.position?.x || 0), Number(effectiveHoveredSeat.y || effectiveHoveredSeat.position?.y || 0));
-    
-    const HUD_EST_W = 280;
-    const HUD_EST_H = 340;
-
-    const pad = 8;
-    let preferredX = seatX_px + 16;
-    let preferredY = seatY_px - HUD_EST_H / 2;
-
-    // Flip to left if not enough space on right
-    if (preferredX + HUD_EST_W + pad > roomRect.x + roomRect.width) {
-      preferredX = seatX_px - HUD_EST_W - 16;
-    }
-
-    // Clamp to canvas bounds
-    const clampedX = Math.min(
-      roomRect.x + roomRect.width - HUD_EST_W - pad,
-      Math.max(roomRect.x + pad, preferredX)
-    );
-
-    const clampedY = Math.min(
-      roomRect.y + roomRect.height - HUD_EST_H - pad,
-      Math.max(roomRect.y + pad, preferredY)
-    );
-
-    return { x: clampedX, y: clampedY };
-  }, [effectiveHoveredSeat, toPx, roomRect]);
 
   // ---------------------------------------------------------------------------
   // HELPER FUNCTIONS (declare early to avoid TDZ)
@@ -910,6 +878,46 @@ React.useEffect(() => {
     const [_mlpPxX, _mlpPxY] = toPx(mlp.x, mlp.y);
     return { mlpPxX: _mlpPxX, mlpPxY: _mlpPxY, midX_m: mlp.x, mlpY_m: mlp.y };
   }, [mlp, toPx]);
+
+  // Combine hoveredSeat and pinnedSeat for effective display
+  const effectiveHoveredSeat = useMemo(() => {
+    if (hudPinnedSeatId) {
+      return seatingPositions.find(s => s.id === hudPinnedSeatId) || null;
+    }
+    return hoveredSeat;
+  }, [hudPinnedSeatId, hoveredSeat, seatingPositions]);
+
+  // Calculate HUD position
+  const hudPosition = useMemo(() => {
+    if (!effectiveHoveredSeat || !toPx || !roomRect) return null;
+
+    const [seatX_px, seatY_px] = toPx(Number(effectiveHoveredSeat.x || effectiveHoveredSeat.position?.x || 0), Number(effectiveHoveredSeat.y || effectiveHoveredSeat.position?.y || 0));
+    
+    const HUD_EST_W = 280;
+    const HUD_EST_H = 340;
+
+    const pad = 8;
+    let preferredX = seatX_px + 16;
+    let preferredY = seatY_px - HUD_EST_H / 2;
+
+    // Flip to left if not enough space on right
+    if (preferredX + HUD_EST_W + pad > roomRect.x + roomRect.width) {
+      preferredX = seatX_px - HUD_EST_W - 16;
+    }
+
+    // Clamp to canvas bounds
+    const clampedX = Math.min(
+      roomRect.x + roomRect.width - HUD_EST_W - pad,
+      Math.max(roomRect.x + pad, preferredX)
+    );
+
+    const clampedY = Math.min(
+      roomRect.y + roomRect.height - HUD_EST_H - pad,
+      Math.max(roomRect.y + pad, preferredY)
+    );
+
+    return { x: clampedX, y: clampedY };
+  }, [effectiveHoveredSeat, toPx, roomRect]);
 
   // Memo for the valid Y-range for the *center* of SL/SR speakers, incorporating overhang.
   const sideSurroundVisualSpanM = useMemo(() => {
@@ -2141,15 +2149,6 @@ React.useEffect(() => {
   }, [hudPinnedSeatId]);
 
   const mlpAnchorEffective = mlp;
-
-  // Combine hoveredSeat and pinnedSeat for effective display
-  const effectiveHoveredSeat = useMemo(() => {
-    if (hudPinnedSeatId) {
-      return seatingPositions.find(s => s.id === hudPinnedSeatId) || null;
-    }
-    return hoveredSeat;
-  }, [hudPinnedSeatId, hoveredSeat, seatingPositions]);
-
 
   // Build tooltip data with RP22 per-seat metrics
   const tooltipData = useMemo(() => {
