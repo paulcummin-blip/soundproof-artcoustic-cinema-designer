@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
@@ -436,16 +437,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [containerH, setContainerH] = useState(0);
   const [hoveredSeat, setHoveredSeat] = useState(null);
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
-  const [seatPanelPos, setSeatPanelPos] = useState(null);
-  const seatPanelDragRef = useRef({
-    dragging: false,
-    startX: 0,
-    startY: 0,
-    origX: 0,
-    origY: 0,
-  });
   const [hudHiddenWhenPinned, setHudHiddenWhenPinned] = useState(false);
-  const [planBoundsRect, setPlanBoundsRect] = useState(null);
+  const [hudPinnedOffsetPx, setHudPinnedOffsetPx] = useState(null);
   const planBoundsRef = useRef(null);
   const svgRef = useRef(null);
   const slsrModeRef = React.useRef('side');
@@ -455,7 +448,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const dragStartCanvasPosRef = useRef(null);
   const dragStartRoomPosRef = useRef(null);
   const dragStartSpeakerPosRef = useRef(null);
-  const rsDragLockRef = useRef(null);
+  const rsDragLockRef = useRef(null); // Declare rsDragLockRef here
   rsDragLockRef.current = null;
   const fwOffsetRef = React.useRef({ L: 0, R: 0 });
   const isDraggingFW = React.useRef(false);
@@ -481,21 +474,73 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   useEffect(() => {
     if (!isHudPinned) {
+      setHudPinnedOffsetPx(null);
       setHudHiddenWhenPinned(false);
     }
   }, [isHudPinned]);
 
-  React.useLayoutEffect(() => {
-    if (!planBoundsRef.current) return;
-    const rect = planBoundsRef.current.getBoundingClientRect();
-    setPlanBoundsRect(rect);
-  }, [containerW, containerH]);
+  useEffect(() => {
+    if (isHudPinned && hudPinnedOffsetPx == null) {
+      setHudPinnedOffsetPx({ x: 24, y: 24 });
+    }
+  }, [isHudPinned, hudPinnedOffsetPx]);
+
+  /* …rest of the component continues below… */
+
 
   // ---------------------------------------------------------------------------
   // HELPER FUNCTIONS (declare early to avoid TDZ)
   // ---------------------------------------------------------------------------
 
+  // Clamp helper (keeps HUD within the plan; safe fallback = window)
+  const clampHudOffset = useCallback((x, y) => {
+    const hud = hudElRef.current;
+    // If we can't measure, return unchanged (safe)
+    if (!hud) return { x, y };
 
+    const hudRect  = hud.getBoundingClientRect();
+    const hostRect = planBoundsRef.current?.getBoundingClientRect?.() ?? {
+      left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight
+    };
+
+    // Compute allowed range so HUD stays fully inside host
+    const minX = - (hudRect.left  - hostRect.left);
+    const minY = - (hudRect.top   - hostRect.top);
+    const maxX =  (hostRect.right - hudRect.right);
+    const maxY =  (hostRect.bottom - hudRect.bottom);
+
+    return {
+      x: Math.max(minX, Math.min(maxX, x)),
+      y: Math.max(minY, Math.min(maxY, y)),
+    };
+  }, []);
+
+  // Drag handlers (defined BEFORE they're used in JSX)
+  const onHudHeaderMouseDown = useCallback((e) => {
+    if (!isHudPinned) return;
+    const origX = hudPinnedOffsetPx?.x ?? 0;
+    const origY = hudPinnedOffsetPx?.y ?? 0;
+    hudDragRef.current = { startX: e.clientX, startY: e.clientY, origX, origY };
+
+    const onHudMouseMove = (e) => {
+      const s = hudDragRef.current;
+      if (!s) return;
+      const dx = e.clientX - s.startX;
+      const dy = e.clientY - s.startY;
+      const next = clampHudOffset(s.origX + dx, s.origY + dy);
+      setHudPinnedOffsetPx(next);
+    };
+
+    const onHudMouseUp = () => {
+      hudDragRef.current = null;
+      window.removeEventListener('mousemove', onHudMouseMove);
+      window.removeEventListener('mouseup', onHudMouseUp);
+    };
+
+    window.addEventListener('mousemove', onHudMouseMove);
+    window.addEventListener('mouseup', onHudMouseUp);
+    e.preventDefault();
+  }, [isHudPinned, hudPinnedOffsetPx, clampHudOffset]);
 
 
   // Helper to clamp HUD within canvas, pick side dynamically
@@ -802,46 +847,6 @@ React.useEffect(() => {
     const [_mlpPxX, _mlpPxY] = toPx(mlp.x, mlp.y);
     return { mlpPxX: _mlpPxX, mlpPxY: _mlpPxY, midX_m: mlp.x, mlpY_m: mlp.y };
   }, [mlp, toPx]);
-
-  // Combine hoveredSeat and pinnedSeat for effective display
-  const effectiveHoveredSeat = useMemo(() => {
-    if (hudPinnedSeatId) {
-      return seatingPositions.find(s => s.id === hudPinnedSeatId) || null;
-    }
-    return hoveredSeat;
-  }, [hudPinnedSeatId, hoveredSeat, seatingPositions]);
-
-  // Calculate HUD position
-  const hudPosition = useMemo(() => {
-    if (!effectiveHoveredSeat || !toPx || !roomRect) return null;
-
-    const [seatX_px, seatY_px] = toPx(Number(effectiveHoveredSeat.x || effectiveHoveredSeat.position?.x || 0), Number(effectiveHoveredSeat.y || effectiveHoveredSeat.position?.y || 0));
-    
-    const HUD_EST_W = 280;
-    const HUD_EST_H = 340;
-
-    const pad = 8;
-    let preferredX = seatX_px + 16;
-    let preferredY = seatY_px - HUD_EST_H / 2;
-
-    // Flip to left if not enough space on right
-    if (preferredX + HUD_EST_W + pad > roomRect.x + roomRect.width) {
-      preferredX = seatX_px - HUD_EST_W - 16;
-    }
-
-    // Clamp to canvas bounds
-    const clampedX = Math.min(
-      roomRect.x + roomRect.width - HUD_EST_W - pad,
-      Math.max(roomRect.x + pad, preferredX)
-    );
-
-    const clampedY = Math.min(
-      roomRect.y + roomRect.height - HUD_EST_H - pad,
-      Math.max(roomRect.y + pad, preferredY)
-    );
-
-    return { x: clampedX, y: clampedY };
-  }, [effectiveHoveredSeat, toPx, roomRect]);
 
   // Memo for the valid Y-range for the *center* of SL/SR speakers, incorporating overhang.
   const sideSurroundVisualSpanM = useMemo(() => {
@@ -1818,6 +1823,9 @@ React.useEffect(() => {
     }
 
     // Fallback for all other draggable speakers (including overheads)
+    const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
+
+    // Special handling for overhead speakers - constrain within their zones
     if (canonicalRole.startsWith('T')) {
       if (!overheadZones || overheadZones.status !== 'ok') {
         // Allow free placement within room if zones not ready
@@ -1867,7 +1875,6 @@ React.useEffect(() => {
 
       // Clamp to zone bounds (RP22-compliant)
       const { x1, x2, y1, y2 } = targetZone;
-      const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos); // Redeclared
       const clampedY = Math.max(y1, Math.min(y2, rawY));
       const outOfZone = rawY < y1 || rawY > y2;
 
@@ -1935,7 +1942,6 @@ React.useEffect(() => {
     }
 
     // Generic fallback for any other speakers
-    const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos); // Redeclared
     onSetSpeakers(prev => {
       let updated = prev.map(s => {
         if (s.id === speakerId) {
@@ -2061,7 +2067,6 @@ React.useEffect(() => {
   // NEW: Seat hover handlers
   const handleSeatClick = useCallback((seat) => {
     setHudPinnedSeatId(prev => (prev === seat.id ? null : seat.id));
-    setSeatPanelPos(null);
   }, []);
 
   const handleSeatMouseEnter = useCallback((seat) => {
@@ -2072,59 +2077,16 @@ React.useEffect(() => {
     if (!hudPinnedSeatId) setHoveredSeat(null);
   }, [hudPinnedSeatId]);
 
-  // Drag handlers for seat panel (defined after hudPosition)
-  const onHudHeaderMouseDown = useCallback((e) => {
-    if (!planBoundsRect) return;
-    e.preventDefault();
-
-    const currentPos = seatPanelPos || {
-      x: hudPosition?.x || (planBoundsRect.width / 2) - 140,
-      y: hudPosition?.y || 20,
-    };
-
-    seatPanelDragRef.current = {
-      dragging: true,
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: currentPos.x,
-      origY: currentPos.y,
-    };
-
-    window.addEventListener("mousemove", handleHudMouseMove);
-    window.addEventListener("mouseup", handleHudMouseUp);
-  }, [planBoundsRect, seatPanelPos, hudPosition]);
-
-  const handleHudMouseMove = useCallback((e) => {
-    const state = seatPanelDragRef.current;
-    if (!state.dragging || !planBoundsRect) return;
-
-    const dx = e.clientX - state.startX;
-    const dy = e.clientY - state.startY;
-
-    let newX = state.origX + dx;
-    let newY = state.origY + dy;
-
-    const panelWidth = 320;
-    const panelHeight = 450;
-
-    const minX = 0;
-    const minY = 0;
-    const maxX = planBoundsRect.width - panelWidth;
-    const maxY = planBoundsRect.height - panelHeight;
-
-    newX = Math.max(minX, Math.min(maxX, newX));
-    newY = Math.max(minY, Math.min(maxY, newY));
-
-    setSeatPanelPos({ x: newX, y: newY });
-  }, [planBoundsRect]);
-
-  const handleHudMouseUp = useCallback(() => {
-    seatPanelDragRef.current.dragging = false;
-    window.removeEventListener("mousemove", handleHudMouseMove);
-    window.removeEventListener("mouseup", handleHudMouseUp);
-  }, [handleHudMouseMove]);
-
   const mlpAnchorEffective = mlp;
+
+  // Combine hoveredSeat and pinnedSeat for effective display
+  const effectiveHoveredSeat = useMemo(() => {
+    if (hudPinnedSeatId) {
+      return seatingPositions.find(s => s.id === hudPinnedSeatId) || null;
+    }
+    return hoveredSeat;
+  }, [hudPinnedSeatId, hoveredSeat, seatingPositions]);
+
 
   // Build tooltip data with RP22 per-seat metrics
   const tooltipData = useMemo(() => {
@@ -2539,145 +2501,2062 @@ React.useEffect(() => {
     getCanonicalRole
   ]);
 
-  // Build HUD style safely
-  const hudDynamicStyle = useMemo(() => {
-    if (seatPanelPos) {
-      return {
-        left: seatPanelPos.x,
-        top: seatPanelPos.y,
-      };
-    }
+  // Calculate HUD position with clamping
+  const hudPosition = useMemo(() => {
+    if (!effectiveHoveredSeat || !toPx || !roomRect) return null;
+
+    const [seatX_px, seatY_px] = toPx(Number(effectiveHoveredSeat.x || effectiveHoveredSeat.position?.x || 0), Number(effectiveHoveredSeat.y || effectiveHoveredSeat.position?.y || 0));
     
-    // Default positioning when not dragged
-    return {
-      left: hudPosition?.x || 20,
-      top: hudPosition?.y || 20,
-    };
-  }, [seatPanelPos, hudPosition]);
+    const HUD_EST_W = 280;
+    const HUD_EST_H = 340; // Increased for all RP22 metrics
 
-  const hudVisibilityStyle = useMemo(() => {
-    if (isHudPinned && hudHiddenWhenPinned) {
-      return {
-        visibility: 'hidden',
-        pointerEvents: 'none',
-      };
+    const pad = 8;
+    let preferredX = seatX_px + 16;
+    let preferredY = seatY_px - HUD_EST_H / 2;
+
+    // Flip to left if not enough space on right
+    if (preferredX + HUD_EST_W + pad > roomRect.x + roomRect.width) {
+      preferredX = seatX_px - HUD_EST_W - 16;
     }
-    return {};
-  }, [isHudPinned, hudHiddenWhenPinned]);
+
+    // Clamp to canvas bounds
+    const clampedX = Math.min(
+      roomRect.x + roomRect.width - HUD_EST_W - pad,
+      Math.max(roomRect.x + pad, preferredX)
+    );
+
+    const clampedY = Math.min(
+      roomRect.y + roomRect.height - HUD_EST_H - pad,
+      Math.max(roomRect.y + pad, preferredY)
+    );
+
+    return { x: clampedX, y: clampedY };
+  }, [effectiveHoveredSeat, toPx, roomRect]);
 
 
-  const containerRect = planBoundsRef.current?.getBoundingClientRect();
+  // Phase 1: Calculate and log LCR constraints, and store them in state
+  React.useEffect(() => {
+    // Only consider speakers that are on the plan
+    const activeSpeakers = placedSpeakers.filter(isRenderableSpeaker);
+
+    // Use visualConstraintZones here as the input for calculation
+    if (!activeSpeakers.length || !visualConstraintZones) return;
+
+    try {
+      const constraints = calculateLcrConstraints({
+        placedSpeakers: activeSpeakers,
+        zones: visualConstraintZones,
+        room: { width: widthM, length: lengthM, height: heightM }, // Pass as object
+        screen,
+        getModelDimsM: getModelDimsM
+      });
+      setConstraintZones(constraints);
+
+      if (Object.keys(constraints).length > 0) {
+        if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
+          console.groupCollapsed('[LCR Constraints] Phase 1 - Movement Corridors');
+
+          Object.entries(constraints).forEach(([role, data]) => {
+            const { clamp, currentX, iconWidthM, travelDistance, canMove } = data;
+            console.log(`${role}:`, {
+              currentX: currentX.toFixed(3),
+              allowedRange: `[${clamp.minX.toFixed(3)}, ${clamp.maxX.toFixed(3)}]`,
+              iconWidth: `${iconWidthM.toFixed(3)}m`,
+              travelDistance: `${travelDistance.toFixed(3)}m`,
+              canMove,
+              model: data.model || 'undefined'
+            });
+          });
+
+          if (typeof console.groupEnd === 'function') console.groupEnd();
+        }
+      }
+    } catch (error) {
+      if (typeof console !== "undefined" && typeof console.warn === "function") {
+        console.warn('[LCR Constraints] Error calculating constraints:', error);
+      }
+    }
+  }, [placedSpeakers, widthM, lengthM, heightM, screen, visualConstraintZones, getModelDimsM]); // Use new dimension variables
+
+  // Auto-adjust LCR speakers on screen/zone changes
+  // [B44] This effect is LCR-only; bed surrounds are not touched
+  useEffect(() => {
+    if (!onSetSpeakers || !constraintZones?.FL || !constraintZones?.FR) {
+      return;
+    }
+
+    const flSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FL');
+    if (!flSpeaker) return;
+
+    // Use the current FL speaker position as the source of truth for re-calculation
+    const { finalLeftX, finalRightX } = resolveSymmetricLCR({
+      desiredX: flSpeaker.position.x,
+      isLeft: true,
+      screenCenterX: screenCenterX_m,
+      leftZone: constraintZones.FL.clamp,
+      rightZone: constraintZones.FR.clamp,
+    });
+
+    // Only update if positions have changed to avoid an infinite loop
+    const frSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FR');
+    const flNeedsUpdate = Math.abs((flSpeaker.position.x || 0) - finalLeftX) > EPS;
+    const frNeedsUpdate = frSpeaker && Math.abs((frSpeaker.position.x || 0) - finalRightX) > EPS;
+
+    if (flNeedsUpdate || frNeedsUpdate) {
+      onSetSpeakers(prev => {
+        return prev.map(s => {
+          const role = getCanonicalRole(s.role);
+          if (role === 'FL') {
+            return { ...s, position: { ...(s.position || {}), x: finalLeftX } };
+          }
+          if (role === 'FR') {
+            if (frSpeaker) {
+              return { ...s, position: { ...(s.position || {}), x: finalRightX } };
+            }
+          }
+          return s;
+        });
+      });
+    }
+
+  }, [constraintZones, screenCenterX_m, onSetSpeakers, placedSpeakers, getCanonicalRole]);
+
+  // [NEW] Auto-hug surrounds to walls when room dimensions change
+  useEffect(() => {
+    if (!onSetSpeakers || !placedSpeakers?.length) return;
+
+    const W = widthM || 0;
+    const L = lengthM || 0;
+    if (!(W > 0 && L > 0)) return;
+
+    let needsUpdate = false;
+    const updated = placedSpeakers.map(spk => {
+      const canon = getCanonicalRole(spk.role);
+      
+      // [B44 REAR FIX] Only process SIDE wall speakers (SL/SR/LW/RW)
+      // SBL/SBR are handled by SpeakerPlacement and should NOT be auto-hugged to side walls
+      if (!['SL', 'SR', 'LW', 'RW'].includes(canon)) return spk;
+      if (!spk.position || !spk.model) return spk;
+
+      const dims = getModelDimsM(spk.model);
+      const isLeft = ['SL', 'LW'].includes(canon);
+      const side = isLeft ? 'L' : 'R';
+
+      // Calculate correct wall-hugged X using same helper as drag code
+      const targetX = fixedSideX(W, dims, side, WALL_BUFFER_M);
+      const currentX = Number(spk.position.x) || 0;
+
+      // Only update if position has actually changed
+      if (Math.abs(currentX - targetX) > 0.001) {
+        needsUpdate = true;
+        return {
+          ...spk,
+          position: { ...spk.position, x: targetX }
+        };
+      }
+
+      return spk;
+    });
+
+    if (needsUpdate) {
+      onSetSpeakers(updated);
+    }
+  }, [widthM, lengthM, placedSpeakers, onSetSpeakers, getModelDimsM, getCanonicalRole]);
+
+  // [FC_CENTERLINE_LOCK] — Enforce FC always at room centerline
+  useEffect(() => {
+    if (!placedSpeakers?.length || !onSetSpeakers) return;
+
+    let needsFix = false;
+    const next = placedSpeakers.map(sp => {
+      const role = getCanonicalRole(sp.role);
+      if (role === 'FC') {
+        const x = Number(sp.position?.x);
+        if (!Number.isFinite(x) || Math.abs(x - centerX_m) > EPS_M) {
+          needsFix = true;
+          return {
+            ...sp,
+            position: { ...sp.position, x: centerX_m }
+          };
+        }
+      }
+      return sp;
+    });
+
+    if (needsFix) onSetSpeakers(next);
+  }, [placedSpeakers, onSetSpeakers, centerX_m, getCanonicalRole]);
+
+  // [B44] DISABLED: SL/SR positions now come from SpeakerPlacement only
+  // This effect has been disabled to prevent RV from overwriting state-driven positions
+  useEffect(() => {
+    // [B44] Legacy corridor/constraint logic for SL/SR disabled.
+    // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
+    return; // Early exit - effect is now a no-op
+    
+    /* ORIGINAL LOGIC DISABLED:
+    if (!onSetSpeakers) return;
+    if (isDraggingRearRef.current > 0) return;
+    if (timeNowMs() - lastInteractionEpoch.current < 500) return;
+
+    const W = widthM || 0;
+    const L = lengthM || 0;
+    if (!(W > 0 && L > 0)) return;
+
+    const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
+    const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
+    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
+
+    if (!sl || !sr) return;
+
+    const dimsL = getSpeakerDims(sl.model);
+    const dimsR = getSpeakerDims(sr.model);
+    const curY_sl = Number(sl?.position?.y);
+    const curY_sr = Number(sr?.position?.y);
+
+    const yMax_side_for_hysteresis = Math.max(
+      Number(sideSurroundVisualSpanM?.minY) || 0,
+      Math.min(Number(sideSurroundVisualSpanM?.maxY) || 0, L - CORNER_CLEAR_M)
+    );
+
+    let currentRefMode = slsrModeRef.current;
+    let nextModeBasedOnPosition = currentRefMode;
+
+    if (currentRefMode === 'back') {
+      if (curY_sl < (yMax_side_for_hysteresis - BACKWALL_HYSTERESIS_M)) {
+        nextModeBasedOnPosition = 'side';
+        if (DBG_SS) console.log('[SS live] position implies side mode: back -> side');
+      }
+    } else if (currentRefMode === 'side') {
+      if (curY_sl > (yMax_side_for_hysteresis + BACKWALL_HYSTERESIS_M)) {
+        nextModeBasedOnPosition = 'back';
+        if (DBG_SS) console.log('[SS live] position implies back mode: side -> back');
+      }
+    }
+    slsrModeRef.current = nextModeBasedOnPosition;
+
+    if (DBG_SS) {
+      try {
+        const yMax_side_live = Number(sideSurroundVisualSpanM?.maxY) || 0;
+        const onBackCheck = isOnBackWall(curY_sl, dimsL, L);
+
+        console.log('[SS live] snapshot', {
+          currentRefMode: currentRefMode,
+          nextModeBasedOnPosition: nextModeBasedOnPosition,
+          ySL: curY_sl?.toFixed?.(3), ySR: curY_sr?.toFixed?.(3),
+          yMax_side_live: yMax_side_live?.toFixed?.(3),
+          onBackCheck,
+        });
+      } catch (_) {}
+    }
+
+    if (slsrModeRef.current === 'side') {
+      const xL_side = fixedSideX(W, dimsL, 'L');
+      const xR_side = fixedSideX(W, dimsR, 'R');
+
+      const segL = sideSegmentAtX(_overlays?.sideSurroundZone, xL_side, L);
+      const segR = sideSegmentAtX(_overlays?.sideSurroundZone, xR_side, L);
+
+      const yMin_side_calc = Number(sideSurroundVisualSpanM?.minY) || 0;
+      const yMax_visual_calc = Number(sideSurroundVisualSpanM?.maxY) || 0;
+      const yMax_clamp_calc = Math.max(yMin_side_calc, Math.min(yMax_visual_calc, L - CORNER_CLEAR_M));
+
+      const yMin = yMin_side_calc;
+      const yMax = yMax_clamp_calc;
+
+      let yStar = resolveSymmetricY(curY_sl, segL, segR);
+
+      const RS_SIDE_EPS = 0.02;
+      if (yStar >= (yMax - RS_SIDE_EPS)) {
+        yStar = Math.max(yMin, yMax - RS_SIDE_EPS);
+      }
+
+      try {
+        // Check SBL vs SL - only adjust if actual overlap exists
+        if (sbl && isOnSideWall('L', sbl, W)) {
+          const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbl.model)) || 0) / 2;
+          const halfSS = (speakerOnWallYFootprint(getModelDimsM(sl.model)) || 0) / 2;
+          const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
+          const yObstacle = Number(sbl?.position?.y)||0;
+          const yPrevSBL = Number(sbl?.position?.y); // Use SBL's previous Y
+          const yPrevSL = Number(sl?.position?.y); // Use SL's previous Y
+          const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
+          if (overlap) {
+            yStar = nonCrossingClampDirectional(yPrevSL, yStar, yObstacle, minSep);
+            yStar = Math.min(Math.max(yStar, yMin), yMax);
+          }
+        }
+
+        // Check SBR vs SR - only adjust if actual overlap exists
+        if (sbr && isOnSideWall('R', sbr, W)) {
+          const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbr.model)) || 0) / 2;
+          const halfSS = (speakerOnWallYFootprint(getModelDimsM(sr.model)) || 0) / 2;
+          const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
+          const yObstacle = Number(sbr?.position?.y)||0;
+          const yPrevSBR = Number(sbr?.position?.y); // Use SBR's previous Y
+          const yPrevSR = Number(sr?.position?.y); // Use SR's previous Y
+          const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
+          if (overlap) {
+            yStar = nonCrossingClampDirectional(yPrevSR, yStar, yObstacle, minSep);
+            yStar = Math.min(Math.max(yStar, yMin), yMax);
+          }
+        }
+
+        if (DBG_SS) {
+          console.log('[SS live] yStar with clearance', { yStar: yStar?.toFixed?.(3) });
+        }
+
+      } catch (_e) {
+        console.warn("Error applying SL/SR vs SBL/SBR clearance during auto-adjust:", _e);
+      }
+
+      const xL_cur = Number(sl?.position?.x);
+      const xR_cur = Number(sr?.position?.x);
+      const needsUpdate = Math.abs(yStar - curY_sl) > RS_EPS ||
+                          Math.abs(xL_cur - xL_side) > RS_EPS ||
+                          Math.abs(xR_cur - xR_side) > RS_EPS;
+
+      if (!needsUpdate) return;
+
+      onSetSpeakers(prev => prev.map(s => {
+        const role = getCanonicalRole(s.role);
+        if (role === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_side, y: yStar } };
+        if (role === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_side, y: yStar } };
+        return s;
+      }));
+
+      return;
+    }
+
+    // back-wall enforcement
+    const roomWidth = widthM || 0;
+    const lanes = rearSurroundVisualLanes ?? {};
+    const leftLane = lanes.left ?? { minX: 0, maxX: roomWidth };
+    const leftLaneMin = leftLane.minX;
+    const leftLaneMax = leftLane.maxX;
+
+    const curXL = Number(sl?.position?.x);
+    if (!Number.isFinite(curXL)) {
+      return;
+    }
+    const xL_star = clamp(curXL, leftLaneMin, leftLaneMax);
+    const xR_star = roomWidth - xL_star;
+
+    const yL = backWallYForDims(getSpeakerDims(sl.model), L, WALL_BUFFER_M);
+    const yR = backWallYForDims(getSpeakerDims(sr.model), L, WALL_BUFFER_M);
+
+    const xL_cur = Number(sl?.position?.x);
+    const yL_cur = Number(sl?.position?.y);
+    const xR_cur = Number(sr?.position?.x);
+    const yR_cur = Number(sr?.position?.y);
+
+    const needsUpdate = Math.abs(xL_cur - xL_star) > RS_EPS ||
+                          Math.abs(yL_cur - yL) > RS_EPS ||
+                          Math.abs(xR_cur - xR_star) > RS_EPS ||
+                          Math.abs(yR_cur - yR) > RS_EPS;
+
+    if (DBG_SS) {
+      console.log('[SS live] back-wall enforcement', {
+        curXL: curXL?.toFixed?.(3), xL_star: xL_star?.toFixed?.(3),
+        curYL: yL_cur?.toFixed?.(3), yL: yL?.toFixed?.(3),
+        curXR: xR_cur?.toFixed?.(3), yR: yR?.toFixed?.(3),
+        needsUpdate
+      });
+    }
+
+    if (!needsUpdate) return;
+
+    onSetSpeakers(prev => prev.map(s => {
+      const r = getCanonicalRole(s.role);
+      if (r === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_star, y: yL } };
+      if (r === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_star, y: yR } };
+      return s;
+    }));
+    */
+  }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
+
+  // [B44] DISABLED: SBL/SBR positions now come from SpeakerPlacement only
+  // This effect has has been disabled to prevent RV from overwriting state-driven positions
+  React.useEffect(() => {
+    // [B44] Legacy corridor/constraint logic for SBL/SBR disabled.
+    // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
+    return; // Early exit - effect is now a no-op
+    
+    /* ORIGINAL LOGIC DISABLED:
+    if (isDraggingRearRef.current > 0) {
+      return;
+    }
+
+    if (timeNowMs() - (lastInteractionEpoch?.current || 0) < 500) return;
+    if (!onSetSpeakers) return;
+
+    rsLastLiveResetEpoch.current = timeNowMs();
+
+    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
+    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
+    if (!sbl || !sbr) return;
+
+    const W = widthM || 0;
+    const L = lengthM || 0;
+    if (!(W > 0 && L > 0)) return;
+
+    const dimsL = getSpeakerDims(sbl.model);
+    const dimsR = getSpeakerDims(sbr.model);
+    const yL_sbl_cur = Number(sbl?.position?.y);
+    const yR_sbr_cur = Number(sbr?.position?.y);
+
+    const yMax_side_for_hysteresis = Math.max(
+      Number(sideSurroundVisualSpanM?.minY) || 0,
+      Math.min(Number(sideSurroundVisualSpanM?.maxY) || 0, L - CORNER_CLEAR_M)
+    );
+
+    let currentRefMode = rearModeRef.current;
+    let nextModeBasedOnPosition = currentRefMode;
+
+    if (currentRefMode === 'back') {
+        if (yL_sbl_cur < (yMax_side_for_hysteresis - BACKWALL_HYSTERESIS_M)) {
+            nextModeBasedOnPosition = 'side';
+            if (DBG_RS) console.log('[RS live] position implies side mode: back -> side');
+        }
+    } else if (currentRefMode === 'side') {
+        if (yL_sbl_cur > (yMax_side_for_hysteresis + BACKWALL_HYSTERESIS_M)) {
+            nextModeBasedOnPosition = 'back';
+            if (DBG_RS) console.log('[RS live] position implies back mode: side -> back');
+        }
+    }
+
+    rearModeRef.current = nextModeBasedOnPosition;
+
+    if (DBG_RS) {
+      try {
+        const yMax_side_live = Number(sideSurroundVisualSpanM?.maxY) || 0;
+        const onBackCheck = isOnBackWall(yL_sbl_cur, dimsL, L);
+
+        console.log('[RS live] snapshot', {
+          currentRefMode: currentRefMode,
+          nextModeBasedOnPosition: nextModeBasedOnPosition,
+          ySBL: yL_sbl_cur?.toFixed?.(3), ySBR: yR_sbr_cur?.toFixed?.(3),
+          yMax_side_live: yMax_side_live?.toFixed?.(3),
+          onBackCheck,
+          lanes: rearSurroundVisualLanes
+        });
+      } catch (_) {}
+    }
+
+    if (rearModeRef.current === 'side') {
+      const xL_side = fixedSideX(W, dimsL, 'L');
+      const xR_side = fixedSideX(W, dimsR, 'R');
+
+      const yMin_side_calc = Number(sideSurroundVisualSpanM?.minY) || 0;
+      const yMax_visual_calc = Number(sideSurroundVisualSpanM?.maxY) || 0;
+      const yMax_clamp_calc = Math.max(yMin_side_calc, Math.min(yMax_visual_calc, L - CORNER_CLEAR_M));
+
+      const yMin = yMin_side_calc;
+      const yMax = yMax_clamp_calc;
+
+      let yStar = Math.min(yMax, Math.max(yMin, yL_sbl_cur));
+
+      const RS_SIDE_EPS = 0.02;
+      if (yStar >= (yMax - RS_SIDE_EPS)) {
+        yStar = Math.max(yMin, yMax - RS_SIDE_EPS);
+      }
+
+      const slSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
+      const srSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+
+      if (slSpeaker && isOnSideWall('L', slSpeaker, W)) {
+        const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbl.model)) || 0) / 2;
+        const halfSS = (speakerOnWallYFootprint(getModelDimsM(slSpeaker.model)) || 0) / 2;
+        const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
+        const yObstacle = Number(slSpeaker?.position?.y)||0;
+        const yPrevSBL = Number(sbl?.position?.y); // Use SBL's previous Y
+        const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
+        if (overlap) {
+          yStar = nonCrossingClampDirectional(yPrevSBL, yStar, yObstacle, minSep);
+          yStar = Math.min(Math.max(yStar, yMin), yMax);
+        }
+      }
+
+      if (srSpeaker && isOnSideWall('R', srSpeaker, W)) {
+        const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbr.model)) || 0) / 2;
+        const halfSS = (speakerOnWallYFootprint(getModelDimsM(srSpeaker.model)) || 0) / 2;
+        const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
+        const yObstacle = Number(srSpeaker?.position?.y)||0;
+        const yPrevSBR = Number(sbr?.position?.y); // Use SBR's previous Y
+        const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
+        if (overlap) {
+          yStar = nonCrossingClampDirectional(yPrevSBR, yStar, yObstacle, minSep);
+          yStar = Math.min(Math.max(yStar, yMin), yMax);
+        }
+      }
+
+      const curXL = Number(sbl?.position?.x);
+      const curXR = Number(sbr?.position?.x);
+      const xL_target = fixedSideX(W, dimsL, 'L');
+      const xR_target = fixedSideX(W, dimsR, 'R');
+
+      const need = Math.abs(curXL - xL_target) > RS_EPS ||
+                   Math.abs(curXR - xR_target) > RS_EPS ||
+                   Math.abs(yL_sbl_cur - yStar) > RS_EPS ||
+                   Math.abs(yR_sbr_cur - yStar) > RS_EPS;
+
+      if (DBG_RS && need) {
+        console.log('[RS live] side-wall auto-correct:', {
+          curXL: curXL?.toFixed?.(3), xL_target: xL_target?.toFixed?.(3),
+          curXR: curXR?.toFixed?.(3), xR_target: xR_target?.toFixed?.(3),
+          curYL: yL_sbl_cur?.toFixed?.(3), curYR: yR_sbr_cur?.toFixed?.(3),
+          yStar: yStar?.toFixed?.(3),
+          need
+        });
+      }
+
+      if (!need) {
+        return;
+      }
+
+      onSetSpeakers(prev => prev.map(s => {
+        const r = getCanonicalRole(s.role);
+        if (r === 'SBL') return { ...s, position: { ...(s.position||{}), x: xL_side, y: yStar } };
+        if (r === 'SBR') return { ...s, position: { ...(s.position||{}), x: xR_side, y: yStar } };
+        return s;
+      }));
+
+      return;
+    }
+
+    // BACK-WALL MODE MAINTENANCE for rears (keep existing logic)
+    const yBackL = backWallYForDims(dimsL, L, WALL_BUFFER_M);
+    const yBackR = backWallYForDims(dimsR, L, WALL_BUFFER_M);
+    const yBack = Math.max(yBackL, yBackR);
+
+    const lanes = rearSurroundVisualLanes ?? {};
+    const leftLane  = lanes.left  ?? { minX: 0, maxX: W };
+    const rightLane = lanes.right ?? { minX: 0, maxX: W };
+
+    let baseMin = Number(leftLane.minX ?? 0);
+    let baseMax = Number(leftLane.maxX ?? W);
+
+    if (!(baseMax > baseMin)) {
+      baseMin = 0;
+      baseMax = W;
+    }
+
+    const halfRS = Math.max(halfWidthOnWall(dimsL), halfWidthOnWall(dimsR));
+    baseMin += halfRS;
+    baseMax -= halfRS;
+
+    const exclusions = [];
+    if (sideSurroundsOnBackWall(placedSpeakers, L)) {
+      const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
+      const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+      function addEx(ss) {
+        if (!ss) return;
+        const d = getSpeakerDims(ss.model);
+        if (!isOnBackWall(ss?.position?.y, d, L)) return;
+        const halfSS = halfWidthOnWall(d);
+        const cx = Number(ss?.position?.x) || 0;
+        const pad = halfSS + halfRS + RS_CLEAR_M;
+        exclusions.push([cx - pad, cx + pad]);
+      }
+      addEx(sl);
+      addEx(sr);
+    }
+
+    const curXL = Number(sbl?.position?.x);
+    if (!Number.isFinite(curXL)) {
+      return;
+    }
+    const xL_star = clampToAllowedWithExclusions(curXL, baseMin, baseMax, exclusions);
+    const xR_star = computeSymmetricXR(W, xL_star);
+
+    const need = Math.abs(curXL - xL_star) > RS_EPS ||
+                 Math.abs((sbr?.position?.x||0) - xR_star) > RS_EPS ||
+                 Math.abs(yL_sbl_cur - yBack) > RS_EPS ||
+                 Math.abs(yR_sbr_cur - yBack) > RS_EPS;
+
+    if (DBG_RS && need) {
+      console.log('[RS live] back-wall auto-correct:', {
+        curXL: curXL?.toFixed?.(3), xL_star: xL_star?.toFixed?.(3),
+        curXR: (sbr?.position?.x||0)?.toFixed?.(3), xR_star: xR_star?.toFixed?.(3),
+        curYL: yL_sbl_cur?.toFixed?.(3), yBackL: yBackL?.toFixed?.(3),
+        curYR: yR_sbr_cur?.toFixed?.(3), yBackR: yBackR?.toFixed?.(3),
+        need
+      });
+    }
+
+
+    if (!need) {
+      return;
+    }
+
+    onSetSpeakers(prev => prev.map(s => {
+      const r = getCanonicalRole(s.role);
+      if (r === 'SBL') return { ...s, position: { ...(s.position||{}), x: xL_star, y: yBack } };
+      if (r === 'SBR') return { ...s, position: { ...(s.position||{}), x: xR_star, y: yBack } };
+      return s;
+    }));
+    */
+  }, [placedSpeakers, onSetSpeakers, widthM, lengthM, sideSurroundVisualSpanM, rearSurroundVisualLanes, rearModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
+
+  // A) Hard-gate the legacy front-wide ribbon generation
+  const ENABLE_LEGACY_FRONT_WIDE_RIBBON = false;
+
+  // ADDED: Step 1 & 3: Confirm missing keys and create a temporary adapter for LCR
+  const { augmentedZones, zoneKeysLabel } = useMemo(() => {
+    const newZones = analysisResult?.zones ? { ...analysisResult.zones } : {};
+
+    // Step 3: If LCR zone data is missing from the analysis engine, create a temporary one.
+    if (!newZones.LCR?.points?.length) {
+      const fl = placedSpeakers.find(s => ['FL', 'L'].includes(String(s.role).toUpperCase()));
+      const fr = placedSpeakers.find(s => ['FR', 'R'].includes(String(s.role).toUpperCase()));
+
+      if (fl?.position && fr?.position) { // Check if speaker positions exist before using widthM and lengthM
+        const WALL_BUFFER_M_LCR_ADAPTER = 0.01;
+        const LCR_ZONE_DEPTH_M = ZONE_DEPTH_M;
+        const roomWidth = widthM || 4.5; // Use new widthM
+
+        newZones.LCR = {
+          points: [
+            { x: Math.max(0, fl.position.x - 0.2), y: WALL_BUFFER_M_LCR_ADAPTER },
+            { x: Math.min(roomWidth, fr.position.x + 0.2), y: WALL_BUFFER_M_LCR_ADAPTER + LCR_ZONE_DEPTH_M },
+            { x: Math.min(roomWidth, fr.position.x + 0.2), y: WALL_BUFFER_M_LCR_ADAPTER },
+            { x: Math.max(0, fl.position.x - 0.2), y: WALL_BUFFER_M_LCR_ADAPTER + LCR_ZONE_DEPTH_M },
+          ]
+        };
+      }
+    }
+
+    // Step 1: Create a QA label to display the keys present in the final zones object
+    const label = `zones: ${Object.keys(newZones).join(',')}`;
+
+    return { augmentedZones: newZones, zoneKeysLabel: label };
+  }, [analysisResult?.zones, placedSpeakers, widthM, lengthM, ZONE_DEPTH_M, getCanonicalRole]);
+
+  // Consolidate overlays for rendering
+  const overlaysForRendering = useMemo(() => {
+    const base = { ...(_overlays || {}) };
+
+    // NEW: Add listening area bounds for overhead zone clamping
+    if (listeningAreaBounds) {
+      base.listeningArea = listeningAreaBounds;
+    }
+
+    // FW zones are always computed, but overlay visibility is controlled separately
+    base.FRONT_WIDE = frontWideZones;
+
+    // This flag controls ONLY the visual overlay band, not icon rendering
+    // Use `enableFrontWides` from appState to control overlay visibility.
+    base.enableFrontWides = enableFrontWides;
+    base.enableRp22Angles = rp22AnglesEnabled;
+
+    return base;
+  }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
+
+  // In the scope where we work with speakers, add safe aliases
+  const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
+  const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+  const slSpeaker = sl || null;
+  const srSpeaker = sr || null;
+
+  // Filter and position speakers for rendering
+  const speakersToRender = React.useMemo(() => {
+    // Make sure we always have an array
+    const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+
+    // Always skip LFE – it’s not drawn as a normal speaker
+    const withoutLfe = base.filter((spk) => {
+      const canonicalRole = getCanonicalRole(spk.role);
+      return canonicalRole !== "LFE";
+    });
+
+    // Respect visibleRoles from appState if it exists
+    const vis = appState?.visibleRoles;
+    if (!vis || !(vis instanceof Set)) {
+      return withoutLfe;
+    }
+
+    // Only keep speakers whose canonical role is in the visibleRoles set
+    return withoutLfe.filter((spk) => vis.has(getCanonicalRole(spk.role)));
+  }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
+
+
+  // Light diagnostics (temporary)
+  if (appState_DBG_FW) {
+    if (typeof console !== 'undefined') console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
+  }
+
+  // Get overhead count from dolbyLayout
+  const overheadCount = useMemo(() => {
+    if (!dolbyLayout) return 0;
+    const parts = String(dolbyLayout).split('.');
+    if (parts.length < 3) return 0;
+    return parseInt(parts[2]) || 0;
+  }, [dolbyLayout]);
+
+  // Determine which overhead positions are visible
+  const visibleOverheadPositions = useMemo(() => {
+    const positions = [];
+    if (overheadCount === 2) {
+      positions.push('mid');
+    } else if (overheadCount === 4) {
+      positions.push('front', 'rear');
+    } else if (overheadCount === 6) {
+      positions.push('front', 'mid', 'rear');
+    }
+    return positions;
+  }, [overheadCount]);
+
+  // Get effective model for each overhead position
+  const getOverheadModelForPosition = useCallback((position) => {
+    if (!overheadGlobalModel || overheadGlobalModel === 'OFF') return null;
+
+    if (position === 'front') {
+      return useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
+    }
+    if (position === 'mid') {
+      return useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
+    }
+    if (position === 'rear') {
+      return useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
+    }
+    return null;
+  }, [overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride]);
+
+
+// Render overhead speaker icons (centered in each zone pad)
+  const overheadIconElements = useMemo(() => {
+    if (!overheadGlobalModel || overheadGlobalModel === 'OFF') return null;
+    if (!overheadZones || overheadZones.status !== 'ok') return null;
+
+    const icons = [];
+
+    visibleOverheadPositions.forEach(position => {
+      const modelKey = getOverheadModelForPosition(position);
+      if (!modelKey) return;
+
+      const modelMeta = getSpeakerModelMeta(modelKey);
+      
+      // Log warning if model not found
+      if (modelMeta?.notFound && typeof console !== 'undefined') {
+        console.warn(`[RoomVisualisation] Overhead model "${modelKey}" not found in registry, using defaults`);
+      }
+      
+      // Determine if this should render as a circle or rectangle
+      const isRound = modelMeta?.round === true || (!!modelMeta?.diameterM && modelMeta?.round !== false);
+      
+      // Get dimensions
+      const widthM_oh = modelMeta?.widthM || 0.24;
+      const depthM_oh = modelMeta?.depthM || 0.24;
+      const diameterM = modelMeta?.diameterM || 0.24;
+
+      // Map position to zone
+      let zone = null;
+      if (position === 'front') {
+        zone = overheadZones.frontZone;
+      } else if (position === 'mid') {
+        zone = overheadZones.midZone;
+      } else if (position === 'rear') {
+        zone = overheadZones.backZone;
+      }
+
+      if (!zone || !zone.active) return;
+
+      const { x1, x2, y1, y2 } = zone;
+      const centerX_m = (x1 + x2) / 2;
+      const centerY_m = (y1 + y2) / 2;
+
+      if (isRound) {
+        // Circular overhead (existing Architect 2-1, 4-2, PAS2-2)
+        const iconSize = diameterM;
+        const clampedX = Math.max(x1 + iconSize / 2, Math.min(x2 - iconSize / 2, centerX_m));
+        const clampedY = Math.max(y1 + iconSize / 2, Math.min(y2 - iconSize / 2, centerY_m));
+
+        if ((x2 - x1) >= iconSize && (y2 - y1) >= iconSize) {
+          const [canvasX, canvasY] = toPx(clampedX, clampedY);
+          const radiusPx = (iconSize / 2) * scale;
+          icons.push(
+            <circle
+              key={`${position}-oh`}
+              cx={canvasX}
+              cy={canvasY}
+              fill="#000000"
+              opacity={0.9}
+              pointerEvents="none"
+              r={radiusPx}
+            />
+          );
+        }
+      } else {
+        // Rectangular overhead (Architect Mikro)
+        const clampedX = Math.max(x1 + widthM_oh / 2, Math.min(x2 - widthM_oh / 2, centerX_m));
+        const clampedY = Math.max(y1 + depthM_oh / 2, Math.min(y2 - depthM_oh / 2, centerY_m));
+
+        if ((x2 - x1) >= widthM_oh && (y2 - y1) >= depthM_oh) {
+          const [canvasX, canvasY] = toPx(clampedX, clampedY);
+          const w_px = widthM_oh * scale;
+          const d_px = depthM_oh * scale;
+          
+          icons.push(
+            <rect
+              key={`${position}-oh`}
+              x={canvasX - w_px / 2}
+              y={canvasY - d_px / 2}
+              width={w_px}
+              height={d_px}
+              fill="#000000"
+              opacity={0.9}
+              pointerEvents="none"
+            />
+          );
+        }
+      }
+    });
+
+    return icons;
+  }, [
+    overheadGlobalModel,
+    overheadZones,
+    visibleOverheadPositions,
+    getOverheadModelForPosition,
+    toPx,
+    scale,
+    getModelDimsM
+  ]);
+
+  // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
+  const renderFrontWideZones = useCallback(() => {
+    // This function is now called conditionally by `overlaysForRendering.enableFrontWides`.
+    // It should only render if frontWideZones are available and valid.
+    // The enableFrontWides from appState is passed through overlaysForRendering, so we check it there.
+
+    const W = widthM || 4.5; // Use new widthM
+    const L = lengthM || 6.0; // Use new lengthM
+    const WALL = 0.02;
+
+    // If we have valid zones, render them
+    if (frontWideZones?.status === 'ok') {
+      const leftZone = frontWideZones.left;
+      const rightZone = frontWideZones.right;
+
+      if (!leftZone || !rightZone) return null;
+
+      const zoneOpacity = 0.25;
+      const strokeOpacity = 0.4;
+
+      return (
+        <g pointerEvents="none">
+          {/* Left zone */}
+          <rect
+            x={roomRect.x + (WALL * scale)}
+            y={roomRect.y + (leftZone.yMin * scale)}
+            width={ZONE_DEPTH_M * scale}
+            height={(leftZone.yMax - leftZone.yMin) * scale}
+            fill="#4A230F"
+            opacity={zoneOpacity}
+            stroke="#4A230F"
+            strokeWidth="1"
+            strokeOpacity={strokeOpacity}
+            strokeDasharray="4,4"
+          />
+          <line
+            x1={roomRect.x + (WALL * scale)}
+            y1={roomRect.y + (leftZone.medianY * scale)}
+            x2={roomRect.x + ((WALL + ZONE_DEPTH_M) * scale)}
+            y2={roomRect.y + (leftZone.medianY * scale)}
+            stroke="#4A230F"
+            strokeWidth="2"
+            strokeOpacity={0.6}
+          />
+
+          {/* Right zone */}
+          <rect
+            x={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
+            y={roomRect.y + (rightZone.yMin * scale)}
+            width={ZONE_DEPTH_M * scale}
+            height={(rightZone.yMax - rightZone.yMin) * scale}
+            fill="#213428"
+            opacity={zoneOpacity}
+            stroke="#213428"
+            strokeWidth="1"
+            strokeOpacity={strokeOpacity}
+            strokeDasharray="4,4"
+          />
+          <line
+            x1={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
+            y1={roomRect.y + (rightZone.medianY * scale)}
+            x2={roomRect.x + roomRect.width - (WALL * scale)}
+            y2={roomRect.y + (rightZone.medianY * scale)}
+            stroke="#213428"
+            strokeWidth="2"
+            strokeOpacity={0.6}
+          />
+        </g>
+      );
+    }
+
+    // Fallback: if zones can't be computed (no sides, invalid geom, etc.)
+    // Renders only when overlay is enabled AND status !== 'ok'
+    if (frontWideZones?.status !== 'ok') {
+      const W = Number(widthM) || 4.5;
+      const L = Number(lengthM) || 6.0;
+      const WALL = 0.02;
+
+      const approxYmin   = L * 0.35;
+      const approxYmax   = L * 0.65;
+      const approxMedian = L * 0.50;
+      const placeholderOpacity = 0.15;
+
+      // Centre label using actual canvas rect
+      const labelX = roomRect.x + (roomRect.width / 2);
+      const labelY = roomRect.y + (approxMedian * scale) - 10;
+
+      return (
+        <g pointerEvents="none">
+          {/* Left placeholder zone */}
+          <rect
+            x={roomRect.x + (WALL * scale)}
+            y={roomRect.y + (approxYmin * scale)}
+            width={ZONE_DEPTH_M * scale}
+            height={(approxYmax - approxYmin) * scale}
+            fill="#4A230F"
+            opacity={placeholderOpacity}
+            stroke="#4A230F"
+            strokeWidth="1"
+            strokeOpacity={0.3}
+            strokeDasharray="8,8"
+          />
+          <line
+            x1={roomRect.x + (WALL * scale)}
+            y1={roomRect.y + (approxMedian * scale)}
+            x2={roomRect.x + ((WALL + ZONE_DEPTH_M) * scale)}
+            y2={roomRect.y + (approxMedian * scale)}
+            stroke="#4A230F"
+            strokeWidth="1.5"
+            strokeOpacity={0.4}
+            strokeDasharray="4,4"
+          />
+
+          {/* Right placeholder zone */}
+          <rect
+            x={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
+            y={roomRect.y + (approxYmin * scale)}
+            width={ZONE_DEPTH_M * scale}
+            height={(approxYmax - approxYmin) * scale}
+            fill="#213428"
+            opacity={placeholderOpacity}
+            stroke="#213428"
+            strokeWidth="1"
+            strokeOpacity={0.3}
+            strokeDasharray="8,8"
+          />
+          <line
+            x1={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
+            y1={roomRect.y + (approxMedian * scale)}
+            x2={roomRect.x + roomRect.width - (WALL * scale)}
+            y2={roomRect.y + (approxMedian * scale)}
+            stroke="#213428"
+            strokeWidth="1.5"
+            strokeOpacity={0.4}
+            strokeDasharray="4,4"
+          />
+
+          {/* Status text for user feedback */}
+          <text
+            x={labelX}
+            y={labelY}
+            textAnchor="middle"
+            fill="#666"
+            fontSize="11"
+            fontFamily="system-ui, sans-serif"
+          >
+            Front-Wide zones (place L/C/R + SL/SR for precise positioning)
+          </text>
+        </g>
+      );
+    }
+    return null;
+  }, [
+    frontWideZones,
+    widthM, // Use new widthM
+    lengthM, // Use new lengthM
+    roomRect,
+    scale,
+    ZONE_DEPTH_M
+  ]);
+
+  // Parse something like "5.1", "7.1", "9.1.2" → {base: 5|7|9, hasWides: boolean}
+  const parseDolbyLayout = useCallback((dolbyLayoutStr) => {
+    if (!dolbyLayoutStr || typeof dolbyLayoutStr !== 'string') return { base: 5, hasWides: false };
+    const parts = dolbyLayoutStr.split('.');
+    const base = Math.max(2, Number(parts[0]) || 5);
+    const hasWides = base >= 9;
+    return { base, hasWides };
+  }, []);
+
+  const getDolbyZoneSpecs = useCallback((dolbyLayoutStr) => {
+    const { base, hasWides } = parseDolbyLayout(dolbyLayoutStr);
+
+    const C_WIDE = '#3b82f6';
+    const C_SIDE = '#f59e0b';
+    const C_REAR = '#10b981';
+    const DASH   = '6,6';
+
+    const specs = [];
+
+    if (base === 5) {
+      specs.push({
+        label: 'Dolby Side (5.1: 110–120°)',
+        stroke: C_SIDE,
+        dash: DASH,
+        ranges: [[110,120], [-120,-110]],
+      });
+    } else if (base === 7) {
+      specs.push({
+        label: 'Dolby Side (90–110°)',
+        stroke: C_SIDE,
+        dash: DASH,
+        ranges: [[90,110], [-110,-90]],
+      });
+      specs.push({
+        label: 'Dolby Rear (135–150°)',
+        stroke: C_REAR,
+        dash: DASH,
+        ranges: [[135,150], [-150,-135]],
+      });
+    } else if (base >= 9) {
+      if (hasWides) {
+        specs.push({
+          label: 'Dolby Wide (50–70°)',
+          stroke: C_WIDE,
+          dash: DASH,
+          ranges: [[50,70], [-70,-50]],
+        });
+      }
+      specs.push({
+        label: 'Dolby Side (90–110°)',
+        stroke: C_SIDE,
+        dash: DASH,
+        ranges: [[90,110], [-110,-90]],
+      });
+      specs.push({
+        label: 'Dolby Rear (135–150°)',
+        stroke: C_REAR,
+        dash: DASH,
+        ranges: [[135,150], [-150,-135]],
+      });
+    }
+
+    return specs;
+  }, [parseDolbyLayout]);
+
+  const arcPathForBand = useCallback((seatX, seatY, radiusM, minDeg, maxDeg, toPxFn) => {
+    const a0 = Number(minDeg);
+    const a1 = Number(maxDeg);
+    if (!Number.isFinite(a0) || !Number.isFinite(a1) || a1 <= a0) return null;
+
+    const steps = 24;
+    const pts = [];
+    for (let i = 0; i <= steps; i++) {
+      const t = a0 + (i * (a1 - a0) / steps);
+      const rad = (t * Math.PI) / 180;
+      const dx = Math.sin(rad) * radiusM;
+      const dy = -Math.cos(rad) * radiusM;
+      const [cx, cy] = toPxFn(seatX + dx, seatY + dy);
+      pts.push(`${i === 0 ? 'M' : 'L'}${cx},${cy}`);
+    }
+    return pts.join(' ');
+  }, []);
+
+  const renderDolbyZones = useCallback(() => {
+    if (!overlaysForRendering?.enableDolbyZones) return null;
+
+    const seat = mlp;
+    if (!seat || !Number.isFinite(seat.x) || !Number.isFinite(seat.y)) return null;
+    if (!toPx) return null;
+
+    const w = widthM || 4.5;
+    const l = lengthM || 6.0;
+
+    const specs = getDolbyZoneSpecs(dolbyLayout || '5.1');
+    if (!specs || !specs.length) return null;
+
+    const rM = Math.max(0.5, Math.min(w, l) * 0.35);
+    const rLabel = rM * 0.35;
+
+    const intersectRay = (sx, sy, deg) => {
+      const rad = (deg * Math.PI) / 180;
+      const dx = Math.sin(rad);
+      const dy = -Math.cos(rad);
+      
+      const tVals = [];
+      const xMin = 0, xMax = w, yMin = 0, yMax = l;
+      
+      if (Math.abs(dx) > 1e-9) {
+        const t1 = (xMin - sx) / dx;
+        const y1 = sy + t1 * dy;
+        if (t1 > 0 && y1 >= yMin && y1 <= yMax) tVals.push(t1);
+        
+        const t2 = (xMax - sx) / dx;
+        const y2 = sy + t2 * dy;
+        if (t2 > 0 && y2 >= yMin && y2 <= yMax) tVals.push(t2);
+      }
+      
+      if (Math.abs(dy) > 1e-9) {
+        const t3 = (yMin - sy) / dy;
+        const x3 = sx + t3 * dx;
+        if (t3 > 0 && x3 >= xMin && x3 <= xMax) tVals.push(t3);
+        
+        const t4 = (yMax - sy) / dy;
+        const x4 = sx + t4 * dx;
+        if (t4 > 0 && x4 >= xMin && x4 <= yMax) tVals.push(t4); // Corrected yMax
+      }
+      
+      if (!tVals.length) return null;
+      const t = Math.min(...tVals);
+      return { x: sx + t * dx, y: sy + t * dy };
+    };
+
+    const elements = [];
+
+    specs.forEach((spec, si) => {
+      spec.ranges.forEach((rng, ri) => {
+        const d = arcPathForBand(seat.x, seat.y, rM, rng[0], rng[1], toPx);
+        if (d) {
+          elements.push(
+            <path
+              key={`band-${si}-${ri}`}
+              d={d}
+              fill="none"
+              stroke={spec.stroke}
+              strokeWidth={1.5}
+              strokeDasharray="6,6"
+              opacity={0.85}
+              pointerEvents="none"
+            />
+          );
+        }
+
+        [rng[0], rng[1]].forEach((deg, di) => {
+          const hit = intersectRay(seat.x, seat.y, deg);
+          if (!hit) return;
+
+          const [sx, sy] = toPx(seat.x, seat.y);
+          const [ex, ey] = toPx(hit.x, hit.y);
+
+          elements.push(
+            <line
+              key={`spoke-${si}-${ri}-${di}`}
+              x1={sx} y1={sy} x2={ex} y2={ey} // Corrected x2 y2 to hit.x, hit.y converted to px
+              stroke={spec.stroke}
+              strokeWidth={1}
+              strokeDasharray="3,6"
+              opacity={0.7}
+              pointerEvents="none"
+            />
+          );
+
+          const rad = (deg * Math.PI) / 180;
+          const lx = seat.x + Math.sin(rad) * rLabel;
+          const ly = seat.y - Math.cos(rad) * rLabel;
+          const [lpx, lpy] = toPx(lx, ly);
+
+          elements.push(
+            <g key={`label-${si}-${ri}-${di}`} pointerEvents="none" opacity={0.95}>
+              <rect x={lpx - 12} y={lpy - 10} width={24} height={16} rx={3} fill="white" opacity={0.9}/>
+              <text x={lpx} y={lpy + 2} fontSize="11" textAnchor="middle" fill={spec.stroke}>{Math.round(deg)}°</text>
+            </g>
+          );
+        });
+      });
+    });
+
+    return <g data-testid="dolby-zones">{elements}</g>;
+  }, [overlaysForRendering?.enableDolbyZones, mlp, toPx, widthM, lengthM, dolbyLayout, getDolbyZoneSpecs, arcPathForBand]);
+
+
+  // Memoize individual zone components with unique IDs
+  const ZoneComponents = useMemo(() => {
+    // LCR Zone Component - Updated to use lcrZoneBlocks
+    const LCRZoneComponent = ({ side }) => {
+      // Only show LCR zone if floating mode is enabled and lcrZoneBlocks are available
+      if (!lcrZoneBlocks || screen?.mountMode !== 'floating') return null;
+
+      const zone = lcrZoneBlocks[side];
+      if (!zone) return null;
+
+      // Convert room meter coordinates to canvas pixel coordinates
+      const [xStartPx] = toPx(zone.x_start, 0);
+      const [x2Px] = toPx(zone.x_end, 0);
+
+      // Y-coordinates are from the front wall (y=0) to ZONE_DEPTH_M
+      const yTopPx = roomRect.y;
+      const yBottomPx = roomRect.y + (ZONE_DEPTH_M * scale);
+
+      const rectX = Math.min(xStartPx, x2Px);
+      const rectWidth = Math.abs(x2Px - xStartPx);
+      const rectY = yTopPx;
+      const rectHeight = yBottomPx - yTopPx;
+
+      const fill = side === 'left' ? '#4A230F' : '#213428';
+
+      // Apply visual overhang for the display, similar to previous LCRZoneComponent
+      const overhangM = 0.50;
+      // Calculate extended room bounds in pixels from room's meter dimensions
+      const [extendedRoomLeftPx] = toPx(0 - overhangM, 0);
+      const [extendedRoomRightPx] = toPx(widthM + overhangM, 0); // Use new widthM
+
+      // Clamp the visual rectangle to the extended bounds for display
+      const finalX = Math.max(extendedRoomLeftPx, rectX);
+      const finalWidth = Math.min(extendedRoomRightPx, rectX + rectWidth) - finalX;
+
+      return (
+        <rect
+          id={`LCR_ZONE_${side.toUpperCase()}`}
+          x={finalX}
+          y={rectY}
+          width={finalWidth}
+          height={rectHeight}
+          fill={fill}
+          fillOpacity="0.35"
+        />
+      );
+    };
+
+    // Side Surround Zone Component (Corrected positioning and seamless rendering)
+    const SideSurroundZoneComponent = ({ side }) => {
+      const fadeLen_px = FADE_LEN_M * scale;
+
+      // ROOM BOUNDS
+      const roomLeft = roomRect.x;
+      const roomRight = roomRect.x + roomRect.width;
+      const roomTop = roomRect.y;
+      const roomBottom = roomRect.y + roomRect.height;
+
+      // CORE POSITIONS
+      const [, mlpY_px] = toPx(0, mlpY_m);
+      const [, rearWallY_px] = toPx(0, lengthM); // Use new lengthM
+      const [, screenWallY_px] = toPx(0, 0);
+
+      const bandW_px = ZONE_DEPTH_M * scale;
+      const isLeft = side === "left";
+      const fill = isLeft ? '#4A230F' : '#213428';
+
+      // SIDE WALL X (inside room)
+      const sideX_px = isLeft ? roomLeft : (roomRight - bandW_px);
+
+      // VERTICAL BAND: Rendered as a single seamless rectangle
+      const vTop_px = Math.max(roomTop, screenWallY_px);
+      const vBottom_px = Math.min(roomBottom, rearWallY_px);
+      const mlpClamped_px = Math.max(vTop_px, Math.min(vBottom_px, mlpY_px));
+
+      const fadeEndY_px = mlpClamped_px;
+      const fadeStartY_px = Math.max(vTop_px, fadeEndY_px - fadeLen_px);
+      const vBandStartY_px = fadeStartY_px;
+      const vBandTotalHeight_px = Math.max(0, vBottom_px - vBandStartY_px);
+
+      // HORIZONTAL BAND Y POSITION: Corrected to be inside the room
+      const backH_px = bandW_px;
+      const backY_px = Math.min(roomBottom, rearWallY_px) - backH_px;
+
+      // HORIZONTAL BAND X extents (logic remains the same)
+      const seatXs = seatingPositions.map(s => Number(s.x)).filter(Number.isFinite);
+      const leftmostSeatX_m = seatXs.length ? Math.min(...seatXs) : widthM * 0.35; // Use new widthM
+      const rightmostSeatX_m = seatXs.length ? Math.max(...seatXs) : widthM * 0.65; // Use new widthM
+      const [leftSeat_px] = toPx(leftmostSeatX_m, 0);
+      const [rightSeat_px] = toPx(rightmostSeatX_m, 0);
+
+      const backSolidStart_px = isLeft ? roomLeft : Math.max(roomLeft, rightSeat_px);
+      const backSolidEnd_px = isLeft ? Math.min(roomRight, leftSeat_px) : roomRight;
+      const backSolidW_px = Math.max(0, backSolidEnd_px - backSolidStart_px);
+
+      const backFadeW_px = fadeLen_px;
+      const totalBackW_px = backSolidW_px + backFadeW_px;
+
+      const gidV = `grad_side_vertical_${side}`;
+      const gidB = `grad_side_back_${side}`;
+
+      // NEW: Pre-calculate offset ratios for clarity and correctness
+      const mlpOffsetRatio = vBandTotalHeight_px > 0 ? (mlpClamped_px - vBandStartY_px) / vBandTotalHeight_px : 0;
+      const solidOffsetRatio = totalBackW_px > 0 ? backSolidW_px / totalBackW_px : 0;
+      const fadeOffsetRatio = totalBackW_px > 0 ? backFadeW_px / totalBackW_px : 0;
+
+      // Handle backRectWidth and backRectX properly for horizontal band
+      let backRectWidth = 0;
+      let backRectX = 0;
+      if (isLeft) {
+        backRectX = roomLeft;
+        backRectWidth = Math.max(0, leftSeat_px - roomLeft + fadeLen_px);
+      } else {
+        backRectX = rightSeat_px - fadeLen_px;
+        backRectWidth = Math.max(0, roomRight - rightSeat_px + fadeLen_px);
+      }
+
+      return (
+        <g pointerEvents="none">
+          {vBandTotalHeight_px > 0 && (
+            <>
+              <defs>
+                <linearGradient id={gidV} gradientUnits="userSpaceOnUse"
+                  x1={sideX_px} y1={vBandStartY_px}
+                  x2={sideX_px} y2={vBottom_px}>
+                  <stop offset="0" stopColor={fill} stopOpacity="0.0" />
+                  <stop offset={mlpOffsetRatio} stopColor={fill} stopOpacity="0.35" />
+                  <stop offset="1" stopColor={fill} stopOpacity="0.35" />
+                </linearGradient>
+              </defs>
+              <rect
+                x={sideX_px}
+                y={vBandStartY_px}
+                width={bandW_px}
+                height={vBandTotalHeight_px}
+                fill={`url(#${gidV})`}
+              />
+            </>
+          )}
+
+          {backRectWidth > 0 && (
+            <>
+              <defs>
+                <linearGradient id={gidB} gradientUnits="userSpaceOnUse"
+                  x1={backRectX} y1={backY_px}
+                  x2={backRectX + backRectWidth} y2={backY_px}>
+                  {isLeft ? (
+                    <>
+                      <stop offset={solidOffsetRatio} stopColor={fill} stopOpacity="0.35" />
+                      <stop offset="1" stopColor={fill} stopOpacity="0" />
+                    </>
+                  ) : (
+                    <>
+                      <stop offset="0" stopColor={fill} stopOpacity="0.0" />
+                      <stop offset={fadeOffsetRatio} stopColor={fill} stopOpacity="0.35" />
+                      <stop offset="1" stopColor={fill} stopOpacity={0.35} />
+                    </>
+                  )}
+                </linearGradient>
+              </defs>
+              <rect
+                x={backRectX}
+                y={backY_px}
+                width={backRectWidth}
+                height={backH_px}
+                fill={`url(#${gidB})`}
+                pointerEvents="none"
+              />
+            </>
+          )}
+        </g>
+      );
+    };
+
+    // Rear Surround Zone Component
+    const RearSurroundZoneComponent = () => {
+      // Rule: Do not render if no seats exist.
+      if (!seatingPositions || seatingPositions.length === 0) return null;
+
+      const fadeLen_px = FADE_LEN_M * scale;
+
+      // Room bounds and core positions
+      const roomLeft = roomRect.x;
+      const roomRight = roomRect.x + roomRect.width;
+      const roomTop = roomRect.y;
+      const roomBottom = roomRect.y + roomRect.height;
+      const [, rearWallY_px] = toPx(0, lengthM); // Use new lengthM
+      const bandW_px = ZONE_DEPTH_M * scale;
+
+      // Find rearmost seat line (global last-seat line)
+      const seatYs = seatingPositions.map(s => Number(s.y)).filter(Number.isFinite);
+      const lastSeatY_m = seatYs.length ? Math.max(...seatYs) : mlp.y;
+      const [, lastSeatY_px_raw] = toPx(0, lastSeatY_m);
+      const lastSeatY_px = Math.max(roomTop, Math.min(roomBottom, lastSeatY_px_raw));
+
+      // Vertical bands: from last-seat line to rear wall
+      const vHeight_px = Math.max(0, Math.min(roomBottom, rearWallY_px) - lastSeatY_px);
+
+      // Horizontal bands: use first-seat X positions
+      const seatXs = seatingPositions.map(s => Number(s.x)).filter(Number.isFinite);
+      const leftmostSeatX_m = seatXs.length ? Math.min(...seatXs) : widthM * 0.35; // Use new widthM
+      const rightmostSeatX_m = seatXs.length ? Math.max(...seatXs) : widthM * 0.65; // Use new widthM
+      const [leftSeat_px] = toPx(leftmostSeatX_m, 0);
+      const [rightSeat_px] = toPx(rightmostSeatX_m, 0);
+
+      // Position horizontal band inside the room
+      const backY_px = Math.min(roomBottom, rearWallY_px) - bandW_px;
+
+      const renderBand = (side) => {
+        const isLeft = side === 'left';
+        const fillColor = isLeft ? '#4A230F' : '#213428';
+        const sideX_px = isLeft ? roomLeft : roomRight - bandW_px;
+
+        const verticalRect = vHeight_px > 0 ? (
+          <rect
+            key={`vert-${side}`}
+            x={sideX_px}
+            y={lastSeatY_px}
+            width={bandW_px}
+            height={vHeight_px}
+            fill={fillColor}
+            opacity={0.35}
+          />
+        ) : null;
+
+        const solidStartX = isLeft ? roomLeft : Math.max(roomLeft, rightSeat_px);
+        const solidEndX = isLeft ? Math.min(roomRight, leftSeat_px) : roomRight;
+        const solidW = Math.max(0, solidEndX - solidStartX);
+        const backFadeW_px = fadeLen_px;
+        const totalW = solidW + backFadeW_px;
+
+        const gidH = `grad_rear_horiz_${side}`;
+        const bandX = isLeft ? solidStartX : (solidStartX - backFadeW_px);
+        const offsetSolid = totalW > 0 ? solidW / totalW : 0;
+        const offsetFade = totalW > 0 ? backFadeW_px / totalW : 0;
+
+        return (
+          <g key={side} pointerEvents="none">
+            {verticalRect}
+            {totalW > 0 && (
+              <>
+                <defs>
+                  <linearGradient
+                    id={gidH}
+                    gradientUnits="userSpaceOnUse"
+                    x1={bandX}
+                    y1={backY_px}
+                    x2={bandX + totalW}
+                    y2={backY_px}
+                  >
+                    {isLeft ? (
+                      <>
+                        <stop offset={offsetSolid} stopColor={fillColor} stopOpacity="0.35" />
+                        <stop offset="1" stopColor={fillColor} stopOpacity="0" />
+                      </>
+                    ) : (
+                      <>
+                        <stop offset="0" stopColor={fillColor} stopOpacity="0.0" />
+                        <stop offset={offsetFade} stopColor={fillColor} stopOpacity="0.35" />
+                        <stop offset="1" stopColor={fillColor} stopOpacity={0.35} />
+                    </>
+                    )}
+                  </linearGradient>
+                </defs>
+                <rect
+                  x={bandX}
+                  y={backY_px}
+                  width={totalW}
+                  height={bandW_px}
+                  fill={`url(#${gidH})`}
+                  pointerEvents="none"
+                />
+              </>
+            )}
+          </g>
+        );
+      };
+
+      return (
+        <g pointerEvents="none">
+          {renderBand('left')}
+          {renderBand('right')}
+        </g>
+      );
+    };
+
+return {
+  LCR: (
+    <g pointerEvents="none">
+      <LCRZoneComponent side="left" />
+      <LCRZoneComponent side="right" />
+    </g>
+  ),
+  SIDE_SURROUND: (
+    <g pointerEvents="none">
+      <SideSurroundZoneComponent side="left" />
+      <SideSurroundZoneComponent side="right" />
+    </g>
+  ),
+  REAR_SURROUND: <RearSurroundZoneComponent />,
+
+  OVERHEADS: renderOverheadBandsSVG({
+    zones: overheadZones,
+    config: overheadCount === 2 ? ".2" : overheadCount === 4 ? ".4" : ".6",
+    toPx,
+    scale,
+    roomRect,
+    placedSpeakers,
+    getCanonicalRole,
+    widthM,
+  }),
+
+  FRONT_WIDE: renderFrontWideZones(),
+  // DOLBY removed
+};
+  }, [seatingPositions, widthM, lengthM, scale, toPx, roomRect, mlpY_m, placedSpeakers, heightM, screen?.mountMode, lcrZoneBlocks, ZONE_DEPTH_M, frontWideZones, renderFrontWideZones, mlp, getCanonicalRole, overheadCount, overheadZones]); // Added overheadZones to dependencies
+
+
+  // constants for seating block shift
+  const TARGET_ANGLE_DEG = 57.5;
+  const SAFETY_MARGIN_M = 0.05;
+
+  // seating row helpers
+  const findFrontRowY = useCallback((seats = []) => {
+    if (!seats.length) return null;
+    return Math.min(...seats.map(s => Number(s.y) || 0));
+  }, []);
+
+  const findBackRowY = useCallback((seats = []) => {
+    if (!seats.length) return null;
+    return Math.max(...seats.map(s => Number(s.y) || 0));
+  }, []);
+
+  // This function shifts all seats as a block to align the specified row (front or back)
+  // with the target 57.5 degree MLP from the screen.
+  const shiftSeatsToMaintainAngle = useCallback((mlpRefKey) => {
+    // room + screen
+    const roomLenM = lengthM || 6.0; // Use new lengthM
+    // target MLP y (from front wall): now directly using the shared utility
+    const targetMLP_Y = targetMlpY57_5(screen, 0);
+
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return;
+
+    // find current MLP row y
+    const currentRowY = (mlpRefKey === "BACK_ROW_CENTER")
+      ? findBackRowY(seatingPositions)
+      : findFrontRowY(seatingPositions);
+
+    if (currentRowY == null) return;
+
+    // compute delta to apply to ALL seats as a rigid block
+    let deltaY = targetMLP_Y - currentRowY;
+
+    // clamp block movement so we don't cross front/back walls
+    const minY = Math.min(...seatingPositions.map(s => Number(s.y) || 0));
+    const maxY = Math.max(...seatingPositions.map(s => Number(s.y) || 0));
+
+    // after shifting, enforce bounds [SAFETY, roomLen - SAFETY]
+    const newMinY = minY + deltaY;
+    const newMaxY = maxY + deltaY;
+    const minAllowed = SAFETY_MARGIN_M;
+    const maxAllowed = roomLenM - SAFETY_MARGIN_M;
+
+    if (newMinY < minAllowed) {
+      deltaY += (minAllowed - newMinY);
+    }
+    if (newMaxY > maxAllowed) {
+      deltaY -= (newMaxY - maxAllowed);
+    }
+
+    // apply translation
+    onSetSeatingPositions?.((prev) =>
+      (prev || []).map(s => ({
+        ...s,
+        y: (Number(s.y) || 0) + deltaY
+      }))
+    );
+  }, [lengthM, screen, seatingPositions, onSetSeatingPositions, findFrontRowY, findBackRowY]); // Use new lengthM
+
+  // UPDATED: Reset side surrounds to their cached default positions
+  const resetSideSurroundsToDefault = useCallback(() => {
+    onSetSpeakers(prev => {
+      const slSpeaker = prev.find(s => getCanonicalRole(s.role) === 'SL');
+      const srSpeaker = prev.find(s => getCanonicalRole(s.role) === 'SR');
+
+      if (!slSpeaker && !srSpeaker) return prev;
+
+      const roomWidth = widthM || 4.5; // Use new widthM
+      const roomLengthM = lengthM || 6.0; // Use new lengthM
+
+      // Determine fixed X positions for both, even if only one exists for robustness
+      // Use getSpeakerDims directly to get dimensions.
+      const dimsL = slSpeaker ? getSpeakerDims(slSpeaker.model) : { heightM: 0.2, depthM: 0.082 };
+      const dimsR = srSpeaker ? getSpeakerDims(srSpeaker.model) : { heightM: 0.2, depthM: 0.082 };
+
+      const xL = fixedSideX(roomWidth, dimsL, 'L');
+      const xR = fixedSideX(roomWidth, dimsR, 'R');
+
+      // Get the y-range for the speaker center (already includes overhang)
+      const yMin_center = Number(sideSurroundVisualSpanM?.minY) ?? 0;
+      const yMax_center = Number(sideSurroundVisualSpanM?.maxY) ?? 0;
+
+      // Calculate a default Y position, e.g., the midpoint of the available range
+      let defaultY = (yMin_center + yMax_center) / 2;
+      // If the span is invalid (e.g., yMin_center >= yMax_center), clamp to a safe default in the room center
+      if (!(yMax_center > yMin_center)) {
+        defaultY = roomLengthM / 2;
+      }
+
+      return prev.map(s => {
+        const role = getCanonicalRole(s.role);
+        if (role === 'SL' || role === 'SR') {
+          const targetX = role === 'SL' ? xL : xR;
+          const targetY = defaultY;
+
+          // Cache this as the new default position
+          const newDefaultPos = { x: targetX, y: targetY };
+          return { ...s, defaultPosition: newDefaultPos, position: { ...s.position, x: targetX, y: targetY } };
+        }
+        return s;
+      });
+    });
+  }, [onSetSpeakers, widthM, lengthM, sideSurroundVisualSpanM, getCanonicalRole]); // Use new widthM, lengthM
+
+  useEffect(() => {
+    window.addEventListener('b44:resetSideSurrounds', resetSideSurroundsToDefault);
+    return () => {
+      window.removeEventListener('b44:resetSideSurrounds', resetSideSurroundsToDefault);
+    };
+  }, [resetSideSurroundsToDefault]);
+
+  // Expose the shift function so parent components can call it
+  useImperativeHandle(ref, () => ({
+    shiftSeatsToMaintainAngle,
+    resetSideSurrounds: resetSideSurroundsToDefault
+  }), [shiftSeatsToMaintainAngle, resetSideSurroundsToDefault]);
+
+  const applyLcrFromDetail = useCallback((detail) => {
+    if (!detail || !onSetSpeakers) return;
+
+    const W = widthM || 4.5; // Use new widthM
+    const L = lengthM || 6.0; // Use new lengthM
+
+    const coords = detail.coords || {};
+    const speakers = detail.speakers || {};
+
+    // coords are normalized [0..1]; convert to room metres
+    const toRoom = (p) => (!p ? { x: W * 0.5, y: 0.03 * L } : { x: (p.x || 0.5) * W, y: (p.y || 0.03) * L });
+
+    const Lpos = toRoom(coords.L);
+    const Cpos = toRoom(coords.C);
+    const Rpos = toRoom(coords.R);
+
+    const Lmodel = speakers.L || "";
+    const Cmodel = speakers.C || "";
+    const Rmodel = speakers.R || "";
+
+    // Build or merge FL/FC/FR entries; keep all other speakers/subs as-is
+    onSetSpeakers((prev = []) => {
+      // Filter out existing LCR speakers using canonical roles for robustness
+      const keep = prev.filter(s => !["FL", "FC", "FR"].includes(getCanonicalRole(s.role)));
+
+      const next = [
+        { id: "auto-fl", role: "FL", model: Lmodel, position: { x: Lpos.x, y: Lpos.y } },
+        { id: "auto-fc", role: "FC", model: Cmodel, position: { x: Cpos.x, y: Cpos.y } },
+        { id: "auto-fr", role: "FR", model: Rmodel, position: { x: Rpos.x, y: Rpos.y } },
+      ];
+
+      return [...keep, ...next];
+    });
+  }, [onSetSpeakers, widthM, lengthM, getCanonicalRole]); // Use new widthM, lengthM
+
+  // Listen for LCR events and expose a direct hook
+  useEffect(() => {
+    const handler = (e) => applyLcrFromDetail(e?.detail);
+    window.addEventListener("b44:overlay:setLCR", handler);
+
+    // Optional direct hook: window.Base44Overlay.setLCR = applyLcrFromDetail
+    try {
+      window.Base44Overlay = window.Base44Overlay || {};
+      window.Base44Overlay.setLCR = applyLcrFromDetail;
+    } catch (e) {
+      if (typeof console !== 'undefined') console.error("Failed to attach Base44Overlay.setLCR:", e);
+    }
+
+    return () => {
+      window.removeEventListener("b44:overlay:setLCR", handler);
+      try {
+        if (window.Base44Overlay && window.Base44Overlay.setLCR === applyLcrFromDetail) {
+          delete window.Base44Overlay.setLCR;
+        }
+      } catch (e) {
+        if (typeof console !== 'undefined') console.error("Failed to detach Base44Overlay.setLCR:", e);
+      }
+    };
+  }, [applyLcrFromDetail]);
+
+  const renderSpeakers = useCallback(() => {
+  // Normalise input
+  const raw = Array.isArray(speakersToRender) ? speakersToRender : [];
+
+  // 1) Basic structural filter (existing helper)
+  const afterRenderable = raw.filter(isRenderableSpeaker);
+
+  // 2) Visibility filter (layout + model) – but never hard-fail on errors
+  const afterVisibility = afterRenderable.filter((spk) => {
+    try {
+      const result = getSpeakerVisibility(spk.role, spk.model);
+      
+      // TEMP DEBUG: Log each visibility check
+      const canon = String(spk.role || "").toUpperCase();
+      if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+        console.log('[RV filter]', {
+          role: canon,
+          model: spk.model,
+          visibilityResult: result
+        });
+      }
+      
+      return result;
+    } catch (err) {
+      console.warn("[RV] getSpeakerVisibility error; allowing speaker through", {
+        role: spk.role,
+        model: spk.model,
+        err,
+      });
+      return true;
+    }
+  });
+
+  // DEBUG: Expose to window for manual inspection
+  if (typeof window !== 'undefined') {
+    window.__LAST_RV__ = { raw, afterVisibility };
+  }
+
+  // DEBUG: Table of afterVisibility with positions
+  try {
+    console.groupCollapsed("[RV] speakersToRender DEBUG");
+    console.log('Raw speakers:');
+    console.table(
+      raw.map((s) => ({
+        id: s.id,
+        role: s.role,
+        model: s.model || "(none)",
+      }))
+    );
+    console.log('After visibility:');
+    console.table(
+      afterVisibility.map((s) => ({
+        id: s.id,
+        role: s.role,
+        model: s.model || "(none)",
+        posX: s.position?.x?.toFixed?.(3) || '—',
+        posY: s.position?.y?.toFixed?.(3) || '—',
+      }))
+    );
+    console.groupEnd();
+  } catch (_) {
+    // ignore console errors in strange environments
+  }
+
+  // Local NaN-safe coordinate mappers (must be inside this loop)
+  const toCanvasX = (xM) => {
+    const safeX = Number.isFinite(xM) ? xM : 0;
+    return roomRect.x + (safeX * scale);
+  };
+
+  const toCanvasY = (yM) => {
+    const safeY = Number.isFinite(yM) ? yM : 0;
+    return roomRect.y + (safeY * scale);
+  };
+
+  // [B44] Debug log to confirm bed-surround positions are not mutated by RV
+  console.log('[RV] speakers BEFORE icon-map',
+    afterVisibility.map(s => ({
+      role: s.role,
+      canon: getCanonicalRole(s.role),
+      x: s.position?.x?.toFixed(3),
+      y: s.position?.y?.toFixed(3),
+    }))
+  );
+
+  // [B44] Debug log to confirm bed-surround positions are not mutated by RV
+  console.log('[RV] speakers BEFORE icon-map',
+    afterVisibility.map(s => ({
+      role: s.role,
+      canon: getCanonicalRole(s.role),
+      x: s.position?.x?.toFixed(3),
+      y: s.position?.y?.toFixed(3),
+    }))
+  );
+
+  // 3) Map to icons
+  return afterVisibility.map((speaker) => {
+    const { id, role, model, position = {} } = speaker;
+    const canon = getCanonicalRole(role);
+
+    // Resolve model & dimensions using your existing helpers
+    const resolvedModel = resolveSurroundModel(model, canon);
+    const dims = getSpeakerDims(resolvedModel);
+    const widthM_spk = dims.widthM || 0;
+    const depthM_spk = dims.depthM || 0;
+
+    // Compute yaw: prefer explicit speaker.yaw (seeded by SpeakerPlacement)
+    // and fall back to the existing helper if it's not set / not finite.
+    let yawDeg;
+
+    if (Number.isFinite(speaker?.yaw)) {
+      yawDeg = Number(speaker.yaw);
+    } else {
+      yawDeg = getYawForObject(
+        speaker,
+        { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
+        aimAtMLP,
+        { width: widthM, length: lengthM, height: heightM },
+        getModelDimsM
+      );
+    }
+
+    // Position coordinates from speaker.position (with safe fallbacks)
+    const pos_x = position.x ?? 0;
+    const pos_y = position.y ?? 0;
+
+    // --- Rear surround wall-aware yaw ---
+    // If SBL/SBR are dragged onto a side wall, rotate them 90° so the
+    // long edge sits flat on that wall (matching SL/SR behaviour).
+    if (canon === "SBL" || canon === "SBR") {
+      const distLeft  = Math.abs(pos_x - 0);
+      const distRight = Math.abs(widthM - pos_x);
+      const distBack  = Math.abs(lengthM - pos_y); // back wall at y = lengthM
+
+      const minDist = Math.min(distLeft, distRight, distBack);
+
+      if (minDist === distBack) {
+        // Closest to back wall: keep standard rear orientation (flat to back)
+        yawDeg = 0;
+      } else if (minDist === distLeft) {
+        // Now effectively on left wall
+        yawDeg = 90;
+      } else if (minDist === distRight) {
+        // Now effectively on right wall
+        yawDeg = -90;
+      }
+    }
+
+    // Convert to canvas coordinates
+    let canvasX, canvasY;
+
+    if (canon === "FL" || canon === "FC" || canon === "FR") {
+      // LCR: pinned to front wall using WALL_BUFFER_M
+      const half = yHalfExtentM(depthM_spk, widthM_spk, yawDeg);
+      const y_m = WALL_BUFFER_M + half;
+      canvasX = toCanvasX(pos_x);
+      canvasY = toCanvasY(y_m);
+    } else {
+      // Everyone else: use their stored world coords directly
+      canvasX = toCanvasX(pos_x);
+      canvasY = toCanvasY(pos_y);
+    }
+
+    // NaN safety: ensure we never pass invalid coordinates
+    const safeCanvasX = Number.isFinite(canvasX) ? canvasX : 0;
+    const safeCanvasY = Number.isFinite(canvasY) ? canvasY : 0;
+
+    // Log any invalid coordinates
+    if (!Number.isFinite(canvasX) || !Number.isFinite(canvasY)) {
+      console.warn('[RV] INVALID CANVAS COORDS', {
+        id,
+        role,
+        pos: position,
+        pos_x,
+        pos_y,
+        canvasX,
+        canvasY,
+      });
+    }
+
+    // DEBUG: Log icon generation for rear/wide speakers
+    if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+      console.log('[RV icon]', {
+        id,
+        role,
+        canon,
+        model,
+        resolvedModel,
+        pos: position,
+        pos_x,
+        pos_y,
+        canvasX: safeCanvasX,
+        canvasY: safeCanvasY,
+        yawDeg,
+        widthM_spk,
+        depthM_spk,
+      });
+    }
+
+    const speakerMouseDownHandler = isDraggable(speaker)
+      ? (e) => handleMouseDown(e, id, "speaker")
+      : undefined;
+
+    return (
+      <SpeakerIcon
+        key={id}
+        speaker={{ ...speaker, model: resolvedModel }}
+        canvasX={safeCanvasX}
+        canvasY_raw={safeCanvasY}
+        yawDeg={yawDeg}
+        widthM={widthM_spk}
+        depthM={depthM_spk}
+        scale={scale}
+        speakerMouseDownHandler={speakerMouseDownHandler}
+        setHoveredSpeaker={setHoveredSpeaker}
+      />
+    );
+  });
+}, [
+  speakersToRender,
+  isRenderableSpeaker,
+  getSpeakerVisibility,
+  getCanonicalRole,
+  resolveSurroundModel,
+  getSpeakerDims,
+  getYawForObject,
+  yHalfExtentM,
+  WALL_BUFFER_M,
+  roomRect,
+  scale,
+  widthM,
+  lengthM,
+  heightM,
+  lcrAngleInfo,
+  aimAtMLP,
+  isDraggable,
+  handleMouseDown,
+  setHoveredSpeaker,
+  SpeakerIcon,
+]);
+
+  // Renders rear subwoofers using SpeakerRect
+  const renderSubwoofers = React.useCallback(() => {
+    const subsToRender = Array.isArray(rearSubs) ? rearSubs : [];
+    if (!subsToRender.length) return null;
+    return (
+      <g data-layer="rear-subwoofers" pointerEvents="none">
+        {subsToRender.map((sub, i) => {
+          if (!hasPos(sub)) return null;
+          // No suffix resolution for subwoofers
+          const { widthM, depthM } = getModelDimsM(sub.model);
+          return (
+            <SpeakerRect
+              key={sub.id || `sub-${i}`}
+              speaker={sub}
+              widthM={widthM}
+              depthM={depthM}
+              opacity={0.8}
+              scale={scale}
+              toPx={toPx}
+            />
+          );
+        })}
+      </g>
+    );
+  }, [rearSubs, getModelDimsM, scale, toPx]);
+
+  // Renders generic room elements. `roomElements` prop is available.
+  const renderRoomElements = useCallback(() => {
+    return <g data-layer="room-elements"></g>;
+  }, []);
+
+  // Renders speaker labels. Not implemented in the original code, so a placeholder.
+  const renderSpeakerLabels = useCallback(() => {
+    return <g data-layer="speaker-labels"></g>;
+  }, []);
+
+  // --- Seats: always render from the latest seatingPositions prop ---
+  const renderSeatingPositions = () => {
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
+      console.log('RoomVisualisation: rendering seats = 0');
+      return null;
+    }
+
+    const RX_M = 0.10;
+    const RY_M = 0.125;
+
+    console.log('RoomVisualisation: rendering seats =', seatingPositions.length);
+
+    return (
+      <g className="seats-layer" style={{ pointerEvents: 'auto' }}>
+        {seatingPositions.map((seat) => {
+          // accept either { x, y } or { position: { x, y } }
+          const xM = Number(
+            seat.x ??
+            seat.position?.x ??
+            0
+          );
+          const yM = Number(
+            seat.y ??
+            seat.position?.y ??
+            0
+          );
+
+          const [seatX, seatY] = toPx(xM, yM);
+          const isPinned = hudPinnedSeatId === seat.id;
+
+          return (
+            <ellipse
+              key={seat.id}
+              cx={seatX}
+              cy={seatY}
+              rx={RX_M * scale}
+              ry={RY_M * scale}
+              fill="rgba(0,0,0,0)"
+              pointerEvents="all"
+              stroke="#213428"
+              strokeWidth={seat.isPrimary ? 2.5 : isPinned ? 2 : 1}
+              strokeDasharray={isPinned ? '4 2' : 'none'}
+              style={{ cursor: 'pointer' }}
+              aria-label="Seat — hover for RP23 and P1 analysis"
+              onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
+              onMouseEnter={() => handleSeatMouseEnter(seat)}
+              onMouseLeave={handleSeatMouseLeave}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleSeatClick(seat);
+              }}
+            />
+          );
+        })}
+      </g>
+    );
+  };
+  
+  // MLP marker: always draw at computed MLP (mlpDotX_m, mlpDotY_m),
+  // never snap horizontally to a specific seat.
+  const MLPMarker = useMemo(() => {
+    if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) {
+      return null;
+    }
+
+    const [x, y] = toPx(mlpDotX_m, mlpDotY_m);
+
+    return (
+      <g data-testid="mlp-marker">
+        <circle
+          cx={x}
+          cy={y}
+          r={4}
+          fill="#22c55e"
+          stroke="#ffffff"
+          strokeWidth={2}
+          opacity={0.9}
+        />
+      </g>
+    );
+  }, [toPx, mlpDotX_m, mlpDotY_m]);
+
+
+  const containerStyle = {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: aspect,
+    maxHeight: 'none',
+    border: '1px solid #DCDBD6',
+    borderRadius: '88px',
+    backgroundColor: '#F8F8F7',
+    overflow: 'hidden',
+  };
+
+  const canvasStyle = {
+    margin: '0 auto',
+    padding: '24px',
+    width: '100%',
+    maxWidth: 'none',
+    overflow: 'hidden',
+    position: 'relative'
+  };
+
+  const containerRect = planBoundsRef.current?.getBoundingClientRect(); // Changed from containerRef
 
   const svgW = containerW;
   const svgH = containerH;
 
-  const canvasStyle = {
-    position: 'relative',
-    width: '100%',
-    height: '100%',
-  };
-
-  const overlaysForRendering = _overlays || {};
-
-  const augmentedZones = {
-    lcrZoneBlocks,
-    frontWideZones,
-    sideSurroundBounds,
-    rearSurroundZones,
-    overheadZones,
-  };
-
-  // Render functions
-  const renderRoomElements = () => null;
-  const renderSubwoofers = () => null;
-  const renderSeatingPositions = () => {
-    return seatingPositions.map(seat => {
-      const [x, y] = toPx(seat.x, seat.y);
-      return (
-        <circle
-          key={seat.id}
-          cx={x}
-          cy={y}
-          r={8}
-          fill={seat.isPrimary ? '#10B981' : '#3B82F6'}
-          stroke="white"
-          strokeWidth="2"
-          style={{ cursor: 'pointer' }}
-          onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
-          onMouseEnter={() => handleSeatMouseEnter(seat)}
-          onMouseLeave={handleSeatMouseLeave}
-          onClick={() => handleSeatClick(seat)}
-        />
-      );
-    });
-  };
-  
-  const overheadIconElements = null;
-  const renderSpeakers = () => {
-    return placedSpeakers.filter(isRenderableSpeaker).map(spk => {
-      const [x, y] = toPx(spk.position.x, spk.position.y);
-      const dims = getModelDimsM(spk.model);
-      const yawDeg = getYawForObject(spk, lcrAngleInfo, aimAtMLP, { width: widthM, length: lengthM }, getModelDimsM);
-      
-      return (
-        <SpeakerIcon
-          key={spk.id}
-          speaker={spk}
-          x={x}
-          y={y}
-          dims={dims}
-          scale={scale}
-          yawDeg={yawDeg}
-          onMouseDown={(e) => handleMouseDown(e, spk.id, 'speaker')}
-          onMouseEnter={() => setHoveredSpeaker(spk)}
-          onMouseLeave={() => setHoveredSpeaker(null)}
-        />
-      );
-    });
-  };
-  
-  const renderSpeakerLabels = () => {
-    return placedSpeakers.filter(isRenderableSpeaker).map(spk => {
-      const [x, y] = toPx(spk.position.x, spk.position.y);
-      return (
-        <text
-          key={`label-${spk.id}`}
-          x={x}
-          y={y - 20}
-          fontSize="10"
-          textAnchor="middle"
-          fill="#625143"
-          pointerEvents="none"
-        >
-          {getCanonicalRole(spk.role)}
-        </text>
-      );
-    });
-  };
-  
-  const renderRp22AnglesOverlay = () => null;
-  const renderDolbyZones = () => null;
-  
-  const ZoneComponents = {
-    LCR: null,
-    SIDE_SURROUND: null,
-    REAR_SURROUND: null,
-    OVERHEADS: null,
-    FRONT_WIDE: null,
-  };
-  
-  const MLPMarker = mlp ? (
-    <circle
-      cx={mlpPxX}
-      cy={mlpPxY}
-      r={6}
-      fill="#10B981"
-      stroke="white"
-      strokeWidth="2"
-      pointerEvents="none"
-    />
-  ) : null;
-
+  // Helper to render level badge
   const renderLevelBadge = useCallback((level) => {
     if (!level || level === 'N/A' || level === '—' || level === 'Below L1') {
       return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
@@ -2703,6 +4582,109 @@ React.useEffect(() => {
     );
   }, []);
 
+  const renderRp22AnglesOverlay = useCallback(() => {
+    if (!overlaysForRendering?.enableRp22Angles) return null;
+    if (!Number.isFinite(scale)) return null;
+    if (!effectiveHoveredSeat) return null;
+
+    const allSurrounds = (placedSpeakers || []).filter(s => {
+      const r = getCanonicalRole(s.role);
+      return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
+    });
+
+    const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
+    const hasSR = allSurrounds.some(s => getCanonicalRole(s.role) === 'SR');
+
+    const eligibleSurrounds = allSurrounds.filter(s => {
+      const r = getCanonicalRole(s.role);
+      if (r === 'LW' || r === 'RW') return hasSL && hasSR;
+      return true;
+    });
+
+    if (eligibleSurrounds.length < 2) return null;
+
+    const az = [];
+    for (const sp of eligibleSurrounds) {
+      const a = azimuthDegFromSeat(effectiveHoveredSeat, sp.position);
+      if (Number.isFinite(a)) az.push({ a, sp });
+    }
+    if (az.length < 2) return null;
+
+    // Sort speakers to get a continuous sweep around the seat
+    // Start with positive angles (right) then negative angles (left), assuming forward (0 deg) is +Y.
+    // Atan2 returns -180 to 180. We need to handle the wrap-around.
+    // Example: -170 is adjacent to +170.
+    // Sorting by raw angle and then detecting segments is robust.
+    const sortedItems = az.sort((a, b) => a.a - b.a);
+
+    const segments = [];
+    for (let i = 0; i < sortedItems.length; i++) {
+        const current = sortedItems[i];
+        const next = sortedItems[(i + 1) % sortedItems.length]; // Wrap around for the last speaker
+        
+        let angle1 = current.a;
+        let angle2 = next.a;
+
+        // If next is "smaller" than current (due to wrap-around from +180 to -180),
+        // adjust angle2 by adding 360 to get the correct positive sweep.
+        if (angle2 < angle1) {
+            angle2 += 360;
+        }
+
+        segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2 });
+    }
+
+    const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
+    const labelGroup = [];
+
+    segments.forEach(({ sp1, sp2, angleA, angleB }, idx) => {
+      const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
+      const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
+
+      // Lines from seat to speakers
+      labelGroup.push(
+        <line key={`rp22-angle-line1-${idx}`} x1={x1} y1={y1} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
+      );
+      labelGroup.push(
+        <line key={`rp22-angle-line2-${idx}`} x1={x2} y1={y2} x2={seatPx[0]} y2={seatPx[1]} stroke="#888" strokeWidth="1" opacity="0.6" />
+      );
+
+      // Angle text
+      const midAngle = (angleA + angleB) / 2;
+      const R = 0.6; // Meters offset from seat for the text
+      
+      const [px, py] = toPx(
+        effectiveHoveredSeat.x + R * Math.sin(midAngle * Math.PI / 180),
+        effectiveHoveredSeat.y - R * Math.cos(midAngle * Math.PI / 180)
+      );
+
+      const deg = angleB - angleA; // This is the positive difference
+      const text = `${deg.toFixed(1)}°`;
+      
+      labelGroup.push(
+        <text key={`rp22-angle-text-${idx}`} x={px} y={py} fill="#666" fontSize="11" textAnchor="middle" dominantBaseline="middle">
+          {text}
+        </text>
+      );
+    });
+
+    return <g aria-label="rp22-surround-angles">{labelGroup}</g>;
+  }, [overlaysForRendering, effectiveHoveredSeat, placedSpeakers, scale, toPx, getCanonicalRole]);
+
+  // Build HUD style safely
+  const hudDynamicStyle = useMemo(() => {
+    const s = {};
+    if (isHudPinned && hudPinnedOffsetPx) {
+      s.transform = `translate3d(${hudPinnedOffsetPx.x}px, ${hudPinnedOffsetPx.y}px, 0)`;
+    }
+    if (isHudPinned && hudHiddenWhenPinned) {
+      s.visibility = 'hidden';
+      s.pointerEvents = 'none';
+    }
+    return s;
+  }, [isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned]);
+
+
 // --- Main render ---
 // SAFETY: local fallbacks in case parent metrics/ids are not initialised yet
 const svgWSafe = Number(svgW) || Math.max(1, Number(roomRect?.width)  || 1200);
@@ -2717,7 +4699,7 @@ return (
     style={{
       aspectRatio: aspect,
       border: '1px solid #DCDBD6',
-      borderRadius: 0,
+      borderRadius: '88px',
       backgroundColor: '#F8F8F7',
     }}
   >
@@ -2948,7 +4930,14 @@ return (
             className="seat-hud"
             style={{
               position: 'absolute',
-              boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+              left: hudPosition?.x || 20,
+              top: hudPosition?.y || 20,
+              background: 'white',
+              border: '1px solid #DCDBD6',
+              borderRadius: 8,
+              padding: 12,
+              boxShadow: '0 44px 12px rgba(0,0,0,0.15)',
+              pointerEvents: isHudPinned ? 'auto' : 'none', // Allow interaction when pinned
               zIndex: 1000,
               minWidth: 260,
               maxWidth: 320,
@@ -2959,13 +4948,7 @@ return (
               display: 'flex',
               flexDirection: 'column',
               gap: 4,
-              background: 'white',
-              border: '1px solid #DCDBD6',
-              borderRadius: 8,
-              padding: 12,
-              ...hudDynamicStyle,
-              ...hudVisibilityStyle,
-              pointerEvents: isHudPinned ? 'auto' : 'none', // Allow interaction when pinned
+              ...hudDynamicStyle
             }}
           >
             {/* Header with drag handle and eye icon */}
@@ -2978,7 +4961,7 @@ return (
                 marginBottom: 4,
                 paddingBottom: 4,
                 borderBottom: '1px solid #E6E4DD',
-                cursor: 'move',
+                cursor: isHudPinned ? 'move' : 'default',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between'
