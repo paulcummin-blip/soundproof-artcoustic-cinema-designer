@@ -2571,6 +2571,12 @@ React.useEffect(() => {
   const svgW = containerW;
   const svgH = containerH;
 
+  const canvasStyle = {
+    position: 'relative',
+    width: '100%',
+    height: '100%',
+  };
+
 // --- Main render ---
 // SAFETY: local fallbacks in case parent metrics/ids are not initialised yet
 const svgWSafe = Number(svgW) || Math.max(1, Number(roomRect?.width)  || 1200);
