@@ -438,6 +438,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
   const [hudHiddenWhenPinned, setHudHiddenWhenPinned] = useState(false);
   const [hudPinnedOffsetPx, setHudPinnedOffsetPx] = useState(null);
+  // Absolute HUD position in canvas pixels (top-left of the HUD card)
+const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const planBoundsRef = useRef(null);
   const svgRef = useRef(null);
   const slsrModeRef = React.useRef('side');
