@@ -437,7 +437,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [hoveredSeat, setHoveredSeat] = useState(null);
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
   const [hudHiddenWhenPinned, setHudHiddenWhenPinned] = useState(false);
-  const [hudPinnedPositionPx, setHudPinnedPositionPx] = useState(null);
+  const [hudPinnedOffsetPx, setHudPinnedOffsetPx] = useState(null);
   const planBoundsRef = useRef(null);
   const svgRef = useRef(null);
   const slsrModeRef = React.useRef('side');
@@ -473,10 +473,16 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   useEffect(() => {
     if (!isHudPinned) {
-      setHudPinnedPositionPx(null);
+      setHudPinnedOffsetPx(null);
       setHudHiddenWhenPinned(false);
     }
   }, [isHudPinned]);
+
+  useEffect(() => {
+    if (isHudPinned && hudPinnedOffsetPx == null) {
+      setHudPinnedOffsetPx({ x: 24, y: 24 });
+    }
+  }, [isHudPinned, hudPinnedOffsetPx]);
 
   /* …rest of the component continues below… */
 
@@ -485,23 +491,22 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   // HELPER FUNCTIONS (declare early to avoid TDZ)
   // ---------------------------------------------------------------------------
 
-  // Clamp helper (keeps HUD within the plan canvas; safe fallback = window)
-  const clampHudToCanvas = useCallback((x, y) => {
+  // Clamp helper (keeps HUD within the plan; safe fallback = window)
+  const clampHudOffset = useCallback((x, y) => {
     const hud = hudElRef.current;
-    const canvas = planBoundsRef.current;
-    
     // If we can't measure, return unchanged (safe)
-    if (!hud || !canvas) return { x, y };
+    if (!hud) return { x, y };
 
-    const hudRect = hud.getBoundingClientRect();
-    const canvasRect = canvas.getBoundingClientRect();
+    const hudRect  = hud.getBoundingClientRect();
+    const hostRect = planBoundsRef.current?.getBoundingClientRect?.() ?? {
+      left: 0, top: 0, right: window.innerWidth, bottom: window.innerHeight
+    };
 
-    // Clamp to canvas bounds (with padding)
-    const pad = 8;
-    const minX = pad;
-    const minY = pad;
-    const maxX = canvasRect.width - hudRect.width - pad;
-    const maxY = canvasRect.height - hudRect.height - pad;
+    // Compute allowed range so HUD stays fully inside host
+    const minX = - (hudRect.left  - hostRect.left);
+    const minY = - (hudRect.top   - hostRect.top);
+    const maxX =  (hostRect.right - hudRect.right);
+    const maxY =  (hostRect.bottom - hudRect.bottom);
 
     return {
       x: Math.max(minX, Math.min(maxX, x)),
@@ -512,14 +517,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   // Drag handlers (defined BEFORE they're used in JSX)
   const onHudHeaderMouseDown = useCallback((e) => {
     if (!isHudPinned) return;
-    
-    // Initialize pinned position from current hudPosition if not set
-    if (hudPinnedPositionPx == null && hudPosition) {
-      setHudPinnedPositionPx({ x: hudPosition.x, y: hudPosition.y });
-    }
-    
-    const origX = hudPinnedPositionPx?.x ?? hudPosition?.x ?? 0;
-    const origY = hudPinnedPositionPx?.y ?? hudPosition?.y ?? 0;
+    const origX = hudPinnedOffsetPx?.x ?? 0;
+    const origY = hudPinnedOffsetPx?.y ?? 0;
     hudDragRef.current = { startX: e.clientX, startY: e.clientY, origX, origY };
 
     const onHudMouseMove = (e) => {
@@ -527,8 +526,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       if (!s) return;
       const dx = e.clientX - s.startX;
       const dy = e.clientY - s.startY;
-      const next = clampHudToCanvas(s.origX + dx, s.origY + dy);
-      setHudPinnedPositionPx(next);
+      const next = clampHudOffset(s.origX + dx, s.origY + dy);
+      setHudPinnedOffsetPx(next);
     };
 
     const onHudMouseUp = () => {
@@ -540,7 +539,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     window.addEventListener('mousemove', onHudMouseMove);
     window.addEventListener('mouseup', onHudMouseUp);
     e.preventDefault();
-  }, [isHudPinned, hudPinnedPositionPx, hudPosition, clampHudToCanvas]);
+  }, [isHudPinned, hudPinnedOffsetPx, clampHudOffset]);
 
 
   // Helper to clamp HUD within canvas, pick side dynamically
@@ -2503,18 +2502,12 @@ React.useEffect(() => {
 
   // Calculate HUD position with clamping to PLAN CANVAS (not just room)
   const hudPosition = useMemo(() => {
-    // If user has dragged it, use that position
-    if (hudPinnedPositionPx) {
-      return hudPinnedPositionPx;
-    }
-
-    // Otherwise, auto-place near seat
     if (!effectiveHoveredSeat || !toPx) return null;
 
     const [seatX_px, seatY_px] = toPx(Number(effectiveHoveredSeat.x || effectiveHoveredSeat.position?.x || 0), Number(effectiveHoveredSeat.y || effectiveHoveredSeat.position?.y || 0));
     
-    const HUD_EST_W = 320;
-    const HUD_EST_H = 520;
+    const HUD_EST_W = 320; // Slightly wider estimate
+    const HUD_EST_H = 520; // Taller for all RP22 metrics
     const pad = 8;
 
     // Get plan canvas bounds (full SVG viewport, not just room rect)
@@ -2543,7 +2536,7 @@ React.useEffect(() => {
     );
 
     return { x: clampedX, y: clampedY };
-  }, [hudPinnedPositionPx, effectiveHoveredSeat, toPx, containerW, containerH]);
+  }, [effectiveHoveredSeat, toPx, containerW, containerH]);
 
 
   // Phase 1: Calculate and log LCR constraints, and store them in state
@@ -4733,12 +4726,15 @@ const renderRp22AnglesOverlay = useCallback(() => {
   // Build HUD style safely
   const hudDynamicStyle = useMemo(() => {
     const s = {};
+    if (isHudPinned && hudPinnedOffsetPx) {
+      s.transform = `translate3d(${hudPinnedOffsetPx.x}px, ${hudPinnedOffsetPx.y}px, 0)`;
+    }
     if (isHudPinned && hudHiddenWhenPinned) {
       s.visibility = 'hidden';
       s.pointerEvents = 'none';
     }
     return s;
-  }, [isHudPinned, hudHiddenWhenPinned]);
+  }, [isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned]);
 
 
 // --- Main render ---
