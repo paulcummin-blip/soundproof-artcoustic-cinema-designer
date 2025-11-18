@@ -2566,6 +2566,11 @@ React.useEffect(() => {
   }, [isHudPinned, hudHiddenWhenPinned]);
 
 
+  const containerRect = planBoundsRef.current?.getBoundingClientRect();
+
+  const svgW = containerW;
+  const svgH = containerH;
+
 // --- Main render ---
 // SAFETY: local fallbacks in case parent metrics/ids are not initialised yet
 const svgWSafe = Number(svgW) || Math.max(1, Number(roomRect?.width)  || 1200);
