@@ -1,4 +1,3 @@
-
 "use client";
 import React, { useState, useMemo, useCallback, useEffect, useRef, Suspense } from "react";
 import { Button } from "@/components/ui/button";
@@ -2103,7 +2102,16 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 12, color: '#625143' }}>Plan Tools</span>
+              <strong style={{
+                fontSize: 16,
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                height: "100%",
+                marginLeft: "12px"
+              }}>
+                {(dolbyPreset || "").split(" ")[0] || ""}
+              </strong>
             </div>
 
             {/* PLAN TOOLS — dynamic list, only show relevant items */}
