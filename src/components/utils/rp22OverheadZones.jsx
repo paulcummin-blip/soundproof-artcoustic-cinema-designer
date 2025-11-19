@@ -35,11 +35,21 @@ export function getListeningAreaBounds(
   }
 
   // 1. Compute min/max seat Y positions
+  // Support both { position: { x, y, z } } and flat { x, y, z } seat shapes.
   const seatYs = seatingPositions
-    .map(s => Number(s?.position?.y))
-    .filter(y => Number.isFinite(y));
+    .map((s) => {
+      if (s && s.position && Number.isFinite(s.position.y)) {
+        return Number(s.position.y);
+      }
+      if (s && Number.isFinite(s.y)) {
+        return Number(s.y);
+      }
+      return null;
+    })
+    .filter((y) => Number.isFinite(y));
 
   if (seatYs.length === 0) {
+    // No valid seats → disable overhead zones
     return null;
   }
 
