@@ -3161,8 +3161,11 @@ useEffect(() => {
     base.enableFrontWides = enableFrontWides;
     base.enableRp22Angles = rp22AnglesEnabled;
 
+    // Auto-enable overhead bands when Dolby layout includes overhead channels
+    base.OVERHEADS = overheadCount > 0;
+
     return base;
-  }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
+  }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled, overheadCount]);
 
   // In the scope where we work with speakers, add safe aliases
   const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
