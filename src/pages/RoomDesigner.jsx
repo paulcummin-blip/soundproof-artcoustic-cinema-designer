@@ -855,16 +855,6 @@ function RoomDesignerWithState() {
   const [lcrAngleDeg, setLcrAngleDeg] = useState(0); // Live angle readout
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
 
-  // Normalised overhead speaker count based on layout (.2 / .4 / .6 / OFF)
-  var overheadCount = (() => {
-    const preset = dolbyPreset || dolbyLayout || '';
-    if (!preset) return 0;
-    const parts = String(preset).split('.');
-    if (parts.length < 3) return 0;
-    const n = parseInt(parts[2], 10);
-    return Number.isFinite(n) ? n : 0;
-  })();
-
   // screen state is now managed directly by AppState, removed local useState here.
 
   // Track preset changes to prevent unnecessary re-seeding
