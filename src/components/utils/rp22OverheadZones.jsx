@@ -20,12 +20,19 @@ export function getListeningAreaBounds(
   placedSpeakers = [],
   getCanonicalRole = null
 ) {
-  // Guard: no seats or invalid MLP
-  if (!Array.isArray(seatingPositions) || seatingPositions.length === 0 || !mlpPoint) {
-    return null;
-  }
-
   const { widthM = 4.5, lengthM = 6.0 } = roomDims || {};
+  
+  // Guard: no seats or invalid MLP - return default inactive bounds
+  if (!Array.isArray(seatingPositions) || seatingPositions.length === 0 || !mlpPoint) {
+    return {
+      listeningFrontY: 0,
+      listeningBackY: 0,
+      midCenterY: lengthM / 2,
+      xLeft: widthM * 0.25,
+      xRight: widthM * 0.75,
+      active: false
+    };
+  }
 
   // 1. Compute min/max seat Y positions
   const seatYs = seatingPositions
@@ -84,7 +91,8 @@ export function getListeningAreaBounds(
     listeningBackY,
     midCenterY,
     xLeft,
-    xRight
+    xRight,
+    active: true
   };
 }
 
@@ -99,7 +107,7 @@ export function getListeningAreaBounds(
  * @returns {Object} {frontZone, midZone, backZone} each with {x1, x2, y1, y2, active}
  */
 export function computeRp22OverheadZoneExtents(bounds, roomDims) {
-  if (!bounds) {
+  if (!bounds || bounds.active === false) {
     return {
       frontZone: { x1: 0, x2: 0, y1: 0, y2: 0, active: false },
       midZone: { x1: 0, x2: 0, y1: 0, y2: 0, active: false },

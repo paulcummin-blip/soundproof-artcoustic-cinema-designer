@@ -3160,9 +3160,12 @@ useEffect(() => {
     // Use `enableFrontWides` from appState to control overlay visibility.
     base.enableFrontWides = enableFrontWides;
     base.enableRp22Angles = rp22AnglesEnabled;
+    
+    // Add overhead zones to overlay state
+    base.OVERHEADS = overheadZones;
 
     return base;
-  }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
+  }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled, overheadZones]);
 
   // In the scope where we work with speakers, add safe aliases
   const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
@@ -3987,16 +3990,23 @@ return {
   ),
   REAR_SURROUND: <RearSurroundZoneComponent />,
 
-  OVERHEADS: renderOverheadBandsSVG({
-    zones: overheadZones,
-    config: overheadCount === 2 ? ".2" : overheadCount === 4 ? ".4" : ".6",
-    toPx,
-    scale,
-    roomRect,
-    placedSpeakers,
-    getCanonicalRole,
-    widthM,
-  }),
+  OVERHEADS: (() => {
+    // Derive overhead config from dolbyLayout without using overheadCount variable
+    const parts = String(dolbyLayout || '5.1').split('.');
+    const ohCount = parts.length >= 3 ? parseInt(parts[2]) || 0 : 0;
+    const config = ohCount === 2 ? ".2" : ohCount === 4 ? ".4" : ohCount === 6 ? ".6" : "off";
+    
+    return renderOverheadBandsSVG({
+      zones: overheadZones,
+      config,
+      toPx,
+      scale,
+      roomRect,
+      placedSpeakers,
+      getCanonicalRole,
+      widthM,
+    });
+  })(),
 
   FRONT_WIDE: renderFrontWideZones(),
   // DOLBY removed

@@ -20,10 +20,6 @@ export function computeOverheadZones({
   placedSpeakers,
   getCanonicalRole,
 }) {
-  if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
-    return { status: "disabled" };
-  }
-
   // Construct MLP point if not provided
   const mlp = mlpPoint || { x: widthM / 2, y: mlpY_m || lengthM / 2, z: 1.2 };
 
@@ -36,15 +32,14 @@ export function computeOverheadZones({
     getCanonicalRole
   );
 
-  if (!bounds) {
-    return { status: "disabled" };
-  }
-
-  // Compute zone extents
+  // Compute zone extents (handles inactive bounds internally)
   const zones = computeRp22OverheadZoneExtents(bounds, { widthM, lengthM, heightM });
 
+  // Determine status based on whether we have valid seats
+  const hasValidSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0 && bounds?.active !== false;
+  
   return {
-    status: "ok",
+    status: hasValidSeats ? "ok" : "disabled",
     frontZone: zones.frontZone,
     midZone: zones.midZone,
     backZone: zones.backZone
