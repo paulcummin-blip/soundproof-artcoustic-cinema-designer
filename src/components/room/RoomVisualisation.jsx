@@ -25,6 +25,7 @@ import ZoomButtons from '@/components/ui/ZoomButtons';
 import { computeOverheadZones, renderOverheadBandsSVG } from '@/components/room/overlays/OverheadZones';
 import { clampOverheadToZone } from '@/components/utils/overheadDragClamping';
 import { useOverheadAutoPlacement } from '@/components/hooks/useOverheadAutoPlacement';
+import { useEnsureOverheadPairs } from '@/components/hooks/useEnsureOverheadPairs';
 import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
 import PlanMessages from '@/components/room/PlanMessages';
 import SvgDefs from '@/components/room/SvgDefs';
@@ -3161,6 +3162,14 @@ useEffect(() => {
     if (parts.length < 3) return 0;
     return parseInt(parts[2]) || 0;
   }, [dolbyLayout]);
+
+  // Ensure all required overhead pairs exist before auto-placement
+  useEnsureOverheadPairs({
+    dolbyConfiguration: dolbyLayout,
+    placedSpeakers,
+    setPlacedSpeakers: onSetSpeakers,
+    useWidesInsteadOfRears: appState?.useWidesInsteadOfRears || false
+  });
 
   // Auto-place overhead speakers at zone centers
   useOverheadAutoPlacement({
