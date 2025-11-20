@@ -1189,15 +1189,6 @@ React.useEffect(() => {
     [seatingPositions, heightM, widthM, lengthM, mlpY_m, mlp, placedSpeakers, getCanonicalRole]
   );
 
-  // Auto-place overhead speakers at zone centers
-  useOverheadAutoPlacement({
-    placedSpeakers,
-    setPlacedSpeakers: onSetSpeakers,
-    overheadZones,
-    getCanonicalRole,
-    ohCount: overheadCount
-  });
-
   // [B44 DISABLED] Auto-positioning of FW based on zones
   // FW median positioning is now FULLY handled by SpeakerPlacement only.
   // The overlay (when enabled) should ONLY:
@@ -3195,6 +3186,15 @@ useEffect(() => {
     if (parts.length < 3) return 0;
     return parseInt(parts[2]) || 0;
   }, [dolbyLayout]);
+
+  // Auto-place overhead speakers at zone centers
+  useOverheadAutoPlacement({
+    placedSpeakers,
+    setPlacedSpeakers: onSetSpeakers,
+    overheadZones,
+    getCanonicalRole,
+    overheadCount
+  });
 
   // Determine which overhead positions are visible
   const visibleOverheadPositions = useMemo(() => {

@@ -20,7 +20,7 @@ export function useOverheadAutoPlacement({
   setPlacedSpeakers,
   overheadZones,
   getCanonicalRole,
-  ohCount
+  overheadCount
 }) {
   useEffect(() => {
     // Guard: zones not ready
@@ -30,7 +30,7 @@ export function useOverheadAutoPlacement({
     if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) return;
     
     // Guard: no overhead channels
-    if (!ohCount || ohCount <= 0) return;
+    if (!overheadCount || overheadCount <= 0) return;
 
     // Extract zone centers
     const zoneCenters = {};
@@ -105,5 +105,5 @@ export function useOverheadAutoPlacement({
     if (needsUpdate && setPlacedSpeakers) {
       setPlacedSpeakers(nextSpeakers);
     }
-  }, [placedSpeakers, setPlacedSpeakers, overheadZones, getCanonicalRole, ohCount]);
+  }, [placedSpeakers, setPlacedSpeakers, overheadZones, getCanonicalRole, overheadCount]);
 }
