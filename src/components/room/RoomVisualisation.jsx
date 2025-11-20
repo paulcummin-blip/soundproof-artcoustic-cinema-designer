@@ -1838,11 +1838,11 @@ React.useEffect(() => {
     // Fallback for all other draggable speakers (including overheads)
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
 
-    // Special handling for overhead speakers - constrain within their zones with 50% overhang
+    // Special handling for overhead speakers - constrain within their zones (no overhang)
     if (canonicalRole.startsWith('T')) {
       const speakerDims = getModelDimsM(spk.model);
       
-      // Use new clamping helper with 50% overhang allowance
+      // Use strict clamping helper (no overhang)
       const clampedPos = clampOverheadToZone({
         proposedPos: { x: rawX, y: rawY },
         canonicalRole,
@@ -1852,77 +1852,52 @@ React.useEffect(() => {
         lengthM
       });
 
-      // Determine if this is .4 or .6 layout (requires pair snapping)
-      const requiresPairSnapping = dolbyLayout?.split('.')?.[2] && 
-        (parseInt(dolbyLayout.split('.')[2]) === 4 || parseInt(dolbyLayout.split('.')[2]) === 6);
+      // Determine partner role for mirror-locked pair dragging
+      const pairMap = {
+        'TFL': 'TFR', 'TFR': 'TFL',
+        'TML': 'TMR', 'TMR': 'TML',
+        'TL': 'TR', 'TR': 'TL',
+        'TBL': 'TBR', 'TBR': 'TBL'
+      };
+      
+      const partnerRole = pairMap[canonicalRole];
+      const partner = partnerRole ? placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRole) : null;
 
-      if (requiresPairSnapping && overheadZones?.status === 'ok') {
-        // Map role to zone for row identification
-        let rowKey = null;
-        let targetZone = null;
-        if (['TFL', 'TFR'].includes(canonicalRole)) {
-          targetZone = overheadZones.frontZone;
-          rowKey = 'front';
-        } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
-          targetZone = overheadZones.midZone;
-          rowKey = 'mid';
-        } else if (['TBL', 'TBR'].includes(canonicalRole)) {
-          targetZone = overheadZones.backZone;
-          rowKey = 'back';
-        }
+      if (partner && overheadZones?.status === 'ok') {
+        // Mirror partner position around room centerline
+        const centerX = widthM / 2;
+        const mirroredX = 2 * centerX - clampedPos.x;
+        
+        // Clamp partner to same zone
+        const partnerClampedPos = clampOverheadToZone({
+          proposedPos: { x: mirroredX, y: clampedPos.y },
+          canonicalRole: partnerRole,
+          overheadZones,
+          speakerDims,
+          widthM,
+          lengthM
+        });
 
-        if (rowKey && targetZone?.active) {
-          // Find partner in the same row
-          const isLeft = ['TFL', 'TL', 'TBL'].includes(canonicalRole);
-          const partnerRole = isLeft 
-            ? (rowKey === 'front' ? 'TFR' : rowKey === 'mid' ? 'TR' : 'TBR')
-            : (rowKey === 'front' ? 'TFL' : rowKey === 'mid' ? 'TL' : 'TBL');
+        // Update both speakers in one pass
+        onSetSpeakers(prev => prev.map(s => {
+          const sRole = getCanonicalRole(s.role);
+          if (sRole === canonicalRole) {
+            return { ...s, position: { ...s.position, x: clampedPos.x, y: clampedPos.y } };
+          }
+          if (sRole === partnerRole) {
+            return { ...s, position: { ...s.position, x: partnerClampedPos.x, y: partnerClampedPos.y } };
+          }
+          return s;
+        }));
 
-          const partner = placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRole);
-
-          // Update both speakers in the row with same Y, keep their X on overhead lines
-          const { x1, x2 } = targetZone;
-          onSetSpeakers(prev => prev.map(s => {
-            const sRole = getCanonicalRole(s.role);
-            if (sRole === canonicalRole) {
-              return { 
-                ...s, 
-                position: { 
-                  ...s.position, 
-                  x: isLeft ? x1 : x2, 
-                  y: clampedPos.y 
-                }
-              };
-            }
-            if (partner && sRole === partnerRole) {
-              return { 
-                ...s, 
-                position: { 
-                  ...s.position, 
-                  x: isLeft ? x2 : x1, 
-                  y: clampedPos.y 
-                }
-              };
-            }
-            return s;
-          }));
-
-          lastInteractionEpoch.current = timeNowMs();
-          return;
-        }
+        lastInteractionEpoch.current = timeNowMs();
+        return;
       }
 
-      // .2 or single speaker: just use clamped position
+      // No partner or zones invalid: just update dragged speaker
       onSetSpeakers(prev => prev.map(s => {
         if (s.id === speakerId) {
-          return { 
-            ...s, 
-            position: { 
-              ...s.position, 
-              x: clampedPos.x, 
-              y: clampedPos.y 
-            }
-          };
+          return { ...s, position: { ...s.position, x: clampedPos.x, y: clampedPos.y } };
         }
         return s;
       }));

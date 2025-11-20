@@ -32,34 +32,49 @@ export function useOverheadAutoPlacement({
     // Guard: no overhead channels
     if (!overheadCount || overheadCount <= 0) return;
 
-    // Extract zone centers
-    const zoneCenters = {};
+    // Extract zone centers and edge positions for L/R pairs
+    const zoneInfo = {};
     
     if (overheadZones.frontZone?.active) {
-      const { y1, y2 } = overheadZones.frontZone;
-      zoneCenters.front = (y1 + y2) / 2;
+      const { x1, x2, y1, y2 } = overheadZones.frontZone;
+      zoneInfo.front = {
+        centerY: (y1 + y2) / 2,
+        leftX: x1,
+        rightX: x2,
+        zone: overheadZones.frontZone
+      };
     }
     
     if (overheadZones.midZone?.active) {
-      const { y1, y2 } = overheadZones.midZone;
-      zoneCenters.mid = (y1 + y2) / 2;
+      const { x1, x2, y1, y2 } = overheadZones.midZone;
+      zoneInfo.mid = {
+        centerY: (y1 + y2) / 2,
+        leftX: x1,
+        rightX: x2,
+        zone: overheadZones.midZone
+      };
     }
     
     if (overheadZones.backZone?.active) {
-      const { y1, y2 } = overheadZones.backZone;
-      zoneCenters.rear = (y1 + y2) / 2;
+      const { x1, x2, y1, y2 } = overheadZones.backZone;
+      zoneInfo.rear = {
+        centerY: (y1 + y2) / 2,
+        leftX: x1,
+        rightX: x2,
+        zone: overheadZones.backZone
+      };
     }
 
-    // Map overhead roles to their zone centers
+    // Map overhead roles to their zones with L/R positions
     const roleToZone = {
-      'TFL': { centerY: zoneCenters.front, zone: overheadZones.frontZone },
-      'TFR': { centerY: zoneCenters.front, zone: overheadZones.frontZone },
-      'TML': { centerY: zoneCenters.mid, zone: overheadZones.midZone },
-      'TMR': { centerY: zoneCenters.mid, zone: overheadZones.midZone },
-      'TL': { centerY: zoneCenters.mid, zone: overheadZones.midZone },
-      'TR': { centerY: zoneCenters.mid, zone: overheadZones.midZone },
-      'TBL': { centerY: zoneCenters.rear, zone: overheadZones.backZone },
-      'TBR': { centerY: zoneCenters.rear, zone: overheadZones.backZone },
+      'TFL': { ...zoneInfo.front, isLeft: true },
+      'TFR': { ...zoneInfo.front, isLeft: false },
+      'TML': { ...zoneInfo.mid, isLeft: true },
+      'TMR': { ...zoneInfo.mid, isLeft: false },
+      'TL': { ...zoneInfo.mid, isLeft: true },
+      'TR': { ...zoneInfo.mid, isLeft: false },
+      'TBL': { ...zoneInfo.rear, isLeft: true },
+      'TBR': { ...zoneInfo.rear, isLeft: false },
     };
 
     // Check which speakers need updating
@@ -72,28 +87,39 @@ export function useOverheadAutoPlacement({
       if (!zoneInfo || !zoneInfo.centerY || !zoneInfo.zone) return spk;
       
       const targetY = zoneInfo.centerY;
+      const targetX = zoneInfo.isLeft ? zoneInfo.leftX : zoneInfo.rightX;
       const zone = zoneInfo.zone;
+      
+      const currentX = spk.position?.x;
       const currentY = spk.position?.y;
 
       // Determine if we should snap this speaker
-      const shouldSnap = 
+      const shouldSnapY = 
         !Number.isFinite(currentY) || // No Y position set
         currentY < (zone.y1 - 0.01) || // Outside zone (below)
         currentY > (zone.y2 + 0.01);   // Outside zone (above)
 
-      if (!shouldSnap) {
-        // Already within zone, don't move it
+      const shouldSnapX =
+        !Number.isFinite(currentX) || // No X position set
+        Math.abs(currentX - (zone.x1 + zone.x2) / 2) < 0.05; // At neutral center
+
+      if (!shouldSnapY && !shouldSnapX) {
+        // Already positioned correctly, don't move it
         return spk;
       }
 
-      // Snap to zone center
-      if (Math.abs(targetY - currentY) > 0.001) {
+      // Snap to zone center Y and edge X
+      const newX = shouldSnapX ? targetX : currentX;
+      const newY = shouldSnapY ? targetY : currentY;
+
+      if (Math.abs(newX - currentX) > 0.001 || Math.abs(newY - currentY) > 0.001) {
         needsUpdate = true;
         return {
           ...spk,
           position: {
             ...spk.position,
-            y: targetY
+            x: newX,
+            y: newY
           }
         };
       }
