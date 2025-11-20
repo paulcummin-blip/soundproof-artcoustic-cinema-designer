@@ -24,6 +24,7 @@ import CanvasMessages from '@/components/room/CanvasMessages';
 import ZoomButtons from '@/components/ui/ZoomButtons';
 import { computeOverheadZones, renderOverheadBandsSVG } from '@/components/room/overlays/OverheadZones';
 import { clampOverheadToZone } from '@/components/utils/overheadDragClamping';
+import { useOverheadAutoPlacement } from '@/components/hooks/useOverheadAutoPlacement';
 import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
 import PlanMessages from '@/components/room/PlanMessages';
 import SvgDefs from '@/components/room/SvgDefs';
@@ -1187,6 +1188,15 @@ React.useEffect(() => {
       }),
     [seatingPositions, heightM, widthM, lengthM, mlpY_m, mlp, placedSpeakers, getCanonicalRole]
   );
+
+  // Auto-place overhead speakers at zone centers
+  useOverheadAutoPlacement({
+    placedSpeakers,
+    setPlacedSpeakers: onSetSpeakers,
+    overheadZones,
+    getCanonicalRole,
+    ohCount: overheadCount
+  });
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
   // FW median positioning is now FULLY handled by SpeakerPlacement only.
