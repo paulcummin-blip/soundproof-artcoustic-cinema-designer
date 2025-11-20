@@ -3115,8 +3115,8 @@ useEffect(() => {
     base.enableFrontWides = enableFrontWides;
     base.enableRp22Angles = rp22AnglesEnabled;
     
-    // Add overhead zones to overlay state
-    base.OVERHEADS = overheadZones;
+    // Add overhead zones to overlay state - only when toggle is enabled
+    base.OVERHEADS = (_overlays?.OVERHEADS && overheadZones?.status === 'ok') ? overheadZones : null;
 
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled, overheadZones]);
@@ -4906,7 +4906,7 @@ return (
             {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
             {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
             {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {!!overlaysForRendering?.OVERHEADS && ZoneComponents.OVERHEADS}
+            {overlaysForRendering?.OVERHEADS?.status === 'ok' && ZoneComponents.OVERHEADS}
             {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
             
             {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
