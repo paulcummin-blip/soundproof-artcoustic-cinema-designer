@@ -90,15 +90,30 @@ export function renderOverheadBandsSVG({
 
     if (wpx <= 0 || hpx <= 0) return;
 
-    // Gradient for visual polish
+    // Gradient for visual polish - adjusted opacity per zone type
     const gid = `oh-${zoneKey}-grad`;
+
+    // Define opacity based on zone type: mid is strongest, front/rear are lighter
+    let minOpacity = 0.06;
+    let maxOpacity = 0.12;
+
+    if (zoneKey === 'mid') {
+      minOpacity = 0.10;
+      maxOpacity = 0.24;
+    } else if (zoneKey === 'front') {
+      minOpacity = 0.06;
+      maxOpacity = 0.18;
+    } else if (zoneKey === 'back') {
+      minOpacity = 0.06;
+      maxOpacity = 0.20;
+    }
 
     elts.push(
       <defs key={`${gid}-defs`}>
         <linearGradient id={gid} x1={x} y1={y} x2={x} y2={y + hpx} gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor={fill} stopOpacity="0.06" />
-          <stop offset="50%" stopColor={fill} stopOpacity="0.12" />
-          <stop offset="100%" stopColor={fill} stopOpacity="0.06" />
+          <stop offset="0%" stopColor={fill} stopOpacity={minOpacity} />
+          <stop offset="50%" stopColor={fill} stopOpacity={maxOpacity} />
+          <stop offset="100%" stopColor={fill} stopOpacity={minOpacity} />
         </linearGradient>
       </defs>
     );
@@ -136,18 +151,18 @@ export function renderOverheadBandsSVG({
     */
   };
 
-  // Render zones with RP22 styling
-  // Upper Front: warm brown
+  // Render zones with RP22 styling - using side surround color family
+  // Upper Front: warm brown (matches left side surround)
   if (showFront) {
     renderZone(frontZone, "front", "Upper Front zone", "#4A230F");
   }
 
-  // Top Middle: neutral grey
+  // Top Middle: warm brown (primary overhead zone, highest opacity)
   if (showMid) {
-    renderZone(midZone, "mid", "Top Middle zone", "#555555");
+    renderZone(midZone, "mid", "Top Middle zone", "#4A230F");
   }
 
-  // Upper Back: warm brown (or use a slightly different shade if desired)
+  // Upper Back: darker brown (matches right side surround)
   if (showBack) {
     renderZone(backZone, "back", "Upper Back zone", "#213428");
   }
