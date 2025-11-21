@@ -195,17 +195,9 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   idealRearCenterY = mlpY_m + symmetricOffset;
 
   // ────────────────────────────────────────────────────────────────────────────
-  // X-WIDTH CALCULATION: Based solely on ear-to-ceiling height + target azimuth
+  // X-WIDTH CALCULATION: Single common lateral band for all overhead rows
   // ────────────────────────────────────────────────────────────────────────────
   
-  // Helper: calculate lateral half-span from azimuth angle range
-  function halfSpanFromAngles(minDeg, maxDeg) {
-    if (!Number.isFinite(minDeg) || !Number.isFinite(maxDeg)) return 0;
-    const targetDeg = (minDeg + maxDeg) / 2;
-    const targetRad = (targetDeg * Math.PI) / 180;
-    return earToCeilingM * Math.tan(targetRad);
-  }
-
   // RP22 target azimuth ranges for overhead positions
   const FRONT_AZ_MIN = 20;  // degrees
   const FRONT_AZ_MAX = 45;
@@ -214,29 +206,47 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   const REAR_AZ_MIN = 20;
   const REAR_AZ_MAX = 45;
 
-  const halfSpanFront = halfSpanFromAngles(FRONT_AZ_MIN, FRONT_AZ_MAX);
-  const halfSpanMid = halfSpanFromAngles(MID_AZ_MIN, MID_AZ_MAX);
-  const halfSpanRear = halfSpanFromAngles(REAR_AZ_MIN, REAR_AZ_MAX);
+  // Collect all valid azimuth ranges
+  const azMins = [];
+  const azMaxs = [];
+
+  if (Number.isFinite(FRONT_AZ_MIN) && Number.isFinite(FRONT_AZ_MAX)) {
+    azMins.push(FRONT_AZ_MIN);
+    azMaxs.push(FRONT_AZ_MAX);
+  }
+  if (Number.isFinite(MID_AZ_MIN) && Number.isFinite(MID_AZ_MAX)) {
+    azMins.push(MID_AZ_MIN);
+    azMaxs.push(MID_AZ_MAX);
+  }
+  if (Number.isFinite(REAR_AZ_MIN) && Number.isFinite(REAR_AZ_MAX)) {
+    azMins.push(REAR_AZ_MIN);
+    azMaxs.push(REAR_AZ_MAX);
+  }
+
+  // Compute common azimuth range (fallback to mid-range defaults)
+  const commonAzMinDeg = azMins.length ? Math.min(...azMins) : 20;
+  const commonAzMaxDeg = azMaxs.length ? Math.max(...azMaxs) : 60;
+
+  // Single target lateral angle for all bands
+  const commonAzTargetDeg = (commonAzMinDeg + commonAzMaxDeg) / 2;
+  const commonAzTargetRad = (commonAzTargetDeg * Math.PI) / 180;
+
+  // Lateral half-span at ceiling, using ear-to-ceiling as the "radius"
+  const halfSpanOverhead = earToCeilingM * Math.tan(commonAzTargetRad);
 
   const roomCenterX = widthM / 2;
 
-  // Set X bounds based on angle-derived spans (independent of Y distance)
-  const frontX1 = Math.max(0, roomCenterX - halfSpanFront);
-  const frontX2 = Math.min(widthM, roomCenterX + halfSpanFront);
-
-  const midX1 = Math.max(0, roomCenterX - halfSpanMid);
-  const midX2 = Math.min(widthM, roomCenterX + halfSpanMid);
-
-  const rearX1 = Math.max(0, roomCenterX - halfSpanRear);
-  const rearX2 = Math.min(widthM, roomCenterX + halfSpanRear);
+  // Apply same X-bounds to all three bands (no Y-based scaling)
+  const x1Overhead = Math.max(0, roomCenterX - halfSpanOverhead);
+  const x2Overhead = Math.min(widthM, roomCenterX + halfSpanOverhead);
 
   // Band thickness (±0.5m around center)
   const halfBandM = 0.5;
 
   // Middle zone: centered on MLP
   const midZone = {
-    x1: midX1,
-    x2: midX2,
+    x1: x1Overhead,
+    x2: x2Overhead,
     y1: Math.max(screenWallInner, mlpY_m - halfBandM),
     y2: Math.min(rearWallInner, mlpY_m + halfBandM),
     active: true
@@ -244,8 +254,8 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
 
   // Front zone: centered on idealFrontCenterY
   const frontZone = {
-    x1: frontX1,
-    x2: frontX2,
+    x1: x1Overhead,
+    x2: x2Overhead,
     y1: Math.max(screenWallInner, idealFrontCenterY - halfBandM),
     y2: Math.min(midZone.y1, idealFrontCenterY + halfBandM),
     active: true
@@ -253,8 +263,8 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
 
   // Back zone: centered on idealRearCenterY
   const backZone = {
-    x1: rearX1,
-    x2: rearX2,
+    x1: x1Overhead,
+    x2: x2Overhead,
     y1: Math.max(midZone.y2, idealRearCenterY - halfBandM),
     y2: Math.min(rearWallInner, idealRearCenterY + halfBandM),
     active: true
