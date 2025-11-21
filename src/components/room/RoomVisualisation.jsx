@@ -23,7 +23,7 @@ import { calculateViewingAngle, rp23LevelForAngleDeg } from '@/components/utils/
 import CanvasMessages from '@/components/room/CanvasMessages';
 import ZoomButtons from '@/components/ui/ZoomButtons';
 import { computeOverheadZones, renderOverheadBandsSVG } from '@/components/room/overlays/OverheadZones';
-import { clampOverheadToZone } from '@/components/utils/overheadDragClamping';
+import { clampOverheadToZone, clampSymmetricOverheadPair } from '@/components/utils/overheadDragClamping';
 import { useOverheadAutoPlacement } from '@/components/hooks/useOverheadAutoPlacement';
 import { useEnsureOverheadPairs } from '@/components/hooks/useEnsureOverheadPairs';
 import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
