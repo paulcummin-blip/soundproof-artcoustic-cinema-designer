@@ -1839,18 +1839,18 @@ React.useEffect(() => {
     // Fallback for all other draggable speakers (including overheads)
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
 
-    // Special handling for overhead speakers - constrain within their zones (no overhang)
-    if (canonicalRole.startsWith('T')) {
-      const speakerDims = getModelDimsM(spk.model);
+    // Special handling for overhead speakers - symmetric pair dragging
+    if (canonicalRole.startsWith('T') && overheadZones?.status === 'ok') {
+      const mlpY_m = mlp?.y || lengthM / 2;
       
-      // Use strict clamping helper (no overhang)
-      const clampedPos = clampOverheadToZone({
+      // Use symmetric clamping helper
+      const { primary, partner: partnerPos } = clampSymmetricOverheadPair({
+        draggedRole: canonicalRole,
         proposedPos: { x: rawX, y: rawY },
-        canonicalRole,
-        overheadZones,
-        speakerDims,
+        mlpY_m,
         widthM,
-        lengthM
+        lengthM,
+        overheadZones,
       });
 
       // Determine partner role for mirror-locked pair dragging
@@ -1864,29 +1864,15 @@ React.useEffect(() => {
       const partnerRole = pairMap[canonicalRole];
       const partner = partnerRole ? placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRole) : null;
 
-      if (partner && overheadZones?.status === 'ok') {
-        // Mirror partner position around room centerline
-        const centerX = widthM / 2;
-        const mirroredX = 2 * centerX - clampedPos.x;
-        
-        // Clamp partner to same zone
-        const partnerClampedPos = clampOverheadToZone({
-          proposedPos: { x: mirroredX, y: clampedPos.y },
-          canonicalRole: partnerRole,
-          overheadZones,
-          speakerDims,
-          widthM,
-          lengthM
-        });
-
+      if (partner && partnerPos) {
         // Update both speakers in one pass
         onSetSpeakers(prev => prev.map(s => {
           const sRole = getCanonicalRole(s.role);
           if (sRole === canonicalRole) {
-            return { ...s, position: { ...s.position, x: clampedPos.x, y: clampedPos.y } };
+            return { ...s, position: { ...s.position, x: primary.x, y: primary.y } };
           }
           if (sRole === partnerRole) {
-            return { ...s, position: { ...s.position, x: partnerClampedPos.x, y: partnerClampedPos.y } };
+            return { ...s, position: { ...s.position, x: partnerPos.x, y: partnerPos.y } };
           }
           return s;
         }));
@@ -1895,10 +1881,10 @@ React.useEffect(() => {
         return;
       }
 
-      // No partner or zones invalid: just update dragged speaker
+      // No partner: just update dragged speaker
       onSetSpeakers(prev => prev.map(s => {
         if (s.id === speakerId) {
-          return { ...s, position: { ...s.position, x: clampedPos.x, y: clampedPos.y } };
+          return { ...s, position: { ...s.position, x: primary.x, y: primary.y } };
         }
         return s;
       }));
