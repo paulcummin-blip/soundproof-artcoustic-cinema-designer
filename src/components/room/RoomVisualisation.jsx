@@ -1516,9 +1516,15 @@ React.useEffect(() => {
     const spk = byId.get(speakerId);
     if (!spk) return;
 
+    // Work out canonical role once, and decide if this is an overhead (T*).
     const canonicalRole = getCanonicalRole(spk.role);
+    const isOverhead =
+      typeof canonicalRole === "string" && canonicalRole.startsWith("T");
 
-    if (!isDraggable(spk)) {
+    // For NON-overhead speakers, keep the existing draggable guard.
+    // Overheads bypass this, because their raw model may be null even though
+    // they are rendered with a resolved overhead model.
+    if (!isOverhead && !isDraggable(spk)) {
       return;
     }
 
