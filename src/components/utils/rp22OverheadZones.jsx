@@ -110,7 +110,7 @@ export function getListeningAreaBounds(
  * Compute RP22-compliant overhead zone extents.
  * Returns three zones: front (Upper Front), mid (Top Middle), back (Upper Back).
  * All zones use the same X-range (overhead ceiling lines).
- * Zones do not overlap in Y; middle zone wins in case of conflict.
+ * Zones are height-aware: positions respond to ceiling height and ear height.
  * 
  * @param {Object} bounds - Output from getListeningAreaBounds
  * @param {Object} roomDims - {widthM, lengthM, heightM}
@@ -125,66 +125,79 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
     };
   }
 
-  const { lengthM = 6.0 } = roomDims || {};
+  const { lengthM = 6.0, heightM = 2.4 } = roomDims || {};
   const { listeningFrontY, listeningBackY, midCenterY, xLeft, xRight } = bounds;
 
   const screenWallInner = 0.05;
   const rearWallInner = lengthM - 0.05;
 
-  // Middle zone: centered on MLP ± 0.5m
-  const midHalfDepth = 0.5;
-  let yMidStart = midCenterY - midHalfDepth;
-  let yMidEnd = midCenterY + midHalfDepth;
+  // Height-aware zone calculation
+  // Use ceiling height and MLP ear height to compute front/rear offsets
+  const mlpY_m = midCenterY;
+  const ceilingHeightM = heightM;
+  const earHeightM = bounds.mlpEarHeight || 1.1;
+  const verticalM = Math.max(ceilingHeightM - earHeightM, 0.5);
 
-  // Clamp middle zone to room
-  yMidStart = Math.max(screenWallInner, yMidStart);
-  yMidEnd = Math.min(rearWallInner, yMidEnd);
+  // Target elevation angles for front/rear (45°)
+  const FRONT_ELEV_DEG = 45;
+  const REAR_ELEV_DEG = 45;
+  const FRONT_ELEV_RAD = FRONT_ELEV_DEG * Math.PI / 180;
+  const REAR_ELEV_RAD = REAR_ELEV_DEG * Math.PI / 180;
 
-  const midActive = yMidEnd > yMidStart;
+  // Compute ideal offsets from MLP
+  const frontOffsetM = verticalM * Math.tan(FRONT_ELEV_RAD);
+  const rearOffsetM = verticalM * Math.tan(REAR_ELEV_RAD);
 
-  // Front zone: screen wall → listening front
-  let yFrontStart = screenWallInner;
-  let yFrontEnd = listeningFrontY;
+  // Ideal centers before clamping
+  let idealFrontCenterY = mlpY_m - frontOffsetM;
+  let idealRearCenterY = mlpY_m + rearOffsetM;
 
-  // Trim front zone if it overlaps with middle zone
-  if (midActive && yFrontEnd > yMidStart) {
-    yFrontEnd = yMidStart;
-  }
+  // Clamp to stay within listening area and room bounds
+  const minFrontCenterY = screenWallInner;
+  const maxRearCenterY = rearWallInner;
 
-  const frontActive = yFrontEnd > yFrontStart;
+  const frontOffset = Math.min(frontOffsetM, mlpY_m - minFrontCenterY);
+  const rearOffset = Math.min(rearOffsetM, maxRearCenterY - mlpY_m);
 
-  // Back zone: listening back → rear wall
-  let yBackStart = listeningBackY;
-  let yBackEnd = rearWallInner;
+  // Keep symmetric about MLP
+  const symmetricOffset = Math.min(frontOffset, rearOffset);
+  idealFrontCenterY = mlpY_m - symmetricOffset;
+  idealRearCenterY = mlpY_m + symmetricOffset;
 
-  // Trim back zone if it overlaps with middle zone
-  if (midActive && yBackStart < yMidEnd) {
-    yBackStart = yMidEnd;
-  }
+  // Band thickness (±0.5m around center)
+  const halfBandM = 0.5;
 
-  const backActive = yBackEnd > yBackStart;
-
-  return {
-    frontZone: {
-      x1: xLeft,
-      x2: xRight,
-      y1: yFrontStart,
-      y2: yFrontEnd,
-      active: frontActive
-    },
-    midZone: {
-      x1: xLeft,
-      x2: xRight,
-      y1: yMidStart,
-      y2: yMidEnd,
-      active: midActive
-    },
-    backZone: {
-      x1: xLeft,
-      x2: xRight,
-      y1: yBackStart,
-      y2: yBackEnd,
-      active: backActive
-    }
+  // Middle zone: centered on MLP
+  const midZone = {
+    x1: xLeft,
+    x2: xRight,
+    y1: Math.max(screenWallInner, mlpY_m - halfBandM),
+    y2: Math.min(rearWallInner, mlpY_m + halfBandM),
+    active: true
   };
+
+  // Front zone: centered on idealFrontCenterY
+  const frontZone = {
+    x1: xLeft,
+    x2: xRight,
+    y1: Math.max(screenWallInner, idealFrontCenterY - halfBandM),
+    y2: Math.min(midZone.y1, idealFrontCenterY + halfBandM),
+    active: true
+  };
+
+  // Back zone: centered on idealRearCenterY
+  const backZone = {
+    x1: xLeft,
+    x2: xRight,
+    y1: Math.max(midZone.y2, idealRearCenterY - halfBandM),
+    y2: Math.min(rearWallInner, idealRearCenterY + halfBandM),
+    active: true
+  };
+
+  // Ensure zones are valid (y2 > y1)
+  frontZone.active = frontZone.y2 > frontZone.y1;
+  midZone.active = midZone.y2 > midZone.y1;
+  backZone.active = backZone.y2 > backZone.y1;
+
+  return { frontZone, midZone, backZone };
 }
