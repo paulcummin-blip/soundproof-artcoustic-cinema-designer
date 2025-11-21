@@ -74,7 +74,7 @@ export function renderOverheadBandsSVG({
 
   const elts = [];
 
-  // Helper to render a zone
+  // Helper to render a zone with optional core region
   const renderZone = (zone, zoneKey, label, fill) => {
     if (!zone || !zone.active) return;
 
@@ -118,6 +118,7 @@ export function renderOverheadBandsSVG({
       </defs>
     );
 
+    // Outer band
     elts.push(
       <rect
         key={`rect-${zoneKey}`}
@@ -129,6 +130,49 @@ export function renderOverheadBandsSVG({
         pointerEvents="none"
       />
     );
+
+    // Core / sweet spot region (if defined)
+    if (zone.coreX1 != null && zone.coreX2 != null && 
+        zone.coreY1 != null && zone.coreY2 != null) {
+      const [coreX0px] = toPx(zone.coreX1, 0);
+      const [coreX1px] = toPx(zone.coreX2, 0);
+      const [, coreY0px] = toPx(0, zone.coreY1);
+      const [, coreY1px] = toPx(0, zone.coreY2);
+
+      const coreX = Math.min(coreX0px, coreX1px);
+      const coreY = Math.min(coreY0px, coreY1px);
+      const coreWpx = Math.abs(coreX1px - coreX0px);
+      const coreHpx = Math.abs(coreY1px - coreY0px);
+
+      if (coreWpx > 0 && coreHpx > 0) {
+        // Core gradient (slightly higher opacity)
+        const coreGid = `oh-${zoneKey}-core-grad`;
+        const coreMinOpacity = minOpacity + 0.08;
+        const coreMaxOpacity = maxOpacity + 0.10;
+
+        elts.push(
+          <defs key={`${coreGid}-defs`}>
+            <linearGradient id={coreGid} x1={coreX} y1={coreY} x2={coreX} y2={coreY + coreHpx} gradientUnits="userSpaceOnUse">
+              <stop offset="0%" stopColor={fill} stopOpacity={coreMinOpacity} />
+              <stop offset="50%" stopColor={fill} stopOpacity={coreMaxOpacity} />
+              <stop offset="100%" stopColor={fill} stopOpacity={coreMinOpacity} />
+            </linearGradient>
+          </defs>
+        );
+
+        elts.push(
+          <rect
+            key={`rect-${zoneKey}-core`}
+            x={coreX}
+            y={coreY}
+            width={coreWpx}
+            height={coreHpx}
+            fill={`url(#${coreGid})`}
+            pointerEvents="none"
+          />
+        );
+      }
+    }
 
     // Optional: add zone label (can be toggled via prop if desired)
     // Uncomment if you want text labels inside zones:

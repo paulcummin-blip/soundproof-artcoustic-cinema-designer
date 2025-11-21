@@ -243,31 +243,95 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   // Band thickness (±0.5m around center)
   const halfBandM = 0.5;
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // CORE / SWEET SPOT CALCULATION
+  // ────────────────────────────────────────────────────────────────────────────
+  
+  // Helper: compute core zone inside a band (narrower angle range)
+  const computeCoreZone = (bandName, centerY, halfBandM, minElevDeg, maxElevDeg) => {
+    // Core azimuth range (narrower than allowed)
+    const coreAzMinDeg = commonAzMinDeg + 5;  // Shift inward by 5°
+    const coreAzMaxDeg = commonAzMaxDeg - 5;
+    const coreAzTargetDeg = (coreAzMinDeg + coreAzMaxDeg) / 2;
+    const coreAzTargetRad = (coreAzTargetDeg * Math.PI) / 180;
+    
+    // Core lateral half-span (narrower than full band)
+    const coreHalfSpan = earToCeilingM * Math.tan(coreAzTargetRad);
+    const coreX1 = Math.max(0, roomCenterX - coreHalfSpan);
+    const coreX2 = Math.min(widthM, roomCenterX + coreHalfSpan);
+    
+    // Core Y range (contract by 15% towards center)
+    const bandHeightM = halfBandM * 2;
+    const coreMarginM = bandHeightM * 0.15;
+    const coreY1 = Math.max(screenWallInner, centerY - halfBandM + coreMarginM);
+    const coreY2 = Math.min(rearWallInner, centerY + halfBandM - coreMarginM);
+    
+    // Quality assessment
+    let quality = "unknown";
+    
+    if (Number.isFinite(coreX1) && Number.isFinite(coreX2) && 
+        Number.isFinite(coreY1) && Number.isFinite(coreY2) && 
+        coreY2 > coreY1 && coreX2 > coreX1) {
+      
+      const coreWidth = coreX2 - coreX1;
+      const coreHeight = coreY2 - coreY1;
+      
+      // Check if core fits cleanly inside the outer zone
+      if (coreWidth > 0.3 && coreHeight > 0.2) {
+        quality = "good";
+      } else if (coreWidth > 0.15 && coreHeight > 0.1) {
+        quality = "ok";
+      } else {
+        quality = "edge";
+      }
+    }
+    
+    return { coreX1, coreX2, coreY1, coreY2, quality };
+  };
+
   // Middle zone: centered on MLP
+  const midCore = computeCoreZone("mid", mlpY_m, halfBandM, 70, 80);
   const midZone = {
     x1: x1Overhead,
     x2: x2Overhead,
     y1: Math.max(screenWallInner, mlpY_m - halfBandM),
     y2: Math.min(rearWallInner, mlpY_m + halfBandM),
-    active: true
+    active: true,
+    coreX1: midCore.coreX1,
+    coreX2: midCore.coreX2,
+    coreY1: midCore.coreY1,
+    coreY2: midCore.coreY2,
+    quality: midCore.quality
   };
 
   // Front zone: centered on idealFrontCenterY
+  const frontCore = computeCoreZone("front", idealFrontCenterY, halfBandM, 40, 50);
   const frontZone = {
     x1: x1Overhead,
     x2: x2Overhead,
     y1: Math.max(screenWallInner, idealFrontCenterY - halfBandM),
     y2: Math.min(midZone.y1, idealFrontCenterY + halfBandM),
-    active: true
+    active: true,
+    coreX1: frontCore.coreX1,
+    coreX2: frontCore.coreX2,
+    coreY1: frontCore.coreY1,
+    coreY2: frontCore.coreY2,
+    quality: frontCore.quality
   };
 
   // Back zone: centered on idealRearCenterY
+  const backCore = computeCoreZone("back", idealRearCenterY, halfBandM, 40, 55);
   const backZone = {
     x1: x1Overhead,
     x2: x2Overhead,
     y1: Math.max(midZone.y2, idealRearCenterY - halfBandM),
     y2: Math.min(rearWallInner, idealRearCenterY + halfBandM),
-    active: true
+    active: true,
+    coreX1: backCore.coreX1,
+    coreX2: backCore.coreX2,
+    coreY1: backCore.coreY1,
+    coreY2: backCore.coreY2,
+    quality: backCore.quality
   };
 
   // Ensure zones are valid (y2 > y1)
