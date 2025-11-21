@@ -38,19 +38,43 @@ export function buildRoleMap(speakers) {
 
 export function isDraggable(speaker) {
   if (!speaker || !speaker.role) return false;
+
   const canonicalRole = getCanonicalRole(speaker.role);
-  
-  // Center speaker is fixed
-  if (canonicalRole === 'FC') return false;
-  
-  // Subwoofers are fixed
-  if (String(speaker.role).toUpperCase().includes("SUB")) return false;
-  if (canonicalRole === 'LFE') return false;
-  
-  // All other speakers (including overheads T*) are draggable if they have a valid model
+
+  if (!canonicalRole || typeof canonicalRole !== "string") {
+    return false;
+  }
+
+  // Centre is fixed
+  if (canonicalRole === "FC") return false;
+
+  // Any sub / LFE is fixed
+  const roleUpper = String(speaker.role).toUpperCase();
+  if (roleUpper.includes("SUB")) return false;
+  if (canonicalRole === "LFE" || canonicalRole === "LFE1" || canonicalRole === "LFE2") {
+    return false;
+  }
+
+  // Overheads (T* roles) ARE draggable,
+  // as long as they have a model and a valid plan position.
+  if (canonicalRole.startsWith("T")) {
+    const pos = speaker.position || {};
+    const hasModel = !!String(speaker.model || "").trim()
+      && String(speaker.model).toLowerCase() !== "off"
+      && String(speaker.model).toLowerCase() !== "none";
+
+    const hasValidPos =
+      Number.isFinite(pos.x) &&
+      Number.isFinite(pos.y);
+
+    return hasModel && hasValidPos;
+  }
+
+  // All other speakers:
+  // draggable if they have a valid model (same rule as before).
   const modelStr = String(speaker.model || "").trim().toLowerCase();
   if (!modelStr || modelStr === "off" || modelStr === "none") return false;
-  
+
   return true;
 }
 
