@@ -1341,12 +1341,23 @@ React.useEffect(() => {
     const target = byId.get(id);
     if (!target) return;
 
-    // Prevent dragging invisible placeholders
-    if (type === 'speaker' && !isRenderableSpeaker(target)) return;
+    const canonRole = getCanonicalRole(target.role);
+    const isOverhead =
+      typeof canonRole === "string" && canonRole.startsWith("T");
 
-    if (type === 'speaker' && !isDraggable(target)) {
+    // Prevent dragging invisible placeholders
+    if (type === "speaker" && !isRenderableSpeaker(target)) return;
+
+    // Lock check: apply to all speakers EXCEPT overheads (T*)
+    if (type === "speaker" && !isOverhead && !isDraggable(target)) {
       setTooltip({ show: true, text: "Position is locked" });
-      setTimeout(() => setTooltip(t => (t.text === "Position is locked" ? { show: false } : t)), 1500);
+      setTimeout(
+        () =>
+          setTooltip((t) =>
+            t.text === "Position is locked" ? { show: false } : t
+          ),
+        1500
+      );
       return;
     }
 
@@ -1358,13 +1369,12 @@ React.useEffect(() => {
     setDragWarning({ show: false });
     rsDragLockRef.current = null;
 
-    if (type === 'speaker') {
-      const speakerBeingDragged = byId.get(id);
-      const canonRole = getCanonicalRole(speakerBeingDragged.role);
-      if (canonRole === 'SBL' || canonRole === 'SBR') {
+    if (type === "speaker") {
+      // We already have canonRole from above
+      if (canonRole === "SBL" || canonRole === "SBR") {
         isDraggingRearRef.current++;
       }
-      if (canonRole === 'LW' || canonRole === 'RW') {
+      if (canonRole === "LW" || canonRole === "RW") {
         isDraggingFW.current = true;
       }
     }
