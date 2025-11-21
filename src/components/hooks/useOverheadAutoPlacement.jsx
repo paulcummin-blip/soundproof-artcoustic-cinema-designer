@@ -65,66 +65,62 @@ export function useOverheadAutoPlacement({
       };
     }
 
-    // Map overhead roles to their zones with L/R positions
-    const roleToZone = {
-      'TFL': { ...zoneInfo.front, isLeft: true },
-      'TFR': { ...zoneInfo.front, isLeft: false },
-      'TML': { ...zoneInfo.mid, isLeft: true },
-      'TMR': { ...zoneInfo.mid, isLeft: false },
-      'TL': { ...zoneInfo.mid, isLeft: true },
-      'TR': { ...zoneInfo.mid, isLeft: false },
-      'TBL': { ...zoneInfo.rear, isLeft: true },
-      'TBR': { ...zoneInfo.rear, isLeft: false },
+    // Map overhead roles to band and side
+    const roleToBand = {
+      'TFL': 'front', 'TFR': 'front', 'TFC': 'front',
+      'TML': 'mid', 'TMR': 'mid', 'TL': 'mid', 'TR': 'mid',
+      'TBL': 'rear', 'TBR': 'rear', 'TBC': 'rear'
+    };
+    
+    const roleToSide = {
+      'TFL': 'L', 'TML': 'L', 'TL': 'L', 'TBL': 'L',
+      'TFR': 'R', 'TMR': 'R', 'TR': 'R', 'TBR': 'R'
     };
 
     // Check which speakers need updating
     let needsUpdate = false;
     const nextSpeakers = placedSpeakers.map(spk => {
       const canonicalRole = getCanonicalRole(spk.role);
-      const zoneInfo = roleToZone[canonicalRole];
+      const band = roleToBand[canonicalRole];
+      const side = roleToSide[canonicalRole];
       
-      // Not an overhead speaker or zone not available
-      if (!zoneInfo || !zoneInfo.centerY || !zoneInfo.zone) return spk;
+      // Not an overhead speaker or band not available
+      if (!band || !zoneInfo[band]) return spk;
       
-      const targetY = zoneInfo.centerY;
-      const targetX = zoneInfo.isLeft ? zoneInfo.leftX : zoneInfo.rightX;
-      const zone = zoneInfo.zone;
+      const zone = zoneInfo[band];
+      const targetY = zone.centerY;
+      const targetX = side === 'R' ? zone.rightX : zone.leftX;
       
       const currentX = spk.position?.x;
       const currentY = spk.position?.y;
 
-      // Determine if we should snap this speaker
-      const shouldSnapY = 
+      // Determine if we need to move this speaker
+      const needsYUpdate = 
         !Number.isFinite(currentY) || // No Y position set
-        currentY < (zone.y1 - 0.01) || // Outside zone (below)
-        currentY > (zone.y2 + 0.01);   // Outside zone (above)
+        Math.abs(currentY - targetY) > 0.001; // Not at center Y
 
-      const shouldSnapX =
+      const needsXUpdate =
         !Number.isFinite(currentX) || // No X position set
-        Math.abs(currentX - (zone.x1 + zone.x2) / 2) < 0.05; // At neutral center
+        Math.abs(currentX - targetX) > 0.001; // Not at edge X
 
-      if (!shouldSnapY && !shouldSnapX) {
-        // Already positioned correctly, don't move it
+      if (!needsYUpdate && !needsXUpdate) {
+        // Already at target position
         return spk;
       }
 
-      // Snap to zone center Y and edge X
-      const newX = shouldSnapX ? targetX : currentX;
-      const newY = shouldSnapY ? targetY : currentY;
+      // Move to zone center Y and edge X
+      const newX = targetX;
+      const newY = targetY;
 
-      if (Math.abs(newX - currentX) > 0.001 || Math.abs(newY - currentY) > 0.001) {
-        needsUpdate = true;
-        return {
-          ...spk,
-          position: {
-            ...spk.position,
-            x: newX,
-            y: newY
-          }
-        };
-      }
-
-      return spk;
+      needsUpdate = true;
+      return {
+        ...spk,
+        position: {
+          ...spk.position,
+          x: newX,
+          y: newY
+        }
+      };
     });
 
     // Only update if meaningful changes occurred
