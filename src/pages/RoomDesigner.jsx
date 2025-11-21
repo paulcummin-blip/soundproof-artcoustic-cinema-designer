@@ -313,6 +313,15 @@ function useProjectLoader(
 
     if (typeof setSpeakerSystem === "function") {
       setSpeakerSystem((prev) => {
+        // If we already have live speakers, KEEP them – do not overwrite with project.
+        if (
+          prev &&
+          Array.isArray(prev.placedSpeakers) &&
+          prev.placedSpeakers.length > 0
+        ) {
+          return prev;
+        }
+
         // Only adopt loaded speakers if we actually have some.
         if (Array.isArray(loadedSpeakers) && loadedSpeakers.length > 0) {
           return { ...(prev || {}), placedSpeakers: loadedSpeakers };
