@@ -1334,51 +1334,70 @@ React.useEffect(() => {
   }, [frontWideZones, widthM, lengthM, getModelDimsM, onSetSpeakers, getCanonicalRole]);
 
   // Drag state management
-  const handleMouseDown = useCallback((e, id, type) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const handleMouseDown = useCallback(
+    (e, id, type) => {
+      e.preventDefault();
+      e.stopPropagation();
 
-    const target = byId.get(id);
-    if (!target) return;
+      const target = byId.get(id);
+      if (!target) return;
 
-    const canonRole = getCanonicalRole(target.role);
-    const isOverhead =
-      typeof canonRole === "string" && canonRole.startsWith("T");
+      const canonRole = getCanonicalRole(target.role);
+      const isOverhead =
+        typeof canonRole === "string" && canonRole.startsWith("T");
 
-    // Prevent dragging invisible placeholders
-    if (type === "speaker" && !isOverhead && !isRenderableSpeaker(target)) return;
+      // 1) For non-overhead speakers, keep the existing "renderable" guard.
+      //    Overheads always bypass this so they can be dragged even if treated
+      //    as placeholders by isRenderableSpeaker.
+      if (type === "speaker" && !isOverhead && !isRenderableSpeaker(target)) {
+        return;
+      }
 
-    // Lock check: apply to all speakers EXCEPT overheads (T*)
-    if (type === "speaker" && !isOverhead && !isDraggable(target)) {
-      setTooltip({ show: true, text: "Position is locked" });
-      setTimeout(
-        () =>
+      // 2) For non-overhead speakers, keep the existing "locked" behaviour.
+      //    Overheads bypass this, so they never show "Position is locked".
+      if (type === "speaker" && !isOverhead && !isDraggable(target)) {
+        setTooltip({ show: true, text: "Position is locked" });
+        setTimeout(() => {
           setTooltip((t) =>
             t.text === "Position is locked" ? { show: false } : t
-          ),
-        1500
-      );
-      return;
-    }
-
-    setDragState({
-      dragging: true,
-      draggedItemId: id,
-      dragType: type,
-    });
-    setDragWarning({ show: false });
-    rsDragLockRef.current = null;
-
-    if (type === "speaker") {
-      // We already have canonRole from above
-      if (canonRole === "SBL" || canonRole === "SBR") {
-        isDraggingRearRef.current++;
+          );
+        }, 1500);
+        return;
       }
-      if (canonRole === "LW" || canonRole === "RW") {
-        isDraggingFW.current = true;
+
+      // 3) At this point:
+      //    - All overheads (T*) are allowed through
+      //    - Non-overheads have passed both guards
+      setDragState({
+        dragging: true,
+        draggedItemId: id,
+        dragType: type,
+      });
+      setDragWarning({ show: false });
+      rsDragLockRef.current = null;
+
+      if (type === "speaker") {
+        const speakerBeingDragged = byId.get(id);
+        const dragCanon = getCanonicalRole(speakerBeingDragged.role);
+
+        // Maintain the existing special-case counters for surrounds / wides.
+        if (dragCanon === "SBL" || dragCanon === "SBR") {
+          isDraggingRearRef.current++;
+        }
+        if (dragCanon === "LW" || dragCanon === "RW") {
+          isDraggingFW.current = true;
+        }
       }
-    }
-  }, [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole]);
+    },
+    [
+      byId,
+      setDragState,
+      setDragWarning,
+      setTooltip,
+      rsDragLockRef,
+      getCanonicalRole,
+    ]
+  );
 
   const handleZoomIn = () => setZoom(prev => Math.min(2.0, prev + 0.1));
   const handleZoomOut = () => setZoom(prev => Math.max(0.5, prev - 0.1));
