@@ -75,7 +75,33 @@ export function getListeningAreaBounds(
   const midCenterY = Number(mlpPoint.y) || (minSeatY + maxSeatY) / 2;
 
   // 5. Extract ear height for height-aware zone calculation
-  const mlpEarHeight = Number(mlpPoint.z) || 1.1;
+  // 1) Try explicit MLP ear height if present
+  let mlpEarHeightM =
+    (Number.isFinite(mlpPoint?.earHeightM) && mlpPoint.earHeightM) ||
+    (Number.isFinite(mlpPoint?.ear_h) && mlpPoint.ear_h) ||
+    (Number.isFinite(mlpPoint?.z) && mlpPoint.z) ||
+    null;
+
+  // 2) Otherwise, derive from seating row ear heights (average)
+  if (!Number.isFinite(mlpEarHeightM)) {
+    const rowHeights = Array.isArray(seatingPositions)
+      ? seatingPositions
+          .map((seat) => seat?.earHeightM ?? seat?.ear_h ?? seat?.position?.z)
+          .filter((h) => Number.isFinite(h))
+      : [];
+
+    if (rowHeights.length > 0) {
+      const sum = rowHeights.reduce((acc, h) => acc + h, 0);
+      mlpEarHeightM = sum / rowHeights.length;
+    }
+  }
+
+  // 3) Final fallback
+  if (!Number.isFinite(mlpEarHeightM)) {
+    mlpEarHeightM = 1.2;
+  }
+
+  const mlpEarHeight = mlpEarHeightM;
 
   // 5. Determine overhead left/right X positions
   // Prefer: align with FL/FR speaker X coordinates
