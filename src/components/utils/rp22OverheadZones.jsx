@@ -74,6 +74,9 @@ export function getListeningAreaBounds(
   // 4. MLP center Y for middle zone
   const midCenterY = Number(mlpPoint.y) || (minSeatY + maxSeatY) / 2;
 
+  // 5. Extract ear height for height-aware zone calculation
+  const mlpEarHeight = Number(mlpPoint.z) || 1.1;
+
   // 5. Determine overhead left/right X positions
   // Prefer: align with FL/FR speaker X coordinates
   // Fallback: symmetric around room center within seating bounds
