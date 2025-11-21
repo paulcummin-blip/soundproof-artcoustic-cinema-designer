@@ -571,7 +571,7 @@ export const artcousticSpeakers = [
     "power_draw_w_nominal": 430,
     "power_draw_vrms_nominal": 59,
     "is_artcoustic": true,
-    "price": 6000,
+    "price": 6600,
     "transducers": "Transducers LF – 12\" woofer (x 4)",
     "enclosure": "Enclosure Medium density Fiber board",
     "accessories": "Accessories Spikes, included",
