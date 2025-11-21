@@ -105,6 +105,7 @@ export function getListeningAreaBounds(
     midCenterY,
     xLeft,
     xRight,
+    mlpEarHeight,
     active: true
   };
 }
