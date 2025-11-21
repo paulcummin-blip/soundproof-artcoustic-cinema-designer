@@ -3229,75 +3229,71 @@ useEffect(() => {
     // No overhead speakers to render
     if (overheadSpeakers.length === 0) return null;
 
-    const icons = [];
-
     // Render one icon per overhead speaker
-    overheadSpeakers.forEach(speaker => {
-      const modelKey = speaker.model;
-      if (!modelKey || modelKey === 'OFF') return;
-
-      const modelMeta = getSpeakerModelMeta(modelKey);
+    return overheadSpeakers.map(speaker => {
+      const canonicalRole = getCanonicalRole?.(speaker.role) || speaker.role;
       
-      // Log warning if model not found
-      if (modelMeta?.notFound && typeof console !== 'undefined') {
-        console.warn(`[RoomVisualisation] Overhead model "${modelKey}" not found in registry, using defaults`);
+      // Determine which zone position this role belongs to (front/mid/rear)
+      let zonePosition = null;
+      if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
+        zonePosition = 'front';
+      } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
+        zonePosition = 'mid';
+      } else if (['TBL', 'TBR', 'TBC'].includes(canonicalRole)) {
+        zonePosition = 'rear';
       }
+
+      // Resolve the actual model using the overhead position helper
+      const resolvedModel = zonePosition && getOverheadModelForPosition
+        ? getOverheadModelForPosition(zonePosition)
+        : speaker.model;
+
+      // Skip if no model selected
+      if (!resolvedModel || resolvedModel === 'OFF') {
+        return null;
+      }
+
+      const modelMeta = getSpeakerModelMeta(resolvedModel);
       
       // Determine if this should render as a circle or rectangle
       const isRound = modelMeta?.round === true || (!!modelMeta?.diameterM && modelMeta?.round !== false);
       
       // Get dimensions
-      const widthM_oh = modelMeta?.widthM || 0.24;
-      const depthM_oh = modelMeta?.depthM || 0.24;
       const diameterM = modelMeta?.diameterM || 0.24;
 
       // Use speaker's actual position from placedSpeakers
       const speakerX_m = speaker.position.x;
       const speakerY_m = speaker.position.y;
       
-      const canonical = getCanonicalRole?.(speaker.role) || speaker.role;
+      const [canvasX, canvasY] = toPx(speakerX_m, speakerY_m);
+      const radiusPx = (diameterM / 2) * scale;
 
-      if (isRound) {
-        // Circular overhead
-        const iconSize = diameterM;
-        const [canvasX, canvasY] = toPx(speakerX_m, speakerY_m);
-        const radiusPx = (iconSize / 2) * scale;
-        icons.push(
+      // Render round overhead icon (matching the old implementation)
+      return (
+        <g key={`oh-${canonicalRole}`} className="overhead-icon" pointerEvents="none">
           <circle
-            key={`${canonical}-oh`}
             cx={canvasX}
             cy={canvasY}
-            fill="#000000"
-            opacity={0.9}
-            pointerEvents="none"
             r={radiusPx}
+            fill="#625143"
+            opacity={0.95}
           />
-        );
-      } else {
-        // Rectangular overhead
-        const [canvasX, canvasY] = toPx(speakerX_m, speakerY_m);
-        const w_px = widthM_oh * scale;
-        const d_px = depthM_oh * scale;
-        
-        icons.push(
-          <rect
-            key={`${canonical}-oh`}
-            x={canvasX - w_px / 2}
-            y={canvasY - d_px / 2}
-            width={w_px}
-            height={d_px}
-            fill="#000000"
-            opacity={0.9}
-            pointerEvents="none"
+          <circle
+            cx={canvasX}
+            cy={canvasY}
+            r={radiusPx * 0.5}
+            fill="none"
+            stroke="white"
+            strokeWidth={1}
+            opacity={0.6}
           />
-        );
-      }
-    });
-
-    return icons;
+        </g>
+      );
+    }).filter(Boolean);
   }, [
     placedSpeakers,
     getCanonicalRole,
+    getOverheadModelForPosition,
     toPx,
     scale
   ]);
