@@ -3210,16 +3210,41 @@ useEffect(() => {
   }, [overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride]);
 
 
-// Render overhead speaker icons (centered in each zone pad)
+// Render overhead speaker icons (one per speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
-    if (!overheadGlobalModel || overheadGlobalModel === 'OFF') return null;
-    if (!overheadZones || overheadZones.status !== 'ok') return null;
+    // Guard: no speakers array
+    if (!Array.isArray(placedSpeakers)) return null;
+
+    // Determine visible overhead roles from appState
+    const visibleRolesSet = appState?.visibleRoles;
+    if (!visibleRolesSet || !(visibleRolesSet instanceof Set)) return null;
+
+    // Build set of visible overhead roles only
+    const visibleOverheadRoles = {};
+    for (const role of visibleRolesSet) {
+      if (role.startsWith('T')) {
+        visibleOverheadRoles[role] = true;
+      }
+    }
+
+    // Select overhead speakers that are visible and have valid positions
+    const overheadSpeakers = placedSpeakers.filter((s) => {
+      const role = getCanonicalRole(s.role);
+      if (!role || !role.startsWith('T')) return false;
+      if (!visibleOverheadRoles[role]) return false;
+      const pos = s.position || {};
+      return Number.isFinite(pos.x) && Number.isFinite(pos.y);
+    });
+
+    // No overhead speakers to render
+    if (overheadSpeakers.length === 0) return null;
 
     const icons = [];
 
-    visibleOverheadPositions.forEach(position => {
-      const modelKey = getOverheadModelForPosition(position);
-      if (!modelKey) return;
+    // Render one icon per overhead speaker
+    overheadSpeakers.forEach(speaker => {
+      const modelKey = speaker.model;
+      if (!modelKey || modelKey === 'OFF') return;
 
       const modelMeta = getSpeakerModelMeta(modelKey);
       
@@ -3236,78 +3261,54 @@ useEffect(() => {
       const depthM_oh = modelMeta?.depthM || 0.24;
       const diameterM = modelMeta?.diameterM || 0.24;
 
-      // Map position to zone
-      let zone = null;
-      if (position === 'front') {
-        zone = overheadZones.frontZone;
-      } else if (position === 'mid') {
-        zone = overheadZones.midZone;
-      } else if (position === 'rear') {
-        zone = overheadZones.backZone;
-      }
-
-      if (!zone || !zone.active) return;
-
-      const { x1, x2, y1, y2 } = zone;
-      const centerX_m = (x1 + x2) / 2;
-      const centerY_m = (y1 + y2) / 2;
+      // Use speaker's actual position from placedSpeakers
+      const speakerX_m = speaker.position.x;
+      const speakerY_m = speaker.position.y;
 
       if (isRound) {
         // Circular overhead (existing Architect 2-1, 4-2, PAS2-2)
         const iconSize = diameterM;
-        const clampedX = Math.max(x1 + iconSize / 2, Math.min(x2 - iconSize / 2, centerX_m));
-        const clampedY = Math.max(y1 + iconSize / 2, Math.min(y2 - iconSize / 2, centerY_m));
-
-        if ((x2 - x1) >= iconSize && (y2 - y1) >= iconSize) {
-          const [canvasX, canvasY] = toPx(clampedX, clampedY);
-          const radiusPx = (iconSize / 2) * scale;
-          icons.push(
-            <circle
-              key={`${position}-oh`}
-              cx={canvasX}
-              cy={canvasY}
-              fill="#000000"
-              opacity={0.9}
-              pointerEvents="none"
-              r={radiusPx}
-            />
-          );
-        }
+        const [canvasX, canvasY] = toPx(speakerX_m, speakerY_m);
+        const radiusPx = (iconSize / 2) * scale;
+        icons.push(
+          <circle
+            key={`${speaker.id}-oh`}
+            cx={canvasX}
+            cy={canvasY}
+            fill="#000000"
+            opacity={0.9}
+            pointerEvents="none"
+            r={radiusPx}
+          />
+        );
       } else {
         // Rectangular overhead (Architect Mikro)
-        const clampedX = Math.max(x1 + widthM_oh / 2, Math.min(x2 - widthM_oh / 2, centerX_m));
-        const clampedY = Math.max(y1 + depthM_oh / 2, Math.min(y2 - depthM_oh / 2, centerY_m));
-
-        if ((x2 - x1) >= widthM_oh && (y2 - y1) >= depthM_oh) {
-          const [canvasX, canvasY] = toPx(clampedX, clampedY);
-          const w_px = widthM_oh * scale;
-          const d_px = depthM_oh * scale;
-          
-          icons.push(
-            <rect
-              key={`${position}-oh`}
-              x={canvasX - w_px / 2}
-              y={canvasY - d_px / 2}
-              width={w_px}
-              height={d_px}
-              fill="#000000"
-              opacity={0.9}
-              pointerEvents="none"
-            />
-          );
-        }
+        const [canvasX, canvasY] = toPx(speakerX_m, speakerY_m);
+        const w_px = widthM_oh * scale;
+        const d_px = depthM_oh * scale;
+        
+        icons.push(
+          <rect
+            key={`${speaker.id}-oh`}
+            x={canvasX - w_px / 2}
+            y={canvasY - d_px / 2}
+            width={w_px}
+            height={d_px}
+            fill="#000000"
+            opacity={0.9}
+            pointerEvents="none"
+          />
+        );
       }
     });
 
     return icons;
   }, [
-    overheadGlobalModel,
-    overheadZones,
-    visibleOverheadPositions,
-    getOverheadModelForPosition,
+    placedSpeakers,
+    appState?.visibleRoles,
+    getCanonicalRole,
     toPx,
-    scale,
-    getModelDimsM
+    scale
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
