@@ -1839,56 +1839,122 @@ React.useEffect(() => {
     // Fallback for all other draggable speakers (including overheads)
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
 
-    // Special handling for overhead speakers - symmetric pair dragging
-    if (canonicalRole.startsWith('T') && overheadZones?.status === 'ok') {
-      const mlpY_m = mlp?.y || lengthM / 2;
-      
-      // Use symmetric clamping helper
-      const { primary, partner: partnerPos } = clampSymmetricOverheadPair({
-        draggedRole: canonicalRole,
-        proposedPos: { x: rawX, y: rawY },
-        mlpY_m,
-        widthM,
-        lengthM,
-        overheadZones,
+    // Overhead drag behaviour: L/R pairs, clamped to bands, front/rear symmetric in Y
+    if (canonicalRole && canonicalRole.startsWith('T') && overheadZones?.status === 'ok') {
+      // Band classification for RP22 overheads
+      const FRONT_ROLES = ['TFL', 'TFR', 'TFC'];
+      const MID_ROLES   = ['TL', 'TR', 'TML', 'TMR'];
+      const REAR_ROLES  = ['TBL', 'TBR', 'TBC'];
+
+      const isFront = FRONT_ROLES.includes(canonicalRole);
+      const isMid   = MID_ROLES.includes(canonicalRole);
+      const isRear  = REAR_ROLES.includes(canonicalRole);
+
+      const { frontZone, midZone, backZone } = overheadZones;
+      const roomCenterX = widthM / 2;
+
+      // Helper: clamp a point into a given zone
+      const clampIntoZone = (zone, xM, yM) => {
+        if (!zone) return { x: xM, y: yM };
+        const clampedX = Math.max(zone.x1, Math.min(zone.x2, xM));
+        const clampedY = Math.max(zone.y1, Math.min(zone.y2, yM));
+        return { x: clampedX, y: clampedY };
+      };
+
+      // Helper: given a left X, mirror a right X around the room centre and clamp to zone
+      const mirrorXInZone = (zone, leftX) => {
+        const mirrored = roomCenterX + (roomCenterX - leftX);
+        return Math.max(zone.x1, Math.min(zone.x2, mirrored));
+      };
+
+      // Helper: convenience for "is this a left role?"
+      const isLeftRole = (role) => ['TFL', 'TML', 'TL', 'TBL'].includes(role);
+
+      onSetSpeakers((prev) => {
+        if (!prev || !Array.isArray(prev.placedSpeakers)) return prev;
+
+        // Shallow copy so we can mutate positions safely
+        const nextSpeakers = prev.placedSpeakers.map((s) => ({ ...s, position: { ...(s.position || {}) } }));
+
+        // Map canonical role -> speaker object
+        const byCanon = {};
+        for (const s of nextSpeakers) {
+          const c = getCanonicalRole(s.role);
+          if (c) byCanon[c] = s;
+        }
+
+        const dragged = byCanon[canonicalRole];
+        if (!dragged || !dragged.position) return prev;
+
+        // Decide which band we're dragging inside
+        const dragZone = isFront ? frontZone : isMid ? midZone : backZone;
+        if (!dragZone) return prev;
+
+        // Current and proposed positions for the dragged speaker
+        const currentPos = dragged.position;
+        const proposedX = rawX;
+        const proposedY = rawY;
+
+        // Clamp dragged speaker into its band
+        const clampedDragged = clampIntoZone(dragZone, proposedX, proposedY);
+
+        // Vertical delta for the dragged band
+        const deltaY = clampedDragged.y - currentPos.y;
+
+        // Helper to move a L/R pair within a band, with optional sign on deltaY
+        const movePairInBand = (leftRole, rightRole, zone, deltaYSign = 1, useDraggedXFor = null) => {
+          if (!zone) return;
+
+          const left  = byCanon[leftRole];
+          const right = byCanon[rightRole];
+          if (!left || !right || !left.position || !right.position) return;
+
+          // Base X for the left speaker in this update
+          let newLeftX;
+          if (useDraggedXFor && canonicalRole === useDraggedXFor && isLeftRole(canonicalRole)) {
+            // If we're dragging the left in this band, use the clamped dragged X
+            newLeftX = Math.max(zone.x1, Math.min(zone.x2, clampedDragged.x));
+          } else if (useDraggedXFor && canonicalRole === useDraggedXFor && !isLeftRole(canonicalRole)) {
+            // Dragging the right in this band: derive left by mirroring the dragged X
+            const draggedX = Math.max(zone.x1, Math.min(zone.x2, clampedDragged.x));
+            newLeftX = Math.max(zone.x1, Math.min(zone.x2, roomCenterX + (roomCenterX - draggedX)));
+          } else {
+            // Not dragging this band directly: keep existing left X
+            newLeftX = Math.max(zone.x1, Math.min(zone.x2, left.position.x));
+          }
+
+          const newRightX = mirrorXInZone(zone, newLeftX);
+
+          const newYBase = left.position.y + deltaY * deltaYSign;
+          const { y: newY } = clampIntoZone(zone, newLeftX, newYBase);
+
+          left.position = { ...left.position, x: newLeftX,  y: newY };
+          right.position = { ...right.position, x: newRightX, y: newY };
+        };
+
+        // 1) Update the band we're actually dragging in
+        if (isFront) {
+          movePairInBand('TFL', 'TFR', frontZone, +1, canonicalRole);
+        } else if (isMid) {
+          // Mid pair does not drive front/rear symmetry – it just moves itself
+          movePairInBand('TML', 'TMR', midZone, +1, canonicalRole);
+          movePairInBand('TL',  'TR',  midZone, +1, canonicalRole); // for 5.1.2 / 7.1.2 mappings
+        } else if (isRear) {
+          movePairInBand('TBL', 'TBR', backZone, +1, canonicalRole);
+        }
+
+        // 2) Symmetric front/rear movement in Y
+        //    Dragging fronts pulls rears in the opposite direction, and vice versa.
+        if (isFront && backZone) {
+          movePairInBand('TBL', 'TBR', backZone, -1, null);
+        } else if (isRear && frontZone) {
+          movePairInBand('TFL', 'TFR', frontZone, -1, null);
+        }
+
+        return { ...prev, placedSpeakers: nextSpeakers };
       });
 
-      // Determine partner role for mirror-locked pair dragging
-      const pairMap = {
-        'TFL': 'TFR', 'TFR': 'TFL',
-        'TML': 'TMR', 'TMR': 'TML',
-        'TL': 'TR', 'TR': 'TL',
-        'TBL': 'TBR', 'TBR': 'TBL'
-      };
-      
-      const partnerRole = pairMap[canonicalRole];
-      const partner = partnerRole ? placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRole) : null;
-
-      if (partner && partnerPos) {
-        // Update both speakers in one pass
-        onSetSpeakers(prev => prev.map(s => {
-          const sRole = getCanonicalRole(s.role);
-          if (sRole === canonicalRole) {
-            return { ...s, position: { ...s.position, x: primary.x, y: primary.y } };
-          }
-          if (sRole === partnerRole) {
-            return { ...s, position: { ...s.position, x: partnerPos.x, y: partnerPos.y } };
-          }
-          return s;
-        }));
-
-        lastInteractionEpoch.current = timeNowMs();
-        return;
-      }
-
-      // No partner: just update dragged speaker
-      onSetSpeakers(prev => prev.map(s => {
-        if (s.id === speakerId) {
-          return { ...s, position: { ...s.position, x: primary.x, y: primary.y } };
-        }
-        return s;
-      }));
-
+      // We've handled this drag specially
       lastInteractionEpoch.current = timeNowMs();
       return;
     }
