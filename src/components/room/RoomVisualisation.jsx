@@ -1940,14 +1940,72 @@ React.useEffect(() => {
       const columnXLeft = isDraggedLeft ? primaryClamped.x : (centerX + (centerX - primaryClamped.x));
       const columnXRight = centerX + (centerX - columnXLeft);
 
-      // 6. Write all overhead speakers with column-locked X positions
+      // 6. Mid-drives-front-rear Y-link (only when dragging mid pair)
+      const isMidDrag = canonicalRole === 'TML' || canonicalRole === 'TMR';
+      let frontYProposed = null;
+      let rearYProposed = null;
+
+      if (isMidDrag) {
+        // Get original mid Y from the speaker before drag
+        const originalMidY = spk.position?.y || 0;
+        const dy = primaryClamped.y - originalMidY;
+
+        // Find front and rear speakers to propagate dy
+        const frontLeft = prev => prev.find(s => getCanonicalRole(s.role) === 'TFL');
+        const rearLeft = prev => prev.find(s => getCanonicalRole(s.role) === 'TBL');
+
+        const tfl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'TFL');
+        const tbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'TBL');
+
+        if (tfl?.position?.y != null) {
+          const originalFrontY = tfl.position.y;
+          frontYProposed = originalFrontY + dy;
+        }
+
+        if (tbl?.position?.y != null) {
+          const originalRearY = tbl.position.y;
+          rearYProposed = originalRearY + dy;
+        }
+      }
+
+      // 7. Write all overhead speakers with column-locked X and Y-linked positions
       onSetSpeakers(prev => {
         if (!Array.isArray(prev)) return prev;
+
+        // If mid-drag, clamp front and rear Y proposals
+        let frontYClamped = null;
+        let rearYClamped = null;
+
+        if (isMidDrag && frontYProposed != null) {
+          const tfl = prev.find(s => getCanonicalRole(s.role) === 'TFL');
+          const frontXCurrent = tfl?.position?.x || columnXLeft;
+          const clampedFront = clampOverheadPairPosition(
+            { x: frontXCurrent, y: frontYProposed },
+            'TFL',
+            overheadZones,
+            widthM,
+            lengthM
+          );
+          frontYClamped = clampedFront.y;
+        }
+
+        if (isMidDrag && rearYProposed != null) {
+          const tbl = prev.find(s => getCanonicalRole(s.role) === 'TBL');
+          const rearXCurrent = tbl?.position?.x || columnXLeft;
+          const clampedRear = clampOverheadPairPosition(
+            { x: rearXCurrent, y: rearYProposed },
+            'TBL',
+            overheadZones,
+            widthM,
+            lengthM
+          );
+          rearYClamped = clampedRear.y;
+        }
 
         return prev.map(spk => {
           const canon = getCanonicalRole(spk.role) || spk.role;
           
-          // Update the dragged speaker (keep its band-specific Y)
+          // Update the dragged speaker
           if (spk.id === speakerId) {
             return {
               ...spk,
@@ -1959,7 +2017,7 @@ React.useEffect(() => {
             };
           }
           
-          // Update the partner speaker (keep its band-specific Y)
+          // Update the partner speaker
           if (canon === pairRole) {
             return {
               ...spk,
@@ -1971,24 +2029,40 @@ React.useEffect(() => {
             };
           }
           
-          // Update all other left column speakers (keep their Y, align X)
+          // Update left column speakers (align X, propagate Y if mid-drag)
           if (LEFT_COLUMN.includes(canon) && canon !== canonicalRole) {
+            const updates = { x: columnXLeft };
+            
+            // Propagate Y from mid-drag
+            if (isMidDrag) {
+              if (canon === 'TFL' && frontYClamped != null) updates.y = frontYClamped;
+              if (canon === 'TBL' && rearYClamped != null) updates.y = rearYClamped;
+            }
+            
             return {
               ...spk,
               position: {
                 ...(spk.position || {}),
-                x: columnXLeft,
+                ...updates,
               },
             };
           }
           
-          // Update all other right column speakers (keep their Y, align X)
+          // Update right column speakers (align X, propagate Y if mid-drag)
           if (RIGHT_COLUMN.includes(canon) && canon !== pairRole) {
+            const updates = { x: columnXRight };
+            
+            // Propagate Y from mid-drag (mirror pairs)
+            if (isMidDrag) {
+              if (canon === 'TFR' && frontYClamped != null) updates.y = frontYClamped;
+              if (canon === 'TBR' && rearYClamped != null) updates.y = rearYClamped;
+            }
+            
             return {
               ...spk,
               position: {
                 ...(spk.position || {}),
-                x: columnXRight,
+                ...updates,
               },
             };
           }
@@ -2041,28 +2115,46 @@ React.useEffect(() => {
         return { x: cx, y: cy };
       };
 
-      // Immediately call handleSpeakerDrag once at the starting point
-      let lastPos = clientToCanvas(mouseDownEvent);
-      handleSpeakerDrag(speakerId, lastPos);
+      // Store initial positions to compute delta
+      const startCanvasPos = clientToCanvas(mouseDownEvent);
+      const startSpeakerCanvasPos = {
+        x: roomRect.x + (spk.position.x * scale),
+        y: roomRect.y + (spk.position.y * scale)
+      };
 
-      // Mouse move: update overhead position continuously
+      dragStartCanvasPosRef.current = startCanvasPos;
+      dragStartSpeakerPosRef.current = startSpeakerCanvasPos;
+
+      // Mouse move: compute delta and apply to initial speaker position
       const onMove = (moveEvent) => {
         moveEvent.preventDefault();
-        const canvasPos = clientToCanvas(moveEvent);
-        lastPos = canvasPos;
-        handleSpeakerDrag(speakerId, canvasPos);
+        const currentCanvasPos = clientToCanvas(moveEvent);
+        
+        // Compute delta from initial pointer position
+        const deltaX = currentCanvasPos.x - startCanvasPos.x;
+        const deltaY = currentCanvasPos.y - startCanvasPos.y;
+        
+        // Apply delta to initial speaker position (not raw pointer position)
+        const adjustedCanvasPos = {
+          x: startSpeakerCanvasPos.x + deltaX,
+          y: startSpeakerCanvasPos.y + deltaY
+        };
+        
+        handleSpeakerDrag(speakerId, adjustedCanvasPos);
       };
 
       const onUp = (upEvent) => {
         upEvent.preventDefault();
         window.removeEventListener("mousemove", onMove);
         window.removeEventListener("mouseup", onUp);
+        dragStartCanvasPosRef.current = null;
+        dragStartSpeakerPosRef.current = null;
       };
 
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },
-    [byId, getCanonicalRole, handleSpeakerDrag, roomRect, svgRef]
+    [byId, getCanonicalRole, handleSpeakerDrag, roomRect, svgRef, scale, dragStartCanvasPosRef, dragStartSpeakerPosRef]
   );
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
