@@ -1346,7 +1346,7 @@ React.useEffect(() => {
       typeof canonRole === "string" && canonRole.startsWith("T");
 
     // Prevent dragging invisible placeholders
-    if (type === "speaker" && !isRenderableSpeaker(target)) return;
+    if (type === "speaker" && !isOverhead && !isRenderableSpeaker(target)) return;
 
     // Lock check: apply to all speakers EXCEPT overheads (T*)
     if (type === "speaker" && !isOverhead && !isDraggable(target)) {
