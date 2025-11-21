@@ -3215,24 +3215,14 @@ useEffect(() => {
     // Guard: no speakers array
     if (!Array.isArray(placedSpeakers)) return null;
 
-    // Determine visible overhead roles from appState
-    const visibleRolesSet = appState?.visibleRoles;
-    if (!visibleRolesSet || !(visibleRolesSet instanceof Set)) return null;
-
-    // Build set of visible overhead roles only
-    const visibleOverheadRoles = {};
-    for (const role of visibleRolesSet) {
-      if (role.startsWith('T')) {
-        visibleOverheadRoles[role] = true;
-      }
-    }
-
-    // Select overhead speakers that are visible and have valid positions
-    const overheadSpeakers = placedSpeakers.filter((s) => {
-      const role = getCanonicalRole(s.role);
-      if (!role || !role.startsWith('T')) return false;
-      if (!visibleOverheadRoles[role]) return false;
-      const pos = s.position || {};
+    // Select overhead speakers from placedSpeakers
+    const overheadSpeakers = placedSpeakers.filter((speaker) => {
+      const canonical = getCanonicalRole?.(speaker.role) || speaker.role;
+      if (typeof canonical !== 'string') return false;
+      // Overhead roles start with 'T' (TFL, TFR, TML, TMR, TBL, TBR, TL, TR)
+      if (!canonical.startsWith('T')) return false;
+      // Must have valid position
+      const pos = speaker.position || {};
       return Number.isFinite(pos.x) && Number.isFinite(pos.y);
     });
 
@@ -3264,15 +3254,17 @@ useEffect(() => {
       // Use speaker's actual position from placedSpeakers
       const speakerX_m = speaker.position.x;
       const speakerY_m = speaker.position.y;
+      
+      const canonical = getCanonicalRole?.(speaker.role) || speaker.role;
 
       if (isRound) {
-        // Circular overhead (existing Architect 2-1, 4-2, PAS2-2)
+        // Circular overhead
         const iconSize = diameterM;
         const [canvasX, canvasY] = toPx(speakerX_m, speakerY_m);
         const radiusPx = (iconSize / 2) * scale;
         icons.push(
           <circle
-            key={`${speaker.id}-oh`}
+            key={`${canonical}-oh`}
             cx={canvasX}
             cy={canvasY}
             fill="#000000"
@@ -3282,14 +3274,14 @@ useEffect(() => {
           />
         );
       } else {
-        // Rectangular overhead (Architect Mikro)
+        // Rectangular overhead
         const [canvasX, canvasY] = toPx(speakerX_m, speakerY_m);
         const w_px = widthM_oh * scale;
         const d_px = depthM_oh * scale;
         
         icons.push(
           <rect
-            key={`${speaker.id}-oh`}
+            key={`${canonical}-oh`}
             x={canvasX - w_px / 2}
             y={canvasY - d_px / 2}
             width={w_px}
@@ -3305,7 +3297,6 @@ useEffect(() => {
     return icons;
   }, [
     placedSpeakers,
-    appState?.visibleRoles,
     getCanonicalRole,
     toPx,
     scale
