@@ -113,7 +113,7 @@ export function getListeningAreaBounds(
 /**
  * Compute RP22-compliant overhead zone extents.
  * Returns three zones: front (Upper Front), mid (Top Middle), back (Upper Back).
- * All zones use the same X-range (overhead ceiling lines).
+ * X-width depends solely on ear-to-ceiling height and target azimuth angles.
  * Zones are height-aware: positions respond to ceiling height and ear height.
  * 
  * @param {Object} bounds - Output from getListeningAreaBounds
@@ -129,8 +129,8 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
     };
   }
 
-  const { lengthM = 6.0, heightM = 2.4 } = roomDims || {};
-  const { listeningFrontY, listeningBackY, midCenterY, xLeft, xRight } = bounds;
+  const { widthM = 4.5, lengthM = 6.0, heightM = 2.4 } = roomDims || {};
+  const { listeningFrontY, listeningBackY, midCenterY } = bounds;
 
   const screenWallInner = 0.05;
   const rearWallInner = lengthM - 0.05;
@@ -140,7 +140,7 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   const mlpY_m = midCenterY;
   const ceilingHeightM = heightM;
   const earHeightM = bounds.mlpEarHeight || 1.1;
-  const verticalM = Math.max(ceilingHeightM - earHeightM, 0.5);
+  const earToCeilingM = Math.max(0.4, ceilingHeightM - earHeightM);
 
   // Target elevation angles for front/rear (45°)
   const FRONT_ELEV_DEG = 45;
@@ -148,9 +148,9 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   const FRONT_ELEV_RAD = FRONT_ELEV_DEG * Math.PI / 180;
   const REAR_ELEV_RAD = REAR_ELEV_DEG * Math.PI / 180;
 
-  // Compute ideal offsets from MLP
-  const frontOffsetM = verticalM * Math.tan(FRONT_ELEV_RAD);
-  const rearOffsetM = verticalM * Math.tan(REAR_ELEV_RAD);
+  // Compute ideal offsets from MLP (Y direction)
+  const frontOffsetM = earToCeilingM * Math.tan(FRONT_ELEV_RAD);
+  const rearOffsetM = earToCeilingM * Math.tan(REAR_ELEV_RAD);
 
   // Ideal centers before clamping
   let idealFrontCenterY = mlpY_m - frontOffsetM;
@@ -168,13 +168,49 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   idealFrontCenterY = mlpY_m - symmetricOffset;
   idealRearCenterY = mlpY_m + symmetricOffset;
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // X-WIDTH CALCULATION: Based solely on ear-to-ceiling height + target azimuth
+  // ────────────────────────────────────────────────────────────────────────────
+  
+  // Helper: calculate lateral half-span from azimuth angle range
+  function halfSpanFromAngles(minDeg, maxDeg) {
+    if (!Number.isFinite(minDeg) || !Number.isFinite(maxDeg)) return 0;
+    const targetDeg = (minDeg + maxDeg) / 2;
+    const targetRad = (targetDeg * Math.PI) / 180;
+    return earToCeilingM * Math.tan(targetRad);
+  }
+
+  // RP22 target azimuth ranges for overhead positions
+  const FRONT_AZ_MIN = 20;  // degrees
+  const FRONT_AZ_MAX = 45;
+  const MID_AZ_MIN = 40;
+  const MID_AZ_MAX = 60;
+  const REAR_AZ_MIN = 20;
+  const REAR_AZ_MAX = 45;
+
+  const halfSpanFront = halfSpanFromAngles(FRONT_AZ_MIN, FRONT_AZ_MAX);
+  const halfSpanMid = halfSpanFromAngles(MID_AZ_MIN, MID_AZ_MAX);
+  const halfSpanRear = halfSpanFromAngles(REAR_AZ_MIN, REAR_AZ_MAX);
+
+  const roomCenterX = widthM / 2;
+
+  // Set X bounds based on angle-derived spans (independent of Y distance)
+  const frontX1 = Math.max(0, roomCenterX - halfSpanFront);
+  const frontX2 = Math.min(widthM, roomCenterX + halfSpanFront);
+
+  const midX1 = Math.max(0, roomCenterX - halfSpanMid);
+  const midX2 = Math.min(widthM, roomCenterX + halfSpanMid);
+
+  const rearX1 = Math.max(0, roomCenterX - halfSpanRear);
+  const rearX2 = Math.min(widthM, roomCenterX + halfSpanRear);
+
   // Band thickness (±0.5m around center)
   const halfBandM = 0.5;
 
   // Middle zone: centered on MLP
   const midZone = {
-    x1: xLeft,
-    x2: xRight,
+    x1: midX1,
+    x2: midX2,
     y1: Math.max(screenWallInner, mlpY_m - halfBandM),
     y2: Math.min(rearWallInner, mlpY_m + halfBandM),
     active: true
@@ -182,8 +218,8 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
 
   // Front zone: centered on idealFrontCenterY
   const frontZone = {
-    x1: xLeft,
-    x2: xRight,
+    x1: frontX1,
+    x2: frontX2,
     y1: Math.max(screenWallInner, idealFrontCenterY - halfBandM),
     y2: Math.min(midZone.y1, idealFrontCenterY + halfBandM),
     active: true
@@ -191,8 +227,8 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
 
   // Back zone: centered on idealRearCenterY
   const backZone = {
-    x1: xLeft,
-    x2: xRight,
+    x1: rearX1,
+    x2: rearX2,
     y1: Math.max(midZone.y2, idealRearCenterY - halfBandM),
     y2: Math.min(rearWallInner, idealRearCenterY + halfBandM),
     active: true
