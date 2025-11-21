@@ -4167,10 +4167,17 @@ return {
   // 2) Visibility filter (layout + model) – but never hard-fail on errors
   const afterVisibility = afterRenderable.filter((spk) => {
     try {
+      const canon = String(spk.role || "").toUpperCase();
+      
+      // OVERHEADS: icons must always be visible when speakers exist.
+      // Do NOT use the Overheads toggle here (that only affects zone bands).
+      if (canon && canon.startsWith('T')) {
+        return true;
+      }
+      
       const result = getSpeakerVisibility(spk.role, spk.model);
       
       // TEMP DEBUG: Log each visibility check
-      const canon = String(spk.role || "").toUpperCase();
       if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
         console.log('[RV filter]', {
           role: canon,
