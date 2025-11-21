@@ -3310,6 +3310,10 @@ useEffect(() => {
       }
 
       // Use SpeakerIcon exactly as renderSpeakers does
+      const speakerMouseDownHandler = isDraggable(speaker)
+        ? (e) => handleMouseDown(e, id, "speaker")
+        : undefined;
+
       return (
         <SpeakerIcon
           key={id}
@@ -3318,7 +3322,7 @@ useEffect(() => {
           canvasY_raw={roomRect.y + (position.y * scale)}
           yaw={speaker.yaw || 0}
           scale={scale}
-          speakerMouseDownHandler={undefined}
+          speakerMouseDownHandler={speakerMouseDownHandler}
           setHoveredSpeaker={setHoveredSpeaker}
         />
       );
@@ -3329,7 +3333,9 @@ useEffect(() => {
     getOverheadModelForPosition,
     scale,
     roomRect,
-    setHoveredSpeaker
+    setHoveredSpeaker,
+    handleMouseDown,
+    isDraggable
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
