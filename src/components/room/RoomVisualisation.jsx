@@ -3229,11 +3229,15 @@ useEffect(() => {
     // No overhead speakers to render
     if (overheadSpeakers.length === 0) return null;
 
-    // Render one icon per overhead speaker
-    return overheadSpeakers.map(speaker => {
-      const canonicalRole = getCanonicalRole?.(speaker.role) || speaker.role;
-      
+    // Render one icon per overhead speaker using SpeakerIcon
+    return overheadSpeakers.map((speaker) => {
+      const { id, role, model, position } = speaker;
+      if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+        return null;
+      }
+
       // Determine which zone position this role belongs to (front/mid/rear)
+      const canonicalRole = getCanonicalRole?.(role) || role;
       let zonePosition = null;
       if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
         zonePosition = 'front';
@@ -3246,56 +3250,34 @@ useEffect(() => {
       // Resolve the actual model using the overhead position helper
       const resolvedModel = zonePosition && getOverheadModelForPosition
         ? getOverheadModelForPosition(zonePosition)
-        : speaker.model;
+        : model;
 
       // Skip if no model selected
       if (!resolvedModel || resolvedModel === 'OFF') {
         return null;
       }
 
-      const modelMeta = getSpeakerModelMeta(resolvedModel);
-      
-      // Determine if this should render as a circle or rectangle
-      const isRound = modelMeta?.round === true || (!!modelMeta?.diameterM && modelMeta?.round !== false);
-      
-      // Get dimensions
-      const diameterM = modelMeta?.diameterM || 0.24;
-
-      // Use speaker's actual position from placedSpeakers
-      const speakerX_m = speaker.position.x;
-      const speakerY_m = speaker.position.y;
-      
-      const [canvasX, canvasY] = toPx(speakerX_m, speakerY_m);
-      const radiusPx = (diameterM / 2) * scale;
-
-      // Render round overhead icon (matching the old implementation)
+      // Use SpeakerIcon exactly as renderSpeakers does
       return (
-        <g key={`oh-${canonicalRole}`} className="overhead-icon" pointerEvents="none">
-          <circle
-            cx={canvasX}
-            cy={canvasY}
-            r={radiusPx}
-            fill="#625143"
-            opacity={0.95}
-          />
-          <circle
-            cx={canvasX}
-            cy={canvasY}
-            r={radiusPx * 0.5}
-            fill="none"
-            stroke="white"
-            strokeWidth={1}
-            opacity={0.6}
-          />
-        </g>
+        <SpeakerIcon
+          key={id}
+          speaker={{ ...speaker, model: resolvedModel }}
+          canvasX={roomRect.x + (position.x * scale)}
+          canvasY_raw={roomRect.y + (position.y * scale)}
+          yaw={speaker.yaw || 0}
+          scale={scale}
+          speakerMouseDownHandler={undefined}
+          setHoveredSpeaker={setHoveredSpeaker}
+        />
       );
     }).filter(Boolean);
   }, [
     placedSpeakers,
     getCanonicalRole,
     getOverheadModelForPosition,
-    toPx,
-    scale
+    scale,
+    roomRect,
+    setHoveredSpeaker
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
