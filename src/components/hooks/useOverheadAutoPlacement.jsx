@@ -94,17 +94,13 @@ export function useOverheadAutoPlacement({
       const currentX = spk.position?.x;
       const currentY = spk.position?.y;
 
-      // Determine if we need to move this speaker
-      const needsYUpdate = 
-        !Number.isFinite(currentY) || // No Y position set
-        Math.abs(currentY - targetY) > 0.001; // Not at center Y
+      const hasValidPos =
+        Number.isFinite(currentX) &&
+        Number.isFinite(currentY);
 
-      const needsXUpdate =
-        !Number.isFinite(currentX) || // No X position set
-        Math.abs(currentX - targetX) > 0.001; // Not at edge X
-
-      if (!needsYUpdate && !needsXUpdate) {
-        // Already at target position
+      // If this overhead already has a valid position (likely from user drag),
+      // do NOT auto-update this speaker. This lets manual drags "win" permanently.
+      if (hasValidPos) {
         return spk;
       }
 
