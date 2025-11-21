@@ -3285,15 +3285,17 @@ useEffect(() => {
         return null;
       }
 
-      // Use SpeakerIcon exactly as renderSpeakers does
-      const speakerMouseDownHandler = isDraggable(speaker)
+      // IMPORTANT: build an effective speaker that includes the resolved model
+      const effectiveSpeaker = { ...speaker, model: resolvedModel };
+
+      const speakerMouseDownHandler = isDraggable(effectiveSpeaker)
         ? (e) => handleMouseDown(e, id, "speaker")
         : undefined;
 
       return (
         <SpeakerIcon
           key={id}
-          speaker={{ ...speaker, model: resolvedModel }}
+          speaker={effectiveSpeaker}
           canvasX={roomRect.x + (position.x * scale)}
           canvasY_raw={roomRect.y + (position.y * scale)}
           yaw={speaker.yaw || 0}
