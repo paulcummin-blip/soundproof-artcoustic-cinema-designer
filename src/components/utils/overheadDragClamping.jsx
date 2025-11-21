@@ -162,3 +162,36 @@ export function clampOverheadToZone({
 
   return { x: clampedX, y: clampedY };
 }
+
+/**
+ * Simple pair-aware position clamp helper for overhead speakers.
+ * Wraps clampOverheadToZone to provide a consistent interface for RV drag handler.
+ * 
+ * @param {Object} proposedPos - Proposed position {x, y} in room meters
+ * @param {string} canonicalRole - Overhead role (TFL, TFR, TML, TMR, TBL, TBR, etc.)
+ * @param {Object} overheadZones - Zones from computeOverheadZones {frontZone, midZone, backZone, status}
+ * @param {number} widthM - Room width in meters
+ * @param {number} lengthM - Room length in meters
+ * @returns {Object} Clamped position {x, y} in room meters
+ */
+export function clampOverheadPairPosition(proposedPos, canonicalRole, overheadZones, widthM, lengthM) {
+  if (!overheadZones || overheadZones.status !== 'ok') {
+    // Fallback: simple room clamp so we never leave the room
+    const x = Math.max(0, Math.min(widthM, proposedPos.x));
+    const y = Math.max(0, Math.min(lengthM, proposedPos.y));
+    return { x, y };
+  }
+
+  // Use the existing single-speaker clamp (clampOverheadToZone)
+  // For now, we pass minimal speaker dims (assume default round overhead)
+  const defaultOverheadDims = { diameterM: 0.24, round: true };
+  
+  return clampOverheadToZone({
+    proposedPos,
+    canonicalRole,
+    overheadZones,
+    speakerDims: defaultOverheadDims,
+    widthM,
+    lengthM
+  });
+}
