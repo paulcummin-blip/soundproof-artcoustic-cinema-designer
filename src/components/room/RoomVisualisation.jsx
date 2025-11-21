@@ -3219,7 +3219,7 @@ useEffect(() => {
     const overheadSpeakers = placedSpeakers.filter((speaker) => {
       const canonical = getCanonicalRole?.(speaker.role) || speaker.role;
       if (typeof canonical !== 'string') return false;
-      // Overhead roles start with 'T' (TFL, TFR, TML, TMR, TBL, TBR, TL, TR)
+      // Any canonical role that starts with 'T' is an overhead (TFL/TFR/TML/TMR/TBL/TBR/TL/TR)
       if (!canonical.startsWith('T')) return false;
       // Must have valid position
       const pos = speaker.position || {};
