@@ -4260,6 +4260,12 @@ return {
     const { id, role, model, position = {} } = speaker;
     const canon = getCanonicalRole(role);
 
+    // NEW: overhead speakers are rendered only by overheadIconElements,
+    // so skip them here to avoid duplicate / rectangular icons.
+    if (typeof canon === "string" && canon.startsWith("T")) {
+      return null;
+    }
+
     // Resolve model & dimensions using your existing helpers
     const resolvedModel = resolveSurroundModel(model, canon);
     const dims = getSpeakerDims(resolvedModel);
