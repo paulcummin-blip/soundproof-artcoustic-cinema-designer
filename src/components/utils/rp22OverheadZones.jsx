@@ -243,30 +243,55 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   // Band thickness (±0.5m around center)
   const halfBandM = 0.5;
 
+  // Helper: shrink span around center to create recommended core
+  const shrinkSpan = (y1, y2, factor = 0.7) => {
+    const mid = (y1 + y2) / 2;
+    const half = ((y2 - y1) / 2) * factor;
+    return { coreY1: mid - half, coreY2: mid + half };
+  };
+
   // Middle zone: centered on MLP
+  const midY1 = Math.max(screenWallInner, mlpY_m - halfBandM);
+  const midY2 = Math.min(rearWallInner, mlpY_m + halfBandM);
+  const midCore = shrinkSpan(midY1, midY2);
+  
   const midZone = {
     x1: x1Overhead,
     x2: x2Overhead,
-    y1: Math.max(screenWallInner, mlpY_m - halfBandM),
-    y2: Math.min(rearWallInner, mlpY_m + halfBandM),
+    y1: midY1,
+    y2: midY2,
+    coreY1: midCore.coreY1,
+    coreY2: midCore.coreY2,
     active: true
   };
 
   // Front zone: centered on idealFrontCenterY
+  const frontY1 = Math.max(screenWallInner, idealFrontCenterY - halfBandM);
+  const frontY2 = Math.min(midZone.y1, idealFrontCenterY + halfBandM);
+  const frontCore = shrinkSpan(frontY1, frontY2);
+  
   const frontZone = {
     x1: x1Overhead,
     x2: x2Overhead,
-    y1: Math.max(screenWallInner, idealFrontCenterY - halfBandM),
-    y2: Math.min(midZone.y1, idealFrontCenterY + halfBandM),
+    y1: frontY1,
+    y2: frontY2,
+    coreY1: frontCore.coreY1,
+    coreY2: frontCore.coreY2,
     active: true
   };
 
   // Back zone: centered on idealRearCenterY
+  const backY1 = Math.max(midZone.y2, idealRearCenterY - halfBandM);
+  const backY2 = Math.min(rearWallInner, idealRearCenterY + halfBandM);
+  const backCore = shrinkSpan(backY1, backY2);
+  
   const backZone = {
     x1: x1Overhead,
     x2: x2Overhead,
-    y1: Math.max(midZone.y2, idealRearCenterY - halfBandM),
-    y2: Math.min(rearWallInner, idealRearCenterY + halfBandM),
+    y1: backY1,
+    y2: backY2,
+    coreY1: backCore.coreY1,
+    coreY2: backCore.coreY2,
     active: true
   };
 
