@@ -845,6 +845,9 @@ function RoomDesignerWithState() {
 
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
   const store = useSpeakerSystemStore();
+  
+  // CRITICAL: Extract placedSpeakers early so it's available for allSeatSplMetrics
+  const placedSpeakers = store.placedSpeakers;
 
   const visualisationRef = useRef(null);
 
@@ -1014,8 +1017,6 @@ function RoomDesignerWithState() {
       getModelDimsM: (model) => getSpeakerModelMeta(model) || { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 },
     });
   }, [_seatingPositions, placedSpeakers, appState?.getEffectiveSplInputs]);
-
-  const placedSpeakers = store.placedSpeakers;
 
   // Compute diagnostic values
   const widthM =
