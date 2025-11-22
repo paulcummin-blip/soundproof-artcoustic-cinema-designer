@@ -3,6 +3,94 @@
 // Section 5.8 and Parameter 9 compliance.
 
 /**
+ * Compute dynamic overhead lateral half-span constrained by seats and L/R speakers.
+ * Returns a symmetric half-span value that keeps overheads outside seats but inside L/R.
+ */
+function computeOverheadHalfSpanX({
+  widthM,
+  placedSpeakers,
+  seatingPositions,
+  getCanonicalRole,
+}) {
+  if (!Number.isFinite(widthM) || widthM <= 0) {
+    return 0;
+  }
+
+  const centerX = widthM / 2;
+
+  // 1) Find FL / FR X positions (if they exist)
+  let flX = null;
+  let frX = null;
+
+  if (Array.isArray(placedSpeakers)) {
+    for (const spk of placedSpeakers) {
+      const canon = getCanonicalRole?.(spk.role) || spk.role;
+      if (canon === "FL" && Number.isFinite(spk?.position?.x)) {
+        flX = spk.position.x;
+      } else if (canon === "FR" && Number.isFinite(spk?.position?.x)) {
+        frX = spk.position.x;
+      }
+    }
+  }
+
+  // Default L/R span if we don't have explicit FL/FR
+  if (!Number.isFinite(flX)) flX = centerX - widthM * 0.25;
+  if (!Number.isFinite(frX)) frX = centerX + widthM * 0.25;
+
+  const lcrHalfSpan = Math.max(
+    0,
+    Math.min(centerX - flX, frX - centerX)
+  );
+
+  // 2) Find widest seat X position
+  let seatMinX = centerX;
+  let seatMaxX = centerX;
+
+  if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
+    for (const seat of seatingPositions) {
+      const x = Number(seat?.x ?? seat?.position?.x);
+      if (!Number.isFinite(x)) continue;
+      if (x < seatMinX) seatMinX = x;
+      if (x > seatMaxX) seatMaxX = x;
+    }
+  } else {
+    // Fallback: assume a central seating block
+    seatMinX = centerX - widthM * 0.15;
+    seatMaxX = centerX + widthM * 0.15;
+  }
+
+  const seatHalfSpan = Math.max(
+    centerX - seatMinX,
+    seatMaxX - centerX
+  );
+
+  // 3) Apply margins and clamping
+  const SEAT_MARGIN_M = 0.15;  // seats should be comfortably inside
+  const LCR_CLEAR_M   = 0.05;  // stay just inside L/R
+
+  let targetHalfSpan = seatHalfSpan + SEAT_MARGIN_M;
+
+  // Don't go inside the seating block
+  const minHalfSpan = seatHalfSpan;
+  // Don't go outside L/R
+  const maxHalfSpan = Math.max(
+    0,
+    lcrHalfSpan - LCR_CLEAR_M
+  );
+
+  targetHalfSpan = Math.max(minHalfSpan, targetHalfSpan);
+  if (Number.isFinite(maxHalfSpan) && maxHalfSpan > 0) {
+    targetHalfSpan = Math.min(targetHalfSpan, maxHalfSpan);
+  }
+
+  // Final safety clamp inside the room
+  const MAX_ALLOWED = Math.max(0, centerX - 0.1);
+  targetHalfSpan = Math.min(targetHalfSpan, MAX_ALLOWED);
+
+  return Math.max(0, targetHalfSpan);
+}
+
+/**
  * Compute listening area bounds relative to seating positions and MLP.
  * Returns the front/back boundaries of the listening area plus overhead X-lines.
  * 
@@ -292,21 +380,21 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   const halfSpanOverhead = earToCeilingM * Math.tan(commonAzTargetRad);
 
   // NEW: constrain using seats + L/R speakers
-  const { centerX, maxHalfSpan } = computeOverheadLateralBounds({
+  const halfSpanX = computeOverheadHalfSpanX({
     widthM,
-    seatingPositions,
     placedSpeakers,
+    seatingPositions,
     getCanonicalRole,
   });
 
-  // Don't let corridors exceed what seats+L/R allow
-  const clampedFront = Math.min(halfSpanOverhead, maxHalfSpan);
-  const clampedMid = Math.min(halfSpanOverhead, maxHalfSpan);
-  const clampedRear = Math.min(halfSpanOverhead, maxHalfSpan);
+  // Take the minimum of angle-based and seat/LCR-based constraints
+  const clampedHalfSpan = Math.min(halfSpanOverhead, halfSpanX);
 
-  // Apply to zones
-  const x1Overhead = Math.max(0, centerX - clampedFront);
-  const x2Overhead = Math.min(widthM, centerX + clampedFront);
+  const roomCenterX = widthM / 2;
+
+  // Apply symmetric bounds to all zones
+  const x1Overhead = Math.max(0, roomCenterX - clampedHalfSpan);
+  const x2Overhead = Math.min(widthM, roomCenterX + clampedHalfSpan);
 
   // Band thickness (±0.5m around center)
   const halfBandM = 0.5;
