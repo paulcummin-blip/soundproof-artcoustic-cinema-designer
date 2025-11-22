@@ -1095,8 +1095,8 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
 
       <Label htmlFor="lcr-model" className="text-[#3E4349] font-medium">LCR Model</Label>
       <Select value={lcrModel || undefined} onValueChange={onChooseModel} disabled={disabled}>
-        <SelectTrigger id="lcr-model" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
-          <SelectValue placeholder="Select LCR model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
+        <SelectTrigger id="lcr-model" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none" style={{ color: "#213428" }}>
+          <SelectValue placeholder="Select LCR model" className="text-2xl font-semibold" />
         </SelectTrigger>
         <SelectContent className="bg-white border-[#DCDBD6]">
           {lcrModelOptions.map(model => (
@@ -2157,8 +2157,8 @@ function SpeakerPlacementImpl(props) {
           }}
           disabled={disabled}
         >
-          <SelectTrigger id="system-config" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
-            <SelectValue placeholder="Select configuration" className="text-2xl font-semibold" style={{ color: "#213428" }} />
+          <SelectTrigger id="system-config" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none" style={{ color: "#213428" }}>
+            <SelectValue placeholder="Select configuration" className="text-2xl font-semibold" />
           </SelectTrigger>
           <SelectContent>
             {Object.keys(audioConfigurations).map(preset => (

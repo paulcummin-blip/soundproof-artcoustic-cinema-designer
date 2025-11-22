@@ -56,8 +56,8 @@ export default function SurroundsSelector({
           }}
           disabled={disabled}
         >
-          <SelectTrigger className="w-full bg-white border-[#DCDBD6] text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-            <SelectValue placeholder="Select surround model..." className="text-2xl font-semibold" style={{ color: "#213428" }} />
+          <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]" style={{ color: "#213428" }}>
+            <SelectValue placeholder="Select surround model..." className="text-2xl font-semibold" />
           </SelectTrigger>
           <SelectContent className="bg-white border-[#DCDBD6]">
             {choices.map((choice) => (

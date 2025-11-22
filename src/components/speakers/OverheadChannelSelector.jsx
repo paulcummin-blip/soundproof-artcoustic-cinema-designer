@@ -55,8 +55,8 @@ export default function OverheadChannelSelector({
           onValueChange={(val) => onGlobalModelChange(val === 'OFF' ? null : val)}
           disabled={disabled}
         >
-          <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select overhead model..." className="text-2xl font-semibold" style={{ color: "#213428" }} />
+          <SelectTrigger className="w-full" style={{ color: "#213428" }}>
+            <SelectValue placeholder="Select overhead model..." className="text-2xl font-semibold" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="OFF" style={{ color: "#213428" }}>OFF — (no overheads active)</SelectItem>
