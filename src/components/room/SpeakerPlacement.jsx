@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } from 'react';
@@ -27,6 +26,9 @@ import AmplifierPowerSelector from '@/components/spl/AmplifierPowerSelector';
 import EqHeadroomSelector from '@/components/spl/EqHeadroomSelector';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
 import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRoleMap";
+import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
+import SurroundSplStrip from '@/components/speakers/SurroundSplStrip';
+import OverheadSplStrip from '@/components/speakers/OverheadSplStrip';
 
 const P12_THRESHOLDS = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P13_THRESHOLDS = { L1: 99, L2: 102, L3: 105, L4: 108 };
@@ -1033,8 +1035,8 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
   });
 }
 
-function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled }) {
-  const { speakerSystem, setScreen, splConfig, updateGlobalSpl } = useAppState();
+function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics }) {
+  const { speakerSystem, setScreen, splConfig, updateGlobalSpl, seatingPositions } = useAppState();
   const { LCR: lcrModelOptions } = getModelsByCategoryOrdered();
 
   const LCR_CANONICAL_ROLES = useMemo(() => new Set(["FL", "FC", "FR"]), []);
@@ -1125,9 +1127,9 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         {lcrRoles.map((role) => (
           <LcrSplCard
             key={role}
-            speaker={getByRole(role)}
-            mlpPoint={mlpPoint}
-            disabled={disabled}
+            role={role}
+            label={role === 'FL' ? 'Left' : role === 'FC' ? 'Center' : 'Right'}
+            allSeatSplMetrics={allSeatSplMetrics}
           />
         ))}
       </div>
@@ -1552,6 +1554,22 @@ function SpeakerPlacementImpl(props) {
     const major = Number(String(effectivePreset).split(".")[0]) || 5;
     return major >= 7;
   }, [effectivePreset]);
+
+  // NEW: Compute centralized SPL data for all seats
+  const allSeatSplMetrics = useMemo(() => {
+    return computeAllSeatSplMetrics({
+      seats: seatingPositions || [],
+      placedSpeakers,
+      getCanonicalRole,
+      getEffectiveSplInputs: app?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
+      getModelDimsM,
+    });
+  }, [seatingPositions, placedSpeakers, app?.getEffectiveSplInputs, getModelDimsM]);
+
+  // NEW: Get MLP seat for SPL displays
+  const mlpSeat = useMemo(() => {
+    return getMlpSeat(seatingPositions || []);
+  }, [seatingPositions]);
 
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
@@ -2193,6 +2211,7 @@ function SpeakerPlacementImpl(props) {
           lcrAngleDeg={lcrAngleDeg}
           mlpPoint={mlpPoint}
           disabled={disabled}
+          allSeatSplMetrics={allSeatSplMetrics}
         />
       </CollapsiblePanel>
 
@@ -2237,6 +2256,15 @@ function SpeakerPlacementImpl(props) {
           effectivePreset={effectivePreset} 
           useWides={useWides}
         />
+
+        {/* NEW: Surround SPL @ MLP strip */}
+        <div className="mt-4">
+          <SurroundSplStrip
+            allSeatSplMetrics={allSeatSplMetrics}
+            mlpSeat={mlpSeat}
+            dolbyLayout={effectivePreset}
+          />
+        </div>
       </CollapsiblePanel>
 
       {overheadCount > 0 && (
@@ -2259,6 +2287,15 @@ function SpeakerPlacementImpl(props) {
               onUseRearGlobalChange={setUseRearGlobal}
               disabled={disabled}
             />
+
+            {/* NEW: Overhead SPL @ MLP strip */}
+            <div className="mt-4">
+              <OverheadSplStrip
+                allSeatSplMetrics={allSeatSplMetrics}
+                mlpSeat={mlpSeat}
+                dolbyLayout={effectivePreset}
+              />
+            </div>
           </div>
         </CollapsiblePanel>
       )}
