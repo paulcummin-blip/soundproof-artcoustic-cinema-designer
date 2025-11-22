@@ -3490,15 +3490,12 @@ useEffect(() => {
     // Guard: no speakers array
     if (!Array.isArray(placedSpeakers)) return null;
 
-    // Select overhead speakers from placedSpeakers
+    // Select overhead speakers from placedSpeakers (no position check here)
     const overheadSpeakers = placedSpeakers.filter((speaker) => {
       const canonical = getCanonicalRole?.(speaker.role) || speaker.role;
       if (typeof canonical !== 'string') return false;
       // Any canonical role that starts with 'T' is an overhead (TFL/TFR/TML/TMR/TBL/TBR/TL/TR)
-      if (!canonical.startsWith('T')) return false;
-      // Must have valid position
-      const pos = speaker.position || {};
-      return Number.isFinite(pos.x) && Number.isFinite(pos.y);
+      return canonical.startsWith('T');
     });
 
     // No overhead speakers to render
@@ -3507,24 +3504,26 @@ useEffect(() => {
     // Render one icon per overhead speaker using SpeakerIcon
     return overheadSpeakers.map((speaker) => {
       const { id, role, model, position } = speaker;
-      if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+      const canonicalRole = getCanonicalRole?.(role) || role;
+
+      // Determine which zone position this role belongs to (front/mid/rear)
+      let band = null;
+      if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
+        band = 'front';
+      } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
+        band = 'mid';
+      } else if (['TBL', 'TBR', 'TBC'].includes(canonicalRole)) {
+        band = 'rear';
+      }
+
+      // If we don't know the band, skip it quietly
+      if (!band) {
         return null;
       }
 
-      // Determine which zone position this role belongs to (front/mid/rear)
-      const canonicalRole = getCanonicalRole?.(role) || role;
-      let zonePosition = null;
-      if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
-        zonePosition = 'front';
-      } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
-        zonePosition = 'mid';
-      } else if (['TBL', 'TBR', 'TBC'].includes(canonicalRole)) {
-        zonePosition = 'rear';
-      }
-
       // Resolve the actual model using the overhead position helper
-      const resolvedModel = zonePosition && getOverheadModelForPosition
-        ? getOverheadModelForPosition(zonePosition)
+      const resolvedModel = band && getOverheadModelForPosition
+        ? getOverheadModelForPosition(band)
         : model;
 
       // Skip if no model selected
@@ -3532,8 +3531,54 @@ useEffect(() => {
         return null;
       }
 
-      // IMPORTANT: build an effective speaker that includes the resolved model
-      const effectiveSpeaker = { ...speaker, model: resolvedModel };
+      // --- NEW: derive a safe effective position for drawing ---
+      let effX = position?.x;
+      let effY = position?.y;
+
+      const zones = overheadZones;
+      const bandZone =
+        zones && zones.status === 'ok'
+          ? (band === 'front'
+              ? zones.frontZone
+              : band === 'mid'
+              ? zones.midZone
+              : zones.backZone)
+          : null;
+
+      if (!Number.isFinite(effX) || !Number.isFinite(effY)) {
+        if (bandZone) {
+          // Centre of the band by default
+          const bandCenterY = (bandZone.y1 + bandZone.y2) / 2;
+          const roomCenterX = widthM / 2;
+
+          // Simple lateral offset for L/R symmetry
+          const lateralOffset = roomCenterX * 0.25;
+
+          if (canonicalRole.endsWith('L')) {
+            effX = roomCenterX - lateralOffset;
+          } else if (canonicalRole.endsWith('R')) {
+            effX = roomCenterX + lateralOffset;
+          } else {
+            // TFC / TMC / TBC etc
+            effX = roomCenterX;
+          }
+
+          effY = bandCenterY;
+        } else {
+          // Absolute last resort – drop it to avoid NaNs
+          return null;
+        }
+      }
+
+      const effectiveSpeaker = {
+        ...speaker,
+        model: resolvedModel,
+        position: {
+          ...(speaker.position || {}),
+          x: effX,
+          y: effY,
+        },
+      };
 
       const isOverhead =
         typeof canonicalRole === "string" && canonicalRole.startsWith("T");
@@ -3548,8 +3593,8 @@ useEffect(() => {
         <SpeakerIcon
           key={id}
           speaker={effectiveSpeaker}
-          canvasX={roomRect.x + (position.x * scale)}
-          canvasY_raw={roomRect.y + (position.y * scale)}
+          canvasX={roomRect.x + (effX * scale)}
+          canvasY_raw={roomRect.y + (effY * scale)}
           yaw={speaker.yaw || 0}
           scale={scale}
           speakerMouseDownHandler={speakerMouseDownHandler}
