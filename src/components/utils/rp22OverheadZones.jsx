@@ -139,14 +139,17 @@ export function getListeningAreaBounds(
 /**
  * Compute RP22-compliant overhead zone extents.
  * Returns three zones: front (Upper Front), mid (Top Middle), back (Upper Back).
- * X-width depends solely on ear-to-ceiling height and target azimuth angles.
+ * X-width constrained by seats and front L/R speakers.
  * Zones are height-aware: positions respond to ceiling height and ear height.
  * 
  * @param {Object} bounds - Output from getListeningAreaBounds
  * @param {Object} roomDims - {widthM, lengthM, heightM}
+ * @param {Array} seatingPositions - Array of seat objects
+ * @param {Array} placedSpeakers - Array of speaker objects
+ * @param {Function} getCanonicalRole - Role normalization function
  * @returns {Object} {frontZone, midZone, backZone} each with {x1, x2, y1, y2, active}
  */
-export function computeRp22OverheadZoneExtents(bounds, roomDims) {
+export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPositions, placedSpeakers, getCanonicalRole) {
   if (!bounds || bounds.active === false) {
     return {
       frontZone: { x1: 0, x2: 0, y1: 0, y2: 0, active: false },
@@ -195,9 +198,63 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   idealRearCenterY = mlpY_m + symmetricOffset;
 
   // ────────────────────────────────────────────────────────────────────────────
-  // X-WIDTH CALCULATION: Single common lateral band for all overhead rows
+  // X-WIDTH CALCULATION: constrained by seats + L/R speakers
   // ────────────────────────────────────────────────────────────────────────────
   
+  // Helper to compute lateral bounds
+  function computeOverheadLateralBounds({
+    widthM,
+    seatingPositions,
+    placedSpeakers,
+    getCanonicalRole,
+  }) {
+    const centerX = widthM / 2;
+
+    // 1) Seat span (all rows, all seats)
+    const seatXs = (seatingPositions || [])
+      .map(seat => Number(seat?.x ?? seat?.position?.x))
+      .filter(x => Number.isFinite(x));
+
+    // If no seats, fall back to a narrow strip around centre
+    const seatMinX = seatXs.length ? Math.min(...seatXs) : centerX - 0.4;
+    const seatMaxX = seatXs.length ? Math.max(...seatXs) : centerX + 0.4;
+
+    // Small safety offset so overheads are just outside the widest seats
+    const SEAT_MARGIN_M = 0.15;
+    const innerLeft = Math.max(0, seatMinX - SEAT_MARGIN_M);
+    const innerRight = Math.min(widthM, seatMaxX + SEAT_MARGIN_M);
+
+    // 2) Front L / R loudspeakers
+    const fl = (placedSpeakers || []).find(
+      s => getCanonicalRole(s.role) === "FL"
+    );
+    const fr = (placedSpeakers || []).find(
+      s => getCanonicalRole(s.role) === "FR"
+    );
+
+    const flX = Number(fl?.position?.x);
+    const frX = Number(fr?.position?.x);
+
+    // If missing, use room edges as outer limits
+    const outerLeft = Number.isFinite(flX) ? flX : 0;
+    const outerRight = Number.isFinite(frX) ? frX : widthM;
+
+    // Combine: corridors must be outside seats, but inside L/R span
+    const minX = Math.min(innerLeft, centerX);
+    const maxX = Math.max(innerRight, centerX);
+
+    const clampedMinX = Math.max(outerLeft, minX);
+    const clampedMaxX = Math.min(outerRight, maxX);
+
+    return {
+      centerX,
+      maxHalfSpan: Math.max(
+        0,
+        Math.min(centerX - clampedMinX, clampedMaxX - centerX)
+      ),
+    };
+  }
+
   // RP22 target azimuth ranges for overhead positions
   const FRONT_AZ_MIN = 20;  // degrees
   const FRONT_AZ_MAX = 45;
@@ -234,11 +291,22 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   // Lateral half-span at ceiling, using ear-to-ceiling as the "radius"
   const halfSpanOverhead = earToCeilingM * Math.tan(commonAzTargetRad);
 
-  const roomCenterX = widthM / 2;
+  // NEW: constrain using seats + L/R speakers
+  const { centerX, maxHalfSpan } = computeOverheadLateralBounds({
+    widthM,
+    seatingPositions,
+    placedSpeakers,
+    getCanonicalRole,
+  });
 
-  // Apply same X-bounds to all three bands (no Y-based scaling)
-  const x1Overhead = Math.max(0, roomCenterX - halfSpanOverhead);
-  const x2Overhead = Math.min(widthM, roomCenterX + halfSpanOverhead);
+  // Don't let corridors exceed what seats+L/R allow
+  const clampedFront = Math.min(halfSpanOverhead, maxHalfSpan);
+  const clampedMid = Math.min(halfSpanOverhead, maxHalfSpan);
+  const clampedRear = Math.min(halfSpanOverhead, maxHalfSpan);
+
+  // Apply to zones
+  const x1Overhead = Math.max(0, centerX - clampedFront);
+  const x2Overhead = Math.min(widthM, centerX + clampedFront);
 
   // Band thickness (±0.5m around center)
   const halfBandM = 0.5;
