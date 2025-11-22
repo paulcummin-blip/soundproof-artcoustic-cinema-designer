@@ -74,35 +74,28 @@ function computeOverheadHalfSpanX({
   // ─────────────────────────────────────────────
   // 3) Apply "between seats and L/R" rule
   // ─────────────────────────────────────────────
-  const SEAT_MARGIN_M = 0.10;  // keep overheads clearly outside seats
-  const LCR_MARGIN_M  = 0.05;  // don't sit exactly on top of L/R
+  const SEAT_MARGIN_M = 0.15;  // keep overheads clearly outside seats
+  const LCR_CLEAR_M   = 0.05;  // stay just inside L/R
 
   // Minimum half-span: just outside the widest seats
   const minHalfSpan = seatHalfSpan + SEAT_MARGIN_M;
 
   // Maximum half-span: just inside the L/R speakers
-  const maxHalfSpan = Math.max(
-    0,
-    lcrHalfSpan - LCR_MARGIN_M
-  );
+  const maxHalfSpan = Math.max(0, lcrHalfSpan - LCR_CLEAR_M);
 
-  // If L/R are actually *inside* the seats (weird but possible),
-  // just bail out to whatever we can.
-  if (maxHalfSpan <= 0) {
-    return Math.max(0, minHalfSpan);
+  // Start with the maximum (L/R constraint)
+  let halfSpan = maxHalfSpan;
+  
+  // But never narrower than the seat minimum
+  if (Number.isFinite(minHalfSpan)) {
+    halfSpan = Math.max(halfSpan, minHalfSpan);
   }
 
-  // Start by aiming for the middle of the allowed corridor
-  let targetHalfSpan = (minHalfSpan + maxHalfSpan) / 2;
+  // Clamp to room centre
+  const maxAllowed = Math.max(0, centerX - 0.1);
+  halfSpan = Math.min(halfSpan, maxAllowed);
 
-  // Clamp into [min, max]
-  targetHalfSpan = Math.max(minHalfSpan, Math.min(targetHalfSpan, maxHalfSpan));
-
-  // Final safety clamp to never leave the room entirely
-  const MAX_ALLOWED = Math.max(0, centerX - 0.1);
-  targetHalfSpan = Math.min(targetHalfSpan, MAX_ALLOWED);
-
-  return Math.max(0, targetHalfSpan);
+  return Math.max(0, halfSpan);
 }
 
 /**
