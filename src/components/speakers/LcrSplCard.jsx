@@ -71,38 +71,19 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics }) {
 
   return (
     <Card className="bg-white">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Volume2 className="w-4 h-4" style={{ color: '#625143' }} />
+      <CardHeader className="pb-2 pt-3 px-3">
+        <CardTitle className="text-xs font-medium flex items-center gap-1">
+          <Volume2 className="w-3 h-3" style={{ color: '#625143' }} />
           {label} SPL @ MLP
         </CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="space-y-2">
-          <div className="text-2xl font-bold" style={{ color: '#1B1A1A' }}>
-            {Number.isFinite(finalSplDb) ? `${finalSplDb.toFixed(1)} dB` : '—'}
-          </div>
-          
-          <div className="text-xs" style={{ color: '#625143' }}>
-            {speaker?.position && Number.isFinite(speaker.position.x) ? (
-              <>
-                <div>Model: {modelLabel || 'Unknown'}</div>
-                {Number.isFinite(sensitivity) && (
-                  <div>Sensitivity: {sensitivity.toFixed(1)} dB @ 1W/1m</div>
-                )}
-                <div>Power: {powerW}W</div>
-                {eqHeadroomDb > 0 && (
-                  <div>EQ Headroom: -{eqHeadroomDb} dB</div>
-                )}
-                {Number.isFinite(distanceM) && (
-                  <div>Distance to MLP: {distanceM.toFixed(2)}m</div>
-                )}
-              </>
-            ) : (
-              <div>Not placed</div>
-            )}
-          </div>
+      <CardContent className="px-3 pb-3">
+        <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
+          {Number.isFinite(finalSplDb) ? `${finalSplDb.toFixed(1)} dB` : '—'}
         </div>
+        {!speaker?.position && (
+          <div className="text-xs text-[#625143] mt-1">Not placed</div>
+        )}
       </CardContent>
     </Card>
   );
