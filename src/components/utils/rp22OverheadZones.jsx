@@ -388,7 +388,7 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   });
 
   // Take the minimum of angle-based and seat/LCR-based constraints
-  const clampedHalfSpan = Math.min(halfSpanOverhead, halfSpanX);
+  const clampedHalfSpan = halfSpanX;
 
   const roomCenterX = widthM / 2;
 
