@@ -106,6 +106,9 @@ import {
   azimuthDegFromSeat
 } from "@/components/utils/seatMetrics";
 
+// NEW: Import centralized SPL engine
+import { computeAllSeatSplMetrics, getSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
+
 
 import {
   SIDE_ALLOW_OVERHANG,
@@ -2243,6 +2246,17 @@ React.useEffect(() => {
     return hoveredSeat;
   }, [hudPinnedSeatId, hoveredSeat, seatingPositions]);
 
+  // NEW: Centralized SPL calculation for all seats (single source of truth)
+  const allSeatSplMetrics = useMemo(() => {
+    return computeAllSeatSplMetrics({
+      seats: seatingPositions,
+      placedSpeakers,
+      getCanonicalRole,
+      getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
+      getModelDimsM,
+    });
+  }, [seatingPositions, placedSpeakers, getCanonicalRole, appState?.getEffectiveSplInputs, getModelDimsM]);
+
 
   // Build tooltip data with RP22 per-seat metrics
   const tooltipData = useMemo(() => {
@@ -2322,33 +2336,17 @@ React.useEffect(() => {
       p20: { valueDeg: null, level: '—', formatted: '—' },
     };
 
-    // Initialize SPL @ Seat section
+    // NEW: Use centralized SPL calculation (single source of truth)
+    const seatSplData = getSeatSplMetrics(allSeatSplMetrics, effectiveHoveredSeat.id);
+    
     data.splAtSeat = {
-      lcr: {},
-      surrounds: {},
-      overheads: {}
+      lcr: seatSplData?.screen || {},
+      surrounds: seatSplData?.surrounds || {},
+      overheads: seatSplData?.uppers || {},
     };
 
     // Helper: check if speaker has valid position
     const hasPos = s => s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
-
-    // Helper for low-level SPL calculation
-    const _calculateSplFromComponentsForTooltip = (speakerPosition, seatPosition, sensitivityDb, powerW) => {
-      if (!Number.isFinite(sensitivityDb) || !Number.isFinite(powerW) || powerW <= 0) return null;
-      if (!speakerPosition || !Number.isFinite(speakerPosition.x) || !Number.isFinite(speakerPosition.y)) return null;
-      if (!seatPosition || !Number.isFinite(seatPosition.x) || !Number.isFinite(seatPosition.y)) return null;
-
-      const dx = speakerPosition.x - seatPosition.x;
-      const dy = speakerPosition.y - seatPosition.y;
-      const dz = (speakerPosition.z || 1.2) - (seatPosition.z || 1.2); 
-
-      const distance = Math.max(0.10, Math.hypot(dx, dy, dz)); // 10cm floor
-      
-      const spl = sensitivityDb + 10 * Math.log10(powerW) - 20 * Math.log10(distance);
-      
-      return Number.isFinite(spl) ? spl : null;
-    };
-
 
     // Role sets
     const screenRoles = new Set(['FL','FC','FR']);
@@ -2375,33 +2373,6 @@ React.useEffect(() => {
     };
 
     const seatPos = { x: seatX, y: seatY, z: seatZ };
-
-    // --- Compute SPL @ Seat for all categories (using appState for power) ---
-    const processSpeakersForSplAtSeat = (speakerArray, categoryKey) => {
-      for (const spk of speakerArray) {
-        const role = getCanonicalRole(spk.role);
-        const speakerMeta = getModelDimsM(spk.model);
-        const effectiveSplInputs = appState.getEffectiveSplInputs(spk.role); // Get power from appState
-
-        const spl = _calculateSplFromComponentsForTooltip(
-          spk.position,
-          seatPos,
-          effectiveSplInputs?.sensitivity_dB_1w1m || effectiveSplInputs?.sensitivity || speakerMeta?.sensitivity_dB_1w1m || speakerMeta?.sensitivity || 87, // Use effective sensitivity or fallback
-          effectiveSplInputs?.powerW || 100 // Fallback to 100W if appState power is missing
-        );
-
-        if (Number.isFinite(spl)) {
-          data.splAtSeat[categoryKey][role] = {
-            value: spl,
-            formatted: `${spl.toFixed(1)} dB`
-          };
-        }
-      }
-    };
-
-    processSpeakersForSplAtSeat(placedLCR, 'lcr');
-    processSpeakersForSplAtSeat(placedSur, 'surrounds');
-    processSpeakersForSplAtSeat(placedOH, 'overheads');
 
     // --- Compute P1: Nearest boundary distance ---
     if (Number.isFinite(seatX) && Number.isFinite(seatY)) {
@@ -2434,36 +2405,14 @@ React.useEffect(() => {
     }
 
     // --- Compute P4: Max SPL difference between screen speakers ---
-    if (placedLCR.length >= 2) {
-      const lcrSpls = [];
+    if (placedLCR.length >= 2 && seatSplData?.screen) {
+      const lcrSplValues = Object.values(seatSplData.screen)
+        .map(s => s.value)
+        .filter(Number.isFinite);
       
-      for (let spk of placedLCR) {
-        const speakerMeta = getModelDimsM(spk.model);
-        const effectiveSplInputs = appState.getEffectiveSplInputs(spk.role);
-        const sensitivity = effectiveSplInputs?.sensitivity_dB_1w1m || effectiveSplInputs?.sensitivity || speakerMeta?.sensitivity_dB_1w1m || speakerMeta?.sensitivity || 87;
-        const powerW = effectiveSplInputs?.powerW || 100;
-
-        if (!Number.isFinite(sensitivity)) continue;
-        
-        const spl = _calculateSplFromComponentsForTooltip(spk.position, seatPos, sensitivity, powerW);
-        
-        if (Number.isFinite(spl)) {
-          lcrSpls.push({ role: getCanonicalRole(spk.role), spl });
-        }
-      }
+      const valueDb = maxPairwiseDelta(lcrSplValues);
       
-      if (lcrSpls.length >= 2) {
-        let maxDelta = 0;
-        
-        for (let i = 0; i < lcrSpls.length; i++) {
-          for (let j = i + 1; j < lcrSpls.length; j++) {
-            const delta = Math.abs(lcrSpls[i].spl - lcrSpls[j].spl);
-            if (delta > maxDelta) maxDelta = delta;
-          }
-        }
-        
-        const valueDb = maxDelta;
-        
+      if (Number.isFinite(valueDb)) {
         data.rp22.p4 = {
           valueDb,
           level: rp22LevelForP4(valueDb),
@@ -2508,24 +2457,12 @@ React.useEffect(() => {
     data.rp22.p5 = { valueDeg: p5Val, level: p5Level, formatted: p5Formatted };
 
     // --- P6: Surround SPL delta (requires ≥2 surrounds) ---
-    if (placedSur.length >= 2) {
-      const rp22SplValues = [];
-      for (const spk of placedSur) {
-        const speakerMeta = getModelDimsM(spk.model);
-        const effectiveSplInputs = appState.getEffectiveSplInputs(spk.role);
-        const sensitivity = effectiveSplInputs?.sensitivity_dB_1w1m || effectiveSplInputs?.sensitivity || speakerMeta?.sensitivity_dB_1w1m || speakerMeta?.sensitivity || 87;
-        const powerW = effectiveSplInputs?.powerW || 100;
+    if (placedSur.length >= 2 && seatSplData?.surrounds) {
+      const surSplValues = Object.values(seatSplData.surrounds)
+        .map(s => s.value)
+        .filter(Number.isFinite);
 
-        const spl = _calculateSplFromComponentsForTooltip(
-          spk.position,
-          seatPos,
-          sensitivity,
-          powerW
-        );
-        if (Number.isFinite(spl)) rp22SplValues.push(spl);
-      }
-
-      const p6ValueDb = maxPairwiseDelta(rp22SplValues);
+      const p6ValueDb = maxPairwiseDelta(surSplValues);
       if (Number.isFinite(p6ValueDb)) {
         let level = '—';
         if (p6ValueDb <= 2) level = 'L4';
@@ -2558,24 +2495,12 @@ React.useEffect(() => {
     }
     
     // --- P10: Overhead SPL delta (requires ≥2 overheads) ---
-    if (placedOH.length >= 2) {
-      const rp22SplValues = [];
-      for (const spk of placedOH) {
-        const speakerMeta = getModelDimsM(spk.model);
-        const effectiveSplInputs = appState.getEffectiveSplInputs(spk.role);
-        const sensitivity = effectiveSplInputs?.sensitivity_dB_1w1m || effectiveSplInputs?.sensitivity || speakerMeta?.sensitivity_dB_1w1m || speakerMeta?.sensitivity || 87;
-        const powerW = effectiveSplInputs?.powerW || 100;
+    if (placedOH.length >= 2 && seatSplData?.uppers) {
+      const ohSplValues = Object.values(seatSplData.uppers)
+        .map(s => s.value)
+        .filter(Number.isFinite);
 
-        const spl = _calculateSplFromComponentsForTooltip(
-          spk.position,
-          seatPos,
-          sensitivity,
-          powerW
-        );
-        if (Number.isFinite(spl)) rp22SplValues.push(spl);
-      }
-
-      const p10ValueDb = maxPairwiseDelta(rp22SplValues);
+      const p10ValueDb = maxPairwiseDelta(ohSplValues);
       if (Number.isFinite(p10ValueDb)) {
         let level = '—';
         if (p10ValueDb <= 2) level = 'L4';
@@ -2643,18 +2568,19 @@ React.useEffect(() => {
     return data;
   }, [
     effectiveHoveredSeat,
-    placedSpeakers, // Added for P5 and general SPL calculations
-    widthM, // Use new widthM
-    lengthM, // Use new lengthM
-    screenFrontPlaneM, // Dependency for screenFrontPlaneM
+    placedSpeakers,
+    widthM,
+    lengthM,
+    screenFrontPlaneM,
     mlp,
     screen?.visibleWidthInches,
-    seatingPositions, // Added for P1 convention detection and P20
-    getModelDimsM, // Added for SPL calculations
-    screen, // Added for P16/P17 to pass screen object
-    appState, // Added for SPL calculations
-    heightM, // Use new heightM
-    getCanonicalRole
+    seatingPositions,
+    getModelDimsM,
+    screen,
+    appState,
+    heightM,
+    getCanonicalRole,
+    allSeatSplMetrics, // NEW: SPL data dependency
   ]);
 
 // 1) Auto-position HUD near the currently hovered/pinned seat
