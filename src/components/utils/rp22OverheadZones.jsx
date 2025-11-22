@@ -2,10 +2,13 @@
 // RP22-compliant overhead zone calculations for Dolby upper speakers.
 // Section 5.8 and Parameter 9 compliance.
 
-// Simple, RP22-style lateral rule:
-//  - overheads may never be NARROWER than the widest seat span
-//  - overheads may never be WIDER than the FL/FR span
-//  - corridor is symmetric around the room centre
+/**
+ * Compute dynamic overhead lateral half-span constrained by seats and L/R speakers.
+ * Rule:
+ *  - Never NARROWER than the widest seat (plus a small margin)
+ *  - Never WIDER than the L/R speakers (minus a small margin)
+ *  - Symmetric around the room centre line
+ */
 function computeOverheadHalfSpanX({
   widthM,
   placedSpeakers,
@@ -18,35 +21,35 @@ function computeOverheadHalfSpanX({
 
   const centerX = widthM / 2;
 
-  // ─────────────────────────────────────
-  // 1) Front L/R speaker span (outer limit)
-  // ─────────────────────────────────────
+  // ─────────────────────────────────────────────
+  // 1) L/R speaker span
+  // ─────────────────────────────────────────────
   let flX = null;
   let frX = null;
 
   if (Array.isArray(placedSpeakers)) {
     for (const spk of placedSpeakers) {
       const canon = getCanonicalRole?.(spk.role) || spk.role;
-      const x = spk?.position?.x;
-      if (!Number.isFinite(x)) continue;
+      const px = spk?.position?.x;
+      if (!Number.isFinite(px)) continue;
 
-      if (canon === "FL") flX = x;
-      if (canon === "FR") frX = x;
+      if (canon === "FL") flX = px;
+      if (canon === "FR") frX = px;
     }
   }
 
-  // If we don't have explicit FL/FR, fall back to a safe default span
+  // If FL/FR missing, fall back to a sensible default span
   if (!Number.isFinite(flX)) flX = centerX - widthM * 0.25;
   if (!Number.isFinite(frX)) frX = centerX + widthM * 0.25;
 
-  // Distance from centre out to each L/R speaker
-  const lHalf = Math.max(0, centerX - flX);
-  const rHalf = Math.max(0, frX - centerX);
-  const lcrHalfSpan = Math.max(lHalf, rHalf); // use the wider side
+  const lcrHalfSpan = Math.max(
+    0,
+    Math.min(centerX - flX, frX - centerX)
+  );
 
-  // ─────────────────────────────────────
-  // 2) Seat span (inner limit)
-  // ─────────────────────────────────────
+  // ─────────────────────────────────────────────
+  // 2) Widest seat span
+  // ─────────────────────────────────────────────
   let seatMinX = centerX;
   let seatMaxX = centerX;
 
@@ -58,7 +61,7 @@ function computeOverheadHalfSpanX({
       if (x > seatMaxX) seatMaxX = x;
     }
   } else {
-    // Fallback: small central seating block
+    // Fallback: central seating block if we have no explicit seats
     seatMinX = centerX - widthM * 0.15;
     seatMaxX = centerX + widthM * 0.15;
   }
@@ -68,19 +71,38 @@ function computeOverheadHalfSpanX({
     seatMaxX - centerX
   );
 
-  // ─────────────────────────────────────
-  // 3) Final half-span:
-  //    - at least as wide as the seats
-  //    - no wider than the L/R speakers
-  // ─────────────────────────────────────
-  const MAX_ALLOWED = Math.max(0, centerX - 0.05); // tiny safety margin to wall
+  // ─────────────────────────────────────────────
+  // 3) Apply "between seats and L/R" rule
+  // ─────────────────────────────────────────────
+  const SEAT_MARGIN_M = 0.10;  // keep overheads clearly outside seats
+  const LCR_MARGIN_M  = 0.05;  // don't sit exactly on top of L/R
 
-  let halfSpan = lcrHalfSpan;
-  halfSpan = Math.max(seatHalfSpan, halfSpan);      // not narrower than seats
-  halfSpan = Math.min(halfSpan, lcrHalfSpan);       // never wider than L/R
-  halfSpan = Math.min(halfSpan, MAX_ALLOWED);       // and stay inside room
+  // Minimum half-span: just outside the widest seats
+  const minHalfSpan = seatHalfSpan + SEAT_MARGIN_M;
 
-  return Math.max(0, halfSpan);
+  // Maximum half-span: just inside the L/R speakers
+  const maxHalfSpan = Math.max(
+    0,
+    lcrHalfSpan - LCR_MARGIN_M
+  );
+
+  // If L/R are actually *inside* the seats (weird but possible),
+  // just bail out to whatever we can.
+  if (maxHalfSpan <= 0) {
+    return Math.max(0, minHalfSpan);
+  }
+
+  // Start by aiming for the middle of the allowed corridor
+  let targetHalfSpan = (minHalfSpan + maxHalfSpan) / 2;
+
+  // Clamp into [min, max]
+  targetHalfSpan = Math.max(minHalfSpan, Math.min(targetHalfSpan, maxHalfSpan));
+
+  // Final safety clamp to never leave the room entirely
+  const MAX_ALLOWED = Math.max(0, centerX - 0.1);
+  targetHalfSpan = Math.min(targetHalfSpan, MAX_ALLOWED);
+
+  return Math.max(0, targetHalfSpan);
 }
 
 /**
