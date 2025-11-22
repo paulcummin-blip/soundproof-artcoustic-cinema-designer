@@ -26,8 +26,8 @@ export function useOverheadAutoPlacement({
     // Guard: zones not ready
     if (!overheadZones || overheadZones.status !== 'ok') return;
     
-    // Guard: no speakers
-    if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) return;
+    // Guard: invalid speakers array (allow empty array - we'll create overheads from scratch)
+    if (!Array.isArray(placedSpeakers)) return;
     
     // Guard: no overhead channels
     if (!overheadCount || overheadCount <= 0) return;
