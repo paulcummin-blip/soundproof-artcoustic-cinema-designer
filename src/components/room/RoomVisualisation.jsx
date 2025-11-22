@@ -1983,57 +1983,6 @@ React.useEffect(() => {
     lastInteractionEpoch.current = timeNowMs();
   }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, dolbyLayout]);
 
-  // [B44] Direct drag handler for overhead speakers (T* roles)
-  const handleOverheadDragStart = useCallback(
-    (mouseDownEvent, speakerId) => {
-      if (!svgRef.current || !roomRect) return;
-
-      mouseDownEvent.preventDefault();
-      mouseDownEvent.stopPropagation();
-
-      const spk = byId.get(speakerId);
-      if (!spk) return;
-
-      const canon = getCanonicalRole(spk.role);
-      // Only handle T* overheads here – everything else uses the normal drag pipeline
-      if (typeof canon !== "string" || !canon.startsWith("T")) {
-        return;
-      }
-
-      const svgElement = svgRef.current;
-      const svgBounds = svgElement.getBoundingClientRect();
-
-      // Helper: convert client coords to canvas coords
-      const clientToCanvas = (evt) => {
-        const cx = evt.clientX - svgBounds.left;
-        const cy = evt.clientY - svgBounds.top;
-        return { x: cx, y: cy };
-      };
-
-      // Immediately call handleSpeakerDrag once at the starting point
-      let lastPos = clientToCanvas(mouseDownEvent);
-      handleSpeakerDrag(speakerId, lastPos);
-
-      // Mouse move: update overhead position continuously
-      const onMove = (moveEvent) => {
-        moveEvent.preventDefault();
-        const canvasPos = clientToCanvas(moveEvent);
-        lastPos = canvasPos;
-        handleSpeakerDrag(speakerId, canvasPos);
-      };
-
-      const onUp = (upEvent) => {
-        upEvent.preventDefault();
-        window.removeEventListener("mousemove", onMove);
-        window.removeEventListener("mouseup", onUp);
-      };
-
-      window.addEventListener("mousemove", onMove);
-      window.addEventListener("mouseup", onUp);
-    },
-    [byId, getCanonicalRole, handleSpeakerDrag, roomRect, svgRef]
-  );
-
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
     const { x: roomX, y: roomY } = canvasToRoom(newCanvasPos);
@@ -3374,14 +3323,8 @@ useEffect(() => {
       // IMPORTANT: build an effective speaker that includes the resolved model
       const effectiveSpeaker = { ...speaker, model: resolvedModel };
 
-      const isOverhead =
-        typeof canonicalRole === "string" && canonicalRole.startsWith("T");
-
-      const speakerMouseDownHandler = isOverhead
-        ? (e) => handleOverheadDragStart(e, id)
-        : (isDraggable(effectiveSpeaker)
-            ? (e) => handleMouseDown(e, id, "speaker")
-            : undefined);
+      // Overheads always get a drag handler because they bypass isDraggable checks
+      const speakerMouseDownHandler = (e) => handleMouseDown(e, id, "speaker");
 
       return (
         <SpeakerIcon
@@ -3403,9 +3346,7 @@ useEffect(() => {
     scale,
     roomRect,
     setHoveredSpeaker,
-    handleOverheadDragStart,
-    handleMouseDown,
-    isDraggable
+    handleMouseDown
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
