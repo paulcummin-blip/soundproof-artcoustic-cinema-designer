@@ -404,8 +404,62 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   const x1Overhead = Math.max(0, roomCenterX - clampedHalfSpan);
   const x2Overhead = Math.min(widthM, roomCenterX + clampedHalfSpan);
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // SIDE CORRIDORS: between widest seats and L/R speakers
+  // ────────────────────────────────────────────────────────────────────────────
+
+  // Collect seat X positions (flattened)
+  const seatXs = (seatingPositions || [])
+    .map(seat => Number(seat?.x ?? seat?.position?.x))
+    .filter(x => Number.isFinite(x));
+
+  const centerX = roomCenterX;
+
+  // If we have no seats, fall back to a central seating block
+  let seatMinX = centerX - widthM * 0.15;
+  let seatMaxX = centerX + widthM * 0.15;
+
+  if (seatXs.length > 0) {
+    seatMinX = Math.min(...seatXs);
+    seatMaxX = Math.max(...seatXs);
+  }
+
+  // Find FL / FR X positions
+  const fl = (placedSpeakers || []).find(
+    s => getCanonicalRole?.(s.role) === "FL"
+  );
+  const fr = (placedSpeakers || []).find(
+    s => getCanonicalRole?.(s.role) === "FR"
+  );
+
+  const flX = Number.isFinite(fl?.position?.x) ? fl.position.x : 0;
+  const frX = Number.isFinite(fr?.position?.x) ? fr.position.x : widthM;
+
+  const SEAT_MARGIN_M = 0.15; // keep overheads comfortably outside seats
+  const LCR_MARGIN_M  = 0.05; // keep just inside the L/R speakers
+
+  // Inner edges are just outside the widest seats
+  const innerLeft  = Math.min(centerX, seatMinX - SEAT_MARGIN_M);
+  const innerRight = Math.max(centerX, seatMaxX + SEAT_MARGIN_M);
+
+  // Outer edges are just inside the L/R speakers
+  const outerLeft  = Math.max(0, flX + LCR_MARGIN_M);
+  const outerRight = Math.min(widthM, frX - LCR_MARGIN_M);
+
+  // Final clamping and sanity checks: no inverted corridors
+  const leftCorridor  = outerLeft < innerLeft
+    ? { x1: outerLeft, x2: innerLeft }
+    : null;
+
+  const rightCorridor = innerRight < outerRight
+    ? { x1: innerRight, x2: outerRight }
+    : null;
+
   // Band thickness (±0.5m around center)
   const halfBandM = 0.5;
+
+  const basePieces =
+    [leftCorridor, rightCorridor].filter(Boolean);
 
   // Middle zone: centered on MLP
   const midZone = {
@@ -413,7 +467,9 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
     x2: x2Overhead,
     y1: Math.max(screenWallInner, mlpY_m - halfBandM),
     y2: Math.min(rearWallInner, mlpY_m + halfBandM),
-    active: true
+    active: true,
+    // NEW: side corridors only (no shading over the central seating block)
+    pieces: basePieces,
   };
 
   // Front zone: centered on idealFrontCenterY
@@ -422,7 +478,8 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
     x2: x2Overhead,
     y1: Math.max(screenWallInner, idealFrontCenterY - halfBandM),
     y2: Math.min(midZone.y1, idealFrontCenterY + halfBandM),
-    active: true
+    active: true,
+    pieces: basePieces,
   };
 
   // Back zone: centered on idealRearCenterY
@@ -431,7 +488,8 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
     x2: x2Overhead,
     y1: Math.max(midZone.y2, idealRearCenterY - halfBandM),
     y2: Math.min(rearWallInner, idealRearCenterY + halfBandM),
-    active: true
+    active: true,
+    pieces: basePieces,
   };
 
   // Ensure zones are valid (y2 > y1)
