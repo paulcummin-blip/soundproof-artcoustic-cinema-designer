@@ -56,7 +56,7 @@ export default function OverheadChannelSelector({
           disabled={disabled}
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder="Select overhead model..." />
+            <SelectValue placeholder="Select overhead model..." className="text-2xl font-semibold" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="OFF">OFF — (no overheads active)</SelectItem>
