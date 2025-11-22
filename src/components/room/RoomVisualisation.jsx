@@ -1896,6 +1896,59 @@ React.useEffect(() => {
       // Raw room coords from the mouse
       const rawRoomPos = canvasToRoom(newCanvasPos);
 
+      // Helper: get lateral bounds for a given overhead role at a given Y position
+      const getOverheadLateralBoundsForRole = (role, roomY) => {
+        if (!overheadZones || overheadZones.status !== 'ok') {
+          return null; // no clamping if zones unavailable
+        }
+
+        const { frontZone, midZone, backZone } = overheadZones;
+
+        // Decide which band this Y sits in
+        const band =
+          (frontZone?.active && roomY >= frontZone.y1 && roomY <= frontZone.y2) ? 'front' :
+          (backZone?.active && roomY >= backZone.y1 && roomY <= backZone.y2)   ? 'back'  :
+          'mid';
+
+        const zone = band === 'front' ? frontZone : band === 'back' ? backZone : midZone;
+        if (!zone || !zone.active || !Array.isArray(zone.pieces)) {
+          return null;
+        }
+
+        // Determine if this is a left or right role
+        const isLeft = isLeftRole(role);
+        
+        // pieces[0] is left corridor, pieces[1] is right corridor
+        const piece = isLeft ? zone.pieces[0] : zone.pieces[1];
+        if (!piece || !Number.isFinite(piece.x1) || !Number.isFinite(piece.x2)) {
+          return null;
+        }
+
+        return {
+          minX: Math.min(piece.x1, piece.x2),
+          maxX: Math.max(piece.x1, piece.x2),
+        };
+      };
+
+      // Helper: clamp X to lateral bounds (with safety against crossing center)
+      const clampX = (x, role, roomY) => {
+        const lateralBounds = getOverheadLateralBoundsForRole(role, roomY);
+        if (!lateralBounds) return x; // fallback: no clamping
+        
+        const { minX, maxX } = lateralBounds;
+        let clamped = Math.min(maxX, Math.max(minX, x));
+        
+        // Safety: never cross room center line
+        const centerX = widthM / 2;
+        if (isLeftRole(role)) {
+          clamped = Math.min(clamped, centerX);
+        } else if (isRightRole(role)) {
+          clamped = Math.max(clamped, centerX);
+        }
+        
+        return clamped;
+      };
+
       // Clamp dragged speaker inside its own band
       const primaryClamped = clampOverheadPairPosition(
         { x: rawRoomPos.x, y: rawRoomPos.y },
@@ -1905,42 +1958,34 @@ React.useEffect(() => {
         lengthM
       );
 
-      // Derive shared column X
+      // Derive shared column X with lateral bounds clamping
       const centerX = widthM / 2;
       let leftColumnX = null;
       let rightColumnX = null;
 
       if (isLeftRole(canonicalRole)) {
-        leftColumnX = primaryClamped.x;
+        // Clamp primary to its lateral bounds
+        const primaryClampedX = clampX(rawRoomPos.x, canonicalRole, rawRoomPos.y);
+        leftColumnX = primaryClampedX;
         rightColumnX = centerX + (centerX - leftColumnX);
       }
 
       if (isRightRole(canonicalRole)) {
-        rightColumnX = primaryClamped.x;
+        // Clamp primary to its lateral bounds
+        const primaryClampedX = clampX(rawRoomPos.x, canonicalRole, rawRoomPos.y);
+        rightColumnX = primaryClampedX;
         leftColumnX = centerX + (centerX - rightColumnX);
       }
 
-      // Clamp both columns
+      // Apply lateral clamping to both columns
       if (leftColumnX != null) {
-        const leftClamped = clampOverheadPairPosition(
-          { x: leftColumnX, y: primaryClamped.y },
-          'TL',
-          overheadZones,
-          widthM,
-          lengthM
-        );
-        leftColumnX = leftClamped.x;
+        // Use 'TL' as representative left role for mid-band clamping
+        leftColumnX = clampX(leftColumnX, 'TL', rawRoomPos.y);
       }
 
       if (rightColumnX != null) {
-        const rightClamped = clampOverheadPairPosition(
-          { x: rightColumnX, y: primaryClamped.y },
-          'TR',
-          overheadZones,
-          widthM,
-          lengthM
-        );
-        rightColumnX = rightClamped.x;
+        // Use 'TR' as representative right role for mid-band clamping
+        rightColumnX = clampX(rightColumnX, 'TR', rawRoomPos.y);
       }
 
       // Discover current Y positions from placedSpeakers
