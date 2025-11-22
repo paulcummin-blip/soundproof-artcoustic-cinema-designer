@@ -1153,6 +1153,7 @@ function SpeakerPlacementImpl(props) {
     lcrAimMode = "flat",
     onChangeLcrAimMode = () => {},
     lcrAngleDeg = 0,
+    allSeatSplMetrics, // NEW: SPL data from parent
   } = props;
 
   const app = useAppState();
@@ -1555,18 +1556,7 @@ function SpeakerPlacementImpl(props) {
     return major >= 7;
   }, [effectivePreset]);
 
-  // NEW: Compute centralized SPL data for all seats
-  const allSeatSplMetrics = useMemo(() => {
-    return computeAllSeatSplMetrics({
-      seats: seatingPositions || [],
-      placedSpeakers,
-      getCanonicalRole,
-      getEffectiveSplInputs: app?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
-      getModelDimsM,
-    });
-  }, [seatingPositions, placedSpeakers, app?.getEffectiveSplInputs, getModelDimsM]);
-
-  // NEW: Get MLP seat for SPL displays
+  // NEW: Get MLP seat for SPL displays (use passed allSeatSplMetrics from parent)
   const mlpSeat = useMemo(() => {
     return getMlpSeat(seatingPositions || []);
   }, [seatingPositions]);

@@ -28,6 +28,7 @@ import { placeSubwoofers } from '@/components/room/placement/placeSubwoofers'; /
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones"; // NEW import
 import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Import SHOW_DEBUG_LOGS
 import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/seatingUtils';
+import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 
 // NEW: Helper hook for URL query parameters - SSR Safe
 function useUrlQuery() {
@@ -994,6 +995,25 @@ function RoomDesignerWithState() {
       z: 1.2,
     };
   }, [appState?.mlpY_m, stableDimensions?.width]);
+
+  // NEW: Compute centralized SPL data for all seats (powers sidebar SPL cards)
+  const allSeatSplMetrics = useMemo(() => {
+    const getCanonicalRoleLocal = (role) => {
+      const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', 
+                    FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR',
+                    TFL:'TFL',TFR:'TFR',TL:'TL',TML:'TL',TR:'TR',TMR:'TR',TBL:'TBL',TBR:'TBR' };
+      const r = String(role || '').toUpperCase();
+      return map[r] || r;
+    };
+
+    return computeAllSeatSplMetrics({
+      seats: _seatingPositions || [],
+      placedSpeakers: placedSpeakers || [],
+      getCanonicalRole: getCanonicalRoleLocal,
+      getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
+      getModelDimsM: (model) => getSpeakerModelMeta(model) || { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 },
+    });
+  }, [_seatingPositions, placedSpeakers, appState?.getEffectiveSplInputs]);
 
   const placedSpeakers = store.placedSpeakers;
 
@@ -2335,6 +2355,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         setUseMidGlobal={setUseMidGlobal}
                         useRearGlobal={useRearGlobal}
                         setUseRearGlobal={setUseRearGlobal}
+                        
+                        allSeatSplMetrics={allSeatSplMetrics}
                       />
                   </Suspense>
               </CollapsiblePanel>
