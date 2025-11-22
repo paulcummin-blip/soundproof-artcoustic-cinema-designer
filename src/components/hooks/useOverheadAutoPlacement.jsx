@@ -31,6 +31,9 @@ export function useOverheadAutoPlacement({
     
     // Guard: no overhead channels
     if (!overheadCount || overheadCount <= 0) return;
+    
+    // Guard: no setter
+    if (!setPlacedSpeakers) return;
 
     // Extract zone centers and edge positions for L/R pairs
     const zoneInfo = {};
@@ -77,7 +80,8 @@ export function useOverheadAutoPlacement({
       'TFR': 'R', 'TMR': 'R', 'TR': 'R', 'TBR': 'R'
     };
 
-    // Check which speakers need updating
+    // Position all overhead speakers at their band centers
+    // Only update speakers without valid positions OR those at (0,0) placeholder
     let needsUpdate = false;
     const nextSpeakers = placedSpeakers.map(spk => {
       const canonicalRole = getCanonicalRole(spk.role);
@@ -94,27 +98,25 @@ export function useOverheadAutoPlacement({
       const currentX = spk.position?.x;
       const currentY = spk.position?.y;
 
+      // Check if position is invalid or is at the placeholder (0,0) from template
       const hasValidPos =
         Number.isFinite(currentX) &&
-        Number.isFinite(currentY);
+        Number.isFinite(currentY) &&
+        !(currentX === 0 && currentY === 0);
 
-      // If this overhead already has a valid position (likely from user drag),
-      // do NOT auto-update this speaker. This lets manual drags "win" permanently.
+      // Only auto-position if no valid position OR at (0,0) template position
       if (hasValidPos) {
         return spk;
       }
 
       // Move to zone center Y and edge X
-      const newX = targetX;
-      const newY = targetY;
-
       needsUpdate = true;
       return {
         ...spk,
         position: {
           ...spk.position,
-          x: newX,
-          y: newY
+          x: targetX,
+          y: targetY
         }
       };
     });

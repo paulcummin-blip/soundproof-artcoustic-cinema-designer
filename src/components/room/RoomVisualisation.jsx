@@ -3442,7 +3442,8 @@ useEffect(() => {
     dolbyConfiguration: dolbyLayout,
     placedSpeakers,
     setPlacedSpeakers: onSetSpeakers,
-    useWidesInsteadOfRears: appState?.useWidesInsteadOfRears || false
+    useWidesInsteadOfRears: appState?.useWidesInsteadOfRears || false,
+    overheadGlobalModel
   });
 
   // Auto-place overhead speakers at zone centers
