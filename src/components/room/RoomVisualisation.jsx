@@ -1905,7 +1905,7 @@ React.useEffect(() => {
         lengthM
       );
 
-      // Derive shared column X
+      // Derive shared column X (mirrored, no re-clamping)
       const centerX = widthM / 2;
       let leftColumnX = null;
       let rightColumnX = null;
@@ -1918,29 +1918,6 @@ React.useEffect(() => {
       if (isRightRole(canonicalRole)) {
         rightColumnX = primaryClamped.x;
         leftColumnX = centerX + (centerX - rightColumnX);
-      }
-
-      // Clamp both columns
-      if (leftColumnX != null) {
-        const leftClamped = clampOverheadPairPosition(
-          { x: leftColumnX, y: primaryClamped.y },
-          'TL',
-          overheadZones,
-          widthM,
-          lengthM
-        );
-        leftColumnX = leftClamped.x;
-      }
-
-      if (rightColumnX != null) {
-        const rightClamped = clampOverheadPairPosition(
-          { x: rightColumnX, y: primaryClamped.y },
-          'TR',
-          overheadZones,
-          widthM,
-          lengthM
-        );
-        rightColumnX = rightClamped.x;
       }
 
       // Discover current Y positions from placedSpeakers
@@ -3362,7 +3339,8 @@ useEffect(() => {
     getCanonicalRole,
     overheadCount,
     hasManualOverheadEdit,
-    mlpPoint: mlp
+    mlpPoint: mlp,
+    heightM
   });
 
   // Determine which overhead positions are visible

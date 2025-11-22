@@ -22,7 +22,8 @@ export function useOverheadAutoPlacement({
   getCanonicalRole,
   overheadCount,
   hasManualOverheadEdit = false,
-  mlpPoint = null
+  mlpPoint = null,
+  heightM = 2.4
 }) {
   const lastLayoutKeyRef = useRef(null);
 
@@ -53,47 +54,76 @@ export function useOverheadAutoPlacement({
     const clampByRole = overheadZones?.clampByRole;
     if (!clampByRole) return;
 
+    // Build list of expected overhead roles for current layout
+    const expectedRoles = [];
+    if (overheadCount === 2) {
+      expectedRoles.push('TL', 'TR');
+    } else if (overheadCount === 4) {
+      expectedRoles.push('TFL', 'TFR', 'TBL', 'TBR');
+    } else if (overheadCount === 6) {
+      expectedRoles.push('TFL', 'TFR', 'TL', 'TR', 'TBL', 'TBR');
+    }
+
+    if (expectedRoles.length === 0) return;
+
     let needsUpdate = false;
-    const nextSpeakers = placedSpeakers.map(spk => {
-      const canonicalRole = getCanonicalRole(spk.role);
-      const rect = clampByRole[canonicalRole];
-      
-      // Not an overhead speaker or clamp rect not available
+    const nextSpeakers = [...placedSpeakers];
+
+    // For each expected overhead role, ensure it exists and is positioned
+    expectedRoles.forEach(role => {
+      const rect = clampByRole[role];
       if (!rect || !Number.isFinite(rect.xMin) || !Number.isFinite(rect.xMax) || 
           !Number.isFinite(rect.yMin) || !Number.isFinite(rect.yMax)) {
-        return spk;
+        return;
       }
 
       // Calculate center of this role's clamp rectangle
       const centerX = (rect.xMin + rect.xMax) / 2;
       const centerY = (rect.yMin + rect.yMax) / 2;
 
-      const currentX = spk.position?.x;
-      const currentY = spk.position?.y;
+      // Find existing speaker with this role
+      const existingIndex = nextSpeakers.findIndex(s => getCanonicalRole(s.role) === role);
 
-      // Only move if speaker is outside rect or uninitialized
-      const isOutsideX = !Number.isFinite(currentX) || currentX < rect.xMin || currentX > rect.xMax;
-      const isOutsideY = !Number.isFinite(currentY) || currentY < rect.yMin || currentY > rect.yMax;
+      if (existingIndex >= 0) {
+        // Speaker exists - check if it needs repositioning
+        const spk = nextSpeakers[existingIndex];
+        const currentX = spk.position?.x;
+        const currentY = spk.position?.y;
 
-      if (!isOutsideX && !isOutsideY) {
-        // Speaker is already inside its zone, leave it alone
-        return spk;
+        const isOutsideX = !Number.isFinite(currentX) || currentX < rect.xMin || currentX > rect.xMax;
+        const isOutsideY = !Number.isFinite(currentY) || currentY < rect.yMin || currentY > rect.yMax;
+
+        if (isOutsideX || isOutsideY) {
+          nextSpeakers[existingIndex] = {
+            ...spk,
+            position: {
+              ...(spk.position || {}),
+              x: centerX,
+              y: centerY,
+              z: spk.position?.z || heightM - 0.1, // Near ceiling
+            },
+          };
+          needsUpdate = true;
+        }
+      } else {
+        // Speaker doesn't exist - create it
+        nextSpeakers.push({
+          id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+          role: role,
+          model: null, // Will be resolved from global overhead model
+          position: {
+            x: centerX,
+            y: centerY,
+            z: heightM - 0.1,
+          },
+        });
+        needsUpdate = true;
       }
-
-      needsUpdate = true;
-      return {
-        ...spk,
-        position: {
-          ...(spk.position || {}),
-          x: centerX,
-          y: centerY,
-        },
-      };
     });
 
     // Only update if meaningful changes occurred
     if (needsUpdate && setPlacedSpeakers) {
       setPlacedSpeakers(nextSpeakers);
     }
-  }, [placedSpeakers, setPlacedSpeakers, overheadZones, getCanonicalRole, overheadCount, mlpPoint]);
+  }, [placedSpeakers, setPlacedSpeakers, overheadZones, getCanonicalRole, overheadCount, mlpPoint, heightM]);
 }
