@@ -59,9 +59,9 @@ export default function OverheadChannelSelector({
             <SelectValue placeholder="Select overhead model..." className="text-2xl font-semibold" style={{ color: "#213428" }} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="OFF">OFF — (no overheads active)</SelectItem>
+            <SelectItem value="OFF" style={{ color: "#213428" }}>OFF — (no overheads active)</SelectItem>
             {overheadModels.map((model) => (
-              <SelectItem key={model.key} value={model.key}>
+              <SelectItem key={model.key} value={model.key} style={{ color: "#213428" }}>
                 {model.label}
               </SelectItem>
             ))}
