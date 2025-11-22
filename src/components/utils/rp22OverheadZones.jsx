@@ -361,10 +361,66 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, placedSpeakers 
   midZone.active = midZone.y2 > midZone.y1;
   backZone.active = backZone.y2 > backZone.y1;
 
+  // Build left/right split zones for each band
+  const leftX1 = centreX_m - maxHalfSpanM;
+  const leftX2 = centreX_m - minHalfSpanM;
+  const rightX1 = centreX_m + minHalfSpanM;
+  const rightX2 = centreX_m + maxHalfSpanM;
+
+  const frontLeftZone = {
+    x1: leftX1, x2: leftX2,
+    y1: frontZone.y1, y2: frontZone.y2,
+    active: frontZone.active
+  };
+  const frontRightZone = {
+    x1: rightX1, x2: rightX2,
+    y1: frontZone.y1, y2: frontZone.y2,
+    active: frontZone.active
+  };
+
+  const midLeftZone = {
+    x1: leftX1, x2: leftX2,
+    y1: midZone.y1, y2: midZone.y2,
+    active: midZone.active
+  };
+  const midRightZone = {
+    x1: rightX1, x2: rightX2,
+    y1: midZone.y1, y2: midZone.y2,
+    active: midZone.active
+  };
+
+  const rearLeftZone = {
+    x1: leftX1, x2: leftX2,
+    y1: backZone.y1, y2: backZone.y2,
+    active: backZone.active
+  };
+  const rearRightZone = {
+    x1: rightX1, x2: rightX2,
+    y1: backZone.y1, y2: backZone.y2,
+    active: backZone.active
+  };
+
+  // Build per-role clamp rectangles
+  const clampByRole = {
+    TFL: { xMin: leftX1, xMax: leftX2, yMin: frontZone.y1, yMax: frontZone.y2 },
+    TFR: { xMin: rightX1, xMax: rightX2, yMin: frontZone.y1, yMax: frontZone.y2 },
+    TL: { xMin: leftX1, xMax: leftX2, yMin: midZone.y1, yMax: midZone.y2 },
+    TR: { xMin: rightX1, xMax: rightX2, yMin: midZone.y1, yMax: midZone.y2 },
+    TBL: { xMin: leftX1, xMax: leftX2, yMin: backZone.y1, yMax: backZone.y2 },
+    TBR: { xMin: rightX1, xMax: rightX2, yMin: backZone.y1, yMax: backZone.y2 },
+  };
+
   return {
     frontZone,
     midZone,
     backZone,
+    frontLeftZone,
+    frontRightZone,
+    midLeftZone,
+    midRightZone,
+    rearLeftZone,
+    rearRightZone,
+    clampByRole,
     lateral: {
       centreX_m,
       seatWidthM,

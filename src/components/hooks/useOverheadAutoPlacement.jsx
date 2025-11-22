@@ -2,7 +2,7 @@
 // Auto-placement hook for overhead speakers within RP22 zones
 // Positions overhead speakers at the vertical center of their designated zone bands
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
  * Automatically positions overhead speakers to the center of their RP22 zones.
@@ -21,8 +21,11 @@ export function useOverheadAutoPlacement({
   overheadZones,
   getCanonicalRole,
   overheadCount,
-  hasManualOverheadEdit = false
+  hasManualOverheadEdit = false,
+  mlpPoint = null
 }) {
+  const lastLayoutKeyRef = useRef(null);
+
   useEffect(() => {
     // Guard: user has manually edited overheads - don't auto-place anymore
     if (hasManualOverheadEdit) return;
@@ -36,94 +39,55 @@ export function useOverheadAutoPlacement({
     // Guard: no overhead channels
     if (!overheadCount || overheadCount <= 0) return;
 
-    // Extract zone centers and edge positions for L/R pairs
-    const zoneInfo = {};
-    
-    if (overheadZones.frontZone?.active) {
-      const { x1, x2, y1, y2 } = overheadZones.frontZone;
-      zoneInfo.front = {
-        centerY: (y1 + y2) / 2,
-        leftX: x1,
-        rightX: x2,
-        zone: overheadZones.frontZone
-      };
-    }
-    
-    if (overheadZones.midZone?.active) {
-      const { x1, x2, y1, y2 } = overheadZones.midZone;
-      zoneInfo.mid = {
-        centerY: (y1 + y2) / 2,
-        leftX: x1,
-        rightX: x2,
-        zone: overheadZones.midZone
-      };
-    }
-    
-    if (overheadZones.backZone?.active) {
-      const { x1, x2, y1, y2 } = overheadZones.backZone;
-      zoneInfo.rear = {
-        centerY: (y1 + y2) / 2,
-        leftX: x1,
-        rightX: x2,
-        zone: overheadZones.backZone
-      };
-    }
+    // Build layout signature to detect zone changes
+    const layoutKey = JSON.stringify({
+      clampByRole: overheadZones?.clampByRole || null,
+      mlp: mlpPoint || null,
+    });
 
-    // Map overhead roles to band and side
-    const roleToBand = {
-      'TFL': 'front', 'TFR': 'front', 'TFC': 'front',
-      'TML': 'mid', 'TMR': 'mid', 'TL': 'mid', 'TR': 'mid',
-      'TBL': 'rear', 'TBR': 'rear', 'TBC': 'rear'
-    };
-    
-    const roleToSide = {
-      'TFL': 'L', 'TML': 'L', 'TL': 'L', 'TBL': 'L',
-      'TFR': 'R', 'TMR': 'R', 'TR': 'R', 'TBR': 'R'
-    };
+    // Only reposition if layout has changed
+    if (layoutKey === lastLayoutKeyRef.current) return;
+    lastLayoutKeyRef.current = layoutKey;
 
-    // Check which speakers need updating
+    // Use per-role clamp rectangles to center each overhead
+    const clampByRole = overheadZones?.clampByRole;
+    if (!clampByRole) return;
+
     let needsUpdate = false;
     const nextSpeakers = placedSpeakers.map(spk => {
       const canonicalRole = getCanonicalRole(spk.role);
-      const band = roleToBand[canonicalRole];
-      const side = roleToSide[canonicalRole];
+      const rect = clampByRole[canonicalRole];
       
-      // Not an overhead speaker or band not available
-      if (!band || !zoneInfo[band]) return spk;
-      
-      const zone = zoneInfo[band];
-      const targetY = zone.centerY;
-      const targetX = side === 'R' ? zone.rightX : zone.leftX;
-      
-      const currentX = spk.position?.x;
-      const currentY = spk.position?.y;
-
-      // Determine if we need to move this speaker
-      const needsYUpdate = 
-        !Number.isFinite(currentY) || // No Y position set
-        Math.abs(currentY - targetY) > 0.001; // Not at center Y
-
-      const needsXUpdate =
-        !Number.isFinite(currentX) || // No X position set
-        Math.abs(currentX - targetX) > 0.001; // Not at edge X
-
-      if (!needsYUpdate && !needsXUpdate) {
-        // Already at target position
+      // Not an overhead speaker or clamp rect not available
+      if (!rect || !Number.isFinite(rect.xMin) || !Number.isFinite(rect.xMax) || 
+          !Number.isFinite(rect.yMin) || !Number.isFinite(rect.yMax)) {
         return spk;
       }
 
-      // Move to zone center Y and edge X
-      const newX = targetX;
-      const newY = targetY;
+      // Calculate center of this role's clamp rectangle
+      const centerX = (rect.xMin + rect.xMax) / 2;
+      const centerY = (rect.yMin + rect.yMax) / 2;
+
+      const currentX = spk.position?.x;
+      const currentY = spk.position?.y;
+
+      // Only move if speaker is outside rect or uninitialized
+      const isOutsideX = !Number.isFinite(currentX) || currentX < rect.xMin || currentX > rect.xMax;
+      const isOutsideY = !Number.isFinite(currentY) || currentY < rect.yMin || currentY > rect.yMax;
+
+      if (!isOutsideX && !isOutsideY) {
+        // Speaker is already inside its zone, leave it alone
+        return spk;
+      }
 
       needsUpdate = true;
       return {
         ...spk,
         position: {
-          ...spk.position,
-          x: newX,
-          y: newY
-        }
+          ...(spk.position || {}),
+          x: centerX,
+          y: centerY,
+        },
       };
     });
 
@@ -131,5 +95,5 @@ export function useOverheadAutoPlacement({
     if (needsUpdate && setPlacedSpeakers) {
       setPlacedSpeakers(nextSpeakers);
     }
-  }, [placedSpeakers, setPlacedSpeakers, overheadZones, getCanonicalRole, overheadCount]);
+  }, [placedSpeakers, setPlacedSpeakers, overheadZones, getCanonicalRole, overheadCount, mlpPoint]);
 }
