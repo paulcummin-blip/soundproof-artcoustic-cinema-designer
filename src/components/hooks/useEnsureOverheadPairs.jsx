@@ -21,7 +21,6 @@ export function useEnsureOverheadPairs({
   placedSpeakers,
   setPlacedSpeakers,
   useWidesInsteadOfRears = false,
-  overheadGlobalModel = null,
 }) {
   React.useEffect(() => {
     // Guard: no configuration
@@ -29,9 +28,6 @@ export function useEnsureOverheadPairs({
     
     // Guard: invalid speakers array
     if (!Array.isArray(placedSpeakers)) return;
-
-    // Guard: no overhead model selected or OFF
-    if (!overheadGlobalModel || overheadGlobalModel === 'OFF') return;
 
     // 1. Determine required overhead roles from visibility logic
     const visibleRolesSet = getSpeakerVisibilityFor(dolbyConfiguration, useWidesInsteadOfRears);
@@ -59,26 +55,24 @@ export function useEnsureOverheadPairs({
     // All required overhead roles already exist
     if (missingRoles.length === 0) return;
 
-    // 4. Find a template speaker (or create default)
+    // 4. Find a template speaker
     const templateOverhead = placedSpeakers.find(s =>
       s.role && String(s.role).startsWith('T')
     );
     const templateAny = placedSpeakers[0];
-    const template = templateOverhead || templateAny || {
-      id: 'overhead-template',
-      model: overheadGlobalModel,
-      position: { x: 0, y: 0, z: 2.4 }
-    };
+    const template = templateOverhead || templateAny;
 
-    // 5. Create missing speakers with unique IDs
+    // Can't create speakers without a template
+    if (!template) return;
+
+    // 5. Create missing speakers
     const nextSpeakers = [...placedSpeakers];
     
     missingRoles.forEach(role => {
       const newSpeaker = {
         ...template,
-        id: `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+        id: template.id ? `${template.id}_${role}` : role,
         role,
-        model: overheadGlobalModel,
         position: {
           x: template.position?.x ?? 0,
           y: template.position?.y ?? 0,
@@ -93,5 +87,5 @@ export function useEnsureOverheadPairs({
     if (nextSpeakers.length > placedSpeakers.length) {
       setPlacedSpeakers(nextSpeakers);
     }
-  }, [dolbyConfiguration, placedSpeakers, setPlacedSpeakers, useWidesInsteadOfRears, overheadGlobalModel]);
+  }, [dolbyConfiguration, placedSpeakers, setPlacedSpeakers, useWidesInsteadOfRears]);
 }

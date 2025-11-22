@@ -1940,85 +1940,14 @@ React.useEffect(() => {
       const columnXLeft = isDraggedLeft ? primaryClamped.x : (centerX + (centerX - primaryClamped.x));
       const columnXRight = centerX + (centerX - columnXLeft);
 
-      // 6. Mid-drives-front-rear Y-link: if dragging mid pair, propagate Y delta
-      const isMidPair = (canonicalRole === 'TML' || canonicalRole === 'TMR' || canonicalRole === 'TL' || canonicalRole === 'TR');
-      let frontYUpdates = null;
-      let rearYUpdates = null;
-
-      if (isMidPair) {
-        // Get original mid Y position from the speaker before drag
-        const originalMidY = Number(spk.position?.y) || primaryClamped.y;
-        const dy = primaryClamped.y - originalMidY;
-
-        // Find front and rear pairs in current speaker array
-        const frontLeftSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === 'TFL');
-        const frontRightSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === 'TFR');
-        const rearLeftSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === 'TBL');
-        const rearRightSpk = placedSpeakers.find(s => getCanonicalRole(s.role) === 'TBR');
-
-        // Apply dy to front pair if it exists
-        if (frontLeftSpk && frontRightSpk) {
-          const originalFrontY = Number(frontLeftSpk.position?.y) || 0;
-          const proposedFrontY = originalFrontY + dy;
-          
-          const frontLeftClamped = clampOverheadPairPosition(
-            { x: columnXLeft, y: proposedFrontY },
-            'TFL',
-            overheadZones,
-            widthM,
-            lengthM
-          );
-          
-          const frontRightClamped = clampOverheadPairPosition(
-            { x: columnXRight, y: proposedFrontY },
-            'TFR',
-            overheadZones,
-            widthM,
-            lengthM
-          );
-
-          frontYUpdates = {
-            left: frontLeftClamped.y,
-            right: frontRightClamped.y
-          };
-        }
-
-        // Apply dy to rear pair if it exists
-        if (rearLeftSpk && rearRightSpk) {
-          const originalRearY = Number(rearLeftSpk.position?.y) || 0;
-          const proposedRearY = originalRearY + dy;
-          
-          const rearLeftClamped = clampOverheadPairPosition(
-            { x: columnXLeft, y: proposedRearY },
-            'TBL',
-            overheadZones,
-            widthM,
-            lengthM
-          );
-          
-          const rearRightClamped = clampOverheadPairPosition(
-            { x: columnXRight, y: proposedRearY },
-            'TBR',
-            overheadZones,
-            widthM,
-            lengthM
-          );
-
-          rearYUpdates = {
-            left: rearLeftClamped.y,
-            right: rearRightClamped.y
-          };
-        }
-      }
-
-      // 7. Write all overhead speakers with column-locked X and linked Y
+      // 6. Write all overhead speakers with column-locked X positions
       onSetSpeakers(prev => {
         if (!Array.isArray(prev)) return prev;
 
         return prev.map(spk => {
           const canon = getCanonicalRole(spk.role) || spk.role;
           
-          // Update the dragged speaker
+          // Update the dragged speaker (keep its band-specific Y)
           if (spk.id === speakerId) {
             return {
               ...spk,
@@ -2030,7 +1959,7 @@ React.useEffect(() => {
             };
           }
           
-          // Update the partner speaker
+          // Update the partner speaker (keep its band-specific Y)
           if (canon === pairRole) {
             return {
               ...spk,
@@ -2042,56 +1971,8 @@ React.useEffect(() => {
             };
           }
           
-          // Update front pair Y if mid is being dragged
-          if (isMidPair && frontYUpdates) {
-            if (canon === 'TFL') {
-              return {
-                ...spk,
-                position: {
-                  ...(spk.position || {}),
-                  x: columnXLeft,
-                  y: frontYUpdates.left,
-                },
-              };
-            }
-            if (canon === 'TFR') {
-              return {
-                ...spk,
-                position: {
-                  ...(spk.position || {}),
-                  x: columnXRight,
-                  y: frontYUpdates.right,
-                },
-              };
-            }
-          }
-          
-          // Update rear pair Y if mid is being dragged
-          if (isMidPair && rearYUpdates) {
-            if (canon === 'TBL') {
-              return {
-                ...spk,
-                position: {
-                  ...(spk.position || {}),
-                  x: columnXLeft,
-                  y: rearYUpdates.left,
-                },
-              };
-            }
-            if (canon === 'TBR') {
-              return {
-                ...spk,
-                position: {
-                  ...(spk.position || {}),
-                  x: columnXRight,
-                  y: rearYUpdates.right,
-                },
-              };
-            }
-          }
-          
-          // Update all other left column speakers (X only, keep their Y)
-          if (LEFT_COLUMN.includes(canon) && canon !== canonicalRole && canon !== pairRole) {
+          // Update all other left column speakers (keep their Y, align X)
+          if (LEFT_COLUMN.includes(canon) && canon !== canonicalRole) {
             return {
               ...spk,
               position: {
@@ -2101,8 +1982,8 @@ React.useEffect(() => {
             };
           }
           
-          // Update all other right column speakers (X only, keep their Y)
-          if (RIGHT_COLUMN.includes(canon) && canon !== canonicalRole && canon !== pairRole) {
+          // Update all other right column speakers (keep their Y, align X)
+          if (RIGHT_COLUMN.includes(canon) && canon !== pairRole) {
             return {
               ...spk,
               position: {
@@ -2160,26 +2041,16 @@ React.useEffect(() => {
         return { x: cx, y: cy };
       };
 
-      // Capture initial positions to prevent jump
-      const startMouseCanvas = clientToCanvas(mouseDownEvent);
-      const startSpeakerCanvas = roomToCanvas(spk.position || { x: 0, y: 0 });
+      // Immediately call handleSpeakerDrag once at the starting point
+      let lastPos = clientToCanvas(mouseDownEvent);
+      handleSpeakerDrag(speakerId, lastPos);
 
-      // Mouse move: update overhead position using delta
+      // Mouse move: update overhead position continuously
       const onMove = (moveEvent) => {
         moveEvent.preventDefault();
-        const currentMouseCanvas = clientToCanvas(moveEvent);
-        
-        // Calculate delta from initial mouse position
-        const deltaX = currentMouseCanvas.x - startMouseCanvas.x;
-        const deltaY = currentMouseCanvas.y - startMouseCanvas.y;
-        
-        // Apply delta to initial speaker position
-        const newCanvasPos = {
-          x: startSpeakerCanvas.x + deltaX,
-          y: startSpeakerCanvas.y + deltaY
-        };
-        
-        handleSpeakerDrag(speakerId, newCanvasPos);
+        const canvasPos = clientToCanvas(moveEvent);
+        lastPos = canvasPos;
+        handleSpeakerDrag(speakerId, canvasPos);
       };
 
       const onUp = (upEvent) => {
@@ -2191,7 +2062,7 @@ React.useEffect(() => {
       window.addEventListener("mousemove", onMove);
       window.addEventListener("mouseup", onUp);
     },
-    [byId, getCanonicalRole, handleSpeakerDrag, roomRect, svgRef, roomToCanvas]
+    [byId, getCanonicalRole, handleSpeakerDrag, roomRect, svgRef]
   );
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
@@ -3442,8 +3313,7 @@ useEffect(() => {
     dolbyConfiguration: dolbyLayout,
     placedSpeakers,
     setPlacedSpeakers: onSetSpeakers,
-    useWidesInsteadOfRears: appState?.useWidesInsteadOfRears || false,
-    overheadGlobalModel
+    useWidesInsteadOfRears: appState?.useWidesInsteadOfRears || false
   });
 
   // Auto-place overhead speakers at zone centers
@@ -3485,86 +3355,78 @@ useEffect(() => {
   }, [overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride]);
 
 
-// Render overhead speaker icons (one per T* speaker, using their own positions)
+// Render overhead speaker icons (one per speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
-    // Basic guards
-    if (!Array.isArray(placedSpeakers) || !roomRect) return null;
+    // Guard: no speakers array
+    if (!Array.isArray(placedSpeakers)) return null;
 
-    // If the global overhead model is OFF / empty, show no overheads at all
-    if (!overheadGlobalModel || overheadGlobalModel === "OFF") {
-      return null;
-    }
-
-    // Pick out all overhead speakers (roles starting with T) that have a usable position
+    // Select overhead speakers from placedSpeakers
     const overheadSpeakers = placedSpeakers.filter((speaker) => {
       const canonical = getCanonicalRole?.(speaker.role) || speaker.role;
-      if (typeof canonical !== "string") return false;
-      if (!canonical.startsWith("T")) return false;
-
+      if (typeof canonical !== 'string') return false;
+      // Any canonical role that starts with 'T' is an overhead (TFL/TFR/TML/TMR/TBL/TBR/TL/TR)
+      if (!canonical.startsWith('T')) return false;
+      // Must have valid position
       const pos = speaker.position || {};
       return Number.isFinite(pos.x) && Number.isFinite(pos.y);
     });
 
-    if (overheadSpeakers.length === 0) {
-      return null;
-    }
+    // No overhead speakers to render
+    if (overheadSpeakers.length === 0) return null;
 
-    return overheadSpeakers
-      .map((speaker) => {
-        const { id, role, position } = speaker;
-        if (!position) return null;
+    // Render one icon per overhead speaker using SpeakerIcon
+    return overheadSpeakers.map((speaker) => {
+      const { id, role, model, position } = speaker;
+      if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) {
+        return null;
+      }
 
-        const canonicalRole = getCanonicalRole?.(role) || role;
+      // Determine which zone position this role belongs to (front/mid/rear)
+      const canonicalRole = getCanonicalRole?.(role) || role;
+      let zonePosition = null;
+      if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
+        zonePosition = 'front';
+      } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
+        zonePosition = 'mid';
+      } else if (['TBL', 'TBR', 'TBC'].includes(canonicalRole)) {
+        zonePosition = 'rear';
+      }
 
-        // Work out which band this role belongs to
-        let band = null;
-        if (["TFL", "TFR", "TFC"].includes(canonicalRole)) {
-          band = "front";
-        } else if (["TL", "TR", "TML", "TMR"].includes(canonicalRole)) {
-          band = "mid";
-        } else if (["TBL", "TBR", "TBC"].includes(canonicalRole)) {
-          band = "rear";
-        }
+      // Resolve the actual model using the overhead position helper
+      const resolvedModel = zonePosition && getOverheadModelForPosition
+        ? getOverheadModelForPosition(zonePosition)
+        : model;
 
-        // Resolve the model for this band (front / mid / rear),
-        // falling back to the global overhead model.
-        let resolvedModel = overheadGlobalModel;
+      // Skip if no model selected
+      if (!resolvedModel || resolvedModel === 'OFF') {
+        return null;
+      }
 
-        if (band && typeof getOverheadModelForPosition === "function") {
-          const bandModel = getOverheadModelForPosition(band);
-          if (bandModel && bandModel !== "OFF") {
-            resolvedModel = bandModel;
-          }
-        }
+      // IMPORTANT: build an effective speaker that includes the resolved model
+      const effectiveSpeaker = { ...speaker, model: resolvedModel };
 
-        // If we still don't have a model, skip this speaker
-        if (!resolvedModel || resolvedModel === "OFF") {
-          return null;
-        }
+      const isOverhead =
+        typeof canonicalRole === "string" && canonicalRole.startsWith("T");
 
-        // This is the effective speaker used for rendering & dragging
-        const effectiveSpeaker = { ...speaker, model: resolvedModel };
+      const speakerMouseDownHandler = isOverhead
+        ? (e) => handleOverheadDragStart(e, id)
+        : (isDraggable(effectiveSpeaker)
+            ? (e) => handleMouseDown(e, id, "speaker")
+            : undefined);
 
-        const speakerMouseDownHandler = (e) => {
-          // Always route overhead clicks into the existing drag pipeline.
-          handleMouseDown(e, id, "speaker");
-        };
-
-        return (
-          <SpeakerIcon
-            key={id}
-            speaker={effectiveSpeaker}
-            canvasX={roomRect.x + position.x * scale}
-            canvasY_raw={roomRect.y + position.y * scale}
-            // overheads currently use `yaw`, keep behaviour the same
-            yaw={speaker.yaw || 0}
-            scale={scale}
-            speakerMouseDownHandler={speakerMouseDownHandler}
-            setHoveredSpeaker={setHoveredSpeaker}
-          />
-        );
-      })
-      .filter(Boolean);
+      return (
+        <SpeakerIcon
+          key={id}
+          speaker={effectiveSpeaker}
+          canvasX={roomRect.x + (position.x * scale)}
+          canvasY_raw={roomRect.y + (position.y * scale)}
+          yaw={speaker.yaw || 0}
+          scale={scale}
+          speakerMouseDownHandler={speakerMouseDownHandler}
+          setHoveredSpeaker={setHoveredSpeaker}
+        />
+      );
+    }).filter(Boolean);
   }, [
     placedSpeakers,
     getCanonicalRole,
