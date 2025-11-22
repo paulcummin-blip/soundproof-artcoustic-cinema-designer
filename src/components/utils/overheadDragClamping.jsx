@@ -182,17 +182,8 @@ export function clampOverheadPairPosition(proposedPos, canonicalRole, overheadZo
     return { x, y };
   }
 
-  // Use per-role clamp rectangle if available
-  const clampRect = overheadZones?.clampByRole?.[canonicalRole];
-  
-  if (clampRect && Number.isFinite(clampRect.xMin) && Number.isFinite(clampRect.xMax) && 
-      Number.isFinite(clampRect.yMin) && Number.isFinite(clampRect.yMax)) {
-    const x = Math.min(clampRect.xMax, Math.max(clampRect.xMin, proposedPos.x));
-    const y = Math.min(clampRect.yMax, Math.max(clampRect.yMin, proposedPos.y));
-    return { x, y };
-  }
-
-  // Fallback to old behavior
+  // Use the existing single-speaker clamp (clampOverheadToZone)
+  // For now, we pass minimal speaker dims (assume default round overhead)
   const defaultOverheadDims = { diameterM: 0.24, round: true };
   
   return clampOverheadToZone({

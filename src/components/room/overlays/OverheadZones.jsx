@@ -33,13 +33,7 @@ export function computeOverheadZones({
   );
 
   // Compute zone extents (handles inactive bounds internally)
-  const zones = computeRp22OverheadZoneExtents(
-    bounds,
-    { widthM, lengthM, heightM },
-    placedSpeakers,
-    seatingPositions,
-    getCanonicalRole
-  );
+  const zones = computeRp22OverheadZoneExtents(bounds, { widthM, lengthM, heightM });
 
   // Determine status based on whether we have valid seats
   const hasValidSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0 && bounds?.active !== false;
@@ -48,8 +42,7 @@ export function computeOverheadZones({
     status: hasValidSeats ? "ok" : "disabled",
     frontZone: zones.frontZone,
     midZone: zones.midZone,
-    backZone: zones.backZone,
-    lateral: zones.lateral
+    backZone: zones.backZone
   };
 }
 
@@ -81,54 +74,24 @@ export function renderOverheadBandsSVG({
 
   const elts = [];
 
-  // Helper to compute left/right spans from lateral constraints
-  const getLeftRightSpans = (lateral) => {
-    if (!lateral) return null;
-
-    const centreX_m = Number(lateral.centreX_m);
-    const minHalf_m = Number(lateral.minHalfSpanM);
-    const maxHalf_m = Number(lateral.maxHalfSpanM);
-
-    if (!Number.isFinite(centreX_m) || !Number.isFinite(maxHalf_m) || maxHalf_m <= 0) {
-      return null;
-    }
-
-    const innerHalf = Math.max(0, minHalf_m || 0);
-    const outerHalf = maxHalf_m;
-
-    if (outerHalf <= innerHalf) {
-      return {
-        left: { x1: centreX_m - outerHalf, x2: centreX_m - outerHalf },
-        right: { x1: centreX_m + outerHalf, x2: centreX_m + outerHalf },
-      };
-    }
-
-    return {
-      left: {
-        x1: centreX_m - outerHalf,
-        x2: centreX_m - innerHalf,
-      },
-      right: {
-        x1: centreX_m + innerHalf,
-        x2: centreX_m + outerHalf,
-      },
-    };
-  };
-
-  const lateral = zones?.lateral || null;
-  const spans = getLeftRightSpans(lateral);
-
   // Helper to render a zone
   const renderZone = (zone, zoneKey, label, fill) => {
     if (!zone || !zone.active) return;
 
+    const [x0px] = toPx(zone.x1, 0);
+    const [x1px] = toPx(zone.x2, 0);
     const [, y0px] = toPx(0, zone.y1);
     const [, y1px] = toPx(0, zone.y2);
 
+    const x = Math.min(x0px, x1px);
     const y = Math.min(y0px, y1px);
+    const wpx = Math.abs(x1px - x0px);
     const hpx = Math.abs(y1px - y0px);
 
-    if (hpx <= 0) return;
+    if (wpx <= 0 || hpx <= 0) return;
+
+    // Gradient for visual polish - adjusted opacity per zone type
+    const gid = `oh-${zoneKey}-grad`;
 
     // Define opacity based on zone type: mid is strongest, front/rear are lighter
     let minOpacity = 0.06;
@@ -144,139 +107,6 @@ export function renderOverheadBandsSVG({
       minOpacity = 0.06;
       maxOpacity = 0.20;
     }
-
-    // If we have lateral splits, render left and right strips separately
-    if (spans) {
-      // Left strip
-      if (spans.left && Number.isFinite(spans.left.x1) && Number.isFinite(spans.left.x2) && spans.left.x2 > spans.left.x1) {
-        const [x0px] = toPx(spans.left.x1, 0);
-        const [x1px] = toPx(spans.left.x2, 0);
-        const xLeft = Math.min(x0px, x1px);
-        const wLeft = Math.abs(x1px - x0px);
-
-        const gidLeft = `oh-${zoneKey}-left-grad`;
-
-        elts.push(
-          <defs key={`${gidLeft}-defs`}>
-            <linearGradient id={gidLeft} x1={xLeft} y1={y} x2={xLeft} y2={y + hpx} gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor={fill} stopOpacity={minOpacity} />
-              <stop offset="50%" stopColor={fill} stopOpacity={maxOpacity} />
-              <stop offset="100%" stopColor={fill} stopOpacity={minOpacity} />
-            </linearGradient>
-          </defs>
-        );
-
-        elts.push(
-          <rect
-            key={`rect-${zoneKey}-left`}
-            x={xLeft}
-            y={y}
-            width={wLeft}
-            height={hpx}
-            fill={`url(#${gidLeft})`}
-            pointerEvents="none"
-          />
-        );
-
-        // Left core
-        if (zone.coreY1 != null && zone.coreY2 != null) {
-          const [, coreY0px] = toPx(0, zone.coreY1);
-          const [, coreY1px] = toPx(0, zone.coreY2);
-          const coreY = Math.min(coreY0px, coreY1px);
-          const coreH = Math.abs(coreY1px - coreY0px);
-
-          if (coreH > 0) {
-            elts.push(
-              <rect
-                key={`core-${zoneKey}-left`}
-                x={xLeft}
-                y={coreY}
-                width={wLeft}
-                height={coreH}
-                fill={fill}
-                fillOpacity={0.15}
-                stroke={fill}
-                strokeWidth={0.5}
-                strokeOpacity={0.3}
-                strokeDasharray="2,2"
-                pointerEvents="none"
-              />
-            );
-          }
-        }
-      }
-
-      // Right strip
-      if (spans.right && Number.isFinite(spans.right.x1) && Number.isFinite(spans.right.x2) && spans.right.x2 > spans.right.x1) {
-        const [x0px] = toPx(spans.right.x1, 0);
-        const [x1px] = toPx(spans.right.x2, 0);
-        const xRight = Math.min(x0px, x1px);
-        const wRight = Math.abs(x1px - x0px);
-
-        const gidRight = `oh-${zoneKey}-right-grad`;
-
-        elts.push(
-          <defs key={`${gidRight}-defs`}>
-            <linearGradient id={gidRight} x1={xRight} y1={y} x2={xRight} y2={y + hpx} gradientUnits="userSpaceOnUse">
-              <stop offset="0%" stopColor={fill} stopOpacity={minOpacity} />
-              <stop offset="50%" stopColor={fill} stopOpacity={maxOpacity} />
-              <stop offset="100%" stopColor={fill} stopOpacity={minOpacity} />
-            </linearGradient>
-          </defs>
-        );
-
-        elts.push(
-          <rect
-            key={`rect-${zoneKey}-right`}
-            x={xRight}
-            y={y}
-            width={wRight}
-            height={hpx}
-            fill={`url(#${gidRight})`}
-            pointerEvents="none"
-          />
-        );
-
-        // Right core
-        if (zone.coreY1 != null && zone.coreY2 != null) {
-          const [, coreY0px] = toPx(0, zone.coreY1);
-          const [, coreY1px] = toPx(0, zone.coreY2);
-          const coreY = Math.min(coreY0px, coreY1px);
-          const coreH = Math.abs(coreY1px - coreY0px);
-
-          if (coreH > 0) {
-            elts.push(
-              <rect
-                key={`core-${zoneKey}-right`}
-                x={xRight}
-                y={coreY}
-                width={wRight}
-                height={coreH}
-                fill={fill}
-                fillOpacity={0.15}
-                stroke={fill}
-                strokeWidth={0.5}
-                strokeOpacity={0.3}
-                strokeDasharray="2,2"
-                pointerEvents="none"
-              />
-            );
-          }
-        }
-      }
-
-      return;
-    }
-
-    // Fallback: no lateral data - render full-width band
-    const [x0px] = toPx(zone.x1, 0);
-    const [x1px] = toPx(zone.x2, 0);
-    const x = Math.min(x0px, x1px);
-    const wpx = Math.abs(x1px - x0px);
-
-    if (wpx <= 0) return;
-
-    const gid = `oh-${zoneKey}-grad`;
 
     elts.push(
       <defs key={`${gid}-defs`}>

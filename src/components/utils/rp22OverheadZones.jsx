@@ -146,7 +146,7 @@ export function getListeningAreaBounds(
  * @param {Object} roomDims - {widthM, lengthM, heightM}
  * @returns {Object} {frontZone, midZone, backZone} each with {x1, x2, y1, y2, active}
  */
-export function computeRp22OverheadZoneExtents(bounds, roomDims, placedSpeakers = [], seatingPositions = [], getCanonicalRole = null) {
+export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   if (!bounds || bounds.active === false) {
     return {
       frontZone: { x1: 0, x2: 0, y1: 0, y2: 0, active: false },
@@ -157,67 +157,6 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, placedSpeakers 
 
   const { widthM = 4.5, lengthM = 6.0, heightM = 2.4 } = roomDims || {};
   const { listeningFrontY, listeningBackY, midCenterY } = bounds;
-
-  // --- RP22 lateral metrics for overheads ---
-  const roomWidthM = Number(widthM) || 0;
-  const centreX_m = roomWidthM > 0 ? roomWidthM / 2 : 0;
-
-  // 1) Front L/R spacing
-  const frontLeft = Array.isArray(placedSpeakers)
-    ? placedSpeakers.find(s => getCanonicalRole?.(s.role) === 'FL')
-    : null;
-  const frontRight = Array.isArray(placedSpeakers)
-    ? placedSpeakers.find(s => getCanonicalRole?.(s.role) === 'FR')
-    : null;
-
-  const flX = Number(frontLeft?.position?.x);
-  const frX = Number(frontRight?.position?.x);
-
-  let lrWidthM = (Number.isFinite(flX) && Number.isFinite(frX))
-    ? Math.abs(frX - flX)
-    : 0;
-
-  // 2) Listening area width across all seats
-  let minSeatX = Infinity;
-  let maxSeatX = -Infinity;
-
-  if (Array.isArray(seatingPositions)) {
-    seatingPositions.forEach(seat => {
-      const sx = Number(seat?.position?.x ?? seat?.x);
-      if (Number.isFinite(sx)) {
-        if (sx < minSeatX) minSeatX = sx;
-        if (sx > maxSeatX) maxSeatX = sx;
-      }
-    });
-  }
-
-  const hasSeats = Number.isFinite(minSeatX) && Number.isFinite(maxSeatX) && minSeatX <= maxSeatX;
-  const seatWidthM = hasSeats ? (maxSeatX - minSeatX) : 0;
-
-  // 3) Half-spans and RP22-style constraints
-  let minHalfSpanM = 0;
-  let maxHalfSpanM = 0;
-  let halfSpanTargetM = 0;
-  let wideSeatingVsLR = false;
-
-  if (roomWidthM > 0 && lrWidthM > 0 && seatWidthM > 0) {
-    const halfSeat = seatWidthM / 2;
-    const halfLR = lrWidthM / 2;
-
-    if (seatWidthM <= lrWidthM) {
-      // Normal case: we can satisfy both rules
-      minHalfSpanM = halfSeat;  // not narrower than listening area
-      maxHalfSpanM = halfLR;    // not wider than L/R
-      halfSpanTargetM = (minHalfSpanM + maxHalfSpanM) / 2;
-    } else {
-      // Seating is wider than L/R: can't satisfy both rules.
-      // Follow RP22: keep aligned with L/R, flag for HUD/report.
-      wideSeatingVsLR = true;
-      minHalfSpanM = halfLR;
-      maxHalfSpanM = halfLR;
-      halfSpanTargetM = halfLR;
-    }
-  }
 
   const screenWallInner = 0.05;
   const rearWallInner = lengthM - 0.05;
@@ -361,74 +300,5 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, placedSpeakers 
   midZone.active = midZone.y2 > midZone.y1;
   backZone.active = backZone.y2 > backZone.y1;
 
-  // Build left/right split zones for each band
-  const leftX1 = centreX_m - maxHalfSpanM;
-  const leftX2 = centreX_m - minHalfSpanM;
-  const rightX1 = centreX_m + minHalfSpanM;
-  const rightX2 = centreX_m + maxHalfSpanM;
-
-  const frontLeftZone = {
-    x1: leftX1, x2: leftX2,
-    y1: frontZone.y1, y2: frontZone.y2,
-    active: frontZone.active
-  };
-  const frontRightZone = {
-    x1: rightX1, x2: rightX2,
-    y1: frontZone.y1, y2: frontZone.y2,
-    active: frontZone.active
-  };
-
-  const midLeftZone = {
-    x1: leftX1, x2: leftX2,
-    y1: midZone.y1, y2: midZone.y2,
-    active: midZone.active
-  };
-  const midRightZone = {
-    x1: rightX1, x2: rightX2,
-    y1: midZone.y1, y2: midZone.y2,
-    active: midZone.active
-  };
-
-  const rearLeftZone = {
-    x1: leftX1, x2: leftX2,
-    y1: backZone.y1, y2: backZone.y2,
-    active: backZone.active
-  };
-  const rearRightZone = {
-    x1: rightX1, x2: rightX2,
-    y1: backZone.y1, y2: backZone.y2,
-    active: backZone.active
-  };
-
-  // Build per-role clamp rectangles
-  const clampByRole = {
-    TFL: { xMin: leftX1, xMax: leftX2, yMin: frontZone.y1, yMax: frontZone.y2 },
-    TFR: { xMin: rightX1, xMax: rightX2, yMin: frontZone.y1, yMax: frontZone.y2 },
-    TL: { xMin: leftX1, xMax: leftX2, yMin: midZone.y1, yMax: midZone.y2 },
-    TR: { xMin: rightX1, xMax: rightX2, yMin: midZone.y1, yMax: midZone.y2 },
-    TBL: { xMin: leftX1, xMax: leftX2, yMin: backZone.y1, yMax: backZone.y2 },
-    TBR: { xMin: rightX1, xMax: rightX2, yMin: backZone.y1, yMax: backZone.y2 },
-  };
-
-  return {
-    frontZone,
-    midZone,
-    backZone,
-    frontLeftZone,
-    frontRightZone,
-    midLeftZone,
-    midRightZone,
-    rearLeftZone,
-    rearRightZone,
-    clampByRole,
-    lateral: {
-      centreX_m,
-      seatWidthM,
-      lrWidthM,
-      minHalfSpanM,
-      maxHalfSpanM,
-      halfSpanTargetM,
-      wideSeatingVsLR,
-    },
-  };
+  return { frontZone, midZone, backZone };
 }
