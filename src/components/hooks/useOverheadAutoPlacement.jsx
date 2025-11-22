@@ -20,9 +20,13 @@ export function useOverheadAutoPlacement({
   setPlacedSpeakers,
   overheadZones,
   getCanonicalRole,
-  overheadCount
+  overheadCount,
+  hasManualOverheadEdit = false
 }) {
   useEffect(() => {
+    // Guard: user has manually edited overheads - don't auto-place anymore
+    if (hasManualOverheadEdit) return;
+    
     // Guard: zones not ready
     if (!overheadZones || overheadZones.status !== 'ok') return;
     
