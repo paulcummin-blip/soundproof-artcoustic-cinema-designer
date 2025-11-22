@@ -2158,7 +2158,7 @@ function SpeakerPlacementImpl(props) {
           disabled={disabled}
         >
           <SelectTrigger id="system-config" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
-            <SelectValue placeholder="Select configuration" className="text-2xl font-semibold" />
+            <SelectValue placeholder="Select configuration" className="text-2xl font-semibold" style={{ color: "#213428" }} />
           </SelectTrigger>
           <SelectContent>
             {Object.keys(audioConfigurations).map(preset => (
