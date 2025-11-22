@@ -112,9 +112,6 @@ export default function OverheadSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayo
                 <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
                   {hasValue ? `${splValue.toFixed(1)} dB` : '—'}
                 </div>
-                {!hasValue && (
-                  <div className="text-xs text-[#625143] mt-1">Not placed</div>
-                )}
               </CardContent>
             </Card>
           );
