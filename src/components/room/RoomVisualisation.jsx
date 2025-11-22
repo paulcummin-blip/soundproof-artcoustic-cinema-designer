@@ -1886,7 +1886,7 @@ React.useEffect(() => {
     // Fallback for all other draggable speakers (including overheads)
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
 
-    // Overhead drag behaviour: L/R pairs, clamped to bands, mirrored horizontally, column-locked
+    // Overhead drag behaviour: L/R pairs, clamped to bands, mirrored horizontally
     if (canonicalRole && canonicalRole.startsWith('T')) {
       const pairRole = OVERHEAD_PAIR_MAP[canonicalRole];
       
@@ -1931,23 +1931,14 @@ React.useEffect(() => {
         lengthM
       );
 
-      // 4. Column-lock: define overhead columns
-      const LEFT_COLUMN = ['TFL', 'TL', 'TML', 'TBL'];
-      const RIGHT_COLUMN = ['TFR', 'TR', 'TMR', 'TBR'];
-
-      // 5. Compute unified X positions for each column
-      const isDraggedLeft = LEFT_COLUMN.includes(canonicalRole);
-      const columnXLeft = isDraggedLeft ? primaryClamped.x : (centerX + (centerX - primaryClamped.x));
-      const columnXRight = centerX + (centerX - columnXLeft);
-
-      // 6. Write all overhead speakers with column-locked X positions
+      // 4. Write both back into placedSpeakers in a single update
       onSetSpeakers(prev => {
         if (!Array.isArray(prev)) return prev;
 
         return prev.map(spk => {
           const canon = getCanonicalRole(spk.role) || spk.role;
           
-          // Update the dragged speaker (keep its band-specific Y)
+          // Update the dragged speaker
           if (spk.id === speakerId) {
             return {
               ...spk,
@@ -1959,7 +1950,7 @@ React.useEffect(() => {
             };
           }
           
-          // Update the partner speaker (keep its band-specific Y)
+          // Update the partner speaker
           if (canon === pairRole) {
             return {
               ...spk,
@@ -1967,28 +1958,6 @@ React.useEffect(() => {
                 ...(spk.position || {}),
                 x: partnerClamped.x,
                 y: partnerClamped.y,
-              },
-            };
-          }
-          
-          // Update all other left column speakers (keep their Y, align X)
-          if (LEFT_COLUMN.includes(canon) && canon !== canonicalRole) {
-            return {
-              ...spk,
-              position: {
-                ...(spk.position || {}),
-                x: columnXLeft,
-              },
-            };
-          }
-          
-          // Update all other right column speakers (keep their Y, align X)
-          if (RIGHT_COLUMN.includes(canon) && canon !== pairRole) {
-            return {
-              ...spk,
-              position: {
-                ...(spk.position || {}),
-                x: columnXRight,
               },
             };
           }
