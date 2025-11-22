@@ -84,20 +84,18 @@ export function renderOverheadBandsSVG({
   const renderZone = (zone, zoneKey, label, fill) => {
     if (!zone || !zone.active) return;
 
-    const [x0px] = toPx(zone.x1, 0);
-    const [x1px] = toPx(zone.x2, 0);
+    // Use pieces if available, otherwise fallback to full zone
+    const pieces = Array.isArray(zone.pieces) && zone.pieces.length
+      ? zone.pieces
+      : [{ x1: zone.x1, x2: zone.x2 }];
+
     const [, y0px] = toPx(0, zone.y1);
     const [, y1px] = toPx(0, zone.y2);
 
-    const x = Math.min(x0px, x1px);
     const y = Math.min(y0px, y1px);
-    const wpx = Math.abs(x1px - x0px);
     const hpx = Math.abs(y1px - y0px);
 
-    if (wpx <= 0 || hpx <= 0) return;
-
-    // Gradient for visual polish - adjusted opacity per zone type
-    const gid = `oh-${zoneKey}-grad`;
+    if (hpx <= 0) return;
 
     // Define opacity based on zone type: mid is strongest, front/rear are lighter
     let minOpacity = 0.06;
@@ -114,27 +112,41 @@ export function renderOverheadBandsSVG({
       maxOpacity = 0.20;
     }
 
-    elts.push(
-      <defs key={`${gid}-defs`}>
-        <linearGradient id={gid} x1={x} y1={y} x2={x} y2={y + hpx} gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor={fill} stopOpacity={minOpacity} />
-          <stop offset="50%" stopColor={fill} stopOpacity={maxOpacity} />
-          <stop offset="100%" stopColor={fill} stopOpacity={minOpacity} />
-        </linearGradient>
-      </defs>
-    );
+    // Render each piece separately
+    pieces.forEach((piece, idx) => {
+      const [x0px] = toPx(piece.x1, 0);
+      const [x1px] = toPx(piece.x2, 0);
 
-    elts.push(
-      <rect
-        key={`rect-${zoneKey}`}
-        x={x}
-        y={y}
-        width={wpx}
-        height={hpx}
-        fill={`url(#${gid})`}
-        pointerEvents="none"
-      />
-    );
+      const x = Math.min(x0px, x1px);
+      const wpx = Math.abs(x1px - x0px);
+
+      if (wpx <= 0) return;
+
+      // Gradient for visual polish
+      const gid = `oh-${zoneKey}-${idx}-grad`;
+
+      elts.push(
+        <defs key={`${gid}-defs`}>
+          <linearGradient id={gid} x1={x} y1={y} x2={x} y2={y + hpx} gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stopColor={fill} stopOpacity={minOpacity} />
+            <stop offset="50%" stopColor={fill} stopOpacity={maxOpacity} />
+            <stop offset="100%" stopColor={fill} stopOpacity={minOpacity} />
+          </linearGradient>
+        </defs>
+      );
+
+      elts.push(
+        <rect
+          key={`rect-${zoneKey}-${idx}`}
+          x={x}
+          y={y}
+          width={wpx}
+          height={hpx}
+          fill={`url(#${gid})`}
+          pointerEvents="none"
+        />
+      );
+    });
 
     // Optional: add zone label (can be toggled via prop if desired)
     // Uncomment if you want text labels inside zones:
