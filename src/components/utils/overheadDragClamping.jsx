@@ -186,7 +186,7 @@ export function clampOverheadPairPosition(proposedPos, canonicalRole, overheadZo
   // For now, we pass minimal speaker dims (assume default round overhead)
   const defaultOverheadDims = { diameterM: 0.24, round: true };
   
-  const clampedPos = clampOverheadToZone({
+  return clampOverheadToZone({
     proposedPos,
     canonicalRole,
     overheadZones,
@@ -194,15 +194,4 @@ export function clampOverheadPairPosition(proposedPos, canonicalRole, overheadZo
     widthM,
     lengthM
   });
-
-  // Apply width band clamping (outside seating, inside L/R speakers)
-  const centerX = widthM / 2;
-  const side = clampedPos.x >= centerX ? 'right' : 'left';
-  const band = overheadZones.widthBand?.[side];
-
-  if (band && Number.isFinite(band.minX) && Number.isFinite(band.maxX)) {
-    clampedPos.x = Math.max(band.minX, Math.min(band.maxX, clampedPos.x));
-  }
-
-  return clampedPos;
 }

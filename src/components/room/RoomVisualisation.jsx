@@ -2048,44 +2048,6 @@ React.useEffect(() => {
         });
       });
 
-      // Check if any row moved outside its recommended core
-      const checkCoreCompliance = () => {
-        const frontZone = overheadZones?.frontZone;
-        const midZone = overheadZones?.midZone;
-        const rearZone = overheadZones?.backZone;
-
-        const warnings = [];
-
-        if (frontZone?.coreY1 != null && frontZone?.coreY2 != null && Number.isFinite(newFrontY)) {
-          if (newFrontY < frontZone.coreY1 || newFrontY > frontZone.coreY2) {
-            warnings.push('Front row outside core');
-          }
-        }
-
-        if (midZone?.coreY1 != null && midZone?.coreY2 != null && Number.isFinite(newMidY)) {
-          if (newMidY < midZone.coreY1 || newMidY > midZone.coreY2) {
-            warnings.push('Mid row outside core');
-          }
-        }
-
-        if (rearZone?.coreY1 != null && rearZone?.coreY2 != null && Number.isFinite(newRearY)) {
-          if (newRearY < rearZone.coreY1 || newRearY > rearZone.coreY2) {
-            warnings.push('Rear row outside core');
-          }
-        }
-
-        if (warnings.length > 0) {
-          setDragWarning({
-            show: true,
-            message: `RP22 P9: ${warnings.join(', ')} — Level may drop`,
-            x: newCanvasPos.x,
-            y: newCanvasPos.y
-          });
-        }
-      };
-
-      checkCoreCompliance();
-
       lastInteractionEpoch.current = timeNowMs();
       return;
     }

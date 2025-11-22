@@ -1,11 +1,11 @@
+
 // hooks/useRP22AnalysisEngine.js
 import { useMemo } from 'react';
 import { degreesBetweenVectors } from '../utils/geometryUtils';
 import { pickMLP } from '../utils/seatingUtils';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import { computeBackArc, param5LevelFromGap } from "@/components/utils/RP22Geometry";
-import { computeSeatRoles } from "@/components/utils/seatRoles";
-import { computeUpperRowAnglesAndP9 } from '@/components/utils/rp22UpperAnalysis';
+import { computeSeatRoles } from "@/components/utils/seatRoles"; // Import the new utility
 
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
@@ -195,19 +195,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     const hasSecondarySeating = secondarySeats.length > 0;
 
-    // Compute P9 (overhead angles) for all seats
-    const { widthM, lengthM, heightM } = dimensions || {};
-    const upperP9 = computeUpperRowAnglesAndP9({
-      seats: seatsWithRoles,
-      overheadSpeakers: safeSpeakers,
-      dimensions: { widthM, lengthM, heightM },
-      getCanonicalRole: (role) => {
-        const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
-        const r = String(role || '').toUpperCase();
-        return map[r] || r;
-      }
-    });
-
     // RP22 Parameter 5 — graded entry
     const p5Result = evaluateParameter5AllLayouts(safeSpeakers, safeSeats, mlpBasis);
     if (p5Result) {
@@ -282,34 +269,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       gradedParameters.primary[7] = null;
     }
 
-    // RP22 Parameter 9 — Overhead Row Angle Gaps
-    const p9CatalogEntry = RP22_CATALOG["9"];
-    if (p9CatalogEntry && upperP9?.perSeat) {
-      const perSeatP9 = {};
-      for (const seat of seatsWithRoles) {
-        const seatUpper = upperP9.perSeat[seat.id];
-        perSeatP9[seat.id] = {
-          value: seatUpper?.p9GapDeg ?? null,
-          level: seatUpper?.p9Level ?? null,
-        };
-      }
-      
-      // Find MLP-level P9 for overall parameter grading
-      const mlpSeat = primarySeats.length > 0 ? primarySeats[0] : seatsWithRoles[0];
-      const mlpP9 = mlpSeat ? upperP9.perSeat[mlpSeat.id] : null;
-      
-      gradedParameters.primary[9] = {
-        title: p9CatalogEntry.title,
-        level: mlpP9?.p9Level ? parseInt(mlpP9.p9Level.replace('L', '')) : null,
-        value: mlpP9?.p9GapDeg ?? null,
-        unit: p9CatalogEntry.unit,
-        perSeat: perSeatP9,
-        note: "Vertical angle between overhead rows"
-      };
-    } else {
-      gradedParameters.primary[9] = null;
-    }
-
     gradedParameters.secondary = null;
 
     return {
@@ -317,7 +276,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       p7Details: (evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis) || {}).perSide,
       param5,
       surroundGaps,
-      upperP9,
       analysisDetails: {
         hasSecondarySeating: hasSecondarySeating,
         totalSpeakers: safeSpeakers.length,
@@ -326,7 +284,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         secondarySeats: secondarySeats.length,
       }
     };
-  }, [placedSpeakers, seatingPositions, mlpBasis, dimensions]);
+  }, [placedSpeakers, seatingPositions, mlpBasis]);
 
   return { ...memoizedResult, evaluateOverheads };
 };

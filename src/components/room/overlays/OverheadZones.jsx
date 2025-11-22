@@ -33,13 +33,7 @@ export function computeOverheadZones({
   );
 
   // Compute zone extents (handles inactive bounds internally)
-  const zones = computeRp22OverheadZoneExtents(
-    bounds,
-    { widthM, lengthM, heightM },
-    seatingPositions,
-    placedSpeakers,
-    getCanonicalRole
-  );
+  const zones = computeRp22OverheadZoneExtents(bounds, { widthM, lengthM, heightM });
 
   // Determine status based on whether we have valid seats
   const hasValidSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0 && bounds?.active !== false;
@@ -135,34 +129,6 @@ export function renderOverheadBandsSVG({
         pointerEvents="none"
       />
     );
-
-    // Render recommended core if available
-    if (zone.coreY1 != null && zone.coreY2 != null) {
-      const [, coreY0px] = toPx(0, zone.coreY1);
-      const [, coreY1px] = toPx(0, zone.coreY2);
-      
-      const coreY = Math.min(coreY0px, coreY1px);
-      const coreH = Math.abs(coreY1px - coreY0px);
-      
-      if (coreH > 0) {
-        elts.push(
-          <rect
-            key={`core-${zoneKey}`}
-            x={x}
-            y={coreY}
-            width={wpx}
-            height={coreH}
-            fill={fill}
-            fillOpacity={0.15}
-            stroke={fill}
-            strokeWidth={0.5}
-            strokeOpacity={0.3}
-            strokeDasharray="2,2"
-            pointerEvents="none"
-          />
-        );
-      }
-    }
 
     // Optional: add zone label (can be toggled via prop if desired)
     // Uncomment if you want text labels inside zones:
