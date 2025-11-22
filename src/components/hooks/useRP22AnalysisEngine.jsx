@@ -1,11 +1,12 @@
-
 // hooks/useRP22AnalysisEngine.js
 import { useMemo } from 'react';
 import { degreesBetweenVectors } from '../utils/geometryUtils';
 import { pickMLP } from '../utils/seatingUtils';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import { computeBackArc, param5LevelFromGap } from "@/components/utils/RP22Geometry";
-import { computeSeatRoles } from "@/components/utils/seatRoles"; // Import the new utility
+import { computeSeatRoles } from "@/components/utils/seatRoles";
+import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
+import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
 
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
@@ -166,7 +167,10 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
   };
 }
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis }) => {
+// Helper to normalize role names
+const getCanonicalRole = (role) => String(role || "").toUpperCase();
+
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, seatSplMetrics }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -271,11 +275,76 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     gradedParameters.secondary = null;
 
+    // Compute per-seat RP22 metrics (P9, P10, P16, P17, P20)
+    const seatMetrics = new Map();
+    const roomCenterX = (dimensions?.widthM || 0) / 2;
+
+    // Helper to get SPL at seat for a specific role
+    const getSplAtSeat = (seatId, role) => {
+      if (!seatSplMetrics) return null;
+      const metrics = seatSplMetrics.get(seatId);
+      if (!metrics || !metrics.spl) return null;
+      
+      // Check in all categories
+      const allSpl = { ...metrics.spl.screen, ...metrics.spl.surrounds, ...metrics.spl.uppers };
+      const splObj = allSpl[role];
+      return splObj?.value ?? null;
+    };
+
+    for (const seat of seatsWithRoles) {
+      const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
+      const metrics = { p1: null, p4: null, p5: null, p6: null, p9: null, p10: null, p16: null, p17: null, p20: null };
+
+      // P9 - Maximum vertical angle between adjacent upper speakers
+      const upperSpeakers = getUpperSpeakersForSeat(seat, safeSpeakers, getCanonicalRole);
+      if (upperSpeakers.length >= 2) {
+        const { maxVerticalGapDeg } = computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCenterX);
+        
+        if (isNum(maxVerticalGapDeg)) {
+          let level9 = 1;
+          if (maxVerticalGapDeg <= 50) level9 = 4;
+          else if (maxVerticalGapDeg <= 60) level9 = 3;
+          else if (maxVerticalGapDeg <= 80) level9 = 2;
+          
+          metrics.p9 = {
+            value: maxVerticalGapDeg,
+            formatted: `${maxVerticalGapDeg.toFixed(1)}°`,
+            level: level9,
+          };
+        }
+      }
+
+      // P10 - Maximum SPL difference between upper speakers
+      if (upperSpeakers.length >= 2) {
+        const deltaUpperSpl = computeUpperSplSpreadForSeat(seat, upperSpeakers, getSplAtSeat);
+        
+        if (isNum(deltaUpperSpl)) {
+          let level10 = 1;
+          if (deltaUpperSpl <= 2) level10 = 4;
+          else if (deltaUpperSpl <= 5) level10 = 3;
+          else if (deltaUpperSpl <= 8) level10 = 2;
+          else if (deltaUpperSpl <= 12) level10 = 1;
+          
+          metrics.p10 = {
+            value: deltaUpperSpl,
+            formatted: `±${deltaUpperSpl.toFixed(1)} dB`,
+            level: level10,
+          };
+        }
+      }
+
+      // P16, P17, P20 - Placeholder until frequency response data is available
+      // These will show "—" in the HUD for now
+      
+      seatMetrics.set(seatId, metrics);
+    }
+
     return {
       gradedParameters,
       p7Details: (evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis) || {}).perSide,
       param5,
       surroundGaps,
+      seatMetrics, // New: per-seat RP22 metrics
       analysisDetails: {
         hasSecondarySeating: hasSecondarySeating,
         totalSpeakers: safeSpeakers.length,
@@ -284,7 +353,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         secondarySeats: secondarySeats.length,
       }
     };
-  }, [placedSpeakers, seatingPositions, mlpBasis]);
+  }, [placedSpeakers, seatingPositions, mlpBasis, dimensions, seatSplMetrics]);
 
   return { ...memoizedResult, evaluateOverheads };
 };
