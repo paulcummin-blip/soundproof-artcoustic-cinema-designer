@@ -2,10 +2,10 @@
 // RP22-compliant overhead zone calculations for Dolby upper speakers.
 // Section 5.8 and Parameter 9 compliance.
 
-/**
- * Compute dynamic overhead lateral half-span constrained by seats and L/R speakers.
- * Returns a symmetric half-span value that keeps overheads outside seats but inside L/R.
- */
+// Simple, RP22-style lateral rule:
+//  - overheads may never be NARROWER than the widest seat span
+//  - overheads may never be WIDER than the FL/FR span
+//  - corridor is symmetric around the room centre
 function computeOverheadHalfSpanX({
   widthM,
   placedSpeakers,
@@ -18,31 +18,35 @@ function computeOverheadHalfSpanX({
 
   const centerX = widthM / 2;
 
-  // 1) Find FL / FR X positions (if they exist)
+  // ─────────────────────────────────────
+  // 1) Front L/R speaker span (outer limit)
+  // ─────────────────────────────────────
   let flX = null;
   let frX = null;
 
   if (Array.isArray(placedSpeakers)) {
     for (const spk of placedSpeakers) {
       const canon = getCanonicalRole?.(spk.role) || spk.role;
-      if (canon === "FL" && Number.isFinite(spk?.position?.x)) {
-        flX = spk.position.x;
-      } else if (canon === "FR" && Number.isFinite(spk?.position?.x)) {
-        frX = spk.position.x;
-      }
+      const x = spk?.position?.x;
+      if (!Number.isFinite(x)) continue;
+
+      if (canon === "FL") flX = x;
+      if (canon === "FR") frX = x;
     }
   }
 
-  // Default L/R span if we don't have explicit FL/FR
+  // If we don't have explicit FL/FR, fall back to a safe default span
   if (!Number.isFinite(flX)) flX = centerX - widthM * 0.25;
   if (!Number.isFinite(frX)) frX = centerX + widthM * 0.25;
 
-  const lcrHalfSpan = Math.max(
-    0,
-    Math.min(centerX - flX, frX - centerX)
-  );
+  // Distance from centre out to each L/R speaker
+  const lHalf = Math.max(0, centerX - flX);
+  const rHalf = Math.max(0, frX - centerX);
+  const lcrHalfSpan = Math.max(lHalf, rHalf); // use the wider side
 
-  // 2) Find widest seat X position
+  // ─────────────────────────────────────
+  // 2) Seat span (inner limit)
+  // ─────────────────────────────────────
   let seatMinX = centerX;
   let seatMaxX = centerX;
 
@@ -54,7 +58,7 @@ function computeOverheadHalfSpanX({
       if (x > seatMaxX) seatMaxX = x;
     }
   } else {
-    // Fallback: assume a central seating block
+    // Fallback: small central seating block
     seatMinX = centerX - widthM * 0.15;
     seatMaxX = centerX + widthM * 0.15;
   }
@@ -64,30 +68,19 @@ function computeOverheadHalfSpanX({
     seatMaxX - centerX
   );
 
-  // 3) Apply margins and clamping
-  const SEAT_MARGIN_M = 0.15;  // seats should be comfortably inside
-  const LCR_CLEAR_M   = 0.05;  // stay just inside L/R
+  // ─────────────────────────────────────
+  // 3) Final half-span:
+  //    - at least as wide as the seats
+  //    - no wider than the L/R speakers
+  // ─────────────────────────────────────
+  const MAX_ALLOWED = Math.max(0, centerX - 0.05); // tiny safety margin to wall
 
-  let targetHalfSpan = seatHalfSpan + SEAT_MARGIN_M;
+  let halfSpan = lcrHalfSpan;
+  halfSpan = Math.max(seatHalfSpan, halfSpan);      // not narrower than seats
+  halfSpan = Math.min(halfSpan, lcrHalfSpan);       // never wider than L/R
+  halfSpan = Math.min(halfSpan, MAX_ALLOWED);       // and stay inside room
 
-  // Don't go inside the seating block
-  const minHalfSpan = seatHalfSpan;
-  // Don't go outside L/R
-  const maxHalfSpan = Math.max(
-    0,
-    lcrHalfSpan - LCR_CLEAR_M
-  );
-
-  targetHalfSpan = Math.max(minHalfSpan, targetHalfSpan);
-  if (Number.isFinite(maxHalfSpan) && maxHalfSpan > 0) {
-    targetHalfSpan = Math.min(targetHalfSpan, maxHalfSpan);
-  }
-
-  // Final safety clamp inside the room
-  const MAX_ALLOWED = Math.max(0, centerX - 0.1);
-  targetHalfSpan = Math.min(targetHalfSpan, MAX_ALLOWED);
-
-  return Math.max(0, targetHalfSpan);
+  return Math.max(0, halfSpan);
 }
 
 /**
