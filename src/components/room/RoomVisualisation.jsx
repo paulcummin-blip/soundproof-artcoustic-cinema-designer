@@ -443,6 +443,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [dragState, setDragState] = useState({ dragging: false, draggedItemId: null, dragType: null });
   const { dragging, draggedItemId, dragType } = dragState;
   const [draggingRole, setDraggingRole] = useState(null);
+  const [hasManualOverheadEdit, setHasManualOverheadEdit] = useState(false);
   const [dragWarning, setDragWarning] = useState({ show: false, message: '', x: 0, y: 0 });
   const [constraintZones, setConstraintZones] = useState(null);
   const [zoom, setZoom] = React.useState(1.0);
@@ -1874,6 +1875,9 @@ React.useEffect(() => {
 
     // Overhead drag behaviour: L/R pairs, clamped to bands, mirrored horizontally
     if (canonicalRole && canonicalRole.startsWith('T')) {
+      // mark that the user has manually edited an overhead
+      setHasManualOverheadEdit(true);
+
       const pairRole = OVERHEAD_PAIR_MAP[canonicalRole];
       
       // If no pair role found, fall back to single-speaker drag
@@ -3226,7 +3230,8 @@ useEffect(() => {
     setPlacedSpeakers: onSetSpeakers,
     overheadZones,
     getCanonicalRole,
-    overheadCount
+    overheadCount,
+    hasManualOverheadEdit
   });
 
   // Determine which overhead positions are visible
