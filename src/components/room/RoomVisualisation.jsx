@@ -1896,7 +1896,7 @@ React.useEffect(() => {
       // Raw room coords from the mouse
       const rawRoomPos = canvasToRoom(newCanvasPos);
 
-      // Clamp dragged speaker inside its own band
+      // Clamp dragged speaker inside its own band (now uses clampByRole rectangles)
       const primaryClamped = clampOverheadPairPosition(
         { x: rawRoomPos.x, y: rawRoomPos.y },
         canonicalRole,
@@ -1904,34 +1904,6 @@ React.useEffect(() => {
         widthM,
         lengthM
       );
-
-      // --- RP22 lateral clamp for overhead columns ---
-      const lateral = overheadZones?.lateral;
-      if (lateral && widthM > 0) {
-        const centreX = Number(lateral.centreX_m) || (widthM / 2);
-        const minHalf = Number(lateral.minHalfSpanM) || 0;
-        const maxHalf = Number(lateral.maxHalfSpanM) || 0;
-
-        if (maxHalf > 0) {
-          const isLeftRole =
-            canonicalRole === 'TFL' ||
-            canonicalRole === 'TL' ||
-            canonicalRole === 'TBL';
-
-          // Current offset from centre (keep sign for left/right)
-          let offset = primaryClamped.x - centreX;
-          const sign = isLeftRole ? -1 : 1;
-
-          // Work in positive half-span, clamp to RP22 band
-          let half = Math.abs(offset);
-          let clampedHalf = half;
-
-          if (half < minHalf) clampedHalf = minHalf;
-          if (maxHalf >= minHalf && half > maxHalf) clampedHalf = maxHalf;
-
-          primaryClamped.x = centreX + sign * clampedHalf;
-        }
-      }
 
       // Derive shared column X
       const centerX = widthM / 2;
@@ -3389,7 +3361,8 @@ useEffect(() => {
     overheadZones,
     getCanonicalRole,
     overheadCount,
-    hasManualOverheadEdit
+    hasManualOverheadEdit,
+    mlpPoint: mlp
   });
 
   // Determine which overhead positions are visible
