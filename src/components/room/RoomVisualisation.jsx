@@ -3485,123 +3485,86 @@ useEffect(() => {
   }, [overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride]);
 
 
-// Render overhead speaker icons (one per speaker, using their own positions)
+// Render overhead speaker icons (one per T* speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
-    // Guard: no speakers array
-    if (!Array.isArray(placedSpeakers)) return null;
+    // Basic guards
+    if (!Array.isArray(placedSpeakers) || !roomRect) return null;
 
-    // Select overhead speakers from placedSpeakers (no position check here)
+    // If the global overhead model is OFF / empty, show no overheads at all
+    if (!overheadGlobalModel || overheadGlobalModel === "OFF") {
+      return null;
+    }
+
+    // Pick out all overhead speakers (roles starting with T) that have a usable position
     const overheadSpeakers = placedSpeakers.filter((speaker) => {
       const canonical = getCanonicalRole?.(speaker.role) || speaker.role;
-      if (typeof canonical !== 'string') return false;
-      // Any canonical role that starts with 'T' is an overhead (TFL/TFR/TML/TMR/TBL/TBR/TL/TR)
-      return canonical.startsWith('T');
+      if (typeof canonical !== "string") return false;
+      if (!canonical.startsWith("T")) return false;
+
+      const pos = speaker.position || {};
+      return Number.isFinite(pos.x) && Number.isFinite(pos.y);
     });
 
-    // No overhead speakers to render
-    if (overheadSpeakers.length === 0) return null;
+    if (overheadSpeakers.length === 0) {
+      return null;
+    }
 
-    // Render one icon per overhead speaker using SpeakerIcon
-    return overheadSpeakers.map((speaker) => {
-      const { id, role, model, position } = speaker;
-      const canonicalRole = getCanonicalRole?.(role) || role;
+    return overheadSpeakers
+      .map((speaker) => {
+        const { id, role, position } = speaker;
+        if (!position) return null;
 
-      // Determine which zone position this role belongs to (front/mid/rear)
-      let band = null;
-      if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
-        band = 'front';
-      } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
-        band = 'mid';
-      } else if (['TBL', 'TBR', 'TBC'].includes(canonicalRole)) {
-        band = 'rear';
-      }
+        const canonicalRole = getCanonicalRole?.(role) || role;
 
-      // If we don't know the band, skip it quietly
-      if (!band) {
-        return null;
-      }
+        // Work out which band this role belongs to
+        let band = null;
+        if (["TFL", "TFR", "TFC"].includes(canonicalRole)) {
+          band = "front";
+        } else if (["TL", "TR", "TML", "TMR"].includes(canonicalRole)) {
+          band = "mid";
+        } else if (["TBL", "TBR", "TBC"].includes(canonicalRole)) {
+          band = "rear";
+        }
 
-      // Resolve the actual model using the overhead position helper
-      const resolvedModel = band && getOverheadModelForPosition
-        ? getOverheadModelForPosition(band)
-        : model;
+        // Resolve the model for this band (front / mid / rear),
+        // falling back to the global overhead model.
+        let resolvedModel = overheadGlobalModel;
 
-      // Skip if no model selected
-      if (!resolvedModel || resolvedModel === 'OFF') {
-        return null;
-      }
-
-      // --- NEW: derive a safe effective position for drawing ---
-      let effX = position?.x;
-      let effY = position?.y;
-
-      const zones = overheadZones;
-      const bandZone =
-        zones && zones.status === 'ok'
-          ? (band === 'front'
-              ? zones.frontZone
-              : band === 'mid'
-              ? zones.midZone
-              : zones.backZone)
-          : null;
-
-      if (!Number.isFinite(effX) || !Number.isFinite(effY)) {
-        if (bandZone) {
-          // Centre of the band by default
-          const bandCenterY = (bandZone.y1 + bandZone.y2) / 2;
-          const roomCenterX = widthM / 2;
-
-          // Simple lateral offset for L/R symmetry
-          const lateralOffset = roomCenterX * 0.25;
-
-          if (canonicalRole.endsWith('L')) {
-            effX = roomCenterX - lateralOffset;
-          } else if (canonicalRole.endsWith('R')) {
-            effX = roomCenterX + lateralOffset;
-          } else {
-            // TFC / TMC / TBC etc
-            effX = roomCenterX;
+        if (band && typeof getOverheadModelForPosition === "function") {
+          const bandModel = getOverheadModelForPosition(band);
+          if (bandModel && bandModel !== "OFF") {
+            resolvedModel = bandModel;
           }
+        }
 
-          effY = bandCenterY;
-        } else {
-          // Absolute last resort – drop it to avoid NaNs
+        // If we still don't have a model, skip this speaker
+        if (!resolvedModel || resolvedModel === "OFF") {
           return null;
         }
-      }
 
-      const effectiveSpeaker = {
-        ...speaker,
-        model: resolvedModel,
-        position: {
-          ...(speaker.position || {}),
-          x: effX,
-          y: effY,
-        },
-      };
+        // This is the effective speaker used for rendering & dragging
+        const effectiveSpeaker = { ...speaker, model: resolvedModel };
 
-      const isOverhead =
-        typeof canonicalRole === "string" && canonicalRole.startsWith("T");
+        const speakerMouseDownHandler = (e) => {
+          // Always route overhead clicks into the existing drag pipeline.
+          handleMouseDown(e, id, "speaker");
+        };
 
-      const speakerMouseDownHandler = isOverhead
-        ? (e) => handleOverheadDragStart(e, id)
-        : (isDraggable(effectiveSpeaker)
-            ? (e) => handleMouseDown(e, id, "speaker")
-            : undefined);
-
-      return (
-        <SpeakerIcon
-          key={id}
-          speaker={effectiveSpeaker}
-          canvasX={roomRect.x + (effX * scale)}
-          canvasY_raw={roomRect.y + (effY * scale)}
-          yaw={speaker.yaw || 0}
-          scale={scale}
-          speakerMouseDownHandler={speakerMouseDownHandler}
-          setHoveredSpeaker={setHoveredSpeaker}
-        />
-      );
-    }).filter(Boolean);
+        return (
+          <SpeakerIcon
+            key={id}
+            speaker={effectiveSpeaker}
+            canvasX={roomRect.x + position.x * scale}
+            canvasY_raw={roomRect.y + position.y * scale}
+            // overheads currently use `yaw`, keep behaviour the same
+            yaw={speaker.yaw || 0}
+            scale={scale}
+            speakerMouseDownHandler={speakerMouseDownHandler}
+            setHoveredSpeaker={setHoveredSpeaker}
+          />
+        );
+      })
+      .filter(Boolean);
   }, [
     placedSpeakers,
     getCanonicalRole,
