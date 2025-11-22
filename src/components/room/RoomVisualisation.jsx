@@ -1882,183 +1882,169 @@ React.useEffect(() => {
         return;
       }
 
-      // Helper to classify band from role
-      const bandForRole = (role) => {
-        const c = getCanonicalRole(role);
-        if (!c || typeof c !== "string") return null;
-        if (c === "TFL" || c === "TFR" || c === "TFC") return "front";
-        if (c === "TL"  || c === "TR"  || c === "TML" || c === "TMR") return "mid";
-        if (c === "TBL" || c === "TBR" || c === "TBC") return "rear";
-        return null;
-      };
+      // Role group helpers
+      const LEFT_ROLES = ['TFL', 'TL', 'TBL'];
+      const RIGHT_ROLES = ['TFR', 'TR', 'TBR'];
 
-      const draggedBand = bandForRole(canonicalRole);
-      const isDraggedLeft = canonicalRole.endsWith("L");
+      const isLeftRole = (role) => LEFT_ROLES.includes(role);
+      const isRightRole = (role) => RIGHT_ROLES.includes(role);
 
-      const pairRole = OVERHEAD_PAIR_MAP[canonicalRole];
+      const isFrontRole = (role) => role === 'TFL' || role === 'TFR';
+      const isMidRole = (role) => role === 'TL' || role === 'TR';
+      const isRearRole = (role) => role === 'TBL' || role === 'TBR';
 
       // Raw room coords from the mouse
       const rawRoomPos = canvasToRoom(newCanvasPos);
-      const rawX = rawRoomPos.x;
-      const rawY = rawRoomPos.y;
 
       // Clamp dragged speaker inside its own band
       const primaryClamped = clampOverheadPairPosition(
-        { x: rawX, y: rawY },
+        { x: rawRoomPos.x, y: rawRoomPos.y },
         canonicalRole,
         overheadZones,
         widthM,
         lengthM
       );
 
+      // Derive shared column X
       const centerX = widthM / 2;
-      const mirroredX = centerX + (centerX - primaryClamped.x);
+      let leftColumnX = null;
+      let rightColumnX = null;
 
-      // Clamp partner (other side) into its band
-      const partnerClamped = pairRole
-        ? clampOverheadPairPosition(
-            { x: mirroredX, y: primaryClamped.y },
-            pairRole,
-            overheadZones,
-            widthM,
-            lengthM
-          )
-        : null;
+      if (isLeftRole(canonicalRole)) {
+        leftColumnX = primaryClamped.x;
+        rightColumnX = centerX + (centerX - leftColumnX);
+      }
 
-      // How far did the dragged speaker move horizontally?
-      const oldPos = spk.position || {};
-      const deltaX = Number.isFinite(oldPos.x)
-        ? primaryClamped.x - oldPos.x
-        : 0;
+      if (isRightRole(canonicalRole)) {
+        rightColumnX = primaryClamped.x;
+        leftColumnX = centerX + (centerX - rightColumnX);
+      }
 
-      onSetSpeakers((prev) => {
+      // Clamp both columns
+      if (leftColumnX != null) {
+        const leftClamped = clampOverheadPairPosition(
+          { x: leftColumnX, y: primaryClamped.y },
+          'TL',
+          overheadZones,
+          widthM,
+          lengthM
+        );
+        leftColumnX = leftClamped.x;
+      }
+
+      if (rightColumnX != null) {
+        const rightClamped = clampOverheadPairPosition(
+          { x: rightColumnX, y: primaryClamped.y },
+          'TR',
+          overheadZones,
+          widthM,
+          lengthM
+        );
+        rightColumnX = rightClamped.x;
+      }
+
+      // Discover current Y positions from placedSpeakers
+      let frontY = null;
+      let midY = null;
+      let rearY = null;
+
+      for (const s of placedSpeakers) {
+        const role = getCanonicalRole(s.role);
+        const posY = s?.position?.y;
+        if (!Number.isFinite(posY)) continue;
+
+        if (isFrontRole(role)) frontY = posY;
+        if (isMidRole(role)) midY = posY;
+        if (isRearRole(role)) rearY = posY;
+      }
+
+      // Fallback: use dragged Y as mid anchor if missing
+      if (!Number.isFinite(midY)) {
+        midY = primaryClamped.y;
+      }
+
+      // Compute symmetric Y around mid
+      let newFrontY = frontY;
+      let newMidY = midY;
+      let newRearY = rearY;
+
+      if (isMidRole(canonicalRole)) {
+        // Dragging mid: move front and rear in parallel
+        const dFront = Number.isFinite(frontY) ? midY - frontY : 0;
+        const dRear = Number.isFinite(rearY) ? rearY - midY : 0;
+
+        newMidY = primaryClamped.y;
+        newFrontY = newMidY - dFront;
+        newRearY = newMidY + dRear;
+      }
+
+      if (isFrontRole(canonicalRole)) {
+        // Dragging front: enforce symmetry around mid
+        newFrontY = primaryClamped.y;
+        const d = midY - newFrontY;
+        newRearY = midY + d;
+      }
+
+      if (isRearRole(canonicalRole)) {
+        // Dragging rear: enforce symmetry around mid
+        newRearY = primaryClamped.y;
+        const d = newRearY - midY;
+        newFrontY = midY - d;
+      }
+
+      // Clamp Y for each row
+      const clampYForRole = (x, y, role) => {
+        const clamped = clampOverheadPairPosition(
+          { x, y },
+          role,
+          overheadZones,
+          widthM,
+          lengthM
+        );
+        return clamped.y;
+      };
+
+      if (Number.isFinite(newFrontY)) {
+        newFrontY = clampYForRole(leftColumnX ?? primaryClamped.x, newFrontY, 'TFL');
+      }
+      if (Number.isFinite(newMidY)) {
+        newMidY = clampYForRole(leftColumnX ?? primaryClamped.x, newMidY, 'TL');
+      }
+      if (Number.isFinite(newRearY)) {
+        newRearY = clampYForRole(leftColumnX ?? primaryClamped.x, newRearY, 'TBL');
+      }
+
+      // Write positions for all six overheads
+      onSetSpeakers(prev => {
         if (!Array.isArray(prev)) return prev;
 
-        // First pass: work out the new LEFT-column X per band
-        let leftXByBand = {
-          front: null,
-          mid: null,
-          rear: null,
-        };
+        return prev.map(spk => {
+          const role = getCanonicalRole(spk.role);
+          if (!role || !role.startsWith('T')) return spk;
 
-        // Seed from current positions
-        for (const s of prev) {
-          const c = getCanonicalRole(s.role);
-          const band = bandForRole(c);
-          if (!band) continue;
-          if (!c.endsWith("L")) continue;
+          const current = { ...(spk.position || {}) };
 
-          const pos = s.position || {};
-          if (!Number.isFinite(pos.x)) continue;
+          const isLeft = isLeftRole(role);
+          const isRight = isRightRole(role);
 
-          if (leftXByBand[band] == null) {
-            leftXByBand[band] = pos.x;
+          if (isLeft && leftColumnX != null) {
+            current.x = leftColumnX;
           }
-        }
-
-        // Apply horizontal movement to the dragged band on the LEFT side
-        if (isDraggedLeft && draggedBand && Number.isFinite(deltaX)) {
-          const currentX = leftXByBand[draggedBand];
-          const targetX = Number.isFinite(currentX)
-            ? currentX + deltaX
-            : primaryClamped.x;
-
-          // Clamp that target inside the dragged band
-          const clamped = clampOverheadPairPosition(
-            { x: targetX, y: primaryClamped.y },
-            canonicalRole,
-            overheadZones,
-            widthM,
-            lengthM
-          );
-          leftXByBand[draggedBand] = clamped.x;
-        }
-
-        // If we dragged on the RIGHT side, deduce the left position from mirror
-        if (!isDraggedLeft && draggedBand && Number.isFinite(deltaX)) {
-          const currentRightX = oldPos.x;
-          if (Number.isFinite(currentRightX)) {
-            const currentLeftX = centerX - (currentRightX - centerX);
-            const targetLeftX = currentLeftX + deltaX;
-            const clampedLeft = clampOverheadPairPosition(
-              { x: targetLeftX, y: primaryClamped.y },
-              // map dragged role to the left-side equivalent for clamping
-              draggedBand === "front"
-                ? "TFL"
-                : draggedBand === "mid"
-                ? "TL"
-                : "TBL",
-              overheadZones,
-              widthM,
-              lengthM
-            );
-            leftXByBand[draggedBand] = clampedLeft.x;
-          }
-        }
-
-        // If some bands never got seeded (e.g. weird layout), just keep them as-is
-        return prev.map((s) => {
-          const c = getCanonicalRole(s.role);
-          const band = bandForRole(c);
-          if (!band) return s;
-          const pos = s.position || {};
-          let x = pos.x;
-          let y = pos.y;
-
-          // 1) Dragged speaker: use primaryClamped
-          if (s.id === speakerId) {
-            x = primaryClamped.x;
-            y = primaryClamped.y;
-          }
-          // 2) Mirrored partner in the same band
-          else if (pairRole && c === pairRole) {
-            if (partnerClamped) {
-              x = partnerClamped.x;
-              y = partnerClamped.y;
-            }
+          if (isRight && rightColumnX != null) {
+            current.x = rightColumnX;
           }
 
-          // 3) Keep all LEFT speakers in a vertical line per band
-          if (c && c.startsWith("T") && c.endsWith("L")) {
-            const bandX = leftXByBand[band];
-            if (Number.isFinite(bandX)) {
-              const clamped = clampOverheadPairPosition(
-                { x: bandX, y },
-                c,
-                overheadZones,
-                widthM,
-                lengthM
-              );
-              x = clamped.x;
-              y = clamped.y;
-            }
+          if (isFrontRole(role) && Number.isFinite(newFrontY)) {
+            current.y = newFrontY;
+          }
+          if (isMidRole(role) && Number.isFinite(newMidY)) {
+            current.y = newMidY;
+          }
+          if (isRearRole(role) && Number.isFinite(newRearY)) {
+            current.y = newRearY;
           }
 
-          // 4) RIGHT speakers are mirrored from the left per band
-          if (c && c.startsWith("T") && c.endsWith("R")) {
-            const leftBandX = leftXByBand[band];
-            if (Number.isFinite(leftBandX)) {
-              const mirroredBandX = centerX + (centerX - leftBandX);
-              const clamped = clampOverheadPairPosition(
-                { x: mirroredBandX, y },
-                c,
-                overheadZones,
-                widthM,
-                lengthM
-              );
-              x = clamped.x;
-              y = clamped.y;
-            }
-          }
-
-          return {
-            ...s,
-            position: {
-              ...(s.position || {}),
-              x,
-              y,
-            },
-          };
+          return { ...spk, position: current };
         });
       });
 
