@@ -187,21 +187,20 @@ export function clampOverheadPairPosition(proposedPos, canonicalRole, overheadZo
   
   if (clampRect && Number.isFinite(clampRect.xMin) && Number.isFinite(clampRect.xMax) && 
       Number.isFinite(clampRect.yMin) && Number.isFinite(clampRect.yMax)) {
-    // Tiny epsilon to avoid exact boundary floating-point issues
-    const EPS = 0.0005; // 0.5mm
-    
-    const minX = clampRect.xMin + EPS;
-    const maxX = clampRect.xMax - EPS;
-    const minY = clampRect.yMin + EPS;
-    const maxY = clampRect.yMax - EPS;
-    
-    const x = Math.min(maxX, Math.max(minX, proposedPos.x));
-    const y = Math.min(maxY, Math.max(minY, proposedPos.y));
+    const x = Math.min(clampRect.xMax, Math.max(clampRect.xMin, proposedPos.x));
+    const y = Math.min(clampRect.yMax, Math.max(clampRect.yMin, proposedPos.y));
     return { x, y };
   }
 
-  // Fallback: simple room clamp (should rarely be used if clampByRole is properly computed)
-  const x = Math.max(0, Math.min(widthM, proposedPos.x));
-  const y = Math.max(0, Math.min(lengthM, proposedPos.y));
-  return { x, y };
+  // Fallback to old behavior
+  const defaultOverheadDims = { diameterM: 0.24, round: true };
+  
+  return clampOverheadToZone({
+    proposedPos,
+    canonicalRole,
+    overheadZones,
+    speakerDims: defaultOverheadDims,
+    widthM,
+    lengthM
+  });
 }

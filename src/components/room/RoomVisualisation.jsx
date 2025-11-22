@@ -1896,7 +1896,7 @@ React.useEffect(() => {
       // Raw room coords from the mouse
       const rawRoomPos = canvasToRoom(newCanvasPos);
 
-      // Clamp dragged speaker inside its own band (now uses clampByRole rectangles)
+      // Clamp dragged speaker inside its own band
       const primaryClamped = clampOverheadPairPosition(
         { x: rawRoomPos.x, y: rawRoomPos.y },
         canonicalRole,
@@ -1905,7 +1905,35 @@ React.useEffect(() => {
         lengthM
       );
 
-      // Derive shared column X (mirrored, no re-clamping)
+      // --- RP22 lateral clamp for overhead columns ---
+      const lateral = overheadZones?.lateral;
+      if (lateral && widthM > 0) {
+        const centreX = Number(lateral.centreX_m) || (widthM / 2);
+        const minHalf = Number(lateral.minHalfSpanM) || 0;
+        const maxHalf = Number(lateral.maxHalfSpanM) || 0;
+
+        if (maxHalf > 0) {
+          const isLeftRole =
+            canonicalRole === 'TFL' ||
+            canonicalRole === 'TL' ||
+            canonicalRole === 'TBL';
+
+          // Current offset from centre (keep sign for left/right)
+          let offset = primaryClamped.x - centreX;
+          const sign = isLeftRole ? -1 : 1;
+
+          // Work in positive half-span, clamp to RP22 band
+          let half = Math.abs(offset);
+          let clampedHalf = half;
+
+          if (half < minHalf) clampedHalf = minHalf;
+          if (maxHalf >= minHalf && half > maxHalf) clampedHalf = maxHalf;
+
+          primaryClamped.x = centreX + sign * clampedHalf;
+        }
+      }
+
+      // Derive shared column X
       const centerX = widthM / 2;
       let leftColumnX = null;
       let rightColumnX = null;
@@ -1918,6 +1946,29 @@ React.useEffect(() => {
       if (isRightRole(canonicalRole)) {
         rightColumnX = primaryClamped.x;
         leftColumnX = centerX + (centerX - rightColumnX);
+      }
+
+      // Clamp both columns
+      if (leftColumnX != null) {
+        const leftClamped = clampOverheadPairPosition(
+          { x: leftColumnX, y: primaryClamped.y },
+          'TL',
+          overheadZones,
+          widthM,
+          lengthM
+        );
+        leftColumnX = leftClamped.x;
+      }
+
+      if (rightColumnX != null) {
+        const rightClamped = clampOverheadPairPosition(
+          { x: rightColumnX, y: primaryClamped.y },
+          'TR',
+          overheadZones,
+          widthM,
+          lengthM
+        );
+        rightColumnX = rightClamped.x;
       }
 
       // Discover current Y positions from placedSpeakers
@@ -3338,9 +3389,7 @@ useEffect(() => {
     overheadZones,
     getCanonicalRole,
     overheadCount,
-    hasManualOverheadEdit,
-    mlpPoint: mlp,
-    heightM
+    hasManualOverheadEdit
   });
 
   // Determine which overhead positions are visible
