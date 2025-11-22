@@ -391,10 +391,9 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   const commonAzTargetDeg = (commonAzMinDeg + commonAzMaxDeg) / 2;
   const commonAzTargetRad = (commonAzTargetDeg * Math.PI) / 180;
 
-  // Lateral half-span at ceiling, using ear-to-ceiling as the "radius"
-  const halfSpanOverhead = earToCeilingM * Math.tan(commonAzTargetRad);
-
-  // NEW: constrain using seats + L/R speakers
+  // NEW: lateral half-span driven by seats + L/R speakers only.
+  // Angle / elevation constraints are handled in the Y direction and RP22 metrics,
+  // not by squeezing the side-to-side corridor.
   const halfSpanX = computeOverheadHalfSpanX({
     widthM,
     placedSpeakers,
@@ -402,10 +401,11 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
     getCanonicalRole,
   });
 
-  // Take the minimum of angle-based and seat/LCR-based constraints
-  const clampedHalfSpan = halfSpanX;
-
+  // If for some reason we get 0 or NaN, fall back to a sane default
   const roomCenterX = widthM / 2;
+  const clampedHalfSpan = Number.isFinite(halfSpanX) && halfSpanX > 0
+    ? halfSpanX
+    : widthM * 0.25;
 
   // Apply symmetric bounds to all zones
   const x1Overhead = Math.max(0, roomCenterX - clampedHalfSpan);
