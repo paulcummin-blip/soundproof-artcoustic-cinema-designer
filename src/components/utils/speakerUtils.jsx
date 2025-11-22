@@ -40,7 +40,6 @@ export function isDraggable(speaker) {
   if (!speaker || !speaker.role) return false;
 
   const canonicalRole = getCanonicalRole(speaker.role);
-
   if (!canonicalRole || typeof canonicalRole !== "string") {
     return false;
   }
@@ -51,27 +50,29 @@ export function isDraggable(speaker) {
   // Any sub / LFE is fixed
   const roleUpper = String(speaker.role).toUpperCase();
   if (roleUpper.includes("SUB")) return false;
-  if (canonicalRole === "LFE" || canonicalRole === "LFE1" || canonicalRole === "LFE2") {
+  if (
+    canonicalRole === "LFE" ||
+    canonicalRole === "LFE1" ||
+    canonicalRole === "LFE2"
+  ) {
     return false;
   }
 
-  // Overheads (T* roles) ARE draggable,
-  // as long as they have a model and a valid plan position.
+  // ---- Overheads (T* roles) ----
+  // These should be draggable whenever they exist in the plan and have a
+  // valid 2D position. We do *not* rely on the raw model here because
+  // overheads often inherit a global model.
   if (canonicalRole.startsWith("T")) {
     const pos = speaker.position || {};
-    const hasModel = !!String(speaker.model || "").trim()
-      && String(speaker.model).toLowerCase() !== "off"
-      && String(speaker.model).toLowerCase() !== "none";
-
     const hasValidPos =
       Number.isFinite(pos.x) &&
       Number.isFinite(pos.y);
 
-    return hasModel && hasValidPos;
+    return hasValidPos;
   }
 
-  // All other speakers:
-  // draggable if they have a valid model (same rule as before).
+  // ---- All other speakers ----
+  // Draggable if they have an explicit, non-OFF model.
   const modelStr = String(speaker.model || "").trim().toLowerCase();
   if (!modelStr || modelStr === "off" || modelStr === "none") return false;
 

@@ -1342,13 +1342,11 @@ React.useEffect(() => {
       const target = byId.get(id);
       if (!target) return;
 
-      const canonRole = getCanonicalRole(target.role);
+      const canonicalRole = getCanonicalRole(target.role);
       const isOverhead =
-        typeof canonRole === "string" && canonRole.startsWith("T");
+        typeof canonicalRole === "string" && canonicalRole.startsWith("T");
 
       // 1) For non-overhead speakers, keep the existing "renderable" guard.
-      //    Overheads always bypass this so they can be dragged even if treated
-      //    as placeholders by isRenderableSpeaker.
       if (type === "speaker" && !isOverhead && !isRenderableSpeaker(target)) {
         return;
       }
@@ -1365,9 +1363,6 @@ React.useEffect(() => {
         return;
       }
 
-      // 3) At this point:
-      //    - All overheads (T*) are allowed through
-      //    - Non-overheads have passed both guards
       setDragState({
         dragging: true,
         draggedItemId: id,
@@ -1378,25 +1373,16 @@ React.useEffect(() => {
 
       if (type === "speaker") {
         const speakerBeingDragged = byId.get(id);
-        const dragCanon = getCanonicalRole(speakerBeingDragged.role);
-
-        // Maintain the existing special-case counters for surrounds / wides.
-        if (dragCanon === "SBL" || dragCanon === "SBR") {
+        const canonRole = getCanonicalRole(speakerBeingDragged.role);
+        if (canonRole === "SBL" || canonRole === "SBR") {
           isDraggingRearRef.current++;
         }
-        if (dragCanon === "LW" || dragCanon === "RW") {
+        if (canonRole === "LW" || canonRole === "RW") {
           isDraggingFW.current = true;
         }
       }
     },
-    [
-      byId,
-      setDragState,
-      setDragWarning,
-      setTooltip,
-      rsDragLockRef,
-      getCanonicalRole,
-    ]
+    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole]
   );
 
   const handleZoomIn = () => setZoom(prev => Math.min(2.0, prev + 0.1));
