@@ -146,7 +146,7 @@ export function getListeningAreaBounds(
  * @param {Object} roomDims - {widthM, lengthM, heightM}
  * @returns {Object} {frontZone, midZone, backZone} each with {x1, x2, y1, y2, active}
  */
-export function computeRp22OverheadZoneExtents(bounds, roomDims) {
+export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPositions = [], placedSpeakers = [], getCanonicalRole = null) {
   if (!bounds || bounds.active === false) {
     return {
       frontZone: { x1: 0, x2: 0, y1: 0, y2: 0, active: false },
@@ -156,6 +156,57 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   }
 
   const { widthM = 4.5, lengthM = 6.0, heightM = 2.4 } = roomDims || {};
+  const centerX = widthM / 2;
+
+  // Compute seating extents for width limits
+  let maxSeatOffsetR = 0;
+  let maxSeatOffsetL = 0;
+  
+  if (Array.isArray(seatingPositions)) {
+    for (const seat of seatingPositions) {
+      const seatX = seat?.position?.x ?? seat?.x;
+      if (!Number.isFinite(seatX)) continue;
+      
+      const dx = seatX - centerX;
+      if (dx > 0) maxSeatOffsetR = Math.max(maxSeatOffsetR, dx);
+      if (dx < 0) maxSeatOffsetL = Math.min(maxSeatOffsetL, dx);
+    }
+  }
+
+  const seatMarginM = 0.10; // 10cm outside outer seat
+  const xMinR = centerX + maxSeatOffsetR + seatMarginM;
+  const xMaxL = centerX + maxSeatOffsetL - seatMarginM;
+
+  // Find front L/R speaker positions
+  let xLCR_L = centerX - 0.5;
+  let xLCR_R = centerX + 0.5;
+  
+  if (Array.isArray(placedSpeakers) && getCanonicalRole) {
+    const fl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FL');
+    const fr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FR');
+    
+    if (fl && Number.isFinite(fl.position?.x)) {
+      xLCR_L = fl.position.x;
+    }
+    if (fr && Number.isFinite(fr.position?.x)) {
+      xLCR_R = fr.position.x;
+    }
+  }
+
+  const lcrMarginM = 0.05; // small gap to avoid icon overlap
+  const wallMarginM = 0.05;
+
+  // Build width bands for left and right sides
+  const widthBand = {
+    left: {
+      minX: Math.max(wallMarginM, xMaxL),
+      maxX: Math.min(centerX - seatMarginM, xLCR_L + lcrMarginM),
+    },
+    right: {
+      minX: Math.max(centerX + seatMarginM, xMinR),
+      maxX: Math.min(widthM - wallMarginM, xLCR_R - lcrMarginM),
+    },
+  };
   const { listeningFrontY, listeningBackY, midCenterY } = bounds;
 
   const screenWallInner = 0.05;
@@ -300,5 +351,5 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims) {
   midZone.active = midZone.y2 > midZone.y1;
   backZone.active = backZone.y2 > backZone.y1;
 
-  return { frontZone, midZone, backZone };
+  return { frontZone, midZone, backZone, widthBand };
 }

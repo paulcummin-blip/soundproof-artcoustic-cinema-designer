@@ -33,7 +33,13 @@ export function computeOverheadZones({
   );
 
   // Compute zone extents (handles inactive bounds internally)
-  const zones = computeRp22OverheadZoneExtents(bounds, { widthM, lengthM, heightM });
+  const zones = computeRp22OverheadZoneExtents(
+    bounds,
+    { widthM, lengthM, heightM },
+    seatingPositions,
+    placedSpeakers,
+    getCanonicalRole
+  );
 
   // Determine status based on whether we have valid seats
   const hasValidSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0 && bounds?.active !== false;
