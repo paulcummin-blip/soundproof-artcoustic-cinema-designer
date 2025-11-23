@@ -1496,7 +1496,7 @@ function RoomDesignerWithState() {
 
   // Pass appState as the first argument to useProjectLoader
   const {
-    projectId: projectIdState,
+    projectId: loadedProjectId,
     projectName,
     loadState,
     autosaveStatus,
