@@ -149,7 +149,11 @@ export default function SeatHud({
               }}
             >
               <span>
-                {key.toUpperCase()}: {metric.formatted || '—'}
+                {key === 'p16' && metric.hudLabel ? (
+                  `P16: ${metric.hudLabel}`
+                ) : (
+                  `${key.toUpperCase()}: ${metric.formatted || '—'}`
+                )}
               </span>
               {renderLevelBadge(metric.level || '—')}
             </div>
