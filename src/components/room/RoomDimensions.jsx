@@ -85,21 +85,6 @@ export default function RoomDimensions({ disabled }) {
   return (
     <div className="space-y-4">
       <div>
-        <Label htmlFor="room-width" className="block mb-2">Width (m)</Label>
-        <Input
-          id="room-width"
-          type="text"
-          inputMode="decimal"
-          value={draftDims.width}
-          onChange={(e) => handleDimensionChange('width', e.target.value)}
-          onBlur={() => handleDimensionBlur('width')}
-          disabled={disabled}
-          style={inputStyle}
-          placeholder="e.g. 4.55"
-        />
-      </div>
-
-      <div>
         <Label htmlFor="room-length" className="block mb-2">Length (m)</Label>
         <Input
           id="room-length"
@@ -110,7 +95,20 @@ export default function RoomDimensions({ disabled }) {
           onBlur={() => handleDimensionBlur('length')}
           disabled={disabled}
           style={inputStyle}
-          placeholder="e.g. 6.20"
+        />
+      </div>
+
+      <div>
+        <Label htmlFor="room-width" className="block mb-2">Width (m)</Label>
+        <Input
+          id="room-width"
+          type="text"
+          inputMode="decimal"
+          value={draftDims.width}
+          onChange={(e) => handleDimensionChange('width', e.target.value)}
+          onBlur={() => handleDimensionBlur('width')}
+          disabled={disabled}
+          style={inputStyle}
         />
       </div>
 
@@ -125,7 +123,6 @@ export default function RoomDimensions({ disabled }) {
           onBlur={() => handleDimensionBlur('height')}
           disabled={disabled}
           style={inputStyle}
-          placeholder="e.g. 2.80"
         />
       </div>
 
