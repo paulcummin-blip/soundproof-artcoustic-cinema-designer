@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { installConsolePolyfill } from "@/components/utils/consolePolyfill";
 
@@ -33,7 +32,7 @@ import {
 import ApiBadge from "@/components/ui/ApiBadge";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
-import { useProjectActions, useActiveProjectId } from "@/components/state/project-session";
+import { useProjectActions, useActiveProjectId, useProjectSummary } from "@/components/state/project-session";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
@@ -53,6 +52,7 @@ const menuItems = [
 export default function Layout({ children, currentPageName }) {
   const projectActions = useProjectActions();
   const activeProjectId = useActiveProjectId();
+  const projectSummary = useProjectSummary();
 
   useEffect(() => {
     log.debug(`[Layout] Page: ${currentPageName}`);
@@ -115,7 +115,19 @@ export default function Layout({ children, currentPageName }) {
                   </SidebarGroupLabel>
                   <SidebarGroupContent>
                     <div className="px-3 py-2 text-xs text-brand-text-muted">
-                      {activeProjectId ? `Active: ${activeProjectId.slice(0, 8)}...` : "No active project"}
+                      {activeProjectId && projectSummary?.name ? (
+                        <>
+                          <div className="font-semibold text-brand-text-label">{projectSummary.name}</div>
+                          {projectSummary.client_name && (
+                            <div className="text-[10px] mt-0.5">Client: {projectSummary.client_name}</div>
+                          )}
+                          <div className="text-[10px] mt-0.5 opacity-60">ID: {activeProjectId.slice(0, 8)}...</div>
+                        </>
+                      ) : activeProjectId ? (
+                        `Active: ${activeProjectId.slice(0, 8)}...`
+                      ) : (
+                        "No active project"
+                      )}
                     </div>
                   </SidebarGroupContent>
                 </SidebarGroup>
