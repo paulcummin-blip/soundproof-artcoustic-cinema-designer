@@ -31,28 +31,32 @@ const listeners = new Set();
 
 // Persistence helpers
 function load() {
+  // Never restore an "active project" across a fresh page load.
+  // The user must explicitly Open Project in this session.
+  const empty = {
+    activeProjectId: null,
+    byProject: {},
+    spec: { dolbyLayout: undefined, targetSPL_LCR_dB: null },
+  };
+
+  if (typeof window === "undefined") {
+    return empty;
+  }
+
   try {
-    // Load active project ID from dedicated key (new approach)
-    const activeId = typeof window !== "undefined" ? window.localStorage?.getItem(ACTIVE_PROJECT_KEY) : null;
-    
-    const raw = typeof window !== "undefined" ? window.localStorage?.getItem(STORAGE_KEY) : null;
-    if (!raw) {
-      // If we have an active ID but no session data, initialize with it
-      if (activeId) {
-        state.activeProjectId = activeId;
-      }
-      return;
-    }
-    const parsed = JSON.parse(raw);
-    if (parsed && typeof parsed === "object") {
-      state = {
-        // Prefer dedicated key over embedded value
-        activeProjectId: activeId || parsed.activeProjectId || null,
-        byProject: parsed.byProject ?? {},
-        spec: parsed.spec ?? { dolbyLayout: undefined, targetSPL_LCR_dB: null },
-      };
-    }
-  } catch {}
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return empty;
+
+    const parsed = JSON.parse(raw) || {};
+    return {
+      activeProjectId: null,               // ← key line: always start with none
+      byProject: parsed.byProject || {},
+      spec: parsed.spec || { dolbyLayout: undefined, targetSPL_LCR_dB: null },
+    };
+  } catch (err) {
+    console.warn("[project-session] Failed to load state, starting empty.", err);
+    return empty;
+  }
 }
 function save() {
   try {
@@ -75,7 +79,7 @@ function save() {
 }
 
 // Initialize from storage
-load();
+state = load();
 
 // Core store API
 function getState() {
