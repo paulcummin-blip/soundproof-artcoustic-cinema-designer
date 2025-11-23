@@ -2479,18 +2479,60 @@ React.useEffect(() => {
       }
     }
 
-    // --- P9: Overhead Row Gap Deg ---
-    // Placeholder for now - uses SeatRP22 logic
-    if (typeof metricP1_nearestWallM.p9_overheadRowGapDeg === 'function') { // corrected reference
-      const valueDeg = metricP1_nearestWallM.p9_overheadRowGapDeg( // corrected reference
-        { x: seatX, y: seatY, z: seatZ },
-        placed // Pass all placed speakers for full context
-      );
-      if (Number.isFinite(valueDeg)) {
+    // --- P9: Overhead Row Gap Deg (vertical spacing between upper rows) ---
+    if (placedOH.length >= 2) {
+      const earHeight = finite(seatZ, 1.2);
+      
+      // Categorize uppers into left and right columns
+      const leftRoles = ['TFL', 'TL', 'TBL'];
+      const rightRoles = ['TFR', 'TR', 'TBR'];
+      
+      const leftUppers = placedOH.filter(s => leftRoles.includes(getCanonicalRole(s.role)));
+      const rightUppers = placedOH.filter(s => rightRoles.includes(getCanonicalRole(s.role)));
+      
+      const computeElevationGaps = (speakers) => {
+        if (speakers.length < 2) return [];
+        
+        // Sort by Y (front to back)
+        const sorted = [...speakers].sort((a, b) => (a.position?.y || 0) - (b.position?.y || 0));
+        
+        // Compute elevation angle for each
+        const angles = sorted.map(sp => {
+          const spX = finite(sp.position?.x, 0);
+          const spY = finite(sp.position?.y, 0);
+          const spZ = finite(sp.position?.z, 2.4);
+          
+          const dXY = Math.hypot(spX - seatX, spY - seatY);
+          const dZ = spZ - earHeight;
+          
+          return Math.atan2(dZ, dXY) * (180 / Math.PI);
+        });
+        
+        // Compute gaps between adjacent angles
+        const gaps = [];
+        for (let i = 0; i < angles.length - 1; i++) {
+          gaps.push(Math.abs(angles[i + 1] - angles[i]));
+        }
+        return gaps;
+      };
+      
+      const leftGaps = computeElevationGaps(leftUppers);
+      const rightGaps = computeElevationGaps(rightUppers);
+      const allGaps = [...leftGaps, ...rightGaps];
+      
+      if (allGaps.length > 0) {
+        const maxGapDeg = Math.max(...allGaps);
+        
+        let level = '—';
+        if (maxGapDeg <= 50) level = 'L4';
+        else if (maxGapDeg <= 60) level = 'L3';
+        else if (maxGapDeg <= 80) level = 'L2';
+        else level = 'L1';
+        
         data.rp22.p9 = {
-          valueDeg,
-          level: metricP1_nearestWallM.p9_level?.(valueDeg) || '—', // corrected reference
-          formatted: `${valueDeg.toFixed(1)}° (upper spacing)`
+          valueDeg: maxGapDeg,
+          level,
+          formatted: `${maxGapDeg.toFixed(1)}° (upper spacing)`
         };
       }
     }
@@ -2517,51 +2559,10 @@ React.useEffect(() => {
       }
     }
 
-    // P16: Screen Angle H Deg
-    if (typeof metricP1_nearestWallM.p16_screenAngleH_deg === 'function') { // corrected reference
-      const valueDeg = metricP1_nearestWallM.p16_screenAngleH_deg( // corrected reference
-        { x: seatX, y: seatY, z: seatZ },
-        screen
-      );
-      if (Number.isFinite(valueDeg)) {
-        data.rp22.p16 = {
-          valueDeg,
-          level: metricP1_nearestWallM.p16_level?.(valueDeg) || '—', // corrected reference
-          formatted: `${valueDeg.toFixed(1)}° (H Angle)`
-        };
-      }
-    }
-
-    // P17: Screen Angle V Deg
-    if (typeof metricP1_nearestWallM.p17_screenAngleV_deg === 'function') { // corrected reference
-      const valueDeg = metricP1_nearestWallM.p17_screenAngleV_deg( // corrected reference
-        { x: seatX, y: seatY, z: seatZ },
-        screen,
-        screenFrontPlaneM
-      );
-      if (Number.isFinite(valueDeg)) {
-        data.rp22.p17 = {
-          valueDeg,
-          level: metricP1_nearestWallM.p17_level?.(valueDeg) || '—', // corrected reference
-          formatted: `${valueDeg.toFixed(1)}° (V Angle)`
-        };
-      }
-    }
-
-    // P20: Seat Separation Deg
-    if (typeof metricP1_nearestWallM.p20_seatSeparation_deg === 'function') { // corrected reference
-      const valueDeg = metricP1_nearestWallM.p20_seatSeparation_deg( // corrected reference
-        { x: seatX, y: seatY, z: seatZ },
-        seatingPositions
-      );
-      if (Number.isFinite(valueDeg)) {
-        data.rp22.p20 = {
-          valueDeg,
-          level: metricP1_nearestWallM.p20_level?.(valueDeg) || '—', // corrected reference
-          formatted: `${valueDeg.toFixed(1)}° (seat sep)`
-        };
-      }
-    }
+    // P16 / P17 / P20 reserved:
+    // require per-seat frequency-response prediction (500 Hz–16 kHz and LF),
+    // to be implemented when HF / LF response engine is in place.
+    // Keep as null for now - HUD will skip rendering them
 
     // Legacy bridge
     data.p1NearestM = data.rp22.p1.valueM;
