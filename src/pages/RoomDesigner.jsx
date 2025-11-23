@@ -511,7 +511,7 @@ function useProjectLoader(
       console.error("[RoomDesigner] boot init error:", e);
     }
     return () => controller.abort();
-  }, [loadProject, initWithDefaultsAndRules, placedSpeakers, projectIdFromUrl, setProjectIdState, appState?.roomDims]); // Added appState.roomDims to deps for init
+  }, [projectIdFromUrl]); // Only re-run when project ID changes, not when loadProject identity changes
 
   const manualSaveProject = useCallback(async () => {
     setAutosaveStatus("saving");
