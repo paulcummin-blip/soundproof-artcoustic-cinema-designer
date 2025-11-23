@@ -623,7 +623,18 @@ export default function ProjectsPage() {
           <button
             type="button"
             onClick={() => {
-              projectActions.setActiveProjectId(created.id);
+              try {
+                if (typeof window !== "undefined" && window.localStorage) {
+                  window.localStorage.setItem("b44_activeProjectId", created.id);
+                }
+              } catch (e) {
+                console.error("[Projects] Failed to persist active project id (created banner)", e);
+              }
+
+              if (projectActions && typeof projectActions.setActiveProjectId === "function") {
+                projectActions.setActiveProjectId(created.id);
+              }
+
               window.location.href = "/RoomDesigner";
             }}
             style={{
