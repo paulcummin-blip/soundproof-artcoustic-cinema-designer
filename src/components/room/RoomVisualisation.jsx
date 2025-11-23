@@ -4927,6 +4927,70 @@ return (
               strokeWidth={2}
             />
 
+            {/* Room Dimensions Overlay */}
+            {overlaysForRendering?.ROOM_DIMS && (
+              <g data-layer="room-dimensions">
+                {/* Arrow markers */}
+                <defs>
+                  <marker
+                    id="dim-arrow"
+                    viewBox="0 0 10 10"
+                    refX="5"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
+                    orient="auto"
+                  >
+                    <path
+                      d="M 0 0 L 10 5 L 0 10 z"
+                      fill="#DCDBD6"
+                    />
+                  </marker>
+                </defs>
+
+                {/* Horizontal (length) line – top of the room */}
+                <line
+                  x1={roomRect.x + 20}
+                  y1={roomRect.y - 20}
+                  x2={roomRect.x + roomRect.width - 20}
+                  y2={roomRect.y - 20}
+                  stroke="#DCDBD6"
+                  strokeWidth={2}
+                  markerStart="url(#dim-arrow)"
+                  markerEnd="url(#dim-arrow)"
+                />
+                <text
+                  x={roomRect.x + roomRect.width / 2}
+                  y={roomRect.y - 28}
+                  textAnchor="middle"
+                  style={{ fontSize: 12, fill: "#1B1A1A" }}
+                >
+                  {`${(lengthM ?? 0).toFixed(2)} m`}
+                </text>
+
+                {/* Vertical (width) line – left side of the room */}
+                <line
+                  x1={roomRect.x - 20}
+                  y1={roomRect.y + 20}
+                  x2={roomRect.x - 20}
+                  y2={roomRect.y + roomRect.height - 20}
+                  stroke="#DCDBD6"
+                  strokeWidth={2}
+                  markerStart="url(#dim-arrow)"
+                  markerEnd="url(#dim-arrow)"
+                />
+                <text
+                  x={roomRect.x - 28}
+                  y={roomRect.y + roomRect.height / 2}
+                  textAnchor="middle"
+                  transform={`rotate(-90 ${roomRect.x - 28} ${roomRect.y + roomRect.height / 2})`}
+                  style={{ fontSize: 12, fill: "#1B1A1A" }}
+                >
+                  {`${(widthM ?? 0).toFixed(2)} m`}
+                </text>
+              </g>
+            )}
+
             {/* Screen and baffle - Layer 3: Visual representation of the screen and baffle */}
             {BaffleAndScreen}
 
