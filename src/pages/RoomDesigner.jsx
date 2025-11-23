@@ -604,27 +604,48 @@ function useProjectLoader(
     rowSpacingM, appState.screenFrontPlaneM, seatsPerRowByRow // Add screenFrontPlaneM and seatsPerRowByRow to dependencies
   ]);
 
-  // Bootstraps a "demo" room only when we are not working in a real project.
-  // If a projectIdState exists, RoomDesigner should rely entirely on hydrateFromProject.
+  // Boot logic: only run defaults when we *don't* have a real project
   useEffect(() => {
     const controller = new AbortController();
+
     try {
-      if (projectIdFromUrl) {
-        setProjectIdState(projectIdFromUrl); // Ensure initial projectId is set
-        loadProject(controller.signal);
-      } else if (!projectIdState) {
-        // Only initialise defaults if there's no active project
+      if (projectIdFromUrl || projectIdState) {
+        // We have a real project (from URL or from session) – just load it.
+        const idToLoad = projectIdFromUrl || projectIdState;
+        if (idToLoad) {
+          setProjectIdState(idToLoad);
+          loadProject(controller.signal);
+        }
+      } else {
+        // No project at all – this is a fresh, local-only design.
+        // Only initialise defaults if nothing has been laid out yet.
         const hasSpeakers =
           Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
-        if (!hasSpeakers && appState?.roomDims) {
-          initWithDefaultsAndRules();
+        const hasSeats =
+          Array.isArray(seatingPositions) && seatingPositions.length > 0;
+
+        if (!hasSpeakers && !hasSeats && appState?.roomDims) {
+          if (typeof initWithDefaultsAndRules === "function") {
+            initWithDefaultsAndRules();
+          }
         }
       }
     } catch (e) {
       console.error("[RoomDesigner] boot init error:", e);
     }
+
     return () => controller.abort();
-  }, [projectIdFromUrl, projectIdState]); // Add projectIdState to deps
+    // IMPORTANT: include projectIdState etc. so this effect behaves correctly
+  }, [
+    projectIdFromUrl,
+    projectIdState,
+    placedSpeakers,
+    seatingPositions,
+    appState?.roomDims,
+    initWithDefaultsAndRules,
+    loadProject,
+    setProjectIdState,
+  ]);
 
   const manualSaveProject = useCallback(async () => {
     setAutosaveStatus("saving");
