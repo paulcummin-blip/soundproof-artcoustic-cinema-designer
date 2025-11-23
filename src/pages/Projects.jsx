@@ -461,7 +461,6 @@ export default function ProjectsPage() {
 
           <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
             <StatusPill value={p.status} />
-            <span style={{ fontSize: 12, color: statusColor(p.status) }}>{p.status}</span>
           </div>
 
           <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 8 }}>
