@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAppState } from '../components/AppStateProvider';
+import { AppStateProvider, useAppState } from '../components/AppStateProvider';
 import { useRP22AnalysisEngine } from '../components/hooks/useRP22AnalysisEngine';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -9,8 +9,21 @@ import { rp22Parameters } from '../components/data/rp22Parameters';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import ParameterCard from '../components/report/ParameterCard';
 
-export default function RP22Report() {
-    const { backgroundNoiseNCB, setBackgroundNoiseNCB, ...appState } = useAppState();
+function RP22ReportInner() {
+    const app = useAppState();
+    
+    if (!app) {
+        return (
+            <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
+                <div className="text-center text-[#3E4349]">
+                    <p>App state is not initialised.</p>
+                    <p>Please open the Room Designer first, then return to this report.</p>
+                </div>
+            </div>
+        );
+    }
+
+    const { backgroundNoiseNCB, setBackgroundNoiseNCB, ...appState } = app;
     const analysisResult = useRP22AnalysisEngine(appState);
 
     // Build ordered parameters list (1-21)
@@ -133,5 +146,13 @@ export default function RP22Report() {
                 </Card>
             </div>
         </div>
+    );
+}
+
+export default function RP22Report() {
+    return (
+        <AppStateProvider>
+            <RP22ReportInner />
+        </AppStateProvider>
     );
 }
