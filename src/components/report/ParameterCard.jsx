@@ -1,76 +1,110 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { AlertTriangle, CheckCircle2, AlertCircle, XCircle } from 'lucide-react';
 import RP22GradingPill from '../ui/RP22GradingPill';
 
-export default function ParameterCard({ parameter, result }) {
+export default function ParameterCard({ parameter, roomResult, seatResults = [] }) {
     if (!parameter) return null;
 
-    const hasResult = result && typeof result === 'object';
-    const level = hasResult ? (result.level || 0) : 0;
-    const value = hasResult ? result.value : null;
-    const status = hasResult ? result.status : 'unknown';
-
-    const getStatusIcon = () => {
-        switch (status) {
-            case 'pass': return <CheckCircle2 className="w-4 h-4" style={{ color: 'var(--brand-green)' }} />;
-            case 'warning': return <AlertTriangle className="w-4 h-4" style={{ color: 'var(--brand-outline)' }} />;
-            case 'fail': return <XCircle className="w-4 h-4" style={{ color: 'var(--brand-red)' }} />;
-            default: return <AlertCircle className="w-4 h-4" style={{ color: 'var(--brand-accent)' }} />;
-        }
-    };
+    const hasRoomResult = roomResult && typeof roomResult === 'object';
+    const level = hasRoomResult ? (roomResult.level || null) : null;
+    const value = hasRoomResult ? roomResult.value : null;
+    const formatted = hasRoomResult ? roomResult.formatted : null;
+    
+    const isSeatScoped = parameter.scope === 'Seat';
+    const hasSeatData = Array.isArray(seatResults) && seatResults.length > 0;
 
     const formatValue = (val) => {
         if (val === null || val === undefined) return 'N/A';
         if (typeof val === 'number') {
-            return parameter.unit ? `${val.toFixed(1)}${parameter.unit}` : val.toFixed(1);
+            return parameter.unit ? `${val.toFixed(1)} ${parameter.unit}` : val.toFixed(1);
         }
         return String(val);
     };
 
+    // Level badge helper
+    const renderLevelBadge = (lvl) => {
+        if (!lvl || lvl === '—') return <Badge variant="outline" className="text-xs">—</Badge>;
+        return <RP22GradingPill level={typeof lvl === 'string' ? parseInt(lvl.replace('L', '')) : lvl} />;
+    };
+
     return (
-        <Card className="border" style={{ backgroundColor: '#FFFFFF', borderColor: 'var(--brand-border)' }}>
+        <Card className="border bg-white border-[#DCDBD6]">
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                     <div className="flex-1">
-                        <CardTitle className="text-sm font-medium" style={{ color: 'var(--brand-ink)', fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                            Parameter {parameter.id}
+                        <CardTitle 
+                            className="text-sm font-semibold text-[#1B1A1A]"
+                            style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
+                        >
+                            P{parameter.id} — {parameter.name}
                         </CardTitle>
-                        <p className="text-xs mt-1" style={{ color: 'var(--brand-brown)', fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
-                            {parameter.short_name}
+                        <p className="text-xs mt-1 text-[#3E4349]">
+                            {parameter.scope} • {parameter.unit}
                         </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {getStatusIcon()}
-                        <RP22GradingPill level={level} />
                     </div>
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="space-y-3" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs" style={{ color: 'var(--brand-accent)' }}>Current Value:</span>
-                        <Badge variant="outline" className="font-mono text-xs" style={{ backgroundColor: 'var(--brand-sand)', borderColor: 'var(--brand-outline)' }}>
-                            {formatValue(value)}
-                        </Badge>
-                    </div>
-                    
-                    <div className="text-xs" style={{ color: 'var(--brand-brown)' }}>
-                        <div className="mb-1 font-medium" style={{ color: 'var(--brand-accent)' }}>
-                            {parameter.name}
+                <div 
+                    className="space-y-3"
+                    style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}
+                >
+                    {/* Room/System Value */}
+                    <div className="border-b border-[#E6E4DD] pb-3">
+                        <div className="text-xs font-medium text-[#3E4349] mb-2">
+                            {isSeatScoped ? 'Overall (Room)' : 'System Metric'}
                         </div>
-                        <p className="leading-relaxed">
-                            {parameter.description}
-                        </p>
+                        {hasRoomResult ? (
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm text-[#213428] font-medium">
+                                    {formatted || formatValue(value)}
+                                </span>
+                                {renderLevelBadge(level)}
+                            </div>
+                        ) : (
+                            <span className="text-xs text-gray-400 italic">No data yet</span>
+                        )}
                     </div>
 
-                    {parameter.target_range && (
-                        <div className="pt-2 border-t" style={{ borderColor: 'var(--brand-border)' }}>
-                            <div className="text-xs" style={{ color: 'var(--brand-accent)' }}>
-                                <span className="font-medium">Target: </span>
-                                <span style={{ color: 'var(--brand-brown)' }}>{parameter.target_range}</span>
+                    {/* Per-Seat Data (for seat-scoped parameters) */}
+                    {isSeatScoped && (
+                        <div>
+                            <div className="text-xs font-medium text-[#3E4349] mb-2">
+                                Per-Seat Values
                             </div>
+                            {hasSeatData ? (
+                                <div className="max-h-40 overflow-y-auto border border-[#E6E4DD] rounded">
+                                    <table className="w-full text-xs">
+                                        <thead className="bg-[#F8F8F7] sticky top-0">
+                                            <tr>
+                                                <th className="text-left px-2 py-1 text-[#3E4349]">Seat</th>
+                                                <th className="text-right px-2 py-1 text-[#3E4349]">Value</th>
+                                                <th className="text-right px-2 py-1 text-[#3E4349]">Level</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {seatResults.map(({ seatId, isPrimary, metric }) => (
+                                                <tr key={seatId} className="border-t border-[#E6E4DD]">
+                                                    <td className="px-2 py-1 text-[#1B1A1A]">
+                                                        {seatId} {isPrimary ? '(MLP)' : ''}
+                                                    </td>
+                                                    <td className="px-2 py-1 text-right text-[#213428]">
+                                                        {metric.formatted || formatValue(metric.value)}
+                                                    </td>
+                                                    <td className="px-2 py-1 text-right">
+                                                        {renderLevelBadge(metric.level)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <span className="text-xs text-gray-400 italic">
+                                    Per-seat metrics not implemented yet
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>

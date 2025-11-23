@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useAppState } from '../components/AppStateProvider';
 import { useRP22AnalysisEngine } from '../components/hooks/useRP22AnalysisEngine';
@@ -6,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { BarChart4 } from 'lucide-react';
-import { rp22Parameters, rp22ByNumber } from '../components/data/rp22Parameters'; // Import canonical data
+import { rp22Parameters } from '../components/data/rp22Parameters';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import ParameterCard from '../components/report/ParameterCard';
 
@@ -14,10 +13,38 @@ export default function RP22Report() {
     const { backgroundNoiseNCB, setBackgroundNoiseNCB, ...appState } = useAppState();
     const analysisResult = useRP22AnalysisEngine(appState);
 
+    // Build ordered parameters list (1-21)
+    const orderedParams = React.useMemo(() => {
+        return [...rp22Parameters].sort((a, b) => a.id - b.id);
+    }, []);
+
+    // Helper: get room-level result for a parameter
+    const getRoomResult = React.useCallback((paramId) => {
+        return analysisResult?.gradedParameters?.primary?.[paramId] ?? null;
+    }, [analysisResult]);
+
+    // Helper: get seat results for a parameter
+    const getSeatResults = React.useCallback((paramId) => {
+        if (!analysisResult?.perSeatRp22) return [];
+        
+        const results = [];
+        for (const [seatId, seatData] of Object.entries(analysisResult.perSeatRp22)) {
+            const metric = seatData.rp22?.[paramId];
+            if (metric) {
+                results.push({
+                    seatId,
+                    isPrimary: seatData.isPrimary,
+                    metric
+                });
+            }
+        }
+        return results;
+    }, [analysisResult]);
+
     const levelCounts = React.useMemo(() => {
         if (!analysisResult?.gradedParameters?.primary) return {};
         return Object.values(analysisResult.gradedParameters.primary).reduce((acc, param) => {
-            const level = param?.level?.level;
+            const level = param?.level;
             if (level) {
                 acc[`L${level}`] = (acc[`L${level}`] || 0) + 1;
             }
@@ -33,7 +60,7 @@ export default function RP22Report() {
         return 'L1';
     };
 
-    if (!analysisResult || !analysisResult.gradedParameters || !analysisResult.gradedParameters.primary) {
+    if (!analysisResult || !analysisResult.gradedParameters) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
                 <Card className="max-w-xl mx-auto w-full">
@@ -48,32 +75,6 @@ export default function RP22Report() {
             </div>
         );
     }
-    
-    const { gradedParameters, analysisDetails } = analysisResult;
-
-    const parameterGroups = {
-        geometry: { title: 'Room & Seating Geometry', ids: [1, 3, 11] },
-        placement: { title: 'Speaker Placement & Coherence', ids: [4, 5, 6, 7, 9, 10] },
-        capability: { title: 'System Capability & SPL', ids: [2, 8, 12, 13, 14, 18] },
-        acoustics: { title: 'Acoustic Performance & Variance', ids: [15, 16, 17, 19, 20, 21] },
-    };
-
-    const renderCategory = (group, results, keyPrefix) => (
-        <div key={`${keyPrefix}-${group.title}`}>
-            <h3 className="text-xl font-header text-[#1B1A1A] mt-8 mb-4">{group.title}</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {rp22Parameters
-                    .filter(p => group.ids.includes(p.id))
-                    .map(param => (
-                        <ParameterCard 
-                            key={param.id} 
-                            parameter={param} 
-                            result={results ? results[param.id] : null}
-                        />
-                ))}
-            </div>
-        </div>
-    );
 
     return (
         <div className="min-h-screen bg-[#F9F8F6] p-6">
@@ -111,14 +112,25 @@ export default function RP22Report() {
                     </CardContent>
                 </Card>
 
-                {Object.values(parameterGroups).map(group => renderCategory(group, gradedParameters.primary, 'primary'))}
-
-                {analysisDetails.hasSecondarySeating && gradedParameters.secondary && (
-                     <>
-                        <h2 className="text-2xl font-header text-[#1B1A1A] mt-12 pt-6 border-t border-[#DCDBD6]">Secondary Seating Area</h2>
-                        {Object.values(parameterGroups).map(group => renderCategory(group, gradedParameters.secondary, 'secondary'))}
-                    </>
-                )}
+                <Card className="bg-[#FFFFFF] border-[#DCDBD6] mt-6">
+                    <CardHeader>
+                        <CardTitle className="text-[#1B1A1A] font-header">
+                            RP22 Parameters (All 21)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {orderedParams.map(param => (
+                                <ParameterCard
+                                    key={param.id}
+                                    parameter={param}
+                                    roomResult={getRoomResult(param.id)}
+                                    seatResults={getSeatResults(param.id)}
+                                />
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
             </div>
         </div>
     );

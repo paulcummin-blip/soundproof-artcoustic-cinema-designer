@@ -362,12 +362,38 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       seatMetrics.set(seatId, metrics);
     }
 
+    // Build perSeatRp22 - reusable structure for all consumers
+    const perSeatRp22 = {};
+    for (const seat of seatsWithRoles) {
+      const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
+      const metrics = seatMetrics.get(seatId) || {};
+      
+      perSeatRp22[seatId] = {
+        seatId,
+        isPrimary: seat.isPrimary || false,
+        isSecondary: seat.isSecondary || false,
+        rp22: {}
+      };
+
+      // Map p9 -> parameter 9, p10 -> parameter 10, etc.
+      if (metrics.p1) perSeatRp22[seatId].rp22[1] = metrics.p1;
+      if (metrics.p4) perSeatRp22[seatId].rp22[4] = metrics.p4;
+      if (metrics.p5) perSeatRp22[seatId].rp22[5] = metrics.p5;
+      if (metrics.p6) perSeatRp22[seatId].rp22[6] = metrics.p6;
+      if (metrics.p9) perSeatRp22[seatId].rp22[9] = metrics.p9;
+      if (metrics.p10) perSeatRp22[seatId].rp22[10] = metrics.p10;
+      if (metrics.p16) perSeatRp22[seatId].rp22[16] = metrics.p16;
+      if (metrics.p17) perSeatRp22[seatId].rp22[17] = metrics.p17;
+      if (metrics.p20) perSeatRp22[seatId].rp22[20] = metrics.p20;
+    }
+
     return {
       gradedParameters,
       p7Details: (evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis) || {}).perSide,
       param5,
       surroundGaps,
-      seatMetrics, // New: per-seat RP22 metrics
+      seatMetrics,
+      perSeatRp22, // New: structured per-seat RP22 data
       analysisDetails: {
         hasSecondarySeating: hasSecondarySeating,
         totalSpeakers: safeSpeakers.length,
