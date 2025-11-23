@@ -905,6 +905,13 @@ function RoomDesignerWithState() {
   // Use session active project ID (from Projects page), fallback to URL param for legacy support
   const activeProjectId = sessionActiveProjectId || initialProjectIdFromUrl;
 
+  // Sync URL param to local state ONCE (one-way: URL → projectIdState)
+  useEffect(() => {
+    if (activeProjectId && activeProjectId !== projectIdState) {
+      setProjectIdState(activeProjectId);
+    }
+  }, [activeProjectId]);
+
   // Don't block render - allow local-only mode
   const showLocalHint = !activeProjectId;
 
