@@ -1,7 +1,7 @@
 // pages/Projects.js — Stable, JS-only version (no external UI deps)
 import React, { useMemo, useRef, useState, useEffect } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
-import { useProjectActions } from "@/components/state/project-session";
+import { useProjectActions, setProjectSummaryFromEntity } from "@/components/state/project-session";
 import { base44 } from "@/api/base44Client";
 
 const Project = base44.entities.Project;
@@ -94,6 +94,9 @@ export default function ProjectsPage() {
         setLoading(true);
         const list = await Project.list('-created_date', 100);
         setProjects(list || []);
+        
+        // Sync all project summaries to session
+        (list || []).forEach(p => setProjectSummaryFromEntity(p));
       } catch (err) {
         console.error('[Projects] Failed to load projects:', err);
       } finally {
@@ -175,7 +178,10 @@ export default function ProjectsPage() {
       // Add to local list
       setProjects((arr) => [created, ...arr]);
       
-      // Set as active project (RoomDesigner will sync summary when it loads)
+      // Sync summary to session
+      setProjectSummaryFromEntity(created);
+      
+      // Set as active project
       projectActions.setActiveProjectId(created.id);
       
       setDialogOpen(false);
