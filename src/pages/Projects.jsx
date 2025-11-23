@@ -476,25 +476,13 @@ export default function ProjectsPage() {
           <button
             type="button"
             onClick={() => {
-              // Persist active project id so the next page load can see it
-              try {
-                if (typeof window !== "undefined" && window.localStorage) {
-                  window.localStorage.setItem("b44_activeProjectId", p.id);
-                }
-              } catch (e) {
-                // ignore storage errors – not fatal
-                console.error("[Projects] Failed to persist active project id", e);
-              }
-
-              // Still call the shared action (harmless even if it's not wired perfectly)
+              const id = p.id;
+              // keep this if you still want the session store to know about it
               if (projectActions && typeof projectActions.setActiveProjectId === "function") {
-                projectActions.setActiveProjectId(p.id);
+                projectActions.setActiveProjectId(id);
               }
-
-              // Also pass the id explicitly in the URL so RoomDesigner can
-              // reliably pick it up on first load
-              const url = `/RoomDesigner?projectId=${encodeURIComponent(p.id)}`;
-              window.location.href = url;
+              // navigate *with* the project id in the URL
+              window.location.href = `/RoomDesigner?project=${encodeURIComponent(id)}`;
             }}
             style={{
               padding: "8px 12px",
@@ -690,20 +678,11 @@ export default function ProjectsPage() {
           <button
             type="button"
             onClick={() => {
-              try {
-                if (typeof window !== "undefined" && window.localStorage) {
-                  window.localStorage.setItem("b44_activeProjectId", created.id);
-                }
-              } catch (e) {
-                console.error("[Projects] Failed to persist active project id (created banner)", e);
-              }
-
+              const id = created.id;
               if (projectActions && typeof projectActions.setActiveProjectId === "function") {
-                projectActions.setActiveProjectId(created.id);
+                projectActions.setActiveProjectId(id);
               }
-
-              const url = `/RoomDesigner?projectId=${encodeURIComponent(created.id)}`;
-              window.location.href = url;
+              window.location.href = `/RoomDesigner?project=${encodeURIComponent(id)}`;
             }}
             style={{
               marginLeft: 8,
