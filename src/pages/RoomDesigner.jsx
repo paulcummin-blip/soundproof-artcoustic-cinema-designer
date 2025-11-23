@@ -355,9 +355,8 @@ function useProjectLoader(
         setProjectNameState(p?.name || "Project"); // Update internal projectName state
         setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
       } else {
-        // Project not found - treat as stale ID, clear it and reset
-        console.log('[RoomDesigner] Project not found in cloud, starting fresh.');
-        setProjectIdState(null);
+        // Project not found in cloud; keeping id so user can still save into it
+        console.log('[RoomDesigner] Project not found in cloud; keeping id so user can continue working.');
         setLoadState({ phase: "idle", error: null, name: null });
       }
     } catch (err) {
@@ -365,16 +364,15 @@ function useProjectLoader(
         setLoadState(prev => ({ ...prev, phase: "idle" }));
         return;
       }
-      
+
       // Check for stale/invalid ID errors
       const errMsg = String(err?.message || err || '');
       if (errMsg.includes('Invalid id value') || errMsg.includes('Object not found') || errMsg.includes('404')) {
-        console.log('[RoomDesigner] Invalid project ID detected, clearing and starting fresh.');
-        setProjectIdState(null);
+        console.log('[RoomDesigner] Invalid project ID detected, but keeping it so user can continue working.');
         setLoadState({ phase: "idle", error: null, name: null });
         return;
       }
-      
+
       window.__APP_DEBUG = window.__APP_DEBUG || [];
       window.__APP_DEBUG.push(`[RoomDesigner] Project load error: ${err?.message || err}`);
       console.error('[RoomDesigner] Failed to load project:', err);
@@ -466,12 +464,7 @@ function useProjectLoader(
           // Check if this is a 404/invalid ID error
           const errMsg = String(updateErr?.message || updateErr || '');
           if (errMsg.includes('Invalid id value') || errMsg.includes('Object not found') || errMsg.includes('404')) {
-            console.log('[Project Sync] Stale project ID detected, clearing and continuing locally.');
-            if (typeof window !== 'undefined' && window.__APPSTATE__?.clearActiveProject) {
-              window.__APPSTATE__.clearActiveProject();
-            }
-            // Clear the local project ID state so we stop trying to update it
-            setProjectIdState(null);
+            console.log('[Project Sync] Stale project ID detected, but keeping it so user can continue working.');
             setAutosaveStatus("idle");
             return; // Exit the autosave gracefully
           }
