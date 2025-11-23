@@ -95,43 +95,51 @@ export function computeP16ForSeat({
     return null;
   }
 
-  const perSpeakerDeltas = [];
+  let worst = {
+    delta: 0,
+    speaker: null,
+    angle: 0
+  };
 
   for (const spk of screenSpeakers) {
     const model = getModelMeta?.(spk.model);
     const hfProfile = model?.hfOffAxis16k;
     if (!hfProfile) continue;
 
-    // Compute off-axis angles for this seat and for MLP
     const angleSeat = computeSpeakerSeatAzimuth(spk, seat);
     const angleMlp = computeSpeakerSeatAzimuth(spk, mlpSeat);
 
     if (!Number.isFinite(angleSeat) || !Number.isFinite(angleMlp)) continue;
 
-    const attSeat = estimateHFAttenuationAt16k(angleSeat, hfProfile); // negative dB
+    const attSeat = estimateHFAttenuationAt16k(angleSeat, hfProfile);
     const attMlp = estimateHFAttenuationAt16k(angleMlp, hfProfile);
 
-    const delta = attSeat - attMlp; // dB difference vs RSP for this speaker
+    const delta = attSeat - attMlp;
     if (!Number.isFinite(delta)) continue;
 
-    perSpeakerDeltas.push(delta);
+    // Track worst absolute delta
+    if (Math.abs(delta) > Math.abs(worst.delta)) {
+      worst.delta = delta;
+      worst.speaker = spk.role;
+      worst.angle = Math.abs(angleSeat);
+    }
   }
 
-  if (perSpeakerDeltas.length === 0) {
-    return null; // nothing to base P16 on
-  }
+  if (!worst.speaker) return null;
 
-  const worstDelta = perSpeakerDeltas.reduce(
-    (max, d) => Math.max(max, Math.abs(d)),
-    0
-  );
-
-  const level = classifyP16(worstDelta);
+  const value = Math.abs(worst.delta);
+  const level = classifyP16(value);
   if (!level) return null;
 
+  const formattedAngle = `${worst.angle.toFixed(0)}°`;
+
   return {
-    value: worstDelta,
-    formatted: `${worstDelta.toFixed(1)} dB`,
-    level
+    value,
+    formatted: `${value.toFixed(1)} dB`,
+    level,
+    worstSpeaker: worst.speaker,
+    worstAngleDeg: worst.angle,
+    worstAngleFormatted: formattedAngle,
+    hudLabel: `${level} (${worst.speaker} ${formattedAngle})`
   };
 }
