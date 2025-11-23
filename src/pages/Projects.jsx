@@ -427,7 +427,22 @@ export default function ProjectsPage() {
           <button
             type="button"
             onClick={() => {
-              projectActions.setActiveProjectId(p.id);
+              // Persist active project id so the next page load can see it
+              try {
+                if (typeof window !== "undefined" && window.localStorage) {
+                  window.localStorage.setItem("b44_activeProjectId", p.id);
+                }
+              } catch (e) {
+                // ignore storage errors – not fatal
+                console.error("[Projects] Failed to persist active project id", e);
+              }
+
+              // Still call the shared action (harmless even if it's not wired perfectly)
+              if (projectActions && typeof projectActions.setActiveProjectId === "function") {
+                projectActions.setActiveProjectId(p.id);
+              }
+
+              // Full navigation to RoomDesigner – store will re-initialise and read the id
               window.location.href = "/RoomDesigner";
             }}
             style={{
