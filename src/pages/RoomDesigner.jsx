@@ -360,23 +360,26 @@ function useProjectLoader(
         setLoadState({ phase: "idle", error: null, name: null });
       }
     } catch (err) {
+      const errMsg = String(err?.message || err || '');
+
+      // Abort is fine – usually navigating away or changing project.
       if (err?.name === "AbortError") {
         setLoadState(prev => ({ ...prev, phase: "idle" }));
         return;
       }
 
-      // Check for stale/invalid ID errors
-      const errMsg = String(err?.message || err || '');
-      if (errMsg.includes('Invalid id value') || errMsg.includes('Object not found') || errMsg.includes('404')) {
-        console.log('[RoomDesigner] Invalid project ID detected, but keeping it so user can continue working.');
-        setLoadState({ phase: "idle", error: null, name: null });
+      // Stale / invalid ID / 404 – don't keep retrying, mark as error
+      if (errMsg.includes("Invalid id value") || errMsg.includes("Object not found") || errMsg.includes("404")) {
+        console.log("[RoomDesigner] Invalid project ID detected, keeping it but stopping auto-reload.");
+        setLoadState({ phase: "error", error: errMsg, name: null });
         return;
       }
 
+      // Any other load error (including 429 rate limit) – stop auto-reload
       window.__APP_DEBUG = window.__APP_DEBUG || [];
-      window.__APP_DEBUG.push(`[RoomDesigner] Project load error: ${err?.message || err}`);
-      console.error('[RoomDesigner] Failed to load project:', err);
-      setLoadState({ phase: "idle", error: null, name: null });
+      window.__APP_DEBUG.push(`[RoomDesigner] Project load error: ${errMsg}`);
+      console.error("[RoomDesigner] Failed to load project:", err);
+      setLoadState({ phase: "error", error: errMsg, name: null });
     }
   }, [projectIdState, hydrateFromProject, setProjectNameState]);
 
