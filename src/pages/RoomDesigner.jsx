@@ -285,8 +285,23 @@ function useProjectLoader(
     const overlaysData = parseMaybe(p?.overlays, defaultOverlays);
     if(typeof setOverlays === "function") setOverlays({...defaultOverlays, ...overlaysData});
 
+    // --- SEATING & LAYOUT ---
     const sp = parseMaybe(p?.seating_positions, []);
-    if (Array.isArray(sp) && typeof setSeatingPositions === "function") setSeatingPositions(sp);
+    const seatsPerRowByRowData = parseMaybe(p?.seats_per_row_by_row, []);
+    const rowSpacing = Number(p?.row_spacing_m) || 1.8;
+
+    // Only use defaults if nothing was stored
+    if (Array.isArray(sp) && sp.length > 0 && typeof setSeatingPositions === "function") {
+      setSeatingPositions(sp);
+    }
+
+    if (Array.isArray(seatsPerRowByRowData) && seatsPerRowByRowData.length > 0 && typeof setSeatsPerRowByRow === "function") {
+      setSeatsPerRowByRow(seatsPerRowByRowData);
+    }
+
+    if (typeof setRowSpacingM === "function") {
+      setRowSpacingM(rowSpacing);
+    }
 
     const re = parseMaybe(p?.room_elements, []);
     if (Array.isArray(re) && typeof setRoomElements === "function") setRoomElements(re);
