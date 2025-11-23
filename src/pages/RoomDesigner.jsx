@@ -604,17 +604,19 @@ function useProjectLoader(
     rowSpacingM, appState.screenFrontPlaneM, seatsPerRowByRow // Add screenFrontPlaneM and seatsPerRowByRow to dependencies
   ]);
 
+  // Bootstraps a "demo" room only when we are not working in a real project.
+  // If a projectIdState exists, RoomDesigner should rely entirely on hydrateFromProject.
   useEffect(() => {
     const controller = new AbortController();
     try {
       if (projectIdFromUrl) {
         setProjectIdState(projectIdFromUrl); // Ensure initial projectId is set
         loadProject(controller.signal);
-      } else {
-        // Only initialise if there are no speakers yet, and dimensions have loaded
+      } else if (!projectIdState) {
+        // Only initialise defaults if there's no active project
         const hasSpeakers =
           Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
-        if (!hasSpeakers && appState?.roomDims) { // Ensure roomDims is available before init
+        if (!hasSpeakers && appState?.roomDims) {
           initWithDefaultsAndRules();
         }
       }
@@ -622,7 +624,7 @@ function useProjectLoader(
       console.error("[RoomDesigner] boot init error:", e);
     }
     return () => controller.abort();
-  }, [projectIdFromUrl]); // Only re-run when project ID changes, not when loadProject identity changes
+  }, [projectIdFromUrl, projectIdState]); // Add projectIdState to deps
 
   const manualSaveProject = useCallback(async () => {
     setAutosaveStatus("saving");
