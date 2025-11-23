@@ -446,9 +446,8 @@ function useProjectLoader(
     debounceTimeoutRef.current = setTimeout(async () => {
       try {
         const projectData = serializeProject({
-          // Pass roomDims as JSON string
-          roomDims: JSON.stringify(appState.roomDims),
-          // Keep dimensions for backward compatibility with `room_width` etc.
+          // Pass plain objects/arrays
+          roomDims: appState.roomDims,
           dimensions,
           screen,
           seatingPositions,
@@ -456,15 +455,15 @@ function useProjectLoader(
           roomElements,
           overlays,
           projectName: projectNameState,
-          dolbyPreset,
+          dolbyLayout: dolbyPreset,
           frozenTabs,
           sevenBedLayoutType,
           frontSubsCfg,
           rearSubsCfg,
           lcrAimMode,
           enableFrontWides,
-          selectedSpeakersByRole: JSON.stringify(appState.selectedSpeakersByRole),
-          spl_speaker_nodes: JSON.stringify(appState.speakerNodes),
+          selectedSpeakersByRole: appState.selectedSpeakersByRole,
+          spl_speaker_nodes: appState.speakerNodes,
           overheadGlobalModel,
           overheadFrontOverride,
           overheadMidOverride,
@@ -472,9 +471,10 @@ function useProjectLoader(
           useFrontGlobal,
           useMidGlobal,
           useRearGlobal,
-          row_spacing_m: rowSpacingM,
+          rowSpacingM: rowSpacingM,
           screenFrontPlaneM: appState.screenFrontPlaneM,
-          seatsPerRowByRow: JSON.stringify(seatsPerRowByRow),
+          seatsPerRowByRow: seatsPerRowByRow,
+          splConfig: appState.splConfig,
         });
 
         // IMPORTANT:
@@ -543,21 +543,24 @@ function useProjectLoader(
     setAutosaveStatus("saving");
     try {
       const projectData = serializeProject({
-        // NEW: Pass roomDims as JSON string
-        roomDims: JSON.stringify(appState.roomDims), // Use appState.roomDims
-        // Keep dimensions for backward compatibility with `room_width` etc. fields in Project entity
-        dimensions, screen, seatingPositions,
+        // Pass plain objects/arrays
+        roomDims: appState.roomDims,
+        dimensions,
+        screen,
+        seatingPositions,
         placedSpeakers,
-        roomElements, overlays,
-        projectName: projectNameState, dolbyPreset, frozenTabs,
+        roomElements,
+        overlays,
+        projectName: projectNameState,
+        dolbyLayout: dolbyPreset,
+        frozenTabs,
         sevenBedLayoutType,
         frontSubsCfg,
         rearSubsCfg,
         lcrAimMode,
         enableFrontWides,
-        // Use selectedSpeakersByRole and speakerNodes from appState
-        selectedSpeakersByRole: JSON.stringify(appState.selectedSpeakersByRole),
-        spl_speaker_nodes: JSON.stringify(appState.speakerNodes),
+        selectedSpeakersByRole: appState.selectedSpeakersByRole,
+        spl_speaker_nodes: appState.speakerNodes,
         overheadGlobalModel,
         overheadFrontOverride,
         overheadMidOverride,
@@ -565,9 +568,10 @@ function useProjectLoader(
         useFrontGlobal,
         useMidGlobal,
         useRearGlobal,
-        row_spacing_m: rowSpacingM,
+        rowSpacingM: rowSpacingM,
         screenFrontPlaneM: appState.screenFrontPlaneM,
-        seatsPerRowByRow: JSON.stringify(seatsPerRowByRow), // NEW: Add seatsPerRowByRow
+        seatsPerRowByRow: seatsPerRowByRow,
+        splConfig: appState.splConfig,
       });
 
       let savedProject;
