@@ -1,4 +1,3 @@
-
 import React, { useEffect } from "react";
 import { installConsolePolyfill } from "@/components/utils/consolePolyfill";
 
@@ -8,6 +7,7 @@ installConsolePolyfill();
 import "./globals.css";
 import log from "@/components/utils/logger";
 import { ToastProvider } from "@/components/ui/ToastProvider";
+import { Project } from "@/api/entities/Project";
 import {
   Home,
   Calculator,
@@ -53,6 +53,47 @@ const menuItems = [
 export default function Layout({ children, currentPageName }) {
   const projectActions = useProjectActions();
   const activeProjectId = useActiveProjectId();
+
+  // Active project meta for sidebar (name + client)
+  const [activeProjectMeta, setActiveProjectMeta] = React.useState(null);
+  const [activeProjectLoading, setActiveProjectLoading] = React.useState(false);
+
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function fetchActiveProject() {
+      if (!activeProjectId) {
+        setActiveProjectMeta(null);
+        return;
+      }
+
+      try {
+        setActiveProjectLoading(true);
+        // Use Project entity wrapper, same pattern as RoomDesigner
+        const results = await Project.filter({ id: activeProjectId });
+
+        if (cancelled) return;
+
+        const proj = Array.isArray(results) && results.length > 0 ? results[0] : null;
+        setActiveProjectMeta(proj || null);
+      } catch (err) {
+        console.error("[Layout] Failed to load active project meta:", err);
+        if (!cancelled) {
+          setActiveProjectMeta(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setActiveProjectLoading(false);
+        }
+      }
+    }
+
+    fetchActiveProject();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeProjectId]);
 
   useEffect(() => {
     log.debug(`[Layout] Page: ${currentPageName}`);
@@ -111,11 +152,28 @@ export default function Layout({ children, currentPageName }) {
 
                 <SidebarGroup>
                   <SidebarGroupLabel className="text-brand-text-label font-medium">
-                    Project
+                    Active Project
                   </SidebarGroupLabel>
                   <SidebarGroupContent>
                     <div className="px-3 py-2 text-xs text-brand-text-muted">
-                      {activeProjectId ? `Active: ${activeProjectId.slice(0, 8)}...` : "No active project"}
+                      {activeProjectId ? (
+                        activeProjectLoading ? (
+                          <span>Loading project…</span>
+                        ) : activeProjectMeta ? (
+                          <div>
+                            <div className="font-semibold text-brand-text-label">
+                              {activeProjectMeta.name || "Untitled Project"}
+                            </div>
+                            <div className="text-[11px] text-brand-text-muted">
+                              Client: {activeProjectMeta.client_name || "—"}
+                            </div>
+                          </div>
+                        ) : (
+                          <span>No active project</span>
+                        )
+                      ) : (
+                        <span>No active project</span>
+                      )}
                     </div>
                   </SidebarGroupContent>
                 </SidebarGroup>
