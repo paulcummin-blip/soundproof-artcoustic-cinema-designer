@@ -1,10 +1,7 @@
 // pages/Projects.js — Stable, JS-only version (no external UI deps)
-import React, { useMemo, useRef, useState, useEffect } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
-import { useProjectActions, setProjectSummaryFromEntity } from "@/components/state/project-session";
-import { base44 } from "@/api/base44Client";
-
-const Project = base44.entities.Project;
+import { useProjectActions } from "@/components/state/project-session";
 
 // ---- Brand tokens ----
 const BRAND = {
@@ -64,7 +61,6 @@ function fieldStyle() {
 export default function ProjectsPage() {
   const projectActions = useProjectActions();
   const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [sortKey, setSortKey] = useState("recent");
@@ -86,26 +82,6 @@ export default function ProjectsPage() {
   // Hold-to-delete state
   const holdTimers = useRef({});
   const [holdProgress, setHoldProgress] = useState({});
-
-  // Load projects from database on mount
-  useEffect(() => {
-    async function loadProjects() {
-      try {
-        setLoading(true);
-        const list = await Project.list('-created_date', 100);
-        setProjects(list || []);
-        
-        // Sync all project summaries to session
-        (list || []).forEach(p => setProjectSummaryFromEntity(p));
-      } catch (err) {
-        console.error('[Projects] Failed to load projects:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    
-    loadProjects();
-  }, []);
 
   // Derived list
   const list = useMemo(() => {
@@ -153,44 +129,41 @@ export default function ProjectsPage() {
     return Number.isFinite(n) ? n : null;
   }
 
-  async function saveProject() {
+  function saveProject() {
     const name = draft.name.trim();
     const client = draft.client.trim();
+    const status = draft.status;
+
     const rl = toNumberOrNull(draft.roomLength);
     const rw = toNumberOrNull(draft.roomWidth);
     const rh = toNumberOrNull(draft.roomHeight);
 
     if (!name) return alert("Please enter a project name.");
     if (!client) return alert("Please enter a client name.");
+    if (STATUS.indexOf(status) === -1) return alert("Please select a valid status.");
 
-    try {
-      const projectData = {
-        name,
-        client_name: client,
-        room_length: rl,
-        room_width: rw,
-        room_height: rh,
-      };
-
-      // Create in database
-      const created = await Project.create(projectData);
-      
-      // Add to local list
-      setProjects((arr) => [created, ...arr]);
-      
-      // Sync summary to session
-      setProjectSummaryFromEntity(created);
-      
-      // Set as active project
-      projectActions.setActiveProjectId(created.id);
-      
-      setDialogOpen(false);
-      setCreated(created);
-      window.setTimeout(() => setCreated(null), 4000);
-    } catch (err) {
-      console.error('[Projects] Failed to create project:', err);
-      alert('Failed to create project. Please try again.');
-    }
+    const p = {
+      id: `p_${Date.now().toString(36)}`,
+      name,
+      client,
+      status,
+      roomLength: rl,
+      roomWidth: rw,
+      roomHeight: rh,
+      createdAt: Date.now(),
+      // Read-only summary fields will be filled later by Room Designer (kept null here)
+      lcrModel: null,
+      surroundModel: null,
+      heightModel: null,
+      subModel: null,
+      subCount: null,
+      screenSizeInches: null,
+      seats: null,
+    };
+    setProjects((arr) => [p, ...arr]);
+    setDialogOpen(false);
+    setCreated(p);
+    window.setTimeout(() => setCreated(null), 4000);
   }
 
   function startHoldDelete(id) {
@@ -205,7 +178,7 @@ export default function ProjectsPage() {
       if (pct >= 1) {
         clear();
         if (window.confirm("Delete this project? This cannot be undone.")) {
-          deleteProject(id);
+          setProjects((arr) => arr.filter((p) => p.id !== id));
         } else {
           setHoldProgress((m) => ({ ...m, [id]: 0 }));
         }
@@ -221,24 +194,6 @@ export default function ProjectsPage() {
     }
 
     holdTimers.current[id] = { t: window.setTimeout(tick, 16), startedAt };
-  }
-
-  async function deleteProject(id) {
-    try {
-      await Project.delete(id);
-      setProjects((arr) => arr.filter((p) => p.id !== id));
-      
-      // Clear active project if it was deleted
-      if (projectActions) {
-        const activeId = window.localStorage?.getItem('b44_activeProjectId');
-        if (activeId === id) {
-          projectActions.clearActiveProject();
-        }
-      }
-    } catch (err) {
-      console.error('[Projects] Failed to delete project:', err);
-      alert('Failed to delete project. Please try again.');
-    }
   }
 
   function cancelHoldDelete(id) {
@@ -317,9 +272,9 @@ export default function ProjectsPage() {
           </div>
 
           <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 8 }}>
-            Room: {p.room_length != null ? p.room_length : "—"}m ×{" "}
-            {p.room_width != null ? p.room_width : "—"}m ×{" "}
-            {p.room_height != null ? p.room_height : "—"}m
+            Room: {p.roomLength != null ? p.roomLength : "—"}m ×{" "}
+            {p.roomWidth != null ? p.roomWidth : "—"}m ×{" "}
+            {p.roomHeight != null ? p.roomHeight : "—"}m
           </div>
         </div>
 
@@ -511,19 +466,7 @@ export default function ProjectsPage() {
       )}
 
       {/* Grid or empty */}
-      {loading ? (
-        <div
-          style={{
-            marginTop: 16,
-            padding: 24,
-            textAlign: "center",
-            color: BRAND.subtext,
-            fontSize: 16,
-          }}
-        >
-          Loading projects...
-        </div>
-      ) : list.length === 0 ? (
+      {list.length === 0 ? (
         <div
           style={{
             marginTop: 16,

@@ -101,41 +101,6 @@ function setActiveProjectId(id) {
 function clearActiveProject() {
   setState({ activeProjectId: null });
 }
-
-// Upsert project summary from entity
-function upsertProjectSummary(project) {
-  if (!project || !project.id) return;
-  
-  const summary = {
-    id: project.id,
-    name: project.name || null,
-    client_name: project.client_name || null,
-    dolbyLayout: project.dolby_config || undefined,
-    roomDims: project.roomDims || null,
-    lcrModel: project.selected_speakers_by_role ? 
-      (() => { try { const s = JSON.parse(project.selected_speakers_by_role); return s?.L || s?.FL || null; } catch { return null; } })() : null,
-    surroundModel: project.selected_speakers_by_role ?
-      (() => { try { const s = JSON.parse(project.selected_speakers_by_role); return s?.SL || s?.LS || null; } catch { return null; } })() : null,
-    heightModel: project.selected_speakers_by_role ?
-      (() => { try { const s = JSON.parse(project.selected_speakers_by_role); return s?.TFL || s?.TL || null; } catch { return null; } })() : null,
-    subModel: null,
-    subCount: null,
-    targetSPL_LCR_dB: project.target_spl || null,
-    ampHeadroom_dB: null,
-  };
-
-  setState({
-    ...state,
-    byProject: {
-      ...state.byProject,
-      [project.id]: summary,
-    },
-  });
-}
-
-function setProjectSummaryFromEntity(entity) {
-  upsertProjectSummary(entity);
-}
 // Add fromBus guard and no-op if nothing changes
 function setSummaryFor(projectId, partial, { fromBus = false } = {}) {
   if (!projectId) return;
@@ -217,7 +182,7 @@ export function useProjectSpec() {
 }
 export function useProjectActions() {
   const actions = React.useMemo(
-    () => ({ setActiveProject, setActiveProjectId, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec, setProjectSummaryFromEntity }),
+    () => ({ setActiveProject, setActiveProjectId, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec }),
     []
   );
   return actions;
@@ -237,8 +202,5 @@ if (typeof window !== "undefined") {
   } catch {}
 }
 
-// Export standalone for direct imports
-export { setProjectSummaryFromEntity };
-
 // Optional raw accessor
-export const ProjectSession = { getState, setActiveProject, setActiveProjectId, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec, setProjectSummaryFromEntity };
+export const ProjectSession = { getState, setActiveProject, setActiveProjectId, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec };

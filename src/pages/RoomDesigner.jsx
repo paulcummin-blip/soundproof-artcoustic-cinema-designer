@@ -10,7 +10,7 @@ import { SidebarInset } from "@/components/ui/sidebar"; // NEW: Import SidebarIn
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
-import { useActiveProjectId, setProjectSummaryFromEntity } from "@/components/state/project-session";
+import { useActiveProjectId } from "@/components/state/project-session";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
@@ -354,9 +354,6 @@ function useProjectLoader(
         hydrateFromProject(p);
         setProjectNameState(p?.name || "Project"); // Update internal projectName state
         setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
-        
-        // Sync project summary to session
-        setProjectSummaryFromEntity(p);
       } else {
         // Project not found - treat as stale ID, clear it and reset
         console.log('[RoomDesigner] Project not found in cloud, starting fresh.');
