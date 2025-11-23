@@ -3,6 +3,7 @@ import { ProjectBus } from "@/components/state/bus";
 
 // Persistent project session with per-project summary + legacy spec (for backward compatibility)
 const STORAGE_KEY = "project-session";
+const ACTIVE_PROJECT_KEY = "b44_activeProjectId";
 
 // Summary model (per acceptance)
 const emptySummary = {
@@ -31,12 +32,22 @@ const listeners = new Set();
 // Persistence helpers
 function load() {
   try {
+    // Load active project ID from dedicated key (new approach)
+    const activeId = typeof window !== "undefined" ? window.localStorage?.getItem(ACTIVE_PROJECT_KEY) : null;
+    
     const raw = typeof window !== "undefined" ? window.localStorage?.getItem(STORAGE_KEY) : null;
-    if (!raw) return;
+    if (!raw) {
+      // If we have an active ID but no session data, initialize with it
+      if (activeId) {
+        state.activeProjectId = activeId;
+      }
+      return;
+    }
     const parsed = JSON.parse(raw);
     if (parsed && typeof parsed === "object") {
       state = {
-        activeProjectId: parsed.activeProjectId ?? null,
+        // Prefer dedicated key over embedded value
+        activeProjectId: activeId || parsed.activeProjectId || null,
         byProject: parsed.byProject ?? {},
         spec: parsed.spec ?? { dolbyLayout: undefined, targetSPL_LCR_dB: null },
       };
@@ -46,6 +57,14 @@ function load() {
 function save() {
   try {
     if (typeof window === "undefined") return;
+    
+    // Persist active project ID to dedicated key
+    if (state.activeProjectId) {
+      window.localStorage?.setItem(ACTIVE_PROJECT_KEY, state.activeProjectId);
+    } else {
+      window.localStorage?.removeItem(ACTIVE_PROJECT_KEY);
+    }
+    
     const payload = {
       activeProjectId: state.activeProjectId,
       byProject: state.byProject,
@@ -75,6 +94,9 @@ function subscribe(listener) {
 // Actions
 function setActiveProject(id) {
   setState({ activeProjectId: id || null });
+}
+function setActiveProjectId(id) {
+  setActiveProject(id);
 }
 function clearActiveProject() {
   setState({ activeProjectId: null });
@@ -160,7 +182,7 @@ export function useProjectSpec() {
 }
 export function useProjectActions() {
   const actions = React.useMemo(
-    () => ({ setActiveProject, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec }),
+    () => ({ setActiveProject, setActiveProjectId, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec }),
     []
   );
   return actions;
@@ -181,4 +203,4 @@ if (typeof window !== "undefined") {
 }
 
 // Optional raw accessor
-export const ProjectSession = { getState, setActiveProject, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec };
+export const ProjectSession = { getState, setActiveProject, setActiveProjectId, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec };

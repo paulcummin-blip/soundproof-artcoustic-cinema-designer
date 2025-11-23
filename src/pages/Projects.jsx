@@ -1,6 +1,7 @@
 // pages/Projects.js — Stable, JS-only version (no external UI deps)
 import React, { useMemo, useRef, useState } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
+import { useProjectActions } from "@/components/state/project-session";
 
 // ---- Brand tokens ----
 const BRAND = {
@@ -58,6 +59,7 @@ function fieldStyle() {
 
 // ---- Component ----
 export default function ProjectsPage() {
+  const projectActions = useProjectActions();
   const [projects, setProjects] = useState([]);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
@@ -279,9 +281,10 @@ export default function ProjectsPage() {
         <div style={{ display: "flex", gap: 8 }}>
           <button
             type="button"
-            onClick={() =>
-              (window.location.href = `/RoomDesigner?project=${encodeURIComponent(p.id)}`)
-            }
+            onClick={() => {
+              projectActions.setActiveProjectId(p.id);
+              window.location.href = "/RoomDesigner";
+            }}
             style={{
               padding: "8px 12px",
               borderRadius: 10,
@@ -442,9 +445,10 @@ export default function ProjectsPage() {
           <strong style={{ color: BRAND.text }}>{created.name}</strong> created.
           <button
             type="button"
-            onClick={() =>
-              (window.location.href = `/RoomDesigner?project=${encodeURIComponent(created.id)}`)
-            }
+            onClick={() => {
+              projectActions.setActiveProjectId(created.id);
+              window.location.href = "/RoomDesigner";
+            }}
             style={{
               marginLeft: 8,
               padding: "6px 10px",

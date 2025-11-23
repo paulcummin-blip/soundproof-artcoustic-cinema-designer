@@ -10,6 +10,7 @@ import { SidebarInset } from "@/components/ui/sidebar"; // NEW: Import SidebarIn
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
+import { useActiveProjectId } from "@/components/state/project-session";
 
 // Hooks and utils (kept eager; they are light and provide guards below)
 import { useRP22AnalysisEngine } from "@/components/hooks/useRP22AnalysisEngine";
@@ -354,16 +355,30 @@ function useProjectLoader(
         setProjectNameState(p?.name || "Project"); // Update internal projectName state
         setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
       } else {
-        setLoadState({ phase: "error", error: "Project not found.", name: null });
+        // Project not found - treat as stale ID, clear it and reset
+        console.log('[RoomDesigner] Project not found in cloud, starting fresh.');
+        setProjectIdState(null);
+        setLoadState({ phase: "idle", error: null, name: null });
       }
     } catch (err) {
       if (err?.name === "AbortError") {
         setLoadState(prev => ({ ...prev, phase: "idle" }));
         return;
       }
+      
+      // Check for stale/invalid ID errors
+      const errMsg = String(err?.message || err || '');
+      if (errMsg.includes('Invalid id value') || errMsg.includes('Object not found') || errMsg.includes('404')) {
+        console.log('[RoomDesigner] Invalid project ID detected, clearing and starting fresh.');
+        setProjectIdState(null);
+        setLoadState({ phase: "idle", error: null, name: null });
+        return;
+      }
+      
       window.__APP_DEBUG = window.__APP_DEBUG || [];
       window.__APP_DEBUG.push(`[RoomDesigner] Project load error: ${err?.message || err}`);
-      setLoadState({ phase: "error", error: err?.message || "Failed to fetch project data.", name: null });
+      console.error('[RoomDesigner] Failed to load project:', err);
+      setLoadState({ phase: "idle", error: null, name: null });
     }
   }, [projectIdState, hydrateFromProject, setProjectNameState]);
 
@@ -824,6 +839,7 @@ function useGuardedSetter(setter, tabName) {
 function RoomDesignerWithState() {
   // All hook calls must be unconditional and at the top level
   const appState = useAppState();
+  const sessionActiveProjectId = useActiveProjectId();
 
   // Temporary variables for values that might be undefined if appState is null
   // (Assumes AppStateProvider has been updated to provide these)
@@ -883,9 +899,8 @@ function RoomDesignerWithState() {
 
   const visualisationRef = useRef(null);
 
-  const activeProjectId = React.useMemo(() => {
-    return appState?.activeProjectId || null;
-  }, [appState?.activeProjectId]);
+  // Use session active project ID (from Projects page), fallback to URL param for legacy support
+  const activeProjectId = sessionActiveProjectId || initialProjectIdFromUrl;
 
   // Don't block render - allow local-only mode
   const showLocalHint = !activeProjectId;
