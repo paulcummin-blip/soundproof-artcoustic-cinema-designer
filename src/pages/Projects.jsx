@@ -79,6 +79,9 @@ export default function ProjectsPage() {
     roomHeight: "",
   });
 
+  // If not null, dialog is editing an existing project
+  const [editingProject, setEditingProject] = useState(null);
+
   // Banner after create
   const [created, setCreated] = useState(null);
   const [createError, setCreateError] = useState(null);
@@ -103,7 +106,7 @@ export default function ProjectsPage() {
             id: p.id,
             name: p.name || "Untitled Project",
             client: p.client_name || "",
-            status: "Prospective", // Default status for now
+            status: p.project_status || "Prospective",
             roomLength: p.room_length || null,
             roomWidth: p.room_width || null,
             roomHeight: p.room_height || null,
@@ -167,6 +170,8 @@ export default function ProjectsPage() {
 
   // ---- UI bits ----
   function openDialog() {
+    // New project
+    setEditingProject(null);
     setDraft({
       name: "",
       client: "",
@@ -175,6 +180,21 @@ export default function ProjectsPage() {
       roomWidth: "",
       roomHeight: "",
     });
+    setCreateError(null);
+    setDialogOpen(true);
+  }
+
+  function handleEditProject(p) {
+    setEditingProject(p);
+    setDraft({
+      name: p.name || "",
+      client: p.client || "",
+      status: p.status || "Prospective",
+      roomLength: p.roomLength != null ? String(p.roomLength) : "",
+      roomWidth: p.roomWidth != null ? String(p.roomWidth) : "",
+      roomHeight: p.roomHeight != null ? String(p.roomHeight) : "",
+    });
+    setCreateError(null);
     setDialogOpen(true);
   }
 
@@ -199,44 +219,72 @@ export default function ProjectsPage() {
 
     try {
       setCreateError(null);
-      
-      // Create project entity in backend
+
       const projectData = {
         name,
         client_name: client || "",
         room_length: rl,
         room_width: rw,
         room_height: rh,
+        project_status: status,
       };
-      
-      const newProject = await base44.entities.Project.create(projectData);
-      
-      // Map to UI format and add to list
-      const p = {
-        id: newProject.id,
-        name: newProject.name,
-        client: newProject.client_name || "",
-        status,
-        roomLength: newProject.room_length,
-        roomWidth: newProject.room_width,
-        roomHeight: newProject.room_height,
-        createdAt: new Date(newProject.created_date).getTime(),
-        lcrModel: null,
-        surroundModel: null,
-        heightModel: null,
-        subModel: null,
-        subCount: null,
-        screenSizeInches: null,
-        seats: null,
-      };
-      
-      setProjects((arr) => [p, ...arr]);
-      setDialogOpen(false);
-      setCreated(p);
-      window.setTimeout(() => setCreated(null), 4000);
+
+      if (!editingProject) {
+        // CREATE NEW PROJECT
+        const newProject = await base44.entities.Project.create(projectData);
+
+        const p = {
+          id: newProject.id,
+          name: newProject.name,
+          client: newProject.client_name || "",
+          status: newProject.project_status || status,
+          roomLength: newProject.room_length,
+          roomWidth: newProject.room_width,
+          roomHeight: newProject.room_height,
+          createdAt: new Date(newProject.created_date).getTime(),
+          lcrModel: null,
+          surroundModel: null,
+          heightModel: null,
+          subModel: null,
+          subCount: null,
+          screenSizeInches: null,
+          seats: null,
+        };
+
+        setProjects((arr) => [p, ...arr]);
+        setDialogOpen(false);
+        setEditingProject(null);
+        setCreated(p);
+        window.setTimeout(() => setCreated(null), 4000);
+      } else {
+        // UPDATE EXISTING PROJECT
+        const updated = await base44.entities.Project.update(
+          editingProject.id,
+          projectData
+        );
+
+        setProjects((arr) =>
+          arr.map((p) =>
+            p.id === editingProject.id
+              ? {
+                  ...p,
+                  name: updated.name,
+                  client: updated.client_name || "",
+                  status: updated.project_status || status,
+                  roomLength: updated.room_length,
+                  roomWidth: updated.room_width,
+                  roomHeight: updated.room_height,
+                }
+              : p
+          )
+        );
+
+        setDialogOpen(false);
+        setEditingProject(null);
+      }
     } catch (err) {
-      console.error('[Projects] Failed to create project:', err);
-      setCreateError(err?.message || "Failed to create project. Please try again.");
+      console.error("[Projects] Failed to save project:", err);
+      setCreateError(err?.message || "Failed to save project. Please try again.");
     }
   }
 
@@ -380,7 +428,7 @@ export default function ProjectsPage() {
     );
   }
 
-  function ProjectCard({ p }) {
+  function ProjectCard({ p, onEdit }) {
     const prog = holdProgress[p.id] || 0;
     const barColor =
       p.status === "Live"
@@ -456,6 +504,22 @@ export default function ProjectsPage() {
             }}
           >
             Open Project
+          </button>
+
+          <button
+            type="button"
+            onClick={() => onEdit && onEdit(p)}
+            style={{
+              padding: "8px 12px",
+              borderRadius: 10,
+              border: `1px solid ${BRAND.border}`,
+              background: BRAND.btnGhost,
+              color: BRAND.text,
+              fontSize: 13,
+              cursor: "pointer",
+            }}
+          >
+            Edit
           </button>
 
           <button
@@ -744,7 +808,11 @@ export default function ProjectsPage() {
             }}
           >
             {list.map((p) => (
-              <ProjectCard key={p.id} p={p} />
+              <ProjectCard
+                key={p.id}
+                p={p}
+                onEdit={handleEditProject}
+              />
             ))}
           </div>
         </SegmentBoundary>
@@ -781,7 +849,9 @@ export default function ProjectsPage() {
                 marginBottom: 8,
               }}
             >
-              <h2 style={{ margin: 0, fontSize: 18 }}>Create Project</h2>
+              <h2 style={{ margin: 0, fontSize: 18 }}>
+                {editingProject ? "Edit Project" : "Create Project"}
+              </h2>
               <button
                 type="button"
                 onClick={() => setDialogOpen(false)}
@@ -911,7 +981,7 @@ export default function ProjectsPage() {
                     fontSize: 14,
                   }}
                 >
-                  Save Project
+                  {editingProject ? "Save Changes" : "Save Project"}
                 </button>
               </div>
             </div>
