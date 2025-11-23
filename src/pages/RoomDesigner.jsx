@@ -843,7 +843,6 @@ function RoomDesignerWithState() {
   // All hook calls must be unconditional and at the top level
   const appState = useAppState();
   const sessionActiveProjectId = useActiveProjectId();
-  const [projectIdState, setProjectIdState] = useState(null);
 
   // Temporary variables for values that might be undefined if appState is null
   // (Assumes AppStateProvider has been updated to provide these)
