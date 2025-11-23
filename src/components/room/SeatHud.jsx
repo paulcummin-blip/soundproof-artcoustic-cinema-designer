@@ -113,30 +113,49 @@ export default function SeatHud({
         )}
       </div>
 
-      {/* Basic info */}
-      <div style={{ marginBottom: 4 }}>
-        <div>Position: {fmt(tooltipData.position)}</div>
-        <div>Distance to Screen: {fmt(tooltipData.distanceToScreen)}</div>
-        {tooltipData.distanceToMLP != null && tooltipData.distanceToMLP !== "—" && (
-          <div>Distance to MLP: {fmt(tooltipData.distanceToMLP)}</div>
-        )}
-      </div>
-
-      {/* RP23 */}
+      {/* RP23 - MOVED TO TOP & ENLARGED */}
       {rp23.formatted && rp23.formatted !== "—" && (
         <div
           style={{
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            padding: "4px 0",
+            padding: "6px 0",
             borderTop: "1px solid #E6E4DD",
+            fontSize: "1.25em",
+            fontWeight: 500,
           }}
         >
           <span>RP23 Horizontal: {fmt(rp23)}</span>
           {typeof renderLevelBadge === "function" ? renderLevelBadge(rp23.level ?? "—") : null}
         </div>
       )}
+
+      {/* RP22 Metrics - MOVED UP & ENLARGED */}
+      <div style={{ borderTop: "1px solid #E6E4DD", paddingTop: 8, marginTop: 4, fontSize: "1.2em" }}>
+        <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 6, color: "#1B1A1A" }}>
+          RP22 Per-Seat Metrics
+        </div>
+        {["p1", "p4", "p5", "p6", "p9", "p10", "p16", "p17", "p20"].map((key) => {
+          const metric = tooltipData.rp22?.[key];
+          if (!metric) return null;
+          return (
+            <div
+              key={key}
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                padding: "3px 0",
+                fontSize: 12,
+              }}
+            >
+              <span>{key.toUpperCase()}: {metric.formatted || "—"}</span>
+              {typeof renderLevelBadge === "function" ? renderLevelBadge(metric.level || "—") : null}
+            </div>
+          );
+        })}
+      </div>
 
       {/* SPL @ Seat */}
       {hasAnySPL && (
@@ -180,30 +199,13 @@ export default function SeatHud({
         </div>
       )}
 
-      {/* RP22 Metrics */}
-      <div style={{ borderTop: "1px solid #E6E4DD", paddingTop: 4, marginTop: 4 }}>
-        <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 4, color: "#1B1A1A" }}>
-          RP22 Per-Seat Metrics
-        </div>
-        {["p1", "p4", "p5", "p6", "p9", "p10", "p16", "p17", "p20"].map((key) => {
-          const metric = tooltipData.rp22?.[key];
-          if (!metric) return null;
-          return (
-            <div
-              key={key}
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                padding: "2px 0",
-                fontSize: 12,
-              }}
-            >
-              <span>{key.toUpperCase()}: {metric.formatted || "—"}</span>
-              {typeof renderLevelBadge === "function" ? renderLevelBadge(metric.level || "—") : null}
-            </div>
-          );
-        })}
+      {/* Basic info - MOVED TO BOTTOM */}
+      <div style={{ borderTop: "1px solid #E6E4DD", paddingTop: 8, marginTop: 8 }}>
+        <div>Position: {fmt(tooltipData.position)}</div>
+        <div>Distance to Screen: {fmt(tooltipData.distanceToScreen)}</div>
+        {tooltipData.distanceToMLP != null && tooltipData.distanceToMLP !== "—" && (
+          <div>Distance to MLP: {fmt(tooltipData.distanceToMLP)}</div>
+        )}
       </div>
     </div>
   );
