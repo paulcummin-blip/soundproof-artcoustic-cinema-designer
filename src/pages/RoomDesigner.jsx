@@ -338,6 +338,7 @@ function useProjectLoader(
       OVERHEADS_6: false,
       RP22_ANGLES: false,
       enableDolbyZones: false,
+      ROOM_DIMS: false, // NEW – plan dimension overlay
     };
     const overlaysData = parseMaybe(p?.overlays, defaultOverlays);
     if (typeof setOverlays === "function") {

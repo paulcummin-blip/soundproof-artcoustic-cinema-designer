@@ -28,7 +28,7 @@ const formatDimension = (value) => {
 };
 
 export default function RoomDimensions({ disabled }) {
-  const { roomDims, setRoomWidthM, setRoomLengthM, setRoomHeightM } = useAppState();
+  const { roomDims, setRoomWidthM, setRoomLengthM, setRoomHeightM, overlays, setOverlays } = useAppState();
 
   const [draftDims, setDraftDims] = React.useState(() => ({
     width: formatDimension(roomDims?.widthM),
@@ -124,6 +124,54 @@ export default function RoomDimensions({ disabled }) {
           disabled={disabled}
           style={inputStyle}
         />
+      </div>
+
+      <div
+        style={{
+          marginTop: 12,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+        }}
+      >
+        <span style={{ fontSize: 13, color: "#3E4349" }}>
+          Show room dimensions on plan
+        </span>
+        <button
+          type="button"
+          onClick={() => {
+            if (!setOverlays) return;
+            const on = !!overlays?.ROOM_DIMS;
+            setOverlays({ ...(overlays || {}), ROOM_DIMS: !on });
+          }}
+          style={{
+            position: "relative",
+            width: 54,
+            height: 30,
+            borderRadius: 999,
+            border: "1px solid #DCDBD6",
+            padding: 0,
+            background: overlays?.ROOM_DIMS ? "#213428" : "#FFFFFF",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: overlays?.ROOM_DIMS ? "flex-end" : "flex-start",
+            cursor: "pointer",
+            transition: "background 120ms ease, justify-content 120ms ease",
+          }}
+          aria-pressed={overlays?.ROOM_DIMS ? "true" : "false"}
+        >
+          <span
+            style={{
+              width: 22,
+              height: 22,
+              borderRadius: "999px",
+              margin: "0 3px",
+              background: "#FFFFFF",
+              boxShadow: "0 1px 2px rgba(0,0,0,0.15)",
+            }}
+          />
+        </button>
       </div>
 
       {roomDims.widthM > 0 && roomDims.lengthM > 0 && roomDims.heightM > 0 && (
