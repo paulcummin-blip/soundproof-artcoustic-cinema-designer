@@ -96,47 +96,102 @@ export default function SeatHud({
         )}
       </div>
 
-      {/* Basic info */}
-      <div style={{ marginBottom: 4 }}>
-        <div>Position: {tooltipData.position}</div>
-        <div>Distance to Screen: {tooltipData.distanceToScreen}</div>
-        {tooltipData.distanceToMLP !== '—' && (
-          <div>Distance to MLP: {tooltipData.distanceToMLP}</div>
-        )}
-      </div>
-
-      {/* RP23 */}
-      {tooltipData.rp23.formatted !== '—' && (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          padding: '4px 0',
-          borderTop: '1px solid #E6E4DD'
-        }}>
+      {/* RP23 – now directly under the header, slightly larger */}
+      {tooltipData.rp23 && tooltipData.rp23.formatted !== '—' && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '6px 0',
+            borderTop: '1px solid #E6E4DD',
+            fontSize: 14,         // ~25% larger than the base 11
+            fontWeight: 500,
+          }}
+        >
           <span>RP23 Horizontal: {tooltipData.rp23.formatted}</span>
           {renderLevelBadge(tooltipData.rp23.level)}
         </div>
       )}
 
-      {/* SPL @ Seat section */}
-      {(Object.keys(tooltipData.splAtSeat.lcr).length > 0 || 
-        Object.keys(tooltipData.splAtSeat.surrounds).length > 0 || 
-        Object.keys(tooltipData.splAtSeat.overheads).length > 0) && (
-        <div style={{ 
+      {/* RP22 Per-Seat Metrics – directly under RP23, bumped up */}
+      <div
+        style={{
           borderTop: '1px solid #E6E4DD',
-          marginTop: '8px',
-          paddingTop: '8px'
-        }}>
-          <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '6px', color: '#1B1A1A' }}>
+          paddingTop: 6,
+          marginTop: 4,
+        }}
+      >
+        <div
+          style={{
+            fontWeight: 600,
+            fontSize: 13,       // about 20% larger than before
+            marginBottom: 6,
+            color: '#1B1A1A',
+          }}
+        >
+          RP22 Per-Seat Metrics
+        </div>
+
+        {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
+          const metric = tooltipData.rp22?.[key];
+          if (!metric) return null;
+
+          return (
+            <div
+              key={key}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '3px 0',
+                fontSize: 12,
+              }}
+            >
+              <span>
+                {key.toUpperCase()}: {metric.formatted || '—'}
+              </span>
+              {renderLevelBadge(metric.level || '—')}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* SPL @ Seat section – same content as before, just moved below RP22 */}
+      {(Object.keys(tooltipData.splAtSeat.lcr).length > 0 ||
+        Object.keys(tooltipData.splAtSeat.surrounds).length > 0 ||
+        Object.keys(tooltipData.splAtSeat.overheads).length > 0) && (
+        <div
+          style={{
+            borderTop: '1px solid #E6E4DD',
+            marginTop: 8,
+            paddingTop: 8,
+          }}
+        >
+          <div
+            style={{
+              fontWeight: 600,
+              fontSize: 13,
+              marginBottom: 6,
+              color: '#1B1A1A',
+            }}
+          >
             SPL @ Seat (Target: 100W)
           </div>
-          
+
           {Object.keys(tooltipData.splAtSeat.lcr).length > 0 && (
-            <div style={{ marginBottom: '4px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Screen:</div>
+            <div style={{ marginBottom: 4 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: '#888',
+                  marginBottom: 2,
+                }}
+              >
+                Screen:
+              </div>
               {Object.entries(tooltipData.splAtSeat.lcr).map(([role, spl]) => (
-                <div key={role} style={{ fontSize: '12px', paddingLeft: '8px' }}>
+                <div key={role} style={{ fontSize: 12, paddingLeft: 8 }}>
                   {role}: {spl.formatted}
                 </div>
               ))}
@@ -144,19 +199,37 @@ export default function SeatHud({
           )}
 
           {Object.keys(tooltipData.splAtSeat.surrounds).length > 0 && (
-            <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Surrounds:</div>
-          )}
-            {Object.entries(tooltipData.splAtSeat.surrounds).map(([role, spl]) => (
-              <div key={role} style={{ fontSize: '12px', paddingLeft: '8px' }}>
-                {role}: {spl.formatted}
+            <>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: '#888',
+                  marginBottom: 2,
+                }}
+              >
+                Surrounds:
               </div>
-            ))}
-          
+              {Object.entries(tooltipData.splAtSeat.surrounds).map(([role, spl]) => (
+                <div key={role} style={{ fontSize: 12, paddingLeft: 8 }}>
+                  {role}: {spl.formatted}
+                </div>
+              ))}
+            </>
+          )}
+
           {Object.keys(tooltipData.splAtSeat.overheads).length > 0 && (
-            <div style={{ marginBottom: '4px' }}>
-              <div style={{ fontSize: '11px', color: '#888', marginBottom: '2px' }}>Overheads:</div>
+            <div style={{ marginBottom: 4 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  color: '#888',
+                  marginBottom: 2,
+                }}
+              >
+                Overheads:
+              </div>
               {Object.entries(tooltipData.splAtSeat.overheads).map(([role, spl]) => (
-                <div key={role} style={{ fontSize: '12px', paddingLeft: '8px' }}>
+                <div key={role} style={{ fontSize: 12, paddingLeft: 8 }}>
                   {role}: {spl.formatted}
                 </div>
               ))}
@@ -165,31 +238,19 @@ export default function SeatHud({
         </div>
       )}
 
-
-      {/* RP22 Metrics */}
-      <div style={{ borderTop: '1px solid #E6E4DD', paddingTop: 4, marginTop: 4 }}>
-        <div style={{ fontWeight: 600, fontSize: 11, marginBottom: 4, color: '#1B1A1A' }}>
-          RP22 Per-Seat Metrics
-        </div>
-        
-        {/* Always show all RP22 metrics */}
-        {['p1','p4','p5','p6','p9','p10','p16','p17','p20'].map(key => {
-          const metric = tooltipData.rp22?.[key];
-          if (!metric) return null;
-          
-          return (
-            <div key={key} style={{ 
-              display: 'flex', 
-              justifyContent: 'space-between', 
-              alignItems: 'center',
-              padding: '2px 0',
-              fontSize: '12px'
-            }}>
-              <span>{key.toUpperCase()}: {metric.formatted || '—'}</span>
-              {renderLevelBadge(metric.level || '—')}
-            </div>
-          );
-        })}
+      {/* Basic info – now at the very bottom */}
+      <div
+        style={{
+          borderTop: '1px solid #E6E4DD',
+          paddingTop: 8,
+          marginTop: 8,
+        }}
+      >
+        <div>Position: {tooltipData.position}</div>
+        <div>Distance to Screen: {tooltipData.distanceToScreen}</div>
+        {tooltipData.distanceToMLP !== '—' && (
+          <div>Distance to MLP: {tooltipData.distanceToMLP}</div>
+        )}
       </div>
     </div>
   );
