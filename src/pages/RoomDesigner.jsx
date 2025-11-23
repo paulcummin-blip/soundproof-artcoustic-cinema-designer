@@ -637,15 +637,13 @@ function useProjectLoader(
     return () => controller.abort();
     // IMPORTANT: include projectIdState etc. so this effect behaves correctly
   }, [
-    projectIdFromUrl,
-    projectIdState,
-    placedSpeakers,
-    seatingPositions,
-    appState?.roomDims,
-    initWithDefaultsAndRules,
-    loadProject,
-    setProjectIdState,
-  ]);
+  projectIdFromUrl,
+  projectIdState,
+  appState?.roomDims,
+  initWithDefaultsAndRules,
+  loadProject,
+  setProjectIdState,
+]);
 
   const manualSaveProject = useCallback(async () => {
     setAutosaveStatus("saving");
