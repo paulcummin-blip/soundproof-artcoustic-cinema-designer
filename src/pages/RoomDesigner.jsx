@@ -502,6 +502,7 @@ function useProjectLoader(
 
   const debounceTimeoutRef = useRef(null);
   const isHydratingRef = useRef(false); // Initialize with false
+  const hasBootstrappedRef = useRef(false);
 
   useEffect(() => {
     // Update the ref whenever loadState changes
@@ -604,15 +605,19 @@ function useProjectLoader(
     rowSpacingM, appState.screenFrontPlaneM, seatsPerRowByRow // Add screenFrontPlaneM and seatsPerRowByRow to dependencies
   ]);
 
-  // Boot logic: only run defaults when we *don't* have a real project
+  // Boot logic: run ONCE – either load a project or initialise defaults
   useEffect(() => {
+    // Already bootstrapped for this mount? Do nothing.
+    if (hasBootstrappedRef.current) return;
+
     const controller = new AbortController();
 
     try {
       if (projectIdFromUrl || projectIdState) {
-        // We have a real project (from URL or from session) – just load it.
+        // We have a real project (from URL or from session) – load it once.
         const idToLoad = projectIdFromUrl || projectIdState;
         if (idToLoad) {
+          hasBootstrappedRef.current = true;
           setProjectIdState(idToLoad);
           loadProject(controller.signal);
         }
@@ -625,6 +630,7 @@ function useProjectLoader(
           Array.isArray(seatingPositions) && seatingPositions.length > 0;
 
         if (!hasSpeakers && !hasSeats && appState?.roomDims) {
+          hasBootstrappedRef.current = true;
           if (typeof initWithDefaultsAndRules === "function") {
             initWithDefaultsAndRules();
           }
@@ -635,15 +641,10 @@ function useProjectLoader(
     }
 
     return () => controller.abort();
-    // IMPORTANT: include projectIdState etc. so this effect behaves correctly
-  }, [
-  projectIdFromUrl,
-  projectIdState,
-  appState?.roomDims,
-  initWithDefaultsAndRules,
-  loadProject,
-  setProjectIdState,
-]);
+    // Intentionally **not** depending on speakers/seats/loadProject,
+    // we only want to boot once per project / page load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectIdFromUrl, projectIdState, appState?.roomDims]);
 
   const manualSaveProject = useCallback(async () => {
     setAutosaveStatus("saving");
