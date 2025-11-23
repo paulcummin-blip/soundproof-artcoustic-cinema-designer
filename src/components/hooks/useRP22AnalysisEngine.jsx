@@ -7,6 +7,8 @@ import { computeBackArc, param5LevelFromGap } from "@/components/utils/RP22Geome
 import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
+import { computeP16ForSeat } from "../utils/rp22HfOffAxis";
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
@@ -291,6 +293,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       return splObj?.value ?? null;
     };
 
+    // Find MLP seat for P16 reference
+    const mlpSeat = mlp && isNum(mlp.x) && isNum(mlp.y) ? mlp : null;
+
     for (const seat of seatsWithRoles) {
       const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
       const metrics = { p1: null, p4: null, p5: null, p6: null, p9: null, p10: null, p16: null, p17: null, p20: null };
@@ -333,8 +338,26 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P16, P17, P20 - Placeholder until frequency response data is available
-      // These will show "—" in the HUD for now
+      // P16 - Screen FR variance using off-axis HF data
+      const screenSpeakers = safeSpeakers.filter(s => 
+        ['FL', 'FC', 'FR', 'L', 'C', 'R'].includes(getCanonicalRole(s.role))
+      );
+      
+      if (mlpSeat && screenSpeakers.length > 0) {
+        const p16 = computeP16ForSeat({
+          seat,
+          mlpSeat,
+          screenSpeakers,
+          getModelMeta: getSpeakerModelMeta,
+        });
+        
+        if (p16) {
+          metrics.p16 = p16;
+        }
+      }
+
+      // P17, P20 - Reserved for future FR implementation
+      // require per-seat frequency-response prediction (500 Hz–16 kHz and LF)
       
       seatMetrics.set(seatId, metrics);
     }

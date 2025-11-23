@@ -2332,10 +2332,21 @@ React.useEffect(() => {
       p6: { valueDb: null, level: '—', formatted: '—' },
       p9: { valueDeg: null, level: '—', formatted: '—' },
       p10: { valueDb: null, level: '—', formatted: '—' },
-      p16: { valueDeg: null, level: '—', formatted: '—' }, 
-      p17: { valueDeg: null, level: '—', formatted: '—' }, 
-      p20: { valueDeg: null, level: '—', formatted: '—' },
+      p16: { valueDb: null, level: '—', formatted: '—' }, 
+      p17: { valueDb: null, level: '—', formatted: '—' }, 
+      p20: { valueDb: null, level: '—', formatted: '—' },
     };
+
+    // Try to pull per-seat RP22 metrics from analysisResult
+    const seatMetrics = analysisResult?.seatMetrics?.get?.(effectiveHoveredSeat.id);
+    if (seatMetrics) {
+      // Merge in P9, P10, P16 from the analysis engine
+      if (seatMetrics.p9) data.rp22.p9 = seatMetrics.p9;
+      if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
+      if (seatMetrics.p16) data.rp22.p16 = seatMetrics.p16;
+      if (seatMetrics.p17) data.rp22.p17 = seatMetrics.p17;
+      if (seatMetrics.p20) data.rp22.p20 = seatMetrics.p20;
+    }
 
     // NEW: Use centralized SPL calculation (single source of truth)
     const seatSplData = getSeatSplMetrics(allSeatSplMetrics, effectiveHoveredSeat.id);
@@ -2479,90 +2490,12 @@ React.useEffect(() => {
       }
     }
 
-    // --- P9: Overhead Row Gap Deg (vertical spacing between upper rows) ---
-    if (placedOH.length >= 2) {
-      const earHeight = finite(seatZ, 1.2);
-      
-      // Categorize uppers into left and right columns
-      const leftRoles = ['TFL', 'TL', 'TBL'];
-      const rightRoles = ['TFR', 'TR', 'TBR'];
-      
-      const leftUppers = placedOH.filter(s => leftRoles.includes(getCanonicalRole(s.role)));
-      const rightUppers = placedOH.filter(s => rightRoles.includes(getCanonicalRole(s.role)));
-      
-      const computeElevationGaps = (speakers) => {
-        if (speakers.length < 2) return [];
-        
-        // Sort by Y (front to back)
-        const sorted = [...speakers].sort((a, b) => (a.position?.y || 0) - (b.position?.y || 0));
-        
-        // Compute elevation angle for each
-        const angles = sorted.map(sp => {
-          const spX = finite(sp.position?.x, 0);
-          const spY = finite(sp.position?.y, 0);
-          const spZ = finite(sp.position?.z, 2.4);
-          
-          const dXY = Math.hypot(spX - seatX, spY - seatY);
-          const dZ = spZ - earHeight;
-          
-          return Math.atan2(dZ, dXY) * (180 / Math.PI);
-        });
-        
-        // Compute gaps between adjacent angles
-        const gaps = [];
-        for (let i = 0; i < angles.length - 1; i++) {
-          gaps.push(Math.abs(angles[i + 1] - angles[i]));
-        }
-        return gaps;
-      };
-      
-      const leftGaps = computeElevationGaps(leftUppers);
-      const rightGaps = computeElevationGaps(rightUppers);
-      const allGaps = [...leftGaps, ...rightGaps];
-      
-      if (allGaps.length > 0) {
-        const maxGapDeg = Math.max(...allGaps);
-        
-        let level = '—';
-        if (maxGapDeg <= 50) level = 'L4';
-        else if (maxGapDeg <= 60) level = 'L3';
-        else if (maxGapDeg <= 80) level = 'L2';
-        else level = 'L1';
-        
-        data.rp22.p9 = {
-          valueDeg: maxGapDeg,
-          level,
-          formatted: `${maxGapDeg.toFixed(1)}° (upper spacing)`
-        };
-      }
-    }
+    // P9 and P10 are now computed in useRP22AnalysisEngine and pulled from seatMetrics above
+    // Legacy inline calculations removed - single source of truth is the analysis engine
     
-    // --- P10: Overhead SPL delta (requires ≥2 overheads) ---
-    if (placedOH.length >= 2 && seatSplData?.uppers) {
-      const ohSplValues = Object.values(seatSplData.uppers)
-        .map(s => s.value)
-        .filter(Number.isFinite);
-
-      const p10ValueDb = maxPairwiseDelta(ohSplValues);
-      if (Number.isFinite(p10ValueDb)) {
-        let level = '—';
-        if (p10ValueDb <= 2) level = 'L4';
-        else if (p10ValueDb <= 5) level = 'L3';
-        else if (p10ValueDb <= 8) level = 'L2';
-        else if (p10ValueDb <= 12) level = 'L1';
-
-        data.rp22.p10 = {
-          valueDb: p10ValueDb,
-          level,
-          formatted: `±${Math.floor(p10ValueDb)} dB (upper)`
-        };
-      }
-    }
-
-    // P16 / P17 / P20 reserved:
-    // require per-seat frequency-response prediction (500 Hz–16 kHz and LF),
-    // to be implemented when HF / LF response engine is in place.
-    // Keep as null for now - HUD will skip rendering them
+    // P16 / P17 / P20 are also computed in useRP22AnalysisEngine
+    // P16 uses off-axis HF data
+    // P17 / P20 reserved for future FR implementation
 
     // Legacy bridge
     data.p1NearestM = data.rp22.p1.valueM;
