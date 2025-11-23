@@ -27,10 +27,10 @@ const STATUS = ["Live", "Prospective", "Lost", "Completed"];
 
 function statusColor(s) {
   const v = (s || "").toLowerCase();
-  if (v === "live") return BRAND.green;
-  if (v === "prospective") return BRAND.amber;
-  if (v === "lost") return BRAND.red;
-  if (v === "completed") return BRAND.blue;
+  if (v === "live") return "#213428";         // Live
+  if (v === "prospective") return "#625143";  // Prospective
+  if (v === "lost") return "#4A230F";         // Lost
+  if (v === "completed") return "#3E4349";    // Completed
   return BRAND.subtext;
 }
 
