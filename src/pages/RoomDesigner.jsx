@@ -431,20 +431,23 @@ function useProjectLoader(
     debounceTimeoutRef.current = setTimeout(async () => {
       try {
         const projectData = serializeProject({
-          // NEW: Pass roomDims as JSON string
-          roomDims: JSON.stringify(appState.roomDims), // Use appState.roomDims
-          // Keep dimensions for backward compatibility with `room_width` etc. fields in Project entity
-          dimensions, screen, seatingPositions,
+          // Pass roomDims as JSON string
+          roomDims: JSON.stringify(appState.roomDims),
+          // Keep dimensions for backward compatibility with `room_width` etc.
+          dimensions,
+          screen,
+          seatingPositions,
           placedSpeakers,
-          roomElements, overlays,
+          roomElements,
+          overlays,
           projectName: projectNameState,
-          dolbyPreset, frozenTabs,
+          dolbyPreset,
+          frozenTabs,
           sevenBedLayoutType,
           frontSubsCfg,
           rearSubsCfg,
           lcrAimMode,
           enableFrontWides,
-          // Use selectedSpeakersByRole and speakerNodes from appState
           selectedSpeakersByRole: JSON.stringify(appState.selectedSpeakersByRole),
           spl_speaker_nodes: JSON.stringify(appState.speakerNodes),
           overheadGlobalModel,
@@ -456,8 +459,16 @@ function useProjectLoader(
           useRearGlobal,
           row_spacing_m: rowSpacingM,
           screenFrontPlaneM: appState.screenFrontPlaneM,
-          seatsPerRowByRow: JSON.stringify(seatsPerRowByRow), // NEW: Add seatsPerRowByRow
+          seatsPerRowByRow: JSON.stringify(seatsPerRowByRow),
         });
+
+        // IMPORTANT:
+        // For existing projects we NEVER let RoomDesigner change
+        // the project name or client name. Those are owned by Projects.
+        if (projectIdState) {
+          delete projectData.name;
+          delete projectData.client_name;
+        }
 
         // Only update existing project, never create new ones
         try {
@@ -546,6 +557,10 @@ function useProjectLoader(
 
       let savedProject;
       if (projectIdState) {
+        // Do not let manual "Save Project" rename an existing project
+        delete projectData.name;
+        delete projectData.client_name;
+        
         try {
           savedProject = await Project.update(projectIdState, projectData);
         } catch (updateErr) {
