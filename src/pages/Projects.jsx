@@ -280,6 +280,32 @@ export default function ProjectsPage() {
     }
   }
 
+  async function bulkDeleteUntitledProjects() {
+    const untitledProjects = projects.filter(p => p.name === "Untitled Room");
+    
+    if (untitledProjects.length === 0) {
+      alert("No 'Untitled Room' projects to delete.");
+      return;
+    }
+
+    if (!window.confirm("Delete ALL projects named 'Untitled Room'? This cannot be undone.")) {
+      return;
+    }
+
+    const idsToDelete = untitledProjects.map(p => p.id);
+    
+    for (const id of idsToDelete) {
+      try {
+        await base44.entities.Project.delete(id);
+      } catch (err) {
+        console.error('[Projects] Bulk delete failed for', id, err);
+      }
+    }
+
+    setProjects(prev => prev.filter(p => p.name !== "Untitled Room"));
+    alert("All 'Untitled Room' projects have been deleted.");
+  }
+
   function cancelHoldDelete(id) {
     const rec = holdTimers.current[id];
     if (rec && rec.t) window.clearTimeout(rec.t);
@@ -441,21 +467,38 @@ export default function ProjectsPage() {
         }}
       >
         <h1 style={{ margin: 0, fontSize: 28, color: BRAND.text }}>Projects</h1>
-        <button
-          type="button"
-          onClick={openDialog}
-          style={{
-            padding: "10px 16px",
-            borderRadius: 10,
-            border: `1px solid ${BRAND.border}`,
-            background: BRAND.btn,
-            color: BRAND.btnText,
-            cursor: "pointer",
-            fontSize: 14,
-          }}
-        >
-          + New Project
-        </button>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button
+            type="button"
+            onClick={bulkDeleteUntitledProjects}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 10,
+              border: `1px solid ${BRAND.red}`,
+              background: "#FFFFFF",
+              color: BRAND.red,
+              cursor: "pointer",
+              fontSize: 14,
+            }}
+          >
+            Delete "Untitled Room"
+          </button>
+          <button
+            type="button"
+            onClick={openDialog}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 10,
+              border: `1px solid ${BRAND.border}`,
+              background: BRAND.btn,
+              color: BRAND.btnText,
+              cursor: "pointer",
+              fontSize: 14,
+            }}
+          >
+            + New Project
+          </button>
+        </div>
       </div>
 
       {/* Controls */}
