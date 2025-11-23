@@ -409,14 +409,20 @@ function useProjectLoader(
   }, [loadState.phase, projectIdFromUrl]);
 
 
+  // Auto-save ONLY for existing projects.
+  // If there is no projectIdState yet, we keep everything local/ephemeral.
   useEffect(() => {
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-    }
+    // 1) No real project yet? Do nothing.
+    if (!projectIdState) return;
 
+    // 2) Skip if hydrating
     if (isHydratingRef.current) {
         setAutosaveStatus("hydrating");
         return;
+    }
+
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
 
     setAutosaveStatus("dirty");
@@ -452,41 +458,25 @@ function useProjectLoader(
           seatsPerRowByRow: JSON.stringify(seatsPerRowByRow), // NEW: Add seatsPerRowByRow
         });
 
-        let savedProject;
-        if (projectIdState) {
-          try {
-            savedProject = await Project.update(projectIdState, projectData);
-          } catch (updateErr) {
-            // Check if this is a 404/invalid ID error
-            const errMsg = String(updateErr?.message || updateErr || '');
-            if (errMsg.includes('Invalid id value') || errMsg.includes('Object not found') || errMsg.includes('404')) {
-              console.log('[Project Sync] Stale project ID detected, clearing and continuing locally.');
-              if (typeof window !== 'undefined' && window.__APPSTATE__?.clearActiveProject) {
-                window.__APPSTATE__.clearActiveProject();
-              }
-              // Clear the local project ID state so we stop trying to update it
-              setProjectIdState(null);
-              setAutosaveStatus("idle");
-              return; // Exit the autosave gracefully
-            }
-            // For other errors, re-throw to be caught by outer catch
-            throw updateErr;
-          }
-        } else {
-          savedProject = await Project.create(projectData);
-        }
-
-        if (savedProject) {
+        // Only update existing project, never create new ones
+        try {
+          await Project.update(projectIdState, projectData);
           setAutosaveStatus("saved");
-          if (!projectIdState) {
-            const newProjectId = savedProject.id;
-            if (newProjectId) {
-              handleProjectCreated(newProjectId);
+        } catch (updateErr) {
+          // Check if this is a 404/invalid ID error
+          const errMsg = String(updateErr?.message || updateErr || '');
+          if (errMsg.includes('Invalid id value') || errMsg.includes('Object not found') || errMsg.includes('404')) {
+            console.log('[Project Sync] Stale project ID detected, clearing and continuing locally.');
+            if (typeof window !== 'undefined' && window.__APPSTATE__?.clearActiveProject) {
+              window.__APPSTATE__.clearActiveProject();
             }
+            // Clear the local project ID state so we stop trying to update it
+            setProjectIdState(null);
+            setAutosaveStatus("idle");
+            return; // Exit the autosave gracefully
           }
-        } else {
-          console.error("Autosave failed: Project could not be saved.");
-          setAutosaveStatus("error");
+          // For other errors, re-throw to be caught by outer catch
+          throw updateErr;
         }
       } catch (e) {
         console.error("Error during autosave:", e.message);
