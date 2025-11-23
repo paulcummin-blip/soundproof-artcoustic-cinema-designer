@@ -8,6 +8,7 @@ import "./globals.css";
 import log from "@/components/utils/logger";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { Project } from "@/api/entities/Project";
+import { base44 } from "@/api/base44Client";
 import {
   Home,
   Calculator,
@@ -55,45 +56,52 @@ export default function Layout({ children, currentPageName }) {
   const activeProjectId = useActiveProjectId();
 
   // Active project meta for sidebar (name + client)
-  const [activeProjectMeta, setActiveProjectMeta] = React.useState(null);
-  const [activeProjectLoading, setActiveProjectLoading] = React.useState(false);
+  const [activeProjectSummary, setActiveProjectSummary] = React.useState({
+    id: null,
+    name: null,
+    client_name: null,
+  });
 
   React.useEffect(() => {
     let cancelled = false;
 
-    async function fetchActiveProject() {
-      if (!activeProjectId) {
-        setActiveProjectMeta(null);
+    try {
+      const url = new URL(window.location.href);
+      const projectId = url.searchParams.get("project");
+
+      if (!projectId) {
+        setActiveProjectSummary({ id: null, name: null, client_name: null });
         return;
       }
 
-      try {
-        setActiveProjectLoading(true);
-        // Use Project entity wrapper, same pattern as RoomDesigner
-        const results = await Project.filter({ id: activeProjectId });
-
-        if (cancelled) return;
-
-        const proj = Array.isArray(results) && results.length > 0 ? results[0] : null;
-        setActiveProjectMeta(proj || null);
-      } catch (err) {
-        console.error("[Layout] Failed to load active project meta:", err);
-        if (!cancelled) {
-          setActiveProjectMeta(null);
+      (async () => {
+        try {
+          const projects = await base44.entities.Project.filter({ id: projectId });
+          const project = Array.isArray(projects) && projects.length > 0 ? projects[0] : null;
+          
+          if (!cancelled) {
+            setActiveProjectSummary({
+              id: projectId,
+              name: project?.name || "Untitled Project",
+              client_name: project?.client_name || "",
+            });
+          }
+        } catch (err) {
+          console.error("[Layout] Failed to load active project:", err);
+          if (!cancelled) {
+            setActiveProjectSummary({ id: null, name: null, client_name: null });
+          }
         }
-      } finally {
-        if (!cancelled) {
-          setActiveProjectLoading(false);
-        }
-      }
+      })();
+    } catch (e) {
+      console.error("[Layout] Failed to parse URL for active project:", e);
+      setActiveProjectSummary({ id: null, name: null, client_name: null });
     }
-
-    fetchActiveProject();
 
     return () => {
       cancelled = true;
     };
-  }, [activeProjectId]);
+  }, [currentPageName]);
 
   useEffect(() => {
     log.debug(`[Layout] Page: ${currentPageName}`);
@@ -156,23 +164,19 @@ export default function Layout({ children, currentPageName }) {
                   </SidebarGroupLabel>
                   <SidebarGroupContent>
                     <div className="px-3 py-2 text-xs text-brand-text-muted">
-                      {activeProjectId ? (
-                        activeProjectLoading ? (
-                          <span>Loading project…</span>
-                        ) : activeProjectMeta ? (
-                          <div>
-                            <div className="font-semibold text-brand-text-label">
-                              {activeProjectMeta.name || "Untitled Project"}
-                            </div>
-                            <div className="text-[11px] text-brand-text-muted">
-                              Client: {activeProjectMeta.client_name || "—"}
-                            </div>
+                      {activeProjectSummary.id ? (
+                        <>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: "#1B1A1A" }}>
+                            {activeProjectSummary.name}
                           </div>
-                        ) : (
-                          <span>No active project</span>
-                        )
+                          {activeProjectSummary.client_name && (
+                            <div style={{ fontSize: 12, color: "#3E4349", marginTop: 2 }}>
+                              Client: {activeProjectSummary.client_name}
+                            </div>
+                          )}
+                        </>
                       ) : (
-                        <span>No active project</span>
+                        "No active project"
                       )}
                     </div>
                   </SidebarGroupContent>

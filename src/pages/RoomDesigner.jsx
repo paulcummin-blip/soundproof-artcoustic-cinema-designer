@@ -179,7 +179,7 @@ function useProjectLoader(
   seatsPerRowByRow,
   setSeatsPerRowByRow,
 }) {
-  const [projectIdState, setProjectIdState] = useState(projectIdFromUrl || null);
+  const [projectIdState, setProjectIdState] = useState(projectIdFromUrl);
   const [projectNameState, setProjectNameState] = useState("Untitled Room"); // Internal projectName for loader
   const [loadState, setLoadState] = useState({ phase: "idle", error: null, name: null });
   const [autosaveStatus, setAutosaveStatus] = useState("idle");
