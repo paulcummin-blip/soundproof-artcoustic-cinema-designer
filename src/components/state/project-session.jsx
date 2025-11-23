@@ -237,5 +237,8 @@ if (typeof window !== "undefined") {
   } catch {}
 }
 
+// Export standalone for direct imports
+export { setProjectSummaryFromEntity };
+
 // Optional raw accessor
 export const ProjectSession = { getState, setActiveProject, setActiveProjectId, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec, setProjectSummaryFromEntity };
