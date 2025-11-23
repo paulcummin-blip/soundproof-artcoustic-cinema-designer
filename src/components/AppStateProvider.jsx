@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { timeNowMs } from "@/components/utils/timeNow";
 import { safeTable } from '@/components/utils/safeLog';
@@ -576,7 +575,7 @@ function useDesignerState() {
   return value;
 }
 
-export default function AppStateProvider({ children }) {
+export function AppStateProvider({ children }) {
   const state = useDesignerState();
   return (
     <AppStateContext.Provider value={state}>
@@ -584,6 +583,8 @@ export default function AppStateProvider({ children }) {
     </AppStateContext.Provider>
   );
 }
+
+export default AppStateProvider;
 
 export function useScreenFrontPlaneY() {
   const { screen, screenCentreDepthM } = useAppState() || {};
