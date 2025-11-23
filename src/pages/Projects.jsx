@@ -489,8 +489,10 @@ export default function ProjectsPage() {
                 projectActions.setActiveProjectId(p.id);
               }
 
-              // Full navigation to RoomDesigner – store will re-initialise and read the id
-              window.location.href = "/RoomDesigner";
+              // Also pass the id explicitly in the URL so RoomDesigner can
+              // reliably pick it up on first load
+              const url = `/RoomDesigner?projectId=${encodeURIComponent(p.id)}`;
+              window.location.href = url;
             }}
             style={{
               padding: "8px 12px",
@@ -698,7 +700,8 @@ export default function ProjectsPage() {
                 projectActions.setActiveProjectId(created.id);
               }
 
-              window.location.href = "/RoomDesigner";
+              const url = `/RoomDesigner?projectId=${encodeURIComponent(created.id)}`;
+              window.location.href = url;
             }}
             style={{
               marginLeft: 8,
