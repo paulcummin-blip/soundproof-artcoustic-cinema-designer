@@ -1,4 +1,3 @@
-
 import React from "react";
 import { ProjectBus } from "@/components/state/bus";
 
@@ -76,6 +75,9 @@ function subscribe(listener) {
 // Actions
 function setActiveProject(id) {
   setState({ activeProjectId: id || null });
+}
+function clearActiveProject() {
+  setState({ activeProjectId: null });
 }
 // Add fromBus guard and no-op if nothing changes
 function setSummaryFor(projectId, partial, { fromBus = false } = {}) {
@@ -158,7 +160,7 @@ export function useProjectSpec() {
 }
 export function useProjectActions() {
   const actions = React.useMemo(
-    () => ({ setActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec }),
+    () => ({ setActiveProject, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec }),
     []
   );
   return actions;
@@ -179,4 +181,4 @@ if (typeof window !== "undefined") {
 }
 
 // Optional raw accessor
-export const ProjectSession = { getState, setActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec };
+export const ProjectSession = { getState, setActiveProject, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec };

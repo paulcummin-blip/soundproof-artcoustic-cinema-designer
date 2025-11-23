@@ -439,7 +439,24 @@ function useProjectLoader(
 
         let savedProject;
         if (projectIdState) {
-          savedProject = await Project.update(projectIdState, projectData);
+          try {
+            savedProject = await Project.update(projectIdState, projectData);
+          } catch (updateErr) {
+            // Check if this is a 404/invalid ID error
+            const errMsg = String(updateErr?.message || updateErr || '');
+            if (errMsg.includes('Invalid id value') || errMsg.includes('Object not found') || errMsg.includes('404')) {
+              console.log('[Project Sync] Stale project ID detected, clearing and continuing locally.');
+              if (typeof window !== 'undefined' && window.__APPSTATE__?.clearActiveProject) {
+                window.__APPSTATE__.clearActiveProject();
+              }
+              // Clear the local project ID state so we stop trying to update it
+              setProjectIdState(null);
+              setAutosaveStatus("idle");
+              return; // Exit the autosave gracefully
+            }
+            // For other errors, re-throw to be caught by outer catch
+            throw updateErr;
+          }
         } else {
           savedProject = await Project.create(projectData);
         }
@@ -528,7 +545,22 @@ function useProjectLoader(
 
       let savedProject;
       if (projectIdState) {
-        savedProject = await Project.update(projectIdState, projectData);
+        try {
+          savedProject = await Project.update(projectIdState, projectData);
+        } catch (updateErr) {
+          // Check if this is a 404/invalid ID error
+          const errMsg = String(updateErr?.message || updateErr || '');
+          if (errMsg.includes('Invalid id value') || errMsg.includes('Object not found') || errMsg.includes('404')) {
+            console.log('[Project Sync] Stale project ID detected during manual save, clearing.');
+            if (typeof window !== 'undefined' && window.__APPSTATE__?.clearActiveProject) {
+              window.__APPSTATE__.clearActiveProject();
+            }
+            setProjectIdState(null);
+            setAutosaveStatus("idle");
+            return { success: false, error: "Selected project no longer exists in cloud. Continuing to work locally." };
+          }
+          throw updateErr;
+        }
       } else {
         savedProject = await Project.create(projectData);
       }
@@ -549,7 +581,7 @@ function useProjectLoader(
       }
     } catch (e) {
       setAutosaveStatus("error");
-      console.error("Error during autosave:", e.message);
+      console.error("Error during manual save:", e.message);
       return { success: false, error: e.message };
     }
   }, [
