@@ -193,133 +193,207 @@ function useProjectLoader(
   }, []);
 
   const hydrateFromProject = useCallback((p) => {
-    // NEW: Load roomDims first (single source of truth)
-    if (p?.roomDims && appState?.setRoomDims) {
-      try {
-        const parsed = JSON.parse(p.roomDims);
-        appState.setRoomDims({
-          widthM: Number(parsed?.widthM) || Number(p?.room_width) || 4.5,
-          lengthM: Number(parsed?.lengthM) || Number(p?.room_length) || 6.0,
-          heightM: Number(parsed?.heightM) || Number(p?.room_height) || 2.4,
-        });
-      } catch (e) {
-        // Fallback to legacy fields
+    if (!p) return;
+
+    //
+    // 1) ROOM DIMS (single source of truth)
+    //
+    if (appState?.setRoomDims) {
+      if (p.roomDims) {
+        try {
+          const parsed = JSON.parse(p.roomDims);
+          appState.setRoomDims({
+            widthM: Number(parsed?.widthM) || Number(p?.room_width) || 4.5,
+            lengthM: Number(parsed?.lengthM) || Number(p?.room_length) || 6.0,
+            heightM: Number(parsed?.heightM) || Number(p?.room_height) || 2.4,
+          });
+        } catch {
+          appState.setRoomDims({
+            widthM: Number(p?.room_width) || 4.5,
+            lengthM: Number(p?.room_length) || 6.0,
+            heightM: Number(p?.room_height) || 2.4,
+          });
+        }
+      } else {
         appState.setRoomDims({
           widthM: Number(p?.room_width) || 4.5,
           lengthM: Number(p?.room_length) || 6.0,
           heightM: Number(p?.room_height) || 2.4,
         });
       }
-    } else if (appState?.setRoomDims) { // Fallback if no roomDims but legacy fields exist
-      appState.setRoomDims({
-        widthM: Number(p?.room_width) || 4.5,
-        lengthM: Number(p?.room_length) || 6.0,
-        heightM: Number(p?.room_height) || 2.4,
-      });
     }
 
-    // REMOVED: Redundant `setDimensions` call for legacy fields, now handled by appState.setRoomDims above
-    // const width = Number(p?.room_width) || 4.5;
-    // const length = Number(p?.room_length) || 6.0;
-    // const height = Number(p?.room_height) || 2.8;
-    // if (typeof setDimensions === "function") setDimensions({ width_m: width, length_m: length, height_m: height });
-
+    //
+    // 2) SCREEN
+    //
     const screenSizeInches = Number(p?.screen_size) || 100;
     const aspectRatio = p?.aspect_ratio || "16:9";
-    if (typeof setScreen === "function") setScreen(prev => ({
-      ...prev,
-      visibleWidthInches: screenSizeInches,
-      aspectRatio,
-      manualMode: !!p?.manual_dimensions,
-      manualWidthM: Number(p?.manual_width_m) || 0,
-      manualHeightM: Number(p?.manual_height_m) || 0,
-      mountMode: 'floating', // Always force floating mode on load
-      floatDepthM: Number(p?.float_depth_m) || 0.2, // Default to 20cm if not present
-      showScreenPlane: !!p?.show_screen_plane,
-      showCavity: !!p?.show_cavity,
-      speakerClearanceM: Number(p?.speaker_clearance_m) || 0.02,
-      heightFromFloorM: (typeof (p?.screen_height_from_floor) === "number") ? p.screen_height_from_floor : 0.5,
-    }));
 
-    if (typeof setDolbyConfig === "function") setDolbyConfig(p?.dolby_config || "5.1");
-    if (typeof setDolbyPreset === "function") setDolbyPreset(p?.dolby_config || "5.1"); // Update local Dolby preset state in RoomDesignerWithState
-    if (typeof setSevenBedLayoutType === "function") setSevenBedLayoutType(p?.seven_bed_layout_type || "rears");
-
-    // NEW: Hydrate LCR Aiming Mode
-    const hydratedLcrAimMode = p?.lcr_aim_mode;
-    if (hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") {
-        if (typeof setLcrAimMode === "function") setLcrAimMode(hydratedLcrAimMode);
+    if (typeof setScreen === "function") {
+      setScreen((prev) => ({
+        ...prev,
+        visibleWidthInches: screenSizeInches,
+        aspectRatio,
+        manualMode: !!p?.manual_dimensions,
+        manualWidthM: Number(p?.manual_width_m) || 0,
+        manualHeightM: Number(p?.manual_height_m) || 0,
+        mountMode: "floating",
+        floatDepthM: Number(p?.float_depth_m) || 0.2,
+        showScreenPlane: !!p?.show_screen_plane,
+        showCavity: !!p?.show_cavity,
+        speakerClearanceM: Number(p?.speaker_clearance_m) || 0.02,
+        heightFromFloorM:
+          typeof p?.screen_height_from_floor === "number"
+            ? p.screen_height_from_floor
+            : 0.5,
+      }));
     }
 
-    // NEW: Hydrate Front Wide Overlay setting
+    //
+    // 3) LAYOUT / DOLBY / ROWS
+    //
+    if (typeof setDolbyConfig === "function") {
+      setDolbyConfig(p?.dolby_config || "5.1");
+    }
+    if (typeof setDolbyPreset === "function") {
+      setDolbyPreset(p?.dolby_config || "5.1");
+    }
+    if (typeof setSevenBedLayoutType === "function") {
+      setSevenBedLayoutType(p?.seven_bed_layout_type || "rears");
+    }
+
+    const hydratedLcrAimMode = p?.lcr_aim_mode;
+    if (
+      (hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") &&
+      typeof setLcrAimMode === "function"
+    ) {
+      setLcrAimMode(hydratedLcrAimMode);
+    }
+
     const hydratedEnableFrontWides = p?.enable_front_wides ?? false;
-    if (typeof setEnableFrontWides === "function") setEnableFrontWides(hydratedEnableFrontWides);
+    if (typeof setEnableFrontWides === "function") {
+      setEnableFrontWides(hydratedEnableFrontWides);
+    }
 
-    // NEW: Hydrate Overhead channel settings
-    if (typeof setOverheadGlobalModel === "function") setOverheadGlobalModel(p?.overheadGlobalModel || null);
-    if (typeof setOverheadFrontOverride === "function") setOverheadFrontOverride(p?.overheadFrontOverride || null);
-    if (typeof setOverheadMidOverride === "function") setOverheadMidOverride(p?.overheadMidOverride || null);
-    if (typeof setOverheadRearOverride === "function") setOverheadRearOverride(p?.overheadRearOverride || null);
-    if (typeof setUseFrontGlobal === "function") setUseFrontGlobal(p?.useFrontGlobal ?? true); // Default to true
-    if (typeof setUseMidGlobal === "function") setUseMidGlobal(p?.useMidGlobal ?? true);     // Default to true
-    if (typeof setUseRearGlobal === "function") setUseRearGlobal(p?.useUseRearGlobal ?? true);     // Default to true
+    // Row spacing + seats per row (correct field names)
+    const rowSpacing = Number(p?.row_spacing_m) || 1.8;
+    if (typeof setRowSpacingM === "function") {
+      setRowSpacingM(rowSpacing);
+    }
 
-    // NEW: Hydrate Row Spacing
-    if (typeof setRowSpacingM === "function") setRowSpacingM(Number(p?.row_spacing_m) || 1.8);
+    const seatsPerRowByRowData = parseMaybe(p?.seats_per_row_by_row, []);
+    if (
+      Array.isArray(seatsPerRowByRowData) &&
+      seatsPerRowByRowData.length > 0 &&
+      typeof setSeatsPerRowByRow === "function"
+    ) {
+      setSeatsPerRowByRow(seatsPerRowByRowData);
+    }
 
-    // NEW: Hydrate Seats Per Row By Row
-    if (typeof setSeatsPerRowByRow === "function") setSeatsPerRowByRow(parseProjectJson(p?.seatsPerRowByRow, null));
+    //
+    // 4) OVERHEAD CONFIG (correct snake_case field names)
+    //
+    if (typeof setOverheadGlobalModel === "function") {
+      setOverheadGlobalModel(p?.overhead_global_model || null);
+    }
+    if (typeof setOverheadFrontOverride === "function") {
+      setOverheadFrontOverride(p?.overhead_front_override || null);
+    }
+    if (typeof setOverheadMidOverride === "function") {
+      setOverheadMidOverride(p?.overhead_mid_override || null);
+    }
+    if (typeof setOverheadRearOverride === "function") {
+      setOverheadRearOverride(p?.overhead_rear_override || null);
+    }
+    if (typeof setUseFrontGlobal === "function") {
+      setUseFrontGlobal(p?.use_front_global ?? true);
+    }
+    if (typeof setUseMidGlobal === "function") {
+      setUseMidGlobal(p?.use_mid_global ?? true);
+    }
+    if (typeof setUseRearGlobal === "function") {
+      setUseRearGlobal(p?.use_rear_global ?? true);
+    }
 
-    // Hydrate screen front plane position
-    if (typeof appState?.setScreenFrontPlaneM === 'function') {
+    //
+    // 5) SCREEN FRONT PLANE
+    //
+    if (typeof appState?.setScreenFrontPlaneM === "function") {
       const savedPlaneM = Number(p?.screen_front_plane_m);
       if (Number.isFinite(savedPlaneM)) {
         appState.setScreenFrontPlaneM(savedPlaneM);
       }
     }
 
+    //
+    // 6) OVERLAYS
+    //
     const defaultOverlays = {
-        LCR: false, FRONT_WIDE: false, SIDE_SURROUND: false, REAR_SURROUND: false,
-        OVERHEADS_2: false, OVERHEADS_4: false, OVERHEADS_6: false, RP22_ANGLES: false, enableDolbyZones: false
+      LCR: false,
+      FRONT_WIDE: false,
+      SIDE_SURROUND: false,
+      REAR_SURROUND: false,
+      OVERHEADS_2: false,
+      OVERHEADS_4: false,
+      OVERHEADS_6: false,
+      RP22_ANGLES: false,
+      enableDolbyZones: false,
     };
     const overlaysData = parseMaybe(p?.overlays, defaultOverlays);
-    if(typeof setOverlays === "function") setOverlays({...defaultOverlays, ...overlaysData});
+    if (typeof setOverlays === "function") {
+      setOverlays({ ...defaultOverlays, ...overlaysData });
+    }
 
-    // --- SEATING & LAYOUT ---
+    //
+    // 7) SEATING
+    //
     const sp = parseMaybe(p?.seating_positions, []);
-    const seatsPerRowByRowData = parseMaybe(p?.seats_per_row_by_row, []);
-    const rowSpacing = Number(p?.row_spacing_m) || 1.8;
-
-    // Only use defaults if nothing was stored
-    if (Array.isArray(sp) && sp.length > 0 && typeof setSeatingPositions === "function") {
+    if (
+      Array.isArray(sp) &&
+      sp.length > 0 &&
+      typeof setSeatingPositions === "function"
+    ) {
       setSeatingPositions(sp);
     }
 
-    if (Array.isArray(seatsPerRowByRowData) && seatsPerRowByRowData.length > 0 && typeof setSeatsPerRowByRow === "function") {
-      setSeatsPerRowByRow(seatsPerRowByRowData);
-    }
-
-    if (typeof setRowSpacingM === "function") {
-      setRowSpacingM(rowSpacing);
-    }
-
+    //
+    // 8) ROOM ELEMENTS
+    //
     const re = parseMaybe(p?.room_elements, []);
-    if (Array.isArray(re) && typeof setRoomElements === "function") setRoomElements(re);
+    if (Array.isArray(re) && typeof setRoomElements === "function") {
+      setRoomElements(re);
+    }
 
-    // Subwoofers are now automatically placed, so we only need to hydrate their configuration, not positions.
-    if (typeof setFrontSubsCfg === "function") setFrontSubsCfg(p?.frontSubsCfg || { count: 1, model: "SUB2-12" });
-    if (typeof setRearSubsCfg === "function") setRearSubsCfg(p?.rearSubsCfg || { count: 0, model: null });
+    //
+    // 9) SUB CONFIG (front/rear groups – config, not positions)
+    //
+    if (typeof setFrontSubsCfg === "function") {
+      setFrontSubsCfg(
+        p?.frontSubsCfg || { count: 1, model: "SUB2-12" }
+      );
+    }
+    if (typeof setRearSubsCfg === "function") {
+      setRearSubsCfg(
+        p?.rearSubsCfg || { count: 0, model: null }
+      );
+    }
 
-    // NEW: Hydrate selectedSpeakersByRole and speakerNodes directly into appState
+    //
+    // 10) SPEAKER ROLES + SPL NODES
+    //
     if (typeof setSelectedSpeakersByRole === "function") {
-      setSelectedSpeakersByRole(p ? parseProjectJson(p?.selected_speakers_by_role) : null);
-    }
-    if (typeof setSpeakerNodes === "function") {
-      setSpeakerNodes(p ? parseProjectJson(p?.spl_speaker_nodes) : null);
+      const byRole = parseMaybe(p?.selected_speakers_by_role, {});
+      setSelectedSpeakersByRole(byRole || {});
     }
 
-    // Hydrate speakers from persistence, but DO NOT clobber runtime state with empties.
-    // Prefer new schema (selected_speakers), fall back to legacy (placedSpeakers), else leave as-is.
+    if (typeof setSpeakerNodes === "function") {
+      const nodes = parseMaybe(p?.spl_speaker_nodes, []);
+      setSpeakerNodes(Array.isArray(nodes) ? nodes : []);
+    }
+
+    //
+    // 11) PLACED SPEAKERS – ALWAYS HYDRATE FROM PROJECT
+    //
     const loadedSpeakers = (() => {
       const v1 = parseMaybe(p?.selected_speakers, null);
       if (Array.isArray(v1)) return v1;
@@ -328,32 +402,43 @@ function useProjectLoader(
       return null;
     })();
 
-    if (typeof setSpeakerSystem === "function") {
-      setSpeakerSystem((prev) => {
-        // If we already have live speakers, KEEP them – do not overwrite with project.
-        if (
-          prev &&
-          Array.isArray(prev.placedSpeakers) &&
-          prev.placedSpeakers.length > 0
-        ) {
-          return prev;
-        }
-
-        // Only adopt loaded speakers if we actually have some.
-        if (Array.isArray(loadedSpeakers) && loadedSpeakers.length > 0) {
-          return { ...(prev || {}), placedSpeakers: loadedSpeakers };
-        }
-        // Otherwise, keep current in-memory speakers (prevents the "flash then disappear").
-        return prev || {};
-      });
+    if (
+      typeof setSpeakerSystem === "function" &&
+      Array.isArray(loadedSpeakers) &&
+      loadedSpeakers.length > 0
+    ) {
+      setSpeakerSystem((prev) => ({
+        ...(prev || {}),
+        placedSpeakers: loadedSpeakers,
+      }));
     }
-
   }, [
-    appState?.setRoomDims, setScreen, setDolbyConfig, setDolbyPreset, setSevenBedLayoutType, setSeatingPositions,
-    setRoomElements, setOverlays, parseMaybe, setSpeakerSystem, setFrontSubsCfg, setRearSubsCfg, setLcrAimMode,
-    setEnableFrontWides, setOverheadGlobalModel, setOverheadFrontOverride, setOverheadMidOverride,
-    setOverheadRearOverride, setUseFrontGlobal, setUseMidGlobal, setUseRearGlobal, setRowSpacingM,
-    setSelectedSpeakersByRole, setSpeakerNodes, appState?.setScreenFrontPlaneM, setSeatsPerRowByRow
+    appState?.setRoomDims,
+    appState?.setScreenFrontPlaneM,
+    setScreen,
+    setDolbyConfig,
+    setDolbyPreset,
+    setSevenBedLayoutType,
+    setLcrAimMode,
+    setEnableFrontWides,
+    setOverheadGlobalModel,
+    setOverheadFrontOverride,
+    setOverheadMidOverride,
+    setOverheadRearOverride,
+    setUseFrontGlobal,
+    setUseMidGlobal,
+    setUseRearGlobal,
+    setRowSpacingM,
+    setSeatsPerRowByRow,
+    setOverlays,
+    setSeatingPositions,
+    setRoomElements,
+    setFrontSubsCfg,
+    setRearSubsCfg,
+    setSelectedSpeakersByRole,
+    setSpeakerNodes,
+    setSpeakerSystem,
+    parseMaybe,
   ]);
 
 
