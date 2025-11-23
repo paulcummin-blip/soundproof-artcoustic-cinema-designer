@@ -1,7 +1,8 @@
 // pages/Projects.js — Stable, JS-only version (no external UI deps)
-import React, { useMemo, useRef, useState } from "react";
+import React, { useMemo, useRef, useState, useEffect } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import { useProjectActions } from "@/components/state/project-session";
+import { base44 } from "@/api/base44Client";
 
 // ---- Brand tokens ----
 const BRAND = {
@@ -61,6 +62,8 @@ function fieldStyle() {
 export default function ProjectsPage() {
   const projectActions = useProjectActions();
   const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [q, setQ] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [sortKey, setSortKey] = useState("recent");
@@ -78,10 +81,61 @@ export default function ProjectsPage() {
 
   // Banner after create
   const [created, setCreated] = useState(null);
+  const [createError, setCreateError] = useState(null);
 
   // Hold-to-delete state
   const holdTimers = useRef({});
   const [holdProgress, setHoldProgress] = useState({});
+
+  // Load projects from backend on mount
+  useEffect(() => {
+    let mounted = true;
+    
+    async function loadProjects() {
+      try {
+        setLoading(true);
+        setLoadError(null);
+        const projectList = await base44.entities.Project.list('-created_date', 100);
+        
+        if (mounted) {
+          // Map to the format expected by the UI
+          const mapped = (projectList || []).map(p => ({
+            id: p.id,
+            name: p.name || "Untitled Project",
+            client: p.client_name || "",
+            status: "Prospective", // Default status for now
+            roomLength: p.room_length || null,
+            roomWidth: p.room_width || null,
+            roomHeight: p.room_height || null,
+            createdAt: new Date(p.created_date).getTime() || Date.now(),
+            // Optional fields for display
+            lcrModel: p.selected_speakers_by_role ? JSON.parse(p.selected_speakers_by_role)?.L?.model : null,
+            surroundModel: null,
+            heightModel: null,
+            subModel: null,
+            subCount: null,
+            screenSizeInches: p.screen_size || null,
+            seats: p.seating_positions ? JSON.parse(p.seating_positions).length : null,
+          }));
+          
+          setProjects(mapped);
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('[Projects] Failed to load projects:', err);
+        if (mounted) {
+          setLoadError(err?.message || "Failed to load projects");
+          setLoading(false);
+        }
+      }
+    }
+    
+    loadProjects();
+    
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   // Derived list
   const list = useMemo(() => {
@@ -129,7 +183,7 @@ export default function ProjectsPage() {
     return Number.isFinite(n) ? n : null;
   }
 
-  function saveProject() {
+  async function saveProject() {
     const name = draft.name.trim();
     const client = draft.client.trim();
     const status = draft.status;
@@ -138,32 +192,52 @@ export default function ProjectsPage() {
     const rw = toNumberOrNull(draft.roomWidth);
     const rh = toNumberOrNull(draft.roomHeight);
 
-    if (!name) return alert("Please enter a project name.");
-    if (!client) return alert("Please enter a client name.");
-    if (STATUS.indexOf(status) === -1) return alert("Please select a valid status.");
+    if (!name) {
+      setCreateError("Please enter a project name.");
+      return;
+    }
 
-    const p = {
-      id: `p_${Date.now().toString(36)}`,
-      name,
-      client,
-      status,
-      roomLength: rl,
-      roomWidth: rw,
-      roomHeight: rh,
-      createdAt: Date.now(),
-      // Read-only summary fields will be filled later by Room Designer (kept null here)
-      lcrModel: null,
-      surroundModel: null,
-      heightModel: null,
-      subModel: null,
-      subCount: null,
-      screenSizeInches: null,
-      seats: null,
-    };
-    setProjects((arr) => [p, ...arr]);
-    setDialogOpen(false);
-    setCreated(p);
-    window.setTimeout(() => setCreated(null), 4000);
+    try {
+      setCreateError(null);
+      
+      // Create project entity in backend
+      const projectData = {
+        name,
+        client_name: client || "",
+        room_length: rl,
+        room_width: rw,
+        room_height: rh,
+      };
+      
+      const newProject = await base44.entities.Project.create(projectData);
+      
+      // Map to UI format and add to list
+      const p = {
+        id: newProject.id,
+        name: newProject.name,
+        client: newProject.client_name || "",
+        status,
+        roomLength: newProject.room_length,
+        roomWidth: newProject.room_width,
+        roomHeight: newProject.room_height,
+        createdAt: new Date(newProject.created_date).getTime(),
+        lcrModel: null,
+        surroundModel: null,
+        heightModel: null,
+        subModel: null,
+        subCount: null,
+        screenSizeInches: null,
+        seats: null,
+      };
+      
+      setProjects((arr) => [p, ...arr]);
+      setDialogOpen(false);
+      setCreated(p);
+      window.setTimeout(() => setCreated(null), 4000);
+    } catch (err) {
+      console.error('[Projects] Failed to create project:', err);
+      setCreateError(err?.message || "Failed to create project. Please try again.");
+    }
   }
 
   function startHoldDelete(id) {
@@ -178,7 +252,7 @@ export default function ProjectsPage() {
       if (pct >= 1) {
         clear();
         if (window.confirm("Delete this project? This cannot be undone.")) {
-          setProjects((arr) => arr.filter((p) => p.id !== id));
+          deleteProject(id);
         } else {
           setHoldProgress((m) => ({ ...m, [id]: 0 }));
         }
@@ -194,6 +268,16 @@ export default function ProjectsPage() {
     }
 
     holdTimers.current[id] = { t: window.setTimeout(tick, 16), startedAt };
+  }
+
+  async function deleteProject(id) {
+    try {
+      await base44.entities.Project.delete(id);
+      setProjects((arr) => arr.filter((p) => p.id !== id));
+    } catch (err) {
+      console.error('[Projects] Failed to delete project:', err);
+      alert("Failed to delete project. Please try again.");
+    }
   }
 
   function cancelHoldDelete(id) {
@@ -466,7 +550,54 @@ export default function ProjectsPage() {
       )}
 
       {/* Grid or empty */}
-      {list.length === 0 ? (
+      {loading ? (
+        <div
+          style={{
+            marginTop: 16,
+            padding: 24,
+            textAlign: "center",
+            border: `1px dashed ${BRAND.border}`,
+            borderRadius: 12,
+            background: BRAND.card,
+            color: BRAND.subtext,
+            fontSize: 16,
+          }}
+        >
+          Loading projects...
+        </div>
+      ) : loadError ? (
+        <div
+          style={{
+            marginTop: 16,
+            padding: 24,
+            textAlign: "center",
+            border: `1px dashed ${BRAND.border}`,
+            borderRadius: 12,
+            background: BRAND.card,
+            color: BRAND.red,
+            fontSize: 16,
+          }}
+        >
+          {loadError}
+          <div style={{ marginTop: 12 }}>
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 10,
+                border: `1px solid ${BRAND.border}`,
+                background: BRAND.btn,
+                color: BRAND.btnText,
+                cursor: "pointer",
+                fontSize: 14,
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      ) : list.length === 0 ? (
         <div
           style={{
             marginTop: 16,
@@ -640,6 +771,12 @@ export default function ProjectsPage() {
               <div style={{ marginTop: 6, fontSize: 12, color: BRAND.subtext }}>
                 <em>Speakers, screen size and seats will auto‑populate from Room Designer (read‑only).</em>
               </div>
+
+              {createError && (
+                <div style={{ marginTop: 8, padding: 8, background: "#fee", border: "1px solid #fcc", borderRadius: 6, fontSize: 13, color: BRAND.red }}>
+                  {createError}
+                </div>
+              )}
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 8 }}>
                 <button
