@@ -404,21 +404,22 @@ export default function ProjectsPage() {
         style={{
           display: "inline-flex",
           alignItems: "center",
-          gap: 6,
-          padding: "2px 8px",
+          gap: 8,
+          padding: "6px 14px",
           borderRadius: 999,
           border: `1px solid ${BRAND.border}`,
           background: BRAND.card,
-          fontSize: 12,
+          fontSize: 14,
+          fontWeight: 600,
           color: c,
         }}
         aria-label={`Status: ${value}`}
       >
         <span
           style={{
-            width: 8,
-            height: 8,
-            borderRadius: 8,
+            width: 12,
+            height: 12,
+            borderRadius: 12,
             background: c,
           }}
           aria-hidden
@@ -459,14 +460,15 @@ export default function ProjectsPage() {
             Client: {p.client || "—"}
           </div>
 
-          <div style={{ marginTop: 8, display: "flex", gap: 8, alignItems: "center" }}>
+          <div
+            style={{
+              marginTop: 10,
+              display: "flex",
+              gap: 10,
+              alignItems: "center",
+            }}
+          >
             <StatusPill value={p.status} />
-          </div>
-
-          <div style={{ fontSize: 12, color: BRAND.subtext, marginTop: 8 }}>
-            Room: {p.roomLength != null ? p.roomLength : "—"}m ×{" "}
-            {p.roomWidth != null ? p.roomWidth : "—"}m ×{" "}
-            {p.roomHeight != null ? p.roomHeight : "—"}m
           </div>
         </div>
 
