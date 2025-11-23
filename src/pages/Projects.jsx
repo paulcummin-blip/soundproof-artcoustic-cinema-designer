@@ -280,49 +280,63 @@ export default function ProjectsPage() {
     }
   }
 
+  // Delete *all* untitled projects from the backend, not just the ones in state
   async function bulkDeleteUntitled() {
-    // Only operate on what we already have loaded in state
-    const toDelete = projects.filter(p => {
-      const name = (p.name || "").trim();
+    const isUntitledName = (rawName) => {
+      const name = (rawName || "").trim();
       return (
+        name === "" ||
         name === "Untitled Room" ||
         name === "Untitled Project" ||
-        name === "Untitled" ||
-        name === ""
+        name === "Untitled"
       );
-    });
+    };
 
-    if (toDelete.length === 0) {
-      window.alert("No untitled projects found to delete.");
+    if (!window.confirm(
+      "This will permanently delete ALL projects named 'Untitled Room', 'Untitled Project', 'Untitled' or with a blank name from the cloud.\n\nAre you sure you want to continue?"
+    )) {
       return;
     }
 
-    const confirmMsg =
-      `This will permanently delete ${toDelete.length} untitled project(s) from the cloud.\n\n` +
-      `Are you sure you want to continue?`;
-
-    if (!window.confirm(confirmMsg)) return;
+    let totalDeleted = 0;
 
     try {
-      // Delete on backend
-      for (const p of toDelete) {
-        try {
-          await base44.entities.Project.delete(p.id);
-        } catch (err) {
-          console.error("[Projects] Failed to delete untitled project", p.id, err);
+      // We'll keep asking the backend for batches until there are no untitled projects left.
+      // Safety cap: max 50 loops so we can't get stuck.
+      for (let pass = 0; pass < 50; pass++) {
+        // Fetch a fresh batch each time so we see older rows once newer ones are gone
+        const batch = await base44.entities.Project.list("-created_date", 200);
+        if (!batch || batch.length === 0) break;
+
+        const untitledBatch = batch.filter((p) => isUntitledName(p.name));
+        if (untitledBatch.length === 0) {
+          // No more untitled projects in this batch – we're done
+          break;
         }
+
+        // Delete this batch
+        for (const p of untitledBatch) {
+          try {
+            await base44.entities.Project.delete(p.id);
+            totalDeleted += 1;
+          } catch (err) {
+            console.error("[Projects] Failed to delete untitled project", p.id, err);
+          }
+        }
+
+        // If the backend has more than 200 untitled projects, the next loop
+        // will fetch the next "page" and keep going.
       }
 
-      // Then remove from local state
-      setProjects(arr =>
-        arr.filter(p => !toDelete.some(td => td.id === p.id))
+      // Also prune any untitled ones from local state
+      setProjects((arr) =>
+        arr.filter((p) => !isUntitledName(p.name))
       );
-
-      // Clear any hold bars too
       setHoldProgress({});
-      window.alert(`Deleted ${toDelete.length} untitled project(s).`);
+
+      window.alert(`Deleted ${totalDeleted} untitled project(s). If you still see any after a refresh, they are newly created ones.`);
     } catch (err) {
-      console.error("[Projects] Bulk delete failed:", err);
+      console.error("[Projects] Bulk delete (all untitled) failed:", err);
       window.alert("Bulk delete failed. Check console for details.");
     }
   }
