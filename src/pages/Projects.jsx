@@ -280,30 +280,51 @@ export default function ProjectsPage() {
     }
   }
 
-  async function bulkDeleteUntitledProjects() {
-    const untitledProjects = projects.filter(p => p.name === "Untitled Room");
-    
-    if (untitledProjects.length === 0) {
-      alert("No 'Untitled Room' projects to delete.");
+  async function bulkDeleteUntitled() {
+    // Only operate on what we already have loaded in state
+    const toDelete = projects.filter(p => {
+      const name = (p.name || "").trim();
+      return (
+        name === "Untitled Room" ||
+        name === "Untitled Project" ||
+        name === "Untitled" ||
+        name === ""
+      );
+    });
+
+    if (toDelete.length === 0) {
+      window.alert("No untitled projects found to delete.");
       return;
     }
 
-    if (!window.confirm("Delete ALL projects named 'Untitled Room'? This cannot be undone.")) {
-      return;
-    }
+    const confirmMsg =
+      `This will permanently delete ${toDelete.length} untitled project(s) from the cloud.\n\n` +
+      `Are you sure you want to continue?`;
 
-    const idsToDelete = untitledProjects.map(p => p.id);
-    
-    for (const id of idsToDelete) {
-      try {
-        await base44.entities.Project.delete(id);
-      } catch (err) {
-        console.error('[Projects] Bulk delete failed for', id, err);
+    if (!window.confirm(confirmMsg)) return;
+
+    try {
+      // Delete on backend
+      for (const p of toDelete) {
+        try {
+          await base44.entities.Project.delete(p.id);
+        } catch (err) {
+          console.error("[Projects] Failed to delete untitled project", p.id, err);
+        }
       }
-    }
 
-    setProjects(prev => prev.filter(p => p.name !== "Untitled Room"));
-    alert("All 'Untitled Room' projects have been deleted.");
+      // Then remove from local state
+      setProjects(arr =>
+        arr.filter(p => !toDelete.some(td => td.id === p.id))
+      );
+
+      // Clear any hold bars too
+      setHoldProgress({});
+      window.alert(`Deleted ${toDelete.length} untitled project(s).`);
+    } catch (err) {
+      console.error("[Projects] Bulk delete failed:", err);
+      window.alert("Bulk delete failed. Check console for details.");
+    }
   }
 
   function cancelHoldDelete(id) {
@@ -470,18 +491,18 @@ export default function ProjectsPage() {
         <div style={{ display: "flex", gap: 8 }}>
           <button
             type="button"
-            onClick={bulkDeleteUntitledProjects}
+            onClick={bulkDeleteUntitled}
             style={{
-              padding: "10px 16px",
+              padding: "10px 14px",
               borderRadius: 10,
-              border: `1px solid ${BRAND.red}`,
-              background: "#FFFFFF",
+              border: `1px solid ${BRAND.border}`,
+              background: BRAND.card,
               color: BRAND.red,
               cursor: "pointer",
-              fontSize: 14,
+              fontSize: 13,
             }}
           >
-            Delete "Untitled Room"
+            Delete all "Untitled"
           </button>
           <button
             type="button"
