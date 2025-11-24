@@ -1877,6 +1877,11 @@ function RoomDesignerWithState() {
 
   // Effect to swap between Rear Surrounds and Front Wides for 7.x layouts
   useEffect(() => {
+    // If we've just loaded a real project, don't overwrite its speaker layout
+    if (loadState?.phase === "loaded") {
+      return;
+    }
+
     const is7ChannelBed = dolbyPreset && (dolbyPreset.startsWith('7.1') || dolbyPreset.startsWith('7.2'));
     if (!is7ChannelBed || (_isFrozen && _isFrozen('speakers'))) {
       return;
@@ -1930,6 +1935,11 @@ function RoomDesignerWithState() {
 
   // Effect to re-seed speakers when Dolby layout changes - now more selective
   useEffect(() => {
+    // If we've just loaded a real project, don't overwrite its speaker layout
+    if (loadState?.phase === "loaded") {
+      return;
+    }
+
     if (!dolbyPreset || (_isFrozen && _isFrozen('speakers'))) return;
 
     const noSpeakers = (placedSpeakers || []).length === 0;
@@ -2021,6 +2031,11 @@ function RoomDesignerWithState() {
 
   // Build or rebuild seating positions whenever seating config changes
   useEffect(() => {
+    // If we've just loaded a real project, don't overwrite its seating layout
+    if (loadState?.phase === "loaded") {
+      return;
+    }
+
     const setSeats = appState?.setSeatingPositions;
     if (typeof setSeats !== 'function') return;
 
