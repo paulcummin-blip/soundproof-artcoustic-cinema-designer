@@ -642,10 +642,11 @@ function useProjectLoader(
     }
 
     return () => controller.abort();
-    // Intentionally **not** depending on speakers/seats/loadProject,
-    // we only want to boot once per project / page load.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectIdFromUrl, projectIdState, appState?.roomDims]);
+  }, [
+    projectIdFromUrl,
+    projectIdState,
+    // deliberately NOT depending on seating/speakers/etc.
+  ]);
 
   const manualSaveProject = useCallback(async () => {
     setAutosaveStatus("saving");
