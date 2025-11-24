@@ -4948,11 +4948,11 @@ return (
                   </marker>
                 </defs>
 
-                {/* Horizontal (length) line – top of the room */}
+                {/* Horizontal (width) line – top of the room (screen wall) */}
                 <line
-                  x1={roomRect.x + 20}
+                  x1={roomRect.x}
                   y1={roomRect.y - 20}
-                  x2={roomRect.x + roomRect.width - 20}
+                  x2={roomRect.x + roomRect.width}
                   y2={roomRect.y - 20}
                   stroke="#DCDBD6"
                   strokeWidth={2}
@@ -4965,15 +4965,15 @@ return (
                   textAnchor="middle"
                   style={{ fontSize: 12, fill: "#1B1A1A" }}
                 >
-                  {`${(lengthM ?? 0).toFixed(2)} m`}
+                  {`${(widthM ?? 0).toFixed(2)} m`}
                 </text>
 
-                {/* Vertical (width) line – left side of the room */}
+                {/* Vertical (length) line – left side of the room */}
                 <line
                   x1={roomRect.x - 20}
-                  y1={roomRect.y + 20}
+                  y1={roomRect.y}
                   x2={roomRect.x - 20}
-                  y2={roomRect.y + roomRect.height - 20}
+                  y2={roomRect.y + roomRect.height}
                   stroke="#DCDBD6"
                   strokeWidth={2}
                   markerStart="url(#dim-arrow)"
@@ -4986,7 +4986,7 @@ return (
                   transform={`rotate(-90 ${roomRect.x - 28} ${roomRect.y + roomRect.height / 2})`}
                   style={{ fontSize: 12, fill: "#1B1A1A" }}
                 >
-                  {`${(widthM ?? 0).toFixed(2)} m`}
+                  {`${(lengthM ?? 0).toFixed(2)} m`}
                 </text>
               </g>
             )}
