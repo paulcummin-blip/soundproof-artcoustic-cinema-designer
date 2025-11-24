@@ -1315,7 +1315,8 @@ function RoomDesignerWithState() {
     };
   }, [appState?.mlpY_m, stableDimensions?.width]);
 
-  // NEW: Compute centralized SPL data for all seats (powers sidebar SPL cards)
+  // NEW: Compute centralized SPL data for all seats (powers sidebar SPL cards AND HUD)
+  // Uses unified SPL logic with max_spl_cont_db_1m cap from speakerData.js
   const allSeatSplMetrics = useMemo(() => {
     const getCanonicalRoleLocal = (role) => {
       const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', 
@@ -1325,14 +1326,22 @@ function RoomDesignerWithState() {
       return map[r] || r;
     };
 
+    // Get global SPL config from appState (same values used by HUD)
+    const splConfig = appState?.splConfig || {};
+    const screenLoss = Number(splConfig.screenLossDb) || 0;
+    const eqHeadroom = Number(splConfig.globalEqHeadroomDb) || 0;
+
     return computeAllSeatSplMetrics({
       seats: _seatingPositions || [],
       placedSpeakers: placedSpeakers || [],
       getCanonicalRole: getCanonicalRoleLocal,
       getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
       getModelDimsM: (model) => getSpeakerModelMeta(model) || { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 },
+      // Pass screen loss and EQ headroom from global splConfig
+      screenLoss_dB: screenLoss,
+      eqHeadroom_dB: eqHeadroom,
     });
-  }, [_seatingPositions, placedSpeakers, appState?.getEffectiveSplInputs]);
+  }, [_seatingPositions, placedSpeakers, appState?.getEffectiveSplInputs, appState?.splConfig]);
 
   // Compute diagnostic values
   const widthM =
