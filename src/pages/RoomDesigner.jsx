@@ -545,24 +545,25 @@ function useProjectLoader(
     debounceTimeoutRef.current = setTimeout(async () => {
       try {
         const projectData = serializeProject({
-          // Single source of truth: appState
+          name: projectNameState,
           roomDims: appState.roomDims,
           dimensions,
           screen,
           seatingPositions,
+          seatsPerRowByRow,
+          rowSpacingM,
           placedSpeakers,
           roomElements,
-          overlays,
-          projectName: projectNameState,
+          selectedSpeakersByRole: appState.selectedSpeakersByRole,
+          speakerNodes: appState.speakerNodes,
           dolbyLayout: dolbyPreset,
+          overlays,
           frozenTabs,
           sevenBedLayoutType,
           frontSubsCfg,
           rearSubsCfg,
           lcrAimMode,
           enableFrontWides,
-          selectedSpeakersByRole: appState.selectedSpeakersByRole,
-          speakerNodes: appState.speakerNodes,
           overheadGlobalModel,
           overheadFrontOverride,
           overheadMidOverride,
@@ -570,9 +571,7 @@ function useProjectLoader(
           useFrontGlobal,
           useMidGlobal,
           useRearGlobal,
-          rowSpacingM,
           screenFrontPlaneM: appState.screenFrontPlaneM,
-          seatsPerRowByRow,
           splConfig: appState.splConfig,
         });
 
@@ -689,26 +688,21 @@ function useProjectLoader(
         roomDims: appState.roomDims,
         dimensions,
         screen,
-
         seatingPositions,
         seatsPerRowByRow,
         rowSpacingM,
-
         placedSpeakers,
+        roomElements,
         selectedSpeakersByRole: appState.selectedSpeakersByRole,
         speakerNodes: appState.speakerNodes,
-
-        roomElements,
-
-        frontSubsCfg,
-        rearSubsCfg,
         dolbyLayout: dolbyPreset,
-
         overlays,
         frozenTabs,
         sevenBedLayoutType,
+        frontSubsCfg,
+        rearSubsCfg,
+        lcrAimMode,
         enableFrontWides,
-
         overheadGlobalModel,
         overheadFrontOverride,
         overheadMidOverride,
@@ -716,9 +710,8 @@ function useProjectLoader(
         useFrontGlobal,
         useMidGlobal,
         useRearGlobal,
-
-        splConfig: appState.splConfig,
         screenFrontPlaneM: appState.screenFrontPlaneM,
+        splConfig: appState.splConfig,
       });
 
       let savedProject;

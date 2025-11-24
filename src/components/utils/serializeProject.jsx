@@ -1,13 +1,23 @@
-export function serializeProject(input) {
+// components/utils/serializeProject.js
+//
+// Single source of truth for how a Room Designer project
+// is written into the Project entity.
+//
+// INPUT: plain JS values from appState + local state
+// OUTPUT: flat object that matches entities/Project.json
+
+export function serializeProject(input = {}) {
   const {
-    // Core meta
+    // Meta (RoomDesigner is NOT allowed to rename an existing project)
     name,
 
-    // Room geometry
+    // Geometry / room
     roomDims = { widthM: 4.5, lengthM: 6.0, heightM: 2.4 },
+
+    // Legacy dimensions – kept for backwards compatibility
     dimensions = {},
 
-    // Screen
+    // Screen config
     screen = {},
 
     // Seating & layout
@@ -15,24 +25,26 @@ export function serializeProject(input) {
     seatsPerRowByRow = [],
     rowSpacingM = 1.8,
 
-    // Speakers
+    // Speakers / subs / elements
     placedSpeakers = [],
-    selectedSpeakersByRole = {},    // NEW: canonical per-role speaker map
-    speakerNodes = [],              // NEW: from SPL calculator
-
-    // Room elements
     roomElements = [],
+    subwoofers = [],
 
-    // Subs & config
-    frontSubsCfg = null,            // { count, model } or similar
-    rearSubsCfg = null,
+    // Config + overlays
     dolbyLayout = "5.1",
-
-    // Overlays / UI state
     overlays = {},
     frozenTabs = {},
     sevenBedLayoutType = "rears",
+
+    // Speaker selection & SPL
+    speakerSelections = {},
+    selectedSpeakersByRole = {},
+    speakerNodes = [],
+    splConfig = { globalPowerW: 100, globalEqHeadroomDb: 0, perRole: {} },
+
+    // Front wides / bed layout
     enableFrontWides = false,
+    lcrAimMode = "angled",
 
     // Overheads
     overheadGlobalModel = null,
@@ -43,95 +55,134 @@ export function serializeProject(input) {
     useMidGlobal = true,
     useRearGlobal = true,
 
-    // SPL / screen front plane
-    splConfig = { globalPowerW: 100, globalEqHeadroomDb: 0, perRole: {} },
+    // Screen plane
     screenFrontPlaneM = 0,
+
+    // Subwoofer config (stored as JSON blobs for now)
+    frontSubsCfg = null,
+    rearSubsCfg = null,
   } = input;
 
-  // Build a simple persisted subwoofer description from front/rear configs
-  const subArray = [];
-  if (frontSubsCfg && frontSubsCfg.count > 0) {
-    subArray.push({
-      position: "front",
-      count: Number(frontSubsCfg.count) || 0,
-      model: frontSubsCfg.model || null,
-    });
-  }
-  if (rearSubsCfg && rearSubsCfg.count > 0) {
-    subArray.push({
-      position: "rear",
-      count: Number(rearSubsCfg.count) || 0,
-      model: rearSubsCfg.model || null,
-    });
-  }
+  // Normalised room dims (support legacy dimensions as a fallback)
+  const widthM =
+    Number(roomDims?.widthM) ||
+    Number(dimensions?.width) ||
+    0;
+  const lengthM =
+    Number(roomDims?.lengthM) ||
+    Number(dimensions?.length) ||
+    0;
+  const heightM =
+    Number(roomDims?.heightM) ||
+    Number(dimensions?.height) ||
+    0;
 
-  const safeRoomDims = {
-    widthM: Number(roomDims?.widthM || dimensions?.width) || 0,
-    lengthM: Number(roomDims?.lengthM || dimensions?.length) || 0,
-    heightM: Number(roomDims?.heightM || dimensions?.height) || 0,
+  // Screen
+  const visibleWidthInches = Number(screen?.visibleWidthInches) || 0;
+  const aspectRatio = screen?.aspectRatio || "16:9";
+  const manualMode = !!screen?.manualMode;
+  const manualWidthM = Number(screen?.manualWidthM) || 0;
+  const manualHeightM = Number(screen?.manualHeightM) || 0;
+  const screenHeightFromFloorM =
+    typeof screen?.heightFromFloorM === "number"
+      ? screen.heightFromFloorM
+      : 0.5;
+  const floatDepthM = Number(screen?.floatDepthM) || 0;
+  const speakerClearanceM =
+    Number(screen?.speakerClearanceM ?? 0.02) || 0.02;
+  const showScreenPlane = !!screen?.showScreenPlane;
+  const showCavity = !!screen?.showCavity;
+
+  // Helper to JSON-stringify safely
+  const j = (value, fallback) => {
+    try {
+      if (value == null) return fallback ?? null;
+      return JSON.stringify(value);
+    } catch (e) {
+      return fallback ?? null;
+    }
   };
 
   return {
     // Meta
     name: name || "Untitled Room",
 
-    // Room geometry (legacy + new JSON)
-    room_width: safeRoomDims.widthM,
-    room_length: safeRoomDims.lengthM,
-    room_height: safeRoomDims.heightM,
-    roomDims: JSON.stringify(safeRoomDims),
+    // Room dims (canonical + legacy)
+    room_width: widthM,
+    room_length: lengthM,
+    room_height: heightM,
+    roomDims: j(
+      {
+        widthM,
+        lengthM,
+        heightM,
+      },
+      null
+    ),
 
     // Screen
-    screen_size: Number(screen?.visibleWidthInches) || 0,
-    aspect_ratio: screen?.aspectRatio || "16:9",
-    manual_dimensions: !!screen?.manualMode,
-    manual_width_m: Number(screen?.manualWidthM) || 0,
-    manual_height_m: Number(screen?.manualHeightM) || 0,
-    screen_height_from_floor: Number(screen?.heightFromFloorM ?? 0),
+    screen_size: visibleWidthInches,
+    aspect_ratio: aspectRatio,
+    manual_dimensions: manualMode,
+    manual_width_m: manualWidthM,
+    manual_height_m: manualHeightM,
+    screen_height_from_floor: screenHeightFromFloorM,
+    screen_mount_mode: "floating",
+    float_depth_m: floatDepthM,
+    show_screen_plane: showScreenPlane,
+    show_cavity: showCavity,
+    speaker_clearance_m: speakerClearanceM,
+    screen_front_plane_m: Number(screenFrontPlaneM) || 0,
 
-    // Layout / format
-    dolby_config: dolbyLayout || "5.1",
-
-    // Seating
-    seating_positions: JSON.stringify(
-      Array.isArray(seatingPositions) ? seatingPositions : []
+    // Seating & layout
+    seating_positions: j(
+      Array.isArray(seatingPositions) ? seatingPositions : [],
+      "[]"
     ),
     row_spacing_m: Number(rowSpacingM) || 1.8,
-    seats_per_row_by_row: JSON.stringify(
-      Array.isArray(seatsPerRowByRow) ? seatsPerRowByRow : []
+    seats_per_row_by_row: j(
+      Array.isArray(seatsPerRowByRow) ? seatsPerRowByRow : [],
+      "[]"
     ),
 
-    // Speakers
-    selected_speakers: JSON.stringify(
-      Array.isArray(placedSpeakers) ? placedSpeakers : []
-    ),
-    selected_speakers_by_role: JSON.stringify(
-      selectedSpeakersByRole && typeof selectedSpeakersByRole === "object"
-        ? selectedSpeakersByRole
-        : {}
-    ),
-    spl_speaker_nodes: JSON.stringify(
-      Array.isArray(speakerNodes) ? speakerNodes : []
-    ),
-
-    // Room elements
-    room_elements: JSON.stringify(
-      Array.isArray(roomElements) ? roomElements : []
-    ),
-
-    // Subs
-    subwoofers: JSON.stringify(subArray),
-
-    // Overlays / UI flags
-    overlays: JSON.stringify(overlays || {}),
-    screen_mount_mode: "floating",
-    float_depth_m: Number(screen?.floatDepthM) || 0,
-    show_screen_plane: !!screen?.showScreenPlane,
-    show_cavity: !!screen?.showCavity,
-    speaker_clearance_m: Number(screen?.speakerClearanceM ?? 0.02) || 0.02,
-    frozen_tabs: frozenTabs,
+    // Dolby / bed layout
+    dolby_config: dolbyLayout || "5.1",
     seven_bed_layout_type: sevenBedLayoutType,
+    lcr_aim_mode: lcrAimMode,
     enable_front_wides: !!enableFrontWides,
+
+    // Speakers & subs
+    selected_speakers: j(
+      Array.isArray(placedSpeakers) ? placedSpeakers : [],
+      "[]"
+    ),
+    selected_speakers_by_role: j(
+      typeof selectedSpeakersByRole === "object" &&
+        selectedSpeakersByRole !== null
+        ? selectedSpeakersByRole
+        : {},
+      "{}"
+    ),
+    spl_speaker_nodes: j(
+      Array.isArray(speakerNodes) ? speakerNodes : [],
+      "[]"
+    ),
+    room_elements: j(
+      Array.isArray(roomElements) ? roomElements : [],
+      "[]"
+    ),
+    subwoofers: j(
+      Array.isArray(subwoofers) ? subwoofers : [],
+      "[]"
+    ),
+
+    // Sub configs stored as JSON blobs for now
+    front_subs_cfg: j(frontSubsCfg, null),
+    rear_subs_cfg: j(rearSubsCfg, null),
+
+    // Overlays / UI state
+    overlays: j(overlays || {}, "{}"),
+    frozen_tabs: frozenTabs || {},
 
     // Overheads
     overhead_global_model: overheadGlobalModel,
@@ -142,8 +193,7 @@ export function serializeProject(input) {
     use_mid_global: !!useMidGlobal,
     use_rear_global: !!useRearGlobal,
 
-    // SPL + screen plane
-    spl_config: JSON.stringify(splConfig || {}),
-    screen_front_plane_m: Number(screenFrontPlaneM) || 0,
+    // SPL config
+    spl_config: j(splConfig || {}, "{}"),
   };
 }
