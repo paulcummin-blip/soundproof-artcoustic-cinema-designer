@@ -873,10 +873,6 @@ export default function ProjectsPage() {
                 </select>
               </label>
 
-              <div style={{ marginTop: 6, fontSize: 12, color: BRAND.subtext }}>
-                <em>Speakers, screen size and seats will auto‑populate from Room Designer (read‑only).</em>
-              </div>
-
               {createError && (
                 <div style={{ marginTop: 8, padding: 8, background: "#fee", border: "1px solid #fcc", borderRadius: 6, fontSize: 13, color: BRAND.red }}>
                   {createError}
