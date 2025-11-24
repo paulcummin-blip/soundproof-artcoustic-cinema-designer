@@ -161,11 +161,18 @@ function calculateSplAtPoint({
  * Compute SPL metrics for all seats in the room.
  * Returns a map: seatId → { spl: { screen: {...}, surrounds: {...}, uppers: {...} } }
  * 
+ * Now uses UNIFIED SPL logic matching the SPL Calculator:
+ * - Looks up speaker data from speakerData.js
+ * - Applies max_spl_cont_db_1m cap before distance loss
+ * - Same calculation for LCR, Surrounds, and Overheads
+ * 
  * @param {Array} seats - Array of seat objects with x, y, z, id
  * @param {Array} placedSpeakers - Array of speaker objects
  * @param {Function} getCanonicalRole - Role normalization function
  * @param {Function} getEffectiveSplInputs - Function to get power/sensitivity for a role
  * @param {Function} getModelDimsM - Function to get speaker dimensions/metadata
+ * @param {number} screenLoss_dB - Screen loss in dB (default 0)
+ * @param {number} eqHeadroom_dB - EQ headroom in dB (default 0)
  * @returns {Map} seatId → metrics object
  */
 export function computeAllSeatSplMetrics({
@@ -174,6 +181,8 @@ export function computeAllSeatSplMetrics({
   getCanonicalRole,
   getEffectiveSplInputs,
   getModelDimsM,
+  screenLoss_dB = 0,
+  eqHeadroom_dB = 0,
 }) {
   const metricsMap = new Map();
   
@@ -181,7 +190,7 @@ export function computeAllSeatSplMetrics({
     return metricsMap;
   }
 
-  // Role categorization
+  // Role categorization (same for all speaker types)
   const screenRoles = new Set(['FL', 'FC', 'FR']);
   const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
   const overheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TBL', 'TBR', 'TL', 'TR', 'TFC', 'TBC']);
@@ -211,22 +220,39 @@ export function computeAllSeatSplMetrics({
       uppers: {},
     };
 
-    // Helper to process speakers in a category
+    // ─────────────────────────────────────────────────────────────────────────
+    // UNIFIED: Same processing for LCR, Surrounds, and Overheads
+    // The only differences come from: distance, power setting, and speaker specs.
+    // ─────────────────────────────────────────────────────────────────────────
     const processSpeakers = (speakerArray, categoryKey) => {
       for (const spk of speakerArray) {
         const role = getCanonicalRole(spk.role);
+        
+        // Get speaker metadata from getModelDimsM (which should query speakerData.js)
         const speakerMeta = getModelDimsM(spk.model);
+        
+        // Get effective SPL inputs (power, sensitivity overrides)
         const effectiveSplInputs = getEffectiveSplInputs(spk.role);
 
+        // Calculate SPL using UNIFIED logic with 1m capability cap
         const splValue = calculateSplAtPoint({
           speakerPos: spk.position,
           seatPos,
+          // Pass model name for speakerData.js lookup
+          speakerModel: spk.model,
+          // Pass any pre-resolved metadata
+          speakerMeta: speakerMeta,
+          // Legacy sensitivity fallback
           sensitivity_dB_1w1m: effectiveSplInputs?.sensitivity_dB_1w1m || 
                                effectiveSplInputs?.sensitivity || 
                                speakerMeta?.sensitivity_dB_1w1m || 
                                speakerMeta?.sensitivity || 
                                87,
+          // Power from effective inputs
           powerW: effectiveSplInputs?.powerW || 100,
+          // Screen loss and EQ headroom
+          screenLoss_dB: screenLoss_dB || 0,
+          eqHeadroom_dB: eqHeadroom_dB || 0,
         });
 
         if (Number.isFinite(splValue)) {
@@ -238,6 +264,7 @@ export function computeAllSeatSplMetrics({
       }
     };
 
+    // Process all speaker categories with unified logic
     processSpeakers(placedLCR, 'screen');
     processSpeakers(placedSur, 'surrounds');
     processSpeakers(placedOH, 'uppers');
