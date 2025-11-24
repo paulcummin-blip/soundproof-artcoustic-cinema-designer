@@ -195,6 +195,19 @@ function useProjectLoader(
   const hydrateFromProject = useCallback((p) => {
     if (!p) return;
 
+    // DEBUG: Log what we're loading
+    console.log('[RD] hydrateFromProject', {
+      id: p.id,
+      name: p.name,
+      client_name: p.client_name,
+      roomDims: p.roomDims,
+      room_width: p.room_width,
+      room_length: p.room_length,
+      room_height: p.room_height,
+      seating_positions: typeof p.seating_positions === 'string' ? p.seating_positions.slice(0, 200) : p.seating_positions,
+      selected_speakers: typeof p.selected_speakers === 'string' ? p.selected_speakers.slice(0, 200) : p.selected_speakers,
+    });
+
     //
     // 1) ROOM DIMS (single source of truth)
     //
@@ -683,6 +696,17 @@ function useProjectLoader(
     const effectiveProjectId = projectIdState || projectIdFromUrl || null;
 
     try {
+      // DEBUG: Capture pre-save snapshot
+      const debugSnapshot = {
+        projectIdState,
+        projectIdFromUrl,
+        effectiveProjectId,
+        projectNameState,
+        roomDims: appState.roomDims,
+        seatingCount: Array.isArray(seatingPositions) ? seatingPositions.length : null,
+        placedSpeakerCount: Array.isArray(placedSpeakers) ? placedSpeakers.length : null,
+      };
+
       const projectData = serializeProject({
         name: projectNameState,
         roomDims: appState.roomDims,
@@ -712,6 +736,24 @@ function useProjectLoader(
         useRearGlobal,
         screenFrontPlaneM: appState.screenFrontPlaneM,
         splConfig: appState.splConfig,
+      });
+
+      // DEBUG: Log what we're about to save
+      console.log('[RD] manualSaveProject payload', {
+        debugSnapshot,
+        projectDataPreview: {
+          effectiveProjectId,
+          name: projectData.name,
+          room_width: projectData.room_width,
+          room_length: projectData.room_length,
+          room_height: projectData.room_height,
+          seating_positions: typeof projectData.seating_positions === 'string'
+            ? projectData.seating_positions.slice(0, 200)
+            : projectData.seating_positions,
+          selected_speakers: typeof projectData.selected_speakers === 'string'
+            ? projectData.selected_speakers.slice(0, 200)
+            : projectData.selected_speakers,
+        },
       });
 
       let savedProject;
@@ -747,6 +789,25 @@ function useProjectLoader(
       }
 
       if (savedProject) {
+        // DEBUG: Log what came back from save
+        console.log('[RD] manualSaveProject result', {
+          projectIdState,
+          effectiveProjectId,
+          savedId: savedProject?.id,
+          name: savedProject?.name,
+          client_name: savedProject?.client_name,
+        });
+
+        // DEBUG: One-shot reload to verify we can read back what we wrote
+        if (effectiveProjectId && typeof loadProject === 'function') {
+          console.log('[RD] manualSaveProject -> reloading project after save', { effectiveProjectId });
+          try {
+            await loadProject();
+          } catch (e) {
+            console.error('[RD] reload after save failed', e);
+          }
+        }
+
         setAutosaveStatus("saved");
         return { success: true };
       } else {
