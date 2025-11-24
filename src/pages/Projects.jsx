@@ -74,9 +74,6 @@ export default function ProjectsPage() {
     name: "",
     client: "",
     status: "Prospective",
-    roomLength: "",
-    roomWidth: "",
-    roomHeight: "",
   });
 
   // If not null, dialog is editing an existing project
@@ -176,9 +173,6 @@ export default function ProjectsPage() {
       name: "",
       client: "",
       status: "Prospective",
-      roomLength: "",
-      roomWidth: "",
-      roomHeight: "",
     });
     setCreateError(null);
     setDialogOpen(true);
@@ -190,9 +184,6 @@ export default function ProjectsPage() {
       name: p.name || "",
       client: p.client || "",
       status: p.status || "Prospective",
-      roomLength: p.roomLength != null ? String(p.roomLength) : "",
-      roomWidth: p.roomWidth != null ? String(p.roomWidth) : "",
-      roomHeight: p.roomHeight != null ? String(p.roomHeight) : "",
     });
     setCreateError(null);
     setDialogOpen(true);
@@ -208,10 +199,6 @@ export default function ProjectsPage() {
     const client = draft.client.trim();
     const status = draft.status;
 
-    const rl = toNumberOrNull(draft.roomLength);
-    const rw = toNumberOrNull(draft.roomWidth);
-    const rh = toNumberOrNull(draft.roomHeight);
-
     if (!name) {
       setCreateError("Please enter a project name.");
       return;
@@ -223,10 +210,9 @@ export default function ProjectsPage() {
       const projectData = {
         name,
         client_name: client || "",
-        room_length: rl,
-        room_width: rw,
-        room_height: rh,
         project_status: status,
+        // Room dimensions will be filled in by Room Designer and autosave.
+        // We deliberately do NOT set room_length / room_width / room_height here.
       };
 
       if (!editingProject) {
@@ -886,44 +872,6 @@ export default function ProjectsPage() {
                   ))}
                 </select>
               </label>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(3, 1fr)",
-                  gap: 10,
-                }}
-              >
-                <label style={{ fontSize: 12, color: BRAND.subtext }}>
-                  Room Length (m)
-                  <input
-                    value={draft.roomLength}
-                    onChange={(e) => setDraft((d) => ({ ...d, roomLength: e.target.value }))}
-                    style={fieldStyle()}
-                    placeholder="e.g. 6.2"
-                  />
-                </label>
-
-                <label style={{ fontSize: 12, color: BRAND.subtext }}>
-                  Room Width (m)
-                  <input
-                    value={draft.roomWidth}
-                    onChange={(e) => setDraft((d) => ({ ...d, roomWidth: e.target.value }))}
-                    style={fieldStyle()}
-                    placeholder="e.g. 4.1"
-                  />
-                </label>
-
-                <label style={{ fontSize: 12, color: BRAND.subtext }}>
-                  Room Height (m)
-                  <input
-                    value={draft.roomHeight}
-                    onChange={(e) => setDraft((d) => ({ ...d, roomHeight: e.target.value }))}
-                    style={fieldStyle()}
-                    placeholder="e.g. 2.4"
-                  />
-                </label>
-              </div>
 
               <div style={{ marginTop: 6, fontSize: 12, color: BRAND.subtext }}>
                 <em>Speakers, screen size and seats will auto‑populate from Room Designer (read‑only).</em>
