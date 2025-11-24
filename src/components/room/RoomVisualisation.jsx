@@ -4995,10 +4995,7 @@ return (
             {BaffleAndScreen}
 
 
-            {/* SCREEN WALL LABEL */}
-            <text x={svgW / 2} y={roomRect.y - 10} fontSize="12" textAnchor="middle" fill="#625143" style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
-              Screen Wall
-            </text>
+
 
             {/* RP22 Zones Overlay - UNCONDITIONAL MOUNT */}
             <g className="rp22-zones-layer" pointerEvents="none">
