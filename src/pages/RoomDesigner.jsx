@@ -479,12 +479,13 @@ function useProjectLoader(
   ]);
 
 
-  const loadProject = useCallback(async (signal) => {
-    if (!projectIdState) return;
+  const loadProject = useCallback(async (signal, idOverride) => {
+    const id = idOverride || projectIdState;
+    if (!id) return;
     setLoadState({ phase: "loading", error: null, name: null });
     try {
       // AbortController signal is not directly supported by the SDK, but the operation is fast.
-      const projects = await Project.filter({ id: projectIdState }, '-updated_date', 1);
+      const projects = await Project.filter({ id }, '-updated_date', 1);
 
       if (Array.isArray(projects) && projects.length) {
         const p = projects[0] || null;
@@ -822,7 +823,7 @@ function useProjectLoader(
         if (effectiveProjectId && typeof loadProject === 'function') {
           console.log('[RD] manualSaveProject -> reloading project after save', { effectiveProjectId });
           try {
-            await loadProject();
+            await loadProject(undefined, effectiveProjectId);
           } catch (e) {
             console.error('[RD] reload after save failed', e);
           }
@@ -1105,6 +1106,10 @@ function RoomDesignerWithState() {
   // All hook calls must be unconditional and at the top level
   const appState = useAppState();
   const sessionActiveProjectId = useActiveProjectId();
+  const { projectId: initialProjectIdFromUrl } = useUrlQuery();
+  
+  // Single source of truth for the project ID
+  const resolvedProjectId = sessionActiveProjectId || initialProjectIdFromUrl || null;
 
   // Temporary variables for values that might be undefined if appState is null
   // (Assumes AppStateProvider has been updated to provide these)
@@ -1156,7 +1161,6 @@ function RoomDesignerWithState() {
   const _setRowSpacingM = appState?.setRowSpacingM;
 
 
-  const { projectId: initialProjectIdFromUrl } = useUrlQuery();
   const store = useSpeakerSystemStore();
   
   // CRITICAL: Extract placedSpeakers early so it's available for allSeatSplMetrics
@@ -1760,7 +1764,7 @@ function RoomDesignerWithState() {
    } = useProjectLoader(
     appState, // Pass appState here
     {
-    projectIdFromUrl: initialProjectIdFromUrl,
+    projectIdFromUrl: resolvedProjectId,
     dolbyPreset,
     dimensions: stableDimensions, // Pass stableDimensions for serializeProject's old fields
     screen: _screen, seatingPositions: _seatingPositions, roomElements: _roomElements,
