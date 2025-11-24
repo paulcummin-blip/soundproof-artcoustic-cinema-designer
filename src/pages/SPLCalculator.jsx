@@ -1,4 +1,3 @@
-
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import { useProjectActions, useActiveProjectId } from "@/components/state/project-session";
@@ -84,6 +83,11 @@ function convert2p83VTo1W(sens2p83V, impedanceOhm) {
 }
 
 // Compute SPL at 1m capability considering speaker specs and amplifier power
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED SPL ENGINE — 1m CAPABILITY CAP
+// This function enforces the speaker's physical max SPL limit (max_spl_cont_db_1m)
+// from speakerData.js. The same capping logic should be reused in Room Designer.
+// ─────────────────────────────────────────────────────────────────────────────
 function getSPL1mCapability(speaker, ampPower_W) {
   const P_amp = nW(ampPower_W);
   const P_spk = nW(speaker.power_handling_w || speaker.max_power);
@@ -94,7 +98,7 @@ function getSPL1mCapability(speaker, ampPower_W) {
   // Available power is minimum of amp and speaker (0 if amp missing or speaker has 0 power handling)
   const P_available = Math.min(P_amp || 0, P_ceiling_from_speaker);
   
-  // Get sensitivity in 1W/1m terms
+  // Get sensitivity in 1W/1m terms (from speakerData.js)
   let sens_1W = safeNum(speaker.sensitivity_db_1w_1m || speaker.sensitivity);
   const sens_2p83V = safeNum(speaker.sensitivity_db_2v83_1m);
   const impedanceOhm = safeNum(speaker.impedance_ohm || speaker.impedance);
@@ -105,16 +109,26 @@ function getSPL1mCapability(speaker, ampPower_W) {
     sens_1W = convert2p83VTo1W(sens_2p83V, assumedZ);
   }
   
-  // Compute amp-limited SPL
+  // Compute amp-limited SPL: sensitivity + 10·log10(min(ampPower, speakerMaxPower))
   let SPL_1m_amp_limited = null;
   if (sens_1W !== null && P_available > 0) {
     SPL_1m_amp_limited = sens_1W + 10 * Math.log10(P_available);
   }
   
-  // Get RP1 capability if available
+  // ─────────────────────────────────────────────────────────────────────────
+  // CRITICAL: Cap at max_spl_cont_db_1m from speakerData.js
+  // This is the speaker's verified continuous max SPL at 1m — the physical limit
+  // that cannot be exceeded regardless of amplifier power.
+  // ─────────────────────────────────────────────────────────────────────────
+  const SPL_1m_max_cont = safeNum(speaker.max_spl_cont_db_1m || speaker.max_spl);
+  
+  // Legacy RP1 field (fallback for comparators without max_spl_cont_db_1m)
   const SPL_1m_rp1 = safeNum(speaker.rp1_midTermRMS_dBZ_1m);
   
-  // Determine capability (minimum of both constraints)
+  // Determine the hard cap: prefer max_spl_cont_db_1m, fall back to rp1
+  const hardCap = SPL_1m_max_cont !== null ? SPL_1m_max_cont : SPL_1m_rp1;
+  
+  // Determine capability (minimum of amp-limited and hard cap)
   let SPL_1m_capability = null;
   let method = "Unknown";
   let isVerified = false;
@@ -122,24 +136,25 @@ function getSPL1mCapability(speaker, ampPower_W) {
   let assumptionNote = null;
   let ampLimitWarning = false;
   
-  if (SPL_1m_amp_limited !== null && SPL_1m_rp1 !== null) {
-    // Both available: use minimum
-    SPL_1m_capability = Math.min(SPL_1m_amp_limited, SPL_1m_rp1);
-    method = SPL_1m_capability === SPL_1m_rp1 ? "RP1" : "Amp-limited";
-    isVerified = SPL_1m_capability === SPL_1m_rp1;
+  if (SPL_1m_amp_limited !== null && hardCap !== null) {
+    // Both available: use minimum (cap the amp-limited value)
+    SPL_1m_capability = Math.min(SPL_1m_amp_limited, hardCap);
+    method = SPL_1m_capability === hardCap ? "Max SPL Cap" : "Amp-limited";
+    isVerified = SPL_1m_capability === hardCap; // Verified if capped by speaker spec
     if (method === "Amp-limited") {
       formula = `${sens_1W.toFixed(1)} dB + 10·log10(${Math.round(P_available)} W) = ${SPL_1m_capability.toFixed(1)} dB`;
-      if (impedanceOhm === null && sens_2p83V !== null && sens_1W === null) { // This case should be covered by sens_1W = null check earlier
+      if (impedanceOhm === null && sens_2p83V !== null) {
         assumptionNote = "Assumed 8 Ω impedance for 2.83V → 1W conversion";
       }
-    } else { // RP1 method
-      // If RP1 is chosen, but amp is less than speaker max, warn if we can't calculate amp-limited
+    } else {
+      formula = `Capped at speaker max: ${hardCap.toFixed(1)} dB`;
+      // If amp power is less than speaker max but we're still hitting the cap, note it
       if (P_amp > 0 && P_spk > 0 && P_amp < P_spk && sens_1W === null) {
         ampLimitWarning = true;
       }
     }
   } else if (SPL_1m_amp_limited !== null) {
-    // Only amp-limited available
+    // Only amp-limited available (no hard cap data)
     SPL_1m_capability = SPL_1m_amp_limited;
     method = "Amp-limited";
     isVerified = false;
@@ -147,11 +162,12 @@ function getSPL1mCapability(speaker, ampPower_W) {
     if (impedanceOhm === null && sens_2p83V !== null) {
       assumptionNote = "Assumed 8 Ω impedance for 2.83V → 1W conversion";
     }
-  } else if (SPL_1m_rp1 !== null) {
-    // Only RP1 available
-    SPL_1m_capability = SPL_1m_rp1;
-    method = "RP1";
+  } else if (hardCap !== null) {
+    // Only hard cap available (no sensitivity data for amp calc)
+    SPL_1m_capability = hardCap;
+    method = "Max SPL Cap";
     isVerified = true;
+    formula = `Using speaker max: ${hardCap.toFixed(1)} dB`;
     // Check if amp is smaller than speaker and we can't reflect it
     if (P_amp > 0 && P_spk > 0 && P_amp < P_spk && sens_1W === null) {
       ampLimitWarning = true;
@@ -164,7 +180,14 @@ function getSPL1mCapability(speaker, ampPower_W) {
     isVerified,
     formula,
     assumptionNote,
-    ampLimitWarning
+    ampLimitWarning,
+    // Expose for debugging/display
+    _debug: {
+      sens_1W,
+      P_available,
+      SPL_1m_amp_limited,
+      hardCap,
+    }
   };
 }
 
