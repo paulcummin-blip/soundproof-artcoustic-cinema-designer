@@ -2401,6 +2401,9 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
             {autosaveStatus === "saved"   && <span className="text-[#3E4349]">All changes saved</span>}
             {autosaveStatus === "dirty"   && <span className="text-amber-600">Pending changes…</span>}
             {autosaveStatus === "hydrating" && <span>Loading project data...</span>}
+            {projectIdState && (
+              <span className="text-xs text-gray-400 ml-auto">ID: {projectIdState.slice(0, 12)}…</span>
+            )}
         </div>
       </header>
 
