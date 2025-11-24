@@ -388,13 +388,15 @@ function useProjectLoader(
     // 9) SUB CONFIG (front/rear groups – config, not positions)
     //
     if (typeof setFrontSubsCfg === "function") {
+      const frontCfg = parseMaybe(p?.front_subs_cfg, null);
       setFrontSubsCfg(
-        p?.frontSubsCfg || { count: 1, model: "SUB2-12" }
+        frontCfg || { count: 1, model: "SUB2-12" }
       );
     }
     if (typeof setRearSubsCfg === "function") {
+      const rearCfg = parseMaybe(p?.rear_subs_cfg, null);
       setRearSubsCfg(
-        p?.rearSubsCfg || { count: 0, model: null }
+        rearCfg || { count: 0, model: null }
       );
     }
 
@@ -409,6 +411,16 @@ function useProjectLoader(
     if (typeof setSpeakerNodes === "function") {
       const nodes = parseMaybe(p?.spl_speaker_nodes, []);
       setSpeakerNodes(Array.isArray(nodes) ? nodes : []);
+    }
+
+    //
+    // 10A) SPL CONFIG
+    //
+    if (typeof appState?.setSplConfig === "function") {
+      const splCfg = parseMaybe(p?.spl_config, null);
+      if (splCfg) {
+        appState.setSplConfig(splCfg);
+      }
     }
 
     //
@@ -476,6 +488,7 @@ function useProjectLoader(
 
       if (Array.isArray(projects) && projects.length) {
         const p = projects[0] || null;
+        console.log('[RD] loadProject result', { projectIdState, id: p?.id, name: p?.name });
         hydrateFromProject(p);
         setProjectNameState(p?.name || "Project"); // Update internal projectName state
         setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
@@ -739,6 +752,13 @@ function useProjectLoader(
       });
 
       // DEBUG: Log what we're about to save
+      console.log('[RD] manualSaveProject payload', effectiveProjectId, {
+        room: { w: projectData.room_width, l: projectData.room_length, h: projectData.room_height },
+        seating_count: projectData.seating_positions ? JSON.parse(projectData.seating_positions).length : 0,
+        speakers_count: projectData.selected_speakers ? JSON.parse(projectData.selected_speakers).length : 0,
+        screen_size: projectData.screen_size,
+        dolby: projectData.dolby_config,
+      });
       console.log('[RD] manualSaveProject payload', {
         debugSnapshot,
         projectDataPreview: {
