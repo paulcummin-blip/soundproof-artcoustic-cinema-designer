@@ -1,38 +1,23 @@
 export function serializeProject(input = {}) {
   const {
-    // meta
-    name, // we will NOT write name for existing projects
-
-    // geometry + screen
+    name,
     roomDims = { widthM: 4.5, lengthM: 6.0, heightM: 2.4 },
     dimensions = {},
     screen = {},
     screenHeight = 0.5,
-
-    // layout + content
     seatingPositions = [],
     placedSpeakers = [],
     roomElements = [],
     subwoofers = [],
-
-    // audio layout
     dolbyLayout = "5.1",
     overlays = {},
     frozenTabs = {},
     sevenBedLayoutType = "rears",
-
-    // speakers by role / SPL config
-    speakerSelections = {},
-    selectedSpeakersByRole,      // alias from RoomDesigner
-    splConfig = { globalPowerW: 100, globalEqHeadroomDb: 0, perRole: {} },
-    spl_speaker_nodes,           // alias from RoomDesigner
-
-    // wides + rows
+    selectedSpeakersByRole = {},
+    speakerNodes = null,
     enableFrontWides = false,
     rowSpacingM = 1.8,
     seatsPerRowByRow = [],
-
-    // overheads
     overheadGlobalModel = null,
     overheadFrontOverride = null,
     overheadMidOverride = null,
@@ -40,14 +25,11 @@ export function serializeProject(input = {}) {
     useFrontGlobal = true,
     useMidGlobal = true,
     useRearGlobal = true,
-
-    // screen plane / cavity
+    splConfig = { globalPowerW: 100, globalEqHeadroomDb: 0, perRole: {} },
     screenFrontPlaneM = 0,
   } = input || {};
 
   const effectiveRoomDims = roomDims || {};
-  const effectiveSpeakerSelections =
-    selectedSpeakersByRole || speakerSelections || {};
 
   return {
     // IMPORTANT: do NOT let RoomDesigner rename projects any more.
@@ -92,7 +74,9 @@ export function serializeProject(input = {}) {
 
     // matches Project.json: selected_speakers_by_role
     selected_speakers_by_role: JSON.stringify(
-      effectiveSpeakerSelections || {}
+      typeof selectedSpeakersByRole === "object" && selectedSpeakersByRole !== null
+        ? selectedSpeakersByRole
+        : {}
     ),
 
     enable_front_wides: !!enableFrontWides,
@@ -109,7 +93,7 @@ export function serializeProject(input = {}) {
     use_rear_global: useRearGlobal,
 
     spl_config: JSON.stringify(splConfig || {}),
-    spl_speaker_nodes: JSON.stringify(spl_speaker_nodes || []),
+    spl_speaker_nodes: JSON.stringify(speakerNodes || null),
 
     screen_front_plane_m: Number(screenFrontPlaneM) || 0,
   };

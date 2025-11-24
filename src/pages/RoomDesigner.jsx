@@ -691,35 +691,22 @@ function useProjectLoader(
   }, [
     projectIdFromUrl,
     projectIdState,
-    // deliberately NOT depending on seating/speakers/etc.
+    appState?.roomDims,
+    initWithDefaultsAndRules,
+    loadProject,
+    setProjectIdState,
   ]);
 
   const manualSaveProject = useCallback(async () => {
     setAutosaveStatus("saving");
-
-    // Seats & layout – same logic as autosave
-    const seatingPositionsToSave =
-      appState?.seatingPositions && Array.isArray(appState.seatingPositions)
-        ? appState.seatingPositions
-        : seatingPositions;
-
-    const seatsPerRowByRowToSave =
-      appState?.seatsPerRowByRow && Array.isArray(appState.seatsPerRowByRow)
-        ? appState.seatsPerRowByRow
-        : seatsPerRowByRow;
-
     try {
       const projectData = serializeProject({
-        // Room + geometry
+        // IMPORTANT: use appState as the source of truth
+        name: projectNameState,
         roomDims: appState.roomDims,
         dimensions,
         screen,
-        seatingPositions: seatingPositionsToSave,
-        seatsPerRowByRow: seatsPerRowByRowToSave,
-        rowSpacingM,
-        screenFrontPlaneM: appState.screenFrontPlaneM,
-
-        // Layout + content
+        seatingPositions,
         placedSpeakers,
         roomElements,
         overlays,
@@ -730,13 +717,9 @@ function useProjectLoader(
         rearSubsCfg,
         lcrAimMode,
         enableFrontWides,
-
-        // Speaker / SPL metadata
-        speakerSelections: appState.selectedSpeakersByRole,
-        spl_speaker_nodes: appState.speakerNodes,
-        splConfig: appState.splConfig,
-
-        // Overheads / extras
+        // Use selectedSpeakersByRole and speakerNodes from appState
+        selectedSpeakersByRole: appState.selectedSpeakersByRole,
+        speakerNodes: appState.speakerNodes,
         overheadGlobalModel,
         overheadFrontOverride,
         overheadMidOverride,
@@ -744,15 +727,16 @@ function useProjectLoader(
         useFrontGlobal,
         useMidGlobal,
         useRearGlobal,
-
-        // Name is used ONLY when creating a brand new project
-        name: projectNameState,
+        rowSpacingM,
+        screenFrontPlaneM: appState.screenFrontPlaneM,
+        seatsPerRowByRow,
+        splConfig: appState.splConfig,
       });
 
       let savedProject;
 
       if (projectIdState) {
-        // Do not let manual "Save Project" rename an existing project
+        // Existing project: update design fields only, keep name/client from Projects UI
         delete projectData.name;
         delete projectData.client_name;
 
@@ -785,20 +769,18 @@ function useProjectLoader(
           throw updateErr;
         }
       } else {
-        // First time save: create a new project in Base44
+        // No id – create once, then treat like a normal project
         savedProject = await Project.create(projectData);
       }
 
       if (savedProject) {
         setAutosaveStatus("saved");
-
         if (!projectIdState) {
           const newProjectId = savedProject.id;
           if (newProjectId) {
             handleProjectCreated(newProjectId);
           }
         }
-
         return { success: true };
       } else {
         setAutosaveStatus("error");
@@ -807,8 +789,8 @@ function useProjectLoader(
       }
     } catch (e) {
       setAutosaveStatus("error");
-      console.error("Error during manual save:", e.message);
-      return { success: false, error: e.message };
+      console.error("Error during manual save:", e?.message || e);
+      return { success: false, error: e?.message || String(e) };
     }
   }, [
     projectIdState,
@@ -817,27 +799,19 @@ function useProjectLoader(
     dimensions,
     screen,
     seatingPositions,
-    seatsPerRowByRow,
     placedSpeakers,
     roomElements,
     overlays,
     frozenTabs,
+    handleProjectCreated,
     sevenBedLayoutType,
     frontSubsCfg,
     rearSubsCfg,
     lcrAimMode,
     enableFrontWides,
-    rowSpacingM,
-    handleProjectCreated,
-    // appState-driven bits
     appState.roomDims,
-    appState.seatingPositions,
-    appState.seatsPerRowByRow,
     appState.selectedSpeakersByRole,
     appState.speakerNodes,
-    appState.splConfig,
-    appState.screenFrontPlaneM,
-    // overheads
     overheadGlobalModel,
     overheadFrontOverride,
     overheadMidOverride,
@@ -845,6 +819,10 @@ function useProjectLoader(
     useFrontGlobal,
     useMidGlobal,
     useRearGlobal,
+    rowSpacingM,
+    appState.screenFrontPlaneM,
+    seatsPerRowByRow,
+    appState.splConfig,
   ]);
 
   return {
