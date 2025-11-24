@@ -306,13 +306,19 @@ function useProjectLoader(
       setOverheadRearOverride(p?.overhead_rear_override || null);
     }
     if (typeof setUseFrontGlobal === "function") {
-      setUseFrontGlobal(p?.use_front_global ?? true);
+      setUseFrontGlobal(
+        typeof p?.use_front_global === "boolean" ? p.use_front_global : true
+      );
     }
     if (typeof setUseMidGlobal === "function") {
-      setUseMidGlobal(p?.use_mid_global ?? true);
+      setUseMidGlobal(
+        typeof p?.use_mid_global === "boolean" ? p.use_mid_global : true
+      );
     }
     if (typeof setUseRearGlobal === "function") {
-      setUseRearGlobal(p?.use_rear_global ?? true);
+      setUseRearGlobal(
+        typeof p?.use_rear_global === "boolean" ? p.use_rear_global : true
+      );
     }
 
     //
@@ -403,15 +409,20 @@ function useProjectLoader(
       return null;
     })();
 
-    if (
-      typeof setSpeakerSystem === "function" &&
-      Array.isArray(loadedSpeakers) &&
-      loadedSpeakers.length > 0
-    ) {
-      setSpeakerSystem((prev) => ({
-        ...(prev || {}),
-        placedSpeakers: loadedSpeakers,
-      }));
+    if (typeof setSpeakerSystem === "function") {
+      setSpeakerSystem((prev) => {
+        // Prefer speakers stored with the Project entity when present.
+        if (Array.isArray(loadedSpeakers) && loadedSpeakers.length > 0) {
+          return {
+            ...(prev || {}),
+            placedSpeakers: loadedSpeakers,
+          };
+        }
+
+        // If nothing was stored, keep whatever we already had in memory
+        // (e.g. brand-new design that hasn't been saved yet).
+        return prev || {};
+      });
     }
   }, [
     appState?.setRoomDims,
@@ -701,25 +712,30 @@ function useProjectLoader(
     setAutosaveStatus("saving");
     try {
       const projectData = serializeProject({
-        // IMPORTANT: use appState as the source of truth
         name: projectNameState,
         roomDims: appState.roomDims,
         dimensions,
         screen,
+
         seatingPositions,
+        seatsPerRowByRow,
+        rowSpacingM,
+
         placedSpeakers,
-        roomElements,
-        overlays,
-        dolbyLayout: dolbyPreset,
-        frozenTabs,
-        sevenBedLayoutType,
-        frontSubsCfg,
-        rearSubsCfg,
-        lcrAimMode,
-        enableFrontWides,
-        // Use selectedSpeakersByRole and speakerNodes from appState
         selectedSpeakersByRole: appState.selectedSpeakersByRole,
         speakerNodes: appState.speakerNodes,
+
+        roomElements,
+
+        frontSubsCfg,
+        rearSubsCfg,
+        dolbyLayout: dolbyPreset,
+
+        overlays,
+        frozenTabs,
+        sevenBedLayoutType,
+        enableFrontWides,
+
         overheadGlobalModel,
         overheadFrontOverride,
         overheadMidOverride,
@@ -727,10 +743,9 @@ function useProjectLoader(
         useFrontGlobal,
         useMidGlobal,
         useRearGlobal,
-        rowSpacingM,
-        screenFrontPlaneM: appState.screenFrontPlaneM,
-        seatsPerRowByRow,
+
         splConfig: appState.splConfig,
+        screenFrontPlaneM: appState.screenFrontPlaneM,
       });
 
       let savedProject;
