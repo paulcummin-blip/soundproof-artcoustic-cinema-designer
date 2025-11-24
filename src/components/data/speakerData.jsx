@@ -177,7 +177,13 @@ export const artcousticSpeakers = [
     "widthM": 0.15,
     "depthM": 0.08,
     "heightM": 0.35,
-    "description": "FR – 3\" woofer (x 2) HF 1.5\" (x 1)"
+    "description": "FR – 3\" woofer (x 2) HF 1.5\" (x 1)",
+    "recommended_high_pass_hz": 100,
+    "recommended_high_pass_slope_db_oct": 24,
+    "crossover_lp_hz": 1000,
+    "crossover_lp_slope_db_oct": 6,
+    "crossover_hp_hz": 4000,
+    "crossover_hp_slope_db_oct": 12
   },
   {
     "id": "evolve_3_1",
@@ -207,7 +213,13 @@ export const artcousticSpeakers = [
     "is_artcoustic": true,
     "price": 1170,
     "category": "Evolve",
-    "description": "FR – 3\" woofer (x 3) HF 1.5\" (x 1)"
+    "description": "FR – 3\" woofer (x 3) HF 1.5\" (x 1)",
+    "recommended_high_pass_hz": 100,
+    "recommended_high_pass_slope_db_oct": 24,
+    "crossover_lp_hz": 1000,
+    "crossover_lp_slope_db_oct": 6,
+    "crossover_hp_hz": 4000,
+    "crossover_hp_slope_db_oct": 12
   },
   {
     "id": "evolve_4_2",
@@ -237,7 +249,13 @@ export const artcousticSpeakers = [
     "is_artcoustic": true,
     "price": 1780,
     "category": "Evolve",
-    "description": "FR – 3\" woofer (x 4) HF 1.5\" (x 2)"
+    "description": "FR – 3\" woofer (x 4) HF 1.5\" (x 2)",
+    "recommended_high_pass_hz": 100,
+    "recommended_high_pass_slope_db_oct": 24,
+    "crossover_lp_hz": 1000,
+    "crossover_lp_slope_db_oct": 6,
+    "crossover_hp_hz": 4000,
+    "crossover_hp_slope_db_oct": 12
   },
   {
     "id": "evolve_6_3",
@@ -267,7 +285,13 @@ export const artcousticSpeakers = [
     "is_artcoustic": true,
     "price": 2250,
     "category": "Evolve",
-    "description": "FR – 3\" woofer (x 6) HF 1.5\" (x 3)"
+    "description": "FR – 3\" woofer (x 6) HF 1.5\" (x 3)",
+    "recommended_high_pass_hz": 100,
+    "recommended_high_pass_slope_db_oct": 24,
+    "crossover_lp_hz": 1000,
+    "crossover_lp_slope_db_oct": 6,
+    "crossover_hp_hz": 4000,
+    "crossover_hp_slope_db_oct": 12
   },
   {
     "id": "evolve_8_4",
@@ -297,7 +321,13 @@ export const artcousticSpeakers = [
     "is_artcoustic": true,
     "price": 2720,
     "category": "Evolve",
-    "description": "FR – 3\" woofer (x 8) HF 1.5\" (x 4)"
+    "description": "FR – 3\" woofer (x 8) HF 1.5\" (x 4)",
+    "recommended_high_pass_hz": 100,
+    "recommended_high_pass_slope_db_oct": 24,
+    "crossover_lp_hz": 1000,
+    "crossover_lp_slope_db_oct": 6,
+    "crossover_hp_hz": 4000,
+    "crossover_hp_slope_db_oct": 12
   },
   {
     "id": "architect_2_1",
