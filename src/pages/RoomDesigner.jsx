@@ -1336,7 +1336,21 @@ function RoomDesignerWithState() {
       placedSpeakers: placedSpeakers || [],
       getCanonicalRole: getCanonicalRoleLocal,
       getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
-      getModelDimsM: (model) => getSpeakerModelMeta(model) || { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 },
+      getModelDimsM: (model) => {
+        const meta = getSpeakerModelMeta(model);
+        if (meta && !meta.notFound) {
+          // Return full metadata including SPL-critical fields
+          return {
+            ...meta,
+            // Ensure these critical SPL fields are present
+            sensitivity_db_1w_1m: meta.sensitivity_dB_1w1m || meta.sensitivity || 87,
+            power_handling_w: meta.max_power || Infinity,
+            max_spl_cont_db_1m: meta.max_spl || null,
+          };
+        }
+        // Fallback for unknown models
+        return { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 };
+      },
       // Pass screen loss and EQ headroom from global splConfig
       screenLoss_dB: screenLoss,
       eqHeadroom_dB: eqHeadroom,
@@ -2556,6 +2570,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   viewingDistanceOffsetM={_seatingBlockOffset}
                   mlpBasis={_mlpBasis}
                   rp22AnglesEnabled={_overlays?.RP22_ANGLES}
+                  allSeatSplMetrics={allSeatSplMetrics}
                 />
               </Suspense>
             </ErrorBoundary>

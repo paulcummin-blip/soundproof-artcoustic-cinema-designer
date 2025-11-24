@@ -332,6 +332,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     showScreenPlane = false,
     screenPlaneMode = 'autoTight',
     rp22AnglesEnabled = false,
+    allSeatSplMetrics: allSeatSplMetricsProp = null,
   } = props;
 
   const appState = useAppState();
@@ -2247,8 +2248,12 @@ React.useEffect(() => {
     return hoveredSeat;
   }, [hudPinnedSeatId, hoveredSeat, seatingPositions]);
 
-  // NEW: Centralized SPL calculation for all seats (single source of truth)
-  const allSeatSplMetrics = useMemo(() => {
+  // SPL metrics: Use prop from RoomDesigner if available (single source of truth)
+  // Only compute locally if prop not provided (fallback for standalone use)
+  const allSeatSplMetricsLocal = useMemo(() => {
+    // If prop is provided, don't compute locally
+    if (allSeatSplMetricsProp) return null;
+    
     return computeAllSeatSplMetrics({
       seats: seatingPositions,
       placedSpeakers,
@@ -2256,7 +2261,10 @@ React.useEffect(() => {
       getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
       getModelDimsM,
     });
-  }, [seatingPositions, placedSpeakers, getCanonicalRole, appState?.getEffectiveSplInputs, getModelDimsM]);
+  }, [allSeatSplMetricsProp, seatingPositions, placedSpeakers, getCanonicalRole, appState?.getEffectiveSplInputs, getModelDimsM]);
+
+  // Use prop if available, otherwise use local computation
+  const allSeatSplMetrics = allSeatSplMetricsProp || allSeatSplMetricsLocal;
 
 
   // Build tooltip data with RP22 per-seat metrics
