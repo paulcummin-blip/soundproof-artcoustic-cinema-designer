@@ -182,7 +182,7 @@ export function serializeProject(input = {}) {
 
     // Overlays / UI state
     overlays: j(overlays || {}, "{}"),
-    frozen_tabs: frozenTabs || {},
+    frozen_tabs: j(frozenTabs || {}, "{}"),
 
     // Overheads
     overhead_global_model: overheadGlobalModel,
