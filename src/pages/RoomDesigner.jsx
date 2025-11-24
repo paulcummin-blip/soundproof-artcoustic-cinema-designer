@@ -677,6 +677,12 @@ function useProjectLoader(
 
   const manualSaveProject = useCallback(async () => {
     setAutosaveStatus("saving");
+
+    // Work out which project we are saving into:
+    // 1) local state set by loader
+    // 2) id from URL query (?project=...)
+    const effectiveProjectId = projectIdState || projectIdFromUrl || null;
+
     try {
       const projectData = serializeProject({
         name: projectNameState,
@@ -717,52 +723,38 @@ function useProjectLoader(
 
       let savedProject;
 
-      if (projectIdState) {
-        // Existing project: update design fields only, keep name/client from Projects UI
+      if (effectiveProjectId) {
+        // Updating an existing project.
+        // Do not let RoomDesigner rename it.
         delete projectData.name;
         delete projectData.client_name;
 
-        try {
-          savedProject = await Project.update(projectIdState, projectData);
-        } catch (updateErr) {
-          const errMsg = String(updateErr?.message || updateErr || "");
-          if (
-            errMsg.includes("Invalid id value") ||
-            errMsg.includes("Object not found") ||
-            errMsg.includes("404")
-          ) {
-            console.log(
-              "[Project Sync] Stale project ID detected during manual save, clearing."
-            );
-            if (
-              typeof window !== "undefined" &&
-              window.__APPSTATE__?.clearActiveProject
-            ) {
-              window.__APPSTATE__.clearActiveProject();
-            }
-            setProjectIdState(null);
-            setAutosaveStatus("idle");
-            return {
-              success: false,
-              error:
-                "Selected project no longer exists in cloud. Continuing to work locally.",
-            };
-          }
-          throw updateErr;
+        savedProject = await Project.update(effectiveProjectId, projectData);
+
+        // Make sure our local state tracks this id
+        if (!projectIdState) {
+          setProjectIdState(effectiveProjectId);
         }
       } else {
-        // No id – create once, then treat like a normal project
+        // First-time save: create a brand new project.
         savedProject = await Project.create(projectData);
+
+        if (savedProject?.id) {
+          const newId = savedProject.id;
+          setProjectIdState(newId);
+          // Keep URL in sync so future loads work correctly
+          try {
+            const url = new URL(window.location.href);
+            url.searchParams.set("project", newId);
+            window.history.replaceState({}, "", url.toString());
+          } catch (e) {
+            console.error("Failed to update URL with new project id:", e);
+          }
+        }
       }
 
       if (savedProject) {
         setAutosaveStatus("saved");
-        if (!projectIdState) {
-          const newProjectId = savedProject.id;
-          if (newProjectId) {
-            handleProjectCreated(newProjectId);
-          }
-        }
         return { success: true };
       } else {
         setAutosaveStatus("error");
@@ -771,11 +763,12 @@ function useProjectLoader(
       }
     } catch (e) {
       setAutosaveStatus("error");
-      console.error("Error during manual save:", e?.message || e);
-      return { success: false, error: e?.message || String(e) };
+      console.error("Error during manual save:", e);
+      return { success: false, error: e.message || String(e) };
     }
   }, [
     projectIdState,
+    projectIdFromUrl,
     projectNameState,
     dolbyPreset,
     dimensions,
@@ -785,7 +778,6 @@ function useProjectLoader(
     roomElements,
     overlays,
     frozenTabs,
-    handleProjectCreated,
     sevenBedLayoutType,
     frontSubsCfg,
     rearSubsCfg,
