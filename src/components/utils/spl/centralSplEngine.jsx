@@ -1,33 +1,158 @@
 // components/utils/spl/centralSplEngine.js
-// Single source of truth for SPL calculations across the entire app.
+// ─────────────────────────────────────────────────────────────────────────────
+// UNIFIED SPL ENGINE — Single source of truth for SPL calculations.
 // Used by: Seat HUD, LCR cards, Surround cards, Overhead cards.
+// 
+// This engine now uses the same 1m capability logic as the SPL Calculator,
+// driven entirely from components/data/speakerData.js.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import { artcousticSpeakers } from "@/components/data/speakerData";
+
+// Helper to find speaker data from speakerData.js by model name
+function findSpeakerData(modelName) {
+  if (!modelName || !Array.isArray(artcousticSpeakers)) return null;
+  
+  const normalizedModel = String(modelName).toLowerCase().replace(/[-_\s]/g, '');
+  
+  return artcousticSpeakers.find(s => {
+    const normalizedEntry = String(s.model || '').toLowerCase().replace(/[-_\s]/g, '');
+    return normalizedEntry === normalizedModel || s.id === modelName;
+  }) || null;
+}
+
+// Helper to safely parse numbers
+function safeNum(v) {
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
 
 /**
- * Calculate SPL at a point given speaker position, seat position, sensitivity, and power.
- * This is the canonical formula used throughout the app.
+ * Compute 1m SPL capability with the same logic as SPL Calculator.
+ * This is the critical function that caps SPL at speaker's physical limits.
  * 
- * Formula: SPL = sensitivity + 10*log10(power) - 20*log10(distance)
+ * @param {Object} speakerMeta - Speaker metadata from speakerData.js or getModelDimsM
+ * @param {number} ampPowerW - Amplifier power in watts
+ * @returns {Object} { spl1m_capability, method, isVerified }
+ */
+function getSPL1mCapability(speakerMeta, ampPowerW) {
+  const P_amp = safeNum(ampPowerW) || 0;
+  const P_spk = safeNum(speakerMeta?.power_handling_w || speakerMeta?.max_power) || Infinity;
+  
+  // Available power is minimum of amp and speaker max
+  const P_available = Math.min(P_amp, P_spk);
+  
+  // Get sensitivity in 1W/1m terms
+  const sens_1W = safeNum(speakerMeta?.sensitivity_db_1w_1m || speakerMeta?.sensitivity);
+  
+  // Compute amp-limited SPL at 1m
+  let SPL_1m_amp_limited = null;
+  if (sens_1W !== null && P_available > 0) {
+    SPL_1m_amp_limited = sens_1W + 10 * Math.log10(P_available);
+  }
+  
+  // ─────────────────────────────────────────────────────────────────────────
+  // CRITICAL: Cap at max_spl_cont_db_1m from speakerData.js
+  // This is the speaker's verified continuous max SPL at 1m — the physical limit.
+  // ─────────────────────────────────────────────────────────────────────────
+  const hardCap = safeNum(speakerMeta?.max_spl_cont_db_1m || speakerMeta?.max_spl);
+  
+  // Determine final 1m capability
+  let spl1m_capability = null;
+  let method = "Unknown";
+  let isVerified = false;
+  
+  if (SPL_1m_amp_limited !== null && hardCap !== null) {
+    // Both available: use minimum (cap the amp-limited value)
+    spl1m_capability = Math.min(SPL_1m_amp_limited, hardCap);
+    method = spl1m_capability === hardCap ? "Max SPL Cap" : "Amp-limited";
+    isVerified = spl1m_capability === hardCap;
+  } else if (SPL_1m_amp_limited !== null) {
+    // Only amp-limited available
+    spl1m_capability = SPL_1m_amp_limited;
+    method = "Amp-limited";
+    isVerified = false;
+  } else if (hardCap !== null) {
+    // Only hard cap available (fallback)
+    spl1m_capability = hardCap;
+    method = "Max SPL Cap";
+    isVerified = true;
+  }
+  
+  return { spl1m_capability, method, isVerified };
+}
+
+/**
+ * Calculate SPL at a point using unified logic matching SPL Calculator.
+ * 
+ * Steps:
+ * 1. Look up speaker data from speakerData.js
+ * 2. Compute capped 1m SPL capability (amp-limited, then capped at max_spl_cont_db_1m)
+ * 3. Calculate 3D distance loss
+ * 4. Subtract screen loss and EQ headroom
+ * 
+ * @param {Object} params
+ * @returns {number|null} Final SPL at seat position
  */
 function calculateSplAtPoint({
   speakerPos,
   seatPos,
   sensitivity_dB_1w1m,
   powerW,
+  // New unified parameters
+  speakerModel = null,
+  speakerMeta = null,
+  screenLoss_dB = 0,
+  eqHeadroom_dB = 0,
 }) {
-  // Validate inputs
+  // Validate positions
   if (!speakerPos || !Number.isFinite(speakerPos.x) || !Number.isFinite(speakerPos.y)) return null;
   if (!seatPos || !Number.isFinite(seatPos.x) || !Number.isFinite(seatPos.y)) return null;
-  if (!Number.isFinite(sensitivity_dB_1w1m) || !Number.isFinite(powerW) || powerW <= 0) return null;
 
-  // Calculate 3D distance (including Z if available)
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 1: Resolve speaker metadata from speakerData.js
+  // ─────────────────────────────────────────────────────────────────────────
+  let resolvedMeta = speakerMeta;
+  if (!resolvedMeta && speakerModel) {
+    resolvedMeta = findSpeakerData(speakerModel);
+  }
+  
+  // Build effective speaker data (merge passed values with resolved data)
+  const effectiveMeta = {
+    sensitivity_db_1w_1m: safeNum(resolvedMeta?.sensitivity_db_1w_1m) || 
+                          safeNum(resolvedMeta?.sensitivity) || 
+                          safeNum(sensitivity_dB_1w1m) || 
+                          87,
+    power_handling_w: safeNum(resolvedMeta?.power_handling_w) || 
+                      safeNum(resolvedMeta?.max_power) || 
+                      Infinity,
+    max_spl_cont_db_1m: safeNum(resolvedMeta?.max_spl_cont_db_1m) || 
+                        safeNum(resolvedMeta?.max_spl) || 
+                        null,
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 2: Compute capped 1m SPL capability (same as SPL Calculator)
+  // ─────────────────────────────────────────────────────────────────────────
+  const { spl1m_capability } = getSPL1mCapability(effectiveMeta, powerW);
+  
+  if (spl1m_capability === null) return null;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 3: Calculate 3D distance loss (Room Designer's accurate geometry)
+  // ─────────────────────────────────────────────────────────────────────────
   const dx = speakerPos.x - seatPos.x;
   const dy = speakerPos.y - seatPos.y;
   const dz = (speakerPos.z || 1.2) - (seatPos.z || 1.2);
   
-  const distance = Math.max(0.10, Math.hypot(dx, dy, dz)); // 10cm floor to avoid infinity
-  
-  // SPL calculation
-  const spl = sensitivity_dB_1w1m + 10 * Math.log10(powerW) - 20 * Math.log10(distance);
+  const distance = Math.max(0.10, Math.hypot(dx, dy, dz)); // 10cm floor
+  const distanceLoss = 20 * Math.log10(Math.max(1, distance)); // Floor at 1m for log
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 4: Apply all losses to the CAPPED 1m capability
+  // ─────────────────────────────────────────────────────────────────────────
+  const spl = spl1m_capability - distanceLoss - (screenLoss_dB || 0) - (eqHeadroom_dB || 0);
   
   return Number.isFinite(spl) ? spl : null;
 }
