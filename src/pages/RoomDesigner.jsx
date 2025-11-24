@@ -518,10 +518,10 @@ function useProjectLoader(
     // 1) No real project yet? Do nothing.
     if (!projectIdState) return;
 
-    // 2) Skip if hydrating
+    // 2) Skip while hydrating from cloud
     if (isHydratingRef.current) {
-        setAutosaveStatus("hydrating");
-        return;
+      setAutosaveStatus("hydrating");
+      return;
     }
 
     if (debounceTimeoutRef.current) {
@@ -530,18 +530,32 @@ function useProjectLoader(
 
     setAutosaveStatus("dirty");
 
+    // Seats & layout – take from appState if available, otherwise fall back
+    const seatingPositionsToSave =
+      appState?.seatingPositions && Array.isArray(appState.seatingPositions)
+        ? appState.seatingPositions
+        : seatingPositions;
+
+    const seatsPerRowByRowToSave =
+      appState?.seatsPerRowByRow && Array.isArray(appState.seatsPerRowByRow)
+        ? appState.seatsPerRowByRow
+        : seatsPerRowByRow;
+
     debounceTimeoutRef.current = setTimeout(async () => {
       try {
         const projectData = serializeProject({
-          // Pass plain objects/arrays
+          // Room + geometry
           roomDims: appState.roomDims,
           dimensions,
           screen,
-          seatingPositions,
+          seatingPositions: seatingPositionsToSave,
+          seatsPerRowByRow: seatsPerRowByRowToSave,
+          rowSpacingM,
+
+          // Layout + content
           placedSpeakers,
           roomElements,
           overlays,
-          projectName: projectNameState,
           dolbyLayout: dolbyPreset,
           frozenTabs,
           sevenBedLayoutType,
@@ -549,8 +563,13 @@ function useProjectLoader(
           rearSubsCfg,
           lcrAimMode,
           enableFrontWides,
-          selectedSpeakersByRole: appState.selectedSpeakersByRole,
+
+          // Speaker / SPL metadata
+          speakerSelections: appState.selectedSpeakersByRole,
           spl_speaker_nodes: appState.speakerNodes,
+          splConfig: appState.splConfig,
+
+          // Overheads / extras
           overheadGlobalModel,
           overheadFrontOverride,
           overheadMidOverride,
@@ -558,33 +577,32 @@ function useProjectLoader(
           useFrontGlobal,
           useMidGlobal,
           useRearGlobal,
-          rowSpacingM: rowSpacingM,
           screenFrontPlaneM: appState.screenFrontPlaneM,
-          seatsPerRowByRow: seatsPerRowByRow,
-          splConfig: appState.splConfig,
+
+          // Name is only used when creating new projects; for updates we strip it
+          name: projectNameState,
         });
 
-        // IMPORTANT:
-        // For existing projects we NEVER let RoomDesigner change
-        // the project name or client name. Those are owned by Projects.
-        if (projectIdState) {
-          delete projectData.name;
-          delete projectData.client_name;
-        }
+        // For existing projects we NEVER change name / client from RoomDesigner
+        delete projectData.name;
+        delete projectData.client_name;
 
-        // Only update existing project, never create new ones
         try {
           await Project.update(projectIdState, projectData);
           setAutosaveStatus("saved");
         } catch (updateErr) {
-          // Check if this is a 404/invalid ID error
-          const errMsg = String(updateErr?.message || updateErr || '');
-          if (errMsg.includes('Invalid id value') || errMsg.includes('Object not found') || errMsg.includes('404')) {
-            console.log('[Project Sync] Stale project ID detected, but keeping it so user can continue working.');
+          const errMsg = String(updateErr?.message || updateErr || "");
+          if (
+            errMsg.includes("Invalid id value") ||
+            errMsg.includes("Object not found") ||
+            errMsg.includes("404")
+          ) {
+            console.log(
+              "[Project Sync] Stale project ID detected, but keeping it so user can continue working."
+            );
             setAutosaveStatus("idle");
-            return; // Exit the autosave gracefully
+            return;
           }
-          // For other errors, re-throw to be caught by outer catch
           throw updateErr;
         }
       } catch (e) {
@@ -592,18 +610,46 @@ function useProjectLoader(
         setAutosaveStatus("error");
       }
     }, 800); // debounceMs
+
     return () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
     };
   }, [
-    projectIdState, projectNameState, dolbyPreset, dimensions, screen, seatingPositions, placedSpeakers,
-    roomElements, overlays, frozenTabs, handleProjectCreated, sevenBedLayoutType, frontSubsCfg, rearSubsCfg, lcrAimMode, enableFrontWides,
-    appState.roomDims, appState.selectedSpeakersByRole, appState.speakerNodes, // NEW dependencies
-    overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
-    useFrontGlobal, useMidGlobal, useRearGlobal,
-    rowSpacingM, appState.screenFrontPlaneM, seatsPerRowByRow // Add screenFrontPlaneM and seatsPerRowByRow to dependencies
+    projectIdState,
+    projectNameState,
+    dolbyPreset,
+    dimensions,
+    screen,
+    seatingPositions,
+    seatsPerRowByRow,
+    placedSpeakers,
+    roomElements,
+    overlays,
+    frozenTabs,
+    sevenBedLayoutType,
+    frontSubsCfg,
+    rearSubsCfg,
+    lcrAimMode,
+    enableFrontWides,
+    rowSpacingM,
+    // appState-derived bits
+    appState.roomDims,
+    appState.seatingPositions,
+    appState.seatsPerRowByRow,
+    appState.selectedSpeakersByRole,
+    appState.speakerNodes,
+    appState.splConfig,
+    appState.screenFrontPlaneM,
+    // overheads
+    overheadGlobalModel,
+    overheadFrontOverride,
+    overheadMidOverride,
+    overheadRearOverride,
+    useFrontGlobal,
+    useMidGlobal,
+    useRearGlobal,
   ]);
 
   // Boot logic: run ONCE – either load a project or initialise defaults
@@ -650,17 +696,33 @@ function useProjectLoader(
 
   const manualSaveProject = useCallback(async () => {
     setAutosaveStatus("saving");
+
+    // Seats & layout – same logic as autosave
+    const seatingPositionsToSave =
+      appState?.seatingPositions && Array.isArray(appState.seatingPositions)
+        ? appState.seatingPositions
+        : seatingPositions;
+
+    const seatsPerRowByRowToSave =
+      appState?.seatsPerRowByRow && Array.isArray(appState.seatsPerRowByRow)
+        ? appState.seatsPerRowByRow
+        : seatsPerRowByRow;
+
     try {
       const projectData = serializeProject({
-        // Pass plain objects/arrays
+        // Room + geometry
         roomDims: appState.roomDims,
         dimensions,
         screen,
-        seatingPositions,
+        seatingPositions: seatingPositionsToSave,
+        seatsPerRowByRow: seatsPerRowByRowToSave,
+        rowSpacingM,
+        screenFrontPlaneM: appState.screenFrontPlaneM,
+
+        // Layout + content
         placedSpeakers,
         roomElements,
         overlays,
-        projectName: projectNameState,
         dolbyLayout: dolbyPreset,
         frozenTabs,
         sevenBedLayoutType,
@@ -668,8 +730,13 @@ function useProjectLoader(
         rearSubsCfg,
         lcrAimMode,
         enableFrontWides,
-        selectedSpeakersByRole: appState.selectedSpeakersByRole,
+
+        // Speaker / SPL metadata
+        speakerSelections: appState.selectedSpeakersByRole,
         spl_speaker_nodes: appState.speakerNodes,
+        splConfig: appState.splConfig,
+
+        // Overheads / extras
         overheadGlobalModel,
         overheadFrontOverride,
         overheadMidOverride,
@@ -677,46 +744,61 @@ function useProjectLoader(
         useFrontGlobal,
         useMidGlobal,
         useRearGlobal,
-        rowSpacingM: rowSpacingM,
-        screenFrontPlaneM: appState.screenFrontPlaneM,
-        seatsPerRowByRow: seatsPerRowByRow,
-        splConfig: appState.splConfig,
+
+        // Name is used ONLY when creating a brand new project
+        name: projectNameState,
       });
 
       let savedProject;
+
       if (projectIdState) {
         // Do not let manual "Save Project" rename an existing project
         delete projectData.name;
         delete projectData.client_name;
-        
+
         try {
           savedProject = await Project.update(projectIdState, projectData);
         } catch (updateErr) {
-          // Check if this is a 404/invalid ID error
-          const errMsg = String(updateErr?.message || updateErr || '');
-          if (errMsg.includes('Invalid id value') || errMsg.includes('Object not found') || errMsg.includes('404')) {
-            console.log('[Project Sync] Stale project ID detected during manual save, clearing.');
-            if (typeof window !== 'undefined' && window.__APPSTATE__?.clearActiveProject) {
+          const errMsg = String(updateErr?.message || updateErr || "");
+          if (
+            errMsg.includes("Invalid id value") ||
+            errMsg.includes("Object not found") ||
+            errMsg.includes("404")
+          ) {
+            console.log(
+              "[Project Sync] Stale project ID detected during manual save, clearing."
+            );
+            if (
+              typeof window !== "undefined" &&
+              window.__APPSTATE__?.clearActiveProject
+            ) {
               window.__APPSTATE__.clearActiveProject();
             }
             setProjectIdState(null);
             setAutosaveStatus("idle");
-            return { success: false, error: "Selected project no longer exists in cloud. Continuing to work locally." };
+            return {
+              success: false,
+              error:
+                "Selected project no longer exists in cloud. Continuing to work locally.",
+            };
           }
           throw updateErr;
         }
       } else {
+        // First time save: create a new project in Base44
         savedProject = await Project.create(projectData);
       }
 
       if (savedProject) {
         setAutosaveStatus("saved");
+
         if (!projectIdState) {
           const newProjectId = savedProject.id;
-            if (newProjectId) {
-              handleProjectCreated(newProjectId);
-            }
+          if (newProjectId) {
+            handleProjectCreated(newProjectId);
           }
+        }
+
         return { success: true };
       } else {
         setAutosaveStatus("error");
@@ -729,12 +811,40 @@ function useProjectLoader(
       return { success: false, error: e.message };
     }
   }, [
-    projectIdState, projectNameState, dolbyPreset, dimensions, screen, seatingPositions, placedSpeakers,
-    roomElements, overlays, frozenTabs, handleProjectCreated, sevenBedLayoutType, frontSubsCfg, rearSubsCfg, lcrAimMode, enableFrontWides,
-    appState.roomDims, appState.selectedSpeakersByRole, appState.speakerNodes, // NEW dependencies
-    overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
-    useFrontGlobal, useMidGlobal, useRearGlobal,
-    rowSpacingM, appState.screenFrontPlaneM, seatsPerRowByRow // Add screenFrontPlaneM and seatsPerRowByRow to dependencies
+    projectIdState,
+    projectNameState,
+    dolbyPreset,
+    dimensions,
+    screen,
+    seatingPositions,
+    seatsPerRowByRow,
+    placedSpeakers,
+    roomElements,
+    overlays,
+    frozenTabs,
+    sevenBedLayoutType,
+    frontSubsCfg,
+    rearSubsCfg,
+    lcrAimMode,
+    enableFrontWides,
+    rowSpacingM,
+    handleProjectCreated,
+    // appState-driven bits
+    appState.roomDims,
+    appState.seatingPositions,
+    appState.seatsPerRowByRow,
+    appState.selectedSpeakersByRole,
+    appState.speakerNodes,
+    appState.splConfig,
+    appState.screenFrontPlaneM,
+    // overheads
+    overheadGlobalModel,
+    overheadFrontOverride,
+    overheadMidOverride,
+    overheadRearOverride,
+    useFrontGlobal,
+    useMidGlobal,
+    useRearGlobal,
   ]);
 
   return {
