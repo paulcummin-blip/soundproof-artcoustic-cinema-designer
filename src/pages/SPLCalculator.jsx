@@ -61,6 +61,50 @@ function safeNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 
+// Legacy helper for 1m SPL capability, used by speaker list rendering.
+// Main seat SPL is now computed by computeSingleSeatSplAtDistance, but we
+// keep this here so any remaining calls don't crash.
+function getSPL1mCapability(speaker, ampPower_W) {
+  if (!speaker || !ampPower_W) return null;
+
+  const sens =
+    Number(
+      speaker.sensitivity_db_1w_1m ??
+        speaker.sensitivity ??
+        speaker.sensitivity_db_2v83_1m
+    ) || 0;
+
+  // Use whichever power field is available as the speaker's limit
+  const speakerMaxPower =
+    speaker.power_handling_w ?? speaker.max_power ?? ampPower_W;
+
+  const pAvailable = Math.min(ampPower_W, speakerMaxPower);
+
+  if (!sens || !pAvailable || !Number.isFinite(pAvailable)) {
+    return null;
+  }
+
+  const splAmpLimited = sens + 10 * Math.log10(pAvailable);
+
+  // Continuous 1 m cap if present
+  const hardCap =
+    speaker.max_spl_cont_db_1m ??
+    speaker.max_spl ??
+    null;
+
+  const spl1m =
+    hardCap != null ? Math.min(splAmpLimited, hardCap) : splAmpLimited;
+
+  return spl1m;
+}
+
+// Legacy helper for distance loss, used by speaker list rendering
+function getDistanceLoss(speaker, distance_m) {
+  if (!Number.isFinite(distance_m) || distance_m <= 0) return { loss: 0, model: "Unknown" };
+  const loss = 20 * Math.log10(Math.max(1, distance_m));
+  return { loss, model: "Point" };
+}
+
 // Helper to safely parse positive watts
 function nW(v) {
   const n = Number(v);
