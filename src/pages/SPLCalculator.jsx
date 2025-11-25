@@ -393,7 +393,7 @@ function Button({ children, onClick, disabled, tone = "dark", title, className =
     padding: "10px 14px",
     borderRadius: 10,
     border: `1px solid ${disabled ? BRAND.border : bg}`,
-    background: disabled ? "#A0A0A0" : bg,
+    background: disabled ? "#625143" : bg,
     color: BRAND.btnText,
     cursor: disabled ? "not-allowed" : "pointer",
     fontSize: 14,
