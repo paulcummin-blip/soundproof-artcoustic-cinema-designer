@@ -1,9 +1,8 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
-import { useProjectActions, useActiveProjectId } from "@/components/state/project-session";
+import { useActiveProjectId } from "@/components/state/project-session";
 import { artcousticSpeakers } from "@/components/data/speakerData";
 import { useRoomDimensions } from "@/components/hooks/useRoomDimensions";
-import { createPageUrl } from "@/utils"; // Fixed import path
 
 // ---- brand palette ----
 const BRAND = {
@@ -519,7 +518,6 @@ const ARTCOUSTIC_LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1
 
 export default function SPLCalculatorPage() {
   const activeId = useActiveProjectId();
-  const { setSummaryFor, mergeSummary } = useProjectActions();
 
   // Use shared room dimensions hook (read-only mode - no setDims needed)
   const { 
@@ -695,18 +693,6 @@ export default function SPLCalculatorPage() {
     return false;
   }, [art, artBaseline, comparators, P]);
 
-
-  // Use in Project
-  function handleUseInProject(kind) {
-    if (!activeId || !art) return alert("Open or create a Project first.");
-    const patch =
-      kind === "LCR"
-        ? { lcrModel: `${art.brand} ${art.model}`, dolbyLayout: undefined }
-        : { surroundModel: `${art.brand} ${art.model}` };
-    if (typeof setSummaryFor === "function") setSummaryFor(activeId, patch);
-    else if (typeof mergeSummary === "function") mergeSummary(patch);
-    alert(`${kind} set to ${art.brand} ${art.model} for project ${activeId}.`);
-  }
 
   // Export PDF handler
   function handleExportPdf() {
@@ -1022,12 +1008,6 @@ export default function SPLCalculatorPage() {
                 );
               })}
             </div>
-          </div>
-
-          {/* Use in Project */}
-          <div style={{ display: "flex", gap: 8, marginTop: 16 }} className="no-print">
-            <Button onClick={() => handleUseInProject("LCR")} title="Set primary as LCR in active project">Use in Project (LCR)</Button>
-            <Button onClick={() => handleUseInProject("SUR")} title="Set primary as Surrounds in active project">Use in Project (Surrounds)</Button>
           </div>
         </div>
 
