@@ -1084,12 +1084,37 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs text-[#625143]">EQ Headroom (All)</Label>
-          <EqHeadroomSelector
-            value={splConfig?.globalEqHeadroomDb || 0}
-            onChange={(eqHeadroomDb) => updateGlobalSpl?.({ globalEqHeadroomDb: eqHeadroomDb })}
-            disabled={disabled}
-          />
+          <Label className="text-xs text-[#625143]">Radiation Mode</Label>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode ? 'default' : 'outline'}
+              className={
+                splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode
+                  ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                  : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+              }
+              onClick={() => updateGlobalSpl?.({ radiationMode: 'half-space' })}
+              disabled={disabled}
+            >
+              Half-Space
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={splConfig?.radiationMode === 'anechoic' ? 'default' : 'outline'}
+              className={
+                splConfig?.radiationMode === 'anechoic'
+                  ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                  : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+              }
+              onClick={() => updateGlobalSpl?.({ radiationMode: 'anechoic' })}
+              disabled={disabled}
+            >
+              Anechoic
+            </Button>
+          </div>
         </div>
       </div>
 
