@@ -599,101 +599,91 @@ export default function SPLCalculatorPage() {
   // Reference playback level
   const referencePlaybackLevel = getReferencePlaybackLevel(volume_m3);
 
-  // Artcoustic computations with amplifier power
-  const artBaseline = useMemo(() => {
-    if (!art) return null;
-    return getSPL1mCapability(art, P);
-  }, [art, P]);
+  // Use unified SPL engine for Artcoustic speaker
+  const artCalculatedSpl = useMemo(() => {
+    if (!art || !d || !P) return null;
+    return computeSingleSeatSplAtDistance({
+      speakerModelId: art.id,
+      distance_m: d,
+      powerW: P,
+      radiationMode,
+      screenLoss_dB: screenLossDb,
+      eqHeadroom_dB: 0,
+    });
+  }, [art, d, P, radiationMode, screenLossDb]);
 
-  const artDistanceLoss = useMemo(() => {
-    if (!art || !d) return null;
-    // Point source: 6 dB per doubling (20 * log10)
-    const loss = 20 * Math.log10(Math.max(1, d));
-    return { loss, model: "Point" };
-  }, [art, d]);
+  const artSPL_RSP = artCalculatedSpl?.spl_continuous_db_at_seat !== null
+    ? roundUpHalf(artCalculatedSpl.spl_continuous_db_at_seat)
+    : null;
 
-  // Derive offset from radiation mode
-  const radiationOffset_dB = radiationMode === 'anechoic' ? 6 : 0;
+  const artPeakSplAtSeat = artCalculatedSpl?.spl_peak_cf6_db_at_seat !== null
+    ? roundUpHalf(artCalculatedSpl.spl_peak_cf6_db_at_seat)
+    : null;
 
-  const artSPL_RSP_raw = useMemo(() => {
-    if (!artBaseline || artBaseline.value === null || !artDistanceLoss || artDistanceLoss.loss === null) {
-      return null;
-    }
-    // Apply radiation mode offset
-    return artBaseline.value - screenLossDb - artDistanceLoss.loss - radiationOffset_dB;
-  }, [artBaseline, artDistanceLoss, screenLossDb, radiationOffset_dB]);
-
-  const artSPL_RSP = useMemo(() => {
-    return roundUpHalf(artSPL_RSP_raw);
-  }, [artSPL_RSP_raw]);
-
-  // Collect issues for mini report (now includes amp power)
+  // Collect issues for mini report
   const allIssues = useMemo(() => {
     const issues = [];
     
     // Check Artcoustic speaker
-    if (art) {
-      const group = mode === "LCR" ? "screen" : "non-screen";
-      issues.push(...detectIssues(art, group, artBaseline, artDistanceLoss, screenLossDb, d, P, radiationOffset_dB));
-    }
-    
-    // Check comparators
-    comparators.forEach((c, idx) => {
-      if (!c.brand && !c.model) return;
+    if (art && artCalculatedSpl) {
+      const targetL1 = mode === "LCR" ? 102 : 99;
+      const splAtSeat = artCalculatedSpl.spl_continuous_db_at_seat;
       
-      const compSpeaker = {
-        brand: c.brand,
-        model: c.model,
-        sensitivity: safeNum(c.sensitivity),
-        sensitivity_db_1w_1m: c.sensUnit === "1W@1m" ? safeNum(c.sensitivity) : null,
-        sensitivity_db_2v83_1m: c.sensUnit === "2.83V@1m" ? safeNum(c.sensitivity) : null,
-        impedance_ohm: safeNum(c.nominalOhms),
-        max_power: safeNum(c.max_power),
-        power_handling_w: safeNum(c.max_power),
-        rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m),
-      };
+      if (splAtSeat !== null && splAtSeat < targetL1) {
+        issues.push(`${art.brand} ${art.model}: insufficient continuous SPL for Level 1 (${splAtSeat.toFixed(1)} dB < ${targetL1} dB)`);
+      }
       
-      const compBaseline = getSPL1mCapability(compSpeaker, P);
-      // Point source distance loss
-      const compDistLoss = d ? { loss: 20 * Math.log10(Math.max(1, d)), model: "Point" } : null;
-      const group = mode === "LCR" ? "screen" : "non-screen";
-      
-      issues.push(...detectIssues(compSpeaker, group, compBaseline, compDistLoss, screenLossDb, d, P, radiationOffset_dB));
-    });
-    
-    return issues;
-  }, [art, artBaseline, artDistanceLoss, comparators, mode, screenLossDb, d, P, radiationOffset_dB]);
-
-  // Detect if any speaker uses non-RP1 data (updated to use getSPL1mCapability)
-  const hasNonRp1 = useMemo(() => {
-    // Check Artcoustic
-    if (art && artBaseline && !artBaseline.isVerified) {
-      return true;
-    }
-    
-    // Check comparators
-    for (const c of comparators) {
-      if (!c.brand && !c.model) continue;
-      
-      const compSpeaker = {
-        brand: c.brand,
-        model: c.model,
-        sensitivity_db_1w_1m: c.sensUnit === "1W@1m" ? safeNum(c.sensitivity) : null,
-        sensitivity_db_2v83_1m: c.sensUnit === "2.83V@1m" ? safeNum(c.sensitivity) : null,
-        impedance_ohm: safeNum(c.nominalOhms),
-        max_power: safeNum(c.max_power),
-        power_handling_w: safeNum(c.max_power),
-        rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m),
-      };
-      
-      const compBaseline = getSPL1mCapability(compSpeaker, P);
-      if (compBaseline && !compBaseline.isVerified) {
-        return true;
+      const powerHandling = safeNum(art.power_handling_w || art.max_power);
+      if (Number.isFinite(P) && Number.isFinite(powerHandling) && P > powerHandling) {
+        issues.push(`${art.brand} ${art.model}: amplifier power (${Math.ceil(P)} W) exceeds speaker max (${Math.ceil(powerHandling)} W)`);
       }
     }
     
-    return false;
-  }, [art, artBaseline, comparators, P]);
+    // Check comparators
+    comparators.forEach((c) => {
+      if (!c.brand && !c.model) return;
+
+      let sens_1W = null;
+      if (c.sensUnit === "1W@1m") {
+        sens_1W = safeNum(c.sensitivity);
+      } else if (c.sensUnit === "2.83V@1m") {
+        const sens2p83V = safeNum(c.sensitivity);
+        const impedanceOhm = safeNum(c.nominalOhms) || 8;
+        if (sens2p83V !== null) {
+          sens_1W = convert2p83VTo1W(sens2p83V, impedanceOhm);
+        }
+      }
+
+      const compCalculatedSpl = computeSingleSeatSplAtDistance({
+        speakerModelId: null,
+        distance_m: d,
+        powerW: P,
+        radiationMode,
+        screenLoss_dB: screenLossDb,
+        eqHeadroom_dB: 0,
+        speakerMeta: {
+          sensitivity_db_1w_1m: sens_1W,
+          power_handling_w: safeNum(c.max_power),
+          max_power: safeNum(c.max_power),
+          max_spl_cont_db_1m: safeNum(c.max_spl_1m),
+        }
+      });
+
+      const targetL1 = mode === "LCR" ? 102 : 99;
+      const splAtSeat = compCalculatedSpl?.spl_continuous_db_at_seat;
+
+      if (splAtSeat !== null && splAtSeat < targetL1) {
+        issues.push(`${c.brand} ${c.model}: insufficient continuous SPL for Level 1 (${splAtSeat.toFixed(1)} dB < ${targetL1} dB)`);
+      }
+
+      const powerHandling = safeNum(c.max_power);
+      if (Number.isFinite(P) && Number.isFinite(powerHandling) && P > powerHandling) {
+        issues.push(`${c.brand} ${c.model}: amplifier power (${Math.ceil(P)} W) exceeds speaker max (${Math.ceil(powerHandling)} W)`);
+      }
+    });
+    
+    return issues;
+  }, [art, artCalculatedSpl, comparators, mode, d, P, radiationMode, screenLossDb]);
 
 
   // Export PDF handler
@@ -834,14 +824,19 @@ export default function SPLCalculatorPage() {
               <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, background: BRAND.panel, padding: 6, maxHeight: 320, overflowY: 'auto' }} className="no-print">
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {artcousticVisible.map((opt) => {
-                    const optBaseline = getSPL1mCapability(opt, P); // Use getSPL1mCapability
-                    const optDistLoss = getDistanceLoss(opt, d || 3);
-                    const optSPL_RSP_raw = (optBaseline?.value !== null && optDistLoss?.loss !== null)
-                      ? optBaseline.value - screenLossDb - optDistLoss.loss - radiationOffset_dB
+                    const optCalculatedSpl = computeSingleSeatSplAtDistance({
+                      speakerModelId: opt.id,
+                      distance_m: d || 3,
+                      powerW: P,
+                      radiationMode,
+                      screenLoss_dB: screenLossDb,
+                      eqHeadroom_dB: 0,
+                    });
+                    const optSPL_RSP = optCalculatedSpl?.spl_continuous_db_at_seat !== null
+                      ? roundUpHalf(optCalculatedSpl.spl_continuous_db_at_seat)
                       : null;
-                    const optSPL_RSP = roundUpHalf(optSPL_RSP_raw);
 
-                    const targetDb = mode === "LCR" ? RP22.LCR.levels[1].db : RP22.SUR.levels[1].db; // Use L2 for color indication
+                    const targetDb = mode === "LCR" ? RP22.LCR.levels[1].db : RP22.SUR.levels[1].db;
                     const status = optSPL_RSP !== null ? rp22ColourStatus(optSPL_RSP, targetDb) : "neutral";
                     const statusColor = status === 'green' ? BRAND.green : status === 'gold' ? BRAND.gold : BRAND.red;
 
@@ -1050,6 +1045,11 @@ export default function SPLCalculatorPage() {
               </div>
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                 {artSPL_RSP !== null ? `${artSPL_RSP.toFixed(1)} dB(C)` : "—"}
+                {artPeakSplAtSeat !== null && (
+                  <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
+                    Peak (CF6): {artPeakSplAtSeat.toFixed(1)} dB
+                  </div>
+                )}
               </div>
               <div style={{ padding: 10, border: `2px solid ${BRAND.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {artSPL_RSP !== null ? (
@@ -1066,37 +1066,30 @@ export default function SPLCalculatorPage() {
               </div>
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                 {(() => {
-                  if (!art || !artDistanceLoss) return "—";
-                  const achievable = getAchievableLevels(art, mode === "LCR", screenLossDb, artDistanceLoss.loss, radiationOffset_dB);
-                  const highest = achievable.length > 0 ? achievable[achievable.length - 1].level : null;
-                  
-                  if (achievable.length === 0) {
-                    // Check if we can compute but just can't achieve
-                    const targetL1Db = (mode === "LCR" ? RP22.LCR : RP22.SUR).levels[0].db;
-                    const requiredL1 = computeRequiredPowerForLevel(
-                      art, 
-                      targetL1Db,
-                      screenLossDb, 
-                      artDistanceLoss.loss,
-                      radiationOffset_dB
-                    );
-                    if (requiredL1 !== null) {
-                      return <div>Level 1 not achieved</div>;
+                  const artSplCont = artCalculatedSpl?.spl_continuous_db_at_seat;
+                  if (artSplCont === null) return "—";
+
+                  const achievable = [];
+                  for (const level of (mode === "LCR" ? RP22.LCR.levels : RP22.SUR.levels)) {
+                    if (artSplCont >= level.db) {
+                      achievable.push(level.key);
                     }
-                    return "—";
                   }
-                  
+
+                  if (achievable.length === 0) {
+                    return <div>Level 1 not achieved</div>;
+                  }
+
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {achievable.map(({ level, power }) => {
-                        const isHighest = level === highest;
-                        const label = `${level} requires ${formatPower(power)}`;
+                      {achievable.map((level) => {
+                        const isHighest = level === achievable[achievable.length - 1];
                         return (
                           <div
                             key={level}
                             style={isHighest ? { color: '#213428', textTransform: 'uppercase', fontWeight: 600 } : undefined}
                           >
-                            {label}
+                            {level} Achieved
                           </div>
                         );
                       })}
@@ -1108,7 +1101,7 @@ export default function SPLCalculatorPage() {
 
             {/* Comparator rows */}
             {comparators.map((c, idx) => {
-              // Step 1: Compute display sensitivity
+              // Convert 2.83V sensitivity to 1W if needed
               let sens_1W_display = null;
               let sens_1W_for_calc = null;
               
@@ -1120,41 +1113,33 @@ export default function SPLCalculatorPage() {
                 const impedanceOhm = safeNum(c.nominalOhms) || 8;
                 if (sens2p83V !== null) {
                   sens_1W_for_calc = convert2p83VTo1W(sens2p83V, impedanceOhm);
-                  sens_1W_display = sens2p83V; // Display 2.83V value
+                  sens_1W_display = sens2p83V;
                 }
               }
 
-              // Step 2: Build speaker object
-              const compSpeaker = {
-                brand: c.brand,
-                model: c.model,
-                sensitivity_db_1w_1m: sens_1W_for_calc,
-                sensitivity_db_2v83_1m: c.sensUnit === "2.83V@1m" ? safeNum(c.sensitivity) : null,
-                impedance_ohm: safeNum(c.nominalOhms),
-                max_power: safeNum(c.max_power),
-                power_handling_w: safeNum(c.max_power),
-                rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m),
-              };
+              // Compute SPL using unified engine
+              const compCalculatedSpl = computeSingleSeatSplAtDistance({
+                speakerModelId: null,
+                distance_m: d,
+                powerW: P,
+                radiationMode,
+                screenLoss_dB: screenLossDb,
+                eqHeadroom_dB: 0,
+                speakerMeta: {
+                  sensitivity_db_1w_1m: sens_1W_for_calc,
+                  power_handling_w: safeNum(c.max_power),
+                  max_power: safeNum(c.max_power),
+                  max_spl_cont_db_1m: safeNum(c.max_spl_1m),
+                }
+              });
 
-              // Step 3: Compute SPL capability with amp power
-              const compBaseline = getSPL1mCapability(compSpeaker, P);
-              const compDistLoss = d ? { loss: 20 * Math.log10(Math.max(1, d)), model: "Point" } : null;
-              
-              // Apply EQ headroom deduction
-              const compSPL_RSP_raw = (compBaseline?.value !== null && compDistLoss?.loss !== null)
-                ? compBaseline.value - screenLossDb - compDistLoss.loss - eqHeadroom_dB
+              const compSPL_RSP = compCalculatedSpl?.spl_continuous_db_at_seat !== null
+                ? roundUpHalf(compCalculatedSpl.spl_continuous_db_at_seat)
                 : null;
-              const compSPL_RSP = roundUpHalf(compSPL_RSP_raw);
               const compRP22Level = compSPL_RSP !== null ? getRP22Level(compSPL_RSP, mode === "LCR").label : "—";
 
               const compPowerHandling = safeNum(c.max_power);
               const compAmpExceeds = Number.isFinite(P) && Number.isFinite(compPowerHandling) && compPowerHandling > 0 && P > compPowerHandling;
-
-              // Compute achievable levels with radiation offset
-              const achievableLevels = compDistLoss 
-                ? getAchievableLevels(compSpeaker, mode === "LCR", screenLossDb, compDistLoss.loss, radiationOffset_dB)
-                : [];
-              const highestLevel = achievableLevels.length > 0 ? achievableLevels[achievableLevels.length - 1].level : null;
 
               return (
                 <div key={idx} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1.5fr", gap: 8, marginTop: 8, alignItems: "stretch" }}>
@@ -1177,6 +1162,11 @@ export default function SPLCalculatorPage() {
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {compSPL_RSP !== null ? `${compSPL_RSP.toFixed(1)} dB(C)` : "—"}
+                    {compCalculatedSpl?.spl_peak_cf6_db_at_seat !== null && (
+                      <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
+                        Peak (CF6): {roundUpHalf(compCalculatedSpl.spl_peak_cf6_db_at_seat).toFixed(1)} dB
+                      </div>
+                    )}
                   </div>
                   <div style={{ padding: 10, border: `2px solid ${BRAND.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {compRP22Level !== "—" ? (
@@ -1193,34 +1183,30 @@ export default function SPLCalculatorPage() {
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {(() => {
-                      if (!compDistLoss) return "—";
-                      
-                      if (achievableLevels.length === 0) {
-                        const targetL1Db = (mode === "LCR" ? RP22.LCR : RP22.SUR).levels[0].db;
-                        const requiredL1 = computeRequiredPowerForLevel(
-                          compSpeaker, 
-                          targetL1Db,
-                          screenLossDb, 
-                          compDistLoss.loss,
-                          radiationOffset_dB
-                        );
-                        if (requiredL1 !== null) {
-                          return <div>Level 1 not achieved</div>;
+                      const compSplCont = compCalculatedSpl?.spl_continuous_db_at_seat;
+                      if (compSplCont === null) return "—";
+
+                      const achievable = [];
+                      for (const level of (mode === "LCR" ? RP22.LCR.levels : RP22.SUR.levels)) {
+                        if (compSplCont >= level.db) {
+                          achievable.push(level.key);
                         }
-                        return "—";
                       }
-                      
+
+                      if (achievable.length === 0) {
+                        return <div>Level 1 not achieved</div>;
+                      }
+
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {achievableLevels.map(({ level, power }) => {
-                            const isHighest = level === highestLevel;
-                            const label = `${level} requires ${formatPower(power)}`;
+                          {achievable.map((level) => {
+                            const isHighest = level === achievable[achievable.length - 1];
                             return (
                               <div
                                 key={level}
                                 style={isHighest ? { color: '#213428', textTransform: 'uppercase', fontWeight: 600 } : undefined}
                               >
-                                {label}
+                                {level} Achieved
                               </div>
                             );
                           })}
