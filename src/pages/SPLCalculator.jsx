@@ -956,25 +956,24 @@ export default function SPLCalculatorPage() {
                   rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m),
                 };
 
-                // Step 3: Compute SPL capability with amp power
-                const compBaseline = getSPL1mCapability(compSpeaker, P);
-                const compDistLoss = d ? { loss: 20 * Math.log10(Math.max(1, d)), model: "Point" } : null;
+                // Compute SPL using unified engine (for the input form speaker list)
+                const optCalculatedSpl = computeSingleSeatSplAtDistance({
+                  speakerModelId: null,
+                  distance_m: d || 3,
+                  powerW: P,
+                  radiationMode,
+                  screenLoss_dB: screenLossDb,
+                  eqHeadroom_dB: 0,
+                  speakerMeta: compSpeaker
+                });
                 
-                // Apply radiation mode offset
-                const compSPL_RSP_raw = (compBaseline?.value !== null && compDistLoss?.loss !== null)
-                  ? compBaseline.value - screenLossDb - compDistLoss.loss - radiationOffset_dB
+                const compSPL_RSP = (optCalculatedSpl?.spl_continuous_db_at_seat ?? null) !== null
+                  ? roundUpHalf(optCalculatedSpl.spl_continuous_db_at_seat)
                   : null;
-                const compSPL_RSP = roundUpHalf(compSPL_RSP_raw);
                 const compRP22Level = compSPL_RSP !== null ? getRP22Level(compSPL_RSP, mode === "LCR").label : "—";
 
                 const compPowerHandling = safeNum(c.max_power);
                 const compAmpExceeds = Number.isFinite(P) && Number.isFinite(compPowerHandling) && compPowerHandling > 0 && P > compPowerHandling;
-
-                // Compute achievable levels with radiation offset
-                const achievableLevels = compDistLoss 
-                  ? getAchievableLevels(compSpeaker, mode === "LCR", screenLossDb, compDistLoss.loss, radiationOffset_dB)
-                  : [];
-                const highestLevel = achievableLevels.length > 0 ? achievableLevels[achievableLevels.length - 1].level : null;
 
                 return (
                   <div key={idx} style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, padding: 12 }}>
