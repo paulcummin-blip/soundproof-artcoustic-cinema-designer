@@ -1,7 +1,5 @@
-
 import React, { useMemo, useState, useCallback, useEffect } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
-import { useProjectActions, useActiveProjectId } from "@/components/state/project-session";
 
 // ---- brand palette ----
 const BRAND = {
@@ -275,8 +273,6 @@ function ResultTile({ label, valueText, valueNum, targetNum }) {
 }
 
 export default function SPLCalculatorV2Page() {
-  const activeId = useActiveProjectId();
-  const { setSummaryFor, mergeSummary } = useProjectActions();
 
   // Global Show Prices toggle (hidden by default)
   const [showPrices, setShowPrices] = useState(false);
@@ -382,18 +378,6 @@ export default function SPLCalculatorV2Page() {
     const wattsAt2p83V = (volts * volts) / Z;
     const delta = 10 * Math.log10(wattsAt2p83V / 1);
     return s - delta;
-  }
-
-  // Use in Project
-  function useInProject(kind) {
-    if (!activeId || !art) return alert("Open or create a Project first.");
-    const patch =
-      kind === "LCR"
-        ? { lcrModel: `${art.brand} ${art.model}`, dolbyLayout: undefined, targetSPL_LCR_dB: target_dB }
-        : { surroundModel: `${art.brand} ${art.model}` };
-    if (typeof setSummaryFor === "function") setSummaryFor(activeId, patch);
-    else if (typeof mergeSummary === "function") mergeSummary(patch);
-    alert(`${kind} set to ${art.brand} ${art.model} for project ${activeId}.`);
   }
 
   // Export (print) current panel
@@ -636,12 +620,6 @@ export default function SPLCalculatorV2Page() {
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Use in Project */}
-        <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-          <Button onClick={() => useInProject("LCR")} title="Set primary as LCR in active project">Use in Project (LCR)</Button>
-          <Button onClick={() => useInProject("SUR")} title="Set primary as Surrounds in active project">Use in Project (Surrounds)</Button>
         </div>
       </div>
 
