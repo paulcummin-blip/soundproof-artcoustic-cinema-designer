@@ -2365,6 +2365,13 @@ React.useEffect(() => {
       overheads: seatSplData?.uppers || {},
     };
 
+    // SPL meta: power + radiation mode for HUD caption
+    const splConfig = appState?.splConfig;
+    data.splAtSeatMeta = {
+      powerW: splConfig?.globalPowerW ?? 100,
+      radiationMode: splConfig?.radiationMode ?? 'half-space',
+    };
+
     // Helper: check if speaker has valid position
     const hasPos = s => s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
 
@@ -5086,6 +5093,8 @@ return (
           setHudHiddenWhenPinned={setHudHiddenWhenPinned}
           hudHiddenWhenPinned={hudHiddenWhenPinned}
           renderLevelBadge={renderLevelBadge}
+          splPowerW={tooltipData?.splAtSeatMeta?.powerW}
+          splRadiationMode={tooltipData?.splAtSeatMeta?.radiationMode}
         />
       </div>
     </div>
