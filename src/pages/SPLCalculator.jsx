@@ -3,6 +3,7 @@ import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import { useActiveProjectId } from "@/components/state/project-session";
 import { artcousticSpeakers } from "@/components/data/speakerData";
 import { useRoomDimensions } from "@/components/hooks/useRoomDimensions";
+import { computeSingleSeatSplAtDistance } from "@/components/utils/spl/centralSplEngine";
 
 // ---- brand palette ----
 const BRAND = {
@@ -81,13 +82,11 @@ function convert2p83VTo1W(sens2p83V, impedanceOhm) {
   return sens2p83V - delta;
 }
 
-// Compute SPL at 1m capability considering speaker specs and amplifier power
 // ─────────────────────────────────────────────────────────────────────────────
-// UNIFIED SPL ENGINE — 1m CAPABILITY CAP
-// This function enforces the speaker's physical max SPL limit (max_spl_cont_db_1m)
-// from speakerData.js. The same capping logic should be reused in Room Designer.
+// Legacy SPL functions - replaced by centralSplEngine.computeSingleSeatSplAtDistance
+// Kept here for comparator 2.83V conversion and RP22 level checks only
 // ─────────────────────────────────────────────────────────────────────────────
-function getSPL1mCapability(speaker, ampPower_W) {
+function _LEGACY_getSPL1mCapability(speaker, ampPower_W) {
   const P_amp = nW(ampPower_W);
   const P_spk = nW(speaker.power_handling_w || speaker.max_power);
   
@@ -190,8 +189,8 @@ function getSPL1mCapability(speaker, ampPower_W) {
   };
 }
 
-// Compute distance loss - UNIFIED POINT SOURCE MODEL (6 dB per doubling)
-function getDistanceLoss(speaker, distance_m) {
+// Legacy - no longer used
+function _LEGACY_getDistanceLoss(speaker, distance_m) {
   if (!Number.isFinite(distance_m) || distance_m <= 0) return { loss: 0, model: "Unknown" };
   
   // Point source: 6 dB per doubling (20*log10)
@@ -199,8 +198,8 @@ function getDistanceLoss(speaker, distance_m) {
   return { loss, model: "Point" };
 }
 
-// Helper to compute required power for a given RP22 level
-function computeRequiredPowerForLevel(speaker, targetDb, screenLossDb, distanceLossDb, eqHeadroom_dB = 0) {
+// Legacy - no longer used
+function _LEGACY_computeRequiredPowerForLevel(speaker, targetDb, screenLossDb, distanceLossDb, eqHeadroom_dB = 0) {
   // Get sensitivity in 1W/1m terms
   let sens_1W = safeNum(speaker.sensitivity_db_1w_1m || speaker.sensitivity);
   const sens_2p83V = safeNum(speaker.sensitivity_db_2v83_1m);
@@ -280,8 +279,8 @@ function formatPower(watts) {
   return `${rounded} W`;
 }
 
-// Helper to get achievable RP22 levels for a speaker
-function getAchievableLevels(speaker, isScreen, screenLossDb, distanceLossDb, eqHeadroom_dB = 0) {
+// Legacy - no longer used
+function _LEGACY_getAchievableLevels(speaker, isScreen, screenLossDb, distanceLossDb, eqHeadroom_dB = 0) {
   const powerHandling = safeNum(speaker.power_handling_w || speaker.max_power);
   if (!Number.isFinite(powerHandling) || powerHandling <= 0) return [];
   
@@ -301,8 +300,8 @@ function getAchievableLevels(speaker, isScreen, screenLossDb, distanceLossDb, eq
   return achievable;
 }
 
-// Helper to detect issues for mini report (updated for amp power)
-function detectIssues(speaker, group, baseline, distanceLoss, screenLossDb, distance_m, ampPower_W, eqHeadroom_dB = 0) {
+// Legacy - no longer used
+function _LEGACY_detectIssues(speaker, group, baseline, distanceLoss, screenLossDb, distance_m, ampPower_W, eqHeadroom_dB = 0) {
   const issues = [];
   const targetL1 = group === "screen" ? 102 : 99;
   const label = `${speaker.brand || "Unknown"} ${speaker.model || ""}`.trim();
@@ -1398,7 +1397,6 @@ export default function SPLCalculatorPage() {
             <div>Amplifier Power: {P ? `${Math.ceil(P)} W` : '—'}</div>
             <div>Room Volume: {volume_m3.toFixed(2)} m³</div>
             <div>Calibration: {referencePlaybackLevel} dB(C)</div>
-            <div>Propagation Model: Point Source</div>
           </div>
         </div>
 

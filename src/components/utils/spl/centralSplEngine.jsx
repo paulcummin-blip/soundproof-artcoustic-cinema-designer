@@ -332,3 +332,78 @@ export function getMlpSeat(seats) {
   // Fallback to first seat
   return seats[0];
 }
+
+/**
+ * Compute SPL at a specific distance for a single speaker.
+ * Unifies continuous and peak SPL calculation for both SPL Calculator and Room Designer.
+ * 
+ * @param {Object} params
+ * @param {string} params.speakerModelId - Speaker model ID for lookup in speakerData.js
+ * @param {number} params.distance_m - Listening distance in meters
+ * @param {number} params.powerW - Amplifier power in watts
+ * @param {string} params.radiationMode - 'half-space' or 'anechoic'
+ * @param {number} [params.screenLoss_dB=0] - Screen loss in dB
+ * @param {number} [params.eqHeadroom_dB=0] - EQ headroom in dB
+ * @param {Object} [params.speakerMeta=null] - Pre-resolved speaker metadata (for comparators without IDs)
+ * @returns {Object|null} { spl_continuous_db_at_seat, spl_peak_cf6_db_at_seat, details }
+ */
+export function computeSingleSeatSplAtDistance({
+  speakerModelId,
+  distance_m,
+  powerW,
+  radiationMode,
+  screenLoss_dB = 0,
+  eqHeadroom_dB = 0,
+  speakerMeta = null,
+}) {
+  // 1. Retrieve speaker metadata (lookup or use provided)
+  let resolvedMeta = speakerMeta;
+  if (!resolvedMeta && speakerModelId) {
+    resolvedMeta = findSpeakerData(speakerModelId);
+  }
+  
+  if (!resolvedMeta) return null;
+
+  // Build effective metadata
+  const effectiveMeta = {
+    sensitivity_db_1w_1m: safeNum(resolvedMeta?.sensitivity_db_1w_1m || resolvedMeta?.sensitivity) || 87,
+    power_handling_w: safeNum(resolvedMeta?.power_handling_w || resolvedMeta?.max_power) || Infinity,
+    max_spl_cont_db_1m: safeNum(resolvedMeta?.max_spl_cont_db_1m || resolvedMeta?.max_spl) || null,
+    max_spl_peak_db_cf6_1m: safeNum(resolvedMeta?.max_spl_peak_db_cf6_1m) || null,
+  };
+
+  // 2. Resolve effective sensitivity with radiation mode adjustment
+  const effectiveSensitivity = resolveEffectiveSensitivity(effectiveMeta, { radiationMode });
+
+  // 3. Compute continuous SPL @ 1m (with hard cap)
+  const { spl1m_capability: spl1m_cont } = getSPL1mCapability(effectiveMeta, powerW, effectiveSensitivity);
+
+  // 4. Peak SPL @ 1m (CF6) - direct from spec, not amp-limited
+  const spl1m_peak = effectiveMeta.max_spl_peak_db_cf6_1m;
+
+  // 5. Distance loss (simple 1D for calculator context)
+  const distanceLoss = Number.isFinite(distance_m) && distance_m > 0 
+    ? 20 * Math.log10(distance_m) 
+    : 0;
+
+  // 6. Apply losses to continuous SPL
+  const spl_continuous_db_at_seat = Number.isFinite(spl1m_cont)
+    ? spl1m_cont - distanceLoss - (screenLoss_dB || 0) - (eqHeadroom_dB || 0)
+    : null;
+
+  // 7. Apply losses to peak SPL (no EQ headroom on peak)
+  const spl_peak_cf6_db_at_seat = Number.isFinite(spl1m_peak)
+    ? spl1m_peak - distanceLoss - (screenLoss_dB || 0)
+    : null;
+
+  return {
+    spl_continuous_db_at_seat,
+    spl_peak_cf6_db_at_seat,
+    details: {
+      spl1m_cont,
+      spl1m_peak,
+      effectiveSensitivity,
+      distanceLoss,
+    },
+  };
+}
