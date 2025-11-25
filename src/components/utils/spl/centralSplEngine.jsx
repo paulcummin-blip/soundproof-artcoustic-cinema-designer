@@ -362,7 +362,13 @@ export function computeSingleSeatSplAtDistance({
     resolvedMeta = findSpeakerData(speakerModelId);
   }
   
-  if (!resolvedMeta) return null;
+  if (!resolvedMeta) {
+    return {
+      spl_continuous_db_at_seat: null,
+      spl_peak_cf6_db_at_seat: null,
+      details: null,
+    };
+  }
 
   // Build effective metadata
   const effectiveMeta = {

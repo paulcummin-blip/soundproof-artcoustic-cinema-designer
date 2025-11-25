@@ -612,11 +612,11 @@ export default function SPLCalculatorPage() {
     });
   }, [art, d, P, radiationMode, screenLossDb]);
 
-  const artSPL_RSP = artCalculatedSpl?.spl_continuous_db_at_seat !== null
+  const artSPL_RSP = (artCalculatedSpl?.spl_continuous_db_at_seat ?? null) !== null
     ? roundUpHalf(artCalculatedSpl.spl_continuous_db_at_seat)
     : null;
 
-  const artPeakSplAtSeat = artCalculatedSpl?.spl_peak_cf6_db_at_seat !== null
+  const artPeakSplAtSeat = (artCalculatedSpl?.spl_peak_cf6_db_at_seat ?? null) !== null
     ? roundUpHalf(artCalculatedSpl.spl_peak_cf6_db_at_seat)
     : null;
 
@@ -670,7 +670,7 @@ export default function SPLCalculatorPage() {
       });
 
       const targetL1 = mode === "LCR" ? 102 : 99;
-      const splAtSeat = compCalculatedSpl?.spl_continuous_db_at_seat;
+      const splAtSeat = compCalculatedSpl?.spl_continuous_db_at_seat ?? null;
 
       if (splAtSeat !== null && splAtSeat < targetL1) {
         issues.push(`${c.brand} ${c.model}: insufficient continuous SPL for Level 1 (${splAtSeat.toFixed(1)} dB < ${targetL1} dB)`);
@@ -832,7 +832,7 @@ export default function SPLCalculatorPage() {
                       screenLoss_dB: screenLossDb,
                       eqHeadroom_dB: 0,
                     });
-                    const optSPL_RSP = optCalculatedSpl?.spl_continuous_db_at_seat !== null
+                    const optSPL_RSP = (optCalculatedSpl?.spl_continuous_db_at_seat ?? null) !== null
                       ? roundUpHalf(optCalculatedSpl.spl_continuous_db_at_seat)
                       : null;
 
@@ -1066,7 +1066,7 @@ export default function SPLCalculatorPage() {
               </div>
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                 {(() => {
-                  const artSplCont = artCalculatedSpl?.spl_continuous_db_at_seat;
+                  const artSplCont = artCalculatedSpl?.spl_continuous_db_at_seat ?? null;
                   if (artSplCont === null) return "—";
 
                   const achievable = [];
@@ -1133,7 +1133,7 @@ export default function SPLCalculatorPage() {
                 }
               });
 
-              const compSPL_RSP = compCalculatedSpl?.spl_continuous_db_at_seat !== null
+              const compSPL_RSP = (compCalculatedSpl?.spl_continuous_db_at_seat ?? null) !== null
                 ? roundUpHalf(compCalculatedSpl.spl_continuous_db_at_seat)
                 : null;
               const compRP22Level = compSPL_RSP !== null ? getRP22Level(compSPL_RSP, mode === "LCR").label : "—";
@@ -1162,7 +1162,7 @@ export default function SPLCalculatorPage() {
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {compSPL_RSP !== null ? `${compSPL_RSP.toFixed(1)} dB(C)` : "—"}
-                    {compCalculatedSpl?.spl_peak_cf6_db_at_seat !== null && (
+                    {(compCalculatedSpl?.spl_peak_cf6_db_at_seat ?? null) !== null && (
                       <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
                         Peak (CF6): {roundUpHalf(compCalculatedSpl.spl_peak_cf6_db_at_seat).toFixed(1)} dB
                       </div>
@@ -1183,7 +1183,7 @@ export default function SPLCalculatorPage() {
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {(() => {
-                      const compSplCont = compCalculatedSpl?.spl_continuous_db_at_seat;
+                      const compSplCont = compCalculatedSpl?.spl_continuous_db_at_seat ?? null;
                       if (compSplCont === null) return "—";
 
                       const achievable = [];
