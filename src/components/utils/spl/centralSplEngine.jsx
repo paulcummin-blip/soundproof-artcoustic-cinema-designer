@@ -29,6 +29,28 @@ function safeNum(v) {
 }
 
 /**
+ * Resolve effective sensitivity, applying radiation mode adjustment.
+ * 
+ * @param {Object} speakerMeta - Speaker metadata
+ * @param {Object} effectiveSplInputs - SPL inputs including radiationMode
+ * @returns {number} Effective sensitivity in dB @ 1W/1m
+ */
+function resolveEffectiveSensitivity(speakerMeta, effectiveSplInputs) {
+  // Start from speaker's sensitivity (same resolution as before)
+  let baseSens = safeNum(speakerMeta?.sensitivity_db_1w_1m) || 
+                 safeNum(speakerMeta?.sensitivity) || 
+                 87; // default fallback
+  
+  // Apply radiation mode adjustment
+  const radiationMode = effectiveSplInputs?.radiationMode || 'half-space';
+  if (radiationMode === 'anechoic') {
+    baseSens -= 6; // Anechoic reduces effective sensitivity by 6 dB
+  }
+  
+  return baseSens;
+}
+
+/**
  * Compute 1m SPL capability with the same logic as SPL Calculator.
  * This is the critical function that caps SPL at speaker's physical limits.
  * 
@@ -36,15 +58,17 @@ function safeNum(v) {
  * @param {number} ampPowerW - Amplifier power in watts
  * @returns {Object} { spl1m_capability, method, isVerified }
  */
-function getSPL1mCapability(speakerMeta, ampPowerW) {
-  const P_amp = safeNum(ampPowerW) || 0;
-  const P_spk = safeNum(speakerMeta?.power_handling_w || speakerMeta?.max_power) || Infinity;
-  
-  // Available power is minimum of amp and speaker max
-  const P_available = Math.min(P_amp, P_spk);
-  
-  // Get sensitivity in 1W/1m terms
-  const sens_1W = safeNum(speakerMeta?.sensitivity_db_1w_1m || speakerMeta?.sensitivity);
+function getSPL1mCapability(speakerMeta, ampPowerW, effectiveSensitivity = null) {
+    const P_amp = safeNum(ampPowerW) || 0;
+    const P_spk = safeNum(speakerMeta?.power_handling_w || speakerMeta?.max_power) || Infinity;
+
+    // Available power is minimum of amp and speaker max
+    const P_available = Math.min(P_amp, P_spk);
+
+    // Get sensitivity in 1W/1m terms (use passed-in effective sensitivity if provided)
+    const sens_1W = effectiveSensitivity !== null 
+      ? effectiveSensitivity 
+      : safeNum(speakerMeta?.sensitivity_db_1w_1m || speakerMeta?.sensitivity);
   
   // Compute amp-limited SPL at 1m
   let SPL_1m_amp_limited = null;
@@ -105,6 +129,8 @@ function calculateSplAtPoint({
   speakerMeta = null,
   screenLoss_dB = 0,
   eqHeadroom_dB = 0,
+  // Effective SPL inputs (includes radiationMode)
+  effectiveSplInputs = null,
 }) {
   // Validate positions
   if (!speakerPos || !Number.isFinite(speakerPos.x) || !Number.isFinite(speakerPos.y)) return null;
@@ -133,14 +159,19 @@ function calculateSplAtPoint({
   };
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Step 2: Compute capped 1m SPL capability (same as SPL Calculator)
+  // Step 2: Resolve effective sensitivity (applies radiationMode adjustment)
   // ─────────────────────────────────────────────────────────────────────────
-  const { spl1m_capability } = getSPL1mCapability(effectiveMeta, powerW);
+  const effectiveSensitivity = resolveEffectiveSensitivity(effectiveMeta, effectiveSplInputs);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Step 3: Compute capped 1m SPL capability (same as SPL Calculator)
+  // ─────────────────────────────────────────────────────────────────────────
+  const { spl1m_capability } = getSPL1mCapability(effectiveMeta, powerW, effectiveSensitivity);
   
   if (spl1m_capability === null) return null;
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Step 3: Calculate 3D distance loss (Room Designer's accurate geometry)
+  // Step 4: Calculate 3D distance loss (Room Designer's accurate geometry)
   // ─────────────────────────────────────────────────────────────────────────
   const dx = speakerPos.x - seatPos.x;
   const dy = speakerPos.y - seatPos.y;
@@ -150,7 +181,7 @@ function calculateSplAtPoint({
   const distanceLoss = 20 * Math.log10(Math.max(1, distance)); // Floor at 1m for log
 
   // ─────────────────────────────────────────────────────────────────────────
-  // Step 4: Apply all losses to the CAPPED 1m capability
+  // Step 5: Apply all losses to the CAPPED 1m capability
   // ─────────────────────────────────────────────────────────────────────────
   const spl = spl1m_capability - distanceLoss - (screenLoss_dB || 0) - (eqHeadroom_dB || 0);
   
@@ -253,6 +284,8 @@ export function computeAllSeatSplMetrics({
           // Screen loss and EQ headroom
           screenLoss_dB: screenLoss_dB || 0,
           eqHeadroom_dB: eqHeadroom_dB || 0,
+          // Pass effectiveSplInputs for radiationMode
+          effectiveSplInputs: effectiveSplInputs,
         });
 
         if (Number.isFinite(splValue)) {
