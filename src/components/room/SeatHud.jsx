@@ -12,6 +12,8 @@ export default function SeatHud({
   setHudHiddenWhenPinned,
   hudHiddenWhenPinned,
   renderLevelBadge,
+  splPowerW,
+  splRadiationMode,
 }) {
   // Guard: render nothing if no hovered seat or tooltip data
   if (!effectiveHoveredSeat || !tooltipData) return null;
@@ -180,7 +182,7 @@ export default function SeatHud({
               color: '#1B1A1A',
             }}
           >
-            SPL @ Seat (Target: 100W)
+            SPL @ Seat
           </div>
 
           {Object.keys(tooltipData.splAtSeat.lcr).length > 0 && (
@@ -199,6 +201,19 @@ export default function SeatHud({
                   {role}: {spl.formatted}
                 </div>
               ))}
+              {/* Power + Radiation Mode caption */}
+              <div
+                style={{
+                  fontSize: 10,
+                  color: '#888',
+                  paddingLeft: 8,
+                  marginTop: 4,
+                }}
+              >
+                {splPowerW != null ? `${splPowerW} W` : ''}
+                {splPowerW != null && splRadiationMode ? ', ' : ''}
+                {splRadiationMode === 'anechoic' ? 'Anechoic' : 'Half-Space'}
+              </div>
             </div>
           )}
 
