@@ -18,7 +18,7 @@ const BRAND = {
   green: "#2A6E3F",
   gold: "#B48A3A",
   red: "#7A1E19",
-  blue: "#1B4E7A"
+  blue: "#1B4E7A",
 };
 
 // ---- RP22 targets ----
@@ -27,22 +27,22 @@ const RP22 = {
     param: 12,
     label: "Parameter 12 — Screen Speakers SPL at RSP (post‑cal EQ, within assigned bandwidth) without clipping",
     levels: [
-    { key: "L1", db: 102 },
-    { key: "L2", db: 105 },
-    { key: "L3", db: 108 },
-    { key: "L4", db: 111 }]
-
+      { key: "L1", db: 102 },
+      { key: "L2", db: 105 },
+      { key: "L3", db: 108 },
+      { key: "L4", db: 111 },
+    ],
   },
   SUR: {
     param: 13,
     label: "Parameter 13 — Non‑screen Speakers SPL at RSP (post‑cal EQ, within assigned bandwidth) without clipping (includes amplifier headroom)",
     levels: [
-    { key: "L1", db: 99 },
-    { key: "L2", db: 102 },
-    { key: "L3", db: 105 },
-    { key: "L4", db: 108 }]
-
-  }
+      { key: "L1", db: 99 },
+      { key: "L2", db: 102 },
+      { key: "L3", db: 105 },
+      { key: "L4", db: 108 },
+    ],
+  },
 };
 
 function isSubwooferEntry(s) {
@@ -77,7 +77,7 @@ function roundUpHalf(raw) {
 function convert2p83VTo1W(sens2p83V, impedanceOhm) {
   if (!Number.isFinite(sens2p83V) || !Number.isFinite(impedanceOhm) || impedanceOhm <= 0) return null;
   const volts = 2.83;
-  const wattsAt2p83V = volts * volts / impedanceOhm;
+  const wattsAt2p83V = (volts * volts) / impedanceOhm;
   const delta = 10 * Math.log10(wattsAt2p83V / 1);
   return sens2p83V - delta;
 }
@@ -91,43 +91,43 @@ function convert2p83VTo1W(sens2p83V, impedanceOhm) {
 function getSPL1mCapability(speaker, ampPower_W) {
   const P_amp = nW(ampPower_W);
   const P_spk = nW(speaker.power_handling_w || speaker.max_power);
-
+  
   // Ceiling from speaker (Infinity if unknown, or 0 if 0)
   const P_ceiling_from_speaker = P_spk > 0 ? P_spk : Infinity;
-
+  
   // Available power is minimum of amp and speaker (0 if amp missing or speaker has 0 power handling)
   const P_available = Math.min(P_amp || 0, P_ceiling_from_speaker);
-
+  
   // Get sensitivity in 1W/1m terms (from speakerData.js)
   let sens_1W = safeNum(speaker.sensitivity_db_1w_1m || speaker.sensitivity);
   const sens_2p83V = safeNum(speaker.sensitivity_db_2v83_1m);
   const impedanceOhm = safeNum(speaker.impedance_ohm || speaker.impedance);
-
+  
   // Convert if only 2.83V available
   if (sens_1W === null && sens_2p83V !== null) {
     const assumedZ = impedanceOhm !== null ? impedanceOhm : 8;
     sens_1W = convert2p83VTo1W(sens_2p83V, assumedZ);
   }
-
+  
   // Compute amp-limited SPL: sensitivity + 10·log10(min(ampPower, speakerMaxPower))
   let SPL_1m_amp_limited = null;
   if (sens_1W !== null && P_available > 0) {
     SPL_1m_amp_limited = sens_1W + 10 * Math.log10(P_available);
   }
-
+  
   // ─────────────────────────────────────────────────────────────────────────
   // CRITICAL: Cap at max_spl_cont_db_1m from speakerData.js
   // This is the speaker's verified continuous max SPL at 1m — the physical limit
   // that cannot be exceeded regardless of amplifier power.
   // ─────────────────────────────────────────────────────────────────────────
   const SPL_1m_max_cont = safeNum(speaker.max_spl_cont_db_1m || speaker.max_spl);
-
+  
   // Legacy RP1 field (fallback for comparators without max_spl_cont_db_1m)
   const SPL_1m_rp1 = safeNum(speaker.rp1_midTermRMS_dBZ_1m);
-
+  
   // Determine the hard cap: prefer max_spl_cont_db_1m, fall back to rp1
   const hardCap = SPL_1m_max_cont !== null ? SPL_1m_max_cont : SPL_1m_rp1;
-
+  
   // Determine capability (minimum of amp-limited and hard cap)
   let SPL_1m_capability = null;
   let method = "Unknown";
@@ -135,7 +135,7 @@ function getSPL1mCapability(speaker, ampPower_W) {
   let formula = null;
   let assumptionNote = null;
   let ampLimitWarning = false;
-
+  
   if (SPL_1m_amp_limited !== null && hardCap !== null) {
     // Both available: use minimum (cap the amp-limited value)
     SPL_1m_capability = Math.min(SPL_1m_amp_limited, hardCap);
@@ -173,7 +173,7 @@ function getSPL1mCapability(speaker, ampPower_W) {
       ampLimitWarning = true;
     }
   }
-
+  
   return {
     value: SPL_1m_capability,
     method,
@@ -186,7 +186,7 @@ function getSPL1mCapability(speaker, ampPower_W) {
       sens_1W,
       P_available,
       SPL_1m_amp_limited,
-      hardCap
+      hardCap,
     }
   };
 }
@@ -194,7 +194,7 @@ function getSPL1mCapability(speaker, ampPower_W) {
 // Compute distance loss - UNIFIED POINT SOURCE MODEL (6 dB per doubling)
 function getDistanceLoss(speaker, distance_m) {
   if (!Number.isFinite(distance_m) || distance_m <= 0) return { loss: 0, model: "Unknown" };
-
+  
   // Point source: 6 dB per doubling (20*log10)
   const loss = 20 * Math.log10(Math.max(1, distance_m));
   return { loss, model: "Point" };
@@ -206,19 +206,19 @@ function computeRequiredPowerForLevel(speaker, targetDb, screenLossDb, distanceL
   let sens_1W = safeNum(speaker.sensitivity_db_1w_1m || speaker.sensitivity);
   const sens_2p83V = safeNum(speaker.sensitivity_db_2v83_1m);
   const impedanceOhm = safeNum(speaker.impedance_ohm || speaker.impedance);
-
+  
   // Convert if only 2.83V available
   if (sens_1W === null && sens_2p83V !== null) {
     const assumedZ = impedanceOhm !== null ? impedanceOhm : 8;
     sens_1W = convert2p83VTo1W(sens_2p83V, assumedZ);
   }
-
+  
   if (sens_1W === null || !Number.isFinite(targetDb)) return null;
-
+  
   // EQ headroom increases the required baseline (we need MORE capability to cover the EQ cut)
   const required_1m = targetDb + screenLossDb + distanceLossDb + eqHeadroom_dB;
   const requiredPower_W = Math.pow(10, (required_1m - sens_1W) / 10);
-
+  
   return Number.isFinite(requiredPower_W) ? requiredPower_W : null;
 }
 
@@ -235,17 +235,17 @@ function getReferencePlaybackLevel(volume_m3) {
 // RP22 level determination
 function getRP22Level(splRSP, isScreen) {
   if (!Number.isFinite(splRSP)) return { level: null, label: "—" };
-
+  
   const spec = isScreen ? RP22.LCR : RP22.SUR;
   const levels = spec.levels;
-
+  
   // Find highest level achieved
   for (let i = levels.length - 1; i >= 0; i--) {
     if (splRSP >= levels[i].db) {
       return { level: levels[i].key, label: levels[i].key, db: levels[i].db };
     }
   }
-
+  
   return { level: null, label: "Below L1", db: null };
 }
 
@@ -262,7 +262,7 @@ function tileStyles(status = "neutral") {
     padding: 10,
     borderRadius: 8,
     border: `1px dashed ${BRAND.border}`,
-    background: "#FFF"
+    background: "#FFF",
   };
   if (status === "green") return { ...base, border: `1px solid ${BRAND.green}`, background: "rgba(42,110,63,0.08)" };
   if (status === "gold") return { ...base, border: `1px solid ${BRAND.gold}`, background: "rgba(180,138,58,0.08)" };
@@ -285,20 +285,20 @@ function formatPower(watts) {
 function getAchievableLevels(speaker, isScreen, screenLossDb, distanceLossDb, eqHeadroom_dB = 0) {
   const powerHandling = safeNum(speaker.power_handling_w || speaker.max_power);
   if (!Number.isFinite(powerHandling) || powerHandling <= 0) return [];
-
-  const thresholds = isScreen ?
-  [{ key: "L1", db: 102 }, { key: "L2", db: 105 }, { key: "L3", db: 108 }, { key: "L4", db: 111 }] :
-  [{ key: "L1", db: 99 }, { key: "L2", db: 102 }, { key: "L3", db: 105 }, { key: "L4", db: 108 }];
-
+  
+  const thresholds = isScreen 
+    ? [{ key: "L1", db: 102 }, { key: "L2", db: 105 }, { key: "L3", db: 108 }, { key: "L4", db: 111 }]
+    : [{ key: "L1", db: 99 }, { key: "L2", db: 102 }, { key: "L3", db: 105 }, { key: "L4", db: 108 }];
+  
   const achievable = [];
-
+  
   for (const level of thresholds) {
     const requiredPower = computeRequiredPowerForLevel(speaker, level.db, screenLossDb, distanceLossDb, eqHeadroom_dB);
     if (requiredPower !== null && requiredPower <= powerHandling) {
       achievable.push({ level: level.key, power: requiredPower });
     }
   }
-
+  
   return achievable;
 }
 
@@ -307,24 +307,24 @@ function detectIssues(speaker, group, baseline, distanceLoss, screenLossDb, dist
   const issues = [];
   const targetL1 = group === "screen" ? 102 : 99;
   const label = `${speaker.brand || "Unknown"} ${speaker.model || ""}`.trim();
-
+  
   const P_amp = nW(ampPower_W);
   const P_spk = nW(speaker.power_handling_w || speaker.max_power);
-
+  
   // Check for amplifier power exceeding speaker max
   if (P_amp > 0 && P_spk > 0 && P_amp > P_spk) {
     issues.push(
       `${label}: amplifier power exceeds speaker max (AMP ${Math.ceil(P_amp)} W > MAX ${Math.ceil(P_spk)} W)`
     );
   }
-
+  
   // Check for amp limit warning (RP1 only, amp < speaker, no sensitivity)
   if (baseline && baseline.ampLimitWarning) {
     issues.push(
       `${label}: cannot reflect amplifier limit (needs sensitivity); showing RP1 capability`
     );
   }
-
+  
   // Check if Level 1 is achievable based on speaker power handling (with EQ headroom)
   if (distanceLoss && Number.isFinite(targetL1) && P_spk > 0) {
     const requiredPowerL1 = computeRequiredPowerForLevel(speaker, targetL1, screenLossDb, distanceLoss.loss, eqHeadroom_dB);
@@ -344,25 +344,25 @@ function detectIssues(speaker, group, baseline, distanceLoss, screenLossDb, dist
       );
     }
   }
-
+  
   // Missing or weak data
   if (baseline && !baseline.isVerified) {
     if (!P_spk || P_spk <= 0) {
       issues.push(`${label}: missing power handling — calculated estimate may be inaccurate`);
     }
-
+    
     const impedanceOhm = safeNum(speaker.impedance_ohm || speaker.impedance);
     const sens_2p83V = safeNum(speaker.sensitivity_db_2v83_1m);
-    if (!impedanceOhm && sens_2p83V !== null && !baseline.ampLimitWarning) {// Only warn if not already covered by ampLimitWarning
+    if (!impedanceOhm && sens_2p83V !== null && !baseline.ampLimitWarning) { // Only warn if not already covered by ampLimitWarning
       issues.push(`${label}: impedance not specified — assumed 8 Ω for sensitivity conversion`);
     }
   }
-
+  
   // No data at all
   if (!baseline || baseline.value === null) {
     issues.push(`${label}: no SPL capability data available`);
   }
-
+  
   return issues;
 }
 
@@ -372,8 +372,8 @@ function Field({ label, children }) {
     <div style={{ marginBottom: 12 }}>
       <div style={{ fontSize: 13, color: BRAND.subtext, marginBottom: 6 }}>{label}</div>
       {children}
-    </div>);
-
+    </div>
+  );
 }
 function inputStyle() {
   return {
@@ -383,7 +383,7 @@ function inputStyle() {
     padding: "10px 12px",
     background: "#FFF",
     color: BRAND.text,
-    fontSize: 14
+    fontSize: 14,
   };
 }
 function Button({ children, onClick, disabled, tone = "dark", title, className = "" }) {
@@ -393,54 +393,54 @@ function Button({ children, onClick, disabled, tone = "dark", title, className =
     padding: "10px 14px",
     borderRadius: 10,
     border: `1px solid ${disabled ? BRAND.border : bg}`,
-    background: disabled ? "#625143" : bg,
+    background: disabled ? "#A0A0A0" : bg,
     color: BRAND.btnText,
     cursor: disabled ? "not-allowed" : "pointer",
-    fontSize: 14
+    fontSize: 14,
   };
   return (
-    <button type="button" onClick={onClick} disabled={disabled} style={style} title={title} className="bg-[#625143] 2 5 1 4 3 ]">
+    <button type="button" onClick={onClick} disabled={disabled} style={style} title={title} className={className}>
       {children}
-    </button>);
-
+    </button>
+  );
 }
 
 // Info icon with tooltip
 function InfoIcon({ tooltip }) {
   const [showTooltip, setShowTooltip] = useState(false);
   return (
-    <span
+    <span 
       style={{ position: "relative", display: "inline-block", marginLeft: 4, cursor: "help" }}
       onMouseEnter={() => setShowTooltip(true)}
-      onMouseLeave={() => setShowTooltip(false)}>
-
+      onMouseLeave={() => setShowTooltip(false)}
+    >
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={BRAND.hint} strokeWidth="2">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 16v-4M12 8h.01" />
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M12 16v-4M12 8h.01"/>
       </svg>
-      {showTooltip && tooltip &&
-      <div style={{
-        position: "absolute",
-        bottom: "100%",
-        left: "50%",
-        transform: "translateX(-50%)",
-        marginBottom: 8,
-        padding: 8,
-        borderRadius: 8,
-        background: BRAND.text,
-        color: "#FFF",
-        fontSize: 11,
-        whiteSpace: "pre-wrap",
-        minWidth: 200,
-        maxWidth: 300,
-        zIndex: 1000,
-        boxShadow: "0 4px 8px rgba(0,0,0,0.15)"
-      }}>
+      {showTooltip && tooltip && (
+        <div style={{
+          position: "absolute",
+          bottom: "100%",
+          left: "50%",
+          transform: "translateX(-50%)",
+          marginBottom: 8,
+          padding: 8,
+          borderRadius: 8,
+          background: BRAND.text,
+          color: "#FFF",
+          fontSize: 11,
+          whiteSpace: "pre-wrap",
+          minWidth: 200,
+          maxWidth: 300,
+          zIndex: 1000,
+          boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
+        }}>
           {tooltip}
         </div>
-      }
-    </span>);
-
+      )}
+    </span>
+  );
 }
 
 // Warning box styles
@@ -461,40 +461,40 @@ function SpeakerDetails({ speaker, showPrices }) {
     return (
       <div style={{ padding: 12, color: BRAND.subtext }}>
         Select a speaker to see details.
-      </div>);
-
+      </div>
+    );
   }
 
   const DetailRow = ({ label, value }) =>
-  value ?
-  <div>
+    value ? (
+      <div>
         <span style={{ color: BRAND.subtext }}>{label}: </span>
         <span style={{ color: BRAND.text, fontWeight: 500 }}>{value}</span>
-      </div> :
-  null;
+      </div>
+    ) : null;
 
   const sensText = [
-  speaker.sensitivity ? `${speaker.sensitivity} dB @ 1W/1m` : null,
-  speaker.sensitivity_db_2v83_1m ? `(${speaker.sensitivity_db_2v83_1m} dB @ 2.83V)` : null].
-  filter(Boolean).join(" ");
+    speaker.sensitivity ? `${speaker.sensitivity} dB @ 1W/1m` : null,
+    speaker.sensitivity_db_2v83_1m ? `(${speaker.sensitivity_db_2v83_1m} dB @ 2.83V)` : null
+  ].filter(Boolean).join(" ");
 
   const powerText = [
-  speaker.max_power ? `${speaker.max_power} W` : null,
-  speaker.power_handling_vrms ? `(${speaker.power_handling_vrms} Vrms)` : null].
-  filter(Boolean).join(" ");
+    speaker.max_power ? `${speaker.max_power} W` : null,
+    speaker.power_handling_vrms ? `(${speaker.power_handling_vrms} Vrms)` : null
+  ].filter(Boolean).join(" ");
 
   const maxSplText = [
-  speaker.max_spl_cont_db_1m ? `${speaker.max_spl_cont_db_1m} dB cont` : null,
-  speaker.max_spl_peak_db_cf6_1m ? `${speaker.max_spl_peak_db_cf6_1m} dB peak (CF6)` : null].
-  filter(Boolean).join(", ");
+    speaker.max_spl_cont_db_1m ? `${speaker.max_spl_cont_db_1m} dB cont` : null,
+    speaker.max_spl_peak_db_cf6_1m ? `${speaker.max_spl_peak_db_cf6_1m} dB peak (CF6)` : null
+  ].filter(Boolean).join(", ");
 
-  const freqRangeText = Array.isArray(speaker.frequency_range_hz) ?
-  `${speaker.frequency_range_hz[0].toLocaleString().replace(",", " ")}–${speaker.frequency_range_hz[1].toLocaleString().replace(",", " ")} Hz` :
-  null;
-
-  const coverageText = speaker.coverage_deg ?
-  `H ${speaker.coverage_deg.horizontal}° / V ${speaker.coverage_deg.vertical}°` :
-  null;
+  const freqRangeText = Array.isArray(speaker.frequency_range_hz)
+    ? `${speaker.frequency_range_hz[0].toLocaleString().replace(",", " ")}–${speaker.frequency_range_hz[1].toLocaleString().replace(",", " ")} Hz`
+    : null;
+    
+  const coverageText = speaker.coverage_deg
+    ? `H ${speaker.coverage_deg.horizontal}° / V ${speaker.coverage_deg.vertical}°`
+    : null;
 
   return (
     <div style={{ padding: 12, fontSize: 13, lineHeight: 1.6, display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -510,8 +510,8 @@ function SpeakerDetails({ speaker, showPrices }) {
       <DetailRow label="Coverage" value={coverageText} />
       {showPrices && speaker.price != null && <DetailRow label="Price" value={`£${speaker.price.toLocaleString()}`} />}
       {speaker.description && !speaker.transducers && <div style={{ marginTop: 6, color: BRAND.hint, fontStyle: 'italic' }}>{speaker.description}</div>}
-    </div>);
-
+    </div>
+  );
 }
 
 // Logo URL from layout
@@ -522,10 +522,10 @@ export default function SPLCalculatorPage() {
   const { setSummaryFor, mergeSummary } = useProjectActions();
 
   // Use shared room dimensions hook (read-only mode - no setDims needed)
-  const {
-    dims,
-    loadDims,
-    loaded: dimsLoaded
+  const { 
+    dims, 
+    loadDims, 
+    loaded: dimsLoaded,
   } = useRoomDimensions(activeId);
 
   // Load dimensions on mount
@@ -556,7 +556,7 @@ export default function SPLCalculatorPage() {
 
   // Screen/fabric loss - simplified to single numeric input
   const [screenLoss_dB, setScreenLoss_dB] = useState(0);
-
+  
   // Show prices toggle
   const [showPrices, setShowPrices] = useState(false);
 
@@ -570,7 +570,7 @@ export default function SPLCalculatorPage() {
   // Auto-select first speaker if current selection is invalid
   useEffect(() => {
     if (artcousticVisible.length > 0) {
-      if (!artId || !artcousticVisible.find((s) => s.id === artId)) {
+      if (!artId || !artcousticVisible.find(s => s.id === artId)) {
         const firstId = artcousticVisible[0].id;
         setArtId(firstId);
       }
@@ -579,13 +579,13 @@ export default function SPLCalculatorPage() {
 
   // Third‑party comparators (REMOVED isLineSource field)
   const [comparators, setComparators] = useState([
-  { brand: "", model: "", sensitivity: "", max_power: "", price: "", sensUnit: "1W@1m", nominalOhms: "8", max_spl_1m: "" }]
-  );
+    { brand: "", model: "", sensitivity: "", max_power: "", price: "", sensUnit: "1W@1m", nominalOhms: "8", max_spl_1m: "" },
+  ]);
   const addComparator = () => {
     if (comparators.length >= 2) return;
     setComparators((prev) => [...prev, { brand: "", model: "", sensitivity: "", max_power: "", price: "", sensUnit: "1W@1m", nominalOhms: "8", max_spl_1m: "" }]);
   };
-  const updateComparator = (idx, patch) => setComparators((prev) => prev.map((c, i) => i === idx ? { ...c, ...patch } : c));
+  const updateComparator = (idx, patch) => setComparators((prev) => prev.map((c, i) => (i === idx ? { ...c, ...patch } : c)));
   const removeComparator = (idx) => setComparators((prev) => prev.filter((_, i) => i !== idx));
 
   // Parsed inputs (dims now come from shared state, read-only)
@@ -595,9 +595,9 @@ export default function SPLCalculatorPage() {
   const W = dims.width_m || 0;
   const L = dims.length_m || 0;
   const H = dims.height_m || 0;
-  const volume_m3 = dims.width_m && dims.length_m && dims.height_m ?
-  dims.width_m * dims.length_m * dims.height_m :
-  0;
+  const volume_m3 = dims.width_m && dims.length_m && dims.height_m 
+    ? dims.width_m * dims.length_m * dims.height_m 
+    : 0;
 
   // Reference playback level
   const referencePlaybackLevel = getReferencePlaybackLevel(volume_m3);
@@ -630,17 +630,17 @@ export default function SPLCalculatorPage() {
   // Collect issues for mini report (now includes amp power)
   const allIssues = useMemo(() => {
     const issues = [];
-
+    
     // Check Artcoustic speaker
     if (art) {
       const group = mode === "LCR" ? "screen" : "non-screen";
       issues.push(...detectIssues(art, group, artBaseline, artDistanceLoss, screenLossDb, d, P, eqHeadroom_dB));
     }
-
+    
     // Check comparators
     comparators.forEach((c, idx) => {
       if (!c.brand && !c.model) return;
-
+      
       const compSpeaker = {
         brand: c.brand,
         model: c.model,
@@ -650,17 +650,17 @@ export default function SPLCalculatorPage() {
         impedance_ohm: safeNum(c.nominalOhms),
         max_power: safeNum(c.max_power),
         power_handling_w: safeNum(c.max_power),
-        rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m)
+        rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m),
       };
-
+      
       const compBaseline = getSPL1mCapability(compSpeaker, P);
       // Point source distance loss
       const compDistLoss = d ? { loss: 20 * Math.log10(Math.max(1, d)), model: "Point" } : null;
       const group = mode === "LCR" ? "screen" : "non-screen";
-
+      
       issues.push(...detectIssues(compSpeaker, group, compBaseline, compDistLoss, screenLossDb, d, P, eqHeadroom_dB));
     });
-
+    
     return issues;
   }, [art, artBaseline, artDistanceLoss, comparators, mode, screenLossDb, d, P, eqHeadroom_dB]);
 
@@ -670,11 +670,11 @@ export default function SPLCalculatorPage() {
     if (art && artBaseline && !artBaseline.isVerified) {
       return true;
     }
-
+    
     // Check comparators
     for (const c of comparators) {
       if (!c.brand && !c.model) continue;
-
+      
       const compSpeaker = {
         brand: c.brand,
         model: c.model,
@@ -683,15 +683,15 @@ export default function SPLCalculatorPage() {
         impedance_ohm: safeNum(c.nominalOhms),
         max_power: safeNum(c.max_power),
         power_handling_w: safeNum(c.max_power),
-        rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m)
+        rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m),
       };
-
+      
       const compBaseline = getSPL1mCapability(compSpeaker, P);
       if (compBaseline && !compBaseline.isVerified) {
         return true;
       }
     }
-
+    
     return false;
   }, [art, artBaseline, comparators, P]);
 
@@ -700,11 +700,11 @@ export default function SPLCalculatorPage() {
   function handleUseInProject(kind) {
     if (!activeId || !art) return alert("Open or create a Project first.");
     const patch =
-    kind === "LCR" ?
-    { lcrModel: `${art.brand} ${art.model}`, dolbyLayout: undefined } :
-    { surroundModel: `${art.brand} ${art.model}` };
-    if (typeof setSummaryFor === "function") setSummaryFor(activeId, patch);else
-    if (typeof mergeSummary === "function") mergeSummary(patch);
+      kind === "LCR"
+        ? { lcrModel: `${art.brand} ${art.model}`, dolbyLayout: undefined }
+        : { surroundModel: `${art.brand} ${art.model}` };
+    if (typeof setSummaryFor === "function") setSummaryFor(activeId, patch);
+    else if (typeof mergeSummary === "function") mergeSummary(patch);
     alert(`${kind} set to ${art.brand} ${art.model} for project ${activeId}.`);
   }
 
@@ -714,13 +714,13 @@ export default function SPLCalculatorPage() {
     const projectName = activeId || 'SPL Report';
     const date = new Date();
     const yyyy = date.getFullYear();
-    const mm = String(date.getMonth() + 1).padStart(2, '0');
-    const dd = String(date.getDate()).padStart(2, '0');
+    const mm = String(date.getMonth()+1).padStart(2,'0');
+    const dd = String(date.getDate()).padStart(2,'0');
     document.title = `SPL Report — ${projectName} — ${yyyy}-${mm}-${dd}`;
-
+    
     setTimeout(() => {
       window.print();
-      setTimeout(() => {document.title = oldTitle;}, 0);
+      setTimeout(() => { document.title = oldTitle; }, 0);
     }, 30);
   }
 
@@ -728,12 +728,12 @@ export default function SPLCalculatorPage() {
     <div style={{ padding: 24, background: BRAND.bg, minHeight: "100vh", color: BRAND.text }}>
       {/* Print-only header */}
       <div id="spl-print-header" aria-hidden="true">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <img src={ARTCOUSTIC_LOGO_URL} alt="Artcoustic" style={{ height: 18 }} />
-            <span style={{ fontSize: 12, fontWeight: 600 }}>SPL Comparison Report</span>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <img src={ARTCOUSTIC_LOGO_URL} alt="Artcoustic" style={{ height:18 }} />
+            <span style={{ fontSize:12, fontWeight:600 }}>SPL Comparison Report</span>
           </div>
-          <div style={{ fontSize: 12, textAlign: 'right' }}>
+          <div style={{ fontSize:12, textAlign:'right' }}>
             <div>{new Date().toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })}</div>
             <div>Project: {activeId || 'Untitled'}</div>
           </div>
@@ -753,9 +753,9 @@ export default function SPLCalculatorPage() {
             border: `1px solid ${BRAND.border}`,
             borderRadius: 12,
             padding: 20,
-            marginBottom: 16
-          }}>
-
+            marginBottom: 16,
+          }}
+        >
           {/* RP22 selector */}
           <div style={{ display: "flex", gap: 10, marginBottom: 12 }} className="no-print">
             <button
@@ -767,9 +767,9 @@ export default function SPLCalculatorPage() {
                 background: mode === "LCR" ? BRAND.btn : "#FFF",
                 color: mode === "LCR" ? "#FFF" : BRAND.text,
                 cursor: "pointer",
-                fontSize: 13
-              }}>
-
+                fontSize: 13,
+              }}
+            >
               LCR (Param 12)
             </button>
             <button
@@ -781,9 +781,9 @@ export default function SPLCalculatorPage() {
                 background: mode === "SUR" ? BRAND.btn : "#FFF",
                 color: mode === "SUR" ? "#FFF" : BRAND.text,
                 cursor: "pointer",
-                fontSize: 13
-              }}>
-
+                fontSize: 13,
+              }}
+            >
               Surrounds (Param 13)
             </button>
           </div>
@@ -802,8 +802,8 @@ export default function SPLCalculatorPage() {
                 onChange={(e) => setDistance(e.target.value)}
                 placeholder="e.g. 3.0"
                 style={inputStyle()}
-                className="no-print" />
-
+                className="no-print"
+              />
               <span className="print-only-value" style={{ display: 'none', padding: '10px 12px', fontSize: 14 }}>
                 {d ? `${d.toFixed(2)} m` : '—'}
               </span>
@@ -819,8 +819,8 @@ export default function SPLCalculatorPage() {
                 onChange={(e) => setAmpPower(e.target.value)}
                 style={inputStyle()}
                 aria-label="Amplifier power in watts"
-                className="no-print" />
-
+                className="no-print"
+              />
               <span className="print-only-value" style={{ display: 'none', padding: '10px 12px', fontSize: 14 }}>
                 {P ? `${Math.ceil(P)} W` : '—'}
               </span>
@@ -835,9 +835,9 @@ export default function SPLCalculatorPage() {
             border: `1px solid ${BRAND.border}`,
             borderRadius: 12,
             padding: 20,
-            marginBottom: 16
-          }}>
-
+            marginBottom: 16,
+          }}
+        >
           <h2 style={{ fontSize: 18, margin: 0, marginBottom: 12, color: BRAND.text }}>Inputs & Speaker Selection</h2>
 
           {/* Artcoustic selector */}
@@ -848,9 +848,9 @@ export default function SPLCalculatorPage() {
                   {artcousticVisible.map((opt) => {
                     const optBaseline = getSPL1mCapability(opt, P); // Use getSPL1mCapability
                     const optDistLoss = getDistanceLoss(opt, d || 3);
-                    const optSPL_RSP_raw = optBaseline?.value !== null && optDistLoss?.loss !== null ?
-                    optBaseline.value - screenLossDb - optDistLoss.loss - eqHeadroom_dB :
-                    null;
+                    const optSPL_RSP_raw = (optBaseline?.value !== null && optDistLoss?.loss !== null)
+                      ? optBaseline.value - screenLossDb - optDistLoss.loss - eqHeadroom_dB
+                      : null;
                     const optSPL_RSP = roundUpHalf(optSPL_RSP_raw);
 
                     const targetDb = mode === "LCR" ? RP22.LCR.levels[1].db : RP22.SUR.levels[1].db; // Use L2 for color indication
@@ -868,9 +868,9 @@ export default function SPLCalculatorPage() {
                           padding: "6px 10px",
                           borderRadius: 8,
                           border: `2px solid ${artId === opt.id ? BRAND.blue : 'transparent'}`,
-                          background: artId === opt.id ? 'rgba(27, 78, 122, 0.08)' : BRAND.panel
-                        }}>
-
+                          background: artId === opt.id ? 'rgba(27, 78, 122, 0.08)' : BRAND.panel,
+                        }}
+                      >
                         <div style={{ width: 6, height: 24, borderRadius: 3, background: statusColor, marginRight: 10, flexShrink: 0 }} />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 600, color: BRAND.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{opt.brand} {opt.model}</div>
@@ -878,8 +878,8 @@ export default function SPLCalculatorPage() {
                             {opt.sensitivity ? `${opt.sensitivity} dB, ` : ""}{opt.max_power} W{showPrices && Number.isFinite(opt.price) ? `, £${opt.price?.toLocaleString()}` : ""}
                           </div>
                         </div>
-                      </div>);
-
+                      </div>
+                    );
                   })}
                 </div>
               </div>
@@ -904,7 +904,7 @@ export default function SPLCalculatorPage() {
                 // Step 1: Compute display sensitivity
                 let sens_1W_display = null;
                 let sens_1W_for_calc = null;
-
+                
                 if (c.sensUnit === "1W@1m") {
                   sens_1W_display = safeNum(c.sensitivity);
                   sens_1W_for_calc = sens_1W_display;
@@ -926,17 +926,17 @@ export default function SPLCalculatorPage() {
                   impedance_ohm: safeNum(c.nominalOhms),
                   max_power: safeNum(c.max_power),
                   power_handling_w: safeNum(c.max_power),
-                  rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m)
+                  rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m),
                 };
 
                 // Step 3: Compute SPL capability with amp power
                 const compBaseline = getSPL1mCapability(compSpeaker, P);
                 const compDistLoss = d ? { loss: 20 * Math.log10(Math.max(1, d)), model: "Point" } : null;
-
+                
                 // Apply EQ headroom deduction
-                const compSPL_RSP_raw = compBaseline?.value !== null && compDistLoss?.loss !== null ?
-                compBaseline.value - screenLossDb - compDistLoss.loss - eqHeadroom_dB :
-                null;
+                const compSPL_RSP_raw = (compBaseline?.value !== null && compDistLoss?.loss !== null)
+                  ? compBaseline.value - screenLossDb - compDistLoss.loss - eqHeadroom_dB
+                  : null;
                 const compSPL_RSP = roundUpHalf(compSPL_RSP_raw);
                 const compRP22Level = compSPL_RSP !== null ? getRP22Level(compSPL_RSP, mode === "LCR").label : "—";
 
@@ -944,9 +944,9 @@ export default function SPLCalculatorPage() {
                 const compAmpExceeds = Number.isFinite(P) && Number.isFinite(compPowerHandling) && compPowerHandling > 0 && P > compPowerHandling;
 
                 // Compute achievable levels with EQ headroom
-                const achievableLevels = compDistLoss ?
-                getAchievableLevels(compSpeaker, mode === "LCR", screenLossDb, compDistLoss.loss, eqHeadroom_dB) :
-                [];
+                const achievableLevels = compDistLoss 
+                  ? getAchievableLevels(compSpeaker, mode === "LCR", screenLossDb, compDistLoss.loss, eqHeadroom_dB)
+                  : [];
                 const highestLevel = achievableLevels.length > 0 ? achievableLevels[achievableLevels.length - 1].level : null;
 
                 return (
@@ -989,8 +989,8 @@ export default function SPLCalculatorPage() {
                           style={inputStyle()}
                           placeholder="e.g. 115"
                           inputMode="decimal"
-                          className="no-print" />
-
+                          className="no-print"
+                        />
                         <span className="print-only-value" style={{ display: 'none', padding: '10px 12px', fontSize: 14 }}>
                           {safeNum(c.max_spl_1m) ? `${c.max_spl_1m} dB` : '—'}
                         </span>
@@ -1010,7 +1010,7 @@ export default function SPLCalculatorPage() {
                       </div>
                     </div>
                     <div className="print-only-value" style={{ display: 'none', padding: '10px 12px', fontSize: 14 }}>
-                        <div style={{ display: 'flex', gap: '16px', marginTop: 8 }}>
+                        <div style={{display: 'flex', gap: '16px', marginTop: 8}}>
                           <div>Sensitivity Spec: {c.sensUnit === "1W@1m" ? "1W/1m" : "2.83V/1m"}</div>
                           {c.sensUnit === "2.83V@1m" && <div>Nominal Impedance: {c.nominalOhms || '—'} Ω</div>}
                         </div>
@@ -1018,8 +1018,8 @@ export default function SPLCalculatorPage() {
                     <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }} className="no-print">
                       <Button onClick={() => removeComparator(idx)} title="Remove comparator">Remove</Button>
                     </div>
-                  </div>);
-
+                  </div>
+                );
               })}
             </div>
           </div>
@@ -1050,9 +1050,9 @@ export default function SPLCalculatorPage() {
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1.5fr", gap: 8, alignItems: "stretch" }}>
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                 <div>
-                  {art ?
-                  `${art.brand} ${art.model}` + (showPrices && Number.isFinite(art.price) ? ` — £${art.price?.toLocaleString()}` : "") :
-                  "—"}
+                  {art
+                    ? `${art.brand} ${art.model}` + (showPrices && Number.isFinite(art.price) ? ` — £${art.price?.toLocaleString()}` : "")
+                    : "—"}
                 </div>
               </div>
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
@@ -1060,41 +1060,41 @@ export default function SPLCalculatorPage() {
               </div>
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                 {art?.max_power ? `${art.max_power} W` : "—"}
-                {art && nW(P) > 0 && nW(art.max_power) > 0 && nW(P) > nW(art.max_power) &&
-                <div style={warnBox} role="alert" aria-live="polite">
+                {art && nW(P) > 0 && nW(art.max_power) > 0 && nW(P) > nW(art.max_power) && (
+                  <div style={warnBox} role="alert" aria-live="polite">
                     {`${Math.ceil(P)} W > ${Math.ceil(nW(art.max_power))} W`}
                   </div>
-                }
+                )}
               </div>
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                 {artSPL_RSP !== null ? `${artSPL_RSP.toFixed(1)} dB(C)` : "—"}
               </div>
               <div style={{ padding: 10, border: `2px solid ${BRAND.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {artSPL_RSP !== null ?
-                <div
-                  style={{
-                    fontSize: 16,
-                    fontWeight: 500,
-                    color: '#1B1A1A'
-                  }}>
-
+                {artSPL_RSP !== null ? (
+                  <div
+                    style={{
+                      fontSize: 16,
+                      fontWeight: 500,
+                      color: '#1B1A1A',
+                    }}
+                  >
                     {getRP22Level(artSPL_RSP, mode === "LCR").label}
-                  </div> :
-                "—"}
+                  </div>
+                ) : "—"}
               </div>
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                 {(() => {
                   if (!art || !artDistanceLoss) return "—";
                   const achievable = getAchievableLevels(art, mode === "LCR", screenLossDb, artDistanceLoss.loss, eqHeadroom_dB);
                   const highest = achievable.length > 0 ? achievable[achievable.length - 1].level : null;
-
+                  
                   if (achievable.length === 0) {
                     // Check if we can compute but just can't achieve
                     const targetL1Db = (mode === "LCR" ? RP22.LCR : RP22.SUR).levels[0].db;
                     const requiredL1 = computeRequiredPowerForLevel(
-                      art,
+                      art, 
                       targetL1Db,
-                      screenLossDb,
+                      screenLossDb, 
                       artDistanceLoss.loss,
                       eqHeadroom_dB
                     );
@@ -1103,7 +1103,7 @@ export default function SPLCalculatorPage() {
                     }
                     return "—";
                   }
-
+                  
                   return (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                       {achievable.map(({ level, power }) => {
@@ -1112,14 +1112,14 @@ export default function SPLCalculatorPage() {
                         return (
                           <div
                             key={level}
-                            style={isHighest ? { color: '#213428', textTransform: 'uppercase', fontWeight: 600 } : undefined}>
-
+                            style={isHighest ? { color: '#213428', textTransform: 'uppercase', fontWeight: 600 } : undefined}
+                          >
                             {label}
-                          </div>);
-
+                          </div>
+                        );
                       })}
-                    </div>);
-
+                    </div>
+                  );
                 })()}
               </div>
             </div>
@@ -1129,7 +1129,7 @@ export default function SPLCalculatorPage() {
               // Step 1: Compute display sensitivity
               let sens_1W_display = null;
               let sens_1W_for_calc = null;
-
+              
               if (c.sensUnit === "1W@1m") {
                 sens_1W_display = safeNum(c.sensitivity);
                 sens_1W_for_calc = sens_1W_display;
@@ -1151,17 +1151,17 @@ export default function SPLCalculatorPage() {
                 impedance_ohm: safeNum(c.nominalOhms),
                 max_power: safeNum(c.max_power),
                 power_handling_w: safeNum(c.max_power),
-                rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m)
+                rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m),
               };
 
               // Step 3: Compute SPL capability with amp power
               const compBaseline = getSPL1mCapability(compSpeaker, P);
               const compDistLoss = d ? { loss: 20 * Math.log10(Math.max(1, d)), model: "Point" } : null;
-
+              
               // Apply EQ headroom deduction
-              const compSPL_RSP_raw = compBaseline?.value !== null && compDistLoss?.loss !== null ?
-              compBaseline.value - screenLossDb - compDistLoss.loss - eqHeadroom_dB :
-              null;
+              const compSPL_RSP_raw = (compBaseline?.value !== null && compDistLoss?.loss !== null)
+                ? compBaseline.value - screenLossDb - compDistLoss.loss - eqHeadroom_dB
+                : null;
               const compSPL_RSP = roundUpHalf(compSPL_RSP_raw);
               const compRP22Level = compSPL_RSP !== null ? getRP22Level(compSPL_RSP, mode === "LCR").label : "—";
 
@@ -1169,9 +1169,9 @@ export default function SPLCalculatorPage() {
               const compAmpExceeds = Number.isFinite(P) && Number.isFinite(compPowerHandling) && compPowerHandling > 0 && P > compPowerHandling;
 
               // Compute achievable levels with EQ headroom
-              const achievableLevels = compDistLoss ?
-              getAchievableLevels(compSpeaker, mode === "LCR", screenLossDb, compDistLoss.loss, eqHeadroom_dB) :
-              [];
+              const achievableLevels = compDistLoss 
+                ? getAchievableLevels(compSpeaker, mode === "LCR", screenLossDb, compDistLoss.loss, eqHeadroom_dB)
+                : [];
               const highestLevel = achievableLevels.length > 0 ? achievableLevels[achievableLevels.length - 1].level : null;
 
               return (
@@ -1187,38 +1187,38 @@ export default function SPLCalculatorPage() {
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {compPowerHandling ? `${compPowerHandling} W` : "—"}
-                    {compAmpExceeds &&
-                    <div style={warnBox} role="alert" aria-live="polite">
+                    {compAmpExceeds && (
+                      <div style={warnBox} role="alert" aria-live="polite">
                         {`${Math.ceil(P)} W > ${Math.ceil(compPowerHandling)} W`}
                       </div>
-                    }
+                    )}
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {compSPL_RSP !== null ? `${compSPL_RSP.toFixed(1)} dB(C)` : "—"}
                   </div>
                   <div style={{ padding: 10, border: `2px solid ${BRAND.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {compRP22Level !== "—" ?
-                    <div
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 500,
-                        color: '#1B1A1A'
-                      }}>
-
+                    {compRP22Level !== "—" ? (
+                      <div
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 500,
+                          color: '#1B1A1A',
+                        }}
+                      >
                         {compRP22Level}
-                      </div> :
-                    "—"}
+                      </div>
+                    ) : "—"}
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {(() => {
                       if (!compDistLoss) return "—";
-
+                      
                       if (achievableLevels.length === 0) {
                         const targetL1Db = (mode === "LCR" ? RP22.LCR : RP22.SUR).levels[0].db;
                         const requiredL1 = computeRequiredPowerForLevel(
-                          compSpeaker,
+                          compSpeaker, 
                           targetL1Db,
-                          screenLossDb,
+                          screenLossDb, 
                           compDistLoss.loss,
                           eqHeadroom_dB
                         );
@@ -1227,7 +1227,7 @@ export default function SPLCalculatorPage() {
                         }
                         return "—";
                       }
-
+                      
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                           {achievableLevels.map(({ level, power }) => {
@@ -1236,44 +1236,44 @@ export default function SPLCalculatorPage() {
                             return (
                               <div
                                 key={level}
-                                style={isHighest ? { color: '#213428', textTransform: 'uppercase', fontWeight: 600 } : undefined}>
-
+                                style={isHighest ? { color: '#213428', textTransform: 'uppercase', fontWeight: 600 } : undefined}
+                              >
                                 {label}
-                              </div>);
-
+                              </div>
+                            );
                           })}
-                        </div>);
-
+                        </div>
+                      );
                     })()}
                   </div>
-                </div>);
-
+                </div>
+              );
             })}
           </div>
         </SegmentBoundary>
 
         {/* Attention section */}
-        {allIssues.length > 0 &&
-        <div
-          style={{
-            background: BRAND.panel,
-            border: `1px solid ${BRAND.border}`,
-            borderRadius: 12,
-            padding: 20,
-            marginTop: 16,
-            marginBottom: 16
-          }}>
-
+        {allIssues.length > 0 && (
+          <div
+            style={{
+              background: BRAND.panel,
+              border: `1px solid ${BRAND.border}`,
+              borderRadius: 12,
+              padding: 20,
+              marginTop: 16,
+              marginBottom: 16,
+            }}
+          >
             <h3 style={{ fontSize: 16, margin: 0, marginBottom: 8, color: '#8B0000' }}>
               Attention
             </h3>
             <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, lineHeight: 1.6 }}>
-              {allIssues.map((issue, idx) =>
-            <li key={idx} style={{ color: '#8B0000' }}>{issue}</li>
-            )}
+              {allIssues.map((issue, idx) => (
+                <li key={idx} style={{ color: '#8B0000' }}>{issue}</li>
+              ))}
             </ul>
           </div>
-        }
+        )}
 
         {/* Controls toolbar */}
         <div style={{ marginTop: 16, marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 24, flexWrap: "wrap" }} className="no-print">
@@ -1291,9 +1291,9 @@ export default function SPLCalculatorPage() {
                 background: showPrices ? "rgba(42,110,63,0.08)" : "#FFF",
                 color: BRAND.text,
                 fontSize: 13,
-                cursor: "pointer"
-              }}>
-
+                cursor: "pointer",
+              }}
+            >
               {showPrices ? "On" : "Off"}
             </button>
           </div>
@@ -1313,10 +1313,10 @@ export default function SPLCalculatorPage() {
                   color: eqHeadroom_dB === 0 ? BRAND.btnText : BRAND.text,
                   fontSize: 13,
                   cursor: "pointer",
-                  fontWeight: eqHeadroom_dB === 0 ? 600 : 400
+                  fontWeight: eqHeadroom_dB === 0 ? 600 : 400,
                 }}
-                aria-pressed={eqHeadroom_dB === 0 ? "true" : "false"}>
-
+                aria-pressed={eqHeadroom_dB === 0 ? "true" : "false"}
+              >
                 Off
               </button>
               <button
@@ -1330,10 +1330,10 @@ export default function SPLCalculatorPage() {
                   color: eqHeadroom_dB === 3 ? BRAND.btnText : BRAND.text,
                   fontSize: 13,
                   cursor: "pointer",
-                  fontWeight: eqHeadroom_dB === 3 ? 600 : 400
+                  fontWeight: eqHeadroom_dB === 3 ? 600 : 400,
                 }}
-                aria-pressed={eqHeadroom_dB === 3 ? "true" : "false"}>
-
+                aria-pressed={eqHeadroom_dB === 3 ? "true" : "false"}
+              >
                 –3 dB
               </button>
               <button
@@ -1347,10 +1347,10 @@ export default function SPLCalculatorPage() {
                   color: eqHeadroom_dB === 6 ? BRAND.btnText : BRAND.text,
                   fontSize: 13,
                   cursor: "pointer",
-                  fontWeight: eqHeadroom_dB === 6 ? 600 : 400
+                  fontWeight: eqHeadroom_dB === 6 ? 600 : 400,
                 }}
-                aria-pressed={eqHeadroom_dB === 6 ? "true" : "false"}>
-
+                aria-pressed={eqHeadroom_dB === 6 ? "true" : "false"}
+              >
                 –6 dB
               </button>
             </div>
@@ -1388,8 +1388,8 @@ export default function SPLCalculatorPage() {
                   background: "transparent"
                 }}
                 aria-label="Screen loss in dB"
-                placeholder="0.0" />
-
+                placeholder="0.0"
+              />
             </div>
             <span style={{ fontSize: 13, color: BRAND.subtext }}>dB</span>
           </div>
@@ -1411,8 +1411,8 @@ export default function SPLCalculatorPage() {
               alignItems: "center",
               gap: 6
             }}
-            title="Export to PDF">
-
+            title="Export to PDF"
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
@@ -1446,10 +1446,10 @@ export default function SPLCalculatorPage() {
             background: "#FFFFFF",
             fontSize: 12,
             color: BRAND.subtext,
-            lineHeight: 1.5
+            lineHeight: 1.5,
           }}
-          data-testid="rp22-reference">
-
+          data-testid="rp22-reference"
+        >
           <div style={{ fontWeight: 700, color: BRAND.text, marginBottom: 6 }}>
             RP22 Reference
           </div>
@@ -1478,7 +1478,7 @@ export default function SPLCalculatorPage() {
 
       {/* Print-only footer */}
       <div id="spl-print-footer" aria-hidden="true">
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: '#3E4349' }}>
+        <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, color:'#3E4349' }}>
           <span>Generated by Artcoustic Loudspeakers</span>
           <span className="page-number"></span>
         </div>
@@ -1638,6 +1638,6 @@ export default function SPLCalculatorPage() {
           display: none; 
         }
       `}</style>
-    </div>);
-
+    </div>
+  );
 }
