@@ -558,8 +558,8 @@ export default function SPLCalculatorPage() {
   // Show prices toggle
   const [showPrices, setShowPrices] = useState(false);
 
-  // EQ Headroom state
-  const [eqHeadroom_dB, setEqHeadroom_dB] = useState(0);
+  // Radiation Mode state
+  const [radiationMode, setRadiationMode] = useState('half-space');
 
   // Artcoustic primary
   const [artId, setArtId] = useState("");
@@ -613,17 +613,20 @@ export default function SPLCalculatorPage() {
     return { loss, model: "Point" };
   }, [art, d]);
 
+  // Derive offset from radiation mode
+  const radiationOffset_dB = radiationMode === 'anechoic' ? 6 : 0;
+
   const artSPL_RSP_raw = useMemo(() => {
     if (!artBaseline || artBaseline.value === null || !artDistanceLoss || artDistanceLoss.loss === null) {
       return null;
     }
-    // Apply EQ headroom deduction
-    return artBaseline.value - screenLossDb - artDistanceLoss.loss - eqHeadroom_dB;
-  }, [artBaseline, artDistanceLoss, screenLossDb, eqHeadroom_dB]);
+    // Apply radiation mode offset
+    return artBaseline.value - screenLossDb - artDistanceLoss.loss - radiationOffset_dB;
+  }, [artBaseline, artDistanceLoss, screenLossDb, radiationOffset_dB]);
 
   const artSPL_RSP = useMemo(() => {
     return roundUpHalf(artSPL_RSP_raw);
-  }, [artBaseline, artDistanceLoss, screenLossDb, eqHeadroom_dB, artSPL_RSP_raw]);
+  }, [artSPL_RSP_raw]);
 
   // Collect issues for mini report (now includes amp power)
   const allIssues = useMemo(() => {
@@ -632,7 +635,7 @@ export default function SPLCalculatorPage() {
     // Check Artcoustic speaker
     if (art) {
       const group = mode === "LCR" ? "screen" : "non-screen";
-      issues.push(...detectIssues(art, group, artBaseline, artDistanceLoss, screenLossDb, d, P, eqHeadroom_dB));
+      issues.push(...detectIssues(art, group, artBaseline, artDistanceLoss, screenLossDb, d, P, radiationOffset_dB));
     }
     
     // Check comparators
@@ -656,11 +659,11 @@ export default function SPLCalculatorPage() {
       const compDistLoss = d ? { loss: 20 * Math.log10(Math.max(1, d)), model: "Point" } : null;
       const group = mode === "LCR" ? "screen" : "non-screen";
       
-      issues.push(...detectIssues(compSpeaker, group, compBaseline, compDistLoss, screenLossDb, d, P, eqHeadroom_dB));
+      issues.push(...detectIssues(compSpeaker, group, compBaseline, compDistLoss, screenLossDb, d, P, radiationOffset_dB));
     });
     
     return issues;
-  }, [art, artBaseline, artDistanceLoss, comparators, mode, screenLossDb, d, P, eqHeadroom_dB]);
+  }, [art, artBaseline, artDistanceLoss, comparators, mode, screenLossDb, d, P, radiationOffset_dB]);
 
   // Detect if any speaker uses non-RP1 data (updated to use getSPL1mCapability)
   const hasNonRp1 = useMemo(() => {
@@ -835,7 +838,7 @@ export default function SPLCalculatorPage() {
                     const optBaseline = getSPL1mCapability(opt, P); // Use getSPL1mCapability
                     const optDistLoss = getDistanceLoss(opt, d || 3);
                     const optSPL_RSP_raw = (optBaseline?.value !== null && optDistLoss?.loss !== null)
-                      ? optBaseline.value - screenLossDb - optDistLoss.loss - eqHeadroom_dB
+                      ? optBaseline.value - screenLossDb - optDistLoss.loss - radiationOffset_dB
                       : null;
                     const optSPL_RSP = roundUpHalf(optSPL_RSP_raw);
 
@@ -919,9 +922,9 @@ export default function SPLCalculatorPage() {
                 const compBaseline = getSPL1mCapability(compSpeaker, P);
                 const compDistLoss = d ? { loss: 20 * Math.log10(Math.max(1, d)), model: "Point" } : null;
                 
-                // Apply EQ headroom deduction
+                // Apply radiation mode offset
                 const compSPL_RSP_raw = (compBaseline?.value !== null && compDistLoss?.loss !== null)
-                  ? compBaseline.value - screenLossDb - compDistLoss.loss - eqHeadroom_dB
+                  ? compBaseline.value - screenLossDb - compDistLoss.loss - radiationOffset_dB
                   : null;
                 const compSPL_RSP = roundUpHalf(compSPL_RSP_raw);
                 const compRP22Level = compSPL_RSP !== null ? getRP22Level(compSPL_RSP, mode === "LCR").label : "—";
@@ -929,9 +932,9 @@ export default function SPLCalculatorPage() {
                 const compPowerHandling = safeNum(c.max_power);
                 const compAmpExceeds = Number.isFinite(P) && Number.isFinite(compPowerHandling) && compPowerHandling > 0 && P > compPowerHandling;
 
-                // Compute achievable levels with EQ headroom
+                // Compute achievable levels with radiation offset
                 const achievableLevels = compDistLoss 
-                  ? getAchievableLevels(compSpeaker, mode === "LCR", screenLossDb, compDistLoss.loss, eqHeadroom_dB)
+                  ? getAchievableLevels(compSpeaker, mode === "LCR", screenLossDb, compDistLoss.loss, radiationOffset_dB)
                   : [];
                 const highestLevel = achievableLevels.length > 0 ? achievableLevels[achievableLevels.length - 1].level : null;
 
@@ -1065,7 +1068,7 @@ export default function SPLCalculatorPage() {
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                 {(() => {
                   if (!art || !artDistanceLoss) return "—";
-                  const achievable = getAchievableLevels(art, mode === "LCR", screenLossDb, artDistanceLoss.loss, eqHeadroom_dB);
+                  const achievable = getAchievableLevels(art, mode === "LCR", screenLossDb, artDistanceLoss.loss, radiationOffset_dB);
                   const highest = achievable.length > 0 ? achievable[achievable.length - 1].level : null;
                   
                   if (achievable.length === 0) {
@@ -1076,7 +1079,7 @@ export default function SPLCalculatorPage() {
                       targetL1Db,
                       screenLossDb, 
                       artDistanceLoss.loss,
-                      eqHeadroom_dB
+                      radiationOffset_dB
                     );
                     if (requiredL1 !== null) {
                       return <div>Level 1 not achieved</div>;
@@ -1148,9 +1151,9 @@ export default function SPLCalculatorPage() {
               const compPowerHandling = safeNum(c.max_power);
               const compAmpExceeds = Number.isFinite(P) && Number.isFinite(compPowerHandling) && compPowerHandling > 0 && P > compPowerHandling;
 
-              // Compute achievable levels with EQ headroom
+              // Compute achievable levels with radiation offset
               const achievableLevels = compDistLoss 
-                ? getAchievableLevels(compSpeaker, mode === "LCR", screenLossDb, compDistLoss.loss, eqHeadroom_dB)
+                ? getAchievableLevels(compSpeaker, mode === "LCR", screenLossDb, compDistLoss.loss, radiationOffset_dB)
                 : [];
               const highestLevel = achievableLevels.length > 0 ? achievableLevels[achievableLevels.length - 1].level : null;
 
@@ -1200,7 +1203,7 @@ export default function SPLCalculatorPage() {
                           targetL1Db,
                           screenLossDb, 
                           compDistLoss.loss,
-                          eqHeadroom_dB
+                          radiationOffset_dB
                         );
                         if (requiredL1 !== null) {
                           return <div>Level 1 not achieved</div>;
@@ -1278,60 +1281,43 @@ export default function SPLCalculatorPage() {
             </button>
           </div>
 
-          {/* EQ Headroom control */}
+          {/* Radiation Mode control */}
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <label style={{ fontSize: 13, color: BRAND.subtext }}>EQ Headroom</label>
+            <label style={{ fontSize: 13, color: BRAND.subtext }}>Radiation Mode</label>
             <div style={{ display: "flex", gap: 4, border: `1px solid ${BRAND.border}`, borderRadius: 8, padding: 2, background: "#FFF" }}>
               <button
                 type="button"
-                onClick={() => setEqHeadroom_dB(0)}
+                onClick={() => setRadiationMode('half-space')}
                 style={{
                   padding: "6px 12px",
                   borderRadius: 6,
                   border: "none",
-                  background: eqHeadroom_dB === 0 ? BRAND.btn : "transparent",
-                  color: eqHeadroom_dB === 0 ? BRAND.btnText : BRAND.text,
+                  background: radiationMode === 'half-space' ? BRAND.btn : "transparent",
+                  color: radiationMode === 'half-space' ? BRAND.btnText : BRAND.text,
                   fontSize: 13,
                   cursor: "pointer",
-                  fontWeight: eqHeadroom_dB === 0 ? 600 : 400,
+                  fontWeight: radiationMode === 'half-space' ? 600 : 400,
                 }}
-                aria-pressed={eqHeadroom_dB === 0 ? "true" : "false"}
+                aria-pressed={radiationMode === 'half-space' ? "true" : "false"}
               >
-                Off
+                Half-Space
               </button>
               <button
                 type="button"
-                onClick={() => setEqHeadroom_dB(3)}
+                onClick={() => setRadiationMode('anechoic')}
                 style={{
                   padding: "6px 12px",
                   borderRadius: 6,
                   border: "none",
-                  background: eqHeadroom_dB === 3 ? BRAND.btn : "transparent",
-                  color: eqHeadroom_dB === 3 ? BRAND.btnText : BRAND.text,
+                  background: radiationMode === 'anechoic' ? BRAND.btn : "transparent",
+                  color: radiationMode === 'anechoic' ? BRAND.btnText : BRAND.text,
                   fontSize: 13,
                   cursor: "pointer",
-                  fontWeight: eqHeadroom_dB === 3 ? 600 : 400,
+                  fontWeight: radiationMode === 'anechoic' ? 600 : 400,
                 }}
-                aria-pressed={eqHeadroom_dB === 3 ? "true" : "false"}
+                aria-pressed={radiationMode === 'anechoic' ? "true" : "false"}
               >
-                –3 dB
-              </button>
-              <button
-                type="button"
-                onClick={() => setEqHeadroom_dB(6)}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  border: "none",
-                  background: eqHeadroom_dB === 6 ? BRAND.btn : "transparent",
-                  color: eqHeadroom_dB === 6 ? BRAND.btnText : BRAND.text,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  fontWeight: eqHeadroom_dB === 6 ? 600 : 400,
-                }}
-                aria-pressed={eqHeadroom_dB === 6 ? "true" : "false"}
-              >
-                –6 dB
+                Anechoic
               </button>
             </div>
           </div>
@@ -1406,7 +1392,7 @@ export default function SPLCalculatorPage() {
         <div className="print-only-params" style={{ display: 'none', marginTop: 16, marginBottom: 16, padding: 12, border: '1px solid #E5E7EB', borderRadius: 8, background: '#F9FAF9' }}>
           <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>Calculation Parameters</div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: 13 }}>
-            <div>EQ Headroom: {eqHeadroom_dB === 0 ? 'Off' : `–${eqHeadroom_dB} dB`}</div>
+            <div>Radiation Mode: {radiationMode === 'half-space' ? 'Half-Space' : 'Anechoic'}</div>
             <div>Screen Loss: –{screenLoss_dB.toFixed(1)} dB</div>
             <div>Distance: {d ? `${d.toFixed(2)} m` : '—'}</div>
             <div>Amplifier Power: {P ? `${Math.ceil(P)} W` : '—'}</div>
