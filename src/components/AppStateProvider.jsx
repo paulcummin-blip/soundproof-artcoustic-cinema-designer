@@ -199,25 +199,28 @@ function useDesignerState() {
   const [useRearGlobal, setUseRearGlobal] = useState(true);
 
   const [splConfig, setSplConfig] = useState({
-    globalPowerW: 100,
-    globalEqHeadroomDb: 0,
-    perRole: {}
-  });
+        globalPowerW: 100,
+        globalEqHeadroomDb: 0,
+        radiationMode: 'half-space', // 'half-space' | 'anechoic'
+        perRole: {}
+      });
 
   const getEffectiveSplInputs = useCallback((role) => {
     const roleConfig = splConfig.perRole[role];
     
     if (roleConfig && !roleConfig.useGlobal) {
-      return {
-        powerW: roleConfig.powerW ?? splConfig.globalPowerW,
-        eqHeadroomDb: roleConfig.eqHeadroomDb ?? splConfig.globalEqHeadroomDb
-      };
-    }
-    
-    return {
-      powerW: splConfig.globalPowerW,
-      eqHeadroomDb: splConfig.globalEqHeadroomDb
-    };
+            return {
+              powerW: roleConfig.powerW ?? splConfig.globalPowerW,
+              eqHeadroomDb: roleConfig.eqHeadroomDb ?? splConfig.globalEqHeadroomDb,
+              radiationMode: splConfig.radiationMode || 'half-space',
+            };
+          }
+
+          return {
+            powerW: splConfig.globalPowerW,
+            eqHeadroomDb: splConfig.globalEqHeadroomDb,
+            radiationMode: splConfig.radiationMode || 'half-space',
+          };
   }, [splConfig]);
 
   const updateGlobalSpl = useCallback((updates) => {
