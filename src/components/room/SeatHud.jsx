@@ -37,6 +37,12 @@ export default function SeatHud({
     return String(v);
   };
 
+  const seatRp22 =
+    tooltipData.rp22 ||
+    tooltipData.rp22SeatMetrics ||
+    tooltipData.rp22Metrics ||
+    {};
+
   return (
     <div
       ref={hudElRef}
@@ -149,8 +155,20 @@ export default function SeatHud({
 
         {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
           const paramNum = key.replace('p', '');
-          const metric = tooltipData.rp22?.[paramNum];
+          // Try a few shapes: "10", "P10", or the raw key
+          const metric =
+            seatRp22[paramNum] ||
+            seatRp22[`P${paramNum}`] ||
+            seatRp22[key.toUpperCase()] ||
+            null;
+
           if (!metric) return null;
+
+          // Prefer a preformatted label if it exists, otherwise "P#: value"
+          const labelText =
+            key === 'p16' && metric.hudLabel
+              ? `P16: ${metric.hudLabel}`
+              : `P${paramNum}: ${metric.formatted || '—'}`;
 
           return (
             <div
@@ -163,13 +181,7 @@ export default function SeatHud({
                 fontSize: 12,
               }}
             >
-              <span>
-                {key === 'p16' && metric.hudLabel ? (
-                  `P16: ${metric.hudLabel}`
-                ) : (
-                  `P${paramNum}: ${metric.formatted || '—'}`
-                )}
-              </span>
+              <span>{labelText}</span>
               {renderLevelBadge(metric.level || '—')}
             </div>
           );
