@@ -2346,14 +2346,15 @@ React.useEffect(() => {
     };
 
     // Try to pull per-seat RP22 metrics from analysisResult
-    const seatMetrics = analysisResult?.seatMetrics?.get?.(effectiveHoveredSeat.id);
-    if (seatMetrics) {
+    const seatId = effectiveHoveredSeat.id || `seat-${effectiveHoveredSeat.x}-${effectiveHoveredSeat.y}`;
+    const rp22DataForSeat = analysisResult?.perSeatRp22?.[seatId]?.rp22;
+    if (rp22DataForSeat) {
       // Merge in P9, P10, P16 from the analysis engine
-      if (seatMetrics.p9) data.rp22.p9 = seatMetrics.p9;
-      if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
-      if (seatMetrics.p16) data.rp22.p16 = seatMetrics.p16;
-      if (seatMetrics.p17) data.rp22.p17 = seatMetrics.p17;
-      if (seatMetrics.p20) data.rp22.p20 = seatMetrics.p20;
+      if (rp22DataForSeat[9]) data.rp22.p9 = rp22DataForSeat[9];
+      if (rp22DataForSeat[10]) data.rp22.p10 = rp22DataForSeat[10];
+      if (rp22DataForSeat[16]) data.rp22.p16 = rp22DataForSeat[16];
+      if (rp22DataForSeat[17]) data.rp22.p17 = rp22DataForSeat[17];
+      if (rp22DataForSeat[20]) data.rp22.p20 = rp22DataForSeat[20];
     }
 
     // NEW: Use centralized SPL calculation (single source of truth)
@@ -2531,6 +2532,7 @@ React.useEffect(() => {
     heightM,
     getCanonicalRole,
     allSeatSplMetrics, // NEW: SPL data dependency
+    analysisResult, // Make tooltipData react to changes in analysisResult
   ]);
 
 // 1) Auto-position HUD near the currently hovered/pinned seat
