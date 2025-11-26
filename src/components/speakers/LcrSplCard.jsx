@@ -4,6 +4,7 @@ import { Volume2 } from 'lucide-react';
 import { useAppState } from '@/components/AppStateProvider';
 import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 import { getSeatSplMetrics, getMlpSeat } from '@/components/utils/spl/centralSplEngine';
+import { formatDb } from '@/components/utils/formatDb';
 
 export default function LcrSplCard({ role, label, allSeatSplMetrics }) {
   const appState = useAppState();
@@ -79,7 +80,7 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics }) {
       </CardHeader>
       <CardContent className="px-3 pb-3">
         <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
-          {Number.isFinite(finalSplDb) ? `${finalSplDb.toFixed(1)} dB` : '—'}
+          {formatDb(finalSplDb)}
         </div>
         {!speaker?.position && (
           <div className="text-xs text-[#625143] mt-1">Not placed</div>

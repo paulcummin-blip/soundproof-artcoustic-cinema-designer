@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import { formatDb } from '@/components/utils/formatDb';
 
 export default function SeatHud({
   tooltipData,
@@ -21,7 +22,18 @@ export default function SeatHud({
   // Safe value formatter
   const fmt = (v) => {
     if (v == null) return "—";
-    if (typeof v === "object" && "formatted" in v) return v.formatted ?? "—";
+    if (typeof v === "object" && "formatted" in v) {
+      // If the formatted value is a SPL reading (ends with " dB"), reformat it
+      const formatted = v.formatted ?? "—";
+      if (typeof formatted === 'string' && formatted.includes(' dB')) {
+        const numMatch = formatted.match(/^([-\d.]+)\s*dB/);
+        if (numMatch) {
+          const rawValue = parseFloat(numMatch[1]);
+          return formatDb(rawValue);
+        }
+      }
+      return formatted;
+    }
     return String(v);
   };
 

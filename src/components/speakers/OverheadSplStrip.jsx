@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Volume2 } from 'lucide-react';
+import { formatDb } from '@/components/utils/formatDb';
 
 /**
  * Displays SPL @ MLP for overhead speakers.
@@ -110,7 +111,7 @@ export default function OverheadSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayo
               </CardHeader>
               <CardContent className="px-3 pb-3">
                 <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
-                  {hasValue ? `${splValue.toFixed(1)} dB` : '—'}
+                  {formatDb(splValue)}
                 </div>
               </CardContent>
             </Card>
