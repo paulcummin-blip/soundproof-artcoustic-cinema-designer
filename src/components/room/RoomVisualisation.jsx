@@ -2332,8 +2332,29 @@ React.useEffect(() => {
       }
     };
 
-    // Initialize RP22 section - will be populated from analysis engine
-    data.rp22 = {};
+    // Initialize RP22 section with all metrics present (defaults to "—")
+    data.rp22 = {
+      p1: { valueM: null, level: '—', formatted: '—' },
+      p4: { valueDb: null, level: '—', formatted: '—' },
+      p5: { valueDeg: null, level: '—', formatted: '—' },
+      p6: { valueDb: null, level: '—', formatted: '—' },
+      p9: { valueDeg: null, level: '—', formatted: '—' },
+      p10: { valueDb: null, level: '—', formatted: '—' },
+      p16: { valueDb: null, level: '—', formatted: '—' }, 
+      p17: { valueDb: null, level: '—', formatted: '—' }, 
+      p20: { valueDb: null, level: '—', formatted: '—' },
+    };
+
+    // Try to pull per-seat RP22 metrics from analysisResult
+    const seatMetrics = analysisResult?.seatMetrics?.get?.(effectiveHoveredSeat.id);
+    if (seatMetrics) {
+      // Merge in P9, P10, P16 from the analysis engine
+      if (seatMetrics.p9) data.rp22.p9 = seatMetrics.p9;
+      if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
+      if (seatMetrics.p16) data.rp22.p16 = seatMetrics.p16;
+      if (seatMetrics.p17) data.rp22.p17 = seatMetrics.p17;
+      if (seatMetrics.p20) data.rp22.p20 = seatMetrics.p20;
+    }
 
     // NEW: Use centralized SPL calculation (single source of truth)
     const seatSplData = getSeatSplMetrics(allSeatSplMetrics, effectiveHoveredSeat.id);
@@ -2484,19 +2505,15 @@ React.useEffect(() => {
       }
     }
 
-    // Pull all RP22 metrics from analysis engine (P9, P10, P16, P17, P20)
-    const seatIdForEngine = effectiveHoveredSeat.id || `seat-${effectiveHoveredSeat.x}-${effectiveHoveredSeat.y}`;
-    const seatRp22Entry = analysisResult?.perSeatRp22?.[seatIdForEngine];
+    // P9 and P10 are now computed in useRP22AnalysisEngine and pulled from seatMetrics above
+    // Legacy inline calculations removed - single source of truth is the analysis engine
     
-    // Generic merge: copy all engine metrics to data.rp22
-    if (seatRp22Entry?.rp22) {
-      Object.keys(seatRp22Entry.rp22).forEach(key => {
-        data.rp22[`p${key}`] = seatRp22Entry.rp22[key];
-      });
-    }
+    // P16 / P17 / P20 are also computed in useRP22AnalysisEngine
+    // P16 uses off-axis HF data
+    // P17 / P20 reserved for future FR implementation
 
     // Legacy bridge
-    data.p1NearestM = data.rp22.p1?.valueM;
+    data.p1NearestM = data.rp22.p1.valueM;
 
     return data;
   }, [
@@ -2514,7 +2531,6 @@ React.useEffect(() => {
     heightM,
     getCanonicalRole,
     allSeatSplMetrics, // NEW: SPL data dependency
-    analysisResult, // Make tooltipData react to changes in analysisResult
   ]);
 
 // 1) Auto-position HUD near the currently hovered/pinned seat

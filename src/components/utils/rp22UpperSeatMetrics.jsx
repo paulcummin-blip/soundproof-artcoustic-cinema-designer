@@ -121,76 +121,29 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
 }
 
 /**
- * Compute upper SPL spread for a seat, normalized to RSP
- * Returns max SPL difference among upper speakers after removing RSP offsets
+ * Compute upper SPL spread for a seat
+ * Returns max SPL difference among upper speakers
  * @param {Object} seat - Seat object
  * @param {Array} upperSpeakers - Array from getUpperSpeakersForSeat
  * @param {Function} getSplAtSeat - Function(seatId, role) => SPL in dB
- * @param {Object} mlpSeat - MLP/RSP seat object for normalization
- * @returns {Number|null} deltaUpperSPL in dB (normalized)
+ * @returns {Number|null} deltaUpperSPL in dB
  */
-export function computeUpperSplSpreadForSeat(seat, upperSpeakers, getSplAtSeat, mlpSeat = null) {
+export function computeUpperSplSpreadForSeat(seat, upperSpeakers, getSplAtSeat) {
   if (!seat || !Array.isArray(upperSpeakers) || upperSpeakers.length < 2 || typeof getSplAtSeat !== 'function') {
     return null;
   }
 
   const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
   
-  // If no MLP provided, use raw SPL differences (backward compatibility)
-  if (!mlpSeat) {
-    const splValues = upperSpeakers
-      .map(spk => getSplAtSeat(seatId, spk.role))
-      .filter(v => isNum(v));
+  const splValues = upperSpeakers
+    .map(spk => getSplAtSeat(seatId, spk.role))
+    .filter(v => isNum(v));
 
-    if (splValues.length < 2) return null;
+  if (splValues.length < 2) return null;
 
-    const maxSpl = Math.max(...splValues);
-    const minSpl = Math.min(...splValues);
-    return maxSpl - minSpl;
-  }
+  const maxSpl = Math.max(...splValues);
+  const minSpl = Math.min(...splValues);
+  const deltaSpl = maxSpl - minSpl;
 
-  // Compute MLP upper levels and reference
-  const mlpSeatId = mlpSeat.id || `seat-${mlpSeat.x}-${mlpSeat.y}`;
-  const mlpUpperLevels = {};
-  
-  upperSpeakers.forEach(spk => {
-    const spl = getSplAtSeat(mlpSeatId, spk.role);
-    if (isNum(spl)) {
-      mlpUpperLevels[spk.role] = spl;
-    }
-  });
-
-  const mlpVals = Object.values(mlpUpperLevels);
-  if (mlpVals.length < 2) return null;
-
-  // Reference level at MLP (average of all uppers)
-  const mlpRef = mlpVals.reduce((a, b) => a + b, 0) / mlpVals.length;
-
-  // Compute offset for each upper relative to MLP reference
-  const upperOffsets = {};
-  upperSpeakers.forEach(spk => {
-    const mlpLevel = mlpUpperLevels[spk.role];
-    if (isNum(mlpLevel)) {
-      upperOffsets[spk.role] = mlpLevel - mlpRef;
-    } else {
-      upperOffsets[spk.role] = 0;
-    }
-  });
-
-  // Get normalized levels at this seat (remove MLP offsets)
-  const normLevels = [];
-  upperSpeakers.forEach(spk => {
-    const raw = getSplAtSeat(seatId, spk.role);
-    if (!isNum(raw)) return;
-    
-    const offset = upperOffsets[spk.role] || 0;
-    const norm = raw - offset;
-    normLevels.push(norm);
-  });
-
-  if (normLevels.length < 2) return null;
-
-  const maxNorm = Math.max(...normLevels);
-  const minNorm = Math.min(...normLevels);
-  return maxNorm - minNorm;
+  return deltaSpl;
 }

@@ -320,37 +320,23 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       }
 
       // P10 - Maximum SPL difference between upper speakers
-      const seatSpl = seatSplMetrics?.get(seatId);
-      const upperMap = seatSpl?.spl?.uppers || {};
-      
-      const upperValues = Object.values(upperMap)
-        .map((entry) => entry?.value)
-        .filter((v) => isNum(v));
-      
-      let p10Value = null;
-      let p10Level = null;
-      
-      if (upperValues.length >= 2) {
-        const maxVal = Math.max(...upperValues);
-        const minVal = Math.min(...upperValues);
-        p10Value = maxVal - minVal;
+      if (upperSpeakers.length >= 2) {
+        const deltaUpperSpl = computeUpperSplSpreadForSeat(seat, upperSpeakers, getSplAtSeat);
+        
+        if (isNum(deltaUpperSpl)) {
+          let level10 = 1;
+          if (deltaUpperSpl <= 2) level10 = 4;
+          else if (deltaUpperSpl <= 5) level10 = 3;
+          else if (deltaUpperSpl <= 8) level10 = 2;
+          else if (deltaUpperSpl <= 12) level10 = 1;
+          
+          metrics.p10 = {
+            value: deltaUpperSpl,
+            formatted: `±${deltaUpperSpl.toFixed(1)} dB`,
+            level: level10,
+          };
+        }
       }
-      
-      if (isNum(p10Value)) {
-        if (p10Value <= 2) p10Level = 'L4';
-        else if (p10Value <= 5) p10Level = 'L3';
-        else if (p10Value <= 8) p10Level = 'L2';
-        else p10Level = 'L1';
-      }
-      
-      const p10Metric = {
-        id: 10,
-        value: isNum(p10Value) ? p10Value : null,
-        formatted: isNum(p10Value) ? `${Math.round(p10Value)} dB` : '—',
-        level: p10Level,
-      };
-      
-      metrics.p10 = p10Metric;
 
       // P16 - Screen FR variance using off-axis HF data
       const screenSpeakers = safeSpeakers.filter(s => 
@@ -389,16 +375,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         rp22: {}
       };
 
-      // Map metrics to perSeatRp22 structure (always store metrics, even if null)
-      perSeatRp22[seatId].rp22[1] = metrics.p1 || null;
-      perSeatRp22[seatId].rp22[4] = metrics.p4 || null;
-      perSeatRp22[seatId].rp22[5] = metrics.p5 || null;
-      perSeatRp22[seatId].rp22[6] = metrics.p6 || null;
-      perSeatRp22[seatId].rp22[9] = metrics.p9 || null;
-      perSeatRp22[seatId].rp22[10] = metrics.p10;  // Always store P10 (already has safe fallback structure)
-      perSeatRp22[seatId].rp22[16] = metrics.p16 || null;
-      perSeatRp22[seatId].rp22[17] = metrics.p17 || null;
-      perSeatRp22[seatId].rp22[20] = metrics.p20 || null;
+      // Map p9 -> parameter 9, p10 -> parameter 10, etc.
+      if (metrics.p1) perSeatRp22[seatId].rp22[1] = metrics.p1;
+      if (metrics.p4) perSeatRp22[seatId].rp22[4] = metrics.p4;
+      if (metrics.p5) perSeatRp22[seatId].rp22[5] = metrics.p5;
+      if (metrics.p6) perSeatRp22[seatId].rp22[6] = metrics.p6;
+      if (metrics.p9) perSeatRp22[seatId].rp22[9] = metrics.p9;
+      if (metrics.p10) perSeatRp22[seatId].rp22[10] = metrics.p10;
+      if (metrics.p16) perSeatRp22[seatId].rp22[16] = metrics.p16;
+      if (metrics.p17) perSeatRp22[seatId].rp22[17] = metrics.p17;
+      if (metrics.p20) perSeatRp22[seatId].rp22[20] = metrics.p20;
     }
 
     return {
