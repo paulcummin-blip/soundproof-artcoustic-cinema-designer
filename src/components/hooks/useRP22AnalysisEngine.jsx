@@ -341,12 +341,21 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         else p10Level = 'L1';
       }
       
-      metrics.p10 = {
-        id: 10,
-        value: isNum(p10Value) ? p10Value : null,
-        formatted: isNum(p10Value) ? `${Math.round(p10Value)} dB` : '—',
-        level: p10Level,
-      };
+      const p10Metric = isNum(p10Value)
+        ? {
+            id: 10,
+            value: p10Value,
+            formatted: `${Math.round(p10Value)} dB`,
+            level: p10Level,
+          }
+        : {
+            id: 10,
+            value: null,
+            formatted: '—',
+            level: null,
+          };
+      
+      metrics.p10 = p10Metric;
 
       // P16 - Screen FR variance using off-axis HF data
       const screenSpeakers = safeSpeakers.filter(s => 

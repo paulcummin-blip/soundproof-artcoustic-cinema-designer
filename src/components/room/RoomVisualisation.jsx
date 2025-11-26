@@ -2332,30 +2332,8 @@ React.useEffect(() => {
       }
     };
 
-    // Initialize RP22 section with all metrics present (defaults to "—")
-    data.rp22 = {
-      p1: { valueM: null, level: '—', formatted: '—' },
-      p4: { valueDb: null, level: '—', formatted: '—' },
-      p5: { valueDeg: null, level: '—', formatted: '—' },
-      p6: { valueDb: null, level: '—', formatted: '—' },
-      p9: { valueDeg: null, level: '—', formatted: '—' },
-      p10: { valueDb: null, level: '—', formatted: '—' },
-      p16: { valueDb: null, level: '—', formatted: '—' }, 
-      p17: { valueDb: null, level: '—', formatted: '—' }, 
-      p20: { valueDb: null, level: '—', formatted: '—' },
-    };
-
-    // Try to pull per-seat RP22 metrics from analysisResult
-    const seatId = effectiveHoveredSeat.id || `seat-${effectiveHoveredSeat.x}-${effectiveHoveredSeat.y}`;
-    const rp22DataForSeat = analysisResult?.perSeatRp22?.[seatId]?.rp22;
-    if (rp22DataForSeat) {
-      // Merge in P9, P10, P16 from the analysis engine
-      if (rp22DataForSeat[9]) data.rp22.p9 = rp22DataForSeat[9];
-      if (rp22DataForSeat[10]) data.rp22.p10 = rp22DataForSeat[10];
-      if (rp22DataForSeat[16]) data.rp22.p16 = rp22DataForSeat[16];
-      if (rp22DataForSeat[17]) data.rp22.p17 = rp22DataForSeat[17];
-      if (rp22DataForSeat[20]) data.rp22.p20 = rp22DataForSeat[20];
-    }
+    // Initialize RP22 section - will be populated from analysis engine
+    data.rp22 = {};
 
     // NEW: Use centralized SPL calculation (single source of truth)
     const seatSplData = getSeatSplMetrics(allSeatSplMetrics, effectiveHoveredSeat.id);
@@ -2401,6 +2379,15 @@ React.useEffect(() => {
     };
 
     const seatPos = { x: seatX, y: seatY, z: seatZ };
+
+    // Pull all RP22 metrics from analysis engine (generic pattern)
+    const seatId = effectiveHoveredSeat.id || `seat-${effectiveHoveredSeat.x}-${effectiveHoveredSeat.y}`;
+    const rp22FromEngine = analysisResult?.perSeatRp22?.[seatId]?.rp22 || {};
+    
+    // Copy all metrics from engine to data.rp22
+    Object.keys(rp22FromEngine).forEach(key => {
+      data.rp22[`p${key}`] = rp22FromEngine[key];
+    });
 
     // --- Compute P1: Nearest boundary distance ---
     if (Number.isFinite(seatX) && Number.isFinite(seatY)) {
