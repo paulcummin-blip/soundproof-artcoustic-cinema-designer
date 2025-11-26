@@ -334,26 +334,21 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         const maxVal = Math.max(...upperValues);
         const minVal = Math.min(...upperValues);
         p10Value = maxVal - minVal;
-        
+      }
+      
+      if (isNum(p10Value)) {
         if (p10Value <= 2) p10Level = 'L4';
         else if (p10Value <= 5) p10Level = 'L3';
         else if (p10Value <= 8) p10Level = 'L2';
         else p10Level = 'L1';
       }
       
-      const p10Metric = isNum(p10Value)
-        ? {
-            id: 10,
-            value: p10Value,
-            formatted: `${Math.round(p10Value)} dB`,
-            level: p10Level,
-          }
-        : {
-            id: 10,
-            value: null,
-            formatted: '—',
-            level: null,
-          };
+      const p10Metric = {
+        id: 10,
+        value: isNum(p10Value) ? p10Value : null,
+        formatted: isNum(p10Value) ? `${Math.round(p10Value)} dB` : '—',
+        level: p10Level,
+      };
       
       metrics.p10 = p10Metric;
 
@@ -394,16 +389,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         rp22: {}
       };
 
-      // Map p9 -> parameter 9, p10 -> parameter 10, etc.
-      if (metrics.p1) perSeatRp22[seatId].rp22[1] = metrics.p1;
-      if (metrics.p4) perSeatRp22[seatId].rp22[4] = metrics.p4;
-      if (metrics.p5) perSeatRp22[seatId].rp22[5] = metrics.p5;
-      if (metrics.p6) perSeatRp22[seatId].rp22[6] = metrics.p6;
-      if (metrics.p9) perSeatRp22[seatId].rp22[9] = metrics.p9;
-      if (metrics.p10) perSeatRp22[seatId].rp22[10] = metrics.p10;
-      if (metrics.p16) perSeatRp22[seatId].rp22[16] = metrics.p16;
-      if (metrics.p17) perSeatRp22[seatId].rp22[17] = metrics.p17;
-      if (metrics.p20) perSeatRp22[seatId].rp22[20] = metrics.p20;
+      // Map metrics to perSeatRp22 structure (always store metrics, even if null)
+      perSeatRp22[seatId].rp22[1] = metrics.p1 || null;
+      perSeatRp22[seatId].rp22[4] = metrics.p4 || null;
+      perSeatRp22[seatId].rp22[5] = metrics.p5 || null;
+      perSeatRp22[seatId].rp22[6] = metrics.p6 || null;
+      perSeatRp22[seatId].rp22[9] = metrics.p9 || null;
+      perSeatRp22[seatId].rp22[10] = metrics.p10;  // Always store P10 (already has safe fallback structure)
+      perSeatRp22[seatId].rp22[16] = metrics.p16 || null;
+      perSeatRp22[seatId].rp22[17] = metrics.p17 || null;
+      perSeatRp22[seatId].rp22[20] = metrics.p20 || null;
     }
 
     return {
