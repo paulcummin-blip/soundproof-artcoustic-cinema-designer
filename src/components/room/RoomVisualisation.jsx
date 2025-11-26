@@ -2380,15 +2380,6 @@ React.useEffect(() => {
 
     const seatPos = { x: seatX, y: seatY, z: seatZ };
 
-    // Pull all RP22 metrics from analysis engine (generic pattern)
-    const seatId = effectiveHoveredSeat.id || `seat-${effectiveHoveredSeat.x}-${effectiveHoveredSeat.y}`;
-    const rp22FromEngine = analysisResult?.perSeatRp22?.[seatId]?.rp22 || {};
-    
-    // Copy all metrics from engine to data.rp22
-    Object.keys(rp22FromEngine).forEach(key => {
-      data.rp22[`p${key}`] = rp22FromEngine[key];
-    });
-
     // --- Compute P1: Nearest boundary distance ---
     if (Number.isFinite(seatX) && Number.isFinite(seatY)) {
       const isCenterlineX = seatX < 0 || (
@@ -2493,14 +2484,16 @@ React.useEffect(() => {
       }
     }
 
-    // Merge in P9, P10, P16, P17, P20 from analysis engine (generic pattern)
+    // Pull all RP22 metrics from analysis engine (P9, P10, P16, P17, P20)
     const seatIdForEngine = effectiveHoveredSeat.id || `seat-${effectiveHoveredSeat.x}-${effectiveHoveredSeat.y}`;
-    const rp22FromEngine = analysisResult?.perSeatRp22?.[seatIdForEngine]?.rp22 || {};
+    const seatRp22Entry = analysisResult?.perSeatRp22?.[seatIdForEngine];
     
-    // Copy all engine-computed metrics to data.rp22
-    Object.keys(rp22FromEngine).forEach(key => {
-      data.rp22[`p${key}`] = rp22FromEngine[key];
-    });
+    // Generic merge: copy all engine metrics to data.rp22
+    if (seatRp22Entry?.rp22) {
+      Object.keys(seatRp22Entry.rp22).forEach(key => {
+        data.rp22[`p${key}`] = seatRp22Entry.rp22[key];
+      });
+    }
 
     // Legacy bridge
     data.p1NearestM = data.rp22.p1?.valueM;
