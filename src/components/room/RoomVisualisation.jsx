@@ -2493,15 +2493,17 @@ React.useEffect(() => {
       }
     }
 
-    // P9 and P10 are now computed in useRP22AnalysisEngine and pulled from seatMetrics above
-    // Legacy inline calculations removed - single source of truth is the analysis engine
+    // Merge in P9, P10, P16, P17, P20 from analysis engine (generic pattern)
+    const seatIdForEngine = effectiveHoveredSeat.id || `seat-${effectiveHoveredSeat.x}-${effectiveHoveredSeat.y}`;
+    const rp22FromEngine = analysisResult?.perSeatRp22?.[seatIdForEngine]?.rp22 || {};
     
-    // P16 / P17 / P20 are also computed in useRP22AnalysisEngine
-    // P16 uses off-axis HF data
-    // P17 / P20 reserved for future FR implementation
+    // Copy all engine-computed metrics to data.rp22
+    Object.keys(rp22FromEngine).forEach(key => {
+      data.rp22[`p${key}`] = rp22FromEngine[key];
+    });
 
     // Legacy bridge
-    data.p1NearestM = data.rp22.p1.valueM;
+    data.p1NearestM = data.rp22.p1?.valueM;
 
     return data;
   }, [
