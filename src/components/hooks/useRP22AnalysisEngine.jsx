@@ -319,20 +319,19 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P10 - Maximum SPL difference between upper speakers
-      if (upperSpeakers.length >= 2) {
-        const deltaUpperSpl = computeUpperSplSpreadForSeat(seat, upperSpeakers, getSplAtSeat);
+      // P10 - Maximum SPL difference between upper speakers (normalized to RSP)
+      if (upperSpeakers.length >= 2 && mlpSeat) {
+        const deltaUpperSpl = computeUpperSplSpreadForSeat(seat, upperSpeakers, getSplAtSeat, mlpSeat);
         
         if (isNum(deltaUpperSpl)) {
-          let level10 = 1;
-          if (deltaUpperSpl <= 2) level10 = 4;
-          else if (deltaUpperSpl <= 5) level10 = 3;
-          else if (deltaUpperSpl <= 8) level10 = 2;
-          else if (deltaUpperSpl <= 12) level10 = 1;
+          let level10 = 'L1';
+          if (deltaUpperSpl <= 2) level10 = 'L4';
+          else if (deltaUpperSpl <= 5) level10 = 'L3';
+          else if (deltaUpperSpl <= 8) level10 = 'L2';
           
           metrics.p10 = {
             value: deltaUpperSpl,
-            formatted: `±${deltaUpperSpl.toFixed(1)} dB`,
+            formatted: `${Math.round(deltaUpperSpl)} dB`,
             level: level10,
           };
         }
