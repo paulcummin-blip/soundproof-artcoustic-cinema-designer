@@ -23,7 +23,6 @@ export default function SeatHud({
   const fmt = (v) => {
     if (v == null) return "—";
     if (typeof v === "object" && "formatted" in v) {
-      // If the formatted value is a SPL reading (ends with " dB"), reformat it
       const formatted = v.formatted ?? "—";
       if (typeof formatted === 'string' && formatted.includes(' dB')) {
         const numMatch = formatted.match(/^([-\d.]+)\s*dB/);
@@ -37,11 +36,27 @@ export default function SeatHud({
     return String(v);
   };
 
-  const seatRp22 =
-    tooltipData.rp22 ||
-    tooltipData.rp22SeatMetrics ||
-    tooltipData.rp22Metrics ||
-    {};
+  // Try to auto-detect whichever tooltipData child holds the RP22 per-seat metrics
+  const seatRp22 = React.useMemo(() => {
+    if (!tooltipData) return {};
+
+    // 1) Obvious explicit keys first
+    if (tooltipData.rp22 && typeof tooltipData.rp22 === 'object') return tooltipData.rp22;
+    if (tooltipData.rp22SeatMetrics && typeof tooltipData.rp22SeatMetrics === 'object') return tooltipData.rp22SeatMetrics;
+    if (tooltipData.rp22Metrics && typeof tooltipData.rp22Metrics === 'object') return tooltipData.rp22Metrics;
+
+    // 2) Fallback: scan all tooltipData children and pick the one that has P1 / 1 keys
+    for (const key of Object.keys(tooltipData)) {
+      const value = tooltipData[key];
+      if (!value || typeof value !== 'object') continue;
+      const subKeys = Object.keys(value);
+      if (subKeys.some(k => k === 'P1' || k === '1' || k === 'p1')) {
+        return value;
+      }
+    }
+
+    return {};
+  }, [tooltipData]);
 
   return (
     <div
@@ -155,16 +170,17 @@ export default function SeatHud({
 
         {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
           const paramNum = key.replace('p', '');
-          // Try a few shapes: "10", "P10", or the raw key
+
+          // Try a few common shapes: P10, "10", "P10" upper-case, or raw key
           const metric =
-            seatRp22[paramNum] ||
             seatRp22[`P${paramNum}`] ||
+            seatRp22[paramNum] ||
             seatRp22[key.toUpperCase()] ||
+            seatRp22[key] ||
             null;
 
           if (!metric) return null;
 
-          // Prefer a preformatted label if it exists, otherwise "P#: value"
           const labelText =
             key === 'p16' && metric.hudLabel
               ? `P16: ${metric.hudLabel}`
