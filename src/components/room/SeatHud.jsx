@@ -148,7 +148,8 @@ export default function SeatHud({
         </div>
 
         {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
-          const metric = tooltipData.rp22?.[key];
+          const paramNum = key.replace('p', '');
+          const metric = tooltipData.rp22?.[paramNum];
           if (!metric) return null;
 
           return (
@@ -166,7 +167,7 @@ export default function SeatHud({
                 {key === 'p16' && metric.hudLabel ? (
                   `P16: ${metric.hudLabel}`
                 ) : (
-                  `${key.toUpperCase()}: ${metric.formatted || '—'}`
+                  `P${paramNum}: ${metric.formatted || '—'}`
                 )}
               </span>
               {renderLevelBadge(metric.level || '—')}
