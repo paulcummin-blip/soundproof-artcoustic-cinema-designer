@@ -319,23 +319,34 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P10 - Maximum SPL difference between upper speakers (normalized to RSP)
-      if (upperSpeakers.length >= 2 && mlpSeat) {
-        const deltaUpperSpl = computeUpperSplSpreadForSeat(seat, upperSpeakers, getSplAtSeat, mlpSeat);
+      // P10 - Maximum SPL difference between upper speakers
+      const seatSpl = seatSplMetrics?.get(seatId);
+      const upperMap = seatSpl?.spl?.uppers || {};
+      
+      const upperValues = Object.values(upperMap)
+        .map((entry) => entry?.value)
+        .filter((v) => isNum(v));
+      
+      let p10Value = null;
+      let p10Level = null;
+      
+      if (upperValues.length >= 2) {
+        const maxVal = Math.max(...upperValues);
+        const minVal = Math.min(...upperValues);
+        p10Value = maxVal - minVal;
         
-        if (isNum(deltaUpperSpl)) {
-          let level10 = 'L1';
-          if (deltaUpperSpl <= 2) level10 = 'L4';
-          else if (deltaUpperSpl <= 5) level10 = 'L3';
-          else if (deltaUpperSpl <= 8) level10 = 'L2';
-          
-          metrics.p10 = {
-            value: deltaUpperSpl,
-            formatted: `${Math.round(deltaUpperSpl)} dB`,
-            level: level10,
-          };
-        }
+        if (p10Value <= 2) p10Level = 'L4';
+        else if (p10Value <= 5) p10Level = 'L3';
+        else if (p10Value <= 8) p10Level = 'L2';
+        else p10Level = 'L1';
       }
+      
+      metrics.p10 = {
+        id: 10,
+        value: isNum(p10Value) ? p10Value : null,
+        formatted: isNum(p10Value) ? `${Math.round(p10Value)} dB` : '—',
+        level: p10Level,
+      };
 
       // P16 - Screen FR variance using off-axis HF data
       const screenSpeakers = safeSpeakers.filter(s => 
