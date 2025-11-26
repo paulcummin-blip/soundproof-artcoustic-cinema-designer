@@ -210,7 +210,7 @@ export default function SeatHud({
               </div>
               {Object.entries(tooltipData.splAtSeat.lcr).map(([role, spl]) => (
                 <div key={role} style={{ fontSize: 12, paddingLeft: 8 }}>
-                  {role}: {spl.formatted}
+                  {role}: {formatDb(spl.value)}
                 </div>
               ))}
               {/* Power + Radiation Mode caption */}
@@ -242,7 +242,7 @@ export default function SeatHud({
               </div>
               {Object.entries(tooltipData.splAtSeat.surrounds).map(([role, spl]) => (
                 <div key={role} style={{ fontSize: 12, paddingLeft: 8 }}>
-                  {role}: {spl.formatted}
+                  {role}: {formatDb(spl.value)}
                 </div>
               ))}
             </>
@@ -261,7 +261,7 @@ export default function SeatHud({
               </div>
               {Object.entries(tooltipData.splAtSeat.overheads).map(([role, spl]) => (
                 <div key={role} style={{ fontSize: 12, paddingLeft: 8 }}>
-                  {role}: {spl.formatted}
+                  {role}: {formatDb(spl.value)}
                 </div>
               ))}
             </div>
