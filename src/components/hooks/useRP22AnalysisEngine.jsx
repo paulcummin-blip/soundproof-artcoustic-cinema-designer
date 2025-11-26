@@ -321,21 +321,39 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
       // P10 - Maximum SPL difference between upper speakers
       if (upperSpeakers.length >= 2) {
-        const deltaUpperSpl = computeUpperSplSpreadForSeat(seat, upperSpeakers, getSplAtSeat);
-        
+        const deltaUpperSpl = computeUpperSplSpreadForSeat(
+          seat,
+          upperSpeakers,
+          getSplAtSeat
+        );
+
         if (isNum(deltaUpperSpl)) {
           let level10 = 1;
           if (deltaUpperSpl <= 2) level10 = 4;
           else if (deltaUpperSpl <= 5) level10 = 3;
           else if (deltaUpperSpl <= 8) level10 = 2;
           else if (deltaUpperSpl <= 12) level10 = 1;
-          
+
           metrics.p10 = {
             value: deltaUpperSpl,
             formatted: `±${deltaUpperSpl.toFixed(1)} dB`,
             level: level10,
           };
+        } else {
+          // We had enough uppers, but could not get a valid SPL spread
+          metrics.p10 = {
+            value: null,
+            formatted: 'N/A',
+            level: '—',
+          };
         }
+      } else {
+        // Not enough upper speakers to evaluate this parameter
+        metrics.p10 = {
+          value: null,
+          formatted: 'N/A (min 2 uppers)',
+          level: '—',
+        };
       }
 
       // P16 - Screen FR variance using off-axis HF data
