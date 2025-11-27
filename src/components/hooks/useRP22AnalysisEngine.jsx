@@ -9,6 +9,7 @@ import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUppe
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
 import { computeP16ForSeat } from "../utils/rp22HfOffAxis";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
@@ -320,8 +321,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       }
 
       // P10 - Maximum SPL difference between upper speakers
-      // RP22: "Maximum predicted SPL difference between any two height/upper speakers"
-      // We use the same SPL data that drives the HUD: seatSplMetrics.get(seat.id).spl.uppers
+      // "Maximum predicted SPL difference between any two height/upper speakers"
+      // We deliberately use getSeatSplMetrics so we read *exactly* the same SPL data
+      // that drives the HUD "Overheads" block.
       {
         let p10Metric = {
           value: null,
@@ -330,11 +332,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         };
 
         if (seatSplMetrics) {
-          const seatSpl = seatSplMetrics.get(seatId);
-          const upperMap = seatSpl?.spl?.uppers || null;
+          // getSeatSplMetrics handles whatever keying the SPL map uses internally
+          const splForSeat = getSeatSplMetrics(seatSplMetrics, seat.id);
+          const uppers = splForSeat?.uppers || null;
 
-          if (upperMap) {
-            const upperSplValues = Object.values(upperMap)
+          if (uppers) {
+            const upperSplValues = Object.values(uppers)
               .map((entry) =>
                 entry && typeof entry.value === 'number' ? entry.value : null
               )
@@ -345,7 +348,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
               const minSpl = Math.min(...upperSplValues);
               const delta = Math.abs(maxSpl - minSpl);
 
-              // RP22 levels for P10:
+              // RP22 level mapping for P10:
               // L4: ≤ 2 dB, L3: ≤ 5 dB, L2: ≤ 8 dB, L1: ≤ 12 dB
               let level10 = 1;
               if (delta <= 2) level10 = 4;
