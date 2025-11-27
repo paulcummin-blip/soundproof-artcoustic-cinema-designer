@@ -332,12 +332,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         const upperSplValues = [];
 
         for (const upper of upperSpeakers) {
-          // getSplAtSeat(seatId, role) returns the predicted SPL @ seat
-          // using the central SPL engine. We only care about the numeric value.
-          const splResult = getSplAtSeat(seat.id, upper.role);
-          const splValue = splResult && typeof splResult === 'number'
-            ? splResult
-            : null;
+          // getSplAtSeat returns a plain number (or null), not an object
+          const splValue = getSplAtSeat(seatId, upper.role);
 
           if (isNum(splValue)) {
             upperSplValues.push(splValue);
