@@ -320,52 +320,55 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P10 - Maximum SPL difference between upper speakers
-      // "Maximum predicted SPL difference between any two height/upper speakers"
-      // We deliberately use getSeatSplMetrics so we read *exactly* the same SPL data
-      // that drives the HUD "Overheads" block.
+      // P10 – Maximum SPL difference between upper speakers
       {
-        let p10Metric = {
-          value: null,
-          formatted: 'N/A (insufficient data)',
-          level: '—',
-        };
+        const upperSplValues = [];
 
         if (seatSplMetrics) {
-          // getSeatSplMetrics handles whatever keying the SPL map uses internally
-          const splForSeat = getSeatSplMetrics(seatSplMetrics, seat.id);
-          const uppers = splForSeat?.uppers || null;
+          // seatId key is whatever we already use in the seatSplMetrics map
+          const seatId = seat.id;
+          const seatSpl = seatSplMetrics.get(seatId);
 
-          if (uppers) {
-            const upperSplValues = Object.values(uppers)
-              .map((entry) =>
-                entry && typeof entry.value === 'number' ? entry.value : null
-              )
-              .filter((v) => isNum(v));
-
-            if (upperSplValues.length >= 2) {
-              const maxSpl = Math.max(...upperSplValues);
-              const minSpl = Math.min(...upperSplValues);
-              const delta = Math.abs(maxSpl - minSpl);
-
-              // RP22 level mapping for P10:
-              // L4: ≤ 2 dB, L3: ≤ 5 dB, L2: ≤ 8 dB, L1: ≤ 12 dB
-              let level10 = 1;
-              if (delta <= 2) level10 = 4;
-              else if (delta <= 5) level10 = 3;
-              else if (delta <= 8) level10 = 2;
-              else if (delta <= 12) level10 = 1;
-
-              p10Metric = {
-                value: delta,
-                formatted: `±${delta.toFixed(1)} dB`,
-                level: level10,
-              };
+          if (seatSpl && seatSpl.spl && seatSpl.spl.uppers) {
+            // seatSpl.spl.uppers is an object like { TFL: { value, formatted }, ... }
+            for (const splObj of Object.values(seatSpl.spl.uppers)) {
+              const v = splObj && typeof splObj.value === 'number' ? splObj.value : null;
+              if (isNum(v)) {
+                upperSplValues.push(v);
+              }
             }
           }
         }
 
-        metrics.p10 = p10Metric;
+        if (upperSplValues.length >= 2) {
+          const maxSpl = Math.max(...upperSplValues);
+          const minSpl = Math.min(...upperSplValues);
+          const delta = Math.abs(maxSpl - minSpl);
+
+          // Round to 0.1 dB for display, but keep raw delta as value if you prefer
+          const deltaRounded = Math.round(delta * 10) / 10;
+
+          // RP22 P10 levels:
+          // L4: ≤ 2 dB, L3: ≤ 5 dB, L2: ≤ 8 dB, L1: ≤ 12 dB, >12 dB also L1 (fail)
+          let level10 = 1;
+          if (deltaRounded <= 2) level10 = 4;
+          else if (deltaRounded <= 5) level10 = 3;
+          else if (deltaRounded <= 8) level10 = 2;
+          else level10 = 1;
+
+          metrics.p10 = {
+            value: deltaRounded,
+            formatted: `±${deltaRounded.toFixed(1)} dB`,
+            level: level10,
+          };
+        } else {
+          // Not enough valid upper SPL values – keep HUD honest but non-crashy
+          metrics.p10 = {
+            value: null,
+            formatted: 'N/A (insufficient data)',
+            level: '—',
+          };
+        }
       }
 
       // P16 – front centre horizontal offset per seat
