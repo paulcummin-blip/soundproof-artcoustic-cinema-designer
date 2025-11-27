@@ -320,35 +320,65 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       }
 
       // P10 - Maximum SPL difference between upper speakers
+      //
+      // RP22: "Maximum predicted SPL difference (using anechoic propagation loss)
+      // between any two height/upper speakers, normalized to RSP."
+      //
+      // Implementation notes:
+      // - Use the same SPL engine as the HUD via getSplAtSeat.
+      // - Work purely in dB at the seat for each upper speaker.
+      // - If we cannot get at least two valid SPL values, mark as N/A.
       if (upperSpeakers.length >= 2) {
-        const deltaUpperSpl = computeUpperSplSpreadForSeat(
-          seat,
-          upperSpeakers,
-          getSplAtSeat
-        );
+        const upperSplValues = [];
 
-        if (isNum(deltaUpperSpl)) {
-          let level10 = 1;
-          if (deltaUpperSpl <= 2) level10 = 4;
-          else if (deltaUpperSpl <= 5) level10 = 3;
-          else if (deltaUpperSpl <= 8) level10 = 2;
-          else if (deltaUpperSpl <= 12) level10 = 1;
+        for (const upper of upperSpeakers) {
+          // getSplAtSeat(seat, speaker) already returns the predicted SPL @ seat
+          // using the central SPL engine. We only care about the numeric value.
+          const splResult = getSplAtSeat(seat, upper);
+          const splValue = splResult && typeof splResult.value === 'number'
+            ? splResult.value
+            : null;
 
-          metrics.p10 = {
-            value: deltaUpperSpl,
-            formatted: `±${deltaUpperSpl.toFixed(1)} dB`,
-            level: level10,
-          };
+          if (isNum(splValue)) {
+            upperSplValues.push(splValue);
+          }
+        }
+
+        if (upperSplValues.length >= 2) {
+          const maxSpl = Math.max(...upperSplValues);
+          const minSpl = Math.min(...upperSplValues);
+          const deltaUpperSpl = maxSpl - minSpl; // dB spread between loudest & quietest upper
+
+          if (isNum(deltaUpperSpl)) {
+            let level10 = 1;
+            if (deltaUpperSpl <= 2) level10 = 4;
+            else if (deltaUpperSpl <= 5) level10 = 3;
+            else if (deltaUpperSpl <= 8) level10 = 2;
+            else if (deltaUpperSpl <= 12) level10 = 1;
+
+            metrics.p10 = {
+              value: deltaUpperSpl,
+              formatted: `±${deltaUpperSpl.toFixed(1)} dB`,
+              level: level10,
+            };
+          } else {
+            // Should be very rare – indicates bad SPL data even after checks
+            metrics.p10 = {
+              value: null,
+              formatted: 'N/A',
+              level: '—',
+            };
+          }
         } else {
-          // We had enough uppers, but could not get a valid SPL spread
+          // Not enough valid SPL values from uppers (e.g. SPL engine failed a channel)
           metrics.p10 = {
             value: null,
-            formatted: 'N/A',
+            formatted: 'N/A (insufficient data)',
             level: '—',
           };
         }
       } else {
-        // Not enough upper speakers to evaluate this parameter
+        // Less than two upper speakers: P10 is not applicable
         metrics.p10 = {
           value: null,
           formatted: 'N/A (min 2 uppers)',
