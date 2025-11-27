@@ -320,66 +320,49 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       }
 
       // P10 - Maximum SPL difference between upper speakers
-      //
-      // RP22: "Maximum predicted SPL difference (using anechoic propagation loss)
-      // between any two height/upper speakers, normalized to RSP."
-      //
-      // Implementation notes:
-      // - Use the same SPL engine as the HUD via getSplAtSeat.
-      // - Work purely in dB at the seat for each upper speaker.
-      // - If we cannot get at least two valid SPL values, mark as N/A.
-      if (upperSpeakers.length >= 2) {
-        const upperSplValues = [];
-
-        for (const upper of upperSpeakers) {
-          // getSplAtSeat returns a plain number (or null), not an object
-          const splValue = getSplAtSeat(seatId, upper.role);
-
-          if (isNum(splValue)) {
-            upperSplValues.push(splValue);
-          }
-        }
-
-        if (upperSplValues.length >= 2) {
-          const maxSpl = Math.max(...upperSplValues);
-          const minSpl = Math.min(...upperSplValues);
-          const deltaUpperSpl = maxSpl - minSpl; // dB spread between loudest & quietest upper
-
-          if (isNum(deltaUpperSpl)) {
-            let level10 = 1;
-            if (deltaUpperSpl <= 2) level10 = 4;
-            else if (deltaUpperSpl <= 5) level10 = 3;
-            else if (deltaUpperSpl <= 8) level10 = 2;
-            else if (deltaUpperSpl <= 12) level10 = 1;
-
-            metrics.p10 = {
-              value: deltaUpperSpl,
-              formatted: `±${deltaUpperSpl.toFixed(1)} dB`,
-              level: level10,
-            };
-          } else {
-            // Should be very rare – indicates bad SPL data even after checks
-            metrics.p10 = {
-              value: null,
-              formatted: 'N/A',
-              level: '—',
-            };
-          }
-        } else {
-          // Not enough valid SPL values from uppers (e.g. SPL engine failed a channel)
-          metrics.p10 = {
-            value: null,
-            formatted: 'N/A (insufficient data)',
-            level: '—',
-          };
-        }
-      } else {
-        // Less than two upper speakers: P10 is not applicable
-        metrics.p10 = {
+      // RP22: "Maximum predicted SPL difference between any two height/upper speakers"
+      // We use the same SPL data that drives the HUD: seatSplMetrics.get(seat.id).spl.uppers
+      {
+        let p10Metric = {
           value: null,
-          formatted: 'N/A (min 2 uppers)',
+          formatted: 'N/A (insufficient data)',
           level: '—',
         };
+
+        if (seatSplMetrics) {
+          const seatSpl = seatSplMetrics.get(seatId);
+          const upperMap = seatSpl?.spl?.uppers || null;
+
+          if (upperMap) {
+            const upperSplValues = Object.values(upperMap)
+              .map((entry) =>
+                entry && typeof entry.value === 'number' ? entry.value : null
+              )
+              .filter((v) => isNum(v));
+
+            if (upperSplValues.length >= 2) {
+              const maxSpl = Math.max(...upperSplValues);
+              const minSpl = Math.min(...upperSplValues);
+              const delta = Math.abs(maxSpl - minSpl);
+
+              // RP22 levels for P10:
+              // L4: ≤ 2 dB, L3: ≤ 5 dB, L2: ≤ 8 dB, L1: ≤ 12 dB
+              let level10 = 1;
+              if (delta <= 2) level10 = 4;
+              else if (delta <= 5) level10 = 3;
+              else if (delta <= 8) level10 = 2;
+              else if (delta <= 12) level10 = 1;
+
+              p10Metric = {
+                value: delta,
+                formatted: `±${delta.toFixed(1)} dB`,
+                level: level10,
+              };
+            }
+          }
+        }
+
+        metrics.p10 = p10Metric;
       }
 
       // P16 - Screen FR variance using off-axis HF data
