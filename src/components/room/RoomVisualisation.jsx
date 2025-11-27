@@ -2332,23 +2332,23 @@ React.useEffect(() => {
       }
     };
 
-    // Initialize RP22 section with all metrics present (defaults to "—")
+    // RP22 per-seat metrics – initialise with defaults
     data.rp22 = {
-      p1: { valueM: null, level: '—', formatted: '—' },
-      p4: { valueDb: null, level: '—', formatted: '—' },
-      p5: { valueDeg: null, level: '—', formatted: '—' },
-      p6: { valueDb: null, level: '—', formatted: '—' },
-      p9: { valueDeg: null, level: '—', formatted: '—' },
+      p1:  { valueM:  null, level: '—', formatted: '—' },
+      p4:  { valueDb: null, level: '—', formatted: '—' },
+      p5:  { valueDeg: null, level: '—', formatted: '—' },
+      p6:  { valueDb: null, level: '—', formatted: '—' },
+      p9:  { valueDeg: null, level: '—', formatted: '—' },
       p10: { valueDb: null, level: '—', formatted: '—' },
-      p16: { valueDb: null, level: '—', formatted: '—' }, 
-      p17: { valueDb: null, level: '—', formatted: '—' }, 
+      p16: { valueDb: null, level: '—', formatted: '—' },
+      p17: { valueDb: null, level: '—', formatted: '—' },
       p20: { valueDb: null, level: '—', formatted: '—' },
     };
 
     // Pull per-seat RP22 metrics from analysisResult (single source of truth)
     const seatMetrics = analysisResult?.seatMetrics?.get?.(effectiveHoveredSeat.id);
     if (seatMetrics) {
-      if (seatMetrics.p9) data.rp22.p9 = seatMetrics.p9;
+      if (seatMetrics.p9)  data.rp22.p9  = seatMetrics.p9;
       if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
       if (seatMetrics.p16) data.rp22.p16 = seatMetrics.p16;
       if (seatMetrics.p17) data.rp22.p17 = seatMetrics.p17;
@@ -2503,13 +2503,6 @@ React.useEffect(() => {
         };
       }
     }
-
-    // P9 and P10 are now computed in useRP22AnalysisEngine and pulled from seatMetrics above
-    // Legacy inline calculations removed - single source of truth is the analysis engine
-    
-    // P16 / P17 / P20 are also computed in useRP22AnalysisEngine
-    // P16 uses off-axis HF data
-    // P17 / P20 reserved for future FR implementation
 
     // Legacy bridge
     data.p1NearestM = data.rp22.p1.valueM;
