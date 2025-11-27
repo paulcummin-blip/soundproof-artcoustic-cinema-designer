@@ -320,36 +320,34 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P10 – Maximum SPL difference between upper speakers
+      // P10 – Maximum SPL difference between upper speakers (upper SPL spread)
+      // Uses the same SPL data source as the HUD (getSeatSplMetrics → .uppers)
       {
-        const upperSplValues = [];
+        let upperValues = [];
 
         if (seatSplMetrics) {
-          // seatId key is whatever we already use in the seatSplMetrics map
-          const seatId = seat.id;
-          const seatSpl = seatSplMetrics.get(seatId);
+          // Use the same helper + key as RoomVisualisation / HUD:
+          // getSeatSplMetrics(allSeatSplMetrics, effectiveHoveredSeat.id)
+          const seatSpl = getSeatSplMetrics(seatSplMetrics, seat.id);
 
-          if (seatSpl && seatSpl.spl && seatSpl.spl.uppers) {
-            // seatSpl.spl.uppers is an object like { TFL: { value, formatted }, ... }
-            for (const splObj of Object.values(seatSpl.spl.uppers)) {
-              const v = splObj && typeof splObj.value === 'number' ? splObj.value : null;
-              if (isNum(v)) {
-                upperSplValues.push(v);
-              }
-            }
+          if (seatSpl && seatSpl.uppers) {
+            // seatSpl.uppers is an object like { TFL: { value, formatted }, ... }
+            upperValues = Object.values(seatSpl.uppers)
+              .map((o) => (o && typeof o.value === 'number' ? o.value : null))
+              .filter((v) => isNum(v));
           }
         }
 
-        if (upperSplValues.length >= 2) {
-          const maxSpl = Math.max(...upperSplValues);
-          const minSpl = Math.min(...upperSplValues);
+        if (upperValues.length >= 2) {
+          const maxSpl = Math.max(...upperValues);
+          const minSpl = Math.min(...upperValues);
           const delta = Math.abs(maxSpl - minSpl);
 
-          // Round to 0.1 dB for display, but keep raw delta as value if you prefer
+          // Round to 0.1 dB for display, keep numeric for value
           const deltaRounded = Math.round(delta * 10) / 10;
 
           // RP22 P10 levels:
-          // L4: ≤ 2 dB, L3: ≤ 5 dB, L2: ≤ 8 dB, L1: ≤ 12 dB, >12 dB also L1 (fail)
+          // L4: ≤ 2 dB, L3: ≤ 5 dB, L2: ≤ 8 dB, L1: > 8 dB
           let level10 = 1;
           if (deltaRounded <= 2) level10 = 4;
           else if (deltaRounded <= 5) level10 = 3;
@@ -362,7 +360,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             level: level10,
           };
         } else {
-          // Not enough valid upper SPL values – keep HUD honest but non-crashy
+          // Less than 2 valid upper SPL values – keep HUD honest but neutral
           metrics.p10 = {
             value: null,
             formatted: 'N/A (insufficient data)',
