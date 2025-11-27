@@ -2345,10 +2345,9 @@ React.useEffect(() => {
       p20: { valueDb: null, level: '—', formatted: '—' },
     };
 
-    // Try to pull per-seat RP22 metrics from analysisResult
+    // Pull per-seat RP22 metrics from analysisResult (single source of truth)
     const seatMetrics = analysisResult?.seatMetrics?.get?.(effectiveHoveredSeat.id);
     if (seatMetrics) {
-      // Merge in P9, P10, P16 from the analysis engine
       if (seatMetrics.p9) data.rp22.p9 = seatMetrics.p9;
       if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
       if (seatMetrics.p16) data.rp22.p16 = seatMetrics.p16;
