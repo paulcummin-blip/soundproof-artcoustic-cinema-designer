@@ -328,7 +328,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         if (seatSplMetrics) {
           // Use the same helper + key as RoomVisualisation / HUD:
           // getSeatSplMetrics(allSeatSplMetrics, effectiveHoveredSeat.id)
-          const seatSpl = getSeatSplMetrics(seatSplMetrics, seat.id);
+          const seatSpl = getSeatSplMetrics(seatSplMetrics, seatId);
 
           if (seatSpl && seatSpl.uppers) {
             // seatSpl.uppers is an object like { TFL: { value, formatted }, ... }
