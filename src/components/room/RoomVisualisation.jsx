@@ -2364,6 +2364,52 @@ React.useEffect(() => {
       overheads: seatSplData?.uppers || {},
     };
 
+    // HUD-local P10 – Maximum SPL difference between upper speakers
+    // Uses the same SPL data as the "Overheads" SPL @ Seat block
+    {
+      const upperEntries = seatSplData?.uppers
+        ? Object.values(seatSplData.uppers)
+        : [];
+
+      const upperValues = upperEntries
+        .map((o) =>
+          o && typeof o.value === 'number' && Number.isFinite(o.value)
+            ? o.value
+            : null
+        )
+        .filter((v) => typeof v === 'number' && Number.isFinite(v));
+
+      if (upperValues.length >= 2) {
+        const maxSpl = Math.max(...upperValues);
+        const minSpl = Math.min(...upperValues);
+        const delta  = Math.abs(maxSpl - minSpl);
+
+        // Round to 0.1 dB, same as elsewhere
+        const deltaRounded = Math.round(delta * 10) / 10;
+
+        // RP22 P10 thresholds:
+        // L4: ≤ 2 dB, L3: ≤ 5 dB, L2: ≤ 8 dB, L1: > 8 dB
+        let level10 = 1;
+        if (deltaRounded <= 2)      level10 = 4;
+        else if (deltaRounded <= 5) level10 = 3;
+        else if (deltaRounded <= 8) level10 = 2;
+        else                        level10 = 1;
+
+        data.rp22.p10 = {
+          value:     deltaRounded,
+          formatted: `±${deltaRounded.toFixed(1)} dB`,
+          level:     level10,
+        };
+      } else {
+        // Less than 2 valid overhead SPL values – safe fallback
+        data.rp22.p10 = {
+          value:     null,
+          formatted: 'N/A (insufficient data)',
+          level:     '—',
+        };
+      }
+    }
+
     // SPL meta: power + radiation mode for HUD caption
     const splConfig = appState?.splConfig;
     data.splAtSeatMeta = {
