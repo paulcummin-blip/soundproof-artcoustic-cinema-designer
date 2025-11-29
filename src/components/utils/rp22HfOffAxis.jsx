@@ -80,73 +80,60 @@ export function computeSpeakerSeatAzimuth(speaker, seat) {
 /**
  * Compute RP22 P16 for a given seat using off-axis HF roll-off.
  *
- * @param {Object} params
- * @param {Object} params.seat - { x, y, earHeightM, ... }
- * @param {Array}  params.speakers - all placed speakers
- * @param {Function} params.getCanonicalRole - role normalization function
+ * @param {Object} seat - { x, y, ... }
+ * @param {Array} speakers - all placed speakers
+ * @param {Function} getSpeakerModelMeta - function to get speaker model metadata
  * @returns {Object|null} p16 metric { value, formatted, level, hudLabel } or null
  */
-export function computeP16ForSeat({
-  seat,
-  speakers,
-  getCanonicalRole,
-}) {
-  // 1. Find the front-centre speaker
-  const fc = speakers.find(s => 
-    ['FC', 'C'].includes(getCanonicalRole(s.role)) && 
-    s.position && 
-    Number.isFinite(s.position.x) && 
+export function computeP16ForSeat(seat, speakers, getSpeakerModelMeta) {
+  // 1. Find the front centre speaker
+  const fc = speakers.find(s =>
+    ['FC', 'C'].includes(String(s.role).toUpperCase()) &&
+    s.position &&
+    Number.isFinite(s.position.x) &&
     Number.isFinite(s.position.y)
   );
+  if (!fc) return null;
 
-  // 2. Validate seat and FC
-  if (!fc || !seat || !Number.isFinite(seat.x) || !Number.isFinite(seat.y)) {
-    return null;
-  }
+  // 2. Get the FC model meta and the HF horizontal −3 dB angle
+  const meta = getSpeakerModelMeta(fc.model);
+  const A3 = meta?.hfOffAxis16k?.minus3deg ?? 30; // sensible default if missing
 
-  // 3. Get the HF horizontal coverage from the model data
-  const fcMeta = getSpeakerModelMeta(fc.model);
-  const horiz3dB = fcMeta?.hfOffAxis16k?.minus3deg ?? 30; // default to 30° if missing
-
-  // 4. Compute the off-axis angle from FC to this seat
+  // 3. Compute horizontal off-axis angle from FC → seat (speaker is origin, looking "up" the room)
   const dx = seat.x - fc.position.x;
   const dy = seat.y - fc.position.y;
-  const rawDeg = Math.atan2(dx, dy) * 180 / Math.PI;
-  const offAxis = Math.abs(rawDeg); // 0..180
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
 
-  // 5. Convert off-axis angle to predicted HF loss in dB
+  const rawAngleDeg = Math.atan2(dx, dy) * 180 / Math.PI; // 0° = straight into room
+  const offAxis = Math.abs(rawAngleDeg); // 0..180
+
+  // 4. Map offAxis angle → predicted dB loss using stepped rule
   let lossDb;
 
-  if (offAxis <= horiz3dB) {
-    // inside main coverage
-    lossDb = 1.5;
-  } else if (offAxis <= horiz3dB + 10) {
-    // just outside −3 dB line
-    lossDb = 3.0;
+  if (offAxis <= A3) {
+    lossDb = 1.5;          // inside coverage
+  } else if (offAxis <= A3 + 10) {
+    lossDb = 3.0;          // just outside coverage
   } else {
-    // further out into the roll-off
-    lossDb = 5.1;
+    lossDb = 5.5;          // 5 dB or worse
   }
 
-  // 6. Map dB value to RP22 "level", with NO L3 state
+  // 5. Map lossDb → RP22 level, with no Level 3
   let level;
-  if (lossDb > 5.0) {
-    level = 1; // "Level 1 not achieved"
-  } else if (lossDb > 3.0 && lossDb <= 5.0) {
-    level = 1; // passes only L1
-  } else if (lossDb > 1.5 && lossDb <= 3.0) {
-    level = 2; // passes L1 & L2
+  if (lossDb > 5) {
+    level = 1;             // fails L1
+  } else if (lossDb > 3) {
+    level = 2;             // between 3 and 5 dB
   } else {
-    level = 4; // passes L1–L4; do not ever return level 3
+    level = 4;             // ≤ 3 dB always treated as L4
   }
 
-  // 7. Return the metric in the standard format used by the HUD
-  const valueRounded = Math.round(lossDb * 10) / 10;
-
+  // 6. Return the P16 metric object
+  const valueDb = Number(lossDb.toFixed(1));
   return {
-    value: valueRounded,
-    formatted: `±${valueRounded.toFixed(1)} dB`,
-    hudLabel: `FC ±${valueRounded.toFixed(1)} dB`,
+    value: valueDb,
+    formatted: `±${valueDb.toFixed(1)} dB`,
+    hudLabel: `FC ±${valueDb.toFixed(1)} dB`,
     level,
   };
 }

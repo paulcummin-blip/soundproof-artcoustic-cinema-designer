@@ -369,14 +369,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P16 – seat-to-seat frequency response variance (off-axis HF loss)
+      // P16 – FC HF off-axis predicted dB loss per seat
       {
-        const p16Metric = computeP16ForSeat({
-          seat,
-          speakers: safeSpeakers,
-          getCanonicalRole,
-        });
-
+        const p16Metric = computeP16ForSeat(seat, safeSpeakers, getSpeakerModelMeta);
         metrics.p16 = p16Metric || {
           value: null,
           formatted: '—',
