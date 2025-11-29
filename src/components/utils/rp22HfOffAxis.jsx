@@ -36,6 +36,24 @@ function classifyP16(lossDb) {
   return 4;
 }
 
+// Try several common yaw/rotation properties and fall back to 0°
+function resolveYawDeg(spk) {
+  const candidates = [
+    spk?.yaw,
+    spk?.rotationDeg,
+    spk?.rotation_deg,
+    spk?.rotation,
+    spk?.yawDeg,
+  ];
+
+  for (const v of candidates) {
+    if (typeof v === "number" && Number.isFinite(v)) {
+      return v;
+    }
+  }
+  return 0;
+}
+
 export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeakerMeta) {
   if (!seat || !allSpeakers) return null;
   if (!isNum(seat.x) || !isNum(seat.y)) return null;
@@ -53,19 +71,14 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
     const meta = spk.model ? getSpeakerMeta(spk.model) : null;
     const hf3dBAng = meta?.hfOffAxis16k?.minus3deg ?? 30;
     
-    // Use the same property RV uses (spk.yaw), then fall back to older fields
-    const yawDeg = Number.isFinite(spk.yaw)
-      ? spk.yaw
-      : Number.isFinite(spk.rotationDeg)
-        ? spk.rotationDeg
-        : Number.isFinite(spk.rotation_deg)
-          ? spk.rotation_deg
-          : 0;
+    // Speaker aim / yaw – 0° means facing straight into the room.
+    // Use resolveYawDeg so we pick up whatever property the plan view is using.
+    const aimDeg = resolveYawDeg(spk);
     
     lcrData.push({
       role: canon,
       pos: spk.position,
-      yawDeg,
+      aimDeg,
       hf3dBAng,
     });
   }
@@ -77,24 +90,27 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
   let worstLoss = 0;
   let worstRole = null;
 
-  for (const { role, pos, yawDeg, hf3dBAng } of lcrData) {
+  for (const { role, pos, aimDeg, hf3dBAng } of lcrData) {
     // Step 1: Compute seat azimuth from speaker (0° = +Y axis, into room)
     const dx = seat.x - pos.x;
     const dy = seat.y - pos.y;
-    const seatAz = Math.atan2(dx, dy) * 180 / Math.PI; // -180..+180
+    const seatAzimuthDeg = Math.atan2(dx, dy) * 180 / Math.PI; // -180..+180
 
     // Step 2: Compute aim azimuth (base is 0° straight into room, apply yaw)
-    const aimAz = yawDeg; // yawDeg is already relative to forward axis
+    const aimAz = aimDeg; // aimDeg is already relative to forward axis
 
     // Step 3: Compute off-axis angle
-    const offAxisDeg = Math.abs(normalizeAngle(seatAz - aimAz));
+    const offAxisDeg = Math.abs(normalizeAngle(seatAzimuthDeg - aimAz));
 
     // Step 4: Convert to predicted HF loss
     const lossDb = hfLoss(offAxisDeg, hf3dBAng);
 
     // Store debug info
     perSpeaker[role] = {
-      angleDeg: Number(offAxisDeg.toFixed(1)),
+      seatAzimuthDeg: Number(seatAzimuthDeg.toFixed(1)), // azimuth seat-from-speaker
+      aimDeg: Number(aimDeg.toFixed(1)),                 // resolved yaw/aim
+      offAxisDeg: Number(offAxisDeg.toFixed(1)),         // |seatAz - aim|
+      coverage3dB: Number(hf3dBAng.toFixed(1)),
       lossDb: lossDb !== null ? Number(lossDb.toFixed(1)) : null,
     };
 
