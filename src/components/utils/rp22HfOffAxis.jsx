@@ -53,13 +53,14 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
     const meta = spk.model ? getSpeakerMeta(spk.model) : null;
     const hf3dBAng = meta?.hfOffAxis16k?.minus3deg ?? 30;
     
-    // Speaker aim / yaw – 0° means facing straight into the room.
-    // Prefer rotationDeg (used by the plan view), but fall back to rotation_deg if present.
-    const yawDeg = Number.isFinite(spk.rotationDeg)
-      ? spk.rotationDeg
-      : Number.isFinite(spk.rotation_deg)
-        ? spk.rotation_deg
-        : 0;
+    // Use the same property RV uses (spk.yaw), then fall back to older fields
+    const yawDeg = Number.isFinite(spk.yaw)
+      ? spk.yaw
+      : Number.isFinite(spk.rotationDeg)
+        ? spk.rotationDeg
+        : Number.isFinite(spk.rotation_deg)
+          ? spk.rotation_deg
+          : 0;
     
     lcrData.push({
       role: canon,
