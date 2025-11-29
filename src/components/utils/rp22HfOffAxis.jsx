@@ -45,6 +45,8 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerMeta) {
   if (!seat || !allSpeakers) return null;
   if (!isNum(seat.x) || !isNum(seat.y)) return null;
 
+  const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
+
   // Get valid LCR speakers
   const lcr = allSpeakers.filter(spk => {
     const r = String(spk.role || "").toUpperCase();
@@ -60,6 +62,10 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerMeta) {
 
   let worstLoss = 0;
   let worstRole = null;
+  let worstAngle = null;
+
+  // Debug payload
+  const perSpeaker = {};
 
   for (const spk of lcr) {
     const role = String(spk.role || "").toUpperCase();
@@ -68,11 +74,19 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerMeta) {
 
     const angle = horizontalOffAxisDeg(spk.position, seat);
     const loss = hfLoss(angle, horiz3dB);
+
+    // Store debug info for this speaker
+    perSpeaker[role] = {
+      angleDeg: angle !== null ? Number(angle.toFixed(1)) : null,
+      lossDb: loss !== null ? Number(loss.toFixed(1)) : null,
+    };
+
     if (!isNum(loss)) continue;
 
     if (loss > worstLoss) {
       worstLoss = loss;
       worstRole = role;
+      worstAngle = angle;
     }
   }
 
@@ -86,5 +100,14 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerMeta) {
     hudLabel: `${worstRole} ±${worstLoss.toFixed(1)} dB`,
     level: result.level,
     fail: result.fail,
+    debug: {
+      seatId,
+      perSpeaker,
+      worst: {
+        role: worstRole,
+        angleDeg: worstAngle !== null ? Number(worstAngle.toFixed(1)) : null,
+        lossDb: Number(worstLoss.toFixed(1)),
+      },
+    },
   };
 }

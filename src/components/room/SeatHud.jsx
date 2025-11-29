@@ -152,25 +152,48 @@ export default function SeatHud({
           if (!metric) return null;
 
           return (
-            <div
-              key={key}
-              style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                padding: '3px 0',
-                fontSize: 12,
-              }}
-            >
-              <span>
-                {key === 'p16' && metric.hudLabel ? (
-                  `P16: ${metric.hudLabel}`
-                ) : (
-                  `${key.toUpperCase()}: ${metric.formatted || '—'}`
-                )}
-              </span>
-              {renderLevelBadge(metric.level || '—')}
-            </div>
+            <React.Fragment key={key}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '3px 0',
+                  fontSize: 12,
+                }}
+              >
+                <span>
+                  {key === 'p16' && metric.hudLabel ? (
+                    `P16: ${metric.hudLabel}`
+                  ) : (
+                    `${key.toUpperCase()}: ${metric.formatted || '—'}`
+                  )}
+                </span>
+                {renderLevelBadge(metric.level || '—')}
+              </div>
+
+              {/* P16 debug info */}
+              {key === 'p16' && metric.debug && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: '#999',
+                    paddingLeft: 16,
+                    paddingBottom: 3,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  {['FL', 'FC', 'FR'].map((role) => {
+                    const data = metric.debug.perSpeaker[role];
+                    if (!data) return null;
+                    return `${role} ${data.angleDeg ?? '—'}° / ${data.lossDb ?? '—'} dB`;
+                  }).filter(Boolean).join(', ')}
+                  {metric.debug.worst?.role && (
+                    <span> (worst: {metric.debug.worst.role})</span>
+                  )}
+                </div>
+              )}
+            </React.Fragment>
           );
         })}
       </div>
