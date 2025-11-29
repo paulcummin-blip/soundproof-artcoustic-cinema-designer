@@ -369,46 +369,20 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P16 – front centre horizontal offset per seat
-      // "Front centre offset" – absolute horizontal angle from seat's forward axis to FC
+      // P16 – seat-to-seat frequency response variance (off-axis HF loss)
       {
-        const fc = safeSpeakers.find(s => 
-          ['FC', 'C'].includes(getCanonicalRole(s.role)) && 
-          s.position && 
-          Number.isFinite(s.position.x) && 
-          Number.isFinite(s.position.y)
-        );
-        
-        let p16Metric = {
+        const p16Metric = computeP16ForSeat({
+          seat,
+          speakers: safeSpeakers,
+          getCanonicalRole,
+        });
+
+        metrics.p16 = p16Metric || {
           value: null,
           formatted: '—',
           hudLabel: null,
           level: '—',
         };
-
-        if (fc && seat && Number.isFinite(seat.x) && Number.isFinite(seat.y)) {
-          // Compute horizontal angle from seat to FC (using azimuthFromMLP logic)
-          const dx = fc.position.x - seat.x;
-          const dy = fc.position.y - seat.y;
-          const rawAngleDeg = Math.atan2(dx, dy) * 180 / Math.PI;
-          const angleToFc = Math.abs(rawAngleDeg);
-
-          // RP22 thresholds for P16:
-          // L4: ≤ 20°, L3: ≤ 30°, L2: ≤ 45°, L1: > 45°
-          let level = 1;
-          if (angleToFc <= 20) level = 4;
-          else if (angleToFc <= 30) level = 3;
-          else if (angleToFc <= 45) level = 2;
-
-          p16Metric = {
-            value: angleToFc,
-            formatted: `${angleToFc.toFixed(0)}°`,
-            hudLabel: `FC ${angleToFc.toFixed(0)}°`,
-            level,
-          };
-        }
-
-        metrics.p16 = p16Metric;
       }
 
       // P17, P20 - Reserved for future FR implementation
