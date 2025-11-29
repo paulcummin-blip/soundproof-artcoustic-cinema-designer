@@ -369,15 +369,25 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P16 – FC HF off-axis predicted dB loss per seat
+      // P16 – LCR HF off-axis variance
       {
-        const p16Metric = computeP16ForSeat(seat, safeSpeakers, getSpeakerModelMeta);
-        metrics.p16 = p16Metric || {
-          value: null,
-          formatted: '—',
-          hudLabel: null,
-          level: '—',
-        };
+        const p16 = computeP16ForSeat(seat, safeSpeakers, getSpeakerModelMeta);
+
+        if (p16) {
+          metrics.p16 = {
+            value: p16.valueDb,
+            formatted: p16.formatted,
+            hudLabel: p16.hudLabel,
+            level: p16.level,
+          };
+        } else {
+          metrics.p16 = {
+            value: null,
+            formatted: "—",
+            hudLabel: null,
+            level: "—",
+          };
+        }
       }
 
       // P17, P20 - Reserved for future FR implementation
