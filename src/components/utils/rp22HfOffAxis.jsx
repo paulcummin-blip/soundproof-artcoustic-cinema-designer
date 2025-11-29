@@ -1,6 +1,8 @@
 // rp22HfOffAxis.js
 // RP22 P16 implementation: off-axis HF attenuation helpers
 
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+
 /**
  * Estimate HF attenuation at 16 kHz based on off-axis angle.
  * 
@@ -89,9 +91,6 @@ export function computeP16ForSeat({
   speakers,
   getCanonicalRole,
 }) {
-  // Import getSpeakerModelMeta for looking up speaker data
-  const { getSpeakerModelMeta } = require('@/components/models/speakers/registry');
-
   // 1. Find the front-centre speaker
   const fc = speakers.find(s => 
     ['FC', 'C'].includes(getCanonicalRole(s.role)) && 
