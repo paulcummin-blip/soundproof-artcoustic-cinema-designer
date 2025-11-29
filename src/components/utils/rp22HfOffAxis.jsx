@@ -80,66 +80,74 @@ export function computeSpeakerSeatAzimuth(speaker, seat) {
  *
  * @param {Object} params
  * @param {Object} params.seat - { x, y, earHeightM, ... }
- * @param {Object} params.mlpSeat - the reference/RSP seat
- * @param {Array}  params.screenSpeakers - FL/FC/FR placed speakers
- * @param {Function} params.getModelMeta - lookup(modelName) -> { hfOffAxis16k, ... }
- * @returns {Object|null} p16 metric { value, formatted, level } or null
+ * @param {Array}  params.speakers - all placed speakers
+ * @param {Function} params.getCanonicalRole - role normalization function
+ * @returns {Object|null} p16 metric { value, formatted, level, hudLabel } or null
  */
 export function computeP16ForSeat({
   seat,
-  mlpSeat,
-  screenSpeakers,
-  getModelMeta,
+  speakers,
+  getCanonicalRole,
 }) {
-  if (!seat || !mlpSeat || !Array.isArray(screenSpeakers) || screenSpeakers.length === 0) {
+  // Import getSpeakerModelMeta for looking up speaker data
+  const { getSpeakerModelMeta } = require('@/components/models/speakers/registry');
+
+  // 1. Find the front-centre speaker
+  const fc = speakers.find(s => 
+    ['FC', 'C'].includes(getCanonicalRole(s.role)) && 
+    s.position && 
+    Number.isFinite(s.position.x) && 
+    Number.isFinite(s.position.y)
+  );
+
+  // 2. Validate seat and FC
+  if (!fc || !seat || !Number.isFinite(seat.x) || !Number.isFinite(seat.y)) {
     return null;
   }
 
-  let worst = {
-    delta: 0,
-    speaker: null,
-    angle: 0
-  };
+  // 3. Get the HF horizontal coverage from the model data
+  const fcMeta = getSpeakerModelMeta(fc.model);
+  const horiz3dB = fcMeta?.hfOffAxis16k?.minus3deg ?? 30; // default to 30° if missing
 
-  for (const spk of screenSpeakers) {
-    const model = getModelMeta?.(spk.model);
-    const hfProfile = model?.hfOffAxis16k;
-    if (!hfProfile) continue;
+  // 4. Compute the off-axis angle from FC to this seat
+  const dx = seat.x - fc.position.x;
+  const dy = seat.y - fc.position.y;
+  const rawDeg = Math.atan2(dx, dy) * 180 / Math.PI;
+  const offAxis = Math.abs(rawDeg); // 0..180
 
-    const angleSeat = computeSpeakerSeatAzimuth(spk, seat);
-    const angleMlp = computeSpeakerSeatAzimuth(spk, mlpSeat);
+  // 5. Convert off-axis angle to predicted HF loss in dB
+  let lossDb;
 
-    if (!Number.isFinite(angleSeat) || !Number.isFinite(angleMlp)) continue;
-
-    const attSeat = estimateHFAttenuationAt16k(angleSeat, hfProfile);
-    const attMlp = estimateHFAttenuationAt16k(angleMlp, hfProfile);
-
-    const delta = attSeat - attMlp;
-    if (!Number.isFinite(delta)) continue;
-
-    // Track worst absolute delta
-    if (Math.abs(delta) > Math.abs(worst.delta)) {
-      worst.delta = delta;
-      worst.speaker = spk.role;
-      worst.angle = Math.abs(angleSeat);
-    }
+  if (offAxis <= horiz3dB) {
+    // inside main coverage
+    lossDb = 1.5;
+  } else if (offAxis <= horiz3dB + 10) {
+    // just outside −3 dB line
+    lossDb = 3.0;
+  } else {
+    // further out into the roll-off
+    lossDb = 5.1;
   }
 
-  if (!worst.speaker) return null;
+  // 6. Map dB value to RP22 "level", with NO L3 state
+  let level;
+  if (lossDb > 5.0) {
+    level = 1; // "Level 1 not achieved"
+  } else if (lossDb > 3.0 && lossDb <= 5.0) {
+    level = 1; // passes only L1
+  } else if (lossDb > 1.5 && lossDb <= 3.0) {
+    level = 2; // passes L1 & L2
+  } else {
+    level = 4; // passes L1–L4; do not ever return level 3
+  }
 
-  const value = Math.abs(worst.delta);
-  const level = classifyP16(value);
-  if (!level) return null;
-
-  const formattedAngle = `${worst.angle.toFixed(0)}°`;
+  // 7. Return the metric in the standard format used by the HUD
+  const valueRounded = Math.round(lossDb * 10) / 10;
 
   return {
-    value,
-    formatted: `${value.toFixed(1)} dB`,
+    value: valueRounded,
+    formatted: `±${valueRounded.toFixed(1)} dB`,
+    hudLabel: `FC ±${valueRounded.toFixed(1)} dB`,
     level,
-    worstSpeaker: worst.speaker,
-    worstAngleDeg: worst.angle,
-    worstAngleFormatted: formattedAngle,
-    hudLabel: `${level} (${worst.speaker} ${formattedAngle})`
   };
 }
