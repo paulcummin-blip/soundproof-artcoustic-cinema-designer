@@ -53,8 +53,8 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
     const meta = spk.model ? getSpeakerMeta(spk.model) : null;
     const hf3dBAng = meta?.hfOffAxis16k?.minus3deg ?? 30;
     
-    // Get speaker yaw (rotation_deg field)
-    const yawDeg = isNum(spk.rotation_deg) ? spk.rotation_deg : 0;
+    // Get speaker yaw (yaw field, as used in RoomVisualisation)
+    const yawDeg = isNum(spk.yaw) ? spk.yaw : 0;
     
     lcrData.push({
       role: canon,
