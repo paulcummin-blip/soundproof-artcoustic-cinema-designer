@@ -379,6 +379,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             formatted: p16.formatted,
             hudLabel: p16.hudLabel,
             level: p16.level,
+            debug: p16.debug, // Keep debug payload for HUD
           };
         } else {
           metrics.p16 = {
