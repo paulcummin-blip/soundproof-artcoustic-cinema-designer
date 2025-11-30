@@ -106,10 +106,16 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
     const lossDb = hfLoss(offAxisDeg, hf3dBAng);
 
     // Store debug info
+    const offAxisRounded = Number(offAxisDeg.toFixed(1));
+
     perSpeaker[role] = {
+      // Main value used by the HUD today
+      angleDeg: offAxisRounded,                          // keep legacy name for HUD
+
+      // Extra debug fields so we can sanity-check geometry
       seatAzimuthDeg: Number(seatAzimuthDeg.toFixed(1)), // azimuth seat-from-speaker
       aimDeg: Number(aimDeg.toFixed(1)),                 // resolved yaw/aim
-      offAxisDeg: Number(offAxisDeg.toFixed(1)),         // |seatAz - aim|
+      offAxisDeg: offAxisRounded,                        // |seatAz - aim|
       coverage3dB: Number(hf3dBAng.toFixed(1)),
       lossDb: lossDb !== null ? Number(lossDb.toFixed(1)) : null,
     };
