@@ -1,9 +1,11 @@
 // rp22HfOffAxis.js
-// RP22 P16 – HF off-axis attenuation per seat
+// RP22 P16 + P17 – HF off-axis attenuation per seat
+// P16: LCR speakers
+// P17: Surrounds, Wides, Overheads
 // Uses speaker.yaw as the aim direction and computes true off-axis angle
 // between the speaker's front axis and the seat direction.
 
-import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/speakers/registry";
 
 const LCR_ROLES = new Set(["FL", "L", "FC", "C", "FR", "R"]);
 
