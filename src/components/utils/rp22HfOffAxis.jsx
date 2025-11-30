@@ -78,22 +78,27 @@ export function computeP16ForSeat(seat, allSpeakers, mlpPoint, getCanonicalRole,
   const perSpeaker = {};
   let worstLoss = 0;
   let worstRole = null;
-  let worstOffAxis = 0;
+  let worstAngle = 0;
 
   for (const { spk, role, horiz3dB } of lcrList) {
     const pos = spk.position;
 
-    // angle from speaker → seat and speaker → MLP
+    // 0° = +Y into the room, +ve = clockwise
     const seatAz = angleFromTo(pos, seat);
     const aimAz  = angleFromTo(pos, mlpPoint);
 
+    // signed difference, then take absolute for the actual off-axis angle
     const offAxis = normalizeAngle(seatAz - aimAz);
-    const lossDb  = hfLossFromAngle(offAxis, horiz3dB);
+    const offAxisAbs = Math.abs(offAxis);
 
+    // Convert off-axis angle → predicted HF loss
+    const lossDb = hfLossFromAngle(offAxisAbs, horiz3dB);
+
+    // Store per-speaker debug data
     perSpeaker[role] = {
       seatAzimuthDeg: Number(seatAz.toFixed(1)),
       aimAzimuthDeg: Number(aimAz.toFixed(1)),
-      offAxisDeg: Number(Math.abs(offAxis).toFixed(1)),
+      angleDeg: Number(offAxisAbs.toFixed(1)),     // POSITIVE angle away from aim
       coverage3dB: Number(horiz3dB.toFixed(1)),
       lossDb: lossDb != null ? Number(lossDb.toFixed(1)) : null,
     };
@@ -103,7 +108,7 @@ export function computeP16ForSeat(seat, allSpeakers, mlpPoint, getCanonicalRole,
     if (lossDb > worstLoss) {
       worstLoss = lossDb;
       worstRole = role;
-      worstOffAxis = Math.abs(offAxis);
+      worstAngle = offAxisAbs;
     }
   }
 
@@ -115,15 +120,16 @@ export function computeP16ForSeat(seat, allSpeakers, mlpPoint, getCanonicalRole,
   return {
     value: loss,
     valueDb: loss,
-    formatted: `±${loss.toFixed(1)} dB`,
-    hudLabel: `${worstRole} ±${loss.toFixed(1)} dB`,
+    // P16 is a one-sided dB loss, not ±
+    formatted: `${loss.toFixed(1)} dB`,
+    hudLabel: `${worstRole} ${loss.toFixed(1)} dB`,
     level: level ?? 'FAIL',
     debug: {
       seatId,
       perSpeaker,
       worst: {
         role: worstRole,
-        angleDeg: Number(worstOffAxis.toFixed(1)),
+        angleDeg: Number(worstAngle.toFixed(1)),  // POSITIVE worst off-axis angle
         lossDb: loss,
       },
     },
