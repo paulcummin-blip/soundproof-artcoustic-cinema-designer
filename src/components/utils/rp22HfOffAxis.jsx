@@ -105,13 +105,8 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
     const seatAngleDeg = Math.atan2(dxSeat, dySeat) * 180 / Math.PI; // -180..+180
 
     // --- 3. Speaker aim direction in same coordinate system ---
-    // resolveYawDeg reads whatever the icon is using (spk.yaw / rotationDeg / etc.)
-    // Icon yaw is the *visual* rotation; to get the forward firing axis we flip the sign.
-    const visualYawDeg = resolveYawDeg(spk);   // what the icon shows
-    const aimDeg      = -visualYawDeg;         // 0° = straight into room, +ve = clockwise
-
-    // Flat: aimDeg ≈ 0°
-    // Angled-at-MLP: aimDeg ≈ angleFromTo(speaker → MLP)
+    // resolveYawDeg returns the speaker's aim angle (0° = flat, +ve = clockwise)
+    const aimDeg = resolveYawDeg(spk);    // 0° = flat to wall, +ve = clockwise toe-in
 
     // --- 4. Off-axis angle = | seat direction – aim direction | (0..180°) ---
     const diffDeg    = normalizeAngle(seatAngleDeg - aimDeg);
