@@ -43,63 +43,85 @@ function classifyP16(lossDb) {
   return 4;                    // ≤ 1.5
 }
 
-export function computeP16ForSeat(seat, allSpeakers, mlpPoint, getCanonicalRole, getSpeakerMeta) {
-  if (!seat || !isNum(seat.x) || !isNum(seat.y)) return null;
-  if (!mlpPoint || !isNum(mlpPoint.x) || !isNum(mlpPoint.y)) return null;
-  if (!Array.isArray(allSpeakers) || !allSpeakers.length) return null;
+// Resolve speaker yaw/rotation in degrees (0 = flat to room, +ve = clockwise)
+function resolveYawDeg(spk) {
+  if (isNum(spk.yaw)) return spk.yaw;
+  if (isNum(spk.rotationDeg)) return spk.rotationDeg;
+  if (isNum(spk.rotation_deg)) return spk.rotation_deg;
+  return 0; // flat
+}
+
+// Map off-axis angle → predicted HF loss (dB) - renamed for consistency
+function hfLoss(offAxisDeg, horiz3dB) {
+  if (!isNum(offAxisDeg) || !isNum(horiz3dB)) return null;
+
+  const a = Math.abs(offAxisDeg);
+
+  if (a <= horiz3dB) return 1.5;
+  if (a <= horiz3dB + 10) return 5.0;
+  return 6.0; // clearly >5 → FAIL
+}
+
+// P16 – seat-to-seat frequency response variance across LCR
+// Uses HF horizontal off-axis angle from each LCR to the seat,
+// based on the speaker's stored yaw (flat vs angled).
+
+export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeakerMeta) {
+  if (!seat || !allSpeakers) return null;
+  if (!isNum(seat.x) || !isNum(seat.y)) return null;
 
   const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
 
-  // Collect valid LCR speakers on the screen wall
-  const lcrList = allSpeakers
-    .filter(spk => {
-      const role = getCanonicalRole(spk.role);
-      return (
-        LCR_ROLES.has(role) &&
-        spk.position &&
-        isNum(spk.position.x) &&
-        isNum(spk.position.y)
-      );
-    })
-    .map(spk => {
-      const role = getCanonicalRole(spk.role);
-      const meta = spk.model ? getSpeakerMeta(spk.model) : null;
-      const horiz3dB =
-        meta?.hfOffAxis16k?.minus3deg ??
-        meta?.hfHoriz3dB ??
-        meta?.hfHoriz_3db ??
-        30; // sensible default
+  // 1) Collect valid LCR speakers (FL / FC / FR only)
+  const lcrData = [];
 
-      return { spk, role, horiz3dB };
+  for (const spk of allSpeakers) {
+    const canon = getCanonicalRole(spk.role);
+    if (!["FL", "FC", "FR"].includes(canon)) continue;
+    if (!spk.position || !isNum(spk.position.x) || !isNum(spk.position.y)) continue;
+
+    // Horizontal HF 3 dB angle from model meta (fallback 30° if missing)
+    const meta = spk.model ? getSpeakerMeta(spk.model) : null;
+    const hf3dBAng =
+      meta?.hfOffAxis16k?.minus3deg ??
+      meta?.hfHoriz3dB ??
+      meta?.hfHoriz_3db ??
+      30;
+
+    // Speaker aim / yaw in degrees.
+    // RoomVisualisation persists this as `speaker.yaw`.
+    const aimDeg = resolveYawDeg(spk); // 0 = flat to room, +ve = clockwise
+
+    lcrData.push({
+      role: canon,
+      pos: spk.position,
+      aimDeg,
+      hf3dBAng,
     });
+  }
 
-  if (!lcrList.length) return null;
+  if (!lcrData.length) return null;
 
+  // 2) For each LCR, compute seat azimuth, off-axis angle, and loss
   const perSpeaker = {};
-  let worstLoss = 0;
+  let worstLoss = -Infinity;
   let worstRole = null;
-  let worstAngle = 0;
 
-  for (const { spk, role, horiz3dB } of lcrList) {
-    const pos = spk.position;
+  for (const { role, pos, aimDeg, hf3dBAng } of lcrData) {
+    // Angle from speaker to seat, 0° = +Y (into room), +ve = clockwise
+    const seatAzimuthDeg = angleFromTo(pos, seat); // uses same convention as plan view
 
-    // 0° = +Y into the room, +ve = clockwise
-    const seatAz = angleFromTo(pos, seat);
-    const aimAz  = angleFromTo(pos, mlpPoint);
+    // Off-axis = absolute difference between where speaker is pointed and where seat is
+    const offAxisDeg = Math.abs(normalizeAngle(seatAzimuthDeg - aimDeg)); // 0..180
 
-    // signed difference, then take absolute for the actual off-axis angle
-    const offAxis = normalizeAngle(seatAz - aimAz);
-    const offAxisAbs = Math.abs(offAxis);
+    // Convert off-axis angle → predicted HF loss using RP22 logic
+    const lossDb = hfLoss(offAxisDeg, hf3dBAng);
 
-    // Convert off-axis angle → predicted HF loss
-    const lossDb = hfLossFromAngle(offAxisAbs, horiz3dB);
-
-    // Store per-speaker debug data
     perSpeaker[role] = {
-      seatAzimuthDeg: Number(seatAz.toFixed(1)),
-      aimAzimuthDeg: Number(aimAz.toFixed(1)),
-      angleDeg: Number(offAxisAbs.toFixed(1)),     // POSITIVE angle away from aim
-      coverage3dB: Number(horiz3dB.toFixed(1)),
+      angleDeg: Number(offAxisDeg.toFixed(1)),          // geometric off-axis angle
+      seatAzimuthDeg: Number(seatAzimuthDeg.toFixed(1)),// direction seat is seen from speaker
+      aimDeg: Number(aimDeg.toFixed(1)),                // stored yaw
+      coverage3dB: Number(hf3dBAng.toFixed(1)),
       lossDb: lossDb != null ? Number(lossDb.toFixed(1)) : null,
     };
 
@@ -108,29 +130,29 @@ export function computeP16ForSeat(seat, allSpeakers, mlpPoint, getCanonicalRole,
     if (lossDb > worstLoss) {
       worstLoss = lossDb;
       worstRole = role;
-      worstAngle = offAxisAbs;
     }
   }
 
-  if (!worstRole) return null;
+  if (!isNum(worstLoss) || !worstRole) return null;
 
-  const loss = Number(worstLoss.toFixed(1));
-  const level = classifyP16(loss);
+  // 3) Map worst loss → RP22 level (using existing thresholds)
+  const level = classifyP16(worstLoss); // returns 1,2,4 or null for FAIL
+
+  const lossRounded = Number(worstLoss.toFixed(1));
 
   return {
-    value: loss,
-    valueDb: loss,
-    // P16 is a one-sided dB loss, not ±
-    formatted: `${loss.toFixed(1)} dB`,
-    hudLabel: `${worstRole} ${loss.toFixed(1)} dB`,
-    level: level ?? 'FAIL',
+    value: lossRounded,
+    valueDb: lossRounded,
+    formatted: `±${lossRounded.toFixed(1)} dB`,
+    hudLabel: `${worstRole} ±${lossRounded.toFixed(1)} dB`,
+    level: level ?? "FAIL",
     debug: {
       seatId,
       perSpeaker,
       worst: {
         role: worstRole,
-        angleDeg: Number(worstAngle.toFixed(1)),  // POSITIVE worst off-axis angle
-        lossDb: loss,
+        angleDeg: perSpeaker[worstRole]?.angleDeg ?? null,
+        lossDb: lossRounded,
       },
     },
   };
