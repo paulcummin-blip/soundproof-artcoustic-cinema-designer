@@ -371,7 +371,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
       // P16 – LCR horizontal off-axis HF loss (RP22 Param 16)
       {
-        const p16 = computeP16ForSeat(seat, safeSpeakers, mlp, getCanonicalRole, getSpeakerModelMeta);
+        const p16 = computeP16ForSeat(seat, safeSpeakers, getSpeakerModelMeta);
 
         metrics.p16 = p16 || {
           value: null,
