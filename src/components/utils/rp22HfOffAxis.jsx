@@ -76,7 +76,7 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
   const lcrData = [];
 
   for (const spk of allSpeakers) {
-    const canon = getCanonicalRole(spk.role);
+    const canon = (spk.role || "").toUpperCase();
     if (!["FL", "FC", "FR"].includes(canon)) continue;
     if (!spk.position || !isNum(spk.position.x) || !isNum(spk.position.y)) continue;
 
