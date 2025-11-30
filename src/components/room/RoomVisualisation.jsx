@@ -2703,9 +2703,9 @@ useEffect(() => {
     if (!fl && !fc && !fr) return;
 
     // Compute target yaw for each LCR
-    const targetYawL = aimAtMLP ? -(Number(lcrAngleInfo.L) || 0) : 0;
+    const targetYawL = aimAtMLP ? (Number(lcrAngleInfo.L) || 0) : 0;
     const targetYawC = 0;
-    const targetYawR = aimAtMLP ? -(Number(lcrAngleInfo.R) || 0) : 0;
+    const targetYawR = aimAtMLP ? (Number(lcrAngleInfo.R) || 0) : 0;
 
     // Check if any need updating
     const needsUpdateL = fl && Math.abs((fl.yaw ?? 0) - targetYawL) > 0.1;
