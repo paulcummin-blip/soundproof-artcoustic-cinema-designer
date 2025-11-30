@@ -97,7 +97,9 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
     const seatAzimuthDeg = Math.atan2(dx, dy) * 180 / Math.PI; // -180..+180
 
     // Step 2: Compute aim azimuth (base is 0° straight into room, apply yaw)
-    const aimAz = aimDeg; // aimDeg is already relative to forward axis
+    // NOTE: plan-view rotation uses the opposite sign, so we flip here to
+    // match the on-screen speaker icons (toe-in towards the seat reduces angle).
+    const aimAz = -aimDeg;
 
     // Step 3: Compute off-axis angle
     const offAxisDeg = Math.abs(normalizeAngle(seatAzimuthDeg - aimAz));
