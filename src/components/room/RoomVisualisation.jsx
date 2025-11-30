@@ -2692,37 +2692,36 @@ useEffect(() => {
 
   }, [constraintZones, screenCenterX_m, onSetSpeakers, placedSpeakers, getCanonicalRole]);
 
-  // [NEW] Persist LCR yaw to speaker objects for RP22 P16
+  // [NEW] Persist LCR yaw when aimAtMLP or lcrAngleInfo changes
   useEffect(() => {
-    if (!onSetSpeakers || !placedSpeakers?.length) return;
+    if (!onSetSpeakers) return;
 
-    let needsUpdate = false;
-    const updated = placedSpeakers.map(spk => {
-      const canon = getCanonicalRole(spk.role);
-      if (!['FL', 'FC', 'FR'].includes(canon)) return spk;
+    const fl = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL');
+    const fc = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FC');
+    const fr = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR');
 
-      // Compute current yaw
-      const computedYaw = getYawForObject(
-        spk,
-        { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
-        aimAtMLP,
-        { width: widthM, length: lengthM, height: heightM },
-        getModelDimsM
-      );
+    if (!fl && !fc && !fr) return;
 
-      // Only update if yaw changed
-      if (Math.abs((spk.yaw ?? 0) - computedYaw) > 0.1) {
-        needsUpdate = true;
-        return { ...spk, yaw: computedYaw };
-      }
+    // Compute target yaw for each LCR
+    const targetYawL = aimAtMLP ? -(Number(lcrAngleInfo.L) || 0) : 0;
+    const targetYawC = 0;
+    const targetYawR = aimAtMLP ? -(Number(lcrAngleInfo.R) || 0) : 0;
 
+    // Check if any need updating
+    const needsUpdateL = fl && Math.abs((fl.yaw ?? 0) - targetYawL) > 0.1;
+    const needsUpdateC = fc && Math.abs((fc.yaw ?? 0) - targetYawC) > 0.1;
+    const needsUpdateR = fr && Math.abs((fr.yaw ?? 0) - targetYawR) > 0.1;
+
+    if (!needsUpdateL && !needsUpdateC && !needsUpdateR) return;
+
+    onSetSpeakers(prev => prev.map(spk => {
+      const role = getCanonicalRole(spk.role);
+      if (role === 'FL') return { ...spk, yaw: targetYawL };
+      if (role === 'FC') return { ...spk, yaw: targetYawC };
+      if (role === 'FR') return { ...spk, yaw: targetYawR };
       return spk;
-    });
-
-    if (needsUpdate) {
-      onSetSpeakers(updated);
-    }
-  }, [lcrAngleInfo, aimAtMLP, placedSpeakers, onSetSpeakers, widthM, lengthM, heightM, getModelDimsM, getCanonicalRole]);
+    }));
+  }, [aimAtMLP, lcrAngleInfo.L, lcrAngleInfo.R, onSetSpeakers, getCanonicalRole, placedSpeakers]);
 
   // [NEW] Auto-hug surrounds to walls when room dimensions change
   useEffect(() => {
