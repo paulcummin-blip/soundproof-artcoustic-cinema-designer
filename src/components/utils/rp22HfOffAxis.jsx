@@ -60,24 +60,98 @@ const classifyP17 = (lossDb) => {
   return 2;                      // >3 dB (never Level 1)
 };
 
-// Apply vertical tilt correction for overhead speakers (P17 only)
-function applyVerticalTiltForOverhead({ role, modelInfo, offAxisDeg }) {
-  const canonRole = String(role || "").toUpperCase();
+// Overhead role checker
+function isOverheadRole(role) {
+  const r = String(role || "").toUpperCase();
+  return (
+    r === "TL"  || r === "TR"  ||
+    r === "TFL" || r === "TFR" ||
+    r === "TBL" || r === "TBR"
+  );
+}
 
-  // Only overhead roles are affected
-  const isOverhead =
-    canonRole === "TL"  || canonRole === "TR"  ||
-    canonRole === "TFL" || canonRole === "TFR" ||
-    canonRole === "TBL" || canonRole === "TBR";
+// Normalise a {x,y,z} with safe fallback
+function normaliseVec3(v) {
+  const x = Number(v?.x) || 0;
+  const y = Number(v?.y) || 0;
+  const z = Number(v?.z) || 0;
+  const len = Math.sqrt(x * x + y * y + z * z) || 1;
+  return { x: x / len, y: y / len, z: z / len };
+}
 
-  if (!isOverhead || !modelInfo) return offAxisDeg;
+// Compute 3D off-axis angle for overhead speakers with tilt toward MLP
+function computeOverheadOffAxisDeg({
+  speaker,
+  seat,
+  modelInfo,
+  roomHeightM,
+  mlpPoint,
+}) {
+  if (!speaker || !seat) return null;
 
-  const tilt = Number(modelInfo.verticalTiltDeg) || 0;
-  if (!tilt) return offAxisDeg;
+  const spkPos = speaker.position || {};
+  const seatPos = seat.position || seat; // seat might already be {x,y,z}
 
-  // Effective off-axis is reduced by the built-in tilt, but never below 0
-  const effective = Math.max(0, Math.abs(offAxisDeg) - tilt);
-  return effective;
+  // --- 1) Establish Z (height) for speaker and seat ---------------------
+  const spkZ =
+    Number(spkPos.z) ||
+    Number(roomHeightM) ||
+    2.5; // safe fallback
+
+  const seatZ =
+    Number(seatPos.z) ||
+    1.2; // default ear height if not provided
+
+  const spk = { x: Number(spkPos.x) || 0, y: Number(spkPos.y) || 0, z: spkZ };
+  const listener = { x: Number(seatPos.x) || 0, y: Number(seatPos.y) || 0, z: seatZ };
+
+  // --- 2) Direction from speaker to listener ----------------------------
+  const vSeat = normaliseVec3({
+    x: listener.x - spk.x,
+    y: listener.y - spk.y,
+    z: listener.z - spk.z,
+  });
+
+  // --- 3) Build the speaker's *axis* vector -----------------------------
+  // Base axis: straight down from ceiling
+  const axisDown = { x: 0, y: 0, z: -1 };
+
+  // How much the driver is tilted away from vertical, in degrees
+  const tiltDeg = Number(modelInfo?.verticalTiltDeg) || 0;
+  const tiltRad = (tiltDeg * Math.PI) / 180;
+
+  // Horizontal direction toward the MLP (for "tilt toward MLP" models)
+  const mlp = mlpPoint || listener; // fall back to MLP seat itself
+  const dirToMlpXY = normaliseVec3({
+    x: mlp.x - spk.x,
+    y: mlp.y - spk.y,
+    z: 0,
+  });
+
+  // If no valid horizontal direction (edge cases), keep axis straight down
+  let axis;
+  if (!Number.isFinite(dirToMlpXY.x) || !Number.isFinite(dirToMlpXY.y)) {
+    axis = axisDown;
+  } else {
+    // Axis = combination of "down" and "toward MLP" in a vertical plane
+    const cosT = Math.cos(tiltRad);
+    const sinT = Math.sin(tiltRad);
+
+    axis = normaliseVec3({
+      x: dirToMlpXY.x * sinT,
+      y: dirToMlpXY.y * sinT,
+      z: axisDown.z * cosT, // negative (pointing down)
+    });
+  }
+
+  // --- 4) Off-axis angle between axis and seat direction ----------------
+  const dot = axis.x * vSeat.x + axis.y * vSeat.y + axis.z * vSeat.z;
+  const clamped = Math.max(-1, Math.min(1, dot));
+  const angleRad = Math.acos(clamped);
+  const angleDeg = (angleRad * 180) / Math.PI;
+
+  // This is always a positive "difference from on-axis"
+  return Math.abs(angleDeg);
 }
 
 export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
@@ -177,7 +251,7 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
 }
 
 // RP22 P17 – HF off-axis attenuation for surrounds/wides/heights (non-LCR, non-sub)
-export function computeP17ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
+export function computeP17ForSeat(seat, allSpeakers, getSpeakerModelMeta, roomHeightM, mlpPoint) {
   if (!seat || !isNum(seat.x) || !isNum(seat.y)) return null;
   if (!Array.isArray(allSpeakers) || !allSpeakers.length) return null;
 
@@ -206,33 +280,43 @@ export function computeP17ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
     const role = String(spk.role || "").toUpperCase();
     const pos = spk.position;
 
-    // Direction from speaker → seat
-    const seatAzDeg = angleFromTo(pos, seat);
-    if (!isNum(seatAzDeg)) continue;
-
-    // Aim direction: prefer explicit yaw, otherwise flat
-    let aimDeg = 0;
-    if (isNum(spk.yaw)) {
-      aimDeg = Number(spk.yaw);
-    } else if (isNum(spk.rotationDeg)) {
-      aimDeg = Number(spk.rotationDeg);
-    } else if (isNum(spk.rotation_deg)) {
-      aimDeg = Number(spk.rotation_deg);
-    }
-
-    // True off-axis angle
-    let offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
-    if (!isNum(offAxisDeg)) continue;
-
     // Speaker model HF 3 dB horizontal coverage
     const meta = spk.model ? getSpeakerModelMeta(spk.model) : null;
-    
-    // Apply vertical tilt correction for overhead speakers
-    offAxisDeg = applyVerticalTiltForOverhead({
-      role: spk.role,
-      modelInfo: meta,
-      offAxisDeg,
-    });
+
+    let offAxisDeg;
+
+    // Use 3D geometry for overheads, 2D for wall speakers
+    if (!isOverheadRole(role)) {
+      // Wall speakers: 2D horizontal off-axis
+      const seatAzDeg = angleFromTo(pos, seat);
+      if (!isNum(seatAzDeg)) continue;
+
+      // Aim direction: prefer explicit yaw, otherwise flat
+      let aimDeg = 0;
+      if (isNum(spk.yaw)) {
+        aimDeg = Number(spk.yaw);
+      } else if (isNum(spk.rotationDeg)) {
+        aimDeg = Number(spk.rotationDeg);
+      } else if (isNum(spk.rotation_deg)) {
+        aimDeg = Number(spk.rotation_deg);
+      }
+
+      offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
+    } else {
+      // Overheads: full 3D overhead maths using ceiling + seat height + tilt to MLP
+      offAxisDeg = computeOverheadOffAxisDeg({
+        speaker: spk,
+        seat,
+        modelInfo: meta,
+        roomHeightM,
+        mlpPoint,
+      });
+    }
+
+    // Safety fallback
+    if (!Number.isFinite(offAxisDeg)) {
+      offAxisDeg = 0;
+    }
     
     const horiz3dB =
       meta?.hfOffAxis16k?.minus3deg ??

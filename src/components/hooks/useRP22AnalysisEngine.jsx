@@ -383,7 +383,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
       // P17 – Surround/wide/height HF off-axis loss (RP22 Param 17)
       {
-        const p17 = computeP17ForSeat(seat, safeSpeakers, getSpeakerModelMeta);
+        const roomHeightM = dimensions?.heightM || dimensions?.height || 2.5;
+        const p17 = computeP17ForSeat(seat, safeSpeakers, getSpeakerModelMeta, roomHeightM, mlpSeat);
 
         metrics.p17 = p17 || {
           value: null,
