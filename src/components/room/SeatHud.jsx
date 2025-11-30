@@ -204,6 +204,21 @@ export default function SeatHud({
                   )}
                 </div>
               )}
+
+              {/* P17 debug info */}
+              {key === 'p17' && metric.debug && metric.debug.worst && (
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: '#999',
+                    paddingLeft: 16,
+                    paddingBottom: 3,
+                    lineHeight: 1.4,
+                  }}
+                >
+                  Worst: {metric.debug.worst.role} {Math.abs(Number(metric.debug.worst.angleDeg) || 0).toFixed(1)}° / {metric.debug.worst.lossDb} dB
+                </div>
+              )}
             </React.Fragment>
           );
         })}

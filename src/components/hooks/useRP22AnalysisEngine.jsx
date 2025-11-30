@@ -7,7 +7,7 @@ import { computeBackArc, param5LevelFromGap } from "@/components/utils/RP22Geome
 import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
-import { computeP16ForSeat } from "../utils/rp22HfOffAxis";
+import { computeP16ForSeat, computeP17ForSeat } from "../utils/rp22HfOffAxis";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 
@@ -381,8 +381,20 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         };
       }
 
-      // P17, P20 - Reserved for future FR implementation
-      // require per-seat frequency-response prediction (500 Hz–16 kHz and LF)
+      // P17 – Surround/wide/height HF off-axis loss (RP22 Param 17)
+      {
+        const p17 = computeP17ForSeat(seat, safeSpeakers, getSpeakerModelMeta);
+
+        metrics.p17 = p17 || {
+          value: null,
+          formatted: "—",
+          hudLabel: null,
+          level: "—",
+        };
+      }
+
+      // P20 - Reserved for future FR implementation
+      // requires per-seat frequency-response prediction (LF)
       
       seatMetrics.set(seatId, metrics);
     }

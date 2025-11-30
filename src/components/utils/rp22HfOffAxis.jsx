@@ -52,6 +52,14 @@ const classifyP16 = (lossDb) => {
   return 4;                      // ≤1.5 dB
 };
 
+// P17 level mapping based on loss (surrounds/wides/heights only, no Level 1)
+const classifyP17 = (lossDb) => {
+  if (!isNum(lossDb)) return null;
+  if (lossDb <= 1.5) return 4;   // ≤1.5 dB
+  if (lossDb <= 3.0) return 3;   // 1.5–3 dB
+  return 2;                      // >3 dB (never Level 1)
+};
+
 export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
   if (!seat || !isNum(seat.x) || !isNum(seat.y)) return null;
   if (!Array.isArray(allSpeakers) || !allSpeakers.length) return null;
@@ -130,6 +138,103 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
 
   const value = Number(worstLossDb.toFixed(1));
   const level = classifyP16(value);
+  const worstAngle = perSpeaker[worstRole]?.angleDeg ?? null;
+
+  return {
+    value,
+    formatted: `±${value.toFixed(1)} dB`,
+    hudLabel: `${worstRole} ±${value.toFixed(1)} dB`,
+    level,
+    debug: {
+      perSpeaker,
+      worst: {
+        role: worstRole,
+        angleDeg: worstAngle,
+        lossDb: value,
+      },
+    },
+  };
+}
+
+// RP22 P17 – HF off-axis attenuation for surrounds/wides/heights (non-LCR, non-sub)
+export function computeP17ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
+  if (!seat || !isNum(seat.x) || !isNum(seat.y)) return null;
+  if (!Array.isArray(allSpeakers) || !allSpeakers.length) return null;
+
+  // Filter to non-LCR, non-subwoofer speakers with valid positions
+  const SUB_ROLES = new Set(["LFE", "LFE1", "LFE2", "SUB", "SUBF", "SUBR"]);
+  
+  const nonLcrSpeakers = allSpeakers.filter((spk) => {
+    const role = String(spk.role || "").toUpperCase();
+    const pos = spk.position;
+    
+    // Exclude LCR and subs
+    if (LCR_ROLES.has(role) || SUB_ROLES.has(role)) return false;
+    
+    // Must have valid position
+    return pos && isNum(pos.x) && isNum(pos.y);
+  });
+
+  if (!nonLcrSpeakers.length) return null;
+
+  const perSpeaker = {};
+  let worstLossDb = -Infinity;
+  let worstRole = null;
+
+  // Evaluate each surround/wide/height speaker
+  for (const spk of nonLcrSpeakers) {
+    const role = String(spk.role || "").toUpperCase();
+    const pos = spk.position;
+
+    // Direction from speaker → seat
+    const seatAzDeg = angleFromTo(pos, seat);
+    if (!isNum(seatAzDeg)) continue;
+
+    // Aim direction: prefer explicit yaw, otherwise flat
+    let aimDeg = 0;
+    if (isNum(spk.yaw)) {
+      aimDeg = Number(spk.yaw);
+    } else if (isNum(spk.rotationDeg)) {
+      aimDeg = Number(spk.rotationDeg);
+    } else if (isNum(spk.rotation_deg)) {
+      aimDeg = Number(spk.rotation_deg);
+    }
+
+    // True off-axis angle
+    const offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
+    if (!isNum(offAxisDeg)) continue;
+
+    // Speaker model HF 3 dB horizontal coverage
+    const meta = spk.model ? getSpeakerModelMeta(spk.model) : null;
+    const horiz3dB =
+      meta?.hfOffAxis16k?.minus3deg ??
+      meta?.hfHoriz3dB ??
+      meta?.hfHoriz_3db ??
+      meta?.hfHorz3dB ??
+      meta?.horiz3dB ??
+      30;
+
+    const lossDbRaw = lossFromAngle(offAxisDeg, horiz3dB);
+    if (!isNum(lossDbRaw)) continue;
+
+    const lossDb = Number(lossDbRaw.toFixed(1));
+    const angleDeg = Number(offAxisDeg.toFixed(1));
+
+    perSpeaker[role] = {
+      angleDeg,
+      lossDb,
+    };
+
+    if (lossDb > worstLossDb) {
+      worstLossDb = lossDb;
+      worstRole = role;
+    }
+  }
+
+  if (!worstRole || !isNum(worstLossDb)) return null;
+
+  const value = Number(worstLossDb.toFixed(1));
+  const level = classifyP17(value);
   const worstAngle = perSpeaker[worstRole]?.angleDeg ?? null;
 
   return {
