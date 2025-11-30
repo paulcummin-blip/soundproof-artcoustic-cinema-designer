@@ -147,6 +147,16 @@ export default function SeatHud({
           RP22 Per-Seat Metrics
         </div>
 
+        {(() => {
+          console.log(
+            "[HUD P16]",
+            {
+              seatId: effectiveHoveredSeat?.id,
+              rp22Metrics: tooltipData?.rp22,
+            }
+          );
+          return null;
+        })()}
         {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
           const metric = tooltipData.rp22?.[key];
           if (!metric) return null;
