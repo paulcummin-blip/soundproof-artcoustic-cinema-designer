@@ -19,7 +19,14 @@ function normalizeAngle(deg) {
 function angleFromTo(from, to) {
   const dx = to.x - from.x; // lateral
   const dy = to.y - from.y; // fore/aft
-  return (Math.atan2(dx, dy) * 180) / Math.PI;
+  const deg = (Math.atan2(dx, dy) * 180) / Math.PI; // -180..+180, 0 = +Y
+  return ((deg % 360) + 360) % 360; // 0..360
+}
+
+// Shortest angular difference between two angles (0..180)
+function shortestDiff(a, b) {
+  let diff = Math.abs(((a - b + 540) % 360) - 180); // 0..180
+  return diff;
 }
 
 // Map off-axis angle → predicted HF loss (dB)
@@ -100,17 +107,15 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
       : 30; // safe default
 
     // --- 2. Angle from speaker → seat (0° = +Y, +ve = clockwise) ---
-    const dxSeat = seat.x - pos.x; // lateral (right = +)
-    const dySeat = seat.y - pos.y; // depth   (into room = +)
-    const seatAngleDeg = Math.atan2(dxSeat, dySeat) * 180 / Math.PI; // -180..+180
+    const seatAzDeg = angleFromTo(pos, seat); // 0..360
 
     // --- 3. Speaker aim direction in same coordinate system ---
-    // resolveYawDeg returns the speaker's aim angle (0° = flat, +ve = clockwise)
-    const aimDeg = resolveYawDeg(spk);    // 0° = flat to wall, +ve = clockwise toe-in
+    // resolveYawDeg returns the speaker's yaw as stored (rotation of the icon)
+    const rawYaw = resolveYawDeg(spk);
+    const aimDeg = ((rawYaw % 360) + 360) % 360; // 0..360, 0 = +Y, clockwise positive
 
-    // --- 4. Off-axis angle = | seat direction – aim direction | (0..180°) ---
-    const diffDeg    = normalizeAngle(seatAngleDeg - aimDeg);
-    const offAxisDeg = Math.abs(diffDeg);       // always positive
+    // --- 4. Off-axis angle = shortest difference (0..180°) ---
+    const offAxisDeg = shortestDiff(seatAzDeg, aimDeg);
 
     // --- 5. Convert off-axis angle → predicted HF loss (dB) ---
     const lossDb = hfLoss(offAxisDeg, horiz3dB);
@@ -121,11 +126,11 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
 
     // Store per-speaker debug so HUD can show real angles
     perSpeaker[role] = {
-      angleDeg: angleRounded,     // off-axis from speaker front axis
+      seatAzDeg: Number(seatAzDeg.toFixed(1)),
+      aimDeg: Number(aimDeg.toFixed(1)),
+      angleDeg: angleRounded,     // off-axis from speaker front axis (what HUD shows)
       lossDb: lossRounded,
       coverage3dB: horiz3dB,
-      seatAzimuthDeg: Number(seatAngleDeg.toFixed(1)),
-      aimDeg: Number(aimDeg.toFixed(1)),
     };
 
     // Track worst (highest) loss of the three LCR
