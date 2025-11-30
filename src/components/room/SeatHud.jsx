@@ -196,7 +196,8 @@ export default function SeatHud({
                   {['FL', 'FC', 'FR'].map((role) => {
                     const data = metric.debug.perSpeaker[role];
                     if (!data) return null;
-                    return `${role} ${data.angleDeg ?? '—'}° / ${data.lossDb ?? '—'} dB`;
+                    const angleDisplay = Math.abs(Number(data.angleDeg) || 0);
+                    return `${role} ${angleDisplay.toFixed(1)}° / ${data.lossDb ?? '—'} dB`;
                   }).filter(Boolean).join(', ')}
                   {metric.debug.worst?.role && (
                     <span> (worst: {metric.debug.worst.role})</span>
