@@ -117,6 +117,19 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
     // --- 4. Off-axis angle = shortest difference (0..180°) ---
     const offAxisDeg = shortestDiff(seatAzDeg, aimDeg);
 
+    // DEBUG: Log P16 angle calculations for LCR speakers
+    if (role === 'FL' || role === 'FC' || role === 'FR') {
+      console.log('[P16 DEBUG]', {
+        seatId,
+        role,
+        seatPos: { x: Number(seat.x?.toFixed?.(3) ?? seat.x), y: Number(seat.y?.toFixed?.(3) ?? seat.y) },
+        spkPos: { x: Number(pos.x?.toFixed?.(3) ?? pos.x), y: Number(pos.y?.toFixed?.(3) ?? pos.y) },
+        seatAzDeg: Number(seatAzDeg.toFixed(1)),
+        aimDeg: Number(aimDeg.toFixed(1)),
+        offAxisDeg: Number(offAxisDeg.toFixed(1)),
+      });
+    }
+
     // --- 5. Convert off-axis angle → predicted HF loss (dB) ---
     const lossDb = hfLoss(offAxisDeg, horiz3dB);
     if (!isNum(lossDb)) continue;
