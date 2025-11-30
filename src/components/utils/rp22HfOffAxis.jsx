@@ -60,6 +60,26 @@ const classifyP17 = (lossDb) => {
   return 2;                      // >3 dB (never Level 1)
 };
 
+// Apply vertical tilt correction for overhead speakers (P17 only)
+function applyVerticalTiltForOverhead({ role, modelInfo, offAxisDeg }) {
+  const canonRole = String(role || "").toUpperCase();
+
+  // Only overhead roles are affected
+  const isOverhead =
+    canonRole === "TL"  || canonRole === "TR"  ||
+    canonRole === "TFL" || canonRole === "TFR" ||
+    canonRole === "TBL" || canonRole === "TBR";
+
+  if (!isOverhead || !modelInfo) return offAxisDeg;
+
+  const tilt = Number(modelInfo.verticalTiltDeg) || 0;
+  if (!tilt) return offAxisDeg;
+
+  // Effective off-axis is reduced by the built-in tilt, but never below 0
+  const effective = Math.max(0, Math.abs(offAxisDeg) - tilt);
+  return effective;
+}
+
 export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
   if (!seat || !isNum(seat.x) || !isNum(seat.y)) return null;
   if (!Array.isArray(allSpeakers) || !allSpeakers.length) return null;
@@ -201,11 +221,19 @@ export function computeP17ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
     }
 
     // True off-axis angle
-    const offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
+    let offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
     if (!isNum(offAxisDeg)) continue;
 
     // Speaker model HF 3 dB horizontal coverage
     const meta = spk.model ? getSpeakerModelMeta(spk.model) : null;
+    
+    // Apply vertical tilt correction for overhead speakers
+    offAxisDeg = applyVerticalTiltForOverhead({
+      role: spk.role,
+      modelInfo: meta,
+      offAxisDeg,
+    });
+    
     const horiz3dB =
       meta?.hfOffAxis16k?.minus3deg ??
       meta?.hfHoriz3dB ??
