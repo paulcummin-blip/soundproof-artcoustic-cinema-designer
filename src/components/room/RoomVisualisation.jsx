@@ -4493,13 +4493,16 @@ return {
       ? (e) => handleMouseDown(e, id, "speaker")
       : undefined;
 
+    // Visual-only yaw: flip sign so icons match the room coordinate system.
+    const visualYawDeg = Number.isFinite(yawDeg) ? -yawDeg : 0;
+
     return (
       <SpeakerIcon
         key={id}
         speaker={{ ...speaker, model: resolvedModel }}
         canvasX={safeCanvasX}
         canvasY_raw={safeCanvasY}
-        yawDeg={yawDeg}
+        yawDeg={visualYawDeg}
         widthM={widthM_spk}
         depthM={depthM_spk}
         scale={scale}
