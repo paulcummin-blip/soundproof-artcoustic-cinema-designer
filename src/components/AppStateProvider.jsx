@@ -76,45 +76,13 @@ function speakersShallowEqual(a = [], b = []) {
   for (const [role, sa] of A) {
     const sb = B.get(role);
     if (!sb) return false;
+    if ((sa.model || 'off') !== (sb.model || 'off')) return false;
 
-    // Model
-    if ((sa.model || "off") !== (sb.model || "off")) return false;
+    const pa = sa.position || {}, pb = sb.position || {};
+    if (!almostEq(pa.x, pb.x) || !almostEq(pa.y, pb.y) || !almostEq(pa.z, pb.z)) return false;
 
-    // Position
-    const pa = sa.position || {};
-    const pb = sb.position || {};
-    if (
-      !almostEq(pa.x, pb.x) ||
-      !almostEq(pa.y, pb.y) ||
-      !almostEq(pa.z, pb.z)
-    ) {
-      return false;
-    }
-
-    // Legacy rotation object
-    const ra = sa.rotation || {};
-    const rb = sb.rotation || {};
-    if (
-      !almostEq(ra.x, rb.x) ||
-      !almostEq(ra.y, rb.y) ||
-      !almostEq(ra.z, rb.z)
-    ) {
-      return false;
-    }
-
-    // NEW: compare yaw / rotationDeg so P16 sees LCR toe-in changes
-    const yawA =
-      sa.yaw ??
-      sa.rotationDeg ??
-      sa.rotation_deg ??
-      (sa.rotation && sa.rotation.y);
-    const yawB =
-      sb.yaw ??
-      sb.rotationDeg ??
-      sb.rotation_deg ??
-      (sb.rotation && sb.rotation.y);
-
-    if (!almostEq(yawA, yawB)) return false;
+    const ra = sa.rotation || {}, rb = sb.rotation || {};
+    if (!almostEq(ra.x, rb.x) || !almostEq(ra.y, rb.y) || !almostEq(ra.z, rb.z)) return false;
   }
   return true;
 }
@@ -483,13 +451,6 @@ function useDesignerState() {
           role: getCanonicalRole(s.role),
           model: s.model
         })));
-
-        console.log("[AS] setSpeakerSystem candidate yaw by role:",
-          speakers.map(s => ({
-            role: String(s.role || "").toUpperCase(),
-            yaw: s.yaw ?? null,
-          }))
-        );
 
         // ✅ If speakers didn't actually change, return prev to avoid churn
         if (speakersShallowEqual(prev.placedSpeakers, speakers)) {
