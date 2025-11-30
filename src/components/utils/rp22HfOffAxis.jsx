@@ -145,7 +145,7 @@ export function computeP16ForSeat(seat, allSpeakers, getCanonicalRole, getSpeake
       perSpeaker,
       worst: {
         role: worstRole,
-        angleDeg: perSpeaker[worstRole]?.angleDeg ?? null,
+        angleDeg: perSpeaker[worstRole]?.offAxisDeg ?? null,
         lossDb: Number(worstLoss.toFixed(1)),
       },
     },

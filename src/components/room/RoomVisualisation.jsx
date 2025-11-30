@@ -2692,6 +2692,38 @@ useEffect(() => {
 
   }, [constraintZones, screenCenterX_m, onSetSpeakers, placedSpeakers, getCanonicalRole]);
 
+  // [NEW] Persist LCR yaw to speaker objects for RP22 P16
+  useEffect(() => {
+    if (!onSetSpeakers || !placedSpeakers?.length) return;
+
+    let needsUpdate = false;
+    const updated = placedSpeakers.map(spk => {
+      const canon = getCanonicalRole(spk.role);
+      if (!['FL', 'FC', 'FR'].includes(canon)) return spk;
+
+      // Compute current yaw
+      const computedYaw = getYawForObject(
+        spk,
+        { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
+        aimAtMLP,
+        { width: widthM, length: lengthM, height: heightM },
+        getModelDimsM
+      );
+
+      // Only update if yaw changed
+      if (Math.abs((spk.yaw ?? 0) - computedYaw) > 0.1) {
+        needsUpdate = true;
+        return { ...spk, yaw: computedYaw };
+      }
+
+      return spk;
+    });
+
+    if (needsUpdate) {
+      onSetSpeakers(updated);
+    }
+  }, [lcrAngleInfo, aimAtMLP, placedSpeakers, onSetSpeakers, widthM, lengthM, heightM, getModelDimsM, getCanonicalRole]);
+
   // [NEW] Auto-hug surrounds to walls when room dimensions change
   useEffect(() => {
     if (!onSetSpeakers || !placedSpeakers?.length) return;
