@@ -388,8 +388,37 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         };
       }
 
-      // P17, P20 - Reserved for future FR implementation
-      // require per-seat frequency-response prediction (500 Hz–16 kHz and LF)
+      // P17 – Non-LCR (surrounds/wides/overheads) HF off-axis variance
+      {
+        const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
+        const p17Data = p17Results[seatId];
+
+        if (p17Data && isNum(p17Data.maxAbsLossDb)) {
+          const valueDb = p17Data.maxAbsLossDb;
+
+          // P17 level mapping
+          let level17 = 2; // Default
+          if (valueDb <= 1.5) level17 = 4;
+          else if (valueDb <= 3.0) level17 = 3;
+
+          metrics.p17 = {
+            value: valueDb,
+            formatted: `±${valueDb.toFixed(1)} dB`,
+            level: level17,
+            worstRole: p17Data.worstRole,
+            worstAngleDeg: p17Data.worstAngleDeg,
+          };
+        } else {
+          metrics.p17 = {
+            value: null,
+            formatted: "—",
+            level: "—",
+          };
+        }
+      }
+
+      // P20 - Reserved for future FR implementation (LF variance)
+      // requires per-seat frequency-response prediction
       
       seatMetrics.set(seatId, metrics);
     }
