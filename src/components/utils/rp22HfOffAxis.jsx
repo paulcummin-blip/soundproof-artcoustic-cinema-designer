@@ -160,19 +160,31 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
 // Model-specific vertical tilt for in-ceiling speakers.
 // This is the *built-in* tilt away from straight-down, not seat-dependent.
 function getOverheadTiltDeg(modelKeyRaw) {
-  const key = String(modelKeyRaw || "").toLowerCase().trim();
+  if (!modelKeyRaw) return 0;
+  const key = String(modelKeyRaw).toLowerCase().trim();
+  if (!key) return 0;
 
-  // Architect 2-1 / 4-2: approx 5° tilt
-  if (key.includes("architect-2-1") || key.includes("architect-4-2")) {
+  // Mikro: 0° tilt (explicit, though also default)
+  if (key.includes("mikro")) {
+    return 0;
+  }
+
+  // Architect 2-1: 5° tilt
+  if (key.includes("architect-2-1") || key.includes("2-1")) {
     return 5;
   }
 
-  // Architect PAS in-ceiling: approx 20° tilt
-  if (key.includes("architect-pas") || key.includes("pas2-2")) {
+  // Architect 4-2: 5° tilt
+  if (key.includes("architect-4-2") || key.includes("4-2")) {
+    return 5;
+  }
+
+  // Architect PAS / PAS2-2: 20° tilt
+  if (key.includes("architect-pas") || key.includes("pas2-2") || key.includes("pas")) {
     return 20;
   }
 
-  // Mikro, and any unknown models: treat as flat (0°)
+  // All other overhead models: default 0° tilt
   return 0;
 }
 
@@ -186,39 +198,47 @@ export function computeVerticalOffAxisDeg({
 }) {
   if (!speakerPos || !seatPos) return null;
 
-  const sx = Number(speakerPos.x) || 0;
-  const sy = Number(speakerPos.y) || 0;
+  // 1. Normalize coordinates and heights
+  const sx = Number(speakerPos?.x) || 0;
+  const sy = Number(speakerPos?.y) || 0;
+  const sz = Number(speakerPos?.z) || 0;
 
-  const seatX = Number(seatPos.x) || 0;
-  const seatY = Number(seatPos.y) || 0;
+  const ex = Number(seatPos?.x) || 0;
+  const ey = Number(seatPos?.y) || 0;
 
-  // Speaker Z: for overheads we always treat them as being on the ceiling plane.
-  const ceilingM = Number(roomHeightM);
-  const speakerZ =
-    Number(speakerPos.z) && Number.isFinite(speakerPos.z)
-      ? speakerPos.z
-      : (Number.isFinite(ceilingM) ? ceilingM : 2.4);
+  const earZ = Number.isFinite(earHeightM)
+    ? earHeightM
+    : (Number(seatPos?.z) || 1.2);
 
-  // Ear Z: use explicit ear height if present, otherwise seat.z, otherwise 1.2 m
-  const seatZ =
-    Number(earHeightM) && Number.isFinite(earHeightM)
-      ? earHeightM
-      : (Number(seatPos.z) && Number.isFinite(seatPos.z) ? seatPos.z : 1.2);
+  // 2. Build the vector from speaker to listener
+  const dx = ex - sx;
+  const dy = ey - sy;
+  const dz = earZ - sz; // will normally be negative (listener below speaker)
 
-  // Horizontal distance in the room plane (x-y)
-  const horizontalDist = Math.hypot(seatX - sx, seatY - sy);
+  // 3. Compute horizontal and vertical separations
+  const horizontalDist = Math.hypot(dx, dy); // plan distance
+  const verticalDist = Math.abs(dz);         // positive distance between ear and speaker in height
 
-  // Vertical separation from speaker to ear – never allow 0 to avoid atan2 issues
-  const verticalDist = Math.max(0.05, speakerZ - seatZ);
+  // Guard: if both distances are extremely tiny, treat off-axis as 0
+  if (horizontalDist < 0.01 && verticalDist < 0.01) {
+    return 0;
+  }
 
-  // Angle away from straight down (0° = directly under the speaker, 90° = horizontal)
-  const rawAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
+  // Guard: avoid division by zero in atan2
+  const safeVerticalDist = Math.max(0.01, verticalDist);
 
-  // Correct for built-in tilt of the in-ceiling model (5° / 20° etc.)
-  const tiltDeg = getOverheadTiltDeg(modelKey);
+  // 4. Compute the angle from the vertical (speaker pointing straight down)
+  const angleFromVerticalDeg = rad2deg(Math.atan2(horizontalDist, safeVerticalDist));
 
-  // We only care about the absolute off-axis magnitude
-  const offAxisDeg = Math.max(0, Math.abs(rawAngleDeg - tiltDeg));
+  // 5. Apply model-specific tilt
+  const tiltDeg = getOverheadTiltDeg(modelKey); // 0 / 5 / 20
+
+  // Compute the off-axis angle as the difference between listener's vertical angle and speaker's axis tilt
+  let offAxisDeg = Math.abs(angleFromVerticalDeg - tiltDeg);
+
+  // 6. Clamp the result to the physical range [0, 90]
+  if (!Number.isFinite(offAxisDeg)) offAxisDeg = 0;
+  offAxisDeg = Math.max(0, Math.min(90, offAxisDeg));
 
   return Number(offAxisDeg.toFixed(1));
 }
