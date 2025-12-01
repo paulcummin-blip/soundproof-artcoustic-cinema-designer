@@ -51,6 +51,26 @@ const OVERHEAD_PAIR_MAP = {
   TBR: 'TBL',
 };
 
+// Compute horizontal seat band used to clamp overhead speakers
+function getSeatBandXBounds(seats) {
+  if (!Array.isArray(seats) || seats.length === 0) {
+    return { minX: null, maxX: null };
+  }
+
+  const xs = seats
+    .map(s => Number(s?.position?.x ?? s?.x))
+    .filter(Number.isFinite);
+
+  if (!xs.length) {
+    return { minX: null, maxX: null };
+  }
+
+  return {
+    minX: Math.min(...xs),
+    maxX: Math.max(...xs),
+  };
+}
+
 // local sideSegmentAtX — safe fallback if polygons are missing
 function sideSegmentAtX(zonePolygonPoints, x, roomLength = 6.0) {
   const safeMinY = 0.5;
@@ -686,6 +706,10 @@ const onHudHeaderMouseDown = useCallback((event) => {
     });
     return map;
   }, [placedSpeakers, seatingPositions]);
+
+  const seatBandXBounds = React.useMemo(() => {
+    return getSeatBandXBounds(seatingPositions || []);
+  }, [seatingPositions]);
 
   const ids = React.useMemo(() => ({
     grid: `grid-${Math.random().toString(36).slice(2)}`,
@@ -1880,6 +1904,7 @@ React.useEffect(() => {
 
     // Overhead drag behaviour: L/R pairs, clamped to bands, mirrored horizontally
     if (canonicalRole && canonicalRole.startsWith('T')) {
+      const OVERHEAD_ROLES = new Set(["TL", "TR", "TFL", "TFR", "TBL", "TBR"]);
       // Mark that the user has taken control of overheads
       setHasManualOverheadEdit(true);
 
@@ -1955,13 +1980,26 @@ React.useEffect(() => {
       };
 
       // Clamp dragged speaker inside its own band
-      const primaryClamped = clampOverheadPairPosition(
+      let primaryClamped = clampOverheadPairPosition(
         { x: rawRoomPos.x, y: rawRoomPos.y },
         canonicalRole,
         overheadZones,
         widthM,
         lengthM
       );
+
+      // Apply seat band X clamping for overhead speakers
+      if (OVERHEAD_ROLES.has(canonicalRole)) {
+        const minX = Number(seatBandXBounds.minX);
+        const maxX = Number(seatBandXBounds.maxX);
+
+        if (Number.isFinite(minX) && Number.isFinite(maxX)) {
+          let clampedX = primaryClamped.x;
+          if (clampedX < minX) clampedX = minX;
+          if (clampedX > maxX) clampedX = maxX;
+          primaryClamped = { ...primaryClamped, x: clampedX };
+        }
+      }
 
       // Derive shared column X with lateral bounds clamping
       const centerX = widthM / 2;
