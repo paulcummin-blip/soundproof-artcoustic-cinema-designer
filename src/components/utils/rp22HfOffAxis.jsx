@@ -157,36 +157,78 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
 
 // --- P17 HELPERS ---
 
-// Get overhead speaker model-specific tilt angle (degrees from straight down)
-function getOverheadTiltDeg(modelKey) {
-  if (!modelKey) return 0;
-  const normalized = normaliseModelKey(modelKey);
-  
-  if (normalized.includes("architect-2-1")) return 5;
-  if (normalized.includes("architect-4-2")) return 5;
-  if (normalized.includes("architect-pas2-2")) return 20;
-  if (normalized.includes("architect-mikro")) return 0;
-  
-  return 0; // Default for unknown models
+// Model-specific vertical tilt for in-ceiling speakers.
+// This is the *built-in* tilt away from straight-down, not seat-dependent.
+function getOverheadTiltDeg(modelKeyRaw) {
+  const key = String(modelKeyRaw || "").toLowerCase().trim();
+
+  // Architect 2-1 / 4-2: approx 5° tilt
+  if (key.includes("architect-2-1") || key.includes("architect-4-2")) {
+    return 5;
+  }
+
+  // Architect PAS in-ceiling: approx 20° tilt
+  if (key.includes("architect-pas") || key.includes("pas2-2")) {
+    return 20;
+  }
+
+  // Mikro, and any unknown models: treat as flat (0°)
+  return 0;
 }
 
 // Compute vertical off-axis angle for an overhead speaker using 3D geometry
 function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey) {
-  if (!speakerPos || !seatPos) return null;
-  if (!isNum(speakerPos.x) || !isNum(speakerPos.y) || !isNum(speakerPos.z)) return null;
-  if (!isNum(seatPos.x) || !isNum(seatPos.y)) return null;
-  if (!isNum(earHeightM)) return null;
+  // Guard against missing data
+  if (!seatPos || !speakerPos) return null;
 
-  const horizontalDist = Math.hypot(
-    seatPos.x - speakerPos.x,
-    seatPos.y - speakerPos.y
-  );
+  const sx = Number(speakerPos.x) || 0;
+  const sy = Number(speakerPos.y) || 0;
+  const sz = Number(speakerPos.z); // overhead Z should already be the ceiling height
 
-  const verticalDist = Math.max(0.01, speakerPos.z - earHeightM); // Floor to avoid division by zero
+  const ex = Number(seatPos.x) || 0;
+  const ey = Number(seatPos.y) || 0;
+  const ez = Number(earHeightM);   // ear height in metres
 
-  const rawAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
-  
+  // If we don't have a sensible ceiling height or ear height, bail early
+  if (!Number.isFinite(sz) || !Number.isFinite(ez)) return null;
+
+  // 1) Vector from speaker to listener's ears
+  const vx = ex - sx;
+  const vy = ey - sy;
+  const vz = ez - sz; // will usually be negative (ears below the speaker)
+
+  const horizontalDist = Math.hypot(vx, vy);
+  const radialDist = Math.hypot(horizontalDist, vz);
+
+  if (radialDist < 0.01) {
+    // Seat is effectively at the speaker – treat as on-axis
+    return 0;
+  }
+
+  // 2) Reference axis: straight down from the ceiling speaker.
+  // In world coordinates this is (0, 0, -1).
+  const refZ = -1;
+  const refLen = 1; // already unit length
+
+  // 3) Normalised actual direction vector (speaker -> ear)
+  const dirX = vx / radialDist;
+  const dirY = vy / radialDist;
+  const dirZ = vz / radialDist;
+
+  // 4) Angle between the straight-down vector and the actual direction.
+  // dot(ref, dir) = (0 * dirX) + (0 * dirY) + (-1 * dirZ) = -dirZ
+  let cosTheta = -(dirZ);
+
+  // Clamp for numeric safety
+  if (cosTheta > 1) cosTheta = 1;
+  if (cosTheta < -1) cosTheta = -1;
+
+  const rawAngleDeg = rad2deg(Math.acos(cosTheta)); // 0° = straight down, 90° = horizontal
+
+  // 5) Apply model-specific tilt: Architect 2-1/4-2 ≈ 5°, PAS ≈ 20°, Mikro = 0°
   const tiltDeg = getOverheadTiltDeg(modelKey);
+
+  // Off-axis angle is how far the listener is from the *aimed* axis
   const offAxisDeg = Math.abs(rawAngleDeg - tiltDeg);
 
   if (typeof window !== "undefined" && window.__DBG_P17_OVERHEAD__) {
@@ -196,14 +238,15 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey) {
       seatPos,
       earHeightM,
       horizontalDist,
-      verticalDist,
+      verticalDist: sz - ez,
       rawAngleDeg,
       tiltDeg,
       offAxisDeg,
     });
   }
 
-  return offAxisDeg;
+  // Always return a positive, rounded value
+  return Number(offAxisDeg.toFixed(1));
 }
 
 // Unified helper: compute HF loss for one non-LCR speaker at one seat
@@ -225,10 +268,11 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta }) {
   // Overhead speakers: use vertical off-axis
   if (OVERHEAD_ROLES.has(role)) {
     if (!isNum(pos.z)) return null;
+    const earHeight = Number(seat.z) || 1.2;
     offAxisDeg = computeVerticalOffAxisDeg(
       pos,
       { x: seat.x, y: seat.y },
-      earHeightM || 1.2,
+      earHeight,
       speaker.model
     );
   } 
@@ -305,7 +349,7 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
       if (result.lossDb > maxAbsLossDb) {
         maxAbsLossDb = result.lossDb;
         worstRole = result.role;
-        worstAngleDeg = result.offAxisDeg;
+        worstAngleDeg = Math.abs(result.offAxisDeg);
       }
 
       // Store in debug if provided
