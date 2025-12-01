@@ -501,11 +501,6 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
     pieces: basePieces,
   };
 
-  // Ensure zones are valid (y2 > y1)
-  frontZone.active = frontZone.y2 > frontZone.y1;
-  midZone.active = midZone.y2 > midZone.y1;
-  backZone.active = backZone.y2 > backZone.y1;
-
   // ────────────────────────────────────────────────────────────────────────────
   // FINAL CLAMPING: prevent overhead zones from extending inside outer seats
   // ────────────────────────────────────────────────────────────────────────────
@@ -558,7 +553,7 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   }
 
   // Apply clamping if we have valid seat boundaries
-  if (seatXs.length > 0 && Number.isFinite(centerX)) {
+  if (seatXs.length > 0 && Number.isFinite(centreX)) {
     const clampedSeatMinX = seatMinX;
     const clampedSeatMaxX = seatMaxX;
     
@@ -568,16 +563,20 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
       
       zone.pieces = zone.pieces.map(piece => {
         if (!piece) return piece;
-        
-        const midX = (piece.x1 + piece.x2) / 2;
+
+        const x1 = Number(piece.x1);
+        const x2 = Number(piece.x2);
+        if (!Number.isFinite(x1) || !Number.isFinite(x2)) return piece;
+
+        const midX = (x1 + x2) / 2;
         
         // Determine if this is a left or right corridor based on which side of centre it's on
-        if (midX < centerX) {
+        if (midX < centreX) {
           // Left corridor
-          return clampLeftCorridorToSeats(piece, centerX, clampedSeatMinX);
+          return clampLeftCorridorToSeats({ x1, x2 }, centreX, clampedSeatMinX);
         } else {
           // Right corridor
-          return clampRightCorridorToSeats(piece, centerX, clampedSeatMaxX);
+          return clampRightCorridorToSeats({ x1, x2 }, centreX, clampedSeatMaxX);
         }
       });
       
@@ -585,6 +584,11 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
       zone.pieces = zone.pieces.filter(Boolean);
     });
   }
+
+  // Re-evaluate active flags after clamping
+  frontZone.active = frontZone.y2 > frontZone.y1 && Array.isArray(frontZone.pieces) && frontZone.pieces.length > 0;
+  midZone.active   = midZone.y2   > midZone.y1   && Array.isArray(midZone.pieces)   && midZone.pieces.length   > 0;
+  backZone.active  = backZone.y2  > backZone.y1  && Array.isArray(backZone.pieces)  && backZone.pieces.length  > 0;
 
   return { frontZone, midZone, backZone };
 }
