@@ -587,5 +587,50 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   midZone.active   = midZone.y2   > midZone.y1   && Array.isArray(midZone.pieces)   && midZone.pieces.length   > 0;
   backZone.active  = backZone.y2  > backZone.y1  && Array.isArray(backZone.pieces)  && backZone.pieces.length  > 0;
 
+  // Extract corridor limits for speaker clamping
+  const extractCorridorLimits = (zone) => {
+    if (!zone || !Array.isArray(zone.pieces) || zone.pieces.length === 0) {
+      return { leftCorridor: null, rightCorridor: null };
+    }
+
+    const centerX = widthM / 2;
+    let leftPiece = null;
+    let rightPiece = null;
+
+    for (const piece of zone.pieces) {
+      if (!piece || !Number.isFinite(piece.x1) || !Number.isFinite(piece.x2)) continue;
+      const midX = (piece.x1 + piece.x2) / 2;
+      
+      if (midX < centerX) {
+        leftPiece = piece;
+      } else {
+        rightPiece = piece;
+      }
+    }
+
+    const leftCorridor = leftPiece
+      ? { outerX: Math.min(leftPiece.x1, leftPiece.x2), innerX: Math.max(leftPiece.x1, leftPiece.x2) }
+      : null;
+
+    const rightCorridor = rightPiece
+      ? { innerX: Math.min(rightPiece.x1, rightPiece.x2), outerX: Math.max(rightPiece.x1, rightPiece.x2) }
+      : null;
+
+    return { leftCorridor, rightCorridor };
+  };
+
+  // Add corridor limits to each zone
+  const frontCorridors = extractCorridorLimits(frontZone);
+  frontZone.leftCorridor = frontCorridors.leftCorridor;
+  frontZone.rightCorridor = frontCorridors.rightCorridor;
+
+  const midCorridors = extractCorridorLimits(midZone);
+  midZone.leftCorridor = midCorridors.leftCorridor;
+  midZone.rightCorridor = midCorridors.rightCorridor;
+
+  const backCorridors = extractCorridorLimits(backZone);
+  backZone.leftCorridor = backCorridors.leftCorridor;
+  backZone.rightCorridor = backCorridors.rightCorridor;
+
   return { frontZone, midZone, backZone };
 }

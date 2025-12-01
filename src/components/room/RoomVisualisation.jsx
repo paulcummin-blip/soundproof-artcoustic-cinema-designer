@@ -1230,21 +1230,53 @@ React.useEffect(() => {
     [seatingPositions, heightM, widthM, lengthM, mlpY_m, mlp, placedSpeakers, getCanonicalRole]
   );
 
-  // Safe access to overhead seat extents for clamping
-  const overheadClampMinX = overheadZones?.bounds?.seatMinX ?? null;
-  const overheadClampMaxX = overheadZones?.bounds?.seatMaxX ?? null;
+  // Helper: Map overhead role to zone and side
+  const getOverheadZoneAndSide = useCallback((role) => {
+    const canonRole = typeof role === 'string' ? role.toUpperCase() : '';
+    
+    // Determine position (front/mid/rear)
+    let position = null;
+    if (canonRole === 'TFL' || canonRole === 'TFR') position = 'front';
+    else if (canonRole === 'TL' || canonRole === 'TR') position = 'mid';
+    else if (canonRole === 'TBL' || canonRole === 'TBR') position = 'rear';
+    
+    if (!position) return { zone: null, side: null };
+    
+    // Determine side (left/right)
+    const side = (canonRole === 'TFL' || canonRole === 'TL' || canonRole === 'TBL') ? 'left' : 'right';
+    
+    // Get the zone
+    const zone = position === 'front' ? overheadZones?.frontZone
+               : position === 'mid' ? overheadZones?.midZone
+               : overheadZones?.backZone;
+    
+    return { zone, side };
+  }, [overheadZones]);
 
-  const seatBandXBounds = React.useMemo(() => {
-    if (Number.isFinite(overheadClampMinX) && Number.isFinite(overheadClampMaxX)) {
-      return {
-        minX: overheadClampMinX,
-        maxX: overheadClampMaxX,
-      };
+  // Helper: Clamp overhead speaker X to its corridor
+  const clampOverheadXToCorridor = useCallback((worldX, role) => {
+    if (!overheadZones || overheadZones.status !== 'ok') return worldX;
+    
+    const { zone, side } = getOverheadZoneAndSide(role);
+    if (!zone || !side) return worldX;
+    
+    const corridor = side === 'left' ? zone.leftCorridor : zone.rightCorridor;
+    if (!corridor || !Number.isFinite(corridor.outerX) || !Number.isFinite(corridor.innerX)) {
+      return worldX;
     }
     
-    // Fallback: compute directly from seats
-    return getSeatBandXBounds(seatingPositions || []);
-  }, [seatingPositions, overheadClampMinX, overheadClampMaxX]);
+    if (side === 'left') {
+      // Left corridor: outerX (wall side) to innerX (seat side)
+      const minX = corridor.outerX;
+      const maxX = corridor.innerX;
+      return Math.max(minX, Math.min(maxX, worldX));
+    } else {
+      // Right corridor: innerX (seat side) to outerX (wall side)
+      const minX = corridor.innerX;
+      const maxX = corridor.outerX;
+      return Math.max(minX, Math.min(maxX, worldX));
+    }
+  }, [overheadZones, getOverheadZoneAndSide]);
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
   // FW median positioning is now FULLY handled by SpeakerPlacement only.
@@ -1949,17 +1981,13 @@ React.useEffect(() => {
         lengthM
       );
 
-      // SEAT BAND X CLAMPING: Always clamp overhead speaker centres to outer seats
-      const minX = Number(seatBandXBounds.minX);
-      const maxX = Number(seatBandXBounds.maxX);
-
-      if (OVERHEAD_ROLES.has(canonicalRole) && Number.isFinite(minX) && Number.isFinite(maxX)) {
-        let clampedX = primaryClamped.x;
-        clampedX = Math.max(minX, Math.min(maxX, clampedX));
+      // CORRIDOR X CLAMPING: Clamp overhead speaker centres to their side corridors
+      if (OVERHEAD_ROLES.has(canonicalRole)) {
+        const clampedX = clampOverheadXToCorridor(primaryClamped.x, canonicalRole);
         primaryClamped = { ...primaryClamped, x: clampedX };
       }
 
-      // Derive shared column X with seat band clamping
+      // Derive shared column X with corridor clamping
       const centerX = widthM / 2;
       let leftColumnX = null;
       let rightColumnX = null;
@@ -1974,13 +2002,13 @@ React.useEffect(() => {
         leftColumnX = centerX + (centerX - rightColumnX);
       }
 
-      // Apply seat band clamping to both columns
-      if (leftColumnX != null && Number.isFinite(minX) && Number.isFinite(maxX)) {
-        leftColumnX = Math.max(minX, Math.min(maxX, leftColumnX));
+      // Apply corridor clamping to mirrored column
+      if (leftColumnX != null) {
+        leftColumnX = clampOverheadXToCorridor(leftColumnX, 'TL');
       }
 
-      if (rightColumnX != null && Number.isFinite(minX) && Number.isFinite(maxX)) {
-        rightColumnX = Math.max(minX, Math.min(maxX, rightColumnX));
+      if (rightColumnX != null) {
+        rightColumnX = clampOverheadXToCorridor(rightColumnX, 'TR');
       }
 
       // Discover current Y positions from placedSpeakers
