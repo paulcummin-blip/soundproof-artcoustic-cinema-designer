@@ -708,8 +708,17 @@ const onHudHeaderMouseDown = useCallback((event) => {
   }, [placedSpeakers, seatingPositions]);
 
   const seatBandXBounds = React.useMemo(() => {
+    // Get seat bounds from overhead zones (includes bounds from getListeningAreaBounds)
+    if (overheadZones?.bounds?.seatMinX != null && overheadZones?.bounds?.seatMaxX != null) {
+      return {
+        minX: overheadZones.bounds.seatMinX,
+        maxX: overheadZones.bounds.seatMaxX,
+      };
+    }
+    
+    // Fallback: compute directly from seats
     return getSeatBandXBounds(seatingPositions || []);
-  }, [seatingPositions]);
+  }, [seatingPositions, overheadZones]);
 
   const ids = React.useMemo(() => ({
     grid: `grid-${Math.random().toString(36).slice(2)}`,
@@ -1926,59 +1935,6 @@ React.useEffect(() => {
       // Raw room coords from the mouse
       const rawRoomPos = canvasToRoom(newCanvasPos);
 
-      // Helper: get lateral bounds for a given overhead role at a given Y position
-      const getOverheadLateralBoundsForRole = (role, roomY) => {
-        if (!overheadZones || overheadZones.status !== 'ok') {
-          return null; // no clamping if zones unavailable
-        }
-
-        const { frontZone, midZone, backZone } = overheadZones;
-
-        // Decide which band this Y sits in
-        const band =
-          (frontZone?.active && roomY >= frontZone.y1 && roomY <= frontZone.y2) ? 'front' :
-          (backZone?.active && roomY >= backZone.y1 && roomY <= backZone.y2)   ? 'back'  :
-          'mid';
-
-        const zone = band === 'front' ? frontZone : band === 'back' ? backZone : midZone;
-        if (!zone || !zone.active || !Array.isArray(zone.pieces)) {
-          return null;
-        }
-
-        // Determine if this is a left or right role
-        const isLeft = isLeftRole(role);
-        
-        // pieces[0] is left corridor, pieces[1] is right corridor
-        const piece = isLeft ? zone.pieces[0] : zone.pieces[1];
-        if (!piece || !Number.isFinite(piece.x1) || !Number.isFinite(piece.x2)) {
-          return null;
-        }
-
-        return {
-          minX: Math.min(piece.x1, piece.x2),
-          maxX: Math.max(piece.x1, piece.x2),
-        };
-      };
-
-      // Helper: clamp X to lateral bounds (with safety against crossing center)
-      const clampX = (x, role, roomY) => {
-        const lateralBounds = getOverheadLateralBoundsForRole(role, roomY);
-        if (!lateralBounds) return x; // fallback: no clamping
-        
-        const { minX, maxX } = lateralBounds;
-        let clamped = Math.min(maxX, Math.max(minX, x));
-        
-        // Safety: never cross room center line
-        const centerX = widthM / 2;
-        if (isLeftRole(role)) {
-          clamped = Math.min(clamped, centerX);
-        } else if (isRightRole(role)) {
-          clamped = Math.max(clamped, centerX);
-        }
-        
-        return clamped;
-      };
-
       // Clamp dragged speaker inside its own band
       let primaryClamped = clampOverheadPairPosition(
         { x: rawRoomPos.x, y: rawRoomPos.y },
@@ -1988,47 +1944,38 @@ React.useEffect(() => {
         lengthM
       );
 
-      // Apply seat band X clamping for overhead speakers
-      if (OVERHEAD_ROLES.has(canonicalRole)) {
-        const minX = Number(seatBandXBounds.minX);
-        const maxX = Number(seatBandXBounds.maxX);
+      // SEAT BAND X CLAMPING: Always clamp overhead speaker centres to outer seats
+      const minX = Number(seatBandXBounds.minX);
+      const maxX = Number(seatBandXBounds.maxX);
 
-        if (Number.isFinite(minX) && Number.isFinite(maxX)) {
-          let clampedX = primaryClamped.x;
-          if (clampedX < minX) clampedX = minX;
-          if (clampedX > maxX) clampedX = maxX;
-          primaryClamped = { ...primaryClamped, x: clampedX };
-        }
+      if (OVERHEAD_ROLES.has(canonicalRole) && Number.isFinite(minX) && Number.isFinite(maxX)) {
+        let clampedX = primaryClamped.x;
+        clampedX = Math.max(minX, Math.min(maxX, clampedX));
+        primaryClamped = { ...primaryClamped, x: clampedX };
       }
 
-      // Derive shared column X with lateral bounds clamping
+      // Derive shared column X with seat band clamping
       const centerX = widthM / 2;
       let leftColumnX = null;
       let rightColumnX = null;
 
       if (isLeftRole(canonicalRole)) {
-        // Clamp primary to its lateral bounds
-        const primaryClampedX = clampX(rawRoomPos.x, canonicalRole, rawRoomPos.y);
-        leftColumnX = primaryClampedX;
+        leftColumnX = primaryClamped.x;
         rightColumnX = centerX + (centerX - leftColumnX);
       }
 
       if (isRightRole(canonicalRole)) {
-        // Clamp primary to its lateral bounds
-        const primaryClampedX = clampX(rawRoomPos.x, canonicalRole, rawRoomPos.y);
-        rightColumnX = primaryClampedX;
+        rightColumnX = primaryClamped.x;
         leftColumnX = centerX + (centerX - rightColumnX);
       }
 
-      // Apply lateral clamping to both columns
-      if (leftColumnX != null) {
-        // Use 'TL' as representative left role for mid-band clamping
-        leftColumnX = clampX(leftColumnX, 'TL', rawRoomPos.y);
+      // Apply seat band clamping to both columns
+      if (leftColumnX != null && Number.isFinite(minX) && Number.isFinite(maxX)) {
+        leftColumnX = Math.max(minX, Math.min(maxX, leftColumnX));
       }
 
-      if (rightColumnX != null) {
-        // Use 'TR' as representative right role for mid-band clamping
-        rightColumnX = clampX(rightColumnX, 'TR', rawRoomPos.y);
+      if (rightColumnX != null && Number.isFinite(minX) && Number.isFinite(maxX)) {
+        rightColumnX = Math.max(minX, Math.min(maxX, rightColumnX));
       }
 
       // Discover current Y positions from placedSpeakers

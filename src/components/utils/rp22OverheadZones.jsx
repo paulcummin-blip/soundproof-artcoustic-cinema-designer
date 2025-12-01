@@ -126,6 +126,8 @@ export function getListeningAreaBounds(
       midCenterY: lengthM / 2,
       xLeft: widthM * 0.25,
       xRight: widthM * 0.75,
+      seatMinX: null,
+      seatMaxX: null,
       active: false
     };
   }
@@ -221,6 +223,14 @@ export function getListeningAreaBounds(
   xLeft = Math.max(0, Math.min(widthM, xLeft));
   xRight = Math.max(0, Math.min(widthM, xRight));
 
+  // Compute seat extents for overhead icon clamping
+  const seatXs = (seatingPositions || [])
+    .map(s => Number(s?.x ?? s?.position?.x))
+    .filter(Number.isFinite);
+
+  const seatMinX = seatXs.length > 0 ? Math.min(...seatXs) : null;
+  const seatMaxX = seatXs.length > 0 ? Math.max(...seatXs) : null;
+
   return {
     listeningFrontY,
     listeningBackY,
@@ -228,6 +238,8 @@ export function getListeningAreaBounds(
     xLeft,
     xRight,
     mlpEarHeight,
+    seatMinX,
+    seatMaxX,
     active: true
   };
 }
