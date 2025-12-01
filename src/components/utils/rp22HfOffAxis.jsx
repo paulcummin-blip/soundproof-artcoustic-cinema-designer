@@ -331,6 +331,8 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
     let maxAbsLossDb = -Infinity;
     let worstRole = null;
     let worstAngleDeg = null;
+    let worstLossDb = null;
+    const perSpeaker = [];
 
     // Loop over all non-LCR speakers
     for (const spk of speakers) {
@@ -344,11 +346,19 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
 
       if (!result) continue;
 
+      // Collect per-speaker data
+      perSpeaker.push({
+        role: result.role,
+        angleDeg: result.offAxisDeg,
+        lossDb: result.lossDb,
+      });
+
       // Track worst loss
       if (result.lossDb > maxAbsLossDb) {
         maxAbsLossDb = result.lossDb;
         worstRole = result.role;
         worstAngleDeg = result.offAxisDeg;
+        worstLossDb = result.lossDb;
       }
 
       // Store in debug if provided
@@ -369,9 +379,11 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
     }
 
     perSeat[seatId] = {
-      maxAbsLossDb: Number(maxAbsLossDb.toFixed(1)),
+      p17Db: Number(maxAbsLossDb.toFixed(1)),
       worstRole,
-      worstAngleDeg,
+      worstAngleDeg: worstAngleDeg !== null ? Number(worstAngleDeg.toFixed(1)) : null,
+      worstLossDb: worstLossDb !== null ? Number(worstLossDb.toFixed(1)) : null,
+      perSpeaker,
     };
   }
 

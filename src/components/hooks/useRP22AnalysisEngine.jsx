@@ -394,8 +394,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
         const p17Data = p17Results[seatId];
 
-        if (p17Data && isNum(p17Data.maxAbsLossDb)) {
-          const valueDb = p17Data.maxAbsLossDb;
+        if (p17Data && isNum(p17Data.p17Db)) {
+          const valueDb = p17Data.p17Db;
 
           // P17 level mapping
           let level17 = 2; // Default
@@ -408,12 +408,15 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             level: level17,
             worstRole: p17Data.worstRole,
             worstAngleDeg: p17Data.worstAngleDeg,
+            worstLossDb: p17Data.worstLossDb,
+            perSpeaker: p17Data.perSpeaker || [],
           };
         } else {
           metrics.p17 = {
             value: null,
             formatted: "—",
             level: "—",
+            perSpeaker: [],
           };
         }
       }
