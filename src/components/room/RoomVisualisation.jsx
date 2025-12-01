@@ -1230,53 +1230,108 @@ React.useEffect(() => {
     [seatingPositions, heightM, widthM, lengthM, mlpY_m, mlp, placedSpeakers, getCanonicalRole]
   );
 
-  // Helper: Map overhead role to zone and side
-  const getOverheadZoneAndSide = useCallback((role) => {
-    const canonRole = typeof role === 'string' ? role.toUpperCase() : '';
-    
-    // Determine position (front/mid/rear)
-    let position = null;
-    if (canonRole === 'TFL' || canonRole === 'TFR') position = 'front';
-    else if (canonRole === 'TL' || canonRole === 'TR') position = 'mid';
-    else if (canonRole === 'TBL' || canonRole === 'TBR') position = 'rear';
-    
-    if (!position) return { zone: null, side: null };
-    
-    // Determine side (left/right)
-    const side = (canonRole === 'TFL' || canonRole === 'TL' || canonRole === 'TBL') ? 'left' : 'right';
-    
-    // Get the zone
-    const zone = position === 'front' ? overheadZones?.frontZone
-               : position === 'mid' ? overheadZones?.midZone
-               : overheadZones?.backZone;
-    
-    return { zone, side };
-  }, [overheadZones]);
+  // Helper: Clamp overhead speaker X to RP22 corridor (locked to outer seats)
+  const clampOverheadXToRp22Corridor = useCallback((role, x, overheadZones, seatingPositions, roomDims) => {
+    const MIN_CORRIDOR_WIDTH_M = 0.10;
+    const OVERHEAD_ICON_HALF_WIDTH_M = 0.05; // ~5cm icon half-width for visual margin
 
-  // Helper: Clamp overhead speaker X to its corridor
-  const clampOverheadXToCorridor = useCallback((worldX, role) => {
-    if (!overheadZones || overheadZones.status !== 'ok') return worldX;
+    // Guard: no data
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return x;
+    if (!roomDims || !Number.isFinite(roomDims.widthM)) return x;
+    if (!overheadZones || overheadZones.status !== 'ok') return x;
+
+    // 1) Compute seat bounds
+    const seatXs = seatingPositions
+      .map(s => Number(s?.x ?? s?.position?.x))
+      .filter(Number.isFinite);
     
-    const { zone, side } = getOverheadZoneAndSide(role);
-    if (!zone || !side) return worldX;
+    if (seatXs.length === 0) return x;
     
-    const corridor = side === 'left' ? zone.leftCorridor : zone.rightCorridor;
-    if (!corridor || !Number.isFinite(corridor.outerX) || !Number.isFinite(corridor.innerX)) {
-      return worldX;
+    const seatMinX = Math.min(...seatXs);
+    const seatMaxX = Math.max(...seatXs);
+    const centreX = roomDims.widthM / 2;
+
+    // 2) Map role to zone
+    const canonRole = typeof role === 'string' ? role.toUpperCase() : '';
+    let zone = null;
+    
+    if (canonRole === 'TFL' || canonRole === 'TFR') zone = overheadZones.frontZone;
+    else if (canonRole === 'TL' || canonRole === 'TR') zone = overheadZones.midZone;
+    else if (canonRole === 'TBL' || canonRole === 'TBR') zone = overheadZones.backZone;
+    
+    if (!zone) return x;
+
+    // 3) Determine side based on role
+    const isLeft = canonRole === 'TFL' || canonRole === 'TL' || canonRole === 'TBL';
+    
+    // 4) Find corridor piece from zone
+    let corridorInnerXFromZone = null;
+    let corridorOuterXFromZone = null;
+
+    if (Array.isArray(zone.pieces)) {
+      for (const piece of zone.pieces) {
+        if (!piece || !Number.isFinite(piece.x1) || !Number.isFinite(piece.x2)) continue;
+        
+        const pieceMinX = Math.min(piece.x1, piece.x2);
+        const pieceMaxX = Math.max(piece.x1, piece.x2);
+        const pieceMidX = (pieceMinX + pieceMaxX) / 2;
+        
+        if (isLeft && pieceMidX < centreX) {
+          corridorOuterXFromZone = pieceMinX;
+          corridorInnerXFromZone = pieceMaxX;
+        } else if (!isLeft && pieceMidX > centreX) {
+          corridorInnerXFromZone = pieceMinX;
+          corridorOuterXFromZone = pieceMaxX;
+        }
+      }
     }
+
+    // 5) Build safe corridor clamped to seats with minimum width
+    let innerX, outerX;
     
-    if (side === 'left') {
-      // Left corridor: outerX (wall side) to innerX (seat side)
-      const minX = corridor.outerX;
-      const maxX = corridor.innerX;
-      return Math.max(minX, Math.min(maxX, worldX));
+    if (isLeft) {
+      // Left side: outer is at wall (seatMinX), inner is toward centre
+      outerX = seatMinX;
+      innerX = corridorInnerXFromZone != null ? Math.min(corridorInnerXFromZone, seatMinX) : seatMinX;
+      
+      // Ensure minimum corridor width
+      const corridorWidth = innerX - outerX;
+      if (corridorWidth < MIN_CORRIDOR_WIDTH_M) {
+        innerX = outerX + MIN_CORRIDOR_WIDTH_M;
+      }
+      
+      // Clamp innerX to not exceed seatMinX (stay outside seats)
+      innerX = Math.min(innerX, seatMinX);
     } else {
-      // Right corridor: innerX (seat side) to outerX (wall side)
-      const minX = corridor.innerX;
-      const maxX = corridor.outerX;
-      return Math.max(minX, Math.min(maxX, worldX));
+      // Right side: outer is at wall (seatMaxX), inner is toward centre
+      outerX = seatMaxX;
+      innerX = corridorInnerXFromZone != null ? Math.max(corridorInnerXFromZone, seatMaxX) : seatMaxX;
+      
+      // Ensure minimum corridor width
+      const corridorWidth = outerX - innerX;
+      if (corridorWidth < MIN_CORRIDOR_WIDTH_M) {
+        innerX = outerX - MIN_CORRIDOR_WIDTH_M;
+      }
+      
+      // Clamp innerX to not go inside seatMaxX (stay outside seats)
+      innerX = Math.max(innerX, seatMaxX);
     }
-  }, [overheadZones, getOverheadZoneAndSide]);
+
+    // 6) Apply icon half-width margin
+    const effectiveInnerX = isLeft ? innerX - OVERHEAD_ICON_HALF_WIDTH_M : innerX + OVERHEAD_ICON_HALF_WIDTH_M;
+    const effectiveOuterX = isLeft ? outerX + OVERHEAD_ICON_HALF_WIDTH_M : outerX - OVERHEAD_ICON_HALF_WIDTH_M;
+    
+    // 7) Clamp x to corridor
+    if (isLeft) {
+      const minX = Math.min(effectiveOuterX, effectiveInnerX);
+      const maxX = Math.max(effectiveOuterX, effectiveInnerX);
+      return Math.max(minX, Math.min(maxX, x));
+    } else {
+      const minX = Math.min(effectiveInnerX, effectiveOuterX);
+      const maxX = Math.max(effectiveInnerX, effectiveOuterX);
+      return Math.max(minX, Math.min(maxX, x));
+    }
+  }, []);
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
   // FW median positioning is now FULLY handled by SpeakerPlacement only.
@@ -1981,9 +2036,15 @@ React.useEffect(() => {
         lengthM
       );
 
-      // CORRIDOR X CLAMPING: Clamp overhead speaker centres to their side corridors
+      // RP22 CORRIDOR X CLAMPING: Lock overhead speakers to side corridors (wall → outer seat)
       if (OVERHEAD_ROLES.has(canonicalRole)) {
-        const clampedX = clampOverheadXToCorridor(primaryClamped.x, canonicalRole);
+        const clampedX = clampOverheadXToRp22Corridor(
+          canonicalRole,
+          primaryClamped.x,
+          overheadZones,
+          seatingPositions,
+          { widthM, lengthM, heightM }
+        );
         primaryClamped = { ...primaryClamped, x: clampedX };
       }
 
@@ -2004,11 +2065,23 @@ React.useEffect(() => {
 
       // Apply corridor clamping to mirrored column
       if (leftColumnX != null) {
-        leftColumnX = clampOverheadXToCorridor(leftColumnX, 'TL');
+        leftColumnX = clampOverheadXToRp22Corridor(
+          'TL',
+          leftColumnX,
+          overheadZones,
+          seatingPositions,
+          { widthM, lengthM, heightM }
+        );
       }
 
       if (rightColumnX != null) {
-        rightColumnX = clampOverheadXToCorridor(rightColumnX, 'TR');
+        rightColumnX = clampOverheadXToRp22Corridor(
+          'TR',
+          rightColumnX,
+          overheadZones,
+          seatingPositions,
+          { widthM, lengthM, heightM }
+        );
       }
 
       // Discover current Y positions from placedSpeakers
