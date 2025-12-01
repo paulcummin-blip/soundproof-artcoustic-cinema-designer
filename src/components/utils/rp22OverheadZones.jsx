@@ -257,23 +257,21 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   const { widthM = 4.5, lengthM = 6.0, heightM = 2.4 } = roomDims || {};
   const { listeningFrontY, listeningBackY, midCenterY } = bounds;
 
-  // Compute room centre X based on seat distribution
-  let centreX = null;
+  // Compute seat bounds and room centre for overhead clamping
+  const seatXs = (seatingPositions || [])
+    .map(s => Number(s?.x ?? s?.position?.x))
+    .filter(Number.isFinite);
 
-  if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
-    const xs = seatingPositions
-      .map(s => Number(s?.x ?? s?.position?.x))
-      .filter(Number.isFinite);
-    if (xs.length > 0) {
-      const minX = Math.min(...xs);
-      const maxX = Math.max(...xs);
-      centreX = (minX + maxX) / 2;
-    }
-  }
+  let seatMinX = null;
+  let seatMaxX = null;
+  let centreX = widthM / 2;
+  let hasSeats = false;
 
-  // Fallback to room centre if no seats
-  if (!Number.isFinite(centreX)) {
-    centreX = widthM / 2;
+  if (seatXs.length > 0) {
+    seatMinX = Math.min(...seatXs);
+    seatMaxX = Math.max(...seatXs);
+    centreX = (seatMinX + seatMaxX) / 2;
+    hasSeats = true;
   }
 
   const screenWallInner = 0.05;
@@ -524,58 +522,10 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   // FINAL CLAMPING: prevent overhead zones from extending inside outer seats
   // ────────────────────────────────────────────────────────────────────────────
   
-  // Helpers to clamp corridor pieces to seat boundaries
-  function clampLeftCorridorToSeats(corridor, centreX, seatMinX) {
-    if (!corridor || !Number.isFinite(centreX) || !Number.isFinite(seatMinX)) return corridor;
-    
-    let x1 = Number(corridor.x1);
-    let x2 = Number(corridor.x2);
-    
-    if (!Number.isFinite(x1) || !Number.isFinite(x2)) return corridor;
-    
-    // For left corridor: inner edge (closer to centre) is the larger X value
-    let innerX = Math.max(x1, x2);
-    let outerX = Math.min(x1, x2);
-    
-    // Clamp inner edge to never go past seatMinX
-    innerX = Math.min(innerX, seatMinX);
-    
-    // If clamping inverts, collapse to thin strip
-    if (innerX <= outerX) {
-      innerX = outerX;
-    }
-    
-    return { x1: outerX, x2: innerX };
-  }
-  
-  function clampRightCorridorToSeats(corridor, centreX, seatMaxX) {
-    if (!corridor || !Number.isFinite(centreX) || !Number.isFinite(seatMaxX)) return corridor;
-    
-    let x1 = Number(corridor.x1);
-    let x2 = Number(corridor.x2);
-    
-    if (!Number.isFinite(x1) || !Number.isFinite(x2)) return corridor;
-    
-    // For right corridor: inner edge (closer to centre) is the smaller X value
-    let innerX = Math.min(x1, x2);
-    let outerX = Math.max(x1, x2);
-    
-    // Clamp inner edge to never go past seatMaxX
-    innerX = Math.max(innerX, seatMaxX);
-    
-    // If clamping inverts, collapse to thin strip
-    if (innerX >= outerX) {
-      innerX = outerX;
-    }
-    
-    return { x1: innerX, x2: outerX };
-  }
+  const MIN_OVERHEAD_WIDTH_M = 0.10;
 
   // Apply clamping if we have valid seat boundaries
-  if (seatXs.length > 0 && Number.isFinite(centreX)) {
-    const clampedSeatMinX = seatMinX;
-    const clampedSeatMaxX = seatMaxX;
-    
+  if (hasSeats && Number.isFinite(seatMinX) && Number.isFinite(seatMaxX)) {
     // Process pieces for each zone
     [frontZone, midZone, backZone].forEach(zone => {
       if (!zone || !Array.isArray(zone.pieces)) return;
@@ -587,20 +537,43 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
         const x2 = Number(piece.x2);
         if (!Number.isFinite(x1) || !Number.isFinite(x2)) return piece;
 
+        const width = Math.abs(x2 - x1);
         const midX = (x1 + x2) / 2;
         
-        // Determine if this is a left or right corridor based on which side of centre it's on
+        // Determine if this is a left or right corridor
         if (midX < centreX) {
-          // Left corridor
-          return clampLeftCorridorToSeats({ x1, x2 }, centreX, clampedSeatMinX);
+          // LEFT CORRIDOR
+          let outerX = Math.min(x1, x2);
+          let innerX = Math.max(x1, x2);
+          
+          // Clamp inner edge to never go past seatMinX
+          innerX = Math.min(innerX, seatMinX);
+          
+          // Enforce minimum width
+          if ((innerX - outerX) < MIN_OVERHEAD_WIDTH_M) {
+            outerX = innerX - MIN_OVERHEAD_WIDTH_M;
+          }
+          
+          return { x1: outerX, x2: innerX };
         } else {
-          // Right corridor
-          return clampRightCorridorToSeats({ x1, x2 }, centreX, clampedSeatMaxX);
+          // RIGHT CORRIDOR
+          let outerX = Math.max(x1, x2);
+          let innerX = Math.min(x1, x2);
+          
+          // Clamp inner edge to never go past seatMaxX
+          innerX = Math.max(innerX, seatMaxX);
+          
+          // Enforce minimum width
+          if ((outerX - innerX) < MIN_OVERHEAD_WIDTH_M) {
+            outerX = innerX + MIN_OVERHEAD_WIDTH_M;
+          }
+          
+          return { x1: innerX, x2: outerX };
         }
       });
       
       // Filter out any null/invalid pieces after clamping
-      zone.pieces = zone.pieces.filter(Boolean);
+      zone.pieces = zone.pieces.filter(p => p && Number.isFinite(p.x1) && Number.isFinite(p.x2));
     });
   }
 
