@@ -425,21 +425,14 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   // SIDE CORRIDORS: between widest seats and L/R speakers
   // ────────────────────────────────────────────────────────────────────────────
 
-  // Collect seat X positions (flattened)
-  const seatXs = (seatingPositions || [])
-    .map(seat => Number(seat?.x ?? seat?.position?.x))
-    .filter(x => Number.isFinite(x));
+  // Use seat bounds already computed earlier (seatXs, seatMinX, seatMaxX, centreX, hasSeats)
+  // If no seats were found earlier, fall back to central block
+  if (!hasSeats) {
+    seatMinX = centreX - widthM * 0.15;
+    seatMaxX = centreX + widthM * 0.15;
+  }
 
   const centerX = roomCenterX;
-
-  // If we have no seats, fall back to a central seating block
-  let seatMinX = centerX - widthM * 0.15;
-  let seatMaxX = centerX + widthM * 0.15;
-
-  if (seatXs.length > 0) {
-    seatMinX = Math.min(...seatXs);
-    seatMaxX = Math.max(...seatXs);
-  }
 
   // Find FL / FR X positions
   const fl = (placedSpeakers || []).find(
