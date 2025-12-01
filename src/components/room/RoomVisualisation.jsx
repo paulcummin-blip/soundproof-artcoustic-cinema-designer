@@ -1230,108 +1230,40 @@ React.useEffect(() => {
     [seatingPositions, heightM, widthM, lengthM, mlpY_m, mlp, placedSpeakers, getCanonicalRole]
   );
 
-  // Helper: Clamp overhead speaker X to RP22 corridor (locked to outer seats)
-  const clampOverheadXToRp22Corridor = useCallback((role, x, overheadZones, seatingPositions, roomDims) => {
-    const MIN_CORRIDOR_WIDTH_M = 0.10;
-    const OVERHEAD_ICON_HALF_WIDTH_M = 0.05; // ~5cm icon half-width for visual margin
+  // Overheads must never come further inboard than the outermost seat on that side.
+  // We allow a tiny margin (tweeter centred in the baffle), but no more.
+  const OVERHEAD_SEAT_MARGIN_M = 0.05; // 5 cm each side of seat centre
 
-    // Guard: no data
-    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return x;
-    if (!roomDims || !Number.isFinite(roomDims.widthM)) return x;
-    if (!overheadZones || overheadZones.status !== 'ok') return x;
-
-    // 1) Compute seat bounds
-    const seatXs = seatingPositions
-      .map(s => Number(s?.x ?? s?.position?.x))
-      .filter(Number.isFinite);
-    
-    if (seatXs.length === 0) return x;
-    
-    const seatMinX = Math.min(...seatXs);
-    const seatMaxX = Math.max(...seatXs);
-    const centreX = roomDims.widthM / 2;
-
-    // 2) Map role to zone
-    const canonRole = typeof role === 'string' ? role.toUpperCase() : '';
-    let zone = null;
-    
-    if (canonRole === 'TFL' || canonRole === 'TFR') zone = overheadZones.frontZone;
-    else if (canonRole === 'TL' || canonRole === 'TR') zone = overheadZones.midZone;
-    else if (canonRole === 'TBL' || canonRole === 'TBR') zone = overheadZones.backZone;
-    
-    if (!zone) return x;
-
-    // 3) Determine side based on role
-    const isLeft = canonRole === 'TFL' || canonRole === 'TL' || canonRole === 'TBL';
-    
-    // 4) Find corridor piece from zone
-    let corridorInnerXFromZone = null;
-    let corridorOuterXFromZone = null;
-
-    if (Array.isArray(zone.pieces)) {
-      for (const piece of zone.pieces) {
-        if (!piece || !Number.isFinite(piece.x1) || !Number.isFinite(piece.x2)) continue;
-        
-        const pieceMinX = Math.min(piece.x1, piece.x2);
-        const pieceMaxX = Math.max(piece.x1, piece.x2);
-        const pieceMidX = (pieceMinX + pieceMaxX) / 2;
-        
-        if (isLeft && pieceMidX < centreX) {
-          corridorOuterXFromZone = pieceMinX;
-          corridorInnerXFromZone = pieceMaxX;
-        } else if (!isLeft && pieceMidX > centreX) {
-          corridorInnerXFromZone = pieceMinX;
-          corridorOuterXFromZone = pieceMaxX;
-        }
-      }
+  function clampOverheadXToSeatSpan(xRoom, seatMinX, seatMaxX) {
+    if (!Number.isFinite(xRoom) || !Number.isFinite(seatMinX) || !Number.isFinite(seatMaxX)) {
+      return xRoom;
     }
 
-    // 5) Build safe corridor clamped to seats with minimum width
-    let innerX, outerX;
-    
-    if (isLeft) {
-      // Left side: outer is at wall (seatMinX), inner is toward centre
-      outerX = seatMinX;
-      innerX = corridorInnerXFromZone != null ? Math.min(corridorInnerXFromZone, seatMinX) : seatMinX;
-      
-      // Ensure minimum corridor width
-      const corridorWidth = innerX - outerX;
-      if (corridorWidth < MIN_CORRIDOR_WIDTH_M) {
-        innerX = outerX + MIN_CORRIDOR_WIDTH_M;
+    const roomCenterX = (seatMinX + seatMaxX) / 2;
+
+    // LEFT side overhead: xRoom < roomCenterX
+    // Do not allow it to move more inboard than (seatMinX + margin)
+    if (xRoom < roomCenterX) {
+      const innerLimitLeft = seatMinX + OVERHEAD_SEAT_MARGIN_M;
+      if (xRoom > innerLimitLeft) {
+        return innerLimitLeft;
       }
-      
-      // Clamp innerX to not exceed seatMinX (stay outside seats)
-      innerX = Math.min(innerX, seatMinX);
-    } else {
-      // Right side: outer is at wall (seatMaxX), inner is toward centre
-      outerX = seatMaxX;
-      innerX = corridorInnerXFromZone != null ? Math.max(corridorInnerXFromZone, seatMaxX) : seatMaxX;
-      
-      // Ensure minimum corridor width
-      const corridorWidth = outerX - innerX;
-      if (corridorWidth < MIN_CORRIDOR_WIDTH_M) {
-        innerX = outerX - MIN_CORRIDOR_WIDTH_M;
-      }
-      
-      // Clamp innerX to not go inside seatMaxX (stay outside seats)
-      innerX = Math.max(innerX, seatMaxX);
+      return xRoom;
     }
 
-    // 6) Apply icon half-width margin
-    const effectiveInnerX = isLeft ? innerX - OVERHEAD_ICON_HALF_WIDTH_M : innerX + OVERHEAD_ICON_HALF_WIDTH_M;
-    const effectiveOuterX = isLeft ? outerX + OVERHEAD_ICON_HALF_WIDTH_M : outerX - OVERHEAD_ICON_HALF_WIDTH_M;
-    
-    // 7) Clamp x to corridor
-    if (isLeft) {
-      const minX = Math.min(effectiveOuterX, effectiveInnerX);
-      const maxX = Math.max(effectiveOuterX, effectiveInnerX);
-      return Math.max(minX, Math.min(maxX, x));
-    } else {
-      const minX = Math.min(effectiveInnerX, effectiveOuterX);
-      const maxX = Math.max(effectiveInnerX, effectiveOuterX);
-      return Math.max(minX, Math.min(maxX, x));
+    // RIGHT side overhead: xRoom > roomCenterX
+    // Do not allow it to move more inboard than (seatMaxX - margin)
+    if (xRoom > roomCenterX) {
+      const innerLimitRight = seatMaxX - OVERHEAD_SEAT_MARGIN_M;
+      if (xRoom < innerLimitRight) {
+        return innerLimitRight;
+      }
+      return xRoom;
     }
-  }, []);
+
+    // Exactly on centre line – leave it (this should not normally happen for overheads)
+    return xRoom;
+  }
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
   // FW median positioning is now FULLY handled by SpeakerPlacement only.
@@ -2036,19 +1968,20 @@ React.useEffect(() => {
         lengthM
       );
 
-      // RP22 CORRIDOR X CLAMPING: Lock overhead speakers to side corridors (wall → outer seat)
+      // SEAT SPAN X CLAMPING: Keep overhead speakers outside the widest seats
       if (OVERHEAD_ROLES.has(canonicalRole)) {
-        const clampedX = clampOverheadXToRp22Corridor(
-          canonicalRole,
-          primaryClamped.x,
-          overheadZones,
-          seatingPositions,
-          { widthM, lengthM, heightM }
-        );
-        primaryClamped = { ...primaryClamped, x: clampedX };
+        const seatXs = (seatingPositions || [])
+          .map(seat => seat?.position?.x ?? seat?.x)
+          .filter(x => Number.isFinite(x));
+
+        if (seatXs.length > 0) {
+          const seatMinX = Math.min(...seatXs);
+          const seatMaxX = Math.max(...seatXs);
+          primaryClamped.x = clampOverheadXToSeatSpan(primaryClamped.x, seatMinX, seatMaxX);
+        }
       }
 
-      // Derive shared column X with corridor clamping
+      // Derive shared column X with seat span clamping
       const centerX = widthM / 2;
       let leftColumnX = null;
       let rightColumnX = null;
@@ -2063,25 +1996,23 @@ React.useEffect(() => {
         leftColumnX = centerX + (centerX - rightColumnX);
       }
 
-      // Apply corridor clamping to mirrored column
-      if (leftColumnX != null) {
-        leftColumnX = clampOverheadXToRp22Corridor(
-          'TL',
-          leftColumnX,
-          overheadZones,
-          seatingPositions,
-          { widthM, lengthM, heightM }
-        );
-      }
+      // Apply seat span clamping to mirrored column
+      if (leftColumnX != null || rightColumnX != null) {
+        const seatXs = (seatingPositions || [])
+          .map(seat => seat?.position?.x ?? seat?.x)
+          .filter(x => Number.isFinite(x));
 
-      if (rightColumnX != null) {
-        rightColumnX = clampOverheadXToRp22Corridor(
-          'TR',
-          rightColumnX,
-          overheadZones,
-          seatingPositions,
-          { widthM, lengthM, heightM }
-        );
+        if (seatXs.length > 0) {
+          const seatMinX = Math.min(...seatXs);
+          const seatMaxX = Math.max(...seatXs);
+
+          if (leftColumnX != null) {
+            leftColumnX = clampOverheadXToSeatSpan(leftColumnX, seatMinX, seatMaxX);
+          }
+          if (rightColumnX != null) {
+            rightColumnX = clampOverheadXToSeatSpan(rightColumnX, seatMinX, seatMaxX);
+          }
+        }
       }
 
       // Discover current Y positions from placedSpeakers
