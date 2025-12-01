@@ -257,6 +257,25 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   const { widthM = 4.5, lengthM = 6.0, heightM = 2.4 } = roomDims || {};
   const { listeningFrontY, listeningBackY, midCenterY } = bounds;
 
+  // Compute room centre X based on seat distribution
+  let centreX = null;
+
+  if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
+    const xs = seatingPositions
+      .map(s => Number(s?.x ?? s?.position?.x))
+      .filter(Number.isFinite);
+    if (xs.length > 0) {
+      const minX = Math.min(...xs);
+      const maxX = Math.max(...xs);
+      centreX = (minX + maxX) / 2;
+    }
+  }
+
+  // Fallback to room centre if no seats
+  if (!Number.isFinite(centreX)) {
+    centreX = widthM / 2;
+  }
+
   const screenWallInner = 0.05;
   const rearWallInner = lengthM - 0.05;
 
