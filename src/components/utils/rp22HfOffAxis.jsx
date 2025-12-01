@@ -177,66 +177,54 @@ function getOverheadTiltDeg(modelKeyRaw) {
 }
 
 // Compute vertical off-axis angle for an overhead speaker using 3D geometry
-function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey) {
-  // Guard against missing data
-  if (!seatPos || !speakerPos) return null;
+export function computeVerticalOffAxisDeg({
+  speakerPos,
+  seatPos,
+  earHeightM,
+  modelKey,
+  roomHeightM,
+}) {
+  if (!speakerPos || !seatPos) return null;
 
   const sx = Number(speakerPos.x) || 0;
   const sy = Number(speakerPos.y) || 0;
-  const sz = Number(speakerPos.z); // overhead Z should already be the ceiling height
 
-  const ex = Number(seatPos.x) || 0;
-  const ey = Number(seatPos.y) || 0;
-  const ez = Number(earHeightM);   // ear height in metres
+  const seatX = Number(seatPos.x) || 0;
+  const seatY = Number(seatPos.y) || 0;
 
-  // If we don't have a sensible ceiling height or ear height, bail early
-  if (!Number.isFinite(sz) || !Number.isFinite(ez)) return null;
+  // Speaker Z: for overheads we always treat them as being on the ceiling plane.
+  const ceilingM = Number(roomHeightM);
+  const speakerZ =
+    Number(speakerPos.z) && Number.isFinite(speakerPos.z)
+      ? speakerPos.z
+      : (Number.isFinite(ceilingM) ? ceilingM : 2.4);
 
-  // 1) Vector from speaker to listener's ears
-  const vx = ex - sx;
-  const vy = ey - sy;
-  const vz = ez - sz; // will usually be negative (ears below the speaker)
+  // Ear Z: use explicit ear height if present, otherwise seat.z, otherwise 1.2 m
+  const seatZ =
+    Number(earHeightM) && Number.isFinite(earHeightM)
+      ? earHeightM
+      : (Number(seatPos.z) && Number.isFinite(seatPos.z) ? seatPos.z : 1.2);
 
-  const horizontalDist = Math.hypot(vx, vy);
-  const radialDist = Math.hypot(horizontalDist, vz);
+  // Horizontal distance in the room plane (x-y)
+  const horizontalDist = Math.hypot(seatX - sx, seatY - sy);
 
-  if (radialDist < 0.01) {
-    // Seat is effectively at the speaker – treat as on-axis
-    return 0;
-  }
+  // Vertical separation from speaker to ear – never allow 0 to avoid atan2 issues
+  const verticalDist = Math.max(0.05, speakerZ - seatZ);
 
-  // 2) Reference axis: straight down from the ceiling speaker.
-  // In world coordinates this is (0, 0, -1).
-  const refZ = -1;
-  const refLen = 1; // already unit length
+  // Angle away from straight down (0° = directly under the speaker, 90° = horizontal)
+  const rawAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
 
-  // 3) Normalised actual direction vector (speaker -> ear)
-  const dirX = vx / radialDist;
-  const dirY = vy / radialDist;
-  const dirZ = vz / radialDist;
-
-  // 4) Angle between the straight-down vector and the actual direction.
-  // dot(ref, dir) = (0 * dirX) + (0 * dirY) + (-1 * dirZ) = -dirZ
-  let cosTheta = -(dirZ);
-
-  // Clamp for numeric safety
-  if (cosTheta > 1) cosTheta = 1;
-  if (cosTheta < -1) cosTheta = -1;
-
-  const rawAngleDeg = rad2deg(Math.acos(cosTheta)); // 0° = straight down, 90° = horizontal
-
-  // 5) Apply model-specific tilt: Architect 2-1/4-2 ≈ 5°, PAS ≈ 20°, Mikro = 0°
+  // Correct for built-in tilt of the in-ceiling model (5° / 20° etc.)
   const tiltDeg = getOverheadTiltDeg(modelKey);
 
-  // Off-axis angle is how far the listener is from the *aimed* axis
-  const offAxisDeg = Math.abs(rawAngleDeg - tiltDeg);
+  // We only care about the absolute off-axis magnitude
+  const offAxisDeg = Math.max(0, Math.abs(rawAngleDeg - tiltDeg));
 
-  // Always return a positive, rounded value
   return Number(offAxisDeg.toFixed(1));
 }
 
 // Unified helper: compute HF loss for one non-LCR speaker at one seat
-function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta }) {
+function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomHeightM }) {
   if (!speaker || !seat) return null;
   
   const role = String(speaker.role || "").toUpperCase();
@@ -253,13 +241,13 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta }) {
 
   // Overhead speakers: use vertical off-axis
   if (OVERHEAD_ROLES.has(role)) {
-    if (!isNum(pos.z)) return null;
-    offAxisDeg = computeVerticalOffAxisDeg(
-      pos,
-      { x: seat.x, y: seat.y },
-      earHeightM || 1.2,
-      speaker.model
-    );
+    offAxisDeg = computeVerticalOffAxisDeg({
+      speakerPos: { x: pos.x, y: pos.y, z: pos.z },
+      seatPos: { x: seat.x, y: seat.y, z: seat.z },
+      earHeightM,
+      modelKey: speaker.model,
+      roomHeightM,
+    });
   } 
   // Bed-layer surrounds/wides: use horizontal off-axis (same as P16)
   else if (SURROUND_ROLES.has(role)) {
@@ -304,7 +292,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta }) {
 }
 
 // P17: Compute surround/wide/overhead HF variance across all non-LCR speakers for all seats
-export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: modelIndex, debug }) {
+export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: modelIndex, roomHeightM, debug }) {
   if (!Array.isArray(seats) || !seats.length) return {};
   if (!Array.isArray(speakers) || !speakers.length) return {};
 
@@ -314,7 +302,12 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
     const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
     if (!isNum(seat.x) || !isNum(seat.y)) continue;
 
-    const earHeightM = seat.z || 1.2;
+    const seatPos = seat.position || {};
+    const earHeightM =
+      Number(seat.earHeightM) && Number.isFinite(seat.earHeightM)
+        ? seat.earHeightM
+        : (Number(seatPos.z) && Number.isFinite(seatPos.z) ? seatPos.z : 1.2);
+
     let maxAbsLossDb = -Infinity;
     let worstRole = null;
     let worstAngleDeg = null;
@@ -323,9 +316,10 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
     for (const spk of speakers) {
       const result = computeSurroundLikeHfLoss({
         speaker: spk,
-        seat,
+        seat: { x: seatPos.x || seat.x, y: seatPos.y || seat.y, z: seatPos.z || seat.z },
         earHeightM,
         modelMeta: spk.model ? modelIndex(spk.model) : null,
+        roomHeightM,
       });
 
       if (!result) continue;

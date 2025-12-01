@@ -287,6 +287,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       seats: seatsWithRoles,
       speakers: safeSpeakers,
       getSpeakerModelMeta,
+      roomHeightM: dimensions?.heightM,
     });
 
     // Helper to get SPL at seat for a specific role
