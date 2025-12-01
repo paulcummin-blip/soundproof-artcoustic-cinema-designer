@@ -707,18 +707,7 @@ const onHudHeaderMouseDown = useCallback((event) => {
     return map;
   }, [placedSpeakers, seatingPositions]);
 
-  const seatBandXBounds = React.useMemo(() => {
-    // Get seat bounds from overhead zones (includes bounds from getListeningAreaBounds)
-    if (overheadZones?.bounds?.seatMinX != null && overheadZones?.bounds?.seatMaxX != null) {
-      return {
-        minX: overheadZones.bounds.seatMinX,
-        maxX: overheadZones.bounds.seatMaxX,
-      };
-    }
-    
-    // Fallback: compute directly from seats
-    return getSeatBandXBounds(seatingPositions || []);
-  }, [seatingPositions, overheadZones]);
+  // Removed seatBandXBounds - computed after overheadZones is defined
 
   const ids = React.useMemo(() => ({
     grid: `grid-${Math.random().toString(36).slice(2)}`,
@@ -1240,6 +1229,22 @@ React.useEffect(() => {
       }),
     [seatingPositions, heightM, widthM, lengthM, mlpY_m, mlp, placedSpeakers, getCanonicalRole]
   );
+
+  // Safe access to overhead seat extents for clamping
+  const overheadClampMinX = overheadZones?.bounds?.seatMinX ?? null;
+  const overheadClampMaxX = overheadZones?.bounds?.seatMaxX ?? null;
+
+  const seatBandXBounds = React.useMemo(() => {
+    if (Number.isFinite(overheadClampMinX) && Number.isFinite(overheadClampMaxX)) {
+      return {
+        minX: overheadClampMinX,
+        maxX: overheadClampMaxX,
+      };
+    }
+    
+    // Fallback: compute directly from seats
+    return getSeatBandXBounds(seatingPositions || []);
+  }, [seatingPositions, overheadClampMinX, overheadClampMaxX]);
 
   // [B44 DISABLED] Auto-positioning of FW based on zones
   // FW median positioning is now FULLY handled by SpeakerPlacement only.
