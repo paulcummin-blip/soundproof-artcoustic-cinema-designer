@@ -189,6 +189,20 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey) {
   const tiltDeg = getOverheadTiltDeg(modelKey);
   const offAxisDeg = Math.abs(rawAngleDeg - tiltDeg);
 
+  if (typeof window !== "undefined" && window.__DBG_P17_OVERHEAD__) {
+    console.log("[P17 overhead]", {
+      modelKey,
+      speakerPos,
+      seatPos,
+      earHeightM,
+      horizontalDist,
+      verticalDist,
+      rawAngleDeg,
+      tiltDeg,
+      offAxisDeg,
+    });
+  }
+
   return offAxisDeg;
 }
 
