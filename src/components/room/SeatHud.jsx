@@ -205,8 +205,8 @@ export default function SeatHud({
                 </div>
               )}
 
-              {/* P17 debug info */}
-              {key === 'p17' && metric.worstRole && (
+              {/* P17 per-speaker breakdown */}
+              {key === 'p17' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
                 <div
                   style={{
                     fontSize: 10,
@@ -216,7 +216,18 @@ export default function SeatHud({
                     lineHeight: 1.4,
                   }}
                 >
-                  Worst: {metric.worstRole} {Math.abs(Number(metric.worstAngleDeg) || 0).toFixed(1)}° / {metric.value?.toFixed(1) ?? '—'} dB
+                  {metric.perSpeaker
+                    .slice()
+                    .sort((a, b) => a.role.localeCompare(b.role))
+                    .map(s => {
+                      const angle = Number.isFinite(s.angleDeg) ? s.angleDeg.toFixed(1) : '—';
+                      const loss = Number.isFinite(s.lossDb) ? s.lossDb.toFixed(1) : '—';
+                      return `${s.role} ${angle}° / ${loss} dB`;
+                    })
+                    .join(', ')}
+                  {metric.worstRole && Number.isFinite(metric.worstAngleDeg) && Number.isFinite(metric.worstLossDb) && (
+                    <span> (worst: {metric.worstRole} {metric.worstAngleDeg.toFixed(1)}° / {metric.worstLossDb.toFixed(1)} dB)</span>
+                  )}
                 </div>
               )}
             </React.Fragment>
