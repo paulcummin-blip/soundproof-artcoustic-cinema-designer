@@ -48,7 +48,8 @@ export function computeOverheadZones({
     status: hasValidSeats ? "ok" : "disabled",
     frontZone: zones.frontZone,
     midZone: zones.midZone,
-    backZone: zones.backZone
+    backZone: zones.backZone,
+    bounds, // Include bounds with seatMinX/seatMaxX for icon clamping
   };
 }
 
