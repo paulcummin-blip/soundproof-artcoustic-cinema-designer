@@ -439,12 +439,21 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   const LCR_MARGIN_M  = 0.05; // keep just inside the L/R speakers
 
   // Inner edges are just outside the widest seats
-  const innerLeft  = Math.min(centerX, seatMinX - SEAT_MARGIN_M);
-  const innerRight = Math.max(centerX, seatMaxX + SEAT_MARGIN_M);
+  let innerLeft  = Math.min(centerX, seatMinX - SEAT_MARGIN_M);
+  let innerRight = Math.max(centerX, seatMaxX + SEAT_MARGIN_M);
 
   // Outer edges are just inside the L/R speakers
   const outerLeft  = Math.max(0, flX + LCR_MARGIN_M);
   const outerRight = Math.min(widthM, frX - LCR_MARGIN_M);
+
+  // CLAMPING: prevent overhead zones from extending inside the outer seats
+  // If FL/FR are inboard of the seats, clamp the inner edges to the seat span
+  if (Number.isFinite(seatMinX) && Number.isFinite(seatMaxX)) {
+    // Left corridor: inner edge must not go past seatMinX
+    innerLeft = Math.min(innerLeft, seatMinX);
+    // Right corridor: inner edge must not go past seatMaxX
+    innerRight = Math.max(innerRight, seatMaxX);
+  }
 
   // Final clamping and sanity checks: no inverted corridors
   const leftCorridor  = outerLeft < innerLeft
