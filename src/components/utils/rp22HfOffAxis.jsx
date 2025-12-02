@@ -189,69 +189,49 @@ function getOverheadTiltDeg(modelKeyRaw) {
 }
 
 // Compute vertical off-axis angle for an overhead speaker using 3D geometry
+// 0° = directly below the speaker (on vertical axis)
+// 90° = listener is horizontal from the speaker plane
 export function computeVerticalOffAxisDeg({
   speakerPos,
   seatPos,
   earHeightM,
   modelKey,
-  roomHeightM,
 }) {
-  if (!speakerPos || !seatPos) return null;
+  if (!speakerPos || !seatPos) return 0;
 
-  // 1. Normalize speaker coordinates
-  const sx = Number(speakerPos?.x) || 0;
-  const sy = Number(speakerPos?.y) || 0;
-  
-  // Speaker Z: For overheads, always use the ceiling height.
-  // If speakerPos.z is present and valid, use it (should already be ceiling height).
-  // Otherwise, fall back to roomHeightM, then a sensible default.
-  let speakerZ = Number(speakerPos?.z);
-  if (!Number.isFinite(speakerZ) || speakerZ === 0) {
-    speakerZ = Number(roomHeightM);
-    if (!Number.isFinite(speakerZ) || speakerZ === 0) {
-      speakerZ = 2.4; // Final fallback
-    }
+  const sx = Number(speakerPos.x) || 0;
+  const sy = Number(speakerPos.y) || 0;
+  const sz = Number(speakerPos.z); // MUST be ceiling height for overheads
+
+  const px = Number(seatPos.x) || 0;
+  const py = Number(seatPos.y) || 0;
+
+  // Ear height: from seat.z when present, else fallback
+  const earZ = Number(earHeightM) || Number(seatPos.z) || 1.2;
+
+  // Horizontal distance in plan
+  const dx = px - sx;
+  const dy = py - sy;
+  const horizontalDist = Math.hypot(dx, dy);
+
+  // TRUE vertical separation: speaker height minus ear height
+  let verticalDist = sz - earZ;
+  if (!Number.isFinite(verticalDist) || verticalDist <= 0) {
+    // Fallback: if something is wrong with sz, assume 1.3 m above listener
+    verticalDist = 1.3;
   }
 
-  // 2. Normalize seat coordinates
-  const ex = Number(seatPos?.x) || 0;
-  const ey = Number(seatPos?.y) || 0;
+  // Geometric angle from vertical (0° = straight down, 90° = horizontal)
+  const geometricRad = Math.atan2(horizontalDist, verticalDist);
+  const geometricDeg = (geometricRad * 180) / Math.PI;
 
-  // Ear height: use earHeightM if provided, otherwise seatPos.z, otherwise 1.2m default
-  let earZ = Number.isFinite(earHeightM) && earHeightM > 0
-    ? earHeightM
-    : (Number(seatPos?.z) || 1.2);
+  // Model-specific tilt towards MLP
+  const tiltDeg = getOverheadTiltDeg(modelKey);
+  const offAxisDeg = Math.abs(geometricDeg - tiltDeg);
 
-  // 3. Compute horizontal and vertical separations
-  const dx = ex - sx;
-  const dy = ey - sy;
-  const horizontalDist = Math.hypot(dx, dy); // plan distance
-
-  // Vertical separation: ceiling to ear (always positive)
-  const verticalDist = Math.max(0.01, speakerZ - earZ);
-
-  // Guard: if both distances are extremely tiny, treat off-axis as 0
-  if (horizontalDist < 0.01 && verticalDist < 0.01) {
-    return 0;
-  }
-
-  // 4. Compute the angle from the vertical (speaker pointing straight down)
-  // atan2(horizontal, vertical) where:
-  //   - 0° = directly below (horizontal = 0)
-  //   - 90° = horizontal offset (vertical = 0)
-  const geometricDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
-
-  // 5. Apply model-specific tilt
-  const tiltDeg = getOverheadTiltDeg(modelKey); // 0 / 5 / 20
-
-  // Compute the off-axis angle as the absolute difference
-  let offAxisDeg = Math.abs(geometricDeg - tiltDeg);
-
-  // 6. Clamp the result to the physical range [0, 89.9]
-  if (!Number.isFinite(offAxisDeg)) offAxisDeg = 0;
-  offAxisDeg = Math.max(0, Math.min(89.9, offAxisDeg));
-
-  return Number(offAxisDeg.toFixed(1));
+  // Clamp and normalise
+  const clamped = Math.min(89.9, Math.max(0, offAxisDeg));
+  return Number(clamped.toFixed(1));
 }
 
 // Unified helper: compute HF loss for one non-LCR speaker at one seat
@@ -273,11 +253,10 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
   // Overhead speakers: use vertical off-axis
   if (OVERHEAD_ROLES.has(role)) {
     offAxisDeg = computeVerticalOffAxisDeg({
-      speakerPos: { x: pos.x, y: pos.y, z: pos.z },
-      seatPos: { x: seat.x, y: seat.y, z: seat.z },
-      earHeightM,
+      speakerPos: speaker.position,
+      seatPos: seat,
+      earHeightM: seat.z || earHeightM || 1.2,
       modelKey: speaker.model,
-      roomHeightM,
     });
   } 
   // Bed-layer surrounds/wides: use horizontal off-axis (same as P16)
