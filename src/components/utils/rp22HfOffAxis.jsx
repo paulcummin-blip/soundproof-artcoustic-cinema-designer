@@ -198,47 +198,58 @@ export function computeVerticalOffAxisDeg({
 }) {
   if (!speakerPos || !seatPos) return null;
 
-  // 1. Normalize coordinates and heights
+  // 1. Normalize speaker coordinates
   const sx = Number(speakerPos?.x) || 0;
   const sy = Number(speakerPos?.y) || 0;
-  const sz = Number(speakerPos?.z) || 0;
+  
+  // Speaker Z: For overheads, always use the ceiling height.
+  // If speakerPos.z is present and valid, use it (should already be ceiling height).
+  // Otherwise, fall back to roomHeightM, then a sensible default.
+  let speakerZ = Number(speakerPos?.z);
+  if (!Number.isFinite(speakerZ) || speakerZ === 0) {
+    speakerZ = Number(roomHeightM);
+    if (!Number.isFinite(speakerZ) || speakerZ === 0) {
+      speakerZ = 2.4; // Final fallback
+    }
+  }
 
+  // 2. Normalize seat coordinates
   const ex = Number(seatPos?.x) || 0;
   const ey = Number(seatPos?.y) || 0;
 
-  const earZ = Number.isFinite(earHeightM)
+  // Ear height: use earHeightM if provided, otherwise seatPos.z, otherwise 1.2m default
+  let earZ = Number.isFinite(earHeightM) && earHeightM > 0
     ? earHeightM
     : (Number(seatPos?.z) || 1.2);
 
-  // 2. Build the vector from speaker to listener
+  // 3. Compute horizontal and vertical separations
   const dx = ex - sx;
   const dy = ey - sy;
-  const dz = earZ - sz; // will normally be negative (listener below speaker)
-
-  // 3. Compute horizontal and vertical separations
   const horizontalDist = Math.hypot(dx, dy); // plan distance
-  const verticalDist = Math.abs(dz);         // positive distance between ear and speaker in height
+
+  // Vertical separation: ceiling to ear (always positive)
+  const verticalDist = Math.max(0.01, speakerZ - earZ);
 
   // Guard: if both distances are extremely tiny, treat off-axis as 0
   if (horizontalDist < 0.01 && verticalDist < 0.01) {
     return 0;
   }
 
-  // Guard: avoid division by zero in atan2
-  const safeVerticalDist = Math.max(0.01, verticalDist);
-
   // 4. Compute the angle from the vertical (speaker pointing straight down)
-  const angleFromVerticalDeg = rad2deg(Math.atan2(horizontalDist, safeVerticalDist));
+  // atan2(horizontal, vertical) where:
+  //   - 0° = directly below (horizontal = 0)
+  //   - 90° = horizontal offset (vertical = 0)
+  const geometricDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
 
   // 5. Apply model-specific tilt
   const tiltDeg = getOverheadTiltDeg(modelKey); // 0 / 5 / 20
 
-  // Compute the off-axis angle as the difference between listener's vertical angle and speaker's axis tilt
-  let offAxisDeg = Math.abs(angleFromVerticalDeg - tiltDeg);
+  // Compute the off-axis angle as the absolute difference
+  let offAxisDeg = Math.abs(geometricDeg - tiltDeg);
 
-  // 6. Clamp the result to the physical range [0, 90]
+  // 6. Clamp the result to the physical range [0, 89.9]
   if (!Number.isFinite(offAxisDeg)) offAxisDeg = 0;
-  offAxisDeg = Math.max(0, Math.min(90, offAxisDeg));
+  offAxisDeg = Math.max(0, Math.min(89.9, offAxisDeg));
 
   return Number(offAxisDeg.toFixed(1));
 }
