@@ -283,11 +283,15 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const roomCenterX = (dimensions?.widthM || 0) / 2;
 
     // Compute P17 for all seats (non-LCR HF variance)
+    const roomHeightM =
+      (dimensions && dimensions.heightM) ||
+      2.5; // safe fallback
+
     const p17Results = computeP17ForAllSeats({
       seats: seatsWithRoles,
       speakers: safeSpeakers,
       getSpeakerModelMeta,
-      roomHeightM: dimensions?.heightM,
+      roomHeightM: roomHeightM,
     });
 
     // Helper to get SPL at seat for a specific role
