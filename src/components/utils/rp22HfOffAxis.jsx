@@ -190,46 +190,50 @@ function getOverheadTiltDeg(modelKey = "") {
  * Returns: off-axis angle in degrees (0° = directly on-axis).
  */
 function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, roomHeightM) {
-  if (!speakerPos || !seatPos) return null;
+  if (!seatPos || !speakerPos) {
+    return { baseAngleDeg: 0, offAxisDeg: 0 };
+  }
 
-  const sx = Number(speakerPos.x) || 0;
-  const sy = Number(speakerPos.y) || 0;
+  const earZ = Number.isFinite(Number(earHeightM))
+    ? Number(earHeightM)
+    : 1.2;
 
-  const px = Number(seatPos.x) || 0;
-  const py = Number(seatPos.y) || 0;
-
-  const earZ = Number(earHeightM) || 1.2;
-
-  // Ceiling height: use explicit roomHeightM if valid, otherwise fall back to speakerPos.z
-  const speakerZRaw = Number.isFinite(roomHeightM)
+  // Work out which Z we're using for the speaker:
+  // 1) explicit room height from dimensions
+  // 2) speaker's own z
+  // 3) fallback to 1 m above the ear
+  const zFromRoom = Number.isFinite(Number(roomHeightM))
     ? Number(roomHeightM)
-    : (Number(speakerPos.z) || (earZ + 1.0));
+    : null;
 
-  const speakerZ = Math.max(earZ + 0.01, speakerZRaw); // ensure above ears
+  const zFromSpeaker = Number.isFinite(Number(speakerPos.z))
+    ? Number(speakerPos.z)
+    : null;
 
-  // 2D horizontal distance in plan
-  const dx = px - sx;
-  const dy = py - sy;
-  const horizontalDist = Math.hypot(dx, dy);
+  let speakerZRaw = zFromRoom ?? zFromSpeaker ?? (earZ + 1.0);
 
-  // Vertical separation from ear to ceiling speaker
-  const verticalDist = Math.max(0.01, speakerZ - earZ);
+  // Ensure the speaker is always above the listener
+  const speakerZ = Math.max(earZ + 0.01, speakerZRaw);
 
-  // Base geometric angle: 0° = straight down, 90° = horizontal
+  // Horizontal distance in plan view
+  const horizontalDist = Math.hypot(
+    Number(seatPos.x) - Number(speakerPos.x),
+    Number(seatPos.y) - Number(speakerPos.y)
+  );
+
+  const verticalDist = speakerZ - earZ;
+
+  // Geometric angle from vertical (0° straight down, 90° horizontal)
   const baseAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
 
-  // Built-in tilt of the overhead towards the listening area
+  // Speaker's built-in tilt towards the MLP
   const tiltDeg = getOverheadTiltDeg(modelKey);
 
-  // Effective on-axis direction (tilt away from straight down)
-  const onAxisDeg = tiltDeg;
-
-  // Off-axis error = difference between actual ray and the aimed axis
-  const offAxisDeg = Math.abs(baseAngleDeg - onAxisDeg);
+  // Off-axis is how far we are from that aimed axis
+  const offAxisDeg = Math.abs(baseAngleDeg - tiltDeg);
 
   return {
     baseAngleDeg,
-    onAxisDeg,
     offAxisDeg,
   };
 }
@@ -360,7 +364,7 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
 
     let maxAbsLossDb = -Infinity;
     let worstRole = null;
-    let worstAngleDeg = null;
+    let worstAngleDeg = -Infinity;
     let worstLossDb = null;
     const perSpeaker = [];
 
@@ -383,8 +387,14 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
         lossDb: result.lossDb,
       });
 
-      // Track worst loss
-      if (result.lossDb > maxAbsLossDb) {
+      // Track worst loss: highest dB loss; if tie, largest angle
+      if (
+        result.lossDb > maxAbsLossDb ||
+        (
+          result.lossDb === maxAbsLossDb &&
+          result.offAxisDeg > worstAngleDeg
+        )
+      ) {
         maxAbsLossDb = result.lossDb;
         worstRole = result.role;
         worstAngleDeg = result.offAxisDeg;

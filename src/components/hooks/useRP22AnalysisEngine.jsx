@@ -193,7 +193,13 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const safeSeats = Array.isArray(seatingPositions) ? seatingPositions : [];
 
     // Extract room height early for use throughout
-    const roomHeightM = (dimensions && dimensions.heightM) || 2.5;
+    // Prefer explicit heightM, fallback to generic height, then default 2.5 m
+    const rawHeight =
+      dimensions && (dimensions.heightM ?? dimensions.height);
+
+    const roomHeightM = Number.isFinite(Number(rawHeight))
+      ? Number(rawHeight)
+      : 2.5;
 
     if (safeSpeakers.length === 0 || safeSeats.length === 0) {
       return { gradedParameters, analysisDetails: { hasSecondarySeating: false } };
@@ -481,7 +487,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         secondarySeats: secondarySeats.length,
       }
     };
-  }, [placedSpeakers, seatingPositions, mlpBasis, dimensions, seatSplMetrics]);
+  }, [
+    placedSpeakers,
+    seatingPositions,
+    mlpBasis,
+    dimensions?.heightM,
+    dimensions?.height,
+    dimensions?.lengthM,
+    dimensions?.widthM,
+    seatSplMetrics
+  ]);
 
   return { ...memoizedResult, evaluateOverheads };
 };
