@@ -192,6 +192,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const safeSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
     const safeSeats = Array.isArray(seatingPositions) ? seatingPositions : [];
 
+    // Extract room height early for use throughout
+    const roomHeightM = (dimensions && dimensions.heightM) || 2.5;
+
     if (safeSpeakers.length === 0 || safeSeats.length === 0) {
       return { gradedParameters, analysisDetails: { hasSecondarySeating: false } };
     }
@@ -283,15 +286,11 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const roomCenterX = (dimensions?.widthM || 0) / 2;
 
     // Compute P17 for all seats (non-LCR HF variance)
-    const roomHeightM =
-      (dimensions && dimensions.heightM) ||
-      2.5; // safe fallback
-
     const p17Results = computeP17ForAllSeats({
       seats: seatsWithRoles,
       speakers: safeSpeakers,
       getSpeakerModelMeta,
-      roomHeightM: roomHeightM,
+      roomHeightM,
     });
 
     // Helper to get SPL at seat for a specific role
