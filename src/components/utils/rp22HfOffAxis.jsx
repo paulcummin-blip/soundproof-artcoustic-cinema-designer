@@ -23,9 +23,26 @@ const norm180 = (deg) => {
 };
 
 // Centralized angle → HF loss mapping using new RP22 thresholds
-function mapAngleToHfLossDb(angleDeg) {
+// Uses model-specific dispersion if available, otherwise defaults to generic thresholds
+function mapAngleToHfLossDb(angleDeg, modelMeta = null) {
   const a = Math.abs(Number(angleDeg) || 0);
 
+  // Try to use model-specific dispersion data
+  if (modelMeta?.dispersion?.horizontal) {
+    const disp = modelMeta.dispersion.horizontal;
+    const minus1p5 = disp.minus1p5dB ?? disp.minus1p5 ?? null;
+    const minus3 = disp.minus3dB ?? disp.minus3 ?? null;
+    const minus5 = disp.minus5dB ?? disp.minus5 ?? null;
+
+    if (minus1p5 != null && minus3 != null && minus5 != null) {
+      if (a <= minus1p5) return 1.5;
+      if (a <= minus3) return 3.0;
+      if (a <= minus5) return 5.0;
+      return null; // Beyond model's −5 dB window
+    }
+  }
+
+  // Fallback to generic RP22 thresholds
   if (a <= 28) return 1.5;
   if (a <= 41) return 3.0;
   if (a <= 55) return 5.0;
@@ -106,13 +123,16 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
 
     const angleDeg = Number(offAxisDeg.toFixed(1));
 
-    // Use new centralized mapping
-    const lossFromAngle = mapAngleToHfLossDb(angleDeg);
+    // Get model metadata for dispersion
+    const meta = spk.model ? getSpeakerModelMeta(spk.model) : null;
+
+    // Use new centralized mapping with model-specific dispersion
+    const lossFromAngle = mapAngleToHfLossDb(angleDeg, meta);
     let lossDb;
     let isBeyondLcrLimit = false;
 
     if (lossFromAngle == null) {
-      // Angle > 55° for LCR: this is a fail for P16
+      // Angle beyond model's −5 dB window: this is a fail for P16
       lossDb = 5.0;
       isBeyondLcrLimit = true;
     } else {
@@ -242,30 +262,48 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
   // Halve the off-axis angle for P17 analysis
   const halfOffAxisDeg = relativeDeg / 2;
 
-  // Apply model-specific thresholds to the halved angle
-  const key = (modelKey || "").toString().toLowerCase();
+  // Get model metadata for dispersion windows
+  const meta = getSpeakerModelMeta(modelKey);
+  
+  // Use model-specific dispersion if available, applying to halved angle
   let lossDb;
+  if (meta?.dispersion?.horizontal) {
+    const disp = meta.dispersion.horizontal;
+    const minus1p5 = disp.minus1p5dB ?? disp.minus1p5 ?? null;
+    const minus3 = disp.minus3dB ?? disp.minus3 ?? null;
+    const minus5 = disp.minus5dB ?? disp.minus5 ?? null;
 
-  if (key.includes("mikro")) {
-    // Mikro: 40° / 50° thresholds
-    if (halfOffAxisDeg <= 40) lossDb = 1.5;
-    else if (halfOffAxisDeg <= 50) lossDb = 3.0;
-    else lossDb = 5.0;
-  } else if (
-    key.includes("architect-2-1") ||
-    key.includes("architect-4-2") ||
-    key.includes("pas2-2") ||
-    key.includes("architect pas")
-  ) {
-    // Architect 2-1 / 4-2 / PAS2-2: 45° / 55° thresholds
-    if (halfOffAxisDeg <= 45) lossDb = 1.5;
-    else if (halfOffAxisDeg <= 55) lossDb = 3.0;
-    else lossDb = 5.0;
+    if (minus1p5 != null && minus3 != null && minus5 != null) {
+      // Use model's actual dispersion windows (already in degrees)
+      if (halfOffAxisDeg <= minus1p5) lossDb = 1.5;
+      else if (halfOffAxisDeg <= minus3) lossDb = 3.0;
+      else if (halfOffAxisDeg <= minus5) lossDb = 5.0;
+      else lossDb = 5.0; // Beyond −5 dB window
+    } else {
+      // Fallback to legacy thresholds if dispersion incomplete
+      const key = (modelKey || "").toString().toLowerCase();
+      if (key.includes("mikro")) {
+        if (halfOffAxisDeg <= 40) lossDb = 1.5;
+        else if (halfOffAxisDeg <= 50) lossDb = 3.0;
+        else lossDb = 5.0;
+      } else {
+        if (halfOffAxisDeg <= 45) lossDb = 1.5;
+        else if (halfOffAxisDeg <= 55) lossDb = 3.0;
+        else lossDb = 5.0;
+      }
+    }
   } else {
-    // Default: similar to Architect
-    if (halfOffAxisDeg <= 45) lossDb = 1.5;
-    else if (halfOffAxisDeg <= 55) lossDb = 3.0;
-    else lossDb = 5.0;
+    // No dispersion data: use legacy thresholds
+    const key = (modelKey || "").toString().toLowerCase();
+    if (key.includes("mikro")) {
+      if (halfOffAxisDeg <= 40) lossDb = 1.5;
+      else if (halfOffAxisDeg <= 50) lossDb = 3.0;
+      else lossDb = 5.0;
+    } else {
+      if (halfOffAxisDeg <= 45) lossDb = 1.5;
+      else if (halfOffAxisDeg <= 55) lossDb = 3.0;
+      else lossDb = 5.0;
+    }
   }
 
   return {
@@ -335,20 +373,28 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
 
     const effectiveAngleDeg = Number(offAxisDeg.toFixed(1));
 
-    // Use centralized mapping
-    const lossFromAngle = mapAngleToHfLossDb(effectiveAngleDeg);
+    // Get model metadata for dispersion
+    const meta = modelMeta || (speaker.model ? getSpeakerModelMeta(speaker.model) : null);
+
+    // Use centralized mapping with model-specific dispersion
+    const lossFromAngle = mapAngleToHfLossDb(effectiveAngleDeg, meta);
 
     let lossDb;
     let isBeyondNonLcrLimit = false;
 
-    if (Math.abs(effectiveAngleDeg) > 41) {
-    // Above 41° we no longer trust the reference spec for non-LCRs
-    isBeyondNonLcrLimit = true;
-    // For RP22 we still want P17 to land at Level 2, so use 3 dB as the nominal value
-    lossDb = 3.0;
+    // Determine limit based on model-specific dispersion or fallback to 41°
+    const nonLcrLimit = meta?.dispersion?.horizontal?.minus3dB ?? 
+                       meta?.dispersion?.horizontal?.minus3 ?? 
+                       41;
+
+    if (Math.abs(effectiveAngleDeg) > nonLcrLimit) {
+      // Beyond the model's −3 dB window
+      isBeyondNonLcrLimit = true;
+      // For RP22 we still want P17 to land at Level 2, so use 3 dB as the nominal value
+      lossDb = 3.0;
     } else {
-    // Within 41°: use the normal 1.5 / 3 / 5 dB values
-    lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
+      // Within the model's coverage: use the normal dispersion-based values
+      lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
     }
 
     return {

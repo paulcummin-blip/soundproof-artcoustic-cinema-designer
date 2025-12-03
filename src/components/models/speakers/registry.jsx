@@ -44,9 +44,59 @@ export const MODELS = [
     nominalOhms: 8,
     max_power: 15
   },
-  { key: "architect-2-1", label: "ARCHITECT 2-1", category: "ARCHITECT", diameterMm: 240, depthMm: 120, round: true, sensitivity_dB_1w1m: 97, sensitivity_dB_2p83: 100, nominalOhms: 4, max_power: 60 },
-  { key: "architect-4-2", label: "ARCHITECT 4-2", category: "ARCHITECT", diameterMm: 300, depthMm: 120, round: true, sensitivity_dB_1w1m: 97, sensitivity_dB_2p83: 97, nominalOhms: 4, max_power: 120 },
-  { key: "architect-pas2-2", label: "ARCHITECT PAS2-2", category: "ARCHITECT", diameterMm: 300, depthMm: 150, round: true, sensitivity_dB_1w1m: 97, sensitivity_dB_2p83: 97, nominalOhms: 4, max_power: 120 },
+  { 
+    key: "architect-2-1", 
+    label: "ARCHITECT 2-1", 
+    category: "ARCHITECT", 
+    diameterMm: 240, 
+    depthMm: 120, 
+    round: true, 
+    sensitivity_dB_1w1m: 97, 
+    sensitivity_dB_2p83: 100, 
+    nominalOhms: 4, 
+    max_power: 60,
+    builtInTiltDeg: 5,
+  },
+  { 
+    key: "architect-4-2", 
+    label: "ARCHITECT 4-2", 
+    category: "ARCHITECT", 
+    diameterMm: 300, 
+    depthMm: 120, 
+    round: true, 
+    sensitivity_dB_1w1m: 97, 
+    sensitivity_dB_2p83: 97, 
+    nominalOhms: 4, 
+    max_power: 120,
+    builtInTiltDeg: 5,
+    dispersion: {
+      horizontal: {
+        minus1p5dB: 30,
+        minus3dB: 45,
+        minus5dB: 63,
+      }
+    }
+  },
+  { 
+    key: "architect-pas2-2", 
+    label: "ARCHITECT PAS2-2", 
+    category: "ARCHITECT", 
+    diameterMm: 300, 
+    depthMm: 150, 
+    round: true, 
+    sensitivity_dB_1w1m: 97, 
+    sensitivity_dB_2p83: 97, 
+    nominalOhms: 4, 
+    max_power: 120,
+    builtInTiltDeg: 20,
+    dispersion: {
+      horizontal: {
+        minus1p5dB: 20,
+        minus3dB: 33,
+        minus5dB: 52,
+      }
+    }
+  },
 
   // SUBWOOFERS — EXACT ORDER
   { key: "sub2-12", label: "SUB2-12", category: "SUBWOOFERS", widthMm: 500, heightMm: 500, depthMm: 255, sensitivity_dB_1w1m: 94, max_power: 350 },
@@ -114,6 +164,8 @@ export function getSpeakerModelMeta(modelName) {
       nominalOhms: hit.nominalOhms ?? null,
       max_power: hit.max_power ?? null,
       hfOffAxis16k: hit.hfOffAxis16k ?? null,
+      builtInTiltDeg: hit.builtInTiltDeg ?? null,
+      dispersion: hit.dispersion ?? null,
     };
   }
 
@@ -130,6 +182,8 @@ export function getSpeakerModelMeta(modelName) {
     nominalOhms: hit.nominalOhms ?? null,
     max_power: hit.max_power ?? null,
     hfOffAxis16k: hit.hfOffAxis16k ?? null,
+    builtInTiltDeg: hit.builtInTiltDeg ?? null,
+    dispersion: hit.dispersion ?? null,
   };
 }
 
