@@ -158,19 +158,20 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
 // --- P17 HELPERS ---
 
 // Map overhead models to their built-in tilt (towards the MLP), in degrees
-function getOverheadTiltDeg(modelKey = "") {
-  const key = String(modelKey).toLowerCase();
+function getOverheadTiltDeg(modelKey) {
+  const key = (modelKey || "").toString().toLowerCase();
 
   // Mikro: flat baffle, no tilt
   if (key.includes("mikro")) return 0;
 
-  // Architect 2-1 and 4-2: ~5° angled tweeter
-  if (key.includes("architect-2-1") || key.includes("architect-4-2")) {
-    return 5;
-  }
+  // Architect 2-1: ~5° angled tweeter
+  if (key.includes("architect-2-1")) return 5;
+
+  // Architect 4-2: ~5° angled tweeter
+  if (key.includes("architect-4-2")) return 5;
 
   // Architect PAS2-2: ~20° angled baffle
-  if (key.includes("pas2-2") || key.includes("architect-pas")) {
+  if (key.includes("pas2-2") || key.includes("architect pas")) {
     return 20;
   }
 
@@ -178,35 +179,7 @@ function getOverheadTiltDeg(modelKey = "") {
   return 0;
 }
 
-// Map overhead off-axis angle to predicted HF loss
-function mapOverheadAngleToLoss(modelKey, offAxisDeg) {
-  const key = (modelKey || "").toLowerCase();
-  const angle = Math.abs(Number(offAxisDeg) || 0);
 
-  // Mikro: 80°/100° → now 40°/50°
-  if (key.includes("mikro")) {
-    if (angle <= 40) return 1.5;
-    if (angle <= 50) return 3.0;
-    return 5.0;
-  }
-
-  // Architect 2-1, 4-2, PAS2-2: 90°/100° → now 45°/50°
-  if (
-    key.includes("architect-2-1") ||
-    key.includes("architect-4-2") ||
-    key.includes("pas2-2") ||
-    key.includes("architect-pas")
-  ) {
-    if (angle <= 45) return 1.5;
-    if (angle <= 50) return 3.0;
-    return 5.0;
-  }
-
-  // Default overhead behaviour: similar to angled models
-  if (angle <= 45) return 1.5;
-  if (angle <= 55) return 3.0;
-  return 5.0;
-}
 
 /**
  * Compute vertical off-axis angle for an overhead speaker relative to the listener.
@@ -217,11 +190,11 @@ function mapOverheadAngleToLoss(modelKey, offAxisDeg) {
  * - modelKey: string used to look up built-in tilt
  * - roomHeightM: current room ceiling height (if finite, overrides speakerPos.z)
  *
- * Returns: off-axis angle in degrees (0° = directly on-axis).
+ * Returns: halved off-axis angle and predicted HF loss.
  */
 function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, roomHeightM) {
   if (!seatPos || !speakerPos) {
-    return { baseAngleDeg: 0, offAxisDeg: 0 };
+    return { offAxisDeg: 0, lossDb: 1.5 };
   }
 
   const earZ = Number.isFinite(Number(earHeightM))
@@ -232,15 +205,9 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
   // 1) explicit room height from dimensions
   // 2) speaker's own z
   // 3) fallback to 1 m above the ear
-  const zFromRoom = Number.isFinite(Number(roomHeightM))
+  const speakerZRaw = Number.isFinite(Number(roomHeightM))
     ? Number(roomHeightM)
-    : null;
-
-  const zFromSpeaker = Number.isFinite(Number(speakerPos.z))
-    ? Number(speakerPos.z)
-    : null;
-
-  let speakerZRaw = zFromRoom ?? zFromSpeaker ?? (earZ + 1.0);
+    : (Number.isFinite(Number(speakerPos.z)) ? Number(speakerPos.z) : (earZ + 1.0));
 
   // Ensure the speaker is always above the listener
   const speakerZ = Math.max(earZ + 0.01, speakerZRaw);
@@ -254,17 +221,46 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
   const verticalDist = speakerZ - earZ;
 
   // Geometric angle from vertical (0° straight down, 90° horizontal)
-  const baseAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
+  const geometricAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
 
   // Speaker's built-in tilt towards the MLP
   const tiltDeg = getOverheadTiltDeg(modelKey);
 
-  // Off-axis is how far we are from that aimed axis
-  const offAxisDeg = Math.abs(baseAngleDeg - tiltDeg);
+  // Effective off-axis relative to the speaker's aimed axis
+  const relativeDeg = Math.abs(geometricAngleDeg - tiltDeg);
+
+  // Halve the off-axis angle for P17 analysis
+  const halfOffAxisDeg = relativeDeg / 2;
+
+  // Apply model-specific thresholds to the halved angle
+  const key = (modelKey || "").toString().toLowerCase();
+  let lossDb;
+
+  if (key.includes("mikro")) {
+    // Mikro: 40° / 50° thresholds
+    if (halfOffAxisDeg <= 40) lossDb = 1.5;
+    else if (halfOffAxisDeg <= 50) lossDb = 3.0;
+    else lossDb = 5.0;
+  } else if (
+    key.includes("architect-2-1") ||
+    key.includes("architect-4-2") ||
+    key.includes("pas2-2") ||
+    key.includes("architect pas")
+  ) {
+    // Architect 2-1 / 4-2 / PAS2-2: 45° / 55° thresholds
+    if (halfOffAxisDeg <= 45) lossDb = 1.5;
+    else if (halfOffAxisDeg <= 55) lossDb = 3.0;
+    else lossDb = 5.0;
+  } else {
+    // Default: similar to Architect
+    if (halfOffAxisDeg <= 45) lossDb = 1.5;
+    else if (halfOffAxisDeg <= 55) lossDb = 3.0;
+    else lossDb = 5.0;
+  }
 
   return {
-    baseAngleDeg,
-    offAxisDeg,
+    offAxisDeg: halfOffAxisDeg,
+    lossDb,
   };
 }
 
@@ -295,17 +291,14 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       roomHeightM
     );
 
-    if (!vert || !Number.isFinite(vert.offAxisDeg)) {
+    if (!vert || !Number.isFinite(vert.offAxisDeg) || !Number.isFinite(vert.lossDb)) {
       return null;
     }
 
-    const offAxisDeg = Math.max(0, Math.min(180, vert.offAxisDeg));
-    const lossDb = mapOverheadAngleToLoss(speaker.model, offAxisDeg);
-
     return {
       role,
-      offAxisDeg: Number(offAxisDeg.toFixed(1)),
-      lossDb: Number(lossDb.toFixed(1)),
+      offAxisDeg: Number(vert.offAxisDeg.toFixed(1)),
+      lossDb: Number(vert.lossDb.toFixed(1)),
     };
   } 
   // Bed-layer surrounds/wides: use horizontal off-axis (same as P16)
