@@ -1383,6 +1383,16 @@ function RoomDesignerWithState() {
     primarySeatingPosition: primarySeatingPosition,
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
     mlpBasis: _mlpBasis,
+    seatSplMetrics: allSeatSplMetrics,
+    overheadState: {
+      globalModel: overheadGlobalModel,
+      frontOverride: overheadFrontOverride,
+      midOverride: overheadMidOverride,
+      rearOverride: overheadRearOverride,
+      useFrontGlobal,
+      useMidGlobal,
+      useRearGlobal,
+    },
   });
 
   const frontSubsForRendering = React.useMemo(() => {

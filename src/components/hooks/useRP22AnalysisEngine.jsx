@@ -173,7 +173,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, seatSplMetrics }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, seatSplMetrics, overheadState }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -184,6 +184,47 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         P11Level: 4,
         P13Level: 2,
     };
+  };
+
+  // Helper to resolve overhead model (same logic as RoomVisualisation)
+  const resolveOverheadModel = (speaker, overheadState) => {
+    if (!speaker || !speaker.role) return speaker.model || null;
+    
+    const role = String(speaker.role).toUpperCase();
+    if (!role.startsWith('T')) return speaker.model || null;
+    
+    // Determine zone position
+    let zonePosition = null;
+    if (['TFL', 'TFR', 'TFC'].includes(role)) {
+      zonePosition = 'front';
+    } else if (['TL', 'TR', 'TML', 'TMR'].includes(role)) {
+      zonePosition = 'mid';
+    } else if (['TBL', 'TBR', 'TBC'].includes(role)) {
+      zonePosition = 'rear';
+    }
+    
+    if (!zonePosition) return speaker.model || null;
+    
+    // Get effective model for this position
+    const global = overheadState?.globalModel;
+    
+    if (zonePosition === 'front') {
+      return overheadState?.useFrontGlobal 
+        ? global 
+        : (overheadState?.frontOverride || global);
+    }
+    if (zonePosition === 'mid') {
+      return overheadState?.useMidGlobal 
+        ? global 
+        : (overheadState?.midOverride || global);
+    }
+    if (zonePosition === 'rear') {
+      return overheadState?.useRearGlobal 
+        ? global 
+        : (overheadState?.rearOverride || global);
+    }
+    
+    return speaker.model || null;
   };
 
   const memoizedResult = useMemo(() => {
@@ -291,10 +332,22 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const seatMetrics = new Map();
     const roomCenterX = (dimensions?.widthM || 0) / 2;
 
+    // Resolve overhead models before passing to P17
+    const speakersWithResolvedOverheads = safeSpeakers.map(speaker => {
+      const role = String(speaker.role || '').toUpperCase();
+      if (!role.startsWith('T')) return speaker;
+      
+      const resolvedModel = resolveOverheadModel(speaker, overheadState);
+      if (resolvedModel && resolvedModel !== speaker.model) {
+        return { ...speaker, model: resolvedModel };
+      }
+      return speaker;
+    });
+
     // Compute P17 for all seats (non-LCR HF variance)
     const p17Results = computeP17ForAllSeats({
       seats: seatsWithRoles,
-      speakers: safeSpeakers,
+      speakers: speakersWithResolvedOverheads,
       getSpeakerModelMeta,
       roomHeightM,
     });
