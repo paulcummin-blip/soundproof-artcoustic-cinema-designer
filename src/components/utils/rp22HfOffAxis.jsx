@@ -306,6 +306,18 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
     offAxisDeg: effectiveAngleDeg,  // effective angle for P17 scoring
     rawAngleDeg: rawAngleDeg,       // geometric angle for display
     lossDb,
+    // Debug data for verification
+    debug: {
+      modelKey,
+      rawAngleDeg,
+      aimOffsetDeg,
+      effectiveAngleDeg,
+      dispersionWindows: meta?.dispersion?.horizontal ? {
+        minus1p5dB: meta.dispersion.horizontal.minus1p5dB ?? meta.dispersion.horizontal.minus1p5 ?? null,
+        minus3dB: meta.dispersion.horizontal.minus3dB ?? meta.dispersion.horizontal.minus3 ?? null,
+        minus5dB: meta.dispersion.horizontal.minus5dB ?? meta.dispersion.horizontal.minus5 ?? null,
+      } : null,
+    },
   };
 }
 
@@ -345,6 +357,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       offAxisDeg: Number(vert.offAxisDeg.toFixed(1)),        // effective angle for scoring
       rawAngleDeg: Number((vert.rawAngleDeg ?? vert.offAxisDeg).toFixed(1)), // geometric angle for display
       lossDb: Number(vert.lossDb.toFixed(1)),
+      debug: vert.debug, // Pass through debug data
     };
   } 
   // Bed-layer surrounds/wides: use horizontal off-axis (same as P16)
@@ -451,6 +464,7 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
         rawAngleDeg: result.rawAngleDeg ?? result.offAxisDeg, // for overhead display
         lossDb: result.lossDb,
         isBeyondNonLcrLimit: result.isBeyondNonLcrLimit || false,
+        debug: result.debug, // Pass through debug data for HUD display
       });
 
       // Track worst loss: highest dB loss; if tie, largest angle

@@ -218,20 +218,40 @@ export default function SeatHud({
                     }}
                   >
                     {metric.perSpeaker
-                      .slice()
-                      .sort((a, b) => a.role.localeCompare(b.role))
-                      .map(s => {
-                        // Use rawAngleDeg if available (for overheads), otherwise angleDeg
-                        const displayAngle = Number.isFinite(s.rawAngleDeg) ? s.rawAngleDeg : s.angleDeg;
-                        const angle = Number.isFinite(displayAngle) ? displayAngle.toFixed(1) : '—';
-                        const loss = s.isBeyondNonLcrLimit ? 'N/A' : (Number.isFinite(s.lossDb) ? `${s.lossDb.toFixed(1)} dB` : '—');
-                        return `${s.role} ${angle}° / ${loss}`;
-                      })
-                      .join(', ')}
+              .slice()
+              .sort((a, b) => a.role.localeCompare(b.role))
+              .map(s => {
+                // Use rawAngleDeg if available (for overheads), otherwise angleDeg
+                const displayAngle = Number.isFinite(s.rawAngleDeg) ? s.rawAngleDeg : s.angleDeg;
+                const angle = Number.isFinite(displayAngle) ? displayAngle.toFixed(1) : '—';
+                const loss = s.isBeyondNonLcrLimit ? 'N/A' : (Number.isFinite(s.lossDb) ? `${s.lossDb.toFixed(1)} dB` : '—');
+                return `${s.role} ${angle}° / ${loss}`;
+              })
+              .join(', ')}
                     {metric.worstRole && Number.isFinite(metric.worstAngleDeg) && Number.isFinite(metric.worstLossDb) && (
                       <span> (worst: {metric.worstRole} {metric.worstAngleDeg.toFixed(1)}° / {metric.worstLossDb.toFixed(1)} dB)</span>
                     )}
                   </div>
+                  {/* Debug info for first overhead speaker */}
+                  {metric.perSpeaker.length > 0 && metric.perSpeaker[0].debug && (
+                    <div
+                      style={{
+                        fontSize: 9,
+                        color: '#aaa',
+                        paddingLeft: 16,
+                        paddingTop: 3,
+                        fontFamily: 'monospace',
+                      }}
+                    >
+                      DEBUG: model={metric.perSpeaker[0].debug.modelKey || '?'}, 
+                      raw={metric.perSpeaker[0].debug.rawAngleDeg?.toFixed(1) || '?'}°, 
+                      aim={metric.perSpeaker[0].debug.aimOffsetDeg || '?'}°, 
+                      eff={metric.perSpeaker[0].debug.effectiveAngleDeg?.toFixed(1) || '?'}°, 
+                      windows={metric.perSpeaker[0].debug.dispersionWindows ? 
+                        `${metric.perSpeaker[0].debug.dispersionWindows.minus1p5dB}/${metric.perSpeaker[0].debug.dispersionWindows.minus3dB}/${metric.perSpeaker[0].debug.dispersionWindows.minus5dB}` : 
+                        'none'}
+                    </div>
+                  )}
                   {metric.p17HasNaAngles && (
                     <div
                       style={{
