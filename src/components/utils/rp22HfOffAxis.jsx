@@ -178,6 +178,36 @@ function getOverheadTiltDeg(modelKey = "") {
   return 0;
 }
 
+// Map overhead off-axis angle to predicted HF loss
+function mapOverheadAngleToLoss(modelKey, offAxisDeg) {
+  const key = (modelKey || "").toLowerCase();
+  const angle = Math.abs(Number(offAxisDeg) || 0);
+
+  // Mikro: 80°/100° → now 40°/50°
+  if (key.includes("mikro")) {
+    if (angle <= 40) return 1.5;
+    if (angle <= 50) return 3.0;
+    return 5.0;
+  }
+
+  // Architect 2-1, 4-2, PAS2-2: 90°/100° → now 45°/50°
+  if (
+    key.includes("architect-2-1") ||
+    key.includes("architect-4-2") ||
+    key.includes("pas2-2") ||
+    key.includes("architect-pas")
+  ) {
+    if (angle <= 45) return 1.5;
+    if (angle <= 50) return 3.0;
+    return 5.0;
+  }
+
+  // Default overhead behaviour: similar to angled models
+  if (angle <= 45) return 1.5;
+  if (angle <= 55) return 3.0;
+  return 5.0;
+}
+
 /**
  * Compute vertical off-axis angle for an overhead speaker relative to the listener.
  *
@@ -262,44 +292,19 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       seat,
       earHeightM,
       speaker.model,
-      roomHeightM      // <-- new argument
+      roomHeightM
     );
 
     if (!vert || !Number.isFinite(vert.offAxisDeg)) {
       return null;
     }
 
-    const angle = Math.max(0, Math.min(180, vert.offAxisDeg));
-    const modelKey = String(speaker.model || "").toLowerCase();
-
-    // HF loss mapping by model family
-    let lossDb;
-
-    if (modelKey.includes("mikro")) {
-      // Mikro: 80° / 100° thresholds
-      if (angle < 80) lossDb = 1.5;
-      else if (angle <= 100) lossDb = 3.0;
-      else lossDb = 5.0;
-    } else if (
-      modelKey.includes("architect-2-1") ||
-      modelKey.includes("architect-4-2") ||
-      modelKey.includes("pas2-2") ||
-      modelKey.includes("architect-pas")
-    ) {
-      // Architect 2-1 / 4-2 / PAS2-2: 90° / 100° thresholds
-      if (angle < 90) lossDb = 1.5;
-      else if (angle <= 100) lossDb = 3.0;
-      else lossDb = 5.0;
-    } else {
-      // Safe default: treat like Architect family
-      if (angle < 90) lossDb = 1.5;
-      else if (angle <= 100) lossDb = 3.0;
-      else lossDb = 5.0;
-    }
+    const offAxisDeg = Math.max(0, Math.min(180, vert.offAxisDeg));
+    const lossDb = mapOverheadAngleToLoss(speaker.model, offAxisDeg);
 
     return {
       role,
-      offAxisDeg: Number(angle.toFixed(1)),
+      offAxisDeg: Number(offAxisDeg.toFixed(1)),
       lossDb: Number(lossDb.toFixed(1)),
     };
   } 
