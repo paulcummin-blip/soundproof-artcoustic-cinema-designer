@@ -207,28 +207,43 @@ export default function SeatHud({
 
               {/* P17 per-speaker breakdown */}
               {key === 'p17' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: '#999',
-                    paddingLeft: 16,
-                    paddingBottom: 3,
-                    lineHeight: 1.4,
-                  }}
-                >
-                  {metric.perSpeaker
-                    .slice()
-                    .sort((a, b) => a.role.localeCompare(b.role))
-                    .map(s => {
-                      const angle = Number.isFinite(s.angleDeg) ? s.angleDeg.toFixed(1) : '—';
-                      const loss = Number.isFinite(s.lossDb) ? s.lossDb.toFixed(1) : '—';
-                      return `${s.role} ${angle}° / ${loss} dB`;
-                    })
-                    .join(', ')}
-                  {metric.worstRole && Number.isFinite(metric.worstAngleDeg) && Number.isFinite(metric.worstLossDb) && (
-                    <span> (worst: {metric.worstRole} {metric.worstAngleDeg.toFixed(1)}° / {metric.worstLossDb.toFixed(1)} dB)</span>
+                <>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: '#999',
+                      paddingLeft: 16,
+                      paddingBottom: 3,
+                      lineHeight: 1.4,
+                    }}
+                  >
+                    {metric.perSpeaker
+                      .slice()
+                      .sort((a, b) => a.role.localeCompare(b.role))
+                      .map(s => {
+                        const angle = Number.isFinite(s.angleDeg) ? s.angleDeg.toFixed(1) : '—';
+                        const loss = s.isBeyondNonLcrLimit ? 'N/A' : (Number.isFinite(s.lossDb) ? `${s.lossDb.toFixed(1)} dB` : '—');
+                        return `${s.role} ${angle}° / ${loss}`;
+                      })
+                      .join(', ')}
+                    {metric.worstRole && Number.isFinite(metric.worstAngleDeg) && Number.isFinite(metric.worstLossDb) && (
+                      <span> (worst: {metric.worstRole} {metric.worstAngleDeg.toFixed(1)}° / {metric.worstLossDb.toFixed(1)} dB)</span>
+                    )}
+                  </div>
+                  {metric.p17HasNaAngles && (
+                    <div
+                      style={{
+                        fontSize: 10,
+                        color: '#999',
+                        paddingLeft: 16,
+                        paddingBottom: 3,
+                        fontStyle: 'italic',
+                      }}
+                    >
+                      N/A = &gt;41° off-axis; RP22 Level 2 limit
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </React.Fragment>
           );
