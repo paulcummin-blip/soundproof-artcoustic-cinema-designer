@@ -42,7 +42,15 @@ export const MODELS = [
     sensitivity_dB_1w1m: 86,
     sensitivity_dB_2p83: 86,
     nominalOhms: 8,
-    max_power: 15
+    max_power: 15,
+    builtInTiltDeg: 0,
+    dispersion: {
+      horizontal: {
+        minus1p5dB: 90,
+        minus3dB: 90,
+        minus5dB: 90,
+      }
+    }
   },
   { 
     key: "architect-2-1", 
@@ -56,6 +64,13 @@ export const MODELS = [
     nominalOhms: 4, 
     max_power: 60,
     builtInTiltDeg: 5,
+    dispersion: {
+      horizontal: {
+        minus1p5dB: 40,
+        minus3dB: 55,
+        minus5dB: 72,
+      }
+    }
   },
   { 
     key: "architect-4-2", 
@@ -91,7 +106,7 @@ export const MODELS = [
     builtInTiltDeg: 20,
     dispersion: {
       horizontal: {
-        minus1p5dB: 20,
+        minus1p5dB: 19,
         minus3dB: 33,
         minus5dB: 52,
       }
