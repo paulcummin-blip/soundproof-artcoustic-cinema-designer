@@ -217,14 +217,14 @@ function getOverheadTiltDeg(modelKey) {
  * - speakerPos: { x, y, z? }  (z will be ignored if roomHeightM is provided)
  * - seatPos: { x, y }
  * - earHeightM: listener ear height in metres
- * - modelKey: string used to look up built-in tilt
+ * - modelKey: string used to look up built-in tilt and dispersion
  * - roomHeightM: current room ceiling height (if finite, overrides speakerPos.z)
  *
- * Returns: halved off-axis angle and predicted HF loss.
+ * Returns: effective off-axis angle (raw - aim offset) and predicted HF loss using model dispersion.
  */
 function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, roomHeightM) {
   if (!seatPos || !speakerPos) {
-    return { offAxisDeg: 0, lossDb: 1.5 };
+    return { offAxisDeg: 0, lossDb: 1.5, rawAngleDeg: 0 };
   }
 
   const earZ = Number.isFinite(Number(earHeightM))
@@ -251,21 +251,17 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
   const verticalDist = speakerZ - earZ;
 
   // Geometric angle from vertical (0° straight down, 90° horizontal)
-  const geometricAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
+  const rawAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
 
-  // Speaker's built-in tilt towards the MLP
-  const tiltDeg = getOverheadTiltDeg(modelKey);
-
-  // Effective off-axis relative to the speaker's aimed axis
-  const relativeDeg = Math.abs(geometricAngleDeg - tiltDeg);
-
-  // Halve the off-axis angle for P17 analysis
-  const halfOffAxisDeg = relativeDeg / 2;
-
-  // Get model metadata for dispersion windows
+  // Get model metadata for aim offset and dispersion
   const meta = getSpeakerModelMeta(modelKey);
-  
-  // Use model-specific dispersion if available, applying to halved angle
+  const aimOffsetDeg = meta?.builtInTiltDeg ?? getOverheadTiltDeg(modelKey) ?? 0;
+
+  // Effective off-axis angle: raw angle minus the speaker's built-in aim
+  // This treats the aim direction as 0° on-axis
+  const effectiveAngleDeg = Math.abs(rawAngleDeg - aimOffsetDeg);
+
+  // Use model-specific dispersion windows if available
   let lossDb;
   if (meta?.dispersion?.horizontal) {
     const disp = meta.dispersion.horizontal;
@@ -274,21 +270,21 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
     const minus5 = disp.minus5dB ?? disp.minus5 ?? null;
 
     if (minus1p5 != null && minus3 != null && minus5 != null) {
-      // Use model's actual dispersion windows (already in degrees)
-      if (halfOffAxisDeg <= minus1p5) lossDb = 1.5;
-      else if (halfOffAxisDeg <= minus3) lossDb = 3.0;
-      else if (halfOffAxisDeg <= minus5) lossDb = 5.0;
+      // Use model's actual dispersion windows directly on effective angle
+      if (effectiveAngleDeg <= minus1p5) lossDb = 1.5;
+      else if (effectiveAngleDeg <= minus3) lossDb = 3.0;
+      else if (effectiveAngleDeg <= minus5) lossDb = 5.0;
       else lossDb = 5.0; // Beyond −5 dB window
     } else {
       // Fallback to legacy thresholds if dispersion incomplete
       const key = (modelKey || "").toString().toLowerCase();
       if (key.includes("mikro")) {
-        if (halfOffAxisDeg <= 40) lossDb = 1.5;
-        else if (halfOffAxisDeg <= 50) lossDb = 3.0;
+        if (effectiveAngleDeg <= 40) lossDb = 1.5;
+        else if (effectiveAngleDeg <= 50) lossDb = 3.0;
         else lossDb = 5.0;
       } else {
-        if (halfOffAxisDeg <= 45) lossDb = 1.5;
-        else if (halfOffAxisDeg <= 55) lossDb = 3.0;
+        if (effectiveAngleDeg <= 45) lossDb = 1.5;
+        else if (effectiveAngleDeg <= 55) lossDb = 3.0;
         else lossDb = 5.0;
       }
     }
@@ -296,18 +292,19 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
     // No dispersion data: use legacy thresholds
     const key = (modelKey || "").toString().toLowerCase();
     if (key.includes("mikro")) {
-      if (halfOffAxisDeg <= 40) lossDb = 1.5;
-      else if (halfOffAxisDeg <= 50) lossDb = 3.0;
+      if (effectiveAngleDeg <= 40) lossDb = 1.5;
+      else if (effectiveAngleDeg <= 50) lossDb = 3.0;
       else lossDb = 5.0;
     } else {
-      if (halfOffAxisDeg <= 45) lossDb = 1.5;
-      else if (halfOffAxisDeg <= 55) lossDb = 3.0;
+      if (effectiveAngleDeg <= 45) lossDb = 1.5;
+      else if (effectiveAngleDeg <= 55) lossDb = 3.0;
       else lossDb = 5.0;
     }
   }
 
   return {
-    offAxisDeg: halfOffAxisDeg,
+    offAxisDeg: effectiveAngleDeg,  // effective angle for P17 scoring
+    rawAngleDeg: rawAngleDeg,       // geometric angle for display
     lossDb,
   };
 }

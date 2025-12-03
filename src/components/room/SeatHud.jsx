@@ -221,7 +221,9 @@ export default function SeatHud({
                       .slice()
                       .sort((a, b) => a.role.localeCompare(b.role))
                       .map(s => {
-                        const angle = Number.isFinite(s.angleDeg) ? s.angleDeg.toFixed(1) : '—';
+                        // Use rawAngleDeg if available (for overheads), otherwise angleDeg
+                        const displayAngle = Number.isFinite(s.rawAngleDeg) ? s.rawAngleDeg : s.angleDeg;
+                        const angle = Number.isFinite(displayAngle) ? displayAngle.toFixed(1) : '—';
                         const loss = s.isBeyondNonLcrLimit ? 'N/A' : (Number.isFinite(s.lossDb) ? `${s.lossDb.toFixed(1)} dB` : '—');
                         return `${s.role} ${angle}° / ${loss}`;
                       })
