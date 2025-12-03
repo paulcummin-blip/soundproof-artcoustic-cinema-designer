@@ -568,7 +568,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     dimensions?.height,
     dimensions?.lengthM,
     dimensions?.widthM,
-    seatSplMetrics
+    seatSplMetrics,
+    overheadState?.globalModel,
+    overheadState?.frontOverride,
+    overheadState?.midOverride,
+    overheadState?.rearOverride,
+    overheadState?.useFrontGlobal,
+    overheadState?.useMidGlobal,
+    overheadState?.useRearGlobal,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };
