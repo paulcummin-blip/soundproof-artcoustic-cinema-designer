@@ -342,7 +342,8 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
 
     return {
       role,
-      offAxisDeg: Number(vert.offAxisDeg.toFixed(1)),
+      offAxisDeg: Number(vert.offAxisDeg.toFixed(1)),        // effective angle for scoring
+      rawAngleDeg: Number((vert.rawAngleDeg ?? vert.offAxisDeg).toFixed(1)), // geometric angle for display
       lossDb: Number(vert.lossDb.toFixed(1)),
     };
   } 
@@ -447,6 +448,7 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
       perSpeaker.push({
         role: result.role,
         angleDeg: result.offAxisDeg,
+        rawAngleDeg: result.rawAngleDeg ?? result.offAxisDeg, // for overhead display
         lossDb: result.lossDb,
         isBeyondNonLcrLimit: result.isBeyondNonLcrLimit || false,
       });
