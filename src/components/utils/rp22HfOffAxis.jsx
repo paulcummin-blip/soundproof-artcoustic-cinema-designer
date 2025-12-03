@@ -22,6 +22,19 @@ const norm180 = (deg) => {
   return a;
 };
 
+// Centralized angle → HF loss mapping using new RP22 thresholds
+function mapAngleToHfLossDb(angleDeg) {
+  const a = Math.abs(Number(angleDeg) || 0);
+
+  if (a <= 28) return 1.5;
+  if (a <= 41) return 3.0;
+  if (a <= 55) return 5.0;
+
+  // Above 55° we are beyond our reference window.
+  // Callers decide how to classify this for RP22.
+  return null; // use null to mean "beyond 55° reference"
+}
+
 // Convert radians to degrees
 const rad2deg = (rad) => rad * 180 / Math.PI;
 
@@ -33,21 +46,6 @@ const angleFromTo = (from, to) => {
   const dy = to.y - from.y;
   if (!isNum(dx) || !isNum(dy)) return null;
   return (Math.atan2(dx, dy) * 180) / Math.PI; // -180..+180
-};
-
-// Map off-axis angle → HF loss (dB) using your existing pattern:
-//  • ≤ horiz3dB  → 1.5 dB
-//  • ≥ horiz3dB+10 → 5.0 dB
-//  • in between → 3 → 5 dB linearly
-const lossFromAngle = (offAxisDeg, horiz3dB) => {
-  if (!isNum(offAxisDeg) || !isNum(horiz3dB)) return null;
-
-  const a = Math.abs(offAxisDeg);
-  if (a <= horiz3dB) return 1.5;
-  if (a >= horiz3dB + 10) return 5.0;
-
-  const t = (a - horiz3dB) / 10; // 0..1
-  return 3 + 2 * t; // 3 → 5 dB
 };
 
 // P16 level mapping based on loss
@@ -106,25 +104,25 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
     const offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
     if (!isNum(offAxisDeg)) continue;
 
-    // Speaker model HF 3 dB horizontal coverage
-    const meta = spk.model ? getSpeakerModelMeta(spk.model) : null;
-    const horiz3dB =
-      meta?.hfOffAxis16k?.minus3deg ??
-      meta?.hfHoriz3dB ??
-      meta?.hfHoriz_3db ??
-      meta?.hfHorz3dB ??
-      meta?.horiz3dB ??
-      30; // Sensible default if missing
+    const angleDeg = Number(offAxisDeg.toFixed(1));
 
-    const lossDbRaw = lossFromAngle(offAxisDeg, horiz3dB);
-    if (!isNum(lossDbRaw)) continue;
+    // Use new centralized mapping
+    const lossFromAngle = mapAngleToHfLossDb(angleDeg);
+    let lossDb;
+    let isBeyondLcrLimit = false;
 
-    const lossDb = Number(lossDbRaw.toFixed(1));
-    const angleDeg = Number(offAxisDeg.toFixed(1)); // ALWAYS positive magnitude
+    if (lossFromAngle == null) {
+      // Angle > 55° for LCR: this is a fail for P16
+      lossDb = 5.0;
+      isBeyondLcrLimit = true;
+    } else {
+      lossDb = lossFromAngle;
+    }
 
     perSpeaker[role] = {
-      angleDeg,   // off-axis angle, not raw yaw
-      lossDb,     // predicted HF loss
+      angleDeg,
+      lossDb: Number(lossDb.toFixed(1)),
+      isBeyondLcrLimit,
     };
 
     if (lossDb > worstLossDb) {
@@ -136,7 +134,18 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
   if (!worstRole || !isNum(worstLossDb)) return null;
 
   const value = Number(worstLossDb.toFixed(1));
-  const level = classifyP16(value);
+
+  // Check if any LCR exceeds 55° off-axis
+  const hasLcrBeyondLimit = Object.values(perSpeaker).some(
+    (spk) => spk.isBeyondLcrLimit === true
+  );
+
+  // Force Level 1 if any LCR is beyond 55°
+  let level = classifyP16(value);
+  if (hasLcrBeyondLimit) {
+    level = 1;
+  }
+
   const worstAngle = perSpeaker[worstRole]?.angleDeg ?? null;
 
   return {
@@ -144,6 +153,7 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
     formatted: `±${value.toFixed(1)} dB`,
     hudLabel: `${worstRole} ±${value.toFixed(1)} dB`,
     level,
+    p16BeyondLcrLimit: hasLcrBeyondLimit,
     debug: {
       perSpeaker,
       worst: {
@@ -153,7 +163,7 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
       },
     },
   };
-}
+  }
 
 // --- P17 HELPERS ---
 
@@ -319,29 +329,35 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
     }
 
     offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
-  }
+    }
 
-  if (!isNum(offAxisDeg)) return null;
+    if (!isNum(offAxisDeg)) return null;
 
-  // Get model HF coverage
-  const meta = modelMeta || (speaker.model ? getSpeakerModelMeta(speaker.model) : null);
-  const horiz3dB =
-    meta?.hfOffAxis16k?.minus3deg ??
-    meta?.hfHoriz3dB ??
-    meta?.hfHoriz_3db ??
-    meta?.hfHorz3dB ??
-    meta?.horiz3dB ??
-    30;
+    const effectiveAngleDeg = Number(offAxisDeg.toFixed(1));
 
-  const lossDb = lossFromAngle(offAxisDeg, horiz3dB);
-  if (!isNum(lossDb)) return null;
+    // Use centralized mapping
+    const lossFromAngle = mapAngleToHfLossDb(effectiveAngleDeg);
 
-  return {
+    let lossDb;
+    let isBeyondNonLcrLimit = false;
+
+    if (Math.abs(effectiveAngleDeg) > 41) {
+    // Above 41° we no longer trust the reference spec for non-LCRs
+    isBeyondNonLcrLimit = true;
+    // For RP22 we still want P17 to land at Level 2, so use 3 dB as the nominal value
+    lossDb = 3.0;
+    } else {
+    // Within 41°: use the normal 1.5 / 3 / 5 dB values
+    lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
+    }
+
+    return {
     role,
-    offAxisDeg: Number(offAxisDeg.toFixed(1)),
+    offAxisDeg: effectiveAngleDeg,
     lossDb: Number(lossDb.toFixed(1)),
-  };
-}
+    isBeyondNonLcrLimit,
+    };
+    }
 
 // P17: Compute surround/wide/overhead HF variance across all non-LCR speakers for all seats
 export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: modelIndex, roomHeightM, debug }) {
@@ -365,6 +381,7 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
     let worstAngleDeg = -Infinity;
     let worstLossDb = null;
     const perSpeaker = [];
+    let p17HasNaAngles = false;
 
     // Loop over all non-LCR speakers
     for (const spk of speakers) {
@@ -378,11 +395,17 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
 
       if (!result) continue;
 
+      // Track if any speaker is beyond 41°
+      if (result.isBeyondNonLcrLimit) {
+        p17HasNaAngles = true;
+      }
+
       // Collect per-speaker data
       perSpeaker.push({
         role: result.role,
         angleDeg: result.offAxisDeg,
         lossDb: result.lossDb,
+        isBeyondNonLcrLimit: result.isBeyondNonLcrLimit || false,
       });
 
       // Track worst loss: highest dB loss; if tie, largest angle
@@ -407,6 +430,7 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
         debug.perSpeaker[result.role].p17 = {
           offAxisDeg: result.offAxisDeg,
           lossDb: result.lossDb,
+          isBeyondNonLcrLimit: result.isBeyondNonLcrLimit || false,
         };
       }
     }
@@ -422,6 +446,7 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
       worstAngleDeg: worstAngleDeg !== null ? Number(worstAngleDeg.toFixed(1)) : null,
       worstLossDb: worstLossDb !== null ? Number(worstLossDb.toFixed(1)) : null,
       perSpeaker,
+      p17HasNaAngles,
     };
   }
 

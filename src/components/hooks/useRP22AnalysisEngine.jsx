@@ -390,12 +390,25 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       {
         const p16 = computeP16ForSeat(seat, safeSpeakers, getSpeakerModelMeta);
 
-        metrics.p16 = p16 || {
-          value: null,
-          formatted: "—",
-          hudLabel: null,
-          level: "—",
-        };
+        if (p16) {
+          // Add note if any LCR is beyond 55°
+          let hudLabel = p16.hudLabel;
+          if (p16.p16BeyondLcrLimit) {
+            hudLabel = `${p16.hudLabel} (>55° off-axis – fail)`;
+          }
+
+          metrics.p16 = {
+            ...p16,
+            hudLabel,
+          };
+        } else {
+          metrics.p16 = {
+            value: null,
+            formatted: "—",
+            hudLabel: null,
+            level: "—",
+          };
+        }
       }
 
       // P17 – Non-LCR (surrounds/wides/overheads) HF off-axis variance
@@ -411,6 +424,11 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           if (valueDb <= 1.5) level17 = 4;
           else if (valueDb <= 3.0) level17 = 3;
 
+          // If any speaker is beyond 41°, cap at Level 2
+          if (p17Data.p17HasNaAngles) {
+            level17 = Math.min(level17, 2);
+          }
+
           metrics.p17 = {
             value: valueDb,
             formatted: `±${valueDb.toFixed(1)} dB`,
@@ -419,6 +437,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             worstAngleDeg: p17Data.worstAngleDeg,
             worstLossDb: p17Data.worstLossDb,
             perSpeaker: p17Data.perSpeaker || [],
+            p17HasNaAngles: p17Data.p17HasNaAngles || false,
           };
         } else {
           metrics.p17 = {
@@ -426,6 +445,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             formatted: "—",
             level: "—",
             perSpeaker: [],
+            p17HasNaAngles: false,
           };
         }
       }
