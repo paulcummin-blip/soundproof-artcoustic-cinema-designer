@@ -1,4 +1,3 @@
-
 import { useAppState } from "../AppStateProvider";
 import { audioConfigurations } from "../data/audioConfigurations";
 import { useMemo, useState, useEffect } from "react";
@@ -133,10 +132,11 @@ export function useSpeakerPlacementLogic(initialSpeakers = [], dimensionsOverrid
                 });
             }
             if (selectedSpeakers.height) {
-                // Assuming selectedSpeakers.height directly provides the model name
+                // Ensure overhead speakers have the model ID stored correctly
                 nextSpeakers.forEach(spk => {
                     const role = spk.role.toUpperCase();
                     if (role.startsWith('T')) {
+                        // Store the model name/key that will be used for registry lookup
                         spk.model = selectedSpeakers.height;
                     }
                 });
