@@ -48,7 +48,17 @@ function useUrlQuery() {
 }
 
 // Put near your other helpers in RoomDesigner.js
-const CANON_MAP = { LS:'SL', SL:'SL', RS:'SR', SR:'SR', RL:'SBL', RR:'SBR', RSL:'SBL', RSR:'SBR', LRS:'SBL', RRS:'SBR', FWL:'LW', FWR:'RW', LW:'LW', RW:'RW', SBL:'SBL', SBR:'SBR', FL:"FL", L:"FL", FC:"FC", C:"FC", FR:"FR", R:"FR", TFL:"TFL", TFR:"TFR", TL:"TL", TML:"TL", TR:"TR", TMR:"TR", TBL:"TBL", TBR:"TBR" };
+const CANON_MAP = { 
+  LS:'SL', SL:'SL', RS:'SR', SR:'SR', 
+  RL:'SBL', RR:'SBR', RSL:'SBL', RSR:'SBR', LRS:'SBL', RRS:'SBR', 
+  FWL:'LW', FWR:'RW', LW:'LW', RW:'RW', 
+  SBL:'SBL', SBR:'SBR', 
+  FL:"FL", L:"FL", FC:"FC", C:"FC", FR:"FR", R:"FR", 
+  TFL:"TFL", TFR:"TFR", 
+  TML:"TML", TMR:"TMR", TL:"TML", TR:"TMR", // Map legacy TL/TR to TML/TMR
+  TRL:"TRL", TRR:"TRR", TBL:"TRL", TBR:"TRR", // Map legacy TBL/TBR to TRL/TRR
+  TFC:"TFC", TRC:"TRC", TBC:"TRC"
+};
 const canon = r => CANON_MAP[String(r||'').toUpperCase()] || String(r||'').toUpperCase();
 
 // Safe wrapper for role canonicalization
@@ -931,15 +941,15 @@ import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 export const DOLBY_PRESETS = {
   "5.1":    ["FL","FC","FR","SL","SR","LFE"],
   "7.1":    ["FL","FC","FR","SL","SR","SBL","SBR","LFE"],
-  "5.1.2":  ["FL","FC","FR","SL","SR","TL","TR","LFE"],
-  "5.1.4":  ["FL","FC","FR","SL","SR","TFL","TFR","TBL","TBR","LFE"],
-  "5.1.6":  ["FL","FC","FR","SL","TFC","SR","TFL","TBL","TBR","LFE"], // TFC/TFL are Front Heights, TBL/TBR are Rear Heights. TML/TMR not explicitly used in this 5.1.6
-  "7.1.2":  ["FL","FC","FR","SL","SR","SBL","SBR","TL","TR","LFE"],
-  "7.1.4":  ["FL","FC","FR","SL","SR","SBL","SBR","TFL","TFR","TBL","TBR","LFE"],
-  "7.1.6":  ["FL","FC","FR","SL","TFC","SR","SBL","SBR","TFL","TBL","TBR","LFE"], // TFC/TFL are Front Heights, TBL/TBR are Rear Heights. TML/TMR not explicitly used in this 7.1.6
-  "9.1.2":  ["FL","FCL","FC","FCR","FR","SL","SR","TL","TR","LFE"],
-  "9.1.4":  ["FL","FCL","FC","FCR","FR","SL","SR","TFL","TFR","TBL","TBR","LFE"],
-  "9.1.6":  ["FL","FCL","FC","FCR","FR","SL","TFC","SR","TFL","TBL","TBR","LFE"], // TFC/TFL are Front Heights, TBL/TBR are Rear Heights. TML/TMR not explicitly used in this 9.1.6
+  "5.1.2":  ["FL","FC","FR","SL","SR","TML","TMR","LFE"],
+  "5.1.4":  ["FL","FC","FR","SL","SR","TFL","TFR","TRL","TRR","LFE"],
+  "5.1.6":  ["FL","FC","FR","SL","SR","TFL","TFR","TML","TMR","TRL","TRR","LFE"],
+  "7.1.2":  ["FL","FC","FR","SL","SR","SBL","SBR","TML","TMR","LFE"],
+  "7.1.4":  ["FL","FC","FR","SL","SR","SBL","SBR","TFL","TFR","TRL","TRR","LFE"],
+  "7.1.6":  ["FL","FC","FR","SL","SR","SBL","SBR","TFL","TFR","TML","TMR","TRL","TRR","LFE"],
+  "9.1.2":  ["FL","FCL","FC","FCR","FR","SL","SR","TML","TMR","LFE"],
+  "9.1.4":  ["FL","FCL","FC","FCR","FR","SL","SR","TFL","TFR","TRL","TRR","LFE"],
+  "9.1.6":  ["FL","FCL","FC","FCR","FR","SL","SR","TFL","TFR","TML","TMR","TRL","TRR","LFE"],
 };
 
 // Single source of truth for overhead IDs per layout
@@ -999,14 +1009,20 @@ export function seedSpeakersFromPreset({
       case "RW": return { x: w * 0.85, y: l * 0.4, z: earZ }; // Example position for Right Wide
 
       // Tops
+      case "TML": return { x: x25, y: l * 0.50, z: topZ }; // Top Mid Left
+      case "TMR": return { x: x75, y: l * 0.50, z: topZ }; // Top Mid Right
+      case "TFL": return { x: x25, y: l * 0.35, z: topZ }; // Top Front Left - 35% from front
+      case "TFR": return { x: x75, y: l * 0.35, z: topZ }; // Top Front Right
+      case "TFC": return { x: x50, y: l * 0.35, z: topZ }; // Top Front Center
+      case "TRL": return { x: x25, y: l * 0.70, z: topZ }; // Top Rear Left - 70% from front
+      case "TRR": return { x: x75, y: l * 0.70, z: topZ }; // Top Rear Right
+      case "TRC": return { x: x50, y: l * 0.70, z: topZ }; // Top Rear Center
+      // Legacy aliases
       case "TL":  return { x: x25, y: l * 0.50, z: topZ };
       case "TR":  return { x: x75, y: l * 0.50, z: topZ };
-      case "TFL": return { x: x25, y: l * 0.35, z: topZ }; // 35% of room length from front
-      case "TFR": return { x: x75, y: l * 0.35, z: topZ };
-      case "TFC": return { x: x50, y: l * 0.35, z: topZ }; // Top Front Center
-      case "TBL": return { x: x25, y: l * 0.70, z: topZ }; // 70% of room length from front
+      case "TBL": return { x: x25, y: l * 0.70, z: topZ };
       case "TBR": return { x: x75, y: l * 0.70, z: topZ };
-      case "TBC": return { x: x50, y: l * 0.70, z: topZ }; // Top Back Center
+      case "TBC": return { x: x50, y: l * 0.70, z: topZ };
       // LFE
       case "LFE": return { x: x50, y: yFront + 0.20, z: 0.3 };
       default:    return { x: x50, y: l * 0.60, z: earZ };
@@ -2073,7 +2089,7 @@ function RoomDesignerWithState() {
          const targetSet = new Set(targetOverheadIds.map(id => id.toUpperCase()));
          
          // Known overhead roles (for filtering)
-         const knownOverheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR', 'TL', 'TR', 'TFC', 'TBC', 'TBL', 'TBR']);
+         const knownOverheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR', 'TL', 'TR', 'TFC', 'TRC', 'TBC', 'TBL', 'TBR']);
          
          // Separate existing speakers into bed layer and overheads
          const bedSpeakers = (prev || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
