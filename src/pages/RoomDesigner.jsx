@@ -2054,7 +2054,16 @@ function RoomDesignerWithState() {
        
        setSpeakers(prev => {
          const hint = (typeof window !== 'undefined' && window.__SURROUND_MODEL_HINT_) || null;
-         const byCanonPrev = new Map((prev||[]).map(s => [safeCanon(s.role), s]));
+         
+         // CRITICAL: Remove ALL old overhead speakers when layout changes
+         // Keep only non-overhead speakers (bed layer + subs)
+         const nonOverheadSpeakers = (prev || []).filter(s => {
+           const canon = safeCanon(s.role);
+           return !canon.startsWith('T');
+         });
+         
+         const byCanonPrev = new Map(nonOverheadSpeakers.map(s => [safeCanon(s.role), s]));
+         
          const nextList = (seededSpeakers||[]).map(seed => {
            const prevMatch = byCanonPrev.get(safeCanon(seed.role));
            let finalModel = prevMatch?.model ?? hint ?? undefined; // Start with previous or hint.
