@@ -2026,16 +2026,48 @@ React.useEffect(() => {
         }
       }
 
-      // NEW: For 5.1.4, compute deltaY and apply to all four overheads
+      // NEW: For 5.1.4, mirror front/rear around MLP Y
       if (is514Layout) {
-        // Get current Y of the dragged speaker
-        const draggedSpeaker = placedSpeakers.find(s => s.id === speakerId);
-        const oldY = draggedSpeaker?.position?.y;
+        const mlpY = mlpDotY_m || (lengthM / 2);
         
-        if (Number.isFinite(oldY)) {
-          const deltaY = primaryClamped.y - oldY;
+        // Determine if dragged speaker is front or rear
+        const isFront = isFrontRole(canonicalRole);
+        const isRear = isRearRole(canonicalRole);
+        
+        if (isFront || isRear) {
+          let frontY, rearY;
           
-          // Apply deltaY to all four overheads, then clamp each one
+          if (isFront) {
+            // Dragging front: use clamped Y for front, mirror for rear
+            frontY = primaryClamped.y;
+            rearY = 2 * mlpY - frontY;
+          } else {
+            // Dragging rear: use clamped Y for rear, mirror for front
+            rearY = primaryClamped.y;
+            frontY = 2 * mlpY - rearY;
+          }
+          
+          // Clamp both rows to their zones
+          const frontClamped = clampOverheadPairPosition(
+            { x: leftColumnX ?? primaryClamped.x, y: frontY },
+            'TFL',
+            overheadZones,
+            widthM,
+            lengthM
+          );
+          
+          const rearClamped = clampOverheadPairPosition(
+            { x: leftColumnX ?? primaryClamped.x, y: rearY },
+            'TBL',
+            overheadZones,
+            widthM,
+            lengthM
+          );
+          
+          frontY = frontClamped.y;
+          rearY = rearClamped.y;
+          
+          // Update all four overheads
           onSetSpeakers(prev => {
             if (!Array.isArray(prev)) return prev;
 
@@ -2056,19 +2088,12 @@ React.useEffect(() => {
                 current.x = rightColumnX;
               }
 
-              // Apply group Y movement
-              let newY = (current.y || 0) + deltaY;
-              
-              // Clamp to zone bounds
-              const clamped = clampOverheadPairPosition(
-                { x: current.x, y: newY },
-                role,
-                overheadZones,
-                widthM,
-                lengthM
-              );
-              
-              current.y = clamped.y;
+              // Apply Y based on row
+              if (role === 'TFL' || role === 'TFR') {
+                current.y = frontY;
+              } else if (role === 'TBL' || role === 'TBR') {
+                current.y = rearY;
+              }
 
               return { ...spk, position: current };
             });
