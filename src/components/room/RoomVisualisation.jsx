@@ -1945,6 +1945,17 @@ React.useEffect(() => {
         return;
       }
 
+      // Check if this is a 5.1.4 layout (exactly 4 overheads: TFL, TFR, TRL, TRR)
+      const overheadSpeakers = placedSpeakers.filter(s => {
+        const r = getCanonicalRole(s.role);
+        return r && r.startsWith('T');
+      });
+      const is514Layout = overheadSpeakers.length === 4 && 
+                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TFL') &&
+                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TFR') &&
+                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TBL') &&
+                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TBR');
+
       // Role group helpers
       const LEFT_ROLES = ['TFL', 'TL', 'TBL'];
       const RIGHT_ROLES = ['TFR', 'TR', 'TBR'];
@@ -2015,6 +2026,60 @@ React.useEffect(() => {
         }
       }
 
+      // NEW: For 5.1.4, compute deltaY and apply to all four overheads
+      if (is514Layout) {
+        // Get current Y of the dragged speaker
+        const draggedSpeaker = placedSpeakers.find(s => s.id === speakerId);
+        const oldY = draggedSpeaker?.position?.y;
+        
+        if (Number.isFinite(oldY)) {
+          const deltaY = primaryClamped.y - oldY;
+          
+          // Apply deltaY to all four overheads, then clamp each one
+          onSetSpeakers(prev => {
+            if (!Array.isArray(prev)) return prev;
+
+            return prev.map(spk => {
+              const role = getCanonicalRole(spk.role);
+              if (!['TFL', 'TFR', 'TBL', 'TBR'].includes(role)) return spk;
+
+              const current = { ...(spk.position || {}) };
+              
+              // Apply X mirroring (existing logic)
+              const isLeft = ['TFL', 'TBL'].includes(role);
+              const isRight = ['TFR', 'TBR'].includes(role);
+              
+              if (isLeft && leftColumnX != null) {
+                current.x = leftColumnX;
+              }
+              if (isRight && rightColumnX != null) {
+                current.x = rightColumnX;
+              }
+
+              // Apply group Y movement
+              let newY = (current.y || 0) + deltaY;
+              
+              // Clamp to zone bounds
+              const clamped = clampOverheadPairPosition(
+                { x: current.x, y: newY },
+                role,
+                overheadZones,
+                widthM,
+                lengthM
+              );
+              
+              current.y = clamped.y;
+
+              return { ...spk, position: current };
+            });
+          });
+
+          lastInteractionEpoch.current = timeNowMs();
+          return;
+        }
+      }
+
+      // Original logic for other overhead layouts (5.1.2, 7.1.6, etc.)
       // Discover current Y positions from placedSpeakers
       let frontY = null;
       let midY = null;
