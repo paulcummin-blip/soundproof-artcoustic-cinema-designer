@@ -942,6 +942,19 @@ export const DOLBY_PRESETS = {
   "9.1.6":  ["FL","FCL","FC","FCR","FR","SL","TFC","SR","TFL","TBL","TBR","LFE"], // TFC/TFL are Front Heights, TBL/TBR are Rear Heights. TML/TMR not explicitly used in this 9.1.6
 };
 
+// Single source of truth for overhead IDs per layout
+function getTargetOverheadIds(preset) {
+  const p = String(preset || "").toLowerCase();
+  
+  // Map TL/TR to TML/TMR for consistency
+  if (p === "5.1.2" || p === "7.1.2") return ["TML", "TMR"];
+  if (p === "5.1.4" || p === "7.1.4") return ["TFL", "TFR", "TRL", "TRR"];
+  if (p === "5.1.6" || p === "7.1.6" || p === "9.1.6") return ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"];
+  
+  // No overheads for this layout
+  return [];
+}
+
 // Coarse seeding for a system preset (RoomDesigner refines later)
 export function seedSpeakersFromPreset({
   preset,
@@ -1996,7 +2009,7 @@ function RoomDesignerWithState() {
     }
   }, [_sevenBedLayoutType, dolbyPreset, placedSpeakers, setSpeakers, stableDimensions.width, stableDimensions.length, _isFrozen]);
 
-  // Effect to re-seed speakers when Dolby layout changes - now more selective
+  // Effect to reconcile overhead speakers when layout changes
   useEffect(() => {
     // If we've just loaded a real project, don't overwrite its speaker layout
     if (loadState?.phase === "loaded") {
@@ -2055,19 +2068,29 @@ function RoomDesignerWithState() {
        setSpeakers(prev => {
          const hint = (typeof window !== 'undefined' && window.__SURROUND_MODEL_HINT_) || null;
          
-         // CRITICAL: Remove ALL old overhead speakers when layout changes
-         // Keep only non-overhead speakers (bed layer + subs)
-         const nonOverheadSpeakers = (prev || []).filter(s => {
-           const canon = safeCanon(s.role);
-           return !canon.startsWith('T');
-         });
+         // Get target overhead IDs for this layout
+         const targetOverheadIds = getTargetOverheadIds(dolbyPreset);
+         const targetSet = new Set(targetOverheadIds.map(id => id.toUpperCase()));
          
-         // Create map from non-overhead speakers only
-         const byCanonPrev = new Map(nonOverheadSpeakers.map(s => [safeCanon(s.role), s]));
+         // Known overhead roles (for filtering)
+         const knownOverheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR', 'TL', 'TR', 'TFC', 'TBC', 'TBL', 'TBR']);
+         
+         // Separate existing speakers into bed layer and overheads
+         const bedSpeakers = (prev || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
+         const existingOverheads = (prev || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
+         
+         // Keep only overheads that are in the target set
+         const keptOverheads = existingOverheads.filter(s => targetSet.has(safeCanon(s.role)));
+         
+         // Create map of existing overheads by canonical role
+         const overheadMap = new Map(keptOverheads.map(s => [safeCanon(s.role), s]));
+         
+         // Create map from bed speakers only
+         const byCanonPrev = new Map(bedSpeakers.map(s => [safeCanon(s.role), s]));
          
          // Separate seeded speakers into bed-layer and overheads
-         const seededBed = (seededSpeakers || []).filter(s => !safeCanon(s.role).startsWith('T'));
-         const seededOverheads = (seededSpeakers || []).filter(s => safeCanon(s.role).startsWith('T'));
+         const seededBed = (seededSpeakers || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
+         const seededOverheads = (seededSpeakers || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
          
          // Process bed-layer speakers (preserve models from previous)
          const nextBed = seededBed.map(seed => {
@@ -2076,25 +2099,38 @@ function RoomDesignerWithState() {
            return { ...seed, model: finalModel, draggable: true };
          });
          
-         // Process overhead speakers (always fresh, use current overhead config)
-         const nextOverheads = seededOverheads.map(seed => {
-           const canonRole = safeCanon(seed.role);
-           let modelFromOverrides = undefined;
-
-           if (['TFL', 'TFR', 'TFC'].includes(canonRole)) {
-             modelFromOverrides = useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
-           } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonRole)) {
-             modelFromOverrides = useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
-           } else if (['TBL', 'TBR', 'TBC'].includes(canonRole)) {
-             modelFromOverrides = useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
-           }
+         // Build final overhead list: reuse existing positions if available, otherwise use seeded defaults
+         const nextOverheads = [];
+         for (const targetId of targetOverheadIds) {
+           const canonId = targetId.toUpperCase();
+           const existing = overheadMap.get(canonId);
            
-           const finalModel = modelFromOverrides || overheadGlobalModel || seed.model;
-           return { ...seed, model: finalModel, draggable: true };
-         });
+           if (existing) {
+             // Reuse existing overhead speaker with its position
+             nextOverheads.push(existing);
+           } else {
+             // Create new overhead speaker from seed
+             const seeded = seededOverheads.find(s => safeCanon(s.role) === canonId);
+             if (seeded) {
+               let modelFromOverrides = undefined;
+
+               if (['TFL', 'TFR', 'TFC'].includes(canonId)) {
+                 modelFromOverrides = useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
+               } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonId)) {
+                 modelFromOverrides = useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
+               } else if (['TBL', 'TBR', 'TBC', 'TRL', 'TRR'].includes(canonId)) {
+                 modelFromOverrides = useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
+               }
+               
+               const finalModel = modelFromOverrides || overheadGlobalModel || seeded.model;
+               nextOverheads.push({ ...seeded, model: finalModel, draggable: true });
+             }
+           }
+         }
          
          const nextList = [...nextBed, ...nextOverheads];
 
+         debug(`[Speakers] Overhead reconciliation: target=${targetOverheadIds.join(',')}, kept=${keptOverheads.length}, created=${nextOverheads.length - keptOverheads.length}`);
          safeGroup('[Speakers] preset re-seed merge check', () => {
            safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
          });
