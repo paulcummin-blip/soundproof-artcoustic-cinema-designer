@@ -953,16 +953,28 @@ export const DOLBY_PRESETS = {
 };
 
 // Single source of truth for overhead IDs per layout
+const OVERHEAD_IDS_BY_LAYOUT = {
+  "5.1.2": ["TML", "TMR"],
+  "5.1.4": ["TFL", "TFR", "TRL", "TRR"],
+  "5.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"],
+  
+  "7.1.2": ["TML", "TMR"],
+  "7.1.4": ["TFL", "TFR", "TRL", "TRR"],
+  "7.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"],
+  
+  "9.1.2": ["TML", "TMR"],
+  "9.1.4": ["TFL", "TFR", "TRL", "TRR"],
+  "9.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"],
+  
+  // Layouts without overheads
+  "5.1": [],
+  "7.1": [],
+  "9.1": [],
+};
+
 function getTargetOverheadIds(preset) {
-  const p = String(preset || "").toLowerCase();
-  
-  // Map TL/TR to TML/TMR for consistency
-  if (p === "5.1.2" || p === "7.1.2") return ["TML", "TMR"];
-  if (p === "5.1.4" || p === "7.1.4") return ["TFL", "TFR", "TRL", "TRR"];
-  if (p === "5.1.6" || p === "7.1.6" || p === "9.1.6") return ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"];
-  
-  // No overheads for this layout
-  return [];
+  const normalized = String(preset || "").toLowerCase();
+  return OVERHEAD_IDS_BY_LAYOUT[normalized] || [];
 }
 
 // Coarse seeding for a system preset (RoomDesigner refines later)
@@ -2027,8 +2039,8 @@ function RoomDesignerWithState() {
 
   // Effect to reconcile overhead speakers when layout changes
   useEffect(() => {
-    // If we've just loaded a real project, don't overwrite its speaker layout
-    if (loadState?.phase === "loaded") {
+    // If we've just loaded a real project, don't overwrite its speaker layout (first load only)
+    if (loadState?.phase === "loaded" && !lastPresetRef.current) {
       return;
     }
 
@@ -2037,11 +2049,14 @@ function RoomDesignerWithState() {
     const noSpeakers = (placedSpeakers || []).length === 0;
     const presetChanged = lastPresetRef.current !== dolbyPreset;
 
-    // Only seed when the plan is empty or the user actually changed presets
+    // ALWAYS run overhead reconciliation when preset changes (even if speakers exist)
+    // Only skip if nothing has changed AND we have speakers
     if (!noSpeakers && !presetChanged) {
-      debug('[Speakers] Skipping re-seed: speakers exist and preset has not changed.');
+      debug('[Speakers] Skipping: speakers exist and preset unchanged.');
       return;
     }
+
+    debug(`[Speakers] Layout change detected: ${lastPresetRef.current} → ${dolbyPreset}`);
 
     // Determine the expected roles based on the dolbyPreset and current sevenBedLayoutType
     const is7ChannelBed = dolbyPreset && (dolbyPreset.startsWith('7.1') || dolbyPreset.startsWith('7.2'));
