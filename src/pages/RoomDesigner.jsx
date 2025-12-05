@@ -2112,9 +2112,11 @@ function RoomDesignerWithState() {
        setSpeakers(prev => {
          const hint = (typeof window !== 'undefined' && window.__SURROUND_MODEL_HINT_) || null;
          
-         // Get target overhead IDs for this layout
+         // Get target overhead IDs for this layout (normalized)
          const targetOverheadIds = getTargetOverheadIds(dolbyPreset);
          const targetSet = new Set(targetOverheadIds.map(id => id.toUpperCase()));
+         
+         debug(`[Speakers] Target overheads for ${dolbyPreset}: [${targetOverheadIds.join(', ')}]`);
          
          // Known overhead roles (for filtering)
          const knownOverheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR', 'TL', 'TR', 'TFC', 'TRC', 'TBC', 'TBL', 'TBR']);
@@ -2122,6 +2124,8 @@ function RoomDesignerWithState() {
          // Separate existing speakers into bed layer and overheads
          const bedSpeakers = (prev || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
          const existingOverheads = (prev || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
+         
+         debug(`[Speakers] Existing: ${bedSpeakers.length} bed + ${existingOverheads.length} overhead (${existingOverheads.map(s => s.role).join(', ')})`);
          
          // Keep only overheads that are in the target set
          const keptOverheads = existingOverheads.filter(s => targetSet.has(safeCanon(s.role)));
@@ -2135,6 +2139,8 @@ function RoomDesignerWithState() {
          // Separate seeded speakers into bed-layer and overheads
          const seededBed = (seededSpeakers || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
          const seededOverheads = (seededSpeakers || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
+         
+         debug(`[Speakers] Seeded: ${seededBed.length} bed + ${seededOverheads.length} overhead (${seededOverheads.map(s => s.role).join(', ')})`);
          
          // Process bed-layer speakers (preserve models from previous)
          const nextBed = seededBed.map(seed => {
@@ -2151,6 +2157,7 @@ function RoomDesignerWithState() {
            
            if (existing) {
              // Reuse existing overhead speaker with its position
+             debug(`[Speakers] Reusing existing overhead: ${canonId}`);
              nextOverheads.push(existing);
            } else {
              // Create new overhead speaker from seed
@@ -2160,23 +2167,26 @@ function RoomDesignerWithState() {
 
                if (['TFL', 'TFR', 'TFC'].includes(canonId)) {
                  modelFromOverrides = useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
-               } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonId)) {
+               } else if (['TML', 'TMR'].includes(canonId)) {
                  modelFromOverrides = useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
-               } else if (['TBL', 'TBR', 'TBC', 'TRL', 'TRR'].includes(canonId)) {
+               } else if (['TRL', 'TRR', 'TRC'].includes(canonId)) {
                  modelFromOverrides = useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
                }
                
                const finalModel = modelFromOverrides || overheadGlobalModel || seeded.model;
+               debug(`[Speakers] Creating new overhead: ${canonId} with model ${finalModel}`);
                nextOverheads.push({ ...seeded, model: finalModel, draggable: true });
+             } else {
+               debug(`[Speakers] WARNING: Target overhead ${canonId} not found in seeded speakers!`);
              }
            }
          }
          
          const nextList = [...nextBed, ...nextOverheads];
 
-         debug(`[Speakers] Overhead reconciliation: target=${targetOverheadIds.join(',')}, kept=${keptOverheads.length}, created=${nextOverheads.length - keptOverheads.length}`);
-         safeGroup('[Speakers] preset re-seed merge check', () => {
-           safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
+         debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
+         safeGroup('[Speakers] Reconciliation result', () => {
+           safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
          });
          return nextList;
        });
