@@ -36,20 +36,23 @@ export function getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears) {
 
   // Add overhead channels based on height count
   if (heights === 2) {
-    roles.add("TL");
-    roles.add("TR");
+    // Canonical: Top Middle Left/Right
+    roles.add("TML");
+    roles.add("TMR");
   } else if (heights === 4) {
+    // Canonical: Top Front + Top Rear
     roles.add("TFL");
     roles.add("TFR");
-    roles.add("TBL");
-    roles.add("TBR");
+    roles.add("TRL");
+    roles.add("TRR");
   } else if (heights === 6) {
+    // Canonical: Top Front + Top Middle + Top Rear
     roles.add("TFL");
     roles.add("TFR");
-    roles.add("TL");
-    roles.add("TR");
-    roles.add("TBL");
-    roles.add("TBR");
+    roles.add("TML");
+    roles.add("TMR");
+    roles.add("TRL");
+    roles.add("TRR");
   }
 
   return roles;
