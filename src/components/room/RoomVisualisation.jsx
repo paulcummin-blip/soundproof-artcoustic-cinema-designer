@@ -43,12 +43,10 @@ const fixedSideX = (roomWidth, dims, side, wallBufferM = WALL_BUFFER_M) => {
 const OVERHEAD_PAIR_MAP = {
   TFL: 'TFR',
   TFR: 'TFL',
-  TL:  'TR',
-  TR:  'TL',
   TML: 'TMR',
   TMR: 'TML',
-  TBL: 'TBR',
-  TBR: 'TBL',
+  TRL: 'TRR',
+  TRR: 'TRL',
 };
 
 // Compute horizontal seat band used to clamp overhead speakers
@@ -1937,7 +1935,7 @@ React.useEffect(() => {
 
     // Overhead drag behaviour: L/R pairs, clamped to bands, mirrored horizontally
     if (canonicalRole && canonicalRole.startsWith('T')) {
-      const OVERHEAD_ROLES = new Set(["TL", "TR", "TFL", "TFR", "TBL", "TBR"]);
+      const OVERHEAD_ROLES = new Set(["TML", "TMR", "TFL", "TFR", "TRL", "TRR"]);
       // Mark that the user has taken control of overheads
       setHasManualOverheadEdit(true);
 
@@ -1953,19 +1951,19 @@ React.useEffect(() => {
       const is514Layout = overheadSpeakers.length === 4 && 
                           overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TFL') &&
                           overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TFR') &&
-                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TBL') &&
-                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TBR');
+                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TRL') &&
+                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TRR');
 
       // Role group helpers
-      const LEFT_ROLES = ['TFL', 'TL', 'TBL'];
-      const RIGHT_ROLES = ['TFR', 'TR', 'TBR'];
+      const LEFT_ROLES = ['TFL', 'TML', 'TRL'];
+      const RIGHT_ROLES = ['TFR', 'TMR', 'TRR'];
 
       const isLeftRole = (role) => LEFT_ROLES.includes(role);
       const isRightRole = (role) => RIGHT_ROLES.includes(role);
 
       const isFrontRole = (role) => role === 'TFL' || role === 'TFR';
-      const isMidRole = (role) => role === 'TL' || role === 'TR';
-      const isRearRole = (role) => role === 'TBL' || role === 'TBR';
+      const isMidRole = (role) => role === 'TML' || role === 'TMR';
+      const isRearRole = (role) => role === 'TRL' || role === 'TRR';
 
       // Raw room coords from the mouse
       const rawRoomPos = canvasToRoom(newCanvasPos);
@@ -2073,13 +2071,13 @@ React.useEffect(() => {
 
             return prev.map(spk => {
               const role = getCanonicalRole(spk.role);
-              if (!['TFL', 'TFR', 'TBL', 'TBR'].includes(role)) return spk;
+              if (!['TFL', 'TFR', 'TRL', 'TRR'].includes(role)) return spk;
 
               const current = { ...(spk.position || {}) };
               
               // Apply X mirroring (existing logic)
-              const isLeft = ['TFL', 'TBL'].includes(role);
-              const isRight = ['TFR', 'TBR'].includes(role);
+              const isLeft = ['TFL', 'TRL'].includes(role);
+              const isRight = ['TFR', 'TRR'].includes(role);
               
               if (isLeft && leftColumnX != null) {
                 current.x = leftColumnX;
@@ -2091,7 +2089,7 @@ React.useEffect(() => {
               // Apply Y based on row
               if (role === 'TFL' || role === 'TFR') {
                 current.y = frontY;
-              } else if (role === 'TBL' || role === 'TBR') {
+              } else if (role === 'TRL' || role === 'TRR') {
                 current.y = rearY;
               }
 
@@ -2170,10 +2168,10 @@ React.useEffect(() => {
         newFrontY = clampYForRole(leftColumnX ?? primaryClamped.x, newFrontY, 'TFL');
       }
       if (Number.isFinite(newMidY)) {
-        newMidY = clampYForRole(leftColumnX ?? primaryClamped.x, newMidY, 'TL');
+        newMidY = clampYForRole(leftColumnX ?? primaryClamped.x, newMidY, 'TML');
       }
       if (Number.isFinite(newRearY)) {
-        newRearY = clampYForRole(leftColumnX ?? primaryClamped.x, newRearY, 'TBL');
+        newRearY = clampYForRole(leftColumnX ?? primaryClamped.x, newRearY, 'TRL');
       }
 
       // Write positions for all six overheads
@@ -2535,7 +2533,7 @@ React.useEffect(() => {
     // Role sets
     const screenRoles = new Set(['FL','FC','FR']);
     const surroundRoles = new Set(['SL','SR','SBL','SBR','LW','RW']);
-    const overheadRoles = new Set(['TFL','TFR','TML','TMR','TBL','TBR','TL','TR','TFC','TBC']);
+    const overheadRoles = new Set(['TFL','TFR','TML','TMR','TRL','TRR','TFC','TRC']);
 
     // Filter placed speakers by category (only those with valid positions)
     const placed = Array.isArray(placedSpeakers) ? placedSpeakers.filter(hasPos) : [];
@@ -3410,23 +3408,12 @@ useEffect(() => {
     return parseInt(parts[2]) || 0;
   }, [dolbyLayout]);
 
-  // Ensure all required overhead pairs exist before auto-placement
-  useEnsureOverheadPairs({
-    dolbyConfiguration: dolbyLayout,
-    placedSpeakers,
-    setPlacedSpeakers: onSetSpeakers,
-    useWidesInsteadOfRears: appState?.useWidesInsteadOfRears || false
-  });
-
-  // Auto-place overhead speakers at zone centers
-  useOverheadAutoPlacement({
-    placedSpeakers,
-    setPlacedSpeakers: onSetSpeakers,
-    overheadZones,
-    getCanonicalRole,
-    overheadCount,
-    hasManualOverheadEdit
-  });
+  // [DISABLED] Legacy overhead creation hooks - no longer needed
+  // Overheads are now created immediately when layout changes in RoomDesigner
+  // These hooks were creating speakers on drag/zones toggle, which is no longer desired
+  
+  // useEnsureOverheadPairs - DISABLED
+  // useOverheadAutoPlacement - DISABLED
 
   // Determine which overhead positions are visible
   const visibleOverheadPositions = useMemo(() => {
@@ -3489,9 +3476,9 @@ useEffect(() => {
       let zonePosition = null;
       if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
         zonePosition = 'front';
-      } else if (['TL', 'TR', 'TML', 'TMR'].includes(canonicalRole)) {
+      } else if (['TML', 'TMR'].includes(canonicalRole)) {
         zonePosition = 'mid';
-      } else if (['TBL', 'TBR', 'TBC'].includes(canonicalRole)) {
+      } else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) {
         zonePosition = 'rear';
       }
 
