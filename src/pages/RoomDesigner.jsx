@@ -2185,6 +2185,41 @@ function RoomDesignerWithState() {
          const nextList = [...nextBed, ...nextOverheads];
 
          debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
+         
+         // FAILSAFE: If layout expects overheads but we have none, reseed from preset
+         const hasOverheadTargets = targetOverheadIds && targetOverheadIds.length > 0;
+         const nextHasOverheads = nextList.some(spk => {
+           const role = safeCanon(spk.role);
+           return role && role.startsWith("T");
+         });
+         
+         if (hasOverheadTargets && !nextHasOverheads) {
+           debug(`[Speakers] FAILSAFE: Layout ${dolbyPreset} expects overheads but none found. Reseeding from preset.`);
+           // Full reseed from preset to recover
+           const freshSeeded = seedSpeakersFromPreset({
+             preset: normalizedPreset,
+             roomDimensions: stableDimensions,
+             listeningArea: null,
+           });
+           
+           return freshSeeded.map(seed => {
+             const canonRole = safeCanon(seed.role);
+             if (canonRole && canonRole.startsWith('T')) {
+               // Apply overhead model overrides
+               let modelFromOverrides = undefined;
+               if (['TFL', 'TFR', 'TFC'].includes(canonRole)) {
+                 modelFromOverrides = useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
+               } else if (['TML', 'TMR'].includes(canonRole)) {
+                 modelFromOverrides = useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
+               } else if (['TRL', 'TRR', 'TRC'].includes(canonRole)) {
+                 modelFromOverrides = useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
+               }
+               return { ...seed, model: modelFromOverrides || overheadGlobalModel || seed.model, draggable: true };
+             }
+             return { ...seed, draggable: true };
+           });
+         }
+         
          safeGroup('[Speakers] Reconciliation result', () => {
            safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
          });
