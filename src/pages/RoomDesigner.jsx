@@ -973,7 +973,16 @@ const OVERHEAD_IDS_BY_LAYOUT = {
 };
 
 function getTargetOverheadIds(preset) {
-  const normalized = String(preset || "").toLowerCase();
+  if (!preset) return [];
+  
+  // Normalize: strip " Dolby Atmos" suffixes and other decorations
+  // "5.1.4 Dolby Atmos" → "5.1.4"
+  // "5.1.4_atmos" → "5.1.4"
+  const normalized = String(preset)
+    .split(" ")[0]      // Remove " Dolby Atmos" suffix
+    .split("_")[0]      // Remove "_atmos" suffix
+    .toLowerCase();
+  
   return OVERHEAD_IDS_BY_LAYOUT[normalized] || [];
 }
 
@@ -2039,7 +2048,7 @@ function RoomDesignerWithState() {
 
   // Effect to reconcile overhead speakers when layout changes
   useEffect(() => {
-    // If we've just loaded a real project, don't overwrite its speaker layout (first load only)
+    // Skip on initial project load (let project hydration complete first)
     if (loadState?.phase === "loaded" && !lastPresetRef.current) {
       return;
     }
@@ -2049,18 +2058,22 @@ function RoomDesignerWithState() {
     const noSpeakers = (placedSpeakers || []).length === 0;
     const presetChanged = lastPresetRef.current !== dolbyPreset;
 
-    // ALWAYS run overhead reconciliation when preset changes (even if speakers exist)
-    // Only skip if nothing has changed AND we have speakers
-    if (!noSpeakers && !presetChanged) {
-      debug('[Speakers] Skipping: speakers exist and preset unchanged.');
+    // Skip only if preset is unchanged AND we have speakers
+    // CRITICAL: If preset changed, ALWAYS run reconciliation
+    if (!presetChanged && !noSpeakers) {
       return;
     }
 
-    debug(`[Speakers] Layout change detected: ${lastPresetRef.current} → ${dolbyPreset}`);
+    debug(`[Speakers] Layout reconciliation: ${lastPresetRef.current} → ${dolbyPreset}`);
+
+    // Get normalized preset for lookup (handles "5.1.4 Dolby Atmos" → "5.1.4")
+    const normalizedPreset = dolbyPreset
+      ? String(dolbyPreset).split(" ")[0].split("_")[0]
+      : dolbyPreset;
 
     // Determine the expected roles based on the dolbyPreset and current sevenBedLayoutType
-    const is7ChannelBed = dolbyPreset && (dolbyPreset.startsWith('7.1') || dolbyPreset.startsWith('7.2'));
-    let expectedRoles = DOLBY_PRESETS[dolbyPreset] || [];
+    const is7ChannelBed = normalizedPreset && (normalizedPreset.startsWith('7.1') || normalizedPreset.startsWith('7.2'));
+    let expectedRoles = DOLBY_PRESETS[normalizedPreset] || [];
 
     if (is7ChannelBed && _sevenBedLayoutType === 'wides') {
       expectedRoles = expectedRoles.map(role => {
@@ -2078,11 +2091,11 @@ function RoomDesignerWithState() {
       [...expectedRolesSet].every(role => currentRolesSet.has(role));
 
     if (!hasCorrectRoles || noSpeakers) { 
-       debug(`[Speakers] Re-seeding speakers due to Dolby preset change (${presetChanged ? 'yes' : 'no'}) or inconsistency: ${dolbyPreset}, layout: ${_sevenBedLayoutType}`);
+       debug(`[Speakers] Reconciling speakers for ${dolbyPreset} (${presetChanged ? 'preset changed' : 'role mismatch'})`);
        // Seed with the canonical Dolby preset (which means SBL/SBR for 7.x)
        let seededSpeakers = seedSpeakersFromPreset({
-         preset: dolbyPreset,
-         roomDimensions: stableDimensions, // Use stableDimensions
+         preset: normalizedPreset,
+         roomDimensions: stableDimensions,
          listeningArea: null,
        });
 
