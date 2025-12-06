@@ -2150,7 +2150,8 @@ function RoomDesignerWithState() {
       safeGroup('[Speakers] swap/reseed merge check (wides)', () => {
         safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
       });
-      setSpeakers(nextList);
+      console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
+      setSpeakers(prev => mergePreserveOverheads(prev, nextList));
 
     } else if (_sevenBedLayoutType === 'rears' && hasWides && !hasRears) {
       debug('[Speakers] Switching from Front Wides (LW/RW) to Rear Surrounds (SBL/SBR).');
