@@ -456,14 +456,14 @@ function useDesignerState() {
         if (!next) return next;
 
         // Capture previous speakers for Atmos repair
-        const prevSpeakers = Array.isArray(prev.placedSpeakers)
-          ? prev.placedSpeakers
+        const prevSpeakers = Array.isArray(prev.speakerSystem?.placedSpeakers)
+          ? prev.speakerSystem.placedSpeakers
           : [];
 
-        let speakers = Array.isArray(next.placedSpeakers)
-          ? next.placedSpeakers.slice()
-          : Array.isArray(prev.placedSpeakers)
-          ? prev.placedSpeakers.slice()
+        let speakers = Array.isArray(next.speakerSystem?.placedSpeakers)
+          ? next.speakerSystem.placedSpeakers.slice()
+          : Array.isArray(prev.speakerSystem?.placedSpeakers)
+          ? prev.speakerSystem.placedSpeakers.slice()
           : [];
 
         console.log('[AS] setSpeakerSystem BEFORE normalization', {
