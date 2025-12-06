@@ -2169,7 +2169,8 @@ function RoomDesignerWithState() {
       safeGroup('[Speakers] swap/reseed merge check (rears)', () => {
         safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
       });
-      setSpeakers(nextList);
+      console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
+      setSpeakers(prev => mergePreserveOverheads(prev, nextList));
     }
   }, [_sevenBedLayoutType, dolbyPreset, placedSpeakers, setSpeakers, stableDimensions.width, stableDimensions.length, _isFrozen]);
 
