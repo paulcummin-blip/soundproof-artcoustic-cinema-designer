@@ -2016,8 +2016,23 @@ function RoomDesignerWithState() {
       return;
     }
 
+    if (!dolbyPreset || (_isFrozen && _isFrozen('speakers'))) {
+      return;
+    }
+
+    // Parse preset to extract height count
+    const rawPreset = String(dolbyPreset || '').split(' ')[0].split('_')[0]; // "7.1.4 Dolby Atmos" → "7.1.4"
+    const parts = rawPreset.split('.');
+    const heights = parseInt(parts[2], 10) || 0; // 7.1.4 → 4, 7.1 → 0
+
+    // Never run this 7.x bed swap logic for Atmos layouts (heights > 0)
+    // For 7.1.2/7.1.4/7.1.6 we let the Dolby reconciliation effect handle everything
+    if (heights > 0) {
+      return;
+    }
+
     const is7ChannelBed = dolbyPreset && (dolbyPreset.startsWith('7.1') || dolbyPreset.startsWith('7.2'));
-    if (!is7ChannelBed || (_isFrozen && _isFrozen('speakers'))) {
+    if (!is7ChannelBed) {
       return;
     }
 
