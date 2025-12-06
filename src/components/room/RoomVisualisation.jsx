@@ -3477,24 +3477,20 @@ useEffect(() => {
 
 // Render overhead speaker icons (one per speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
-    // Start from the prop (single source of truth)
-    const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+    // Use speakersToRender as the source (already includes merged overheads)
+    const allForOverheads = Array.isArray(speakersToRender) ? speakersToRender : (Array.isArray(placedSpeakers) ? placedSpeakers : []);
 
     // DEBUG: Log all speakers received
     if (typeof console !== 'undefined' && console.groupCollapsed) {
       console.groupCollapsed('[RV] overheadIconElements DEBUG');
-      console.log('All speakers from prop:', rawSpeakers.map(s => ({
-        role: s.role,
-        canon: canonRoleRV(s.role),
-        isOverhead: isOverheadRole(s.role),
-        hasPos: !!(s.position),
-      })));
+      console.log('All speakers (for overheads):', allForOverheads);
+      console.log('All roles:', allForOverheads.map(s => rvSafeCanonRole(s.role)));
     }
 
     // Select overhead speakers using the canonical helper
-    const overheadSpeakers = rawSpeakers.filter((speaker) => {
+    const overheadSpeakers = allForOverheads.filter((speaker) => {
       // Use the canonical overhead detection helper
-      if (!isOverheadRole(speaker.role)) return false;
+      if (!rvIsOverheadRole(speaker.role)) return false;
       
       // Must have valid position
       const pos = speaker.position || {};
@@ -3502,12 +3498,8 @@ useEffect(() => {
     });
 
     if (typeof console !== 'undefined') {
-      console.log('Overhead speakers to render:', overheadSpeakers.map(s => ({
-        role: s.role,
-        canon: canonRoleRV(s.role),
-        model: s.model,
-        pos: s.position,
-      })));
+      console.log('Overhead speakers to render:', overheadSpeakers);
+      console.log('Overhead roles:', overheadSpeakers.map(s => rvSafeCanonRole(s.role)));
       if (console.groupEnd) console.groupEnd();
     }
 
