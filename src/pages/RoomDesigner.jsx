@@ -2210,7 +2210,8 @@ function RoomDesignerWithState() {
         roomDimensions: stableDimensions,
         listeningArea: null,
       });
-      setSpeakers(seeded);
+      console.log('[RD] early reseed -> roles', seeded.map(s => safeCanon(s.role)));
+      setSpeakers(prev => mergePreserveOverheads(prev, seeded));
       return;
     }
 
