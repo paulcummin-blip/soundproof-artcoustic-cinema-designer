@@ -482,81 +482,17 @@ function useDesignerState() {
 
         const layoutString = (layoutStringRaw || "").trim() || "5.1";
 
-        // --- ATMOS REPAIR: Re-insert missing overhead speakers ---
-        // This protects against any update that would accidentally drop required overheads
-        const targetOverheadIds = getTargetOverheadIdsForLayout(layoutString);
-        if (targetOverheadIds.length > 0 && speakers.length > 0) {
-          const prevByRole = new Map(
-            prevSpeakers.map(s => [safeCanonRole(s.role), s])
-          );
-          const nextByRole = new Map(
-            speakers.map(s => [safeCanonRole(s.role), s])
-          );
+        // --- PASSTHROUGH MODE: AppStateProvider is now a dumb container ---
+        // RoomDesigner is the single source of truth for speaker seeding/reconciliation
+        // We do NOT filter speakers by layout visibility here - that's RoomVisualisation's job
+        
+        // Simple normalization: ensure we have an array
+        const normalizedSpeakers = Array.isArray(speakers) ? speakers : [];
 
-          const repaired = [...speakers];
-          let repairedAny = false;
-
-          for (const id of targetOverheadIds) {
-            const canonId = safeCanonRole(id);
-            const alreadyPresent = nextByRole.has(canonId);
-
-            if (!alreadyPresent) {
-              const prevSpeaker = prevByRole.get(canonId);
-              if (prevSpeaker) {
-                repaired.push(prevSpeaker);
-                nextByRole.set(canonId, prevSpeaker);
-                repairedAny = true;
-              }
-            }
-          }
-
-          if (repairedAny) {
-            console.log('[AS] Atmos repair', layoutString,
-              'target=', targetOverheadIds,
-              'before=', speakers.map(s => s.role),
-              'after=', repaired.map(s => s.role)
-            );
-            speakers = repaired;
-          }
-        }
-        // --- END ATMOS REPAIR ---
-
-        // Use canonical visibility helper
-        const visible = getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears);
-
-        console.log('[AS] setSpeakerSystem VISIBILITY', {
-          layoutString,
-          useWidesInsteadOfRears,
-          visibleRoles: Array.from(visible)
+        console.log('[AS] setSpeakerSystem AFTER normalization', {
+          count: normalizedSpeakers.length,
+          roles: normalizedSpeakers.map(s => ({ role: s.role, model: s.model }))
         });
-
-        // [B44 FIX] Keep all speakers, preserve surround entries even with null model
-        speakers = speakers.map(spk => {
-          const role = String(spk.role || "").toUpperCase();
-          const canon = getCanonicalRole(role);
-          const isVisible = visible.has(canon);
-          const model = String(spk.model || "").toLowerCase().trim();
-
-          // [B44 FIX] If role is NOT visible in current layout, return unchanged
-          // (RV will filter it out during render)
-          if (!isVisible) {
-            return spk;
-          }
-
-          // Role IS visible - preserve entry even if model is null/'off'
-          // This prevents dropdown snap-back
-          if (!model || model === 'off' || model === 'none') {
-            return { ...spk, model: null };
-          }
-
-          // Has a real model - return unchanged
-          return spk;
-        });
-
-        console.log('[AS] setSpeakerSystem AFTER normalization', speakers.map(s => ({
-          role: getCanonicalRole(s.role),
-          model: s.model
-        })));
 
         console.log("[AS] candidate yaw by role",
           speakers.map(s => ({
