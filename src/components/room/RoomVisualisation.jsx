@@ -3459,19 +3459,39 @@ useEffect(() => {
 
 // Render overhead speaker icons (one per speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
-    // Guard: no speakers array
-    if (!Array.isArray(placedSpeakers)) return null;
+    // Start from the prop (single source of truth)
+    const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
-    // Select overhead speakers from placedSpeakers
-    const overheadSpeakers = placedSpeakers.filter((speaker) => {
-      const canonical = getCanonicalRole?.(speaker.role) || speaker.role;
-      if (typeof canonical !== 'string') return false;
-      // Any canonical role that starts with 'T' is an overhead (TFL/TFR/TML/TMR/TBL/TBR/TL/TR)
-      if (!canonical.startsWith('T')) return false;
+    // DEBUG: Log all speakers received
+    if (typeof console !== 'undefined' && console.groupCollapsed) {
+      console.groupCollapsed('[RV] overheadIconElements DEBUG');
+      console.log('All speakers from prop:', rawSpeakers.map(s => ({
+        role: s.role,
+        canon: canonRoleRV(s.role),
+        isOverhead: isOverheadRole(s.role),
+        hasPos: !!(s.position),
+      })));
+    }
+
+    // Select overhead speakers using the canonical helper
+    const overheadSpeakers = rawSpeakers.filter((speaker) => {
+      // Use the canonical overhead detection helper
+      if (!isOverheadRole(speaker.role)) return false;
+      
       // Must have valid position
       const pos = speaker.position || {};
       return Number.isFinite(pos.x) && Number.isFinite(pos.y);
     });
+
+    if (typeof console !== 'undefined') {
+      console.log('Overhead speakers to render:', overheadSpeakers.map(s => ({
+        role: s.role,
+        canon: canonRoleRV(s.role),
+        model: s.model,
+        pos: s.position,
+      })));
+      if (console.groupEnd) console.groupEnd();
+    }
 
     // No overhead speakers to render
     if (overheadSpeakers.length === 0) return null;
