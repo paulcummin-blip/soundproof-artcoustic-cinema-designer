@@ -1068,6 +1068,7 @@ export function useSpeakerSystemStore() {
     roomDims, setRoomDims, // Use roomDims from AppState
     screen, setScreen,
     seatingPositions, setSeatingPositions,
+    dolbyLayout, // Access current Dolby layout for seeding
    } = useAppState() || {};
 
   const placedSpeakers = React.useMemo(
@@ -1143,14 +1144,22 @@ export function useSpeakerSystemStore() {
     }
 
     if (typeof setSpeakerSystem === "function") {
+      // Determine which preset to seed from based on the current Dolby layout
+      const rawPreset = typeof dolbyLayout === "string" ? dolbyLayout : "5.1";
+      const normalizedPreset = String(rawPreset)
+        .split(" ")[0]   // "5.1.2 Dolby Atmos" -> "5.1.2"
+        .split("_")[0];  // "5.1.2_atmos" -> "5.1.2"
+
+      const presetKey = DOLBY_PRESETS[normalizedPreset] ? normalizedPreset : "5.1";
+
       const seeded = seedSpeakersFromPreset({
-        preset: "5.1",
+        preset: presetKey,
         roomDimensions: room,
         listeningArea: null,
       });
       setSpeakerSystem((prev) => ({ ...(prev || {}), placedSpeakers: seeded }));
     }
-  }, [roomDims, seatingPositions, setRoomDims, setScreen, setSeatingPositions, setSpeakerSystem]);
+  }, [roomDims, seatingPositions, dolbyLayout, setRoomDims, setScreen, setSeatingPositions, setSpeakerSystem]);
 
   return {
     placedSpeakers,
