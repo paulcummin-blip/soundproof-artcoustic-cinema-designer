@@ -76,6 +76,49 @@ function carryModel(prevSpeakers, roleFrom, roleTo, fallbackHint = null) {
   return existing?.model ?? from?.model ?? fallbackHint ?? undefined;
 }
 
+// --- ATMOS OVERHEAD PRESERVATION HELPERS ---
+function isOverheadRole(role) {
+  const canon = safeCanon(role);
+  const OVERHEAD_ROLES = new Set([
+    'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR',
+    'TFC', 'TRC', 'TBC', 'TL', 'TR', 'TBL', 'TBR'
+  ]);
+  return OVERHEAD_ROLES.has(canon);
+}
+
+function mergePreserveOverheads(prevList, draftNextList) {
+  const prev = Array.isArray(prevList) ? prevList : [];
+  const next = Array.isArray(draftNextList) ? draftNextList : [];
+
+  // Collect overhead speakers from both lists
+  const prevOverheads = prev.filter(s => isOverheadRole(s.role));
+  const nextOverheads = next.filter(s => isOverheadRole(s.role));
+
+  // If the draft has overheads, use those; otherwise keep previous
+  const overheadsToKeep = nextOverheads.length > 0 ? nextOverheads : prevOverheads;
+
+  // Deduplicate overheads by canonical role (last one wins)
+  const overheadMap = new Map();
+  overheadsToKeep.forEach(s => {
+    overheadMap.set(safeCanon(s.role), s);
+  });
+
+  // Build final list: bed speakers from draft + deduplicated overheads
+  const nextBeds = next.filter(s => !isOverheadRole(s.role));
+  const mergedOverheads = Array.from(overheadMap.values());
+  const finalList = [...nextBeds, ...mergedOverheads];
+
+  console.log('[RD] mergePreserveOverheads', {
+    prevCount: prev.length,
+    nextCount: next.length,
+    finalCount: finalList.length,
+    overheads: mergedOverheads.map(s => safeCanon(s.role))
+  });
+
+  return finalList;
+}
+// --- END ATMOS OVERHEAD PRESERVATION HELPERS ---
+
 function cloneRoleWithModel(byRole, fromRole, toRole, fallbackModel) {
   const src = byRole.get(fromRole);
   return {
