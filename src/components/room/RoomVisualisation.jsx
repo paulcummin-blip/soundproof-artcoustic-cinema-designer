@@ -4435,8 +4435,8 @@ return {
     console.groupCollapsed('[RV] renderSpeakers DEBUG');
     console.log('Raw speakers from prop:', rawSpeakers.map(s => ({
       role: s.role,
-      canon: canonRoleRV(s.role),
-      isOverhead: isOverheadRole(s.role),
+      canon: rvSafeCanonRole(s.role),
+      isOverhead: rvIsOverheadRole(s.role),
       hasPos: !!(s.position),
     })));
   }
@@ -4445,13 +4445,13 @@ return {
   const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
 
   // 2) Visibility filter (layout + model) – but NEVER drop overhead speakers
-  const afterVisibility = afterRenderable.filter((spk) => {
+  let afterVisibility = afterRenderable.filter((spk) => {
     try {
       const canon = String(spk.role || "").toUpperCase();
       
       // CRITICAL: Overhead speakers MUST always pass through visibility filter
       // The overhead overlay toggle only affects zone bands, NOT icon rendering
-      if (isOverheadRole(spk.role)) {
+      if (rvIsOverheadRole(spk.role)) {
         return true;
       }
       
@@ -4477,6 +4477,33 @@ return {
     }
   });
 
+  // --- OVERHEAD VISIBILITY ENFORCER ---
+  const overheadOverlayEnabled =
+    !!(_overlays?.OVERHEADS || _overlays?.OVERHEADS_2 || _overlays?.OVERHEADS_4 || _overlays?.OVERHEADS_6);
+
+  if (overheadOverlayEnabled) {
+    const overheadSpeakers = rawSpeakers.filter(s => rvIsOverheadRole(s.role));
+
+    if (overheadSpeakers.length > 0) {
+      const existingCanon = new Set(
+        (afterVisibility || []).map(s => rvSafeCanonRole(s.role))
+      );
+
+      const merged = Array.isArray(afterVisibility) ? [...afterVisibility] : [];
+
+      for (const sp of overheadSpeakers) {
+        const canon = rvSafeCanonRole(sp.role);
+        if (!existingCanon.has(canon)) {
+          merged.push(sp);
+          existingCanon.add(canon);
+        }
+      }
+
+      afterVisibility = merged;
+    }
+  }
+  // --- END OVERHEAD VISIBILITY ENFORCER ---
+
   // DEBUG: Expose to window for manual inspection
   if (typeof window !== 'undefined') {
     window.__LAST_RV__ = { rawSpeakers, afterVisibility };
@@ -4486,8 +4513,8 @@ return {
   if (typeof console !== 'undefined') {
     console.log('After visibility filter:', afterVisibility.map(s => ({
       role: s.role,
-      canon: canonRoleRV(s.role),
-      isOverhead: isOverheadRole(s.role),
+      canon: rvSafeCanonRole(s.role),
+      isOverhead: rvIsOverheadRole(s.role),
       hasPos: !!(s.position),
       posX: s.position?.x?.toFixed?.(3) || '—',
       posY: s.position?.y?.toFixed?.(3) || '—',
