@@ -1080,15 +1080,10 @@ export function useSpeakerSystemStore() {
     (listOrUpdater) => {
       if (typeof setSpeakerSystem !== "function") return;
 
-      // Use the latest speakers visible to RoomDesigner as the base
-      const baseList = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-
-      const nextList =
-        typeof listOrUpdater === "function"
-          ? listOrUpdater(baseList)
-          : (listOrUpdater || []);
-
-      const finalList = Array.isArray(nextList) ? nextList : [];
+      // Resolve the final list immediately without re-merging with prev
+      const finalList = typeof listOrUpdater === "function"
+        ? listOrUpdater(Array.isArray(placedSpeakers) ? placedSpeakers : [])
+        : (Array.isArray(listOrUpdater) ? listOrUpdater : []);
 
       // DEBUG: log what we're actually sending into AppStateProvider
       // (keep this for now while we verify overhead behaviour)
@@ -1099,10 +1094,9 @@ export function useSpeakerSystemStore() {
       });
 
       // Push the finished list into AppStateProvider in one shot
-      setSpeakerSystem((prev) => ({
-        ...(prev || {}),
+      setSpeakerSystem({
         placedSpeakers: finalList,
-      }));
+      });
     },
     [setSpeakerSystem, placedSpeakers]
   );
@@ -2091,34 +2085,24 @@ function RoomDesignerWithState() {
       return;
     }
 
-    debug(`[Speakers] Layout reconciliation: ${lastPresetRef.current} → ${dolbyPreset}`);
-
     // Get normalized preset for lookup (handles "5.1.4 Dolby Atmos" → "5.1.4")
     const normalizedPreset = dolbyPreset
       ? String(dolbyPreset).split(" ")[0].split("_")[0]
       : dolbyPreset;
 
-    // Get target overhead IDs early to check if we need a full reseed
+    // Early reseed for Atmos layouts without existing overheads
     const targetOverheadIds = getTargetOverheadIds(dolbyPreset);
-    const hasOverheadTargets = Array.isArray(targetOverheadIds) && targetOverheadIds.length > 0;
-
-    // Check the current speakers list for any T* roles
+    const hasOverheadTargets = targetOverheadIds.length > 0;
     const hasAnyExistingOverheads =
       Array.isArray(placedSpeakers) &&
-      placedSpeakers.some((spk) => {
-        const r = safeCanon(spk.role);
-        return r && r.startsWith("T");
-      });
+      placedSpeakers.some((spk) => safeCanon(spk.role || "").startsWith("T"));
 
-    // If this layout expects overheads but none exist at all, do a full reseed from the preset
     if (hasOverheadTargets && !hasAnyExistingOverheads) {
-      debug(`[Speakers] Layout ${dolbyPreset} expects overheads but none exist - full reseed from preset`);
       const seeded = seedSpeakersFromPreset({
         preset: normalizedPreset,
         roomDimensions: stableDimensions,
         listeningArea: null,
       });
-
       setSpeakers(seeded);
       return;
     }
