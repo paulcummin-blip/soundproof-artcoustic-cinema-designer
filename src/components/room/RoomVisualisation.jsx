@@ -49,17 +49,35 @@ const OVERHEAD_PAIR_MAP = {
   TRR: 'TRL',
 };
 
-// --- ATMOS OVERHEAD DETECTION HELPERS ---
-// Canonical set of all supported overhead roles
-const CANON_OVERHEAD_ROLES = new Set([
-  'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR',
-  'TL', 'TR', 'TBL', 'TBR', 'TFC', 'TRC', 'TBC'
-]);
+// --- OVERHEAD HELPERS (RoomVisualisation) ---
+const rvSafeCanonRole = (role) => String(role || '').toUpperCase();
 
-const canonRoleRV = (role) => String(role || '').toUpperCase();
+const rvIsOverheadRole = (role) => {
+  const r = rvSafeCanonRole(role);
+  switch (r) {
+    case 'TFL':
+    case 'TFR':
+    case 'TML':
+    case 'TMR':
+    case 'TRL':
+    case 'TRR':
+    case 'TFC':
+    case 'TRC':
+    case 'TBC':
+    case 'TL':
+    case 'TR':
+    case 'TBL':
+    case 'TBR':
+      return true;
+    default:
+      return false;
+  }
+};
+// --- END OVERHEAD HELPERS ---
 
-const isOverheadRole = (role) => CANON_OVERHEAD_ROLES.has(canonRoleRV(role));
-// --- END ATMOS OVERHEAD DETECTION HELPERS ---
+// Legacy aliases for backward compatibility
+const canonRoleRV = rvSafeCanonRole;
+const isOverheadRole = rvIsOverheadRole;
 
 // Compute horizontal seat band used to clamp overhead speakers
 function getSeatBandXBounds(seats) {
