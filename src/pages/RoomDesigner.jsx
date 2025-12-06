@@ -2808,6 +2808,14 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
           <div style={{ height: 'calc(100% - 36px)', overflow: 'auto' }}>
             <ErrorBoundary name="RoomVisualisation">
               <Suspense fallback={<div className="p-4">Loading 3D View...</div>}>
+                {(() => {
+                  console.log('[RD] passing placedSpeakers to RoomVisualisation', {
+                    count: Array.isArray(placedSpeakers) ? placedSpeakers.length : 0,
+                    roles: (placedSpeakers || []).map(s => safeCanon(s.role)),
+                    dolbyPreset,
+                  });
+                  return null;
+                })()}
                 <RoomVisualisation
                   ref={visualisationRef}
                   mlpPoint={mlpAnchorEffective}
