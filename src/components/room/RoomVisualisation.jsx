@@ -4389,20 +4389,31 @@ return {
   }, [applyLcrFromDetail]);
 
   const renderSpeakers = useCallback(() => {
-  // Normalise input
-  const raw = Array.isArray(speakersToRender) ? speakersToRender : [];
+  // Start from the prop (single source of truth)
+  const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+
+  // Add grouped debug logging
+  if (typeof console !== 'undefined' && console.groupCollapsed) {
+    console.groupCollapsed('[RV] renderSpeakers DEBUG');
+    console.log('Raw speakers from prop:', rawSpeakers.map(s => ({
+      role: s.role,
+      canon: canonRoleRV(s.role),
+      isOverhead: isOverheadRole(s.role),
+      hasPos: !!(s.position),
+    })));
+  }
 
   // 1) Basic structural filter (existing helper)
-  const afterRenderable = raw.filter(isRenderableSpeaker);
+  const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
 
-  // 2) Visibility filter (layout + model) – but never hard-fail on errors
+  // 2) Visibility filter (layout + model) – but NEVER drop overhead speakers
   const afterVisibility = afterRenderable.filter((spk) => {
     try {
       const canon = String(spk.role || "").toUpperCase();
       
-      // OVERHEADS: icons must always be visible when speakers exist.
-      // Do NOT use the Overheads toggle here (that only affects zone bands).
-      if (canon && canon.startsWith('T')) {
+      // CRITICAL: Overhead speakers MUST always pass through visibility filter
+      // The overhead overlay toggle only affects zone bands, NOT icon rendering
+      if (isOverheadRole(spk.role)) {
         return true;
       }
       
@@ -4430,33 +4441,20 @@ return {
 
   // DEBUG: Expose to window for manual inspection
   if (typeof window !== 'undefined') {
-    window.__LAST_RV__ = { raw, afterVisibility };
+    window.__LAST_RV__ = { rawSpeakers, afterVisibility };
   }
 
   // DEBUG: Table of afterVisibility with positions
-  try {
-    console.groupCollapsed("[RV] speakersToRender DEBUG");
-    console.log('Raw speakers:');
-    console.table(
-      raw.map((s) => ({
-        id: s.id,
-        role: s.role,
-        model: s.model || "(none)",
-      }))
-    );
-    console.log('After visibility:');
-    console.table(
-      afterVisibility.map((s) => ({
-        id: s.id,
-        role: s.role,
-        model: s.model || "(none)",
-        posX: s.position?.x?.toFixed?.(3) || '—',
-        posY: s.position?.y?.toFixed?.(3) || '—',
-      }))
-    );
-    console.groupEnd();
-  } catch (_) {
-    // ignore console errors in strange environments
+  if (typeof console !== 'undefined') {
+    console.log('After visibility filter:', afterVisibility.map(s => ({
+      role: s.role,
+      canon: canonRoleRV(s.role),
+      isOverhead: isOverheadRole(s.role),
+      hasPos: !!(s.position),
+      posX: s.position?.x?.toFixed?.(3) || '—',
+      posY: s.position?.y?.toFixed?.(3) || '—',
+    })));
+    if (console.groupEnd) console.groupEnd();
   }
 
   // Local NaN-safe coordinate mappers (must be inside this loop)
