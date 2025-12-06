@@ -4533,7 +4533,7 @@ return {
 
     // CRITICAL: Overhead speakers are rendered by overheadIconElements,
     // skip them here to avoid duplicate icons
-    if (isOverheadRole(role)) {
+    if (rvIsOverheadRole(role)) {
       return null;
     }
 
