@@ -2098,6 +2098,31 @@ function RoomDesignerWithState() {
       ? String(dolbyPreset).split(" ")[0].split("_")[0]
       : dolbyPreset;
 
+    // Get target overhead IDs early to check if we need a full reseed
+    const targetOverheadIds = getTargetOverheadIds(dolbyPreset);
+    const hasOverheadTargets = Array.isArray(targetOverheadIds) && targetOverheadIds.length > 0;
+
+    // Check the current speakers list for any T* roles
+    const hasAnyExistingOverheads =
+      Array.isArray(placedSpeakers) &&
+      placedSpeakers.some((spk) => {
+        const r = safeCanon(spk.role);
+        return r && r.startsWith("T");
+      });
+
+    // If this layout expects overheads but none exist at all, do a full reseed from the preset
+    if (hasOverheadTargets && !hasAnyExistingOverheads) {
+      debug(`[Speakers] Layout ${dolbyPreset} expects overheads but none exist - full reseed from preset`);
+      const seeded = seedSpeakersFromPreset({
+        preset: normalizedPreset,
+        roomDimensions: stableDimensions,
+        listeningArea: null,
+      });
+
+      setSpeakers(seeded);
+      return;
+    }
+
     // Determine the expected roles based on the dolbyPreset and current sevenBedLayoutType
     const is7ChannelBed = normalizedPreset && (normalizedPreset.startsWith('7.1') || normalizedPreset.startsWith('7.2'));
     let expectedRoles = DOLBY_PRESETS[normalizedPreset] || [];
@@ -2139,8 +2164,7 @@ function RoomDesignerWithState() {
        setSpeakers(prev => {
          const hint = (typeof window !== 'undefined' && window.__SURROUND_MODEL_HINT_) || null;
          
-         // Get target overhead IDs for this layout (normalized)
-         const targetOverheadIds = getTargetOverheadIds(dolbyPreset);
+         // targetOverheadIds already computed above, reuse it
          const targetSet = new Set(targetOverheadIds.map(id => id.toUpperCase()));
          
          debug(`[Speakers] Target overheads for ${dolbyPreset}: [${targetOverheadIds.join(', ')}]`);
@@ -2212,40 +2236,6 @@ function RoomDesignerWithState() {
          const nextList = [...nextBed, ...nextOverheads];
 
          debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
-         
-         // FAILSAFE: If layout expects overheads but we have none, reseed from preset
-         const hasOverheadTargets = targetOverheadIds && targetOverheadIds.length > 0;
-         const nextHasOverheads = nextList.some(spk => {
-           const role = safeCanon(spk.role);
-           return role && role.startsWith("T");
-         });
-         
-         if (hasOverheadTargets && !nextHasOverheads) {
-           debug(`[Speakers] FAILSAFE: Layout ${dolbyPreset} expects overheads but none found. Reseeding from preset.`);
-           // Full reseed from preset to recover
-           const freshSeeded = seedSpeakersFromPreset({
-             preset: normalizedPreset,
-             roomDimensions: stableDimensions,
-             listeningArea: null,
-           });
-           
-           return freshSeeded.map(seed => {
-             const canonRole = safeCanon(seed.role);
-             if (canonRole && canonRole.startsWith('T')) {
-               // Apply overhead model overrides
-               let modelFromOverrides = undefined;
-               if (['TFL', 'TFR', 'TFC'].includes(canonRole)) {
-                 modelFromOverrides = useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
-               } else if (['TML', 'TMR'].includes(canonRole)) {
-                 modelFromOverrides = useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
-               } else if (['TRL', 'TRR', 'TRC'].includes(canonRole)) {
-                 modelFromOverrides = useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
-               }
-               return { ...seed, model: modelFromOverrides || overheadGlobalModel || seed.model, draggable: true };
-             }
-             return { ...seed, draggable: true };
-           });
-         }
          
          safeGroup('[Speakers] Reconciliation result', () => {
            safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
