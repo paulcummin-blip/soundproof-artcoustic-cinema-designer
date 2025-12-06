@@ -4621,6 +4621,7 @@ return {
   handleMouseDown,
   setHoveredSpeaker,
   SpeakerIcon,
+  placedSpeakers, // Added to ensure reactivity when speakers change
 ]);
 
   // Renders rear subwoofers using SpeakerRect
