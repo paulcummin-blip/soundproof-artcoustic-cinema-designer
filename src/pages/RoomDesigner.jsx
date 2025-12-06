@@ -2048,7 +2048,7 @@ function RoomDesignerWithState() {
       
       if (needsUpdate) {
         debug('[Resize Re-clamp] Adjusting LCR positions due to model change or constraint violation.');
-        setSpeakers(updatedSpeakers);
+        setSpeakers(prev => mergePreserveOverheads(prev, updatedSpeakers));
       }
     } catch (error) {
       if (typeof console !== 'undefined' && typeof console.warn === 'function') {
