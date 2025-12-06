@@ -2585,7 +2585,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
         return { ...s, position: { ...(s.position || {}), x: u.position.x, y: u.position.y } };
       });
 
-      setSpeakers(merged);
+      console.log('[RD] optimiseAll -> roles', merged.map(s => safeCanon(s.role)));
+      setSpeakers(prev => mergePreserveOverheads(prev, merged));
     } catch (e) {
       console.error("[OptimiseAll] failed:", e);
     }
