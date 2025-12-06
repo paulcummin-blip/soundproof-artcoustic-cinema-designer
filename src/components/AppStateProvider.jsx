@@ -495,19 +495,19 @@ function useDesignerState() {
         });
 
         console.log("[AS] candidate yaw by role",
-          speakers.map(s => ({
+          normalizedSpeakers.map(s => ({
             role: String(s.role || "").toUpperCase(),
             yaw: s.yaw ?? null,
           }))
         );
 
         // ✅ If speakers didn't actually change, return prev to avoid churn
-        if (speakersShallowEqual(prev.placedSpeakers, speakers)) {
+        if (speakersShallowEqual(prev.placedSpeakers, normalizedSpeakers)) {
           return prev;
         }
 
         if (typeof window !== "undefined") {
-          window.__LAST_SPEAKERS__ = (speakers || []).map(s => ({
+          window.__LAST_SPEAKERS__ = (normalizedSpeakers || []).map(s => ({
             role: String(s.role),
             model: s.model || null,
           }));
@@ -522,7 +522,7 @@ function useDesignerState() {
         return {
           ...prev,
           ...next,
-          placedSpeakers: speakers,
+          placedSpeakers: normalizedSpeakers,
         };
       });
     },
