@@ -1078,14 +1078,32 @@ export function useSpeakerSystemStore() {
   const setSpeakers = React.useCallback(
     (listOrUpdater) => {
       if (typeof setSpeakerSystem !== "function") return;
-      setSpeakerSystem((prev) => {
-        const current = prev?.placedSpeakers || [];
-        const nextList =
-          typeof listOrUpdater === "function" ? listOrUpdater(current) : (listOrUpdater || []);
-        return { ...(prev || {}), placedSpeakers: Array.isArray(nextList) ? nextList : [] };
+
+      // Use the latest speakers visible to RoomDesigner as the base
+      const baseList = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+
+      const nextList =
+        typeof listOrUpdater === "function"
+          ? listOrUpdater(baseList)
+          : (listOrUpdater || []);
+
+      const finalList = Array.isArray(nextList) ? nextList : [];
+
+      // DEBUG: log what we're actually sending into AppStateProvider
+      // (keep this for now while we verify overhead behaviour)
+      // eslint-disable-next-line no-console
+      console.log("[RD] setSpeakers sending to AppStateProvider:", {
+        count: finalList.length,
+        roles: finalList.map(s => s.role),
       });
+
+      // Push the finished list into AppStateProvider in one shot
+      setSpeakerSystem((prev) => ({
+        ...(prev || {}),
+        placedSpeakers: finalList,
+      }));
     },
-    [setSpeakerSystem]
+    [setSpeakerSystem, placedSpeakers]
   );
 
   const initWithDefaultsAndRules = React.useCallback(() => {
