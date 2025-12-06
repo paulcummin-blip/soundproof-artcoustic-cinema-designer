@@ -3555,6 +3555,7 @@ useEffect(() => {
     }).filter(Boolean);
   }, [
     placedSpeakers,
+    speakersToRender,
     getCanonicalRole,
     getOverheadModelForPosition,
     scale,
