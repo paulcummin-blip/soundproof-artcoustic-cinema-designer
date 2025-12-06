@@ -455,6 +455,11 @@ function useDesignerState() {
         const next = typeof updater === "function" ? updater(prev) : updater;
         if (!next) return next;
 
+        // Capture previous speakers for Atmos repair
+        const prevSpeakers = Array.isArray(prev.placedSpeakers)
+          ? prev.placedSpeakers
+          : [];
+
         let speakers = Array.isArray(next.placedSpeakers)
           ? next.placedSpeakers.slice()
           : Array.isArray(prev.placedSpeakers)
@@ -477,6 +482,45 @@ function useDesignerState() {
 
         const layoutString = (layoutStringRaw || "").trim() || "5.1";
 
+        // --- ATMOS REPAIR: Re-insert missing overhead speakers ---
+        // This protects against any update that would accidentally drop required overheads
+        const targetOverheadIds = getTargetOverheadIdsForLayout(layoutString);
+        if (targetOverheadIds.length > 0 && speakers.length > 0) {
+          const prevByRole = new Map(
+            prevSpeakers.map(s => [safeCanonRole(s.role), s])
+          );
+          const nextByRole = new Map(
+            speakers.map(s => [safeCanonRole(s.role), s])
+          );
+
+          const repaired = [...speakers];
+          let repairedAny = false;
+
+          for (const id of targetOverheadIds) {
+            const canonId = safeCanonRole(id);
+            const alreadyPresent = nextByRole.has(canonId);
+
+            if (!alreadyPresent) {
+              const prevSpeaker = prevByRole.get(canonId);
+              if (prevSpeaker) {
+                repaired.push(prevSpeaker);
+                nextByRole.set(canonId, prevSpeaker);
+                repairedAny = true;
+              }
+            }
+          }
+
+          if (repairedAny) {
+            console.log('[AS] Atmos repair', layoutString,
+              'target=', targetOverheadIds,
+              'before=', speakers.map(s => s.role),
+              'after=', repaired.map(s => s.role)
+            );
+            speakers = repaired;
+          }
+        }
+        // --- END ATMOS REPAIR ---
+
         // Use canonical visibility helper
         const visible = getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears);
 
@@ -492,7 +536,7 @@ function useDesignerState() {
           const canon = getCanonicalRole(role);
           const isVisible = visible.has(canon);
           const model = String(spk.model || "").toLowerCase().trim();
-          
+
           // [B44 FIX] If role is NOT visible in current layout, return unchanged
           // (RV will filter it out during render)
           if (!isVisible) {
@@ -504,7 +548,7 @@ function useDesignerState() {
           if (!model || model === 'off' || model === 'none') {
             return { ...spk, model: null };
           }
-          
+
           // Has a real model - return unchanged
           return spk;
         });
