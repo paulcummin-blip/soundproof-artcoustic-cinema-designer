@@ -4468,34 +4468,14 @@ return {
     return roomRect.y + (safeY * scale);
   };
 
-  // [B44] Debug log to confirm bed-surround positions are not mutated by RV
-  console.log('[RV] speakers BEFORE icon-map',
-    afterVisibility.map(s => ({
-      role: s.role,
-      canon: getCanonicalRole(s.role),
-      x: s.position?.x?.toFixed(3),
-      y: s.position?.y?.toFixed(3),
-    }))
-  );
-
-  // [B44] Debug log to confirm bed-surround positions are not mutated by RV
-  console.log('[RV] speakers BEFORE icon-map',
-    afterVisibility.map(s => ({
-      role: s.role,
-      canon: getCanonicalRole(s.role),
-      x: s.position?.x?.toFixed(3),
-      y: s.position?.y?.toFixed(3),
-    }))
-  );
-
   // 3) Map to icons
   return afterVisibility.map((speaker) => {
     const { id, role, model, position = {} } = speaker;
     const canon = getCanonicalRole(role);
 
-    // NEW: overhead speakers are rendered only by overheadIconElements,
-    // so skip them here to avoid duplicate / rectangular icons.
-    if (typeof canon === "string" && canon.startsWith("T")) {
+    // CRITICAL: Overhead speakers are rendered by overheadIconElements,
+    // skip them here to avoid duplicate icons
+    if (isOverheadRole(role)) {
       return null;
     }
 
