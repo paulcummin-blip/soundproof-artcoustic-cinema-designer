@@ -518,8 +518,14 @@ function useDesignerState() {
             );
             speakers = repaired;
           }
-        }
-        // --- END ATMOS REPAIR ---
+          }
+
+          // Assign repaired speakers back to next.speakerSystem
+          if (!next.speakerSystem) {
+          next.speakerSystem = { ...(prev.speakerSystem || {}) };
+          }
+          next.speakerSystem.placedSpeakers = speakers;
+          // --- END ATMOS REPAIR ---
 
         // Use canonical visibility helper
         const visible = getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears);
