@@ -4,6 +4,33 @@ import { safeTable } from '@/components/utils/safeLog';
 import { SHOW_DEBUG_LOGS } from '@/components/utils/diagnostics';
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 
+// --- ATMOS PROTECTION HELPERS ---
+const safeCanonRole = (role) => String(role || '').toUpperCase();
+
+// CRITICAL: This mapping must stay aligned with RoomDesigner's OVERHEAD_IDS_BY_LAYOUT
+const OVERHEAD_IDS_BY_LAYOUT_APPSTATE = {
+  "5.1.2": ["TML", "TMR"],
+  "5.1.4": ["TFL", "TFR", "TRL", "TRR"],
+  "5.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"],
+
+  "7.1.2": ["TML", "TMR"],
+  "7.1.4": ["TFL", "TFR", "TRL", "TRR"],
+  "7.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"],
+
+  "9.1.2": ["TML", "TMR"],
+  "9.1.4": ["TFL", "TFR", "TRL", "TRR"],
+  "9.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"],
+};
+
+function getTargetOverheadIdsForLayout(layout) {
+  if (!layout) return [];
+  const normalized = String(layout)
+    .split(' ')[0] // "5.1.4 Dolby Atmos" -> "5.1.4"
+    .split('_')[0]; // "5.1.4_atmos" -> "5.1.4"
+  return OVERHEAD_IDS_BY_LAYOUT_APPSTATE[normalized] || [];
+}
+// --- END ATMOS PROTECTION HELPERS ---
+
 // --- SINGLE SOURCE OF TRUTH FOR VISIBILITY -----------------------------
 // Simple, explicit visibility rules for bed-layer channels + overhead channels
 export function getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears) {
