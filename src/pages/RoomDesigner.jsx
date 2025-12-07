@@ -1046,6 +1046,80 @@ function getTargetOverheadIds(preset) {
   return OVERHEAD_IDS_BY_LAYOUT[normalized] || [];
 }
 
+// --- ATMOS FAILSAFE: ensure overhead roles are present before sending to AppState ---
+function ensureAtmosOverheads({ placedSpeakers, dolbyPreset, roomDimensions }) {
+  const current = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+
+  // If there are already any T-* roles, do nothing.
+  const hasAnyOverheads = current.some(spk =>
+    typeof spk?.role === "string" &&
+    spk.role.toUpperCase().startsWith("T")
+  );
+  if (hasAnyOverheads) {
+    return current;
+  }
+
+  // Normalise preset string, e.g. "5.1.4 Dolby Atmos" -> "5.1.4"
+  const normalizedPreset = dolbyPreset
+    ? String(dolbyPreset).split(" ")[0].split("_")[0]
+    : "";
+
+  // Only care about Atmos layouts where we expect overheads.
+  const parts = normalizedPreset.split(".");
+  const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
+  if (!heights) {
+    // No height channels in this layout, don't add anything.
+    return current;
+  }
+
+  const targetOverheadIds = getTargetOverheadIds(normalizedPreset);
+  if (!targetOverheadIds || targetOverheadIds.length === 0) {
+    return current;
+  }
+
+  // Seed a full speaker set from the preset.
+  const seeded = seedSpeakersFromPreset({
+    preset: normalizedPreset,
+    roomDimensions,
+    listeningArea: null,
+  }) || [];
+
+  // Extract only the overhead speakers from the seeded list.
+  const seededOverheads = seeded.filter(spk =>
+    typeof spk?.role === "string" &&
+    spk.role.toUpperCase().startsWith("T")
+  );
+
+  if (!seededOverheads.length) {
+    if (typeof window !== "undefined" && window.console) {
+      console.warn("[RD ATMOS FAILSAFE] No seeded overheads found for preset", normalizedPreset);
+    }
+    return current;
+  }
+
+  // Avoid duplicating roles if anything odd happens.
+  const existingRoles = new Set(
+    current.map(spk => (spk?.role || "").toUpperCase())
+  );
+
+  const merged = [
+    ...current,
+    ...seededOverheads.filter(spk => !existingRoles.has(String(spk.role || "").toUpperCase())),
+  ];
+
+  if (typeof window !== "undefined" && window.console) {
+    console.log("[RD ATMOS FAILSAFE] Added overheads for preset",
+      normalizedPreset,
+      "overhead roles:",
+      seededOverheads.map(s => s.role),
+      "final roles:",
+      merged.map(s => s.role)
+    );
+  }
+
+  return merged;
+}
+
 // Coarse seeding for a system preset (RoomDesigner refines later)
 export function seedSpeakersFromPreset({
   preset,
@@ -1155,9 +1229,20 @@ export function useSpeakerSystemStore() {
       if (typeof setSpeakerSystem !== "function") return;
 
       // Resolve the final list immediately without re-merging with prev
-      const finalList = typeof listOrUpdater === "function"
+      let finalList = typeof listOrUpdater === "function"
         ? listOrUpdater(Array.isArray(placedSpeakers) ? placedSpeakers : [])
         : (Array.isArray(listOrUpdater) ? listOrUpdater : []);
+
+      // NEW: ensure Atmos overheads are present before we hand off to AppState
+      finalList = ensureAtmosOverheads({
+        placedSpeakers: finalList,
+        dolbyPreset: dolbyLayout,
+        roomDimensions: roomDims ? {
+          width: roomDims.widthM,
+          length: roomDims.lengthM,
+          height: roomDims.heightM
+        } : { width: 4.5, length: 6.0, height: 2.8 },
+      });
 
       // DEBUG: log what we're actually sending into AppStateProvider
       // (keep this for now while we verify overhead behaviour)
@@ -1172,7 +1257,7 @@ export function useSpeakerSystemStore() {
         placedSpeakers: finalList,
       });
     },
-    [setSpeakerSystem, placedSpeakers]
+    [setSpeakerSystem, placedSpeakers, dolbyLayout, roomDims]
   );
 
   const initWithDefaultsAndRules = React.useCallback(() => {
