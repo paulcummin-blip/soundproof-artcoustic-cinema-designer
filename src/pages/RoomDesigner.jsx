@@ -1047,7 +1047,18 @@ function getTargetOverheadIds(preset) {
 }
 
 // --- ATMOS FAILSAFE: ensure overhead roles match the current layout ---
-function ensureAtmosOverheads({ placedSpeakers, dolbyPreset, roomDimensions }) {
+function ensureAtmosOverheads({ 
+  placedSpeakers, 
+  dolbyPreset, 
+  roomDimensions,
+  overheadGlobalModel = null,
+  overheadFrontOverride = null,
+  overheadMidOverride = null,
+  overheadRearOverride = null,
+  useFrontGlobal = true,
+  useMidGlobal = true,
+  useRearGlobal = true,
+}) {
   const current = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
   // Normalise preset string, e.g. "5.1.4 Dolby Atmos" -> "5.1.4"
@@ -1133,7 +1144,50 @@ function ensureAtmosOverheads({ placedSpeakers, dolbyPreset, roomDimensions }) {
     }
   }
 
-  const merged = [...bedSpeakers, ...nextOverheads];
+  let merged = [...bedSpeakers, ...nextOverheads];
+
+  // FINAL SAFETY PASS: make sure all overhead speakers have a valid model
+  // whenever a global overhead model is selected. This is crucial for:
+  // - visibility independence from surrounds
+  // - SPL calculations (Upper Front / Top Middle / Upper Rear)
+  if (overheadGlobalModel) {
+    const OVERHEAD_CANON_ROLES = new Set([
+      "TFL", "TFR", "TML", "TMR", "TRL", "TRR",
+      // legacy aliases kept for safety
+      "TL", "TR", "TBL", "TBR", "TFC", "TRC", "TBC",
+    ]);
+
+    merged = merged.map(spk => {
+      const canonRole = String(spk.role || "").toUpperCase();
+
+      if (!OVERHEAD_CANON_ROLES.has(canonRole)) {
+        return spk;
+      }
+
+      const currentModel = (spk.model || "").toString().trim().toLowerCase();
+
+      // If this overhead has no usable model, assign based on position/global
+      if (!currentModel || currentModel === "off" || currentModel === "none") {
+        // Determine model from overrides
+        let modelFromOverrides = overheadGlobalModel;
+
+        if (['TFL', 'TFR', 'TFC'].includes(canonRole)) {
+          modelFromOverrides = useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
+        } else if (['TML', 'TMR', 'TL', 'TR'].includes(canonRole)) {
+          modelFromOverrides = useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
+        } else if (['TRL', 'TRR', 'TRC', 'TBL', 'TBR'].includes(canonRole)) {
+          modelFromOverrides = useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
+        }
+
+        return {
+          ...spk,
+          model: modelFromOverrides,
+        };
+      }
+
+      return spk;
+    });
+  }
 
   if (typeof window !== "undefined" && window.console) {
     console.log("[RD ATMOS FAILSAFE] sync overheads for preset",
@@ -1141,7 +1195,9 @@ function ensureAtmosOverheads({ placedSpeakers, dolbyPreset, roomDimensions }) {
       "target=",
       targetOverheadIds,
       "final roles=",
-      merged.map(s => s.role)
+      merged.map(s => s.role),
+      "models=",
+      merged.filter(s => s.role?.toUpperCase().startsWith('T')).map(s => ({ role: s.role, model: s.model }))
     );
   }
 
@@ -1270,6 +1326,13 @@ export function useSpeakerSystemStore() {
           length: roomDims.lengthM,
           height: roomDims.heightM
         } : { width: 4.5, length: 6.0, height: 2.8 },
+        overheadGlobalModel: this?.overheadGlobalModel,
+        overheadFrontOverride: this?.overheadFrontOverride,
+        overheadMidOverride: this?.overheadMidOverride,
+        overheadRearOverride: this?.overheadRearOverride,
+        useFrontGlobal: this?.useFrontGlobal,
+        useMidGlobal: this?.useMidGlobal,
+        useRearGlobal: this?.useRearGlobal,
       });
 
       // DEBUG: log what we're actually sending into AppStateProvider

@@ -3477,8 +3477,10 @@ useEffect(() => {
 
 // Render overhead speaker icons (one per speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
-    // Use speakersToRender as the source (already includes merged overheads)
-    const allForOverheads = Array.isArray(speakersToRender) ? speakersToRender : (Array.isArray(placedSpeakers) ? placedSpeakers : []);
+    // IMPORTANT: overheads must NOT depend on isRenderableSpeaker/speakersToRender.
+    // Always start directly from placedSpeakers so T-roles are not filtered out
+    // just because they have a null model.
+    const allForOverheads = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
     // DEBUG: Log all speakers received
     if (typeof console !== 'undefined' && console.groupCollapsed) {
