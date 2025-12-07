@@ -11,15 +11,17 @@ export const isSubRole = (role) => {
 
 export const hasPos = (s) => (s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y));
 
-// FIXED: Lenient validation - allows speakers without positions (they'll get defaults in render)
 export const isRenderableSpeaker = (speaker) => {
   if (!speaker) return false;
 
   const role = String(speaker.role || "").toUpperCase();
-  const isOverhead =
-    role.startsWith("T"); // TFL, TFR, TML, TMR, TRL, TRR, etc.
 
-  // Must have a valid position
+  // NEW: Overheads ALWAYS render
+  if (role.startsWith("T")) {
+    return true;
+  }
+
+  // Existing position/model rules for non-overheads
   if (
     !speaker.position ||
     typeof speaker.position.x !== "number" ||
@@ -28,13 +30,6 @@ export const isRenderableSpeaker = (speaker) => {
     return false;
   }
 
-  // *** CRITICAL FIX ***
-  // Overheads MUST always render, even with model=null
-  if (isOverhead) {
-    return true;
-  }
-
-  // Bed layer speakers still require a valid model
   if (
     speaker.model === undefined ||
     speaker.model === null ||
