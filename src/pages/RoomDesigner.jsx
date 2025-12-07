@@ -1128,59 +1128,12 @@ export function useSpeakerSystemStore() {
         ? listOrUpdater(Array.isArray(placedSpeakers) ? placedSpeakers : [])
         : (Array.isArray(listOrUpdater) ? listOrUpdater : []);
 
-      // If someone explicitly clears everything, allow it (reconciliation can reseed later)
-      if (!Array.isArray(finalList)) {
-        return;
-      }
-
-      // --- ATMOS SAFETY GUARD ---
-      // If the current Dolby layout has overheads, never accept an update that
-      // silently drops the required overhead roles. This prevents LCR/7.x
-      // helper effects from overwriting a valid Atmos layout with a bed-only list.
-      try {
-        const targetOverheadIds = getTargetOverheadIds(dolbyLayout);
-        const hasOverheadTargets = Array.isArray(targetOverheadIds) && targetOverheadIds.length > 0;
-
-        if (hasOverheadTargets && finalList.length > 0) {
-          const targetSet = new Set(
-            targetOverheadIds.map((id) => String(id || "").toUpperCase())
-          );
-
-          const finalCanonRoles = new Set(
-            finalList.map((s) => safeCanon(s.role))
-          );
-
-          const missing = [...targetSet].filter(
-            (r) => !finalCanonRoles.has(r)
-          );
-
-          if (missing.length > 0) {
-            // We are in an Atmos layout, but this update would remove some or all
-            // overheads. Treat this as a no-op to keep the layout consistent.
-            console.warn(
-              "[RD] setSpeakers: rejected update that would drop required Atmos overheads",
-              {
-                dolbyLayout,
-                targetOverheadIds,
-                missing,
-                incomingRoles: finalList.map((s) => s.role),
-              }
-            );
-            return;
-          }
-        }
-      } catch (e) {
-        console.warn("[RD] setSpeakers Atmos guard error:", e);
-        // In case of error, fall through and still accept the update
-      }
-      // --- END ATMOS SAFETY GUARD ---
-
       // DEBUG: log what we're actually sending into AppStateProvider
       // (keep this for now while we verify overhead behaviour)
       // eslint-disable-next-line no-console
       console.log("[RD] setSpeakers sending to AppStateProvider:", {
         count: finalList.length,
-        roles: finalList.map((s) => s.role),
+        roles: finalList.map(s => s.role),
       });
 
       // Push the finished list into AppStateProvider in one shot
@@ -1188,7 +1141,7 @@ export function useSpeakerSystemStore() {
         placedSpeakers: finalList,
       });
     },
-    [setSpeakerSystem, placedSpeakers, dolbyLayout]
+    [setSpeakerSystem, placedSpeakers]
   );
 
   const initWithDefaultsAndRules = React.useCallback(() => {
