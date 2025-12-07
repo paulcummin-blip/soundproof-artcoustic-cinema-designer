@@ -453,82 +453,36 @@ function useDesignerState() {
     (updater) => {
       _setSpeakerSystem((prev) => {
         const next = typeof updater === "function" ? updater(prev) : updater;
-        if (!next) return next;
+        if (!next) return prev;
 
-        // Capture previous speakers for Atmos repair
-        const prevSpeakers = Array.isArray(prev.placedSpeakers)
-          ? prev.placedSpeakers
-          : [];
-
+        // Start from next.placedSpeakers if present, otherwise keep previous.
         let speakers = Array.isArray(next.placedSpeakers)
           ? next.placedSpeakers.slice()
           : Array.isArray(prev.placedSpeakers)
           ? prev.placedSpeakers.slice()
           : [];
 
-        console.log("[AS] RECEIVED placedSpeakers:", speakers.map(s => s.role));
-        console.log('[AS] setSpeakerSystem BEFORE normalization', {
-          count: speakers.length,
-          roles: speakers.map(s => ({ role: s.role, model: s.model }))
-        });
-
-        const layoutStringRaw =
-          (typeof next.dolbyLayout === "string" && next.dolbyLayout) ||
-          (typeof prev.dolbyLayout === "string" && prev.dolbyLayout) ||
-          (typeof dolbyLayout === "string" && dolbyLayout) ||
-          (dolbyConfig &&
-            typeof dolbyConfig.layout === "string" &&
-            dolbyConfig.layout) ||
-          "";
-
-        const layoutString = (layoutStringRaw || "").trim() || "5.1";
-
-        // --- PASSTHROUGH MODE: AppStateProvider is now a dumb container ---
-        // RoomDesigner is the single source of truth for speaker seeding/reconciliation
-        // We do NOT filter speakers by layout visibility here - that's RoomVisualisation's job
-        
-        // Simple normalization: ensure we have an array
-        const normalizedSpeakers = Array.isArray(speakers) ? speakers : [];
-
-        console.log("[AS] AFTER normalization:", normalizedSpeakers.map(s => s.role));
-        console.log('[AS] setSpeakerSystem AFTER normalization', {
-          count: normalizedSpeakers.length,
-          roles: normalizedSpeakers.map(s => ({ role: s.role, model: s.model }))
-        });
-
-        console.log("[AS] candidate yaw by role",
-          normalizedSpeakers.map(s => ({
-            role: String(s.role || "").toUpperCase(),
-            yaw: s.yaw ?? null,
-          }))
-        );
-
-        // ✅ If speakers didn't actually change, return prev to avoid churn
-        if (speakersShallowEqual(prev.placedSpeakers, normalizedSpeakers)) {
-          return prev;
+        // DEBUG: show exactly what roles we are receiving and storing.
+        if (typeof window !== "undefined" && window.console) {
+          console.log("[AS] setSpeakerSystem RAW incoming roles:",
+            speakers.map(s => s && String(s.role)));
         }
 
-        if (typeof window !== "undefined") {
-          window.__LAST_SPEAKERS__ = (normalizedSpeakers || []).map(s => ({
-            role: String(s.role),
-            model: s.model || null,
-          }));
-          if (DBG_FW) {
-            console.log("[AS] placedSpeakers(normalized)",
-              window.__LAST_SPEAKERS__);
-          }
-        }
-
-        setSpeakersEpoch(prevEpoch => prevEpoch + 1);
-
-        return {
+        const result = {
           ...prev,
           ...next,
-          placedSpeakers: normalizedSpeakers,
+          placedSpeakers: speakers,
         };
+
+        if (typeof window !== "undefined" && window.console) {
+          console.log("[AS] setSpeakerSystem STORED roles:",
+            (result.placedSpeakers || []).map(s => s && String(s.role)));
+        }
+
+        return result;
       });
     },
-    [useWidesInsteadOfRears, dolbyLayout, dolbyConfig, DBG_FW]
+    []
   );
 
   const value = useMemo(() => ({
