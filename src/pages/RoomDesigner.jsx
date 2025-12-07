@@ -1301,6 +1301,13 @@ export function useSpeakerSystemStore() {
     screen, setScreen,
     seatingPositions, setSeatingPositions,
     dolbyLayout, // Access current Dolby layout for seeding
+    overheadGlobalModel,
+    overheadFrontOverride,
+    overheadMidOverride,
+    overheadRearOverride,
+    useFrontGlobal,
+    useMidGlobal,
+    useRearGlobal,
    } = useAppState() || {};
 
   const placedSpeakers = React.useMemo(
@@ -1326,13 +1333,13 @@ export function useSpeakerSystemStore() {
           length: roomDims.lengthM,
           height: roomDims.heightM
         } : { width: 4.5, length: 6.0, height: 2.8 },
-        overheadGlobalModel: this?.overheadGlobalModel,
-        overheadFrontOverride: this?.overheadFrontOverride,
-        overheadMidOverride: this?.overheadMidOverride,
-        overheadRearOverride: this?.overheadRearOverride,
-        useFrontGlobal: this?.useFrontGlobal,
-        useMidGlobal: this?.useMidGlobal,
-        useRearGlobal: this?.useRearGlobal,
+        overheadGlobalModel,
+        overheadFrontOverride,
+        overheadMidOverride,
+        overheadRearOverride,
+        useFrontGlobal,
+        useMidGlobal,
+        useRearGlobal,
       });
 
       // DEBUG: log what we're actually sending into AppStateProvider
@@ -1348,7 +1355,7 @@ export function useSpeakerSystemStore() {
         placedSpeakers: finalList,
       });
     },
-    [setSpeakerSystem, placedSpeakers, dolbyLayout, roomDims]
+    [setSpeakerSystem, placedSpeakers, dolbyLayout, roomDims, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]
   );
 
   const initWithDefaultsAndRules = React.useCallback(() => {
@@ -2533,7 +2540,7 @@ function RoomDesignerWithState() {
   }, [
     dolbyPreset, stableDimensions, setSpeakers, _isFrozen, placedSpeakers, _sevenBedLayoutType, lastPresetRef,
     _overheadGlobalModel, _overheadFrontOverride, _overheadMidOverride, _overheadRearOverride,
-    _useFrontGlobal, _useMidGlobal, _useRearGlobal
+    _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase
   ]);
 
   // Build or rebuild seating positions whenever seating config changes
