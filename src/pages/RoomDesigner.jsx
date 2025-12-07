@@ -1257,22 +1257,22 @@ function RoomDesignerWithState() {
   const _setScreen = appState?.setScreen;
   const _enableFrontWides = appState?.enableFrontWides;
   const _setEnableFrontWides = appState?.setEnableFrontWides;
-  const overheadGlobalModel = appState?.overheadGlobalModel;
-  const setOverheadGlobalModel = appState?.setOverheadGlobalModel;
-  const overheadFrontOverride = appState?.overheadFrontOverride;
-  const setOverheadFrontOverride = appState?.setOverheadFrontOverride;
-  const overheadMidOverride = appState?.overheadMidOverride;
-  const setOverheadMidOverride = appState?.setOverheadMidOverride;
-  const overheadRearOverride = appState?.overheadRearOverride;
-  const setOverheadRearOverride = appState?.setOverheadRearOverride;
-  const useFrontGlobal = appState?.useFrontGlobal;
-  const setUseFrontGlobal = appState?.setUseFrontGlobal;
-  const useMidGlobal = appState?.useMidGlobal;
-  const setUseMidGlobal = appState?.setUseMidGlobal;
-  const useRearGlobal = appState?.useRearGlobal;
-  const setUseRearGlobal = appState?.setUseRearGlobal;
   const _rowSpacingM = appState?.rowSpacingM;
   const _setRowSpacingM = appState?.setRowSpacingM;
+  const _overheadGlobalModel = appState?.overheadGlobalModel;
+  const _setOverheadGlobalModel = appState?.setOverheadGlobalModel;
+  const _overheadFrontOverride = appState?.overheadFrontOverride;
+  const _setOverheadFrontOverride = appState?.setOverheadFrontOverride;
+  const _overheadMidOverride = appState?.overheadMidOverride;
+  const _setOverheadMidOverride = appState?.setOverheadMidOverride;
+  const _overheadRearOverride = appState?.overheadRearOverride;
+  const _setOverheadRearOverride = appState?.setOverheadRearOverride;
+  const _useFrontGlobal = appState?.useFrontGlobal;
+  const _setUseFrontGlobal = appState?.setUseFrontGlobal;
+  const _useMidGlobal = appState?.useMidGlobal;
+  const _setUseMidGlobal = appState?.setUseMidGlobal;
+  const _useRearGlobal = appState?.useRearGlobal;
+  const _setUseRearGlobal = appState?.setUseRearGlobal;
 
 
   const store = useSpeakerSystemStore();
@@ -1499,13 +1499,13 @@ function RoomDesignerWithState() {
     mlpBasis: _mlpBasis,
     seatSplMetrics: allSeatSplMetrics,
     overheadState: {
-      globalModel: overheadGlobalModel,
-      frontOverride: overheadFrontOverride,
-      midOverride: overheadMidOverride,
-      rearOverride: overheadRearOverride,
-      useFrontGlobal,
-      useMidGlobal,
-      useRearGlobal,
+      globalModel: _overheadGlobalModel,
+      frontOverride: _overheadFrontOverride,
+      midOverride: _overheadMidOverride,
+      rearOverride: _overheadRearOverride,
+      useFrontGlobal: _useFrontGlobal,
+      useMidGlobal: _useMidGlobal,
+      useRearGlobal: _useRearGlobal,
     },
   });
 
@@ -1934,28 +1934,28 @@ function RoomDesignerWithState() {
     setLcrAimMode,
     enableFrontWides: _enableFrontWides,
     setEnableFrontWides: _setEnableFrontWides,
-    selectedSpeakersByRole: _selectedSpeakersByRole, // Pass from appState
-    setSelectedSpeakersByRole: _setSelectedSpeakersByRole, // Pass setter for appState
-    speakerNodes: _speakerNodes, // Pass from appState
-    setSpeakerNodes: _setSpeakerNodes, // Pass setter for appState
-    overheadGlobalModel,
-    overheadFrontOverride,
-    overheadMidOverride,
-    overheadRearOverride,
-    useFrontGlobal,
-    useMidGlobal,
-    useRearGlobal,
-    setOverheadGlobalModel: setOverheadGlobalModel,
-    setOverheadFrontOverride: setOverheadFrontOverride,
-    setOverheadMidOverride: setOverheadMidOverride,
-    setOverheadRearOverride: setOverheadRearOverride,
-    setUseFrontGlobal: setUseFrontGlobal,
-    setUseMidGlobal: setUseMidGlobal,
-    setUseRearGlobal: setUseRearGlobal,
+    selectedSpeakersByRole: _selectedSpeakersByRole,
+    setSelectedSpeakersByRole: _setSelectedSpeakersByRole,
+    speakerNodes: _speakerNodes,
+    setSpeakerNodes: _setSpeakerNodes,
+    overheadGlobalModel: _overheadGlobalModel,
+    overheadFrontOverride: _overheadFrontOverride,
+    overheadMidOverride: _overheadMidOverride,
+    overheadRearOverride: _overheadRearOverride,
+    useFrontGlobal: _useFrontGlobal,
+    useMidGlobal: _useMidGlobal,
+    useRearGlobal: _useRearGlobal,
+    setOverheadGlobalModel: _setOverheadGlobalModel,
+    setOverheadFrontOverride: _setOverheadFrontOverride,
+    setOverheadMidOverride: _setOverheadMidOverride,
+    setOverheadRearOverride: _setOverheadRearOverride,
+    setUseFrontGlobal: _setUseFrontGlobal,
+    setUseMidGlobal: _setUseMidGlobal,
+    setUseRearGlobal: _setUseRearGlobal,
     rowSpacingM: _rowSpacingM,
     setRowSpacingM: _setRowSpacingM,
-    seatsPerRowByRow: _seatsPerRowByRow, // NEW: Pass from appState
-    setSeatsPerRowByRow: _setSeatsPerRowByRow, // NEW: Pass setter for appState
+    seatsPerRowByRow: _seatsPerRowByRow,
+    setSeatsPerRowByRow: _setSeatsPerRowByRow,
   });
 
   useEffect(() => {
@@ -2262,14 +2262,14 @@ function RoomDesignerWithState() {
                let modelFromOverrides = undefined;
 
                if (['TFL', 'TFR', 'TFC'].includes(canonId)) {
-                 modelFromOverrides = useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
+                 modelFromOverrides = _useFrontGlobal ? _overheadGlobalModel : (_overheadFrontOverride || _overheadGlobalModel);
                } else if (['TML', 'TMR'].includes(canonId)) {
-                 modelFromOverrides = useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
+                 modelFromOverrides = _useMidGlobal ? _overheadGlobalModel : (_overheadMidOverride || _overheadGlobalModel);
                } else if (['TRL', 'TRR', 'TRC'].includes(canonId)) {
-                 modelFromOverrides = useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
+                 modelFromOverrides = _useRearGlobal ? _overheadGlobalModel : (_overheadRearOverride || _overheadGlobalModel);
                }
-               
-               const finalModel = modelFromOverrides || overheadGlobalModel || seeded.model;
+
+               const finalModel = modelFromOverrides || _overheadGlobalModel || seeded.model;
                debug(`[Speakers] Creating new overhead: ${canonId} with model ${finalModel}`);
                nextOverheads.push({ ...seeded, model: finalModel, draggable: true });
              } else {
@@ -2290,8 +2290,8 @@ function RoomDesignerWithState() {
     }
   }, [
     dolbyPreset, stableDimensions, setSpeakers, _isFrozen, placedSpeakers, _sevenBedLayoutType, lastPresetRef,
-    overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride,
-    useFrontGlobal, useMidGlobal, useRearGlobal
+    _overheadGlobalModel, _overheadFrontOverride, _overheadMidOverride, _overheadRearOverride,
+    _useFrontGlobal, _useMidGlobal, _useRearGlobal
   ]);
 
   // Build or rebuild seating positions whenever seating config changes
@@ -2613,7 +2613,21 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
     overlays, setOverlays, setSevenBedLayoutType,
     frontSubsCfg, setFrontSubsCfg, rearSubsCfg, setRearSubsCfg,
     enableFrontWides: appStateEnableFrontWides, setEnableFrontWides: appStateSetEnableFrontWides,
-    // Removed rowSpacingM, setRowSpacingM from here as they are declared above with '_' prefix.
+    // Overhead state from AppStateProvider (single source of truth)
+    overheadGlobalModel: overheadGlobalModelFromState,
+    setOverheadGlobalModel: setOverheadGlobalModelFromState,
+    overheadFrontOverride: overheadFrontOverrideFromState,
+    setOverheadFrontOverride: setOverheadFrontOverrideFromState,
+    overheadMidOverride: overheadMidOverrideFromState,
+    setOverheadMidOverride: setOverheadMidOverrideFromState,
+    overheadRearOverride: overheadRearOverrideFromState,
+    setOverheadRearOverride: setOverheadRearOverrideFromState,
+    useFrontGlobal: useFrontGlobalFromState,
+    setUseFrontGlobal: setUseFrontGlobalFromState,
+    useMidGlobal: useMidGlobalFromState,
+    setUseMidGlobal: setUseMidGlobalFromState,
+    useRearGlobal: useRearGlobalFromState,
+    setUseRearGlobal: setUseRearGlobalFromState,
   } = appState;
 
   return (
@@ -2921,20 +2935,20 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         onChangeLcrAimMode={setLcrAimMode}
                         lcrAngleDeg={lcrAngleDeg}
 
-                        overheadGlobalModel={overheadGlobalModel}
-                        setOverheadGlobalModel={setOverheadGlobalModel}
-                        overheadFrontOverride={overheadFrontOverride}
-                        setOverheadFrontOverride={setOverheadFrontOverride}
-                        overheadMidOverride={overheadMidOverride}
-                        setOverheadMidOverride={setOverheadMidOverride}
-                        overheadRearOverride={overheadRearOverride}
-                        setOverheadRearOverride={setOverheadRearOverride}
-                        useFrontGlobal={useFrontGlobal}
-                        setUseFrontGlobal={setUseFrontGlobal}
-                        useMidGlobal={useMidGlobal}
-                        setUseMidGlobal={setUseMidGlobal}
-                        useRearGlobal={useRearGlobal}
-                        setUseRearGlobal={setUseRearGlobal}
+                        overheadGlobalModel={overheadGlobalModelFromState}
+                        setOverheadGlobalModel={setOverheadGlobalModelFromState}
+                        overheadFrontOverride={overheadFrontOverrideFromState}
+                        setOverheadFrontOverride={setOverheadFrontOverrideFromState}
+                        overheadMidOverride={overheadMidOverrideFromState}
+                        setOverheadMidOverride={setOverheadMidOverrideFromState}
+                        overheadRearOverride={overheadRearOverrideFromState}
+                        setOverheadRearOverride={setOverheadRearOverrideFromState}
+                        useFrontGlobal={useFrontGlobalFromState}
+                        setUseFrontGlobal={setUseFrontGlobalFromState}
+                        useMidGlobal={useMidGlobalFromState}
+                        setUseMidGlobal={setUseMidGlobalFromState}
+                        useRearGlobal={useRearGlobalFromState}
+                        setUseRearGlobal={setUseRearGlobalFromState}
                         
                         allSeatSplMetrics={allSeatSplMetrics}
                       />

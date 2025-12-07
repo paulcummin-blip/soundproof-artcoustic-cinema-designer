@@ -3529,8 +3529,19 @@ useEffect(() => {
         ? getOverheadModelForPosition(zonePosition)
         : model;
 
+      // DEBUG: Log model resolution for overheads
+      if (typeof console !== 'undefined') {
+        console.log('[RV overhead]', {
+          role: canonicalRole,
+          zone: zonePosition,
+          rawModel: model,
+          resolvedModel,
+        });
+      }
+
       // Skip if no model selected
       if (!resolvedModel || resolvedModel === 'OFF') {
+        console.warn('[RV overhead] Skipped rendering - no model', { role: canonicalRole, resolvedModel });
         return null;
       }
 
