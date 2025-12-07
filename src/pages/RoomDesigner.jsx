@@ -980,45 +980,57 @@ import SubwooferMenu from "@/components/room/SubwooferMenu"; // new
 
 import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 
-// Dolby-style role sets used by the System Configuration selector
+// Canonical Dolby layout → role list
+// This must be the single source of truth for all bed + height roles.
 export const DOLBY_PRESETS = {
-  "5.1":    ["FL","FC","FR","SL","SR","LFE"],
-  "7.1":    ["FL","FC","FR","SL","SR","SBL","SBR","LFE"],
-  "5.1.2":  ["FL","FC","FR","SL","SR","TML","TMR","LFE"],
-  "5.1.4":  ["FL","FC","FR","SL","SR","TFL","TFR","TRL","TRR","LFE"],
-  "5.1.6":  ["FL","FC","FR","SL","SR","TFL","TFR","TML","TMR","TRL","TRR","LFE"],
-  "7.1.2":  ["FL","FC","FR","SL","SR","SBL","SBR","TML","TMR","LFE"],
-  "7.1.4":  ["FL","FC","FR","SL","SR","SBL","SBR","TFL","TFR","TRL","TRR","LFE"],
-  "7.1.6":  ["FL","FC","FR","SL","SR","SBL","SBR","TFL","TFR","TML","TMR","TRL","TRR","LFE"],
-  "9.1.2":  ["FL","FCL","FC","FCR","FR","SL","SR","TML","TMR","LFE"],
-  "9.1.4":  ["FL","FCL","FC","FCR","FR","SL","SR","TFL","TFR","TRL","TRR","LFE"],
-  "9.1.6":  ["FL","FCL","FC","FCR","FR","SL","SR","TFL","TFR","TML","TMR","TRL","TRR","LFE"],
+  // Bed-only layouts
+  "5.1":  ["FL", "FC", "FR", "SL", "SR", "LFE"],
+  "7.1":  ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LFE"],
+  "9.1":  ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LW", "RW", "LFE"],
+
+  // Atmos 5.x
+  "5.1.2": ["FL", "FC", "FR", "SL", "SR", "TML", "TMR", "LFE"],
+  "5.1.4": ["FL", "FC", "FR", "SL", "SR", "TFL", "TFR", "TRL", "TRR", "LFE"],
+  "5.1.6": ["FL", "FC", "FR", "SL", "SR",
+            "TFL", "TFR", "TML", "TMR", "TRL", "TRR", "LFE"],
+
+  // Atmos 7.x
+  "7.1.2": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR",
+            "TML", "TMR", "LFE"],
+  "7.1.4": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR",
+            "TFL", "TFR", "TRL", "TRR", "LFE"],
+  "7.1.6": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR",
+            "TFL", "TFR", "TML", "TMR", "TRL", "TRR", "LFE"],
+
+  // Atmos 9.x (future-friendly; LW/RW wides)
+  "9.1.2": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LW", "RW",
+            "TML", "TMR", "LFE"],
+  "9.1.4": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LW", "RW",
+            "TFL", "TFR", "TRL", "TRR", "LFE"],
+  "9.1.6": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LW", "RW",
+            "TFL", "TFR", "TML", "TMR", "TRL", "TRR", "LFE"],
 };
 
-console.log(
-  "[RD PRESETS] keys =",
-  Object.keys(DOLBY_PRESETS || {})
-);
-
-// Single source of truth for overhead IDs per layout
+// For each Atmos layout, define exactly which overhead roles must exist.
+// This is used by getTargetOverheadIds(...) and reconciliation.
 const OVERHEAD_IDS_BY_LAYOUT = {
   "5.1.2": ["TML", "TMR"],
   "5.1.4": ["TFL", "TFR", "TRL", "TRR"],
   "5.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"],
-  
+
   "7.1.2": ["TML", "TMR"],
   "7.1.4": ["TFL", "TFR", "TRL", "TRR"],
   "7.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"],
-  
+
   "9.1.2": ["TML", "TMR"],
   "9.1.4": ["TFL", "TFR", "TRL", "TRR"],
   "9.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"],
-  
-  // Layouts without overheads
-  "5.1": [],
-  "7.1": [],
-  "9.1": [],
 };
+
+// DEBUG: log the available preset keys once at module load
+if (typeof window !== "undefined" && window.console) {
+  console.log("[RD PRESETS] keys:", Object.keys(DOLBY_PRESETS || {}));
+}
 
 function getTargetOverheadIds(preset) {
   if (!preset) return [];
