@@ -3539,14 +3539,13 @@ useEffect(() => {
         });
       }
 
-      // Skip if no model selected
-      if (!resolvedModel || resolvedModel === 'OFF') {
-        console.warn('[RV overhead] Skipped rendering - no model', { role: canonicalRole, resolvedModel });
-        return null;
-      }
+      // Use fallback model if no model selected (allows rendering with default overhead shape)
+      const effectiveModel = (!resolvedModel || resolvedModel === 'OFF') 
+        ? 'architect-2-1' 
+        : resolvedModel;
 
       // IMPORTANT: build an effective speaker that includes the resolved model
-      const effectiveSpeaker = { ...speaker, model: resolvedModel };
+      const effectiveSpeaker = { ...speaker, model: effectiveModel };
 
       // Overheads always get a drag handler because they bypass isDraggable checks
       const speakerMouseDownHandler = (e) => handleMouseDown(e, id, "speaker");
