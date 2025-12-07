@@ -12,20 +12,38 @@ export const isSubRole = (role) => {
 export const hasPos = (s) => (s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y));
 
 // FIXED: Lenient validation - allows speakers without positions (they'll get defaults in render)
-export const isRenderableSpeaker = (s) => {
-  if (!s) return false;
+export const isRenderableSpeaker = (speaker) => {
+  if (!speaker) return false;
 
-  const role = String(s.role || "").trim().toUpperCase();
-  if (!role) return false;
+  const role = String(speaker.role || "").toUpperCase();
+  const isOverhead =
+    role.startsWith("T"); // TFL, TFR, TML, TMR, TRL, TRR, etc.
 
-  // Optional: honour explicit "off" flags on model
-  const modelStr = String(s.model ?? "").trim().toLowerCase();
-  if (modelStr === "off" || modelStr === "none") {
+  // Must have a valid position
+  if (
+    !speaker.position ||
+    typeof speaker.position.x !== "number" ||
+    typeof speaker.position.y !== "number"
+  ) {
     return false;
   }
 
-  // Do NOT require hasPos / position.x / position.y here.
-  // RoomVisualisation already has safe fallbacks for missing positions.
+  // *** CRITICAL FIX ***
+  // Overheads MUST always render, even with model=null
+  if (isOverhead) {
+    return true;
+  }
+
+  // Bed layer speakers still require a valid model
+  if (
+    speaker.model === undefined ||
+    speaker.model === null ||
+    speaker.model === "off" ||
+    speaker.model === "none"
+  ) {
+    return false;
+  }
+
   return true;
 };
 
