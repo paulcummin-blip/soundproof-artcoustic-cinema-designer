@@ -1046,29 +1046,20 @@ function getTargetOverheadIds(preset) {
   return OVERHEAD_IDS_BY_LAYOUT[normalized] || [];
 }
 
-// --- ATMOS FAILSAFE: ensure overhead roles are present before sending to AppState ---
+// --- ATMOS FAILSAFE: ensure overhead roles match the current layout ---
 function ensureAtmosOverheads({ placedSpeakers, dolbyPreset, roomDimensions }) {
   const current = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-
-  // If there are already any T-* roles, do nothing.
-  const hasAnyOverheads = current.some(spk =>
-    typeof spk?.role === "string" &&
-    spk.role.toUpperCase().startsWith("T")
-  );
-  if (hasAnyOverheads) {
-    return current;
-  }
 
   // Normalise preset string, e.g. "5.1.4 Dolby Atmos" -> "5.1.4"
   const normalizedPreset = dolbyPreset
     ? String(dolbyPreset).split(" ")[0].split("_")[0]
     : "";
 
-  // Only care about Atmos layouts where we expect overheads.
   const parts = normalizedPreset.split(".");
   const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
+
+  // If no height layer, don't touch anything
   if (!heights) {
-    // No height channels in this layout, don't add anything.
     return current;
   }
 
@@ -1077,42 +1068,79 @@ function ensureAtmosOverheads({ placedSpeakers, dolbyPreset, roomDimensions }) {
     return current;
   }
 
-  // Seed a full speaker set from the preset.
+  // Split current speakers into bed + overheads
+  const bedSpeakers = [];
+  const currentOverheads = [];
+
+  for (const spk of current) {
+    const role = String(spk?.role || "").toUpperCase();
+    if (role.startsWith("T")) {
+      currentOverheads.push(spk);
+    } else {
+      bedSpeakers.push(spk);
+    }
+  }
+
+  const targetSet = new Set(
+    targetOverheadIds.map(id => String(id || "").toUpperCase())
+  );
+
+  // Map of existing overheads by role (canonical)
+  const existingByRole = new Map(
+    currentOverheads.map(spk => [
+      String(spk.role || "").toUpperCase(),
+      spk,
+    ])
+  );
+
+  // Seed full speaker set once so we have default positions for any missing overheads
   const seeded = seedSpeakersFromPreset({
     preset: normalizedPreset,
     roomDimensions,
     listeningArea: null,
   }) || [];
 
-  // Extract only the overhead speakers from the seeded list.
-  const seededOverheads = seeded.filter(spk =>
-    typeof spk?.role === "string" &&
-    spk.role.toUpperCase().startsWith("T")
+  const seededOverheadsByRole = new Map(
+    seeded
+      .filter(spk =>
+        typeof spk?.role === "string" &&
+        spk.role.toUpperCase().startsWith("T")
+      )
+      .map(spk => [String(spk.role || "").toUpperCase(), spk])
   );
 
-  if (!seededOverheads.length) {
-    if (typeof window !== "undefined" && window.console) {
-      console.warn("[RD ATMOS FAILSAFE] No seeded overheads found for preset", normalizedPreset);
+  const nextOverheads = [];
+
+  // For each target overhead role, reuse existing one if possible, otherwise seed
+  for (const id of targetOverheadIds) {
+    const canon = String(id || "").toUpperCase();
+    const existing = existingByRole.get(canon);
+    if (existing) {
+      nextOverheads.push(existing);
+      continue;
     }
-    return current;
+
+    const seededSpk = seededOverheadsByRole.get(canon);
+    if (seededSpk) {
+      nextOverheads.push(seededSpk);
+    } else if (typeof window !== "undefined" && window.console) {
+      console.warn(
+        "[RD ATMOS FAILSAFE] No seeded overhead for role",
+        canon,
+        "in preset",
+        normalizedPreset
+      );
+    }
   }
 
-  // Avoid duplicating roles if anything odd happens.
-  const existingRoles = new Set(
-    current.map(spk => (spk?.role || "").toUpperCase())
-  );
-
-  const merged = [
-    ...current,
-    ...seededOverheads.filter(spk => !existingRoles.has(String(spk.role || "").toUpperCase())),
-  ];
+  const merged = [...bedSpeakers, ...nextOverheads];
 
   if (typeof window !== "undefined" && window.console) {
-    console.log("[RD ATMOS FAILSAFE] Added overheads for preset",
+    console.log("[RD ATMOS FAILSAFE] sync overheads for preset",
       normalizedPreset,
-      "overhead roles:",
-      seededOverheads.map(s => s.role),
-      "final roles:",
+      "target=",
+      targetOverheadIds,
+      "final roles=",
       merged.map(s => s.role)
     );
   }
