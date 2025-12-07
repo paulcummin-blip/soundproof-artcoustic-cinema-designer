@@ -466,6 +466,7 @@ function useDesignerState() {
           ? prev.placedSpeakers.slice()
           : [];
 
+        console.log("[AS] RECEIVED placedSpeakers:", speakers.map(s => s.role));
         console.log('[AS] setSpeakerSystem BEFORE normalization', {
           count: speakers.length,
           roles: speakers.map(s => ({ role: s.role, model: s.model }))
@@ -489,6 +490,7 @@ function useDesignerState() {
         // Simple normalization: ensure we have an array
         const normalizedSpeakers = Array.isArray(speakers) ? speakers : [];
 
+        console.log("[AS] AFTER normalization:", normalizedSpeakers.map(s => s.role));
         console.log('[AS] setSpeakerSystem AFTER normalization', {
           count: normalizedSpeakers.length,
           roles: normalizedSpeakers.map(s => ({ role: s.role, model: s.model }))

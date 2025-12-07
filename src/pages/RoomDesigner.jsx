@@ -1194,6 +1194,7 @@ export function useSpeakerSystemStore() {
         roomDimensions: room,
         listeningArea: null,
       });
+      console.log("[RD] SEED RESULT:", seeded.map(s => s.role));
       setSpeakerSystem((prev) => ({ ...(prev || {}), placedSpeakers: seeded }));
     }
   }, [roomDims, seatingPositions, dolbyLayout, setRoomDims, setScreen, setSeatingPositions, setSpeakerSystem]);
@@ -2281,6 +2282,7 @@ function RoomDesignerWithState() {
          const nextList = [...nextBed, ...nextOverheads];
 
          debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
+         console.log("[RD] RECONCILE nextList:", nextList.map(s => s.role));
          
          safeGroup('[Speakers] Reconciliation result', () => {
            safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
