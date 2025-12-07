@@ -2283,6 +2283,10 @@ function RoomDesignerWithState() {
 
          debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
          console.log("[RD] RECONCILE nextList:", nextList.map(s => s.role));
+         console.log(
+           "[RD RECON] OUTPUT roles =",
+           nextList.map(s => s.role)
+         );
          
          safeGroup('[Speakers] Reconciliation result', () => {
            safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
