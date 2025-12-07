@@ -995,6 +995,11 @@ export const DOLBY_PRESETS = {
   "9.1.6":  ["FL","FCL","FC","FCR","FR","SL","SR","TFL","TFR","TML","TMR","TRL","TRR","LFE"],
 };
 
+console.log(
+  "[RD PRESETS] keys =",
+  Object.keys(DOLBY_PRESETS || {})
+);
+
 // Single source of truth for overhead IDs per layout
 const OVERHEAD_IDS_BY_LAYOUT = {
   "5.1.2": ["TML", "TMR"],
@@ -1035,6 +1040,13 @@ export function seedSpeakersFromPreset({
   roomDimensions,
   listeningArea = null,
 }) {
+  console.log(
+    "[RD SEED] called with preset =",
+    preset,
+    "DOLBY_PRESETS[preset] =",
+    DOLBY_PRESETS ? DOLBY_PRESETS[preset] : undefined
+  );
+
   const w = Number(roomDimensions?.width) || 4.5;
   const l = Number(roomDimensions?.length) || 6.0;
   const h = Number(roomDimensions?.height) || 2.8;
@@ -1095,13 +1107,20 @@ export function seedSpeakersFromPreset({
 
   const roles = DOLBY_PRESETS[preset] || [];
   
-  return roles.map((role) => ({
+  const seeded = roles.map((role) => ({
     id: role,
     role,
     label: role,
     model: undefined, // Neutralized default model seeding
     position: posForRole(role),
   }));
+
+  console.log(
+    "[RD SEED] result roles =",
+    Array.isArray(seeded) ? seeded.map(s => s.role) : "(not array)"
+  );
+
+  return seeded;
 }
 
 // Thin store wrapper over AppStateProvider so the page can read/write speakers
@@ -2137,6 +2156,27 @@ function RoomDesignerWithState() {
 
     if (!dolbyPreset || (_isFrozen && _isFrozen('speakers'))) return;
 
+    // --- DEBUG: reconciliation entry ---
+    const normalizedPreset = dolbyPreset
+      ? String(dolbyPreset).split(" ")[0].split("_")[0]
+      : "";
+
+    console.log(
+      "[RD RECON] ENTER",
+      {
+        dolbyPreset,
+        normalizedPreset,
+        hasPlaced: Array.isArray(placedSpeakers) ? placedSpeakers.length : 0
+      }
+    );
+
+    console.log(
+      "[RD RECON] placed roles BEFORE =",
+      Array.isArray(placedSpeakers)
+        ? placedSpeakers.map(s => s.role)
+        : "(no speakers)"
+    );
+
     const noSpeakers = (placedSpeakers || []).length === 0;
     const presetChanged = lastPresetRef.current !== dolbyPreset;
 
@@ -2145,11 +2185,6 @@ function RoomDesignerWithState() {
     if (!presetChanged && !noSpeakers) {
       return;
     }
-
-    // Get normalized preset for lookup (handles "5.1.4 Dolby Atmos" → "5.1.4")
-    const normalizedPreset = dolbyPreset
-      ? String(dolbyPreset).split(" ")[0].split("_")[0]
-      : dolbyPreset;
 
     // Early reseed for Atmos layouts without existing overheads
     const targetOverheadIds = getTargetOverheadIds(dolbyPreset);
@@ -2188,7 +2223,20 @@ function RoomDesignerWithState() {
     const hasCorrectRoles = currentRolesSet.size === expectedRolesSet.size &&
       [...expectedRolesSet].every(role => currentRolesSet.has(role));
 
-    if (!hasCorrectRoles || noSpeakers) { 
+    console.log(
+      "[RD RECON] expectedRoles =",
+      expectedRoles,
+      "hasCorrectRoles =",
+      hasCorrectRoles,
+      "noSpeakers =",
+      noSpeakers
+    );
+
+    if (!hasCorrectRoles || noSpeakers) {
+      console.log(
+        "[RD RECON] about to reseed using normalizedPreset =",
+        normalizedPreset
+      ); 
        debug(`[Speakers] Reconciling speakers for ${dolbyPreset} (${presetChanged ? 'preset changed' : 'role mismatch'})`);
        // Seed with the canonical Dolby preset (which means SBL/SBR for 7.x)
        let seededSpeakers = seedSpeakersFromPreset({
