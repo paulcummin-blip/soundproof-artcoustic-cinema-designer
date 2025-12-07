@@ -334,15 +334,28 @@ function useDesignerState() {
     [dolbyLayout, useWidesInsteadOfRears]
   );
 
+  const OVERHEAD_CANON_ROLES = useMemo(() => new Set([
+    "TFL", "TFR", "TML", "TMR", "TRL", "TRR",
+    "TL", "TR", "TBL", "TBR", "TFC", "TRC", "TBC"
+  ]), []);
+
   const getSpeakerVisibility = useCallback((role, model) => {
     const canon = String(role || "").toUpperCase();
 
-    if (canon === "LFE" || canon === "LFE1" || canon === "LFE2") return false;
+    // Never show LFE
+    if (canon.startsWith("LFE")) return false;
+
+    // Overheads must be visible solely based on layout (visibleRoles)
+    if (OVERHEAD_CANON_ROLES.has(canon)) {
+      return visibleRoles.has(canon);
+    }
+
+    // Non-overheads require a real model
     const modelStr = String(model || "").toLowerCase().trim();
     if (!modelStr || modelStr === "off" || modelStr === "none") return false;
 
     return visibleRoles.has(canon);
-  }, [visibleRoles]);
+  }, [visibleRoles, OVERHEAD_CANON_ROLES]);
 
   const isFrozen = useCallback((tab) => !!frozenTabs[tab], [frozenTabs]);
   const freezeTab = useCallback((tab) => {
