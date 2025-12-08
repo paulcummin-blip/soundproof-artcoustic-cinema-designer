@@ -281,7 +281,22 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
     };
   }
 
-  const { widthM = 4.5, lengthM = 6.0, heightM = 2.4 } = roomDims || {};
+  // Safe room dimensions - handle all possible shapes
+  const safeRoom = {
+    widthM:  typeof roomDims?.widthM  === "number"
+      ? roomDims.widthM
+      : (typeof roomDims?.width === "number" ? roomDims.width : 4.5),
+  
+    lengthM: typeof roomDims?.lengthM === "number"
+      ? roomDims.lengthM
+      : (typeof roomDims?.length === "number" ? roomDims.length : 6.0),
+  
+    heightM: typeof roomDims?.heightM === "number"
+      ? roomDims.heightM
+      : (typeof roomDims?.height === "number" ? roomDims.height : 2.5),
+  };
+  
+  const { widthM, lengthM, heightM } = safeRoom;
   const { listeningFrontY, listeningBackY, midCenterY } = bounds;
 
   // Compute seat bounds and room centre for overhead clamping
