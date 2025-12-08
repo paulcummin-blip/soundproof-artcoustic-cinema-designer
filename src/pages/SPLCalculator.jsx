@@ -1389,7 +1389,8 @@ export default function SPLCalculatorPage() {
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {(() => {
-                      const compSplCont = compCalculatedSpl?.spl_continuous_db_at_seat ?? null;
+                      // Use mehlauSpl for RP22 level checking
+                      const compSplCont = mehlauSpl;
                       if (compSplCont === null) return "—";
 
                       const achievable = [];
