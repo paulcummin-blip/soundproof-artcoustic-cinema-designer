@@ -3,56 +3,6 @@
 // Section 5.8 and Parameter 9 compliance.
 
 /**
- * Get RP22 overhead zone Y bounds in room metres.
- * Returns active bands based on layout (.2/.4/.6).
- * 
- * @param {string} dolbyLayout - e.g. "5.1.4 Dolby Atmos" or "5.1.4"
- * @param {Object} roomDimsM - { widthM, lengthM, heightM } or { width, length, height }
- * @returns {Object} { active, front, mid, rear } where each band has { yMinM, yMaxM } or null
- */
-export function getOverheadZoneBounds(dolbyLayout, roomDimsM) {
-  // Normalise layout: "5.1.4 Dolby Atmos" -> "5.1.4"
-  const layout = String(dolbyLayout || '').split(' ')[0].split('_')[0];
-
-  // If no height layer, mark inactive
-  const parts = layout.split('.');
-  const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
-  if (!heights) {
-    return { active: false, front: null, mid: null, rear: null };
-  }
-
-  const L = Number(roomDimsM?.lengthM) || Number(roomDimsM?.length) || 6.0;
-
-  // RP22 recommended Y bands as fractions of room length
-  const frontStart = L * 0.25;
-  const frontEnd   = L * 0.40;
-  const midStart   = L * 0.40;
-  const midEnd     = L * 0.60;
-  const rearStart  = L * 0.60;
-  const rearEnd    = L * 0.75;
-
-  // Decide which bands are active for each layout:
-  // .2  -> mid only
-  // .4  -> front + rear
-  // .6  -> front + mid + rear
-  const activeBands = {
-    front: heights === 4 || heights === 6,
-    mid:   heights === 2 || heights === 6,
-    rear:  heights === 4 || heights === 6,
-  };
-
-  const band = (start, end, enabled) =>
-    enabled ? { yMinM: start, yMaxM: end } : null;
-
-  return {
-    active: true,
-    front: band(frontStart, frontEnd, activeBands.front),
-    mid:   band(midStart,   midEnd,   activeBands.mid),
-    rear:  band(rearStart,  rearEnd,  activeBands.rear),
-  };
-}
-
-/**
  * Compute dynamic overhead lateral half-span constrained by seats and L/R speakers.
  * Rule:
  *  - Never NARROWER than the widest seat (plus a small margin)
