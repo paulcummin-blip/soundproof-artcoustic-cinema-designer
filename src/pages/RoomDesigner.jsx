@@ -2559,60 +2559,55 @@ function RoomDesignerWithState() {
     _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase
   ]);
 
-  // NEW: Seed overhead speakers immediately when Atmos layout + overhead model are set
+  // Ensure Atmos overheads exist as soon as an Atmos preset AND a
+  // global overhead model are selected – WITHOUT relying on surrounds.
   useEffect(() => {
-    if (!dolbyLayout || !overheadGlobalModelFromState) return;
+    if (!dolbyPreset || !_overheadGlobalModel) return;
     if (_isFrozen && _isFrozen("speakers")) return;
 
     // Normalise preset string, e.g. "5.1.4 Dolby Atmos" -> "5.1.4"
-    const normalized = String(dolbyLayout).split(" ")[0].split("_")[0];
+    const normalized = String(dolbyPreset).split(" ")[0].split("_")[0];
     const parts = normalized.split(".");
     const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
 
     // If layout has no height layer, do nothing
     if (!heights) return;
 
-    // If we already have any overheads, do nothing
+    // If we already have any T* roles, do nothing
     const hasAnyOverheads =
       Array.isArray(placedSpeakers) &&
-      placedSpeakers.some(spk =>
-        String(spk?.role || "").toUpperCase().startsWith("T")
+      placedSpeakers.some((spk) =>
+        safeCanon(spk.role || "").startsWith("T")
       );
 
     if (hasAnyOverheads) return;
 
     // Seed / fix overheads using the existing helper
-    setSpeakers(prev =>
+    setSpeakers((prev) =>
       ensureAtmosOverheads({
         placedSpeakers: prev,
-        dolbyPreset: dolbyLayout,
-        roomDimensions: _roomDims
-          ? {
-              width: _roomDims.widthM,
-              length: _roomDims.lengthM,
-              height: _roomDims.heightM,
-            }
-          : { width: 4.5, length: 6.0, height: 2.8 },
-        overheadGlobalModel: overheadGlobalModelFromState,
-        overheadFrontOverride: overheadFrontOverrideFromState,
-        overheadMidOverride: overheadMidOverrideFromState,
-        overheadRearOverride: overheadRearOverrideFromState,
-        useFrontGlobal: useFrontGlobalFromState,
-        useMidGlobal: useMidGlobalFromState,
-        useRearGlobal: useRearGlobalFromState,
+        dolbyPreset,
+        roomDimensions: stableDimensions,
+        overheadGlobalModel: _overheadGlobalModel,
+        overheadFrontOverride: _overheadFrontOverride,
+        overheadMidOverride: _overheadMidOverride,
+        overheadRearOverride: _overheadRearOverride,
+        useFrontGlobal: _useFrontGlobal,
+        useMidGlobal: _useMidGlobal,
+        useRearGlobal: _useRearGlobal,
       })
     );
   }, [
-    dolbyLayout,
+    dolbyPreset,
     placedSpeakers,
-    _roomDims,
-    overheadGlobalModelFromState,
-    overheadFrontOverrideFromState,
-    overheadMidOverrideFromState,
-    overheadRearOverrideFromState,
-    useFrontGlobalFromState,
-    useMidGlobalFromState,
-    useRearGlobalFromState,
+    stableDimensions,
+    _overheadGlobalModel,
+    _overheadFrontOverride,
+    _overheadMidOverride,
+    _overheadRearOverride,
+    _useFrontGlobal,
+    _useMidGlobal,
+    _useRearGlobal,
     setSpeakers,
     _isFrozen,
   ]);
