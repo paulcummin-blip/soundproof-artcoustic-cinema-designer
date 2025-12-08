@@ -235,7 +235,7 @@ export function computeAllSeatSplMetrics({
   const hasPos = s => s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
   const placedLCR = placedSpeakers.filter(s => hasPos(s) && screenRoles.has(getCanonicalRole(s.role)));
   const placedSur = placedSpeakers.filter(s => hasPos(s) && surroundRoles.has(getCanonicalRole(s.role)));
-  const placedOH = placedSpeakers.filter(s => hasPos(s) && overheadRoles.has(getCanonicalRole(s.role)));
+  const placedOH = placedSpeakers.filter(s => hasPos(s) && isOverheadRole(s.role));
 
   // Process each seat
   for (const seat of seats) {
