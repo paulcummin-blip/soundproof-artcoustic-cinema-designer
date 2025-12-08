@@ -438,90 +438,7 @@ function classifyRp22Level(activeParam, splAtSeatDb) {
   return 'Below L1';
 }
 
-// Legacy - no longer used
-function _LEGACY_getAchievableLevels(speaker, isScreen, screenLossDb, distanceLossDb, eqHeadroom_dB = 0) {
-  const powerHandling = safeNum(speaker.power_handling_w || speaker.max_power);
-  if (!Number.isFinite(powerHandling) || powerHandling <= 0) return [];
-  
-  const thresholds = isScreen 
-    ? [{ key: "L1", db: 102 }, { key: "L2", db: 105 }, { key: "L3", db: 108 }, { key: "L4", db: 111 }]
-    : [{ key: "L1", db: 99 }, { key: "L2", db: 102 }, { key: "L3", db: 105 }, { key: "L4", db: 108 }];
-  
-  const achievable = [];
-  
-  for (const level of thresholds) {
-    const requiredPower = computeRequiredPowerForLevel(speaker, level.db, screenLossDb, distanceLossDb, eqHeadroom_dB);
-    if (requiredPower !== null && requiredPower <= powerHandling) {
-      achievable.push({ level: level.key, power: requiredPower });
-    }
-  }
-  
-  return achievable;
-}
 
-// Legacy - no longer used
-function _LEGACY_detectIssues(speaker, group, baseline, distanceLoss, screenLossDb, distance_m, ampPower_W, eqHeadroom_dB = 0) {
-  const issues = [];
-  const targetL1 = group === "screen" ? 102 : 99;
-  const label = `${speaker.brand || "Unknown"} ${speaker.model || ""}`.trim();
-  
-  const P_amp = nW(ampPower_W);
-  const P_spk = nW(speaker.power_handling_w || speaker.max_power);
-  
-  // Check for amplifier power exceeding speaker max
-  if (P_amp > 0 && P_spk > 0 && P_amp > P_spk) {
-    issues.push(
-      `${label}: amplifier power exceeds speaker max (AMP ${Math.ceil(P_amp)} W > MAX ${Math.ceil(P_spk)} W)`
-    );
-  }
-  
-  // Check for amp limit warning (RP1 only, amp < speaker, no sensitivity)
-  if (baseline && baseline.ampLimitWarning) {
-    issues.push(
-      `${label}: cannot reflect amplifier limit (needs sensitivity); showing RP1 capability`
-    );
-  }
-  
-  // Check if Level 1 is achievable based on speaker power handling (with EQ headroom)
-  if (distanceLoss && Number.isFinite(targetL1) && P_spk > 0) {
-    const requiredPowerL1 = computeRequiredPowerForLevel(speaker, targetL1, screenLossDb, distanceLoss.loss, eqHeadroom_dB);
-    if (requiredPowerL1 !== null && requiredPowerL1 > P_spk) {
-      issues.push(
-        `${label}: Level 1 not achieved (requires ${formatPower(requiredPowerL1)} > max ${formatPower(P_spk)})`
-      );
-    }
-  }
-
-  // Compute required baseline for Level 1 (capability check with EQ headroom)
-  if (baseline && distanceLoss && Number.isFinite(targetL1)) {
-    const required_1m_L1 = targetL1 + screenLossDb + distanceLoss.loss + eqHeadroom_dB;
-    if (baseline.value !== null && baseline.value < required_1m_L1) {
-      issues.push(
-        `${label}: insufficient capability for Level 1 (needs ≥${roundUpHalf(required_1m_L1).toFixed(1)} dB @1 m, has ${roundUpHalf(baseline.value).toFixed(1)} dB @1 m)`
-      );
-    }
-  }
-  
-  // Missing or weak data
-  if (baseline && !baseline.isVerified) {
-    if (!P_spk || P_spk <= 0) {
-      issues.push(`${label}: missing power handling — calculated estimate may be inaccurate`);
-    }
-    
-    const impedanceOhm = safeNum(speaker.impedance_ohm || speaker.impedance);
-    const sens_2p83V = safeNum(speaker.sensitivity_db_2v83_1m);
-    if (!impedanceOhm && sens_2p83V !== null && !baseline.ampLimitWarning) { // Only warn if not already covered by ampLimitWarning
-      issues.push(`${label}: impedance not specified — assumed 8 Ω for sensitivity conversion`);
-    }
-  }
-  
-  // No data at all
-  if (!baseline || baseline.value === null) {
-    issues.push(`${label}: no SPL capability data available`);
-  }
-  
-  return issues;
-}
 
 // ---------- UI atoms ----------
 function Field({ label, children }) {
@@ -818,26 +735,22 @@ export default function SPLCalculatorPage() {
         }
       }
 
-      const compCalculatedSpl = computeSingleSeatSplAtDistance({
-        speakerModelId: null,
-        distance_m: d,
-        powerW: P,
+      // Compute unified continuous SPL at seat for comparator
+      // max_spl_1m is treated as CF6 peak @ 1m
+      const compSplContinuousAtSeat = computeContinuousSplAtDistanceConstrained({
+        sensitivityDb1W1m: sens_1W,
+        ampPowerW: P,
+        speakerMaxPowerW: safeNum(c.max_power),
+        cf6MaxSpl1m: safeNum(c.max_spl_1m),
+        distanceM: d,
         radiationMode,
-        screenLoss_dB: screenLossDb,
-        eqHeadroom_dB: 0,
-        speakerMeta: {
-          sensitivity_db_1w_1m: sens_1W,
-          power_handling_w: safeNum(c.max_power),
-          max_power: safeNum(c.max_power),
-          max_spl_cont_db_1m: safeNum(c.max_spl_1m),
-        }
+        screenLossDb,
       });
 
       const targetL1 = mode === "LCR" ? 102 : 99;
-      const splAtSeat = compCalculatedSpl?.spl_continuous_db_at_seat ?? null;
 
-      if (splAtSeat !== null && splAtSeat < targetL1) {
-        issues.push(`${c.brand} ${c.model}: insufficient continuous SPL for Level 1 (${splAtSeat.toFixed(1)} dB < ${targetL1} dB)`);
+      if (compSplContinuousAtSeat !== null && compSplContinuousAtSeat < targetL1) {
+        issues.push(`${c.brand} ${c.model}: insufficient continuous SPL for Level 1 (${compSplContinuousAtSeat.toFixed(1)} dB < ${targetL1} dB)`);
       }
 
       const powerHandling = safeNum(c.max_power);
@@ -988,17 +901,19 @@ export default function SPLCalculatorPage() {
               <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, background: BRAND.panel, padding: 6, maxHeight: 320, overflowY: 'auto' }} className="no-print">
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {artcousticVisible.map((opt) => {
-                    const optCalculatedSpl = computeSingleSeatSplAtDistance({
-                      speakerModelId: opt.id,
-                      distance_m: d || 3,
-                      powerW: P,
-                      radiationMode,
-                      screenLoss_dB: screenLossDb,
-                      eqHeadroom_dB: 0,
-                    });
-                    const optSPL_RSP = (optCalculatedSpl?.spl_continuous_db_at_seat ?? null) !== null
-                      ? roundUpHalf(optCalculatedSpl.spl_continuous_db_at_seat)
-                      : null;
+                   // Compute unified continuous SPL at seat for Artcoustic speaker
+                   const optSplContinuousAtSeat = computeContinuousSplAtDistanceConstrained({
+                     sensitivityDb1W1m: opt.sensitivity,
+                     ampPowerW: P,
+                     speakerMaxPowerW: opt.max_power,
+                     cf6MaxSpl1m: opt.max_spl_peak_db_cf6_1m,
+                     distanceM: d || 3,
+                     radiationMode,
+                     screenLossDb,
+                   });
+                   const optSPL_RSP = optSplContinuousAtSeat !== null
+                     ? roundUpHalf(optSplContinuousAtSeat)
+                     : null;
 
                     const targetDb = mode === "LCR" ? RP22.LCR.levels[1].db : RP22.SUR.levels[1].db;
                     const status = optSPL_RSP !== null ? rp22ColourStatus(optSPL_RSP, targetDb) : "neutral";
@@ -1076,19 +991,19 @@ export default function SPLCalculatorPage() {
                   rp1_midTermRMS_dBZ_1m: safeNum(c.max_spl_1m),
                 };
 
-                // Compute SPL using unified engine (for the input form speaker list)
-                const optCalculatedSpl = computeSingleSeatSplAtDistance({
-                  speakerModelId: null,
-                  distance_m: d || 3,
-                  powerW: P,
+                // Compute unified continuous SPL at seat for comparator status indicator
+                const compSplContinuousAtSeat = computeContinuousSplAtDistanceConstrained({
+                  sensitivityDb1W1m: sens_1W_for_calc,
+                  ampPowerW: P,
+                  speakerMaxPowerW: safeNum(c.max_power),
+                  cf6MaxSpl1m: safeNum(c.max_spl_1m),
+                  distanceM: d || 3,
                   radiationMode,
-                  screenLoss_dB: screenLossDb,
-                  eqHeadroom_dB: 0,
-                  speakerMeta: compSpeaker
+                  screenLossDb,
                 });
                 
-                const compSPL_RSP = (optCalculatedSpl?.spl_continuous_db_at_seat ?? null) !== null
-                  ? roundUpHalf(optCalculatedSpl.spl_continuous_db_at_seat)
+                const compSPL_RSP = compSplContinuousAtSeat !== null
+                  ? roundUpHalf(compSplContinuousAtSeat)
                   : null;
                 const compRP22Level = compSPL_RSP !== null ? getRP22Level(compSPL_RSP, mode === "LCR").label : "—";
 
@@ -1128,7 +1043,7 @@ export default function SPLCalculatorPage() {
                           {safeNum(c.price) ? `£${Number(c.price).toLocaleString()}` : '—'}
                         </span>
                       </Field>
-                      <Field label="Max SPL @ 1m (optional)">
+                      <Field label="Max SPL @ 1m (CF6 peak, optional)">
                         <input
                           value={c.max_spl_1m || ""}
                           onChange={(e) => updateComparator(idx, { max_spl_1m: e.target.value })}
@@ -1136,6 +1051,7 @@ export default function SPLCalculatorPage() {
                           placeholder="e.g. 115"
                           inputMode="decimal"
                           className="no-print"
+                          title="Peak SPL @ 1m with CF6 (6 dB crest factor)"
                         />
                         <span className="print-only-value" style={{ display: 'none', padding: '10px 12px', fontSize: 14 }}>
                           {safeNum(c.max_spl_1m) ? `${c.max_spl_1m} dB` : '—'}
@@ -1210,22 +1126,22 @@ export default function SPLCalculatorPage() {
                 {(() => {
                   if (!art || !d || !P) return "—";
                   
-                  // Pure Mehlau formula (matches online calculator)
-                  const mehlauSpl = computeMehlauContinuousSpl({
+                  // Unified continuous SPL at seat for Artcoustic (main value for display and RP22)
+                  const artSplContinuousAtSeat = computeContinuousSplAtDistanceConstrained({
                     sensitivityDb1W1m: art.sensitivity,
                     ampPowerW: P,
                     speakerMaxPowerW: art.max_power,
+                    cf6MaxSpl1m: art.max_spl_peak_db_cf6_1m,
                     distanceM: d,
                     radiationMode,
                     screenLossDb,
                   });
                   
-                  // CF6-constrained continuous (our RP22-aware max)
-                  const constrainedSpl = computeContinuousSplAtDistanceConstrained({
+                  // Pure Mehlau (for comparison/debugging if needed)
+                  const mehlauSpl = computeMehlauContinuousSpl({
                     sensitivityDb1W1m: art.sensitivity,
                     ampPowerW: P,
                     speakerMaxPowerW: art.max_power,
-                    cf6MaxSpl1m: art.max_spl_peak_db_cf6_1m,
                     distanceM: d,
                     radiationMode,
                     screenLossDb,
@@ -1245,11 +1161,11 @@ export default function SPLCalculatorPage() {
                   return (
                     <>
                       <div style={{ fontSize: 16, fontWeight: 600 }}>
-                        {mehlauSpl !== null ? `${roundUpHalf(mehlauSpl).toFixed(1)} dB(C)` : "—"}
+                        {artSplContinuousAtSeat !== null ? `${roundUpHalf(artSplContinuousAtSeat).toFixed(1)} dB(C)` : "—"}
                       </div>
-                      {constrainedSpl !== null && (
+                      {mehlauSpl !== null && artSplContinuousAtSeat !== null && Math.abs(mehlauSpl - artSplContinuousAtSeat) > 0.5 && (
                         <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
-                          Max (CF6-limited): {roundUpHalf(constrainedSpl).toFixed(1)} dB(C)
+                          Unconstrained: {roundUpHalf(mehlauSpl).toFixed(1)} dB(C)
                         </div>
                       )}
                       {peakAtSeat !== null && (
@@ -1267,8 +1183,8 @@ export default function SPLCalculatorPage() {
                   
                   const activeParam = mode === "LCR" ? 'P12' : 'P13';
                   
-                  // Use CF6-constrained SPL as RP22 basis
-                  const constrainedSpl = computeContinuousSplAtDistanceConstrained({
+                  // Unified continuous SPL at seat (same as display above)
+                  const artSplContinuousAtSeat = computeContinuousSplAtDistanceConstrained({
                     sensitivityDb1W1m: art.sensitivity,
                     ampPowerW: P,
                     speakerMaxPowerW: art.max_power,
@@ -1278,17 +1194,7 @@ export default function SPLCalculatorPage() {
                     screenLossDb,
                   });
                   
-                  const mehlauSpl = computeMehlauContinuousSpl({
-                    sensitivityDb1W1m: art.sensitivity,
-                    ampPowerW: P,
-                    speakerMaxPowerW: art.max_power,
-                    distanceM: d,
-                    radiationMode,
-                    screenLossDb,
-                  });
-                  
-                  const rp22SplForMain = constrainedSpl != null ? constrainedSpl : mehlauSpl;
-                  const rp22LevelLabel = classifyRp22Level(activeParam, rp22SplForMain);
+                  const rp22LevelLabel = classifyRp22Level(activeParam, artSplContinuousAtSeat);
                   
                   return (
                     <div
@@ -1309,7 +1215,8 @@ export default function SPLCalculatorPage() {
                   
                   const activeParam = mode === "LCR" ? 'P12' : 'P13';
                   
-                  const constrainedSpl = computeContinuousSplAtDistanceConstrained({
+                  // Unified continuous SPL at seat (same as display and RP22 level)
+                  const artSplContinuousAtSeat = computeContinuousSplAtDistanceConstrained({
                     sensitivityDb1W1m: art.sensitivity,
                     ampPowerW: P,
                     speakerMaxPowerW: art.max_power,
@@ -1319,17 +1226,7 @@ export default function SPLCalculatorPage() {
                     screenLossDb,
                   });
                   
-                  const mehlauSpl = computeMehlauContinuousSpl({
-                    sensitivityDb1W1m: art.sensitivity,
-                    ampPowerW: P,
-                    speakerMaxPowerW: art.max_power,
-                    distanceM: d,
-                    radiationMode,
-                    screenLossDb,
-                  });
-                  
-                  const rp22SplForMain = constrainedSpl != null ? constrainedSpl : mehlauSpl;
-                  const rp22LevelLabel = classifyRp22Level(activeParam, rp22SplForMain);
+                  const rp22LevelLabel = classifyRp22Level(activeParam, artSplContinuousAtSeat);
                   
                   const powerToRp22Text =
                     rp22LevelLabel === 'Below L1'
@@ -1362,18 +1259,9 @@ export default function SPLCalculatorPage() {
               const compPowerHandling = safeNum(c.max_power);
               const compAmpExceeds = Number.isFinite(P) && Number.isFinite(compPowerHandling) && compPowerHandling > 0 && P > compPowerHandling;
 
-              // Pure Mehlau formula
-              const mehlauSpl = computeMehlauContinuousSpl({
-                sensitivityDb1W1m: sens_1W_for_calc,
-                ampPowerW: P,
-                speakerMaxPowerW: compPowerHandling,
-                distanceM: d,
-                radiationMode,
-                screenLossDb,
-              });
-              
-              // CF6-constrained continuous (if max_spl_1m provided)
-              const constrainedSpl = computeContinuousSplAtDistanceConstrained({
+              // Unified continuous SPL at seat for comparator (main value for display and RP22)
+              // max_spl_1m is treated as CF6 peak @ 1m
+              const compSplContinuousAtSeat = computeContinuousSplAtDistanceConstrained({
                 sensitivityDb1W1m: sens_1W_for_calc,
                 ampPowerW: P,
                 speakerMaxPowerW: compPowerHandling,
@@ -1383,19 +1271,27 @@ export default function SPLCalculatorPage() {
                 screenLossDb,
               });
               
-              // Peak at seat (if max_spl_1m provided)
+              // Pure Mehlau (for comparison if constrained differs)
+              const mehlauSpl = computeMehlauContinuousSpl({
+                sensitivityDb1W1m: sens_1W_for_calc,
+                ampPowerW: P,
+                speakerMaxPowerW: compPowerHandling,
+                distanceM: d,
+                radiationMode,
+                screenLossDb,
+              });
+              
+              // Peak at seat (if max_spl_1m provided as CF6 peak)
               let peakAtSeat = null;
-              const maxSpl1m = safeNum(c.max_spl_1m);
-              if (Number.isFinite(maxSpl1m) && d) {
-                let peak1m = maxSpl1m;
+              const maxSpl1mCF6 = safeNum(c.max_spl_1m);
+              if (Number.isFinite(maxSpl1mCF6) && d) {
+                let peak1m = maxSpl1mCF6;
                 if (radiationMode === 'anechoic') {
                   peak1m -= 6;
                 }
                 const distLoss = 20 * Math.log10(Math.max(1, d));
                 peakAtSeat = peak1m - distLoss - (screenLossDb || 0);
               }
-
-              const compRP22Level = mehlauSpl !== null ? getRP22Level(roundUpHalf(mehlauSpl), mode === "LCR").label : "—";
 
               return (
                 <div key={idx} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1.5fr", gap: 8, marginTop: 8, alignItems: "stretch" }}>
@@ -1418,16 +1314,16 @@ export default function SPLCalculatorPage() {
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {(() => {
-                      if (mehlauSpl === null) return "—";
+                      if (compSplContinuousAtSeat === null) return "—";
                       
                       return (
                         <>
                           <div style={{ fontSize: 16, fontWeight: 600 }}>
-                            {roundUpHalf(mehlauSpl).toFixed(1)} dB(C)
+                            {roundUpHalf(compSplContinuousAtSeat).toFixed(1)} dB(C)
                           </div>
-                          {constrainedSpl !== null && (
+                          {mehlauSpl !== null && Math.abs(mehlauSpl - compSplContinuousAtSeat) > 0.5 && (
                             <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
-                              Max (CF6-limited): {roundUpHalf(constrainedSpl).toFixed(1)} dB(C)
+                              Unconstrained: {roundUpHalf(mehlauSpl).toFixed(1)} dB(C)
                             </div>
                           )}
                           {peakAtSeat !== null && (
@@ -1442,8 +1338,7 @@ export default function SPLCalculatorPage() {
                   <div style={{ padding: 10, border: `2px solid ${BRAND.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {(() => {
                       const activeParam = mode === "LCR" ? 'P12' : 'P13';
-                      const compRp22Spl = constrainedSpl != null ? constrainedSpl : mehlauSpl;
-                      const compRp22LevelLabel = classifyRp22Level(activeParam, compRp22Spl);
+                      const compRp22LevelLabel = classifyRp22Level(activeParam, compSplContinuousAtSeat);
                       
                       return (
                         <div
@@ -1461,8 +1356,7 @@ export default function SPLCalculatorPage() {
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {(() => {
                       const activeParam = mode === "LCR" ? 'P12' : 'P13';
-                      const compRp22Spl = constrainedSpl != null ? constrainedSpl : mehlauSpl;
-                      const compRp22LevelLabel = classifyRp22Level(activeParam, compRp22Spl);
+                      const compRp22LevelLabel = classifyRp22Level(activeParam, compSplContinuousAtSeat);
                       
                       const compPowerToRp22Text =
                         compRp22LevelLabel === 'Below L1'
