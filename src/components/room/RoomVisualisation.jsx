@@ -24,6 +24,7 @@ import { calculateViewingAngle, rp23LevelForAngleDeg } from '@/components/utils/
 import CanvasMessages from '@/components/room/CanvasMessages';
 import ZoomButtons from '@/components/ui/ZoomButtons';
 import { computeOverheadZones, renderOverheadBandsSVG } from '@/components/room/overlays/OverheadZones';
+import { getOverheadZoneBounds } from '@/components/utils/rp22OverheadZones';
 import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from '@/components/utils/overheadDragClamping';
 import { useOverheadAutoPlacement } from '@/components/hooks/useOverheadAutoPlacement';
 import { useEnsureOverheadPairs } from '@/components/hooks/useEnsureOverheadPairs';
@@ -2789,6 +2790,60 @@ useEffect(() => {
     }
   }, [placedSpeakers, widthM, lengthM, heightM, screen, visualConstraintZones, getModelDimsM]); // Use new dimension variables
 
+  // OVERHEAD CONSTRAINTS: Clamp overhead speakers to RP22 Y corridors
+  React.useEffect(() => {
+    if (!dolbyLayout || !onSetSpeakers) return;
+    
+    // Get RP22 zone bounds
+    const bounds = getOverheadZoneBounds(dolbyLayout, { widthM, lengthM, heightM });
+    if (!bounds?.active) return;
+    
+    // Map canonical role to zone
+    const getRoleZone = (canonRole) => {
+      if (['TFL', 'TFR', 'TFC'].includes(canonRole)) return bounds.front;
+      if (['TML', 'TMR', 'TL', 'TR'].includes(canonRole)) return bounds.mid;
+      if (['TRL', 'TRR', 'TRC', 'TBL', 'TBR', 'TBC'].includes(canonRole)) return bounds.rear;
+      return null;
+    };
+    
+    // Clamp helper
+    const clampToBand = (yM, band) => {
+      if (!band) return yM;
+      const { yMinM, yMaxM } = band;
+      const mid = (yMinM + yMaxM) / 2;
+      return Math.min(Math.max(yM, yMinM), yMaxM) || mid;
+    };
+    
+    // Check if any overhead needs clamping
+    let needsUpdate = false;
+    const updated = placedSpeakers.map(spk => {
+      if (!rvIsOverheadRole(spk.role)) return spk;
+      
+      const canon = getCanonicalRole(spk.role);
+      const zone = getRoleZone(canon);
+      if (!zone) return spk;
+      
+      const currentY = spk.position?.y;
+      if (!Number.isFinite(currentY)) return spk;
+      
+      const clampedY = clampToBand(currentY, zone);
+      
+      if (Math.abs(currentY - clampedY) > 0.001) {
+        needsUpdate = true;
+        return {
+          ...spk,
+          position: { ...spk.position, y: clampedY }
+        };
+      }
+      
+      return spk;
+    });
+    
+    if (needsUpdate) {
+      onSetSpeakers(updated);
+    }
+  }, [dolbyLayout, placedSpeakers, widthM, lengthM, heightM, onSetSpeakers, getCanonicalRole]);
+
   // Auto-adjust LCR speakers on screen/zone changes
   // [B44] This effect is LCR-only; bed surrounds are not touched
   useEffect(() => {
@@ -4243,6 +4298,9 @@ return {
       placedSpeakers,
       getCanonicalRole,
       widthM,
+      dolbyLayout,
+      roomDims: { widthM, lengthM, heightM },
+      overlays: _overlays,
     });
   })(),
 

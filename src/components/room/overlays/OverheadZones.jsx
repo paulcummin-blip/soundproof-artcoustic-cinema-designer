@@ -3,7 +3,8 @@
 // Uses Section 5.8 and Parameter 9 guidance.
 
 import React from "react";
-import { getListeningAreaBounds, computeRp22OverheadZoneExtents } from "@/components/utils/rp22OverheadZones";
+import { getListeningAreaBounds, computeRp22OverheadZoneExtents, getOverheadZoneBounds } from "@/components/utils/rp22OverheadZones";
+import { useAppState } from "@/components/AppStateProvider";
 
 /**
  * Compute RP22-compliant overhead zones.
@@ -65,8 +66,73 @@ export function renderOverheadBandsSVG({
   scale,
   roomRect,
   widthM,
+  dolbyLayout,
+  roomDims,
+  overlays,
 }) {
-  if (!zones || zones.status !== "ok") return null;
+  // NEW: Use simple bounds-based rendering
+  const bounds = React.useMemo(
+    () => getOverheadZoneBounds(dolbyLayout, roomDims),
+    [dolbyLayout, roomDims]
+  );
+
+  if (!bounds?.active) return null;
+
+  // Determine visibility from overlays
+  const parts = String(dolbyLayout || '5.1').split('.');
+  const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
+  
+  const showOverlay = heights === 2 ? (overlays?.OVERHEADS || overlays?.OVERHEADS_2)
+                    : heights === 4 ? (overlays?.OVERHEADS || overlays?.OVERHEADS_4)
+                    : heights === 6 ? (overlays?.OVERHEADS || overlays?.OVERHEADS_6)
+                    : false;
+
+  if (!showOverlay) return null;
+
+  // Legacy zones fallback (for piece-based rendering if needed)
+  if (!zones || zones.status !== "ok") {
+    // Simple rectangular bands based on bounds
+    const elts = [];
+    const W = Number(widthM) || 4.5;
+    
+    const renderSimpleBand = (band, zoneKey, fill) => {
+      if (!band) return;
+      
+      const [, y0px] = toPx(0, band.yMinM);
+      const [, y1px] = toPx(0, band.yMaxM);
+      const y = Math.min(y0px, y1px);
+      const hpx = Math.abs(y1px - y0px);
+      
+      if (hpx <= 0) return;
+      
+      const [x0px] = toPx(0, 0);
+      const [x1px] = toPx(W, 0);
+      const x = Math.min(x0px, x1px);
+      const wpx = Math.abs(x1px - x0px);
+      
+      const gid = `oh-simple-${zoneKey}`;
+      const opacity = zoneKey === 'mid' ? 0.18 : 0.12;
+      
+      elts.push(
+        <rect
+          key={`rect-${zoneKey}`}
+          x={x}
+          y={y}
+          width={wpx}
+          height={hpx}
+          fill={fill}
+          opacity={opacity}
+          pointerEvents="none"
+        />
+      );
+    };
+    
+    renderSimpleBand(bounds.front, 'front', '#4A230F');
+    renderSimpleBand(bounds.mid, 'mid', '#4A230F');
+    renderSimpleBand(bounds.rear, 'rear', '#213428');
+    
+    return <g data-layer="overhead-bands-simple" pointerEvents="none">{elts}</g>;
+  }
 
   const { frontZone, midZone, backZone } = zones;
 
