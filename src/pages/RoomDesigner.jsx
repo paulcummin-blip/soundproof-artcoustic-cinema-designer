@@ -2559,6 +2559,64 @@ function RoomDesignerWithState() {
     _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase
   ]);
 
+  // NEW: Seed overhead speakers immediately when Atmos layout + overhead model are set
+  useEffect(() => {
+    if (!dolbyLayout || !overheadGlobalModelFromState) return;
+    if (_isFrozen && _isFrozen("speakers")) return;
+
+    // Normalise preset string, e.g. "5.1.4 Dolby Atmos" -> "5.1.4"
+    const normalized = String(dolbyLayout).split(" ")[0].split("_")[0];
+    const parts = normalized.split(".");
+    const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
+
+    // If layout has no height layer, do nothing
+    if (!heights) return;
+
+    // If we already have any overheads, do nothing
+    const hasAnyOverheads =
+      Array.isArray(placedSpeakers) &&
+      placedSpeakers.some(spk =>
+        String(spk?.role || "").toUpperCase().startsWith("T")
+      );
+
+    if (hasAnyOverheads) return;
+
+    // Seed / fix overheads using the existing helper
+    setSpeakers(prev =>
+      ensureAtmosOverheads({
+        placedSpeakers: prev,
+        dolbyPreset: dolbyLayout,
+        roomDimensions: _roomDims
+          ? {
+              width: _roomDims.widthM,
+              length: _roomDims.lengthM,
+              height: _roomDims.heightM,
+            }
+          : { width: 4.5, length: 6.0, height: 2.8 },
+        overheadGlobalModel: overheadGlobalModelFromState,
+        overheadFrontOverride: overheadFrontOverrideFromState,
+        overheadMidOverride: overheadMidOverrideFromState,
+        overheadRearOverride: overheadRearOverrideFromState,
+        useFrontGlobal: useFrontGlobalFromState,
+        useMidGlobal: useMidGlobalFromState,
+        useRearGlobal: useRearGlobalFromState,
+      })
+    );
+  }, [
+    dolbyLayout,
+    placedSpeakers,
+    _roomDims,
+    overheadGlobalModelFromState,
+    overheadFrontOverrideFromState,
+    overheadMidOverrideFromState,
+    overheadRearOverrideFromState,
+    useFrontGlobalFromState,
+    useMidGlobalFromState,
+    useRearGlobalFromState,
+    setSpeakers,
+    _isFrozen,
+  ]);
+
   // Build or rebuild seating positions whenever seating config changes
   useEffect(() => {
     // If we've just loaded a real project, don't overwrite its seating layout
