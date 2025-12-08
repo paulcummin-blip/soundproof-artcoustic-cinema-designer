@@ -208,10 +208,7 @@ function computeMehlauContinuousSpl({
   return spl1mHalf - distanceLoss - screenLoss;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Legacy SPL functions - replaced by centralSplEngine.computeSingleSeatSplAtDistance
-// Kept here for comparator 2.83V conversion and RP22 level checks only
-// ─────────────────────────────────────────────────────────────────────────────
+
 function _LEGACY_getSPL1mCapability(speaker, ampPower_W) {
   const P_amp = nW(ampPower_W);
   const P_spk = nW(speaker.power_handling_w || speaker.max_power);
@@ -901,19 +898,19 @@ export default function SPLCalculatorPage() {
               <div style={{ border: `1px solid ${BRAND.border}`, borderRadius: 10, background: BRAND.panel, padding: 6, maxHeight: 320, overflowY: 'auto' }} className="no-print">
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {artcousticVisible.map((opt) => {
-                   // Compute unified continuous SPL at seat for Artcoustic speaker
-                   const optSplContinuousAtSeat = computeContinuousSplAtDistanceConstrained({
-                     sensitivityDb1W1m: opt.sensitivity,
-                     ampPowerW: P,
-                     speakerMaxPowerW: opt.max_power,
-                     cf6MaxSpl1m: opt.max_spl_peak_db_cf6_1m,
-                     distanceM: d || 3,
-                     radiationMode,
-                     screenLossDb,
-                   });
-                   const optSPL_RSP = optSplContinuousAtSeat !== null
-                     ? roundUpHalf(optSplContinuousAtSeat)
-                     : null;
+                    // Compute unified continuous SPL at seat for Artcoustic speaker
+                    const optSplContinuousAtSeat = computeContinuousSplAtDistanceConstrained({
+                      sensitivityDb1W1m: opt.sensitivity,
+                      ampPowerW: P,
+                      speakerMaxPowerW: opt.max_power,
+                      cf6MaxSpl1m: opt.max_spl_peak_db_cf6_1m,
+                      distanceM: d || 3,
+                      radiationMode,
+                      screenLossDb,
+                    });
+                    const optSPL_RSP = optSplContinuousAtSeat !== null
+                      ? roundUpHalf(optSplContinuousAtSeat)
+                      : null;
 
                     const targetDb = mode === "LCR" ? RP22.LCR.levels[1].db : RP22.SUR.levels[1].db;
                     const status = optSPL_RSP !== null ? rp22ColourStatus(optSPL_RSP, targetDb) : "neutral";
