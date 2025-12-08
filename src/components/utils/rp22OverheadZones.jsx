@@ -116,7 +116,22 @@ export function getListeningAreaBounds(
   placedSpeakers = [],
   getCanonicalRole = null
 ) {
-  const { widthM = 4.5, lengthM = 6.0 } = roomDims || {};
+  // Safe room dimensions - handle all possible shapes
+  const safeRoom = {
+    widthM:  typeof roomDims?.widthM  === "number"
+      ? roomDims.widthM
+      : (typeof roomDims?.width === "number" ? roomDims.width : 4.5),
+  
+    lengthM: typeof roomDims?.lengthM === "number"
+      ? roomDims.lengthM
+      : (typeof roomDims?.length === "number" ? roomDims.length : 6.0),
+  
+    heightM: typeof roomDims?.heightM === "number"
+      ? roomDims.heightM
+      : (typeof roomDims?.height === "number" ? roomDims.height : 2.5),
+  };
+  
+  const { widthM, lengthM, heightM } = safeRoom;
   
   // Guard: no seats or invalid MLP - return default inactive bounds
   if (!Array.isArray(seatingPositions) || seatingPositions.length === 0 || !mlpPoint) {
