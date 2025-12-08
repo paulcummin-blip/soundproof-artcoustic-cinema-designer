@@ -391,6 +391,39 @@ function tileStyles(status = "neutral") {
   return base;
 }
 
+function pillStyleForRP22(rp22) {
+  const base = {
+    minWidth: 52,
+    padding: "3px 8px",
+    borderRadius: 999,
+    fontSize: 11,
+    fontWeight: 600,
+    textAlign: "center",
+    whiteSpace: "nowrap",
+  };
+
+  const label = rp22?.label || "—";
+
+  if (label.startsWith("L4") || label === "Level 4") {
+    return { ...base, background: "rgba(42,110,63,0.12)", color: BRAND.green, border: `1px solid ${BRAND.green}` };
+  }
+  if (label.startsWith("L3") || label === "Level 3") {
+    return { ...base, background: "rgba(180,138,58,0.10)", color: BRAND.gold, border: `1px solid ${BRAND.gold}` };
+  }
+  if (label.startsWith("L2") || label === "Level 2") {
+    return { ...base, background: "rgba(180,138,58,0.06)", color: BRAND.gold, border: `1px solid ${BRAND.gold}` };
+  }
+  if (label.startsWith("L1") || label === "Level 1") {
+    return { ...base, background: "rgba(122,30,25,0.06)", color: BRAND.red, border: `1px solid ${BRAND.red}` };
+  }
+  if (label === "Below L1") {
+    return { ...base, background: "rgba(122,30,25,0.06)", color: BRAND.red, border: `1px solid ${BRAND.red}` };
+  }
+
+  // No data
+  return { ...base, background: "#F3F4F6", color: BRAND.subtext, border: `1px solid ${BRAND.border}` };
+}
+
 
 // Helper to format power with units
 function formatPower(watts) {
@@ -912,9 +945,10 @@ export default function SPLCalculatorPage() {
                       ? roundUpHalf(optSplContinuousAtSeat)
                       : null;
 
-                    const targetDb = mode === "LCR" ? RP22.LCR.levels[1].db : RP22.SUR.levels[1].db;
-                    const status = optSPL_RSP !== null ? rp22ColourStatus(optSPL_RSP, targetDb) : "neutral";
-                    const statusColor = status === 'green' ? BRAND.green : status === 'gold' ? BRAND.gold : BRAND.red;
+                    // Compute RP22 level for this option
+                    const activeParam = mode === "LCR" ? 'P12' : 'P13';
+                    const optRP22Label = classifyRp22Level(activeParam, optSplContinuousAtSeat);
+                    const optRP22 = { label: optRP22Label };
 
                     return (
                       <div
@@ -923,6 +957,7 @@ export default function SPLCalculatorPage() {
                         style={{
                           display: "flex",
                           alignItems: "center",
+                          justifyContent: "space-between",
                           cursor: "pointer",
                           padding: "6px 10px",
                           borderRadius: 8,
@@ -930,12 +965,14 @@ export default function SPLCalculatorPage() {
                           background: artId === opt.id ? 'rgba(27, 78, 122, 0.08)' : BRAND.panel,
                         }}
                       >
-                        <div style={{ width: 6, height: 24, borderRadius: 3, background: statusColor, marginRight: 10, flexShrink: 0 }} />
-                        <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
                           <div style={{ fontWeight: 600, color: BRAND.text, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{opt.brand} {opt.model}</div>
                           <div style={{ fontSize: 12, color: BRAND.subtext }}>
                             {opt.sensitivity ? `${opt.sensitivity} dB, ` : ""}{opt.max_power} W{showPrices && Number.isFinite(opt.price) ? `, £${opt.price?.toLocaleString()}` : ""}
                           </div>
+                        </div>
+                        <div style={pillStyleForRP22(optRP22)}>
+                          {optRP22.label}
                         </div>
                       </div>
                     );
