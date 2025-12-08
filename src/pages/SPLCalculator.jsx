@@ -126,6 +126,88 @@ function convert2p83VTo1W(sens2p83V, impedanceOhm) {
   return sens2p83V - delta;
 }
 
+// Mehlau-style continuous SPL at distance, with our constraints:
+// - Sensitivity is 1 W / 1 m in HALF-SPACE
+// - Power is limited by amplifier AND speaker max power
+// - RadiationMode: 'anechoic' = -6 dB vs half-space
+function computeContinuousSplAtDistanceConstrained({
+  sensitivityDb1W1m,
+  ampPowerW,
+  speakerMaxPowerW,
+  cf6MaxSpl1m,      // peak CF6 spec at 1 m, e.g. 114 for Evolve 2-1
+  distanceM,
+  radiationMode,     // 'half-space' | 'anechoic'
+  screenLossDb = 0,
+}) {
+  const sens = Number.isFinite(sensitivityDb1W1m) ? sensitivityDb1W1m : 87;
+
+  const P_amp = Math.max(0, Number(ampPowerW) || 0);
+  const P_spk = Math.max(0, Number(speakerMaxPowerW) || 0);
+  const P_avail = (P_amp && P_spk) ? Math.min(P_amp, P_spk) : (P_amp || P_spk || 0);
+
+  if (!P_avail) return null;
+
+  // 1) Theoretical half-space SPL @ 1 m from sensitivity + power
+  const spl1mTheoreticalHalf = sens + 10 * Math.log10(P_avail);
+
+  // 2) Apply CF6 peak ceiling at 1 m: peak cannot exceed cf6MaxSpl1m
+  // If cf6MaxSpl1m is missing, just fall back to theoretical.
+  let spl1mPeakHalf = spl1mTheoreticalHalf;
+  if (Number.isFinite(cf6MaxSpl1m)) {
+    spl1mPeakHalf = Math.min(spl1mTheoreticalHalf, cf6MaxSpl1m);
+  }
+
+  // 3) Convert peak CF6 → continuous by subtracting 6 dB crest factor
+  let spl1mContHalf = spl1mPeakHalf - 6;
+
+  // 4) Radiation mode: data is half-space; anechoic is -6 dB vs that
+  if (radiationMode === "anechoic") {
+    spl1mContHalf -= 6;
+  }
+
+  // 5) Distance & screen loss
+  const dist = Math.max(1, Number(distanceM) || 1);
+  const distanceLoss = 20 * Math.log10(dist); // 6 dB per doubling
+  const screenLoss = Number(screenLossDb) || 0;
+
+  const splAtSeat = spl1mContHalf - distanceLoss - screenLoss;
+
+  return splAtSeat;
+}
+
+// Pure Mehlau-style continuous SPL (no CF6 limit, just power-constrained)
+function computeMehlauContinuousSpl({
+  sensitivityDb1W1m,
+  ampPowerW,
+  speakerMaxPowerW,
+  distanceM,
+  radiationMode,
+  screenLossDb = 0,
+}) {
+  const sens = Number.isFinite(sensitivityDb1W1m) ? sensitivityDb1W1m : 87;
+  
+  const P_amp = Math.max(0, Number(ampPowerW) || 0);
+  const P_spk = Math.max(0, Number(speakerMaxPowerW) || 0);
+  const P_avail = (P_amp && P_spk) ? Math.min(P_amp, P_spk) : (P_amp || P_spk || 0);
+  
+  if (!P_avail) return null;
+  
+  // SPL at 1m in half-space
+  let spl1mHalf = sens + 10 * Math.log10(P_avail);
+  
+  // Radiation mode adjustment
+  if (radiationMode === "anechoic") {
+    spl1mHalf -= 6;
+  }
+  
+  // Distance & screen loss
+  const dist = Math.max(1, Number(distanceM) || 1);
+  const distanceLoss = 20 * Math.log10(dist);
+  const screenLoss = Number(screenLossDb) || 0;
+  
+  return spl1mHalf - distanceLoss - screenLoss;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Legacy SPL functions - replaced by centralSplEngine.computeSingleSeatSplAtDistance
 // Kept here for comparator 2.83V conversion and RP22 level checks only
@@ -1092,12 +1174,59 @@ export default function SPLCalculatorPage() {
                 )}
               </div>
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
-                {artSPL_RSP !== null ? `${artSPL_RSP.toFixed(1)} dB(C)` : "—"}
-                {artPeakSplAtSeat !== null && (
-                  <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
-                    Peak (CF6): {artPeakSplAtSeat.toFixed(1)} dB
-                  </div>
-                )}
+                {(() => {
+                  if (!art || !d || !P) return "—";
+                  
+                  // Pure Mehlau formula (matches online calculator)
+                  const mehlauSpl = computeMehlauContinuousSpl({
+                    sensitivityDb1W1m: art.sensitivity,
+                    ampPowerW: P,
+                    speakerMaxPowerW: art.max_power,
+                    distanceM: d,
+                    radiationMode,
+                    screenLossDb,
+                  });
+                  
+                  // CF6-constrained continuous (our RP22-aware max)
+                  const constrainedSpl = computeContinuousSplAtDistanceConstrained({
+                    sensitivityDb1W1m: art.sensitivity,
+                    ampPowerW: P,
+                    speakerMaxPowerW: art.max_power,
+                    cf6MaxSpl1m: art.max_spl_peak_db_cf6_1m,
+                    distanceM: d,
+                    radiationMode,
+                    screenLossDb,
+                  });
+                  
+                  // Peak at seat (CF6 limit with radiation mode)
+                  let peakAtSeat = null;
+                  if (Number.isFinite(art.max_spl_peak_db_cf6_1m)) {
+                    let peak1m = art.max_spl_peak_db_cf6_1m;
+                    if (radiationMode === 'anechoic') {
+                      peak1m -= 6;
+                    }
+                    const distLoss = 20 * Math.log10(Math.max(1, d));
+                    peakAtSeat = peak1m - distLoss - (screenLossDb || 0);
+                  }
+                  
+                  return (
+                    <>
+                      <div style={{ fontSize: 16, fontWeight: 600 }}>
+                        {mehlauSpl !== null ? `${roundUpHalf(mehlauSpl).toFixed(1)} dB(C)` : "—"}
+                      </div>
+                      {constrainedSpl !== null && (
+                        <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
+                          Max (CF6-limited): {roundUpHalf(constrainedSpl).toFixed(1)} dB(C)
+                        </div>
+                      )}
+                      {peakAtSeat !== null && (
+                        <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 2 }}>
+                          Peak (CF6): {roundUpHalf(peakAtSeat).toFixed(1)} dB
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
               <div style={{ padding: 10, border: `2px solid ${BRAND.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {artSPL_RSP !== null ? (
@@ -1165,29 +1294,43 @@ export default function SPLCalculatorPage() {
                 }
               }
 
-              // Compute SPL using unified engine
-              const compCalculatedSpl = computeSingleSeatSplAtDistance({
-                speakerModelId: null,
-                distance_m: d,
-                powerW: P,
-                radiationMode,
-                screenLoss_dB: screenLossDb,
-                eqHeadroom_dB: 0,
-                speakerMeta: {
-                  sensitivity_db_1w_1m: sens_1W_for_calc,
-                  power_handling_w: safeNum(c.max_power),
-                  max_power: safeNum(c.max_power),
-                  max_spl_cont_db_1m: safeNum(c.max_spl_1m),
-                }
-              });
-
-              const compSPL_RSP = (compCalculatedSpl?.spl_continuous_db_at_seat ?? null) !== null
-                ? roundUpHalf(compCalculatedSpl.spl_continuous_db_at_seat)
-                : null;
-              const compRP22Level = compSPL_RSP !== null ? getRP22Level(compSPL_RSP, mode === "LCR").label : "—";
-
               const compPowerHandling = safeNum(c.max_power);
               const compAmpExceeds = Number.isFinite(P) && Number.isFinite(compPowerHandling) && compPowerHandling > 0 && P > compPowerHandling;
+
+              // Pure Mehlau formula
+              const mehlauSpl = computeMehlauContinuousSpl({
+                sensitivityDb1W1m: sens_1W_for_calc,
+                ampPowerW: P,
+                speakerMaxPowerW: compPowerHandling,
+                distanceM: d,
+                radiationMode,
+                screenLossDb,
+              });
+              
+              // CF6-constrained continuous (if max_spl_1m provided)
+              const constrainedSpl = computeContinuousSplAtDistanceConstrained({
+                sensitivityDb1W1m: sens_1W_for_calc,
+                ampPowerW: P,
+                speakerMaxPowerW: compPowerHandling,
+                cf6MaxSpl1m: safeNum(c.max_spl_1m),
+                distanceM: d,
+                radiationMode,
+                screenLossDb,
+              });
+              
+              // Peak at seat (if max_spl_1m provided)
+              let peakAtSeat = null;
+              const maxSpl1m = safeNum(c.max_spl_1m);
+              if (Number.isFinite(maxSpl1m) && d) {
+                let peak1m = maxSpl1m;
+                if (radiationMode === 'anechoic') {
+                  peak1m -= 6;
+                }
+                const distLoss = 20 * Math.log10(Math.max(1, d));
+                peakAtSeat = peak1m - distLoss - (screenLossDb || 0);
+              }
+
+              const compRP22Level = mehlauSpl !== null ? getRP22Level(roundUpHalf(mehlauSpl), mode === "LCR").label : "—";
 
               return (
                 <div key={idx} style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr 1fr 1.5fr", gap: 8, marginTop: 8, alignItems: "stretch" }}>
@@ -1209,12 +1352,27 @@ export default function SPLCalculatorPage() {
                     )}
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
-                    {compSPL_RSP !== null ? `${compSPL_RSP.toFixed(1)} dB(C)` : "—"}
-                    {(compCalculatedSpl?.spl_peak_cf6_db_at_seat ?? null) !== null && (
-                      <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
-                        Peak (CF6): {roundUpHalf(compCalculatedSpl.spl_peak_cf6_db_at_seat).toFixed(1)} dB
-                      </div>
-                    )}
+                    {(() => {
+                      if (mehlauSpl === null) return "—";
+                      
+                      return (
+                        <>
+                          <div style={{ fontSize: 16, fontWeight: 600 }}>
+                            {roundUpHalf(mehlauSpl).toFixed(1)} dB(C)
+                          </div>
+                          {constrainedSpl !== null && (
+                            <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
+                              Max (CF6-limited): {roundUpHalf(constrainedSpl).toFixed(1)} dB(C)
+                            </div>
+                          )}
+                          {peakAtSeat !== null && (
+                            <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 2 }}>
+                              Peak (CF6): {roundUpHalf(peakAtSeat).toFixed(1)} dB
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
                   <div style={{ padding: 10, border: `2px solid ${BRAND.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {compRP22Level !== "—" ? (
