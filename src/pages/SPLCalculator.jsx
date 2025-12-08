@@ -646,7 +646,7 @@ export default function SPLCalculatorPage() {
   // Use unified SPL engine for Artcoustic speaker
   const artCalculatedSpl = useMemo(() => {
     if (!art || !d || !P) return null;
-    return computeSingleSeatSplAtDistance({
+    const result = computeSingleSeatSplAtDistance({
       speakerModelId: art.id,
       distance_m: d,
       powerW: P,
@@ -654,6 +654,11 @@ export default function SPLCalculatorPage() {
       screenLoss_dB: screenLossDb,
       eqHeadroom_dB: 0,
     });
+    
+    // Debug logging
+    console.log('[SPLCalc] mode=', radiationMode, 'spl@seat=', result?.spl_continuous_db_at_seat?.toFixed(1), 'peak@seat=', result?.spl_peak_cf6_db_at_seat?.toFixed(1), 'distance=', d, 'power=', P);
+    
+    return result;
   }, [art, d, P, radiationMode, screenLossDb]);
 
   const artSPL_RSP = (artCalculatedSpl?.spl_continuous_db_at_seat ?? null) !== null
