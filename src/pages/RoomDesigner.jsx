@@ -1034,15 +1034,12 @@ if (typeof window !== "undefined" && window.console) {
 
 function getTargetOverheadIds(preset) {
   if (!preset) return [];
-  
-  // Normalize: strip " Dolby Atmos" suffixes and other decorations
-  // "5.1.4 Dolby Atmos" → "5.1.4"
-  // "5.1.4_atmos" → "5.1.4"
+
   const normalized = String(preset)
-    .split(" ")[0]      // Remove " Dolby Atmos" suffix
-    .split("_")[0]      // Remove "_atmos" suffix
+    .split(" ")[0]   // "5.1.4 Dolby Atmos" -> "5.1.4"
+    .split("_")[0]   // "5.1.4_atmos" -> "5.1.4"
     .toLowerCase();
-  
+
   return OVERHEAD_IDS_BY_LAYOUT[normalized] || [];
 }
 
@@ -2382,8 +2379,8 @@ function RoomDesignerWithState() {
     }
 
     // Early reseed for Atmos layouts without existing overheads
-    const targetOverheadIds = getTargetOverheadIds(dolbyPreset);
-    const hasOverheadTargets = targetOverheadIds.length > 0;
+    const targetOverheadIds = getTargetOverheadIds(dolbyPreset) || [];
+    const hasOverheadTargets = Array.isArray(targetOverheadIds) && targetOverheadIds.length > 0;
     const hasAnyExistingOverheads =
       Array.isArray(placedSpeakers) &&
       placedSpeakers.some((spk) => safeCanon(spk.role || "").startsWith("T"));
