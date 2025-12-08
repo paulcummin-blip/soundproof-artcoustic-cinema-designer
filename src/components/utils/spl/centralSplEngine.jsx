@@ -390,7 +390,11 @@ export function computeSingleSeatSplAtDistance({
   const { spl1m_capability: spl1m_cont } = getSPL1mCapability(effectiveMeta, powerW, effectiveSensitivity);
 
   // 4. Peak SPL @ 1m (CF6) - direct from spec, not amp-limited
-  const spl1m_peak = effectiveMeta.max_spl_peak_db_cf6_1m;
+  // Peak SPL also needs radiation mode adjustment (same as sensitivity)
+  let spl1m_peak = effectiveMeta.max_spl_peak_db_cf6_1m;
+  if (spl1m_peak !== null && radiationMode === 'anechoic') {
+    spl1m_peak -= 6; // Apply same radiation mode adjustment to peak
+  }
 
   // 5. Distance loss (simple 1D for calculator context)
   const distanceLoss = Number.isFinite(distance_m) && distance_m > 0 
