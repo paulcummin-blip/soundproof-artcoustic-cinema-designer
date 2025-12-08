@@ -224,7 +224,12 @@ export function computeAllSeatSplMetrics({
   // Role categorization (same for all speaker types)
   const screenRoles = new Set(['FL', 'FC', 'FR']);
   const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
-  const overheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TBL', 'TBR', 'TL', 'TR', 'TFC', 'TBC']);
+  
+  // Generic overhead detector - ANY role starting with "T"
+  const isOverheadRole = (role) => {
+    const canon = getCanonicalRole(role);
+    return canon.startsWith('T'); // TFL, TFR, TML, TMR, TRL, TRR, TL, TR, TBL, TBR, TFC, TRC, TBC...
+  };
 
   // Filter speakers with valid positions
   const hasPos = s => s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
