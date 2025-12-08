@@ -405,6 +405,39 @@ function formatPower(watts) {
   return `${rounded} W`;
 }
 
+// RP22 SPL thresholds at RSP (continuous, post-EQ, no clipping)
+function getRp22Thresholds(activeParam) {
+  if (activeParam === 'P12') {
+    // Parameter 12: Screen speakers
+    return {
+      L1: 102,
+      L2: 105,
+      L3: 108,
+      L4: 111,
+    };
+  }
+  // Parameter 13: Surrounds / non-screen
+  return {
+    L1: 99,
+    L2: 102,
+    L3: 105,
+    L4: 108,
+  };
+}
+
+function classifyRp22Level(activeParam, splAtSeatDb) {
+  if (!Number.isFinite(splAtSeatDb)) return 'Below L1';
+
+  const { L1, L2, L3, L4 } = getRp22Thresholds(activeParam);
+  const spl = Number(splAtSeatDb);
+
+  if (spl >= L4) return 'Level 4';
+  if (spl >= L3) return 'Level 3';
+  if (spl >= L2) return 'Level 2';
+  if (spl >= L1) return 'Level 1';
+  return 'Below L1';
+}
+
 // Legacy - no longer used
 function _LEGACY_getAchievableLevels(speaker, isScreen, screenLossDb, distanceLossDb, eqHeadroom_dB = 0) {
   const powerHandling = safeNum(speaker.power_handling_w || speaker.max_power);
@@ -1229,49 +1262,81 @@ export default function SPLCalculatorPage() {
                 })()}
               </div>
               <div style={{ padding: 10, border: `2px solid ${BRAND.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {artSPL_RSP !== null ? (
-                  <div
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 500,
-                      color: '#1B1A1A',
-                    }}
-                  >
-                    {getRP22Level(artSPL_RSP, mode === "LCR").label}
-                  </div>
-                ) : "—"}
+                {(() => {
+                  if (!art || !d || !P) return "—";
+                  
+                  const activeParam = mode === "LCR" ? 'P12' : 'P13';
+                  
+                  // Use CF6-constrained SPL as RP22 basis
+                  const constrainedSpl = computeContinuousSplAtDistanceConstrained({
+                    sensitivityDb1W1m: art.sensitivity,
+                    ampPowerW: P,
+                    speakerMaxPowerW: art.max_power,
+                    cf6MaxSpl1m: art.max_spl_peak_db_cf6_1m,
+                    distanceM: d,
+                    radiationMode,
+                    screenLossDb,
+                  });
+                  
+                  const mehlauSpl = computeMehlauContinuousSpl({
+                    sensitivityDb1W1m: art.sensitivity,
+                    ampPowerW: P,
+                    speakerMaxPowerW: art.max_power,
+                    distanceM: d,
+                    radiationMode,
+                    screenLossDb,
+                  });
+                  
+                  const rp22SplForMain = constrainedSpl != null ? constrainedSpl : mehlauSpl;
+                  const rp22LevelLabel = classifyRp22Level(activeParam, rp22SplForMain);
+                  
+                  return (
+                    <div
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 500,
+                        color: '#1B1A1A',
+                      }}
+                    >
+                      {rp22LevelLabel}
+                    </div>
+                  );
+                })()}
               </div>
               <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                 {(() => {
-                  const artSplCont = artCalculatedSpl?.spl_continuous_db_at_seat ?? null;
-                  if (artSplCont === null) return "—";
+                  if (!art || !d || !P) return "—";
+                  
+                  const activeParam = mode === "LCR" ? 'P12' : 'P13';
+                  
+                  const constrainedSpl = computeContinuousSplAtDistanceConstrained({
+                    sensitivityDb1W1m: art.sensitivity,
+                    ampPowerW: P,
+                    speakerMaxPowerW: art.max_power,
+                    cf6MaxSpl1m: art.max_spl_peak_db_cf6_1m,
+                    distanceM: d,
+                    radiationMode,
+                    screenLossDb,
+                  });
+                  
+                  const mehlauSpl = computeMehlauContinuousSpl({
+                    sensitivityDb1W1m: art.sensitivity,
+                    ampPowerW: P,
+                    speakerMaxPowerW: art.max_power,
+                    distanceM: d,
+                    radiationMode,
+                    screenLossDb,
+                  });
+                  
+                  const rp22SplForMain = constrainedSpl != null ? constrainedSpl : mehlauSpl;
+                  const rp22LevelLabel = classifyRp22Level(activeParam, rp22SplForMain);
+                  
+                  const powerToRp22Text =
+                    rp22LevelLabel === 'Below L1'
+                      ? 'Level 1 not achieved'
+                      : `${rp22LevelLabel} achieved`;
 
-                  const achievable = [];
-                  for (const level of (mode === "LCR" ? RP22.LCR.levels : RP22.SUR.levels)) {
-                    if (artSplCont >= level.db) {
-                      achievable.push(level.key);
-                    }
-                  }
-
-                  if (achievable.length === 0) {
-                    return <div>Level 1 not achieved</div>;
-                  }
-
-                  return (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {achievable.map((level) => {
-                        const isHighest = level === achievable[achievable.length - 1];
-                        return (
-                          <div
-                            key={level}
-                            style={isHighest ? { color: '#213428', textTransform: 'uppercase', fontWeight: 600 } : undefined}
-                          >
-                            {level} Achieved
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
+                  return <div>{powerToRp22Text}</div>;
                 })()}
               </div>
             </div>
@@ -1375,50 +1440,36 @@ export default function SPLCalculatorPage() {
                     })()}
                   </div>
                   <div style={{ padding: 10, border: `2px solid ${BRAND.border}`, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {compRP22Level !== "—" ? (
-                      <div
-                        style={{
-                          fontSize: 16,
-                          fontWeight: 500,
-                          color: '#1B1A1A',
-                        }}
-                      >
-                        {compRP22Level}
-                      </div>
-                    ) : "—"}
+                    {(() => {
+                      const activeParam = mode === "LCR" ? 'P12' : 'P13';
+                      const compRp22Spl = constrainedSpl != null ? constrainedSpl : mehlauSpl;
+                      const compRp22LevelLabel = classifyRp22Level(activeParam, compRp22Spl);
+                      
+                      return (
+                        <div
+                          style={{
+                            fontSize: 16,
+                            fontWeight: 500,
+                            color: '#1B1A1A',
+                          }}
+                        >
+                          {compRp22LevelLabel}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {(() => {
-                      // Use mehlauSpl for RP22 level checking
-                      const compSplCont = mehlauSpl;
-                      if (compSplCont === null) return "—";
+                      const activeParam = mode === "LCR" ? 'P12' : 'P13';
+                      const compRp22Spl = constrainedSpl != null ? constrainedSpl : mehlauSpl;
+                      const compRp22LevelLabel = classifyRp22Level(activeParam, compRp22Spl);
+                      
+                      const compPowerToRp22Text =
+                        compRp22LevelLabel === 'Below L1'
+                          ? 'Level 1 not achieved'
+                          : `${compRp22LevelLabel} achieved`;
 
-                      const achievable = [];
-                      for (const level of (mode === "LCR" ? RP22.LCR.levels : RP22.SUR.levels)) {
-                        if (compSplCont >= level.db) {
-                          achievable.push(level.key);
-                        }
-                      }
-
-                      if (achievable.length === 0) {
-                        return <div>Level 1 not achieved</div>;
-                      }
-
-                      return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {achievable.map((level) => {
-                            const isHighest = level === achievable[achievable.length - 1];
-                            return (
-                              <div
-                                key={level}
-                                style={isHighest ? { color: '#213428', textTransform: 'uppercase', fontWeight: 600 } : undefined}
-                              >
-                                {level} Achieved
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
+                      return <div>{compPowerToRp22Text}</div>;
                     })()}
                   </div>
                 </div>
