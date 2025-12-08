@@ -130,6 +130,7 @@ function convert2p83VTo1W(sens2p83V, impedanceOhm) {
 // - Sensitivity is 1 W / 1 m in HALF-SPACE
 // - Power is limited by amplifier AND speaker max power
 // - RadiationMode: 'anechoic' = -6 dB vs half-space
+// - CF6 peak spec caps continuous SPL (no crest factor deduction)
 function computeContinuousSplAtDistanceConstrained({
   sensitivityDb1W1m,
   ampPowerW,
@@ -147,25 +148,22 @@ function computeContinuousSplAtDistanceConstrained({
 
   if (!P_avail) return null;
 
-  // 1) Theoretical half-space SPL @ 1 m from sensitivity + power
+  // 1) Theoretical continuous SPL @ 1 m in HALF-SPACE
   const spl1mTheoreticalHalf = sens + 10 * Math.log10(P_avail);
 
-  // 2) Apply CF6 peak ceiling at 1 m: peak cannot exceed cf6MaxSpl1m
+  // 2) Apply CF6 peak ceiling at 1 m (we only cap, we do NOT subtract crest factor here)
   // If cf6MaxSpl1m is missing, just fall back to theoretical.
-  let spl1mPeakHalf = spl1mTheoreticalHalf;
+  let spl1mContHalf = spl1mTheoreticalHalf;
   if (Number.isFinite(cf6MaxSpl1m)) {
-    spl1mPeakHalf = Math.min(spl1mTheoreticalHalf, cf6MaxSpl1m);
+    spl1mContHalf = Math.min(spl1mTheoreticalHalf, cf6MaxSpl1m);
   }
 
-  // 3) Convert peak CF6 → continuous by subtracting 6 dB crest factor
-  let spl1mContHalf = spl1mPeakHalf - 6;
-
-  // 4) Radiation mode: data is half-space; anechoic is -6 dB vs that
+  // 3) Radiation mode: data is half-space; anechoic is -6 dB vs that
   if (radiationMode === "anechoic") {
     spl1mContHalf -= 6;
   }
 
-  // 5) Distance & screen loss
+  // 4) Distance & screen loss to seat
   const dist = Math.max(1, Number(distanceM) || 1);
   const distanceLoss = 20 * Math.log10(dist); // 6 dB per doubling
   const screenLoss = Number(screenLossDb) || 0;
@@ -1160,22 +1158,22 @@ export default function SPLCalculatorPage() {
                 {(() => {
                   if (!art || !d || !P) return "—";
                   
-                  // Unified continuous SPL at seat for Artcoustic (main value for display and RP22)
-                  const artSplContinuousAtSeat = computeContinuousSplAtDistanceConstrained({
+                  // Pure Mehlau (unconstrained)
+                  const mehlauSpl = computeMehlauContinuousSpl({
                     sensitivityDb1W1m: art.sensitivity,
                     ampPowerW: P,
                     speakerMaxPowerW: art.max_power,
-                    cf6MaxSpl1m: art.max_spl_peak_db_cf6_1m,
                     distanceM: d,
                     radiationMode,
                     screenLossDb,
                   });
                   
-                  // Pure Mehlau (for comparison/debugging if needed)
-                  const mehlauSpl = computeMehlauContinuousSpl({
+                  // CF6-limited continuous SPL at seat (main value)
+                  const constrainedSpl = computeContinuousSplAtDistanceConstrained({
                     sensitivityDb1W1m: art.sensitivity,
                     ampPowerW: P,
                     speakerMaxPowerW: art.max_power,
+                    cf6MaxSpl1m: art.max_spl_peak_db_cf6_1m,
                     distanceM: d,
                     radiationMode,
                     screenLossDb,
@@ -1192,19 +1190,28 @@ export default function SPLCalculatorPage() {
                     peakAtSeat = peak1m - distLoss - (screenLossDb || 0);
                   }
                   
+                  const mainValue = constrainedSpl ?? mehlauSpl;
+                  
+                  if (mainValue == null) return "—";
+                  
                   return (
                     <>
+                      {/* MAIN: CF6-limited continuous at seat */}
                       <div style={{ fontSize: 16, fontWeight: 600 }}>
-                        {artSplContinuousAtSeat !== null ? `${roundUpHalf(artSplContinuousAtSeat).toFixed(1)} dB(C)` : "—"}
+                        {roundUpHalf(mainValue).toFixed(1)} dB(C)
                       </div>
-                      {mehlauSpl !== null && artSplContinuousAtSeat !== null && Math.abs(mehlauSpl - artSplContinuousAtSeat) > 0.5 && (
+                      
+                      {/* Reference: unconstrained Mehlau */}
+                      {mehlauSpl !== null && (
                         <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
                           Unconstrained: {roundUpHalf(mehlauSpl).toFixed(1)} dB(C)
                         </div>
                       )}
+                      
+                      {/* Reference: peak CF6 at seat */}
                       {peakAtSeat !== null && (
                         <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 2 }}>
-                          Peak (CF6): {roundUpHalf(peakAtSeat).toFixed(1)} dB
+                          Peak (CF6 @ seat): {roundUpHalf(peakAtSeat).toFixed(1)} dB
                         </div>
                       )}
                     </>
@@ -1348,21 +1355,28 @@ export default function SPLCalculatorPage() {
                   </div>
                   <div style={{ padding: 10, border: `1px solid ${BRAND.border}`, borderRadius: 8 }}>
                     {(() => {
-                      if (compSplContinuousAtSeat === null) return "—";
+                      const mainValue = compSplContinuousAtSeat ?? mehlauSpl;
+                      
+                      if (mainValue === null) return "—";
                       
                       return (
                         <>
+                          {/* MAIN: CF6-limited continuous at seat */}
                           <div style={{ fontSize: 16, fontWeight: 600 }}>
-                            {roundUpHalf(compSplContinuousAtSeat).toFixed(1)} dB(C)
+                            {roundUpHalf(mainValue).toFixed(1)} dB(C)
                           </div>
-                          {mehlauSpl !== null && Math.abs(mehlauSpl - compSplContinuousAtSeat) > 0.5 && (
+                          
+                          {/* Reference: unconstrained Mehlau */}
+                          {mehlauSpl !== null && (
                             <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 4 }}>
                               Unconstrained: {roundUpHalf(mehlauSpl).toFixed(1)} dB(C)
                             </div>
                           )}
+                          
+                          {/* Reference: peak CF6 at seat */}
                           {peakAtSeat !== null && (
                             <div style={{ fontSize: 11, color: BRAND.hint, marginTop: 2 }}>
-                              Peak (CF6): {roundUpHalf(peakAtSeat).toFixed(1)} dB
+                              Peak (CF6 @ seat): {roundUpHalf(peakAtSeat).toFixed(1)} dB
                             </div>
                           )}
                         </>
