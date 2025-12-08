@@ -53,9 +53,11 @@ function resolveEffectiveSensitivity(speakerMeta, effectiveSplInputs) {
 /**
  * Compute 1m SPL capability with the same logic as SPL Calculator.
  * This is the critical function that caps SPL at speaker's physical limits.
+ * NOW MATCHES SPL CALCULATOR: Uses CF6 peak @ 1m as the hard cap (no crest factor deduction).
  * 
  * @param {Object} speakerMeta - Speaker metadata from speakerData.js or getModelDimsM
  * @param {number} ampPowerW - Amplifier power in watts
+ * @param {number} effectiveSensitivity - Pre-adjusted sensitivity (with radiation mode)
  * @returns {Object} { spl1m_capability, method, isVerified }
  */
 function getSPL1mCapability(speakerMeta, ampPowerW, effectiveSensitivity = null) {
@@ -77,10 +79,12 @@ function getSPL1mCapability(speakerMeta, ampPowerW, effectiveSensitivity = null)
   }
   
   // ─────────────────────────────────────────────────────────────────────────
-  // CRITICAL: Cap at max_spl_cont_db_1m from speakerData.js
-  // This is the speaker's verified continuous max SPL at 1m — the physical limit.
+  // CRITICAL: Cap at CF6 peak @ 1m from speakerData.js (matches SPL Calculator)
+  // No crest factor deduction here - the peak value IS the continuous limit.
   // ─────────────────────────────────────────────────────────────────────────
-  const hardCap = safeNum(speakerMeta?.max_spl_cont_db_1m || speakerMeta?.max_spl);
+  const hardCap = safeNum(speakerMeta?.max_spl_peak_db_cf6_1m) || 
+                  safeNum(speakerMeta?.max_spl_cont_db_1m) || 
+                  safeNum(speakerMeta?.max_spl);
   
   // Determine final 1m capability
   let spl1m_capability = null;
@@ -382,6 +386,11 @@ export function computeSingleSeatSplAtDistance({
     max_spl_cont_db_1m: safeNum(resolvedMeta?.max_spl_cont_db_1m || resolvedMeta?.max_spl) || null,
     max_spl_peak_db_cf6_1m: safeNum(resolvedMeta?.max_spl_peak_db_cf6_1m) || null,
   };
+  
+  // Console log for sanity check
+  if (speakerModelId && distance_m && powerW) {
+    console.log(`[centralSplEngine] Computing SPL for ${speakerModelId}: distance=${distance_m.toFixed(2)}m, power=${Math.round(powerW)}W, radiationMode=${radiationMode}`);
+  }
 
   // 2. Resolve effective sensitivity with radiation mode adjustment
   const effectiveSensitivity = resolveEffectiveSensitivity(effectiveMeta, { radiationMode });
@@ -410,6 +419,11 @@ export function computeSingleSeatSplAtDistance({
   const spl_peak_cf6_db_at_seat = Number.isFinite(spl1m_peak)
     ? spl1m_peak - distanceLoss - (screenLoss_dB || 0)
     : null;
+
+  // Console log for sanity check
+  if (speakerModelId) {
+    console.log(`[centralSplEngine] ${speakerModelId} @ ${distance_m.toFixed(2)}m: continuous=${spl_continuous_db_at_seat?.toFixed(1)}dB, peak=${spl_peak_cf6_db_at_seat?.toFixed(1)}dB (1m_cont=${spl1m_cont?.toFixed(1)}dB, 1m_peak=${spl1m_peak?.toFixed(1)}dB, sens_eff=${effectiveSensitivity?.toFixed(1)}dB)`);
+  }
 
   return {
     spl_continuous_db_at_seat,
