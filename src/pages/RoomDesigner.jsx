@@ -2534,9 +2534,25 @@ function RoomDesignerWithState() {
          safeGroup('[Speakers] Reconciliation result', () => {
            safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
          });
-         return nextList;
-       });
-    }
+
+         // NEW: guarantee Atmos overheads exist & have models,
+         // independent of surround model selection.
+         const withOverheads = ensureAtmosOverheads({
+           placedSpeakers: nextList,
+           dolbyPreset,
+           roomDimensions: stableDimensions,
+           overheadGlobalModel: _overheadGlobalModel,
+           overheadFrontOverride: _overheadFrontOverride,
+           overheadMidOverride: _overheadMidOverride,
+           overheadRearOverride: _overheadRearOverride,
+           useFrontGlobal: _useFrontGlobal,
+           useMidGlobal: _useMidGlobal,
+           useRearGlobal: _useRearGlobal,
+         });
+
+         return withOverheads;
+         });
+         }
   }, [
     dolbyPreset, stableDimensions, setSpeakers, _isFrozen, placedSpeakers, _sevenBedLayoutType, lastPresetRef,
     _overheadGlobalModel, _overheadFrontOverride, _overheadMidOverride, _overheadRearOverride,
