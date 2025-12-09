@@ -3391,12 +3391,27 @@ useEffect(() => {
     base.enableFrontWides = enableFrontWides;
     base.enableRp22Angles = rp22AnglesEnabled;
     
-    // CRITICAL: Separate overhead icon visibility from zone data
-    // Icon visibility depends ONLY on the toggle, NOT on zone calculation status
-    base.showOverheadIcons = !!_overlays?.OVERHEADS;
+    // CRITICAL: Overhead ICON visibility - independent of zone overlays
+    // Icons show when ANY overhead toggle is on, regardless of zone overlay state
+    base.showOverheadIcons = !!(
+      _overlays?.OVERHEADS_2 || 
+      _overlays?.OVERHEADS_4 || 
+      _overlays?.OVERHEADS_6
+    );
     
     // Add overhead zones to overlay state - only when toggle is enabled AND zones are ready
-    base.OVERHEADS = (_overlays?.OVERHEADS && overheadZones?.status === 'ok') ? overheadZones : null;
+    // This controls zone RENDERING (shaded corridors), NOT icon visibility
+    base.OVERHEADS = (base.showOverheadIcons && overheadZones?.status === 'ok') ? overheadZones : null;
+
+    console.log('[RV] overlaysForRendering', {
+      showOverheadIcons: base.showOverheadIcons,
+      hasOverheadZones: !!base.OVERHEADS,
+      toggles: {
+        OVERHEADS_2: !!_overlays?.OVERHEADS_2,
+        OVERHEADS_4: !!_overlays?.OVERHEADS_4,
+        OVERHEADS_6: !!_overlays?.OVERHEADS_6,
+      }
+    });
 
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled, overheadZones]);
@@ -3519,17 +3534,19 @@ useEffect(() => {
     });
 
     if (typeof console !== 'undefined') {
-      console.log('Overhead speakers to render:', overheadSpeakers);
+      console.log('Overhead speakers to render:', overheadSpeakers.length);
       console.log('Overhead roles:', overheadSpeakers.map(s => rvSafeCanonRole(s.role)));
-      console.log('[RV] Overhead icon count:', overheadSpeakers.length);
+      console.log('[RV] Overhead icons ON, rendering', overheadSpeakers.length, 'speakers');
       if (console.groupEnd) console.groupEnd();
     }
 
     // No overhead speakers to render
     if (overheadSpeakers.length === 0) {
-      console.log('[RV] No overhead speakers with valid positions found');
+      console.log('[RV] No overhead speakers with valid positions - icons ON but nothing to render');
       return null;
     }
+
+    console.log('[RV] Rendering', overheadSpeakers.length, 'overhead speaker icons');
 
     // Render one icon per overhead speaker using SpeakerIcon
     return overheadSpeakers.map((speaker) => {
