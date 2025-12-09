@@ -3478,8 +3478,8 @@ useEffect(() => {
 // Render overhead speaker icons (one per speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
     // CRITICAL: Only render overheads when the overlay toggle is ON
-    const overheadOverlayEnabled =
-      !!(_overlays?.OVERHEADS || _overlays?.OVERHEADS_2 || _overlays?.OVERHEADS_4 || _overlays?.OVERHEADS_6);
+    // Use overlaysForRendering.OVERHEADS which is consolidated from the three specific toggles
+    const overheadOverlayEnabled = !!overlaysForRendering?.OVERHEADS;
     
     if (!overheadOverlayEnabled) {
       console.log('[RV] Overhead toggle OFF - no overhead icons');
@@ -3575,10 +3575,7 @@ useEffect(() => {
       );
     }).filter(Boolean);
   }, [
-    _overlays?.OVERHEADS,
-    _overlays?.OVERHEADS_2,
-    _overlays?.OVERHEADS_4,
-    _overlays?.OVERHEADS_6,
+    overlaysForRendering?.OVERHEADS,
     placedSpeakers,
     speakersToRender,
     getCanonicalRole,
