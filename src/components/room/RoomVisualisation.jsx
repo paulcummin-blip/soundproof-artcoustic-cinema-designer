@@ -3477,6 +3477,15 @@ useEffect(() => {
 
 // Render overhead speaker icons (one per speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
+    // CRITICAL: Only render overheads when the overlay toggle is ON
+    const overheadOverlayEnabled =
+      !!(_overlays?.OVERHEADS || _overlays?.OVERHEADS_2 || _overlays?.OVERHEADS_4 || _overlays?.OVERHEADS_6);
+    
+    if (!overheadOverlayEnabled) {
+      console.log('[RV] Overhead toggle OFF - no overhead icons');
+      return null;
+    }
+
     // IMPORTANT: overheads must NOT depend on isRenderableSpeaker/speakersToRender.
     // Always start directly from placedSpeakers so T-roles are not filtered out
     // just because they have a null model.
@@ -3566,6 +3575,10 @@ useEffect(() => {
       );
     }).filter(Boolean);
   }, [
+    _overlays?.OVERHEADS,
+    _overlays?.OVERHEADS_2,
+    _overlays?.OVERHEADS_4,
+    _overlays?.OVERHEADS_6,
     placedSpeakers,
     speakersToRender,
     getCanonicalRole,
@@ -4482,32 +4495,10 @@ return {
     }
   });
 
-  // --- OVERHEAD VISIBILITY ENFORCER ---
-  const overheadOverlayEnabled =
-    !!(_overlays?.OVERHEADS || _overlays?.OVERHEADS_2 || _overlays?.OVERHEADS_4 || _overlays?.OVERHEADS_6);
-
-  if (overheadOverlayEnabled) {
-    const overheadSpeakers = rawSpeakers.filter(s => rvIsOverheadRole(s.role));
-
-    if (overheadSpeakers.length > 0) {
-      const existingCanon = new Set(
-        (afterVisibility || []).map(s => rvSafeCanonRole(s.role))
-      );
-
-      const merged = Array.isArray(afterVisibility) ? [...afterVisibility] : [];
-
-      for (const sp of overheadSpeakers) {
-        const canon = rvSafeCanonRole(sp.role);
-        if (!existingCanon.has(canon)) {
-          merged.push(sp);
-          existingCanon.add(canon);
-        }
-      }
-
-      afterVisibility = merged;
-    }
-  }
-  // --- END OVERHEAD VISIBILITY ENFORCER ---
+  // --- OVERHEAD VISIBILITY REMOVED ---
+  // Overhead speakers are now rendered independently via overheadIconElements
+  // This prevents surrounds toggle from showing overheads
+  // --- END OVERHEAD VISIBILITY REMOVED ---
 
   // DEBUG: Expose to window for manual inspection
   if (typeof window !== 'undefined') {
