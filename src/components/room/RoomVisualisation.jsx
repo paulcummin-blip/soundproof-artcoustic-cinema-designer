@@ -3391,25 +3391,30 @@ useEffect(() => {
     base.enableFrontWides = enableFrontWides;
     base.enableRp22Angles = rp22AnglesEnabled;
     
-    // CRITICAL: Overhead ICON visibility - independent of zone overlays
-    // Icons show when ANY overhead toggle is on, regardless of zone overlay state
+    // CRITICAL: Decouple icon visibility from zone overlay rendering
+    // 1. Icon visibility: based on layout toggles (OVERHEADS_2/4/6) - controls speaker icons
     base.showOverheadIcons = !!(
       _overlays?.OVERHEADS_2 || 
       _overlays?.OVERHEADS_4 || 
       _overlays?.OVERHEADS_6
     );
     
-    // Add overhead zones to overlay state - only when toggle is enabled AND zones are ready
-    // This controls zone RENDERING (shaded corridors), NOT icon visibility
-    base.OVERHEADS = (base.showOverheadIcons && overheadZones?.status === 'ok') ? overheadZones : null;
+    // 2. Zone visibility: based on Dolby Zones toggle - controls corridor overlays
+    base.showOverheadZones = !!_overlays?.enableDolbyZones;
+    
+    // 3. Zone data: always include when computed, rendering is controlled separately
+    // This ensures zones are available for clamping even when overlay is hidden
+    base.OVERHEADS = (overheadZones?.status === 'ok') ? overheadZones : null;
 
     console.log('[RV] overlaysForRendering', {
       showOverheadIcons: base.showOverheadIcons,
+      showOverheadZones: base.showOverheadZones,
       hasOverheadZones: !!base.OVERHEADS,
       toggles: {
         OVERHEADS_2: !!_overlays?.OVERHEADS_2,
         OVERHEADS_4: !!_overlays?.OVERHEADS_4,
         OVERHEADS_6: !!_overlays?.OVERHEADS_6,
+        enableDolbyZones: !!_overlays?.enableDolbyZones,
       }
     });
 
@@ -5283,7 +5288,8 @@ return (
             {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
             {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
             {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {overlaysForRendering?.OVERHEADS?.status === 'ok' && ZoneComponents.OVERHEADS}
+            {/* CRITICAL: Zone rendering depends ONLY on showOverheadZones toggle, NOT icon visibility */}
+            {overlaysForRendering?.showOverheadZones && overlaysForRendering?.OVERHEADS?.status === 'ok' && ZoneComponents.OVERHEADS}
             {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
             
             {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
