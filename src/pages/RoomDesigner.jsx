@@ -1911,8 +1911,6 @@ function RoomDesignerWithState() {
     }
   }, [_rearSubsCfg?.model, _rearSubsCfg?.count, placedSpeakers, stableDimensions.width, stableDimensions.length, setSubWarnings]);
 
-  const enableFrontWides = _enableFrontWides;
-  
   // NEW: Calculate live room price total
   const priceData = usePriceCalculation({
     placedSpeakers,
@@ -1920,6 +1918,20 @@ function RoomDesignerWithState() {
     rearSubsCfg: _rearSubsCfg,
     difficultyMultiplier,
   });
+  
+  // Publish price data to window for sidebar consumption
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__ROOM_DESIGNER_PRICE__ = {
+        showPrices,
+        baseTotal: priceData.baseTotal,
+        finalTotal: priceData.finalTotal,
+        difficultyMultiplier,
+      };
+    }
+  }, [showPrices, priceData.baseTotal, priceData.finalTotal, difficultyMultiplier]);
+  
+  const enableFrontWides = _enableFrontWides;
 
   // Safe front-wide zone memo with hard guards
   const frontWideZones = useMemo(() => {
