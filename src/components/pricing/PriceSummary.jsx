@@ -38,15 +38,12 @@ export default function PriceSummary({
       }}
     >
       <div style={{ fontSize: 11, fontWeight: 600, color: '#3E4349', marginBottom: 8 }}>
-        Room Price Summary
+        Loudspeaker system price, inc VAT
       </div>
       
       <div>
-        <div style={{ fontSize: 18, fontWeight: 700, color: '#213428', marginBottom: 4 }}>
+        <div style={{ fontSize: 18, fontWeight: 700, color: '#213428' }}>
           {formatPrice(finalTotal)}
-        </div>
-        <div style={{ fontSize: 10, color: '#3E4349' }}>
-          Base hardware total: {formatPrice(baseTotal)}
         </div>
       </div>
     </div>
