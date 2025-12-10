@@ -3399,16 +3399,19 @@ useEffect(() => {
     // This ensures zones are available for clamping even when overlay is hidden
     base.OVERHEADS = (overheadZones?.status === 'ok') ? overheadZones : null;
 
-    console.log('[RV] overlaysForRendering', {
-      showOverheadZones: base.showOverheadZones,
-      hasOverheadZones: !!base.OVERHEADS,
-      overheadToggles: {
-        OVERHEADS_2: !!_overlays?.OVERHEADS_2,
-        OVERHEADS_4: !!_overlays?.OVERHEADS_4,
-        OVERHEADS_6: !!_overlays?.OVERHEADS_6,
-        enableDolbyZones: !!_overlays?.enableDolbyZones,
-      }
-    });
+    // Debug: Log overlay state for diagnostics
+    if (typeof console !== 'undefined') {
+      console.log('[RV] overlaysForRendering built', {
+        showOverheadZones: base.showOverheadZones,
+        hasOverheadZones: !!base.OVERHEADS,
+        overheadToggles: {
+          OVERHEADS_2: !!_overlays?.OVERHEADS_2,
+          OVERHEADS_4: !!_overlays?.OVERHEADS_4,
+          OVERHEADS_6: !!_overlays?.OVERHEADS_6,
+          enableDolbyZones: !!_overlays?.enableDolbyZones,
+        }
+      });
+    }
 
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled, overheadZones]);
@@ -3494,26 +3497,34 @@ useEffect(() => {
 // Render overhead speaker icons (one per speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
     // CRITICAL: Overhead icons controlled ONLY by Overheads .2/.4/.6 toggle, NOT Dolby Zones
-    // Determine which overhead toggle is active based on layout
     const showOverheadIcons = !!(
       _overlays?.OVERHEADS_2 || 
       _overlays?.OVERHEADS_4 || 
       _overlays?.OVERHEADS_6
     );
     
-    console.log('[RV] Overhead icon visibility check', {
+    const showOverheadZones = !!_overlays?.enableDolbyZones;
+    
+    // Count overhead speakers for diagnostics
+    const rawOverheadCount = (placedSpeakers || []).filter(s => 
+      rvIsOverheadRole(s.role) && s.position && 
+      Number.isFinite(s.position.x) && Number.isFinite(s.position.y)
+    ).length;
+    
+    console.log('[RV overhead toggles]', {
       showOverheadIcons,
-      OVERHEADS_2: !!_overlays?.OVERHEADS_2,
-      OVERHEADS_4: !!_overlays?.OVERHEADS_4,
-      OVERHEADS_6: !!_overlays?.OVERHEADS_6,
-      enableDolbyZones: !!_overlays?.enableDolbyZones,
-      placedSpeakersCount: placedSpeakers?.length || 0,
-      dolbyLayout,
-      overheadCount,
+      showOverheadZones,
+      overheadCount: rawOverheadCount,
+      toggleStates: {
+        OVERHEADS_2: !!_overlays?.OVERHEADS_2,
+        OVERHEADS_4: !!_overlays?.OVERHEADS_4,
+        OVERHEADS_6: !!_overlays?.OVERHEADS_6,
+        enableDolbyZones: !!_overlays?.enableDolbyZones,
+      }
     });
     
     if (!showOverheadIcons) {
-      console.log('[RV] Overheads toggle OFF - hiding overhead icons');
+      console.log('[RV] Overheads .2/.4/.6 toggle OFF - hiding overhead icons');
       return null;
     }
 
