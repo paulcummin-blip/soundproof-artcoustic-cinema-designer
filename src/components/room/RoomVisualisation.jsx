@@ -5054,12 +5054,13 @@ const renderRp22AnglesOverlay = useCallback(() => {
     return s;
   }, [isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned]);
 
-  // RP22 overhead corridors should be controlled ONLY by the Overheads .2/.4/.6 toggle
-  const overheadCorridorsOn = !!(
-    _overlays?.OVERHEADS_2 ||
-    _overlays?.OVERHEADS_4 ||
-    _overlays?.OVERHEADS_6
-  );
+  // RP22 overhead corridors: controlled by the toggle matching current layout
+  const overheadCorridorsOn = useMemo(() => {
+    if (overheadCount === 2) return !!_overlays?.OVERHEADS_2;
+    if (overheadCount === 4) return !!_overlays?.OVERHEADS_4;
+    if (overheadCount === 6) return !!_overlays?.OVERHEADS_6;
+    return false; // no overhead layer in current layout
+  }, [overheadCount, _overlays?.OVERHEADS_2, _overlays?.OVERHEADS_4, _overlays?.OVERHEADS_6]);
 
 
 // --- Main render ---
