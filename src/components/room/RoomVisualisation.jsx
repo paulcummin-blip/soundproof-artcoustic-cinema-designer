@@ -5054,6 +5054,13 @@ const renderRp22AnglesOverlay = useCallback(() => {
     return s;
   }, [isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned]);
 
+  // RP22 overhead corridors should be controlled ONLY by the Overheads .2/.4/.6 toggle
+  const overheadCorridorsOn = !!(
+    _overlays?.OVERHEADS_2 ||
+    _overlays?.OVERHEADS_4 ||
+    _overlays?.OVERHEADS_6
+  );
+
 
 // --- Main render ---
 // SAFETY: local fallbacks in case parent metrics/ids are not initialised yet
@@ -5305,13 +5312,7 @@ return (
             {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
             {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
             {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-
-            {/* RP22 overhead corridors (front/mid/rear). Driven by Overheads .2/.4/.6, not Dolby Zones */}
-            {(_overlays?.OVERHEADS_2 || _overlays?.OVERHEADS_4 || _overlays?.OVERHEADS_6) &&
-              overheadZones?.status === 'ok' &&
-              ZoneComponents.OVERHEADS}
-
-            {/* Dolby bed-layer angle bands (sides/rears/wides only, for now) */}
+            {overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
             {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
             
             {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
