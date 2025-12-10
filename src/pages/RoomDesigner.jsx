@@ -2584,10 +2584,11 @@ function RoomDesignerWithState() {
     _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase
   ]);
 
-  // Ensure Atmos overheads exist as soon as an Atmos preset AND a
-  // global overhead model are selected – WITHOUT relying on surrounds.
+  // Ensure Atmos overheads exist as soon as an Atmos preset with heights is selected,
+  // WITHOUT relying on surrounds or Dolby Zones or any overlay flags.
+  // Overhead speakers should exist whenever the layout has a height layer.
   useEffect(() => {
-    if (!dolbyPreset || !_overheadGlobalModel) return;
+    if (!dolbyPreset) return;
     if (_isFrozen && _isFrozen("speakers")) return;
 
     // Normalise preset string, e.g. "5.1.4 Dolby Atmos" -> "5.1.4"
