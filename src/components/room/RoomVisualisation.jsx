@@ -3391,19 +3391,12 @@ useEffect(() => {
     base.enableFrontWides = enableFrontWides;
     base.enableRp22Angles = rp22AnglesEnabled;
     
-    // CRITICAL: Decouple icon visibility from zone overlay rendering
-    // Zone visibility: based on Dolby Zones toggle - controls corridor overlays ONLY
-    base.showOverheadZones = !!_overlays?.enableDolbyZones;
-    
-    // Zone data: always include when computed, rendering is controlled separately
-    // This ensures zones are available for clamping even when overlay is hidden
-    base.OVERHEADS = (overheadZones?.status === 'ok') ? overheadZones : null;
+    // REMOVED: base.showOverheadZones and base.OVERHEADS derivations
+    // Overhead corridors are controlled directly by OVERHEADS_2/4/6 toggles
 
     // Debug: Log overlay state for diagnostics
     if (typeof console !== 'undefined') {
       console.log('[RV] overlaysForRendering built', {
-        showOverheadZones: base.showOverheadZones,
-        hasOverheadZones: !!base.OVERHEADS,
         overheadToggles: {
           OVERHEADS_2: !!_overlays?.OVERHEADS_2,
           OVERHEADS_4: !!_overlays?.OVERHEADS_4,
@@ -3414,7 +3407,7 @@ useEffect(() => {
     }
 
     return base;
-  }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled, overheadZones]);
+  }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
 
   // In the scope where we work with speakers, add safe aliases
   const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
@@ -5308,8 +5301,15 @@ return (
             {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
             {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
             {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {/* CRITICAL: Zone rendering depends ONLY on showOverheadZones toggle, NOT icon visibility */}
-            {overlaysForRendering?.showOverheadZones && overlaysForRendering?.OVERHEADS?.status === 'ok' && ZoneComponents.OVERHEADS}
+            {/* CRITICAL: Overhead corridors controlled ONLY by Overheads .2/.4/.6 toggles */}
+            {(() => {
+              const overheadToggleOn = !!(
+                _overlays?.OVERHEADS_2 ||
+                _overlays?.OVERHEADS_4 ||
+                _overlays?.OVERHEADS_6
+              );
+              return overheadToggleOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS;
+            })()}
             {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
             
             {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}

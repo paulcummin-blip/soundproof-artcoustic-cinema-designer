@@ -1,4 +1,3 @@
-
 // components/room/RP22ZonesOverlay.jsx
 import React from 'react';
 
@@ -144,7 +143,7 @@ export default function RP22ZonesOverlay(props) {
 
   // --- OVERHEADS .2 (unified style with symmetric left-edge anchoring) ---
   const oh2 = overlays?.OVERHEADS_2;
-  if (oh2 && oh2.enabled) {
+  if (!!oh2) {
     const W = Number(dimensions?.width) || 0;
     const L = Number(dimensions?.length) || 0;
     
@@ -321,7 +320,7 @@ export default function RP22ZonesOverlay(props) {
 
   // --- OVERHEADS .4 (symmetric left-edge anchoring) ---
   const oh4 = overlays?.OVERHEADS_4;
-  if (oh4 && oh4.enabled) {
+  if (!!oh4) {
     const W = Number(dimensions?.width) || 0;
     const L = Number(dimensions?.length) || 0;
     
@@ -499,7 +498,7 @@ export default function RP22ZonesOverlay(props) {
 
   // --- OVERHEADS .6 (symmetric left-edge anchoring) ---
   const oh6 = overlays?.OVERHEADS_6;
-  if (oh6 && oh6.enabled) {
+  if (!!oh6) {
     const W = Number(dimensions?.width) || 0;
     const L = Number(dimensions?.length) || 0;
     
