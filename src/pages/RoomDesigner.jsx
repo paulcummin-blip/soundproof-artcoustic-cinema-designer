@@ -30,6 +30,7 @@ import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Import SHOW_DEBUG_LOGS
 import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/seatingUtils';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
+import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 
 // NEW: Helper hook for URL query parameters - SSR Safe
 function useUrlQuery() {
@@ -1512,6 +1513,10 @@ function RoomDesignerWithState() {
   const [lcrAimMode, setLcrAimMode] = useState("flat"); // "flat" | "angled"
   const [lcrAngleDeg, setLcrAngleDeg] = useState(0); // Live angle readout
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
+  
+  // NEW: Options panel state
+  const [showPrices, setShowPrices] = useState(false);
+  const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
 
   // screen state is now managed directly by AppState, removed local useState here.
 
@@ -1907,6 +1912,14 @@ function RoomDesignerWithState() {
   }, [_rearSubsCfg?.model, _rearSubsCfg?.count, placedSpeakers, stableDimensions.width, stableDimensions.length, setSubWarnings]);
 
   const enableFrontWides = _enableFrontWides;
+  
+  // NEW: Calculate live room price total
+  const priceData = usePriceCalculation({
+    placedSpeakers,
+    frontSubsCfg: _frontSubsCfg,
+    rearSubsCfg: _rearSubsCfg,
+    difficultyMultiplier,
+  });
 
   // Safe front-wide zone memo with hard guards
   const frontWideZones = useMemo(() => {
@@ -3322,6 +3335,51 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   <Suspense fallback={<div>Loading...</div>}>
                       <RP22CompliancePanel analysisResult={analysisResult} screen={_screen} />
                   </Suspense>
+              </CollapsiblePanel>
+              
+              <CollapsiblePanel
+                title="Options"
+                icon={<Box className="w-5 h-5" />}
+                defaultOpen={false}
+              >
+                  <div className="space-y-4 p-4">
+                    {/* Show Prices Toggle */}
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="show-prices" className="text-sm font-medium">
+                        Show Prices
+                      </Label>
+                      <Switch
+                        id="show-prices"
+                        checked={showPrices}
+                        onCheckedChange={setShowPrices}
+                      />
+                    </div>
+                    
+                    {/* Difficulty Rating */}
+                    <div className="space-y-2">
+                      <Label htmlFor="difficulty" className="text-sm font-medium">
+                        Difficulty Rating
+                      </Label>
+                      <div className="text-xs text-gray-500 mb-2">
+                        Multiplies hardware prices to reflect installation difficulty (1.0 = baseline)
+                      </div>
+                      <input
+                        id="difficulty"
+                        type="number"
+                        min="0.5"
+                        max="3.0"
+                        step="0.1"
+                        value={difficultyMultiplier}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setDifficultyMultiplier(
+                            Number.isFinite(val) ? Math.max(0.5, Math.min(3.0, val)) : 1.0
+                          );
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
+                      />
+                    </div>
+                  </div>
               </CollapsiblePanel>
           </div>
         </aside>

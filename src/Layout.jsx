@@ -38,6 +38,7 @@ import { useProjectActions, useActiveProjectId } from "@/components/state/projec
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
+import PriceSummary from "@/components/pricing/PriceSummary";
 
 const menuItems = [
   { title: "Room Designer", url: "/RoomDesigner", icon: Home },
@@ -54,6 +55,14 @@ const menuItems = [
 export default function Layout({ children, currentPageName }) {
   const projectActions = useProjectActions();
   const activeProjectId = useActiveProjectId();
+  
+  // Price summary state (read from window.__ROOM_DESIGNER_PRICE__ set by RoomDesigner)
+  const [priceSummary, setPriceSummary] = React.useState({
+    showPrices: false,
+    baseTotal: 0,
+    finalTotal: 0,
+    difficultyMultiplier: 1.0,
+  });
 
   // Active project meta for sidebar (name + client)
   const [activeProjectSummary, setActiveProjectSummary] = React.useState({
@@ -102,6 +111,17 @@ export default function Layout({ children, currentPageName }) {
       cancelled = true;
     };
   }, [currentPageName]);
+  
+  // Listen for price updates from Room Designer
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof window !== 'undefined' && window.__ROOM_DESIGNER_PRICE__) {
+        setPriceSummary(window.__ROOM_DESIGNER_PRICE__);
+      }
+    }, 500); // Poll every 500ms for updates
+    
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     log.debug(`[Layout] Page: ${currentPageName}`);
@@ -185,6 +205,14 @@ export default function Layout({ children, currentPageName }) {
 
               <SidebarFooter className="p-4 border-t border-brand-border">
                 <SegmentBoundary name="sidebar-footer">
+                  {currentPageName === 'RoomDesigner' && (
+                    <PriceSummary
+                      showPrices={priceSummary.showPrices}
+                      baseTotal={priceSummary.baseTotal}
+                      finalTotal={priceSummary.finalTotal}
+                      difficultyMultiplier={priceSummary.difficultyMultiplier}
+                    />
+                  )}
                   <ApiBadge />
                   <BookDemoBanner />
                 </SegmentBoundary>
