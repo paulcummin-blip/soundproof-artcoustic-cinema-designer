@@ -2625,7 +2625,6 @@ function RoomDesignerWithState() {
   }, [
     dolbyPreset,
     placedSpeakers,
-    stableDimensions,
     _overheadGlobalModel,
     _overheadFrontOverride,
     _overheadMidOverride,

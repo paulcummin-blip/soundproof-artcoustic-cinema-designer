@@ -3537,14 +3537,18 @@ useEffect(() => {
     const overheadSpeakers = allForOverheads.filter((speaker) => {
       // Use the canonical overhead detection helper
       if (!rvIsOverheadRole(speaker.role)) return false;
-      
-      // IMPORTANT: Do NOT use getSpeakerVisibility here for overheads.
-      // Icon visibility for overheads is controlled ONLY by OVERHEADS_2/_4/_6 toggles,
-      // via showOverheadIcons above. Layout (dolbyLayout) must not be able to veto them.
-      
+
       // Must have valid position
       const pos = speaker.position || {};
-      return Number.isFinite(pos.x) && Number.isFinite(pos.y);
+      if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return false;
+
+      // Require a real model – OFF / empty models should not render icons
+      const rawModel = (speaker.model || '').trim().toUpperCase();
+      if (!rawModel || rawModel === 'OFF') {
+        return false;
+      }
+
+      return true;
     });
 
     if (typeof console !== 'undefined') {
@@ -5301,15 +5305,13 @@ return (
             {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
             {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
             {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {/* CRITICAL: Overhead corridors controlled ONLY by Overheads .2/.4/.6 toggles */}
-            {(() => {
-              const overheadToggleOn = !!(
-                _overlays?.OVERHEADS_2 ||
-                _overlays?.OVERHEADS_4 ||
-                _overlays?.OVERHEADS_6
-              );
-              return overheadToggleOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS;
-            })()}
+
+            {/* RP22 overhead corridors (front/mid/rear). Driven by Overheads .2/.4/.6, not Dolby Zones */}
+            {(_overlays?.OVERHEADS_2 || _overlays?.OVERHEADS_4 || _overlays?.OVERHEADS_6) &&
+              overheadZones?.status === 'ok' &&
+              ZoneComponents.OVERHEADS}
+
+            {/* Dolby bed-layer angle bands (sides/rears/wides only, for now) */}
             {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
             
             {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
