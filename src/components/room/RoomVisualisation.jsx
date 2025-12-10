@@ -3545,9 +3545,9 @@ useEffect(() => {
       // Use the canonical overhead detection helper
       if (!rvIsOverheadRole(speaker.role)) return false;
       
-      // Check layout visibility using getSpeakerVisibility (validates role is in current layout)
-      const isVisibleInLayout = getSpeakerVisibility(speaker.role, speaker.model);
-      if (!isVisibleInLayout) return false;
+      // IMPORTANT: Do NOT use getSpeakerVisibility here for overheads.
+      // Icon visibility for overheads is controlled ONLY by OVERHEADS_2/_4/_6 toggles,
+      // via showOverheadIcons above. Layout (dolbyLayout) must not be able to veto them.
       
       // Must have valid position
       const pos = speaker.position || {};
