@@ -3392,14 +3392,8 @@ useEffect(() => {
     base.enableRp22Angles = rp22AnglesEnabled;
     
     // CRITICAL: Decouple icon visibility from zone overlay rendering
-    // 1. Icon visibility: based on layout toggles (OVERHEADS_2/4/6) - controls speaker icons
-    base.showOverheadIcons = !!(
-      _overlays?.OVERHEADS_2 || 
-      _overlays?.OVERHEADS_4 || 
-      _overlays?.OVERHEADS_6
-    );
-    
-    // 2. Zone visibility: based on Dolby Zones toggle - controls corridor overlays
+    // Zone visibility: based on Dolby Zones toggle - controls corridor overlays ONLY
+    // Icon visibility is now handled by getSpeakerVisibility (same as all other speakers)
     base.showOverheadZones = !!_overlays?.enableDolbyZones;
     
     // 3. Zone data: always include when computed, rendering is controlled separately
@@ -3407,13 +3401,9 @@ useEffect(() => {
     base.OVERHEADS = (overheadZones?.status === 'ok') ? overheadZones : null;
 
     console.log('[RV] overlaysForRendering', {
-      showOverheadIcons: base.showOverheadIcons,
       showOverheadZones: base.showOverheadZones,
       hasOverheadZones: !!base.OVERHEADS,
       toggles: {
-        OVERHEADS_2: !!_overlays?.OVERHEADS_2,
-        OVERHEADS_4: !!_overlays?.OVERHEADS_4,
-        OVERHEADS_6: !!_overlays?.OVERHEADS_6,
         enableDolbyZones: !!_overlays?.enableDolbyZones,
       }
     });
@@ -3501,20 +3491,14 @@ useEffect(() => {
 
 // Render overhead speaker icons (one per speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
-    // CRITICAL: Only render overheads when the overlay toggle is ON
-    // Decouple icon visibility from zone calculation - icons can show even if zones aren't ready
-    const overheadIconsOn = !!overlaysForRendering?.showOverheadIcons;
+    // CRITICAL: Icons are ALWAYS visible when speakers are placed and layout allows them
+    // Only the zone corridor overlay is controlled by toggles
     
-    console.log('[RV] Overhead icon visibility', { 
-      showOverheadIconsProp: overlaysForRendering?.showOverheadIcons, 
-      overheadIconsOn,
-      overlaysKeys: Object.keys(overlaysForRendering || {})
+    console.log('[RV] Overhead icon rendering check', {
+      placedSpeakersCount: placedSpeakers?.length || 0,
+      dolbyLayout,
+      overheadCount,
     });
-    
-    if (!overheadIconsOn) {
-      console.log('[RV] Overhead toggle OFF - no overhead icons');
-      return null;
-    }
 
     // IMPORTANT: overheads must NOT depend on isRenderableSpeaker/speakersToRender.
     // Always start directly from placedSpeakers so T-roles are not filtered out
@@ -3532,6 +3516,10 @@ useEffect(() => {
     const overheadSpeakers = allForOverheads.filter((speaker) => {
       // Use the canonical overhead detection helper
       if (!rvIsOverheadRole(speaker.role)) return false;
+      
+      // Check layout visibility using getSpeakerVisibility (same as other speakers)
+      const isVisibleInLayout = getSpeakerVisibility(speaker.role, speaker.model);
+      if (!isVisibleInLayout) return false;
       
       // Must have valid position
       const pos = speaker.position || {};
@@ -3611,9 +3599,8 @@ useEffect(() => {
       );
     }).filter(Boolean);
   }, [
-    overlaysForRendering?.showOverheadIcons,
     placedSpeakers,
-    speakersToRender,
+    getSpeakerVisibility,
     getCanonicalRole,
     getOverheadModelForPosition,
     scale,
