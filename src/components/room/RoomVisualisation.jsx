@@ -3458,43 +3458,41 @@ useEffect(() => {
   const overheadIconElements = useMemo(() => {
     if (!placedSpeakers || !placedSpeakers.length) return null;
 
-    // Inline model resolver (always uses latest overhead state)
+    // Helper: map role → band
+    const getBandForRole = (role) => {
+      const r = String(role || "").toUpperCase();
+      if (r === "TFL" || r === "TFR" || r === "TFC") return "front";
+      if (r === "TML" || r === "TMR") return "mid";
+      if (r === "TRL" || r === "TRR" || r === "TRC") return "rear";
+      return null;
+    };
+
+    const isOff = (modelId) => {
+      if (!modelId) return true;
+      const up = String(modelId).toUpperCase();
+      return up === "OFF" || up.startsWith("OFF ");
+    };
+
+    // Single source of truth for overhead icon model:
+    // always derive from global + band overrides,
+    // never let a stale per-speaker model win.
     const resolveModelForSpeaker = (spk) => {
-      if (!spk || !spk.role) return null;
+      const band = getBandForRole(spk.role);
+      if (!band) return null;
 
-      const role = String(spk.role).toUpperCase();
-      
-      // Determine band from role
-      let band = null;
-      if (["TFL", "TFR", "TFC"].includes(role)) band = "front";
-      else if (["TML", "TMR"].includes(role)) band = "mid";
-      else if (["TRL", "TRR", "TRC"].includes(role)) band = "rear";
-      else return null;
+      let modelId = null;
 
-      const isOff = (v) => {
-        if (!v) return false;
-        const upper = String(v).toUpperCase();
-        return upper === "OFF" || upper.startsWith("OFF ");
-      };
-
-      // 1. Prefer speaker's own model if set and not OFF
-      let modelId = spk.modelId || spk.model || null;
-      if (modelId && !isOff(modelId)) {
-        return modelId;
-      }
-
-      // 2. Fallback to global/override for this band
       if (band === "front") {
-        modelId = useFrontGlobal 
-          ? overheadGlobalModel 
+        modelId = useFrontGlobal
+          ? overheadGlobalModel
           : (overheadFrontOverride || overheadGlobalModel);
       } else if (band === "mid") {
-        modelId = useMidGlobal 
-          ? overheadGlobalModel 
+        modelId = useMidGlobal
+          ? overheadGlobalModel
           : (overheadMidOverride || overheadGlobalModel);
       } else if (band === "rear") {
-        modelId = useRearGlobal 
-          ? overheadGlobalModel 
+        modelId = useRearGlobal
+          ? overheadGlobalModel
           : (overheadRearOverride || overheadGlobalModel);
       }
 
