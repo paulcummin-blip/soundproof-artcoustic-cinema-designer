@@ -3450,96 +3450,55 @@ useEffect(() => {
     return positions;
   }, [overheadCount]);
 
-  // Get effective model for each overhead position *from globals/overrides*
-  const getOverheadModelForPosition = useCallback(
-    (position) => {
-      // If there is no global model at all, just bail – we may still have per-speaker models
-      if (!overheadGlobalModel) return null;
-
-      const isOff =
-        String(overheadGlobalModel).toUpperCase().startsWith("OFF");
-
-      if (isOff) return null;
-
-      if (position === "front") {
-        return useFrontGlobal
-          ? overheadGlobalModel
-          : overheadFrontOverride || overheadGlobalModel;
-      }
-      if (position === "mid") {
-        return useMidGlobal
-          ? overheadGlobalModel
-          : overheadMidOverride || overheadGlobalModel;
-      }
-      if (position === "rear") {
-        return useRearGlobal
-          ? overheadGlobalModel
-          : overheadRearOverride || overheadGlobalModel;
-      }
-      return null;
-    },
-    [
-      overheadGlobalModel,
-      useFrontGlobal,
-      useMidGlobal,
-      useRearGlobal,
-      overheadFrontOverride,
-      overheadMidOverride,
-      overheadRearOverride,
-    ]
-  );
-
-  // Helper: decide which model to use for a specific overhead speaker
-  const getOverheadModelForSpeaker = useCallback(
-    (spk) => {
-      const canonicalRole = String(spk.role || "").toUpperCase();
-
-      let position = null;
-      if (["TFL", "TFR", "TFC"].includes(canonicalRole)) position = "front";
-      else if (["TML", "TMR"].includes(canonicalRole)) position = "mid";
-      else if (["TRL", "TRR", "TRC"].includes(canonicalRole)) position = "rear";
-
-      if (!position) return null;
-
-      // 1) Prefer the model actually stored on the speaker
-      let modelId = spk.model || spk.modelId || null;
-
-      // 2) Fall back to the global/override for that band
-      if (!modelId) {
-        modelId = getOverheadModelForPosition(position);
-      }
-
-      if (!modelId) return null;
-
-      const upper = String(modelId).toUpperCase();
-      if (upper === "OFF" || upper.startsWith("OFF ")) return null;
-
-      return modelId;
-    },
-    [getOverheadModelForPosition]
-  );
-
   // Overhead speaker icons
-  // Rules:
-  // - Only show when one of OVERHEADS_2/4/6 toggles is ON
-  // - For each overhead role, only draw an icon if its effective model is not OFF
+  // Rules now:
+  // - Icons are independent of the Overheads .2/.4/.6 overlay toggles
+  // - For each overhead role (TFL/TFR/TFC/TML/TMR/TRL/TRR/TRC),
+  //   draw an icon only if its effective model is not OFF.
   const overheadIconElements = useMemo(() => {
-    if (!_overlays) return null;
+    // No speakers → nothing to draw
+    if (!placedSpeakers || !placedSpeakers.length) return null;
 
-    const showOverheadIcons =
-      !!_overlays.OVERHEADS_2 ||
-      !!_overlays.OVERHEADS_4 ||
-      !!_overlays.OVERHEADS_6;
-
-    if (!showOverheadIcons) return null;
-
-    const overheadSpeakers = (placedSpeakers || [])
+    // Collect only valid overhead speakers that have a usable model
+    const overheadSpeakers = placedSpeakers
       .filter((spk) => rvIsOverheadRole(spk.role) && hasPos(spk))
       .map((spk) => {
-        const modelId = getOverheadModelForSpeaker(spk);
+        // 1) Prefer the model directly stored on the speaker
+        let modelId = spk.model || spk.modelId || null;
+
+        // 2) If there is no per-speaker model, fall back to the global/override band
+        // (this matches how SPL / config treats overhead bands)
+        if (!modelId && overheadGlobalModel) {
+          const role = String(spk.role || "").toUpperCase();
+          let position = null;
+
+          if (["TFL", "TFR", "TFC"].includes(role)) position = "front";
+          else if (["TML", "TMR"].includes(role)) position = "mid";
+          else if (["TRL", "TRR", "TRC"].includes(role)) position = "rear";
+
+          if (position === "front") {
+            modelId = useFrontGlobal
+              ? overheadGlobalModel
+              : overheadFrontOverride || overheadGlobalModel;
+          } else if (position === "mid") {
+            modelId = useMidGlobal
+              ? overheadGlobalModel
+              : overheadMidOverride || overheadGlobalModel;
+          } else if (position === "rear") {
+            modelId = useRearGlobal
+              ? overheadGlobalModel
+              : overheadRearOverride || overheadGlobalModel;
+          }
+        }
+
+        // Normalise and apply OFF rule
+        if (!modelId) return null;
+        const upper = String(modelId).toUpperCase();
+        if (upper === "OFF" || upper.startsWith("OFF ")) return null;
+
         return { spk, modelId };
       })
-      .filter(({ modelId }) => !!modelId);
+      .filter(Boolean);
 
     if (!overheadSpeakers.length) return null;
 
@@ -3561,7 +3520,18 @@ useEffect(() => {
         ))}
       </g>
     );
-  }, [_overlays, placedSpeakers, toPx, scale, getOverheadModelForSpeaker]);
+  }, [
+    placedSpeakers,
+    toPx,
+    scale,
+    overheadGlobalModel,
+    useFrontGlobal,
+    useMidGlobal,
+    useRearGlobal,
+    overheadFrontOverride,
+    overheadMidOverride,
+    overheadRearOverride,
+  ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
   const renderFrontWideZones = useCallback(() => {
