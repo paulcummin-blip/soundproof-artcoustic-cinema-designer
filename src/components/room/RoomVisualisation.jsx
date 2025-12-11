@@ -3527,9 +3527,7 @@ useEffect(() => {
       <g data-layer="overhead-icons">
         {overheadSpeakers.map(({ spk, modelId }) => {
           const [xPx, yPx] = toPx(spk.position.x, spk.position.y);
-          
-          const speakerMouseDownHandler = (e) => handleMouseDown(e, spk.id, "speaker");
-          
+
           return (
             <SpeakerIcon
               key={spk.id || spk.role}
@@ -3540,7 +3538,7 @@ useEffect(() => {
               widthM={0.27}
               depthM={0.27}
               scale={scale}
-              speakerMouseDownHandler={speakerMouseDownHandler}
+              speakerMouseDownHandler={(e) => handleMouseDown(e, spk.id, "speaker")}
               setHoveredSpeaker={setHoveredSpeaker}
             />
           );
