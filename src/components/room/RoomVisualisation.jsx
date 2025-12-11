@@ -3467,95 +3467,78 @@ useEffect(() => {
   }, [overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride]);
 
 
-// Render overhead speaker icons (one per speaker, using their own positions)
+  // Overhead speaker icons – only show when:
+  // 1) The relevant OVERHEADS_2/4/6 toggle is ON, and
+  // 2) The effective overhead model for that role is NOT "OFF" / null.
   const overheadIconElements = useMemo(() => {
-    const allForOverheads = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+    if (!_overlays) return null;
 
-    // Select ONLY real overhead speakers:
-    //  - role is a T-role
-    //  - has a valid x/y position
-    //  - model exists AND is not "OFF"
-    const overheadSpeakers = allForOverheads.filter((speaker) => {
-      if (!rvIsOverheadRole(speaker.role)) return false;
+    const showOverheadToggle =
+      !!_overlays.OVERHEADS_2 ||
+      !!_overlays.OVERHEADS_4 ||
+      !!_overlays.OVERHEADS_6;
 
-      const pos = speaker.position || {};
-      if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return false;
+    if (!showOverheadToggle) {
+      return null;
+    }
 
-      const model = speaker.model;
-      if (!model || model === "OFF" || model === "off") return false;
+    const speakersWithModel = (placedSpeakers || []).filter((spk) => {
+      if (!rvIsOverheadRole(spk.role)) return false;
+      if (!hasPos(spk)) return false;
+
+      // Use the same resolver as the SPL engine / icons
+      const modelId = getOverheadModelForPosition(spk.role);
+
+      // When the global/override is "OFF" we treat this as "no speaker"
+      if (!modelId) return false;
+      if (String(modelId).toUpperCase() === "OFF") return false;
 
       return true;
     });
 
-    if (overheadSpeakers.length === 0) {
+    if (!speakersWithModel.length) {
+      // No active overhead models → no icons
       return null;
     }
 
-    // Render one icon per overhead speaker using SpeakerIcon
-    return overheadSpeakers.map((speaker) => {
-      const { id, role, model, position } = speaker;
-      if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y)) {
-        return null;
-      }
+    return (
+      <g
+        data-layer="overhead-icons"
+        style={{ pointerEvents: "none" }}
+      >
+        {speakersWithModel.map((spk) => {
+          const { x, y } = spk.position;
+          const modelId = getOverheadModelForPosition(spk.role);
 
-      // Determine which zone position this role belongs to (front/mid/rear)
-      const canonicalRole = getCanonicalRole?.(role) || role;
-      let zonePosition = null;
-      if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
-        zonePosition = 'front';
-      } else if (['TML', 'TMR'].includes(canonicalRole)) {
-        zonePosition = 'mid';
-      } else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) {
-        zonePosition = 'rear';
-      }
+          // Fallback guard: if model somehow vanished between filter and render
+          if (!modelId || String(modelId).toUpperCase() === "OFF") {
+            return null;
+          }
 
-      // Resolve the actual model using the overhead position helper
-      const resolvedModel = zonePosition && getOverheadModelForPosition
-        ? getOverheadModelForPosition(zonePosition)
-        : model;
-
-      // DEBUG: Log model resolution for overheads
-      if (typeof console !== 'undefined') {
-        console.log('[RV overhead]', {
-          role: canonicalRole,
-          zone: zonePosition,
-          rawModel: model,
-          resolvedModel,
-        });
-      }
-
-      // Use fallback model if no model selected (allows rendering with default overhead shape)
-      const effectiveModel = (!resolvedModel || resolvedModel === 'OFF') 
-        ? 'architect-2-1' 
-        : resolvedModel;
-
-      // IMPORTANT: build an effective speaker that includes the resolved model
-      const effectiveSpeaker = { ...speaker, model: effectiveModel };
-
-      // Overheads always get a drag handler because they bypass isDraggable checks
-      const speakerMouseDownHandler = (e) => handleMouseDown(e, id, "speaker");
-
-      return (
-        <SpeakerIcon
-          key={id}
-          speaker={effectiveSpeaker}
-          canvasX={roomRect.x + (position.x * scale)}
-          canvasY_raw={roomRect.y + (position.y * scale)}
-          yaw={speaker.yaw || 0}
-          scale={scale}
-          speakerMouseDownHandler={speakerMouseDownHandler}
-          setHoveredSpeaker={setHoveredSpeaker}
-        />
-      );
-    }).filter(Boolean);
+          return (
+            <SpeakerIcon
+              key={spk.role || spk.id}
+              role={spk.role}
+              modelId={modelId}
+              x={toPx(x)}
+              y={toPx(y)}
+              scale={scale}
+              isSelected={false}
+              isHovered={false}
+              // Overheads are display-only here – drag/hover handled elsewhere
+              draggable={false}
+              showLabel={false}
+            />
+          );
+        })}
+      </g>
+    );
   }, [
+    _overlays,
     placedSpeakers,
-    getCanonicalRole,
-    getOverheadModelForPosition,
     scale,
-    roomRect,
-    setHoveredSpeaker,
-    handleMouseDown,
+    toPx,
+    getOverheadModelForPosition,
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
