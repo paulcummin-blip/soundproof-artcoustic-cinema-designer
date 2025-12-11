@@ -3543,6 +3543,7 @@ useEffect(() => {
     placedSpeakers,
     toPx,
     scale,
+    setHoveredSpeaker,
     overheadGlobalModel,
     useFrontGlobal,
     useMidGlobal,
@@ -3550,7 +3551,6 @@ useEffect(() => {
     overheadFrontOverride,
     overheadMidOverride,
     overheadRearOverride,
-    setHoveredSpeaker,
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
