@@ -3559,6 +3559,7 @@ useEffect(() => {
     overheadFrontOverride,
     overheadMidOverride,
     overheadRearOverride,
+    handleMouseDown,
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
