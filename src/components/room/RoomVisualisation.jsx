@@ -3450,6 +3450,69 @@ useEffect(() => {
     return positions;
   }, [overheadCount]);
 
+  // Helper: resolve effective overhead model for a speaker
+  const getEffectiveOverheadModelForSpeaker = useCallback((spk) => {
+    if (!spk || !spk.role) return null;
+
+    const role = String(spk.role).toUpperCase();
+    
+    // Determine band from role
+    let band = null;
+    if (["TFL", "TFR", "TFC"].includes(role)) band = "front";
+    else if (["TML", "TMR"].includes(role)) band = "mid";
+    else if (["TRL", "TRR", "TRC"].includes(role)) band = "rear";
+    else return null;
+
+    // 1. Prefer speaker's own model if set and not OFF
+    let modelId = spk.modelId || spk.model || null;
+    if (modelId) {
+      const upper = String(modelId).toUpperCase();
+      if (upper === "OFF" || upper.startsWith("OFF ")) {
+        return null;
+      }
+      return modelId;
+    }
+
+    // 2. Fallback to global/override for this band
+    if (!overheadGlobalModel) return null;
+
+    const globalUpper = String(overheadGlobalModel).toUpperCase();
+    if (globalUpper === "OFF" || globalUpper.startsWith("OFF ")) {
+      return null;
+    }
+
+    if (band === "front") {
+      modelId = useFrontGlobal 
+        ? overheadGlobalModel 
+        : (overheadFrontOverride || overheadGlobalModel);
+    } else if (band === "mid") {
+      modelId = useMidGlobal 
+        ? overheadGlobalModel 
+        : (overheadMidOverride || overheadGlobalModel);
+    } else if (band === "rear") {
+      modelId = useRearGlobal 
+        ? overheadGlobalModel 
+        : (overheadRearOverride || overheadGlobalModel);
+    }
+
+    if (!modelId) return null;
+
+    const finalUpper = String(modelId).toUpperCase();
+    if (finalUpper === "OFF" || finalUpper.startsWith("OFF ")) {
+      return null;
+    }
+
+    return modelId;
+  }, [
+    overheadGlobalModel,
+    useFrontGlobal,
+    useMidGlobal,
+    useRearGlobal,
+    overheadFrontOverride,
+    overheadMidOverride,
+    overheadRearOverride,
+  ]);
+
   // Overhead speaker icons
   // Rules:
   // - Icons are driven purely by placedSpeakers (actual system design)
@@ -3459,46 +3522,43 @@ useEffect(() => {
     if (!placedSpeakers || !placedSpeakers.length) return null;
 
     // Filter to only valid overhead speakers that should be visible
-    const overheadSpeakers = placedSpeakers.filter((spk) => {
-      if (!rvIsOverheadRole(spk.role)) return false;
-      if (!hasPos(spk)) return false;
-
-      // Use the speaker's own model/modelId – speaker seeding + UI
-      // should already keep these in sync with the global/override controls.
-      const modelId = spk.modelId || spk.model;
-      if (!modelId) return false;
-
-      const upper = String(modelId).toUpperCase();
-      if (upper === "OFF" || upper.startsWith("OFF ")) return false;
-
-      return true;
-    });
+    const overheadSpeakers = (placedSpeakers || [])
+      .filter((spk) => rvIsOverheadRole(spk.role) && hasPos(spk))
+      .map((spk) => {
+        const modelId = getEffectiveOverheadModelForSpeaker(spk);
+        if (!modelId) return null;
+        
+        console.log('[RV overhead-icons]', spk.role, 'modelId:', modelId, 'pos:', spk.position);
+        
+        return { spk, modelId };
+      })
+      .filter(Boolean);
 
     if (!overheadSpeakers.length) return null;
 
     return (
       <g data-layer="overhead-icons" style={{ pointerEvents: "none" }}>
-        {overheadSpeakers.map((spk) => {
-          const modelId = spk.modelId || spk.model;
-
+        {overheadSpeakers.map(({ spk, modelId }) => {
+          const [xPx, yPx] = toPx(spk.position.x, spk.position.y);
+          
           return (
             <SpeakerIcon
               key={spk.id || spk.role}
-              role={spk.role}
-              modelId={modelId}
-              x={toPx(spk.position.x)}
-              y={toPx(spk.position.y)}
+              speaker={{ ...spk, model: modelId }}
+              canvasX={xPx}
+              canvasY_raw={yPx}
+              yawDeg={0}
+              widthM={0.27}
+              depthM={0.27}
               scale={scale}
-              isSelected={false}
-              isHovered={false}
-              draggable={false}
-              showLabel={false}
+              speakerMouseDownHandler={undefined}
+              setHoveredSpeaker={setHoveredSpeaker}
             />
           );
         })}
       </g>
     );
-  }, [placedSpeakers, toPx, scale]);
+  }, [placedSpeakers, toPx, scale, getEffectiveOverheadModelForSpeaker, setHoveredSpeaker]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
   const renderFrontWideZones = useCallback(() => {

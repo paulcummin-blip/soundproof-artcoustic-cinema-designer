@@ -132,18 +132,18 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   // Get speaker metadata from registry
   const modelMeta = getSpeakerModelMeta(model);
   
-  // Log warning if model not found in registry
+  // Log warning if model not found in registry (with better visibility for overhead debugging)
   if (modelMeta?.notFound && typeof console !== 'undefined') {
-    console.warn(`[RenderPrimitives] Speaker model "${model}" not found in registry, using defaults`);
+    console.warn(`[RenderPrimitives] Speaker model "${model}" not found in registry, using defaults for role ${role}`);
   }
   
   // Determine if this should render as a circle
   // Check BOTH round flag AND presence of diameterM (legacy models might only have diameterM)
   const isRound = modelMeta?.round === true || (modelMeta?.diameterM && modelMeta?.round !== false);
   
-  // Safe fallbacks: use registry dimensions or defaults
+  // Safe fallbacks: use registry dimensions or defaults (ensure always visible)
   const safeWidthM = modelMeta?.widthM || (Number(widthM) > 0 ? Number(widthM) : 0.27);
-  const safeDepthM = modelMeta?.depthM || (Number(depthM) > 0 ? Number(depthM) : 0.082);
+  const safeDepthM = modelMeta?.depthM || (Number(depthM) > 0 ? Number(depthM) : 0.27);
   
   // Get color (currently always black)
   const color = getChannelColor(role);
