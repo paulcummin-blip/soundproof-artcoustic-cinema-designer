@@ -3489,82 +3489,27 @@ useEffect(() => {
 
 // Render overhead speaker icons (one per speaker, using their own positions)
   const overheadIconElements = useMemo(() => {
-    // CRITICAL: Overhead icons controlled ONLY by Overheads .2/.4/.6 toggle, NOT Dolby Zones
-    const showOverheadIcons = !!(
-      _overlays?.OVERHEADS_2 || 
-      _overlays?.OVERHEADS_4 || 
-      _overlays?.OVERHEADS_6
-    );
-    
-    const showOverheadZones = !!_overlays?.enableDolbyZones;
-    
-    // Count overhead speakers for diagnostics
-    const rawOverheadCount = (placedSpeakers || []).filter(s => 
-      rvIsOverheadRole(s.role) && s.position && 
-      Number.isFinite(s.position.x) && Number.isFinite(s.position.y)
-    ).length;
-    
-    console.log('[RV overhead toggles]', {
-      showOverheadIcons,
-      showOverheadZones,
-      overheadCount: rawOverheadCount,
-      toggleStates: {
-        OVERHEADS_2: !!_overlays?.OVERHEADS_2,
-        OVERHEADS_4: !!_overlays?.OVERHEADS_4,
-        OVERHEADS_6: !!_overlays?.OVERHEADS_6,
-        enableDolbyZones: !!_overlays?.enableDolbyZones,
-      }
-    });
-    
-    if (!showOverheadIcons) {
-      console.log('[RV] Overheads .2/.4/.6 toggle OFF - hiding overhead icons');
-      return null;
-    }
-
-    // IMPORTANT: overheads must NOT depend on isRenderableSpeaker/speakersToRender.
-    // Always start directly from placedSpeakers so T-roles are not filtered out
-    // just because they have a null model.
     const allForOverheads = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
-    // DEBUG: Log all speakers received
-    if (typeof console !== 'undefined' && console.groupCollapsed) {
-      console.groupCollapsed('[RV] overheadIconElements DEBUG');
-      console.log('All speakers (for overheads):', allForOverheads);
-      console.log('All roles:', allForOverheads.map(s => rvSafeCanonRole(s.role)));
-    }
-
-    // Select overhead speakers using the canonical helper
+    // Select ONLY real overhead speakers:
+    //  - role is a T-role
+    //  - has a valid x/y position
+    //  - model exists AND is not "OFF"
     const overheadSpeakers = allForOverheads.filter((speaker) => {
-      // Use the canonical overhead detection helper
       if (!rvIsOverheadRole(speaker.role)) return false;
 
-      // Must have valid position
       const pos = speaker.position || {};
       if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return false;
 
-      // Require a real model – OFF / empty models should not render icons
-      const rawModel = (speaker.model || '').trim().toUpperCase();
-      if (!rawModel || rawModel === 'OFF') {
-        return false;
-      }
+      const model = speaker.model;
+      if (!model || model === "OFF" || model === "off") return false;
 
       return true;
     });
 
-    if (typeof console !== 'undefined') {
-      console.log('Overhead speakers to render:', overheadSpeakers.length);
-      console.log('Overhead roles:', overheadSpeakers.map(s => rvSafeCanonRole(s.role)));
-      console.log('[RV] Overhead icons ON, rendering', overheadSpeakers.length, 'speakers');
-      if (console.groupEnd) console.groupEnd();
-    }
-
-    // No overhead speakers to render
     if (overheadSpeakers.length === 0) {
-      console.log('[RV] No overhead speakers with valid positions - icons ON but nothing to render');
       return null;
     }
-
-    console.log('[RV] Rendering', overheadSpeakers.length, 'overhead speaker icons');
 
     // Render one icon per overhead speaker using SpeakerIcon
     return overheadSpeakers.map((speaker) => {
@@ -3624,19 +3569,13 @@ useEffect(() => {
       );
     }).filter(Boolean);
   }, [
-    _overlays?.OVERHEADS_2,
-    _overlays?.OVERHEADS_4,
-    _overlays?.OVERHEADS_6,
     placedSpeakers,
-    getSpeakerVisibility,
     getCanonicalRole,
     getOverheadModelForPosition,
     scale,
     roomRect,
     setHoveredSpeaker,
     handleMouseDown,
-    dolbyLayout,
-    overheadCount
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
