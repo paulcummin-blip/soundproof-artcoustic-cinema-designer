@@ -3505,9 +3505,17 @@ useEffect(() => {
       .filter((spk) => rvIsOverheadRole(spk.role) && hasPos(spk))
       .map((spk) => {
         const modelId = resolveModelForSpeaker(spk);
-        
-        console.log('[RV overhead-icons]', spk.role, 'modelId:', modelId, 'pos:', spk.position);
-        
+
+        // Debug – keep this for now
+        console.log(
+          "[RV overhead-icons]",
+          spk.role,
+          "modelId:",
+          modelId,
+          "pos:",
+          spk.position
+        );
+
         if (!modelId) return null;
         return { spk, modelId };
       })
