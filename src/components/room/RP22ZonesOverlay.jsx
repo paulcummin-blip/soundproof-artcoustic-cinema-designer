@@ -212,42 +212,6 @@ export default function RP22ZonesOverlay(props) {
 
     const children = [];
 
-    // Visual guide: draw thin dashed lines at leftLimitM and rightLimitM
-    const [leftLimitPx]  = toPx(leftLimitM, 0);
-    const [rightLimitPx] = toPx(rightLimitM, 0);
-    const roomTopPx      = toPx(0, 0)[1];
-    const roomBotPx      = toPx(0, L)[1];
-
-    children.push(
-      <line
-        key="oh2-diag-left-bound"
-        x1={leftLimitPx}
-        x2={leftLimitPx}
-        y1={roomTopPx}
-        y2={roomBotPx}
-        stroke="#FF00AA"
-        strokeWidth={1}
-        strokeDasharray="4,3"
-        opacity="0.5"
-        pointerEvents="none"
-      />
-    );
-    children.push(
-      <line
-        key="oh2-diag-right-bound"
-        x1={rightLimitPx}
-        x2={rightLimitPx}
-        y1={roomTopPx}
-        y2={roomBotPx}
-        stroke="#00A0FF"
-        strokeWidth={1}
-        strokeDasharray="4,3"
-        opacity="0.5"
-        pointerEvents="none"
-      />
-    );
-    // ----- END DIAGNOSTICS -----
-
     const bands = { middle: oh2 };
 
     function renderBand(bandType, side) {
@@ -387,42 +351,6 @@ export default function RP22ZonesOverlay(props) {
     }
 
     const children = [];
-
-    // Visual guide: draw thin dashed lines at leftLimitM and rightLimitM
-    const [leftLimitPx]  = toPx(leftLimitM, 0);
-    const [rightLimitPx] = toPx(rightLimitM, 0);
-    const roomTopPx      = toPx(0, 0)[1];
-    const roomBotPx      = toPx(0, L)[1];
-
-    children.push(
-      <line
-        key="oh4-diag-left-bound"
-        x1={leftLimitPx}
-        x2={leftLimitPx}
-        y1={roomTopPx}
-        y2={roomBotPx}
-        stroke="#FF00AA"
-        strokeWidth={1}
-        strokeDasharray="4,3"
-        opacity="0.5"
-        pointerEvents="none"
-      />
-    );
-    children.push(
-      <line
-        key="oh4-diag-right-bound"
-        x1={rightLimitPx}
-        x2={rightLimitPx}
-        y1={roomTopPx}
-        y2={roomBotPx}
-        stroke="#00A0FF"
-        strokeWidth={1}
-        strokeDasharray="4,3"
-        opacity="0.5"
-        pointerEvents="none"
-      />
-    );
-    // ----- END DIAGNOSTICS -----
 
     const bands = { front: oh4.front, rear: oh4.rear };
 
@@ -565,42 +493,6 @@ export default function RP22ZonesOverlay(props) {
     }
 
     const children = [];
-
-    // Visual guide: draw thin dashed lines at leftLimitM and rightLimitM
-    const [leftLimitPx]  = toPx(leftLimitM, 0);
-    const [rightLimitPx] = toPx(rightLimitM, 0);
-    const roomTopPx      = toPx(0, 0)[1];
-    const roomBotPx      = toPx(0, L)[1];
-
-    children.push(
-      <line
-        key="oh6-diag-left-bound"
-        x1={leftLimitPx}
-        x2={leftLimitPx}
-        y1={roomTopPx}
-        y2={roomBotPx}
-        stroke="#FF00AA"
-        strokeWidth={1}
-        strokeDasharray="4,3"
-        opacity="0.5"
-        pointerEvents="none"
-      />
-    );
-    children.push(
-      <line
-        key="oh6-diag-right-bound"
-        x1={rightLimitPx}
-        x2={rightLimitPx}
-        y1={roomTopPx}
-        y2={roomBotPx}
-        stroke="#00A0FF"
-        strokeWidth={1}
-        strokeDasharray="4,3"
-        opacity="0.5"
-        pointerEvents="none"
-      />
-    );
-    // ----- END DIAGNOSTICS -----
 
     const bands = { front: oh6.front, middle: oh6.middle, rear: oh6.rear };
 

@@ -1963,7 +1963,7 @@ React.useEffect(() => {
     // Fallback for all other draggable speakers (including overheads)
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
 
-    // Overhead drag behaviour: L/R pairs, clamped to bands, mirrored horizontally
+    // Overhead drag behaviour: L/R pairs, clamped to RP22 corridors, mirrored horizontally
     if (canonicalRole && canonicalRole.startsWith('T')) {
       const OVERHEAD_ROLES = new Set(["TML", "TMR", "TFL", "TFR", "TRL", "TRR"]);
       // Mark that the user has taken control of overheads
@@ -1971,6 +1971,21 @@ React.useEffect(() => {
 
       if (!overheadZones || overheadZones.status !== "ok") {
         return;
+      }
+
+      // Determine which RP22 zone this role belongs to
+      let zoneKey = null;
+      if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
+        zoneKey = 'front';
+      } else if (['TML', 'TMR'].includes(canonicalRole)) {
+        zoneKey = 'mid';
+      } else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) {
+        zoneKey = 'rear';
+      }
+
+      const zone = zoneKey && overheadZones[zoneKey];
+      if (!zone) {
+        return; // No valid zone for this role
       }
 
       // Check if this is a 5.1.4 layout (exactly 4 overheads: TFL, TFR, TRL, TRR)
@@ -1998,27 +2013,11 @@ React.useEffect(() => {
       // Raw room coords from the mouse
       const rawRoomPos = canvasToRoom(newCanvasPos);
 
-      // Clamp dragged speaker inside its own band
-      let primaryClamped = clampOverheadPairPosition(
-        { x: rawRoomPos.x, y: rawRoomPos.y },
-        canonicalRole,
-        overheadZones,
-        widthM,
-        lengthM
-      );
-
-      // SEAT SPAN X CLAMPING: Keep overhead speakers outside the widest seats
-      if (OVERHEAD_ROLES.has(canonicalRole)) {
-        const seatXs = (seatingPositions || [])
-          .map(seat => seat?.position?.x ?? seat?.x)
-          .filter(x => Number.isFinite(x));
-
-        if (seatXs.length > 0) {
-          const seatMinX = Math.min(...seatXs);
-          const seatMaxX = Math.max(...seatXs);
-          primaryClamped.x = clampOverheadXToSeatSpan(primaryClamped.x, seatMinX, seatMaxX);
-        }
-      }
+      // Clamp dragged speaker exactly to its RP22 corridor
+      const primaryClamped = {
+        x: Math.min(Math.max(rawRoomPos.x, zone.xMin), zone.xMax),
+        y: Math.min(Math.max(rawRoomPos.y, zone.yMin), zone.yMax),
+      };
 
       // Derive shared column X with seat span clamping
       const centerX = widthM / 2;
@@ -2075,25 +2074,17 @@ React.useEffect(() => {
             frontY = 2 * mlpY - rearY;
           }
           
-          // Clamp both rows to their zones
-          const frontClamped = clampOverheadPairPosition(
-            { x: leftColumnX ?? primaryClamped.x, y: frontY },
-            'TFL',
-            overheadZones,
-            widthM,
-            lengthM
-          );
+          // Clamp both rows to their RP22 zones
+          const frontZone = overheadZones.front;
+          const rearZone = overheadZones.rear;
           
-          const rearClamped = clampOverheadPairPosition(
-            { x: leftColumnX ?? primaryClamped.x, y: rearY },
-            'TBL',
-            overheadZones,
-            widthM,
-            lengthM
-          );
+          if (frontZone) {
+            frontY = Math.min(Math.max(frontY, frontZone.yMin), frontZone.yMax);
+          }
           
-          frontY = frontClamped.y;
-          rearY = rearClamped.y;
+          if (rearZone) {
+            rearY = Math.min(Math.max(rearY, rearZone.yMin), rearZone.yMax);
+          }
           
           // Update all four overheads
           onSetSpeakers(prev => {
@@ -2182,26 +2173,15 @@ React.useEffect(() => {
         newFrontY = midY - d;
       }
 
-      // Clamp Y for each row
-      const clampYForRole = (x, y, role) => {
-        const clamped = clampOverheadPairPosition(
-          { x, y },
-          role,
-          overheadZones,
-          widthM,
-          lengthM
-        );
-        return clamped.y;
-      };
-
-      if (Number.isFinite(newFrontY)) {
-        newFrontY = clampYForRole(leftColumnX ?? primaryClamped.x, newFrontY, 'TFL');
+      // Clamp Y for each row to RP22 zones
+      if (Number.isFinite(newFrontY) && overheadZones.front) {
+        newFrontY = Math.min(Math.max(newFrontY, overheadZones.front.yMin), overheadZones.front.yMax);
       }
-      if (Number.isFinite(newMidY)) {
-        newMidY = clampYForRole(leftColumnX ?? primaryClamped.x, newMidY, 'TML');
+      if (Number.isFinite(newMidY) && overheadZones.mid) {
+        newMidY = Math.min(Math.max(newMidY, overheadZones.mid.yMin), overheadZones.mid.yMax);
       }
-      if (Number.isFinite(newRearY)) {
-        newRearY = clampYForRole(leftColumnX ?? primaryClamped.x, newRearY, 'TRL');
+      if (Number.isFinite(newRearY) && overheadZones.rear) {
+        newRearY = Math.min(Math.max(newRearY, overheadZones.rear.yMin), overheadZones.rear.yMax);
       }
 
       // Write positions for all six overheads
