@@ -3487,7 +3487,21 @@ useEffect(() => {
       if (!rvIsOverheadRole(spk.role)) return false;
       if (!hasPos(spk)) return false;
 
-      const modelId = spk.model;
+      // Determine which position this role belongs to
+      const canonicalRole = String(spk.role || '').toUpperCase();
+      let position = null;
+      if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
+        position = 'front';
+      } else if (['TML', 'TMR'].includes(canonicalRole)) {
+        position = 'mid';
+      } else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) {
+        position = 'rear';
+      }
+
+      if (!position) return false;
+
+      // Use the existing helper that applies global + overrides
+      const modelId = getOverheadModelForPosition(position);
 
       // No model or explicitly OFF → treat as "no speaker"
       if (!modelId) return false;
@@ -3505,23 +3519,38 @@ useEffect(() => {
         data-layer="overhead-icons"
         style={{ pointerEvents: "none" }}
       >
-        {overheadSpeakers.map((spk) => (
-          <SpeakerIcon
-            key={spk.role || spk.id}
-            role={spk.role}
-            modelId={spk.model}
-            x={toPx(spk.position.x)}
-            y={toPx(spk.position.y)}
-            scale={scale}
-            isSelected={false}
-            isHovered={false}
-            draggable={false}
-            showLabel={false}
-          />
-        ))}
+        {overheadSpeakers.map((spk) => {
+          // Resolve position from role
+          const canonicalRole = String(spk.role || '').toUpperCase();
+          let position = null;
+          if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
+            position = 'front';
+          } else if (['TML', 'TMR'].includes(canonicalRole)) {
+            position = 'mid';
+          } else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) {
+            position = 'rear';
+          }
+
+          const modelId = position ? getOverheadModelForPosition(position) : null;
+
+          return (
+            <SpeakerIcon
+              key={spk.role || spk.id}
+              role={spk.role}
+              modelId={modelId}
+              x={toPx(spk.position.x)}
+              y={toPx(spk.position.y)}
+              scale={scale}
+              isSelected={false}
+              isHovered={false}
+              draggable={false}
+              showLabel={false}
+            />
+          );
+        })}
       </g>
     );
-  }, [_overlays, placedSpeakers, toPx, scale]);
+  }, [_overlays, placedSpeakers, toPx, scale, getOverheadModelForPosition]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
   const renderFrontWideZones = useCallback(() => {
