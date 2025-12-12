@@ -1467,12 +1467,12 @@ React.useEffect(() => {
         return;
       }
 
+      console.log("[DRAG] START", { id, type, role: target?.role, hasTarget: !!target });
       setDragState({
         dragging: true,
         draggedItemId: id,
         dragType: type,
       });
-      console.log("[DRAG] START", { id, type, role: byId.get(id)?.role, dragState });
       setDragWarning({ show: false });
       rsDragLockRef.current = null;
 
@@ -2047,10 +2047,16 @@ React.useEffect(() => {
         zoneKey = 'rear';
       }
 
-      const zone = zoneKey && overheadZones[zoneKey];
+      let zone = zoneKey && overheadZones[zoneKey];
       if (!zone) {
-        console.log("[DRAG] STOP: blocked by no valid overhead zone", { speakerId, role: spk?.role });
-        return; // No valid zone for this role
+        console.log("[DRAG] overhead bypass: zone missing/invalid, allowing drag");
+        // Create fallback zone using full room bounds (no clamping)
+        zone = {
+          xMin: 0,
+          xMax: widthM,
+          yMin: 0,
+          yMax: lengthM
+        };
       }
 
       // Check if this is a 5.1.4 layout (exactly 4 overheads: TFL, TFR, TRL, TRR)
@@ -2333,6 +2339,7 @@ React.useEffect(() => {
     const svgPoint = point.matrixTransform(inverseCTM);
 
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
+    console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
 
     if (dragType === 'speaker' && speaker) {
       const canonicalRole = getCanonicalRole(speaker.role);
