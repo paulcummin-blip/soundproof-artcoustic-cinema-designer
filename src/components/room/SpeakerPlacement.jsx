@@ -1130,20 +1130,6 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         </SelectContent>
       </Select>
 
-      <div className="mt-2 flex items-center justify-between">
-        <Label htmlFor="lcr-angle-toggle" className="text-sm text-[#3E4349] font-medium">Orientation</Label>
-        <div className="flex items-center gap-3">
-          <span className={`text-xs ${!angled ? "text-[#1B1A1A]" : "text-[#625143]"}`}>Flat</span>
-          <Switch
-            id="lcr-angle-toggle"
-            checked={angled}
-            onCheckedChange={(on) => onChangeLcrAimMode(on ? "angled" : "flat")}
-            disabled={disabled}
-          />
-          <span className={`text-xs ${angled ? "text-[#1B1A1A]" : "text-[#625143]"}`}>Angled</span>
-        </div>
-      </div>
-
       <p className="text-xs text-[#625143] mt-1">
         Angle to MLP: <span className="font-semibold text-[#1B1A1A]">{Math.round(lcrAngleDeg)}°</span>
       </p>

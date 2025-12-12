@@ -3273,6 +3273,15 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                     <div className="text-sm font-medium text-gray-700 mb-3">Aiming</div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
+                        <Label htmlFor="aim-lcr" className="text-sm">Left / Right → Aim to MLP</Label>
+                        <Switch
+                          id="aim-lcr"
+                          checked={lcrAimMode === "angled"}
+                          onCheckedChange={(checked) => setLcrAimMode(checked ? "angled" : "flat")}
+                          disabled={isFrozen('speakers')}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
                         <Label htmlFor="aim-front-wides" className="text-sm">Front Wides → Aim to MLP</Label>
                         <Switch
                           id="aim-front-wides"
