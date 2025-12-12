@@ -1476,6 +1476,12 @@ React.useEffect(() => {
     [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole]
   );
 
+  // Shared drag handler wrapper for all speakers (bed-layer and overhead)
+  const bedLayerSpeakerMouseDownHandler = useCallback(
+    (e, id) => handleMouseDown(e, id, "speaker"),
+    [handleMouseDown]
+  );
+
   const handleZoomIn = () => setZoom(prev => Math.min(2.0, prev + 0.1));
   const handleZoomOut = () => setZoom(prev => Math.max(0.5, prev - 0.1));
 
@@ -4414,12 +4420,6 @@ return {
       }
     };
   }, [applyLcrFromDetail]);
-
-  // Define shared drag handler wrapper for bed-layer speakers
-  const bedLayerSpeakerMouseDownHandler = useCallback(
-    (e, id) => handleMouseDown(e, id, "speaker"),
-    [handleMouseDown]
-  );
 
   const renderSpeakers = useCallback(() => {
   // Start from the prop (single source of truth)
