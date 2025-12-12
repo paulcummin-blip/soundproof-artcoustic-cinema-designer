@@ -3538,7 +3538,7 @@ useEffect(() => {
               widthM={0.27}
               depthM={0.27}
               scale={scale}
-              speakerMouseDownHandler={(e) => handleMouseDown(e, spk.id, "speaker")}
+              speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id)}
               setHoveredSpeaker={setHoveredSpeaker}
             />
           );
@@ -3557,7 +3557,7 @@ useEffect(() => {
     overheadFrontOverride,
     overheadMidOverride,
     overheadRearOverride,
-    handleMouseDown,
+    bedLayerSpeakerMouseDownHandler,
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
@@ -4415,6 +4415,12 @@ return {
     };
   }, [applyLcrFromDetail]);
 
+  // Define shared drag handler wrapper for bed-layer speakers
+  const bedLayerSpeakerMouseDownHandler = useCallback(
+    (e, id) => handleMouseDown(e, id, "speaker"),
+    [handleMouseDown]
+  );
+
   const renderSpeakers = useCallback(() => {
   // Start from the prop (single source of truth)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
@@ -4610,8 +4616,8 @@ return {
       });
     }
 
-    const speakerMouseDownHandler = isDraggable(speaker)
-      ? (e) => handleMouseDown(e, id, "speaker")
+    const speakerDragHandler = isDraggable(speaker)
+      ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
       : undefined;
 
     // Visual-only yaw: flip sign so icons match the room coordinate system.
@@ -4627,7 +4633,7 @@ return {
         widthM={widthM_spk}
         depthM={depthM_spk}
         scale={scale}
-        speakerMouseDownHandler={speakerMouseDownHandler}
+        speakerMouseDownHandler={speakerDragHandler}
         setHoveredSpeaker={setHoveredSpeaker}
       />
     );
@@ -4650,7 +4656,7 @@ return {
   lcrAngleInfo,
   aimAtMLP,
   isDraggable,
-  handleMouseDown,
+  bedLayerSpeakerMouseDownHandler,
   setHoveredSpeaker,
   SpeakerIcon,
   placedSpeakers, // Added to ensure reactivity when speakers change
