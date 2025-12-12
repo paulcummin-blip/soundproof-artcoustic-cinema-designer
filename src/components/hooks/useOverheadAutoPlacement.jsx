@@ -21,9 +21,13 @@ export function useOverheadAutoPlacement({
   overheadZones,
   getCanonicalRole,
   overheadCount,
-  hasManualOverheadEdit = false
+  hasManualOverheadEdit = false,
+  isDragging = false
 }) {
   useEffect(() => {
+    // [B44 PROMPT 3] Guard: don't reposition overheads while dragging
+    if (isDragging) return;
+    
     // Guard: user has manually edited overheads - don't auto-place anymore
     if (hasManualOverheadEdit) return;
     
@@ -131,5 +135,5 @@ export function useOverheadAutoPlacement({
     if (needsUpdate && setPlacedSpeakers) {
       setPlacedSpeakers(nextSpeakers);
     }
-  }, [placedSpeakers, setPlacedSpeakers, overheadZones, getCanonicalRole, overheadCount]);
+  }, [placedSpeakers, setPlacedSpeakers, overheadZones, getCanonicalRole, overheadCount, hasManualOverheadEdit, isDragging]);
 }

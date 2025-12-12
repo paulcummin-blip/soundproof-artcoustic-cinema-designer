@@ -21,8 +21,12 @@ export function useEnsureOverheadPairs({
   placedSpeakers,
   setPlacedSpeakers,
   useWidesInsteadOfRears = false,
+  isDragging = false
 }) {
   React.useEffect(() => {
+    // [B44 PROMPT 3] Guard: don't create/modify overheads while dragging
+    if (isDragging) return;
+    
     // Guard: no configuration
     if (!dolbyConfiguration) return;
     
@@ -87,5 +91,5 @@ export function useEnsureOverheadPairs({
     if (nextSpeakers.length > placedSpeakers.length) {
       setPlacedSpeakers(nextSpeakers);
     }
-  }, [dolbyConfiguration, placedSpeakers, setPlacedSpeakers, useWidesInsteadOfRears]);
+  }, [dolbyConfiguration, placedSpeakers, setPlacedSpeakers, useWidesInsteadOfRears, isDragging]);
 }
