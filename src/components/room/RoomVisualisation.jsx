@@ -2966,6 +2966,172 @@ useEffect(() => {
     }));
   }, [aimAtMLP, lcrAngleInfo.L, lcrAngleInfo.R, onSetSpeakers, getCanonicalRole, placedSpeakers]);
 
+  // [NEW] Apply surround "Aim to MLP" toggles - same method as LCR
+  useEffect(() => {
+    if (!onSetSpeakers || !mlp) return;
+
+    const aimFrontWides = appState?.aimFrontWidesAtMLP || false;
+    const aimSideSurrounds = appState?.aimSideSurroundsAtMLP || false;
+    const aimRearSurrounds = appState?.aimRearSurroundsAtMLP || false;
+
+    // Log toggle state
+    console.log('[Surround Aim] Toggle state:', {
+      aimFrontWides,
+      aimSideSurrounds,
+      aimRearSurrounds
+    });
+
+    // Helper: compute yaw from speaker to MLP (same as L/R)
+    const computeYawToMLP = (speakerPos) => {
+      const dx = mlp.x - speakerPos.x;
+      const dy = mlp.y - speakerPos.y;
+      const yawRad = Math.atan2(dx, dy);
+      return yawRad * (180 / Math.PI);
+    };
+
+    // Helper: check if rotation would keep speaker inside room with 1cm buffer
+    const canRotateSafely = (speaker, targetYaw) => {
+      if (!speaker?.position || !speaker?.model) return true; // Allow if no constraints
+      
+      const dims = getModelDimsM(speaker.model);
+      const widthM_spk = dims.widthM || 0.27;
+      const depthM_spk = dims.depthM || 0.082;
+      
+      const BUFFER_M = 0.01; // 1cm safety buffer
+      
+      // Compute rotated bounding box corners
+      const yawRad = (targetYaw * Math.PI) / 180;
+      const cos = Math.cos(yawRad);
+      const sin = Math.sin(yawRad);
+      
+      // Half dimensions
+      const hw = widthM_spk / 2;
+      const hd = depthM_spk / 2;
+      
+      // Four corners in local space
+      const corners = [
+        { x: -hw, y: -hd },
+        { x:  hw, y: -hd },
+        { x:  hw, y:  hd },
+        { x: -hw, y:  hd }
+      ];
+      
+      // Rotate and translate to world space
+      const worldCorners = corners.map(c => ({
+        x: speaker.position.x + (c.x * cos - c.y * sin),
+        y: speaker.position.y + (c.x * sin + c.y * cos)
+      }));
+      
+      // Check if all corners are inside room bounds (with buffer)
+      const roomWidth = widthM || 4.5;
+      const roomLength = lengthM || 6.0;
+      
+      for (const corner of worldCorners) {
+        if (corner.x < BUFFER_M || corner.x > roomWidth - BUFFER_M ||
+            corner.y < BUFFER_M || corner.y > roomLength - BUFFER_M) {
+          return false; // Would break wall constraint
+        }
+      }
+      
+      return true;
+    };
+
+    // Process speakers
+    onSetSpeakers(prev => {
+      let updated = false;
+      
+      const next = prev.map(spk => {
+        const role = getCanonicalRole(spk.role);
+        if (!spk.position) return spk;
+        
+        let targetYaw = null;
+        let shouldAim = false;
+        
+        // Determine if this speaker should aim to MLP
+        if (['LW', 'RW'].includes(role) && aimFrontWides) {
+          shouldAim = true;
+        } else if (['SL', 'SR'].includes(role) && aimSideSurrounds) {
+          shouldAim = true;
+        } else if (['SBL', 'SBR'].includes(role) && aimRearSurrounds) {
+          shouldAim = true;
+        }
+        
+        if (!shouldAim) {
+          // Reset to flat (0° for back wall, ±90° for side walls)
+          const W = widthM || 4.5;
+          const L = lengthM || 6.0;
+          const dims = getModelDimsM(spk.model);
+          const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
+          
+          const leftX = WALL_BUFFER_M + halfDepth;
+          const rightX = W - WALL_BUFFER_M - halfDepth;
+          const backY = L - WALL_BUFFER_M - halfDepth;
+          
+          const onLeftWall = Math.abs(spk.position.x - leftX) <= 0.035;
+          const onRightWall = Math.abs(spk.position.x - rightX) <= 0.035;
+          const onBackWall = Math.abs(spk.position.y - backY) <= 0.035;
+          
+          let flatYaw = 0;
+          if (onLeftWall) flatYaw = 90;
+          else if (onRightWall) flatYaw = -90;
+          else if (onBackWall) flatYaw = 0;
+          
+          if (Math.abs((spk.yaw ?? 0) - flatYaw) > 0.1) {
+            console.log('[Surround Aim] Reset to flat:', {
+              role,
+              previousYaw: spk.yaw,
+              newYaw: flatYaw
+            });
+            updated = true;
+            return { ...spk, yaw: flatYaw };
+          }
+          return spk;
+        }
+        
+        // Compute desired yaw to MLP
+        targetYaw = computeYawToMLP(spk.position);
+        
+        // Check if rotation is safe
+        if (!canRotateSafely(spk, targetYaw)) {
+          // Clamp to maximum safe rotation
+          // For now, keep speaker flat (TODO: implement actual clamping)
+          console.log('[Surround Aim] Rotation would break wall constraint:', {
+            role,
+            targetYaw: targetYaw.toFixed(1),
+            keepingFlat: true
+          });
+          return spk;
+        }
+        
+        // Apply yaw if changed
+        if (Math.abs((spk.yaw ?? 0) - targetYaw) > 0.1) {
+          console.log('[Surround Aim] Applying yaw:', {
+            role,
+            previousYaw: (spk.yaw ?? 0).toFixed(1),
+            newYaw: targetYaw.toFixed(1)
+          });
+          updated = true;
+          return { ...spk, yaw: targetYaw };
+        }
+        
+        return spk;
+      });
+      
+      return updated ? next : prev;
+    });
+  }, [
+    appState?.aimFrontWidesAtMLP,
+    appState?.aimSideSurroundsAtMLP,
+    appState?.aimRearSurroundsAtMLP,
+    mlp,
+    widthM,
+    lengthM,
+    placedSpeakers,
+    onSetSpeakers,
+    getCanonicalRole,
+    getModelDimsM
+  ]);
+
   // [NEW] Auto-hug surrounds to walls when room dimensions change
   useEffect(() => {
     if (!onSetSpeakers || !placedSpeakers?.length) return;
