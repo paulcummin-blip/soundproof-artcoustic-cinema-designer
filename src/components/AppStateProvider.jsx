@@ -260,6 +260,10 @@ function useDesignerState() {
   const [useMidGlobal, setUseMidGlobal] = useState(true);
   const [useRearGlobal, setUseRearGlobal] = useState(true);
 
+  const [aimFrontWidesAtMLP, setAimFrontWidesAtMLP] = useState(false);
+  const [aimSideSurroundsAtMLP, setAimSideSurroundsAtMLP] = useState(false);
+  const [aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP] = useState(false);
+
   const [splConfig, setSplConfig] = useState({
         globalPowerW: 100,
         globalEqHeadroomDb: 0,
@@ -537,6 +541,9 @@ function useDesignerState() {
     useFrontGlobal, setUseFrontGlobal,
     useMidGlobal, setUseMidGlobal,
     useRearGlobal, setUseRearGlobal,
+    aimFrontWidesAtMLP, setAimFrontWidesAtMLP,
+    aimSideSurroundsAtMLP, setAimSideSurroundsAtMLP,
+    aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP,
     splConfig,
     setSplConfig,
     getEffectiveSplInputs,
@@ -585,6 +592,9 @@ function useDesignerState() {
     useFrontGlobal, setUseFrontGlobal,
     useMidGlobal, setUseMidGlobal,
     useRearGlobal, setUseRearGlobal,
+    aimFrontWidesAtMLP, setAimFrontWidesAtMLP,
+    aimSideSurroundsAtMLP, setAimSideSurroundsAtMLP,
+    aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP,
     splConfig,
     getEffectiveSplInputs,
     updateGlobalSpl,
