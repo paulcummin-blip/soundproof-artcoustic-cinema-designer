@@ -2481,6 +2481,21 @@ React.useEffect(() => {
     if (!hudPinnedSeatId) setHoveredSeat(null);
   }, [hudPinnedSeatId]);
 
+  // NEW: Helper to compute angle-to-MLP for any speaker (defined early to avoid TDZ)
+  const computeAngleToMLP = useCallback((speaker) => {
+    if (!speaker?.position || !mlp) return null;
+    
+    const dx = mlp.x - speaker.position.x;
+    const dy = mlp.y - speaker.position.y;
+    
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
+    
+    const angleRad = Math.atan2(dx, dy);
+    const angleDeg = angleRad * (180 / Math.PI);
+    
+    return angleDeg;
+  }, [mlp]);
+
   const handleSpeakerMouseEnter = useCallback((spk) => {
     if (!dragging && spk) {
       setHoveredSpeaker(spk);
@@ -4730,21 +4745,6 @@ return {
       }
     };
   }, [applyLcrFromDetail]);
-
-  // NEW: Helper to compute angle-to-MLP for any speaker
-const computeAngleToMLP = useCallback((speaker) => {
-  if (!speaker?.position || !mlp) return null;
-  
-  const dx = mlp.x - speaker.position.x;
-  const dy = mlp.y - speaker.position.y;
-  
-  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
-  
-  const angleRad = Math.atan2(dx, dy);
-  const angleDeg = angleRad * (180 / Math.PI);
-  
-  return angleDeg;
-}, [mlp]);
 
 const renderSpeakers = useCallback(() => {
   // Start from the prop (single source of truth)
