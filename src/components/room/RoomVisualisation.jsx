@@ -1608,11 +1608,7 @@ React.useEffect(() => {
 
   // Drag state management
   const handleSpeakerDrag = useCallback((speakerId, newCanvasPos) => {
-    // [B44 PROMPT 1] Verify overheads reach the drag pipeline
-    console.log("[handleSpeakerDrag] ENTERED:", {
-      speakerId,
-      role: byId.get(speakerId)?.role || "—"
-    });
+    console.log("[DRAG] handleSpeakerDrag ENTER", { speakerId, role: byId.get(speakerId)?.role, newCanvasPos });
 
     if (!onSetSpeakers) return;
 
@@ -2210,6 +2206,7 @@ React.useEffect(() => {
       }
 
       // Write positions for all six overheads
+      console.log("[DRAG] handleSpeakerDrag APPLY", { speakerId, role: getCanonicalRole(byId.get(speakerId)?.role), roomPos: rawRoomPos });
       onSetSpeakers(prev => {
         if (!Array.isArray(prev)) return prev;
 
