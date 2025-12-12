@@ -1472,6 +1472,7 @@ React.useEffect(() => {
         draggedItemId: id,
         dragType: type,
       });
+      console.log("[DRAG] START", { id, type, role: byId.get(id)?.role, dragState });
       setDragWarning({ show: false });
       rsDragLockRef.current = null;
 
@@ -2271,6 +2272,7 @@ React.useEffect(() => {
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
+    console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
 
