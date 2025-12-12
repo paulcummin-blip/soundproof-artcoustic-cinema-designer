@@ -380,6 +380,20 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
     }
 
     offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
+
+    // If yaw is explicitly provided, SBL/SBR can be 180° flipped depending on yaw convention.
+    // Try aimDeg + 180 and keep whichever produces the smaller off-axis angle.
+    const yawWasProvided =
+      isNum(speaker.yaw) || isNum(speaker.rotationDeg) || isNum(speaker.rotation_deg);
+
+    if (yawWasProvided && (role === "SBL" || role === "SBR") && isNum(offAxisDeg) && offAxisDeg > 90) {
+      const aimFlip = norm180((Number(aimDeg) || 0) + 180);
+      const offFlip = Math.abs(norm180(seatAzDeg - aimFlip));
+      if (isNum(offFlip) && offFlip < offAxisDeg) {
+        aimDeg = aimFlip;
+        offAxisDeg = offFlip;
+      }
+    }
     }
 
     if (!isNum(offAxisDeg)) return null;
