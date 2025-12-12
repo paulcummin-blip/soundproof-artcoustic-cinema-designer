@@ -2009,8 +2009,31 @@ React.useEffect(() => {
       // Mark that the user has taken control of overheads
       setHasManualOverheadEdit(true);
 
+      // [B44 PROMPT] Allow overhead drag even when zones are missing/invalid
+      // RP22 zones constrain final placement (on mouse up), not interaction.
       if (!overheadZones || overheadZones.status !== "ok") {
-        console.log("[DRAG] STOP: blocked by overheadZones not ready", { speakerId, role: spk?.role });
+        console.log("[DRAG] overhead bypass: zone missing/invalid, allowing drag");
+        
+        // Proceed with basic movement using canvasToRoom conversion
+        const rawRoomPos = canvasToRoom(newCanvasPos);
+        
+        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+        onSetSpeakers(prev => prev.map(s => {
+          if (s.id === speakerId) {
+            return { 
+              ...s, 
+              position: { 
+                ...s.position, 
+                x: rawRoomPos.x, 
+                y: rawRoomPos.y 
+              } 
+            };
+          }
+          return s;
+        }));
+        
+        lastInteractionEpoch.current = timeNowMs();
+        console.log("[DRAG] STOP: overhead drag without zones complete");
         return;
       }
 
