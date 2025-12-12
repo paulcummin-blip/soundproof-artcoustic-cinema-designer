@@ -168,7 +168,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
           cy={canvasY_raw}
           r={radiusPx}
           fill={color || "#000000"}
-          stroke="#000000"}
+          stroke="#000000"
           strokeWidth={1}
           opacity={1}
         />
