@@ -2325,7 +2325,13 @@ React.useEffect(() => {
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
-    if (!dragging || !draggedItemId) return;
+    if (!dragging || !draggedItemId) {
+      // Clear tooltip when not dragging
+      if (!hoveredSpeaker) {
+        setTooltip({ show: false, text: '' });
+      }
+      return;
+    }
     setDragWarning({ show: false });
 
     if (!svgRef.current) return;
@@ -4532,7 +4538,22 @@ return {
     };
   }, [applyLcrFromDetail]);
 
-  const renderSpeakers = useCallback(() => {
+  // NEW: Helper to compute angle-to-MLP for any speaker
+const computeAngleToMLP = useCallback((speaker) => {
+  if (!speaker?.position || !mlp) return null;
+  
+  const dx = mlp.x - speaker.position.x;
+  const dy = mlp.y - speaker.position.y;
+  
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
+  
+  const angleRad = Math.atan2(dx, dy);
+  const angleDeg = angleRad * (180 / Math.PI);
+  
+  return angleDeg;
+}, [mlp]);
+
+const renderSpeakers = useCallback(() => {
   // Start from the prop (single source of truth)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
@@ -4746,6 +4767,8 @@ return {
         scale={scale}
         speakerMouseDownHandler={speakerDragHandler}
         setHoveredSpeaker={setHoveredSpeaker}
+        onMouseEnter={() => handleSpeakerMouseEnter(speaker)}
+        onMouseLeave={handleSpeakerMouseLeave}
       />
     );
   });
