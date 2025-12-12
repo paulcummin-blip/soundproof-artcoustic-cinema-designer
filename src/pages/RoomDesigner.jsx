@@ -2355,9 +2355,9 @@ function RoomDesignerWithState() {
         // Reset to flat if toggle is off
         if (canon === 'FL' || canon === 'FR' || canon === 'LW' || canon === 'RW' || 
             canon === 'SL' || canon === 'SR' || canon === 'SBL' || canon === 'SBR') {
-          const currentYaw = spk.rotation?.y || 0;
+          const currentYaw = spk.yaw || 0;
           if (Math.abs(currentYaw) > 0.001) {
-            return { ...spk, rotation: { ...(spk.rotation || {}), y: 0 } };
+            return { ...spk, yaw: 0 };
           }
         }
         return spk;
@@ -2368,19 +2368,19 @@ function RoomDesignerWithState() {
       
       // Check if rotation is safe
       const safe = canRotateSafely(spk.position, targetYaw, spk.model);
-      const finalYaw = safe ? targetYaw : (spk.rotation?.y || 0);
+      const finalYaw = safe ? targetYaw : (spk.yaw || 0);
       
       // Only update if changed
-      const currentYaw = spk.rotation?.y || 0;
+      const currentYaw = spk.yaw || 0;
       if (Math.abs(finalYaw - currentYaw) < 0.001) return spk;
       
-      return { ...spk, rotation: { ...(spk.rotation || {}), y: finalYaw } };
+      return { ...spk, yaw: finalYaw };
     });
 
     // Only commit if something actually changed
     const changed = updated.some((spk, i) => {
-      const oldYaw = placedSpeakers[i]?.rotation?.y || 0;
-      const newYaw = spk?.rotation?.y || 0;
+      const oldYaw = placedSpeakers[i]?.yaw || 0;
+      const newYaw = spk?.yaw || 0;
       return Math.abs(oldYaw - newYaw) > 0.001;
     });
 
