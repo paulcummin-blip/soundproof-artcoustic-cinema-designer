@@ -2291,6 +2291,115 @@ function RoomDesignerWithState() {
     }
   }, [placedSpeakers, _isFrozen, stableDimensions.width, setSpeakers]);
 
+  // NEW: Apply "Aim to MLP" rotation to LCR and Surrounds
+  useEffect(() => {
+    if (!placedSpeakers.length || (_isFrozen && _isFrozen('speakers')) || !mlpAnchorEffective) return;
+
+    const aimLCR = lcrAimMode === "angled";
+    const aimFW = appState?.aimFrontWidesAtMLP || false;
+    const aimSide = appState?.aimSideSurroundsAtMLP || false;
+    const aimRear = appState?.aimRearSurroundsAtMLP || false;
+
+    // Helper: compute yaw from speaker to MLP (same as L/R uses)
+    const yawToMLP = (spkPos, mlpPos) => {
+      const dx = mlpPos.x - spkPos.x;
+      const dy = mlpPos.y - spkPos.y;
+      const yawRad = Math.atan2(dx, dy);
+      return (yawRad * 180) / Math.PI;
+    };
+
+    // Helper: check if rotated speaker fits in room with 0.01m buffer
+    const canRotateSafely = (pos, yawDeg, model) => {
+      const meta = getSpeakerModelMeta(model);
+      const w = meta?.widthM || 0.27;
+      const d = meta?.depthM || 0.082;
+      
+      const yawRad = (yawDeg * Math.PI) / 180;
+      const cosY = Math.cos(yawRad);
+      const sinY = Math.sin(yawRad);
+      
+      // Rotated bounding box half-extents
+      const hw = w / 2;
+      const hd = d / 2;
+      const corners = [
+        { x: hw * cosY - hd * sinY, y: hw * sinY + hd * cosY },
+        { x: -hw * cosY - hd * sinY, y: -hw * sinY + hd * cosY },
+        { x: hw * cosY + hd * sinY, y: hw * sinY - hd * cosY },
+        { x: -hw * cosY + hd * sinY, y: -hw * sinY - hd * cosY },
+      ];
+      
+      const buffer = 0.01;
+      for (const c of corners) {
+        const wx = pos.x + c.x;
+        const wy = pos.y + c.y;
+        if (wx < buffer || wx > stableDimensions.width - buffer ||
+            wy < buffer || wy > stableDimensions.length - buffer) {
+          return false;
+        }
+      }
+      return true;
+    };
+
+    const updated = placedSpeakers.map(spk => {
+      const canon = safeCanon(spk.role);
+      if (!spk.position) return spk;
+
+      // Determine if this speaker should aim
+      let shouldAim = false;
+      if (canon === 'FL' || canon === 'FR') shouldAim = aimLCR;
+      else if (canon === 'LW' || canon === 'RW') shouldAim = aimFW;
+      else if (canon === 'SL' || canon === 'SR') shouldAim = aimSide;
+      else if (canon === 'SBL' || canon === 'SBR') shouldAim = aimRear;
+      
+      if (!shouldAim) {
+        // Reset to flat if toggle is off
+        if (canon === 'FL' || canon === 'FR' || canon === 'LW' || canon === 'RW' || 
+            canon === 'SL' || canon === 'SR' || canon === 'SBL' || canon === 'SBR') {
+          const currentYaw = spk.rotation?.y || 0;
+          if (Math.abs(currentYaw) > 0.001) {
+            return { ...spk, rotation: { ...(spk.rotation || {}), y: 0 } };
+          }
+        }
+        return spk;
+      }
+
+      // Calculate target yaw to MLP
+      const targetYaw = yawToMLP(spk.position, mlpAnchorEffective);
+      
+      // Check if rotation is safe
+      const safe = canRotateSafely(spk.position, targetYaw, spk.model);
+      const finalYaw = safe ? targetYaw : (spk.rotation?.y || 0);
+      
+      // Only update if changed
+      const currentYaw = spk.rotation?.y || 0;
+      if (Math.abs(finalYaw - currentYaw) < 0.001) return spk;
+      
+      return { ...spk, rotation: { ...(spk.rotation || {}), y: finalYaw } };
+    });
+
+    // Only commit if something actually changed
+    const changed = updated.some((spk, i) => {
+      const oldYaw = placedSpeakers[i]?.rotation?.y || 0;
+      const newYaw = spk?.rotation?.y || 0;
+      return Math.abs(oldYaw - newYaw) > 0.001;
+    });
+
+    if (changed) {
+      setSpeakers(updated);
+    }
+  }, [
+    placedSpeakers,
+    mlpAnchorEffective,
+    lcrAimMode,
+    appState?.aimFrontWidesAtMLP,
+    appState?.aimSideSurroundsAtMLP,
+    appState?.aimRearSurroundsAtMLP,
+    stableDimensions.width,
+    stableDimensions.length,
+    _isFrozen,
+    setSpeakers,
+  ]);
+
 
   // Effect to swap between Rear Surrounds and Front Wides for 7.x layouts
   useEffect(() => {
