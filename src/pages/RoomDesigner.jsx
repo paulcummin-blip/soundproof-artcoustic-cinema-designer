@@ -3267,6 +3267,44 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                       This tab is frozen. Unlock to make changes.
                     </div>
                   )}
+                  
+                  {/* Aiming Controls */}
+                  <div className="px-4 pb-4 border-b border-gray-200">
+                    <div className="text-sm font-medium text-gray-700 mb-3">Aiming</div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="aim-front-wides" className="text-sm">Front Wides → Aim to MLP</Label>
+                        <Switch
+                          id="aim-front-wides"
+                          checked={appState?.aimFrontWidesAtMLP || false}
+                          onCheckedChange={(checked) => appState?.setAimFrontWidesAtMLP(checked)}
+                          disabled={isFrozen('speakers')}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="aim-side-surrounds" className="text-sm">Side Surrounds → Aim to MLP</Label>
+                        <Switch
+                          id="aim-side-surrounds"
+                          checked={appState?.aimSideSurroundsAtMLP || false}
+                          onCheckedChange={(checked) => appState?.setAimSideSurroundsAtMLP(checked)}
+                          disabled={isFrozen('speakers')}
+                        />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="aim-rear-surrounds" className="text-sm">Rear Surrounds → Aim to MLP</Label>
+                        <Switch
+                          id="aim-rear-surrounds"
+                          checked={appState?.aimRearSurroundsAtMLP || false}
+                          onCheckedChange={(checked) => appState?.setAimRearSurroundsAtMLP(checked)}
+                          disabled={isFrozen('speakers')}
+                        />
+                      </div>
+                      <div className="text-xs text-gray-500 mt-2">
+                        Turns the speaker to face the MLP. Position does not change (yet).
+                      </div>
+                    </div>
+                  </div>
+                  
                   <Suspense fallback={<div>Loading...</div>}>
                       <SpeakerPlacement disabled={isFrozen('speakers')}
                         sevenBedLayoutType={_sevenBedLayoutType}
