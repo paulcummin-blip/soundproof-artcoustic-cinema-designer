@@ -366,6 +366,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
     if (!isNum(seatAzDeg)) return null;
 
     // Aim direction from speaker data
+    // CRITICAL: If yaw is missing, default to "aimed at seat" (zero off-axis)
     let aimDeg = null;
     if (isNum(speaker.yaw)) {
       aimDeg = Number(speaker.yaw);
@@ -374,7 +375,8 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
     } else if (isNum(speaker.rotation_deg)) {
       aimDeg = Number(speaker.rotation_deg);
     } else {
-      aimDeg = 0;
+      // Default to aimed at seat, so off-axis becomes 0
+      aimDeg = seatAzDeg;
     }
 
     offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
