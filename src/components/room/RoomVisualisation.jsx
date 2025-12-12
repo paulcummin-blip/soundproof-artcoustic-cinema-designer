@@ -1610,10 +1610,16 @@ React.useEffect(() => {
   const handleSpeakerDrag = useCallback((speakerId, newCanvasPos) => {
     console.log("[DRAG] handleSpeakerDrag ENTER", { speakerId, role: byId.get(speakerId)?.role, newCanvasPos });
 
-    if (!onSetSpeakers) return;
+    if (!onSetSpeakers) {
+      console.log("[DRAG] STOP: no onSetSpeakers");
+      return;
+    }
 
     const spk = byId.get(speakerId);
-    if (!spk) return;
+    if (!spk) {
+      console.log("[DRAG] STOP: spk not found", speakerId);
+      return;
+    }
 
     // Work out canonical role once, and decide if this is an overhead (T*).
     const canonicalRole = getCanonicalRole(spk.role);
@@ -1623,6 +1629,7 @@ React.useEffect(() => {
     // [B44 PROMPT 2] Overheads ALWAYS allowed to move - bypass all drag guards
     // For bed speakers only, apply existing draggable/renderable rules
     if (!isOverhead && !isDraggable(spk)) {
+      console.log("[DRAG] STOP: blocked by isDraggable", { speakerId, role: spk?.role });
       return;
     }
 
@@ -1655,6 +1662,7 @@ React.useEffect(() => {
         });
 
         // Apply positions
+        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
         onSetSpeakers(prev => {
           return prev.map(s => {
             const currentCanonRole = getCanonicalRole(s.role);
@@ -1669,6 +1677,7 @@ React.useEffect(() => {
         });
       }
       lastInteractionEpoch.current = timeNowMs();
+      console.log("[DRAG] STOP: LCR logic complete");
       return;
     }
 
@@ -1773,13 +1782,14 @@ React.useEffect(() => {
 
         lastInteractionEpoch.current = timeNowMs();
 
-
+        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
         onSetSpeakers(prev => prev.map(s => {
           const role = getCanonicalRole(s.role);
           if (role === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_side, y: yStar } };
           if (role === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_side, y: yStar } };
           return s;
         }));
+        console.log("[DRAG] STOP: SL/SR side mode complete");
         return;
       }
 
@@ -1826,6 +1836,7 @@ React.useEffect(() => {
 
 
       // write positions (Y stays at back-wall Y you already computed: y_back_m)
+      console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
       onSetSpeakers(prev =>
         prev.map(s => {
           const r = getCanonicalRole(s.role);
@@ -1834,6 +1845,7 @@ React.useEffect(() => {
           return s;
         })
       );
+      console.log("[DRAG] STOP: SL/SR back mode complete");
       return;
     }
 
@@ -1871,6 +1883,7 @@ React.useEffect(() => {
       const partnerY = cPartner.y; // Always back wall Y
 
       // Update both speakers
+      console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
       onSetSpeakers(prev => prev.map(s => {
         if (s.id === speakerId) {
           return { ...s, position: { ...s.position, x: finalX, y: finalY } };
@@ -1882,12 +1895,16 @@ React.useEffect(() => {
       }));
 
       lastInteractionEpoch.current = timeNowMs();
+      console.log("[DRAG] STOP: SBL/SBR complete");
       return;
     }
 
     // Handle LW/RW front-wide speakers with corridor clamping and mirroring
     if (canonicalRole === 'LW' || canonicalRole === 'RW') {
-      if (frontWideZones?.status !== 'ok') return;
+      if (frontWideZones?.status !== 'ok') {
+        console.log("[DRAG] STOP: blocked by frontWideZones not ready", { speakerId, role: spk?.role });
+        return;
+      }
 
       isDraggingFW.current = true;
 
@@ -1966,6 +1983,7 @@ React.useEffect(() => {
 
       // Update both speakers simultaneously
       if (nextPos && onSetSpeakers) {
+        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
         onSetSpeakers(prev => prev.map(s => {
           if (s.id === speakerId) {
             return { ...s, position: nextPos, meta: spk.meta };
@@ -1978,6 +1996,7 @@ React.useEffect(() => {
       }
 
       lastInteractionEpoch.current = timeNowMs();
+      console.log("[DRAG] STOP: LW/RW complete");
       return;
     }
 
@@ -1991,6 +2010,7 @@ React.useEffect(() => {
       setHasManualOverheadEdit(true);
 
       if (!overheadZones || overheadZones.status !== "ok") {
+        console.log("[DRAG] STOP: blocked by overheadZones not ready", { speakerId, role: spk?.role });
         return;
       }
 
@@ -2006,6 +2026,7 @@ React.useEffect(() => {
 
       const zone = zoneKey && overheadZones[zoneKey];
       if (!zone) {
+        console.log("[DRAG] STOP: blocked by no valid overhead zone", { speakerId, role: spk?.role });
         return; // No valid zone for this role
       }
 
@@ -2108,6 +2129,7 @@ React.useEffect(() => {
           }
           
           // Update all four overheads
+          console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
           onSetSpeakers(prev => {
             if (!Array.isArray(prev)) return prev;
 
@@ -2140,6 +2162,7 @@ React.useEffect(() => {
           });
 
           lastInteractionEpoch.current = timeNowMs();
+          console.log("[DRAG] STOP: 5.1.4 overhead complete");
           return;
         }
       }
@@ -2206,7 +2229,7 @@ React.useEffect(() => {
       }
 
       // Write positions for all six overheads
-      console.log("[DRAG] handleSpeakerDrag APPLY", { speakerId, role: getCanonicalRole(byId.get(speakerId)?.role), roomPos: rawRoomPos });
+      console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
       onSetSpeakers(prev => {
         if (!Array.isArray(prev)) return prev;
 
@@ -2241,10 +2264,12 @@ React.useEffect(() => {
       });
 
       lastInteractionEpoch.current = timeNowMs();
+      console.log("[DRAG] STOP: overhead general complete");
       return;
     }
 
     // Generic fallback for any other speakers
+    console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
     onSetSpeakers(prev => {
       let updated = prev.map(s => {
         if (s.id === speakerId) {
@@ -2255,6 +2280,7 @@ React.useEffect(() => {
       return updated;
     });
     lastInteractionEpoch.current = timeNowMs();
+    console.log("[DRAG] STOP: generic fallback complete");
   }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, dolbyLayout]);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
