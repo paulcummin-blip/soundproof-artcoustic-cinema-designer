@@ -2481,6 +2481,33 @@ React.useEffect(() => {
     if (!hudPinnedSeatId) setHoveredSeat(null);
   }, [hudPinnedSeatId]);
 
+  const handleSpeakerMouseEnter = useCallback((spk) => {
+    if (!dragging && spk) {
+      setHoveredSpeaker(spk);
+      
+      // Compute angle to MLP for tooltip
+      const angleToMLP = computeAngleToMLP(spk);
+      if (Number.isFinite(angleToMLP)) {
+        setTooltip({
+          show: true,
+          text: `${spk.role || 'Speaker'}\nAngle to MLP: ${angleToMLP.toFixed(1)}°`
+        });
+      } else {
+        setTooltip({
+          show: true,
+          text: `${spk.role || 'Speaker'}`
+        });
+      }
+    }
+  }, [dragging, computeAngleToMLP]);
+
+  const handleSpeakerMouseLeave = useCallback(() => {
+    if (!dragging) {
+      setHoveredSpeaker(null);
+      setTooltip({ show: false, text: '' });
+    }
+  }, [dragging]);
+
   const mlpAnchorEffective = mlp;
 
   // Combine hoveredSeat and pinnedSeat for effective display
