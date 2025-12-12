@@ -1130,6 +1130,10 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         </SelectContent>
       </Select>
 
+      <p className="text-xs text-[#625143] mt-1">
+        Angle to MLP: <span className="font-semibold text-[#1B1A1A]">{Math.round(lcrAngleDeg)}°</span>
+      </p>
+
       <div className="grid grid-cols-3 gap-3 mt-4">
         {lcrRoles.map((role) => (
           <LcrSplCard

@@ -2325,13 +2325,7 @@ React.useEffect(() => {
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
-    if (!dragging || !draggedItemId) {
-      // Clear tooltip when not dragging
-      if (!hoveredSpeaker) {
-        setTooltip({ show: false, text: '' });
-      }
-      return;
-    }
+    if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
 
     if (!svgRef.current) return;
@@ -2480,48 +2474,6 @@ React.useEffect(() => {
   const handleSeatMouseLeave = useCallback(() => {
     if (!hudPinnedSeatId) setHoveredSeat(null);
   }, [hudPinnedSeatId]);
-
-  // NEW: Helper to compute angle-to-MLP for any speaker (defined early to avoid TDZ)
-  const computeAngleToMLP = useCallback((speaker) => {
-    if (!speaker?.position || !mlp) return null;
-    
-    const dx = mlp.x - speaker.position.x;
-    const dy = mlp.y - speaker.position.y;
-    
-    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
-    
-    const angleRad = Math.atan2(dx, dy);
-    const angleDeg = angleRad * (180 / Math.PI);
-    
-    return angleDeg;
-  }, [mlp]);
-
-  const handleSpeakerMouseEnter = useCallback((spk) => {
-    if (!dragging && spk) {
-      setHoveredSpeaker(spk);
-      
-      // Compute angle to MLP for tooltip
-      const angleToMLP = computeAngleToMLP(spk);
-      if (Number.isFinite(angleToMLP)) {
-        setTooltip({
-          show: true,
-          text: `${spk.role || 'Speaker'}\nAngle to MLP: ${angleToMLP.toFixed(1)}°`
-        });
-      } else {
-        setTooltip({
-          show: true,
-          text: `${spk.role || 'Speaker'}`
-        });
-      }
-    }
-  }, [dragging, computeAngleToMLP]);
-
-  const handleSpeakerMouseLeave = useCallback(() => {
-    if (!dragging) {
-      setHoveredSpeaker(null);
-      setTooltip({ show: false, text: '' });
-    }
-  }, [dragging]);
 
   const mlpAnchorEffective = mlp;
 
@@ -3007,172 +2959,6 @@ useEffect(() => {
       return spk;
     }));
   }, [aimAtMLP, lcrAngleInfo.L, lcrAngleInfo.R, onSetSpeakers, getCanonicalRole, placedSpeakers]);
-
-  // [NEW] Apply surround "Aim to MLP" toggles - same method as LCR
-  useEffect(() => {
-    if (!onSetSpeakers || !mlp) return;
-
-    const aimFrontWides = appState?.aimFrontWidesAtMLP || false;
-    const aimSideSurrounds = appState?.aimSideSurroundsAtMLP || false;
-    const aimRearSurrounds = appState?.aimRearSurroundsAtMLP || false;
-
-    // Log toggle state
-    console.log('[Surround Aim] Toggle state:', {
-      aimFrontWides,
-      aimSideSurrounds,
-      aimRearSurrounds
-    });
-
-    // Helper: compute yaw from speaker to MLP (same as L/R)
-    const computeYawToMLP = (speakerPos) => {
-      const dx = mlp.x - speakerPos.x;
-      const dy = mlp.y - speakerPos.y;
-      const yawRad = Math.atan2(dx, dy);
-      return yawRad * (180 / Math.PI);
-    };
-
-    // Helper: check if rotation would keep speaker inside room with 1cm buffer
-    const canRotateSafely = (speaker, targetYaw) => {
-      if (!speaker?.position || !speaker?.model) return true; // Allow if no constraints
-      
-      const dims = getModelDimsM(speaker.model);
-      const widthM_spk = dims.widthM || 0.27;
-      const depthM_spk = dims.depthM || 0.082;
-      
-      const BUFFER_M = 0.01; // 1cm safety buffer
-      
-      // Compute rotated bounding box corners
-      const yawRad = (targetYaw * Math.PI) / 180;
-      const cos = Math.cos(yawRad);
-      const sin = Math.sin(yawRad);
-      
-      // Half dimensions
-      const hw = widthM_spk / 2;
-      const hd = depthM_spk / 2;
-      
-      // Four corners in local space
-      const corners = [
-        { x: -hw, y: -hd },
-        { x:  hw, y: -hd },
-        { x:  hw, y:  hd },
-        { x: -hw, y:  hd }
-      ];
-      
-      // Rotate and translate to world space
-      const worldCorners = corners.map(c => ({
-        x: speaker.position.x + (c.x * cos - c.y * sin),
-        y: speaker.position.y + (c.x * sin + c.y * cos)
-      }));
-      
-      // Check if all corners are inside room bounds (with buffer)
-      const roomWidth = widthM || 4.5;
-      const roomLength = lengthM || 6.0;
-      
-      for (const corner of worldCorners) {
-        if (corner.x < BUFFER_M || corner.x > roomWidth - BUFFER_M ||
-            corner.y < BUFFER_M || corner.y > roomLength - BUFFER_M) {
-          return false; // Would break wall constraint
-        }
-      }
-      
-      return true;
-    };
-
-    // Process speakers
-    onSetSpeakers(prev => {
-      let updated = false;
-      
-      const next = prev.map(spk => {
-        const role = getCanonicalRole(spk.role);
-        if (!spk.position) return spk;
-        
-        let targetYaw = null;
-        let shouldAim = false;
-        
-        // Determine if this speaker should aim to MLP
-        if (['LW', 'RW'].includes(role) && aimFrontWides) {
-          shouldAim = true;
-        } else if (['SL', 'SR'].includes(role) && aimSideSurrounds) {
-          shouldAim = true;
-        } else if (['SBL', 'SBR'].includes(role) && aimRearSurrounds) {
-          shouldAim = true;
-        }
-        
-        if (!shouldAim) {
-          // Reset to flat (0° for back wall, ±90° for side walls)
-          const W = widthM || 4.5;
-          const L = lengthM || 6.0;
-          const dims = getModelDimsM(spk.model);
-          const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
-          
-          const leftX = WALL_BUFFER_M + halfDepth;
-          const rightX = W - WALL_BUFFER_M - halfDepth;
-          const backY = L - WALL_BUFFER_M - halfDepth;
-          
-          const onLeftWall = Math.abs(spk.position.x - leftX) <= 0.035;
-          const onRightWall = Math.abs(spk.position.x - rightX) <= 0.035;
-          const onBackWall = Math.abs(spk.position.y - backY) <= 0.035;
-          
-          let flatYaw = 0;
-          if (onLeftWall) flatYaw = 90;
-          else if (onRightWall) flatYaw = -90;
-          else if (onBackWall) flatYaw = 0;
-          
-          if (Math.abs((spk.yaw ?? 0) - flatYaw) > 0.1) {
-            console.log('[Surround Aim] Reset to flat:', {
-              role,
-              previousYaw: spk.yaw,
-              newYaw: flatYaw
-            });
-            updated = true;
-            return { ...spk, yaw: flatYaw };
-          }
-          return spk;
-        }
-        
-        // Compute desired yaw to MLP
-        targetYaw = computeYawToMLP(spk.position);
-        
-        // Check if rotation is safe
-        if (!canRotateSafely(spk, targetYaw)) {
-          // Clamp to maximum safe rotation
-          // For now, keep speaker flat (TODO: implement actual clamping)
-          console.log('[Surround Aim] Rotation would break wall constraint:', {
-            role,
-            targetYaw: targetYaw.toFixed(1),
-            keepingFlat: true
-          });
-          return spk;
-        }
-        
-        // Apply yaw if changed
-        if (Math.abs((spk.yaw ?? 0) - targetYaw) > 0.1) {
-          console.log('[Surround Aim] Applying yaw:', {
-            role,
-            previousYaw: (spk.yaw ?? 0).toFixed(1),
-            newYaw: targetYaw.toFixed(1)
-          });
-          updated = true;
-          return { ...spk, yaw: targetYaw };
-        }
-        
-        return spk;
-      });
-      
-      return updated ? next : prev;
-    });
-  }, [
-    appState?.aimFrontWidesAtMLP,
-    appState?.aimSideSurroundsAtMLP,
-    appState?.aimRearSurroundsAtMLP,
-    mlp,
-    widthM,
-    lengthM,
-    placedSpeakers,
-    onSetSpeakers,
-    getCanonicalRole,
-    getModelDimsM
-  ]);
 
   // [NEW] Auto-hug surrounds to walls when room dimensions change
   useEffect(() => {
@@ -4746,7 +4532,7 @@ return {
     };
   }, [applyLcrFromDetail]);
 
-const renderSpeakers = useCallback(() => {
+  const renderSpeakers = useCallback(() => {
   // Start from the prop (single source of truth)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
@@ -4960,8 +4746,6 @@ const renderSpeakers = useCallback(() => {
         scale={scale}
         speakerMouseDownHandler={speakerDragHandler}
         setHoveredSpeaker={setHoveredSpeaker}
-        onMouseEnter={() => handleSpeakerMouseEnter(speaker)}
-        onMouseLeave={handleSpeakerMouseLeave}
       />
     );
   });
