@@ -2005,37 +2005,8 @@ React.useEffect(() => {
 
     // Overhead drag behaviour: L/R pairs, clamped to RP22 corridors, mirrored horizontally
     if (canonicalRole && canonicalRole.startsWith('T')) {
-      const OVERHEAD_ROLES = new Set(["TML", "TMR", "TFL", "TFR", "TRL", "TRR"]);
       // Mark that the user has taken control of overheads
       setHasManualOverheadEdit(true);
-
-      // [B44 PROMPT] Allow overhead drag even when zones are missing/invalid
-      // RP22 zones constrain final placement (on mouse up), not interaction.
-      if (!overheadZones || overheadZones.status !== "ok") {
-        console.log("[DRAG] overhead bypass: zone missing/invalid, allowing drag");
-        
-        // Proceed with basic movement using canvasToRoom conversion
-        const rawRoomPos = canvasToRoom(newCanvasPos);
-        
-        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
-        onSetSpeakers(prev => prev.map(s => {
-          if (s.id === speakerId) {
-            return { 
-              ...s, 
-              position: { 
-                ...s.position, 
-                x: rawRoomPos.x, 
-                y: rawRoomPos.y 
-              } 
-            };
-          }
-          return s;
-        }));
-        
-        lastInteractionEpoch.current = timeNowMs();
-        console.log("[DRAG] STOP: overhead drag without zones complete");
-        return;
-      }
 
       // Determine which RP22 zone this role belongs to
       let zoneKey = null;
@@ -2047,10 +2018,10 @@ React.useEffect(() => {
         zoneKey = 'rear';
       }
 
-      let zone = zoneKey && overheadZones[zoneKey];
+      // Build zone with fallback to full room bounds
+      let zone = zoneKey && overheadZones?.[zoneKey];
       if (!zone) {
-        console.log("[DRAG] overhead bypass: zone missing/invalid, allowing drag");
-        // Create fallback zone using full room bounds (no clamping)
+        console.log("[DRAG] overhead bypass: zone missing/invalid, using room fallback");
         zone = {
           xMin: 0,
           xMax: widthM,
@@ -2059,241 +2030,31 @@ React.useEffect(() => {
         };
       }
 
-      // Check if this is a 5.1.4 layout (exactly 4 overheads: TFL, TFR, TRL, TRR)
-      const overheadSpeakers = placedSpeakers.filter(s => {
-        const r = getCanonicalRole(s.role);
-        return r && r.startsWith('T');
-      });
-      const is514Layout = overheadSpeakers.length === 4 && 
-                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TFL') &&
-                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TFR') &&
-                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TRL') &&
-                          overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TRR');
-
-      // Role group helpers
-      const LEFT_ROLES = ['TFL', 'TML', 'TRL'];
-      const RIGHT_ROLES = ['TFR', 'TMR', 'TRR'];
-
-      const isLeftRole = (role) => LEFT_ROLES.includes(role);
-      const isRightRole = (role) => RIGHT_ROLES.includes(role);
-
-      const isFrontRole = (role) => role === 'TFL' || role === 'TFR';
-      const isMidRole = (role) => role === 'TML' || role === 'TMR';
-      const isRearRole = (role) => role === 'TRL' || role === 'TRR';
-
       // Raw room coords from the mouse
       const rawRoomPos = canvasToRoom(newCanvasPos);
 
-      // Clamp dragged speaker exactly to its RP22 corridor
-      const primaryClamped = {
-        x: Math.min(Math.max(rawRoomPos.x, zone.xMin), zone.xMax),
-        y: Math.min(Math.max(rawRoomPos.y, zone.yMin), zone.yMax),
-      };
+      // Clamp dragged speaker to its RP22 corridor
+      const clampedX = Math.min(Math.max(rawRoomPos.x, zone.xMin), zone.xMax);
+      const clampedY = Math.min(Math.max(rawRoomPos.y, zone.yMin), zone.yMax);
 
-      // Derive shared column X with seat span clamping
-      const centerX = widthM / 2;
-      let leftColumnX = null;
-      let rightColumnX = null;
-
-      if (isLeftRole(canonicalRole)) {
-        leftColumnX = primaryClamped.x;
-        rightColumnX = centerX + (centerX - leftColumnX);
-      }
-
-      if (isRightRole(canonicalRole)) {
-        rightColumnX = primaryClamped.x;
-        leftColumnX = centerX + (centerX - rightColumnX);
-      }
-
-      // Apply seat span clamping to mirrored column
-      if (leftColumnX != null || rightColumnX != null) {
-        const seatXs = (seatingPositions || [])
-          .map(seat => seat?.position?.x ?? seat?.x)
-          .filter(x => Number.isFinite(x));
-
-        if (seatXs.length > 0) {
-          const seatMinX = Math.min(...seatXs);
-          const seatMaxX = Math.max(...seatXs);
-
-          if (leftColumnX != null) {
-            leftColumnX = clampOverheadXToSeatSpan(leftColumnX, seatMinX, seatMaxX);
-          }
-          if (rightColumnX != null) {
-            rightColumnX = clampOverheadXToSeatSpan(rightColumnX, seatMinX, seatMaxX);
-          }
-        }
-      }
-
-      // NEW: For 5.1.4, mirror front/rear around MLP Y
-      if (is514Layout) {
-        const mlpY = mlpDotY_m || (lengthM / 2);
-        
-        // Determine if dragged speaker is front or rear
-        const isFront = isFrontRole(canonicalRole);
-        const isRear = isRearRole(canonicalRole);
-        
-        if (isFront || isRear) {
-          let frontY, rearY;
-          
-          if (isFront) {
-            // Dragging front: use clamped Y for front, mirror for rear
-            frontY = primaryClamped.y;
-            rearY = 2 * mlpY - frontY;
-          } else {
-            // Dragging rear: use clamped Y for rear, mirror for front
-            rearY = primaryClamped.y;
-            frontY = 2 * mlpY - rearY;
-          }
-          
-          // Clamp both rows to their RP22 zones
-          const frontZone = overheadZones.front;
-          const rearZone = overheadZones.rear;
-          
-          if (frontZone) {
-            frontY = Math.min(Math.max(frontY, frontZone.yMin), frontZone.yMax);
-          }
-          
-          if (rearZone) {
-            rearY = Math.min(Math.max(rearY, rearZone.yMin), rearZone.yMax);
-          }
-          
-          // Update all four overheads
-          console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
-          onSetSpeakers(prev => {
-            if (!Array.isArray(prev)) return prev;
-
-            return prev.map(spk => {
-              const role = getCanonicalRole(spk.role);
-              if (!['TFL', 'TFR', 'TRL', 'TRR'].includes(role)) return spk;
-
-              const current = { ...(spk.position || {}) };
-              
-              // Apply X mirroring (existing logic)
-              const isLeft = ['TFL', 'TRL'].includes(role);
-              const isRight = ['TFR', 'TRR'].includes(role);
-              
-              if (isLeft && leftColumnX != null) {
-                current.x = leftColumnX;
-              }
-              if (isRight && rightColumnX != null) {
-                current.x = rightColumnX;
-              }
-
-              // Apply Y based on row
-              if (role === 'TFL' || role === 'TFR') {
-                current.y = frontY;
-              } else if (role === 'TRL' || role === 'TRR') {
-                current.y = rearY;
-              }
-
-              return { ...spk, position: current };
-            });
-          });
-
-          lastInteractionEpoch.current = timeNowMs();
-          console.log("[DRAG] STOP: 5.1.4 overhead complete");
-          return;
-        }
-      }
-
-      // Original logic for other overhead layouts (5.1.2, 7.1.6, etc.)
-      // Discover current Y positions from placedSpeakers
-      let frontY = null;
-      let midY = null;
-      let rearY = null;
-
-      for (const s of placedSpeakers) {
-        const role = getCanonicalRole(s.role);
-        const posY = s?.position?.y;
-        if (!Number.isFinite(posY)) continue;
-
-        if (isFrontRole(role)) frontY = posY;
-        if (isMidRole(role)) midY = posY;
-        if (isRearRole(role)) rearY = posY;
-      }
-
-      // Fallback: use dragged Y as mid anchor if missing
-      if (!Number.isFinite(midY)) {
-        midY = primaryClamped.y;
-      }
-
-      // Compute symmetric Y around mid
-      let newFrontY = frontY;
-      let newMidY = midY;
-      let newRearY = rearY;
-
-      if (isMidRole(canonicalRole)) {
-        // Dragging mid: move front and rear in parallel
-        const dFront = Number.isFinite(frontY) ? midY - frontY : 0;
-        const dRear = Number.isFinite(rearY) ? rearY - midY : 0;
-
-        newMidY = primaryClamped.y;
-        newFrontY = newMidY - dFront;
-        newRearY = newMidY + dRear;
-      }
-
-      if (isFrontRole(canonicalRole)) {
-        // Dragging front: enforce symmetry around mid
-        newFrontY = primaryClamped.y;
-        const d = midY - newFrontY;
-        newRearY = midY + d;
-      }
-
-      if (isRearRole(canonicalRole)) {
-        // Dragging rear: enforce symmetry around mid
-        newRearY = primaryClamped.y;
-        const d = newRearY - midY;
-        newFrontY = midY - d;
-      }
-
-      // Clamp Y for each row to RP22 zones
-      if (Number.isFinite(newFrontY) && overheadZones.front) {
-        newFrontY = Math.min(Math.max(newFrontY, overheadZones.front.yMin), overheadZones.front.yMax);
-      }
-      if (Number.isFinite(newMidY) && overheadZones.mid) {
-        newMidY = Math.min(Math.max(newMidY, overheadZones.mid.yMin), overheadZones.mid.yMax);
-      }
-      if (Number.isFinite(newRearY) && overheadZones.rear) {
-        newRearY = Math.min(Math.max(newRearY, overheadZones.rear.yMin), overheadZones.rear.yMax);
-      }
-
-      // Write positions for all six overheads
+      // Update ONLY the dragged speaker (no mirroring, no pair syncing)
       console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
-      onSetSpeakers(prev => {
-        if (!Array.isArray(prev)) return prev;
-
-        return prev.map(spk => {
-          const role = getCanonicalRole(spk.role);
-          if (!role || !role.startsWith('T')) return spk;
-
-          const current = { ...(spk.position || {}) };
-
-          const isLeft = isLeftRole(role);
-          const isRight = isRightRole(role);
-
-          if (isLeft && leftColumnX != null) {
-            current.x = leftColumnX;
-          }
-          if (isRight && rightColumnX != null) {
-            current.x = rightColumnX;
-          }
-
-          if (isFrontRole(role) && Number.isFinite(newFrontY)) {
-            current.y = newFrontY;
-          }
-          if (isMidRole(role) && Number.isFinite(newMidY)) {
-            current.y = newMidY;
-          }
-          if (isRearRole(role) && Number.isFinite(newRearY)) {
-            current.y = newRearY;
-          }
-
-          return { ...spk, position: current };
-        });
-      });
+      onSetSpeakers(prev => prev.map(s => {
+        if (s.id === speakerId) {
+          return { 
+            ...s, 
+            position: { 
+              ...s.position, 
+              x: clampedX, 
+              y: clampedY 
+            } 
+          };
+        }
+        return s;
+      }));
 
       lastInteractionEpoch.current = timeNowMs();
-      console.log("[DRAG] STOP: overhead general complete");
+      console.log("[DRAG] STOP: overhead simple drag complete");
       return;
     }
 
