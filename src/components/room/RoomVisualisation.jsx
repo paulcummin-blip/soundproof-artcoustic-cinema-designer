@@ -1607,6 +1607,12 @@ React.useEffect(() => {
 
   // Drag state management
   const handleSpeakerDrag = useCallback((speakerId, newCanvasPos) => {
+    // [B44 PROMPT 1] Verify overheads reach the drag pipeline
+    console.log("[handleSpeakerDrag] ENTERED:", {
+      speakerId,
+      role: byId.get(speakerId)?.role || "—"
+    });
+
     if (!onSetSpeakers) return;
 
     const spk = byId.get(speakerId);
