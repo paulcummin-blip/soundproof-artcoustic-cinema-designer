@@ -731,6 +731,9 @@ const onHudHeaderMouseDown = useCallback((event) => {
       if (item && item.id) {
         map.set(item.id, item);
       }
+      if (item?.role) {
+        map.set(String(item.role).toUpperCase(), item);
+      }
     });
     return map;
   }, [placedSpeakers, seatingPositions]);
@@ -1424,13 +1427,19 @@ React.useEffect(() => {
     return () => window.removeEventListener('b44:fw:resetToMedian', handleReset);
   }, [frontWideZones, widthM, lengthM, getModelDimsM, onSetSpeakers, getCanonicalRole]);
 
+  // Use a stable key for speaker interactions.
+  // Prefer id, fallback to role (needed for overheads if id is missing).
+  const getSpeakerKey = useCallback((spk) => {
+    return spk?.id || spk?.role || null;
+  }, []);
+
   // Drag state management
   const handleMouseDown = useCallback(
     (e, id, type) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const target = byId.get(id);
+      const target = byId.get(id) || byId.get(String(id || "").toUpperCase());
       if (!target) return;
 
       const canonicalRole = getCanonicalRole(target.role);
@@ -3530,7 +3539,7 @@ useEffect(() => {
     if (!overheadSpeakers.length) return null;
 
     return (
-      <g data-layer="overhead-icons">
+      <g data-layer="overhead-icons" style={{ pointerEvents: "all" }}>
         {overheadSpeakers.map(({ spk, modelId }) => {
           const [xPx, yPx] = toPx(spk.position.x, spk.position.y);
 
@@ -3544,7 +3553,11 @@ useEffect(() => {
               widthM={0.27}
               depthM={0.27}
               scale={scale}
-              speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id)}
+              speakerMouseDownHandler={(e) => {
+                const key = getSpeakerKey(spk) || String(spk.role || "").toUpperCase();
+                if (!key) return;
+                handleMouseDown(e, key, "speaker");
+              }}
               setHoveredSpeaker={setHoveredSpeaker}
             />
           );
@@ -3563,7 +3576,8 @@ useEffect(() => {
     overheadFrontOverride,
     overheadMidOverride,
     overheadRearOverride,
-    bedLayerSpeakerMouseDownHandler,
+    getSpeakerKey,
+    handleMouseDown,
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
