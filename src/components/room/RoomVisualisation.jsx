@@ -1623,9 +1623,8 @@ React.useEffect(() => {
     const isOverhead =
       typeof canonicalRole === "string" && canonicalRole.startsWith("T");
 
-    // For NON-overhead speakers, keep the existing draggable guard.
-    // Overheads bypass this, because their raw model may be null even though
-    // they are rendered with a resolved overhead model.
+    // [B44 PROMPT 2] Overheads ALWAYS allowed to move - bypass all drag guards
+    // For bed speakers only, apply existing draggable/renderable rules
     if (!isOverhead && !isDraggable(spk)) {
       return;
     }
