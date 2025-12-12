@@ -26,6 +26,7 @@ export function useOverheadAutoPlacement({
 }) {
   useEffect(() => {
     // [B44 PROMPT 3] Guard: don't reposition overheads while dragging
+    // CRITICAL: RP22 zones constrain placement, not interaction. Never block dragging.
     if (isDragging) return;
     
     // Guard: user has manually edited overheads - don't auto-place anymore

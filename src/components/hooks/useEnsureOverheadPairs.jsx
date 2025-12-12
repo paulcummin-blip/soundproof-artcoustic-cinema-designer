@@ -25,6 +25,7 @@ export function useEnsureOverheadPairs({
 }) {
   React.useEffect(() => {
     // [B44 PROMPT 3] Guard: don't create/modify overheads while dragging
+    // CRITICAL: RP22 zones constrain placement, not interaction. Never block dragging.
     if (isDragging) return;
     
     // Guard: no configuration

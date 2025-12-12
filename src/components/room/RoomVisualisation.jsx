@@ -2351,6 +2351,8 @@ React.useEffect(() => {
 
   const handleMouseUp = useCallback(() => {
     // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
+    // CRITICAL: Overheads must be draggable. RP22 constrains placement, not interaction.
+    // During drag = free movement. After release = snap to compliance.
     if (dragType === 'speaker' && draggedItemId) {
       const spk = byId.get(draggedItemId);
       if (spk) {
