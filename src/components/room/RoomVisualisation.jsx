@@ -725,18 +725,28 @@ const onHudHeaderMouseDown = useCallback((event) => {
     return ['FL', 'FC', 'FR'].flatMap(role => getByRoleArray(byRole, role)).filter(Boolean);
   }, [byRole]);
 
-  const byId = useMemo(() => {
-    const map = new Map();
-    [...(placedSpeakers || []), ...(seatingPositions || [])].forEach(item => {
-      if (item && item.id) {
-        map.set(item.id, item);
-      }
-      if (item?.role) {
-        map.set(String(item.role).toUpperCase(), item);
-      }
-    });
-    return map;
-  }, [placedSpeakers, seatingPositions]);
+const byId = useMemo(() => {
+  const map = new Map();
+
+  // Index speakers
+  (placedSpeakers || []).forEach((spk) => {
+    if (!spk) return;
+
+    // 1) Primary key: id (if present)
+    if (spk.id) map.set(spk.id, spk);
+
+    // 2) Fallback key: role (needed for overheads when id is missing/unstable)
+    if (spk.role) map.set(String(spk.role).toUpperCase(), spk);
+  });
+
+  // Index seats (keep existing behaviour)
+  (seatingPositions || []).forEach((seat) => {
+    if (!seat) return;
+    if (seat.id) map.set(seat.id, seat);
+  });
+
+  return map;
+}, [placedSpeakers, seatingPositions]);
 
   // Removed seatBandXBounds - computed after overheadZones is defined
 
@@ -1427,19 +1437,13 @@ React.useEffect(() => {
     return () => window.removeEventListener('b44:fw:resetToMedian', handleReset);
   }, [frontWideZones, widthM, lengthM, getModelDimsM, onSetSpeakers, getCanonicalRole]);
 
-  // Use a stable key for speaker interactions.
-  // Prefer id, fallback to role (needed for overheads if id is missing).
-  const getSpeakerKey = useCallback((spk) => {
-    return spk?.id || spk?.role || null;
-  }, []);
-
   // Drag state management
   const handleMouseDown = useCallback(
     (e, id, type) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const target = byId.get(id) || byId.get(String(id || "").toUpperCase());
+      const target = byId.get(id);
       if (!target) return;
 
       const canonicalRole = getCanonicalRole(target.role);
@@ -3539,7 +3543,7 @@ useEffect(() => {
     if (!overheadSpeakers.length) return null;
 
     return (
-      <g data-layer="overhead-icons" style={{ pointerEvents: "all" }}>
+      <g data-layer="overhead-icons">
         {overheadSpeakers.map(({ spk, modelId }) => {
           const [xPx, yPx] = toPx(spk.position.x, spk.position.y);
 
@@ -3553,11 +3557,7 @@ useEffect(() => {
               widthM={0.27}
               depthM={0.27}
               scale={scale}
-              speakerMouseDownHandler={(e) => {
-                const key = getSpeakerKey(spk) || String(spk.role || "").toUpperCase();
-                if (!key) return;
-                handleMouseDown(e, key, "speaker");
-              }}
+              speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id)}
               setHoveredSpeaker={setHoveredSpeaker}
             />
           );
@@ -3576,8 +3576,7 @@ useEffect(() => {
     overheadFrontOverride,
     overheadMidOverride,
     overheadRearOverride,
-    getSpeakerKey,
-    handleMouseDown,
+    bedLayerSpeakerMouseDownHandler,
   ]);
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
