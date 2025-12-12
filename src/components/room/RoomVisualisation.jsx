@@ -2350,6 +2350,42 @@ React.useEffect(() => {
   }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, roomToCanvas]);
 
   const handleMouseUp = useCallback(() => {
+    // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
+    if (dragType === 'speaker' && draggedItemId) {
+      const spk = byId.get(draggedItemId);
+      if (spk) {
+        const canonicalRole = getCanonicalRole(spk.role);
+        const isOverhead = typeof canonicalRole === "string" && canonicalRole.startsWith("T");
+        
+        if (isOverhead && overheadZones?.status === 'ok') {
+          // Determine which zone this overhead belongs to
+          let zone = null;
+          if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
+            zone = overheadZones.front;
+          } else if (['TML', 'TMR'].includes(canonicalRole)) {
+            zone = overheadZones.mid;
+          } else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) {
+            zone = overheadZones.rear;
+          }
+          
+          if (zone && Number.isFinite(spk.position?.x) && Number.isFinite(spk.position?.y)) {
+            // Clamp position to zone bounds
+            const clampedX = Math.min(Math.max(spk.position.x, zone.xMin), zone.xMax);
+            const clampedY = Math.min(Math.max(spk.position.y, zone.yMin), zone.yMax);
+            
+            // Only update if clamping occurred
+            if (Math.abs(clampedX - spk.position.x) > 0.001 || Math.abs(clampedY - spk.position.y) > 0.001) {
+              onSetSpeakers(prev => prev.map(s => 
+                s.id === draggedItemId 
+                  ? { ...s, position: { ...s.position, x: clampedX, y: clampedY } }
+                  : s
+              ));
+            }
+          }
+        }
+      }
+    }
+    
     setDragState({
       dragging: false,
       draggedItemId: null,
@@ -2361,7 +2397,7 @@ React.useEffect(() => {
     isDraggingRearRef.current = 0;
     isDraggingFW.current = false;
 
-  }, [setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW]);
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
