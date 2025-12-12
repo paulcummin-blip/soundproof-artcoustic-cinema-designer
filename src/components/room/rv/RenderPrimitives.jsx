@@ -125,7 +125,9 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   depthM,
   scale,
   speakerMouseDownHandler,
-  setHoveredSpeaker
+  setHoveredSpeaker,
+  onMouseEnter,
+  onMouseLeave
 }) {
   const { model, role, id } = speaker || {};
   
@@ -157,10 +159,8 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       <g
         pointerEvents="all"
         onMouseDown={speakerMouseDownHandler}
-        onMouseEnter={() =>
-          setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
-        }
-        onMouseLeave={() => setHoveredSpeaker?.(null)}
+        onMouseEnter={onMouseEnter || (() => setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg }))}
+        onMouseLeave={onMouseLeave || (() => setHoveredSpeaker?.(null))}
         className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
       >
         <circle
@@ -168,7 +168,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
           cy={canvasY_raw}
           r={radiusPx}
           fill={color || "#000000"}
-          stroke="#000000"
+          stroke="#000000"}
           strokeWidth={1}
           opacity={1}
         />
@@ -188,10 +188,8 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       transform={transform}
       pointerEvents="all"
       onMouseDown={speakerMouseDownHandler}
-      onMouseEnter={() =>
-        setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
-      }
-      onMouseLeave={() => setHoveredSpeaker?.(null)}
+      onMouseEnter={onMouseEnter || (() => setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg }))}
+      onMouseLeave={onMouseLeave || (() => setHoveredSpeaker?.(null))}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
       <path
