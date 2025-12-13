@@ -33,6 +33,43 @@ import OverheadSplStrip from '@/components/speakers/OverheadSplStrip';
 const P12_THRESHOLDS = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P13_THRESHOLDS = { L1: 99, L2: 102, L3: 105, L4: 108 };
 
+// Helper: compute RP22 level from SPL thresholds
+function computeRP22Level(splDb, thresholds) {
+  if (!Number.isFinite(splDb)) return null;
+  if (splDb >= thresholds.L4) return 4;
+  if (splDb >= thresholds.L3) return 3;
+  if (splDb >= thresholds.L2) return 2;
+  if (splDb >= thresholds.L1) return 1;
+  return 'FAIL';
+}
+
+// RP22 Level Pill Component
+function RP22LevelPill({ parameter, level, label }) {
+  const isPass = typeof level === 'number' && level >= 1;
+  
+  return (
+    <div 
+      style={{
+        marginTop: 12,
+        padding: '8px 16px',
+        borderRadius: 8,
+        border: '1px solid #E6E4DD',
+        background: isPass ? '#F8F8F7' : '#FFF5F5',
+        display: 'inline-block',
+        width: '100%',
+      }}
+    >
+      <div style={{ 
+        fontSize: 13, 
+        fontWeight: 600, 
+        color: isPass ? '#1B1A1A' : '#DC2626'
+      }}>
+        {label}: {isPass ? `Level ${level}` : 'FAIL'}
+      </div>
+    </div>
+  );
+}
+
 // --- idempotence helpers -----------------------------------------------------
 const EPS = 1e-4;
 const almostEq = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) <= EPS;
@@ -1144,6 +1181,32 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
           />
         ))}
       </div>
+
+      {(() => {
+        // Compute worst-case LCR SPL for P12
+        const mlp = getMlpSeat(seatingPositions || []);
+        if (!mlp || !allSeatSplMetrics) return null;
+        
+        const seatMetrics = allSeatSplMetrics.get(mlp.id);
+        if (!seatMetrics?.spl?.screen) return null;
+        
+        const lcrSplValues = ['FL', 'FC', 'FR']
+          .map(role => seatMetrics.spl.screen[role]?.value)
+          .filter(v => Number.isFinite(v));
+        
+        if (lcrSplValues.length === 0) return null;
+        
+        const worstCaseSpl = Math.min(...lcrSplValues);
+        const level = computeRP22Level(worstCaseSpl, P12_THRESHOLDS);
+        
+        return (
+          <RP22LevelPill 
+            parameter="P12" 
+            level={level} 
+            label="RP22 P12"
+          />
+        );
+      })()}
     </div>
   );
 }
@@ -2265,6 +2328,31 @@ function SpeakerPlacementImpl(props) {
             mlpSeat={mlpSeat}
             dolbyLayout={effectivePreset}
           />
+          
+          {(() => {
+            // Compute worst-case Surround SPL for P13
+            if (!mlpSeat || !allSeatSplMetrics) return null;
+            
+            const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
+            if (!seatMetrics?.spl?.surrounds) return null;
+            
+            const surroundSplValues = Object.values(seatMetrics.spl.surrounds)
+              .map(s => s?.value)
+              .filter(v => Number.isFinite(v));
+            
+            if (surroundSplValues.length === 0) return null;
+            
+            const worstCaseSpl = Math.min(...surroundSplValues);
+            const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
+            
+            return (
+              <RP22LevelPill 
+                parameter="P13" 
+                level={level} 
+                label="RP22 P13 (Surrounds)"
+              />
+            );
+          })()}
         </div>
       </CollapsiblePanel>
 
@@ -2296,6 +2384,31 @@ function SpeakerPlacementImpl(props) {
                 mlpSeat={mlpSeat}
                 dolbyLayout={effectivePreset}
               />
+              
+              {(() => {
+                // Compute worst-case Overhead SPL for P13
+                if (!mlpSeat || !allSeatSplMetrics) return null;
+                
+                const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
+                if (!seatMetrics?.spl?.uppers) return null;
+                
+                const overheadSplValues = Object.values(seatMetrics.spl.uppers)
+                  .map(s => s?.value)
+                  .filter(v => Number.isFinite(v));
+                
+                if (overheadSplValues.length === 0) return null;
+                
+                const worstCaseSpl = Math.min(...overheadSplValues);
+                const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
+                
+                return (
+                  <RP22LevelPill 
+                    parameter="P13" 
+                    level={level} 
+                    label="RP22 P13 (Overheads)"
+                  />
+                );
+              })()}
             </div>
           </div>
         </CollapsiblePanel>
