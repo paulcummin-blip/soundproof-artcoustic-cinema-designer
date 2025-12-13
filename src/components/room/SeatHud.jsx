@@ -197,10 +197,15 @@ export default function SeatHud({
                     const data = metric.debug.perSpeaker[role];
                     if (!data) return null;
                     const angleDisplay = Math.abs(Number(data.angleDeg) || 0);
-                    return `${role} ${angleDisplay.toFixed(1)}° / ${data.lossDb ?? '—'} dB`;
-                  }).filter(Boolean).join(', ')}
+                    const text = `${role} ${angleDisplay.toFixed(1)}° / ${data.lossDb ?? '—'} dB`;
+                    const isWorst = metric.debug.worst?.role === role;
+                    return isWorst ? <strong key={role}>{text}</strong> : <span key={role}>{text}</span>;
+                  }).reduce((acc, item, i, arr) => {
+                    if (i === 0) return [item];
+                    return [...acc, ', ', item];
+                  }, [])}
                   {metric.debug.worst?.role && (
-                    <span> (worst: {metric.debug.worst.role})</span>
+                    <strong> (worst: {metric.debug.worst.role})</strong>
                   )}
                 </div>
               )}
@@ -225,11 +230,16 @@ export default function SeatHud({
                 const displayAngle = Number.isFinite(s.rawAngleDeg) ? s.rawAngleDeg : s.angleDeg;
                 const angle = Number.isFinite(displayAngle) ? displayAngle.toFixed(1) : '—';
                 const loss = s.isBeyondNonLcrLimit ? 'N/A' : (Number.isFinite(s.lossDb) ? `${s.lossDb.toFixed(1)} dB` : '—');
-                return `${s.role} ${angle}° / ${loss}`;
+                const text = `${s.role} ${angle}° / ${loss}`;
+                const isWorst = metric.worstRole === s.role;
+                return isWorst ? <strong key={s.role}>{text}</strong> : <span key={s.role}>{text}</span>;
               })
-              .join(', ')}
+              .reduce((acc, item, i, arr) => {
+                if (i === 0) return [item];
+                return [...acc, ', ', item];
+              }, [])}
                     {metric.worstRole && Number.isFinite(metric.worstAngleDeg) && Number.isFinite(metric.worstLossDb) && (
-                      <span> (worst: {metric.worstRole} {metric.worstAngleDeg.toFixed(1)}° / {metric.worstLossDb.toFixed(1)} dB)</span>
+                      <strong> (worst: {metric.worstRole} {metric.worstAngleDeg.toFixed(1)}° / {metric.worstLossDb.toFixed(1)} dB)</strong>
                     )}
                   </div>
                   {/* Debug info for first overhead speaker */}
