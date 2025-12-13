@@ -432,6 +432,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       isBeyondNonLcrLimit,
     };
   }
+}
 
 // P17: Compute surround/wide/overhead HF variance across all non-LCR speakers for all seats
 export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: modelIndex, roomHeightM, debug }) {
