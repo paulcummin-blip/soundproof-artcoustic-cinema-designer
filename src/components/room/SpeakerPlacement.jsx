@@ -924,7 +924,7 @@ function UnifiedSurroundsConfig({
 
 const MemoizedUnifiedSurroundsConfig = React.memo(UnifiedSurroundsConfig);
 
-function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset, allSeatSplMetrics, mlpSeat }) {
+function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset }) {
   const { ARCHITECT: architectModelOptions } = getModelsByCategoryOrdered();
 
   const groups = React.useMemo(() => getOverheadGroups(dolbyPreset), [dolbyPreset]);
@@ -937,23 +937,35 @@ function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset, 
     return m;
   }, [placedSpeakers]);
 
-  // Get overhead SPL from allSeatSplMetrics
-  const getOverheadSpl = React.useCallback((roles) => {
-    if (!mlpSeat || !allSeatSplMetrics) return null;
-    
-    const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
-    if (!seatMetrics?.spl?.uppers) return null;
-    
-    const splValues = roles
-      .map(role => getCanonicalRole(role))
-      .map(role => seatMetrics.spl.uppers[role]?.value)
-      .filter(v => Number.isFinite(v));
-    
-    if (splValues.length === 0) return null;
-    
-    // Return minimum SPL across the pair
-    return Math.min(...splValues);
-  }, [mlpSeat, allSeatSplMetrics]);
+  const calc = React.useCallback(
+    (spk) => {
+      if (!spk || !spk.model) return null;
+      
+      const modelMeta = getSpeakerModelMeta(spk.model);
+      
+      let ceiling1m;
+      if (architectModelOptions.some(m => m.label === spk.model) && (!modelMeta || !Number.isFinite(modelMeta.max_spl))) {
+        ceiling1m = 105;
+      } else if (modelMeta) {
+        const sens = safeNum(modelMeta.sensitivity);
+        const maxW = safeNum(modelMeta.max_power);
+        const xMax1m = safeNum(modelMeta.max_spl);
+
+        ceiling1m = bestMaxSPL1m({
+          sensitivity_dB_1W1m: sens,
+          max_power_W: maxW,
+          excursionMax1m: xMax1m
+        });
+      } else {
+        return null;
+      }
+
+      const dz = Number.isFinite(spk.position?.z) && Number.isFinite(mlpPoint.z) ? (spk.position.z - mlpPoint.z) : 0;
+      const d = Math.hypot((spk.position.x - mlpPoint.x), (spk.position.y - mlpPoint.y), dz);
+      return (Number.isFinite(d) && Number.isFinite(ceiling1m)) ? ceilDb(splAtDistanceFrom1m(ceiling1m, d)) : null;
+    },
+    [mlpPoint, architectModelOptions]
+  );
 
   return (
     <div style={{ marginTop: 8 }}>
@@ -998,8 +1010,8 @@ function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset, 
             </div>
 
             <div style={rowStyle}>
-              <SplBoxP13 title={`${g.label} — Left`}  rawDbFull={getOverheadSpl([g.roles[0]])} />
-              <SplBoxP13 title={`${g.label} — Right`} rawDbFull={getOverheadSpl([g.roles[1]])} />
+              <SplBoxP13 title={`${g.label} — Left`}  rawDbFull={calc(getByAnyRole(allAliases(g.roles[0]), byRole))} />
+              <SplBoxP13 title={`${g.label} — Right`} rawDbFull={calc(getByAnyRole(allAliases(g.roles[1]), byRole))} />
             </div>
           </div>
         );
@@ -2334,40 +2346,11 @@ function SpeakerPlacementImpl(props) {
             const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
             
             return (
-              <>
-                <RP22LevelPill 
-                  parameter="P13" 
-                  level={level} 
-                  label="RP22 P13 (Surrounds)"
-                />
-                
-                {/* TEMPORARY DEBUG: Surround roles sanity check */}
-                <div style={{ 
-                  marginTop: 8, 
-                  padding: 8, 
-                  fontSize: 11, 
-                  fontFamily: 'monospace', 
-                  background: '#FFF9E6', 
-                  border: '1px solid #FFE066',
-                  borderRadius: 4
-                }}>
-                  <div style={{ fontWeight: 600, marginBottom: 4 }}>DEBUG: Surround SPL Sources</div>
-                  {Object.entries(seatMetrics.spl.surrounds).map(([role, data]) => {
-                    const speaker = placedSpeakers.find(s => getCanonicalRole(s.role) === role);
-                    const dist = speaker && mlpSeat ? 
-                      Math.hypot(
-                        (speaker.position?.x || 0) - (mlpSeat.x || 0),
-                        (speaker.position?.y || 0) - (mlpSeat.y || 0),
-                        (speaker.position?.z || 1.2) - (mlpSeat.z || 1.2)
-                      ).toFixed(2) : '?';
-                    return (
-                      <div key={role}>
-                        {role}: {data.value?.toFixed(1)}dB | dist={dist}m | model={speaker?.model || '?'}
-                      </div>
-                    );
-                  })}
-                </div>
-              </>
+              <RP22LevelPill 
+                parameter="P13" 
+                level={level} 
+                label="RP22 P13 (Surrounds)"
+              />
             );
           })()}
         </div>
@@ -2393,40 +2376,40 @@ function SpeakerPlacementImpl(props) {
               onUseRearGlobalChange={setUseRearGlobal}
               disabled={disabled}
             />
-            
-            <OverheadsSection
-              placedSpeakers={placedSpeakers}
-              setSpeakers={setSpeakers}
-              mlpPoint={mlpPoint}
-              dolbyPreset={effectivePreset}
-              allSeatSplMetrics={allSeatSplMetrics}
-              mlpSeat={mlpSeat}
-            />
 
-            {(() => {
-              // Compute worst-case Overhead SPL for P13
-              if (!mlpSeat || !allSeatSplMetrics) return null;
+            {/* NEW: Overhead SPL @ MLP strip */}
+            <div className="mt-4">
+              <OverheadSplStrip
+                allSeatSplMetrics={allSeatSplMetrics}
+                mlpSeat={mlpSeat}
+                dolbyLayout={effectivePreset}
+              />
               
-              const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
-              if (!seatMetrics?.spl?.uppers) return null;
-              
-              const overheadSplValues = Object.values(seatMetrics.spl.uppers)
-                .map(s => s?.value)
-                .filter(v => Number.isFinite(v));
-              
-              if (overheadSplValues.length === 0) return null;
-              
-              const worstCaseSpl = Math.min(...overheadSplValues);
-              const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
-              
-              return (
-                <RP22LevelPill 
-                  parameter="P13" 
-                  level={level} 
-                  label="RP22 P13 (Overheads)"
-                />
-              );
-            })()}
+              {(() => {
+                // Compute worst-case Overhead SPL for P13
+                if (!mlpSeat || !allSeatSplMetrics) return null;
+                
+                const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
+                if (!seatMetrics?.spl?.uppers) return null;
+                
+                const overheadSplValues = Object.values(seatMetrics.spl.uppers)
+                  .map(s => s?.value)
+                  .filter(v => Number.isFinite(v));
+                
+                if (overheadSplValues.length === 0) return null;
+                
+                const worstCaseSpl = Math.min(...overheadSplValues);
+                const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
+                
+                return (
+                  <RP22LevelPill 
+                    parameter="P13" 
+                    level={level} 
+                    label="RP22 P13 (Overheads)"
+                  />
+                );
+              })()}
+            </div>
           </div>
         </CollapsiblePanel>
       )}
