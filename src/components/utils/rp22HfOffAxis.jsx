@@ -394,7 +394,6 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
         offAxisDeg = offFlip;
       }
     }
-    }
 
     if (!isNum(offAxisDeg)) return null;
 
@@ -424,13 +423,15 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
     }
 
+    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxisDeg, lossDb });
+
     return {
-    role,
-    offAxisDeg: effectiveAngleDeg,
-    lossDb: Number(lossDb.toFixed(1)),
-    isBeyondNonLcrLimit,
+      role,
+      offAxisDeg: effectiveAngleDeg,
+      lossDb: Number(lossDb.toFixed(1)),
+      isBeyondNonLcrLimit,
     };
-    }
+  }
 
 // P17: Compute surround/wide/overhead HF variance across all non-LCR speakers for all seats
 export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: modelIndex, roomHeightM, debug }) {
