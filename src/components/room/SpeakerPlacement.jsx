@@ -1004,10 +1004,15 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
   }, [getByRole, LCR_CANONICAL_ROLES, lcrModelOptions]);
 
   const [lcrModel, setLcrModel] = useState(initialModel);
+  const [powerInputValue, setPowerInputValue] = useState(String(splConfig?.globalPowerW || 100));
 
   useEffect(() => {
     if (initialModel && initialModel !== lcrModel) setLcrModel(initialModel);
   }, [initialModel, lcrModel]);
+
+  useEffect(() => {
+    setPowerInputValue(String(splConfig?.globalPowerW || 100));
+  }, [splConfig?.globalPowerW]);
 
   const onChooseModel = useCallback((modelLabel) => {
     if (!lcrModelOptions.some(opt => opt.label === modelLabel)) return;
@@ -1030,11 +1035,29 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
               min="1"
               max="5000"
               step="1"
-              value={splConfig?.globalPowerW || 100}
+              value={powerInputValue}
               onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
+                const newValue = e.target.value;
+                setPowerInputValue(newValue);
+                
+                if (newValue === '') return;
+                
+                const val = parseInt(newValue, 10);
                 if (Number.isFinite(val) && val >= 1 && val <= 5000) {
                   updateGlobalSpl?.({ globalPowerW: val });
+                }
+              }}
+              onBlur={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!Number.isFinite(val) || val < 1 || val > 5000) {
+                  const lastValid = splConfig?.globalPowerW || 100;
+                  setPowerInputValue(String(lastValid));
+                } else {
+                  const clamped = Math.max(1, Math.min(5000, val));
+                  setPowerInputValue(String(clamped));
+                  if (clamped !== (splConfig?.globalPowerW || 100)) {
+                    updateGlobalSpl?.({ globalPowerW: clamped });
+                  }
                 }
               }}
               disabled={disabled}
