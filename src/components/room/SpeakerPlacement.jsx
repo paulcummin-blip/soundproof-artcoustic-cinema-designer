@@ -610,10 +610,6 @@ export function SplBoxP13({ title, rawDbFull }) {
       <div style={splCardStyles.value}>{displayDb > 0 ? `${displayDb} dB` : '—'}</div>
       <div style={splCardStyles.foot}>Maximum SPL @ MLP: {fullDb > 0 ? `${fullDb} dB` : '—'}</div>
       <div style={splCardStyles.boldFoot}>RP22 P13 Level {level > 0 ? level : "—"}</div>
-      <div style={splCardStyles.foot}>
-        RP22 P13. Non-screen speakers SPL capability at RSP (<span style={{ fontWeight: 700 }}>post calibration EQ</span> within assigned bandwidth) without clipping
-        (includes amplifier headroom) — dB SPL (C). Thresholds: L1 99, L2 102, L3 105, L4 108
-      </div>
     </div>
   );
 }
