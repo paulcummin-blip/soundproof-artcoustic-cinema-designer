@@ -1172,19 +1172,20 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         // Compute worst-case LCR SPL for P12
         const mlp = getMlpSeat(seatingPositions || []);
         if (!mlp || !allSeatSplMetrics) return null;
-        
+
         const seatMetrics = allSeatSplMetrics.get(mlp.id);
         if (!seatMetrics?.spl?.screen) return null;
-        
+
         const lcrSplValues = ['FL', 'FC', 'FR']
           .map(role => seatMetrics.spl.screen[role]?.value)
-          .filter(v => Number.isFinite(v));
-        
+          .filter(v => Number.isFinite(v))
+          .map(v => Math.ceil(v));
+
         if (lcrSplValues.length === 0) return null;
-        
+
         const worstCaseSpl = Math.min(...lcrSplValues);
         const level = computeRP22Level(worstCaseSpl, P12_THRESHOLDS);
-        
+
         return (
           <RP22LevelPill 
             parameter="P12" 
@@ -2318,19 +2319,20 @@ function SpeakerPlacementImpl(props) {
           {(() => {
             // Compute worst-case Surround SPL for P13
             if (!mlpSeat || !allSeatSplMetrics) return null;
-            
+
             const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
             if (!seatMetrics?.spl?.surrounds) return null;
-            
+
             const surroundSplValues = Object.values(seatMetrics.spl.surrounds)
               .map(s => s?.value)
-              .filter(v => Number.isFinite(v));
-            
+              .filter(v => Number.isFinite(v))
+              .map(v => Math.ceil(v));
+
             if (surroundSplValues.length === 0) return null;
-            
+
             const worstCaseSpl = Math.min(...surroundSplValues);
             const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
-            
+
             return (
               <RP22LevelPill 
                 parameter="P13" 
@@ -2381,7 +2383,8 @@ function SpeakerPlacementImpl(props) {
 
               const overheadSplValues = Object.values(seatMetrics.spl.uppers)
                 .map(s => s?.value)
-                .filter(v => Number.isFinite(v));
+                .filter(v => Number.isFinite(v))
+                .map(v => Math.ceil(v));
 
               if (overheadSplValues.length === 0) return null;
 
