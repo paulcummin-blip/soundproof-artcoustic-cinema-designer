@@ -920,88 +920,13 @@ function UnifiedSurroundsConfig({
 const MemoizedUnifiedSurroundsConfig = React.memo(UnifiedSurroundsConfig);
 
 function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset, allSeatSplMetrics, mlpSeat }) {
-  const { ARCHITECT: architectModelOptions } = getModelsByCategoryOrdered();
-  const { splConfig } = useAppState();
-
-  const groups = React.useMemo(() => getOverheadGroups(dolbyPreset), [dolbyPreset]);
-
-  const byRole = React.useMemo(() => {
-    const m = new Map();
-    (Array.isArray(placedSpeakers) ? placedSpeakers : []).forEach((s) =>
-      m.set(String(s.role || "").toUpperCase(), s)
-    );
-    return m;
-  }, [placedSpeakers]);
-
-  // Extract MLP overhead SPL values from central engine
-  // Force update when power or speakers change to ensure fresh data
-  const mlpMetrics = React.useMemo(() => {
-    if (!mlpSeat || !allSeatSplMetrics) return null;
-    return allSeatSplMetrics.get(mlpSeat.id);
-  }, [mlpSeat, allSeatSplMetrics, placedSpeakers, splConfig?.globalPowerW, splConfig?.radiationMode]);
-
-  // Get worst-case SPL for a group of overhead roles
-  // Non-memoized to always read fresh data
-  const getGroupSpl = (roles) => {
-    if (!mlpSeat || !allSeatSplMetrics) return null;
-    const metrics = allSeatSplMetrics.get(mlpSeat.id);
-    if (!metrics?.spl?.uppers) return null;
-
-    const splValues = roles
-      .map(role => metrics.spl.uppers[role]?.value)
-      .filter(v => Number.isFinite(v));
-
-    if (splValues.length === 0) return null;
-    return Math.min(...splValues);
-  };
-
   return (
     <div style={{ marginTop: 8 }}>
-      {groups.map((g) => {
-        const leftModel  = getByAnyRole(allAliases(g.roles[0]), byRole)?.model || "";
-        const rightModel = getByAnyRole(allAliases(g.roles[1]), byRole)?.model || "";
-        const currentModel = leftModel && rightModel && leftModel === rightModel ? leftModel : "";
-
-        return (
-          <div key={g.key} style={{ marginBottom: 12 }}>
-            <div style={groupHeaderStyle}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: "#3E4349" }}>{g.label}</div>
-              <div style={{ display: "flex", alignItems: "center" }}>
-                {!g.required && <span style={noteStyle}>not required in this layout</span>}
-                <div style={{ width: 260, marginLeft: 10 }}>
-                  <Select
-                    value={currentModel || undefined}
-                    onValueChange={(v) => {
-                      setSpeakers(prev => applyModelToAnyRoles(prev, g.roles, v));
-                    }}
-                    disabled={!g.required}
-                  >
-                    <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
-                      <SelectValue placeholder="Choose overhead model" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-white border-[#DCDBD6]">
-                      {architectModelOptions.map((m) => (
-                        <SelectItem
-                          key={m.key}
-                          value={m.label}
-                          className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]"
-                        >
-                          {m.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </div>
-
-            <div style={rowStyle}>
-              <SplBoxP13 title={`${g.label} — Left`}  rawDbFull={getGroupSpl([g.roles[0]])} />
-              <SplBoxP13 title={`${g.label} — Right`} rawDbFull={getGroupSpl([g.roles[1]])} />
-            </div>
-          </div>
-        );
-      })}
+      <OverheadSplStrip
+        allSeatSplMetrics={allSeatSplMetrics}
+        mlpSeat={mlpSeat}
+        dolbyLayout={dolbyPreset}
+      />
     </div>
   );
 }
@@ -2392,17 +2317,15 @@ function SpeakerPlacementImpl(props) {
             />
 
             {(() => {
-              // Compute worst-case Overhead SPL for P13 using the exact tile values
               if (!mlpSeat || !allSeatSplMetrics) return null;
 
               const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
               if (!seatMetrics?.spl?.uppers) return null;
 
-              // Get the same ceiled values shown in OverheadSplStrip tiles (formatDb ceils)
               const overheadTileSplDb = Object.values(seatMetrics.spl.uppers)
                 .map(s => s?.value)
                 .filter(v => Number.isFinite(v))
-                .map(v => Math.ceil(v)); // formatDb uses Math.ceil
+                .map(v => Math.ceil(v));
 
               if (overheadTileSplDb.length === 0) return null;
 
