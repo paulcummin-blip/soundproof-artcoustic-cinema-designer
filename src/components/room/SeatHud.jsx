@@ -161,6 +161,14 @@ export default function SeatHud({
           const metric = tooltipData.rp22?.[key];
           if (!metric) return null;
 
+          // Normalize level to string format ('L1', 'L2', etc.)
+          const normalizeLevel = (level) => {
+            if (!level) return '—';
+            if (typeof level === 'string') return level;
+            if (typeof level === 'number' && level >= 1 && level <= 4) return `L${level}`;
+            return String(level);
+          };
+
           return (
             <React.Fragment key={key}>
               <div
@@ -179,7 +187,7 @@ export default function SeatHud({
                     `${key.toUpperCase()}: ${metric.formatted || '—'}`
                   )}
                 </span>
-                {renderLevelBadge(metric.level || '—')}
+                {renderLevelBadge(normalizeLevel(metric.level))}
               </div>
 
               {/* P16 debug info */}
