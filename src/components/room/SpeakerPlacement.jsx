@@ -924,7 +924,7 @@ function UnifiedSurroundsConfig({
 
 const MemoizedUnifiedSurroundsConfig = React.memo(UnifiedSurroundsConfig);
 
-function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset }) {
+function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset, allSeatSplMetrics, mlpSeat }) {
   const { ARCHITECT: architectModelOptions } = getModelsByCategoryOrdered();
 
   const groups = React.useMemo(() => getOverheadGroups(dolbyPreset), [dolbyPreset]);
@@ -937,40 +937,26 @@ function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset }
     return m;
   }, [placedSpeakers]);
 
-  const calc = React.useCallback(
-    (spk) => {
-      if (!spk || !spk.model) return null;
-      
-      const modelMeta = getSpeakerModelMeta(spk.model);
-      
-      let ceiling1m;
-      if (architectModelOptions.some(m => m.label === spk.model) && (!modelMeta || !Number.isFinite(modelMeta.max_spl))) {
-        ceiling1m = 105;
-      } else if (modelMeta) {
-        const sens = safeNum(modelMeta.sensitivity);
-        const maxW = safeNum(modelMeta.max_power);
-        const xMax1m = safeNum(modelMeta.max_spl);
+  // Extract MLP overhead SPL values from central engine
+  const mlpMetrics = React.useMemo(() => {
+    if (!mlpSeat || !allSeatSplMetrics) return null;
+    return allSeatSplMetrics.get(mlpSeat.id);
+  }, [mlpSeat, allSeatSplMetrics]);
 
-        ceiling1m = bestMaxSPL1m({
-          sensitivity_dB_1W1m: sens,
-          max_power_W: maxW,
-          excursionMax1m: xMax1m
-        });
-      } else {
-        return null;
-      }
-
-      const dz = Number.isFinite(spk.position?.z) && Number.isFinite(mlpPoint.z) ? (spk.position.z - mlpPoint.z) : 0;
-      const d = Math.hypot((spk.position.x - mlpPoint.x), (spk.position.y - mlpPoint.y), dz);
-      return (Number.isFinite(d) && Number.isFinite(ceiling1m)) ? ceilDb(splAtDistanceFrom1m(ceiling1m, d)) : null;
-    },
-    [mlpPoint, architectModelOptions]
-  );
+  // Get worst-case SPL for a group of overhead roles
+  const getGroupSpl = React.useCallback((roles) => {
+    if (!mlpMetrics?.spl?.uppers) return null;
+    
+    const splValues = roles
+      .map(role => mlpMetrics.spl.uppers[role]?.value)
+      .filter(v => Number.isFinite(v));
+    
+    if (splValues.length === 0) return null;
+    return Math.min(...splValues);
+  }, [mlpMetrics]);
 
   return (
     <div style={{ marginTop: 8 }}>
-      <div style={{ fontSize: 16, fontWeight: 700, color: "#1B1A1A", marginBottom: 6 }}>Overheads</div>
-
       {groups.map((g) => {
         const leftModel  = getByAnyRole(allAliases(g.roles[0]), byRole)?.model || "";
         const rightModel = getByAnyRole(allAliases(g.roles[1]), byRole)?.model || "";
@@ -1010,8 +996,8 @@ function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset }
             </div>
 
             <div style={rowStyle}>
-              <SplBoxP13 title={`${g.label} — Left`}  rawDbFull={calc(getByAnyRole(allAliases(g.roles[0]), byRole))} />
-              <SplBoxP13 title={`${g.label} — Right`} rawDbFull={calc(getByAnyRole(allAliases(g.roles[1]), byRole))} />
+              <SplBoxP13 title={`${g.label} — Left`}  rawDbFull={getGroupSpl([g.roles[0]])} />
+              <SplBoxP13 title={`${g.label} — Right`} rawDbFull={getGroupSpl([g.roles[1]])} />
             </div>
           </div>
         );
@@ -2376,40 +2362,41 @@ function SpeakerPlacementImpl(props) {
               onUseRearGlobalChange={setUseRearGlobal}
               disabled={disabled}
             />
-
-            {/* NEW: Overhead SPL @ MLP strip */}
-            <div className="mt-4">
-              <OverheadSplStrip
-                allSeatSplMetrics={allSeatSplMetrics}
-                mlpSeat={mlpSeat}
-                dolbyLayout={effectivePreset}
-              />
+            
+            <OverheadsSection 
+              placedSpeakers={placedSpeakers} 
+              setSpeakers={setSpeakers} 
+              mlpPoint={mlpPoint} 
+              dolbyPreset={effectivePreset}
+              allSeatSplMetrics={allSeatSplMetrics}
+              mlpSeat={mlpSeat}
+            />
+            
+            {(() => {
+              // Compute worst-case Overhead SPL for P13
+              if (!mlpSeat || !allSeatSplMetrics) return null;
               
-              {(() => {
-                // Compute worst-case Overhead SPL for P13
-                if (!mlpSeat || !allSeatSplMetrics) return null;
-                
-                const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
-                if (!seatMetrics?.spl?.uppers) return null;
-                
-                const overheadSplValues = Object.values(seatMetrics.spl.uppers)
-                  .map(s => s?.value)
-                  .filter(v => Number.isFinite(v));
-                
-                if (overheadSplValues.length === 0) return null;
-                
-                const worstCaseSpl = Math.min(...overheadSplValues);
-                const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
-                
-                return (
-                  <RP22LevelPill 
-                    parameter="P13" 
-                    level={level} 
-                    label="RP22 P13 (Overheads)"
-                  />
-                );
-              })()}
-            </div>
+              const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
+              if (!seatMetrics?.spl?.uppers) return null;
+              
+              const overheadSplValues = Object.values(seatMetrics.spl.uppers)
+                .map(s => s?.value)
+                .filter(v => Number.isFinite(v));
+              
+              if (overheadSplValues.length === 0) return null;
+              
+              const worstCaseSpl = Math.min(...overheadSplValues);
+              const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
+              
+              return (
+                <RP22LevelPill 
+                  parameter="P13" 
+                  level={level} 
+                  label="RP22 P13 (Overheads)"
+                />
+              );
+            })()}
+          </div>
           </div>
         </CollapsiblePanel>
       )}
