@@ -6,19 +6,21 @@ import { BassResponseEngine } from '../bass/BassResponseEngine'; // <-- adjust i
 const isNum = v => typeof v === 'number' && Number.isFinite(v);
 
 export const useSeatResponses = () => {
-  const { subwoofers, seatingPositions, dimensions } = useAppState();
+  const appState = useAppState();
+  const { subwoofers, seatingPositions, dimensions, roomDims } = appState || {};
 
   // Create the engine once
   const bassEngine = useMemo(() => new BassResponseEngine(), []);
 
-  // Normalise + validate subs to flat {x,y,z}
+  // Keep full sub objects, only validate position coordinates
   const simSubs = useMemo(() => {
     const subs = Array.isArray(subwoofers) ? subwoofers : [];
     return subs
       .map(s => {
-        const p = s?.position || s; // accept either {position:{x,y,z}} or flat
-        const x = p?.x, y = p?.y, z = p?.z ?? 0.1;
-        return (isNum(x) && isNum(y)) ? { x, y, z } : null;
+        const x = s?.position?.x;
+        const y = s?.position?.y;
+        if (!isNum(x) || !isNum(y)) return null;
+        return s;
       })
       .filter(Boolean);
   }, [subwoofers]);
@@ -29,9 +31,9 @@ export const useSeatResponses = () => {
   }, [seatingPositions]);
 
   const dims = {
-    width:  dimensions?.width  ?? 4,
-    length: dimensions?.length ?? 6,
-    height: dimensions?.height ?? 2.6,
+    width:  roomDims?.widthM  ?? dimensions?.width  ?? 4,
+    length: roomDims?.lengthM ?? dimensions?.length ?? 6,
+    height: roomDims?.heightM ?? dimensions?.height ?? 2.6,
   };
 
   const seatResponses = useMemo(() => {

@@ -1,4 +1,3 @@
-
 import { subDimsMM, subHeightDefault } from "@/components/data/subwooferData";
 
 // helpers
@@ -93,7 +92,12 @@ export function placeSubwoofers({
       model,
       position: { x: xBySlot[slot], y: baseY_m, z: zStack_m },
       dims_m: { w: subW_m, h: subH_m, d: subD_m },
-      group
+      group,
+      enabled: true,
+      phaseAdjust: 0,
+      delay: 0,
+      gainDb: 0,
+      polarity: 1,
     });
   }
 
