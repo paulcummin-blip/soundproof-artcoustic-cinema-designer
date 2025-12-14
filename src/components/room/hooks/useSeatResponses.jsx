@@ -12,15 +12,29 @@ export const useSeatResponses = () => {
   // Create the engine once
   const bassEngine = useMemo(() => new BassResponseEngine(), []);
 
-  // Keep full sub objects, only validate position coordinates
+  // Build full sub objects with all control fields
   const simSubs = useMemo(() => {
     const subs = Array.isArray(subwoofers) ? subwoofers : [];
     return subs
       .map(s => {
         const x = s?.position?.x;
         const y = s?.position?.y;
+        const z = s?.position?.z;
         if (!isNum(x) || !isNum(y)) return null;
-        return s;
+        
+        return {
+          id: s.id || `sub-${x}-${y}`,
+          enabled: s.enabled !== false,
+          model: s.model || 'SUB2-12',
+          position: {
+            x,
+            y,
+            z: isNum(z) ? z : 0.1
+          },
+          delay: isNum(s.delay) ? s.delay : 0,
+          phaseAdjust: isNum(s.phaseAdjust) ? s.phaseAdjust : 0,
+          gainDb: isNum(s.gainDb) ? s.gainDb : 0,
+        };
       })
       .filter(Boolean);
   }, [subwoofers]);

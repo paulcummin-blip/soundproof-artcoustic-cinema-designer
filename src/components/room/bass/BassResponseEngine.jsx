@@ -1,4 +1,3 @@
-
 export class BassResponseEngine {
     constructor() {
         this.speedOfSound = 343; // m/s
@@ -34,6 +33,14 @@ export class BassResponseEngine {
     }
 
     getSubwooferResponse(subwoofer, frequency) {
+        // Import subPerformance at runtime to avoid circular deps
+        const { subPerformance } = require('@/components/data/subwooferData');
+        
+        // Lookup sub specs by model ID
+        const modelId = typeof subwoofer === 'string' ? subwoofer : subwoofer?.model;
+        const specs = modelId ? subPerformance[modelId] : null;
+        const sensitivity = specs?.sensitivity_db_1w_1m || subwoofer?.sensitivity || 90;
+        
         if (subwoofer && subwoofer.realSplData) {
             const frequencies = Object.keys(subwoofer.realSplData).map(Number).sort((a, b) => a - b);
             let lowerFreq = frequencies[0], upperFreq = frequencies[frequencies.length - 1];
@@ -44,18 +51,19 @@ export class BassResponseEngine {
                     break;
                 }
             }
-            if (lowerFreq === upperFreq) return subwoofer.realSplData[lowerFreq] || subwoofer.sensitivity || 90;
+            if (lowerFreq === upperFreq) return subwoofer.realSplData[lowerFreq] || sensitivity;
             const lowerSpl = subwoofer.realSplData[lowerFreq];
             const upperSpl = subwoofer.realSplData[upperFreq];
             const ratio = (frequency - lowerFreq) / (upperFreq - lowerFreq);
             return lowerSpl + (upperSpl - lowerSpl) * ratio;
         }
-        const f3 = subwoofer?.frequency_response_low || 20;
+        
+        const f3 = specs?.frequency_range_hz?.[0] || subwoofer?.frequency_response_low || 20;
         if (frequency < f3) {
             const rolloff = (f3 - frequency) * 0.08;
-            return Math.max(subwoofer.sensitivity - rolloff, subwoofer.sensitivity - 20);
+            return Math.max(sensitivity - rolloff, sensitivity - 20);
         }
-        return subwoofer.sensitivity || 90;
+        return sensitivity;
     }
 
     calculateSchroederFrequency(roomDimensions, rt60 = 0.4) {
@@ -70,20 +78,22 @@ export class BassResponseEngine {
         const responseData = this.oneThirdOctaveBands.map(frequency => {
             let totalPressure = { re: 0, im: 0 };
             subwoofers.forEach(sub => {
-                if (!sub.enabled || !sub.model) return;
+                const enabled = sub.enabled !== false;
+                if (!enabled || !sub.model) return;
+                
                 const distance = this.calculateDistance(sub.position, seatPosition);
-                const subResponseSPL = this.getSubwooferResponse(sub.model, frequency);
+                const subResponseSPL = this.getSubwooferResponse(sub, frequency);
                 const boundaryGain = this.calculateBoundaryGain(sub.position, roomDimensions);
-                const finalSPL = subResponseSPL + boundaryGain - (20 * Math.log10(Math.max(distance, 0.1)));
+                const gainAdjust = sub.gainDb || 0;
+                const finalSPL = subResponseSPL + boundaryGain + gainAdjust - (20 * Math.log10(Math.max(distance, 0.1)));
                 const pressureMagnitude = Math.pow(10, finalSPL / 20);
                 const wavelength = this.speedOfSound / frequency;
                 const distancePhase = (distance / wavelength) * 2 * Math.PI;
-                const userPhase = (sub.phaseAdjust * Math.PI) / 180;
-                
-                // New: Add delay in milliseconds
+                const userPhase = ((sub.phaseAdjust || 0) * Math.PI) / 180;
                 const delayPhase = ((sub.delay || 0) / 1000) * frequency * 2 * Math.PI;
+                const polarityPhase = (sub.polarity === -1) ? Math.PI : 0;
 
-                const totalPhase = distancePhase + userPhase + delayPhase;
+                const totalPhase = distancePhase + userPhase + delayPhase + polarityPhase;
                 totalPressure.re += pressureMagnitude * Math.cos(totalPhase);
                 totalPressure.im += pressureMagnitude * Math.sin(totalPhase);
             });
