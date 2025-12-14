@@ -105,120 +105,78 @@ export default function OverheadChannelSelector({
             {/* Front Overhead */}
             {showFront && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Front Overhead</Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-600">Use Global</span>
-                    <Switch
-                      checked={useFrontGlobal}
-                      onCheckedChange={onUseFrontGlobalChange}
-                      disabled={rowsDisabled}
-                    />
-                  </div>
-                </div>
-                {!useFrontGlobal && (
-                  <Select
-                    value={frontOverride || globalModel || 'OFF'}
-                    onValueChange={onFrontOverrideChange}
-                    disabled={rowsDisabled}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {overheadModels.map((model) => (
-                        <SelectItem key={model.key} value={model.key}>
-                          {model.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {useFrontGlobal && !isOff && (
-                  <div className="text-xs text-gray-500 italic">
-                    Using: {overheadModels.find(m => m.key === globalModel)?.label || 'None'}
-                  </div>
-                )}
+                <Label className="text-sm">Front Overhead</Label>
+                <Select
+                  value={useFrontGlobal ? globalModel : (frontOverride || globalModel || 'OFF')}
+                  onValueChange={(val) => {
+                    onUseFrontGlobalChange(false);
+                    onFrontOverrideChange(val);
+                  }}
+                  disabled={rowsDisabled}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {overheadModels.map((model) => (
+                      <SelectItem key={model.key} value={model.key}>
+                        {model.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
             {/* Mid Overhead */}
             {showMid && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Mid Overhead</Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-600">Use Global</span>
-                    <Switch
-                      checked={useMidGlobal}
-                      onCheckedChange={onUseMidGlobalChange}
-                      disabled={rowsDisabled}
-                    />
-                  </div>
-                </div>
-                {!useMidGlobal && (
-                  <Select
-                    value={midOverride || globalModel || 'OFF'}
-                    onValueChange={onMidOverrideChange}
-                    disabled={rowsDisabled}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {overheadModels.map((model) => (
-                        <SelectItem key={model.key} value={model.key}>
-                          {model.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {useMidGlobal && !isOff && (
-                  <div className="text-xs text-gray-500 italic">
-                    Using: {overheadModels.find(m => m.key === globalModel)?.label || 'None'}
-                  </div>
-                )}
+                <Label className="text-sm">Mid Overhead</Label>
+                <Select
+                  value={useMidGlobal ? globalModel : (midOverride || globalModel || 'OFF')}
+                  onValueChange={(val) => {
+                    onUseMidGlobalChange(false);
+                    onMidOverrideChange(val);
+                  }}
+                  disabled={rowsDisabled}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {overheadModels.map((model) => (
+                      <SelectItem key={model.key} value={model.key}>
+                        {model.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
 
             {/* Rear Overhead */}
             {showRear && (
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm">Rear Overhead</Label>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-600">Use Global</span>
-                    <Switch
-                      checked={useRearGlobal}
-                      onCheckedChange={onUseRearGlobalChange}
-                      disabled={rowsDisabled}
-                    />
-                  </div>
-                </div>
-                {!useRearGlobal && (
-                  <Select
-                    value={rearOverride || globalModel || 'OFF'}
-                    onValueChange={onRearOverrideChange}
-                    disabled={rowsDisabled}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {overheadModels.map((model) => (
-                        <SelectItem key={model.key} value={model.key}>
-                          {model.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                {useRearGlobal && !isOff && (
-                  <div className="text-xs text-gray-500 italic">
-                    Using: {overheadModels.find(m => m.key === globalModel)?.label || 'None'}
-                  </div>
-                )}
+                <Label className="text-sm">Rear Overhead</Label>
+                <Select
+                  value={useRearGlobal ? globalModel : (rearOverride || globalModel || 'OFF')}
+                  onValueChange={(val) => {
+                    onUseRearGlobalChange(false);
+                    onRearOverrideChange(val);
+                  }}
+                  disabled={rowsDisabled}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {overheadModels.map((model) => (
+                      <SelectItem key={model.key} value={model.key}>
+                        {model.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
           </div>
