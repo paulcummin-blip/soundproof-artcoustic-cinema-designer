@@ -1169,22 +1169,23 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
       </div>
 
       {(() => {
-        // Compute worst-case LCR SPL for P12
+        // Compute worst-case LCR SPL for P12 using the exact tile values
         const mlp = getMlpSeat(seatingPositions || []);
         if (!mlp || !allSeatSplMetrics) return null;
 
         const seatMetrics = allSeatSplMetrics.get(mlp.id);
         if (!seatMetrics?.spl?.screen) return null;
 
-        const lcrSplValues = ['FL', 'FC', 'FR']
+        // Get the same rounded values shown in LcrSplCard tiles (formatDb rounds)
+        const lcrTileSplDb = ['FL', 'FC', 'FR']
           .map(role => seatMetrics.spl.screen[role]?.value)
           .filter(v => Number.isFinite(v))
-          .map(v => Math.ceil(v));
+          .map(v => Math.round(v)); // formatDb uses Math.round
 
-        if (lcrSplValues.length === 0) return null;
+        if (lcrTileSplDb.length === 0) return null;
 
-        const worstCaseSpl = Math.min(...lcrSplValues);
-        const level = computeRP22Level(worstCaseSpl, P12_THRESHOLDS);
+        const pillBasisDb = Math.min(...lcrTileSplDb);
+        const level = computeRP22Level(pillBasisDb, P12_THRESHOLDS);
 
         return (
           <RP22LevelPill 
@@ -2317,21 +2318,22 @@ function SpeakerPlacementImpl(props) {
           />
           
           {(() => {
-            // Compute worst-case Surround SPL for P13
+            // Compute worst-case Surround SPL for P13 using the exact tile values
             if (!mlpSeat || !allSeatSplMetrics) return null;
 
             const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
             if (!seatMetrics?.spl?.surrounds) return null;
 
-            const surroundSplValues = Object.values(seatMetrics.spl.surrounds)
+            // Get the same rounded values shown in SurroundSplStrip tiles (formatDb rounds)
+            const surroundTileSplDb = Object.values(seatMetrics.spl.surrounds)
               .map(s => s?.value)
               .filter(v => Number.isFinite(v))
-              .map(v => Math.ceil(v));
+              .map(v => Math.round(v)); // formatDb uses Math.round
 
-            if (surroundSplValues.length === 0) return null;
+            if (surroundTileSplDb.length === 0) return null;
 
-            const worstCaseSpl = Math.min(...surroundSplValues);
-            const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
+            const pillBasisDb = Math.min(...surroundTileSplDb);
+            const level = computeRP22Level(pillBasisDb, P13_THRESHOLDS);
 
             return (
               <RP22LevelPill 
@@ -2375,21 +2377,22 @@ function SpeakerPlacementImpl(props) {
             />
 
             {(() => {
-              // Compute worst-case Overhead SPL for P13
+              // Compute worst-case Overhead SPL for P13 using the exact tile values
               if (!mlpSeat || !allSeatSplMetrics) return null;
 
               const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
               if (!seatMetrics?.spl?.uppers) return null;
 
-              const overheadSplValues = Object.values(seatMetrics.spl.uppers)
+              // Get the same rounded values shown in OverheadSplStrip tiles (formatDb rounds)
+              const overheadTileSplDb = Object.values(seatMetrics.spl.uppers)
                 .map(s => s?.value)
                 .filter(v => Number.isFinite(v))
-                .map(v => Math.ceil(v));
+                .map(v => Math.round(v)); // formatDb uses Math.round
 
-              if (overheadSplValues.length === 0) return null;
+              if (overheadTileSplDb.length === 0) return null;
 
-              const worstCaseSpl = Math.min(...overheadSplValues);
-              const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
+              const pillBasisDb = Math.min(...overheadTileSplDb);
+              const level = computeRP22Level(pillBasisDb, P13_THRESHOLDS);
 
               return (
                 <RP22LevelPill 
