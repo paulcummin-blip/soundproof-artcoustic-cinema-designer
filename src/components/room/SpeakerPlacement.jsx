@@ -22,7 +22,6 @@ import SurroundsSelector from '../speakers/SurroundsSelector';
 import OverheadChannelSelector from '@/components/speakers/OverheadChannelSelector';
 import { calibratedSplAtSeat, euclideanDistance } from "@/components/utils/splMath";
 import { timeNowMs } from "@/components/utils/timeNow";
-import AmplifierPowerSelector from '@/components/spl/AmplifierPowerSelector';
 import EqHeadroomSelector from '@/components/spl/EqHeadroomSelector';
 import LcrSplCard from '@/components/speakers/LcrSplCard';
 import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRoleMap";
@@ -1099,11 +1098,26 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         
         <div className="space-y-2">
           <Label className="text-xs text-[#625143]">Amplifier Power (All)</Label>
-          <AmplifierPowerSelector
-            value={splConfig?.globalPowerW || 100}
-            onChange={(powerW) => updateGlobalSpl?.({ globalPowerW: powerW })}
-            disabled={disabled}
-          />
+          <div className="relative">
+            <Input
+              type="number"
+              min="1"
+              max="5000"
+              step="1"
+              value={splConfig?.globalPowerW || 100}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (Number.isFinite(val) && val >= 1 && val <= 5000) {
+                  updateGlobalSpl?.({ globalPowerW: val });
+                }
+              }}
+              disabled={disabled}
+              className="pr-8"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
+              W
+            </span>
+          </div>
         </div>
 
         <div className="space-y-2">
