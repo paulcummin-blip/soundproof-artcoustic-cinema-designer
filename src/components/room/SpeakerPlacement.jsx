@@ -925,6 +925,7 @@ const MemoizedUnifiedSurroundsConfig = React.memo(UnifiedSurroundsConfig);
 
 function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset, allSeatSplMetrics, mlpSeat }) {
   const { ARCHITECT: architectModelOptions } = getModelsByCategoryOrdered();
+  const { splConfig } = useAppState();
 
   const groups = React.useMemo(() => getOverheadGroups(dolbyPreset), [dolbyPreset]);
 
@@ -937,22 +938,26 @@ function OverheadsSection({ placedSpeakers, setSpeakers, mlpPoint, dolbyPreset, 
   }, [placedSpeakers]);
 
   // Extract MLP overhead SPL values from central engine
+  // Force update when power or speakers change to ensure fresh data
   const mlpMetrics = React.useMemo(() => {
     if (!mlpSeat || !allSeatSplMetrics) return null;
     return allSeatSplMetrics.get(mlpSeat.id);
-  }, [mlpSeat, allSeatSplMetrics]);
+  }, [mlpSeat, allSeatSplMetrics, placedSpeakers, splConfig?.globalPowerW, splConfig?.radiationMode]);
 
   // Get worst-case SPL for a group of overhead roles
-  const getGroupSpl = React.useCallback((roles) => {
-    if (!mlpMetrics?.spl?.uppers) return null;
-    
+  // Non-memoized to always read fresh data
+  const getGroupSpl = (roles) => {
+    if (!mlpSeat || !allSeatSplMetrics) return null;
+    const metrics = allSeatSplMetrics.get(mlpSeat.id);
+    if (!metrics?.spl?.uppers) return null;
+
     const splValues = roles
-      .map(role => mlpMetrics.spl.uppers[role]?.value)
+      .map(role => metrics.spl.uppers[role]?.value)
       .filter(v => Number.isFinite(v));
-    
+
     if (splValues.length === 0) return null;
     return Math.min(...splValues);
-  }, [mlpMetrics]);
+  };
 
   return (
     <div style={{ marginTop: 8 }}>
