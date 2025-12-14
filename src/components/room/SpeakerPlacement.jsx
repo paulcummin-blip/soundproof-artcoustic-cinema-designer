@@ -2078,6 +2078,76 @@ function SpeakerPlacementImpl(props) {
     placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.y,
   ]);
 
+  // Update overhead speaker models when overhead selection state changes
+  useEffect(() => {
+    if (overheadCount === 0) return;
+    
+    const OVERHEAD_ROLES = new Set(['TFL', 'TFR', 'TFC', 'TL', 'TR', 'TML', 'TMR', 'TBL', 'TBR', 'TBC']);
+    
+    // Define which roles belong to which groups
+    const FRONT_ROLES = new Set(['TFL', 'TFR', 'TFC']);
+    const MID_ROLES = new Set(['TL', 'TR', 'TML', 'TMR']);
+    const REAR_ROLES = new Set(['TBL', 'TBR', 'TBC']);
+    
+    setSpeakers(prev => {
+      const list = Array.isArray(prev) ? prev : [];
+      let changed = false;
+      
+      const updated = list.map(speaker => {
+        const canon = getCanonicalRole(speaker.role);
+        
+        // Only process overhead speakers
+        if (!OVERHEAD_ROLES.has(canon)) return speaker;
+        
+        // Determine which group this speaker belongs to
+        let targetModel = null;
+        
+        if (FRONT_ROLES.has(canon)) {
+          targetModel = (!useFrontGlobal && overheadFrontOverride) 
+            ? overheadFrontOverride 
+            : overheadGlobalModel;
+        } else if (MID_ROLES.has(canon)) {
+          targetModel = (!useMidGlobal && overheadMidOverride) 
+            ? overheadMidOverride 
+            : overheadGlobalModel;
+        } else if (REAR_ROLES.has(canon)) {
+          targetModel = (!useRearGlobal && overheadRearOverride) 
+            ? overheadRearOverride 
+            : overheadGlobalModel;
+        }
+        
+        // If target model is null or 'OFF', clear the model
+        if (!targetModel || targetModel === 'OFF') {
+          if (speaker.model !== null) {
+            changed = true;
+            return { ...speaker, model: null };
+          }
+          return speaker;
+        }
+        
+        // Update model if it's different
+        if (speaker.model !== targetModel) {
+          changed = true;
+          return { ...speaker, model: targetModel };
+        }
+        
+        return speaker;
+      });
+      
+      return changed ? updated : prev;
+    });
+  }, [
+    overheadCount,
+    overheadGlobalModel,
+    overheadFrontOverride,
+    overheadMidOverride,
+    overheadRearOverride,
+    useFrontGlobal,
+    useMidGlobal,
+    useRearGlobal,
+    setSpeakers
+  ]);
+
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
     if (!mlpPoint || !dimensions || !canWides) {
         if (showToast) showToast('Front-Wide speakers are not enabled or room data missing.', 'info');
