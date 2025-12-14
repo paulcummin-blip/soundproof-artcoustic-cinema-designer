@@ -2371,23 +2371,23 @@ function SpeakerPlacementImpl(props) {
               allSeatSplMetrics={allSeatSplMetrics}
               mlpSeat={mlpSeat}
             />
-            
+
             {(() => {
               // Compute worst-case Overhead SPL for P13
               if (!mlpSeat || !allSeatSplMetrics) return null;
-              
+
               const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
               if (!seatMetrics?.spl?.uppers) return null;
-              
+
               const overheadSplValues = Object.values(seatMetrics.spl.uppers)
                 .map(s => s?.value)
                 .filter(v => Number.isFinite(v));
-              
+
               if (overheadSplValues.length === 0) return null;
-              
+
               const worstCaseSpl = Math.min(...overheadSplValues);
               const level = computeRP22Level(worstCaseSpl, P13_THRESHOLDS);
-              
+
               return (
                 <RP22LevelPill 
                   parameter="P13" 
@@ -2396,10 +2396,9 @@ function SpeakerPlacementImpl(props) {
                 />
               );
             })()}
-          </div>
-          </div>
-        </CollapsiblePanel>
-      )}
+            </div>
+            </CollapsiblePanel>
+            )}
 
       <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
         <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
