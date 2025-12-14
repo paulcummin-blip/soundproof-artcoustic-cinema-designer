@@ -1901,27 +1901,19 @@ React.useEffect(() => {
 
     // Handle LW/RW front-wide speakers with corridor clamping and mirroring
     if (canonicalRole === 'LW' || canonicalRole === 'RW') {
-      if (frontWideZones?.status !== 'ok') {
-        console.log("[DRAG] STOP: blocked by frontWideZones not ready", { speakerId, role: spk?.role });
-        return;
-      }
-
       isDraggingFW.current = true;
 
       const W = widthM || 4.5;
-      const L = lengthM || 6.0; // Added for yMinClamped, yMaxClamped
+      const L = lengthM || 6.0;
       const dims = getModelDimsM(spk.model);
       const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
       const halfWidth = (Number(dims?.widthM) || 0.20) / 2;
       const WALL_BUFFER_FW = 0.02;
 
-      const zone = (canonicalRole === 'LW') ? frontWideZones.left : frontWideZones.right;
-      const partnerZone = (canonicalRole === 'LW') ? frontWideZones.right : frontWideZones.left;
-
-      // Define partnerRole based on current speaker
+      const zonesReady = frontWideZones?.status === 'ok';
+      const zone = zonesReady ? (canonicalRole === 'LW' ? frontWideZones.left : frontWideZones.right) : null;
+      const partnerZone = zonesReady ? (canonicalRole === 'LW' ? frontWideZones.right : frontWideZones.left) : null;
       const partnerRole = (canonicalRole === 'LW') ? 'RW' : 'LW';
-
-      if (!zone || !partnerZone) return;
 
       // Pin X to the wall
       const xAtWall = (canonicalRole === 'LW')
@@ -1929,14 +1921,20 @@ React.useEffect(() => {
         : (W - WALL_BUFFER_FW - halfDepth);
 
       const { y: rawY } = canvasToRoom(newCanvasPos);
-      // Allow 50% overhang
-      const yMinClamped = (zone.yMin || 0) + (halfWidth * SIDE_ALLOW_OVERHANG);
-      const yMaxClamped = (zone.yMax || L) - (halfWidth * SIDE_ALLOW_OVERHANG);
+      
+      // Fallback: use safe room bounds when zones are not ready
+      const fallbackYMin = WALL_BUFFER_FW + halfWidth;
+      const fallbackYMax = L - WALL_BUFFER_FW - halfWidth;
+      const fallbackMedianY = L / 2;
+      
+      const yMinClamped = zone ? ((zone.yMin || 0) + (halfWidth * SIDE_ALLOW_OVERHANG)) : fallbackYMin;
+      const yMaxClamped = zone ? ((zone.yMax || L) - (halfWidth * SIDE_ALLOW_OVERHANG)) : fallbackYMax;
 
       const yClamped = clamp(rawY, yMinClamped, yMaxClamped);
 
-      // Store offset from median for re-locking
-      const offset = yClamped - zone.medianY;
+      // Store offset from median for re-locking (only if zone exists)
+      const medianY = zone?.medianY || fallbackMedianY;
+      const offset = yClamped - medianY;
       const sideOffsetKey = canonicalRole === 'LW' ? 'L' : 'R';
       fwOffsetRef.current[sideOffsetKey] = offset;
 
@@ -1955,17 +1953,22 @@ React.useEffect(() => {
           ? (W - WALL_BUFFER_FW - partnerHalfDepth)
           : (WALL_BUFFER_FW + partnerHalfDepth);
 
-        // Partner uses same offset from its own median
-        const partnerTargetY = partnerZone.medianY + offset;
-        const partnerYMinClamped = (partnerZone.yMin || 0) + (partnerHalfWidth * SIDE_ALLOW_OVERHANG);
-        const partnerYMaxClamped = (partnerZone.yMax || L) - (partnerHalfWidth * SIDE_ALLOW_OVERHANG);
+        // Fallback for partner zone bounds
+        const partnerFallbackYMin = WALL_BUFFER_FW + partnerHalfWidth;
+        const partnerFallbackYMax = L - WALL_BUFFER_FW - partnerHalfWidth;
+        const partnerFallbackMedianY = L / 2;
+        
+        const partnerMedianY = partnerZone?.medianY || partnerFallbackMedianY;
+        const partnerTargetY = partnerMedianY + offset;
+        const partnerYMinClamped = partnerZone ? ((partnerZone.yMin || 0) + (partnerHalfWidth * SIDE_ALLOW_OVERHANG)) : partnerFallbackYMin;
+        const partnerYMaxClamped = partnerZone ? ((partnerZone.yMax || L) - (partnerHalfWidth * SIDE_ALLOW_OVERHANG)) : partnerFallbackYMax;
         const partnerYClamped = clamp(partnerTargetY, partnerYMinClamped, partnerYMaxClamped);
 
         partnerPos = { x: partnerXAtWall, y: partnerYClamped, z: partner.position?.z ?? 1.1 };
 
         // Store partner offset too (ensure it's based on actual clamped position)
         const partnerSideOffsetKey = partnerRole === 'LW' ? 'L' : 'R';
-        fwOffsetRef.current[partnerSideOffsetKey] = partnerYClamped - partnerZone.medianY;
+        fwOffsetRef.current[partnerSideOffsetKey] = partnerYClamped - partnerMedianY;
       }
 
       // Compute deviation from median (RP22 Parameter 7)
