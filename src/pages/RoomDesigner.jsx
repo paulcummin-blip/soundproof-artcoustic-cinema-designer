@@ -2051,7 +2051,7 @@ function RoomDesignerWithState() {
       screenPlaneY_m: screenDepth_m,
       lcr,
       group: "front",
-      cfg: _frontSubsCfg
+      cfg: { ..._frontSubsCfg, qty: (_frontSubsCfg?.qty ?? _frontSubsCfg?.count ?? 0) }
     });
 
     const rear = placeSubwoofers({
@@ -2060,7 +2060,7 @@ function RoomDesignerWithState() {
       screenPlaneY_m: stableDimensions.length, 
       lcr,
       group: "rear",
-      cfg: _rearSubsCfg
+      cfg: { ..._rearSubsCfg, qty: (_rearSubsCfg?.qty ?? _rearSubsCfg?.count ?? 0) }
     });
     
     if (typeof setSubwoofers === 'function') setSubwoofers([...front.placed, ...rear.placed]);

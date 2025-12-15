@@ -16,7 +16,8 @@ export function placeSubwoofers({
 }) {
   const warnings = [];
   const model = cfg?.model;
-  const qty = Math.max(0, Math.min(4, cfg?.qty ?? 0));
+  const rawCount = cfg?.qty ?? cfg?.count ?? 0;
+  const qty = Math.max(0, Math.min(4, Number(rawCount) || 0));
 
   const dims = subDimsMM[model];
   if (!dims) {
