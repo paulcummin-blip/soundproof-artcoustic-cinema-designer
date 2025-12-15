@@ -3178,7 +3178,21 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   marginLeft: "12px",
                 }}
               >
-                {(dolbyPreset || "").split(" ")[0] || ""}
+                {(() => {
+                  const base = (dolbyPreset || "").split(" ")[0]; // "5.1.4" or "5.1"
+                  const parts = String(base || "5.1").split(".");
+                  const bed = parts[0] || "5";
+                  const heights = parts[2] || ""; // may be missing for "5.1"
+
+                  const frontCount = Number(_frontSubsCfg?.count ?? 0);
+                  const rearCount  = Number(_rearSubsCfg?.count ?? 0);
+                  const totalSubs  = frontCount + rearCount;
+
+                  const subDisplay = totalSubs > 0 ? totalSubs : 1;
+
+                  // If there are heights, show bed.sub.heights. If not, show bed.sub.
+                  return heights ? `${bed}.${subDisplay}.${heights}` : `${bed}.${subDisplay}`;
+                })()}
               </strong>
             </div>
 

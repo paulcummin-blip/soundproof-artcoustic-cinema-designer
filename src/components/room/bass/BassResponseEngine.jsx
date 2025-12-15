@@ -1,3 +1,5 @@
+import { subPerformance } from "@/components/data/subwooferData";
+
 export class BassResponseEngine {
     constructor() {
         this.speedOfSound = 343; // m/s
@@ -33,9 +35,6 @@ export class BassResponseEngine {
     }
 
     getSubwooferResponse(subwoofer, frequency) {
-        // Import subPerformance at runtime to avoid circular deps
-        const { subPerformance } = require('@/components/data/subwooferData');
-        
         // Lookup sub specs by model ID
         const modelId = typeof subwoofer === 'string' ? subwoofer : subwoofer?.model;
         const specs = modelId ? subPerformance[modelId] : null;
