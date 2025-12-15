@@ -30,6 +30,7 @@ import { useEnsureOverheadPairs } from '@/components/hooks/useEnsureOverheadPair
 import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
 import PlanMessages from '@/components/room/PlanMessages';
 import SvgDefs from '@/components/room/SvgDefs';
+import SpeakerPositionsOverlay from '@/components/room/overlays/SpeakerPositionsOverlay';
 
 // local shim for fixedSideX — guaranteed available in this file
 const fixedSideX = (roomWidth, dims, side, wallBufferM = WALL_BUFFER_M) => {
@@ -381,6 +382,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     screenPlaneMode = 'autoTight',
     rp22AnglesEnabled = false,
     allSeatSplMetrics: allSeatSplMetricsProp = null,
+    speakerPositionsView = 'off',
   } = props;
 
   const appState = useAppState();
@@ -5392,6 +5394,14 @@ return (
 
             {/* RP22 Surround Angles Overlay */}
             {renderRp22AnglesOverlay()}
+
+            {/* Speaker Positions Overlay */}
+            <SpeakerPositionsOverlay
+              speakers={placedSpeakers}
+              seatingPositions={seatingPositions}
+              dimensions={{ width: widthM, length: lengthM }}
+              view={speakerPositionsView}
+            />
 
 <PlanMessages
   dragWarning={dragWarning}
