@@ -121,6 +121,12 @@ export default function SpeakerPositionsOverlay({
           bCm = mToCm(W - xM);
           aLabel = `${aCm}cm`;
           bLabel = `${bCm}cm`;
+          
+          // Nudge L/C/R labels horizontally so they never stack on top of each other
+          const lcrPadPx = 34;
+          if (role === "FL") dotX -= lcrPadPx;
+          if (role === "FC") dotX += 0;
+          if (role === "FR") dotX += lcrPadPx;
         } else if (wall === "back") {
           lineX1 = xLeftPx;  lineY1 = yBottomPx + offPx;
           lineX2 = xRightPx; lineY2 = yBottomPx + offPx;
@@ -129,6 +135,12 @@ export default function SpeakerPositionsOverlay({
           bCm = mToCm(W - xM);
           aLabel = `${aCm}cm`;
           bLabel = `${bCm}cm`;
+          
+          // Nudge L/C/R labels horizontally so they never stack on top of each other
+          const lcrPadPx = 34;
+          if (role === "FL") dotX -= lcrPadPx;
+          if (role === "FC") dotX += 0;
+          if (role === "FR") dotX += lcrPadPx;
         } else if (wall === "left") {
           lineX1 = xLeftPx - offPx; lineY1 = yTopPx;
           lineX2 = xLeftPx - offPx; lineY2 = yBottomPx;
@@ -148,9 +160,16 @@ export default function SpeakerPositionsOverlay({
           bLabel = `${bCm}cm`;
         }
 
-        // Label placement (keep it tidy and out of the room area)
-        const labelOffset = 10;
-        const roleLabel = `${role}  H${hCm}cm`;
+        // spacing controls
+        const gapPx = 26;       // distance between the left/right dimension labels
+        const aboveDimPx = 10;  // how high the dimension text sits above the arrow
+        const roleLinePx = 18;  // how far below the arrow the role sits
+        const modelLinePx = 34; // model line below the arrow
+        const hLinePx = 50;     // height line below the arrow
+
+        const roleText = role;
+        const modelText = String(s?.modelLabel || s?.model || "").trim();
+        const heightText = `H${hCm}cm`;
 
         return (
           <g key={`${role}-${idx}`} opacity={0.95}>
@@ -169,17 +188,57 @@ export default function SpeakerPositionsOverlay({
             {/* dot at speaker position */}
             <circle cx={dotX} cy={dotY} r={5} fill={dotFill} />
 
-            {/* two distance labels (to each end) */}
+            {/* labels */}
             {wall === "front" || wall === "back" ? (
               <>
-                <text x={dotX - labelOffset} y={dotY - 8} textAnchor="end" style={{ fontSize: 12, fill: textFill }}>
+                {/* left/right dims with a deliberate gap */}
+                <text
+                  x={dotX - gapPx}
+                  y={dotY - aboveDimPx}
+                  textAnchor="end"
+                  style={{ fontSize: 12, fill: textFill }}
+                >
                   {aLabel}
                 </text>
-                <text x={dotX + labelOffset} y={dotY - 8} textAnchor="start" style={{ fontSize: 12, fill: textFill }}>
+                <text
+                  x={dotX + gapPx}
+                  y={dotY - aboveDimPx}
+                  textAnchor="start"
+                  style={{ fontSize: 12, fill: textFill }}
+                >
                   {bLabel}
                 </text>
-                <text x={dotX} y={dotY + 16} textAnchor="middle" style={{ fontSize: 12, fill: textFill, fontWeight: 600 }}>
-                  {roleLabel}
+
+                {/* role (bold) centred under the dot */}
+                <text
+                  x={dotX}
+                  y={dotY + roleLinePx}
+                  textAnchor="middle"
+                  style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
+                >
+                  {roleText}
+                </text>
+
+                {/* model centred to the speaker (same x as dot) */}
+                {!!modelText && (
+                  <text
+                    x={dotX}
+                    y={dotY + modelLinePx}
+                    textAnchor="middle"
+                    style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
+                  >
+                    {modelText}
+                  </text>
+                )}
+
+                {/* height aligned under the RIGHT-HAND dimension */}
+                <text
+                  x={dotX + gapPx}
+                  y={dotY + hLinePx}
+                  textAnchor="start"
+                  style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
+                >
+                  {heightText}
                 </text>
               </>
             ) : (
