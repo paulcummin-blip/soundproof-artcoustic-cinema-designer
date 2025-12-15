@@ -978,6 +978,7 @@ const RoomVisualisation = React.lazy(() =>
 );
 import { ErrorBoundary } from "@/components/dev/ErrorBoundary";
 import SubwooferMenu from "@/components/room/SubwooferMenu"; // new
+import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
 
 import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 
@@ -3503,6 +3504,13 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         allSeatSplMetrics={allSeatSplMetrics}
                       />
                   </Suspense>
+                  
+                  <SpeakerPositionsReadout
+                    placedSpeakers={placedSpeakers}
+                    roomWidth={stableDimensions.width}
+                    roomLength={stableDimensions.length}
+                    screenFrontPlaneM={appState?.screenFrontPlaneM}
+                  />
               </CollapsiblePanel>
               
               <CollapsiblePanel
