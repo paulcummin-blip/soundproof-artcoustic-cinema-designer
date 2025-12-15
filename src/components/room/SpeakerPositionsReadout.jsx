@@ -9,8 +9,6 @@ export default function SpeakerPositionsReadout({
   roomLength,
   screenFrontPlaneM = null 
 }) {
-  const [origin, setOrigin] = React.useState('front-left'); // 'front-left' | 'screen-plane'
-  
   const modelLabel = (model) => {
     if (!model) return '(none)';
     const key = normaliseModelKey ? normaliseModelKey(model) : model;
@@ -34,50 +32,66 @@ export default function SpeakerPositionsReadout({
     return name;
   };
   
-  const rows = useMemo(() => {
-    if (!placedSpeakers || !Array.isArray(placedSpeakers)) return [];
-    
+  // Practical installer dimensions (bed speakers assumed on walls)
+  // Outputs: along wall run (m), nearest-end (m), height (m)
+  const installerRows = useMemo(() => {
     const W = Number(roomWidth) || 0;
     const L = Number(roomLength) || 0;
-    
-    return placedSpeakers
-      .filter(spk => {
-        const x = spk?.position?.x;
-        const y = spk?.position?.y;
-        return Number.isFinite(x) && Number.isFinite(y);
-      })
-      .map(spk => {
-        const x = Number(spk.position.x);
-        const y = Number(spk.position.y);
-        const z = Number.isFinite(spk.position.z) ? Number(spk.position.z) : null;
-        
-        // Compute Y reference based on origin mode
-        let yFromRef, yFromOpp;
-        if (origin === 'screen-plane' && Number.isFinite(screenFrontPlaneM)) {
-          // Y from screen plane
-          yFromRef = y - screenFrontPlaneM;
-          yFromOpp = L - y;
-        } else {
-          // Y from front wall (default)
-          yFromRef = y;
-          yFromOpp = L - y;
-        }
-        
-        return {
-          role: String(spk.role || '?'),
-          model: modelLabel(spk.model),
-          xFromLeft: x,
-          yFromRef,
-          z,
-          xFromRight: W - x,
-          yFromOpp,
-        };
-      })
-      .sort((a, b) => {
-        // Sort by role alphabetically
-        return a.role.localeCompare(b.role);
+
+    const list = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+    const out = [];
+
+    const safeNum = (v) => typeof v === 'number' && Number.isFinite(v);
+
+    for (const s of list) {
+      const role = (s?.role || '').toString();
+      const canonRole = role.toUpperCase();
+      
+      // Skip LFE and subs for wall-mounted installer table
+      if (canonRole === 'LFE' || canonRole === 'SUB') continue;
+      
+      const model = s?.model || null;
+      const x = s?.position?.x;
+      const y = s?.position?.y;
+      const z = s?.position?.z;
+
+      if (!safeNum(x) || !safeNum(y) || !safeNum(z) || !(W > 0 && L > 0)) continue;
+
+      // Determine nearest wall (front/back/left/right) by distance
+      const dFront = y;
+      const dBack  = L - y;
+      const dLeft  = x;
+      const dRight = W - x;
+
+      let wall = 'front';
+      let wallDist = dFront;
+
+      if (dBack < wallDist) { wall = 'back';  wallDist = dBack; }
+      if (dLeft < wallDist) { wall = 'left';  wallDist = dLeft; }
+      if (dRight < wallDist){ wall = 'right'; wallDist = dRight; }
+
+      // Along-wall coordinate + nearest-end distance
+      // front/back walls: along = x, length = W
+      // left/right walls: along = y, length = L
+      const along = (wall === 'front' || wall === 'back') ? x : y;
+      const runLen = (wall === 'front' || wall === 'back') ? W : L;
+
+      const fromEndA = along;          // from left (or front) end of that wall
+      const fromEndB = runLen - along; // from right (or back) end of that wall
+      const nearestEnd = Math.min(fromEndA, fromEndB);
+
+      out.push({
+        role,
+        model,
+        wall,
+        along,
+        nearestEnd,
+        height: z,
       });
-  }, [placedSpeakers, roomWidth, roomLength, origin, screenFrontPlaneM]);
+    }
+
+    return out;
+  }, [placedSpeakers, roomWidth, roomLength]);
   
   const fmt = (val) => {
     if (!Number.isFinite(val)) return '—';
@@ -85,14 +99,11 @@ export default function SpeakerPositionsReadout({
   };
   
   const copyTable = () => {
-    if (rows.length === 0) return;
+    if (installerRows.length === 0) return;
     
-    const yRefLabel = origin === 'screen-plane' ? 'Y from screen' : 'Y from front';
-    const yOppLabel = origin === 'screen-plane' ? 'Y from rear' : 'Y from rear';
-    
-    const header = `Role\tModel\tX from left (m)\t${yRefLabel} (m)\tZ (m)\tX from right (m)\t${yOppLabel} (m)`;
-    const lines = rows.map(r => 
-      `${r.role}\t${r.model}\t${fmt(r.xFromLeft)}\t${fmt(r.yFromRef)}\t${fmt(r.z)}\t${fmt(r.xFromRight)}\t${fmt(r.yFromOpp)}`
+    const header = `Role\tModel\tWall\tAlong wall (m)\tNearest end (m)\tHeight (m)`;
+    const lines = installerRows.map(r => 
+      `${r.role}\t${r.model}\t${r.wall}\t${fmt(r.along)}\t${fmt(r.nearestEnd)}\t${fmt(r.height)}`
     );
     
     const text = [header, ...lines].join('\n');
@@ -100,21 +111,18 @@ export default function SpeakerPositionsReadout({
   };
   
   const copyCSV = () => {
-    if (rows.length === 0) return;
+    if (installerRows.length === 0) return;
     
-    const yRefLabel = origin === 'screen-plane' ? 'Y from screen (m)' : 'Y from front (m)';
-    const yOppLabel = origin === 'screen-plane' ? 'Y from rear (m)' : 'Y from rear (m)';
-    
-    const header = `Role,Model,X from left (m),${yRefLabel},Z (m),X from right (m),${yOppLabel}`;
-    const lines = rows.map(r => 
-      `${r.role},${r.model},${fmt(r.xFromLeft)},${fmt(r.yFromRef)},${fmt(r.z)},${fmt(r.xFromRight)},${fmt(r.yFromOpp)}`
+    const header = `Role,Model,Wall,Along wall (m),Nearest end (m),Height (m)`;
+    const lines = installerRows.map(r => 
+      `${r.role},${r.model},${r.wall},${fmt(r.along)},${fmt(r.nearestEnd)},${fmt(r.height)}`
     );
     
     const text = [header, ...lines].join('\n');
     navigator.clipboard.writeText(text);
   };
   
-  if (rows.length === 0) {
+  if (installerRows.length === 0) {
     return (
       <div className="px-4 py-3 text-sm text-gray-500">
         No speakers placed yet.
@@ -122,25 +130,11 @@ export default function SpeakerPositionsReadout({
     );
   }
   
-  const showScreenPlaneOption = Number.isFinite(screenFrontPlaneM);
-  const yRefLabel = origin === 'screen-plane' ? 'Y from screen' : 'Y from front';
-  const yOppLabel = 'Y from rear';
-  
   return (
     <div className="px-4 py-3 border-t border-gray-200">
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm font-medium text-gray-700">Speaker Positions (Installer)</div>
         <div className="flex items-center gap-2">
-          {showScreenPlaneOption && (
-            <select
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              className="text-xs px-2 py-1 border border-gray-300 rounded"
-            >
-              <option value="front-left">Front-Left</option>
-              <option value="screen-plane">Screen Plane</option>
-            </select>
-          )}
           <Button size="sm" variant="outline" onClick={copyTable} className="h-7 px-2 text-xs">
             <Copy className="w-3 h-3 mr-1" />
             Copy Table
@@ -158,25 +152,23 @@ export default function SpeakerPositionsReadout({
             <tr className="border-b border-gray-200 text-left">
               <th className="py-1 pr-2 font-medium text-gray-600">Role</th>
               <th className="py-1 pr-2 font-medium text-gray-600">Model</th>
-              <th className="py-1 pr-2 font-medium text-gray-600 text-right">X from left</th>
-              <th className="py-1 pr-2 font-medium text-gray-600 text-right">{yRefLabel}</th>
-              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Z</th>
-              <th className="py-1 pr-2 font-medium text-gray-600 text-right">X from right</th>
-              <th className="py-1 font-medium text-gray-600 text-right">{yOppLabel}</th>
+              <th className="py-1 pr-2 font-medium text-gray-600">Wall</th>
+              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Along wall (m)</th>
+              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Nearest end (m)</th>
+              <th className="py-1 font-medium text-gray-600 text-right">Height (m)</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
-              <tr key={i} className="border-b border-gray-100">
+            {installerRows.map((r, i) => (
+              <tr key={`${r.role}-${i}`} className="border-b border-gray-100">
                 <td className="py-1 pr-2 text-gray-700">{r.role}</td>
                 <td className="py-1 pr-2 text-gray-600 truncate max-w-[100px]" title={r.model}>
                   {r.model}
                 </td>
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{fmt(r.xFromLeft)}</td>
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{fmt(r.yFromRef)}</td>
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{fmt(r.z)}</td>
-                <td className="py-1 pr-2 text-right text-gray-600 font-mono">{fmt(r.xFromRight)}</td>
-                <td className="py-1 text-right text-gray-600 font-mono">{fmt(r.yFromOpp)}</td>
+                <td className="py-1 pr-2 text-gray-600" style={{ textTransform: 'capitalize' }}>{r.wall}</td>
+                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{fmt(r.along)}</td>
+                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{fmt(r.nearestEnd)}</td>
+                <td className="py-1 text-right text-gray-700 font-mono">{fmt(r.height)}</td>
               </tr>
             ))}
           </tbody>
@@ -184,7 +176,7 @@ export default function SpeakerPositionsReadout({
       </div>
       
       <div className="mt-2 text-xs text-gray-500">
-        All distances in metres (±1mm). Screen plane reference available when floating screen is configured.
+        All distances in metres (±1mm). Along wall is the tape-measure distance along the wall run. Nearest end is the closest end of that wall. Height is cabinet centre height.
       </div>
     </div>
   );
