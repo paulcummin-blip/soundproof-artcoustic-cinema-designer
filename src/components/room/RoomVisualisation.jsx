@@ -1504,45 +1504,102 @@ React.useEffect(() => {
   // Memoize baffle and screen calculations for performance
   const { BaffleAndScreen, screenPlaneY, screenCenterX_m, visibleWidthM } = useMemo(() => {
     const inch2m = 0.0254;
-    const viewableWidthM = Math.max(0.1, Number(screen?.visibleWidthInches || 100) * inch2m);
-    const overallWidthM = viewableWidthM + 0.16;
-
+    
+    // Border thickness in metres (default 8cm if not specified)
+    const borderM = Math.max(0, (Number(screen?.borderThicknessCm ?? screen?.frameThicknessCm ?? 8) || 0) / 100);
+    
+    // Visible (image) width in metres
+    const visibleWm = Math.max(0.1, Number(screen?.visibleWidthInches || 100) * inch2m);
+    
+    // Full frame (outer) width in metres = visible width + 2 * border
+    const frameWm = visibleWm + (2 * borderM);
+    
+    // Screen front plane depth
     const planeDepthM = actualScreenFrontY;
 
-
+    // Centre the screen on the room centreline
+    const xCentre = widthM / 2;
+    
+    // Calculate canvas coordinates
     const roomCenterX_px = roomRect.x + roomRect.width / 2;
     const yFront = roomRect.y;
-    const baffleW = viewableWidthM * scale;
-    const screenW = overallWidthM * scale;
+    
+    // Dotted line (speaker space) = visible width (inset by border on each side)
+    const xVisibleL = meterToCanvasX(xCentre - visibleWm / 2);
+    const xVisibleR = meterToCanvasX(xCentre + visibleWm / 2);
+    const visibleW_px = xVisibleR - xVisibleL;
+    
+    // Solid line (frame) = full frame width
+    const xFrameL = meterToCanvasX(xCentre - frameWm / 2);
+    const xFrameR = meterToCanvasX(xCentre + frameWm / 2);
+    const frameW_px = xFrameR - xFrameL;
 
     const baffleH = Math.max(1, planeDepthM * scale);
     const screenH_px = SCREEN_THICKNESS_M * scale;
-    const baffleX = roomCenterX_px - baffleW / 2;
-    const screenX = roomCenterX_px - screenW / 2;
-
+    
     const baffleTop = yFront;
     const screenPlaneY = yFront + baffleH;
 
     const component = (
       <>
         {showBaffle && (
-          <rect x={baffleX} y={baffleTop} width={baffleW} height={baffleH}
-            fill="none" stroke="#4A230F" strokeWidth="1.5" strokeDasharray="6 6" pointerEvents="none" />
+          <>
+            {/* Dotted line = speaker space (visible width, inset by border) */}
+            <rect 
+              x={xVisibleL} 
+              y={baffleTop} 
+              width={visibleW_px} 
+              height={baffleH}
+              fill="none" 
+              stroke="#4A230F" 
+              strokeWidth="1.5" 
+              strokeDasharray="6 6" 
+              pointerEvents="none" 
+            />
+            
+            {/* Vertical end lines at visible edges */}
+            <line
+              x1={xVisibleL}
+              y1={baffleTop}
+              x2={xVisibleL}
+              y2={screenPlaneY}
+              stroke="#4A230F"
+              strokeWidth="1.5"
+              strokeDasharray="6 6"
+              pointerEvents="none"
+            />
+            <line
+              x1={xVisibleR}
+              y1={baffleTop}
+              x2={xVisibleR}
+              y2={screenPlaneY}
+              stroke="#4A230F"
+              strokeWidth="1.5"
+              strokeDasharray="6 6"
+              pointerEvents="none"
+            />
+          </>
         )}
         {showScreen && (
-          <rect x={screenX} y={screenPlaneY} width={screenW} height={screenH_px}
-            fill="#1a1a1a" stroke="#333" strokeWidth="0.5" pointerEvents="none" />
+          <rect 
+            x={xFrameL} 
+            y={screenPlaneY} 
+            width={frameW_px} 
+            height={screenH_px}
+            fill="#1a1a1a" 
+            stroke="#333" 
+            strokeWidth="0.5" 
+            pointerEvents="none" 
+          />
         )}
       </>
     );
 
     const roomWidthM = widthM || 4.5;
     const screenCenterX_m = roomWidthM / 2;
-    const SAFETY_MARGIN_M = 0.05; // Declared here for local use if not globally defined
-    const clampY = (y) => Math.max(SAFETY_MARGIN_M, Math.min(lengthM - SAFETY_MARGIN_M, y));
 
-    return { BaffleAndScreen: component, screenPlaneY, screenCenterX_m, visibleWidthM: viewableWidthM };
-  }, [screen?.visibleWidthInches, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M, lengthM]);
+    return { BaffleAndScreen: component, screenPlaneY, screenCenterX_m, visibleWidthM: visibleWm };
+  }, [screen?.visibleWidthInches, screen?.borderThicknessCm, screen?.frameThicknessCm, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M, lengthM, meterToCanvasX]);
 
 
   // Compute LCR zone blocks with ZONE_DEPTH_M
