@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Copy } from 'lucide-react';
+import { getSpeakerModelMeta, normaliseModelKey } from '@/components/models/speakers/registry';
 
 export default function SpeakerPositionsReadout({ 
   placedSpeakers = [], 
@@ -9,6 +10,29 @@ export default function SpeakerPositionsReadout({
   screenFrontPlaneM = null 
 }) {
   const [origin, setOrigin] = React.useState('front-left'); // 'front-left' | 'screen-plane'
+  
+  const modelLabel = (model) => {
+    if (!model) return '(none)';
+    const key = normaliseModelKey ? normaliseModelKey(model) : model;
+    const meta = getSpeakerModelMeta ? getSpeakerModelMeta(key) : null;
+
+    // Prefer a clean display name from meta if present
+    const name =
+      meta?.displayName ||
+      meta?.name ||
+      meta?.title ||
+      null;
+
+    // Final fallback: turn "evolve-2-1_s" -> "Evolve 2-1"
+    if (!name) {
+      return String(model)
+        .replace(/[_-]s$/i, '')          // strip trailing "_s" or "-s"
+        .replace(/[_-]/g, ' ')           // underscores/hyphens -> spaces
+        .replace(/\b(\w)/g, (m) => m.toUpperCase()); // title case
+    }
+
+    return name;
+  };
   
   const rows = useMemo(() => {
     if (!placedSpeakers || !Array.isArray(placedSpeakers)) return [];
@@ -41,7 +65,7 @@ export default function SpeakerPositionsReadout({
         
         return {
           role: String(spk.role || '?'),
-          model: String(spk.model || '(none)'),
+          model: modelLabel(spk.model),
           xFromLeft: x,
           yFromRef,
           z,
