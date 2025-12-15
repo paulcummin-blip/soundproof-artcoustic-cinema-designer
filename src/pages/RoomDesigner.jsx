@@ -3182,7 +3182,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <strong
                 style={{
-                  fontSize: 20,
+                  fontSize: 40,
                   fontWeight: 700,
                   color: "#213428",
                   display: "flex",
