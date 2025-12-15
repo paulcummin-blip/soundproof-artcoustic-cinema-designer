@@ -3145,7 +3145,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
             viewEmphasis === "plan"
               ? "minmax(720px, 62vw) 1fr"
               : viewEmphasis === "controls"
-                ? "minmax(560px, 40vw) 1fr"
+                ? "minmax(480px, 35vw) 1fr"
                 : "minmax(560px, 48vw) 1fr",
           gap: 16,
           overflow: "hidden",
