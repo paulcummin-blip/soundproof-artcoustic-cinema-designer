@@ -5,31 +5,63 @@ import { getSpeakerModelMeta, normaliseModelKey } from '@/components/models/spea
 
 export default function SpeakerPositionsReadout({ 
   placedSpeakers = [], 
+  seatingPositions = [],
   roomWidth, 
   roomLength,
-  screenFrontPlaneM = null 
+  screenFrontPlaneM = null,
+  view = 'off' // 'off' | 'plan' | 'table' | 'both'
 }) {
-  const modelLabel = (model) => {
-    if (!model) return '(none)';
-    const key = normaliseModelKey ? normaliseModelKey(model) : model;
-    const meta = getSpeakerModelMeta ? getSpeakerModelMeta(key) : null;
+  const modelLabel = (modelId) => {
+    if (!modelId) return '(none)';
+    const key = normaliseModelKey(modelId);
+    const meta = getSpeakerModelMeta(key) || getSpeakerModelMeta(modelId) || null;
 
-    // Prefer a clean display name from meta if present
-    const name =
+    // Prefer a human display name if registry provides one
+    const nice =
       meta?.displayName ||
       meta?.name ||
       meta?.title ||
       null;
 
-    // Final fallback: turn "evolve-2-1_s" -> "Evolve 2-1"
-    if (!name) {
-      return String(model)
-        .replace(/[_-]s$/i, '')          // strip trailing "_s" or "-s"
-        .replace(/[_-]/g, ' ')           // underscores/hyphens -> spaces
-        .replace(/\b(\w)/g, (m) => m.toUpperCase()); // title case
+    // Last fallback: clean up snake keys
+    if (nice) return nice;
+    return String(modelId).replace(/[_-]+/g, ' ').replace(/\b\w/g, m => m.toUpperCase());
+  };
+
+  const mToCm = (m) => Math.round(Number(m) * 100);
+
+  const recommendedBedHeightM = (speakerY, seats) => {
+    const seatArray = Array.isArray(seats) ? seats : [];
+    if (seatArray.length === 0) return 1.2;
+
+    // Collect distinct row centres (Y) and sort front->rear
+    const ys = seatArray
+      .map(s => s?.y)
+      .filter(v => typeof v === 'number' && Number.isFinite(v))
+      .sort((a,b) => a-b);
+
+    if (ys.length === 0) return 1.2;
+
+    // crude but stable: group rows by proximity (20cm)
+    const rows = [];
+    for (const y of ys) {
+      const last = rows[rows.length - 1];
+      if (!last || Math.abs(y - last) > 0.20) rows.push(y);
     }
 
-    return name;
+    // If fewer than 2 rows, always 1.2m
+    if (rows.length < 2) return 1.2;
+
+    const row2Y = rows[1];
+    const row3Y = rows[2];
+
+    // "behind row 3" means speaker is further back than row 3
+    if (typeof row3Y === 'number' && speakerY > row3Y) return 1.8;
+
+    // "behind row 2"
+    if (speakerY > row2Y) return 1.5;
+
+    return 1.2;
   };
   
   // Practical installer dimensions (bed speakers assumed on walls)
@@ -50,12 +82,14 @@ export default function SpeakerPositionsReadout({
       // Skip LFE and subs for wall-mounted installer table
       if (canonRole === 'LFE' || canonRole === 'SUB') continue;
       
+      // Skip overheads (treat separately later)
+      if (canonRole.startsWith('T')) continue;
+      
       const model = s?.model || null;
       const x = s?.position?.x;
       const y = s?.position?.y;
-      const z = s?.position?.z;
 
-      if (!safeNum(x) || !safeNum(y) || !safeNum(z) || !(W > 0 && L > 0)) continue;
+      if (!safeNum(x) || !safeNum(y) || !(W > 0 && L > 0)) continue;
 
       // Determine nearest wall (front/back/left/right) by distance
       const dFront = y;
@@ -80,30 +114,28 @@ export default function SpeakerPositionsReadout({
       const fromEndB = runLen - along; // from right (or back) end of that wall
       const nearestEnd = Math.min(fromEndA, fromEndB);
 
+      // Recommended bed height based on seat rows
+      const height = recommendedBedHeightM(y, seatingPositions);
+
       out.push({
         role,
         model,
         wall,
         along,
         nearestEnd,
-        height: z,
+        height,
       });
     }
 
     return out;
-  }, [placedSpeakers, roomWidth, roomLength]);
-  
-  const fmt = (val) => {
-    if (!Number.isFinite(val)) return '—';
-    return val.toFixed(3);
-  };
+  }, [placedSpeakers, roomWidth, roomLength, seatingPositions, recommendedBedHeightM]);
   
   const copyTable = () => {
     if (installerRows.length === 0) return;
     
-    const header = `Role\tModel\tWall\tAlong wall (m)\tNearest end (m)\tHeight (m)`;
+    const header = `Role\tModel\tWall\tAlong wall (cm)\tNearest end (cm)\tHeight (cm)`;
     const lines = installerRows.map(r => 
-      `${r.role}\t${r.model}\t${r.wall}\t${fmt(r.along)}\t${fmt(r.nearestEnd)}\t${fmt(r.height)}`
+      `${r.role}\t${modelLabel(r.model)}\t${r.wall}\t${mToCm(r.along)}\t${mToCm(r.nearestEnd)}\t${mToCm(r.height)}`
     );
     
     const text = [header, ...lines].join('\n');
@@ -113,15 +145,19 @@ export default function SpeakerPositionsReadout({
   const copyCSV = () => {
     if (installerRows.length === 0) return;
     
-    const header = `Role,Model,Wall,Along wall (m),Nearest end (m),Height (m)`;
+    const header = `Role,Model,Wall,Along wall (cm),Nearest end (cm),Height (cm)`;
     const lines = installerRows.map(r => 
-      `${r.role},${r.model},${r.wall},${fmt(r.along)},${fmt(r.nearestEnd)},${fmt(r.height)}`
+      `${r.role},${modelLabel(r.model)},${r.wall},${mToCm(r.along)},${mToCm(r.nearestEnd)},${mToCm(r.height)}`
     );
     
     const text = [header, ...lines].join('\n');
     navigator.clipboard.writeText(text);
   };
   
+  if (view === 'off' || (view !== 'table' && view !== 'both')) {
+    return null;
+  }
+
   if (installerRows.length === 0) {
     return (
       <div className="px-4 py-3 text-sm text-gray-500">
@@ -133,7 +169,7 @@ export default function SpeakerPositionsReadout({
   return (
     <div className="px-4 py-3 border-t border-gray-200">
       <div className="flex items-center justify-between mb-3">
-        <div className="text-sm font-medium text-gray-700">Speaker Positions (Installer)</div>
+        <div className="text-sm font-medium text-gray-700">Speaker Positions</div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={copyTable} className="h-7 px-2 text-xs">
             <Copy className="w-3 h-3 mr-1" />
@@ -153,22 +189,22 @@ export default function SpeakerPositionsReadout({
               <th className="py-1 pr-2 font-medium text-gray-600">Role</th>
               <th className="py-1 pr-2 font-medium text-gray-600">Model</th>
               <th className="py-1 pr-2 font-medium text-gray-600">Wall</th>
-              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Along wall (m)</th>
-              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Nearest end (m)</th>
-              <th className="py-1 font-medium text-gray-600 text-right">Height (m)</th>
+              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Along wall (cm)</th>
+              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Nearest end (cm)</th>
+              <th className="py-1 font-medium text-gray-600 text-right">Height (cm)</th>
             </tr>
           </thead>
           <tbody>
             {installerRows.map((r, i) => (
               <tr key={`${r.role}-${i}`} className="border-b border-gray-100">
                 <td className="py-1 pr-2 text-gray-700">{r.role}</td>
-                <td className="py-1 pr-2 text-gray-600 truncate max-w-[100px]" title={r.model}>
-                  {r.model}
+                <td className="py-1 pr-2 text-gray-600 truncate max-w-[100px]" title={modelLabel(r.model)}>
+                  {modelLabel(r.model)}
                 </td>
                 <td className="py-1 pr-2 text-gray-600" style={{ textTransform: 'capitalize' }}>{r.wall}</td>
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{fmt(r.along)}</td>
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{fmt(r.nearestEnd)}</td>
-                <td className="py-1 text-right text-gray-700 font-mono">{fmt(r.height)}</td>
+                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(r.along)}</td>
+                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(r.nearestEnd)}</td>
+                <td className="py-1 text-right text-gray-700 font-mono">{mToCm(r.height)}</td>
               </tr>
             ))}
           </tbody>
@@ -176,7 +212,7 @@ export default function SpeakerPositionsReadout({
       </div>
       
       <div className="mt-2 text-xs text-gray-500">
-        All distances in metres (±1mm). Along wall is the tape-measure distance along the wall run. Nearest end is the closest end of that wall. Height is cabinet centre height.
+        All distances in centimetres (±1 cm). Along wall is the tape-measure distance along the wall run. Nearest end is the closest end of that wall. Height is cabinet centre height.
       </div>
     </div>
   );

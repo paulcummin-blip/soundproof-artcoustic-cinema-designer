@@ -1518,6 +1518,7 @@ function RoomDesignerWithState() {
   // NEW: Options panel state
   const [showPrices, setShowPrices] = useState(false);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
+  const [speakerPositionsView, setSpeakerPositionsView] = React.useState('off'); // 'off' | 'plan' | 'table' | 'both'
 
   // Layout emphasis: controls how wide the left plan vs right menu are.
   // "balanced" keeps your current look.
@@ -3310,6 +3311,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   mlpBasis={_mlpBasis}
                   rp22AnglesEnabled={_overlays?.RP22_ANGLES}
                   allSeatSplMetrics={allSeatSplMetrics}
+                  speakerPositionsView={speakerPositionsView}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -3505,11 +3507,29 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                       />
                   </Suspense>
                   
+                  <div className="px-4 py-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-medium text-gray-700">Speaker Positions</div>
+                      <select
+                        value={speakerPositionsView}
+                        onChange={(e) => setSpeakerPositionsView(e.target.value)}
+                        className="text-xs px-2 py-1 border border-gray-300 rounded"
+                      >
+                        <option value="off">Off</option>
+                        <option value="plan">Plan</option>
+                        <option value="table">Table</option>
+                        <option value="both">Both</option>
+                      </select>
+                    </div>
+                  </div>
+                  
                   <SpeakerPositionsReadout
                     placedSpeakers={placedSpeakers}
+                    seatingPositions={_seatingPositions}
                     roomWidth={stableDimensions.width}
                     roomLength={stableDimensions.length}
                     screenFrontPlaneM={appState?.screenFrontPlaneM}
+                    view={speakerPositionsView}
                   />
               </CollapsiblePanel>
               
