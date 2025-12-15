@@ -1,9 +1,9 @@
-
 import React, { useMemo } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useAppState } from "../AppStateProvider";
 import { useSeatResponses } from "./hooks/useSeatResponses";
+import BassGraph from "@/components/room/bass/BassGraph";
 
 const brand = {
   ink:   "#1B1A1A",
@@ -28,6 +28,37 @@ export default function BassResponse() {
   const hasNoSubs  = !Array.isArray(subwoofers) || subwoofers.length === 0;
 
   const dimsTxt = `${dimensions?.width?.toFixed?.(1) ?? "-"}×${dimensions?.length?.toFixed?.(1) ?? "-"}×${dimensions?.height?.toFixed?.(1) ?? "-"} m`;
+
+  // Selected seat for graph (prefer MLP, fallback to first seat)
+  const selectedSeat = useMemo(() => {
+    return seatResponses.find(r => r.isPrimary) || seatResponses[0] || null;
+  }, [seatResponses]);
+
+  const responseData = useMemo(() => {
+    return selectedSeat?.responseData ?? [];
+  }, [selectedSeat]);
+
+  // Schroeder frequency calculation
+  const schroederFrequency = useMemo(() => {
+    const width = dimensions?.width ?? 0;
+    const length = dimensions?.length ?? 0;
+    const height = dimensions?.height ?? 0;
+    if (!width || !length || !height) return 0;
+    
+    const volume = width * length * height;
+    const rt60 = 0.4; // Default RT60
+    return 2000 * Math.sqrt(rt60 / volume);
+  }, [dimensions]);
+
+  // RP22 reference levels
+  const rp22Levels = useMemo(() => [
+    { level: 'L1', spl: 114, color: '#C1B6AD' },
+    { level: 'L2', spl: 117, color: '#8B7F76' },
+    { level: 'L3', spl: 120, color: '#625143' },
+    { level: 'L4', spl: 123, color: '#213428' }
+  ], []);
+
+  const toggles = useMemo(() => ({ smoothing: false }), []);
 
   return (
     <div className="space-y-4" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
@@ -62,6 +93,25 @@ export default function BassResponse() {
           Seats: {seatingPositions?.length ?? 0}
         </Badge>
       </div>
+
+      {/* Bass Response Graph */}
+      {responseData.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold text-[#1B1A1A]">Bass Response</h3>
+            <span className="text-xs text-[#3E4349]">
+              Showing: {selectedSeat?.isPrimary ? 'MLP' : `Seat ${selectedSeat?.seatId || '1'}`}
+            </span>
+          </div>
+          <BassGraph 
+            responseData={responseData}
+            schroederFrequency={schroederFrequency}
+            rp22Levels={rp22Levels}
+            toggles={toggles}
+            crossoverFrequency={80}
+          />
+        </div>
+      )}
 
       {/* Simple per‑seat status list; keeps UI responsive even without charts */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
