@@ -16,7 +16,7 @@ const brand = {
 };
 
 export default function BassResponse() {
-  const { subwoofers, seatingPositions, dimensions } = useAppState();
+  const { subwoofers, seatingPositions, roomDims } = useAppState();
   const seatResponses = useSeatResponses();
 
   const hasEngineError = useMemo(
@@ -95,21 +95,25 @@ export default function BassResponse() {
       </div>
 
       {/* Bass Response Graph */}
-      {responseData.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold text-[#1B1A1A]">Bass Response</h3>
-            <span className="text-xs text-[#3E4349]">
-              Showing: {selectedSeat?.isPrimary ? 'MLP' : `Seat ${selectedSeat?.seatId || '1'}`}
-            </span>
+      {responseData.length > 0 ? (
+        <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
+            <div style={{ fontSize: 12, color: "#3E4349" }}>
+              Showing: {selectedSeat?.isPrimary ? "MLP" : `Seat ${selectedSeat?.seatId ?? ""}`}
+            </div>
           </div>
-          <BassGraph 
+          <BassGraph
             responseData={responseData}
             schroederFrequency={schroederFrequency}
             rp22Levels={rp22Levels}
             toggles={toggles}
             crossoverFrequency={80}
           />
+        </div>
+      ) : (
+        <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
+          No bass response data yet. Add at least one sub and one seat, then check this panel again.
         </div>
       )}
 

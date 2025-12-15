@@ -15,25 +15,25 @@ export const useSeatResponses = () => {
   // Build full sub objects with all control fields
   const simSubs = useMemo(() => {
     const subs = Array.isArray(subwoofers) ? subwoofers : [];
+    
     return subs
-      .map(s => {
-        const x = s?.position?.x;
-        const y = s?.position?.y;
-        const z = s?.position?.z;
+      .map((s) => {
+        const pos = s?.position || s;
+        const x = pos?.x;
+        const y = pos?.y;
+        const z = pos?.z ?? 0.1;
+
         if (!isNum(x) || !isNum(y)) return null;
-        
+
+        // IMPORTANT: keep the full object so enabled/model/delay/phaseAdjust/gainDb exist
         return {
-          id: s.id || `sub-${x}-${y}`,
-          enabled: s.enabled !== false,
-          model: s.model || 'SUB2-12',
-          position: {
-            x,
-            y,
-            z: isNum(z) ? z : 0.1
-          },
-          delay: isNum(s.delay) ? s.delay : 0,
-          phaseAdjust: isNum(s.phaseAdjust) ? s.phaseAdjust : 0,
-          gainDb: isNum(s.gainDb) ? s.gainDb : 0,
+          ...s,
+          position: { x, y, z },
+          enabled: typeof s?.enabled === "boolean" ? s.enabled : true,
+          delay: isNum(s?.delay) ? s.delay : 0,
+          phaseAdjust: isNum(s?.phaseAdjust) ? s.phaseAdjust : 0,
+          gainDb: isNum(s?.gainDb) ? s.gainDb : 0,
+          polarity: isNum(s?.polarity) ? s.polarity : 1,
         };
       })
       .filter(Boolean);
