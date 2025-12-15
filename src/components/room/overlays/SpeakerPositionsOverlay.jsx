@@ -3,6 +3,12 @@ import React from "react";
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const mToCm = (m) => Math.round(Number(m) * 100);
 
+// Lane spacing constants
+const LANE_GAP_M = 0.18;
+const TOP_CLEAR_M = 0.22;
+const TEXT_LINE1_DY_M = -0.10;  // dims line
+const TEXT_LINE2_DY_M = 0.06;   // ID + height line
+
 export default function SpeakerPositionsOverlay({
   speakers = [],
   seatingPositions = [],
@@ -54,7 +60,38 @@ export default function SpeakerPositionsOverlay({
     return isNum(x) && isNum(y);
   });
 
-  const offPx = 18; // how far outside the wall the measurement line sits
+  // --- Assign wall and laneIndex to each speaker ---
+  const speakersWithLanes = bedSpeakers.map((s) => {
+    const xM = s.position.x;
+    const yM = s.position.y;
+    const role = String(s.role).toUpperCase();
+
+    // Determine nearest wall
+    const dFront = yM;
+    const dBack = L - yM;
+    const dLeft = xM;
+    const dRight = W - xM;
+
+    let wall = "front";
+    let min = dFront;
+    if (dBack < min) { wall = "back"; min = dBack; }
+    if (dLeft < min) { wall = "left"; min = dLeft; }
+    if (dRight < min) { wall = "right"; min = dRight; }
+
+    return { ...s, wall, xM, yM, role };
+  });
+
+  // Group by wall and sort along wall axis
+  const frontGroup = speakersWithLanes.filter(s => s.wall === "front").sort((a, b) => a.xM - b.xM);
+  const backGroup = speakersWithLanes.filter(s => s.wall === "back").sort((a, b) => a.xM - b.xM);
+  const leftGroup = speakersWithLanes.filter(s => s.wall === "left").sort((a, b) => a.yM - b.yM);
+  const rightGroup = speakersWithLanes.filter(s => s.wall === "right").sort((a, b) => a.yM - b.yM);
+
+  // Assign lane indices
+  frontGroup.forEach((s, idx) => s.laneIndex = idx);
+  backGroup.forEach((s, idx) => s.laneIndex = idx);
+  leftGroup.forEach((s, idx) => s.laneIndex = idx);
+  rightGroup.forEach((s, idx) => s.laneIndex = idx);
 
   const stroke = "#DCDBD6";
   const dotFill = "#213428";
@@ -76,26 +113,11 @@ export default function SpeakerPositionsOverlay({
         </marker>
       </defs>
 
-      {bedSpeakers.map((s, idx) => {
-        const xM = s.position.x;
-        const yM = s.position.y;
-        const role = String(s.role).toUpperCase();
-
-        // Nearest wall
-        const dFront = yM;
-        const dBack = L - yM;
-        const dLeft = xM;
-        const dRight = W - xM;
-
-        let wall = "front";
-        let min = dFront;
-        if (dBack < min) { wall = "back"; min = dBack; }
-        if (dLeft < min) { wall = "left"; min = dLeft; }
-        if (dRight < min) { wall = "right"; min = dRight; }
-
+      {speakersWithLanes.map((s, idx) => {
+        const { xM, yM, role, wall, laneIndex } = s;
         const hCm = mToCm(bedHeightM(yM));
 
-        // Convert speaker position to canvas
+        // Convert speaker centre to canvas coordinates
         const xPx = meterToCanvasX(xM);
         const yPx = meterToCanvasY(yM);
 
@@ -105,67 +127,61 @@ export default function SpeakerPositionsOverlay({
         const yTopPx = roomRect.y;
         const yBottomPx = roomRect.y + roomRect.height;
 
-        // For each wall, draw:
-        //  - a full wall-length arrow line
-        //  - a "dot" at speaker location projected onto that wall line
-        //  - two small distance labels (to each end)
-        let lineX1, lineY1, lineX2, lineY2, dotX, dotY;
-        let aCm, bCm;
-        let aLabel, bLabel;
+        // Calculate ruler position based on wall and lane
+        let rulerYm, rulerXm, lineX1, lineY1, lineX2, lineY2, dotX, dotY;
+        let leftDistCm, rightDistCm, topDistCm, bottomDistCm;
+        let isHorizontal;
 
         if (wall === "front") {
-          lineX1 = xLeftPx;  lineY1 = yTopPx - offPx;
-          lineX2 = xRightPx; lineY2 = yTopPx - offPx;
-          dotX = xPx; dotY = lineY1;
-          aCm = mToCm(xM);
-          bCm = mToCm(W - xM);
-          aLabel = `${aCm}cm`;
-          bLabel = `${bCm}cm`;
-          
-          // Nudge L/C/R labels horizontally so they never stack on top of each other
-          const lcrPadPx = 34;
-          if (role === "FL") dotX -= lcrPadPx;
-          if (role === "FC") dotX += 0;
-          if (role === "FR") dotX += lcrPadPx;
+          rulerYm = -TOP_CLEAR_M - (laneIndex * LANE_GAP_M);
+          const rulerYpx = meterToCanvasY(rulerYm);
+          lineX1 = xLeftPx;
+          lineY1 = rulerYpx;
+          lineX2 = xRightPx;
+          lineY2 = rulerYpx;
+          dotX = xPx;  // ALWAYS speaker centre
+          dotY = rulerYpx;
+          leftDistCm = mToCm(xM);
+          rightDistCm = mToCm(W - xM);
+          isHorizontal = true;
         } else if (wall === "back") {
-          lineX1 = xLeftPx;  lineY1 = yBottomPx + offPx;
-          lineX2 = xRightPx; lineY2 = yBottomPx + offPx;
-          dotX = xPx; dotY = lineY1;
-          aCm = mToCm(xM);
-          bCm = mToCm(W - xM);
-          aLabel = `${aCm}cm`;
-          bLabel = `${bCm}cm`;
-          
-          // Nudge L/C/R labels horizontally so they never stack on top of each other
-          const lcrPadPx = 34;
-          if (role === "FL") dotX -= lcrPadPx;
-          if (role === "FC") dotX += 0;
-          if (role === "FR") dotX += lcrPadPx;
+          rulerYm = L + TOP_CLEAR_M + (laneIndex * LANE_GAP_M);
+          const rulerYpx = meterToCanvasY(rulerYm);
+          lineX1 = xLeftPx;
+          lineY1 = rulerYpx;
+          lineX2 = xRightPx;
+          lineY2 = rulerYpx;
+          dotX = xPx;  // ALWAYS speaker centre
+          dotY = rulerYpx;
+          leftDistCm = mToCm(xM);
+          rightDistCm = mToCm(W - xM);
+          isHorizontal = true;
         } else if (wall === "left") {
-          lineX1 = xLeftPx - offPx; lineY1 = yTopPx;
-          lineX2 = xLeftPx - offPx; lineY2 = yBottomPx;
-          dotX = lineX1; dotY = yPx;
-          aCm = mToCm(yM);
-          bCm = mToCm(L - yM);
-          aLabel = `${aCm}cm`;
-          bLabel = `${bCm}cm`;
+          rulerXm = -TOP_CLEAR_M - (laneIndex * LANE_GAP_M);
+          const rulerXpx = meterToCanvasX(rulerXm);
+          lineX1 = rulerXpx;
+          lineY1 = yTopPx;
+          lineX2 = rulerXpx;
+          lineY2 = yBottomPx;
+          dotX = rulerXpx;
+          dotY = yPx;  // ALWAYS speaker centre
+          topDistCm = mToCm(yM);
+          bottomDistCm = mToCm(L - yM);
+          isHorizontal = false;
         } else {
           // right
-          lineX1 = xRightPx + offPx; lineY1 = yTopPx;
-          lineX2 = xRightPx + offPx; lineY2 = yBottomPx;
-          dotX = lineX1; dotY = yPx;
-          aCm = mToCm(yM);
-          bCm = mToCm(L - yM);
-          aLabel = `${aCm}cm`;
-          bLabel = `${bCm}cm`;
+          rulerXm = W + TOP_CLEAR_M + (laneIndex * LANE_GAP_M);
+          const rulerXpx = meterToCanvasX(rulerXm);
+          lineX1 = rulerXpx;
+          lineY1 = yTopPx;
+          lineX2 = rulerXpx;
+          lineY2 = yBottomPx;
+          dotX = rulerXpx;
+          dotY = yPx;  // ALWAYS speaker centre
+          topDistCm = mToCm(yM);
+          bottomDistCm = mToCm(L - yM);
+          isHorizontal = false;
         }
-
-        // spacing controls
-        const gapPx = 26;       // distance between the left/right dimension labels
-        const aboveDimPx = 10;  // how high the dimension text sits above the arrow
-        const roleLinePx = 18;  // how far below the arrow the role sits
-        const modelLinePx = 34; // model line below the arrow
-        const hLinePx = 50;     // height line below the arrow
 
         const roleText = role;
         const modelText = String(s?.modelLabel || s?.model || "").trim();
@@ -189,53 +205,55 @@ export default function SpeakerPositionsOverlay({
             <circle cx={dotX} cy={dotY} r={5} fill={dotFill} />
 
             {/* labels */}
-            {wall === "front" || wall === "back" ? (
+            {isHorizontal ? (
               <>
-                {/* left/right dims with a deliberate gap */}
+                {/* Left dimension label */}
                 <text
-                  x={dotX - gapPx}
-                  y={dotY - aboveDimPx}
-                  textAnchor="end"
+                  x={meterToCanvasX(xM / 2)}
+                  y={meterToCanvasY(wall === "front" ? rulerYm : rulerYm) + (meterToCanvasY(TEXT_LINE1_DY_M) - meterToCanvasY(0))}
+                  textAnchor="middle"
                   style={{ fontSize: 12, fill: textFill }}
                 >
-                  {aLabel}
-                </text>
-                <text
-                  x={dotX + gapPx}
-                  y={dotY - aboveDimPx}
-                  textAnchor="start"
-                  style={{ fontSize: 12, fill: textFill }}
-                >
-                  {bLabel}
+                  {leftDistCm}cm
                 </text>
 
-                {/* role (bold) centred under the dot */}
+                {/* Right dimension label */}
+                <text
+                  x={meterToCanvasX((xM + W) / 2)}
+                  y={meterToCanvasY(wall === "front" ? rulerYm : rulerYm) + (meterToCanvasY(TEXT_LINE1_DY_M) - meterToCanvasY(0))}
+                  textAnchor="middle"
+                  style={{ fontSize: 12, fill: textFill }}
+                >
+                  {rightDistCm}cm
+                </text>
+
+                {/* Speaker ID (bold) centred on speaker */}
                 <text
                   x={dotX}
-                  y={dotY + roleLinePx}
+                  y={meterToCanvasY(wall === "front" ? rulerYm : rulerYm) + (meterToCanvasY(TEXT_LINE2_DY_M) - meterToCanvasY(0))}
                   textAnchor="middle"
                   style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
                 >
                   {roleText}
                 </text>
 
-                {/* model centred to the speaker (same x as dot) */}
+                {/* Model centred on speaker (optional) */}
                 {!!modelText && (
                   <text
                     x={dotX}
-                    y={dotY + modelLinePx}
+                    y={meterToCanvasY(wall === "front" ? rulerYm : rulerYm) + (meterToCanvasY(TEXT_LINE2_DY_M + 0.12) - meterToCanvasY(0))}
                     textAnchor="middle"
-                    style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
+                    style={{ fontSize: 11, fill: textFill, fontWeight: 400 }}
                   >
                     {modelText}
                   </text>
                 )}
 
-                {/* height aligned under the RIGHT-HAND dimension */}
+                {/* Height aligned with right dimension zone */}
                 <text
-                  x={dotX + gapPx}
-                  y={dotY + hLinePx}
-                  textAnchor="start"
+                  x={meterToCanvasX((xM + W) / 2)}
+                  y={meterToCanvasY(wall === "front" ? rulerYm : rulerYm) + (meterToCanvasY(TEXT_LINE2_DY_M) - meterToCanvasY(0))}
+                  textAnchor="middle"
                   style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
                 >
                   {heightText}
@@ -243,21 +261,57 @@ export default function SpeakerPositionsOverlay({
               </>
             ) : (
               <>
-                <text x={dotX - 8} y={dotY - 10} textAnchor="end" style={{ fontSize: 12, fill: textFill }}>
-                  {aLabel}
+                {/* Top dimension label (rotated) */}
+                <text
+                  x={meterToCanvasX(wall === "left" ? rulerXm : rulerXm) + (meterToCanvasX(TEXT_LINE1_DY_M) - meterToCanvasX(0))}
+                  y={meterToCanvasY(yM / 2)}
+                  textAnchor="middle"
+                  transform={`rotate(-90, ${meterToCanvasX(wall === "left" ? rulerXm : rulerXm) + (meterToCanvasX(TEXT_LINE1_DY_M) - meterToCanvasX(0))}, ${meterToCanvasY(yM / 2)})`}
+                  style={{ fontSize: 12, fill: textFill }}
+                >
+                  {topDistCm}cm
                 </text>
-                <text x={dotX - 8} y={dotY + 20} textAnchor="end" style={{ fontSize: 12, fill: textFill }}>
-                  {bLabel}
+
+                {/* Bottom dimension label (rotated) */}
+                <text
+                  x={meterToCanvasX(wall === "left" ? rulerXm : rulerXm) + (meterToCanvasX(TEXT_LINE1_DY_M) - meterToCanvasX(0))}
+                  y={meterToCanvasY((yM + L) / 2)}
+                  textAnchor="middle"
+                  transform={`rotate(-90, ${meterToCanvasX(wall === "left" ? rulerXm : rulerXm) + (meterToCanvasX(TEXT_LINE1_DY_M) - meterToCanvasX(0))}, ${meterToCanvasY((yM + L) / 2)})`}
+                  style={{ fontSize: 12, fill: textFill }}
+                >
+                  {bottomDistCm}cm
                 </text>
-                <text x={dotX + 10} y={dotY + 4} textAnchor="start" style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}>
+
+                {/* Speaker ID */}
+                <text
+                  x={dotX + 10}
+                  y={dotY + 4}
+                  textAnchor="start"
+                  style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
+                >
                   {roleText}
                 </text>
+
+                {/* Model */}
                 {!!modelText && (
-                  <text x={dotX + 10} y={dotY + 16} textAnchor="start" style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}>
+                  <text
+                    x={dotX + 10}
+                    y={dotY + 16}
+                    textAnchor="start"
+                    style={{ fontSize: 11, fill: textFill, fontWeight: 400 }}
+                  >
                     {modelText}
                   </text>
                 )}
-                <text x={dotX + 10} y={dotY + 28} textAnchor="start" style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}>
+
+                {/* Height */}
+                <text
+                  x={dotX + 10}
+                  y={dotY + 28}
+                  textAnchor="start"
+                  style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
+                >
                   {heightText}
                 </text>
               </>
