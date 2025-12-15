@@ -12,28 +12,25 @@ export const useSeatResponses = () => {
   // Create the engine once
   const bassEngine = useMemo(() => new BassResponseEngine(), []);
 
-  // Build full sub objects with all control fields
+  // Normalise + validate subs, but keep full object shape (engine expects .position)
   const simSubs = useMemo(() => {
     const subs = Array.isArray(subwoofers) ? subwoofers : [];
-    
     return subs
-      .map((s) => {
-        const pos = s?.position || s;
-        const x = pos?.x;
-        const y = pos?.y;
-        const z = pos?.z ?? 0.1;
+      .map(s => {
+        const p = s?.position || s; // accept either {position:{x,y,z}} or flat
+        const x = p?.x, y = p?.y, z = p?.z ?? 0.1;
 
-        if (!isNum(x) || !isNum(y)) return null;
+        if (!(isNum(x) && isNum(y) && isNum(z))) return null;
 
-        // IMPORTANT: keep the full object so enabled/model/delay/phaseAdjust/gainDb exist
+        // Preserve original fields, but guarantee .position exists
         return {
-          ...s,
+          ...(s && typeof s === 'object' ? s : {}),
           position: { x, y, z },
-          enabled: typeof s?.enabled === "boolean" ? s.enabled : true,
-          delay: isNum(s?.delay) ? s.delay : 0,
-          phaseAdjust: isNum(s?.phaseAdjust) ? s.phaseAdjust : 0,
-          gainDb: isNum(s?.gainDb) ? s.gainDb : 0,
-          polarity: isNum(s?.polarity) ? s.polarity : 1,
+          enabled: s?.enabled ?? true,
+          delay: s?.delay ?? 0,
+          phaseAdjust: s?.phaseAdjust ?? 0,
+          gainDb: s?.gainDb ?? 0,
+          polarity: s?.polarity ?? 1,
         };
       })
       .filter(Boolean);
