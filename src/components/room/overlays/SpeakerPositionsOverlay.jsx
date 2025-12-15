@@ -243,14 +243,22 @@ export default function SpeakerPositionsOverlay({
               </>
             ) : (
               <>
-                <text x={dotX - 8} y={dotY - labelOffset} textAnchor="end" style={{ fontSize: 12, fill: textFill }}>
+                <text x={dotX - 8} y={dotY - 10} textAnchor="end" style={{ fontSize: 12, fill: textFill }}>
                   {aLabel}
                 </text>
-                <text x={dotX - 8} y={dotY + labelOffset + 10} textAnchor="end" style={{ fontSize: 12, fill: textFill }}>
+                <text x={dotX - 8} y={dotY + 20} textAnchor="end" style={{ fontSize: 12, fill: textFill }}>
                   {bLabel}
                 </text>
-                <text x={dotX + 10} y={dotY + 4} textAnchor="start" style={{ fontSize: 12, fill: textFill, fontWeight: 600 }}>
-                  {roleLabel}
+                <text x={dotX + 10} y={dotY + 4} textAnchor="start" style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}>
+                  {roleText}
+                </text>
+                {!!modelText && (
+                  <text x={dotX + 10} y={dotY + 16} textAnchor="start" style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}>
+                    {modelText}
+                  </text>
+                )}
+                <text x={dotX + 10} y={dotY + 28} textAnchor="start" style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}>
+                  {heightText}
                 </text>
               </>
             )}
