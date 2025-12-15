@@ -1505,39 +1505,20 @@ React.useEffect(() => {
   const { BaffleAndScreen, screenPlaneY, screenCenterX_m, visibleWidthM } = useMemo(() => {
     const inch2m = 0.0254;
     const viewableWidthM = Math.max(0.1, Number(screen?.visibleWidthInches || 100) * inch2m);
-    const viewableHeightM = viewableWidthM / (screen?.aspectRatio === "2.35:1" ? 2.35 : 1.78);
-
-    // Source of truth for frame thickness
-    const frameThicknessCm = Number(screen?.borderThicknessCm || screen?.frameThicknessCm || screen?.frameThickness || 8);
-    const frameThicknessM = Math.max(0, Math.min(50, frameThicknessCm)) / 100;
+    const overallWidthM = viewableWidthM + 0.16;
 
     const planeDepthM = actualScreenFrontY;
 
-    // Guard: don't render if viewable dimensions are invalid
-    if (!Number.isFinite(viewableWidthM) || viewableWidthM <= 0 || !Number.isFinite(viewableHeightM) || viewableHeightM <= 0) {
-      return { BaffleAndScreen: null, screenPlaneY: null, screenCenterX_m: widthM / 2, visibleWidthM: 0 };
-    }
-
-    // Calculate outer and inner dimensions
-    const outerW_m = viewableWidthM + (2 * frameThicknessM);
-    const outerH_m = viewableHeightM + (2 * frameThicknessM);
-    
-    const outerLeftX_m = (widthM / 2) - (outerW_m / 2);
-    const outerRightX_m = outerLeftX_m + outerW_m;
-    const innerLeftX_m = outerLeftX_m + frameThicknessM;
-    const innerRightX_m = innerLeftX_m + viewableWidthM;
 
     const roomCenterX_px = roomRect.x + roomRect.width / 2;
     const yFront = roomRect.y;
-
-    // Convert to canvas pixels
-    const outerLeftX_px = meterToCanvasX(outerLeftX_m);
-    const outerRightX_px = meterToCanvasX(outerRightX_m);
-    const innerLeftX_px = meterToCanvasX(innerLeftX_m);
-    const innerRightX_px = meterToCanvasX(innerRightX_m);
+    const baffleW = viewableWidthM * scale;
+    const screenW = overallWidthM * scale;
 
     const baffleH = Math.max(1, planeDepthM * scale);
     const screenH_px = SCREEN_THICKNESS_M * scale;
+    const baffleX = roomCenterX_px - baffleW / 2;
+    const screenX = roomCenterX_px - screenW / 2;
 
     const baffleTop = yFront;
     const screenPlaneY = yFront + baffleH;
@@ -1545,51 +1526,23 @@ React.useEffect(() => {
     const component = (
       <>
         {showBaffle && (
-          <>
-            {/* Dotted outer frame - left vertical */}
-            <line
-              x1={outerLeftX_px}
-              y1={baffleTop}
-              x2={outerLeftX_px}
-              y2={screenPlaneY}
-              stroke="#4A230F"
-              strokeWidth="1.5"
-              strokeDasharray="6 6"
-              pointerEvents="none"
-            />
-            {/* Dotted outer frame - right vertical */}
-            <line
-              x1={outerRightX_px}
-              y1={baffleTop}
-              x2={outerRightX_px}
-              y2={screenPlaneY}
-              stroke="#4A230F"
-              strokeWidth="1.5"
-              strokeDasharray="6 6"
-              pointerEvents="none"
-            />
-          </>
+          <rect x={baffleX} y={baffleTop} width={baffleW} height={baffleH}
+            fill="none" stroke="#4A230F" strokeWidth="1.5" strokeDasharray="6 6" pointerEvents="none" />
         )}
         {showScreen && (
-          <rect
-            x={innerLeftX_px}
-            y={screenPlaneY}
-            width={innerRightX_px - innerLeftX_px}
-            height={screenH_px}
-            fill="#1a1a1a"
-            stroke="#333"
-            strokeWidth="0.5"
-            pointerEvents="none"
-          />
+          <rect x={screenX} y={screenPlaneY} width={screenW} height={screenH_px}
+            fill="#1a1a1a" stroke="#333" strokeWidth="0.5" pointerEvents="none" />
         )}
       </>
     );
 
     const roomWidthM = widthM || 4.5;
     const screenCenterX_m = roomWidthM / 2;
+    const SAFETY_MARGIN_M = 0.05; // Declared here for local use if not globally defined
+    const clampY = (y) => Math.max(SAFETY_MARGIN_M, Math.min(lengthM - SAFETY_MARGIN_M, y));
 
     return { BaffleAndScreen: component, screenPlaneY, screenCenterX_m, visibleWidthM: viewableWidthM };
-  }, [screen?.visibleWidthInches, screen?.aspectRatio, screen?.borderThicknessCm, screen?.frameThicknessCm, screen?.frameThickness, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M, lengthM, meterToCanvasX]);
+  }, [screen?.visibleWidthInches, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M, lengthM]);
 
 
   // Compute LCR zone blocks with ZONE_DEPTH_M
