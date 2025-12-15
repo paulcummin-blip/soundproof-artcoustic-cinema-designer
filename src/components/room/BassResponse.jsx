@@ -27,38 +27,36 @@ export default function BassResponse() {
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
   const hasNoSubs  = !Array.isArray(subwoofers) || subwoofers.length === 0;
 
-  const dimsTxt = `${dimensions?.width?.toFixed?.(1) ?? "-"}×${dimensions?.length?.toFixed?.(1) ?? "-"}×${dimensions?.height?.toFixed?.(1) ?? "-"} m`;
+  const dimsTxt = `${(roomDims?.widthM ?? 0).toFixed(1)}×${(roomDims?.lengthM ?? 0).toFixed(1)}×${(roomDims?.heightM ?? 0).toFixed(1)} m`;
 
-  // Selected seat for graph (prefer MLP, fallback to first seat)
-  const selectedSeat = useMemo(() => {
-    return seatResponses.find(r => r.isPrimary) || seatResponses[0] || null;
+  // Prefer MLP for the graph, otherwise first seat
+  const selectedSeat = React.useMemo(() => {
+    return seatResponses.find(r => r?.isPrimary) || seatResponses[0] || null;
   }, [seatResponses]);
 
-  const responseData = useMemo(() => {
-    return selectedSeat?.responseData ?? [];
+  const responseData = React.useMemo(() => {
+    return Array.isArray(selectedSeat?.responseData) ? selectedSeat.responseData : [];
   }, [selectedSeat]);
 
-  // Schroeder frequency calculation
-  const schroederFrequency = useMemo(() => {
-    const width = dimensions?.width ?? 0;
-    const length = dimensions?.length ?? 0;
-    const height = dimensions?.height ?? 0;
-    if (!width || !length || !height) return 0;
-    
-    const volume = width * length * height;
-    const rt60 = 0.4; // Default RT60
+  // Schroeder frequency (display only)
+  const schroederFrequency = React.useMemo(() => {
+    const w = roomDims?.widthM ?? 0;
+    const l = roomDims?.lengthM ?? 0;
+    const h = roomDims?.heightM ?? 0;
+    if (!(w > 0 && l > 0 && h > 0)) return 0;
+    const volume = w * l * h;
+    const rt60 = 0.4; // default for v1
     return 2000 * Math.sqrt(rt60 / volume);
-  }, [dimensions]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
-  // RP22 reference levels
-  const rp22Levels = useMemo(() => [
-    { level: 'L1', spl: 114, color: '#C1B6AD' },
-    { level: 'L2', spl: 117, color: '#8B7F76' },
-    { level: 'L3', spl: 120, color: '#625143' },
-    { level: 'L4', spl: 123, color: '#213428' }
-  ], []);
+  const rp22Levels = React.useMemo(() => ([
+    { level: "L1", spl: 114, color: "#C1B6AD" },
+    { level: "L2", spl: 117, color: "#8B7F76" },
+    { level: "L3", spl: 120, color: "#625143" },
+    { level: "L4", spl: 123, color: "#213428" },
+  ]), []);
 
-  const toggles = useMemo(() => ({ smoothing: false }), []);
+  const toggles = React.useMemo(() => ({ smoothing: false }), []);
 
   return (
     <div className="space-y-4" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
