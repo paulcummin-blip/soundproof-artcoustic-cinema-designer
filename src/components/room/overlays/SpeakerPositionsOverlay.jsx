@@ -10,8 +10,15 @@ export default function SpeakerPositionsOverlay({
   seatingPositions = [],
   dimensions,
   view = 'off', // 'off' | 'plan' | 'both'
+  meterToCanvasX,
+  meterToCanvasY,
+  roomRect,
+  scale,
 }) {
   if (!(view === 'plan' || view === 'both')) return null;
+  
+  // Test dot to verify coordinate system
+  if (!meterToCanvasX || !meterToCanvasY) return null;
 
   const W = Number(dimensions?.width || dimensions?.widthM || 0);
   const L = Number(dimensions?.length || dimensions?.lengthM || 0);
@@ -49,6 +56,7 @@ export default function SpeakerPositionsOverlay({
 
   return (
     <g>
+      <circle cx={meterToCanvasX(0.25)} cy={meterToCanvasY(0.25)} r="6" fill="#213428" />
       {bedSpeakers.map((s, idx) => {
         const x = s.position.x;
         const y = s.position.y;
@@ -67,19 +75,46 @@ export default function SpeakerPositionsOverlay({
 
         const h = bedHeight(y);
 
-        // Draw a simple "L" measurement: from wall to speaker
-        const x0 = wall === 'left' ? 0 : wall === 'right' ? W : x;
-        const y0 = wall === 'front' ? 0 : wall === 'back' ? L : y;
-        const x1 = x;
-        const y1 = y;
+        // Draw a simple "L" measurement: from wall to speaker (in room meters)
+        const x0_m = wall === 'left' ? 0 : wall === 'right' ? W : x;
+        const y0_m = wall === 'front' ? 0 : wall === 'back' ? L : y;
+        const x1_m = x;
+        const y1_m = y;
+
+        // Convert to canvas pixels
+        const x0 = meterToCanvasX(x0_m);
+        const y0 = meterToCanvasY(y0_m);
+        const x1 = meterToCanvasX(x1_m);
+        const y1 = meterToCanvasY(y1_m);
 
         const label = `${role}  ${mToCm(along)}cm  ${mToCm(nearestEnd)}cm  H${mToCm(h)}cm`;
 
+        // Label positioning (convert label offsets from meters to pixels)
+        const labelOffsetX = 0.05 * scale;
+        const labelOffsetY = 0.08 * scale;
+        const labelWidth = 2.2 * scale;
+        const labelHeight = 0.18 * scale;
+        const fontSize = 0.12 * scale;
+
         return (
           <g key={`${role}-${idx}`}>
-            <line x1={x0} y1={y0} x2={x1} y2={y1} stroke="#213428" strokeWidth={0.01} opacity={0.7} />
-            <rect x={x1 + 0.05} y={y1 - 0.08} width={2.2} height={0.18} fill="#FFFFFF" stroke="#DCDBD6" strokeWidth={0.01} rx={0.03}/>
-            <text x={x1 + 0.10} y={y1 + 0.04} fontSize={0.12} fill="#1B1A1A">
+            <line x1={x0} y1={y0} x2={x1} y2={y1} stroke="#213428" strokeWidth="1.5" opacity={0.7} />
+            <rect 
+              x={x1 + labelOffsetX} 
+              y={y1 - labelOffsetY} 
+              width={labelWidth} 
+              height={labelHeight} 
+              fill="#FFFFFF" 
+              stroke="#DCDBD6" 
+              strokeWidth="1" 
+              rx={3}
+            />
+            <text 
+              x={x1 + labelOffsetX + 8} 
+              y={y1 + 4} 
+              fontSize={fontSize} 
+              fill="#1B1A1A"
+            >
               {label}
             </text>
           </g>

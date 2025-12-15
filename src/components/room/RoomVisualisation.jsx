@@ -5399,8 +5399,12 @@ return (
             <SpeakerPositionsOverlay
               speakers={placedSpeakers}
               seatingPositions={seatingPositions}
-              dimensions={{ width: widthM, length: lengthM }}
+              dimensions={{ width: widthM, length: lengthM, height: heightM }}
               view={speakerPositionsView}
+              meterToCanvasX={meterToCanvasX}
+              meterToCanvasY={meterToCanvasY}
+              roomRect={roomRect}
+              scale={scale}
             />
 
 <PlanMessages
