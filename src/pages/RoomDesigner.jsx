@@ -1518,6 +1518,12 @@ function RoomDesignerWithState() {
   const [showPrices, setShowPrices] = useState(false);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
 
+  // Layout emphasis: controls how wide the left plan vs right menu are.
+  // "balanced" keeps your current look.
+  // "plan" gives the plan more space (useful when talking room layout).
+  // "controls" gives the right menu more space (useful when showing the bass graph).
+  const [viewEmphasis, setViewEmphasis] = React.useState("balanced"); // "plan" | "balanced" | "controls"
+
   // screen state is now managed directly by AppState, removed local useState here.
 
   // Track preset changes to prevent unnecessary re-seeding
@@ -3135,7 +3141,12 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(560px, 48vw) 1fr",
+          gridTemplateColumns:
+            viewEmphasis === "plan"
+              ? "minmax(720px, 62vw) 1fr"
+              : viewEmphasis === "controls"
+                ? "minmax(560px, 40vw) 1fr"
+                : "minmax(560px, 48vw) 1fr",
           gap: 16,
           overflow: "hidden",
           padding: 16,
