@@ -13,19 +13,28 @@ export default function SpeakerPositionsReadout({
 }) {
   const modelLabel = (modelId) => {
     if (!modelId) return '(none)';
+    
+    const raw = String(modelId || '');
+    
+    // Special case: evolve-2-1 variants always show as "Evolve 2-1"
+    if (raw.toLowerCase().startsWith('evolve-2-1')) {
+      return 'Evolve 2-1';
+    }
+    
     const key = normaliseModelKey(modelId);
     const meta = getSpeakerModelMeta(key) || getSpeakerModelMeta(modelId) || null;
 
     // Prefer a human display name if registry provides one
     const nice =
       meta?.displayName ||
+      meta?.label ||
       meta?.name ||
       meta?.title ||
       null;
 
     // Last fallback: clean up snake keys
     if (nice) return nice;
-    return String(modelId).replace(/[_-]+/g, ' ').replace(/\b\w/g, m => m.toUpperCase());
+    return raw.replace(/[_-]+/g, ' ').replace(/\b\w/g, m => m.toUpperCase());
   };
 
   const mToCm = (m) => Math.round(Number(m) * 100);

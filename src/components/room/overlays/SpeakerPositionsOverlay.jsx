@@ -8,24 +8,20 @@ export default function SpeakerPositionsOverlay({
   seatingPositions = [],
   dimensions,
   view = "off", // 'off' | 'plan' | 'both'
-
-  // NEW: supplied by RoomVisualisation so we draw in the correct coordinate space
   meterToCanvasX,
   meterToCanvasY,
   roomRect,
-  scale,
 }) {
   if (!(view === "plan" || view === "both")) return null;
 
-  if (typeof meterToCanvasX !== "function" || typeof meterToCanvasY !== "function") return null;
-  if (!roomRect || !isNum(roomRect.x) || !isNum(roomRect.y) || !isNum(roomRect.width) || !isNum(roomRect.height)) return null;
-  if (!isNum(scale) || scale <= 0) return null;
-
-  const W = Number(dimensions?.width || dimensions?.widthM || 0);
-  const L = Number(dimensions?.length || dimensions?.lengthM || 0);
+  const W = Number(dimensions?.width ?? dimensions?.widthM ?? 0);
+  const L = Number(dimensions?.length ?? dimensions?.lengthM ?? 0);
   if (!(W > 0 && L > 0)) return null;
 
-  // Identify seating rows (by Y) so we can set bed height rules
+  if (typeof meterToCanvasX !== "function" || typeof meterToCanvasY !== "function") return null;
+  if (!roomRect || !isNum(roomRect.x) || !isNum(roomRect.y) || !isNum(roomRect.width) || !isNum(roomRect.height)) return null;
+
+  // --- Seating rows (used only to choose 120 / 150 / 180 cm height) ---
   const ys = (Array.isArray(seatingPositions) ? seatingPositions : [])
     .map((s) => s?.y)
     .filter(isNum)
@@ -34,14 +30,11 @@ export default function SpeakerPositionsOverlay({
   const rows = [];
   for (const y of ys) {
     const last = rows[rows.length - 1];
-    if (!last || Math.abs(y - last) > 0.2) rows.push(y);
+    if (!last || Math.abs(y - last) > 0.20) rows.push(y);
   }
 
-  // Bed height rule:
-  // Default 1.2m.
-  // If speaker is behind row 2 -> 1.5m.
-  // If speaker is behind row 3 -> 1.8m.
   const bedHeightM = (speakerY) => {
+    // Default 1.2m. Only raise if speaker is BEHIND row 2/row 3.
     if (rows.length < 2) return 1.2;
     const row2Y = rows[1];
     const row3Y = rows[2];
@@ -50,114 +43,158 @@ export default function SpeakerPositionsOverlay({
     return 1.2;
   };
 
-  // Filter to bed speakers only (no subs/LFE/overheads)
+  // --- Only "bed" speakers (no subs/LFE, no overheads) ---
   const bedSpeakers = (Array.isArray(speakers) ? speakers : []).filter((s) => {
     const role = String(s?.role || "").toUpperCase();
     if (!role) return false;
     if (role === "SUB" || role === "LFE") return false;
     if (role.startsWith("T")) return false; // overheads
-
     const x = s?.position?.x;
     const y = s?.position?.y;
     return isNum(x) && isNum(y);
   });
 
-  // Styling sizes in metres, converted to canvas px with `scale`
-  const strokePx = Math.max(1, Math.round(1.5)); // keep consistent thickness
-  const labelPadX_px = Math.round(8);
-  const labelPadY_px = Math.round(6);
-  const labelW_px = Math.round(280);
-  const labelH_px = Math.round(28);
-  const fontPx = Math.round(12);
+  const offPx = 18; // how far outside the wall the measurement line sits
 
-  // Arrow-ish offset from speaker point (in metres, then to px)
-  const labelOffsetX_px = Math.round(0.12 * scale);
-  const labelOffsetY_px = Math.round(0.10 * scale);
+  const stroke = "#DCDBD6";
+  const dotFill = "#213428";
+  const textFill = "#1B1A1A";
 
   return (
     <g data-layer="speaker-positions-overlay" pointerEvents="none">
+      <defs>
+        <marker
+          id="spk-dim-arrow"
+          viewBox="0 0 10 10"
+          refX="5"
+          refY="5"
+          markerWidth="6"
+          markerHeight="6"
+          orient="auto"
+        >
+          <path d="M 0 0 L 10 5 L 0 10 z" fill={stroke} />
+        </marker>
+      </defs>
+
       {bedSpeakers.map((s, idx) => {
         const xM = s.position.x;
         const yM = s.position.y;
         const role = String(s.role).toUpperCase();
 
-        // Nearest wall in metres
+        // Nearest wall
         const dFront = yM;
         const dBack = L - yM;
         const dLeft = xM;
         const dRight = W - xM;
 
         let wall = "front";
-        let wallDist = dFront;
-        if (dBack < wallDist) {
-          wall = "back";
-          wallDist = dBack;
+        let min = dFront;
+        if (dBack < min) { wall = "back"; min = dBack; }
+        if (dLeft < min) { wall = "left"; min = dLeft; }
+        if (dRight < min) { wall = "right"; min = dRight; }
+
+        const hCm = mToCm(bedHeightM(yM));
+
+        // Convert speaker position to canvas
+        const xPx = meterToCanvasX(xM);
+        const yPx = meterToCanvasY(yM);
+
+        // Room bounds in canvas
+        const xLeftPx = roomRect.x;
+        const xRightPx = roomRect.x + roomRect.width;
+        const yTopPx = roomRect.y;
+        const yBottomPx = roomRect.y + roomRect.height;
+
+        // For each wall, draw:
+        //  - a full wall-length arrow line
+        //  - a "dot" at speaker location projected onto that wall line
+        //  - two small distance labels (to each end)
+        let lineX1, lineY1, lineX2, lineY2, dotX, dotY;
+        let aCm, bCm;
+        let aLabel, bLabel;
+
+        if (wall === "front") {
+          lineX1 = xLeftPx;  lineY1 = yTopPx - offPx;
+          lineX2 = xRightPx; lineY2 = yTopPx - offPx;
+          dotX = xPx; dotY = lineY1;
+          aCm = mToCm(xM);
+          bCm = mToCm(W - xM);
+          aLabel = `${aCm}cm`;
+          bLabel = `${bCm}cm`;
+        } else if (wall === "back") {
+          lineX1 = xLeftPx;  lineY1 = yBottomPx + offPx;
+          lineX2 = xRightPx; lineY2 = yBottomPx + offPx;
+          dotX = xPx; dotY = lineY1;
+          aCm = mToCm(xM);
+          bCm = mToCm(W - xM);
+          aLabel = `${aCm}cm`;
+          bLabel = `${bCm}cm`;
+        } else if (wall === "left") {
+          lineX1 = xLeftPx - offPx; lineY1 = yTopPx;
+          lineX2 = xLeftPx - offPx; lineY2 = yBottomPx;
+          dotX = lineX1; dotY = yPx;
+          aCm = mToCm(yM);
+          bCm = mToCm(L - yM);
+          aLabel = `${aCm}cm`;
+          bLabel = `${bCm}cm`;
+        } else {
+          // right
+          lineX1 = xRightPx + offPx; lineY1 = yTopPx;
+          lineX2 = xRightPx + offPx; lineY2 = yBottomPx;
+          dotX = lineX1; dotY = yPx;
+          aCm = mToCm(yM);
+          bCm = mToCm(L - yM);
+          aLabel = `${aCm}cm`;
+          bLabel = `${bCm}cm`;
         }
-        if (dLeft < wallDist) {
-          wall = "left";
-          wallDist = dLeft;
-        }
-        if (dRight < wallDist) {
-          wall = "right";
-          wallDist = dRight;
-        }
 
-        // Along-wall distance in metres
-        const alongM = wall === "front" || wall === "back" ? xM : yM;
-        const runLenM = wall === "front" || wall === "back" ? W : L;
-        const nearestEndM = Math.min(alongM, runLenM - alongM);
-
-        // Height in metres, then cm
-        const hM = bedHeightM(yM);
-
-        // Start point on nearest wall (metres)
-        const x0M = wall === "left" ? 0 : wall === "right" ? W : xM;
-        const y0M = wall === "front" ? 0 : wall === "back" ? L : yM;
-
-        // Convert to CANVAS coordinates
-        const x0 = meterToCanvasX(x0M);
-        const y0 = meterToCanvasY(y0M);
-        const x1 = meterToCanvasX(xM);
-        const y1 = meterToCanvasY(yM);
-
-        const label = `${role}  ${mToCm(alongM)}cm  ${mToCm(nearestEndM)}cm  H${mToCm(hM)}cm`;
-
-        // Label box position (canvas px)
-        const bx = x1 + labelOffsetX_px;
-        const by = y1 - labelOffsetY_px - labelH_px;
+        // Label placement (keep it tidy and out of the room area)
+        const labelOffset = 10;
+        const roleLabel = `${role}  H${hCm}cm`;
 
         return (
-          <g key={`${role}-${idx}`}>
-            {/* measurement arm */}
+          <g key={`${role}-${idx}`} opacity={0.95}>
+            {/* main measurement line */}
             <line
-              x1={x0}
-              y1={y0}
-              x2={x1}
-              y2={y1}
-              stroke="#213428"
-              strokeWidth={strokePx}
-              opacity={0.65}
+              x1={lineX1}
+              y1={lineY1}
+              x2={lineX2}
+              y2={lineY2}
+              stroke={stroke}
+              strokeWidth={2}
+              markerStart="url(#spk-dim-arrow)"
+              markerEnd="url(#spk-dim-arrow)"
             />
 
-            {/* label */}
-            <rect
-              x={bx}
-              y={by}
-              width={labelW_px}
-              height={labelH_px}
-              fill="#FFFFFF"
-              stroke="#DCDBD6"
-              strokeWidth={1}
-              rx={8}
-            />
-            <text
-              x={bx + labelPadX_px}
-              y={by + labelH_px - labelPadY_px}
-              fontSize={fontPx}
-              fill="#1B1A1A"
-            >
-              {label}
-            </text>
+            {/* dot at speaker position */}
+            <circle cx={dotX} cy={dotY} r={5} fill={dotFill} />
+
+            {/* two distance labels (to each end) */}
+            {wall === "front" || wall === "back" ? (
+              <>
+                <text x={dotX - labelOffset} y={dotY - 8} textAnchor="end" style={{ fontSize: 12, fill: textFill }}>
+                  {aLabel}
+                </text>
+                <text x={dotX + labelOffset} y={dotY - 8} textAnchor="start" style={{ fontSize: 12, fill: textFill }}>
+                  {bLabel}
+                </text>
+                <text x={dotX} y={dotY + 16} textAnchor="middle" style={{ fontSize: 12, fill: textFill, fontWeight: 600 }}>
+                  {roleLabel}
+                </text>
+              </>
+            ) : (
+              <>
+                <text x={dotX - 8} y={dotY - labelOffset} textAnchor="end" style={{ fontSize: 12, fill: textFill }}>
+                  {aLabel}
+                </text>
+                <text x={dotX - 8} y={dotY + labelOffset + 10} textAnchor="end" style={{ fontSize: 12, fill: textFill }}>
+                  {bLabel}
+                </text>
+                <text x={dotX + 10} y={dotY + 4} textAnchor="start" style={{ fontSize: 12, fill: textFill, fontWeight: 600 }}>
+                  {roleLabel}
+                </text>
+              </>
+            )}
           </g>
         );
       })}
