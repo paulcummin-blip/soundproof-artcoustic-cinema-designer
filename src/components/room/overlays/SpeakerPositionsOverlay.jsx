@@ -134,6 +134,19 @@ export default function SpeakerPositionsOverlay({
   const dotFill = "#213428";
   const textFill = "#1B1A1A";
 
+  // --- Safe drawing margins INSIDE the clipped viewport (px) ---
+  // These ensure nothing can go off-canvas / get clipped.
+  const SAFE_TOP_PX = 18;
+  const SAFE_SIDE_PX = 18;
+
+  const clampPx = (v, min, max) => Math.max(min, Math.min(max, v));
+
+  const safeTopY = roomRect.y + SAFE_TOP_PX;
+  const safeBottomY = roomRect.y + roomRect.height - SAFE_TOP_PX;
+
+  const safeLeftX = roomRect.x + SAFE_SIDE_PX;
+  const safeRightX = roomRect.x + roomRect.width - SAFE_SIDE_PX;
+
   // --- LCR RENDERER (stacked lines, pixel-based) ---
   const renderLcrDims = () => {
     if (!lcr.length) return null;
@@ -430,57 +443,6 @@ export default function SpeakerPositionsOverlay({
     });
   };
 
-  // Visual spacing (metres in plan space)
-  const OUTER = 0.55;      // how far OUTSIDE the room the dimension lines sit
-  const LANE_GAP = 0.22;   // gap BETWEEN stacked lines on same wall
-  const DOT_R = 0.035;
-
-  // Helpers
-  const cm = (m) => `${mToCm(m)}cm`;
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-
-  // Split speakers by which wall they are on (for clean stacking)
-  const onFront = [];
-  const onLeft = [];
-  const onRight = [];
-
-  bedSpeakers.forEach((s) => {
-    const x = s.position.x;
-    const y = s.position.y;
-
-    // decide wall by nearest
-    const dFront = y, dBack = L - y, dLeft = x, dRight = W - x;
-    let wall = "front", dist = dFront;
-    if (dBack < dist) { wall = "back"; dist = dBack; }
-    if (dLeft < dist) { wall = "left"; dist = dLeft; }
-    if (dRight < dist){ wall = "right"; dist = dRight; }
-
-    // For this overlay we only draw practical "mounted on a wall" speakers.
-    // If something is closest to the back wall, treat it like a back-wall speaker later (optional).
-    if (wall === "front") onFront.push(s);
-    else if (wall === "left") onLeft.push(s);
-    else if (wall === "right") onRight.push(s);
-  });
-
-  // Front wall: give FL/FC/FR their own lanes (so lines don't clash)
-  const frontLaneForRole = (role) => {
-    const r = String(role || "").toUpperCase();
-    if (r === "FL" || r === "L") return 0;
-    if (r === "FC" || r === "C") return 1;
-    if (r === "FR" || r === "R") return 2;
-    return 3; // any other front-mounted speaker
-  };
-
-  // Side walls: stack by Y order (if multiple speakers end up on same wall)
-  const makeSideLanes = (arr) => {
-    return [...arr]
-      .sort((a,b) => a.position.y - b.position.y)
-      .map((s, i) => ({ s, lane: i }));
-  };
-
-  const leftLanes = makeSideLanes(onLeft);
-  const rightLanes = makeSideLanes(onRight);
-
   return (
     <g data-layer="speaker-positions-overlay" pointerEvents="none">
       <defs>
@@ -498,16 +460,16 @@ export default function SpeakerPositionsOverlay({
       </defs>
 
       {/* FRONT WALL DIMENSION LINES (one per LCR, stacked) */}
-      {onFront
-        .sort((a,b) => frontLaneForRole(a.role) - frontLaneForRole(b.role))
-        .map((s, idx) => {
-          const x = clamp(s.position.x, 0, W);
+      {lcr.map((s, idx) => {
+          const x = s.position.x;
           const role = String(s.role || "").toUpperCase();
           const modelText = prettyModel(s.model);
           const h = bedHeightM(s.position.y);
 
-          const lane = frontLaneForRole(role);
-          const yLine = meterToCanvasY(-OUTER - (lane * LANE_GAP));
+          const lane = idx;
+          // Put LCR ruler lines ABOVE the room, but clamped so they never clip off-screen
+          const desiredY = roomRect.y - LCR_TOP_PAD_PX - (lane * LCR_STACK_GAP_PX);
+          const yLine = clampPx(desiredY, safeTopY, roomRect.y - 6);
           const xCanvas = meterToCanvasX(x);
           const x0Canvas = meterToCanvasX(0);
           const xWCanvas = meterToCanvasX(W);
@@ -586,13 +548,15 @@ export default function SpeakerPositionsOverlay({
         })}
 
       {/* LEFT WALL DIMENSION LINES (text must sit on the LEFT of the line) */}
-      {leftLanes.map(({ s, lane }, idx) => {
-        const y = clamp(s.position.y, 0, L);
+      {leftGroup.map((s, idx) => {
+        const y = s.position.y;
+        const lane = idx;
         const role = String(s.role || "").toUpperCase();
         const modelText = prettyModel(s.model);
         const h = bedHeightM(s.position.y);
 
-        const xLine = meterToCanvasX(-OUTER - (lane * LANE_GAP));
+        const desiredX = roomRect.x - (SIDE_LABEL_PAD_PX + 26) - (lane * SIDE_STACK_GAP_PX);
+        const xLine = clampPx(desiredX, safeLeftX, roomRect.x - 6);
         const yCanvas = meterToCanvasY(y);
         const y0Canvas = meterToCanvasY(0);
         const yLCanvas = meterToCanvasY(L);
@@ -667,13 +631,15 @@ export default function SpeakerPositionsOverlay({
       })}
 
       {/* RIGHT WALL DIMENSION LINES (text must sit on the RIGHT of the line) */}
-      {rightLanes.map(({ s, lane }, idx) => {
-        const y = clamp(s.position.y, 0, L);
+      {rightGroup.map((s, idx) => {
+        const y = s.position.y;
+        const lane = idx;
         const role = String(s.role || "").toUpperCase();
         const modelText = prettyModel(s.model);
         const h = bedHeightM(s.position.y);
 
-        const xLine = meterToCanvasX(W + OUTER + (lane * LANE_GAP));
+        const desiredX = roomRect.x + roomRect.width + (SIDE_LABEL_PAD_PX + 26) + (lane * SIDE_STACK_GAP_PX);
+        const xLine = clampPx(desiredX, roomRect.x + roomRect.width + 6, safeRightX);
         const yCanvas = meterToCanvasY(y);
         const y0Canvas = meterToCanvasY(0);
         const yLCanvas = meterToCanvasY(L);
