@@ -147,6 +147,9 @@ export default function SpeakerPositionsOverlay({
   const safeLeftX = roomRect.x + SAFE_SIDE_PX;
   const safeRightX = roomRect.x + roomRect.width - SAFE_SIDE_PX;
 
+  // Helper for distance formatting
+  const cm = (m) => `${mToCm(m)}cm`;
+
   // --- LCR RENDERER (stacked lines, pixel-based) ---
   const renderLcrDims = () => {
     if (!lcr.length) return null;
