@@ -2404,6 +2404,16 @@ React.useEffect(() => {
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
+    // Pan mode: if we're not dragging a speaker/seat, handle pan drag
+    if (panDragStartRef.current && !dragging) {
+      const dx = e.clientX - panDragStartRef.current.x;
+      const dy = e.clientY - panDragStartRef.current.y;
+      const clampMax = roomRect.width;
+      setPanPxX(Math.max(-clampMax, Math.min(clampMax, panStartPosRef.current.x + dx)));
+      setPanPxY(Math.max(-clampMax, Math.min(clampMax, panStartPosRef.current.y + dy)));
+      return;
+    }
+
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
