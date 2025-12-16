@@ -5227,9 +5227,24 @@ return (
               ref={zoomGroupRef}
               clipPath={`url(#${idsClip})`}
               transform={(() => {
-                const cx = roomRect.x + roomRect.width / 2;
-                const cy = roomRect.y + roomRect.height / 2;
-                return `translate(${cx}, ${cy}) scale(${Number(zoom) || 1}) translate(${-cx}, ${-cy})`;
+                const z = Number(zoom) || 1;
+                
+                // room centre (in SVG px space)
+                const cx = (roomRect?.x || 0) + (roomRect?.width || 0) / 2;
+                const cy = (roomRect?.y || 0) + (roomRect?.height || 0) / 2;
+                
+                // viewport centre (in SVG px space)
+                const vx = (svgWSafe || 0) / 2;
+                const vy = (svgHSafe || 0) / 2;
+                
+                // 1) move room centre to viewport centre
+                // 2) zoom around room centre
+                return (
+                  `translate(${vx - cx}, ${vy - cy}) ` +
+                  `translate(${cx}, ${cy}) ` +
+                  `scale(${z}) ` +
+                  `translate(${-cx}, ${-cy})`
+                );
               })()}
           >
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
