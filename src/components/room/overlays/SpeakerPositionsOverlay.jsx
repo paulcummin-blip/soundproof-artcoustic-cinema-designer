@@ -192,7 +192,7 @@ export default function SpeakerPositionsOverlay({
 
               <text
                 x={xPx}
-                y={yLine + 16}
+                y={yLine + LCR_LINE_TO_TEXT_PX}
                 textAnchor="middle"
                 fontSize={13}
                 fill="#1B1A1A"
@@ -204,7 +204,7 @@ export default function SpeakerPositionsOverlay({
               {modelText ? (
                 <text
                   x={xPx}
-                  y={yLine + 28}
+                  y={yLine + LCR_LINE_TO_TEXT_PX + 14}
                   textAnchor="middle"
                   fontSize={12}
                   fill="#3E4349"
@@ -216,7 +216,7 @@ export default function SpeakerPositionsOverlay({
 
               <text
                 x={meterToCanvasX(xM + (W - xM) / 2)}
-                y={yLine + 16}
+                y={yLine + LCR_LINE_TO_TEXT_PX}
                 textAnchor="middle"
                 fontSize={12}
                 fill="#3E4349"
