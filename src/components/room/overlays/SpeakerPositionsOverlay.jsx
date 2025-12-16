@@ -273,6 +273,10 @@ export default function SpeakerPositionsOverlay({
 
     return speakersWithLanes.map((s, idx) => {
       const { xM, yM, role, wall, laneIndex } = s;
+      
+      // Skip left wall speakers entirely
+      if (wall === "left") return null;
+      
       const hCm = mToCm(bedHeightM(yM));
 
       const xPx = meterToCanvasX(xM);
