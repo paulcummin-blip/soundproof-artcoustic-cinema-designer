@@ -5482,6 +5482,7 @@ return (
   svgW={svgW}
 />
 
+            </g>
           </g>
         </svg>
 
