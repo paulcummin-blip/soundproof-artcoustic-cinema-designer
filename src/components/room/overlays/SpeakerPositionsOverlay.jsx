@@ -31,10 +31,14 @@ const prettyModel = (raw) => {
 };
 
 // Spacing constants (px)
-const LCR_STACK_GAP_PX = 52;
+const LCR_MIN_STACK_GAP_PX = 26;   // minimum lane separation
+const LCR_MAX_STACK_GAP_PX = 56;   // maximum lane separation (nice airy UI)
 const LCR_LINE_TO_TEXT_PX = 14;
-const LCR_SIDE_TEXT_GAP_PX = 18;
 const LCR_TOP_PAD_PX = 54;
+
+// Safety margins (px)
+const LCR_TOP_SAFE_PX = 18;        // never draw above this Y
+const LCR_LABEL_NUDGE_PX = 18;     // small x nudge when two labels would collide
 
 // Side wall constants
 const SIDE_LABEL_PAD_PX = 26;
@@ -154,6 +158,19 @@ export default function SpeakerPositionsOverlay({
   const renderLcrDims = () => {
     if (!lcr.length) return null;
 
+    // Auto lane spacing so we never clip off the top of the SVG
+    const lcrCount = lcr.length;
+
+    // How much vertical room exists ABOVE the room?
+    const availableAbovePx = Math.max(0, (roomRect.y - LCR_TOP_SAFE_PX) - LCR_TOP_PAD_PX);
+
+    // If we have enough room, use a "nice" gap. If not, compress.
+    const idealGap = LCR_MAX_STACK_GAP_PX;
+    const maxGapThatFits = lcrCount <= 1 ? idealGap : (availableAbovePx / (lcrCount - 1));
+    const laneGapPx = Math.max(LCR_MIN_STACK_GAP_PX, Math.min(idealGap, maxGapThatFits));
+
+    // Base Y is fixed, then lanes stack upwards by laneGapPx.
+    // If laneGapPx has been compressed, this guarantees top-most line stays visible.
     const baseY = roomRect.y - LCR_TOP_PAD_PX;
 
     return (
@@ -162,11 +179,30 @@ export default function SpeakerPositionsOverlay({
           const xM = s.position.x;
           const role = String(s.role || "").toUpperCase();
 
-          const yLine = baseY - (i * LCR_STACK_GAP_PX);
+          const yLine = baseY - (i * laneGapPx);
           const leftCm = mToCm(xM);
           const rightCm = mToCm(W - xM);
 
           const xPx = meterToCanvasX(xM);
+          
+          // Small nudge if two adjacent LCR x positions are close in screen pixels
+          let xLabel = xPx;
+
+          const prev = lcr[i - 1];
+          if (prev) {
+            const prevXPx = meterToCanvasX(prev.position.x);
+            if (Math.abs(xPx - prevXPx) < 48) {
+              xLabel = xPx + LCR_LABEL_NUDGE_PX;
+            }
+          }
+
+          const next = lcr[i + 1];
+          if (next) {
+            const nextXPx = meterToCanvasX(next.position.x);
+            if (Math.abs(xPx - nextXPx) < 48) {
+              xLabel = xPx - LCR_LABEL_NUDGE_PX;
+            }
+          }
           const xLeftPx = roomRect.x;
           const xRightPx = roomRect.x + roomRect.width;
 
@@ -204,7 +240,7 @@ export default function SpeakerPositionsOverlay({
               </text>
 
               <text
-                x={xPx}
+                x={xLabel}
                 y={yLine + 20}
                 textAnchor="middle"
                 fontSize={13}
