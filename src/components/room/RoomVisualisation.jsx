@@ -5220,10 +5220,25 @@ return (
           overflow: 'hidden',
           position: 'relative',
           zIndex: 1,
+          cursor: dragging && dragType !== 'speaker' && dragType !== 'seat' ? 'grabbing' : zoom > 1 ? 'grab' : 'default',
         }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onMouseDown={(e) => {
+          if (!dragging && zoom > 1 && e.target === svgRef.current) {
+            panDragStartRef.current = { x: e.clientX, y: e.clientY };
+            panStartPosRef.current = { x: panPxX, y: panPxY };
+          }
+        }}
+        onWheel={(e) => {
+          if (zoom > 1) {
+            e.preventDefault();
+            const clampMax = roomRect.width;
+            setPanPxX(prev => Math.max(-clampMax, Math.min(clampMax, prev - e.deltaX)));
+            setPanPxY(prev => Math.max(-clampMax, Math.min(clampMax, prev - e.deltaY)));
+          }
+        }}
       >
 <SvgDefs ids={ids} scale={scale} svgW={svgW} svgH={svgH} />
 
