@@ -5269,6 +5269,7 @@ return (
               <g
                 clipPath={`url(#${idsClip})`}
                 transform={
+                  `translate(${panPxX}, ${panPxY}) ` +
                   `translate(${zoomCenterX}, ${zoomCenterY}) ` +
                   `scale(${Number(zoom) || 1}) ` +
                   `translate(${-zoomCenterX}, ${-zoomCenterY})`
