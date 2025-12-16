@@ -725,6 +725,19 @@ export default function SpeakerPositionsOverlay({
     const xLeftPx = roomRect.x;
     const xRightPx = roomRect.x + roomRect.width;
 
+    // For clash avoidance with the LEFT vertical overhead ruler
+    const ICON_R_PX = 12;
+    const GAP_FROM_ICON_PX = 20;
+
+    // Match the vertical ruler positioning logic (dynamic, 20px off the left overhead icon edge)
+    const leftOverheadMinXPx = overheadLeft.length
+      ? Math.min(...overheadLeft.map(s => meterToCanvasX(s.position.x)))
+      : null;
+
+    const xLeftRuler = (leftOverheadMinXPx != null)
+      ? (leftOverheadMinXPx - ICON_R_PX - GAP_FROM_ICON_PX)
+      : null;
+
     return (
       <g data-layer="speaker-positions-overheads-horizontal" pointerEvents="none">
         {(() => {
@@ -774,6 +787,11 @@ export default function SpeakerPositionsOverlay({
               {row.items.map((it, idx) => {
                 const xPx = meterToCanvasX(it.xM);
 
+                // If this dot is close to the left vertical ruler, spread text out more to avoid clashes
+                const nearLeftRuler = (xLeftRuler != null) && (Math.abs(xPx - xLeftRuler) < 90);
+
+                const distTextY = yPx + (nearLeftRuler ? 20 : 12);
+
                 const leftDist = mToCm(it.xM);
                 const rightDist = mToCm(W - it.xM);
 
@@ -795,13 +813,18 @@ export default function SpeakerPositionsOverlay({
                   }
                 }
 
+                if (nearLeftRuler) {
+                  leftOffset = Math.max(leftOffset, 24);
+                  rightOffset = Math.max(rightOffset, 18);
+                }
+
                 return (
                   <g key={`oh-top-${idx}`}>
                     <circle cx={xPx} cy={yPx} r={5} fill={dotFill} />
 
                     <text
                       x={xPx - leftOffset}
-                      y={yPx + 12}
+                      y={distTextY}
                       textAnchor="end"
                       style={{ fontSize, fill: textFill }}
                     >
@@ -810,7 +833,7 @@ export default function SpeakerPositionsOverlay({
 
                     <text
                       x={xPx + rightOffset}
-                      y={yPx + 12}
+                      y={distTextY}
                       textAnchor="start"
                       style={{ fontSize, fill: textFill }}
                     >
