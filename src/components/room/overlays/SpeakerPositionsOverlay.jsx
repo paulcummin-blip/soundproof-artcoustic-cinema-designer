@@ -131,7 +131,7 @@ export default function SpeakerPositionsOverlay({
   const dotFill = "#213428";
   const textFill = "#1B1A1A";
 
-  // --- LCR RENDERER (stacked, pixel-based) ---
+  // --- LCR RENDERER (stacked lines, pixel-based) ---
   const renderLcrDims = () => {
     if (!lcr.length) return null;
 
@@ -154,7 +154,6 @@ export default function SpeakerPositionsOverlay({
 
           return (
             <g key={`lcr-dim-${role}-${i}`}>
-              {/* full width dimension line */}
               <line
                 x1={xLeftPx}
                 y1={yLine}
@@ -166,10 +165,8 @@ export default function SpeakerPositionsOverlay({
                 markerEnd="url(#spk-dim-arrow)"
               />
 
-              {/* centre dot exactly above speaker centre */}
               <circle cx={xPx} cy={yLine} r={5} fill="#213428" />
 
-              {/* left distance (left wall -> dot) */}
               <text
                 x={meterToCanvasX(xM / 2)}
                 y={yLine - 8}
@@ -180,7 +177,6 @@ export default function SpeakerPositionsOverlay({
                 {leftCm}cm
               </text>
 
-              {/* right distance (dot -> right wall) */}
               <text
                 x={meterToCanvasX(xM + (W - xM) / 2)}
                 y={yLine - 8}
@@ -191,7 +187,6 @@ export default function SpeakerPositionsOverlay({
                 {rightCm}cm
               </text>
 
-              {/* role (bold) centred at the dot */}
               <text
                 x={xPx}
                 y={yLine + 16}
@@ -203,7 +198,6 @@ export default function SpeakerPositionsOverlay({
                 {role}
               </text>
 
-              {/* model directly under the role (optional) */}
               {modelText ? (
                 <text
                   x={xPx}
@@ -217,7 +211,6 @@ export default function SpeakerPositionsOverlay({
                 </text>
               ) : null}
 
-              {/* height aligned under the RIGHT distance (not bold) */}
               <text
                 x={meterToCanvasX(xM + (W - xM) / 2)}
                 y={yLine + 16}
@@ -428,103 +421,6 @@ export default function SpeakerPositionsOverlay({
         </g>
       );
     });
-  };
-
-  // --- LCR RENDERER (stacked lines, pixel-based) ---
-  const renderLcrDims = () => {
-    if (!lcr.length) return null;
-
-    const baseY = roomRect.y - LCR_TOP_PAD_PX;
-
-    return (
-      <g data-layer="speaker-positions-lcr" pointerEvents="none">
-        {lcr.map((s, i) => {
-          const xM = s.position.x;
-          const role = String(s.role || "").toUpperCase();
-
-          const yLine = baseY - (i * LCR_STACK_GAP_PX);
-          const leftCm = mToCm(xM);
-          const rightCm = mToCm(W - xM);
-          const modelText = prettyModel(s.modelLabel || s.model);
-
-          const xPx = meterToCanvasX(xM);
-          const xLeftPx = roomRect.x;
-          const xRightPx = roomRect.x + roomRect.width;
-
-          return (
-            <g key={`lcr-dim-${role}-${i}`}>
-              <line
-                x1={xLeftPx}
-                y1={yLine}
-                x2={xRightPx}
-                y2={yLine}
-                stroke="#DCDBD6"
-                strokeWidth={2}
-                markerStart="url(#spk-dim-arrow)"
-                markerEnd="url(#spk-dim-arrow)"
-              />
-
-              <circle cx={xPx} cy={yLine} r={5} fill="#213428" />
-
-              <text
-                x={meterToCanvasX(xM / 2)}
-                y={yLine - 8}
-                textAnchor="middle"
-                fontSize={12}
-                fill="#1B1A1A"
-              >
-                {leftCm}cm
-              </text>
-
-              <text
-                x={meterToCanvasX(xM + (W - xM) / 2)}
-                y={yLine - 8}
-                textAnchor="middle"
-                fontSize={12}
-                fill="#1B1A1A"
-              >
-                {rightCm}cm
-              </text>
-
-              <text
-                x={xPx}
-                y={yLine + 16}
-                textAnchor="middle"
-                fontSize={13}
-                fill="#1B1A1A"
-                fontWeight={700}
-              >
-                {role}
-              </text>
-
-              {modelText ? (
-                <text
-                  x={xPx}
-                  y={yLine + 28}
-                  textAnchor="middle"
-                  fontSize={12}
-                  fill="#3E4349"
-                  fontWeight={400}
-                >
-                  {modelText}
-                </text>
-              ) : null}
-
-              <text
-                x={meterToCanvasX(xM + (W - xM) / 2)}
-                y={yLine + 16}
-                textAnchor="middle"
-                fontSize={12}
-                fill="#3E4349"
-                fontWeight={400}
-              >
-                H{mToCm(bedHeightM(s.position.y))}cm
-              </text>
-            </g>
-          );
-        })}
-      </g>
-    );
   };
 
   return (
