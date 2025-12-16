@@ -5171,7 +5171,7 @@ const renderRp22AnglesOverlay = useCallback(() => {
 // --- Main render ---
 // SAFETY: local fallbacks in case parent metrics/ids are not initialised yet
 const svgWSafe = Number(svgW) || Math.max(1, Number(roomRect?.width)  || 1200);
-const svgHSafe = Number(svgH) || Math.max(1, Number(roomRect?.height) || 800);
+const svgHSafe = (Number(svgH) || Math.max(1, Number(roomRect?.height) || 800)) + BOTTOM_GUTTER_PX;
 const idsGrid = (ids && ids.grid) ? ids.grid : 'b44_grid_fallback';
 const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
 
