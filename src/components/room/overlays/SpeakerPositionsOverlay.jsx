@@ -438,34 +438,40 @@ export default function SpeakerPositionsOverlay({
             }
           }
 
+          const dotX = rulerXpx;
+          const dotY = yPx;
+          const dx = 14; // distance from ruler line
+          const yTop = dotY - 14; // above the dot
+          const yBot = dotY + 14; // below the dot
+
           return (
             <g key={`right-dim-${s.role}-${idx}`}>
-              <circle cx={rulerXpx} cy={yPx} r={5} fill={dotFill} />
+              <circle cx={dotX} cy={dotY} r={5} fill={dotFill} />
 
-              {/* Top distance (rotated, close to dot like LCR) */}
+              {/* Top distance (tight to dot, above) */}
               <text
-                x={rulerXpx + 14}
-                y={meterToCanvasY(s.yM / 2)}
-                textAnchor="start"
-                transform={`rotate(-90, ${rulerXpx + 14}, ${meterToCanvasY(s.yM / 2)})`}
+                x={dotX + dx}
+                y={yTop}
+                textAnchor="middle"
+                transform={`rotate(-90, ${dotX + dx}, ${yTop})`}
                 style={{ fontSize, fill: textFill }}
               >
                 {topDistCm}cm
               </text>
 
-              {/* Bottom distance (rotated, close to dot like LCR) */}
+              {/* Bottom distance (tight to dot, below) */}
               <text
-                x={rulerXpx + 14}
-                y={meterToCanvasY((s.yM + L) / 2)}
-                textAnchor="start"
-                transform={`rotate(-90, ${rulerXpx + 14}, ${meterToCanvasY((s.yM + L) / 2)})`}
+                x={dotX + dx}
+                y={yBot}
+                textAnchor="middle"
+                transform={`rotate(-90, ${dotX + dx}, ${yBot})`}
                 style={{ fontSize, fill: textFill }}
               >
                 {bottomDistCm}cm
               </text>
 
               {/* Role and height (rotated, matching LCR layout: role centred, H to the right) */}
-              <g transform={`translate(${rulerXpx + SIDE_LABEL_PAD_PX}, ${yPx + labelNudge}) rotate(-90)`}>
+              <g transform={`translate(${dotX + SIDE_LABEL_PAD_PX}, ${dotY + labelNudge}) rotate(-90)`}>
                 <text
                   x={0}
                   y={4}
