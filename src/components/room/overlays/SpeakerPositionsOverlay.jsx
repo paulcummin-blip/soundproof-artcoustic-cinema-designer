@@ -30,13 +30,16 @@ const prettyModel = (raw) => {
     .join(" ");
 };
 
-// Lane spacing constants for surrounds
-const LANE_GAP_PX = 28; // match LCR spacing for consistency
-const TOP_CLEAR_M = 0.22;
+// Spacing constants (px)
+const LCR_STACK_GAP_PX = 26;
+const LCR_LINE_TO_TEXT_PX = 14;
+const LCR_SIDE_TEXT_GAP_PX = 18;
+const LCR_TOP_PAD_PX = 54;
 
-// LCR stacking constants
-const LCR_STACK_GAP_PX = 28; // more breathing room
-const LCR_TOP_PAD_PX = 28;
+// Side wall constants
+const SIDE_LABEL_PAD_PX = 26;
+const SIDE_STACK_GAP_PX = 34;
+const TOP_CLEAR_M = 0.22;
 
 export default function SpeakerPositionsOverlay({
   speakers = [],
@@ -251,7 +254,7 @@ export default function SpeakerPositionsOverlay({
       let isHorizontal;
 
       if (wall === "front") {
-        const stackOffset = laneIndex * LANE_GAP_PX;
+        const stackOffset = laneIndex * SIDE_STACK_GAP_PX;
         const rulerYpx = roomRect.y - TOP_CLEAR_M * scale - stackOffset;
         lineX1 = xLeftPx;
         lineY1 = rulerYpx;
@@ -263,7 +266,7 @@ export default function SpeakerPositionsOverlay({
         rightDistCm = mToCm(W - xM);
         isHorizontal = true;
       } else if (wall === "back") {
-        const stackOffset = laneIndex * LANE_GAP_PX;
+        const stackOffset = laneIndex * SIDE_STACK_GAP_PX;
         const rulerYpx = roomRect.y + roomRect.height + (TOP_CLEAR_M * scale) + stackOffset;
         lineX1 = xLeftPx;
         lineY1 = rulerYpx;
@@ -275,7 +278,7 @@ export default function SpeakerPositionsOverlay({
         rightDistCm = mToCm(W - xM);
         isHorizontal = true;
       } else if (wall === "left") {
-        const stackOffset = laneIndex * LANE_GAP_PX;
+        const stackOffset = laneIndex * SIDE_STACK_GAP_PX;
         const rulerXpx = roomRect.x - (TOP_CLEAR_M * scale) - stackOffset;
         lineX1 = rulerXpx;
         lineY1 = yTopPx;
@@ -287,7 +290,7 @@ export default function SpeakerPositionsOverlay({
         bottomDistCm = mToCm(L - yM);
         isHorizontal = false;
       } else {
-        const stackOffset = laneIndex * LANE_GAP_PX;
+        const stackOffset = laneIndex * SIDE_STACK_GAP_PX;
         const rulerXpx = roomRect.x + roomRect.width + (TOP_CLEAR_M * scale) + stackOffset;
         lineX1 = rulerXpx;
         lineY1 = yTopPx;
@@ -390,9 +393,9 @@ export default function SpeakerPositionsOverlay({
                 {bottomDistCm}cm
               </text>
 
-              <g transform={`rotate(-90, ${dotX + 16}, ${dotY})`}>
+              <g transform={`rotate(-90, ${wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}, ${dotY})`}>
                 <text
-                  x={dotX + 16}
+                  x={wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}
                   y={dotY + 4}
                   textAnchor="middle"
                   style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
@@ -402,7 +405,7 @@ export default function SpeakerPositionsOverlay({
 
                 {!!modelText && (
                   <text
-                    x={dotX + 16}
+                    x={wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}
                     y={dotY + 16}
                     textAnchor="middle"
                     style={{ fontSize: 11, fill: textFill, fontWeight: 400 }}
@@ -412,7 +415,7 @@ export default function SpeakerPositionsOverlay({
                 )}
 
                 <text
-                  x={dotX + 16}
+                  x={wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}
                   y={dotY + 28}
                   textAnchor="middle"
                   style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
