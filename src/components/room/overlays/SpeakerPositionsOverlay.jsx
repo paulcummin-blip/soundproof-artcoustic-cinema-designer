@@ -31,11 +31,11 @@ const prettyModel = (raw) => {
 };
 
 // Lane spacing constants for surrounds
-const LANE_GAP_M = 0.18;
+const LANE_GAP_PX = 28; // match LCR spacing for consistency
 const TOP_CLEAR_M = 0.22;
 
 // LCR stacking constants
-const LCR_STACK_GAP_PX = 18;
+const LCR_STACK_GAP_PX = 28; // more breathing room
 const LCR_TOP_PAD_PX = 28;
 
 export default function SpeakerPositionsOverlay({
@@ -232,6 +232,8 @@ export default function SpeakerPositionsOverlay({
   const renderSurroundDims = () => {
     if (!speakersWithLanes.length) return null;
 
+    const scale = roomRect.width / W;
+
     return speakersWithLanes.map((s, idx) => {
       const { xM, yM, role, wall, laneIndex } = s;
       const hCm = mToCm(bedHeightM(yM));
@@ -244,13 +246,13 @@ export default function SpeakerPositionsOverlay({
       const yTopPx = roomRect.y;
       const yBottomPx = roomRect.y + roomRect.height;
 
-      let rulerYm, rulerXm, lineX1, lineY1, lineX2, lineY2, dotX, dotY;
+      let lineX1, lineY1, lineX2, lineY2, dotX, dotY;
       let leftDistCm, rightDistCm, topDistCm, bottomDistCm;
       let isHorizontal;
 
       if (wall === "front") {
-        rulerYm = -TOP_CLEAR_M - (laneIndex * LANE_GAP_M);
-        const rulerYpx = meterToCanvasY(rulerYm);
+        const stackOffset = laneIndex * LANE_GAP_PX;
+        const rulerYpx = roomRect.y - TOP_CLEAR_M * scale - stackOffset;
         lineX1 = xLeftPx;
         lineY1 = rulerYpx;
         lineX2 = xRightPx;
@@ -261,8 +263,8 @@ export default function SpeakerPositionsOverlay({
         rightDistCm = mToCm(W - xM);
         isHorizontal = true;
       } else if (wall === "back") {
-        rulerYm = L + TOP_CLEAR_M + (laneIndex * LANE_GAP_M);
-        const rulerYpx = meterToCanvasY(rulerYm);
+        const stackOffset = laneIndex * LANE_GAP_PX;
+        const rulerYpx = roomRect.y + roomRect.height + (TOP_CLEAR_M * scale) + stackOffset;
         lineX1 = xLeftPx;
         lineY1 = rulerYpx;
         lineX2 = xRightPx;
@@ -273,8 +275,8 @@ export default function SpeakerPositionsOverlay({
         rightDistCm = mToCm(W - xM);
         isHorizontal = true;
       } else if (wall === "left") {
-        rulerXm = -TOP_CLEAR_M - (laneIndex * LANE_GAP_M);
-        const rulerXpx = meterToCanvasX(rulerXm);
+        const stackOffset = laneIndex * LANE_GAP_PX;
+        const rulerXpx = roomRect.x - (TOP_CLEAR_M * scale) - stackOffset;
         lineX1 = rulerXpx;
         lineY1 = yTopPx;
         lineX2 = rulerXpx;
@@ -285,8 +287,8 @@ export default function SpeakerPositionsOverlay({
         bottomDistCm = mToCm(L - yM);
         isHorizontal = false;
       } else {
-        rulerXm = W + TOP_CLEAR_M + (laneIndex * LANE_GAP_M);
-        const rulerXpx = meterToCanvasX(rulerXm);
+        const stackOffset = laneIndex * LANE_GAP_PX;
+        const rulerXpx = roomRect.x + roomRect.width + (TOP_CLEAR_M * scale) + stackOffset;
         lineX1 = rulerXpx;
         lineY1 = yTopPx;
         lineX2 = rulerXpx;
@@ -388,34 +390,36 @@ export default function SpeakerPositionsOverlay({
                 {bottomDistCm}cm
               </text>
 
-              <text
-                x={dotX + 10}
-                y={dotY + 4}
-                textAnchor="start"
-                style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
-              >
-                {roleText}
-              </text>
-
-              {!!modelText && (
+              <g transform={`rotate(-90, ${dotX + 16}, ${dotY})`}>
                 <text
-                  x={dotX + 10}
-                  y={dotY + 16}
-                  textAnchor="start"
-                  style={{ fontSize: 11, fill: textFill, fontWeight: 400 }}
+                  x={dotX + 16}
+                  y={dotY + 4}
+                  textAnchor="middle"
+                  style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
                 >
-                  {modelText}
+                  {roleText}
                 </text>
-              )}
 
-              <text
-                x={dotX + 10}
-                y={dotY + 28}
-                textAnchor="start"
-                style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
-              >
-                {heightText}
-              </text>
+                {!!modelText && (
+                  <text
+                    x={dotX + 16}
+                    y={dotY + 16}
+                    textAnchor="middle"
+                    style={{ fontSize: 11, fill: textFill, fontWeight: 400 }}
+                  >
+                    {modelText}
+                  </text>
+                )}
+
+                <text
+                  x={dotX + 16}
+                  y={dotY + 28}
+                  textAnchor="middle"
+                  style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
+                >
+                  {heightText}
+                </text>
+              </g>
             </>
           )}
         </g>
