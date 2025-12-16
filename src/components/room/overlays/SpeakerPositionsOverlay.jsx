@@ -280,6 +280,13 @@ export default function SpeakerPositionsOverlay({
     const fontSize = calcFontSize(11, roomRect.width);
     const roleFontSize = calcFontSize(12, roomRect.width);
 
+    // Keep rear speaker ID/H spacing consistent (not glued to the back wall)
+    const wallYpx = roomRect.y + roomRect.height;
+    const labelYpx = wallYpx + 16;
+
+    // Keep rear distances visible even when the ruler line is near the bottom
+    const distTextY = Math.min(rulerYpx + 12, wallYpx + 34);
+
     return (
       <g data-layer="speaker-positions-back" pointerEvents="none">
         {/* Single dimension line for back wall */}
@@ -297,10 +304,11 @@ export default function SpeakerPositionsOverlay({
         {/* Dots and labels for each speaker */}
         {backGroup.map((s, idx) => {
           const xPx = meterToCanvasX(s.xM);
-          const yIconPx = meterToCanvasY(s.yM);
+
           const leftDistCm = mToCm(s.xM);
           const rightDistCm = mToCm(W - s.xM);
-          const hCm = mToCm(bedHeightM());
+
+          const hCm = mToCm(bedHeightM(s.yM)); // FIX: pass yM
 
           // Check for close neighbors
           let leftOffset = 14;
@@ -326,40 +334,39 @@ export default function SpeakerPositionsOverlay({
             <g key={`back-dim-${s.role}-${idx}`}>
               <circle cx={xPx} cy={rulerYpx} r={5} fill={dotFill} />
 
-              {/* Left distance */}
+              {/* Left distance (below the line, kept visible) */}
               <text
                 x={xPx - leftOffset}
-                y={rulerYpx + 12}
+                y={distTextY}
                 textAnchor="end"
                 style={{ fontSize, fill: textFill }}
               >
                 {leftDistCm}cm
               </text>
 
-              {/* Right distance */}
+              {/* Right distance (below the line, kept visible) */}
               <text
                 x={xPx + rightOffset}
-                y={rulerYpx + 12}
+                y={distTextY}
                 textAnchor="start"
                 style={{ fontSize, fill: textFill }}
               >
                 {rightDistCm}cm
               </text>
 
-              {/* Role centred under the speaker icon */}
+              {/* Role + H: same consistent gap as LCR/sides */}
               <text
                 x={xPx}
-                y={yIconPx + 16}
+                y={labelYpx}
                 textAnchor="middle"
                 style={{ fontSize: roleFontSize, fill: textFill, fontWeight: 700 }}
               >
                 {s.role}
               </text>
 
-              {/* Height to the right of the role */}
               <text
                 x={xPx + 18}
-                y={yIconPx + 16}
+                y={labelYpx}
                 textAnchor="start"
                 style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
               >
