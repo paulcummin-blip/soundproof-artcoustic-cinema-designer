@@ -400,56 +400,53 @@ export default function SpeakerPositionsOverlay({
               </text>
             </>
           ) : (
-            <>
-              {/* distances close to the dot (above / below), not mid-wall */}
+            <g
+              transform={
+                wall === "left"
+                  ? `translate(${dotX - SIDE_LABEL_PAD_PX}, ${dotY}) rotate(-90)`
+                  : `translate(${dotX + SIDE_LABEL_PAD_PX}, ${dotY}) rotate(-90)`
+              }
+            >
+              {/* top distance (front of room) - left of dot in rotated space */}
               <text
-                x={wall === "left" ? dotX - 14 : dotX + 14}
-                y={dotY - 8}
-                textAnchor={wall === "left" ? "end" : "start"}
+                x={-14}
+                y={-8}
+                textAnchor="end"
                 style={{ fontSize: 12, fill: textFill }}
               >
                 {topDistCm}cm
               </text>
 
+              {/* bottom distance (back of room) - right of dot in rotated space */}
               <text
-                x={wall === "left" ? dotX - 14 : dotX + 14}
-                y={dotY + 18}
-                textAnchor={wall === "left" ? "end" : "start"}
+                x={14}
+                y={-8}
+                textAnchor="start"
                 style={{ fontSize: 12, fill: textFill }}
               >
                 {bottomDistCm}cm
               </text>
 
-              {/* speaker label "under" the dot in the rotated orientation, with H next to it */}
-              <g
-                transform={
-                  wall === "left"
-                    ? `translate(${dotX - SIDE_LABEL_PAD_PX}, ${dotY}) rotate(-90)`
-                    : `translate(${dotX + SIDE_LABEL_PAD_PX}, ${dotY}) rotate(-90)`
-                }
+              {/* Role centered under dot */}
+              <text
+                x={0}
+                y={16}
+                textAnchor="middle"
+                style={{ fontSize: 13, fill: textFill, fontWeight: 700 }}
               >
-                {/* role centred under dot */}
-                <text
-                  x={0}
-                  y={0}
-                  textAnchor="middle"
-                  style={{ fontSize: 13, fill: textFill, fontWeight: 700 }}
-                >
-                  {roleText}
-                </text>
+                {roleText}
+              </text>
 
-                {/* H value next to role, same style as dims */}
-                <text
-                  x={0}
-                  y={0}
-                  dx={wall === "left" ? -22 : 22}
-                  textAnchor={wall === "left" ? "end" : "start"}
-                  style={{ fontSize: 12, fill: "#3E4349", fontWeight: 400 }}
-                >
-                  {heightText}
-                </text>
-              </g>
-            </>
+              {/* Height to the right of role */}
+              <text
+                x={18}
+                y={16}
+                textAnchor="start"
+                style={{ fontSize: 12, fill: "#3E4349", fontWeight: 400 }}
+              >
+                {heightText}
+              </text>
+            </g>
           )}
         </g>
       );
