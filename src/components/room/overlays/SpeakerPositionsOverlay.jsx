@@ -154,87 +154,83 @@ export default function SpeakerPositionsOverlay({
   // Helper for distance formatting
   const cm = (m) => `${mToCm(m)}cm`;
 
-  // --- LCR RENDERER (stacked lines, pixel-based) ---
-  const renderLcrDims = () => {
+  // --- FRONT WALL RENDERER (single line, multiple dots) ---
+  const renderFrontDims = () => {
     if (!lcr.length) return null;
 
-    // Auto lane spacing so we never clip off the top of the SVG
-    const lcrCount = lcr.length;
+    const yLine = roomRect.y - LCR_TOP_PAD_PX;
+    const xLeftPx = roomRect.x;
+    const xRightPx = roomRect.x + roomRect.width;
 
-    // How much vertical room exists ABOVE the room?
-    const availableAbovePx = Math.max(0, (roomRect.y - LCR_TOP_SAFE_PX) - LCR_TOP_PAD_PX);
-
-    // If we have enough room, use a "nice" gap. If not, compress.
-    const idealGap = LCR_MAX_STACK_GAP_PX;
-    const maxGapThatFits = lcrCount <= 1 ? idealGap : (availableAbovePx / (lcrCount - 1));
-    const laneGapPx = Math.max(LCR_MIN_STACK_GAP_PX, Math.min(idealGap, maxGapThatFits));
-
-    // Base Y is fixed, then lanes stack upwards by laneGapPx.
-    // If laneGapPx has been compressed, this guarantees top-most line stays visible.
-    const baseY = roomRect.y - LCR_TOP_PAD_PX;
+    // Calculate font size based on spacing
+    const xPositions = lcr.map(s => meterToCanvasX(s.position.x));
+    const fontSize = calcFontSize(xPositions, xLeftPx, xRightPx);
+    const roleFontSize = fontSize + 1;
 
     return (
-      <g data-layer="speaker-positions-lcr" pointerEvents="none">
+      <g data-layer="speaker-positions-front" pointerEvents="none">
+        {/* Single dimension line for front wall */}
+        <line
+          x1={xLeftPx}
+          y1={yLine}
+          x2={xRightPx}
+          y2={yLine}
+          stroke="#DCDBD6"
+          strokeWidth={2}
+          markerStart="url(#spk-dim-arrow)"
+          markerEnd="url(#spk-dim-arrow)"
+        />
+
+        {/* Dots and labels for each speaker */}
         {lcr.map((s, i) => {
           const xM = s.position.x;
           const role = String(s.role || "").toUpperCase();
-
-          const yLine = baseY - (i * laneGapPx);
+          const xPx = meterToCanvasX(xM);
           const leftCm = mToCm(xM);
           const rightCm = mToCm(W - xM);
 
-          const xPx = meterToCanvasX(xM);
+          // Check for close neighbors to adjust text offset
+          let leftOffset = 14;
+          let rightOffset = 14;
           
-          // Small nudge if two adjacent LCR x positions are close in screen pixels
-          let xLabel = xPx;
-
           const prev = lcr[i - 1];
           if (prev) {
             const prevXPx = meterToCanvasX(prev.position.x);
-            if (Math.abs(xPx - prevXPx) < 48) {
-              xLabel = xPx + LCR_LABEL_NUDGE_PX;
+            if (Math.abs(xPx - prevXPx) < 40) {
+              leftOffset = 10;
+              rightOffset = 10;
             }
           }
 
           const next = lcr[i + 1];
           if (next) {
             const nextXPx = meterToCanvasX(next.position.x);
-            if (Math.abs(xPx - nextXPx) < 48) {
-              xLabel = xPx - LCR_LABEL_NUDGE_PX;
+            if (Math.abs(xPx - nextXPx) < 40) {
+              leftOffset = 10;
+              rightOffset = 10;
             }
           }
-          const xLeftPx = roomRect.x;
-          const xRightPx = roomRect.x + roomRect.width;
 
           return (
-            <g key={`lcr-dim-${role}-${i}`}>
-              <line
-                x1={xLeftPx}
-                y1={yLine}
-                x2={xRightPx}
-                y2={yLine}
-                stroke="#DCDBD6"
-                strokeWidth={2}
-                markerStart="url(#spk-dim-arrow)"
-                markerEnd="url(#spk-dim-arrow)"
-              />
-
+            <g key={`front-dim-${role}-${i}`}>
               <circle cx={xPx} cy={yLine} r={5} fill="#213428" />
 
-              {/* distances close to the dot */}
+              {/* Left distance */}
               <text
-                x={xPx - 14}
+                x={xPx - leftOffset}
                 y={yLine - 8}
                 textAnchor="end"
-                style={{ fontSize: 12, fill: "#1B1A1A" }}
+                style={{ fontSize, fill: "#1B1A1A" }}
               >
                 {leftCm}cm
               </text>
+
+              {/* Right distance */}
               <text
-                x={xPx + 14}
+                x={xPx + rightOffset}
                 y={yLine - 8}
                 textAnchor="start"
-                style={{ fontSize: 12, fill: "#1B1A1A" }}
+                style={{ fontSize, fill: "#1B1A1A" }}
               >
                 {rightCm}cm
               </text>
@@ -244,20 +240,221 @@ export default function SpeakerPositionsOverlay({
                 x={xPx}
                 y={yLine + 16}
                 textAnchor="middle"
-                style={{ fontSize: 13, fill: "#1B1A1A", fontWeight: 700 }}
+                style={{ fontSize: roleFontSize, fill: "#1B1A1A", fontWeight: 700 }}
               >
                 {role}
               </text>
 
-              {/* Height to the right of the role (same line, not bold) */}
+              {/* Height to the right of the role */}
               <text
                 x={xPx + 18}
                 y={yLine + 16}
                 textAnchor="start"
-                style={{ fontSize: 12, fill: "#3E4349", fontWeight: 400 }}
+                style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
               >
                 {`H${mToCm(bedHeightM(s.position.y))}cm`}
               </text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  };
+
+  // --- BACK WALL RENDERER (single line, multiple dots) ---
+  const renderBackDims = () => {
+    if (!backGroup.length) return null;
+
+    const scale = roomRect.width / W;
+    const rulerYpx = roomRect.y + roomRect.height + (TOP_CLEAR_M * scale);
+
+    const xLeftPx = roomRect.x;
+    const xRightPx = roomRect.x + roomRect.width;
+
+    // Calculate font size
+    const xPositions = backGroup.map(s => meterToCanvasX(s.xM));
+    const fontSize = calcFontSize(xPositions, xLeftPx, xRightPx);
+    const roleFontSize = fontSize + 1;
+
+    return (
+      <g data-layer="speaker-positions-back" pointerEvents="none">
+        {/* Single dimension line for back wall */}
+        <line
+          x1={xLeftPx}
+          y1={rulerYpx}
+          x2={xRightPx}
+          y2={rulerYpx}
+          stroke={stroke}
+          strokeWidth={2}
+          markerStart="url(#spk-dim-arrow)"
+          markerEnd="url(#spk-dim-arrow)"
+        />
+
+        {/* Dots and labels for each speaker */}
+        {backGroup.map((s, idx) => {
+          const xPx = meterToCanvasX(s.xM);
+          const leftDistCm = mToCm(s.xM);
+          const rightDistCm = mToCm(W - s.xM);
+          const hCm = mToCm(bedHeightM(s.yM));
+
+          // Check for close neighbors
+          let leftOffset = 14;
+          let rightOffset = 14;
+          
+          if (idx > 0) {
+            const prevXPx = meterToCanvasX(backGroup[idx - 1].xM);
+            if (Math.abs(xPx - prevXPx) < 40) {
+              leftOffset = 10;
+              rightOffset = 10;
+            }
+          }
+
+          if (idx < backGroup.length - 1) {
+            const nextXPx = meterToCanvasX(backGroup[idx + 1].xM);
+            if (Math.abs(xPx - nextXPx) < 40) {
+              leftOffset = 10;
+              rightOffset = 10;
+            }
+          }
+
+          return (
+            <g key={`back-dim-${s.role}-${idx}`}>
+              <circle cx={xPx} cy={rulerYpx} r={5} fill={dotFill} />
+
+              {/* Left distance */}
+              <text
+                x={xPx - leftOffset}
+                y={rulerYpx - 8}
+                textAnchor="end"
+                style={{ fontSize, fill: textFill }}
+              >
+                {leftDistCm}cm
+              </text>
+
+              {/* Right distance */}
+              <text
+                x={xPx + rightOffset}
+                y={rulerYpx - 8}
+                textAnchor="start"
+                style={{ fontSize, fill: textFill }}
+              >
+                {rightDistCm}cm
+              </text>
+
+              {/* Role centred under the dot */}
+              <text
+                x={xPx}
+                y={rulerYpx + 16}
+                textAnchor="middle"
+                style={{ fontSize: roleFontSize, fill: textFill, fontWeight: 700 }}
+              >
+                {s.role}
+              </text>
+
+              {/* Height to the right of the role */}
+              <text
+                x={xPx + 18}
+                y={rulerYpx + 16}
+                textAnchor="start"
+                style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
+              >
+                {`H${hCm}cm`}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  };
+
+  // --- RIGHT WALL RENDERER (single line, multiple dots) ---
+  const renderRightDims = () => {
+    if (!rightGroup.length) return null;
+
+    const scale = roomRect.width / W;
+    const rulerXpx = roomRect.x + roomRect.width + (TOP_CLEAR_M * scale);
+
+    const yTopPx = roomRect.y;
+    const yBottomPx = roomRect.y + roomRect.height;
+
+    // Calculate font size based on vertical spacing
+    const yPositions = rightGroup.map(s => meterToCanvasY(s.yM));
+    const fontSize = calcFontSize(yPositions, yTopPx, yBottomPx);
+
+    return (
+      <g data-layer="speaker-positions-right" pointerEvents="none">
+        {/* Single dimension line for right wall */}
+        <line
+          x1={rulerXpx}
+          y1={yTopPx}
+          x2={rulerXpx}
+          y2={yBottomPx}
+          stroke={stroke}
+          strokeWidth={2}
+          markerStart="url(#spk-dim-arrow)"
+          markerEnd="url(#spk-dim-arrow)"
+        />
+
+        {/* Dots and labels for each speaker */}
+        {rightGroup.map((s, idx) => {
+          const yPx = meterToCanvasY(s.yM);
+          const topDistCm = mToCm(s.yM);
+          const bottomDistCm = mToCm(L - s.yM);
+          const hCm = mToCm(bedHeightM(s.yM));
+
+          // Check for close neighbors to adjust label position
+          let labelNudge = 0;
+          
+          if (idx > 0) {
+            const prevYPx = meterToCanvasY(rightGroup[idx - 1].yM);
+            if (Math.abs(yPx - prevYPx) < 50) {
+              labelNudge = 4;
+            }
+          }
+
+          return (
+            <g key={`right-dim-${s.role}-${idx}`}>
+              <circle cx={rulerXpx} cy={yPx} r={5} fill={dotFill} />
+
+              {/* Top distance (rotated) */}
+              <text
+                x={rulerXpx - 12}
+                y={meterToCanvasY(s.yM / 2)}
+                textAnchor="middle"
+                transform={`rotate(-90, ${rulerXpx - 12}, ${meterToCanvasY(s.yM / 2)})`}
+                style={{ fontSize, fill: textFill }}
+              >
+                {topDistCm}cm
+              </text>
+
+              {/* Bottom distance (rotated) */}
+              <text
+                x={rulerXpx - 12}
+                y={meterToCanvasY((s.yM + L) / 2)}
+                textAnchor="middle"
+                transform={`rotate(-90, ${rulerXpx - 12}, ${meterToCanvasY((s.yM + L) / 2)})`}
+                style={{ fontSize, fill: textFill }}
+              >
+                {bottomDistCm}cm
+              </text>
+
+              {/* Role and height (rotated, to the right of the dot) */}
+              <g transform={`rotate(-90, ${rulerXpx - SIDE_LABEL_PAD_PX}, ${yPx + labelNudge})`}>
+                <text
+                  x={rulerXpx - SIDE_LABEL_PAD_PX}
+                  y={yPx + 4 + labelNudge}
+                  textAnchor="middle"
+                  style={{ fontSize, fill: textFill, fontWeight: 700 }}
+                >
+                  {s.role}
+                  <tspan
+                    dx={8}
+                    style={{ fontWeight: 400, fill: "#3E4349" }}
+                  >
+                    {`H${hCm}cm`}
+                  </tspan>
+                </text>
+              </g>
             </g>
           );
         })}
@@ -460,8 +657,9 @@ export default function SpeakerPositionsOverlay({
         </marker>
       </defs>
 
-      {renderLcrDims()}
-      {renderSurroundDims()}
+      {renderFrontDims()}
+      {renderRightDims()}
+      {renderBackDims()}
     </g>
   );
 }
