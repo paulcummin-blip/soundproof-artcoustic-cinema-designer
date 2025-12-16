@@ -31,7 +31,7 @@ const prettyModel = (raw) => {
 };
 
 // Spacing constants (px)
-const LCR_STACK_GAP_PX = 26;
+const LCR_STACK_GAP_PX = 52;
 const LCR_LINE_TO_TEXT_PX = 14;
 const LCR_SIDE_TEXT_GAP_PX = 18;
 const LCR_TOP_PAD_PX = 54;
