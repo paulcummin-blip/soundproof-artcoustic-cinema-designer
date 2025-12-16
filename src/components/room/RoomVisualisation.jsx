@@ -515,7 +515,6 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const hudPosition = hudBasePosPx;
   const planBoundsRef = useRef(null);
   const svgRef = useRef(null);
-  const zoomGroupRef = useRef(null);
   const slsrModeRef = React.useRef('side');
   const rearModeRef = React.useRef('back');
   const lastInteractionEpoch = React.useRef(0);
@@ -1385,7 +1384,8 @@ React.useEffect(() => {
     }
     */
   }, [
-    // REMOVED: enableFrontWides, frontWideZones (overlay visibility must not reset positions)
+    enableFrontWides,
+    frontWideZones,
     placedSpeakers,
     widthM,
     lengthM,
@@ -1557,9 +1557,8 @@ React.useEffect(() => {
               height={baffleH}
               fill="none" 
               stroke="#4A230F" 
-              strokeWidth="1" 
-              strokeDasharray="4 6" 
-              opacity="0.55"
+              strokeWidth="1.5" 
+              strokeDasharray="6 6" 
               pointerEvents="none" 
             />
             
@@ -1570,9 +1569,8 @@ React.useEffect(() => {
               x2={xVisibleL}
               y2={screenPlaneY}
               stroke="#4A230F"
-              strokeWidth="1"
-              strokeDasharray="4 6"
-              opacity="0.55"
+              strokeWidth="1.5"
+              strokeDasharray="6 6"
               pointerEvents="none"
             />
             <line
@@ -1581,9 +1579,8 @@ React.useEffect(() => {
               x2={xVisibleR}
               y2={screenPlaneY}
               stroke="#4A230F"
-              strokeWidth="1"
-              strokeDasharray="4 6"
-              opacity="0.55"
+              strokeWidth="1.5"
+              strokeDasharray="6 6"
               pointerEvents="none"
             />
           </>
@@ -2392,27 +2389,21 @@ React.useEffect(() => {
     );
   }, [onSetSeatingPositions, canvasToRoom]);
 
-  // Mouse handling with CTM guard - ROBUST coordinate mapping through zoom
+  // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
 
-    if (!svgRef.current || !zoomGroupRef.current) return;
-    
-    // Step 1: Client coords → SVG root coords
+    if (!svgRef.current) return;
     const svgElement = svgRef.current;
     const point = svgElement.createSVGPoint();
     point.x = e.clientX;
     point.y = e.clientY;
     const ctm = svgElement.getScreenCTM();
     if (!ctm) return;
-    const svgRootPoint = point.matrixTransform(ctm.inverse());
-    
-    // Step 2: SVG root coords → Zoom group local coords
-    const zoomCTM = zoomGroupRef.current.getCTM();
-    if (!zoomCTM) return;
-    const svgPoint = svgRootPoint.matrixTransform(zoomCTM.inverse());
+    const inverseCTM = ctm.inverse();
+    const svgPoint = point.matrixTransform(inverseCTM);
 
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
     console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
@@ -4925,9 +4916,8 @@ return {
               fill="rgba(0,0,0,0)"
               pointerEvents="all"
               stroke="#213428"
-              strokeWidth={seat.isPrimary ? 2 : isPinned ? 1.5 : 1}
+              strokeWidth={seat.isPrimary ? 2.5 : isPinned ? 2 : 1}
               strokeDasharray={isPinned ? '4 2' : 'none'}
-              opacity={seat.isPrimary ? 0.85 : 0.75}
               style={{ cursor: 'pointer' }}
               aria-label="Seat — hover for RP23 and P1 analysis"
               onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
@@ -4958,11 +4948,11 @@ return {
         <circle
           cx={x}
           cy={y}
-          r={3}
+          r={4}
           fill="#22c55e"
           stroke="#ffffff"
-          strokeWidth={1.5}
-          opacity={0.85}
+          strokeWidth={2}
+          opacity={0.9}
         />
       </g>
     );
@@ -5226,30 +5216,14 @@ return (
 
 {/* Removed debug label (zoneKeysLabel) */}
 
-          {/* ZOOM GROUP — CLIPPED TO VIEWPORT, CENTERED ON ROOM RECT */}
+          {/* ZOOM GROUP — CLIPPED TO VIEWPORT, SO IT CAN'T ESCAPE */}
           <g
-              ref={zoomGroupRef}
               clipPath={`url(#${idsClip})`}
-              transform={(() => {
-                const z = Number(zoom) || 1;
-                
-                // room centre (in SVG px space)
-                const cx = (roomRect?.x || 0) + (roomRect?.width || 0) / 2;
-                const cy = (roomRect?.y || 0) + (roomRect?.height || 0) / 2;
-                
-                // viewport centre (in SVG px space)
-                const vx = (svgWSafe || 0) / 2;
-                const vy = (svgHSafe || 0) / 2;
-                
-                // 1) move room centre to viewport centre
-                // 2) zoom around room centre
-                return (
-                  `translate(${vx - cx}, ${vy - cy}) ` +
-                  `translate(${cx}, ${cy}) ` +
-                  `scale(${z}) ` +
-                  `translate(${-cx}, ${-cy})`
-                );
-              })()}
+  transform={
+    `translate(${svgWSafe / 2}, ${(roomRect.y || 0) + PLAN_TOP_PAD_PX}) ` +
+    `scale(${Number(zoom) || 1}) ` +
+    `translate(${-svgWSafe / 2}, ${-((roomRect.y || 0) + PLAN_TOP_PAD_PX)})`
+  }
           >
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
             <g data-layer="grid">
@@ -5291,7 +5265,6 @@ return (
                         y2={roomRect.y + roomRect.height}
                         stroke="#E6E4DD"
                         strokeWidth="0.5"
-                        opacity="0.22"
                       />
                     );
                     anyDrawn = true;
@@ -5308,7 +5281,6 @@ return (
                         y2={roomRect.y + roomRect.height}
                         stroke="#E6E4DD"
                         strokeWidth="0.5"
-                        opacity="0.22"
                       />
                     );
                     anyDrawn = true;
@@ -5427,7 +5399,7 @@ return (
 
 
             {/* RP22 Zones Overlay - UNCONDITIONAL MOUNT */}
-            <g className="rp22-zones-layer" pointerEvents="none" data-layer="rp22-zones">
+            <g className="rp22-zones-layer" pointerEvents="none">
               <RP22ZonesOverlay
                 overlays={overlaysForRendering}
                 zones={augmentedZones}
@@ -5443,14 +5415,14 @@ return (
             </g>
 
             {/* Layer 5: Other Informational Zone Overlays */}
-            <g pointerEvents="none" data-layer="zone-overlays">
-              {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
-              {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
-              {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-              {overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
-              {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
-              {overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
-            </g>
+            {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
+            {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
+            {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
+            {overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
+            {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
+            
+            {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
+            {overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
             {renderRoomElements()}

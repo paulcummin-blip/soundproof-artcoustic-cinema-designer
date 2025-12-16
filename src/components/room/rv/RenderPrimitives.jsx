@@ -74,7 +74,7 @@ export const safeYawToMLP = (speaker, mlp) => {
 };
 
 // ---- Visual constants ----
-export const PADDING = 160;
+export const PADDING = 40;
 export const DEFAULT_W = 1000;
 export const DEFAULT_H = 700;
 

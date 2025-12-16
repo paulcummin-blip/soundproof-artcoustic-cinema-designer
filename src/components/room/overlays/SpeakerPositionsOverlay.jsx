@@ -273,10 +273,6 @@ export default function SpeakerPositionsOverlay({
 
     return speakersWithLanes.map((s, idx) => {
       const { xM, yM, role, wall, laneIndex } = s;
-      
-      // Skip left wall entirely (no dimension overlay for left wall)
-      if (wall === "left") return null;
-      
       const hCm = mToCm(bedHeightM(yM));
 
       const xPx = meterToCanvasX(xM);
@@ -400,53 +396,44 @@ export default function SpeakerPositionsOverlay({
               </text>
             </>
           ) : (
-            <g
-              transform={
-                wall === "left"
-                  ? `translate(${dotX - SIDE_LABEL_PAD_PX}, ${dotY}) rotate(-90)`
-                  : `translate(${dotX + SIDE_LABEL_PAD_PX}, ${dotY}) rotate(-90)`
-              }
-            >
-              {/* top distance (front of room) - left of dot in rotated space */}
+            <>
               <text
-                x={-14}
-                y={-8}
-                textAnchor="end"
+                x={dotX - 12}
+                y={meterToCanvasY(yM / 2)}
+                textAnchor="middle"
+                transform={`rotate(-90, ${dotX - 12}, ${meterToCanvasY(yM / 2)})`}
                 style={{ fontSize: 12, fill: textFill }}
               >
                 {topDistCm}cm
               </text>
 
-              {/* bottom distance (back of room) - right of dot in rotated space */}
               <text
-                x={14}
-                y={-8}
-                textAnchor="start"
+                x={dotX - 12}
+                y={meterToCanvasY((yM + L) / 2)}
+                textAnchor="middle"
+                transform={`rotate(-90, ${dotX - 12}, ${meterToCanvasY((yM + L) / 2)})`}
                 style={{ fontSize: 12, fill: textFill }}
               >
                 {bottomDistCm}cm
               </text>
 
-              {/* Role centered under dot */}
-              <text
-                x={0}
-                y={16}
-                textAnchor="middle"
-                style={{ fontSize: 13, fill: textFill, fontWeight: 700 }}
-              >
-                {roleText}
-              </text>
-
-              {/* Height to the right of role */}
-              <text
-                x={18}
-                y={16}
-                textAnchor="start"
-                style={{ fontSize: 12, fill: "#3E4349", fontWeight: 400 }}
-              >
-                {heightText}
-              </text>
-            </g>
+              <g transform={`rotate(-90, ${wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}, ${dotY})`}>
+                <text
+                  x={wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}
+                  y={dotY + 4}
+                  textAnchor="middle"
+                  style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
+                >
+                  {roleText}
+                  <tspan
+                    dx={8}
+                    style={{ fontWeight: 400, fill: "#3E4349" }}
+                  >
+                    {heightText}
+                  </tspan>
+                </text>
+              </g>
+            </>
           )}
         </g>
       );
