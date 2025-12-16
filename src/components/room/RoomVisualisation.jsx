@@ -896,15 +896,19 @@ React.useEffect(() => {
   return () => clearTimeout(screenSendTimerRef.current);
 }, [actualScreenFrontY, onScreenPlaneChange]);
 
+  const TOP_GUTTER_PX = 80; // reserved space above room for dimension lines
+  
   const availW = (containerW || DEFAULT_W) - 2 * PADDING;
-  const availH = (containerH || DEFAULT_H) - 2 * PADDING;
+  const availH = (containerH || DEFAULT_H) - 2 * PADDING - TOP_GUTTER_PX;
   const scale = useMemo(() =>
     Math.min(availW / widthM, availH / lengthM),
     [availW, availH, widthM, lengthM]);
 
   const roomRect = useMemo(() => ({
-    x: PADDING, y: PADDING,
-    width: widthM * scale, height: lengthM * scale
+    x: PADDING, 
+    y: PADDING + TOP_GUTTER_PX,
+    width: widthM * scale, 
+    height: lengthM * scale
   }), [widthM, lengthM, scale]);
 
   // Update toPx for pixel-perfect rendering
