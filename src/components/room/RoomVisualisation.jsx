@@ -5217,7 +5217,7 @@ return (
 {/* Removed debug label (zoneKeysLabel) */}
 
           {/* ZOOM GROUP — CLIPPED TO VIEWPORT, SO IT CAN'T ESCAPE */}
-          {(() => {
+          {React.useMemo(() => {
             const zoomCenterX = roomRect.x + roomRect.width / 2;
             const zoomCenterY = roomRect.y + roomRect.height / 2;
             
@@ -5230,8 +5230,6 @@ return (
                   `translate(${-zoomCenterX}, ${-zoomCenterY})`
                 }
               >
-            );
-          })()}
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
             <g data-layer="grid">
               {/* Draw vertical grid lines (centre-anchored) */}
