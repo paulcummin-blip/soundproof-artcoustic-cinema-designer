@@ -186,29 +186,27 @@ export default function SpeakerPositionsOverlay({
 
               <circle cx={xPx} cy={yLine} r={5} fill="#213428" />
 
+              {/* distances close to the dot */}
               <text
-                x={meterToCanvasX(xM / 2)}
+                x={xPx - 14}
                 y={yLine - 8}
-                textAnchor="middle"
-                fontSize={12}
-                fill="#1B1A1A"
+                textAnchor="end"
+                style={{ fontSize: 12, fill: "#1B1A1A" }}
               >
                 {leftCm}cm
               </text>
-
               <text
-                x={meterToCanvasX(xM + (W - xM) / 2)}
+                x={xPx + 14}
                 y={yLine - 8}
-                textAnchor="middle"
-                fontSize={12}
-                fill="#1B1A1A"
+                textAnchor="start"
+                style={{ fontSize: 12, fill: "#1B1A1A" }}
               >
                 {rightCm}cm
               </text>
 
               <text
                 x={xPx}
-                y={yLine + LCR_LINE_TO_TEXT_PX}
+                y={yLine + 20}
                 textAnchor="middle"
                 fontSize={13}
                 fill="#1B1A1A"
@@ -217,26 +215,22 @@ export default function SpeakerPositionsOverlay({
                 {role}
               </text>
 
-              {modelText ? (
+              {modelText && (
                 <text
-                  x={xPx}
-                  y={yLine + LCR_LINE_TO_TEXT_PX + 14}
-                  textAnchor="middle"
-                  fontSize={12}
-                  fill="#3E4349"
-                  fontWeight={400}
+                  x={xPx + 18}
+                  y={yLine + 36}
+                  textAnchor="start"
+                  style={{ fontSize: 12, fill: "#3E4349" }}
                 >
                   {modelText}
                 </text>
-              ) : null}
+              )}
 
               <text
-                x={meterToCanvasX(xM + (W - xM) / 2)}
-                y={yLine + LCR_LINE_TO_TEXT_PX}
-                textAnchor="middle"
-                fontSize={12}
-                fill="#3E4349"
-                fontWeight={400}
+                x={xPx + 18}
+                y={yLine + 52}
+                textAnchor="start"
+                style={{ fontSize: 12, fill: "#3E4349" }}
               >
                 H{mToCm(bedHeightM(s.position.y))}cm
               </text>
