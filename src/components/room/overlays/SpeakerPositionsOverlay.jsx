@@ -4,6 +4,31 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const mToCm = (m) => Math.round(Number(m) * 100);
 
+// Dynamic font size so labels never clash in small rooms
+const calcFontSize = (pxPositions = [], {
+  maxFont = 12,
+  minFont = 9,
+  large = 90,
+  med = 70,
+  small = 55,
+} = {}) => {
+  const xs = (Array.isArray(pxPositions) ? pxPositions : [])
+    .filter((v) => typeof v === "number" && Number.isFinite(v))
+    .sort((a, b) => a - b);
+
+  if (xs.length <= 1) return maxFont;
+
+  let minGap = Infinity;
+  for (let i = 1; i < xs.length; i++) {
+    minGap = Math.min(minGap, xs[i] - xs[i - 1]);
+  }
+
+  if (minGap >= large) return maxFont;       // 12
+  if (minGap >= med) return Math.max(minFont, maxFont - 1);   // 11
+  if (minGap >= small) return Math.max(minFont, maxFont - 2); // 10
+  return minFont;                             // 9
+};
+
 const prettyModel = (raw) => {
   if (!raw) return "";
   
