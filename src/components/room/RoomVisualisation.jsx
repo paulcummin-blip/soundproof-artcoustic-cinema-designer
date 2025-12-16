@@ -5527,7 +5527,7 @@ return (
 
               </g>
             );
-          }, [roomRect, zoom, idsClip, panPxX, panPxY])}
+          })()}
         </svg>
 
         {/* SEAT HOVER HUD - updated with drag and hide/show */}
