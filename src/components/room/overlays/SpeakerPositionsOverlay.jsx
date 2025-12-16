@@ -731,7 +731,32 @@ export default function SpeakerPositionsOverlay({
           const row = overheadRows[0];
           if (!row) return null;
 
-          const yPx = meterToCanvasY(row.yM);
+          const ySpeakerPx = meterToCanvasY(row.yM);
+
+          // Keep the horizontal ruler a clean distance away from:
+          // 1) the overhead icon edges
+          // 2) the vertical ruler's label block (so it never clashes)
+          //
+          // Tunables:
+          const ICON_R_PX = 12;
+          const GAP_FROM_ICON_PX = 20;
+          const SAFE_INSET_PX = 12;
+
+          // This should match what you used for the vertical ruler label placement.
+          // In your vertical overhead code you used: translate(rulerX + 22, ...) then rotate(-90)
+          // That label block projects into the room by roughly this much:
+          const V_LABEL_PROJECT_PX = 70;
+
+          // If the vertical ruler exists, keep the horizontal line to the RIGHT of that label zone.
+          // (We can't literally "move a horizontal line right", so instead we shift the y a bit
+          // so the nearby text doesn't sit on top of the line.)
+          const avoidLabelExtraY = overheadLeft.length ? 10 : 0;
+
+          // Desired y: just BELOW the overhead icons for that row
+          let yPx = ySpeakerPx + ICON_R_PX + GAP_FROM_ICON_PX + avoidLabelExtraY;
+
+          // Clamp so it stays inside the room (and doesn't sit on the border)
+          yPx = Math.max(roomRect.y + SAFE_INSET_PX, Math.min(roomRect.y + roomRect.height - SAFE_INSET_PX, yPx));
 
           return (
             <g key={`oh-row-top`}>
