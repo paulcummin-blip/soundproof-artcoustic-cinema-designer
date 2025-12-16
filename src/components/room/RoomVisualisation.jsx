@@ -5217,14 +5217,21 @@ return (
 {/* Removed debug label (zoneKeysLabel) */}
 
           {/* ZOOM GROUP — CLIPPED TO VIEWPORT, SO IT CAN'T ESCAPE */}
-          <g
-              clipPath={`url(#${idsClip})`}
-  transform={
-    `translate(${svgWSafe / 2}, ${(roomRect.y || 0) + PLAN_TOP_PAD_PX}) ` +
-    `scale(${Number(zoom) || 1}) ` +
-    `translate(${-svgWSafe / 2}, ${-((roomRect.y || 0) + PLAN_TOP_PAD_PX)})`
-  }
-          >
+          {(() => {
+            const zoomCenterX = roomRect.x + roomRect.width / 2;
+            const zoomCenterY = roomRect.y + roomRect.height / 2;
+            
+            return (
+              <g
+                clipPath={`url(#${idsClip})`}
+                transform={
+                  `translate(${zoomCenterX}, ${zoomCenterY}) ` +
+                  `scale(${Number(zoom) || 1}) ` +
+                  `translate(${-zoomCenterX}, ${-zoomCenterY})`
+                }
+              >
+            );
+          })()}
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
             <g data-layer="grid">
               {/* Draw vertical grid lines (centre-anchored) */}
