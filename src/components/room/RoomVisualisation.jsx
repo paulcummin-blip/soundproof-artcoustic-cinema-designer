@@ -5261,7 +5261,7 @@ return (
 {/* Removed debug label (zoneKeysLabel) */}
 
           {/* ZOOM GROUP — CLIPPED TO VIEWPORT, SO IT CAN'T ESCAPE */}
-          {React.useMemo(() => {
+          {(() => {
             const zoomCenterX = roomRect.x + roomRect.width / 2;
             const zoomCenterY = roomRect.y + roomRect.height / 2;
             
