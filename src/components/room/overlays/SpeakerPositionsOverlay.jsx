@@ -90,6 +90,12 @@ export default function SpeakerPositionsOverlay({
     return 1.2;
   };
 
+  const overheadHeightCm = () => {
+    const Hm = Number(dimensions?.height ?? dimensions?.heightM ?? 0);
+    if (!(Hm > 0)) return 0;
+    return mToCm(Hm);
+  };
+
   // --- Filter bed speakers (no subs/LFE, no overheads) ---
   const bedSpeakers = (Array.isArray(speakers) ? speakers : []).filter((s) => {
     const role = String(s?.role || "").toUpperCase();
@@ -100,6 +106,48 @@ export default function SpeakerPositionsOverlay({
     const y = s?.position?.y;
     return isNum(x) && isNum(y);
   });
+
+  // --- Overhead speakers (separate from bed speakers) ---
+  const overheadSpeakers = (Array.isArray(speakers) ? speakers : []).filter((s) => {
+    const role = String(s?.role || "").toUpperCase();
+    if (!role) return false;
+    if (!role.startsWith("T")) return false;
+    const x = s?.position?.x;
+    const y = s?.position?.y;
+    return isNum(x) && isNum(y);
+  });
+
+  // Split overheads into left/right columns by room midline
+  const overheadLeft = overheadSpeakers
+    .filter((s) => (s.position.x ?? 0) < (W / 2))
+    .sort((a, b) => (a.position.y ?? 0) - (b.position.y ?? 0));
+
+  const overheadRight = overheadSpeakers
+    .filter((s) => (s.position.x ?? 0) >= (W / 2))
+    .sort((a, b) => (a.position.y ?? 0) - (b.position.y ?? 0));
+
+  // Group overheads into rows (front/mid/rear) based on y clustering
+  const overheadRows = (() => {
+    const items = overheadSpeakers
+      .map((s) => ({ s, xM: s.position.x, yM: s.position.y }))
+      .sort((a, b) => a.yM - b.yM);
+
+    const groups = [];
+    for (const it of items) {
+      const last = groups[groups.length - 1];
+      if (!last || Math.abs(it.yM - last.yM) > 0.35) {
+        groups.push({ yM: it.yM, items: [it] });
+      } else {
+        last.items.push(it);
+        // keep a stable row centre
+        last.yM = (last.yM * (last.items.length - 1) + it.yM) / last.items.length;
+      }
+    }
+
+    // within each row, sort left→right
+    groups.forEach((g) => g.items.sort((a, b) => a.xM - b.xM));
+    return groups;
+  })();
 
   // --- Split LCR vs surrounds ---
   const lcrRoles = new Set(["FL","FC","FR","L","C","R"]);
@@ -486,6 +534,248 @@ export default function SpeakerPositionsOverlay({
     );
   };
 
+  // --- OVERHEAD VERTICAL RULERS (left + right columns, inside the room) ---
+  const renderOverheadVerticalDims = () => {
+    const Hcm = overheadHeightCm();
+    if (!Hcm) return null;
+
+    const roomFontBasis = Math.min(roomRect.width, roomRect.height);
+    const fontSize = calcFontSize(11, roomFontBasis);
+    const roleFontSize = calcFontSize(12, roomFontBasis);
+
+    // Put the two vertical rulers slightly inside the room so they never clip
+    const insetPx = 26;
+    const xLeftRuler = roomRect.x + insetPx;
+    const xRightRuler = roomRect.x + roomRect.width - insetPx;
+
+    const yTopPx = roomRect.y;
+    const yBottomPx = roomRect.y + roomRect.height;
+
+    const drawColumn = (list, rulerX, keyPrefix) => {
+      if (!list.length) return null;
+
+      return list.map((s, idx) => {
+        const role = String(s.role || "").toUpperCase();
+        const yM = s.position.y;
+        const yPx = meterToCanvasY(yM);
+
+        // distances to front/back walls
+        const distFront = mToCm(yM);
+        const distBack = mToCm(L - yM);
+
+        // Keep it identical to LCR spacing, just rotated
+        const distDx = 14;
+        const distY = 12;  // BELOW the (imagined) line & dot
+        const roleY = 16;
+        const hDx = 18;
+
+        // Small nudge if two dots are close
+        let nudge = 0;
+        if (idx > 0) {
+          const prevYPx = meterToCanvasY(list[idx - 1].position.y);
+          if (Math.abs(yPx - prevYPx) < 44) nudge = 6;
+        }
+
+        // rotate -90 so "left/right of dot" becomes "above/below dot" on the vertical ruler
+        const rot = -90;
+
+        return (
+          <g key={`${keyPrefix}-${role}-${idx}`}>
+            {/* dot on the vertical ruler */}
+            <circle cx={rulerX} cy={yPx} r={5} fill={dotFill} />
+
+            {/* distances either side of the dot (like LCR), but turned 90° */}
+            <g transform={`translate(${rulerX}, ${yPx}) rotate(${rot})`}>
+              <text
+                x={-distDx}
+                y={distY}
+                textAnchor="end"
+                style={{ fontSize, fill: textFill }}
+              >
+                {distBack}cm
+              </text>
+
+              <text
+                x={distDx}
+                y={distY}
+                textAnchor="start"
+                style={{ fontSize, fill: textFill }}
+              >
+                {distFront}cm
+              </text>
+            </g>
+
+            {/* ID + H: same relationship as LCR, placed to the room-side of the ruler */}
+            <g transform={`translate(${rulerX + 22}, ${yPx + nudge}) rotate(${rot})`}>
+              <text
+                x={0}
+                y={roleY}
+                textAnchor="middle"
+                style={{ fontSize: roleFontSize, fill: textFill, fontWeight: 700 }}
+              >
+                {role}
+              </text>
+
+              <text
+                x={hDx}
+                y={roleY}
+                textAnchor="start"
+                style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
+              >
+                {`H${Hcm}cm`}
+              </text>
+            </g>
+          </g>
+        );
+      });
+    };
+
+    return (
+      <g data-layer="speaker-positions-overheads-vertical" pointerEvents="none">
+        {/* Left vertical ruler */}
+        {overheadLeft.length ? (
+          <line
+            x1={xLeftRuler}
+            y1={yTopPx}
+            x2={xLeftRuler}
+            y2={yBottomPx}
+            stroke={stroke}
+            strokeWidth={2}
+            markerStart="url(#spk-dim-arrow)"
+            markerEnd="url(#spk-dim-arrow)"
+          />
+        ) : null}
+
+        {/* Right vertical ruler */}
+        {overheadRight.length ? (
+          <line
+            x1={xRightRuler}
+            y1={yTopPx}
+            x2={xRightRuler}
+            y2={yBottomPx}
+            stroke={stroke}
+            strokeWidth={2}
+            markerStart="url(#spk-dim-arrow)"
+            markerEnd="url(#spk-dim-arrow)"
+          />
+        ) : null}
+
+        {drawColumn(overheadLeft, xLeftRuler, "ohL")}
+        {drawColumn(overheadRight, xRightRuler, "ohR")}
+      </g>
+    );
+  };
+
+  // --- OVERHEAD HORIZONTAL RULERS (front/mid/rear rows, inside the room) ---
+  const renderOverheadHorizontalDims = () => {
+    const Hcm = overheadHeightCm();
+    if (!Hcm) return null;
+    if (!overheadRows.length) return null;
+
+    const roomFontBasis = Math.min(roomRect.width, roomRect.height);
+    const fontSize = calcFontSize(11, roomFontBasis);
+    const roleFontSize = calcFontSize(12, roomFontBasis);
+
+    const xLeftPx = roomRect.x;
+    const xRightPx = roomRect.x + roomRect.width;
+
+    return (
+      <g data-layer="speaker-positions-overheads-horizontal" pointerEvents="none">
+        {overheadRows.map((row, rIdx) => {
+          const yPx = meterToCanvasY(row.yM);
+
+          return (
+            <g key={`oh-row-${rIdx}`}>
+              {/* ruler line */}
+              <line
+                x1={xLeftPx}
+                y1={yPx}
+                x2={xRightPx}
+                y2={yPx}
+                stroke={stroke}
+                strokeWidth={2}
+                markerStart="url(#spk-dim-arrow)"
+                markerEnd="url(#spk-dim-arrow)"
+              />
+
+              {/* dots + labels */}
+              {row.items.map((it, idx) => {
+                const s = it.s;
+                const role = String(s.role || "").toUpperCase();
+                const xPx = meterToCanvasX(it.xM);
+
+                const leftDist = mToCm(it.xM);
+                const rightDist = mToCm(W - it.xM);
+
+                // tighten if neighbours are close
+                let leftOffset = 14;
+                let rightOffset = 14;
+                if (idx > 0) {
+                  const prevXPx = meterToCanvasX(row.items[idx - 1].xM);
+                  if (Math.abs(xPx - prevXPx) < 40) {
+                    leftOffset = 10;
+                    rightOffset = 10;
+                  }
+                }
+                if (idx < row.items.length - 1) {
+                  const nextXPx = meterToCanvasX(row.items[idx + 1].xM);
+                  if (Math.abs(xPx - nextXPx) < 40) {
+                    leftOffset = 10;
+                    rightOffset = 10;
+                  }
+                }
+
+                return (
+                  <g key={`oh-row-${rIdx}-${role}-${idx}`}>
+                    <circle cx={xPx} cy={yPx} r={5} fill={dotFill} />
+
+                    {/* distances BELOW the line */}
+                    <text
+                      x={xPx - leftOffset}
+                      y={yPx + 12}
+                      textAnchor="end"
+                      style={{ fontSize, fill: textFill }}
+                    >
+                      {leftDist}cm
+                    </text>
+
+                    <text
+                      x={xPx + rightOffset}
+                      y={yPx + 12}
+                      textAnchor="start"
+                      style={{ fontSize, fill: textFill }}
+                    >
+                      {rightDist}cm
+                    </text>
+
+                    {/* ID + H: same line relationship as your other rulers */}
+                    <text
+                      x={xPx}
+                      y={yPx + 28}
+                      textAnchor="middle"
+                      style={{ fontSize: roleFontSize, fill: textFill, fontWeight: 700 }}
+                    >
+                      {role}
+                    </text>
+
+                    <text
+                      x={xPx + 18}
+                      y={yPx + 28}
+                      textAnchor="start"
+                      style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
+                    >
+                      {`H${Hcm}cm`}
+                    </text>
+                  </g>
+                );
+              })}
+            </g>
+          );
+        })}
+      </g>
+    );
+  };
+
   // --- SURROUND RENDERER (lanes) ---
   const renderSurroundDims = () => {
     if (!speakersWithLanes.length) return null;
@@ -727,6 +1017,8 @@ export default function SpeakerPositionsOverlay({
       {renderFrontDims()}
       {renderRightDims()}
       {renderBackDims()}
+      {renderOverheadVerticalDims()}
+      {renderOverheadHorizontalDims()}
     </g>
   );
 }
