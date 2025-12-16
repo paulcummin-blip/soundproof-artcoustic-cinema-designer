@@ -136,8 +136,17 @@ export default function SpeakerPositionsOverlay({
   };
 
   const overheadHeightCm = () => {
-    const Hm = Number(dimensions?.height ?? dimensions?.heightM ?? 0);
-    if (!(Hm > 0)) return 0;
+    const Hm = Number(
+      dimensions?.height ??
+      dimensions?.heightM ??
+      dimensions?.roomHeight ??
+      dimensions?.roomHeightM ??
+      dimensions?.ceilingHeight ??
+      dimensions?.ceilingHeightM ??
+      0
+    );
+
+    if (!(Hm > 0)) return null;
     return mToCm(Hm);
   };
 
@@ -593,8 +602,7 @@ export default function SpeakerPositionsOverlay({
 
   // --- OVERHEAD VERTICAL RULERS (left + right columns, inside the room) ---
   const renderOverheadVerticalDims = () => {
-    const Hcm = overheadHeightCm();
-    if (!Hcm) return null;
+    const Hcm = overheadHeightCm(); // may be null, that's ok
 
     const roomFontBasis = Math.min(roomRect.width, roomRect.height);
     const fontSize = calcFontSize(11, roomFontBasis);
@@ -679,7 +687,7 @@ export default function SpeakerPositionsOverlay({
                 textAnchor="start"
                 style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
               >
-                {`H${Hcm}cm`}
+                {Hcm ? `H${Hcm}cm` : ""}
               </text>
             </g>
           </g>
@@ -725,8 +733,7 @@ export default function SpeakerPositionsOverlay({
 
   // --- OVERHEAD HORIZONTAL RULERS (front/mid/rear rows, inside the room) ---
   const renderOverheadHorizontalDims = () => {
-    const Hcm = overheadHeightCm();
-    if (!Hcm) return null;
+    const Hcm = overheadHeightCm(); // may be null, that's ok
     if (!overheadRows.length) return null;
 
     const roomFontBasis = Math.min(roomRect.width, roomRect.height);
@@ -821,7 +828,7 @@ export default function SpeakerPositionsOverlay({
                       textAnchor="start"
                       style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
                     >
-                      {`H${Hcm}cm`}
+                      {Hcm ? `H${Hcm}cm` : ""}
                     </text>
                   </g>
                 );
