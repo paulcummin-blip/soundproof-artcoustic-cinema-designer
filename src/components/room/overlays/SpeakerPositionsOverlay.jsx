@@ -212,15 +212,12 @@ export default function SpeakerPositionsOverlay({
                 fontWeight={700}
               >
                 {role}
-              </text>
-
-              <text
-                x={xPx + 18}
-                y={yLine + 36}
-                textAnchor="start"
-                style={{ fontSize: 12, fill: "#3E4349" }}
-              >
-                H{mToCm(bedHeightM(s.position.y))}cm
+                <tspan
+                  dx={8}
+                  style={{ fontWeight: 400, fill: "#3E4349", fontSize: 12 }}
+                >
+                  H{mToCm(bedHeightM(s.position.y))}cm
+                </tspan>
               </text>
             </g>
           );
@@ -346,15 +343,12 @@ export default function SpeakerPositionsOverlay({
                 style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
               >
                 {roleText}
-              </text>
-
-              <text
-                x={dotX}
-                y={dotY + 28}
-                textAnchor="middle"
-                style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
-              >
-                {heightText}
+                <tspan
+                  dx={8}
+                  style={{ fontWeight: 400, fill: "#3E4349" }}
+                >
+                  {heightText}
+                </tspan>
               </text>
             </>
           ) : (
@@ -387,15 +381,12 @@ export default function SpeakerPositionsOverlay({
                   style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
                 >
                   {roleText}
-                </text>
-
-                <text
-                  x={wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}
-                  y={dotY + 16}
-                  textAnchor="middle"
-                  style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
-                >
-                  {heightText}
+                  <tspan
+                    dx={8}
+                    style={{ fontWeight: 400, fill: "#3E4349" }}
+                  >
+                    {heightText}
+                  </tspan>
                 </text>
               </g>
             </>
