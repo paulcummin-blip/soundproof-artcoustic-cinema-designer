@@ -1508,7 +1508,16 @@ React.useEffect(() => {
   );
 
   const handleZoomIn = () => setZoom(prev => Math.min(2.0, prev + 0.1));
-  const handleZoomOut = () => setZoom(prev => Math.max(0.5, prev - 0.1));
+  const handleZoomOut = () => {
+    setZoom(prev => {
+      const next = Math.max(0.5, prev - 0.1);
+      if (next <= 1.0) {
+        setPanPxX(0);
+        setPanPxY(0);
+      }
+      return next;
+    });
+  };
 
   // Memoize baffle and screen calculations for performance
   const { BaffleAndScreen, screenPlaneY, screenCenterX_m, visibleWidthM } = useMemo(() => {
