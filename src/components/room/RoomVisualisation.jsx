@@ -515,6 +515,7 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const hudPosition = hudBasePosPx;
   const planBoundsRef = useRef(null);
   const svgRef = useRef(null);
+  const zoomGroupRef = useRef(null);
   const slsrModeRef = React.useRef('side');
   const rearModeRef = React.useRef('back');
   const lastInteractionEpoch = React.useRef(0);
@@ -1384,8 +1385,7 @@ React.useEffect(() => {
     }
     */
   }, [
-    enableFrontWides,
-    frontWideZones,
+    // REMOVED: enableFrontWides, frontWideZones (overlay visibility must not reset positions)
     placedSpeakers,
     widthM,
     lengthM,
@@ -2389,21 +2389,27 @@ React.useEffect(() => {
     );
   }, [onSetSeatingPositions, canvasToRoom]);
 
-  // Mouse handling with CTM guard
+  // Mouse handling with CTM guard - ROBUST coordinate mapping through zoom
   const handleMouseMove = useCallback((e) => {
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
 
-    if (!svgRef.current) return;
+    if (!svgRef.current || !zoomGroupRef.current) return;
+    
+    // Step 1: Client coords → SVG root coords
     const svgElement = svgRef.current;
     const point = svgElement.createSVGPoint();
     point.x = e.clientX;
     point.y = e.clientY;
     const ctm = svgElement.getScreenCTM();
     if (!ctm) return;
-    const inverseCTM = ctm.inverse();
-    const svgPoint = point.matrixTransform(inverseCTM);
+    const svgRootPoint = point.matrixTransform(ctm.inverse());
+    
+    // Step 2: SVG root coords → Zoom group local coords
+    const zoomCTM = zoomGroupRef.current.getCTM();
+    if (!zoomCTM) return;
+    const svgPoint = svgRootPoint.matrixTransform(zoomCTM.inverse());
 
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
     console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
@@ -5216,14 +5222,15 @@ return (
 
 {/* Removed debug label (zoneKeysLabel) */}
 
-          {/* ZOOM GROUP — CLIPPED TO VIEWPORT, SO IT CAN'T ESCAPE */}
+          {/* ZOOM GROUP — CLIPPED TO VIEWPORT, CENTERED ON ROOM RECT */}
           <g
+              ref={zoomGroupRef}
               clipPath={`url(#${idsClip})`}
-  transform={
-    `translate(${svgWSafe / 2}, ${(roomRect.y || 0) + PLAN_TOP_PAD_PX}) ` +
-    `scale(${Number(zoom) || 1}) ` +
-    `translate(${-svgWSafe / 2}, ${-((roomRect.y || 0) + PLAN_TOP_PAD_PX)})`
-  }
+              transform={(() => {
+                const cx = roomRect.x + roomRect.width / 2;
+                const cy = roomRect.y + roomRect.height / 2;
+                return `translate(${cx}, ${cy}) scale(${Number(zoom) || 1}) translate(${-cx}, ${-cy})`;
+              })()}
           >
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
             <g data-layer="grid">
@@ -5399,7 +5406,7 @@ return (
 
 
             {/* RP22 Zones Overlay - UNCONDITIONAL MOUNT */}
-            <g className="rp22-zones-layer" pointerEvents="none">
+            <g className="rp22-zones-layer" pointerEvents="none" data-layer="rp22-zones">
               <RP22ZonesOverlay
                 overlays={overlaysForRendering}
                 zones={augmentedZones}
@@ -5415,14 +5422,14 @@ return (
             </g>
 
             {/* Layer 5: Other Informational Zone Overlays */}
-            {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
-            {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
-            {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
-            {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
-            
-            {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
-            {overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
+            <g pointerEvents="none" data-layer="zone-overlays">
+              {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
+              {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
+              {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
+              {overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
+              {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
+              {overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
+            </g>
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
             {renderRoomElements()}
