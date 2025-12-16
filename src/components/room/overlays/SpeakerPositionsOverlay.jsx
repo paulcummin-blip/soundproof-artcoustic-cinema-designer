@@ -615,51 +615,63 @@ export default function SpeakerPositionsOverlay({
           ) : (
             <>
               {/*
-                SIDE WALLS (vertical): Match LCR layout, rotated -90
-                - distances sit either side of the dot (above/below), rotated -90
-                - role is centred under the dot (after rotation), H sits to the right of the role
+                SIDE WALLS (vertical): Make it identical to LCR, just rotated.
+                Layout in "imagined horizontal" LCR form:
+                  WALL, [ROLE H], ruler line with dot, leftDist | dot | rightDist
+                For side walls we map:
+                  leftDist  = distance to BACK wall  (rear)  = (L - yM)
+                  rightDist = distance to FRONT wall (front) = yM
               */}
+
               {(() => {
-                const baseSize = calcFontSize(12, roomRect.width);
-                const roleSize = calcFontSize(13, roomRect.width);
+                // Match LCR spacing
+                const baseSize = calcFontSize(11, roomRect.width); // one size smaller by default
+                const roleSize = calcFontSize(12, roomRect.width); // one size smaller than LCR role
+                const distDx = 14;    // same as LCR distance offset
+                const distY = -8;     // same as LCR distance baseline above dot
+                const roleY = 16;     // same as LCR role baseline below dot
+                const hDx = 18;       // same as LCR H offset to the right of role
 
-                const distGap = 14;           // same as LCR +/- 14px
-                const roleY = 16;             // same as LCR +16px
-                const hDx = 18;               // same as LCR +18px
-                const labelOffset = SIDE_LABEL_PAD_PX; // distance from the line (keeps it off the speakers)
+                // Distances (swap mapping so it reads "rear on left, front on right" in the imagined horizontal view)
+                const distLeft = mToCm(L - yM); // rear wall
+                const distRight = mToCm(yM);    // front wall
 
-                // anchor point for the rotated label group (to the RIGHT of the line)
-                const ax = wall === "left" ? dotX - labelOffset : dotX + labelOffset;
-                const ay = dotY;
-
-                // rotate so text reads upright like the LCR (just turned)
+                // Rotation: turn the whole LCR layout 90° so text reads the right way on a vertical ruler
                 const rot = -90;
+
+                // Put the ROLE/H label BETWEEN wall and ruler.
+                // Right wall: wallX < labelX < lineX (label sits just inside the ruler)
+                // Left wall:  lineX < labelX < wallX
+                const wallX = wall === "right" ? (roomRect.x + roomRect.width) : roomRect.x;
+                const labelX = wall === "right"
+                  ? (dotX - SIDE_LABEL_PAD_PX)   // between wall and ruler
+                  : (dotX + SIDE_LABEL_PAD_PX);  // between wall and ruler
 
                 return (
                   <>
-                    {/* distances: either side of dot (above/below), rotated */}
-                    <text
-                      x={dotX}
-                      y={dotY - distGap}
-                      textAnchor="middle"
-                      transform={`rotate(${rot}, ${dotX}, ${dotY - distGap})`}
-                      style={{ fontSize: baseSize, fill: textFill }}
-                    >
-                      {topDistCm}cm
-                    </text>
+                    {/* Distances: either side of dot (like LCR), rotated as a unit */}
+                    <g transform={`translate(${dotX}, ${dotY}) rotate(${rot})`}>
+                      <text
+                        x={-distDx}
+                        y={distY}
+                        textAnchor="end"
+                        style={{ fontSize: baseSize, fill: textFill }}
+                      >
+                        {distLeft}cm
+                      </text>
 
-                    <text
-                      x={dotX}
-                      y={dotY + distGap}
-                      textAnchor="middle"
-                      transform={`rotate(${rot}, ${dotX}, ${dotY + distGap})`}
-                      style={{ fontSize: baseSize, fill: textFill }}
-                    >
-                      {bottomDistCm}cm
-                    </text>
+                      <text
+                        x={distDx}
+                        y={distY}
+                        textAnchor="start"
+                        style={{ fontSize: baseSize, fill: textFill }}
+                      >
+                        {distRight}cm
+                      </text>
+                    </g>
 
-                    {/* role + H: positioned off the line, same spacing logic as LCR */}
-                    <g transform={`translate(${ax}, ${ay}) rotate(${rot})`}>
+                    {/* Role + H: identical spacing to LCR, but positioned between wall and ruler, rotated as a unit */}
+                    <g transform={`translate(${labelX}, ${dotY}) rotate(${rot})`}>
                       <text
                         x={0}
                         y={roleY}
