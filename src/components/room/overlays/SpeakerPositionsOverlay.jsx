@@ -6,8 +6,8 @@ const mToCm = (m) => Math.round(Number(m) * 100);
 
 // Dynamic font size so labels never clash in small rooms
 const calcFontSize = (pxPositions = [], {
-  maxFont = 12,
-  minFont = 9,
+  maxFont = 11,
+  minFont = 8,
   large = 90,
   med = 70,
   small = 55,
