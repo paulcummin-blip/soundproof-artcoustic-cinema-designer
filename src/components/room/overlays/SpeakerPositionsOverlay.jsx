@@ -165,7 +165,6 @@ export default function SpeakerPositionsOverlay({
           const yLine = baseY - (i * LCR_STACK_GAP_PX);
           const leftCm = mToCm(xM);
           const rightCm = mToCm(W - xM);
-          const modelText = prettyModel(s.modelLabel || s.model);
 
           const xPx = meterToCanvasX(xM);
           const xLeftPx = roomRect.x;
@@ -215,20 +214,9 @@ export default function SpeakerPositionsOverlay({
                 {role}
               </text>
 
-              {modelText && (
-                <text
-                  x={xPx + 18}
-                  y={yLine + 36}
-                  textAnchor="start"
-                  style={{ fontSize: 12, fill: "#3E4349" }}
-                >
-                  {modelText}
-                </text>
-              )}
-
               <text
                 x={xPx + 18}
-                y={yLine + 52}
+                y={yLine + 36}
                 textAnchor="start"
                 style={{ fontSize: 12, fill: "#3E4349" }}
               >
@@ -314,7 +302,6 @@ export default function SpeakerPositionsOverlay({
       }
 
       const roleText = role;
-      const modelText = prettyModel(s?.modelLabel || s?.model);
       const heightText = `H${hCm}cm`;
 
       return (
@@ -361,20 +348,9 @@ export default function SpeakerPositionsOverlay({
                 {roleText}
               </text>
 
-              {!!modelText && (
-                <text
-                  x={dotX}
-                  y={dotY + 28}
-                  textAnchor="middle"
-                  style={{ fontSize: 11, fill: textFill, fontWeight: 400 }}
-                >
-                  {modelText}
-                </text>
-              )}
-
               <text
-                x={meterToCanvasX((xM + W) / 2)}
-                y={dotY + 16}
+                x={dotX}
+                y={dotY + 28}
                 textAnchor="middle"
                 style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
               >
@@ -413,20 +389,9 @@ export default function SpeakerPositionsOverlay({
                   {roleText}
                 </text>
 
-                {!!modelText && (
-                  <text
-                    x={wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}
-                    y={dotY + 16}
-                    textAnchor="middle"
-                    style={{ fontSize: 11, fill: textFill, fontWeight: 400 }}
-                  >
-                    {modelText}
-                  </text>
-                )}
-
                 <text
                   x={wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}
-                  y={dotY + 28}
+                  y={dotY + 16}
                   textAnchor="middle"
                   style={{ fontSize: 12, fill: textFill, fontWeight: 400 }}
                 >
