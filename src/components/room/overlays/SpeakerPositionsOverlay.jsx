@@ -402,9 +402,10 @@ export default function SpeakerPositionsOverlay({
     const yTopPx = roomRect.y;
     const yBottomPx = roomRect.y + roomRect.height;
 
-    // Calculate font size based on vertical spacing
+    // Calculate font size based on vertical spacing (match LCR)
     const yPositions = rightGroup.map(s => meterToCanvasY(s.yM));
     const fontSize = calcFontSize(yPositions, yTopPx, yBottomPx);
+    const roleFontSize = fontSize + 1;
 
     return (
       <g data-layer="speaker-positions-right" pointerEvents="none">
@@ -441,43 +442,46 @@ export default function SpeakerPositionsOverlay({
             <g key={`right-dim-${s.role}-${idx}`}>
               <circle cx={rulerXpx} cy={yPx} r={5} fill={dotFill} />
 
-              {/* Top distance (rotated) */}
+              {/* Top distance (rotated, close to dot like LCR) */}
               <text
-                x={rulerXpx - 12}
+                x={rulerXpx + 14}
                 y={meterToCanvasY(s.yM / 2)}
-                textAnchor="middle"
-                transform={`rotate(-90, ${rulerXpx - 12}, ${meterToCanvasY(s.yM / 2)})`}
+                textAnchor="start"
+                transform={`rotate(-90, ${rulerXpx + 14}, ${meterToCanvasY(s.yM / 2)})`}
                 style={{ fontSize, fill: textFill }}
               >
                 {topDistCm}cm
               </text>
 
-              {/* Bottom distance (rotated) */}
+              {/* Bottom distance (rotated, close to dot like LCR) */}
               <text
-                x={rulerXpx - 12}
+                x={rulerXpx + 14}
                 y={meterToCanvasY((s.yM + L) / 2)}
-                textAnchor="middle"
-                transform={`rotate(-90, ${rulerXpx - 12}, ${meterToCanvasY((s.yM + L) / 2)})`}
+                textAnchor="start"
+                transform={`rotate(-90, ${rulerXpx + 14}, ${meterToCanvasY((s.yM + L) / 2)})`}
                 style={{ fontSize, fill: textFill }}
               >
                 {bottomDistCm}cm
               </text>
 
-              {/* Role and height (rotated, to the right of the dot) */}
-              <g transform={`rotate(-90, ${rulerXpx - SIDE_LABEL_PAD_PX}, ${yPx + labelNudge})`}>
+              {/* Role and height (rotated, matching LCR layout: role centred, H to the right) */}
+              <g transform={`translate(${rulerXpx + SIDE_LABEL_PAD_PX}, ${yPx + labelNudge}) rotate(-90)`}>
                 <text
-                  x={rulerXpx - SIDE_LABEL_PAD_PX}
-                  y={yPx + 4 + labelNudge}
+                  x={0}
+                  y={4}
                   textAnchor="middle"
-                  style={{ fontSize, fill: textFill, fontWeight: 700 }}
+                  style={{ fontSize: roleFontSize, fill: textFill, fontWeight: 700 }}
                 >
                   {s.role}
-                  <tspan
-                    dx={8}
-                    style={{ fontWeight: 400, fill: "#3E4349" }}
-                  >
-                    {`H${hCm}cm`}
-                  </tspan>
+                </text>
+
+                <text
+                  x={roleFontSize * 1.8}
+                  y={4}
+                  textAnchor="start"
+                  style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
+                >
+                  {`H${hCm}cm`}
                 </text>
               </g>
             </g>
