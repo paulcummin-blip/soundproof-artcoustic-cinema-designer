@@ -397,40 +397,52 @@ export default function SpeakerPositionsOverlay({
             </>
           ) : (
             <>
+              {/* distances close to the dot (above / below), not mid-wall */}
               <text
-                x={dotX - 12}
-                y={meterToCanvasY(yM / 2)}
-                textAnchor="middle"
-                transform={`rotate(-90, ${dotX - 12}, ${meterToCanvasY(yM / 2)})`}
+                x={wall === "left" ? dotX - 14 : dotX + 14}
+                y={dotY - 8}
+                textAnchor={wall === "left" ? "end" : "start"}
                 style={{ fontSize: 12, fill: textFill }}
               >
                 {topDistCm}cm
               </text>
 
               <text
-                x={dotX - 12}
-                y={meterToCanvasY((yM + L) / 2)}
-                textAnchor="middle"
-                transform={`rotate(-90, ${dotX - 12}, ${meterToCanvasY((yM + L) / 2)})`}
+                x={wall === "left" ? dotX - 14 : dotX + 14}
+                y={dotY + 18}
+                textAnchor={wall === "left" ? "end" : "start"}
                 style={{ fontSize: 12, fill: textFill }}
               >
                 {bottomDistCm}cm
               </text>
 
-              <g transform={`rotate(-90, ${wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}, ${dotY})`}>
+              {/* speaker label "under" the dot in the rotated orientation, with H next to it */}
+              <g
+                transform={
+                  wall === "left"
+                    ? `translate(${dotX - SIDE_LABEL_PAD_PX}, ${dotY}) rotate(-90)`
+                    : `translate(${dotX + SIDE_LABEL_PAD_PX}, ${dotY}) rotate(-90)`
+                }
+              >
+                {/* role centred under dot */}
                 <text
-                  x={wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}
-                  y={dotY + 4}
+                  x={0}
+                  y={0}
                   textAnchor="middle"
-                  style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
+                  style={{ fontSize: 13, fill: textFill, fontWeight: 700 }}
                 >
                   {roleText}
-                  <tspan
-                    dx={8}
-                    style={{ fontWeight: 400, fill: "#3E4349" }}
-                  >
-                    {heightText}
-                  </tspan>
+                </text>
+
+                {/* H value next to role, same style as dims */}
+                <text
+                  x={0}
+                  y={0}
+                  dx={wall === "left" ? -22 : 22}
+                  textAnchor={wall === "left" ? "end" : "start"}
+                  style={{ fontSize: 12, fill: "#3E4349", fontWeight: 400 }}
+                >
+                  {heightText}
                 </text>
               </g>
             </>
