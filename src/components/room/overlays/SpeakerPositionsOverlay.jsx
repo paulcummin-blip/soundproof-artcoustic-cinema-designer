@@ -84,10 +84,55 @@ export default function SpeakerPositionsOverlay({
     if (!last || Math.abs(y - last) > 0.20) rows.push(y);
   }
 
-  const bedHeightM = () => {
-    if (rows.length >= 3) return 1.8;
-    if (rows.length >= 2) return 1.5;
-    return 1.2;
+  // Row Y positions (front to back), clustered from seating positions
+  const rowYs = (() => {
+    const ys = (Array.isArray(seatingPositions) ? seatingPositions : [])
+      .map((s) => s?.y)
+      .filter(isNum)
+      .sort((a, b) => a - b);
+
+    const out = [];
+    for (const y of ys) {
+      const last = out[out.length - 1];
+      if (!last || Math.abs(y - last) > 0.20) out.push(y);
+    }
+    return out;
+  })();
+
+  // Raked seating heights by row count
+  const rowHeightsM = (() => {
+    if (rowYs.length <= 1) return [1.2];
+    if (rowYs.length === 2) return [1.2, 1.5];
+    return [1.2, 1.5, 1.8]; // 3+ rows
+  })();
+
+  // Midpoints between rows (used to "step up" along side walls)
+  const rowMid12 = (rowYs.length >= 2) ? ((rowYs[0] + rowYs[1]) / 2) : null;
+  const rowMid23 = (rowYs.length >= 3) ? ((rowYs[1] + rowYs[2]) / 2) : null;
+
+  const bedHeightM = (role, speakerY) => {
+    const r = String(role || "").toUpperCase();
+
+    // Front Wides always match Row 1 height
+    if (r === "LW" || r === "RW") return rowHeightsM[0];
+
+    // Rear speakers always match the last row height
+    if (r === "SBL" || r === "SBR" || r === "RBL" || r === "RBR") {
+      return rowHeightsM[rowHeightsM.length - 1];
+    }
+
+    // If only one row, everything is Row 1 height
+    if (rowHeightsM.length === 1 || !isNum(speakerY)) return rowHeightsM[0];
+
+    // Two rows: step up after midpoint
+    if (rowHeightsM.length === 2) {
+      return (speakerY > rowMid12) ? rowHeightsM[1] : rowHeightsM[0];
+    }
+
+    // Three rows: step at each midpoint
+    if (speakerY > rowMid23) return rowHeightsM[2];
+    if (speakerY > rowMid12) return rowHeightsM[1];
+    return rowHeightsM[0];
   };
 
   const overheadHeightCm = () => {
@@ -126,27 +171,38 @@ export default function SpeakerPositionsOverlay({
     .filter((s) => (s.position.x ?? 0) >= (W / 2))
     .sort((a, b) => (a.position.y ?? 0) - (b.position.y ?? 0));
 
-  // Group overheads into rows (front/mid/rear) based on y clustering
+  // Overhead rows should ONLY exist if the corresponding overhead roles exist.
+  // Front row: TF*
+  // Mid row:   TM*
+  // Rear row:  TB*
   const overheadRows = (() => {
-    const items = overheadSpeakers
-      .map((s) => ({ s, xM: s.position.x, yM: s.position.y }))
-      .sort((a, b) => a.yM - b.yM);
+    const rows = [];
 
-    const groups = [];
-    for (const it of items) {
-      const last = groups[groups.length - 1];
-      if (!last || Math.abs(it.yM - last.yM) > 0.35) {
-        groups.push({ yM: it.yM, items: [it] });
-      } else {
-        last.items.push(it);
-        // keep a stable row centre
-        last.yM = (last.yM * (last.items.length - 1) + it.yM) / last.items.length;
-      }
-    }
+    const front = overheadSpeakers.filter(s => String(s.role || "").toUpperCase().startsWith("TF"));
+    const mid   = overheadSpeakers.filter(s => String(s.role || "").toUpperCase().startsWith("TM"));
+    const rear  = overheadSpeakers.filter(s => String(s.role || "").toUpperCase().startsWith("TB"));
 
-    // within each row, sort left→right
-    groups.forEach((g) => g.items.sort((a, b) => a.xM - b.xM));
-    return groups;
+    const makeRow = (label, list) => {
+      if (!list.length) return null;
+      const items = list
+        .map(s => ({ s, xM: s.position.x, yM: s.position.y }))
+        .sort((a,b) => a.xM - b.xM);
+
+      // Use average y as the ruler line Y (stable even if slightly uneven)
+      const yM = items.reduce((sum, it) => sum + it.yM, 0) / items.length;
+
+      return { label, yM, items };
+    };
+
+    const rFront = makeRow("front", front);
+    const rMid   = makeRow("mid", mid);
+    const rRear  = makeRow("rear", rear);
+
+    if (rFront) rows.push(rFront);
+    if (rMid)   rows.push(rMid);
+    if (rRear)  rows.push(rRear);
+
+    return rows;
   })();
 
   // --- Split LCR vs surrounds ---
@@ -241,6 +297,7 @@ export default function SpeakerPositionsOverlay({
           const xPx = meterToCanvasX(xM);
           const leftCm = mToCm(xM);
           const rightCm = mToCm(W - xM);
+          const hCm = mToCm(bedHeightM(s.role, s.position.y));
 
           // Check for close neighbors to adjust text offset
           let leftOffset = 14;
@@ -305,7 +362,7 @@ export default function SpeakerPositionsOverlay({
                 textAnchor="start"
                 style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
               >
-                {`H${mToCm(bedHeightM(s.position.y))}cm`}
+                {`H${hCm}cm`}
               </text>
             </g>
           );
@@ -356,7 +413,7 @@ export default function SpeakerPositionsOverlay({
           const leftDistCm = mToCm(s.xM);
           const rightDistCm = mToCm(W - s.xM);
 
-          const hCm = mToCm(bedHeightM(s.yM)); // FIX: pass yM
+          const hCm = mToCm(bedHeightM(s.role, s.yM));
 
           // Check for close neighbors
           let leftOffset = 14;
@@ -458,7 +515,7 @@ export default function SpeakerPositionsOverlay({
         {/* Dots and labels for each speaker */}
         {rightGroup.map((s, idx) => {
           const yPx = meterToCanvasY(s.yM);
-          const hCm = mToCm(bedHeightM(s.yM));
+          const hCm = mToCm(bedHeightM(s.role, s.yM));
 
           const dotX = rulerXpx;
           const dotY = yPx;
