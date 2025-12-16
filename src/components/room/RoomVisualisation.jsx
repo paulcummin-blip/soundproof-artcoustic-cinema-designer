@@ -5480,8 +5480,9 @@ return (
   svgW={svgW}
 />
 
-            </g>
-          </g>
+              </g>
+            );
+          }, [roomRect, zoom, idsClip])}
         </svg>
 
         {/* SEAT HOVER HUD - updated with drag and hide/show */}
