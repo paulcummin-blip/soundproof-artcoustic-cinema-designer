@@ -59,7 +59,7 @@ const prettyModel = (raw) => {
 const LCR_MIN_STACK_GAP_PX = 26;   // minimum lane separation
 const LCR_MAX_STACK_GAP_PX = 56;   // maximum lane separation (nice airy UI)
 const LCR_LINE_TO_TEXT_PX = 14;
-const LCR_TOP_PAD_PX = 54;
+const LCR_TOP_PAD_PX = 27; // 50% closer to the room
 
 // Safety margins (px)
 const LCR_TOP_SAFE_PX = 18;        // never draw above this Y
