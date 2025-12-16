@@ -4,29 +4,13 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const mToCm = (m) => Math.round(Number(m) * 100);
 
-// Dynamic font size so labels never clash in small rooms
-const calcFontSize = (pxPositions = [], {
-  maxFont = 11,
-  minFont = 8,
-  large = 90,
-  med = 70,
-  small = 55,
-} = {}) => {
-  const xs = (Array.isArray(pxPositions) ? pxPositions : [])
-    .filter((v) => typeof v === "number" && Number.isFinite(v))
-    .sort((a, b) => a - b);
-
-  if (xs.length <= 1) return maxFont;
-
-  let minGap = Infinity;
-  for (let i = 1; i < xs.length; i++) {
-    minGap = Math.min(minGap, xs[i] - xs[i - 1]);
-  }
-
-  if (minGap >= large) return maxFont;       // 12
-  if (minGap >= med) return Math.max(minFont, maxFont - 1);   // 11
-  if (minGap >= small) return Math.max(minFont, maxFont - 2); // 10
-  return minFont;                             // 9
+// Font scaling: default slightly smaller than before, shrink further if crowded
+const calcFontSize = (basePx, roomWidthPx) => {
+  const w = Number(roomWidthPx) || 0;
+  if (w < 260) return Math.max(9, basePx - 3);
+  if (w < 360) return Math.max(10, basePx - 2);
+  if (w < 520) return Math.max(11, basePx - 1);
+  return basePx;
 };
 
 const prettyModel = (raw) => {
@@ -187,10 +171,9 @@ export default function SpeakerPositionsOverlay({
     const xLeftPx = roomRect.x;
     const xRightPx = roomRect.x + roomRect.width;
 
-    // Calculate font size based on spacing
-    const xPositions = lcr.map(s => meterToCanvasX(s.position.x));
-    const fontSize = calcFontSize(xPositions, xLeftPx, xRightPx);
-    const roleFontSize = fontSize + 1;
+    // Calculate font size
+    const fontSize = calcFontSize(11, roomRect.width);
+    const roleFontSize = calcFontSize(12, roomRect.width);
 
     return (
       <g data-layer="speaker-positions-front" pointerEvents="none">
@@ -297,9 +280,8 @@ export default function SpeakerPositionsOverlay({
     const xRightPx = roomRect.x + roomRect.width;
 
     // Calculate font size
-    const xPositions = backGroup.map(s => meterToCanvasX(s.xM));
-    const fontSize = calcFontSize(xPositions, xLeftPx, xRightPx);
-    const roleFontSize = fontSize + 1;
+    const fontSize = calcFontSize(11, roomRect.width);
+    const roleFontSize = calcFontSize(12, roomRect.width);
 
     return (
       <g data-layer="speaker-positions-back" pointerEvents="none">
@@ -402,10 +384,9 @@ export default function SpeakerPositionsOverlay({
     const yTopPx = roomRect.y;
     const yBottomPx = roomRect.y + roomRect.height;
 
-    // Calculate font size based on vertical spacing (match LCR)
-    const yPositions = rightGroup.map(s => meterToCanvasY(s.yM));
-    const fontSize = calcFontSize(yPositions, yTopPx, yBottomPx);
-    const roleFontSize = fontSize + 1;
+    // Calculate font size (match LCR)
+    const fontSize = calcFontSize(11, roomRect.width);
+    const roleFontSize = calcFontSize(12, roomRect.width);
 
     return (
       <g data-layer="speaker-positions-right" pointerEvents="none">
@@ -633,42 +614,73 @@ export default function SpeakerPositionsOverlay({
             </>
           ) : (
             <>
-              <text
-                x={dotX - 12}
-                y={meterToCanvasY(yM / 2)}
-                textAnchor="middle"
-                transform={`rotate(-90, ${dotX - 12}, ${meterToCanvasY(yM / 2)})`}
-                style={{ fontSize: 12, fill: textFill }}
-              >
-                {topDistCm}cm
-              </text>
+              {/*
+                SIDE WALLS (vertical): Match LCR layout, rotated -90
+                - distances sit either side of the dot (above/below), rotated -90
+                - role is centred under the dot (after rotation), H sits to the right of the role
+              */}
+              {(() => {
+                const baseSize = calcFontSize(12, roomRect.width);
+                const roleSize = calcFontSize(13, roomRect.width);
 
-              <text
-                x={dotX - 12}
-                y={meterToCanvasY((yM + L) / 2)}
-                textAnchor="middle"
-                transform={`rotate(-90, ${dotX - 12}, ${meterToCanvasY((yM + L) / 2)})`}
-                style={{ fontSize: 12, fill: textFill }}
-              >
-                {bottomDistCm}cm
-              </text>
+                const distGap = 14;           // same as LCR +/- 14px
+                const roleY = 16;             // same as LCR +16px
+                const hDx = 18;               // same as LCR +18px
+                const labelOffset = SIDE_LABEL_PAD_PX; // distance from the line (keeps it off the speakers)
 
-              <g transform={`rotate(-90, ${wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}, ${dotY})`}>
-                <text
-                  x={wall === 'left' ? dotX + SIDE_LABEL_PAD_PX : dotX - SIDE_LABEL_PAD_PX}
-                  y={dotY + 4}
-                  textAnchor="middle"
-                  style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
-                >
-                  {roleText}
-                  <tspan
-                    dx={8}
-                    style={{ fontWeight: 400, fill: "#3E4349" }}
-                  >
-                    {heightText}
-                  </tspan>
-                </text>
-              </g>
+                // anchor point for the rotated label group (to the RIGHT of the line)
+                const ax = wall === "left" ? dotX - labelOffset : dotX + labelOffset;
+                const ay = dotY;
+
+                // rotate so text reads upright like the LCR (just turned)
+                const rot = -90;
+
+                return (
+                  <>
+                    {/* distances: either side of dot (above/below), rotated */}
+                    <text
+                      x={dotX}
+                      y={dotY - distGap}
+                      textAnchor="middle"
+                      transform={`rotate(${rot}, ${dotX}, ${dotY - distGap})`}
+                      style={{ fontSize: baseSize, fill: textFill }}
+                    >
+                      {topDistCm}cm
+                    </text>
+
+                    <text
+                      x={dotX}
+                      y={dotY + distGap}
+                      textAnchor="middle"
+                      transform={`rotate(${rot}, ${dotX}, ${dotY + distGap})`}
+                      style={{ fontSize: baseSize, fill: textFill }}
+                    >
+                      {bottomDistCm}cm
+                    </text>
+
+                    {/* role + H: positioned off the line, same spacing logic as LCR */}
+                    <g transform={`translate(${ax}, ${ay}) rotate(${rot})`}>
+                      <text
+                        x={0}
+                        y={roleY}
+                        textAnchor="middle"
+                        style={{ fontSize: roleSize, fill: textFill, fontWeight: 700 }}
+                      >
+                        {roleText}
+                      </text>
+
+                      <text
+                        x={hDx}
+                        y={roleY}
+                        textAnchor="start"
+                        style={{ fontSize: baseSize, fill: "#3E4349", fontWeight: 400 }}
+                      >
+                        {heightText}
+                      </text>
+                    </g>
+                  </>
+                );
+              })()}
             </>
           )}
         </g>
