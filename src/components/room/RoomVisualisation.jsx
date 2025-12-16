@@ -1557,8 +1557,9 @@ React.useEffect(() => {
               height={baffleH}
               fill="none" 
               stroke="#4A230F" 
-              strokeWidth="1.5" 
-              strokeDasharray="6 6" 
+              strokeWidth="1" 
+              strokeDasharray="4 6" 
+              opacity="0.55"
               pointerEvents="none" 
             />
             
@@ -1569,8 +1570,9 @@ React.useEffect(() => {
               x2={xVisibleL}
               y2={screenPlaneY}
               stroke="#4A230F"
-              strokeWidth="1.5"
-              strokeDasharray="6 6"
+              strokeWidth="1"
+              strokeDasharray="4 6"
+              opacity="0.55"
               pointerEvents="none"
             />
             <line
@@ -1579,8 +1581,9 @@ React.useEffect(() => {
               x2={xVisibleR}
               y2={screenPlaneY}
               stroke="#4A230F"
-              strokeWidth="1.5"
-              strokeDasharray="6 6"
+              strokeWidth="1"
+              strokeDasharray="4 6"
+              opacity="0.55"
               pointerEvents="none"
             />
           </>
@@ -4922,8 +4925,9 @@ return {
               fill="rgba(0,0,0,0)"
               pointerEvents="all"
               stroke="#213428"
-              strokeWidth={seat.isPrimary ? 2.5 : isPinned ? 2 : 1}
+              strokeWidth={seat.isPrimary ? 2 : isPinned ? 1.5 : 1}
               strokeDasharray={isPinned ? '4 2' : 'none'}
+              opacity={seat.isPrimary ? 0.85 : 0.75}
               style={{ cursor: 'pointer' }}
               aria-label="Seat — hover for RP23 and P1 analysis"
               onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
@@ -4954,11 +4958,11 @@ return {
         <circle
           cx={x}
           cy={y}
-          r={4}
+          r={3}
           fill="#22c55e"
           stroke="#ffffff"
-          strokeWidth={2}
-          opacity={0.9}
+          strokeWidth={1.5}
+          opacity={0.85}
         />
       </g>
     );
@@ -5287,6 +5291,7 @@ return (
                         y2={roomRect.y + roomRect.height}
                         stroke="#E6E4DD"
                         strokeWidth="0.5"
+                        opacity="0.22"
                       />
                     );
                     anyDrawn = true;
@@ -5303,6 +5308,7 @@ return (
                         y2={roomRect.y + roomRect.height}
                         stroke="#E6E4DD"
                         strokeWidth="0.5"
+                        opacity="0.22"
                       />
                     );
                     anyDrawn = true;
