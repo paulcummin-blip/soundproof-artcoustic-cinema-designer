@@ -503,10 +503,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [dragWarning, setDragWarning] = useState({ show: false, message: '', x: 0, y: 0 });
   const [constraintZones, setConstraintZones] = useState(null);
   const [zoom, setZoom] = React.useState(1.0);
-  const [panPxX, setPanPxX] = React.useState(0);
-  const [panPxY, setPanPxY] = React.useState(0);
-  const panDragStartRef = useRef(null);
-  const panStartPosRef = useRef(null);
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
@@ -1508,16 +1504,7 @@ React.useEffect(() => {
   );
 
   const handleZoomIn = () => setZoom(prev => Math.min(2.0, prev + 0.1));
-  const handleZoomOut = () => {
-    setZoom(prev => {
-      const next = Math.max(0.5, prev - 0.1);
-      if (next <= 1.0) {
-        setPanPxX(0);
-        setPanPxY(0);
-      }
-      return next;
-    });
-  };
+  const handleZoomOut = () => setZoom(prev => Math.max(0.5, prev - 0.1));
 
   // Memoize baffle and screen calculations for performance
   const { BaffleAndScreen, screenPlaneY, screenCenterX_m, visibleWidthM } = useMemo(() => {
@@ -2404,16 +2391,6 @@ React.useEffect(() => {
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
-    // Pan mode: if we're not dragging a speaker/seat, handle pan drag
-    if (panDragStartRef.current && !dragging) {
-      const dx = e.clientX - panDragStartRef.current.x;
-      const dy = e.clientY - panDragStartRef.current.y;
-      const clampMax = roomRect.width;
-      setPanPxX(Math.max(-clampMax, Math.min(clampMax, panStartPosRef.current.x + dx)));
-      setPanPxY(Math.max(-clampMax, Math.min(clampMax, panStartPosRef.current.y + dy)));
-      return;
-    }
-
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
@@ -2495,12 +2472,6 @@ React.useEffect(() => {
   }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, roomToCanvas]);
 
   const handleMouseUp = useCallback(() => {
-    // End pan drag
-    if (panDragStartRef.current) {
-      panDragStartRef.current = null;
-      panStartPosRef.current = null;
-    }
-
     // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
     // CRITICAL: Overheads must be draggable. RP22 constrains placement, not interaction.
     // During drag = free movement. After release = snap to compliance.
@@ -5236,45 +5207,24 @@ return (
           overflow: 'hidden',
           position: 'relative',
           zIndex: 1,
-          cursor: dragging && dragType !== 'speaker' && dragType !== 'seat' ? 'grabbing' : zoom > 1 ? 'grab' : 'default',
         }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
-        onMouseDown={(e) => {
-          if (!dragging && zoom > 1 && e.target === svgRef.current) {
-            panDragStartRef.current = { x: e.clientX, y: e.clientY };
-            panStartPosRef.current = { x: panPxX, y: panPxY };
-          }
-        }}
-        onWheel={(e) => {
-          if (zoom > 1) {
-            e.preventDefault();
-            const clampMax = roomRect.width;
-            setPanPxX(prev => Math.max(-clampMax, Math.min(clampMax, prev - e.deltaX)));
-            setPanPxY(prev => Math.max(-clampMax, Math.min(clampMax, prev - e.deltaY)));
-          }
-        }}
       >
 <SvgDefs ids={ids} scale={scale} svgW={svgW} svgH={svgH} />
 
 {/* Removed debug label (zoneKeysLabel) */}
 
           {/* ZOOM GROUP — CLIPPED TO VIEWPORT, SO IT CAN'T ESCAPE */}
-          {(() => {
-            const zoomCenterX = roomRect.x + roomRect.width / 2;
-            const zoomCenterY = roomRect.y + roomRect.height / 2;
-            
-            return (
-              <g
-                clipPath={`url(#${idsClip})`}
-                transform={
-                  `translate(${panPxX}, ${panPxY}) ` +
-                  `translate(${zoomCenterX}, ${zoomCenterY}) ` +
-                  `scale(${Number(zoom) || 1}) ` +
-                  `translate(${-zoomCenterX}, ${-zoomCenterY})`
-                }
-              >
+          <g
+              clipPath={`url(#${idsClip})`}
+  transform={
+    `translate(${svgWSafe / 2}, ${(roomRect.y || 0) + PLAN_TOP_PAD_PX}) ` +
+    `scale(${Number(zoom) || 1}) ` +
+    `translate(${-svgWSafe / 2}, ${-((roomRect.y || 0) + PLAN_TOP_PAD_PX)})`
+  }
+          >
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
             <g data-layer="grid">
               {/* Draw vertical grid lines (centre-anchored) */}
@@ -5525,9 +5475,7 @@ return (
   svgW={svgW}
 />
 
-              </g>
-            );
-          })()}
+          </g>
         </svg>
 
         {/* SEAT HOVER HUD - updated with drag and hide/show */}
