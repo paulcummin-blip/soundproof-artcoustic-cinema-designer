@@ -725,11 +725,12 @@ export default function SpeakerPositionsOverlay({
     const xLeftPx = roomRect.x;
     const xRightPx = roomRect.x + roomRect.width;
 
-    // For clash avoidance with the LEFT vertical overhead ruler
+    // --- Clash avoidance: push horizontal overhead rulers DOWN if they intersect the LEFT vertical ruler label lane ---
+
     const ICON_R_PX = 12;
     const GAP_FROM_ICON_PX = 20;
 
-    // Match the vertical ruler positioning logic (dynamic, 20px off the left overhead icon edge)
+    // Left vertical ruler X (same logic as your dynamic left ruler)
     const leftOverheadMinXPx = overheadLeft.length
       ? Math.min(...overheadLeft.map(s => meterToCanvasX(s.position.x)))
       : null;
@@ -737,6 +738,36 @@ export default function SpeakerPositionsOverlay({
     const xLeftRuler = (leftOverheadMinXPx != null)
       ? (leftOverheadMinXPx - ICON_R_PX - GAP_FROM_ICON_PX)
       : null;
+
+    // The vertical ruler's label lane sits to the RIGHT of the ruler (you used +22 before)
+    const VERT_LABEL_LANE_LEFT_X  = (xLeftRuler != null) ? (xLeftRuler + 10) : null;
+    const VERT_LABEL_LANE_RIGHT_X = (xLeftRuler != null) ? (xLeftRuler + 70) : null;
+
+    // Build "blocked Y bands" around each left-column overhead dot (where the vertical distances + label text live)
+    const blockedYBands = (overheadLeft || []).map((s) => {
+      const y = meterToCanvasY(s.position.y);
+      return { yMin: y - 28, yMax: y + 28 };
+    });
+
+    const overlapsBand = (y, band) => y >= band.yMin && y <= band.yMax;
+
+    // If the horizontal line is within any blocked Y band, push it down by STEP_PX until clear
+    const pushRowDownIfNeeded = (yPx) => {
+      if (xLeftRuler == null) return yPx;
+
+      let y = yPx;
+      const STEP_PX = 18; // one "comfortable" nudge
+      const MAX_PUSH = 6; // don't run away forever
+
+      let loops = 0;
+      while (loops < MAX_PUSH) {
+        const hit = blockedYBands.some((b) => overlapsBand(y, b));
+        if (!hit) break;
+        y += STEP_PX;
+        loops += 1;
+      }
+      return y;
+    };
 
     return (
       <g data-layer="speaker-positions-overheads-horizontal" pointerEvents="none">
@@ -766,10 +797,12 @@ export default function SpeakerPositionsOverlay({
           const avoidLabelExtraY = overheadLeft.length ? 10 : 0;
 
           // Desired y: just BELOW the overhead icons for that row
-          let yPx = ySpeakerPx + ICON_R_PX + GAP_FROM_ICON_PX + avoidLabelExtraY;
+          let yPxRaw = ySpeakerPx + ICON_R_PX + GAP_FROM_ICON_PX + avoidLabelExtraY;
 
           // Clamp so it stays inside the room (and doesn't sit on the border)
-          yPx = Math.max(roomRect.y + SAFE_INSET_PX, Math.min(roomRect.y + roomRect.height - SAFE_INSET_PX, yPx));
+          yPxRaw = Math.max(roomRect.y + SAFE_INSET_PX, Math.min(roomRect.y + roomRect.height - SAFE_INSET_PX, yPxRaw));
+
+          const yPx = pushRowDownIfNeeded(yPxRaw);
 
           return (
             <g key={`oh-row-top`}>
