@@ -608,10 +608,26 @@ export default function SpeakerPositionsOverlay({
     const fontSize = calcFontSize(11, roomFontBasis);
     const roleFontSize = calcFontSize(12, roomFontBasis);
 
-    // Put the two vertical rulers slightly inside the room so they never clip
-    const insetPx = 26;
-    const xLeftRuler = roomRect.x + insetPx;
-    const xRightRuler = roomRect.x + roomRect.width - insetPx;
+    // Left overhead ruler: dynamically sit ~20px to the LEFT of the left-most overhead icon edge,
+    // but never outside the room (keep a small safety inset so it won't clip).
+    const GAP_PX = 20;
+    const SAFE_INSET_PX = 12;
+
+    // approximate overhead icon radius on plan (matches your overhead dots visually)
+    const ICON_R_PX = 12;
+
+    // Find the left-most overhead icon edge in pixels (fallback to a safe inset if none)
+    const leftMostOhEdgePx = overheadLeft.length
+      ? Math.min(...overheadLeft.map(s => meterToCanvasX(s.position.x) - ICON_R_PX))
+      : (roomRect.x + SAFE_INSET_PX);
+
+    // Desired ruler X: 20px left of that edge
+    const desiredLeftRulerX = leftMostOhEdgePx - GAP_PX;
+
+    // Clamp so it always stays inside the roomRect
+    const xLeftRuler = Math.max(roomRect.x + SAFE_INSET_PX, desiredLeftRulerX);
+
+    // (we're no longer drawing the right overhead ruler)
 
     const yTopPx = roomRect.y;
     const yBottomPx = roomRect.y + roomRect.height;
