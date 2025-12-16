@@ -430,6 +430,57 @@ export default function SpeakerPositionsOverlay({
     });
   };
 
+  // Visual spacing (metres in plan space)
+  const OUTER = 0.55;      // how far OUTSIDE the room the dimension lines sit
+  const LANE_GAP = 0.22;   // gap BETWEEN stacked lines on same wall
+  const DOT_R = 0.035;
+
+  // Helpers
+  const cm = (m) => `${mToCm(m)}cm`;
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+  // Split speakers by which wall they are on (for clean stacking)
+  const onFront = [];
+  const onLeft = [];
+  const onRight = [];
+
+  bedSpeakers.forEach((s) => {
+    const x = s.position.x;
+    const y = s.position.y;
+
+    // decide wall by nearest
+    const dFront = y, dBack = L - y, dLeft = x, dRight = W - x;
+    let wall = "front", dist = dFront;
+    if (dBack < dist) { wall = "back"; dist = dBack; }
+    if (dLeft < dist) { wall = "left"; dist = dLeft; }
+    if (dRight < dist){ wall = "right"; dist = dRight; }
+
+    // For this overlay we only draw practical "mounted on a wall" speakers.
+    // If something is closest to the back wall, treat it like a back-wall speaker later (optional).
+    if (wall === "front") onFront.push(s);
+    else if (wall === "left") onLeft.push(s);
+    else if (wall === "right") onRight.push(s);
+  });
+
+  // Front wall: give FL/FC/FR their own lanes (so lines don't clash)
+  const frontLaneForRole = (role) => {
+    const r = String(role || "").toUpperCase();
+    if (r === "FL" || r === "L") return 0;
+    if (r === "FC" || r === "C") return 1;
+    if (r === "FR" || r === "R") return 2;
+    return 3; // any other front-mounted speaker
+  };
+
+  // Side walls: stack by Y order (if multiple speakers end up on same wall)
+  const makeSideLanes = (arr) => {
+    return [...arr]
+      .sort((a,b) => a.position.y - b.position.y)
+      .map((s, i) => ({ s, lane: i }));
+  };
+
+  const leftLanes = makeSideLanes(onLeft);
+  const rightLanes = makeSideLanes(onRight);
+
   return (
     <g data-layer="speaker-positions-overlay" pointerEvents="none">
       <defs>
@@ -442,12 +493,259 @@ export default function SpeakerPositionsOverlay({
           markerHeight="6"
           orient="auto"
         >
-          <path d="M 0 0 L 10 5 L 0 10 z" fill={stroke} />
+          <path d="M 0 0 L 10 5 L 0 10 z" fill="#DCDBD6" />
         </marker>
       </defs>
 
-      {renderLcrDims()}
-      {renderSurroundDims()}
+      {/* FRONT WALL DIMENSION LINES (one per LCR, stacked) */}
+      {onFront
+        .sort((a,b) => frontLaneForRole(a.role) - frontLaneForRole(b.role))
+        .map((s, idx) => {
+          const x = clamp(s.position.x, 0, W);
+          const role = String(s.role || "").toUpperCase();
+          const modelText = prettyModel(s.model);
+          const h = bedHeightM(s.position.y);
+
+          const lane = frontLaneForRole(role);
+          const yLine = meterToCanvasY(-OUTER - (lane * LANE_GAP));
+          const xCanvas = meterToCanvasX(x);
+          const x0Canvas = meterToCanvasX(0);
+          const xWCanvas = meterToCanvasX(W);
+
+          const leftDist = x;
+          const rightDist = W - x;
+
+          // Dot above the speaker centre
+          return (
+            <g key={`front-${role}-${idx}`}>
+              {/* full width line */}
+              <line
+                x1={x0Canvas}
+                y1={yLine}
+                x2={xWCanvas}
+                y2={yLine}
+                stroke="#DCDBD6"
+                strokeWidth={2}
+                markerStart="url(#spk-dim-arrow)"
+                markerEnd="url(#spk-dim-arrow)"
+                opacity={0.95}
+              />
+
+              {/* centre dot */}
+              <circle cx={xCanvas} cy={yLine} r={5} fill="#213428" />
+
+              {/* left / right distances with extra breathing space */}
+              <text
+                x={xCanvas - 30}
+                y={yLine - 8}
+                textAnchor="end"
+                style={{ fontSize: 12, fill: "#1B1A1A" }}
+              >
+                {cm(leftDist)}
+              </text>
+              <text
+                x={xCanvas + 30}
+                y={yLine - 8}
+                textAnchor="start"
+                style={{ fontSize: 12, fill: "#1B1A1A" }}
+              >
+                {cm(rightDist)}
+              </text>
+
+              {/* speaker id + model centred on the dot */}
+              <text
+                x={xCanvas}
+                y={yLine + 16}
+                textAnchor="middle"
+                style={{ fontSize: 13, fill: "#1B1A1A", fontWeight: 700 }}
+              >
+                {role}
+              </text>
+              {!!modelText && (
+                <text
+                  x={xCanvas}
+                  y={yLine + 30}
+                  textAnchor="middle"
+                  style={{ fontSize: 12, fill: "#3E4349" }}
+                >
+                  {modelText}
+                </text>
+              )}
+
+              {/* height aligned with the RIGHT distance (not bold) */}
+              <text
+                x={xCanvas + 30}
+                y={yLine + 30}
+                textAnchor="start"
+                style={{ fontSize: 12, fill: "#3E4349" }}
+              >
+                {`H${mToCm(h)}cm`}
+              </text>
+            </g>
+          );
+        })}
+
+      {/* LEFT WALL DIMENSION LINES (text must sit on the LEFT of the line) */}
+      {leftLanes.map(({ s, lane }, idx) => {
+        const y = clamp(s.position.y, 0, L);
+        const role = String(s.role || "").toUpperCase();
+        const modelText = prettyModel(s.model);
+        const h = bedHeightM(s.position.y);
+
+        const xLine = meterToCanvasX(-OUTER - (lane * LANE_GAP));
+        const yCanvas = meterToCanvasY(y);
+        const y0Canvas = meterToCanvasY(0);
+        const yLCanvas = meterToCanvasY(L);
+
+        const topDist = y;
+        const botDist = L - y;
+
+        return (
+          <g key={`left-${role}-${idx}`}>
+            <line
+              x1={xLine}
+              y1={y0Canvas}
+              x2={xLine}
+              y2={yLCanvas}
+              stroke="#DCDBD6"
+              strokeWidth={2}
+              markerStart="url(#spk-dim-arrow)"
+              markerEnd="url(#spk-dim-arrow)"
+              opacity={0.95}
+            />
+            <circle cx={xLine} cy={yCanvas} r={5} fill="#213428" />
+
+            {/* distances (above/below the dot) */}
+            <text
+              x={xLine - 12}
+              y={yCanvas - 12}
+              textAnchor="end"
+              style={{ fontSize: 12, fill: "#1B1A1A" }}
+            >
+              {cm(topDist)}
+            </text>
+            <text
+              x={xLine - 12}
+              y={yCanvas + 18}
+              textAnchor="end"
+              style={{ fontSize: 12, fill: "#1B1A1A" }}
+            >
+              {cm(botDist)}
+            </text>
+
+            {/* label on LEFT side only, rotated */}
+            <g transform={`translate(${xLine - 26}, ${yCanvas}) rotate(-90)`}>
+              <text
+                x={0}
+                y={4}
+                textAnchor="middle"
+                style={{ fontSize: 12, fill: "#1B1A1A", fontWeight: 700 }}
+              >
+                {role}
+              </text>
+              {!!modelText && (
+                <text
+                  x={0}
+                  y={16}
+                  textAnchor="middle"
+                  style={{ fontSize: 11, fill: "#3E4349" }}
+                >
+                  {modelText}
+                </text>
+              )}
+              <text
+                x={0}
+                y={28}
+                textAnchor="middle"
+                style={{ fontSize: 12, fill: "#3E4349" }}
+              >
+                {`H${mToCm(h)}cm`}
+              </text>
+            </g>
+          </g>
+        );
+      })}
+
+      {/* RIGHT WALL DIMENSION LINES (text must sit on the RIGHT of the line) */}
+      {rightLanes.map(({ s, lane }, idx) => {
+        const y = clamp(s.position.y, 0, L);
+        const role = String(s.role || "").toUpperCase();
+        const modelText = prettyModel(s.model);
+        const h = bedHeightM(s.position.y);
+
+        const xLine = meterToCanvasX(W + OUTER + (lane * LANE_GAP));
+        const yCanvas = meterToCanvasY(y);
+        const y0Canvas = meterToCanvasY(0);
+        const yLCanvas = meterToCanvasY(L);
+
+        const topDist = y;
+        const botDist = L - y;
+
+        return (
+          <g key={`right-${role}-${idx}`}>
+            <line
+              x1={xLine}
+              y1={y0Canvas}
+              x2={xLine}
+              y2={yLCanvas}
+              stroke="#DCDBD6"
+              strokeWidth={2}
+              markerStart="url(#spk-dim-arrow)"
+              markerEnd="url(#spk-dim-arrow)"
+              opacity={0.95}
+            />
+            <circle cx={xLine} cy={yCanvas} r={5} fill="#213428" />
+
+            {/* distances (above/below the dot) */}
+            <text
+              x={xLine + 12}
+              y={yCanvas - 12}
+              textAnchor="start"
+              style={{ fontSize: 12, fill: "#1B1A1A" }}
+            >
+              {cm(topDist)}
+            </text>
+            <text
+              x={xLine + 12}
+              y={yCanvas + 18}
+              textAnchor="start"
+              style={{ fontSize: 12, fill: "#1B1A1A" }}
+            >
+              {cm(botDist)}
+            </text>
+
+            {/* label on RIGHT side only, rotated */}
+            <g transform={`translate(${xLine + 26}, ${yCanvas}) rotate(-90)`}>
+              <text
+                x={0}
+                y={4}
+                textAnchor="middle"
+                style={{ fontSize: 12, fill: "#1B1A1A", fontWeight: 700 }}
+              >
+                {role}
+              </text>
+              {!!modelText && (
+                <text
+                  x={0}
+                  y={16}
+                  textAnchor="middle"
+                  style={{ fontSize: 11, fill: "#3E4349" }}
+                >
+                  {modelText}
+                </text>
+              )}
+              <text
+                x={0}
+                y={28}
+                textAnchor="middle"
+                style={{ fontSize: 12, fill: "#3E4349" }}
+              >
+                {`H${mToCm(h)}cm`}
+              </text>
+            </g>
+          </g>
+        );
+      })}
     </g>
   );
 }
