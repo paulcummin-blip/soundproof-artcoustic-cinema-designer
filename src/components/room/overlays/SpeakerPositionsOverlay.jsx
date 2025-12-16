@@ -670,26 +670,7 @@ export default function SpeakerPositionsOverlay({
               </text>
             </g>
 
-            {/* ID + H: same relationship as LCR, placed to the room-side of the ruler */}
-            <g transform={`translate(${rulerX + 22}, ${yPx + nudge}) rotate(${rot})`}>
-              <text
-                x={0}
-                y={roleY}
-                textAnchor="middle"
-                style={{ fontSize: roleFontSize, fill: textFill, fontWeight: 700 }}
-              >
-                {role}
-              </text>
 
-              <text
-                x={hDx}
-                y={roleY}
-                textAnchor="start"
-                style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
-              >
-                {Hcm ? `H${Hcm}cm` : ""}
-              </text>
-            </g>
           </g>
         );
       });
@@ -711,22 +692,7 @@ export default function SpeakerPositionsOverlay({
           />
         ) : null}
 
-        {/* Right vertical ruler */}
-        {overheadRight.length ? (
-          <line
-            x1={xRightRuler}
-            y1={yTopPx}
-            x2={xRightRuler}
-            y2={yBottomPx}
-            stroke={stroke}
-            strokeWidth={2}
-            markerStart="url(#spk-dim-arrow)"
-            markerEnd="url(#spk-dim-arrow)"
-          />
-        ) : null}
-
         {drawColumn(overheadLeft, xLeftRuler, "ohL")}
-        {drawColumn(overheadRight, xRightRuler, "ohR")}
       </g>
     );
   };
@@ -745,12 +711,14 @@ export default function SpeakerPositionsOverlay({
 
     return (
       <g data-layer="speaker-positions-overheads-horizontal" pointerEvents="none">
-        {overheadRows.map((row, rIdx) => {
+        {(() => {
+          const row = overheadRows[0];
+          if (!row) return null;
+
           const yPx = meterToCanvasY(row.yM);
 
           return (
-            <g key={`oh-row-${rIdx}`}>
-              {/* ruler line */}
+            <g key={`oh-row-top`}>
               <line
                 x1={xLeftPx}
                 y1={yPx}
@@ -762,18 +730,15 @@ export default function SpeakerPositionsOverlay({
                 markerEnd="url(#spk-dim-arrow)"
               />
 
-              {/* dots + labels */}
               {row.items.map((it, idx) => {
-                const s = it.s;
-                const role = String(s.role || "").toUpperCase();
                 const xPx = meterToCanvasX(it.xM);
 
                 const leftDist = mToCm(it.xM);
                 const rightDist = mToCm(W - it.xM);
 
-                // tighten if neighbours are close
                 let leftOffset = 14;
                 let rightOffset = 14;
+
                 if (idx > 0) {
                   const prevXPx = meterToCanvasX(row.items[idx - 1].xM);
                   if (Math.abs(xPx - prevXPx) < 40) {
@@ -790,10 +755,9 @@ export default function SpeakerPositionsOverlay({
                 }
 
                 return (
-                  <g key={`oh-row-${rIdx}-${role}-${idx}`}>
+                  <g key={`oh-top-${idx}`}>
                     <circle cx={xPx} cy={yPx} r={5} fill={dotFill} />
 
-                    {/* distances BELOW the line */}
                     <text
                       x={xPx - leftOffset}
                       y={yPx + 12}
@@ -811,31 +775,12 @@ export default function SpeakerPositionsOverlay({
                     >
                       {rightDist}cm
                     </text>
-
-                    {/* ID + H: same line relationship as your other rulers */}
-                    <text
-                      x={xPx}
-                      y={yPx + 28}
-                      textAnchor="middle"
-                      style={{ fontSize: roleFontSize, fill: textFill, fontWeight: 700 }}
-                    >
-                      {role}
-                    </text>
-
-                    <text
-                      x={xPx + 18}
-                      y={yPx + 28}
-                      textAnchor="start"
-                      style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
-                    >
-                      {Hcm ? `H${Hcm}cm` : ""}
-                    </text>
                   </g>
                 );
               })}
             </g>
           );
-        })}
+        })()}
       </g>
     );
   };
