@@ -503,6 +503,10 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [dragWarning, setDragWarning] = useState({ show: false, message: '', x: 0, y: 0 });
   const [constraintZones, setConstraintZones] = useState(null);
   const [zoom, setZoom] = React.useState(1.0);
+  const [panPxX, setPanPxX] = React.useState(0);
+  const [panPxY, setPanPxY] = React.useState(0);
+  const panDragStartRef = useRef(null);
+  const panStartPosRef = useRef(null);
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
