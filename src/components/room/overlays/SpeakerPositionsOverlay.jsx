@@ -421,7 +421,7 @@ export default function SpeakerPositionsOverlay({
           const roleSize = calcFontSize(12, roomRect.width);
 
           const distDx = 14;   // same as LCR
-          const distY = -8;    // same as LCR
+          const distY = 12;    // flip to opposite side of dot
           const roleY = 16;    // same as LCR
           const hDx = 18;      // same as LCR
 
