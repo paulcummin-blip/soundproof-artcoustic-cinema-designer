@@ -405,68 +405,71 @@ export default function SpeakerPositionsOverlay({
         {/* Dots and labels for each speaker */}
         {rightGroup.map((s, idx) => {
           const yPx = meterToCanvasY(s.yM);
-          const topDistCm = mToCm(s.yM);
-          const bottomDistCm = mToCm(L - s.yM);
           const hCm = mToCm(bedHeightM(s.yM));
-
-          // Check for close neighbors to adjust label position
-          let labelNudge = 0;
-          
-          if (idx > 0) {
-            const prevYPx = meterToCanvasY(rightGroup[idx - 1].yM);
-            if (Math.abs(yPx - prevYPx) < 50) {
-              labelNudge = 4;
-            }
-          }
 
           const dotX = rulerXpx;
           const dotY = yPx;
-          const dx = 14; // distance from ruler line
-          const yTop = dotY - 14; // above the dot
-          const yBot = dotY + 14; // below the dot
+
+          // Treat this like LCR rotated:
+          // left of dot = distance to BACK wall (rear) = L - yM
+          // right of dot = distance to FRONT wall      = yM
+          const distLeft = mToCm(L - s.yM);
+          const distRight = mToCm(s.yM);
+
+          // Font sizes (match your "one smaller" defaults)
+          const baseSize = calcFontSize(11, roomRect.width);
+          const roleSize = calcFontSize(12, roomRect.width);
+
+          const distDx = 14;   // same as LCR
+          const distY = -8;    // same as LCR
+          const roleY = 16;    // same as LCR
+          const hDx = 18;      // same as LCR
+
+          // Place ROLE + H between the wall edge and the ruler line
+          // For right wall, label goes to the LEFT of the ruler line
+          const labelX = dotX - SIDE_LABEL_PAD_PX;
 
           return (
             <g key={`right-dim-${s.role}-${idx}`}>
               <circle cx={dotX} cy={dotY} r={5} fill={dotFill} />
 
-              {/* Top distance (tight to dot, above) */}
-              <text
-                x={dotX + dx}
-                y={yTop}
-                textAnchor="middle"
-                transform={`rotate(-90, ${dotX + dx}, ${yTop})`}
-                style={{ fontSize, fill: textFill }}
-              >
-                {topDistCm}cm
-              </text>
+              {/* Distances either side of dot (like LCR), rotated as a unit */}
+              <g transform={`translate(${dotX}, ${dotY}) rotate(-90)`}>
+                <text
+                  x={-distDx}
+                  y={distY}
+                  textAnchor="end"
+                  style={{ fontSize: baseSize, fill: textFill }}
+                >
+                  {distLeft}cm
+                </text>
 
-              {/* Bottom distance (tight to dot, below) */}
-              <text
-                x={dotX + dx}
-                y={yBot}
-                textAnchor="middle"
-                transform={`rotate(-90, ${dotX + dx}, ${yBot})`}
-                style={{ fontSize, fill: textFill }}
-              >
-                {bottomDistCm}cm
-              </text>
+                <text
+                  x={distDx}
+                  y={distY}
+                  textAnchor="start"
+                  style={{ fontSize: baseSize, fill: textFill }}
+                >
+                  {distRight}cm
+                </text>
+              </g>
 
-              {/* Role and height (rotated, matching LCR layout: role centred, H to the right) */}
-              <g transform={`translate(${dotX + SIDE_LABEL_PAD_PX}, ${dotY + labelNudge}) rotate(-90)`}>
+              {/* Role + H identical spacing to LCR, positioned between wall and ruler, rotated as a unit */}
+              <g transform={`translate(${labelX}, ${dotY}) rotate(-90)`}>
                 <text
                   x={0}
-                  y={4}
+                  y={roleY}
                   textAnchor="middle"
-                  style={{ fontSize: roleFontSize, fill: textFill, fontWeight: 700 }}
+                  style={{ fontSize: roleSize, fill: textFill, fontWeight: 700 }}
                 >
                   {s.role}
                 </text>
 
                 <text
-                  x={roleFontSize * 1.8}
-                  y={4}
+                  x={hDx}
+                  y={roleY}
                   textAnchor="start"
-                  style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
+                  style={{ fontSize: baseSize, fill: "#3E4349", fontWeight: 400 }}
                 >
                   {`H${hCm}cm`}
                 </text>
