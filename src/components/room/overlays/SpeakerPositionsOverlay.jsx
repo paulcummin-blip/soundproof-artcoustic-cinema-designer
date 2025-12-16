@@ -3,6 +3,13 @@ import React from "react";
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const mToCm = (m) => Math.round(Number(m) * 100);
 
+const prettyModel = (raw) => {
+  const s = String(raw || "");
+  if (!s) return "";
+  if (s === "evolve-2-1_s") return "Evolve 2-1";
+  return s.replace(/_/g, " ").replace(/-/g, " ").replace(/\s+/g, " ").trim();
+};
+
 // Lane spacing constants
 const LANE_GAP_M = 0.18;
 const TOP_CLEAR_M = 0.22;
@@ -60,8 +67,16 @@ export default function SpeakerPositionsOverlay({
     return isNum(x) && isNum(y);
   });
 
-  // --- Assign wall and laneIndex to each speaker ---
-  const speakersWithLanes = bedSpeakers.map((s) => {
+  // --- Split LCR vs surrounds ---
+  const lcrRoles = new Set(["FL","FC","FR","L","C","R"]);
+  const lcr = bedSpeakers
+    .filter(s => lcrRoles.has(String(s.role || "").toUpperCase()))
+    .sort((a,b) => (a.position.x ?? 0) - (b.position.x ?? 0));
+
+  const surrounds = bedSpeakers.filter(s => !lcrRoles.has(String(s.role || "").toUpperCase()));
+
+  // --- Assign wall and laneIndex to surrounds only ---
+  const speakersWithLanes = surrounds.map((s) => {
     const xM = s.position.x;
     const yM = s.position.y;
     const role = String(s.role).toUpperCase();
@@ -97,6 +112,122 @@ export default function SpeakerPositionsOverlay({
   const dotFill = "#213428";
   const textFill = "#1B1A1A";
 
+  const cm = (m) => Math.round((Number(m) || 0) * 100);
+
+  // LCR stacking constants
+  const LCR_STACK_GAP_M = 0.18;
+  const LCR_TOP_PAD_M = 0.30;
+
+  const bedHeight = (yM) => bedHeightM(yM);
+
+  // --- LCR DIMENSIONS (separate stacked lines) ---
+  const renderLcrDims = () => {
+    if (!lcr.length) return null;
+
+    const baseY = -LCR_TOP_PAD_M;
+
+    return (
+      <g data-layer="speaker-positions-lcr" pointerEvents="none">
+        {lcr.map((s, i) => {
+          const x = s.position.x;
+          const role = String(s.role || "").toUpperCase();
+
+          const yLine = baseY - (i * LCR_STACK_GAP_M);
+
+          const leftCm = cm(x);
+          const rightCm = cm(W - x);
+
+          const modelText = prettyModel(s.modelLabel || s.model);
+
+          // Convert to canvas coordinates
+          const yLinePx = meterToCanvasY(yLine);
+          const xPx = meterToCanvasX(x);
+          const xLeftPx = meterToCanvasX(0);
+          const xRightPx = meterToCanvasX(W);
+
+          return (
+            <g key={`lcr-dim-${role}-${i}`}>
+              {/* full width dimension line */}
+              <line
+                x1={xLeftPx}
+                y1={yLinePx}
+                x2={xRightPx}
+                y2={yLinePx}
+                stroke="#DCDBD6"
+                strokeWidth={2}
+                markerStart="url(#spk-dim-arrow)"
+                markerEnd="url(#spk-dim-arrow)"
+              />
+
+              {/* centre dot exactly above speaker centre */}
+              <circle cx={xPx} cy={yLinePx} r={5} fill="#213428" />
+
+              {/* left distance (left wall -> dot) */}
+              <text
+                x={meterToCanvasX(x / 2)}
+                y={yLinePx - 8}
+                textAnchor="middle"
+                fontSize={12}
+                fill="#1B1A1A"
+              >
+                {leftCm}cm
+              </text>
+
+              {/* right distance (dot -> right wall) */}
+              <text
+                x={meterToCanvasX(x + (W - x) / 2)}
+                y={yLinePx - 8}
+                textAnchor="middle"
+                fontSize={12}
+                fill="#1B1A1A"
+              >
+                {rightCm}cm
+              </text>
+
+              {/* role (bold) centred at the dot */}
+              <text
+                x={xPx}
+                y={yLinePx + 16}
+                textAnchor="middle"
+                fontSize={13}
+                fill="#1B1A1A"
+                fontWeight={700}
+              >
+                {role}
+              </text>
+
+              {/* model directly under the role (optional) */}
+              {modelText ? (
+                <text
+                  x={xPx}
+                  y={yLinePx + 28}
+                  textAnchor="middle"
+                  fontSize={12}
+                  fill="#3E4349"
+                  fontWeight={400}
+                >
+                  {modelText}
+                </text>
+              ) : null}
+
+              {/* height aligned under the RIGHT distance (not bold) */}
+              <text
+                x={meterToCanvasX(x + (W - x) / 2)}
+                y={yLinePx + 16}
+                textAnchor="middle"
+                fontSize={12}
+                fill="#3E4349"
+                fontWeight={400}
+              >
+                H{cm(bedHeight(s.position.y))}cm
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  };
+
   return (
     <g data-layer="speaker-positions-overlay" pointerEvents="none">
       <defs>
@@ -113,6 +244,10 @@ export default function SpeakerPositionsOverlay({
         </marker>
       </defs>
 
+      {/* LCR dimensions (stacked) */}
+      {renderLcrDims()}
+
+      {/* Surround dimensions (lanes) */}
       {speakersWithLanes.map((s, idx) => {
         const { xM, yM, role, wall, laneIndex } = s;
         const hCm = mToCm(bedHeightM(yM));
