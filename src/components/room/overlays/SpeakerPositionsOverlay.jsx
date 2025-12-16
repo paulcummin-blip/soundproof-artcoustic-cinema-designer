@@ -239,21 +239,24 @@ export default function SpeakerPositionsOverlay({
                 {rightCm}cm
               </text>
 
+              {/* Role centred under the dot */}
               <text
-                x={xLabel}
-                y={yLine + 20}
+                x={xPx}
+                y={yLine + 16}
                 textAnchor="middle"
-                fontSize={13}
-                fill="#1B1A1A"
-                fontWeight={700}
+                style={{ fontSize: 13, fill: "#1B1A1A", fontWeight: 700 }}
               >
                 {role}
-                <tspan
-                  dx={8}
-                  style={{ fontWeight: 400, fill: "#3E4349", fontSize: 12 }}
-                >
-                  H{mToCm(bedHeightM(s.position.y))}cm
-                </tspan>
+              </text>
+
+              {/* Height to the right of the role (same line, not bold) */}
+              <text
+                x={xPx + 18}
+                y={yLine + 16}
+                textAnchor="start"
+                style={{ fontSize: 12, fill: "#3E4349", fontWeight: 400 }}
+              >
+                {`H${mToCm(bedHeightM(s.position.y))}cm`}
               </text>
             </g>
           );
