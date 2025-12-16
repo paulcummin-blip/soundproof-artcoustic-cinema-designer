@@ -896,7 +896,7 @@ React.useEffect(() => {
   return () => clearTimeout(screenSendTimerRef.current);
 }, [actualScreenFrontY, onScreenPlaneChange]);
 
-  const TOP_GUTTER_PX = 120; // reserved space above room for dimension lines
+  const TOP_GUTTER_PX = 150; // reserved space above room for dimension lines
   
   const availW = (containerW || DEFAULT_W) - 2 * PADDING;
   const availH = (containerH || DEFAULT_H) - 2 * PADDING - TOP_GUTTER_PX;
