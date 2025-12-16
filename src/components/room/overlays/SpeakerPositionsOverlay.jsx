@@ -41,9 +41,9 @@ const LCR_TOP_SAFE_PX = 18;        // never draw above this Y
 const LCR_LABEL_NUDGE_PX = 18;     // small x nudge when two labels would collide
 
 // Side wall constants
-const SIDE_LABEL_PAD_PX = 26;
+const SIDE_LABEL_PAD_PX = 38;
 const SIDE_STACK_GAP_PX = 34;
-const TOP_CLEAR_M = 0.22;
+const TOP_CLEAR_M = 0.35;
 
 export default function SpeakerPositionsOverlay({
   speakers = [],
@@ -357,37 +357,42 @@ export default function SpeakerPositionsOverlay({
 
           {isHorizontal ? (
             <>
+              {/* distances close to the dot */}
               <text
-                x={meterToCanvasX(xM / 2)}
+                x={dotX - 14}
                 y={dotY - 8}
-                textAnchor="middle"
+                textAnchor="end"
                 style={{ fontSize: 12, fill: textFill }}
               >
                 {leftDistCm}cm
               </text>
-
               <text
-                x={meterToCanvasX((xM + W) / 2)}
+                x={dotX + 14}
                 y={dotY - 8}
-                textAnchor="middle"
+                textAnchor="start"
                 style={{ fontSize: 12, fill: textFill }}
               >
                 {rightDistCm}cm
               </text>
 
+              {/* Role centred under the dot */}
               <text
                 x={dotX}
                 y={dotY + 16}
                 textAnchor="middle"
-                style={{ fontSize: 12, fill: textFill, fontWeight: 700 }}
+                style={{ fontSize: 13, fill: textFill, fontWeight: 700 }}
               >
                 {roleText}
-                <tspan
-                  dx={8}
-                  style={{ fontWeight: 400, fill: "#3E4349" }}
-                >
-                  {heightText}
-                </tspan>
+              </text>
+
+              {/* Height to the right of the role */}
+              <text
+                x={dotX + 18}
+                y={dotY + 16}
+                textAnchor="start"
+                style={{ fontSize: 12, fill: "#3E4349", fontWeight: 400 }}
+              >
+                {heightText}
               </text>
             </>
           ) : (
