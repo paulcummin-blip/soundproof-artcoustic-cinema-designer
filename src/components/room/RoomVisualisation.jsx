@@ -408,6 +408,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const EPS_M = 0.0005;
   const ALLOW_AUTO_DIMENSIONS = false;
   const PLAN_TOP_PAD_PX = 60; // headroom for top dimension line + labels
+  const BOTTOM_GUTTER_PX = 220; // ensures bottom speaker dimension lanes never clip
 
   const getModelDimsM = useCallback((modelName) => {
     const meta = getSpeakerModelMeta?.(modelName);
