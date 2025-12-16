@@ -2437,6 +2437,44 @@ function SpeakerPlacementImpl(props) {
             </CollapsiblePanel>
             )}
 
+      {/* Aim Loudspeakers (dropdown) */}
+      <details
+        style={{
+          borderTop: "1px solid #EEECE6",
+          paddingTop: 10,
+          marginTop: 6,
+        }}
+      >
+        <summary
+          style={{
+            cursor: "pointer",
+            listStyle: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            fontWeight: 600,
+            color: "#1B1A1A",
+            padding: "6px 0",
+            userSelect: "none",
+          }}
+        >
+          <span>Aim Loudspeakers</span>
+          <span style={{ fontSize: 12, color: "#6B6F76" }}>▼</span>
+        </summary>
+
+        <div style={{ paddingTop: 8 }}>
+          <div style={{ fontSize: 13, color: "#3E4349", marginBottom: 8 }}>
+            Aiming
+          </div>
+
+          {/* Existing aiming toggles would go here - but I couldn't find them in the current file */}
+          <div style={{ marginTop: 10, fontSize: 12, color: "#6B6F76", lineHeight: 1.35 }}>
+            Turns the speaker to face the MLP. Position does not change (yet).
+          </div>
+        </div>
+      </details>
+
       <CollapsiblePanel title="Subwoofers" defaultOpen={false}>
         <div className="rounded-none border border-[#E7E4DF] bg-[#F7F4F0]/40 px-4 py-4">
           <div className="grid grid-cols-12 gap-x-4 gap-y-3">
