@@ -84,12 +84,9 @@ export default function SpeakerPositionsOverlay({
     if (!last || Math.abs(y - last) > 0.20) rows.push(y);
   }
 
-  const bedHeightM = (speakerY) => {
-    if (rows.length < 2) return 1.2;
-    const row2Y = rows[1];
-    const row3Y = rows[2];
-    if (isNum(row3Y) && speakerY > row3Y) return 1.8;
-    if (speakerY > row2Y) return 1.5;
+  const bedHeightM = () => {
+    if (rows.length >= 3) return 1.8;
+    if (rows.length >= 2) return 1.5;
     return 1.2;
   };
 
@@ -300,14 +297,15 @@ export default function SpeakerPositionsOverlay({
         {/* Dots and labels for each speaker */}
         {backGroup.map((s, idx) => {
           const xPx = meterToCanvasX(s.xM);
+          const yIconPx = meterToCanvasY(s.yM);
           const leftDistCm = mToCm(s.xM);
           const rightDistCm = mToCm(W - s.xM);
-          const hCm = mToCm(bedHeightM(s.yM));
+          const hCm = mToCm(bedHeightM());
 
           // Check for close neighbors
           let leftOffset = 14;
           let rightOffset = 14;
-          
+
           if (idx > 0) {
             const prevXPx = meterToCanvasX(backGroup[idx - 1].xM);
             if (Math.abs(xPx - prevXPx) < 40) {
@@ -331,7 +329,7 @@ export default function SpeakerPositionsOverlay({
               {/* Left distance */}
               <text
                 x={xPx - leftOffset}
-                y={rulerYpx - 8}
+                y={rulerYpx + 12}
                 textAnchor="end"
                 style={{ fontSize, fill: textFill }}
               >
@@ -341,17 +339,17 @@ export default function SpeakerPositionsOverlay({
               {/* Right distance */}
               <text
                 x={xPx + rightOffset}
-                y={rulerYpx - 8}
+                y={rulerYpx + 12}
                 textAnchor="start"
                 style={{ fontSize, fill: textFill }}
               >
                 {rightDistCm}cm
               </text>
 
-              {/* Role centred under the dot */}
+              {/* Role centred under the speaker icon */}
               <text
                 x={xPx}
-                y={rulerYpx + 16}
+                y={yIconPx + 16}
                 textAnchor="middle"
                 style={{ fontSize: roleFontSize, fill: textFill, fontWeight: 700 }}
               >
@@ -361,7 +359,7 @@ export default function SpeakerPositionsOverlay({
               {/* Height to the right of the role */}
               <text
                 x={xPx + 18}
-                y={rulerYpx + 16}
+                y={yIconPx + 16}
                 textAnchor="start"
                 style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
               >
