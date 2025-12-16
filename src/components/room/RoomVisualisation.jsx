@@ -407,6 +407,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
   const EPS_M = 0.0005;
   const ALLOW_AUTO_DIMENSIONS = false;
+  const PLAN_TOP_PAD_PX = 60; // headroom for top dimension line + labels
 
   const getModelDimsM = useCallback((modelName) => {
     const meta = getSpeakerModelMeta?.(modelName);
@@ -5215,9 +5216,9 @@ return (
           <g
               clipPath={`url(#${idsClip})`}
   transform={
-    `translate(${svgWSafe / 2}, ${roomRect.y || 0}) ` +
+    `translate(${svgWSafe / 2}, ${(roomRect.y || 0) + PLAN_TOP_PAD_PX}) ` +
     `scale(${Number(zoom) || 1}) ` +
-    `translate(${-svgWSafe / 2}, ${-(roomRect.y || 0)})`
+    `translate(${-svgWSafe / 2}, ${-((roomRect.y || 0) + PLAN_TOP_PAD_PX)})`
   }
           >
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
