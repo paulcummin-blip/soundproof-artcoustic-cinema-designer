@@ -4,13 +4,17 @@ import { useAppState } from '@/components/AppStateProvider';
 import { calculateViewingAngle, assignRP23Level } from '@/components/utils/viewingAngleUtils';
 import RP22GradingPill from '../ui/RP22GradingPill';
 import { getLevelColors } from '@/components/utils/rp22Colors';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 
 export default function ViewingAnglePanel({
   screen,
   seatingPositions,
   viewingDistanceOffsetM,
   mlpOverride,
-  mlpDotOffsetM
+  mlpDotOffsetM,
+  showMlpRuler = false,
+  onShowMlpRulerChange
 }) {
   // Pull derived MLP and screen plane from app state (single source of truth)
   const { mlpY_m, screenFrontPlaneM } = useAppState() || {};
@@ -68,6 +72,18 @@ export default function ViewingAnglePanel({
 
   return (
     <div className="space-y-4">
+      {/* MLP Position Ruler Toggle */}
+      <div className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ border: '1px solid #E6E4DD', backgroundColor: '#F8F8F7' }}>
+        <Label htmlFor="mlp-ruler-toggle" className="text-sm" style={{ color: '#3E4349', cursor: 'pointer' }}>
+          MLP Position Ruler
+        </Label>
+        <Switch
+          id="mlp-ruler-toggle"
+          checked={showMlpRuler}
+          onCheckedChange={onShowMlpRulerChange}
+        />
+      </div>
+
       <h3 className="text-base font-medium flex items-center gap-2" style={{ color: '#1B1A1A' }}>
         <Eye className="w-5 h-5" style={{ color: '#625143' }} />
         Viewing Angle Analysis
