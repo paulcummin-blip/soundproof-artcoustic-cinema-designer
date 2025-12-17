@@ -1144,11 +1144,11 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
 
         if (!seatMetrics?.spl?.screen) return null;
 
-        // Get the same rounded values shown in LcrSplCard tiles (formatDb rounds)
+        // Get the same ceiled values shown in LcrSplCard tiles (formatDb ceils)
         const lcrTileSplDb = ['FL', 'FC', 'FR']
           .map(role => seatMetrics.spl.screen[role]?.value)
           .filter(v => Number.isFinite(v))
-          .map(v => Math.round(v)); // formatDb uses Math.round
+          .map(v => Math.ceil(v)); // formatDb uses Math.ceil
 
         if (lcrTileSplDb.length === 0) return null;
 
@@ -2376,11 +2376,11 @@ function SpeakerPlacementImpl(props) {
 
             if (!seatMetrics?.spl?.surrounds) return null;
 
-            // Get the same rounded values shown in SurroundSplStrip tiles (formatDb rounds)
+            // Get the same ceiled values shown in SurroundSplStrip tiles (formatDb ceils)
             const surroundTileSplDb = Object.values(seatMetrics.spl.surrounds)
               .map(s => s?.value)
               .filter(v => Number.isFinite(v))
-              .map(v => Math.round(v)); // formatDb uses Math.round
+              .map(v => Math.ceil(v)); // formatDb uses Math.ceil
 
             if (surroundTileSplDb.length === 0) return null;
 
@@ -2440,7 +2440,7 @@ function SpeakerPlacementImpl(props) {
               const overheadTileSplDb = Object.values(seatMetrics.spl.uppers)
                 .map(s => s?.value)
                 .filter(v => Number.isFinite(v))
-                .map(v => Math.round(v));
+                .map(v => Math.ceil(v));
 
               if (overheadTileSplDb.length === 0) return null;
 
