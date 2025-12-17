@@ -1696,8 +1696,9 @@ function RoomDesignerWithState() {
       // Pass screen loss and EQ headroom from global splConfig
       screenLoss_dB: screenLoss,
       eqHeadroom_dB: eqHeadroom,
+      mlpPoint: mlpAnchorEffective, // NEW: Pass green dot MLP for synthetic "mlp" seat
     });
-  }, [_seatingPositions, placedSpeakers, appState?.getEffectiveSplInputs, appState?.splConfig]);
+  }, [_seatingPositions, placedSpeakers, appState?.getEffectiveSplInputs, appState?.splConfig, mlpAnchorEffective]);
 
   // Compute diagnostic values
   const widthM =
