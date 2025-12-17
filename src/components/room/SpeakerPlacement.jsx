@@ -1705,7 +1705,8 @@ function SpeakerPlacementImpl(props) {
         // BACK wall speakers (SBL + SBR only)
         if (R === 'SBL' || R === 'SBR') {
           const backY = dims.length - WALL_BUFFER_M - halfShortEdge;
-          p.y = Number.isFinite(backY) ? backY : dims.length / 2;
+          // CRITICAL: Always clamp to actual room back wall, even if projection went beyond
+          p.y = Number.isFinite(backY) ? Math.min(backY, dims.length - WALL_BUFFER_M - 0.01) : dims.length / 2;
         }
 
         // --- Front-Wide Corner Pin Guard ---
@@ -1790,10 +1791,20 @@ function SpeakerPlacementImpl(props) {
           
           console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
           
-          const pos  = finalisePos(base, canon, resolvedModel, hitWall);
+          let pos  = finalisePos(base, canon, resolvedModel, hitWall);
 
           if (!pos) {
             return;
+          }
+
+          // CRITICAL: Final back-wall safety clamp for rear speakers
+          // Ensure they NEVER initialize outside the actual room length
+          if (canon === 'SBL' || canon === 'SBR') {
+            const maxAllowedY = dims.length - WALL_BUFFER_M - 0.01;
+            if (pos.y > maxAllowedY) {
+              console.warn(`[seed] ${canon} Y clamped from ${pos.y.toFixed(3)} to ${maxAllowedY.toFixed(3)} (room length=${dims.length.toFixed(3)})`);
+              pos = { ...pos, y: maxAllowedY };
+            }
           }
 
           const initialYaw = Number.isFinite(yawDeg) ? yawDeg : 0;

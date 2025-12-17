@@ -1247,14 +1247,14 @@ export function seedSpeakersFromPreset({
       case "FCL": return { x: Math.max(m, x25 - 0.2), y: yFront, z: earZ };
       case "FCR": return { x: Math.min(w - m, x75 + 0.2), y: yFront, z: earZ };
       // Sides
-      case "SL":  return { x: m,     y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY)), z: earZ };
-      case "SR":  return { x: w - m, y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY)), z: earZ };
-      // Backs
-      case "SBL": return { x: backLeftX,  y: yRear, z: earZ };
-      case "SBR": return { x: backRightX, y: yRear, z: earZ };
-      // New Wides for 7.x swap (arbitrary initial positions, can be refined)
-      case "LW": return { x: w * 0.15, y: l * 0.4, z: earZ }; // Example position for Left Wide
-      case "RW": return { x: w * 0.85, y: l * 0.4, z: earZ }; // Example position for Right Wide
+      case "SL":  return { x: m,     y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY, l - m)), z: earZ };
+      case "SR":  return { x: w - m, y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY, l - m)), z: earZ };
+      // Backs - ALWAYS clamp to actual room back wall
+      case "SBL": return { x: backLeftX,  y: Math.min(yRear, l - m), z: earZ };
+      case "SBR": return { x: backRightX, y: Math.min(yRear, l - m), z: earZ };
+      // New Wides for 7.x swap - clamp to room bounds
+      case "LW": return { x: w * 0.15, y: Math.max(m, Math.min(l * 0.4, l - m)), z: earZ };
+      case "RW": return { x: w * 0.85, y: Math.max(m, Math.min(l * 0.4, l - m)), z: earZ };
 
       // Tops
       case "TML": return { x: x25, y: l * 0.50, z: topZ }; // Top Mid Left
