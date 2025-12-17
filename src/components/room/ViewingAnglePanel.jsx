@@ -88,17 +88,44 @@ export default function ViewingAnglePanel({
         </div>
       </div>
 
-      <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: '1px solid #C1B6AD', backgroundColor: '#FFFFFF' }}>
-        <div className="flex items-center gap-2">
-          <Ruler className="w-4 h-4" style={{ color: '#625143' }} />
-          <span className="text-sm font-medium" style={{ color: '#3E4349' }}>RP23 Viewing Angle: Level {rp23Data.level}</span>
+      <div style={{ border: '1px solid #DCDBD6', background: '#fff', borderRadius: 8 }}>
+        <div style={{ padding: '12px 12px 0 12px' }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: '#1B1A1A' }}>
+            RP23 Viewing Angle: Level {rp23Data.level}
+          </div>
+          <div style={{ fontSize: 12, color: '#625143', marginTop: 4 }}>
+            Target: 50–65° (Level 4)
+          </div>
         </div>
-        <RP22GradingPill level={rp23Data.level} label={rp23Data.label} />
+        <div style={{ padding: '8px 12px 12px 12px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 0 }}>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <span style={{ fontSize: 12, color: '#625143' }}>Achieved</span>
+              <span style={{ 
+                fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+                fontSize: 12,
+                color: '#3E4349'
+              }}>
+                {rp23Data.angle.toFixed(1)}°
+              </span>
+            </div>
+            <span style={{
+              border: '1px solid #C1B6AD',
+              borderRadius: 9999,
+              padding: '2px 8px',
+              fontSize: 12,
+              fontWeight: 600,
+              display: 'inline-flex',
+              alignItems: 'center',
+              lineHeight: 1,
+              background: rp23Data.level === 4 ? '#F6F3EE' : rp23Data.level === 3 ? '#E9ECEF' : rp23Data.level === 2 ? '#EFEAE4' : '#FBE9E7',
+              color: rp23Data.level === 4 ? '#213428' : rp23Data.level === 3 ? '#3E4349' : rp23Data.level === 2 ? '#625143' : '#A7302F'
+            }}>
+              L{rp23Data.level}
+            </span>
+          </div>
+        </div>
       </div>
-
-      <p className="text-xs" style={{ color: '#625143' }}>
-        RP23 target: 50–65° (Level 4).
-      </p>
     </div>
   );
 }
