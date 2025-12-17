@@ -5553,18 +5553,6 @@ return (
                     {distScreen.toFixed(2)}m
                   </text>
                   
-                  {/* Screen centre → MLP distance label (horizontal, below screen plane) */}
-                  <text
-                    x={mlpX_px}
-                    y={screenY_px + 20}
-                    textAnchor="middle"
-                    fontSize={fontSize}
-                    fill={rulerColor}
-                    fontFamily="system-ui, sans-serif"
-                  >
-                    {distScreen.toFixed(2)}m
-                  </text>
-                  
                   {/* MLP → Back wall distance label (rotated, right side) */}
                   <text
                     x={mlpX_px + labelOffset}
