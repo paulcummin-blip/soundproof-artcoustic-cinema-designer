@@ -88,11 +88,16 @@ export default function ViewingAnglePanel({
         </div>
       </div>
 
-      <div style={{ border: '1px solid #DCDBD6', background: '#fff', borderRadius: 8, padding: '12px' }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#1B1A1A' }}>
+      <div style={{ 
+        border: '1px solid #E6E4DD',
+        background: rp23Data.level === 4 ? '#2A6E3F' : rp23Data.level === 3 ? '#2A6E3F' : rp23Data.level === 2 ? '#935F1A' : '#7A1E19',
+        borderRadius: 8, 
+        padding: '12px'
+      }}>
+        <div style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF' }}>
           RP23 Viewing Angle: Level {rp23Data.level}
         </div>
-        <div style={{ fontSize: 12, color: '#625143', marginTop: 4 }}>
+        <div style={{ fontSize: 12, color: '#FFFFFF', marginTop: 4 }}>
           Target: 50–65° (Level 4)
         </div>
       </div>

@@ -44,7 +44,16 @@ function computeRP22Level(splDb, thresholds) {
 
 // RP22 Level Pill Component
 function RP22LevelPill({ parameter, level, label }) {
-  const isPass = typeof level === 'number' && level >= 1;
+  // Map level to colors using same logic as HUD
+  const bgColor = (() => {
+    if (typeof level !== 'number' || level < 1) return '#7A1E19'; // Red (FAIL)
+    if (level === 4) return '#2A6E3F'; // Green (L4)
+    if (level === 3) return '#2A6E3F'; // Green (L3)
+    if (level === 2) return '#935F1A'; // Amber (L2)
+    return '#935F1A'; // Amber (L1)
+  })();
+  
+  const textColor = '#FFFFFF'; // Light text for all colored backgrounds
   
   return (
     <div 
@@ -53,7 +62,7 @@ function RP22LevelPill({ parameter, level, label }) {
         padding: '8px 16px',
         borderRadius: 8,
         border: '1px solid #E6E4DD',
-        background: isPass ? '#F8F8F7' : '#FFF5F5',
+        background: bgColor,
         display: 'inline-block',
         width: '100%',
       }}
@@ -61,9 +70,9 @@ function RP22LevelPill({ parameter, level, label }) {
       <div style={{ 
         fontSize: 13, 
         fontWeight: 600, 
-        color: isPass ? '#1B1A1A' : '#DC2626'
+        color: textColor
       }}>
-        {label}: {isPass ? `Level ${level}` : 'FAIL'}
+        {label}: {typeof level === 'number' && level >= 1 ? `Level ${level}` : 'FAIL'}
       </div>
     </div>
   );
