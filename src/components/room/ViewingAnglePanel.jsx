@@ -91,13 +91,13 @@ export default function ViewingAnglePanel({
       <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: '1px solid #C1B6AD', backgroundColor: '#FFFFFF' }}>
         <div className="flex items-center gap-2">
           <Ruler className="w-4 h-4" style={{ color: '#625143' }} />
-          <span className="text-sm font-medium" style={{ color: '#3E4349' }}>RP23 Compliance</span>
+          <span className="text-sm font-medium" style={{ color: '#3E4349' }}>RP23 Viewing Angle: Level {rp23Data.level}</span>
         </div>
         <RP22GradingPill level={rp23Data.level} label={rp23Data.label} />
       </div>
 
       <p className="text-xs" style={{ color: '#625143' }}>
-        RP23 target: 50-65° (Level 4). Current angle: {rp23Data.angle.toFixed(1)}°
+        RP23 target: 50–65° (Level 4).
       </p>
     </div>
   );
