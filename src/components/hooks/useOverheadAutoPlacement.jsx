@@ -65,9 +65,17 @@ export function useOverheadAutoPlacement({
     }
     
     if (overheadZones.backZone?.active) {
-      const { x1, x2, y1, y2 } = overheadZones.backZone;
+      const { x1, x2, y1, y2, roomLength } = overheadZones.backZone;
+      const centerY = (y1 + y2) / 2;
+      
+      // CRITICAL: Rear overheads must never exceed room length
+      // Clamp to ensure they stay within the room bounds
+      const WALL_BUFFER_M = 0.01;
+      const maxAllowedY = Number.isFinite(roomLength) ? roomLength - WALL_BUFFER_M - 0.01 : y2;
+      const safeCenterY = Math.min(centerY, maxAllowedY);
+      
       zoneInfo.rear = {
-        centerY: (y1 + y2) / 2,
+        centerY: safeCenterY,
         leftX: x1,
         rightX: x2,
         zone: overheadZones.backZone
