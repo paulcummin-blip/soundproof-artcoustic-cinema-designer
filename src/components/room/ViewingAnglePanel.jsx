@@ -80,8 +80,7 @@ export default function ViewingAnglePanel({
         <Switch
           id="mlp-ruler-toggle"
           checked={showMlpRuler}
-          onCheckedChange={onShowMlpRulerChange}
-        />
+          onCheckedChange={onShowMlpRulerChange} className="bg-[#3E4349] text-[#3E4349] rounded-full peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center border transition-colors border-[#DCDBD6] border-[#3E4349] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#C1B6AD] disabled:cursor-not-allowed disabled:opacity-50" />
 
       </div>
 

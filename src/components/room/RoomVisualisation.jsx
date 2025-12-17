@@ -4832,11 +4832,8 @@ return {
       ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
       : undefined;
 
-    // Get yaw from rotation.y (set by RoomDesigner aiming logic)
-    const speakerYaw = speaker.yaw ?? speaker.rotation?.y ?? 0;
-    
     // Visual-only yaw: flip sign so icons match the room coordinate system.
-    const visualYawDeg = Number.isFinite(speakerYaw) ? -speakerYaw : 0;
+    const visualYawDeg = Number.isFinite(yawDeg) ? -yawDeg : 0;
 
     return (
       <SpeakerIcon
