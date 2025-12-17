@@ -1521,6 +1521,7 @@ function RoomDesignerWithState() {
   const [showPrices, setShowPrices] = useState(false);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
   const [speakerPositionsView, setSpeakerPositionsView] = React.useState('off'); // 'off' | 'plan' | 'table' | 'both'
+  const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
 
   // Layout emphasis: controls how wide the left plan vs right menu are.
   // "balanced" keeps your current look.
@@ -3318,6 +3319,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   rp22AnglesEnabled={_overlays?.RP22_ANGLES}
                   allSeatSplMetrics={allSeatSplMetrics}
                   speakerPositionsView={speakerPositionsView}
+                  showMlpRuler={showMlpRuler}
                 />
               </Suspense>
             </ErrorBoundary>
@@ -3422,7 +3424,9 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         disabled={isFrozen('seating')} 
                         screen={_screen} 
                         dimensions={stableDimensions}
-                        shiftSeatsToMaintainAngle={visualisationRef.current?.shiftSeatsToMaintainAngle} 
+                        shiftSeatsToMaintainAngle={visualisationRef.current?.shiftSeatsToMaintainAngle}
+                        showMlpRuler={showMlpRuler}
+                        onShowMlpRulerChange={setShowMlpRuler}
                       />
                   </Suspense>
               </CollapsiblePanel>
