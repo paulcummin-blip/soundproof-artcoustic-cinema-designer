@@ -5455,6 +5455,10 @@ return (
               const distRightWall = widthM - mlpDotX_m; // Distance from right wall
               const distScreen = mlpDotY_m - screenFrontPlaneM; // Distance from screen
               const distBackWall = lengthM - mlpDotY_m; // Distance from back wall
+              const distFrontWall = mlpDotY_m; // Distance from front wall (y=0)
+
+              // Secondary ruler X position: 80% from centerline toward left wall
+              const secondaryRulerX_px = mlpX_px - (mlpX_px - roomRect.x) * 0.2;
 
               return (
                 <g data-layer="mlp-ruler" pointerEvents="none">
@@ -5564,6 +5568,47 @@ return (
                     transform={`rotate(-90 ${mlpX_px + labelOffset} ${(mlpY_px + roomRect.y + roomRect.height) / 2})`}
                   >
                     {distBackWall.toFixed(2)}m
+                  </text>
+
+                  {/* SECONDARY RULER: MLP → Front Wall depth */}
+                  <defs>
+                    <marker
+                      id="mlp-depth-arrow"
+                      viewBox="0 0 10 10"
+                      refX="5"
+                      refY="5"
+                      markerWidth="4"
+                      markerHeight="4"
+                      orient="auto"
+                    >
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill={rulerColor} />
+                    </marker>
+                  </defs>
+
+                  {/* Vertical line from front wall to MLP horizontal ruler */}
+                  <line
+                    x1={secondaryRulerX_px}
+                    y1={roomRect.y}
+                    x2={secondaryRulerX_px}
+                    y2={mlpY_px}
+                    stroke={rulerColor}
+                    strokeWidth={rulerStroke}
+                    opacity={0.6}
+                    markerStart="url(#mlp-depth-arrow)"
+                    markerEnd="url(#mlp-depth-arrow)"
+                  />
+                  
+                  {/* MLP → Front wall distance label (rotated, reading bottom to top) */}
+                  <text
+                    x={secondaryRulerX_px + labelOffset}
+                    y={(roomRect.y + mlpY_px) / 2}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily="system-ui, sans-serif"
+                    transform={`rotate(-90 ${secondaryRulerX_px + labelOffset} ${(roomRect.y + mlpY_px) / 2})`}
+                  >
+                    {distFrontWall.toFixed(2)}m
                   </text>
                 </g>
               );
