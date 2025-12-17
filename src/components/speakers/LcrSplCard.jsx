@@ -15,8 +15,17 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics }) {
   }, [appState?.seatingPositions]);
 
   const mlpSplData = useMemo(() => {
-    if (!mlpSeat || !allSeatSplMetrics) return null;
-    return getSeatSplMetrics(allSeatSplMetrics, mlpSeat.id);
+    if (!allSeatSplMetrics) return null;
+    
+    // Prefer synthetic "mlp" entry (green dot), fallback to mlpSeat
+    const mlpMetrics = getSeatSplMetrics(allSeatSplMetrics, "mlp");
+    if (mlpMetrics) return mlpMetrics;
+    
+    if (mlpSeat) {
+      return getSeatSplMetrics(allSeatSplMetrics, mlpSeat.id);
+    }
+    
+    return null;
   }, [mlpSeat, allSeatSplMetrics]);
 
   // Find the placed speaker for this role

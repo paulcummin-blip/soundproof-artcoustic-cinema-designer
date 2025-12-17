@@ -9,9 +9,18 @@ import { formatDb } from '@/components/utils/formatDb';
  */
 export default function SurroundSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayout }) {
   const mlpSplData = useMemo(() => {
-    if (!mlpSeat || !allSeatSplMetrics) return null;
-    const metrics = allSeatSplMetrics.get(mlpSeat.id);
-    return metrics?.spl || null;
+    if (!allSeatSplMetrics) return null;
+    
+    // Prefer synthetic "mlp" entry (green dot), fallback to mlpSeat
+    const mlpMetrics = allSeatSplMetrics.get("mlp");
+    if (mlpMetrics?.spl) return mlpMetrics.spl;
+    
+    if (mlpSeat) {
+      const metrics = allSeatSplMetrics.get(mlpSeat.id);
+      return metrics?.spl || null;
+    }
+    
+    return null;
   }, [mlpSeat, allSeatSplMetrics]);
 
   // Determine which groups to show based on layout

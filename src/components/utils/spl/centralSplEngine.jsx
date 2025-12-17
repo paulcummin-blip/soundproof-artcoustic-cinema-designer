@@ -218,11 +218,25 @@ export function computeAllSeatSplMetrics({
   getModelDimsM,
   screenLoss_dB = 0,
   eqHeadroom_dB = 0,
+  mlpPoint = null, // NEW: canonical MLP point (green dot)
 }) {
   const metricsMap = new Map();
   
   if (!Array.isArray(seats) || !Array.isArray(placedSpeakers)) {
     return metricsMap;
+  }
+
+  // NEW: Add synthetic "mlp" seat if mlpPoint is provided
+  let seatsToProcess = [...seats];
+  if (mlpPoint && Number.isFinite(mlpPoint.x) && Number.isFinite(mlpPoint.y)) {
+    seatsToProcess.push({
+      id: "mlp",
+      x: mlpPoint.x,
+      y: mlpPoint.y,
+      z: mlpPoint.z || 1.2,
+      isPrimary: false, // This is NOT a real seat
+      __isSyntheticMLP: true,
+    });
   }
 
   // Role categorization (same for all speaker types)
@@ -241,8 +255,8 @@ export function computeAllSeatSplMetrics({
   const placedSur = placedSpeakers.filter(s => hasPos(s) && surroundRoles.has(getCanonicalRole(s.role)));
   const placedOH = placedSpeakers.filter(s => hasPos(s) && isOverheadRole(s.role));
 
-  // Process each seat
-  for (const seat of seats) {
+  // Process each seat (including synthetic MLP)
+  for (const seat of seatsToProcess) {
     const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
     const seatPos = {
       x: Number(seat?.x ?? seat?.position?.x),
