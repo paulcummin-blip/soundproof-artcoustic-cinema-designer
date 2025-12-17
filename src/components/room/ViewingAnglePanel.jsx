@@ -104,9 +104,6 @@ export default function ViewingAnglePanel({
             <div style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>
               {label}
             </div>
-            <div style={{ fontSize: 12, color: colors.text, marginTop: 4 }}>
-              Target: 50–65° (Level 4)
-            </div>
           </div>
         );
       })()}
