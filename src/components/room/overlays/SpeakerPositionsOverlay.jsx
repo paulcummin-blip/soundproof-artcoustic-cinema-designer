@@ -746,7 +746,8 @@ export default function SpeakerPositionsOverlay({
     // Build "blocked Y bands" around each left-column overhead dot (where the vertical distances + label text live)
     const blockedYBands = (overheadLeft || []).map((s) => {
       const y = meterToCanvasY(s.position.y);
-      return { yMin: y - 28, yMax: y + 28 };
+      // Wider band to cover the real footprint of the rotated vertical distance text
+      return { yMin: y - 46, yMax: y + 46 };
     });
 
     const overlapsBand = (y, band) => y >= band.yMin && y <= band.yMax;
@@ -756,8 +757,8 @@ export default function SpeakerPositionsOverlay({
       if (xLeftRuler == null) return yPx;
 
       let y = yPx;
-      const STEP_PX = 18; // one "comfortable" nudge
-      const MAX_PUSH = 6; // don't run away forever
+      const STEP_PX = 24; // bigger step so it clears in one move
+      const MAX_PUSH = 8;
 
       let loops = 0;
       while (loops < MAX_PUSH) {
@@ -797,7 +798,9 @@ export default function SpeakerPositionsOverlay({
           const avoidLabelExtraY = overheadLeft.length ? 10 : 0;
 
           // Desired y: just BELOW the overhead icons for that row
-          let yPxRaw = ySpeakerPx + ICON_R_PX + GAP_FROM_ICON_PX + avoidLabelExtraY;
+          // Extra clearance so the horizontal ruler never clashes with the vertical ruler text lane
+          const EXTRA_CLEAR_PX = overheadLeft.length ? 28 : 0;
+          let yPxRaw = ySpeakerPx + ICON_R_PX + GAP_FROM_ICON_PX + avoidLabelExtraY + EXTRA_CLEAR_PX;
 
           // Clamp so it stays inside the room (and doesn't sit on the border)
           yPxRaw = Math.max(roomRect.y + SAFE_INSET_PX, Math.min(roomRect.y + roomRect.height - SAFE_INSET_PX, yPxRaw));
