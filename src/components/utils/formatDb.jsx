@@ -1,4 +1,4 @@
 export function formatDb(value) {
   if (!Number.isFinite(value)) return '—';
-  return `${Math.ceil(value)} dB`;
+  return `${Math.round(value)} dB`;
 }
