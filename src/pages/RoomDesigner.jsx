@@ -2312,7 +2312,7 @@ function RoomDesignerWithState() {
     const aimSide = appState?.aimSideSurroundsAtMLP || false;
     const aimRear = appState?.aimRearSurroundsAtMLP || false;
 
-    // Helper: compute yaw from speaker to MLP (same as L/R uses)
+    // Helper: compute yaw from speaker to MLP (green dot)
     const yawToMLP = (spkPos, mlpPos) => {
       const dx = mlpPos.x - spkPos.x;
       const dy = mlpPos.y - spkPos.y;
@@ -2367,26 +2367,27 @@ function RoomDesignerWithState() {
         // Reset to flat if toggle is off
         if (canon === 'FL' || canon === 'FR' || canon === 'LW' || canon === 'RW' || 
             canon === 'SL' || canon === 'SR' || canon === 'SBL' || canon === 'SBR') {
-          const currentYaw = spk.rotation?.y || 0;
-          if (Math.abs(currentYaw) > 0.001) {
-            return { ...spk, rotation: { ...(spk.rotation || {}), y: 0 } };
+          const currentYaw = spk.yaw ?? spk.rotation?.y ?? 0;
+          if (Math.abs(currentYaw) > 0.1) {
+            return { ...spk, yaw: 0, rotation: { ...(spk.rotation || {}), y: 0 } };
           }
         }
         return spk;
       }
 
-      // Calculate target yaw to MLP
+      // Calculate target yaw to MLP (green dot)
       const targetYaw = yawToMLP(spk.position, mlpAnchorEffective);
       
       // Check if rotation is safe
       const safe = canRotateSafely(spk.position, targetYaw, spk.model);
-      const finalYaw = safe ? targetYaw : (spk.rotation?.y || 0);
+      const finalYaw = safe ? targetYaw : (spk.yaw ?? spk.rotation?.y ?? 0);
       
-      // Only update if changed
-      const currentYaw = spk.rotation?.y || 0;
-      if (Math.abs(finalYaw - currentYaw) < 0.001) return spk;
+      // Only update if changed (prevent loops)
+      const currentYaw = spk.yaw ?? spk.rotation?.y ?? 0;
+      if (Math.abs(finalYaw - currentYaw) < 0.1) return spk;
       
-      return { ...spk, rotation: { ...(spk.rotation || {}), y: finalYaw } };
+      // Write to BOTH yaw and rotation.y so renderer can read either
+      return { ...spk, yaw: finalYaw, rotation: { ...(spk.rotation || {}), y: finalYaw } };
     });
 
     // Only commit if something actually changed

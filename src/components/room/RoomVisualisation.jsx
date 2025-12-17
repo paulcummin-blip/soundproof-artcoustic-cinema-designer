@@ -4839,31 +4839,18 @@ return {
     const visualYawDeg = Number.isFinite(speakerYaw) ? -speakerYaw : 0;
 
     return (
-      <g key={id}>
-        <SpeakerIcon
-          speaker={{ ...speaker, model: resolvedModel }}
-          canvasX={safeCanvasX}
-          canvasY_raw={safeCanvasY}
-          yawDeg={visualYawDeg}
-          widthM={widthM_spk}
-          depthM={depthM_spk}
-          scale={scale}
-          speakerMouseDownHandler={speakerDragHandler}
-          setHoveredSpeaker={setHoveredSpeaker}
-        />
-        
-        {/* Temporary debug label: role + yaw */}
-        <text
-          x={safeCanvasX}
-          y={safeCanvasY + 24}
-          textAnchor="middle"
-          fontSize="9"
-          fill="#999"
-          pointerEvents="none"
-        >
-          {canon} {speakerYaw !== 0 ? `${speakerYaw.toFixed(1)}°` : ''}
-        </text>
-      </g>
+      <SpeakerIcon
+        key={id}
+        speaker={{ ...speaker, model: resolvedModel }}
+        canvasX={safeCanvasX}
+        canvasY_raw={safeCanvasY}
+        yawDeg={visualYawDeg}
+        widthM={widthM_spk}
+        depthM={depthM_spk}
+        scale={scale}
+        speakerMouseDownHandler={speakerDragHandler}
+        setHoveredSpeaker={setHoveredSpeaker}
+      />
     );
   });
 }, [
