@@ -19,7 +19,7 @@ const Switch = React.forwardRef(({ className, checked, onCheckedChange, ...props
         // Brand colors - unchecked state
         "border-[#DCDBD6] bg-[#F8F8F7]",
         // Brand colors - checked state  
-        checked ? "bg-[#213428] border-[#213428]" : "",
+        checked ? "bg-[#3E4349] border-[#3E4349]" : "",
         // Focus styles
         "focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#C1B6AD]",
         // Disabled state
