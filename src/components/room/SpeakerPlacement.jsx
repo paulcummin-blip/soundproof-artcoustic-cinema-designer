@@ -1702,8 +1702,9 @@ function SpeakerPlacementImpl(props) {
           p.x = Number.isFinite(rightX) ? rightX : dims.width / 2;
         }
 
-        // BACK wall speakers (SBL + SBR only)
-        if (R === 'SBL' || R === 'SBR') {
+        // BACK wall speakers (SBL + SBR + RBL + RBR only)
+        const isRearRole = R === 'SBL' || R === 'SBR' || R === 'RBL' || R === 'RBR';
+        if (isRearRole) {
           const backY = dims.length - WALL_BUFFER_M - halfShortEdge;
           // CRITICAL: Always clamp to actual room back wall, even if projection went beyond
           p.y = Number.isFinite(backY) ? Math.min(backY, dims.length - WALL_BUFFER_M - 0.01) : dims.length / 2;
@@ -1797,14 +1798,17 @@ function SpeakerPlacementImpl(props) {
             return;
           }
 
-          // CRITICAL: Final back-wall safety clamp for rear speakers
+          // CRITICAL: Final back-wall safety clamp ONLY for rear speakers
           // Ensure they NEVER initialize outside the actual room length
-          if (canon === 'SBL' || canon === 'SBR') {
+          const isRearRole = canon === 'SBL' || canon === 'SBR' || canon === 'RBL' || canon === 'RBR';
+          if (isRearRole) {
             const maxAllowedY = dims.length - WALL_BUFFER_M - 0.01;
             if (pos.y > maxAllowedY) {
               console.warn(`[seed] ${canon} Y clamped from ${pos.y.toFixed(3)} to ${maxAllowedY.toFixed(3)} (room length=${dims.length.toFixed(3)})`);
               pos = { ...pos, y: maxAllowedY };
             }
+            // Also clamp X to room bounds for rear speakers
+            pos.x = Math.max(WALL_BUFFER_M, Math.min(pos.x, dims.width - WALL_BUFFER_M));
           }
 
           const initialYaw = Number.isFinite(yawDeg) ? yawDeg : 0;
