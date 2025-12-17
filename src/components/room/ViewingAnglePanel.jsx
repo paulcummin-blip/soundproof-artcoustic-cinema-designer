@@ -3,6 +3,7 @@ import { Eye, Ruler } from 'lucide-react';
 import { useAppState } from '@/components/AppStateProvider';
 import { calculateViewingAngle, assignRP23Level } from '@/components/utils/viewingAngleUtils';
 import RP22GradingPill from '../ui/RP22GradingPill';
+import { getLevelColors } from '@/components/utils/rp22Colors';
 
 export default function ViewingAnglePanel({
   screen,
@@ -88,19 +89,24 @@ export default function ViewingAnglePanel({
         </div>
       </div>
 
-      <div style={{ 
-        border: '1px solid #E6E4DD',
-        background: rp23Data.level === 4 ? '#2A6E3F' : rp23Data.level === 3 ? '#2A6E3F' : rp23Data.level === 2 ? '#935F1A' : '#7A1E19',
-        borderRadius: 8, 
-        padding: '12px'
-      }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF' }}>
-          RP23 Viewing Angle: Level {rp23Data.level}
-        </div>
-        <div style={{ fontSize: 12, color: '#FFFFFF', marginTop: 4 }}>
-          Target: 50–65° (Level 4)
-        </div>
-      </div>
+      {(() => {
+        const colors = getLevelColors(rp23Data.level);
+        return (
+          <div style={{ 
+            border: `1px solid ${colors.border || '#E6E4DD'}`,
+            background: colors.bg,
+            borderRadius: 8, 
+            padding: '12px'
+          }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>
+              RP23 Viewing Angle: Level {rp23Data.level}
+            </div>
+            <div style={{ fontSize: 12, color: colors.text, marginTop: 4 }}>
+              Target: 50–65° (Level 4)
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

@@ -18,6 +18,7 @@ import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 import { safeGroup, safeTable, safeGroupEnd } from "@/components/utils/safeLog";
 import { getSpeakerModelMeta, getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
 import { safeComputeLcrSpl } from '@/components/utils/splMathSafe';
+import { getLevelColors } from '@/components/utils/rp22Colors';
 import SurroundsSelector from '../speakers/SurroundsSelector';
 import OverheadChannelSelector from '@/components/speakers/OverheadChannelSelector';
 import { calibratedSplAtSeat, euclideanDistance } from "@/components/utils/splMath";
@@ -42,18 +43,11 @@ function computeRP22Level(splDb, thresholds) {
   return 'FAIL';
 }
 
+import { getLevelColors } from '@/components/utils/rp22Colors';
+
 // RP22 Level Pill Component
 function RP22LevelPill({ parameter, level, label }) {
-  // Map level to colors using same logic as HUD
-  const bgColor = (() => {
-    if (typeof level !== 'number' || level < 1) return '#7A1E19'; // Red (FAIL)
-    if (level === 4) return '#2A6E3F'; // Green (L4)
-    if (level === 3) return '#2A6E3F'; // Green (L3)
-    if (level === 2) return '#935F1A'; // Amber (L2)
-    return '#935F1A'; // Amber (L1)
-  })();
-  
-  const textColor = '#FFFFFF'; // Light text for all colored backgrounds
+  const colors = getLevelColors(level);
   
   return (
     <div 
@@ -61,8 +55,8 @@ function RP22LevelPill({ parameter, level, label }) {
         marginTop: 12,
         padding: '8px 16px',
         borderRadius: 8,
-        border: '1px solid #E6E4DD',
-        background: bgColor,
+        border: `1px solid ${colors.border || '#E6E4DD'}`,
+        background: colors.bg,
         display: 'inline-block',
         width: '100%',
       }}
@@ -70,7 +64,7 @@ function RP22LevelPill({ parameter, level, label }) {
       <div style={{ 
         fontSize: 13, 
         fontWeight: 600, 
-        color: textColor
+        color: colors.text
       }}>
         {label}: {typeof level === 'number' && level >= 1 ? `Level ${level}` : 'FAIL'}
       </div>
