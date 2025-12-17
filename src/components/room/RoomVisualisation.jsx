@@ -4832,22 +4832,38 @@ return {
       ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
       : undefined;
 
+    // Get yaw from rotation.y (set by RoomDesigner aiming logic)
+    const speakerYaw = speaker.yaw ?? speaker.rotation?.y ?? 0;
+    
     // Visual-only yaw: flip sign so icons match the room coordinate system.
-    const visualYawDeg = Number.isFinite(yawDeg) ? -yawDeg : 0;
+    const visualYawDeg = Number.isFinite(speakerYaw) ? -speakerYaw : 0;
 
     return (
-      <SpeakerIcon
-        key={id}
-        speaker={{ ...speaker, model: resolvedModel }}
-        canvasX={safeCanvasX}
-        canvasY_raw={safeCanvasY}
-        yawDeg={visualYawDeg}
-        widthM={widthM_spk}
-        depthM={depthM_spk}
-        scale={scale}
-        speakerMouseDownHandler={speakerDragHandler}
-        setHoveredSpeaker={setHoveredSpeaker}
-      />
+      <g key={id}>
+        <SpeakerIcon
+          speaker={{ ...speaker, model: resolvedModel }}
+          canvasX={safeCanvasX}
+          canvasY_raw={safeCanvasY}
+          yawDeg={visualYawDeg}
+          widthM={widthM_spk}
+          depthM={depthM_spk}
+          scale={scale}
+          speakerMouseDownHandler={speakerDragHandler}
+          setHoveredSpeaker={setHoveredSpeaker}
+        />
+        
+        {/* Temporary debug label: role + yaw */}
+        <text
+          x={safeCanvasX}
+          y={safeCanvasY + 24}
+          textAnchor="middle"
+          fontSize="9"
+          fill="#999"
+          pointerEvents="none"
+        >
+          {canon} {speakerYaw !== 0 ? `${speakerYaw.toFixed(1)}°` : ''}
+        </text>
+      </g>
     );
   });
 }, [
