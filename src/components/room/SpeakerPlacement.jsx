@@ -28,7 +28,6 @@ import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRol
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import SurroundSplStrip from '@/components/speakers/SurroundSplStrip';
 import OverheadSplStrip from '@/components/speakers/OverheadSplStrip';
-import { clampSpeakerPosition, clampAllSpeakers } from "@/components/utils/clampSpeakerPosition";
 
 const P12_THRESHOLDS = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P13_THRESHOLDS = { L1: 99, L2: 102, L3: 105, L4: 108 };
@@ -1592,19 +1591,6 @@ function SpeakerPlacementImpl(props) {
     return getMlpSeat(seatingPositions || []);
   }, [seatingPositions]);
 
-  // ONE-TIME REPAIR: Fix any speakers with invalid positions (outside room bounds)
-  // Runs when dimensions change OR when speakers are first loaded
-  useEffect(() => {
-    if (!dimensions || !placedSpeakers || placedSpeakers.length === 0) return;
-
-    const { speakers: repaired, changed } = clampAllSpeakers(placedSpeakers, dimensions);
-
-    if (changed) {
-      console.log('[SpeakerPlacement] Repairing speaker positions outside room bounds');
-      setSpeakers(repaired);
-    }
-  }, [dimensions?.width, dimensions?.length, placedSpeakers, setSpeakers]);
-
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
       // --- B44 FIX: ensure dims is always valid ---
@@ -1823,14 +1809,11 @@ function SpeakerPlacementImpl(props) {
 
           const initialYaw = Number.isFinite(yawDeg) ? yawDeg : 0;
 
-          // CRITICAL: Apply universal position clamping before adding to list
-          const clampedPos = clampSpeakerPosition(canon, pos, dims);
-
           next.push({
             id: existing?.id || `${canon}-${timeNowMs()}`,
             role: canon,
             model: resolvedModel,
-            position: clampedPos,
+            position: pos,
             draggable: true,
 
             // Keep yaw for labels / analysis
