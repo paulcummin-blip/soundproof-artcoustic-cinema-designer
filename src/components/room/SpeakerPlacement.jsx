@@ -1133,10 +1133,15 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
 
       {(() => {
         // Compute worst-case LCR SPL for P12 using the exact tile values
-        const mlp = getMlpSeat(seatingPositions || []);
-        if (!mlp || !allSeatSplMetrics) return null;
+        if (!allSeatSplMetrics) return null;
 
-        const seatMetrics = allSeatSplMetrics.get(mlp.id);
+        // Use synthetic "mlp" entry (green dot), fallback to mlpSeat
+        const mlpMetrics = allSeatSplMetrics.get("mlp");
+        const seatMetrics = mlpMetrics || (() => {
+          const mlp = getMlpSeat(seatingPositions || []);
+          return mlp ? allSeatSplMetrics.get(mlp.id) : null;
+        })();
+
         if (!seatMetrics?.spl?.screen) return null;
 
         // Get the same ceiled values shown in LcrSplCard tiles (formatDb ceils)
@@ -2352,9 +2357,12 @@ function SpeakerPlacementImpl(props) {
           
           {(() => {
             // Compute worst-case Surround SPL for P13 using the exact tile values
-            if (!mlpSeat || !allSeatSplMetrics) return null;
+            if (!allSeatSplMetrics) return null;
 
-            const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
+            // Use synthetic "mlp" entry (green dot), fallback to mlpSeat
+            const mlpMetrics = allSeatSplMetrics.get("mlp");
+            const seatMetrics = mlpMetrics || (mlpSeat ? allSeatSplMetrics.get(mlpSeat.id) : null);
+
             if (!seatMetrics?.spl?.surrounds) return null;
 
             // Get the same ceiled values shown in SurroundSplStrip tiles (formatDb ceils)
@@ -2410,9 +2418,12 @@ function SpeakerPlacementImpl(props) {
             />
 
             {(() => {
-              if (!mlpSeat || !allSeatSplMetrics) return null;
+              if (!allSeatSplMetrics) return null;
 
-              const seatMetrics = allSeatSplMetrics.get(mlpSeat.id);
+              // Use synthetic "mlp" entry (green dot), fallback to mlpSeat
+              const mlpMetrics = allSeatSplMetrics.get("mlp");
+              const seatMetrics = mlpMetrics || (mlpSeat ? allSeatSplMetrics.get(mlpSeat.id) : null);
+
               if (!seatMetrics?.spl?.uppers) return null;
 
               const overheadTileSplDb = Object.values(seatMetrics.spl.uppers)
