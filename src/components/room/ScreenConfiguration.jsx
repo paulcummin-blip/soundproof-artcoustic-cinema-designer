@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useCallback, useMemo, useEffect } from "react";
@@ -128,7 +127,7 @@ export default function ScreenConfiguration(props) {
     }
   }, [manualSize, screenData.visibleWidthInches, screenData.aspectRatio]);
 
-  // Live metrics computation
+  // Live metrics computation - uses VIEWABLE width only (same as Viewing Angle Analysis)
   const liveMetrics = useMemo(() => {
     if (!mlpPoint || !dimensions) {
       return {
@@ -139,15 +138,8 @@ export default function ScreenConfiguration(props) {
       };
     }
 
-    // screenFrontY here represents the Y-position of the screen's front surface relative to the front wall (Y=0) of the room.
-    // This value is effectively `screenFrontPlaneM` from appState.
-    // However, the existing `screenData.floatDepthM` is used to calculate distanceToMLP,
-    // which seems to imply a calculation based on the screen's configured depth.
-    // The requirement is to *display* `screenFrontPlaneM`, not necessarily use it for the angle calculation if `screenData.floatDepthM`
-    // has a specific role there.
-    // Assuming screenData.floatDepthM is the offset *from* the screen's visual origin for calculation purposes.
-    const screenFrontY = Number(screenData.floatDepthM) || 0.02; 
-    const distanceToMLP = Math.max(0, mlpPoint.y - screenFrontY);
+    // Use live screen front plane from appState (same as Viewing Angle Analysis)
+    const distanceToMLP = Math.max(0, mlpPoint.y - screenFrontPlaneM);
     
     if (distanceToMLP <= 0.10) {
       return {
@@ -158,6 +150,8 @@ export default function ScreenConfiguration(props) {
       };
     }
 
+    // CRITICAL: Use viewableDimensions (excludes borders) for angle calculation
+    // This matches the Viewing Angle Analysis calculation exactly
     const horizontalAngle = 2 * Math.atan((viewableDimensions.widthM / 2) / distanceToMLP) * (180 / Math.PI);
     const verticalAngle = 2 * Math.atan((viewableDimensions.heightM / 2) / distanceToMLP) * (180 / Math.PI);
 
@@ -167,7 +161,7 @@ export default function ScreenConfiguration(props) {
       distanceToMLP,
       valid: true
     };
-  }, [mlpPoint, dimensions, screenData.floatDepthM, viewableDimensions]);
+  }, [mlpPoint, screenFrontPlaneM, viewableDimensions]);
 
   // Overall dimensions including border
   const overallDimensions = useMemo(() => {
