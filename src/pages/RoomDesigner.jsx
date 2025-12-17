@@ -3101,6 +3101,9 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
           border-color:transparent !important;
         }
         .brand-btn:hover{ background:#3E4349 !important; }
+        details[open] summary svg {
+          transform: rotate(180deg) !important;
+        }
       `}</style>
 
       <header className="p-4 bg-white border-b border-[#DCDBD6] flex-shrink-0">
@@ -3435,10 +3438,15 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                     </div>
                   )}
                   
-                  {/* Aiming Controls */}
-                  <div className="px-4 pb-4 border-b border-gray-200">
-                    <div className="text-sm font-medium text-gray-700 mb-3">Aiming</div>
-                    <div className="space-y-2">
+                  {/* Aim Loudspeaker - Nested Collapsible */}
+                  <details className="px-4 pb-4 border-b border-gray-200">
+                    <summary className="cursor-pointer text-sm font-medium text-gray-700 mb-3 list-none flex items-center justify-between">
+                      <span>Aim Loudspeaker</span>
+                      <svg className="w-4 h-4 transition-transform" style={{ transform: 'rotate(0deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </summary>
+                    <div className="space-y-2 mt-3">
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-lcr" className="text-sm">Left / Right → Aim to MLP</Label>
                         <Switch
@@ -3479,7 +3487,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         Turns the speaker to face the MLP. Position does not change (yet).
                       </div>
                     </div>
-                  </div>
+                  </details>
                   
                   <Suspense fallback={<div>Loading...</div>}>
                       <SpeakerPlacement disabled={isFrozen('speakers')}
