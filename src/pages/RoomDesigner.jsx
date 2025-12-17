@@ -31,6 +31,7 @@ import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Impor
 import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/seatingUtils';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
+import { clampSpeakerPosition, clampAllSpeakers } from "@/components/utils/clampSpeakerPosition";
 
 // NEW: Helper hook for URL query parameters - SSR Safe
 function useUrlQuery() {
@@ -1239,42 +1240,46 @@ export function seedSpeakersFromPreset({
   const backRightX = la ? Math.min(w - m, la.maxX) : x75;
 
   const posForRole = (role) => {
+    let rawPos;
     switch (role) {
       // Fronts
-      case "FL":  return { x: x25, y: yFront, z: earZ };
-      case "FC":  return { x: x50, y: yFront, z: earZ };
-      case "FR":  return { x: x75, y: yFront, z: earZ };
-      case "FCL": return { x: Math.max(m, x25 - 0.2), y: yFront, z: earZ };
-      case "FCR": return { x: Math.min(w - m, x75 + 0.2), y: yFront, z: earZ };
+      case "FL":  rawPos = { x: x25, y: yFront, z: earZ }; break;
+      case "FC":  rawPos = { x: x50, y: yFront, z: earZ }; break;
+      case "FR":  rawPos = { x: x75, y: yFront, z: earZ }; break;
+      case "FCL": rawPos = { x: Math.max(m, x25 - 0.2), y: yFront, z: earZ }; break;
+      case "FCR": rawPos = { x: Math.min(w - m, x75 + 0.2), y: yFront, z: earZ }; break;
       // Sides
-      case "SL":  return { x: m,     y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY, l - m)), z: earZ };
-      case "SR":  return { x: w - m, y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY, l - m)), z: earZ };
-      // Backs - ALWAYS clamp to actual room back wall
-      case "SBL": return { x: backLeftX,  y: Math.min(yRear, l - m), z: earZ };
-      case "SBR": return { x: backRightX, y: Math.min(yRear, l - m), z: earZ };
-      // New Wides for 7.x swap - clamp to room bounds
-      case "LW": return { x: w * 0.15, y: Math.max(m, Math.min(l * 0.4, l - m)), z: earZ };
-      case "RW": return { x: w * 0.85, y: Math.max(m, Math.min(l * 0.4, l - m)), z: earZ };
+      case "SL":  rawPos = { x: m,     y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY, l - m)), z: earZ }; break;
+      case "SR":  rawPos = { x: w - m, y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY, l - m)), z: earZ }; break;
+      // Backs - Initial position, will be clamped by helper
+      case "SBL": rawPos = { x: backLeftX,  y: yRear, z: earZ }; break;
+      case "SBR": rawPos = { x: backRightX, y: yRear, z: earZ }; break;
+      // New Wides for 7.x swap
+      case "LW": rawPos = { x: w * 0.15, y: l * 0.4, z: earZ }; break;
+      case "RW": rawPos = { x: w * 0.85, y: l * 0.4, z: earZ }; break;
 
       // Tops
-      case "TML": return { x: x25, y: l * 0.50, z: topZ }; // Top Mid Left
-      case "TMR": return { x: x75, y: l * 0.50, z: topZ }; // Top Mid Right
-      case "TFL": return { x: x25, y: l * 0.35, z: topZ }; // Top Front Left - 35% from front
-      case "TFR": return { x: x75, y: l * 0.35, z: topZ }; // Top Front Right
-      case "TFC": return { x: x50, y: l * 0.35, z: topZ }; // Top Front Center
-      case "TRL": return { x: x25, y: l * 0.70, z: topZ }; // Top Rear Left - 70% from front
-      case "TRR": return { x: x75, y: l * 0.70, z: topZ }; // Top Rear Right
-      case "TRC": return { x: x50, y: l * 0.70, z: topZ }; // Top Rear Center
+      case "TML": rawPos = { x: x25, y: l * 0.50, z: topZ }; break;
+      case "TMR": rawPos = { x: x75, y: l * 0.50, z: topZ }; break;
+      case "TFL": rawPos = { x: x25, y: l * 0.35, z: topZ }; break;
+      case "TFR": rawPos = { x: x75, y: l * 0.35, z: topZ }; break;
+      case "TFC": rawPos = { x: x50, y: l * 0.35, z: topZ }; break;
+      case "TRL": rawPos = { x: x25, y: l * 0.70, z: topZ }; break;
+      case "TRR": rawPos = { x: x75, y: l * 0.70, z: topZ }; break;
+      case "TRC": rawPos = { x: x50, y: l * 0.70, z: topZ }; break;
       // Legacy aliases
-      case "TL":  return { x: x25, y: l * 0.50, z: topZ };
-      case "TR":  return { x: x75, y: l * 0.50, z: topZ };
-      case "TBL": return { x: x25, y: l * 0.70, z: topZ };
-      case "TBR": return { x: x75, y: l * 0.70, z: topZ };
-      case "TBC": return { x: x50, y: l * 0.70, z: topZ };
+      case "TL":  rawPos = { x: x25, y: l * 0.50, z: topZ }; break;
+      case "TR":  rawPos = { x: x75, y: l * 0.50, z: topZ }; break;
+      case "TBL": rawPos = { x: x25, y: l * 0.70, z: topZ }; break;
+      case "TBR": rawPos = { x: x75, y: l * 0.70, z: topZ }; break;
+      case "TBC": rawPos = { x: x50, y: l * 0.70, z: topZ }; break;
       // LFE
-      case "LFE": return { x: x50, y: yFront + 0.20, z: 0.3 };
-      default:    return { x: x50, y: l * 0.60, z: earZ };
+      case "LFE": rawPos = { x: x50, y: yFront + 0.20, z: 0.3 }; break;
+      default:    rawPos = { x: x50, y: l * 0.60, z: earZ }; break;
     }
+    
+    // CRITICAL: Apply universal clamping/snapping
+    return clampSpeakerPosition(role, rawPos, { width: w, length: l });
   };
 
   const roles = DOLBY_PRESETS[preset] || [];
@@ -2468,10 +2473,12 @@ function RoomDesignerWithState() {
       debug('[Speakers] Switching from Front Wides (LW/RW) to Rear Surrounds (SBL/SBR).');
       
       const sbl = cloneRoleWithModel(byRole, 'LW', 'SBL', hint);
-      sbl.position = { x: stableDimensions.width * 0.25, y: stableDimensions.length - 0.1, z: earZ };
+      const rawSblPos = { x: stableDimensions.width * 0.25, y: stableDimensions.length - 0.1, z: earZ };
+      sbl.position = clampSpeakerPosition('SBL', rawSblPos, stableDimensions);
       
       const sbr = cloneRoleWithModel(byRole, 'RW', 'SBR', hint);
-      sbr.position = { x: stableDimensions.width * 0.75, y: stableDimensions.length - 0.1, z: earZ };
+      const rawSbrPos = { x: stableDimensions.width * 0.75, y: stableDimensions.length - 0.1, z: earZ };
+      sbr.position = clampSpeakerPosition('SBR', rawSbrPos, stableDimensions);
       
       const nextList = currentSpeakers
         .filter(s => s.role !== 'LW' && s.role !== 'RW')
