@@ -604,10 +604,6 @@ export default function SpeakerPositionsOverlay({
   const renderOverheadVerticalDims = () => {
     const Hcm = overheadHeightCm(); // may be null, that's ok
 
-    const roomFontBasis = Math.min(roomRect.width, roomRect.height);
-    const fontSize = calcFontSize(11, roomFontBasis);
-    const roleFontSize = calcFontSize(12, roomFontBasis);
-
     // Left overhead ruler: dynamically sit ~20px to the LEFT of the left-most overhead icon edge,
     // but never outside the room (keep a small safety inset so it won't clip).
     const GAP_PX = 20;
@@ -644,21 +640,11 @@ export default function SpeakerPositionsOverlay({
         const distFront = mToCm(yM);
         const distBack = mToCm(L - yM);
 
-        // Keep it identical to LCR spacing, just rotated
-        const distDx = 14;
-        const distY = 12;  // BELOW the (imagined) line & dot
-        const roleY = 16;
-        const hDx = 18;
-
-        // Small nudge if two dots are close
-        let nudge = 0;
-        if (idx > 0) {
-          const prevYPx = meterToCanvasY(list[idx - 1].position.y);
-          if (Math.abs(yPx - prevYPx) < 44) nudge = 6;
-        }
-
-        // rotate -90 so "left/right of dot" becomes "above/below dot" on the vertical ruler
-        const rot = -90;
+        // Match RIGHT WALL sizing + geometry exactly
+        const baseSize = calcFontSize(11, roomRect.width);
+        const distDx = 14;     // same as right wall
+        const distY  = 12;     // same as right wall
+        const rot    = -90;    // same as right wall
 
         return (
           <g key={`${keyPrefix}-${role}-${idx}`}>
@@ -666,12 +652,13 @@ export default function SpeakerPositionsOverlay({
             <circle cx={rulerX} cy={yPx} r={5} fill={dotFill} />
 
             {/* distances either side of the dot (like LCR), but turned 90° */}
+            {/* IMPORTANT: keep the same "rear on the left, front on the right" reading order */}
             <g transform={`translate(${rulerX}, ${yPx}) rotate(${rot})`}>
               <text
                 x={-distDx}
                 y={distY}
                 textAnchor="end"
-                style={{ fontSize, fill: textFill }}
+                style={{ fontSize: baseSize, fill: textFill }}
               >
                 {distBack}cm
               </text>
@@ -680,13 +667,11 @@ export default function SpeakerPositionsOverlay({
                 x={distDx}
                 y={distY}
                 textAnchor="start"
-                style={{ fontSize, fill: textFill }}
+                style={{ fontSize: baseSize, fill: textFill }}
               >
                 {distFront}cm
               </text>
             </g>
-
-
           </g>
         );
       });
