@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useMemo, useCallback, useState } from 'react';
@@ -109,7 +108,9 @@ export default function SeatingLayout({
   onSetSeatingPositions,
   disabled = false,
   screen,
-  dimensions
+  dimensions,
+  showMlpRuler = false,
+  onShowMlpRulerChange
 }) {
   // Build rowsArray purely from props (parent is the source of truth)
   const rowsArray = React.useMemo(() => {
@@ -797,6 +798,8 @@ export default function SeatingLayout({
     viewingDistanceOffsetM={seatingBlockOffset}
     mlpOverride={mlpOverride}
     mlpDotOffsetM={seatingBlockOffset}
+    showMlpRuler={showMlpRuler}
+    onShowMlpRulerChange={onShowMlpRulerChange}
   />
 </div>
 );
