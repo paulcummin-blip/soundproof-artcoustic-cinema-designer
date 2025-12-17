@@ -1,4 +1,3 @@
-
 /**
  * RP23 viewing angle calculations and seat generation utilities
  * Prioritizes angle-based logic over distance tables for accurate RP23 compliance
@@ -55,12 +54,13 @@ export function rp23LevelForAngleDeg(angleDeg) {
   // L4: 50–65° (Excellent)
   // L3: 45–70° (Good)
   // L2: 40–80° (Acceptable)
-  // L1: 35–45° (Poor)
+  // L1: 33–90° (Minimum)
+  // Fail: outside 33–90°
   
   if (angleDeg >= 50 && angleDeg <= 65) return 'L4';
   if (angleDeg >= 45 && angleDeg <= 70) return 'L3';
   if (angleDeg >= 40 && angleDeg <= 80) return 'L2';
-  if (angleDeg >= 35 && angleDeg <= 45) return 'L1';
+  if (angleDeg >= 33 && angleDeg <= 90) return 'L1';
   
   return null; // out of range
 }
@@ -78,10 +78,10 @@ function assignRP23Level(viewingAngle) {
     'L4': { level: 4, label: "Level 4 - Excellent", color: "green" },
     'L3': { level: 3, label: "Level 3 - Good", color: "blue" },
     'L2': { level: 2, label: "Level 2 - Acceptable", color: "yellow" },
-    'L1': { level: 1, label: "Level 1 - Poor", color: "orange" }
+    'L1': { level: 1, label: "Level 1 - Minimum", color: "orange" }
   };
   
-  return levelMap[level] || { level: 0, label: "Fail", color: "red" };
+  return levelMap[level] || { level: 0, label: "FAIL", color: "red" };
 }
 
 /**

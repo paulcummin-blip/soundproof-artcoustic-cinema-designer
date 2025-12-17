@@ -91,6 +91,9 @@ export default function ViewingAnglePanel({
 
       {(() => {
         const colors = getLevelColors(rp23Data.level);
+        const label = rp23Data.level >= 1 && rp23Data.level <= 4 
+          ? `RP23 Viewing Angle: Level ${rp23Data.level}` 
+          : 'RP23 Viewing Angle: FAIL';
         return (
           <div style={{ 
             border: `1px solid ${colors.border || '#E6E4DD'}`,
@@ -99,7 +102,7 @@ export default function ViewingAnglePanel({
             padding: '12px'
           }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>
-              RP23 Viewing Angle: Level {rp23Data.level}
+              {label}
             </div>
             <div style={{ fontSize: 12, color: colors.text, marginTop: 4 }}>
               Target: 50–65° (Level 4)
