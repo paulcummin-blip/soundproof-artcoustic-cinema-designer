@@ -383,6 +383,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     rp22AnglesEnabled = false,
     allSeatSplMetrics: allSeatSplMetricsProp = null,
     speakerPositionsView = 'off',
+    showMlpRuler = false,
   } = props;
 
   const appState = useAppState();
@@ -5431,6 +5432,142 @@ return (
 
             {/* Layer 7: MLP Marker (Fixed point, generally on top of zones but under draggable items) */}
             {MLPMarker}
+
+            {/* Layer 7.5: MLP Position Ruler (when enabled) */}
+            {showMlpRuler && (() => {
+              // Render MLP position ruler using the same visual style as speaker rulers
+              if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) return null;
+
+              const [mlpX_px, mlpY_px] = toPx(mlpDotX_m, mlpDotY_m);
+              
+              // Screen position (for screen → MLP distance)
+              const screenY_px = roomRect.y + (screenFrontPlaneM * scale);
+              
+              // Ruler styling (match speaker rulers)
+              const rulerColor = '#625143';
+              const rulerStroke = 1.5;
+              const dotRadius = 3;
+              const fontSize = 11;
+              const labelOffset = 16; // pixels from the line
+
+              // Calculate distances
+              const distLeftWall = mlpDotX_m; // Distance from left wall (x=0)
+              const distRightWall = widthM - mlpDotX_m; // Distance from right wall
+              const distScreen = mlpDotY_m - screenFrontPlaneM; // Distance from screen
+              const distBackWall = lengthM - mlpDotY_m; // Distance from back wall
+
+              return (
+                <g data-layer="mlp-ruler" pointerEvents="none">
+                  {/* Horizontal ruler (left wall ↔ MLP ↔ right wall) */}
+                  <line
+                    x1={roomRect.x}
+                    y1={mlpY_px}
+                    x2={roomRect.x + roomRect.width}
+                    y2={mlpY_px}
+                    stroke={rulerColor}
+                    strokeWidth={rulerStroke}
+                    opacity={0.6}
+                  />
+                  
+                  {/* Left wall dot */}
+                  <circle
+                    cx={roomRect.x}
+                    cy={mlpY_px}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Right wall dot */}
+                  <circle
+                    cx={roomRect.x + roomRect.width}
+                    cy={mlpY_px}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Left wall → MLP distance label */}
+                  <text
+                    x={(roomRect.x + mlpX_px) / 2}
+                    y={mlpY_px - labelOffset}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily="system-ui, sans-serif"
+                  >
+                    {distLeftWall.toFixed(2)}m
+                  </text>
+                  
+                  {/* MLP → Right wall distance label */}
+                  <text
+                    x={(mlpX_px + roomRect.x + roomRect.width) / 2}
+                    y={mlpY_px - labelOffset}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily="system-ui, sans-serif"
+                  >
+                    {distRightWall.toFixed(2)}m
+                  </text>
+
+                  {/* Vertical ruler (screen ↔ MLP ↔ back wall) */}
+                  <line
+                    x1={mlpX_px}
+                    y1={screenY_px}
+                    x2={mlpX_px}
+                    y2={roomRect.y + roomRect.height}
+                    stroke={rulerColor}
+                    strokeWidth={rulerStroke}
+                    opacity={0.6}
+                  />
+                  
+                  {/* Screen plane dot */}
+                  <circle
+                    cx={mlpX_px}
+                    cy={screenY_px}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Back wall dot */}
+                  <circle
+                    cx={mlpX_px}
+                    cy={roomRect.y + roomRect.height}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Screen → MLP distance label (rotated, left side) */}
+                  <text
+                    x={mlpX_px - labelOffset}
+                    y={(screenY_px + mlpY_px) / 2}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily="system-ui, sans-serif"
+                    transform={`rotate(-90 ${mlpX_px - labelOffset} ${(screenY_px + mlpY_px) / 2})`}
+                  >
+                    {distScreen.toFixed(2)}m
+                  </text>
+                  
+                  {/* MLP → Back wall distance label (rotated, right side) */}
+                  <text
+                    x={mlpX_px + labelOffset}
+                    y={(mlpY_px + roomRect.y + roomRect.height) / 2}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily="system-ui, sans-serif"
+                    transform={`rotate(-90 ${mlpX_px + labelOffset} ${(mlpY_px + roomRect.y + roomRect.height) / 2})`}
+                  >
+                    {distBackWall.toFixed(2)}m
+                  </text>
+                </g>
+              );
+            })()}
 
 
             {/* Layer 8: Subwoofers (generally non-draggable, but present) */}
