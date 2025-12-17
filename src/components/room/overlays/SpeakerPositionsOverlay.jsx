@@ -808,10 +808,7 @@ export default function SpeakerPositionsOverlay({
               {row.items.map((it, idx) => {
                 const xPx = meterToCanvasX(it.xM);
 
-                // If this dot is close to the left vertical ruler, spread text out more to avoid clashes
-                const nearLeftRuler = (xLeftRuler != null) && (Math.abs(xPx - xLeftRuler) < 90);
-
-                const distTextY = yPx + (nearLeftRuler ? 20 : 12);
+                const distTextY = yPx + 12;
 
                 const leftDist = mToCm(it.xM);
                 const rightDist = mToCm(W - it.xM);
@@ -832,11 +829,6 @@ export default function SpeakerPositionsOverlay({
                     leftOffset = 10;
                     rightOffset = 10;
                   }
-                }
-
-                if (nearLeftRuler) {
-                  leftOffset = Math.max(leftOffset, 24);
-                  rightOffset = Math.max(rightOffset, 18);
                 }
 
                 return (
