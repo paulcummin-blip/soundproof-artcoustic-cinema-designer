@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
-
+import { Eye, Ruler } from 'lucide-react';
 import { useAppState } from '@/components/AppStateProvider';
 import { calculateViewingAngle, assignRP23Level } from '@/components/utils/viewingAngleUtils';
-
+import RP22GradingPill from '../ui/RP22GradingPill';
 
 export default function ViewingAnglePanel({
   screen,
@@ -66,15 +66,39 @@ export default function ViewingAnglePanel({
   }
 
   return (
-    <div className="space-y-2">
-      <div style={{ border: '1px solid #E6E4DD', borderRadius: 12, padding: 16, background: '#fff' }}>
-        <div style={{ fontSize: 12, lineHeight: '16px', color: '#1B1A1A', fontWeight: 700 }}>
-          RP23 Viewing Angle: Level {rp23Data.level}
+    <div className="space-y-4">
+      <h3 className="text-base font-medium flex items-center gap-2" style={{ color: '#1B1A1A' }}>
+        <Eye className="w-5 h-5" style={{ color: '#625143' }} />
+        Viewing Angle Analysis
+      </h3>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div className="p-4 rounded-lg" style={{ border: '1px solid #C1B6AD', backgroundColor: '#F8F8F7' }}>
+          <div className="text-xs mb-1" style={{ color: '#625143' }}>Horizontal FOV</div>
+          <div className="text-2xl font-bold" style={{ color: '#1B1A1A' }}>
+            {rp23Data.angle.toFixed(1)}°
+          </div>
         </div>
-        <div style={{ fontSize: 12, lineHeight: '16px', color: '#61656B', marginTop: 6 }}>
-          Target: 50–65°. Current angle: {rp23Data.angle.toFixed(1)}°
+
+        <div className="p-4 rounded-lg" style={{ border: '1px solid #C1B6AD', backgroundColor: '#F8F8F7' }}>
+          <div className="text-xs mb-1" style={{ color: '#625143' }}>Viewing Distance</div>
+          <div className="text-2xl font-bold" style={{ color: '#1B1A1A' }}>
+            {rp23Data.distance.toFixed(2)}m
+          </div>
         </div>
       </div>
+
+      <div className="flex items-center justify-between p-3 rounded-lg" style={{ border: '1px solid #C1B6AD', backgroundColor: '#FFFFFF' }}>
+        <div className="flex items-center gap-2">
+          <Ruler className="w-4 h-4" style={{ color: '#625143' }} />
+          <span className="text-sm font-medium" style={{ color: '#3E4349' }}>RP23 Compliance</span>
+        </div>
+        <RP22GradingPill level={rp23Data.level} label={rp23Data.label} />
+      </div>
+
+      <p className="text-xs" style={{ color: '#625143' }}>
+        RP23 target: 50-65° (Level 4). Current angle: {rp23Data.angle.toFixed(1)}°
+      </p>
     </div>
   );
 }
