@@ -2565,8 +2565,9 @@ React.useEffect(() => {
       getCanonicalRole,
       getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
       getModelDimsM,
+      mlpPoint: mlp, // NEW: Pass green dot MLP for synthetic "mlp" seat
     });
-  }, [allSeatSplMetricsProp, seatingPositions, placedSpeakers, getCanonicalRole, appState?.getEffectiveSplInputs, getModelDimsM]);
+  }, [allSeatSplMetricsProp, seatingPositions, placedSpeakers, getCanonicalRole, appState?.getEffectiveSplInputs, getModelDimsM, mlp]);
 
   // Use prop if available, otherwise use local computation
   const allSeatSplMetrics = allSeatSplMetricsProp || allSeatSplMetricsLocal;
