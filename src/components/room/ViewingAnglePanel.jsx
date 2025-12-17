@@ -30,10 +30,10 @@ export default function ViewingAnglePanel({
 
     // Use the exact same inputs as dot placement
     const computedAngle = calculateViewingAngle(
-      { y: mlpY_m },                    // viewer position (the green dot)
-      visibleWidthInches,               // visible width in inches
-      aspectRatio,                      // aspect ratio
-      { y: screenFrontPlaneM }          // screen front plane Y
+      { y: mlpY_m }, // viewer position (the green dot)
+      visibleWidthInches, // visible width in inches
+      aspectRatio, // aspect ratio
+      { y: screenFrontPlaneM } // screen front plane Y
     );
 
     if (computedAngle == null) return null;
@@ -46,8 +46,8 @@ export default function ViewingAnglePanel({
       const widthM = visibleWidthInches * 0.0254;
       const d = Math.max(viewerDistance, 1e-6);
       console.log('[RP23-angle] widthM=%o mlpY=%o planeFrontY=%o d=%o angle=%o',
-        widthM, mlpY_m, screenFrontPlaneM, d,
-        2 * Math.atan(widthM / (2 * d)) * 180 / Math.PI
+      widthM, mlpY_m, screenFrontPlaneM, d,
+      2 * Math.atan(widthM / (2 * d)) * 180 / Math.PI
       );
     }
 
@@ -66,8 +66,8 @@ export default function ViewingAnglePanel({
         <p className="text-sm text-gray-500">
           Calculating viewing angle...
         </p>
-      </div>
-    );
+      </div>);
+
   }
 
   return (
@@ -80,8 +80,8 @@ export default function ViewingAnglePanel({
         <Switch
           id="mlp-ruler-toggle"
           checked={showMlpRuler}
-          onCheckedChange={onShowMlpRulerChange}
-        />
+          onCheckedChange={onShowMlpRulerChange} className="bg-[#3E4349] text-[#3E4349] rounded-full peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center border transition-colors border-[#DCDBD6] border-[#3E4349] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#C1B6AD] disabled:cursor-not-allowed disabled:opacity-50" />
+
       </div>
 
       <h3 className="text-base font-medium flex items-center gap-2" style={{ color: '#1B1A1A' }}>
@@ -107,22 +107,22 @@ export default function ViewingAnglePanel({
 
       {(() => {
         const colors = getLevelColors(rp23Data.level);
-        const label = rp23Data.level >= 1 && rp23Data.level <= 4 
-          ? `RP23 Viewing Angle: Level ${rp23Data.level}` 
-          : 'RP23 Viewing Angle: FAIL';
+        const label = rp23Data.level >= 1 && rp23Data.level <= 4 ?
+        `RP23 Viewing Angle: Level ${rp23Data.level}` :
+        'RP23 Viewing Angle: FAIL';
         return (
-          <div style={{ 
+          <div style={{
             border: `1px solid ${colors.border || '#E6E4DD'}`,
             background: colors.bg,
-            borderRadius: 8, 
+            borderRadius: 8,
             padding: '12px'
           }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: colors.text }}>
               {label}
             </div>
-          </div>
-        );
+          </div>);
+
       })()}
-    </div>
-  );
+    </div>);
+
 }
