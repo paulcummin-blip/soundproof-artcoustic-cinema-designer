@@ -1895,7 +1895,11 @@ function SpeakerPlacementImpl(props) {
       return;
     }
     
-    setSpeakers(currentSpeakers => resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, globalSurroundModel));
+    setSpeakers(currentSpeakers => {
+      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, globalSurroundModel);
+      // Clear positionSource for all speakers (return to auto mode)
+      return reset.map(s => ({ ...s, positionSource: 'auto' }));
+    });
     
     if (showToast) {
       const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : effectivePreset.startsWith('9.') ? '9.x' : '7.1';
@@ -1907,6 +1911,13 @@ function SpeakerPlacementImpl(props) {
     if (!mlpPoint || !dimensions) return;
 
     setSpeakers(prev => {
+      // Only auto-adjust speakers that haven't been manually positioned
+      const preserveUserPositions = (prev || []).filter(s => {
+        const canon = getCanonicalRole(s.role);
+        return SURROUND_BED_ROLES.has(canon) && s.positionSource === 'user';
+      });
+      
+      // Reset non-user speakers
       const next = resetSurroundPositions(
         effectivePreset,
         mlpPoint,
@@ -1914,7 +1925,16 @@ function SpeakerPlacementImpl(props) {
         prev,
         globalSurroundModel
       );
-      return speakersShallowEqual(prev, next) ? prev : next;
+      
+      // Merge: keep user positions, update auto positions
+      const merged = next.map(speaker => {
+        const userVersion = preserveUserPositions.find(u => 
+          getCanonicalRole(u.role) === getCanonicalRole(speaker.role)
+        );
+        return userVersion || speaker;
+      });
+      
+      return speakersShallowEqual(prev, merged) ? prev : merged;
     });
 
     lastPresetRef.current = effectivePreset;
@@ -1930,7 +1950,7 @@ function SpeakerPlacementImpl(props) {
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
   // ---------------------------------------------------------------------------
-  // FRONT-WIDE AUTO MEDIAN (RP22 - UNCONDITIONAL)
+  // FRONT-WIDE AUTO MEDIAN (RP22 - UNCONDITIONAL, but respects user lock)
   // LW / RW sit at the midpoint between FL/SL and FR/SR respectively.
   // This runs whenever speakers or dimensions change, independent of overlay state.
   // ---------------------------------------------------------------------------
@@ -1972,6 +1992,9 @@ function SpeakerPlacementImpl(props) {
       const updated = list.map((s) => {
         const canon = getCanonicalRole(s.role);
         if (canon !== "LW" && canon !== "RW") return s;
+        
+        // [B44 POSITION LOCK] Skip user-positioned speakers
+        if (s.positionSource === 'user') return s;
 
         const frontRole = canon === "LW" ? "FL" : "FR";
         const sideRole  = canon === "LW" ? "SL" : "SR";
@@ -2054,6 +2077,7 @@ function SpeakerPlacementImpl(props) {
   // Ensures LW and RW always sit at the true median between front and side
   // surrounds on their own side. We only touch the Y position; X is already
   // wall-pinned by the hugging logic.
+  // [B44 POSITION LOCK] Only adjusts auto-positioned speakers
   useEffect(() => {
     setSpeakers(prev => {
       if (!Array.isArray(prev) || prev.length === 0) return prev;
@@ -2070,13 +2094,16 @@ function SpeakerPlacementImpl(props) {
 
       // If any of the anchors are missing, do nothing.
       if (!FL || !FR || !SL || !SR || !LW || !RW) return prev;
+      
+      // [B44 POSITION LOCK] Skip if user has manually placed FW speakers
+      if (LW.positionSource === 'user' && RW.positionSource === 'user') return prev;
 
       const targetYL = (FL.position.y + SL.position.y) / 2;
       const targetYR = (FR.position.y + SR.position.y) / 2;
 
       const EPS = 0.001;
-      const needsLeftAdjust  = Math.abs(LW.position.y - targetYL) > EPS;
-      const needsRightAdjust = Math.abs(RW.position.y - targetYR) > EPS;
+      const needsLeftAdjust  = LW.positionSource !== 'user' && Math.abs(LW.position.y - targetYL) > EPS;
+      const needsRightAdjust = RW.positionSource !== 'user' && Math.abs(RW.position.y - targetYR) > EPS;
 
       if (!needsLeftAdjust && !needsRightAdjust) {
         return prev; // already correct — avoid infinite loops

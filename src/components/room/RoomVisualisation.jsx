@@ -1437,7 +1437,8 @@ React.useEffect(() => {
             x: xAtWall,
             y: yClamped,
             z: s.position?.z ?? 1.1
-          }
+          },
+          positionSource: 'auto' // Clear user lock on reset
         };
       }));
     };
@@ -2503,11 +2504,32 @@ React.useEffect(() => {
             if (Math.abs(clampedX - spk.position.x) > 0.001 || Math.abs(clampedY - spk.position.y) > 0.001) {
               onSetSpeakers(prev => prev.map(s => 
                 s.id === draggedItemId 
-                  ? { ...s, position: { ...s.position, x: clampedX, y: clampedY } }
+                  ? { ...s, position: { ...s.position, x: clampedX, y: clampedY }, positionSource: 'user' }
+                  : s
+              ));
+            } else {
+              // No clamping needed, just mark as user-positioned
+              onSetSpeakers(prev => prev.map(s => 
+                s.id === draggedItemId 
+                  ? { ...s, positionSource: 'user' }
                   : s
               ));
             }
+          } else {
+            // No zone or invalid position, still mark as user-positioned
+            onSetSpeakers(prev => prev.map(s => 
+              s.id === draggedItemId 
+                ? { ...s, positionSource: 'user' }
+                : s
+            ));
           }
+        } else {
+          // Non-overhead speaker: mark as user-positioned
+          onSetSpeakers(prev => prev.map(s => 
+            s.id === draggedItemId 
+              ? { ...s, positionSource: 'user' }
+              : s
+          ));
         }
       }
     }
@@ -3030,7 +3052,7 @@ useEffect(() => {
     }));
   }, [aimAtMLP, lcrAngleInfo.L, lcrAngleInfo.R, onSetSpeakers, getCanonicalRole, placedSpeakers]);
 
-  // [NEW] Auto-hug surrounds to walls when room dimensions change
+  // [NEW] Auto-hug surrounds to walls when room dimensions change (only auto-positioned speakers)
   useEffect(() => {
     if (!onSetSpeakers || !placedSpeakers?.length) return;
 
@@ -3046,6 +3068,9 @@ useEffect(() => {
       // SBL/SBR are handled by SpeakerPlacement and should NOT be auto-hugged to side walls
       if (!['SL', 'SR', 'LW', 'RW'].includes(canon)) return spk;
       if (!spk.position || !spk.model) return spk;
+      
+      // [B44 POSITION LOCK] Skip user-positioned speakers
+      if (spk.positionSource === 'user') return spk;
 
       const dims = getModelDimsM(spk.model);
       const isLeft = ['SL', 'LW'].includes(canon);
@@ -3284,11 +3309,17 @@ useEffect(() => {
     */
   }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
 
-  // [B44] DISABLED: SBL/SBR positions now come from SpeakerPlacement only
-  // This effect has has been disabled to prevent RV from overwriting state-driven positions
+  // [B44] Auto-adjust SBL/SBR only if positionSource !== 'user'
   React.useEffect(() => {
-    // [B44] Legacy corridor/constraint logic for SBL/SBR disabled.
-    // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
+    // Skip if user has manually placed these speakers
+    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
+    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
+    
+    if ((sbl?.positionSource === 'user') || (sbr?.positionSource === 'user')) {
+      return; // User has taken control - don't auto-adjust
+    }
+    
+    // Otherwise continue with existing auto-adjustment logic
     return; // Early exit - effect is now a no-op
     
     /* ORIGINAL LOGIC DISABLED:
