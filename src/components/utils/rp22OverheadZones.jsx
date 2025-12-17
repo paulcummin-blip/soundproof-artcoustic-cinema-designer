@@ -544,7 +544,6 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
   };
 
   // Back zone: centered on idealRearCenterY
-  // CRITICAL: Include roomLength for rear overhead placement safety
   const backZone = {
     x1: x1Overhead,
     x2: x2Overhead,
@@ -552,7 +551,6 @@ export function computeRp22OverheadZoneExtents(bounds, roomDims, seatingPosition
     y2: Math.min(rearWallInner, idealRearCenterY + halfBandM),
     active: true,
     pieces: basePieces,
-    roomLength: lengthM, // Pass room length for auto-placement clamping
   };
 
   // ────────────────────────────────────────────────────────────────────────────
