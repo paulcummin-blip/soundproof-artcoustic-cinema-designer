@@ -5457,8 +5457,9 @@ return (
               const distBackWall = lengthM - mlpDotY_m; // Distance from back wall
               const distFrontWall = mlpDotY_m; // Distance from front wall (y=0)
 
-              // Secondary ruler X position: 80% from centerline toward left wall
-              const secondaryRulerX_px = mlpX_px - (mlpX_px - roomRect.x) * 0.2;
+              // Secondary ruler X position: 20% from left wall toward MLP centerline
+              // Formula: x = leftWallX + 0.20 * (mlpCenterX - leftWallX)
+              const secondaryRulerX_px = roomRect.x + 0.20 * (mlpX_px - roomRect.x);
 
               return (
                 <g data-layer="mlp-ruler" pointerEvents="none">
