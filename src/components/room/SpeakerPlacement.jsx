@@ -43,8 +43,6 @@ function computeRP22Level(splDb, thresholds) {
   return 'FAIL';
 }
 
-import { getLevelColors } from '@/components/utils/rp22Colors';
-
 // RP22 Level Pill Component
 function RP22LevelPill({ parameter, level, label }) {
   const colors = getLevelColors(level);
