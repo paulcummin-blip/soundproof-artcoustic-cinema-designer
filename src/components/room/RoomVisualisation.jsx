@@ -2872,7 +2872,6 @@ React.useEffect(() => {
       });
     }
   }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM, dimsOk]);
-  }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM, dimsOk]);
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
