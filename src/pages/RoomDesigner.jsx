@@ -1901,24 +1901,24 @@ function RoomDesignerWithState() {
       // Compute safe X bounds using half-width + buffer
       const minX = (widthM / 2) + sideBuffer;
       const maxX = stableDimensions.width - (widthM / 2) - sideBuffer;
+      
+      // Only warn if sub physically cannot fit anywhere on this wall
+      if (minX >= maxX) {
+        warnings.push("Rear subwoofer is too wide for this room width.");
+        setSubWarnings(prev => ({ ...prev, rear: warnings }));
+        return [];
+      }
+      
+      const clamp = (v) => Math.max(minX, Math.min(maxX, v));
 
       if (qty >= 1) {
         const defaultXPos = leftRefX;
         const userPos = savedPositions[0];
-        const rawX = userPos?.x ?? defaultXPos;
+        const xPosLeftSub = clamp(userPos?.x ?? defaultXPos);
         
-        // Always clamp to safe bounds
-        const xClamped = Math.max(minX, Math.min(maxX, rawX));
-        
-        // Add warning if clamped
-        if (Math.abs(rawX - xClamped) > 0.001) {
-          warnings.push("Rear left subwoofer was clamped inside the room (too close to side wall).");
-        }
-        
-        // Always render
         subsToRender.push({
           id: 'rear-sub-left', role: 'SUB', model,
-          position: { x: xClamped, y: centerY, z: zCenter },
+          position: { x: xPosLeftSub, y: centerY, z: zCenter },
           dims_m: { w: widthM, h: heightM, d: depthM },
         });
       }
@@ -1926,20 +1926,11 @@ function RoomDesignerWithState() {
       if (qty >= 2) {
         const defaultXPos = rightRefX;
         const userPos = savedPositions[1];
-        const rawX = userPos?.x ?? defaultXPos;
+        const xPosRightSub = clamp(userPos?.x ?? defaultXPos);
         
-        // Always clamp to safe bounds
-        const xClamped = Math.max(minX, Math.min(maxX, rawX));
-        
-        // Add warning if clamped
-        if (Math.abs(rawX - xClamped) > 0.001) {
-          warnings.push("Rear right subwoofer was clamped inside the room (too close to side wall).");
-        }
-        
-        // Always render
         subsToRender.push({
           id: 'rear-sub-right', role: 'SUB', model,
-          position: { x: xClamped, y: centerY, z: zCenter },
+          position: { x: xPosRightSub, y: centerY, z: zCenter },
           dims_m: { w: widthM, h: heightM, d: depthM },
         });
       }
