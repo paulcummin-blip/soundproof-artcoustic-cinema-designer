@@ -2893,16 +2893,30 @@ React.useEffect(() => {
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
     console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
 
-    // REMOVE AFTER FIX CONFIRMED - Debug lookup for subs
+    // [B44] Robust fallback lookup for subs (prevents disappearance bug)
     if (dragType === 'sub') {
-      const subInById = byId.get(draggedItemId);
-      const allRearSubIds = (rearSubs || []).map(s => s?.id).filter(Boolean);
-      console.log('[SUB MOVE_LOOKUP]', {
-        draggedItemId,
-        found: !!subInById,
-        allRearSubIds,
-        rearSubsCount: rearSubs?.length || 0,
-      });
+      let subFound = byId.get(draggedItemId);
+      
+      // Fallback 1: Search in appropriate sub list
+      if (!subFound) {
+        const isFront = String(draggedItemId).startsWith('front-');
+        const isRear = String(draggedItemId).startsWith('rear-');
+        const searchList = isFront ? frontSubs : isRear ? rearSubs : [];
+        subFound = (searchList || []).find(s => s?.id === draggedItemId);
+      }
+      
+      // Fallback 2: Use last known position from ref
+      if (!subFound && draggedSubLastPosRef.current[draggedItemId]) {
+        subFound = {
+          id: draggedItemId,
+          position: draggedSubLastPosRef.current[draggedItemId],
+          _fallback: true
+        };
+      }
+      
+      if (!subFound) {
+        console.warn('[SUB DRAG] Could not locate sub, continuing with last position', { draggedItemId });
+      }
     }
     
     if (dragType === 'speaker' && speaker) {
