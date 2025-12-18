@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAppState } from "../AppStateProvider";
 import BassGraph from "@/components/room/bass/BassGraph";
 import { simulateBassAtSeats } from "@/components/bass/bassSimulationEngine";
+import SubTuningControls from "@/components/room/bass/SubTuningControls";
 
 const brand = {
   ink:   "#1B1A1A",
@@ -16,7 +17,7 @@ const brand = {
 };
 
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings }) {
-  const { seatingPositions, roomDims, splConfig } = useAppState();
+  const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg } = useAppState();
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
   const totalSubCount = (frontSubsCfg?.count || 0) + (rearSubsCfg?.count || 0);
   const hasNoSubs = totalSubCount === 0;
@@ -31,6 +32,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     const frontModel = frontSubsCfg?.model;
     const frontCount = frontSubsCfg?.count || 0;
     const frontPositions = frontSubsCfg?.positions || [];
+    const frontTuning = frontSubsCfg?.tuning || [];
     
     if (frontModel && frontCount > 0) {
       // Default positions if not saved
@@ -42,12 +44,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       
       for (let i = 0; i < frontCount; i++) {
         const pos = frontPositions[i] || defaultFrontPositions[i] || { x: roomWidth / 2, y: 0.15 };
+        const tuning = frontTuning[i] || { gainDb: 0, delayMs: 0, polarity: 0 };
         subs.push({
           id: `front-sub-${i}`,
           modelKey: frontModel,
           x: pos.x,
           y: pos.y,
-          z: 0.35
+          z: 0.35,
+          tuning
         });
       }
     }
@@ -56,6 +60,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     const rearModel = rearSubsCfg?.model;
     const rearCount = rearSubsCfg?.count || 0;
     const rearPositions = rearSubsCfg?.positions || [];
+    const rearTuning = rearSubsCfg?.tuning || [];
     
     if (rearModel && rearCount > 0) {
       const roomWidth = roomDims?.widthM || 4.5;
@@ -67,12 +72,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       
       for (let i = 0; i < rearCount; i++) {
         const pos = rearPositions[i] || defaultRearPositions[i] || { x: roomWidth / 2, y: roomLength - 0.15 };
+        const tuning = rearTuning[i] || { gainDb: 0, delayMs: 0, polarity: 0 };
         subs.push({
           id: `rear-sub-${i}`,
           modelKey: rearModel,
           x: pos.x,
           y: pos.y,
-          z: 0.35
+          z: 0.35,
+          tuning
         });
       }
     }

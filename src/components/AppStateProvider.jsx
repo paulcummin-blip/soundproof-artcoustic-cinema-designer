@@ -208,8 +208,18 @@ function useDesignerState() {
   const [autoSeatByRP23, setAutoSeatByRP23] = useState(true);
   const [roomElements, setRoomElements] = useState([]);
   const [subwoofers, setSubwoofers] = useState([]);
-  const [frontSubsCfg, setFrontSubsCfg] = useState({ model: "SUB2-12", count: 0 });
-  const [rearSubsCfg, setRearSubsCfg] = useState({ model: "SUB2-12", count: 0 });
+  const [frontSubsCfg, setFrontSubsCfg] = useState({ 
+    model: "SUB2-12", 
+    count: 0, 
+    positions: [],
+    tuning: []
+  });
+  const [rearSubsCfg, setRearSubsCfg] = useState({ 
+    model: "SUB2-12", 
+    count: 0,
+    positions: [],
+    tuning: []
+  });
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
   const [aimAtMLP, setAimAtMLP] = useState(true);
   const [overheadOffsetM, setOverheadOffsetM] = useState(0);

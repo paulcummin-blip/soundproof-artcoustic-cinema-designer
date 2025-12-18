@@ -203,6 +203,18 @@ function detectNulls(freqsHz, splDb, band = [20, 80]) {
   };
 }
 
+// Normalize sub tuning (ensure safe defaults)
+function normalizeSubTuning(tuning) {
+  const defaults = { gainDb: 0, delayMs: 0, polarity: 0 };
+  if (!tuning || typeof tuning !== 'object') return defaults;
+  
+  return {
+    gainDb: Math.max(-12, Math.min(6, Number(tuning.gainDb) || 0)),
+    delayMs: Math.max(0, Math.min(20, Number(tuning.delayMs) || 0)),
+    polarity: (tuning.polarity === 180) ? 180 : 0
+  };
+}
+
 // Main simulation engine
 export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   // Guards
@@ -262,6 +274,9 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         const curve = modelCurves[sub.modelKey];
         if (!curve) return;
         
+        // Normalize tuning
+        const tuning = normalizeSubTuning(sub.tuning);
+        
         // Distance
         const dx = sub.x - seatPos.x;
         const dy = sub.y - seatPos.y;
@@ -277,12 +292,23 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         // Boundary gain
         const dbBoundary = calculateBoundaryGain({ x: sub.x, y: sub.y, z: sub.z }, roomDims, radiationMode);
         
+        // Apply user gain adjustment
+        const dbGain = tuning.gainDb;
+        
         // Total magnitude
-        const dbMag = db0 + dbDist + dbPower + dbEq + dbBoundary;
+        const dbMag = db0 + dbDist + dbPower + dbEq + dbBoundary + dbGain;
         const amplitude = Math.pow(10, dbMag / 20);
         
         // Time-of-flight phase
-        const phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
+        let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
+        
+        // Apply user delay (adds phase lag)
+        phi -= 2 * Math.PI * f * (tuning.delayMs / 1000);
+        
+        // Apply polarity (180° phase shift if inverted)
+        if (tuning.polarity === 180) {
+          phi += Math.PI;
+        }
         
         // Complex accumulation
         sumReal += amplitude * Math.cos(phi);
@@ -306,13 +332,30 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   });
   
   // Compute RP22 metrics
-  const metrics = computeRP22Metrics(seatResponses, seats);
+  const metrics = computeRP22Metrics(seatResponses, seats, subs);
   
   return { seatResponses, metrics };
 }
 
+// Check for extreme tuning settings
+function checkTuningWarnings(subs) {
+  const warnings = [];
+  
+  subs.forEach((sub, i) => {
+    const tuning = normalizeSubTuning(sub.tuning);
+    if (tuning.delayMs > 15) {
+      warnings.push(`Sub ${i + 1}: High delay (${tuning.delayMs.toFixed(1)}ms) - verify alignment`);
+    }
+    if (tuning.gainDb > 3) {
+      warnings.push(`Sub ${i + 1}: High gain (+${tuning.gainDb.toFixed(1)}dB) - check headroom`);
+    }
+  });
+  
+  return warnings;
+}
+
 // Compute RP22 P14, P18, P19 + Designer fairness metrics
-function computeRP22Metrics(seatResponses, seats) {
+function computeRP22Metrics(seatResponses, seats, subs = []) {
   const seatIds = Object.keys(seatResponses);
   if (seatIds.length === 0) return null;
   
@@ -400,6 +443,9 @@ function computeRP22Metrics(seatResponses, seats) {
   fairnessScore -= 4 * Math.max(0, Math.abs(worstNullDb) - 6);
   fairnessScore = Math.max(0, Math.min(100, fairnessScore));
   
+  // Check for tuning warnings
+  const tuningWarnings = checkTuningWarnings(subs);
+  
   return {
     p14: { avgStdDevDb: p14AvgStdDevDb },
     p18: { f3Hz },
@@ -415,6 +461,7 @@ function computeRP22Metrics(seatResponses, seats) {
         worstSeatId,
         worstNullDb
       }
-    }
+    },
+    tuningWarnings
   };
 }
