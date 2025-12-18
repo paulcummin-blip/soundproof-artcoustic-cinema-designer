@@ -2304,55 +2304,6 @@ function RoomDesignerWithState() {
     }
   }, [placedSpeakers, _isFrozen, stableDimensions.width, setSpeakers]);
 
-  // Guard: clamp all speakers inside room when dimensions change
-  useEffect(() => {
-    if (!placedSpeakers.length || (_isFrozen && _isFrozen('speakers'))) return;
-    
-    const roomW = Number(stableDimensions?.width);
-    const roomL = Number(stableDimensions?.length);
-    if (!Number.isFinite(roomW) || !Number.isFinite(roomL) || roomW <= 0 || roomL <= 0) return;
-
-    let needsUpdate = false;
-    const clamped = placedSpeakers.map(spk => {
-      if (!spk?.position || !Number.isFinite(spk.position.x) || !Number.isFinite(spk.position.y)) {
-        return spk;
-      }
-
-      // Get speaker dimensions for accurate margin (or use safe default)
-      const meta = getSpeakerModelMeta(spk.model);
-      const marginX = (meta?.widthM || 0.16) / 2; // half width
-      const marginY = (meta?.depthM || 0.16) / 2; // half depth
-      
-      const minX = marginX;
-      const maxX = roomW - marginX;
-      const minY = marginY;
-      const maxY = roomL - marginY;
-      
-      const clampedX = Math.max(minX, Math.min(maxX, spk.position.x));
-      const clampedY = Math.max(minY, Math.min(maxY, spk.position.y));
-      
-      // Check if anything changed by more than 1mm
-      if (Math.abs(clampedX - spk.position.x) > 0.001 || Math.abs(clampedY - spk.position.y) > 0.001) {
-        needsUpdate = true;
-        return {
-          ...spk,
-          position: {
-            ...spk.position,
-            x: clampedX,
-            y: clampedY
-          }
-        };
-      }
-      
-      return spk;
-    });
-
-    if (needsUpdate) {
-      debug('[Speakers] Clamping speakers inside room after dimension change.');
-      setSpeakers(clamped);
-    }
-  }, [stableDimensions.width, stableDimensions.length, placedSpeakers, _isFrozen, setSpeakers]);
-
   // NEW: Apply "Aim to MLP" rotation to LCR and Surrounds
   useEffect(() => {
     if (!placedSpeakers.length || (_isFrozen && _isFrozen('speakers')) || !mlpAnchorEffective) return;
