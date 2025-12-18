@@ -4,6 +4,63 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const mToCm = (m) => Math.round(Number(m) * 100);
 
+// Dynamic font sizing based on local label crowding
+const computeDynamicFontSize = (labels, defaultSize = 11) => {
+  if (!labels || !labels.length) return defaultSize;
+  
+  const MIN_FONT = 9;
+  const MAX_FONT = defaultSize;
+  
+  // Helper to compute text bounding box
+  const getTextBox = (label, fontSize) => {
+    const approxW = label.text.length * fontSize * 0.6;
+    const approxH = fontSize * 1.1;
+    
+    let xMin, xMax, yMin, yMax;
+    
+    if (label.textAnchor === 'middle') {
+      xMin = label.x - approxW / 2;
+      xMax = label.x + approxW / 2;
+    } else if (label.textAnchor === 'start') {
+      xMin = label.x;
+      xMax = label.x + approxW;
+    } else { // 'end'
+      xMin = label.x - approxW;
+      xMax = label.x;
+    }
+    
+    yMin = label.y - approxH;
+    yMax = label.y;
+    
+    return { xMin, xMax, yMin, yMax };
+  };
+  
+  // Check if two boxes overlap
+  const boxesOverlap = (box1, box2) => {
+    return !(box1.xMax < box2.xMin || box1.xMin > box2.xMax ||
+             box1.yMax < box2.yMin || box1.yMin > box2.yMax);
+  };
+  
+  // Test font size for overlaps
+  for (let fontSize = MAX_FONT; fontSize >= MIN_FONT; fontSize--) {
+    const boxes = labels.map(label => getTextBox(label, fontSize));
+    
+    let hasOverlap = false;
+    for (let i = 0; i < boxes.length && !hasOverlap; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        if (boxesOverlap(boxes[i], boxes[j])) {
+          hasOverlap = true;
+          break;
+        }
+      }
+    }
+    
+    if (!hasOverlap) return fontSize;
+  }
+  
+  return MIN_FONT;
+};
+
 // Font scaling: default slightly smaller than before, shrink further if crowded
 const calcFontSize = (basePx, roomWidthPx) => {
   const w = Number(roomWidthPx) || 0;
@@ -281,9 +338,29 @@ export default function SpeakerPositionsOverlay({
     const xLeftPx = roomRect.x;
     const xRightPx = roomRect.x + roomRect.width;
 
-    // Calculate font size
-    const fontSize = calcFontSize(11, roomRect.width);
-    const roleFontSize = calcFontSize(12, roomRect.width);
+    // Build label slots for dynamic font sizing
+    const distanceLabels = [];
+    const roleLabels = [];
+    
+    lcr.forEach((s, i) => {
+      const xPx = meterToCanvasX(s.position.x);
+      const leftCm = mToCm(s.position.x);
+      const rightCm = mToCm(W - s.position.x);
+      const hCm = mToCm(bedHeightM(s.role, s.position.y));
+      
+      distanceLabels.push(
+        { x: xPx - 14, y: yLine - 8, text: `${leftCm}cm`, textAnchor: 'end' },
+        { x: xPx + 14, y: yLine - 8, text: `${rightCm}cm`, textAnchor: 'start' }
+      );
+      
+      roleLabels.push(
+        { x: xPx, y: yLine + 16, text: String(s.role || '').toUpperCase(), textAnchor: 'middle' },
+        { x: xPx + 18, y: yLine + 16, text: `H${hCm}cm`, textAnchor: 'start' }
+      );
+    });
+    
+    const fontSize = computeDynamicFontSize(distanceLabels, 11);
+    const roleFontSize = computeDynamicFontSize(roleLabels, 12);
 
     return (
       <g data-layer="speaker-positions-front" pointerEvents="none">
@@ -390,16 +467,35 @@ export default function SpeakerPositionsOverlay({
     const xLeftPx = roomRect.x;
     const xRightPx = roomRect.x + roomRect.width;
 
-    // Calculate font size
-    const fontSize = calcFontSize(11, roomRect.width);
-    const roleFontSize = calcFontSize(12, roomRect.width);
-
-    // Keep rear speaker ID/H spacing consistent (not glued to the back wall)
+    // Build label slots for dynamic font sizing
     const wallYpx = roomRect.y + roomRect.height;
     const labelYpx = wallYpx + 16;
-
-    // Keep rear distances visible even when the ruler line is near the bottom
     const distTextY = Math.min(rulerYpx + 12, wallYpx + 34);
+    
+    const distanceLabels = [];
+    const roleLabels = [];
+    
+    backGroup.forEach((s, idx) => {
+      const xPx = meterToCanvasX(s.xM);
+      const leftDistCm = mToCm(s.xM);
+      const rightDistCm = mToCm(W - s.xM);
+      const hCm = mToCm(bedHeightM(s.role, s.yM));
+      
+      distanceLabels.push(
+        { x: xPx - 14, y: distTextY, text: `${leftDistCm}cm`, textAnchor: 'end' },
+        { x: xPx + 14, y: distTextY, text: `${rightDistCm}cm`, textAnchor: 'start' }
+      );
+      
+      roleLabels.push(
+        { x: xPx, y: labelYpx, text: String(s.role || '').toUpperCase(), textAnchor: 'middle' },
+        { x: xPx + 18, y: labelYpx, text: `H${hCm}cm`, textAnchor: 'start' }
+      );
+    });
+    
+    const fontSize = computeDynamicFontSize(distanceLabels, 11);
+    const roleFontSize = computeDynamicFontSize(roleLabels, 12);
+
+
 
     return (
       <g data-layer="speaker-positions-back" pointerEvents="none">
@@ -418,31 +514,7 @@ export default function SpeakerPositionsOverlay({
         {/* Dots and labels for each speaker */}
         {backGroup.map((s, idx) => {
           const xPx = meterToCanvasX(s.xM);
-
-          const leftDistCm = mToCm(s.xM);
-          const rightDistCm = mToCm(W - s.xM);
-
           const hCm = mToCm(bedHeightM(s.role, s.yM));
-
-          // Check for close neighbors
-          let leftOffset = 14;
-          let rightOffset = 14;
-
-          if (idx > 0) {
-            const prevXPx = meterToCanvasX(backGroup[idx - 1].xM);
-            if (Math.abs(xPx - prevXPx) < 40) {
-              leftOffset = 10;
-              rightOffset = 10;
-            }
-          }
-
-          if (idx < backGroup.length - 1) {
-            const nextXPx = meterToCanvasX(backGroup[idx + 1].xM);
-            if (Math.abs(xPx - nextXPx) < 40) {
-              leftOffset = 10;
-              rightOffset = 10;
-            }
-          }
 
           return (
             <g key={`back-dim-${s.role}-${idx}`}>
@@ -450,22 +522,22 @@ export default function SpeakerPositionsOverlay({
 
               {/* Left distance (below the line, kept visible) */}
               <text
-                x={xPx - leftOffset}
+                x={xPx - 14}
                 y={distTextY}
                 textAnchor="end"
                 style={{ fontSize, fill: textFill }}
               >
-                {leftDistCm}cm
+                {mToCm(s.xM)}cm
               </text>
 
               {/* Right distance (below the line, kept visible) */}
               <text
-                x={xPx + rightOffset}
+                x={xPx + 14}
                 y={distTextY}
                 textAnchor="start"
                 style={{ fontSize, fill: textFill }}
               >
-                {rightDistCm}cm
+                {mToCm(W - s.xM)}cm
               </text>
 
               {/* Role + H: same consistent gap as LCR/sides */}
@@ -503,9 +575,31 @@ export default function SpeakerPositionsOverlay({
     const yTopPx = roomRect.y;
     const yBottomPx = roomRect.y + roomRect.height;
 
-    // Calculate font size (match LCR)
-    const fontSize = calcFontSize(11, roomRect.width);
-    const roleFontSize = calcFontSize(12, roomRect.width);
+    // Build label slots for dynamic font sizing (vertical ruler, rotated text)
+    const distanceLabels = [];
+    const roleLabels = [];
+    
+    rightGroup.forEach((s, idx) => {
+      const yPx = meterToCanvasY(s.yM);
+      const distFront = mToCm(s.yM);
+      const distBack = mToCm(L - s.yM);
+      const hCm = mToCm(bedHeightM(s.role, s.yM));
+      
+      // For rotated text, approximate as if horizontal then rotate box
+      distanceLabels.push(
+        { x: rulerXpx, y: yPx - 14, text: `${distBack}cm`, textAnchor: 'end' },
+        { x: rulerXpx, y: yPx + 14, text: `${distFront}cm`, textAnchor: 'start' }
+      );
+      
+      const labelX = rulerXpx - SIDE_LABEL_PAD_PX;
+      roleLabels.push(
+        { x: labelX, y: yPx, text: String(s.role || '').toUpperCase(), textAnchor: 'middle' },
+        { x: labelX, y: yPx + 18, text: `H${hCm}cm`, textAnchor: 'start' }
+      );
+    });
+    
+    const fontSize = computeDynamicFontSize(distanceLabels, 11);
+    const roleFontSize = computeDynamicFontSize(roleLabels, 12);
 
     return (
       <g data-layer="speaker-positions-right" pointerEvents="none">
@@ -628,6 +722,21 @@ export default function SpeakerPositionsOverlay({
     const yTopPx = roomRect.y;
     const yBottomPx = roomRect.y + roomRect.height;
 
+    // Build label slots for overhead vertical ruler
+    const distanceLabels = [];
+    overheadLeft.forEach((s, idx) => {
+      const yPx = meterToCanvasY(s.position.y);
+      const distFront = mToCm(s.position.y);
+      const distBack = mToCm(L - s.position.y);
+      
+      distanceLabels.push(
+        { x: xLeftRuler, y: yPx - 14, text: `${distBack}cm`, textAnchor: 'end' },
+        { x: xLeftRuler, y: yPx + 14, text: `${distFront}cm`, textAnchor: 'start' }
+      );
+    });
+    
+    const fontSize = computeDynamicFontSize(distanceLabels, 11);
+
     const drawColumn = (list, rulerX, keyPrefix) => {
       if (!list.length) return null;
 
@@ -641,7 +750,7 @@ export default function SpeakerPositionsOverlay({
         const distBack = mToCm(L - yM);
 
         // Match RIGHT WALL sizing + geometry exactly
-        const baseSize = calcFontSize(11, roomRect.width);
+        const baseSize = fontSize;
         const distDx = 14;     // same as right wall
         const distY  = 12;     // same as right wall
         const rot    = -90;    // same as right wall
@@ -702,10 +811,6 @@ export default function SpeakerPositionsOverlay({
   const renderOverheadHorizontalDims = () => {
     const Hcm = overheadHeightCm(); // may be null, that's ok
     if (!overheadRows.length) return null;
-
-    const roomFontBasis = Math.min(roomRect.width, roomRect.height);
-    const fontSize = calcFontSize(11, roomFontBasis);
-    const roleFontSize = calcFontSize(12, roomFontBasis);
 
     const xLeftPx = roomRect.x;
     const xRightPx = roomRect.x + roomRect.width;
@@ -792,6 +897,22 @@ export default function SpeakerPositionsOverlay({
 
           const yPx = pushRowDownIfNeeded(yPxRaw);
 
+          // Build label slots for this overhead horizontal ruler
+          const distanceLabels = [];
+          row.items.forEach((it, idx) => {
+            const xPx = meterToCanvasX(it.xM);
+            const distTextY = yPx + 12;
+            const leftDist = mToCm(it.xM);
+            const rightDist = mToCm(W - it.xM);
+            
+            distanceLabels.push(
+              { x: xPx - 14, y: distTextY, text: `${leftDist}cm`, textAnchor: 'end' },
+              { x: xPx + 14, y: distTextY, text: `${rightDist}cm`, textAnchor: 'start' }
+            );
+          });
+          
+          const fontSize = computeDynamicFontSize(distanceLabels, 11);
+
           return (
             <g key={`oh-row-top`}>
               <line
@@ -807,50 +928,28 @@ export default function SpeakerPositionsOverlay({
 
               {row.items.map((it, idx) => {
                 const xPx = meterToCanvasX(it.xM);
-
                 const distTextY = yPx + 12;
-
-                const leftDist = mToCm(it.xM);
-                const rightDist = mToCm(W - it.xM);
-
-                let leftOffset = 14;
-                let rightOffset = 14;
-
-                if (idx > 0) {
-                  const prevXPx = meterToCanvasX(row.items[idx - 1].xM);
-                  if (Math.abs(xPx - prevXPx) < 40) {
-                    leftOffset = 10;
-                    rightOffset = 10;
-                  }
-                }
-                if (idx < row.items.length - 1) {
-                  const nextXPx = meterToCanvasX(row.items[idx + 1].xM);
-                  if (Math.abs(xPx - nextXPx) < 40) {
-                    leftOffset = 10;
-                    rightOffset = 10;
-                  }
-                }
 
                 return (
                   <g key={`oh-top-${idx}`}>
                     <circle cx={xPx} cy={yPx} r={5} fill={dotFill} />
 
                     <text
-                      x={xPx - leftOffset}
+                      x={xPx - 14}
                       y={distTextY}
                       textAnchor="end"
                       style={{ fontSize, fill: textFill }}
                     >
-                      {leftDist}cm
+                      {mToCm(it.xM)}cm
                     </text>
 
                     <text
-                      x={xPx + rightOffset}
+                      x={xPx + 14}
                       y={distTextY}
                       textAnchor="start"
                       style={{ fontSize, fill: textFill }}
                     >
-                      {rightDist}cm
+                      {mToCm(W - it.xM)}cm
                     </text>
                   </g>
                 );
