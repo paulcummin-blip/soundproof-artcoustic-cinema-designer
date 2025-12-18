@@ -22,7 +22,7 @@ import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 import { pickMLP } from '@/components/utils/seatingUtils';
 import { calculateViewingAngle, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 import CanvasMessages from '@/components/room/CanvasMessages';
-import ZoomButtons from '@/components/ui/ZoomButtons';
+
 import { computeOverheadZones, renderOverheadBandsSVG } from '@/components/room/overlays/OverheadZones';
 import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from '@/components/utils/overheadDragClamping';
 import { useOverheadAutoPlacement } from '@/components/hooks/useOverheadAutoPlacement';
@@ -384,6 +384,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     allSeatSplMetrics: allSeatSplMetricsProp = null,
     speakerPositionsView = 'off',
     showMlpRuler = false,
+    zoomMode: zoomModeProp = 'off',
+    onZoomModeChange,
   } = props;
 
   const appState = useAppState();
@@ -507,6 +509,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [zoom, setZoom] = React.useState(1.0);
   const [panX, setPanX] = React.useState(0);
   const [panY, setPanY] = React.useState(0);
+  const zoomMode = zoomModeProp;
   const lastPointerRef = useRef({ x: 0, y: 0 });
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
   const [containerW, setContainerW] = useState(0);
@@ -1536,41 +1539,18 @@ React.useEffect(() => {
     setZoom(Math.max(0.5, Math.min(2.0, newZoom)));
   }, [zoom, panX, panY]);
 
-  const handleZoomIn = useCallback(() => {
-    if (!planBoundsRef.current) return;
+  // Handle plan click for zoom
+  const handlePlanClick = useCallback((e) => {
+    if (zoomMode === 'off') return;
     
-    const rect = planBoundsRef.current.getBoundingClientRect();
-    let centerX, centerY;
+    // Don't zoom if clicking on draggable elements
+    if (e.target.tagName === 'ellipse' || e.target.closest('[data-draggable]')) return;
     
-    // Use last known pointer position if available, otherwise viewport center
-    if (lastPointerRef.current.x !== 0 || lastPointerRef.current.y !== 0) {
-      centerX = lastPointerRef.current.x;
-      centerY = lastPointerRef.current.y;
-    } else {
-      centerX = rect.left + rect.width / 2;
-      centerY = rect.top + rect.height / 2;
-    }
+    const step = 0.15;
+    const newZoom = zoomMode === 'in' ? zoom + step : zoom - step;
     
-    zoomAtPoint(zoom + 0.1, centerX, centerY);
-  }, [zoom, zoomAtPoint]);
-
-  const handleZoomOut = useCallback(() => {
-    if (!planBoundsRef.current) return;
-    
-    const rect = planBoundsRef.current.getBoundingClientRect();
-    let centerX, centerY;
-    
-    // Use last known pointer position if available, otherwise viewport center
-    if (lastPointerRef.current.x !== 0 || lastPointerRef.current.y !== 0) {
-      centerX = lastPointerRef.current.x;
-      centerY = lastPointerRef.current.y;
-    } else {
-      centerX = rect.left + rect.width / 2;
-      centerY = rect.top + rect.height / 2;
-    }
-    
-    zoomAtPoint(zoom - 0.1, centerX, centerY);
-  }, [zoom, zoomAtPoint]);
+    zoomAtPoint(newZoom, e.clientX, e.clientY);
+  }, [zoomMode, zoom, zoomAtPoint]);
 
   // Memoize baffle and screen calculations for performance
   const { BaffleAndScreen, screenPlaneY, screenCenterX_m, visibleWidthM } = useMemo(() => {
@@ -5281,6 +5261,7 @@ return (
       border: '1px solid #DCDBD6',
       borderRadius: '0px', // Square corners - no rounded edges
       backgroundColor: '#F8F8F7',
+      cursor: zoomMode === 'in' ? 'zoom-in' : zoomMode === 'out' ? 'zoom-out' : 'default',
     }}
     onMouseMove={(e) => {
       // Track pointer position for zoom center
@@ -5291,12 +5272,12 @@ return (
         lastPointerRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
       }
     }}
+    onClick={handlePlanClick}
   >
     {/* Toolbar has been moved to the parent component's accordion */}
 
     {/* CANVAS WRAPPER (no tailwind) */}
     <div style={canvasStyle}>
-<ZoomButtons onZoomIn={handleZoomIn} onZoomOut={handleZoomOut} />
 
       {/* ROOT SVG */}
       <svg
