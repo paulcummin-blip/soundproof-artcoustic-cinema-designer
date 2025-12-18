@@ -2753,10 +2753,14 @@ React.useEffect(() => {
     
     // Only update if meaningful movement
     if (Math.abs(finalX - currentX) > 0.001 || Math.abs(finalY - currentY) > 0.001) {
-      setter(prev => (prev || []).map(s => {
-        const sId = s.id || `${subType}-sub-${prev.indexOf(s)}`;
-        return sId === subId ? { ...s, position: { ...s.position, x: finalX, y: finalY } } : s;
-      }));
+      setter(prev => {
+        const positions = prev?.positions || [];
+        const subIndex = subId === 'front-sub-left' || subId === 'rear-sub-left' ? 0 : 1;
+        const updatedPositions = [...positions];
+        updatedPositions[subIndex] = { x: finalX, y: finalY };
+        
+        return { ...prev, positions: updatedPositions };
+      });
     }
   }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, widthM, lengthM, getModelDimsM]);
 

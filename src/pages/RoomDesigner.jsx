@@ -1750,6 +1750,7 @@ function RoomDesignerWithState() {
     try {
       const model = _frontSubsCfg?.model;
       const qty = _frontSubsCfg?.count;
+      const savedPositions = _frontSubsCfg?.positions || [];
       const subsToRender = [];
       const warnings = [];
 
@@ -1784,7 +1785,7 @@ function RoomDesignerWithState() {
       const fcDims = getDims(FC.model);
       const frDims = getDims(FR.model);
 
-      const neededWidthForOneSub = widthM + 0.10; // 5cm buffer each side of the sub (total 10cm)
+      const neededWidthForOneSub = widthM + 0.10;
       const wallBuffer = 0.02;
       const centerY = wallBuffer + (depthM / 2);
       const zBottom = 0.800;
@@ -1795,7 +1796,10 @@ function RoomDesignerWithState() {
         const flRightEdge = FL.position.x + (Number(flDims.widthM) / 2 || 0);
         const fcLeftEdge = FC.position.x - (Number(fcDims.widthM) / 2 || 0);
         const availableSpaceWidth = fcLeftEdge - flRightEdge;
-        const xPosLeftSub = (FL.position.x + FC.position.x) / 2;
+        const defaultXPos = (FL.position.x + FC.position.x) / 2;
+        
+        const userPos = savedPositions[0];
+        const xPosLeftSub = userPos?.x ?? defaultXPos;
 
         if (availableSpaceWidth < neededWidthForOneSub) {
           warnings.push("Front Left sub doesn't fit between L & C speakers.");
@@ -1815,7 +1819,10 @@ function RoomDesignerWithState() {
         const fcRightEdge = FC.position.x + (Number(fcDims.widthM) / 2 || 0);
         const frLeftEdge = FR.position.x - (Number(frDims.widthM) / 2 || 0);
         const availableSpaceWidth = frLeftEdge - fcRightEdge;
-        const xPosRightSub = (FC.position.x + FR.position.x) / 2;
+        const defaultXPos = (FC.position.x + FR.position.x) / 2;
+        
+        const userPos = savedPositions[1];
+        const xPosRightSub = userPos?.x ?? defaultXPos;
 
         if (availableSpaceWidth < neededWidthForOneSub) {
           warnings.push("Front Right sub doesn't fit between C & R speakers.");
@@ -1835,7 +1842,7 @@ function RoomDesignerWithState() {
       // Screen depth check
       if (subsToRender.length > 0) {
           const subFrontY = centerY + (depthM / 2);
-          const requiredScreenDepth = subFrontY + 0.01; // 1cm buffer
+          const requiredScreenDepth = subFrontY + 0.01;
           if ((_screen?.floatDepthM || 0) < requiredScreenDepth) {
               _setScreen(prev => ({ ...prev, floatDepthM: requiredScreenDepth }));
           }
@@ -1848,12 +1855,13 @@ function RoomDesignerWithState() {
       setSubWarnings(prev => ({ ...prev, front: ["Error calculating position."] }));
       return [];
     }
-  }, [_frontSubsCfg?.model, _frontSubsCfg?.count, placedSpeakers, _screen?.floatDepthM, _setScreen, setSubWarnings]);
+  }, [_frontSubsCfg?.model, _frontSubsCfg?.count, _frontSubsCfg?.positions, placedSpeakers, _screen?.floatDepthM, _setScreen, setSubWarnings]);
 
   const rearSubsForRendering = React.useMemo(() => {
     try {
       const model = _rearSubsCfg?.model;
       const qty = _rearSubsCfg?.count;
+      const savedPositions = _rearSubsCfg?.positions || [];
       const subsToRender = [];
       const warnings = [];
 
@@ -1883,9 +1891,9 @@ function RoomDesignerWithState() {
       const rightRefX = (FC.position.x + FR.position.x) / 2;
 
       const rearWallY = stableDimensions.length;
-      const wallBuffer = 0.02; // 20mm
-      const floorBuffer = 0.05; // 50mm
-      const sideBuffer = 0.05; // 50mm
+      const wallBuffer = 0.02;
+      const floorBuffer = 0.05;
+      const sideBuffer = 0.05;
 
       const centerY = rearWallY - wallBuffer - (depthM / 2);
       const zCenter = floorBuffer + (heightM / 2);
@@ -1895,10 +1903,14 @@ function RoomDesignerWithState() {
       };
 
       if (qty >= 1) {
-        if (checkFit(leftRefX)) {
+        const defaultXPos = leftRefX;
+        const userPos = savedPositions[0];
+        const xPosLeftSub = userPos?.x ?? defaultXPos;
+        
+        if (checkFit(xPosLeftSub)) {
           subsToRender.push({
             id: 'rear-sub-left', role: 'SUB', model,
-            position: { x: leftRefX, y: centerY, z: zCenter },
+            position: { x: xPosLeftSub, y: centerY, z: zCenter },
             dims_m: { w: widthM, h: heightM, d: depthM },
           });
         } else {
@@ -1907,10 +1919,14 @@ function RoomDesignerWithState() {
       }
       
       if (qty >= 2) {
-        if (checkFit(rightRefX)) {
+        const defaultXPos = rightRefX;
+        const userPos = savedPositions[1];
+        const xPosRightSub = userPos?.x ?? defaultXPos;
+        
+        if (checkFit(xPosRightSub)) {
           subsToRender.push({
             id: 'rear-sub-right', role: 'SUB', model,
-            position: { x: rightRefX, y: centerY, z: zCenter },
+            position: { x: xPosRightSub, y: centerY, z: zCenter },
             dims_m: { w: widthM, h: heightM, d: depthM },
           });
         } else {
@@ -1926,7 +1942,7 @@ function RoomDesignerWithState() {
       setSubWarnings(prev => ({ ...prev, rear: ["Error calculating position."] }));
       return [];
     }
-  }, [_rearSubsCfg?.model, _rearSubsCfg?.count, placedSpeakers, stableDimensions.width, stableDimensions.length, setSubWarnings]);
+  }, [_rearSubsCfg?.model, _rearSubsCfg?.count, _rearSubsCfg?.positions, placedSpeakers, stableDimensions.width, stableDimensions.length, setSubWarnings]);
 
   // NEW: Calculate live room price total
   const priceData = usePriceCalculation({
