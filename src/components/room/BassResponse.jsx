@@ -276,6 +276,47 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </div>
       )}
 
+      {/* Tuning Warnings */}
+      {simulationResults.metrics?.tuningWarnings && simulationResults.metrics.tuningWarnings.length > 0 && (
+        <Alert className="border border-[#C1B6AD] bg-[#F8F8F7] text-[#3E4349]">
+          <AlertDescription className="text-sm">
+            <div className="font-medium mb-1">Check headroom & alignment:</div>
+            {simulationResults.metrics.tuningWarnings.map((w, i) => (
+              <div key={i}>{w}</div>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {/* Sub Tuning Controls */}
+      <div className="space-y-4">
+        {frontSubsCfg?.count > 0 && (
+          <div>
+            <div className="text-sm font-medium text-[#1B1A1A] mb-3">Front Subwoofer Tuning</div>
+            <SubTuningControls
+              subsCfg={frontSubsCfg}
+              groupLabel="Front"
+              onTuningChange={(newTuning) => {
+                setFrontSubsCfg(prev => ({ ...prev, tuning: newTuning }));
+              }}
+            />
+          </div>
+        )}
+        
+        {rearSubsCfg?.count > 0 && (
+          <div>
+            <div className="text-sm font-medium text-[#1B1A1A] mb-3">Rear Subwoofer Tuning</div>
+            <SubTuningControls
+              subsCfg={rearSubsCfg}
+              groupLabel="Rear"
+              onTuningChange={(newTuning) => {
+                setRearSubsCfg(prev => ({ ...prev, tuning: newTuning }));
+              }}
+            />
+          </div>
+        )}
+      </div>
+
       {/* Per-seat detail cards */}
       {Object.keys(simulationResults.seatResponses).length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
