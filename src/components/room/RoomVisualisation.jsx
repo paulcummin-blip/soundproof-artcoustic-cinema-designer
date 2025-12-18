@@ -509,8 +509,10 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [zoom, setZoom] = React.useState(1.0);
   const [panX, setPanX] = React.useState(0);
   const [panY, setPanY] = React.useState(0);
-  const [isPanning, setIsPanning] = React.useState(false);
-  const panStartRef = useRef(null);
+  const panActiveRef = useRef(false);
+  const panPointerIdRef = useRef(null);
+  const panStartRef = useRef({ x: 0, y: 0 });
+  const panStartOffsetRef = useRef({ x: 0, y: 0 });
   const zoomMode = zoomModeProp;
   const lastPointerRef = useRef({ x: 0, y: 0 });
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
@@ -1514,8 +1516,27 @@ React.useEffect(() => {
     [handleMouseDown]
   );
 
+  // Window-level escape hatch to force end pan
+  useEffect(() => {
+    const forceEndPan = () => {
+      panActiveRef.current = false;
+      panPointerIdRef.current = null;
+    };
+    
+    window.addEventListener('pointerup', forceEndPan);
+    window.addEventListener('blur', forceEndPan);
+    
+    return () => {
+      window.removeEventListener('pointerup', forceEndPan);
+      window.removeEventListener('blur', forceEndPan);
+    };
+  }, []);
+
   // Zoom at point helper
   const zoomAtPoint = useCallback((newZoom, clientX, clientY) => {
+    // Block zoom-on-drag while actively panning
+    if (panActiveRef.current) return;
+    
     if (!planBoundsRef.current) return;
     
     const rect = planBoundsRef.current.getBoundingClientRect();
@@ -1541,46 +1562,66 @@ React.useEffect(() => {
     setZoom(Math.max(0.5, Math.min(2.0, newZoom)));
   }, [zoom, panX, panY]);
 
-  // Handle pan start
+  // End pan helper - called from multiple pointer events
+  const endPan = useCallback((e) => {
+    if (!panActiveRef.current) return;
+    
+    panActiveRef.current = false;
+    panPointerIdRef.current = null;
+    
+    // Release pointer capture (safe - ignore errors)
+    if (e?.currentTarget?.releasePointerCapture && e?.pointerId != null) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (_) {}
+    }
+  }, []);
+
+  // Handle pan start (Pointer Events)
   const handlePanStart = useCallback((e) => {
     // Only allow panning when zoomed in
     if (zoom <= 1.0) return;
     
-    // Don't pan if clicking on draggable elements
-    const target = e.target;
-    if (target.tagName === 'ellipse' || target.closest('[data-draggable]')) return;
+    // Don't pan if clicking on speakers or UI controls
+    if (e.target.closest?.('[data-speaker-hit="true"], button, input, select, textarea')) return;
+    
+    // Don't pan if clicking on draggable seats
+    if (e.target.tagName === 'ellipse') return;
     
     // Only pan on background elements
-    const isBackground = target.tagName === 'rect' || target.tagName === 'line' || 
-                        target.tagName === 'svg' || target.classList?.contains('seats-layer') === false;
+    const isBackground = e.target.tagName === 'rect' || e.target.tagName === 'line' || 
+                        e.target.tagName === 'svg' || e.target.tagName === 'g';
     
     if (!isBackground) return;
     
     e.preventDefault();
-    setIsPanning(true);
-    panStartRef.current = {
-      mouseX: e.clientX,
-      mouseY: e.clientY,
-      startPanX: panX,
-      startPanY: panY,
-    };
+    e.stopPropagation();
+    
+    panActiveRef.current = true;
+    panPointerIdRef.current = e.pointerId;
+    panStartRef.current = { x: e.clientX, y: e.clientY };
+    panStartOffsetRef.current = { x: panX, y: panY };
+    
+    // Capture pointer to prevent lock
+    if (e.currentTarget?.setPointerCapture) {
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch (_) {}
+    }
   }, [zoom, panX, panY]);
 
   // Handle pan move
   const handlePanMove = useCallback((e) => {
-    if (!isPanning || !panStartRef.current) return;
+    if (!panActiveRef.current) return;
+    if (e.pointerId !== panPointerIdRef.current) return;
     
-    const dx = e.clientX - panStartRef.current.mouseX;
-    const dy = e.clientY - panStartRef.current.mouseY;
+    e.preventDefault();
     
-    setPanX(panStartRef.current.startPanX + dx);
-    setPanY(panStartRef.current.startPanY + dy);
-  }, [isPanning]);
-
-  // Handle pan end
-  const handlePanEnd = useCallback(() => {
-    setIsPanning(false);
-    panStartRef.current = null;
+    const dx = e.clientX - panStartRef.current.x;
+    const dy = e.clientY - panStartRef.current.y;
+    
+    setPanX(panStartOffsetRef.current.x + dx);
+    setPanY(panStartOffsetRef.current.y + dy);
   }, []);
 
   // Reset view to default
@@ -2491,12 +2532,6 @@ React.useEffect(() => {
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
-    // Handle panning first (independent of speaker dragging)
-    if (isPanning) {
-      handlePanMove(e);
-      return;
-    }
-
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
@@ -2578,12 +2613,6 @@ React.useEffect(() => {
   }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, roomToCanvas]);
 
   const handleMouseUp = useCallback(() => {
-    // Handle pan end
-    if (isPanning) {
-      handlePanEnd();
-      return;
-    }
-
     // Signal to RoomDesigner that dragging ended
     if (props.isDraggingRef) {
       props.isDraggingRef.current = false;
@@ -5332,10 +5361,11 @@ return (
       border: '1px solid #DCDBD6',
       borderRadius: '0px', // Square corners - no rounded edges
       backgroundColor: '#F8F8F7',
-      cursor: isPanning ? 'grabbing' : 
+      cursor: panActiveRef.current ? 'grabbing' : 
               zoomMode === 'in' ? 'zoom-in' : 
               zoomMode === 'out' ? 'zoom-out' : 
               zoom > 1.0 ? 'grab' : 'default',
+      touchAction: 'none', // Prevent browser touch gestures during pointer events
     }}
     onMouseMove={(e) => {
       // Track pointer position for zoom center
@@ -5347,7 +5377,11 @@ return (
       }
     }}
     onClick={handlePlanClick}
-    onMouseDown={handlePanStart}
+    onPointerDown={handlePanStart}
+    onPointerMove={handlePanMove}
+    onPointerUp={endPan}
+    onPointerCancel={endPan}
+    onPointerLeave={endPan}
   >
     {/* Reset View Button (only when zoomed/panned) */}
     {(zoom > 1.0 || panX !== 0 || panY !== 0) && (
@@ -5393,10 +5427,7 @@ return (
         }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={(e) => {
-          handleMouseUp(e);
-          handlePanEnd();
-        }}
+        onMouseLeave={handleMouseUp}
       >
 <SvgDefs ids={ids} scale={scale} svgW={svgW} svgH={svgH} />
 
