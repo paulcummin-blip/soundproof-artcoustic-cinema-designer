@@ -510,7 +510,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [panX, setPanX] = React.useState(0);
   const [panY, setPanY] = React.useState(0);
   const [isPanning, setIsPanning] = React.useState(false);
-  const isPanningRef = useRef(false);
   const panStartRef = useRef(null);
   const zoomMode = zoomModeProp;
   const lastPointerRef = useRef({ x: 0, y: 0 });
@@ -1517,7 +1516,6 @@ React.useEffect(() => {
 
   // Zoom at point helper
   const zoomAtPoint = useCallback((newZoom, clientX, clientY) => {
-    if (isPanningRef.current) return; // Block zoom while panning
     if (!planBoundsRef.current) return;
     
     const rect = planBoundsRef.current.getBoundingClientRect();
@@ -1548,16 +1546,18 @@ React.useEffect(() => {
     // Only allow panning when zoomed in
     if (zoom <= 1.0) return;
     
-    // Don't pan if clicking on interactive elements (speakers, seats, buttons, etc.)
-    if (e.target.closest?.('[data-speaker-hit], [data-draggable], button, input, select, textarea, ellipse')) {
-      return;
-    }
+    // Don't pan if clicking on draggable elements
+    const target = e.target;
+    if (target.tagName === 'ellipse' || target.closest('[data-draggable]')) return;
+    
+    // Only pan on background elements
+    const isBackground = target.tagName === 'rect' || target.tagName === 'line' || 
+                        target.tagName === 'svg' || target.classList?.contains('seats-layer') === false;
+    
+    if (!isBackground) return;
     
     e.preventDefault();
-    e.stopPropagation();
-    
     setIsPanning(true);
-    isPanningRef.current = true;
     panStartRef.current = {
       mouseX: e.clientX,
       mouseY: e.clientY,
@@ -1580,13 +1580,18 @@ React.useEffect(() => {
   // Handle pan end
   const handlePanEnd = useCallback(() => {
     setIsPanning(false);
-    isPanningRef.current = false;
     panStartRef.current = null;
+  }, []);
+
+  // Reset view to default
+  const handleResetView = useCallback(() => {
+    setPanX(0);
+    setPanY(0);
+    setZoom(1.0);
   }, []);
 
   // Handle plan click for zoom
   const handlePlanClick = useCallback((e) => {
-    if (isPanningRef.current) return; // Block zoom while panning
     if (zoomMode === 'off') return;
     
     // Don't zoom if clicking on draggable elements
@@ -5344,6 +5349,29 @@ return (
     onClick={handlePlanClick}
     onMouseDown={handlePanStart}
   >
+    {/* Reset View Button (only when zoomed/panned) */}
+    {(zoom > 1.0 || panX !== 0 || panY !== 0) && (
+      <button
+        onClick={handleResetView}
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          padding: '6px 12px',
+          fontSize: 11,
+          fontWeight: 500,
+          borderRadius: 4,
+          border: '1px solid #DCDBD6',
+          background: '#FFFFFF',
+          color: '#3E4349',
+          cursor: 'pointer',
+          zIndex: 10,
+        }}
+      >
+        Reset View
+      </button>
+    )}
+
     {/* CANVAS WRAPPER (no tailwind) */}
     <div style={canvasStyle}>
 
