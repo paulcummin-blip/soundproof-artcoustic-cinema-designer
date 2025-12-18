@@ -2050,35 +2050,52 @@ React.useEffect(() => {
 
       const nextPos = { x: xAtWall, y: yClamped, z: spk.position?.z ?? 1.1 };
 
-      // Mirror partner: same offset from its own median
-      const partner = placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRole);
+      // Update both speakers simultaneously
+      if (nextPos && onSetSpeakers) {
+        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+        onSetSpeakers(prev => {
+          // CRITICAL: Find partner from prev (current state), NOT from stale placedSpeakers
+          const partner = prev.find(s => getCanonicalRole(s.role) === partnerRole);
+          
+          return prev.map(s => {
+            // Update dragged speaker
+            if (s.id === speakerId) {
+              return { ...s, position: nextPos, meta: spk.meta };
+            }
+            
+            // Update mirrored partner
+            if (partner && s.id === partner.id) {
+              const partnerDims = getModelDimsM(partner.model);
+              const partnerHalfDepth = (Number(partnerDims?.depthM) || 0.082) / 2;
+              const partnerHalfWidth = (Number(partnerDims?.widthM) || 0.20) / 2;
 
-      let partnerPos = null;
-      if (partner) {
-        const partnerDims = getModelDimsM(partner.model);
-        const partnerHalfDepth = (Number(partnerDims?.depthM) || 0.082) / 2;
-        const partnerHalfWidth = (Number(partnerDims?.widthM) || 0.20) / 2;
+              const partnerXAtWall = (canonicalRole === 'LW')
+                ? (W - WALL_BUFFER_FW - partnerHalfDepth)
+                : (WALL_BUFFER_FW + partnerHalfDepth);
 
-        const partnerXAtWall = (canonicalRole === 'LW')
-          ? (W - WALL_BUFFER_FW - partnerHalfDepth)
-          : (WALL_BUFFER_FW + partnerHalfDepth);
+              // Fallback for partner zone bounds
+              const partnerFallbackYMin = WALL_BUFFER_FW + partnerHalfWidth;
+              const partnerFallbackYMax = L - WALL_BUFFER_FW - partnerHalfWidth;
+              const partnerFallbackMedianY = L / 2;
+              
+              const partnerMedianY = partnerZone?.medianY || partnerFallbackMedianY;
+              const partnerTargetY = partnerMedianY + offset;
+              const partnerYMinClamped = partnerZone ? ((partnerZone.yMin || 0) + (partnerHalfWidth * SIDE_ALLOW_OVERHANG)) : partnerFallbackYMin;
+              const partnerYMaxClamped = partnerZone ? ((partnerZone.yMax || L) - (partnerHalfWidth * SIDE_ALLOW_OVERHANG)) : partnerFallbackYMax;
+              const partnerYClamped = clamp(partnerTargetY, partnerYMinClamped, partnerYMaxClamped);
 
-        // Fallback for partner zone bounds
-        const partnerFallbackYMin = WALL_BUFFER_FW + partnerHalfWidth;
-        const partnerFallbackYMax = L - WALL_BUFFER_FW - partnerHalfWidth;
-        const partnerFallbackMedianY = L / 2;
-        
-        const partnerMedianY = partnerZone?.medianY || partnerFallbackMedianY;
-        const partnerTargetY = partnerMedianY + offset;
-        const partnerYMinClamped = partnerZone ? ((partnerZone.yMin || 0) + (partnerHalfWidth * SIDE_ALLOW_OVERHANG)) : partnerFallbackYMin;
-        const partnerYMaxClamped = partnerZone ? ((partnerZone.yMax || L) - (partnerHalfWidth * SIDE_ALLOW_OVERHANG)) : partnerFallbackYMax;
-        const partnerYClamped = clamp(partnerTargetY, partnerYMinClamped, partnerYMaxClamped);
+              const partnerPos = { x: partnerXAtWall, y: partnerYClamped, z: partner.position?.z ?? 1.1 };
 
-        partnerPos = { x: partnerXAtWall, y: partnerYClamped, z: partner.position?.z ?? 1.1 };
+              // Store partner offset too (ensure it's based on actual clamped position)
+              const partnerSideOffsetKey = partnerRole === 'LW' ? 'L' : 'R';
+              fwOffsetRef.current[partnerSideOffsetKey] = partnerYClamped - partnerMedianY;
 
-        // Store partner offset too (ensure it's based on actual clamped position)
-        const partnerSideOffsetKey = partnerRole === 'LW' ? 'L' : 'R';
-        fwOffsetRef.current[partnerSideOffsetKey] = partnerYClamped - partnerMedianY;
+              return { ...s, position: partnerPos };
+            }
+            
+            return s;
+          });
+        });
       }
 
       // Compute deviation from median (RP22 Parameter 7)
@@ -2093,20 +2110,6 @@ React.useEffect(() => {
 
         spk.meta = { ...(spk.meta || {}), fwDeviationDeg: deviation, fwDeviationLevel: lvl.level };
       } catch (_) { /* silent */ }
-
-      // Update both speakers simultaneously
-      if (nextPos && onSetSpeakers) {
-        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
-        onSetSpeakers(prev => prev.map(s => {
-          if (s.id === speakerId) {
-            return { ...s, position: nextPos, meta: spk.meta };
-          }
-          if (partner && s.id === partner.id && partnerPos) {
-            return { ...s, position: partnerPos };
-          }
-          return s;
-        }));
-      }
 
       lastInteractionEpoch.current = timeNowMs();
       console.log("[DRAG] STOP: LW/RW complete");
