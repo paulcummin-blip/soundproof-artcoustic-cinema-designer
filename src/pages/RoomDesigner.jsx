@@ -1898,40 +1898,50 @@ function RoomDesignerWithState() {
       const centerY = rearWallY - wallBuffer - (depthM / 2);
       const zCenter = floorBuffer + (heightM / 2);
       
-      const checkFit = (xPos) => {
-          return (xPos - widthM / 2 - sideBuffer) > 0 && (xPos + widthM / 2 + sideBuffer) < stableDimensions.width;
-      };
+      // Compute safe X bounds using half-width + buffer
+      const minX = (widthM / 2) + sideBuffer;
+      const maxX = stableDimensions.width - (widthM / 2) - sideBuffer;
 
       if (qty >= 1) {
         const defaultXPos = leftRefX;
         const userPos = savedPositions[0];
-        const xPosLeftSub = userPos?.x ?? defaultXPos;
+        const rawX = userPos?.x ?? defaultXPos;
         
-        if (checkFit(xPosLeftSub)) {
-          subsToRender.push({
-            id: 'rear-sub-left', role: 'SUB', model,
-            position: { x: xPosLeftSub, y: centerY, z: zCenter },
-            dims_m: { w: widthM, h: heightM, d: depthM },
-          });
-        } else {
-          warnings.push("Rear subwoofer doesn't fit in the allocated space.");
+        // Always clamp to safe bounds
+        const xClamped = Math.max(minX, Math.min(maxX, rawX));
+        
+        // Add warning if clamped
+        if (Math.abs(rawX - xClamped) > 0.001) {
+          warnings.push("Rear left subwoofer was clamped inside the room (too close to side wall).");
         }
+        
+        // Always render
+        subsToRender.push({
+          id: 'rear-sub-left', role: 'SUB', model,
+          position: { x: xClamped, y: centerY, z: zCenter },
+          dims_m: { w: widthM, h: heightM, d: depthM },
+        });
       }
       
       if (qty >= 2) {
         const defaultXPos = rightRefX;
         const userPos = savedPositions[1];
-        const xPosRightSub = userPos?.x ?? defaultXPos;
+        const rawX = userPos?.x ?? defaultXPos;
         
-        if (checkFit(xPosRightSub)) {
-          subsToRender.push({
-            id: 'rear-sub-right', role: 'SUB', model,
-            position: { x: xPosRightSub, y: centerY, z: zCenter },
-            dims_m: { w: widthM, h: heightM, d: depthM },
-          });
-        } else {
-          warnings.push("Rear subwoofer doesn't fit in the allocated space.");
+        // Always clamp to safe bounds
+        const xClamped = Math.max(minX, Math.min(maxX, rawX));
+        
+        // Add warning if clamped
+        if (Math.abs(rawX - xClamped) > 0.001) {
+          warnings.push("Rear right subwoofer was clamped inside the room (too close to side wall).");
         }
+        
+        // Always render
+        subsToRender.push({
+          id: 'rear-sub-right', role: 'SUB', model,
+          position: { x: xClamped, y: centerY, z: zCenter },
+          dims_m: { w: widthM, h: heightM, d: depthM },
+        });
       }
 
       setSubWarnings(prev => ({ ...prev, rear: warnings }));
