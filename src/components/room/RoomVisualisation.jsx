@@ -804,18 +804,22 @@ const byId = useMemo(() => {
     if (seat.id) map.set(seat.id, seat);
   });
 
-  // Index subwoofers
-  (frontSubs || []).forEach((sub, idx) => {
-    if (!sub) return;
-    const id = sub.id || `front-sub-${idx}`;
-    map.set(id, { ...sub, _subType: 'front' });
+  // Index subwoofers - ALWAYS use their ID from the sub object (never generate)
+  (frontSubs || []).forEach((sub) => {
+    if (!sub || !sub.id) return;
+    map.set(sub.id, { ...sub, _subType: 'front' });
   });
   
-  (rearSubs || []).forEach((sub, idx) => {
-    if (!sub) return;
-    const id = sub.id || `rear-sub-${idx}`;
-    map.set(id, { ...sub, _subType: 'rear' });
+  (rearSubs || []).forEach((sub) => {
+    if (!sub || !sub.id) return;
+    map.set(sub.id, { ...sub, _subType: 'rear' });
   });
+  
+  // REMOVE AFTER FIX CONFIRMED
+  const rearSubIds = (rearSubs || []).map(s => s?.id).filter(Boolean);
+  if (rearSubIds.length > 0 && Math.random() < 0.1) {
+    console.log('[B44] byId rear subs indexed:', rearSubIds);
+  }
 
   return map;
 }, [placedSpeakers, seatingPositions, frontSubs, rearSubs]);
@@ -2729,7 +2733,10 @@ React.useEffect(() => {
 
   const handleSubDrag = useCallback((subId, newCanvasPos) => {
     const sub = byId.get(subId);
-    if (!sub) return;
+    if (!sub) {
+      console.warn('[SUB DRAG] Aborting: sub not found in byId', { subId });
+      return;
+    }
     
     const subType = draggedSubTypeRef.current || sub._subType;
     const setter = subType === 'front' ? onSetFrontSubs : onSetRearSubs;
@@ -2812,18 +2819,19 @@ React.useEffect(() => {
           return prev;
         }
         
-        const positions = prev?.positions || [];
-        const subIndex = subId === 'front-sub-left' || subId === 'rear-sub-left' ? 0 : 1;
+        // NEW: Prefer positionsById if it exists, otherwise use positions array for backward compat
+        const positionsById = prev?.positionsById || {};
+        const positionsArray = prev?.positions || [];
         
-        // Initialize array with correct length if needed
-        const updatedPositions = positions.length >= 2 ? [...positions] : [null, null];
+        // Build new positionsById object
+        const updatedPositionsById = { ...positionsById };
         
         // Update dragged sub
-        updatedPositions[subIndex] = { x: finalX, y: finalY };
+        updatedPositionsById[subId] = { x: finalX, y: finalY };
         
         // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
         if (pairMode) {
-          const otherIndex = subIndex === 0 ? 1 : 0;
+          const otherSubId = subId === 'rear-sub-left' ? 'rear-sub-right' : 'rear-sub-left';
           const mirrorX = widthM - finalX;
           const clampedMirrorX = Math.max(minX, Math.min(maxX, mirrorX));
           
@@ -2834,13 +2842,20 @@ React.useEffect(() => {
           }
           
           // Mirrored sub uses same wall-locked Y
-          updatedPositions[otherIndex] = { x: clampedMirrorX, y: finalY };
+          updatedPositionsById[otherSubId] = { x: clampedMirrorX, y: finalY };
         }
         
-        return { ...prev, positions: updatedPositions };
+        // REMOVE AFTER FIX CONFIRMED
+        console.log('[SUB DRAG] Updated positions', {
+          subId,
+          pairMode,
+          positionsById: updatedPositionsById,
+        });
+        
+        return { ...prev, positionsById: updatedPositionsById };
       });
     }
-  }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM]);
+  }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM, dimsOk]);
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
@@ -2871,6 +2886,18 @@ React.useEffect(() => {
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
     console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
 
+    // REMOVE AFTER FIX CONFIRMED - Debug lookup for subs
+    if (dragType === 'sub') {
+      const subInById = byId.get(draggedItemId);
+      const allRearSubIds = (rearSubs || []).map(s => s?.id).filter(Boolean);
+      console.log('[SUB MOVE_LOOKUP]', {
+        draggedItemId,
+        found: !!subInById,
+        allRearSubIds,
+        rearSubsCount: rearSubs?.length || 0,
+      });
+    }
+    
     if (dragType === 'speaker' && speaker) {
       const canonicalRole = getCanonicalRole(speaker.role);
 
