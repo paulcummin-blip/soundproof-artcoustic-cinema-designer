@@ -509,6 +509,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [zoom, setZoom] = React.useState(1.0);
   const [panX, setPanX] = React.useState(0);
   const [panY, setPanY] = React.useState(0);
+  const [isPanning, setIsPanning] = React.useState(false);
+  const panStartRef = useRef(null);
   const zoomMode = zoomModeProp;
   const lastPointerRef = useRef({ x: 0, y: 0 });
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
@@ -1539,6 +1541,55 @@ React.useEffect(() => {
     setZoom(Math.max(0.5, Math.min(2.0, newZoom)));
   }, [zoom, panX, panY]);
 
+  // Handle pan start
+  const handlePanStart = useCallback((e) => {
+    // Only allow panning when zoomed in
+    if (zoom <= 1.0) return;
+    
+    // Don't pan if clicking on draggable elements
+    const target = e.target;
+    if (target.tagName === 'ellipse' || target.closest('[data-draggable]')) return;
+    
+    // Only pan on background elements
+    const isBackground = target.tagName === 'rect' || target.tagName === 'line' || 
+                        target.tagName === 'svg' || target.classList?.contains('seats-layer') === false;
+    
+    if (!isBackground) return;
+    
+    e.preventDefault();
+    setIsPanning(true);
+    panStartRef.current = {
+      mouseX: e.clientX,
+      mouseY: e.clientY,
+      startPanX: panX,
+      startPanY: panY,
+    };
+  }, [zoom, panX, panY]);
+
+  // Handle pan move
+  const handlePanMove = useCallback((e) => {
+    if (!isPanning || !panStartRef.current) return;
+    
+    const dx = e.clientX - panStartRef.current.mouseX;
+    const dy = e.clientY - panStartRef.current.mouseY;
+    
+    setPanX(panStartRef.current.startPanX + dx);
+    setPanY(panStartRef.current.startPanY + dy);
+  }, [isPanning]);
+
+  // Handle pan end
+  const handlePanEnd = useCallback(() => {
+    setIsPanning(false);
+    panStartRef.current = null;
+  }, []);
+
+  // Reset view to default
+  const handleResetView = useCallback(() => {
+    setPanX(0);
+    setPanY(0);
+    setZoom(1.0);
+  }, []);
+
   // Handle plan click for zoom
   const handlePlanClick = useCallback((e) => {
     if (zoomMode === 'off') return;
@@ -2440,6 +2491,12 @@ React.useEffect(() => {
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
+    // Handle panning first (independent of speaker dragging)
+    if (isPanning) {
+      handlePanMove(e);
+      return;
+    }
+
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
@@ -2521,6 +2578,12 @@ React.useEffect(() => {
   }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, roomToCanvas]);
 
   const handleMouseUp = useCallback(() => {
+    // Handle pan end
+    if (isPanning) {
+      handlePanEnd();
+      return;
+    }
+
     // Signal to RoomDesigner that dragging ended
     if (props.isDraggingRef) {
       props.isDraggingRef.current = false;
@@ -5269,7 +5332,10 @@ return (
       border: '1px solid #DCDBD6',
       borderRadius: '0px', // Square corners - no rounded edges
       backgroundColor: '#F8F8F7',
-      cursor: zoomMode === 'in' ? 'zoom-in' : zoomMode === 'out' ? 'zoom-out' : 'default',
+      cursor: isPanning ? 'grabbing' : 
+              zoomMode === 'in' ? 'zoom-in' : 
+              zoomMode === 'out' ? 'zoom-out' : 
+              zoom > 1.0 ? 'grab' : 'default',
     }}
     onMouseMove={(e) => {
       // Track pointer position for zoom center
@@ -5281,8 +5347,30 @@ return (
       }
     }}
     onClick={handlePlanClick}
+    onMouseDown={handlePanStart}
   >
-    {/* Toolbar has been moved to the parent component's accordion */}
+    {/* Reset View Button (only when zoomed/panned) */}
+    {(zoom > 1.0 || panX !== 0 || panY !== 0) && (
+      <button
+        onClick={handleResetView}
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          padding: '6px 12px',
+          fontSize: 11,
+          fontWeight: 500,
+          borderRadius: 4,
+          border: '1px solid #DCDBD6',
+          background: '#FFFFFF',
+          color: '#3E4349',
+          cursor: 'pointer',
+          zIndex: 10,
+        }}
+      >
+        Reset View
+      </button>
+    )}
 
     {/* CANVAS WRAPPER (no tailwind) */}
     <div style={canvasStyle}>
@@ -5305,7 +5393,10 @@ return (
         }}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
+        onMouseLeave={(e) => {
+          handleMouseUp(e);
+          handlePanEnd();
+        }}
       >
 <SvgDefs ids={ids} scale={scale} svgW={svgW} svgH={svgH} />
 
