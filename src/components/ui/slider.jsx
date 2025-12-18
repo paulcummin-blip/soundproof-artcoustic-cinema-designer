@@ -79,15 +79,15 @@ const Slider = React.forwardRef(
         )}
         {...props}
       >
-        <div className="slider-track relative h-1.5 w-full grow overflow-hidden rounded-full">
-          <div className="slider-range absolute h-full" style={{ width: `${percentage}%` }} />
+        <div className="slider-track relative h-1.5 w-full grow overflow-hidden rounded-full bg-gray-700">
+          <div className="slider-range absolute h-full bg-[#213428]" style={{ width: `${percentage}%` }} />
         </div>
         <div
           role="slider"
           aria-valuemin={min}
           aria-valuemax={max}
           aria-valuenow={value}
-          className="slider-thumb absolute block h-4 w-4 rounded-full border-2 shadow"
+          className="slider-thumb absolute block h-4 w-4 rounded-full border-2 border-[#213428] bg-white shadow"
           style={{ 
             left: `calc(${percentage}% - 8px)`,
           }}
