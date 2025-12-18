@@ -2771,8 +2771,8 @@ React.useEffect(() => {
     // Room bounds in metres
     const minX = halfW + EPS;
     const maxX = widthM - halfW - EPS;
-    const frontY = halfD + EPS;
-    const rearY = lengthM - halfD - EPS;
+    const pinnedFrontY = halfD + EPS;
+    const pinnedRearY = lengthM - halfD - EPS;
     
     // Abort if room too small for sub
     if (maxX <= minX) {
@@ -2780,13 +2780,15 @@ React.useEffect(() => {
       return;
     }
     
-    // Determine wall and pin Y
-    const wall = isFront ? 'front' : 'rear';
-    const finalY = isFront ? frontY : rearY;
+    // Determine pinned Y for this wall
+    const pinnedY = isFront ? pinnedFrontY : pinnedRearY;
     
     // Check if pair mode (count === 2)
     const count = cfg?.count || 0;
     const pairMode = count === 2;
+    
+    // Store last known position for drag continuity
+    draggedSubLastPosRef.current[subId] = { x: rawX, y: rawY };
     
     setter(prev => {
       // [B44] Guard against invalid prev state
@@ -2795,11 +2797,11 @@ React.useEffect(() => {
         return prev;
       }
       
-      const positionsById = prev?.positionsById || {};
-      const updatedPositionsById = { ...positionsById };
+      // [B44] Build complete positionsById atomically
+      const nextPositionsById = { ...(prev?.positionsById || {}) };
       
       if (pairMode) {
-        // [B44] Pair-safe mirror drag: use offset-from-center approach
+        // [B44] Pair-safe mirror drag: offset-from-center with double-clamp
         const centerX = widthM / 2;
         
         // Calculate offset from centerline for the dragged sub
@@ -2815,7 +2817,7 @@ React.useEffect(() => {
         let xLeft = centerX - safeOffset;
         let xRight = centerX + safeOffset;
         
-        // Final safety guard: clamp to absolute bounds
+        // [B44] CRITICAL: Clamp BOTH positions after mirroring
         xLeft = Math.max(minX, Math.min(maxX, xLeft));
         xRight = Math.max(minX, Math.min(maxX, xRight));
         
@@ -2824,34 +2826,41 @@ React.useEffect(() => {
           return prev;
         }
         
-        // Update both subs with correct ID prefix
+        // [B44] Ensure BOTH IDs exist in the map (no transient missing keys)
         const prefix = isFront ? 'front-sub' : 'rear-sub';
-        updatedPositionsById[`${prefix}-left`] = { x: xLeft, y: finalY };
-        updatedPositionsById[`${prefix}-right`] = { x: xRight, y: finalY };
+        const leftId = `${prefix}-left`;
+        const rightId = `${prefix}-right`;
         
-        console.log('[SUB DRAG MIRROR]', {
-          subId,
-          wall,
-          draggedX: rawX.toFixed(3),
-          centerX: centerX.toFixed(3),
-          maxOffset: maxOffset.toFixed(3),
-          safeOffset: safeOffset.toFixed(3),
-          xLeft: xLeft.toFixed(3),
-          xRight: xRight.toFixed(3),
-        });
+        // Initialize missing IDs with safe defaults if needed
+        if (!nextPositionsById[leftId]) {
+          nextPositionsById[leftId] = { x: xLeft, y: pinnedY };
+        }
+        if (!nextPositionsById[rightId]) {
+          nextPositionsById[rightId] = { x: xRight, y: pinnedY };
+        }
+        
+        // Update both positions atomically
+        nextPositionsById[leftId] = { x: xLeft, y: pinnedY };
+        nextPositionsById[rightId] = { x: xRight, y: pinnedY };
       } else {
-        // Single sub mode: update only the dragged sub
-        const finalX = Math.max(minX, Math.min(maxX, rawX));
+        // [B44] Single sub mode: clamp once, write once
+        const clampedX = Math.max(minX, Math.min(maxX, rawX));
         
-        if (!Number.isFinite(finalX)) {
-          console.warn('[SUB DRAG] Aborting: non-finite position', { finalX });
+        if (!Number.isFinite(clampedX)) {
+          console.warn('[SUB DRAG] Aborting: non-finite position', { clampedX });
           return prev;
         }
         
-        updatedPositionsById[subId] = { x: finalX, y: finalY };
+        // Initialize if missing
+        if (!nextPositionsById[subId]) {
+          nextPositionsById[subId] = { x: clampedX, y: pinnedY };
+        }
+        
+        // Update position
+        nextPositionsById[subId] = { x: clampedX, y: pinnedY };
       }
       
-      return { ...prev, positionsById: updatedPositionsById };
+      return { ...prev, positionsById: nextPositionsById };
     });
   }, [canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM, dimsOk]);
 
