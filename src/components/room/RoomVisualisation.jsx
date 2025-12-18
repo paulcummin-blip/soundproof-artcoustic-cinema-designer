@@ -1560,6 +1560,37 @@ React.useEffect(() => {
           x: seatX - cursorRoom.x,
           y: seatY - cursorRoom.y
         };
+      } else if (type === "sub" && target.position) {
+        dragOffsetRoomRef.current = {
+          x: target.position.x - cursorRoom.x,
+          y: target.position.y - cursorRoom.y
+        };
+        // Detect and store which wall this sub is on
+        const x = target.position.x;
+        const y = target.position.y;
+        const threshold = 0.05;
+        
+        let wall = null;
+        if (Math.abs(y) < threshold) wall = 'front';
+        else if (Math.abs(y - lengthM) < threshold) wall = 'rear';
+        else if (Math.abs(x) < threshold) wall = 'left';
+        else if (Math.abs(x - widthM) < threshold) wall = 'right';
+        else {
+          // Default to closest wall
+          const distFront = y;
+          const distRear = lengthM - y;
+          const distLeft = x;
+          const distRight = widthM - x;
+          const minDist = Math.min(distFront, distRear, distLeft, distRight);
+          
+          if (minDist === distFront) wall = 'front';
+          else if (minDist === distRear) wall = 'rear';
+          else if (minDist === distLeft) wall = 'left';
+          else wall = 'right';
+        }
+        
+        draggedSubWallRef.current = wall;
+        draggedSubTypeRef.current = target._subType;
       }
       
       setDragState({
