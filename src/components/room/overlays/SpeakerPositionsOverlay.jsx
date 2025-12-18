@@ -61,6 +61,25 @@ const computeDynamicFontSize = (labels, defaultSize = 11) => {
   return MIN_FONT;
 };
 
+// Vertical ruler crowding detector for rotated text
+const getCrowdedFontSize = (yPxList, baseSize = 11) => {
+  if (!yPxList || yPxList.length <= 1) return baseSize;
+  
+  const sorted = [...yPxList].sort((a, b) => a - b);
+  let minDy = Infinity;
+  
+  for (let i = 1; i < sorted.length; i++) {
+    const dy = sorted[i] - sorted[i - 1];
+    if (dy < minDy) minDy = dy;
+  }
+  
+  if (minDy < 40) return Math.max(9, baseSize - 3);
+  if (minDy < 52) return Math.max(9, baseSize - 2);
+  if (minDy < 64) return Math.max(9, baseSize - 1);
+  
+  return baseSize;
+};
+
 // Font scaling: default slightly smaller than before, shrink further if crowded
 const calcFontSize = (basePx, roomWidthPx) => {
   const w = Number(roomWidthPx) || 0;
@@ -575,31 +594,12 @@ export default function SpeakerPositionsOverlay({
     const yTopPx = roomRect.y;
     const yBottomPx = roomRect.y + roomRect.height;
 
-    // Build label slots for dynamic font sizing (vertical ruler, rotated text)
-    const distanceLabels = [];
-    const roleLabels = [];
-    
-    rightGroup.forEach((s, idx) => {
-      const yPx = meterToCanvasY(s.yM);
-      const distFront = mToCm(s.yM);
-      const distBack = mToCm(L - s.yM);
-      const hCm = mToCm(bedHeightM(s.role, s.yM));
-      
-      // For rotated text, approximate as if horizontal then rotate box
-      distanceLabels.push(
-        { x: rulerXpx, y: yPx - 14, text: `${distBack}cm`, textAnchor: 'end' },
-        { x: rulerXpx, y: yPx + 14, text: `${distFront}cm`, textAnchor: 'start' }
-      );
-      
-      const labelX = rulerXpx - SIDE_LABEL_PAD_PX;
-      roleLabels.push(
-        { x: labelX, y: yPx, text: String(s.role || '').toUpperCase(), textAnchor: 'middle' },
-        { x: labelX, y: yPx + 18, text: `H${hCm}cm`, textAnchor: 'start' }
-      );
-    });
-    
-    const fontSize = computeDynamicFontSize(distanceLabels, 11);
-    const roleFontSize = computeDynamicFontSize(roleLabels, 12);
+    // Compute crowded font sizes for vertical ruler
+    const yList = rightGroup.map(s => meterToCanvasY(s.yM)).sort((a, b) => a - b);
+    const baseSize = calcFontSize(11, roomRect.width);
+    const roleSize = calcFontSize(12, roomRect.width);
+    const crowdedSize = getCrowdedFontSize(yList, baseSize);
+    const crowdedRoleSize = Math.max(9, Math.min(roleSize, crowdedSize + 1));
 
     return (
       <g data-layer="speaker-positions-right" pointerEvents="none">
@@ -629,14 +629,19 @@ export default function SpeakerPositionsOverlay({
           const distLeft = mToCm(L - s.yM);
           const distRight = mToCm(s.yM);
 
-          // Font sizes (match your "one smaller" defaults)
-          const baseSize = calcFontSize(11, roomRect.width);
-          const roleSize = calcFontSize(12, roomRect.width);
-
           const distDx = 14;   // same as LCR
           const distY = 12;    // flip to opposite side of dot
           const roleY = 16;    // same as LCR
           const hDx = 18;      // same as LCR
+
+          // Compute stagger for very close dots
+          let stagger = 0;
+          if (idx > 0) {
+            const prevYPx = meterToCanvasY(rightGroup[idx - 1].yM);
+            if (Math.abs(yPx - prevYPx) < 44) {
+              stagger = (idx % 2 === 0) ? -6 : 6;
+            }
+          }
 
           // Place ROLE + H between the wall edge and the ruler line
           // For right wall, label goes to the LEFT of the ruler line
@@ -722,20 +727,10 @@ export default function SpeakerPositionsOverlay({
     const yTopPx = roomRect.y;
     const yBottomPx = roomRect.y + roomRect.height;
 
-    // Build label slots for overhead vertical ruler
-    const distanceLabels = [];
-    overheadLeft.forEach((s, idx) => {
-      const yPx = meterToCanvasY(s.position.y);
-      const distFront = mToCm(s.position.y);
-      const distBack = mToCm(L - s.position.y);
-      
-      distanceLabels.push(
-        { x: xLeftRuler, y: yPx - 14, text: `${distBack}cm`, textAnchor: 'end' },
-        { x: xLeftRuler, y: yPx + 14, text: `${distFront}cm`, textAnchor: 'start' }
-      );
-    });
-    
-    const fontSize = computeDynamicFontSize(distanceLabels, 11);
+    // Compute crowded font size for overhead vertical ruler
+    const yList = overheadLeft.map(s => meterToCanvasY(s.position.y)).sort((a, b) => a - b);
+    const baseSize = calcFontSize(11, roomRect.width);
+    const crowdedSize = getCrowdedFontSize(yList, baseSize);
 
     const drawColumn = (list, rulerX, keyPrefix) => {
       if (!list.length) return null;
@@ -749,11 +744,18 @@ export default function SpeakerPositionsOverlay({
         const distFront = mToCm(yM);
         const distBack = mToCm(L - yM);
 
-        // Match RIGHT WALL sizing + geometry exactly
-        const baseSize = fontSize;
-        const distDx = 14;     // same as right wall
-        const distY  = 12;     // same as right wall
-        const rot    = -90;    // same as right wall
+        const distDx = 14;
+        const distY  = 12;
+        const rot    = -90;
+        
+        // Compute stagger for very close dots
+        let stagger = 0;
+        if (idx > 0) {
+          const prevYPx = meterToCanvasY(list[idx - 1].position.y);
+          if (Math.abs(yPx - prevYPx) < 44) {
+            stagger = (idx % 2 === 0) ? -6 : 6;
+          }
+        }
 
         return (
           <g key={`${keyPrefix}-${role}-${idx}`}>
@@ -765,18 +767,18 @@ export default function SpeakerPositionsOverlay({
             <g transform={`translate(${rulerX}, ${yPx}) rotate(${rot})`}>
               <text
                 x={-distDx}
-                y={distY}
+                y={distY + stagger}
                 textAnchor="end"
-                style={{ fontSize: baseSize, fill: textFill }}
+                style={{ fontSize: crowdedSize, fill: textFill }}
               >
                 {distBack}cm
               </text>
 
               <text
                 x={distDx}
-                y={distY}
+                y={distY + stagger}
                 textAnchor="start"
-                style={{ fontSize: baseSize, fill: textFill }}
+                style={{ fontSize: crowdedSize, fill: textFill }}
               >
                 {distFront}cm
               </text>
@@ -1096,39 +1098,48 @@ export default function SpeakerPositionsOverlay({
               </text>
             </>
           ) : (
-            <>
-              {/*
-                SIDE WALLS (vertical): Make it identical to LCR, just rotated.
-                Layout in "imagined horizontal" LCR form:
-                  WALL, [ROLE H], ruler line with dot, leftDist | dot | rightDist
-                For side walls we map:
-                  leftDist  = distance to BACK wall  (rear)  = (L - yM)
-                  rightDist = distance to FRONT wall (front) = yM
-              */}
+           <>
+             {/*
+               SIDE WALLS (vertical): Make it identical to LCR, just rotated.
+               Layout in "imagined horizontal" LCR form:
+                 WALL, [ROLE H], ruler line with dot, leftDist | dot | rightDist
+               For side walls we map:
+                 leftDist  = distance to BACK wall  (rear)  = (L - yM)
+                 rightDist = distance to FRONT wall (front) = yM
+             */}
 
-              {(() => {
-                // Match LCR spacing
-                const baseSize = calcFontSize(11, roomRect.width); // one size smaller by default
-                const roleSize = calcFontSize(12, roomRect.width); // one size smaller than LCR role
-                const distDx = 14;    // same as LCR distance offset
-                const distY = -8;     // same as LCR distance baseline above dot
-                const roleY = 16;     // same as LCR role baseline below dot
-                const hDx = 18;       // same as LCR H offset to the right of role
+             {(() => {
+               // Compute stagger for very close dots on surround rulers
+               let stagger = 0;
+               if (wall === 'right' && idx > 0) {
+                 const prevYPx = meterToCanvasY(rightGroup[idx - 1].yM);
+                 if (Math.abs(yPx - prevYPx) < 44) {
+                   stagger = (idx % 2 === 0) ? -6 : 6;
+                 }
+               }
 
-                // Distances (swap mapping so it reads "rear on left, front on right" in the imagined horizontal view)
-                const distLeft = mToCm(L - yM); // rear wall
-                const distRight = mToCm(yM);    // front wall
+               // Match LCR spacing
+               const baseSize = calcFontSize(11, roomRect.width); // one size smaller by default
+               const roleSize = calcFontSize(12, roomRect.width); // one size smaller than LCR role
+               const distDx = 14;    // same as LCR distance offset
+               const distY = -8;     // same as LCR distance baseline above dot
+               const roleY = 16;     // same as LCR role baseline below dot
+               const hDx = 18;       // same as LCR H offset to the right of role
 
-                // Rotation: turn the whole LCR layout 90° so text reads the right way on a vertical ruler
-                const rot = -90;
+               // Distances (swap mapping so it reads "rear on left, front on right" in the imagined horizontal view)
+               const distLeft = mToCm(L - yM); // rear wall
+               const distRight = mToCm(yM);    // front wall
 
-                // Put the ROLE/H label BETWEEN wall and ruler.
-                // Right wall: wallX < labelX < lineX (label sits just inside the ruler)
-                // Left wall:  lineX < labelX < wallX
-                const wallX = wall === "right" ? (roomRect.x + roomRect.width) : roomRect.x;
-                const labelX = wall === "right"
-                  ? (dotX - SIDE_LABEL_PAD_PX)   // between wall and ruler
-                  : (dotX + SIDE_LABEL_PAD_PX);  // between wall and ruler
+               // Rotation: turn the whole LCR layout 90° so text reads the right way on a vertical ruler
+               const rot = -90;
+
+               // Put the ROLE/H label BETWEEN wall and ruler.
+               // Right wall: wallX < labelX < lineX (label sits just inside the ruler)
+               // Left wall:  lineX < labelX < wallX
+               const wallX = wall === "right" ? (roomRect.x + roomRect.width) : roomRect.x;
+               const labelX = wall === "right"
+                 ? (dotX - SIDE_LABEL_PAD_PX)   // between wall and ruler
+                 : (dotX + SIDE_LABEL_PAD_PX);  // between wall and ruler
 
                 return (
                   <>
@@ -1136,7 +1147,7 @@ export default function SpeakerPositionsOverlay({
                     <g transform={`translate(${dotX}, ${dotY}) rotate(${rot})`}>
                       <text
                         x={-distDx}
-                        y={distY}
+                        y={distY + stagger}
                         textAnchor="end"
                         style={{ fontSize: baseSize, fill: textFill }}
                       >
@@ -1145,7 +1156,7 @@ export default function SpeakerPositionsOverlay({
 
                       <text
                         x={distDx}
-                        y={distY}
+                        y={distY + stagger}
                         textAnchor="start"
                         style={{ fontSize: baseSize, fill: textFill }}
                       >
@@ -1175,13 +1186,13 @@ export default function SpeakerPositionsOverlay({
                     </g>
                   </>
                 );
-              })()}
-            </>
-          )}
-        </g>
-      );
-    });
-  };
+                })()}
+                </>
+                )}
+                </g>
+                );
+                });
+                };
 
   return (
     <g data-layer="speaker-positions-overlay" pointerEvents="none">
