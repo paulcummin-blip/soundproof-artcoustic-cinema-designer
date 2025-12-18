@@ -1458,13 +1458,15 @@ React.useEffect(() => {
   }, [frontWideZones, widthM, lengthM, getModelDimsM, onSetSpeakers, getCanonicalRole]);
 
   // Drag state management
-  const handleMouseDown = useCallback(
+  const handlePointerDownSpeaker = useCallback(
     (e, id, type) => {
+      console.log("SPEAKER DOWN", id);
+      
       e.preventDefault();
       e.stopPropagation();
       
       // Capture pointer for speaker drag (prevents pan from stealing)
-      if (type === "speaker" && e.pointerId != null && e.currentTarget?.setPointerCapture) {
+      if (e.pointerId != null && e.currentTarget?.setPointerCapture) {
         try {
           e.currentTarget.setPointerCapture(e.pointerId);
         } catch (_) {}
@@ -1518,9 +1520,9 @@ React.useEffect(() => {
   );
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
-  const bedLayerSpeakerMouseDownHandler = useCallback(
-    (e, id) => handleMouseDown(e, id, "speaker"),
-    [handleMouseDown]
+  const bedLayerSpeakerPointerDownHandler = useCallback(
+    (e, id) => handlePointerDownSpeaker(e, id, "speaker"),
+    [handlePointerDownSpeaker]
   );
 
   // Window-level escape hatch to force end pan
@@ -1586,12 +1588,14 @@ React.useEffect(() => {
 
   // Handle pan start (Pointer Events) - ONLY on dedicated background rect
   const handlePanStart = useCallback((e) => {
+    console.log("PAN DOWN");
+
     // Only allow panning when zoomed in
     if (zoom <= 1.0) return;
-    
+
     // Hard guard: ONLY start pan on the dedicated background rect
     if (e.target?.dataset?.panBg !== 'true') return;
-    
+
     e.preventDefault();
     e.stopPropagation();
     
@@ -2528,8 +2532,8 @@ React.useEffect(() => {
     );
   }, [onSetSeatingPositions, canvasToRoom]);
 
-  // Mouse handling with CTM guard
-  const handleMouseMove = useCallback((e) => {
+  // Pointer handling with CTM guard
+  const handlePointerMoveSpeaker = useCallback((e) => {
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
@@ -2610,10 +2614,17 @@ React.useEffect(() => {
     }
   }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, roomToCanvas]);
 
-  const handleMouseUp = useCallback(() => {
+  const handlePointerUpSpeaker = useCallback((e) => {
     // Signal to RoomDesigner that dragging ended
     if (props.isDraggingRef) {
       props.isDraggingRef.current = false;
+    }
+    
+    // Release pointer capture for speaker drag
+    if (draggedItemId && e?.currentTarget?.releasePointerCapture && e?.pointerId != null) {
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (_) {}
     }
 
     // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
@@ -2685,21 +2696,14 @@ React.useEffect(() => {
     rsDragLockRef.current = null;
     isDraggingRearRef.current = 0;
     isDraggingFW.current = false;
-    
-    // Release pointer capture for speaker drag
-    if (dragType === 'speaker' && draggedItemId) {
-      const speakerEl = document.querySelector(`[data-speaker-id="${draggedItemId}"]`);
-      if (speakerEl && speakerEl.releasePointerCapture) {
-        try {
-          // Try to release all active captures
-          for (let i = 0; i < 10; i++) {
-            try { speakerEl.releasePointerCapture(i); } catch (_) {}
-          }
-        } catch (_) {}
-      }
-    }
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, props.isDraggingRef]);
+
+  // Wrapper for SVG pointer up that handles both pan and speaker drag
+  const handleSvgPointerUp = useCallback((e) => {
+    endPan(e);
+    handlePointerUpSpeaker(e);
+  }, [endPan, handlePointerUpSpeaker]);
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
@@ -3910,7 +3914,7 @@ useEffect(() => {
               widthM={0.27}
               depthM={0.27}
               scale={scale}
-              speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id)}
+              speakerMouseDownHandler={(e) => bedLayerSpeakerPointerDownHandler(e, spk.id)}
               setHoveredSpeaker={setHoveredSpeaker}
             />
           );
@@ -4983,7 +4987,7 @@ return {
     }
 
     const speakerDragHandler = isDraggable(speaker)
-      ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
+      ? (e) => bedLayerSpeakerPointerDownHandler(e, id)
       : undefined;
 
     // Visual-only yaw: flip sign so icons match the room coordinate system.
@@ -5112,7 +5116,15 @@ return {
               onPointerDown={(e) => {
                 e.stopPropagation();
                 e.preventDefault();
-                handleMouseDown(e, seat.id, 'seat');
+                
+                // Capture pointer for seat drag
+                if (e.pointerId != null && e.currentTarget?.setPointerCapture) {
+                  try {
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                  } catch (_) {}
+                }
+                
+                handlePointerDownSpeaker(e, seat.id, 'seat');
               }}
               onMouseEnter={() => handleSeatMouseEnter(seat)}
               onMouseLeave={handleSeatMouseLeave}
@@ -5436,13 +5448,10 @@ return (
           position: 'relative',
           zIndex: 1,
         }}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onPointerMove={handlePanMove}
-        onPointerUp={endPan}
-        onPointerCancel={endPan}
-        onPointerLeave={endPan}
+        onPointerMove={handleSvgPointerMove}
+        onPointerUp={handleSvgPointerUp}
+        onPointerCancel={handleSvgPointerUp}
+        onPointerLeave={handleSvgPointerUp}
       >
 <SvgDefs ids={ids} scale={scale} svgW={svgW} svgH={svgH} />
 
@@ -5571,7 +5580,7 @@ return (
 
             {/* Room Dimensions Overlay */}
             {overlaysForRendering?.ROOM_DIMS && (
-              <g data-layer="room-dimensions">
+              <g data-layer="room-dimensions" pointerEvents="none">
                 {/* Arrow markers */}
                 <defs>
                   <marker
@@ -5671,7 +5680,9 @@ return (
             </g>
 
             {/* Layer 7: MLP Marker (Fixed point, generally on top of zones but under draggable items) */}
-            {MLPMarker}
+            <g pointerEvents="none" data-layer="mlp-marker">
+              {MLPMarker}
+            </g>
 
             {/* Layer 7.5: MLP Position Ruler (when enabled) */}
             {showMlpRuler && (() => {
