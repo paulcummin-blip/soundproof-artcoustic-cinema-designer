@@ -2719,7 +2719,8 @@ React.useEffect(() => {
     
     const subType = draggedSubTypeRef.current || sub._subType;
     const setter = subType === 'front' ? onSetFrontSubs : onSetRearSubs;
-    if (!setter) return;
+    const subsList = subType === 'front' ? frontSubs : rearSubs;
+    if (!setter || !subsList) return;
     
     const wall = draggedSubWallRef.current;
     if (!wall) return;
@@ -2754,16 +2755,26 @@ React.useEffect(() => {
     
     // Only update if meaningful movement
     if (Math.abs(finalX - currentX) > 0.001 || Math.abs(finalY - currentY) > 0.001) {
+      const pairMode = subsList.length === 2;
+      
       setter(prev => {
         const positions = prev?.positions || [];
         const subIndex = subId === 'front-sub-left' || subId === 'rear-sub-left' ? 0 : 1;
         const updatedPositions = [...positions];
         updatedPositions[subIndex] = { x: finalX, y: finalY };
         
+        // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
+        if (pairMode) {
+          const otherIndex = subIndex === 0 ? 1 : 0;
+          const mirrorX = widthM - finalX;
+          const clampedMirrorX = Math.max(halfW + inset, Math.min(widthM - halfW - inset, mirrorX));
+          updatedPositions[otherIndex] = { x: clampedMirrorX, y: finalY };
+        }
+        
         return { ...prev, positions: updatedPositions };
       });
     }
-  }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, widthM, lengthM, getModelDimsM]);
+  }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM]);
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
