@@ -505,6 +505,9 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [dragWarning, setDragWarning] = useState({ show: false, message: '', x: 0, y: 0 });
   const [constraintZones, setConstraintZones] = useState(null);
   const [zoom, setZoom] = React.useState(1.0);
+  const [panX, setPanX] = React.useState(0);
+  const [panY, setPanY] = React.useState(0);
+  const lastPointerRef = useRef({ x: 0, y: 0 });
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
@@ -1506,8 +1509,68 @@ React.useEffect(() => {
     [handleMouseDown]
   );
 
-  const handleZoomIn = () => setZoom(prev => Math.min(2.0, prev + 0.1));
-  const handleZoomOut = () => setZoom(prev => Math.max(0.5, prev - 0.1));
+  // Zoom at point helper
+  const zoomAtPoint = useCallback((newZoom, clientX, clientY) => {
+    if (!planBoundsRef.current) return;
+    
+    const rect = planBoundsRef.current.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    
+    // Keep world point under cursor fixed
+    const worldX = (px - panX) / zoom;
+    const worldY = (py - panY) / zoom;
+    
+    const newPanX = px - worldX * newZoom;
+    const newPanY = py - worldY * newZoom;
+    
+    // Clamp pan to keep plan visible (at least 40px of roomRect within viewport)
+    const MIN_VISIBLE = 40;
+    const maxPanX = rect.width - MIN_VISIBLE;
+    const minPanX = -rect.width + MIN_VISIBLE;
+    const maxPanY = rect.height - MIN_VISIBLE;
+    const minPanY = -rect.height + MIN_VISIBLE;
+    
+    setPanX(Math.max(minPanX, Math.min(maxPanX, newPanX)));
+    setPanY(Math.max(minPanY, Math.min(maxPanY, newPanY)));
+    setZoom(Math.max(0.5, Math.min(2.0, newZoom)));
+  }, [zoom, panX, panY]);
+
+  const handleZoomIn = useCallback(() => {
+    if (!planBoundsRef.current) return;
+    
+    const rect = planBoundsRef.current.getBoundingClientRect();
+    let centerX, centerY;
+    
+    // Use last known pointer position if available, otherwise viewport center
+    if (lastPointerRef.current.x !== 0 || lastPointerRef.current.y !== 0) {
+      centerX = lastPointerRef.current.x;
+      centerY = lastPointerRef.current.y;
+    } else {
+      centerX = rect.left + rect.width / 2;
+      centerY = rect.top + rect.height / 2;
+    }
+    
+    zoomAtPoint(zoom + 0.1, centerX, centerY);
+  }, [zoom, zoomAtPoint]);
+
+  const handleZoomOut = useCallback(() => {
+    if (!planBoundsRef.current) return;
+    
+    const rect = planBoundsRef.current.getBoundingClientRect();
+    let centerX, centerY;
+    
+    // Use last known pointer position if available, otherwise viewport center
+    if (lastPointerRef.current.x !== 0 || lastPointerRef.current.y !== 0) {
+      centerX = lastPointerRef.current.x;
+      centerY = lastPointerRef.current.y;
+    } else {
+      centerX = rect.left + rect.width / 2;
+      centerY = rect.top + rect.height / 2;
+    }
+    
+    zoomAtPoint(zoom - 0.1, centerX, centerY);
+  }, [zoom, zoomAtPoint]);
 
   // Memoize baffle and screen calculations for performance
   const { BaffleAndScreen, screenPlaneY, screenCenterX_m, visibleWidthM } = useMemo(() => {
@@ -5219,6 +5282,15 @@ return (
       borderRadius: '0px', // Square corners - no rounded edges
       backgroundColor: '#F8F8F7',
     }}
+    onMouseMove={(e) => {
+      // Track pointer position for zoom center
+      lastPointerRef.current = { x: e.clientX, y: e.clientY };
+    }}
+    onTouchMove={(e) => {
+      if (e.touches.length === 1) {
+        lastPointerRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+      }
+    }}
   >
     {/* Toolbar has been moved to the parent component's accordion */}
 
@@ -5250,14 +5322,10 @@ return (
 
 {/* Removed debug label (zoneKeysLabel) */}
 
-          {/* ZOOM GROUP — CLIPPED TO VIEWPORT, SO IT CAN'T ESCAPE */}
+          {/* ZOOM GROUP — CLIPPED TO VIEWPORT, WITH ZOOM-TO-CURSOR */}
           <g
               clipPath={`url(#${idsClip})`}
-  transform={
-    `translate(${svgWSafe / 2}, ${(roomRect.y || 0) + PLAN_TOP_PAD_PX}) ` +
-    `scale(${Number(zoom) || 1}) ` +
-    `translate(${-svgWSafe / 2}, ${-((roomRect.y || 0) + PLAN_TOP_PAD_PX)})`
-  }
+              transform={`translate(${panX}, ${panY}) scale(${zoom})`}
           >
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
             <g data-layer="grid">
