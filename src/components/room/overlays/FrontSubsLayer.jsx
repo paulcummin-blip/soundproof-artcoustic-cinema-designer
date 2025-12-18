@@ -60,7 +60,7 @@ const FrontSubsLayer = React.memo(function FrontSubsLayer({
               fill="#1a1a1a"
               stroke="none"
               strokeWidth={0}
-              opacity={opacity}
+              opacity={0.8}
               pointerEvents="none"
             />
           </g>
