@@ -2,9 +2,8 @@ import React, { useMemo } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { useAppState } from "../AppStateProvider";
-import { useSeatResponses } from "./hooks/useSeatResponses";
 import BassGraph from "@/components/room/bass/BassGraph";
-import { getSubwooferCurve } from "@/components/models/speakers/registry";
+import { simulateBassAtSeats } from "@/components/bass/bassSimulationEngine";
 
 const brand = {
   ink:   "#1B1A1A",
