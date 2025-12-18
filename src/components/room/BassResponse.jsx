@@ -169,23 +169,54 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </Alert>
       )}
 
+      {/* Fairness Summary */}
+      {simulationResults.metrics?.fairness && (
+        <div className="rounded-lg border border-[#213428] bg-[#213428]/5 p-4 mb-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-sm font-bold text-[#213428]">Designer Metrics</div>
+            <div className="text-2xl font-bold text-[#213428]">
+              {simulationResults.metrics.fairness.score}/100
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div>
+              <span className="text-[#3E4349]">Best↔Worst:</span>
+              <span className="ml-1 font-medium text-[#1B1A1A]">
+                {simulationResults.metrics.fairness.spreadBestWorstDb.toFixed(1)} dB
+              </span>
+            </div>
+            <div>
+              <span className="text-[#3E4349]">Worst Null:</span>
+              <span className="ml-1 font-medium text-[#1B1A1A]">
+                {simulationResults.metrics.fairness.nulls.worstNullDb.toFixed(1)} dB
+              </span>
+            </div>
+          </div>
+          {simulationResults.metrics.fairness.nulls.worstSeatId && (
+            <div className="text-xs text-[#3E4349] mt-2">
+              @ Seat {simulationResults.metrics.fairness.nulls.worstSeatId}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* RP22 Bass Metrics */}
       {simulationResults.metrics && (
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-            <div className="text-xs text-[#3E4349] mb-1">P14 Uniformity (20-80 Hz)</div>
+            <div className="text-xs text-[#3E4349] mb-1">P14 Uniformity</div>
             <div className="text-lg font-bold text-[#1B1A1A]">
               ±{simulationResults.metrics.p14.avgStdDevDb.toFixed(1)} dB
             </div>
           </div>
           <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-            <div className="text-xs text-[#3E4349] mb-1">P18 Extension (F3)</div>
+            <div className="text-xs text-[#3E4349] mb-1">P18 Extension</div>
             <div className="text-lg font-bold text-[#1B1A1A]">
               {simulationResults.metrics.p18.f3Hz.toFixed(0)} Hz
             </div>
           </div>
           <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-            <div className="text-xs text-[#3E4349] mb-1">P19 Peak SPL @ MLP</div>
+            <div className="text-xs text-[#3E4349] mb-1">P19 Peak SPL</div>
             <div className="text-lg font-bold text-[#1B1A1A]">
               {simulationResults.metrics.p19.bandPeakDb.toFixed(1)} dB
             </div>
@@ -238,20 +269,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </div>
       )}
 
-      {/* Simple per‑seat status list */}
+      {/* Per-seat detail cards */}
       {Object.keys(simulationResults.seatResponses).length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {Object.entries(simulationResults.seatResponses).map(([seatId, response]) => {
             const seat = seatingPositions.find(s => (s.id || `${s.x}-${s.y}`) === seatId);
             const isPrimary = seat?.isPrimary || false;
-            const pts = response.freqsHz?.length || 0;
+            const nullInfo = response.nulls || { count: 0, worstDb: 0 };
             
             return (
               <div
                 key={seatId}
                 className="rounded-lg border border-[#DCDBD6] bg-white p-3"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-2">
                   <div className="font-medium text-[#1B1A1A]">
                     Seat {seatId}
                   </div>
@@ -259,8 +290,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                     <Badge className="bg-[#213428] text-white border-[#213428]">MLP</Badge>
                   )}
                 </div>
-                <div className="mt-1 text-xs text-[#3E4349]">
-                  Points: {pts}
+                <div className="space-y-1 text-xs">
+                  {nullInfo.count > 0 && (
+                    <>
+                      <div className="text-[#3E4349]">
+                        <span className="font-medium">Nulls:</span> {nullInfo.count}
+                      </div>
+                      <div className="text-[#3E4349]">
+                        <span className="font-medium">Worst:</span> {nullInfo.worstDb.toFixed(1)} dB
+                      </div>
+                    </>
+                  )}
+                  {nullInfo.count === 0 && (
+                    <div className="text-[#3E4349]">No significant nulls</div>
+                  )}
                 </div>
               </div>
             );

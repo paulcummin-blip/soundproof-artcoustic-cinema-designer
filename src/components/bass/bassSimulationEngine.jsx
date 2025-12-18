@@ -6,6 +6,8 @@ import { getSubwooferCurve } from "@/components/models/speakers/registry";
 const SPEED_OF_SOUND = 343; // m/s
 const MIN_DISTANCE = 0.5; // meters (prevent explosion at near-zero)
 const MIN_SPL_FLOOR = 30; // dB (prevent -Infinity)
+const MODE_Q = 8; // Damping factor for room modes
+const MODE_MAX_GAIN_DB = 6; // Maximum mode influence per frequency
 
 // Build frequency array from curve points, clamped to 15-200 Hz
 export function buildBassFrequencyBins(curvePoints) {
@@ -66,6 +68,141 @@ function calculateBoundaryGain(subPos, roomDims, radiationMode) {
   return Math.min(wallCount * 3, 6);
 }
 
+// Compute axial room modes (L/W/H) up to fMax
+function computeAxialModes(roomDims, fMax = 200) {
+  const modes = [];
+  const c = SPEED_OF_SOUND;
+  
+  // Length modes (along Y axis)
+  for (let n = 1; n < 50; n++) {
+    const f = (c / 2) * (n / roomDims.lengthM);
+    if (f > fMax) break;
+    modes.push({ axis: 'L', n, fHz: f, dim: roomDims.lengthM });
+  }
+  
+  // Width modes (along X axis)
+  for (let n = 1; n < 50; n++) {
+    const f = (c / 2) * (n / roomDims.widthM);
+    if (f > fMax) break;
+    modes.push({ axis: 'W', n, fHz: f, dim: roomDims.widthM });
+  }
+  
+  // Height modes (along Z axis)
+  for (let n = 1; n < 50; n++) {
+    const f = (c / 2) * (n / roomDims.heightM);
+    if (f > fMax) break;
+    modes.push({ axis: 'H', n, fHz: f, dim: roomDims.heightM });
+  }
+  
+  return modes;
+}
+
+// Calculate mode coupling between source and receiver
+function axisCoupling(axis, n, sourcePos, seatPos, dim) {
+  let sourceU, seatU;
+  
+  if (axis === 'L') {
+    sourceU = sourcePos.y;
+    seatU = seatPos.y;
+  } else if (axis === 'W') {
+    sourceU = sourcePos.x;
+    seatU = seatPos.x;
+  } else { // H
+    sourceU = sourcePos.z;
+    seatU = seatPos.z;
+  }
+  
+  // Standing wave pressure shape: cos(n * π * u / dim)
+  const excite = Math.abs(Math.cos(n * Math.PI * sourceU / dim));
+  const receive = Math.abs(Math.cos(n * Math.PI * seatU / dim));
+  
+  return excite * receive;
+}
+
+// Apply mode filtering to complex sum
+function applyModesToMagnitude(magnitude, f, modes, subs, seatPos, roomDims) {
+  const bwHz = modes[0]?.fHz / MODE_Q || 5; // Fallback bandwidth
+  let totalGainDb = 0;
+  let modeCount = 0;
+  
+  for (const mode of modes) {
+    // Only evaluate modes within window
+    const df = Math.abs(f - mode.fHz);
+    const windowBw = 2 * (mode.fHz / MODE_Q);
+    if (df > windowBw) continue;
+    
+    // Calculate total coupling for this mode
+    let coupling = 0;
+    for (const sub of subs) {
+      coupling += axisCoupling(mode.axis, mode.n, 
+        { x: sub.x, y: sub.y, z: sub.z }, 
+        seatPos, 
+        mode.dim);
+    }
+    
+    // Normalize coupling to 0..1
+    coupling = Math.min(1, coupling / Math.max(1, subs.length));
+    
+    // Gaussian-shaped resonant gain
+    const bw = mode.fHz / MODE_Q;
+    const gaussFactor = Math.exp(-Math.pow((f - mode.fHz) / bw, 2));
+    const gainDb = MODE_MAX_GAIN_DB * coupling * gaussFactor;
+    
+    totalGainDb += gainDb;
+    modeCount++;
+  }
+  
+  // Clamp total mode influence to ±8dB
+  totalGainDb = Math.max(-8, Math.min(8, totalGainDb));
+  
+  // Apply gain to magnitude
+  const gainLinear = Math.pow(10, totalGainDb / 20);
+  return magnitude * gainLinear;
+}
+
+// Detect nulls in frequency response (20-80 Hz band)
+function detectNulls(freqsHz, splDb, band = [20, 80]) {
+  const nulls = [];
+  
+  // Find indices in band
+  const indices = freqsHz.map((f, i) => f >= band[0] && f <= band[1] ? i : -1).filter(i => i >= 0);
+  
+  if (indices.length < 3) return { count: 0, worstDb: 0 };
+  
+  // Calculate average SPL in band for reference
+  const bandSpl = indices.map(i => splDb[i]);
+  const avgSpl = bandSpl.reduce((a, b) => a + b, 0) / bandSpl.length;
+  
+  // Look for local dips
+  for (let i = 1; i < indices.length - 1; i++) {
+    const idx = indices[i];
+    const prevIdx = indices[i - 1];
+    const nextIdx = indices[i + 1];
+    
+    const localAvg = (splDb[prevIdx] + splDb[nextIdx]) / 2;
+    const dip = localAvg - splDb[idx];
+    
+    // Count as null if dip is at least 6dB below local neighbors
+    if (dip >= 6) {
+      nulls.push({
+        freqHz: freqsHz[idx],
+        depthDb: -dip,
+        spl: splDb[idx]
+      });
+    }
+  }
+  
+  const worstNull = nulls.length > 0 
+    ? Math.min(...nulls.map(n => n.depthDb))
+    : 0;
+  
+  return { 
+    count: nulls.length, 
+    worstDb: worstNull,
+    nulls 
+  };
+}
+
 // Main simulation engine
 export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   // Guards
@@ -106,6 +243,9 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   
   const dbPower = 10 * Math.log10(Math.max(1, powerW));
   const dbEq = -eqHeadroomDb;
+  
+  // Precompute room modes (do this once)
+  const modes = computeAxialModes(roomDims, 200);
   
   // Compute response for each seat
   const seatResponses = {};
@@ -149,13 +289,20 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         sumImag += amplitude * Math.sin(phi);
       });
       
-      // Convert to SPL
-      const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+      // Convert to SPL with mode influence
+      let magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+      
+      // Apply room modes to magnitude
+      magnitude = applyModesToMagnitude(magnitude, f, modes, subs, seatPos, roomDims);
+      
       const spl = 20 * Math.log10(magnitude);
       return Math.max(MIN_SPL_FLOOR, spl);
     });
     
-    seatResponses[seatId] = { freqsHz, splDb };
+    // Detect nulls for this seat
+    const nullInfo = detectNulls(freqsHz, splDb, [20, 80]);
+    
+    seatResponses[seatId] = { freqsHz, splDb, nulls: nullInfo };
   });
   
   // Compute RP22 metrics
@@ -164,7 +311,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   return { seatResponses, metrics };
 }
 
-// Compute RP22 P14, P18, P19
+// Compute RP22 P14, P18, P19 + Designer fairness metrics
 function computeRP22Metrics(seatResponses, seats) {
   const seatIds = Object.keys(seatResponses);
   if (seatIds.length === 0) return null;
@@ -215,9 +362,59 @@ function computeRP22Metrics(seatResponses, seats) {
     ? variancePerFreq.reduce((a, b) => a + b, 0) / variancePerFreq.length 
     : 0;
   
+  // Designer Fairness Metrics
+  // Calculate average SPL per seat in 20-80 Hz band
+  const seatAvgSpl = {};
+  seatIds.forEach(id => {
+    const bandSpl = band20_80.map(i => seatResponses[id].splDb[i]);
+    seatAvgSpl[id] = bandSpl.reduce((a, b) => a + b, 0) / bandSpl.length;
+  });
+  
+  const avgSplValues = Object.values(seatAvgSpl);
+  const bestSeatAvgDb = Math.max(...avgSplValues);
+  const worstSeatAvgDb = Math.min(...avgSplValues);
+  const spreadBestWorstDb = bestSeatAvgDb - worstSeatAvgDb;
+  
+  // Null analysis across all seats
+  const nullsPerSeat = {};
+  let worstSeatId = null;
+  let worstNullDb = 0;
+  
+  seatIds.forEach(id => {
+    const nullInfo = seatResponses[id].nulls;
+    nullsPerSeat[id] = {
+      count: nullInfo.count,
+      worstDb: nullInfo.worstDb
+    };
+    
+    if (nullInfo.worstDb < worstNullDb) {
+      worstNullDb = nullInfo.worstDb;
+      worstSeatId = id;
+    }
+  });
+  
+  // Fairness Score (0-100)
+  let fairnessScore = 100;
+  fairnessScore -= 6 * p14AvgStdDevDb;
+  fairnessScore -= 2 * spreadBestWorstDb;
+  fairnessScore -= 4 * Math.max(0, Math.abs(worstNullDb) - 6);
+  fairnessScore = Math.max(0, Math.min(100, fairnessScore));
+  
   return {
     p14: { avgStdDevDb: p14AvgStdDevDb },
     p18: { f3Hz },
-    p19: { bandPeakDb: p19PeakDb }
+    p19: { bandPeakDb: p19PeakDb },
+    fairness: {
+      score: Math.round(fairnessScore),
+      seatToSeatStdDevDb: p14AvgStdDevDb,
+      bestSeatAvgDb,
+      worstSeatAvgDb,
+      spreadBestWorstDb,
+      nulls: {
+        perSeat: nullsPerSeat,
+        worstSeatId,
+        worstNullDb
+      }
+    }
   };
 }
