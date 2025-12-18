@@ -274,8 +274,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [roomDamping, setRoomDamping] = useState(20); // Q: 8-35
   const [showModeMarkers, setShowModeMarkers] = useState(false);
 
-  // Auto-align function
-  const autoAlignSubs = (groupLabel) => {
+  // Auto-align function (defined before useEffect hooks)
+  const autoAlignSubs = React.useCallback((groupLabel) => {
     const mlpSeat = seatingPositions?.find(s => s.isPrimary);
     if (!mlpSeat) return; // No MLP, skip
 
@@ -421,7 +421,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     } else {
       setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
     }
-  };
+  }, [seatingPositions, roomDims, frontSubsCfg, rearSubsCfg, tryPolarity, setFrontSubsCfg, setRearSubsCfg]);
 
   // Auto-align on first enable
   useEffect(() => {
@@ -432,7 +432,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     } else if (frontCount === 0) {
       setHasAutoAlignedFront(false);
     }
-  }, [frontSubsCfg?.count]);
+  }, [frontSubsCfg?.count, hasAutoAlignedFront, autoAlignSubs]);
 
   useEffect(() => {
     const rearCount = rearSubsCfg?.count || 0;
@@ -442,7 +442,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     } else if (rearCount === 0) {
       setHasAutoAlignedRear(false);
     }
-  }, [rearSubsCfg?.count]);
+  }, [rearSubsCfg?.count, hasAutoAlignedRear, autoAlignSubs]);
 
   return (
     <div className="space-y-4" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
