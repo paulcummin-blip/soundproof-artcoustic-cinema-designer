@@ -2821,40 +2821,57 @@ React.useEffect(() => {
         
         // NEW: Prefer positionsById if it exists, otherwise use positions array for backward compat
         const positionsById = prev?.positionsById || {};
-        const positionsArray = prev?.positions || [];
         
         // Build new positionsById object
         const updatedPositionsById = { ...positionsById };
         
-        // Update dragged sub
-        updatedPositionsById[subId] = { x: finalX, y: finalY };
-        
-        // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
-        if (pairMode) {
-          const otherSubId = subId === 'rear-sub-left' ? 'rear-sub-right' : 'rear-sub-left';
-          const mirrorX = widthM - finalX;
-          const clampedMirrorX = Math.max(minX, Math.min(maxX, mirrorX));
+        // [B44] Paired mirror drag: use offset-from-center approach for safety
+        if (pairMode && (wall === 'front' || wall === 'rear')) {
+          const centerX = widthM / 2;
           
-          // Final safety check on mirrored position
-          if (!Number.isFinite(clampedMirrorX)) {
-            console.warn('[SUB DRAG] Aborting: non-finite mirror X', { mirrorX, clampedMirrorX });
+          // Calculate offset from centerline for the dragged sub
+          const draggedOffset = Math.abs(finalX - centerX);
+          
+          // Calculate maximum safe offset (ensures both subs stay inside room)
+          const maxOffset = Math.min(centerX - minX, maxX - centerX);
+          
+          // Clamp offset to safe range
+          const safeOffset = Math.max(0, Math.min(maxOffset, draggedOffset));
+          
+          // Apply symmetric positions
+          const xLeft = centerX - safeOffset;
+          const xRight = centerX + safeOffset;
+          
+          // Final safety checks
+          if (!Number.isFinite(xLeft) || !Number.isFinite(xRight)) {
+            console.warn('[SUB DRAG] Aborting: non-finite symmetric positions', { xLeft, xRight });
             return prev;
           }
           
-          // Mirrored sub uses same wall-locked Y
-          updatedPositionsById[otherSubId] = { x: clampedMirrorX, y: finalY };
+          // Update both subs with stable IDs
+          updatedPositionsById['rear-sub-left'] = { x: xLeft, y: finalY };
+          updatedPositionsById['rear-sub-right'] = { x: xRight, y: finalY };
+          
+          // REMOVE AFTER FIX CONFIRMED
+          console.log('[SUB DRAG MIRROR]', {
+            subId,
+            draggedX: finalX.toFixed(3),
+            centerX: centerX.toFixed(3),
+            offset: draggedOffset.toFixed(3),
+            maxOffset: maxOffset.toFixed(3),
+            safeOffset: safeOffset.toFixed(3),
+            xLeft: xLeft.toFixed(3),
+            xRight: xRight.toFixed(3),
+          });
+        } else {
+          // Single sub mode: update only the dragged sub
+          updatedPositionsById[subId] = { x: finalX, y: finalY };
         }
-        
-        // REMOVE AFTER FIX CONFIRMED
-        console.log('[SUB DRAG] Updated positions', {
-          subId,
-          pairMode,
-          positionsById: updatedPositionsById,
-        });
         
         return { ...prev, positionsById: updatedPositionsById };
       });
     }
+  }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM, dimsOk]);
   }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM, dimsOk]);
 
   // Mouse handling with CTM guard
