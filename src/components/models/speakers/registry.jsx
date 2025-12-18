@@ -235,7 +235,7 @@ export function getSpeakerModelMeta(modelName) {
   };
 }
 
-// SUBWOOFER RESPONSE CURVE ACCESSOR
+// SUBWOOFER RESPONSE CURVE ACCESSOR (for engine use)
 export function getSubResponseCurve(modelKey) {
   const normalized = normaliseModelKey(modelKey);
   const model = MODELS.find(m => m.key === normalized);
@@ -251,6 +251,35 @@ export function getSubResponseCurve(modelKey) {
   }));
 }
 
+// VALIDATION HELPER
+export function isValidCurve(curve) {
+  if (!Array.isArray(curve)) return false;
+  return curve.every(point => 
+    Array.isArray(point) && 
+    point.length === 2 && 
+    typeof point[0] === 'number' && 
+    typeof point[1] === 'number'
+  );
+}
+
+// SUBWOOFER CURVE ACCESSOR (for chart plotting)
+export function getSubwooferCurve(modelKey) {
+  const normalized = normaliseModelKey(modelKey);
+  const model = MODELS.find(m => m.key === normalized);
+  
+  if (!model || !model.frequency_response_curve) {
+    return null;
+  }
+  
+  const rawCurve = model.frequency_response_curve;
+  if (!isValidCurve(rawCurve)) {
+    return null;
+  }
+  
+  // Convert [[hz, db], ...] to [{hz, db}, ...]
+  return rawCurve.map(([hz, db]) => ({ hz, db }));
+}
+
 // CATEGORY LISTS IN EXACT UI ORDER
 export function getModelsByCategoryOrdered() {
   const byCat = { LCR: [], SURROUNDS: [], ARCHITECT: [], SUBWOOFERS: [] };
@@ -264,4 +293,4 @@ export function getModelsByCategoryOrdered() {
   return ordered;
 }
 
-export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, CATEGORY_ORDER, MODELS };
+export default { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, getSubResponseCurve, getSubwooferCurve, isValidCurve, CATEGORY_ORDER, MODELS };

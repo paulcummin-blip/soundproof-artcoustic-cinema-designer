@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useAppState } from "../AppStateProvider";
 import { useSeatResponses } from "./hooks/useSeatResponses";
 import BassGraph from "@/components/room/bass/BassGraph";
+import { getSubwooferCurve } from "@/components/models/speakers/registry";
 
 const brand = {
   ink:   "#1B1A1A",
@@ -16,7 +17,7 @@ const brand = {
 };
 
 export default function BassResponse() {
-  const { subwoofers, seatingPositions, roomDims } = useAppState();
+  const { subwoofers, seatingPositions, roomDims, frontSubsCfg, rearSubsCfg } = useAppState();
   const seatResponses = useSeatResponses();
 
   const hasEngineError = useMemo(
@@ -29,14 +30,54 @@ export default function BassResponse() {
 
   const dimsTxt = `${(roomDims?.widthM ?? 0).toFixed(1)}×${(roomDims?.lengthM ?? 0).toFixed(1)}×${(roomDims?.heightM ?? 0).toFixed(1)} m`;
 
+  // Determine active model key for bass chart
+  const activeModelKey = useMemo(() => {
+    const rearCount = rearSubsCfg?.count ?? 0;
+    const frontCount = frontSubsCfg?.count ?? 0;
+    
+    if (rearCount > 0 && rearSubsCfg?.model) {
+      return rearSubsCfg.model;
+    }
+    if (frontCount > 0 && frontSubsCfg?.model) {
+      return frontSubsCfg.model;
+    }
+    return null;
+  }, [rearSubsCfg?.count, rearSubsCfg?.model, frontSubsCfg?.count, frontSubsCfg?.model]);
+
+  // Get raw subwoofer curve
+  const rawSubCurve = useMemo(() => {
+    if (!activeModelKey) return null;
+    const curve = getSubwooferCurve(activeModelKey);
+    
+    // Temporary debug logging
+    if (curve) {
+      console.log('[BassResponse] Loaded curve for model:', {
+        rawKey: activeModelKey,
+        pointCount: curve.length,
+        firstPoint: curve[0],
+        lastPoint: curve[curve.length - 1]
+      });
+    }
+    
+    return curve;
+  }, [activeModelKey]);
+
   // Prefer MLP for the graph, otherwise first seat
   const selectedSeat = React.useMemo(() => {
     return seatResponses.find(r => r?.isPrimary) || seatResponses[0] || null;
   }, [seatResponses]);
 
+  // Use raw curve if available, otherwise fall back to engine response
   const responseData = React.useMemo(() => {
+    if (rawSubCurve && rawSubCurve.length > 0) {
+      // Convert {hz, db} to {frequency, spl} format for chart
+      return rawSubCurve.map(point => ({
+        frequency: point.hz,
+        spl: point.db
+      }));
+    }
     return Array.isArray(selectedSeat?.responseData) ? selectedSeat.responseData : [];
-  }, [selectedSeat]);
+  }, [rawSubCurve, selectedSeat]);
 
   // Schroeder frequency (display only)
   const schroederFrequency = React.useMemo(() => {
@@ -67,6 +108,14 @@ export default function BassResponse() {
             {hasNoSeats && <>No seating found. Go to <strong>Layout → Seating</strong> and generate at least one row.</>}
             {hasNoSeats && hasNoSubs && <><br/></>}
             {hasNoSubs && <>No subwoofers found. Add one in <strong>Speakers</strong> (front corner is fine to start).</>}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {!hasNoSubs && activeModelKey && !rawSubCurve && (
+        <Alert className="border border-[#C1B6AD] bg-[#F8F8F7] text-[#3E4349]">
+          <AlertDescription className="text-sm">
+            No frequency response curve available for this subwoofer model.
           </AlertDescription>
         </Alert>
       )}
