@@ -5225,8 +5225,17 @@ return {
           return (
             <g
               key={subId}
-              style={{ cursor: 'grab' }}
-              onPointerDown={(e) => handleMouseDown(e, subId, 'sub')}
+              style={{ cursor: 'grab', pointerEvents: 'all' }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleMouseDown(e, subId, 'sub');
+                if (e.currentTarget && typeof e.currentTarget.setPointerCapture === 'function') {
+                  try {
+                    e.currentTarget.setPointerCapture(e.pointerId);
+                  } catch (err) {}
+                }
+              }}
             >
               <SpeakerRect
                 speaker={sub}
@@ -5235,6 +5244,7 @@ return {
                 opacity={0.8}
                 scale={scale}
                 toPx={toPx}
+                pointerEvents="none"
               />
             </g>
           );
