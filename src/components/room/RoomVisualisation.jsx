@@ -360,6 +360,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     placedSpeakers = [],
     onSetSpeakers,
     onSetSeatingPositions,
+    onSetFrontSubs,
+    onSetRearSubs,
     overlays: _overlays = {},
     sideLinked = false,
     seatingPositions = [],
@@ -540,6 +542,8 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const isDraggingRearRef = React.useRef(0);
   const isDraggingSpeakerRef = useRef(false);
   const dragOffsetRoomRef = useRef({ x: 0, y: 0 });
+  const draggedSubWallRef = useRef(null);
+  const draggedSubTypeRef = useRef(null);
   const lastSentRef = useRef(null);
   const hudDragRef = useRef(null);
   const hudElRef = useRef(null);
@@ -761,8 +765,21 @@ const byId = useMemo(() => {
     if (seat.id) map.set(seat.id, seat);
   });
 
+  // Index subwoofers
+  (frontSubs || []).forEach((sub, idx) => {
+    if (!sub) return;
+    const id = sub.id || `front-sub-${idx}`;
+    map.set(id, { ...sub, _subType: 'front' });
+  });
+  
+  (rearSubs || []).forEach((sub, idx) => {
+    if (!sub) return;
+    const id = sub.id || `rear-sub-${idx}`;
+    map.set(id, { ...sub, _subType: 'rear' });
+  });
+
   return map;
-}, [placedSpeakers, seatingPositions]);
+}, [placedSpeakers, seatingPositions, frontSubs, rearSubs]);
 
   // Removed seatBandXBounds - computed after overheadZones is defined
 
@@ -1548,8 +1565,21 @@ React.useEffect(() => {
           // Ignore capture errors
         }
       }
+      
+      if (type === "sub") {
+        isDraggingSpeakerRef.current = true;
+        
+        // Capture pointer on the target element
+        try {
+          if (e.target && typeof e.target.setPointerCapture === 'function') {
+            e.target.setPointerCapture(e.pointerId);
+          }
+        } catch (err) {
+          // Ignore capture errors
+        }
+      }
     },
-    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole]
+    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, detectSubWall, widthM, lengthM]
   );
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
@@ -2563,6 +2593,54 @@ React.useEffect(() => {
     );
   }, [onSetSeatingPositions, canvasToRoom]);
 
+  const handleSubDrag = useCallback((subId, newCanvasPos) => {
+    const sub = byId.get(subId);
+    if (!sub) return;
+    
+    const subType = draggedSubTypeRef.current || sub._subType;
+    const setter = subType === 'front' ? onSetFrontSubs : onSetRearSubs;
+    if (!setter) return;
+    
+    const wall = draggedSubWallRef.current;
+    if (!wall) return;
+    
+    const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
+    
+    const dims = getModelDimsM(sub.model);
+    const halfW = (dims.widthM || 0.5) / 2;
+    const halfD = (dims.depthM || 0.25) / 2;
+    const inset = 0.05;
+    
+    let finalX = rawX;
+    let finalY = rawY;
+    
+    // Pin to wall and clamp along that wall
+    if (wall === 'front') {
+      finalY = inset;
+      finalX = Math.max(halfW + inset, Math.min(widthM - halfW - inset, rawX));
+    } else if (wall === 'rear') {
+      finalY = lengthM - inset;
+      finalX = Math.max(halfW + inset, Math.min(widthM - halfW - inset, rawX));
+    } else if (wall === 'left') {
+      finalX = inset;
+      finalY = Math.max(halfD + inset, Math.min(lengthM - halfD - inset, rawY));
+    } else if (wall === 'right') {
+      finalX = widthM - inset;
+      finalY = Math.max(halfD + inset, Math.min(lengthM - halfD - inset, rawY));
+    }
+    
+    const currentX = sub.position?.x ?? 0;
+    const currentY = sub.position?.y ?? 0;
+    
+    // Only update if meaningful movement
+    if (Math.abs(finalX - currentX) > 0.001 || Math.abs(finalY - currentY) > 0.001) {
+      setter(prev => (prev || []).map(s => {
+        const sId = s.id || `${subType}-sub-${prev.indexOf(s)}`;
+        return sId === subId ? { ...s, position: { ...s.position, x: finalX, y: finalY } } : s;
+      }));
+    }
+  }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, widthM, lengthM, getModelDimsM]);
+
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
@@ -2652,8 +2730,10 @@ React.useEffect(() => {
       handleSpeakerDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'seat') {
       handleSeatDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
+    } else if (dragType === 'sub') {
+      handleSubDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     }
-  }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, roomToCanvas, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, dragOffsetRoomRef]);
+  }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, handleSubDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, roomToCanvas, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, dragOffsetRoomRef]);
 
   const handleMouseUp = useCallback((e) => {
     // Signal to RoomDesigner that dragging ended
@@ -2743,6 +2823,8 @@ React.useEffect(() => {
     isDraggingFW.current = false;
     isDraggingSpeakerRef.current = false;
     dragOffsetRoomRef.current = { x: 0, y: 0 };
+    draggedSubWallRef.current = null;
+    draggedSubTypeRef.current = null;
 
   }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, props.isDraggingRef]);
 
@@ -5078,26 +5160,32 @@ return {
     const subsToRender = Array.isArray(rearSubs) ? rearSubs : [];
     if (!subsToRender.length) return null;
     return (
-      <g data-layer="rear-subwoofers" pointerEvents="none">
+      <g data-layer="rear-subwoofers">
         {subsToRender.map((sub, i) => {
           if (!hasPos(sub)) return null;
-          // No suffix resolution for subwoofers
           const { widthM, depthM } = getModelDimsM(sub.model);
+          const subId = sub.id || `rear-sub-${i}`;
+          
           return (
-            <SpeakerRect
-              key={sub.id || `sub-${i}`}
-              speaker={sub}
-              widthM={widthM}
-              depthM={depthM}
-              opacity={0.8}
-              scale={scale}
-              toPx={toPx}
-            />
+            <g
+              key={subId}
+              style={{ cursor: 'grab' }}
+              onPointerDown={(e) => handleMouseDown(e, subId, 'sub')}
+            >
+              <SpeakerRect
+                speaker={sub}
+                widthM={widthM}
+                depthM={depthM}
+                opacity={0.8}
+                scale={scale}
+                toPx={toPx}
+              />
+            </g>
           );
         })}
       </g>
     );
-  }, [rearSubs, getModelDimsM, scale, toPx]);
+  }, [rearSubs, getModelDimsM, scale, toPx, handleMouseDown]);
 
   // Renders generic room elements. `roomElements` prop is available.
   const renderRoomElements = useCallback(() => {
