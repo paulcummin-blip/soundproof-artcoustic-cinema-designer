@@ -336,12 +336,8 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         sumImag += amplitude * Math.sin(phi);
       });
       
-      // Convert to SPL with mode influence
-      let magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
-      
-      // Apply room modes to magnitude
-      magnitude = applyModesToMagnitude(magnitude, f, modes, subs, seatPos, roomDims);
-      
+      // Convert complex sum to SPL (pure pressure summation)
+      const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
       const spl = 20 * Math.log10(magnitude);
       return Math.max(MIN_SPL_FLOOR, spl);
     });
