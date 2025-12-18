@@ -2760,15 +2760,23 @@ React.useEffect(() => {
       setter(prev => {
         const positions = prev?.positions || [];
         const subIndex = subId === 'front-sub-left' || subId === 'rear-sub-left' ? 0 : 1;
-        const updatedPositions = [...positions];
-        updatedPositions[subIndex] = { x: finalX, y: finalY };
+        
+        // Initialize array with correct length if needed
+        const updatedPositions = positions.length >= 2 ? [...positions] : [null, null];
+        
+        // Always use the wall-locked Y value
+        const wallLockedY = finalY;
+        
+        // Update dragged sub
+        updatedPositions[subIndex] = { x: finalX, y: wallLockedY };
         
         // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
         if (pairMode) {
           const otherIndex = subIndex === 0 ? 1 : 0;
           const mirrorX = widthM - finalX;
           const clampedMirrorX = Math.max(halfW + inset, Math.min(widthM - halfW - inset, mirrorX));
-          updatedPositions[otherIndex] = { x: clampedMirrorX, y: finalY };
+          // CRITICAL: mirrored sub must use same wall-locked Y
+          updatedPositions[otherIndex] = { x: clampedMirrorX, y: wallLockedY };
         }
         
         return { ...prev, positions: updatedPositions };
