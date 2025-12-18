@@ -1369,14 +1369,74 @@ React.useEffect(() => {
     return xRoom;
   }
 
-  // [B44 DISABLED] Auto-positioning of FW based on zones
-  // FW median positioning is now FULLY handled by SpeakerPlacement only.
-  // The overlay (when enabled) should ONLY:
-  // - Draw the visual FW zone bands
-  // - Constrain manual drags inside the band during user interaction
+  // [B44] Auto-positioning of FW based on zones (active for auto-positioned speakers only)
+  // Keeps BOTH FWL+FWR paired when zones change (e.g., when SL/SR move)
+  // Skip any speaker marked positionSource='user' to preserve manual placement
   useEffect(() => {
-    // Legacy auto-positioning logic disabled
-    return;
+    if (!enableFrontWides || isDraggingFW.current) return;
+    if (frontWideZones?.status !== 'ok') return;
+
+    const W = widthM || 4.5;
+    const L = lengthM || 6.0;
+    const WALL_BUFFER_FW = 0.02;
+
+    const lwSpeaker = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW');
+    const rwSpeaker = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'RW');
+
+    if (!lwSpeaker && !rwSpeaker) return;
+
+    let needsUpdate = false;
+    const updated = (placedSpeakers || []).map(s => {
+      const role = getCanonicalRole(s.role);
+      if (role !== 'LW' && role !== 'RW') return s;
+
+      // [B44 FIX] Skip user-positioned speakers
+      if (s.positionSource === 'user') return s;
+
+      const zone = role === 'LW' ? frontWideZones.left : frontWideZones.right;
+      if (!zone || !zone.medianY) return s;
+
+      const dims = getModelDimsM(s.model);
+      const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
+      const halfWidth = (Number(dims?.widthM) || 0.20) / 2;
+
+      const xAtWall = role === 'LW'
+        ? (WALL_BUFFER_FW + halfDepth)
+        : (W - WALL_BUFFER_FW - halfDepth);
+
+      const sideOffsetKey = role === 'LW' ? 'L' : 'R';
+      const currentOffset = fwOffsetRef.current[sideOffsetKey] || 0;
+
+      const targetYWithOffset = zone.medianY + currentOffset;
+      const yMinClamped = (zone.yMin || 0) + (halfWidth * SIDE_ALLOW_OVERHANG);
+      const yMaxClamped = (zone.yMax || L) - (halfWidth * SIDE_ALLOW_OVERHANG);
+
+      const yClamped = clamp(targetYWithOffset, yMinClamped, yMaxClamped);
+
+      const currentY = s.position?.y ?? 0;
+      const currentX = s.position?.x ?? 0;
+
+      if (Math.abs(currentY - yClamped) > EPS || Math.abs(currentX - xAtWall) > EPS) {
+        needsUpdate = true;
+        return {
+          ...s,
+          position: {
+            ...s.position,
+            x: xAtWall,
+            y: yClamped,
+            z: s.position?.z ?? 1.1
+          }
+        };
+      }
+
+      return s;
+    });
+
+    if (needsUpdate) {
+      onSetSpeakers(updated);
+    }
+    
+    /* ORIGINAL DISABLED LOGIC REMOVED */
     
     /* ORIGINAL LOGIC DISABLED:
     if (!enableFrontWides || isDraggingFW.current) return;
@@ -2255,7 +2315,7 @@ React.useEffect(() => {
 
       const nextPos = { x: xAtWall, y: yClamped, z: spk.position?.z ?? 1.1 };
 
-      // Update both speakers simultaneously
+      // Update both speakers simultaneously, marking both as user-positioned
       if (nextPos && onSetSpeakers) {
         console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
         onSetSpeakers(prev => {
@@ -2263,12 +2323,12 @@ React.useEffect(() => {
           const partner = prev.find(s => getCanonicalRole(s.role) === partnerRole);
           
           return prev.map(s => {
-            // Update dragged speaker
+            // Update dragged speaker (mark as user-positioned)
             if (s.id === speakerId) {
-              return { ...s, position: nextPos, meta: spk.meta };
+              return { ...s, position: nextPos, meta: spk.meta, positionSource: 'user' };
             }
             
-            // Update mirrored partner
+            // Update mirrored partner (also mark as user-positioned)
             if (partner && s.id === partner.id) {
               const partnerDims = getModelDimsM(partner.model);
               const partnerHalfDepth = (Number(partnerDims?.depthM) || 0.082) / 2;
@@ -2295,7 +2355,7 @@ React.useEffect(() => {
               const partnerSideOffsetKey = partnerRole === 'LW' ? 'L' : 'R';
               fwOffsetRef.current[partnerSideOffsetKey] = partnerYClamped - partnerMedianY;
 
-              return { ...s, position: partnerPos };
+              return { ...s, position: partnerPos, positionSource: 'user' };
             }
             
             return s;
