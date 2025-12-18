@@ -2727,12 +2727,13 @@ React.useEffect(() => {
     
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
     
+    // Robust dimension resolution with safe defaults
     const dims = getModelDimsM(sub.model);
-    const w = dims.widthM || 0.5;
-    const d = dims.depthM || 0.25;
+    const w = (Number.isFinite(dims.widthM) && dims.widthM > 0) ? dims.widthM : 0.50;
+    const d = (Number.isFinite(dims.depthM) && dims.depthM > 0) ? dims.depthM : 0.30;
     const halfW = w / 2;
     const halfD = d / 2;
-    const EPS = 0.001;
+    const EPS = 0.01;
     
     let finalX = rawX;
     let finalY = rawY;
@@ -2742,14 +2743,30 @@ React.useEffect(() => {
       finalY = halfD + EPS;
       finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, rawX));
     } else if (wall === 'rear') {
-      finalY = lengthM - halfD - EPS;
-      finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, rawX));
+      // Rear-specific corner-safe clamping
+      const minX = halfW + EPS;
+      const maxX = widthM - halfW - EPS;
+      const rearPinnedY = lengthM - halfD - EPS;
+      
+      finalY = rearPinnedY;
+      finalX = Math.max(minX, Math.min(maxX, rawX));
+      
+      // Safety: if finalX is invalid, fallback to previous or center
+      if (!Number.isFinite(finalX)) {
+        const prevX = sub.position?.x;
+        finalX = Number.isFinite(prevX) ? prevX : (minX + maxX) / 2;
+      }
     } else if (wall === 'left') {
       finalX = halfW + EPS;
       finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
     } else if (wall === 'right') {
       finalX = widthM - halfW - EPS;
       finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
+    }
+    
+    // Final validation: never write invalid positions
+    if (!Number.isFinite(finalX) || !Number.isFinite(finalY)) {
+      return;
     }
     
     const currentX = sub.position?.x ?? 0;
@@ -2769,7 +2786,7 @@ React.useEffect(() => {
         // Always use the wall-locked Y value
         const wallLockedY = finalY;
         
-        // Update dragged sub
+        // Update dragged sub (with validation)
         updatedPositions[subIndex] = { x: finalX, y: wallLockedY };
         
         // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
@@ -2777,8 +2794,17 @@ React.useEffect(() => {
           const otherIndex = subIndex === 0 ? 1 : 0;
           const mirrorX = widthM - finalX;
           const clampedMirrorX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, mirrorX));
-          // CRITICAL: mirrored sub must use same wall-locked Y
-          updatedPositions[otherIndex] = { x: clampedMirrorX, y: wallLockedY };
+          
+          // Validate mirrored position before writing
+          if (Number.isFinite(clampedMirrorX)) {
+            updatedPositions[otherIndex] = { x: clampedMirrorX, y: wallLockedY };
+          } else {
+            // Keep previous position for mirrored sub if calculation failed
+            const prevPos = positions[otherIndex];
+            if (prevPos) {
+              updatedPositions[otherIndex] = prevPos;
+            }
+          }
         }
         
         return { ...prev, positions: updatedPositions };
