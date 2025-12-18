@@ -207,7 +207,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
 SpeakerIcon.displayName = "SpeakerIcon";
 
 // Simple rectangle (subs etc.)
-export function SpeakerRect({ speaker, widthM, depthM, opacity = 1.0, scale = 1, toPx }) {
+export function SpeakerRect({ speaker, widthM, depthM, opacity = 1.0, scale = 1, toPx, pointerEvents = "auto" }) {
   if (!speaker?.position || !widthM || !depthM) return null;
   const [cx, cy] = toPx(speaker.position.x, speaker.position.y);
   const w = widthM * scale;
@@ -224,6 +224,7 @@ export function SpeakerRect({ speaker, widthM, depthM, opacity = 1.0, scale = 1,
       stroke="none"
       strokeWidth={0}
       style={{ opacity }}
+      pointerEvents={pointerEvents}
     />
   );
 }

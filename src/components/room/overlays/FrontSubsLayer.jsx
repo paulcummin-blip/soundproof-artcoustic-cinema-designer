@@ -36,21 +36,34 @@ const FrontSubsLayer = React.memo(function FrontSubsLayer({
         const subId = sub.id || `front-sub-${idx}`;
 
         return (
-          <rect
+          <g
             key={subId}
-            x={cx - w / 2}
-            y={cy - d / 2}
-            width={w}
-            height={d}
-            rx={0}
-            ry={0}
-            fill="#1a1a1a"
-            stroke="none"
-            strokeWidth={0}
-            style={{ cursor: 'grab' }}
-            pointerEvents="auto"
-            onPointerDown={(e) => onSubPointerDown?.(e, subId)}
-          />
+            style={{ cursor: 'grab', pointerEvents: 'all' }}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (e.currentTarget && typeof e.currentTarget.setPointerCapture === 'function') {
+                try {
+                  e.currentTarget.setPointerCapture(e.pointerId);
+                } catch (err) {}
+              }
+              onSubPointerDown?.(e, subId);
+            }}
+          >
+            <rect
+              x={cx - w / 2}
+              y={cy - d / 2}
+              width={w}
+              height={d}
+              rx={0}
+              ry={0}
+              fill="#1a1a1a"
+              stroke="none"
+              strokeWidth={0}
+              opacity={opacity}
+              pointerEvents="none"
+            />
+          </g>
         );
       })}
     </g>
