@@ -17,6 +17,10 @@ const FrontSubsLayer = React.memo(function FrontSubsLayer({
   getModelDimsM,
   scale,
   onSubPointerDown,
+  onSubPointerMove,
+  onSubPointerUp,
+  dragging,
+  draggedItemId,
 }) {
   if (!Array.isArray(frontSubs) || frontSubs.length === 0) return null;
 
@@ -43,12 +47,31 @@ const FrontSubsLayer = React.memo(function FrontSubsLayer({
           } catch (err) {}
           onSubPointerDown?.(e, subId);
         };
+        
+        const handlePointerMove = (e) => {
+          if (!dragging || draggedItemId !== subId) return;
+          e.preventDefault();
+          e.stopPropagation();
+          onSubPointerMove?.(e);
+        };
+        
+        const handlePointerUp = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          } catch (err) {}
+          onSubPointerUp?.(e);
+        };
 
         return (
           <g
             key={subId}
-            style={{ cursor: 'grab', pointerEvents: 'all' }}
+            style={{ cursor: dragging && draggedItemId === subId ? 'grabbing' : 'grab', pointerEvents: 'all' }}
             onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
           >
             <rect
               x={cx - w / 2}

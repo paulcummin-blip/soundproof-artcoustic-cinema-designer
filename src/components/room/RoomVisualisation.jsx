@@ -1746,6 +1746,9 @@ React.useEffect(() => {
 
   // Pan handlers for background rect only
   const onPanPointerDown = useCallback((e) => {
+    // Never pan if event was already handled (sub/speaker drag)
+    if (e.defaultPrevented) return;
+    
     // Never pan if dragging a speaker
     if (isDraggingSpeakerRef.current) return;
     
@@ -5291,11 +5294,30 @@ return {
             handleMouseDown(e, subId, 'sub');
           };
           
+          const handlePointerMove = (e) => {
+            if (!dragging || draggedItemId !== subId) return;
+            e.preventDefault();
+            e.stopPropagation();
+            handleMouseMove(e);
+          };
+          
+          const handlePointerUp = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            } catch (err) {}
+            handleMouseUp(e);
+          };
+          
           return (
             <g
               key={subId}
-              style={{ cursor: 'grab', pointerEvents: 'all' }}
+              style={{ cursor: dragging && draggedItemId === subId ? 'grabbing' : 'grab', pointerEvents: 'all' }}
               onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
             >
               <SpeakerRect
                 speaker={sub}
@@ -5311,7 +5333,7 @@ return {
         })}
       </g>
     );
-  }, [rearSubs, getModelDimsM, scale, toPx, handleMouseDown]);
+  }, [rearSubs, getModelDimsM, scale, toPx, handleMouseDown, handleMouseMove, handleMouseUp, dragging, draggedItemId]);
 
   // Renders generic room elements. `roomElements` prop is available.
   const renderRoomElements = useCallback(() => {
@@ -6092,6 +6114,10 @@ return (
                 getModelDimsM={getModelDimsM}
                 scale={scale}
                 onSubPointerDown={(e, id) => handleMouseDown(e, id, 'sub')}
+                onSubPointerMove={handleMouseMove}
+                onSubPointerUp={handleMouseUp}
+                dragging={dragging}
+                draggedItemId={draggedItemId}
               />
             )}
             {renderSubwoofers()}
