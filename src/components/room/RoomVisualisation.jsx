@@ -2521,6 +2521,11 @@ React.useEffect(() => {
   }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, roomToCanvas]);
 
   const handleMouseUp = useCallback(() => {
+    // Signal to RoomDesigner that dragging ended
+    if (props.isDraggingRef) {
+      props.isDraggingRef.current = false;
+    }
+
     // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
     // CRITICAL: Overheads must be draggable. RP22 constrains placement, not interaction.
     // During drag = free movement. After release = snap to compliance.
