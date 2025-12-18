@@ -354,12 +354,42 @@ function checkTuningWarnings(subs) {
   return warnings;
 }
 
+// Apply 1/3 octave smoothing to response curve
+function apply13OctaveSmoothing(freqsHz, splDb) {
+  if (freqsHz.length === 0) return splDb;
+  
+  const smoothed = [];
+  
+  for (let i = 0; i < freqsHz.length; i++) {
+    const fc = freqsHz[i];
+    const fLow = fc / Math.pow(2, 1/6);  // Lower edge of 1/3 octave
+    const fHigh = fc * Math.pow(2, 1/6); // Upper edge of 1/3 octave
+    
+    // Find all points within this band
+    const bandPoints = [];
+    for (let j = 0; j < freqsHz.length; j++) {
+      if (freqsHz[j] >= fLow && freqsHz[j] <= fHigh) {
+        bandPoints.push(splDb[j]);
+      }
+    }
+    
+    // Average SPL in band
+    const avgSpl = bandPoints.length > 0 
+      ? bandPoints.reduce((a, b) => a + b, 0) / bandPoints.length
+      : splDb[i];
+    
+    smoothed.push(avgSpl);
+  }
+  
+  return smoothed;
+}
+
 // Compute RP22 P14, P18, P19 + Designer fairness metrics
 function computeRP22Metrics(seatResponses, seats, subs = []) {
   const seatIds = Object.keys(seatResponses);
   if (seatIds.length === 0) return null;
   
-  // Find MLP
+  // Find MLP (RSP)
   const mlpSeat = seats.find(s => s.isPrimary);
   const mlpId = mlpSeat ? (mlpSeat.id || `${mlpSeat.x}-${mlpSeat.y}`) : seatIds[0];
   const mlpResponse = seatResponses[mlpId];
@@ -376,24 +406,47 @@ function computeRP22Metrics(seatResponses, seats, subs = []) {
   const band20_80 = getBandIndices(20, 80);
   const band50_80 = getBandIndices(50, 80);
   
-  // P19: Peak SPL at MLP (20-80 Hz)
+  // P14: Maximum LFE-band SPL capability at RSP (20-80 Hz)
+  // This is the peak SPL the system can produce in the LFE band
   const mlpBandSpl = band20_80.map(i => splDb[i]);
-  const p19PeakDb = mlpBandSpl.length > 0 ? Math.max(...mlpBandSpl) : 0;
+  const p14MaxSplDb = mlpBandSpl.length > 0 ? Math.max(...mlpBandSpl) : 0;
   
-  // P18: F3 extension at MLP
+  // P18: F3 extension at RSP (in-room -3dB point)
   const refBandSpl = band50_80.map(i => splDb[i]);
   const refLevel = refBandSpl.length > 0 ? refBandSpl.reduce((a, b) => a + b, 0) / refBandSpl.length : 0;
   const targetF3 = refLevel - 3;
   
-  let f3Hz = 15;
+  let p18F3Hz = 15;
   for (let i = 0; i < freqsHz.length; i++) {
     if (splDb[i] >= targetF3) {
-      f3Hz = freqsHz[i];
+      p18F3Hz = freqsHz[i];
       break;
     }
   }
   
-  // P14: Seat-to-seat variance (20-80 Hz)
+  // P19: Max deviation from target below transition frequency (1/3 oct smoothing)
+  // Assume transition frequency = Schroeder frequency (calculated elsewhere)
+  // For now, use 80 Hz as proxy for transition frequency
+  const transitionFreqHz = 80;
+  const belowTransition = getBandIndices(20, transitionFreqHz);
+  
+  // Apply 1/3 octave smoothing to RSP response
+  const smoothedSplDb = apply13OctaveSmoothing(freqsHz, splDb);
+  
+  // Target curve is flat (0 dB reference) - so deviation = smoothed response
+  // Calculate max absolute deviation in the band below transition
+  const deviations = belowTransition.map(i => {
+    const targetDb = 0; // Flat target
+    const actualDb = smoothedSplDb[i];
+    // Normalize to average level first
+    const avgInBand = belowTransition.reduce((sum, idx) => sum + smoothedSplDb[idx], 0) / belowTransition.length;
+    return Math.abs(actualDb - avgInBand);
+  });
+  
+  const p19MaxDeviationDb = deviations.length > 0 ? Math.max(...deviations) : 0;
+  
+  // Designer Fairness Metrics (separate from RP22 parameters)
+  // Calculate seat-to-seat variance for fairness scoring
   const variancePerFreq = band20_80.map(freqIdx => {
     const splAtFreq = seatIds.map(id => seatResponses[id].splDb[freqIdx]);
     const mean = splAtFreq.reduce((a, b) => a + b, 0) / splAtFreq.length;
@@ -405,7 +458,6 @@ function computeRP22Metrics(seatResponses, seats, subs = []) {
     ? variancePerFreq.reduce((a, b) => a + b, 0) / variancePerFreq.length 
     : 0;
   
-  // Designer Fairness Metrics
   // Calculate average SPL per seat in 20-80 Hz band
   const seatAvgSpl = {};
   seatIds.forEach(id => {
@@ -447,9 +499,9 @@ function computeRP22Metrics(seatResponses, seats, subs = []) {
   const tuningWarnings = checkTuningWarnings(subs);
   
   return {
-    p14: { avgStdDevDb: p14AvgStdDevDb },
-    p18: { f3Hz },
-    p19: { bandPeakDb: p19PeakDb },
+    p14: { maxSplDb: p14MaxSplDb },
+    p18: { f3Hz: p18F3Hz },
+    p19: { maxDeviationDb: p19MaxDeviationDb },
     fairness: {
       score: Math.round(fairnessScore),
       seatToSeatStdDevDb: p14AvgStdDevDb,

@@ -136,7 +136,7 @@ const RAW = [
   {
     id: 14,
     number: 14,
-    name: "LFE frequencies total SPL capability at RSP (plus bass management if used)",
+    name: "LFE frequencies total SPL capability at RSP, plus bass management if used (post calibration EQ, within bass extension spec for the level) without clipping (includes amplifier headroom)",
     description: "Post calibration EQ; includes amp headroom; can include boundary gain.",
     unit: "dB SPL (C)",
     thresholds: { L1: 114, L2: 117, L3: 120, L4: 123 },
@@ -176,8 +176,8 @@ const RAW = [
   {
     id: 18,
     number: 18,
-    name: "In-room bass extension (-3 dB cut-off)",
-    description: "Measured at SPL per parameter 14.",
+    name: "In-room bass extension -3 dB cut off frequency point",
+    description: "In-room predicted -3 dB bass extension frequency with no perceptible distortion or audible mechanical resonances at the specified minimum SPL according to performance parameter 14… To include speaker coupling, boundary and room gain.",
     unit: "Hz",
     thresholds: { L1: 30, L2: 25, L3: 18, L4: 15 },
     metric: "Min.",

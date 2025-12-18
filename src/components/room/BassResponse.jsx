@@ -274,9 +274,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       {simulationResults.metrics && (
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-            <div className="text-xs text-[#3E4349] mb-1">P14 Uniformity</div>
+            <div className="text-xs text-[#3E4349] mb-1">P14 Max SPL</div>
             <div className="text-lg font-bold text-[#1B1A1A]">
-              ±{simulationResults.metrics.p14.avgStdDevDb.toFixed(1)} dB
+              {simulationResults.metrics.p14.maxSplDb.toFixed(1)} dB
             </div>
           </div>
           <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
@@ -286,9 +286,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             </div>
           </div>
           <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-            <div className="text-xs text-[#3E4349] mb-1">P19 Peak SPL</div>
+            <div className="text-xs text-[#3E4349] mb-1">P19 Deviation</div>
             <div className="text-lg font-bold text-[#1B1A1A]">
-              {simulationResults.metrics.p19.bandPeakDb.toFixed(1)} dB
+              ±{simulationResults.metrics.p19.maxDeviationDb.toFixed(1)} dB
             </div>
           </div>
         </div>
