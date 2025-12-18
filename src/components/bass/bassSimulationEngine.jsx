@@ -321,7 +321,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         const amplitude = Math.pow(10, dbMag / 20);
         
         // Guard against non-finite amplitude
-        if (!isFinite(amplitude)) continue;
+        if (!isFinite(amplitude)) return;
         
         // Time-of-flight phase
         let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
@@ -337,7 +337,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         }
         
         // Guard against non-finite phase
-        if (!isFinite(phi)) continue;
+        if (!isFinite(phi)) return;
         
         // Complex accumulation
         sumReal += amplitude * Math.cos(phi);
