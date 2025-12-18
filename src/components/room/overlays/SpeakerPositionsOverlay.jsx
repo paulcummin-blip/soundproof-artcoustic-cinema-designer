@@ -655,18 +655,18 @@ export default function SpeakerPositionsOverlay({
               <g transform={`translate(${dotX}, ${dotY}) rotate(-90)`}>
                 <text
                   x={-distDx}
-                  y={distY}
+                  y={distY + stagger}
                   textAnchor="end"
-                  style={{ fontSize: baseSize, fill: textFill }}
+                  style={{ fontSize: crowdedSize, fill: textFill }}
                 >
                   {distLeft}cm
                 </text>
 
                 <text
                   x={distDx}
-                  y={distY}
+                  y={distY + stagger}
                   textAnchor="start"
-                  style={{ fontSize: baseSize, fill: textFill }}
+                  style={{ fontSize: crowdedSize, fill: textFill }}
                 >
                   {distRight}cm
                 </text>
@@ -678,7 +678,7 @@ export default function SpeakerPositionsOverlay({
                   x={0}
                   y={roleY}
                   textAnchor="middle"
-                  style={{ fontSize: roleSize, fill: textFill, fontWeight: 700 }}
+                  style={{ fontSize: crowdedRoleSize, fill: textFill, fontWeight: 700 }}
                 >
                   {s.role}
                 </text>
@@ -687,7 +687,7 @@ export default function SpeakerPositionsOverlay({
                   x={hDx}
                   y={roleY}
                   textAnchor="start"
-                  style={{ fontSize: baseSize, fill: "#3E4349", fontWeight: 400 }}
+                  style={{ fontSize: crowdedSize, fill: "#3E4349", fontWeight: 400 }}
                 >
                   {`H${hCm}cm`}
                 </text>
