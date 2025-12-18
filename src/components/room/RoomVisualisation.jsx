@@ -538,6 +538,8 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const fwOffsetRef = React.useRef({ L: 0, R: 0 });
   const isDraggingFW = React.useRef(false);
   const isDraggingRearRef = React.useRef(0);
+  const isDraggingSpeakerRef = useRef(false);
+  const dragOffsetRoomRef = useRef({ x: 0, y: 0 });
   const lastSentRef = useRef(null);
   const hudDragRef = useRef(null);
   const hudElRef = useRef(null);
@@ -942,10 +944,11 @@ React.useEffect(() => {
 
   const canvasToRoom = useCallback((posPx) => {
     if (!posPx) return { x: 0, y: 0 };
-    const xM = (posPx.x - roomRect.x) / scale;
-    const yM = (posPx.y - roomRect.y) / scale;
+    // Account for view offset from pan
+    const xM = (posPx.x - roomRect.x - viewOffsetPx.x) / scale;
+    const yM = (posPx.y - roomRect.y - viewOffsetPx.y) / scale;
     return { x: xM, y: yM };
-  }, [roomRect, scale]);
+  }, [roomRect, scale, viewOffsetPx]);
 
   const roomToCanvas = useCallback((posM) => {
     if (!posM) return { x: 0, y: 0 };
@@ -1487,6 +1490,36 @@ React.useEffect(() => {
       }
 
       console.log("[DRAG] START", { id, type, role: target?.role, hasTarget: !!target });
+      
+      // Get SVG point for offset calculation
+      if (!svgRef.current) return;
+      const svgElement = svgRef.current;
+      const point = svgElement.createSVGPoint();
+      point.x = e.clientX;
+      point.y = e.clientY;
+      const ctm = svgElement.getScreenCTM();
+      if (!ctm) return;
+      const inverseCTM = ctm.inverse();
+      const svgPoint = point.matrixTransform(inverseCTM);
+      
+      // Convert cursor position to room coords
+      const cursorRoom = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
+      
+      // Store offset between speaker center and cursor
+      if (type === "speaker" && target.position) {
+        dragOffsetRoomRef.current = {
+          x: target.position.x - cursorRoom.x,
+          y: target.position.y - cursorRoom.y
+        };
+      } else if (type === "seat" && (target.x || target.position?.x)) {
+        const seatX = target.x ?? target.position?.x ?? 0;
+        const seatY = target.y ?? target.position?.y ?? 0;
+        dragOffsetRoomRef.current = {
+          x: seatX - cursorRoom.x,
+          y: seatY - cursorRoom.y
+        };
+      }
+      
       setDragState({
         dragging: true,
         draggedItemId: id,
@@ -1496,6 +1529,7 @@ React.useEffect(() => {
       rsDragLockRef.current = null;
 
       if (type === "speaker") {
+        isDraggingSpeakerRef.current = true;
         const speakerBeingDragged = byId.get(id);
         const canonRole = getCanonicalRole(speakerBeingDragged.role);
         if (canonRole === "SBL" || canonRole === "SBR") {
@@ -1503,6 +1537,15 @@ React.useEffect(() => {
         }
         if (canonRole === "LW" || canonRole === "RW") {
           isDraggingFW.current = true;
+        }
+        
+        // Capture pointer on the target element
+        try {
+          if (e.target && typeof e.target.setPointerCapture === 'function') {
+            e.target.setPointerCapture(e.pointerId);
+          }
+        } catch (err) {
+          // Ignore capture errors
         }
       }
     },
@@ -1557,6 +1600,9 @@ React.useEffect(() => {
 
   // Pan handlers for background rect only
   const onPanPointerDown = useCallback((e) => {
+    // Never pan if dragging a speaker
+    if (isDraggingSpeakerRef.current) return;
+    
     // Only pan when zoomed
     if (zoom <= 1) return;
     
@@ -1804,12 +1850,19 @@ React.useEffect(() => {
       // FC is locked to center, so this block should not apply to it
       if (canonicalRole === 'FC') {
         // Handle FC explicitly to just ensure its X position is centerX_m
-        onSetSpeakers(prev => prev.map(s => {
-          if (s.id === speakerId) {
-            return { ...s, position: { ...s.position, x: centerX_m } };
-          }
-          return s;
-        }));
+        const rawRoomPos = canvasToRoom(newCanvasPos);
+        const currentY = spk.position?.y ?? rawRoomPos.y;
+        const newY = rawRoomPos.y;
+        
+        // Only update if meaningful movement
+        if (Math.abs(newY - currentY) > 0.001) {
+          onSetSpeakers(prev => prev.map(s => {
+            if (s.id === speakerId) {
+              return { ...s, position: { ...s.position, x: centerX_m, y: newY } };
+            }
+            return s;
+          }));
+        }
       } else { // FL or FR
         if (!constraintZones?.FL || !constraintZones?.FR) {
           return;
@@ -1827,6 +1880,16 @@ React.useEffect(() => {
           rightZone: constraintZones.FR.clamp,
         });
 
+        // Only update if meaningful movement
+        const flSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FL');
+        const frSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'FR');
+        
+        const needsUpdate = 
+          (flSpeaker && Math.abs((flSpeaker.position?.x ?? 0) - finalLeftX) > 0.001) ||
+          (frSpeaker && Math.abs((frSpeaker.position?.x ?? 0) - finalRightX) > 0.001);
+        
+        if (!needsUpdate) return;
+        
         // Apply positions
         console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
         onSetSpeakers(prev => {
@@ -2470,19 +2533,25 @@ React.useEffect(() => {
     }
 
     // Generic fallback for any other speakers
-    console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
-    onSetSpeakers(prev => {
-      let updated = prev.map(s => {
-        if (s.id === speakerId) {
-          return { ...s, position: { ...s.position, x: rawX, y: rawY } };
-        }
-        return s;
+    const currentX = spk.position?.x ?? 0;
+    const currentY = spk.position?.y ?? 0;
+    
+    // Only update if meaningful movement
+    if (Math.abs(rawX - currentX) > 0.001 || Math.abs(rawY - currentY) > 0.001) {
+      console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+      onSetSpeakers(prev => {
+        let updated = prev.map(s => {
+          if (s.id === speakerId) {
+            return { ...s, position: { ...s.position, x: rawX, y: rawY } };
+          }
+          return s;
+        });
+        return updated;
       });
-      return updated;
-    });
+    }
     lastInteractionEpoch.current = timeNowMs();
     console.log("[DRAG] STOP: generic fallback complete");
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, dolbyLayout]);
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, dolbyLayout, placedSpeakers]);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
@@ -2509,6 +2578,16 @@ React.useEffect(() => {
     if (!ctm) return;
     const inverseCTM = ctm.inverse();
     const svgPoint = point.matrixTransform(inverseCTM);
+    
+    // Convert cursor to room coords and apply stored offset
+    const cursorRoom = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
+    const targetRoomPos = {
+      x: cursorRoom.x + dragOffsetRoomRef.current.x,
+      y: cursorRoom.y + dragOffsetRoomRef.current.y
+    };
+    
+    // Convert back to canvas for existing logic
+    const targetCanvasPos = roomToCanvas(targetRoomPos);
 
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
     console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
@@ -2566,20 +2645,31 @@ React.useEffect(() => {
     }
 
 
-    const clampedCanvasX = Math.max(roomRect.x, Math.min(roomRect.x + roomRect.width, svgPoint.x));
-    const clampedCanvasY = Math.max(roomRect.y, Math.min(roomRect.y + roomRect.height, svgPoint.y));
+    const clampedCanvasX = Math.max(roomRect.x, Math.min(roomRect.x + roomRect.width, targetCanvasPos.x));
+    const clampedCanvasY = Math.max(roomRect.y, Math.min(roomRect.y + roomRect.height, targetCanvasPos.y));
 
     if (dragType === 'speaker') {
       handleSpeakerDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'seat') {
       handleSeatDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     }
-  }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, roomToCanvas]);
+  }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, roomToCanvas, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, dragOffsetRoomRef]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback((e) => {
     // Signal to RoomDesigner that dragging ended
     if (props.isDraggingRef) {
       props.isDraggingRef.current = false;
+    }
+    
+    // Release pointer capture
+    if (dragType === 'speaker' && e?.target) {
+      try {
+        if (typeof e.target.releasePointerCapture === 'function' && e.pointerId) {
+          e.target.releasePointerCapture(e.pointerId);
+        }
+      } catch (err) {
+        // Ignore release errors
+      }
     }
 
     // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
@@ -2651,8 +2741,10 @@ React.useEffect(() => {
     rsDragLockRef.current = null;
     isDraggingRearRef.current = 0;
     isDraggingFW.current = false;
+    isDraggingSpeakerRef.current = false;
+    dragOffsetRoomRef.current = { x: 0, y: 0 };
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, props.isDraggingRef]);
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
