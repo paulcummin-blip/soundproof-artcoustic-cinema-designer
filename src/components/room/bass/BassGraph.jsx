@@ -72,40 +72,16 @@ export default function BassGraph({ responseData, schroederFrequency, rp22Levels
                             strokeDasharray="4 4" 
                             label={{ 
                                 value: 'Schroeder', 
-                                position: 'top', 
+                                position: 'insideTopRight', 
                                 fill: '#4A230F', 
                                 className: 'font-body text-xs',
-                                offset: 5
+                                offset: 10,
+                                style: { textAnchor: 'end' }
                             }} 
                         />
                     )}
 
-                    <ReferenceLine 
-                        x={crossoverFrequency} 
-                        stroke="#1d4ed8" 
-                        strokeDasharray="4 4" 
-                        label={{ 
-                            value: 'Crossover', 
-                            position: 'top', 
-                            fill: '#1d4ed8', 
-                            className: 'font-body text-xs',
-                            offset: 5
-                        }} 
-                    />
-                    <ReferenceLine 
-                        x={120} 
-                        stroke="#7e22ce" 
-                        strokeDasharray="4 4" 
-                        label={{ 
-                            value: 'LFE Limit', 
-                            position: 'top', 
-                            fill: '#7e22ce', 
-                            className: 'font-body text-xs',
-                            offset: 5
-                        }} 
-                    />
-
-                    <Line type="monotone" dataKey="spl" stroke="#213428" strokeWidth={2} dot={false} name="Combined Response" />
+                    <Line type="monotone" dataKey="spl" stroke="#213428" strokeWidth={2} dot={false} />
                 </LineChart>
             </ResponsiveContainer>
         </div>
