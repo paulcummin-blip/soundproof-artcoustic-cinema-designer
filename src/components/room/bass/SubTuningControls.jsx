@@ -5,32 +5,41 @@ import { Slider } from "@/components/ui/slider";
 
 export default function SubTuningControls({ 
   subsCfg, 
-  onTuningChange, 
+  onSettingsChange, 
   groupLabel = "Front" 
 }) {
   const count = subsCfg?.count || 0;
-  const tuning = subsCfg?.tuning || [];
+  const settingsById = subsCfg?.settingsById || {};
   
   if (count === 0) return null;
   
-  const updateTuning = (index, field, value) => {
-    const newTuning = [...tuning];
-    while (newTuning.length <= index) {
-      newTuning.push({ gainDb: 0, delayMs: 0, polarity: 0 });
-    }
-    newTuning[index] = { ...newTuning[index], [field]: value };
-    onTuningChange(newTuning);
+  // Determine sub IDs based on group and count
+  const prefix = groupLabel.toLowerCase();
+  const subIds = count === 1 ? [`${prefix}-sub-left`] : [`${prefix}-sub-left`, `${prefix}-sub-right`];
+  
+  const updateSettings = (subId, field, value) => {
+    const newSettings = {
+      ...settingsById,
+      [subId]: {
+        gainDb: 0,
+        delayMs: 0,
+        polarity: 'normal',
+        ...settingsById[subId],
+        [field]: value
+      }
+    };
+    onSettingsChange(newSettings);
   };
   
   const labels = count === 1 ? ["Single"] : ["Left", "Right"];
   
   return (
     <div className="space-y-4">
-      {Array.from({ length: count }).map((_, i) => {
-        const t = tuning[i] || { gainDb: 0, delayMs: 0, polarity: 0 };
+      {subIds.map((subId, i) => {
+        const settings = settingsById[subId] || { gainDb: 0, delayMs: 0, polarity: 'normal' };
         
         return (
-          <div key={i} className="p-3 rounded-lg border border-[#DCDBD6] bg-white space-y-3">
+          <div key={subId} className="p-3 rounded-lg border border-[#DCDBD6] bg-white space-y-3">
             <div className="text-sm font-medium text-[#1B1A1A]">
               {groupLabel} Sub {labels[i]}
             </div>
@@ -40,12 +49,12 @@ export default function SubTuningControls({
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-xs text-[#3E4349]">Gain</Label>
                 <span className="text-xs font-mono text-[#1B1A1A]">
-                  {t.gainDb > 0 ? '+' : ''}{t.gainDb.toFixed(1)} dB
+                  {settings.gainDb > 0 ? '+' : ''}{settings.gainDb.toFixed(1)} dB
                 </span>
               </div>
               <Slider
-                value={[t.gainDb]}
-                onValueChange={([v]) => updateTuning(i, 'gainDb', v)}
+                value={[settings.gainDb]}
+                onValueChange={([v]) => updateSettings(subId, 'gainDb', v)}
                 min={-12}
                 max={6}
                 step={0.5}
@@ -58,12 +67,12 @@ export default function SubTuningControls({
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-xs text-[#3E4349]">Delay</Label>
                 <span className="text-xs font-mono text-[#1B1A1A]">
-                  {t.delayMs.toFixed(1)} ms
+                  {settings.delayMs.toFixed(1)} ms
                 </span>
               </div>
               <Slider
-                value={[t.delayMs]}
-                onValueChange={([v]) => updateTuning(i, 'delayMs', v)}
+                value={[settings.delayMs]}
+                onValueChange={([v]) => updateSettings(subId, 'delayMs', v)}
                 min={0}
                 max={20}
                 step={0.1}
@@ -76,11 +85,11 @@ export default function SubTuningControls({
               <Label className="text-xs text-[#3E4349]">Polarity</Label>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-[#3E4349]">
-                  {t.polarity === 180 ? 'Inverted' : 'Normal'}
+                  {settings.polarity === 'invert' ? 'Inverted' : 'Normal'}
                 </span>
                 <Switch
-                  checked={t.polarity === 180}
-                  onCheckedChange={(checked) => updateTuning(i, 'polarity', checked ? 180 : 0)}
+                  checked={settings.polarity === 'invert'}
+                  onCheckedChange={(checked) => updateSettings(subId, 'polarity', checked ? 'invert' : 'normal')}
                 />
               </div>
             </div>

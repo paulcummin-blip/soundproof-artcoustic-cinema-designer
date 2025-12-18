@@ -320,16 +320,24 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         const dbMag = db0 + dbDist + dbPower + dbEq + dbBoundary + dbGain;
         const amplitude = Math.pow(10, dbMag / 20);
         
+        // Guard against non-finite amplitude
+        if (!isFinite(amplitude)) continue;
+        
         // Time-of-flight phase
         let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
         
         // Apply user delay (adds phase lag)
-        phi -= 2 * Math.PI * f * (tuning.delayMs / 1000);
+        const delaySeconds = tuning.delayMs / 1000;
+        const phaseDelayRadians = -2 * Math.PI * f * delaySeconds;
+        phi += phaseDelayRadians;
         
         // Apply polarity (180° phase shift if inverted)
         if (tuning.polarity === 180) {
           phi += Math.PI;
         }
+        
+        // Guard against non-finite phase
+        if (!isFinite(phi)) continue;
         
         // Complex accumulation
         sumReal += amplitude * Math.cos(phi);
