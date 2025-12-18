@@ -1861,8 +1861,7 @@ function RoomDesignerWithState() {
     try {
       const model = _rearSubsCfg?.model;
       const qty = _rearSubsCfg?.count;
-      const savedPositionsById = _rearSubsCfg?.positionsById || {};
-      const savedPositionsArray = _rearSubsCfg?.positions || []; // Legacy fallback
+      const savedPositions = _rearSubsCfg?.positions || [];
       const subsToRender = [];
       const warnings = [];
 
@@ -1892,49 +1891,46 @@ function RoomDesignerWithState() {
       const rightRefX = (FC.position.x + FR.position.x) / 2;
 
       const rearWallY = stableDimensions.length;
-      const EPS = 0.01;
-      const halfDepth = depthM / 2;
-      
-      const centerY = rearWallY - halfDepth - EPS;
-      const zCenter = 0.05 + (heightM / 2);
+      const wallBuffer = 0.02;
+      const floorBuffer = 0.05;
+      const sideBuffer = 0.05;
+
+      const centerY = rearWallY - wallBuffer - (depthM / 2);
+      const zCenter = floorBuffer + (heightM / 2);
       
       const checkFit = (xPos) => {
-          const halfW = widthM / 2;
-          return (xPos - halfW - EPS) > 0 && (xPos + halfW + EPS) < stableDimensions.width;
+          return (xPos - widthM / 2 - sideBuffer) > 0 && (xPos + widthM / 2 + sideBuffer) < stableDimensions.width;
       };
 
-      // ALWAYS create subs in stable order with stable IDs
       if (qty >= 1) {
-        const id = 'rear-sub-left';
         const defaultXPos = leftRefX;
-        const userPos = savedPositionsById[id] || savedPositionsArray[0]; // Try new format first, fallback to legacy
+        const userPos = savedPositions[0];
         const xPosLeftSub = userPos?.x ?? defaultXPos;
         
         if (checkFit(xPosLeftSub)) {
           subsToRender.push({
-            id, role: 'SUB', model,
+            id: 'rear-sub-left', role: 'SUB', model,
             position: { x: xPosLeftSub, y: centerY, z: zCenter },
             dims_m: { w: widthM, h: heightM, d: depthM },
           });
         } else {
-          warnings.push("Rear left sub doesn't fit in the allocated space.");
+          warnings.push("Rear subwoofer doesn't fit in the allocated space.");
         }
       }
       
       if (qty >= 2) {
-        const id = 'rear-sub-right';
         const defaultXPos = rightRefX;
-        const userPos = savedPositionsById[id] || savedPositionsArray[1]; // Try new format first, fallback to legacy
+        const userPos = savedPositions[1];
         const xPosRightSub = userPos?.x ?? defaultXPos;
         
         if (checkFit(xPosRightSub)) {
           subsToRender.push({
-            id, role: 'SUB', model,
+            id: 'rear-sub-right', role: 'SUB', model,
             position: { x: xPosRightSub, y: centerY, z: zCenter },
             dims_m: { w: widthM, h: heightM, d: depthM },
           });
         } else {
-          warnings.push("Rear right sub doesn't fit in the allocated space.");
+          warnings.push("Rear subwoofer doesn't fit in the allocated space.");
         }
       }
 
@@ -1946,7 +1942,7 @@ function RoomDesignerWithState() {
       setSubWarnings(prev => ({ ...prev, rear: ["Error calculating position."] }));
       return [];
     }
-  }, [_rearSubsCfg?.model, _rearSubsCfg?.count, _rearSubsCfg?.positionsById, _rearSubsCfg?.positions, placedSpeakers, stableDimensions.width, stableDimensions.length, setSubWarnings]);
+  }, [_rearSubsCfg?.model, _rearSubsCfg?.count, _rearSubsCfg?.positions, placedSpeakers, stableDimensions.width, stableDimensions.length, setSubWarnings]);
 
   // NEW: Calculate live room price total
   const priceData = usePriceCalculation({

@@ -391,25 +391,11 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   } = props;
 
   const appState = useAppState();
-  
-  // [B44] DIMENSIONS SAFETY — normalize and validate room dimensions
   const widthM  = Number(appState?.roomDims?.widthM)  || 4.5;
   const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
   const heightM = Number(appState?.roomDims?.heightM) || 2.4;
-  const dimsOk = Number.isFinite(widthM) && Number.isFinite(lengthM) && widthM > 0 && lengthM > 0;
-  
   const screenFrontPlaneM = Number(appState?.screenFrontPlaneM ?? 0);
   const getSpeakerVisibility = appState?.getSpeakerVisibility || (() => true);
-  
-  // REMOVE AFTER FIX CONFIRMED
-  if (typeof console !== 'undefined' && Math.random() < 0.1) {
-    console.log('[B44] DIMENSIONS CHECK', {
-      raw_roomDims: appState?.roomDims,
-      widthM,
-      lengthM,
-      dimsOk,
-    });
-  }
 
   const speakersEpoch = appState?.speakersEpoch || 0;
   const enableFrontWides = appState?.enableFrontWides || false;
@@ -562,7 +548,6 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const hudDragRef = useRef(null);
   const hudElRef = useRef(null);
   const isHudPinned = Boolean(hudPinnedSeatId);
-  const draggedSubLastPosRef = useRef({});
 
   useEffect(() => {
     const onKey = (e) => {
@@ -805,22 +790,18 @@ const byId = useMemo(() => {
     if (seat.id) map.set(seat.id, seat);
   });
 
-  // Index subwoofers - ALWAYS use their ID from the sub object (never generate)
-  (frontSubs || []).forEach((sub) => {
-    if (!sub || !sub.id) return;
-    map.set(sub.id, { ...sub, _subType: 'front' });
+  // Index subwoofers
+  (frontSubs || []).forEach((sub, idx) => {
+    if (!sub) return;
+    const id = sub.id || `front-sub-${idx}`;
+    map.set(id, { ...sub, _subType: 'front' });
   });
   
-  (rearSubs || []).forEach((sub) => {
-    if (!sub || !sub.id) return;
-    map.set(sub.id, { ...sub, _subType: 'rear' });
+  (rearSubs || []).forEach((sub, idx) => {
+    if (!sub) return;
+    const id = sub.id || `rear-sub-${idx}`;
+    map.set(id, { ...sub, _subType: 'rear' });
   });
-  
-  // REMOVE AFTER FIX CONFIRMED
-  const rearSubIds = (rearSubs || []).map(s => s?.id).filter(Boolean);
-  if (rearSubIds.length > 0 && Math.random() < 0.1) {
-    console.log('[B44] byId rear subs indexed:', rearSubIds);
-  }
 
   return map;
 }, [placedSpeakers, seatingPositions, frontSubs, rearSubs]);
@@ -2733,136 +2714,77 @@ React.useEffect(() => {
   }, [onSetSeatingPositions, canvasToRoom]);
 
   const handleSubDrag = useCallback((subId, newCanvasPos) => {
-    // [B44] Determine front/rear PURELY from ID prefix (no lookup, no stale props)
-    const isFront = String(subId).startsWith('front-');
-    const isRear = String(subId).startsWith('rear-');
+    const sub = byId.get(subId);
+    if (!sub) return;
     
-    if (!isFront && !isRear) {
-      console.warn('[SUB DRAG] Aborting: unknown sub ID format', { subId });
-      return;
-    }
+    const subType = draggedSubTypeRef.current || sub._subType;
+    const setter = subType === 'front' ? onSetFrontSubs : onSetRearSubs;
+    const subsList = subType === 'front' ? frontSubs : rearSubs;
+    if (!setter || !subsList) return;
     
-    const setter = isFront ? onSetFrontSubs : onSetRearSubs;
-    if (!setter) return;
-    
-    // [B44] CRITICAL: Abort if room dimensions are invalid
-    if (!dimsOk) {
-      console.warn('[SUB DRAG] Aborting: invalid room dimensions', { widthM, lengthM, dimsOk });
-      return;
-    }
+    const wall = draggedSubWallRef.current;
+    if (!wall) return;
     
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
-    if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) {
-      console.warn('[SUB DRAG] Aborting: invalid canvas coords', { rawX, rawY });
-      return;
-    }
     
-    // Safe dimension extraction - use config model
-    const cfg = isFront ? frontSubs : rearSubs;
-    const subModel = cfg?.model || 'SUB2-12';
-    
-    const EPS = 0.01; // 1cm safety margin
-    const dims = getModelDimsM(subModel) || {};
-    const w = Number.isFinite(dims.widthM) ? dims.widthM : 0.50;
-    const d = Number.isFinite(dims.depthM) ? dims.depthM : 0.30;
+    const dims = getModelDimsM(sub.model);
+    const w = dims.widthM || 0.5;
+    const d = dims.depthM || 0.25;
     const halfW = w / 2;
     const halfD = d / 2;
+    const EPS = 0.001;
     
-    // Room bounds in metres
-    const minX = halfW + EPS;
-    const maxX = widthM - halfW - EPS;
-    const pinnedFrontY = halfD + EPS;
-    const pinnedRearY = lengthM - halfD - EPS;
+    let finalX = rawX;
+    let finalY = rawY;
     
-    // Abort if room too small for sub
-    if (maxX <= minX) {
-      console.warn('[SUB DRAG] Aborting: room too small for sub', { widthM, minX, maxX });
-      return;
+    // Pin to wall using center-safe positioning (account for sub depth/width)
+    if (wall === 'front') {
+      finalY = halfD + EPS;
+      finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, rawX));
+    } else if (wall === 'rear') {
+      finalY = lengthM - halfD - EPS;
+      finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, rawX));
+    } else if (wall === 'left') {
+      finalX = halfW + EPS;
+      finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
+    } else if (wall === 'right') {
+      finalX = widthM - halfW - EPS;
+      finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
     }
     
-    // Determine pinned Y for this wall
-    const pinnedY = isFront ? pinnedFrontY : pinnedRearY;
+    const currentX = sub.position?.x ?? 0;
+    const currentY = sub.position?.y ?? 0;
     
-    // Check if pair mode (count === 2)
-    const count = cfg?.count || 0;
-    const pairMode = count === 2;
-    
-    // Store last known position for drag continuity
-    draggedSubLastPosRef.current[subId] = { x: rawX, y: rawY };
-    
-    setter(prev => {
-      // [B44] Guard against invalid prev state
-      if (!prev || typeof prev !== 'object') {
-        console.warn('[SUB DRAG] Aborting: invalid prev state', prev);
-        return prev;
-      }
+    // Only update if meaningful movement
+    if (Math.abs(finalX - currentX) > 0.001 || Math.abs(finalY - currentY) > 0.001) {
+      const pairMode = subsList.length === 2;
       
-      // [B44] Build complete positionsById atomically
-      const nextPositionsById = { ...(prev?.positionsById || {}) };
-      
-      if (pairMode) {
-        // [B44] Pair-safe mirror drag: offset-from-center with double-clamp
-        const centerX = widthM / 2;
+      setter(prev => {
+        const positions = prev?.positions || [];
+        const subIndex = subId === 'front-sub-left' || subId === 'rear-sub-left' ? 0 : 1;
         
-        // Calculate offset from centerline for the dragged sub
-        const draggedOffset = Math.abs(rawX - centerX);
+        // Initialize array with correct length if needed
+        const updatedPositions = positions.length >= 2 ? [...positions] : [null, null];
         
-        // Calculate maximum safe offset (ensures both subs stay inside room)
-        const maxOffset = Math.min(centerX - minX, maxX - centerX);
+        // Always use the wall-locked Y value
+        const wallLockedY = finalY;
         
-        // Clamp offset to safe range
-        const safeOffset = Math.max(0, Math.min(maxOffset, draggedOffset));
+        // Update dragged sub
+        updatedPositions[subIndex] = { x: finalX, y: wallLockedY };
         
-        // Apply symmetric positions
-        let xLeft = centerX - safeOffset;
-        let xRight = centerX + safeOffset;
-        
-        // [B44] CRITICAL: Clamp BOTH positions after mirroring
-        xLeft = Math.max(minX, Math.min(maxX, xLeft));
-        xRight = Math.max(minX, Math.min(maxX, xRight));
-        
-        if (!Number.isFinite(xLeft) || !Number.isFinite(xRight)) {
-          console.warn('[SUB DRAG] Aborting: non-finite symmetric positions', { xLeft, xRight });
-          return prev;
+        // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
+        if (pairMode) {
+          const otherIndex = subIndex === 0 ? 1 : 0;
+          const mirrorX = widthM - finalX;
+          const clampedMirrorX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, mirrorX));
+          // CRITICAL: mirrored sub must use same wall-locked Y
+          updatedPositions[otherIndex] = { x: clampedMirrorX, y: wallLockedY };
         }
         
-        // [B44] Ensure BOTH IDs exist in the map (no transient missing keys)
-        const prefix = isFront ? 'front-sub' : 'rear-sub';
-        const leftId = `${prefix}-left`;
-        const rightId = `${prefix}-right`;
-        
-        // Initialize missing IDs with safe defaults if needed
-        if (!nextPositionsById[leftId]) {
-          nextPositionsById[leftId] = { x: xLeft, y: pinnedY };
-        }
-        if (!nextPositionsById[rightId]) {
-          nextPositionsById[rightId] = { x: xRight, y: pinnedY };
-        }
-        
-        // Update both positions atomically
-        nextPositionsById[leftId] = { x: xLeft, y: pinnedY };
-        nextPositionsById[rightId] = { x: xRight, y: pinnedY };
-      } else {
-        // [B44] Single sub mode: clamp once, write once
-        const clampedX = Math.max(minX, Math.min(maxX, rawX));
-        
-        if (!Number.isFinite(clampedX)) {
-          console.warn('[SUB DRAG] Aborting: non-finite position', { clampedX });
-          return prev;
-        }
-        
-        // Initialize if missing
-        if (!nextPositionsById[subId]) {
-          nextPositionsById[subId] = { x: clampedX, y: pinnedY };
-        }
-        
-        // Update position
-        nextPositionsById[subId] = { x: clampedX, y: pinnedY };
-      }
-      
-      return { ...prev, positionsById: nextPositionsById };
-    });
-  }, [canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM, dimsOk]);
+        return { ...prev, positions: updatedPositions };
+      });
+    }
+  }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM]);
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
@@ -2893,32 +2815,6 @@ React.useEffect(() => {
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
     console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
 
-    // [B44] Robust fallback lookup for subs (prevents disappearance bug)
-    if (dragType === 'sub') {
-      let subFound = byId.get(draggedItemId);
-      
-      // Fallback 1: Search in appropriate sub list
-      if (!subFound) {
-        const isFront = String(draggedItemId).startsWith('front-');
-        const isRear = String(draggedItemId).startsWith('rear-');
-        const searchList = isFront ? frontSubs : isRear ? rearSubs : [];
-        subFound = (searchList || []).find(s => s?.id === draggedItemId);
-      }
-      
-      // Fallback 2: Use last known position from ref
-      if (!subFound && draggedSubLastPosRef.current[draggedItemId]) {
-        subFound = {
-          id: draggedItemId,
-          position: draggedSubLastPosRef.current[draggedItemId],
-          _fallback: true
-        };
-      }
-      
-      if (!subFound) {
-        console.warn('[SUB DRAG] Could not locate sub, continuing with last position', { draggedItemId });
-      }
-    }
-    
     if (dragType === 'speaker' && speaker) {
       const canonicalRole = getCanonicalRole(speaker.role);
 
