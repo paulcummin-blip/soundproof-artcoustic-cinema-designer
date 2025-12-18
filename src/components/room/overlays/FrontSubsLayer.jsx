@@ -16,11 +16,12 @@ const FrontSubsLayer = React.memo(function FrontSubsLayer({
   toPx,
   getModelDimsM,
   scale,
+  onSubPointerDown,
 }) {
   if (!Array.isArray(frontSubs) || frontSubs.length === 0) return null;
 
   return (
-    <g data-layer="front-subs" pointerEvents="none">
+    <g data-layer="front-subs">
       {frontSubs.map((sub, idx) => {
         const pos = sub?.position;
         if (!pos || !Number.isFinite(pos.x) || !Number.isFinite(pos.y)) return null;
@@ -32,10 +33,11 @@ const FrontSubsLayer = React.memo(function FrontSubsLayer({
         const [cx, cy] = toPx(pos.x, pos.y);
         const w = wM * scale;
         const d = dM * scale;
+        const subId = sub.id || `front-sub-${idx}`;
 
         return (
           <rect
-            key={sub.id || `front-sub-${idx}`}
+            key={subId}
             x={cx - w / 2}
             y={cy - d / 2}
             width={w}
@@ -45,6 +47,9 @@ const FrontSubsLayer = React.memo(function FrontSubsLayer({
             fill="#1a1a1a"
             stroke="none"
             strokeWidth={0}
+            style={{ cursor: 'grab' }}
+            pointerEvents="auto"
+            onPointerDown={(e) => onSubPointerDown?.(e, subId)}
           />
         );
       })}

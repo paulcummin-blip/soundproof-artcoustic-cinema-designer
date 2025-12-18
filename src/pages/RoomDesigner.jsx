@@ -3399,6 +3399,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   screen={_screen}
                   onSetSpeakers={setSpeakers}
                   onSetSeatingPositions={appState?.setSeatingPositions}
+                  onSetFrontSubs={appState?.setFrontSubsCfg}
+                  onSetRearSubs={appState?.setRearSubsCfg}
                   overlays={overlaysForRendering}
                   roomElements={_roomElements}
                   dolbyLayout={dolbyPreset}

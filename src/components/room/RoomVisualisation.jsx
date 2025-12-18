@@ -5958,13 +5958,14 @@ return (
             })()}
 
 
-            {/* Layer 8: Subwoofers (generally non-draggable, but present) */}
+            {/* Layer 8: Subwoofers */}
             {Array.isArray(frontSubs) && frontSubs.length > 0 && (
               <FrontSubsLayer
                 frontSubs={frontSubs}
                 toPx={toPx}
                 getModelDimsM={getModelDimsM}
                 scale={scale}
+                onSubPointerDown={(e, id) => handleMouseDown(e, id, 'sub')}
               />
             )}
             {renderSubwoofers()}
