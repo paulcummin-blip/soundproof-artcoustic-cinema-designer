@@ -24,6 +24,22 @@ export function buildBassFrequencyBins(curvePoints) {
   return [...new Set(frequencies)].sort((a, b) => a - b);
 }
 
+// Generate target curve for bass (flat through 20-80 Hz, gentle roll-off above)
+export function generateTargetCurve(freqsHz) {
+  if (!Array.isArray(freqsHz) || freqsHz.length === 0) {
+    return [];
+  }
+  
+  return freqsHz.map(f => {
+    if (f <= 80) {
+      return 0; // Flat reference
+    }
+    // Gentle roll-off above 80 Hz: -6 dB by 200 Hz
+    const slope = -6 / (200 - 80);
+    return slope * (f - 80);
+  });
+}
+
 // Linear interpolation between curve points
 export function interpolateCurveDb(curvePoints, hz) {
   if (!Array.isArray(curvePoints) || curvePoints.length === 0) {
@@ -381,8 +397,8 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
   const rt60 = 0.4; // default RT60 estimate
   const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
   
-  // Target curve (flat 0 dB reference for now)
-  const targetDb = freqsHz.map(() => 0);
+  // Generate target curve
+  const targetDb = generateTargetCurve(freqsHz);
   
   // Compute RP22 metrics using new helpers
   const p14Result = computeP14MaxLfeSpl({ freqsHz, splDb, band: [20, 80] });
@@ -408,6 +424,31 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
   };
   
   const band20_80 = getBandIndices(20, 80);
+  const band45_70 = getBandIndices(45, 70);
+  
+  // Seat-to-seat uniformity (20-80 Hz)
+  const uniformityPerFreq = band20_80.map(freqIdx => {
+    const splAtFreq = seatIds.map(id => seatResponses[id].splDb[freqIdx]);
+    const mean = splAtFreq.reduce((a, b) => a + b, 0) / splAtFreq.length;
+    const variance = splAtFreq.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / splAtFreq.length;
+    return Math.sqrt(variance);
+  });
+  
+  const uniformitySdDb_20_80 = uniformityPerFreq.length > 0 
+    ? uniformityPerFreq.reduce((a, b) => a + b, 0) / uniformityPerFreq.length 
+    : 0;
+  
+  // Mid-bass uniformity (45-70 Hz) for warnings
+  const midBassUniformity = band45_70.map(freqIdx => {
+    const splAtFreq = seatIds.map(id => seatResponses[id].splDb[freqIdx]);
+    const mean = splAtFreq.reduce((a, b) => a + b, 0) / splAtFreq.length;
+    const variance = splAtFreq.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / splAtFreq.length;
+    return Math.sqrt(variance);
+  });
+  
+  const midBassUniformitySd = midBassUniformity.length > 0
+    ? midBassUniformity.reduce((a, b) => a + b, 0) / midBassUniformity.length
+    : 0;
   
   // Designer Fairness Metrics (separate from RP22 parameters)
   // Calculate seat-to-seat variance for fairness scoring
@@ -462,6 +503,52 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
   // Check for tuning warnings
   const tuningWarnings = checkTuningWarnings(subs);
   
+  // Designer warnings
+  const designerWarnings = [];
+  
+  // 1. Clustered layout detection
+  if (subs.length > 1 && seats.length > 1) {
+    let hasCluster = false;
+    for (let i = 0; i < subs.length; i++) {
+      for (let j = i + 1; j < subs.length; j++) {
+        const dx = subs[i].x - subs[j].x;
+        const dy = subs[i].y - subs[j].y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < 1.0) {
+          hasCluster = true;
+          break;
+        }
+      }
+      if (hasCluster) break;
+    }
+    
+    if (hasCluster) {
+      designerWarnings.push({
+        type: 'clustered_layout',
+        severity: 'warning',
+        message: 'Clustered subwoofer layout detected — maximises SPL at one point but increases modal imbalance across seats. Consider distributing subs (front/back or left/right) for better uniformity.'
+      });
+    }
+  }
+  
+  // 2. Great extension but poor mid-bass integrity
+  if (p18Result.f3Hz && p18Result.f3Hz < 22 && midBassUniformitySd > 4) {
+    designerWarnings.push({
+      type: 'extension_vs_integrity',
+      severity: 'caution',
+      message: `Deep extension (${p18Result.f3Hz.toFixed(0)} Hz) but high mid-bass variance (±${midBassUniformitySd.toFixed(1)} dB in 45–70 Hz). Infrasonic output won't compensate for uneven mid-bass — consider repositioning subs for better 45–70 Hz control.`
+    });
+  }
+  
+  // 3. P19 deviation too high below Schroeder
+  if (p19Result.resultDb && p19Result.resultDb > 4) {
+    designerWarnings.push({
+      type: 'high_p19_deviation',
+      severity: 'warning',
+      message: `High frequency response ripple below Schroeder (±${p19Result.resultDb.toFixed(1)} dB). Modal interference is causing uneven response at RSP. Try sub repositioning or add/adjust tuning (polarity, delay) to smooth the response.`
+    });
+  }
+  
   return {
     p14: { 
       maxSplDb: p14Result.maxSplDb ?? 0,
@@ -475,6 +562,10 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
       maxDeviationDb: p19Result.resultDb ?? 0,
       details: p19Result.details
     },
+    uniformity: {
+      sdDb_20_80: uniformitySdDb_20_80,
+      midBassUniformitySd
+    },
     fairness: {
       score: Math.round(fairnessScore),
       seatToSeatStdDevDb: p14AvgStdDevDb,
@@ -487,6 +578,9 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
         worstNullDb
       }
     },
-    tuningWarnings
+    targetDb,
+    schroederHz,
+    tuningWarnings,
+    designerWarnings
   };
 }

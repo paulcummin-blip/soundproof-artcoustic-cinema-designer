@@ -272,7 +272,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
       {/* RP22 Bass Metrics */}
       {simulationResults.metrics && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-4 gap-3">
           <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
             <div className="text-xs text-[#3E4349] mb-1">P14 Max SPL</div>
             <div className="text-lg font-bold text-[#1B1A1A]">
@@ -291,6 +291,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               ±{simulationResults.metrics.p19.maxDeviationDb.toFixed(1)} dB
             </div>
           </div>
+          <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
+            <div className="text-xs text-[#3E4349] mb-1">Bass Uniformity</div>
+            <div className="text-lg font-bold text-[#1B1A1A]">
+              ±{simulationResults.metrics.uniformity.sdDb_20_80.toFixed(1)} dB
+            </div>
+            <div className="text-xs text-[#3E4349] mt-1">20–80 Hz</div>
+          </div>
+        </div>
+      )}
+      
+      {/* Designer Warnings */}
+      {simulationResults.metrics?.designerWarnings && simulationResults.metrics.designerWarnings.length > 0 && (
+        <div className="space-y-2">
+          {simulationResults.metrics.designerWarnings.map((warning, i) => (
+            <Alert 
+              key={i} 
+              className={`border ${
+                warning.severity === 'warning' 
+                  ? 'border-[#C1B6AD] bg-[#F8F8F7]' 
+                  : 'border-[#DCDBD6] bg-[#F9F9F6]'
+              } text-[#3E4349]`}
+            >
+              <AlertDescription className="text-sm">
+                <strong>{warning.severity === 'warning' ? '⚠️ Warning' : '💡 Note'}:</strong> {warning.message}
+              </AlertDescription>
+            </Alert>
+          ))}
         </div>
       )}
 
