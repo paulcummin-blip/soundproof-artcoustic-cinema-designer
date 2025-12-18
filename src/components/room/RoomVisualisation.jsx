@@ -1604,7 +1604,7 @@ React.useEffect(() => {
         }
       }
     },
-    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, detectSubWall, widthM, lengthM]
+    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef]
   );
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
