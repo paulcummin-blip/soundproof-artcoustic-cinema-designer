@@ -129,6 +129,23 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
 }) {
   const { model, role, id } = speaker || {};
   
+  // Wrap drag handler to capture pointer and stop propagation
+  const wrappedDragHandler = React.useCallback((e) => {
+    if (!speakerMouseDownHandler) return;
+    
+    e.stopPropagation();
+    e.preventDefault();
+    
+    // Capture pointer for this speaker drag
+    if (e.pointerId != null && e.currentTarget?.setPointerCapture) {
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch (_) {}
+    }
+    
+    speakerMouseDownHandler(e);
+  }, [speakerMouseDownHandler]);
+  
   // Get speaker metadata from registry
   const modelMeta = getSpeakerModelMeta(model);
   
@@ -156,8 +173,9 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
     return (
       <g
         data-speaker-hit="true"
+        data-speaker-id={id}
         pointerEvents="all"
-        onMouseDown={speakerMouseDownHandler}
+        onPointerDown={wrappedDragHandler}
         onMouseEnter={() =>
           setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
         }
@@ -187,9 +205,10 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   return (
     <g
       data-speaker-hit="true"
+      data-speaker-id={id}
       transform={transform}
       pointerEvents="all"
-      onMouseDown={speakerMouseDownHandler}
+      onPointerDown={wrappedDragHandler}
       onMouseEnter={() =>
         setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
       }

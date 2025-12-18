@@ -1462,6 +1462,13 @@ React.useEffect(() => {
     (e, id, type) => {
       e.preventDefault();
       e.stopPropagation();
+      
+      // Capture pointer for speaker drag (prevents pan from stealing)
+      if (type === "speaker" && e.pointerId != null && e.currentTarget?.setPointerCapture) {
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch (_) {}
+      }
 
       const target = byId.get(id);
       if (!target) return;
@@ -1577,22 +1584,13 @@ React.useEffect(() => {
     }
   }, []);
 
-  // Handle pan start (Pointer Events)
+  // Handle pan start (Pointer Events) - ONLY on dedicated background rect
   const handlePanStart = useCallback((e) => {
     // Only allow panning when zoomed in
     if (zoom <= 1.0) return;
     
-    // Don't pan if clicking on speakers or UI controls
-    if (e.target.closest?.('[data-speaker-hit="true"], button, input, select, textarea')) return;
-    
-    // Don't pan if clicking on draggable seats
-    if (e.target.tagName === 'ellipse') return;
-    
-    // Only pan on background elements
-    const isBackground = e.target.tagName === 'rect' || e.target.tagName === 'line' || 
-                        e.target.tagName === 'svg' || e.target.tagName === 'g';
-    
-    if (!isBackground) return;
+    // Hard guard: ONLY start pan on the dedicated background rect
+    if (e.target?.dataset?.panBg !== 'true') return;
     
     e.preventDefault();
     e.stopPropagation();
@@ -2687,6 +2685,19 @@ React.useEffect(() => {
     rsDragLockRef.current = null;
     isDraggingRearRef.current = 0;
     isDraggingFW.current = false;
+    
+    // Release pointer capture for speaker drag
+    if (dragType === 'speaker' && draggedItemId) {
+      const speakerEl = document.querySelector(`[data-speaker-id="${draggedItemId}"]`);
+      if (speakerEl && speakerEl.releasePointerCapture) {
+        try {
+          // Try to release all active captures
+          for (let i = 0; i < 10; i++) {
+            try { speakerEl.releasePointerCapture(i); } catch (_) {}
+          }
+        } catch (_) {}
+      }
+    }
 
   }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW]);
 
@@ -5377,11 +5388,6 @@ return (
       }
     }}
     onClick={handlePlanClick}
-    onPointerDown={handlePanStart}
-    onPointerMove={handlePanMove}
-    onPointerUp={endPan}
-    onPointerCancel={endPan}
-    onPointerLeave={endPan}
   >
     {/* Reset View Button (only when zoomed/panned) */}
     {(zoom > 1.0 || panX !== 0 || panY !== 0) && (
@@ -5428,6 +5434,10 @@ return (
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
+        onPointerMove={handlePanMove}
+        onPointerUp={endPan}
+        onPointerCancel={endPan}
+        onPointerLeave={endPan}
       >
 <SvgDefs ids={ids} scale={scale} svgW={svgW} svgH={svgH} />
 
@@ -5438,8 +5448,20 @@ return (
               clipPath={`url(#${idsClip})`}
               transform={`translate(${panX}, ${panY}) scale(${zoom})`}
           >
+            {/* Layer 0: Pan Background (invisible, handles pan-to-move only) */}
+            <rect
+              data-pan-bg="true"
+              x={0}
+              y={0}
+              width={svgWSafe}
+              height={svgHSafe}
+              fill="transparent"
+              pointerEvents="all"
+              onPointerDown={handlePanStart}
+            />
+
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
-            <g data-layer="grid">
+            <g data-layer="grid" pointerEvents="none">
               {/* Draw vertical grid lines (centre-anchored) */}
               {(() => {
                 const GRID_STEP_M = 0.5;
@@ -5539,6 +5561,7 @@ return (
               fill="none"
               stroke="#DCDBD6"
               strokeWidth={2}
+              pointerEvents="none"
             />
 
             {/* Room Dimensions Overlay */}
