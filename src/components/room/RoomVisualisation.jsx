@@ -2699,12 +2699,6 @@ React.useEffect(() => {
 
   }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, props.isDraggingRef]);
 
-  // Wrapper for SVG pointer up that handles both pan and speaker drag
-  const handleSvgPointerUp = useCallback((e) => {
-    endPan(e);
-    handlePointerUpSpeaker(e);
-  }, [endPan, handlePointerUpSpeaker]);
-
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
     setDraggingRole(null);
@@ -5448,10 +5442,22 @@ return (
           position: 'relative',
           zIndex: 1,
         }}
-        onPointerMove={handleSvgPointerMove}
-        onPointerUp={handleSvgPointerUp}
-        onPointerCancel={handleSvgPointerUp}
-        onPointerLeave={handleSvgPointerUp}
+        onPointerMove={(e) => {
+          handlePanMove(e);
+          handlePointerMoveSpeaker(e);
+        }}
+        onPointerUp={(e) => {
+          endPan(e);
+          handlePointerUpSpeaker(e);
+        }}
+        onPointerCancel={(e) => {
+          endPan(e);
+          handlePointerUpSpeaker(e);
+        }}
+        onPointerLeave={(e) => {
+          endPan(e);
+          handlePointerUpSpeaker(e);
+        }}
       >
 <SvgDefs ids={ids} scale={scale} svgW={svgW} svgH={svgH} />
 
