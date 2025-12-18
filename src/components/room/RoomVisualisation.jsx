@@ -1749,8 +1749,9 @@ React.useEffect(() => {
     // Never pan if event was already handled (sub/speaker drag)
     if (e.defaultPrevented) return;
     
-    // Never pan if dragging a speaker
+    // Never pan if dragging anything
     if (isDraggingSpeakerRef.current) return;
+    if (dragging) return;
     
     // Only pan when zoomed
     if (zoom <= 1) return;
@@ -5289,6 +5290,10 @@ return {
           const { widthM, depthM } = getModelDimsM(sub.model);
           const subId = sub.id || `rear-sub-${i}`;
           
+          const [cx, cy] = toPx(sub.position.x, sub.position.y);
+          const w = widthM * scale;
+          const d = depthM * scale;
+          
           const handlePointerDown = (e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -5323,6 +5328,14 @@ return {
               onPointerUp={handlePointerUp}
               onPointerCancel={handlePointerUp}
             >
+              <rect
+                x={cx - w / 2}
+                y={cy - d / 2}
+                width={w}
+                height={d}
+                fill="transparent"
+                pointerEvents="all"
+              />
               <SpeakerRect
                 speaker={sub}
                 widthM={widthM}
@@ -5712,7 +5725,7 @@ return (
                 width={roomRect.width + 2000}
                 height={roomRect.height + 2000}
                 fill="transparent"
-                pointerEvents="auto"
+                pointerEvents={zoom > 1 ? "auto" : "none"}
                 style={{ 
                   cursor: zoom > 1 ? (isPanningRef.current ? "grabbing" : "grab") : "default" 
                 }}

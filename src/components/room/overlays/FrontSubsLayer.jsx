@@ -78,6 +78,14 @@ const FrontSubsLayer = React.memo(function FrontSubsLayer({
               y={cy - d / 2}
               width={w}
               height={d}
+              fill="transparent"
+              pointerEvents="all"
+            />
+            <rect
+              x={cx - w / 2}
+              y={cy - d / 2}
+              width={w}
+              height={d}
               rx={0}
               ry={0}
               fill="#1a1a1a"
