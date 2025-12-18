@@ -583,6 +583,31 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   // HELPER FUNCTIONS (declare early to avoid TDZ)
   // ---------------------------------------------------------------------------
 
+  // Helper to detect which wall a subwoofer is on
+  const detectSubWall = useCallback((sub, W, L) => {
+    if (!sub?.position) return null;
+    const x = sub.position.x;
+    const y = sub.position.y;
+    const threshold = 0.05;
+    
+    if (Math.abs(y) < threshold) return 'front';
+    if (Math.abs(y - L) < threshold) return 'rear';
+    if (Math.abs(x) < threshold) return 'left';
+    if (Math.abs(x - W) < threshold) return 'right';
+    
+    // Default to closest wall
+    const distFront = y;
+    const distRear = L - y;
+    const distLeft = x;
+    const distRight = W - x;
+    const minDist = Math.min(distFront, distRear, distLeft, distRight);
+    
+    if (minDist === distFront) return 'front';
+    if (minDist === distRear) return 'rear';
+    if (minDist === distLeft) return 'left';
+    return 'right';
+  }, []);
+
   // Clamp helper (keeps HUD within the plan; safe fallback = window)
 const clampHudOffset = useCallback((x, y) => {
   const hud = hudElRef.current;
