@@ -509,10 +509,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [zoom, setZoom] = React.useState(1.0);
   const [panX, setPanX] = React.useState(0);
   const [panY, setPanY] = React.useState(0);
-  const panActiveRef = useRef(false);
-  const panPointerIdRef = useRef(null);
-  const panStartRef = useRef({ x: 0, y: 0 });
-  const panStartOffsetRef = useRef({ x: 0, y: 0 });
   const zoomMode = zoomModeProp;
   const lastPointerRef = useRef({ x: 0, y: 0 });
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
@@ -1458,19 +1454,10 @@ React.useEffect(() => {
   }, [frontWideZones, widthM, lengthM, getModelDimsM, onSetSpeakers, getCanonicalRole]);
 
   // Drag state management
-  const handlePointerDownSpeaker = useCallback(
+  const handleMouseDown = useCallback(
     (e, id, type) => {
-      console.log("SPEAKER DOWN", id);
-      
       e.preventDefault();
       e.stopPropagation();
-      
-      // Capture pointer for speaker drag (prevents pan from stealing)
-      if (e.pointerId != null && e.currentTarget?.setPointerCapture) {
-        try {
-          e.currentTarget.setPointerCapture(e.pointerId);
-        } catch (_) {}
-      }
 
       const target = byId.get(id);
       if (!target) return;
@@ -1520,32 +1507,13 @@ React.useEffect(() => {
   );
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
-  const bedLayerSpeakerPointerDownHandler = useCallback(
-    (e, id) => handlePointerDownSpeaker(e, id, "speaker"),
-    [handlePointerDownSpeaker]
+  const bedLayerSpeakerMouseDownHandler = useCallback(
+    (e, id) => handleMouseDown(e, id, "speaker"),
+    [handleMouseDown]
   );
-
-  // Window-level escape hatch to force end pan
-  useEffect(() => {
-    const forceEndPan = () => {
-      panActiveRef.current = false;
-      panPointerIdRef.current = null;
-    };
-    
-    window.addEventListener('pointerup', forceEndPan);
-    window.addEventListener('blur', forceEndPan);
-    
-    return () => {
-      window.removeEventListener('pointerup', forceEndPan);
-      window.removeEventListener('blur', forceEndPan);
-    };
-  }, []);
 
   // Zoom at point helper
   const zoomAtPoint = useCallback((newZoom, clientX, clientY) => {
-    // Block zoom-on-drag while actively panning
-    if (panActiveRef.current) return;
-    
     if (!planBoundsRef.current) return;
     
     const rect = planBoundsRef.current.getBoundingClientRect();
@@ -1570,68 +1538,6 @@ React.useEffect(() => {
     setPanY(Math.max(minPanY, Math.min(maxPanY, newPanY)));
     setZoom(Math.max(0.5, Math.min(2.0, newZoom)));
   }, [zoom, panX, panY]);
-
-  // End pan helper - called from multiple pointer events
-  const endPan = useCallback((e) => {
-    if (!panActiveRef.current) return;
-    
-    panActiveRef.current = false;
-    panPointerIdRef.current = null;
-    
-    // Release pointer capture (safe - ignore errors)
-    if (e?.currentTarget?.releasePointerCapture && e?.pointerId != null) {
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch (_) {}
-    }
-  }, []);
-
-  // Handle pan start (Pointer Events) - ONLY on dedicated background rect
-  const handlePanStart = useCallback((e) => {
-    console.log("PAN DOWN");
-
-    // Only allow panning when zoomed in
-    if (zoom <= 1.0) return;
-
-    // Hard guard: ONLY start pan on the dedicated background rect
-    if (e.target?.dataset?.panBg !== 'true') return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    
-    panActiveRef.current = true;
-    panPointerIdRef.current = e.pointerId;
-    panStartRef.current = { x: e.clientX, y: e.clientY };
-    panStartOffsetRef.current = { x: panX, y: panY };
-    
-    // Capture pointer to prevent lock
-    if (e.currentTarget?.setPointerCapture) {
-      try {
-        e.currentTarget.setPointerCapture(e.pointerId);
-      } catch (_) {}
-    }
-  }, [zoom, panX, panY]);
-
-  // Handle pan move
-  const handlePanMove = useCallback((e) => {
-    if (!panActiveRef.current) return;
-    if (e.pointerId !== panPointerIdRef.current) return;
-    
-    e.preventDefault();
-    
-    const dx = e.clientX - panStartRef.current.x;
-    const dy = e.clientY - panStartRef.current.y;
-    
-    setPanX(panStartOffsetRef.current.x + dx);
-    setPanY(panStartOffsetRef.current.y + dy);
-  }, []);
-
-  // Reset view to default
-  const handleResetView = useCallback(() => {
-    setPanX(0);
-    setPanY(0);
-    setZoom(1.0);
-  }, []);
 
   // Handle plan click for zoom
   const handlePlanClick = useCallback((e) => {
@@ -2532,8 +2438,8 @@ React.useEffect(() => {
     );
   }, [onSetSeatingPositions, canvasToRoom]);
 
-  // Pointer handling with CTM guard
-  const handlePointerMoveSpeaker = useCallback((e) => {
+  // Mouse handling with CTM guard
+  const handleMouseMove = useCallback((e) => {
     console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
@@ -2614,17 +2520,10 @@ React.useEffect(() => {
     }
   }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, roomToCanvas]);
 
-  const handlePointerUpSpeaker = useCallback((e) => {
+  const handleMouseUp = useCallback(() => {
     // Signal to RoomDesigner that dragging ended
     if (props.isDraggingRef) {
       props.isDraggingRef.current = false;
-    }
-    
-    // Release pointer capture for speaker drag
-    if (draggedItemId && e?.currentTarget?.releasePointerCapture && e?.pointerId != null) {
-      try {
-        e.currentTarget.releasePointerCapture(e.pointerId);
-      } catch (_) {}
     }
 
     // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
@@ -2697,7 +2596,7 @@ React.useEffect(() => {
     isDraggingRearRef.current = 0;
     isDraggingFW.current = false;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, props.isDraggingRef]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW]);
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
@@ -3908,7 +3807,7 @@ useEffect(() => {
               widthM={0.27}
               depthM={0.27}
               scale={scale}
-              speakerMouseDownHandler={(e) => bedLayerSpeakerPointerDownHandler(e, spk.id)}
+              speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id)}
               setHoveredSpeaker={setHoveredSpeaker}
             />
           );
@@ -4981,7 +4880,7 @@ return {
     }
 
     const speakerDragHandler = isDraggable(speaker)
-      ? (e) => bedLayerSpeakerPointerDownHandler(e, id)
+      ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
       : undefined;
 
     // Visual-only yaw: flip sign so icons match the room coordinate system.
@@ -5095,7 +4994,6 @@ return {
           return (
             <ellipse
               key={seat.id}
-              data-speaker-hit="true"
               cx={seatX}
               cy={seatY}
               rx={RX_M * scale}
@@ -5107,19 +5005,7 @@ return {
               strokeDasharray={isPinned ? '4 2' : 'none'}
               style={{ cursor: 'pointer' }}
               aria-label="Seat — hover for RP23 and P1 analysis"
-              onPointerDown={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                
-                // Capture pointer for seat drag
-                if (e.pointerId != null && e.currentTarget?.setPointerCapture) {
-                  try {
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                  } catch (_) {}
-                }
-                
-                handlePointerDownSpeaker(e, seat.id, 'seat');
-              }}
+              onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
               onMouseEnter={() => handleSeatMouseEnter(seat)}
               onMouseLeave={handleSeatMouseLeave}
               onClick={(e) => {
@@ -5383,11 +5269,7 @@ return (
       border: '1px solid #DCDBD6',
       borderRadius: '0px', // Square corners - no rounded edges
       backgroundColor: '#F8F8F7',
-      cursor: panActiveRef.current ? 'grabbing' : 
-              zoomMode === 'in' ? 'zoom-in' : 
-              zoomMode === 'out' ? 'zoom-out' : 
-              zoom > 1.0 ? 'grab' : 'default',
-      touchAction: 'none', // Prevent browser touch gestures during pointer events
+      cursor: zoomMode === 'in' ? 'zoom-in' : zoomMode === 'out' ? 'zoom-out' : 'default',
     }}
     onMouseMove={(e) => {
       // Track pointer position for zoom center
@@ -5400,28 +5282,7 @@ return (
     }}
     onClick={handlePlanClick}
   >
-    {/* Reset View Button (only when zoomed/panned) */}
-    {(zoom > 1.0 || panX !== 0 || panY !== 0) && (
-      <button
-        onClick={handleResetView}
-        style={{
-          position: 'absolute',
-          top: 12,
-          right: 12,
-          padding: '6px 12px',
-          fontSize: 11,
-          fontWeight: 500,
-          borderRadius: 4,
-          border: '1px solid #DCDBD6',
-          background: '#FFFFFF',
-          color: '#3E4349',
-          cursor: 'pointer',
-          zIndex: 10,
-        }}
-      >
-        Reset View
-      </button>
-    )}
+    {/* Toolbar has been moved to the parent component's accordion */}
 
     {/* CANVAS WRAPPER (no tailwind) */}
     <div style={canvasStyle}>
@@ -5442,22 +5303,9 @@ return (
           position: 'relative',
           zIndex: 1,
         }}
-        onPointerMove={(e) => {
-          handlePanMove(e);
-          handlePointerMoveSpeaker(e);
-        }}
-        onPointerUp={(e) => {
-          endPan(e);
-          handlePointerUpSpeaker(e);
-        }}
-        onPointerCancel={(e) => {
-          endPan(e);
-          handlePointerUpSpeaker(e);
-        }}
-        onPointerLeave={(e) => {
-          endPan(e);
-          handlePointerUpSpeaker(e);
-        }}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
       >
 <SvgDefs ids={ids} scale={scale} svgW={svgW} svgH={svgH} />
 
@@ -5468,20 +5316,8 @@ return (
               clipPath={`url(#${idsClip})`}
               transform={`translate(${panX}, ${panY}) scale(${zoom})`}
           >
-            {/* Layer 0: Pan Background (invisible, handles pan-to-move only) */}
-            <rect
-              data-pan-bg="true"
-              x={0}
-              y={0}
-              width={svgWSafe}
-              height={svgHSafe}
-              fill="transparent"
-              pointerEvents="all"
-              onPointerDown={handlePanStart}
-            />
-
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
-            <g data-layer="grid" pointerEvents="none">
+            <g data-layer="grid">
               {/* Draw vertical grid lines (centre-anchored) */}
               {(() => {
                 const GRID_STEP_M = 0.5;
@@ -5581,12 +5417,11 @@ return (
               fill="none"
               stroke="#DCDBD6"
               strokeWidth={2}
-              pointerEvents="none"
             />
 
             {/* Room Dimensions Overlay */}
             {overlaysForRendering?.ROOM_DIMS && (
-              <g data-layer="room-dimensions" pointerEvents="none">
+              <g data-layer="room-dimensions">
                 {/* Arrow markers */}
                 <defs>
                   <marker
@@ -5654,8 +5489,8 @@ return (
 
 
 
-            {/* RP22 Zones Overlay - UNCONDITIONAL MOUNT (non-interactive) */}
-            <g className="rp22-zones-layer" pointerEvents="none" data-overlay="rp22-zones">
+            {/* RP22 Zones Overlay - UNCONDITIONAL MOUNT */}
+            <g className="rp22-zones-layer" pointerEvents="none">
               <RP22ZonesOverlay
                 overlays={overlaysForRendering}
                 zones={augmentedZones}
@@ -5670,25 +5505,21 @@ return (
               />
             </g>
 
-            {/* Layer 5: Other Informational Zone Overlays (all non-interactive) */}
-            <g pointerEvents="none" data-overlay="zones">
-              {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
-              {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
-              {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-              {overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
-              {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
-              {overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
-            </g>
+            {/* Layer 5: Other Informational Zone Overlays */}
+            {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
+            {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
+            {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
+            {overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
+            {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
+            
+            {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
+            {overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
 
-            {/* Layer 6: Static Room Elements (furniture, etc.) - non-interactive */}
-            <g pointerEvents="none" data-layer="room-elements">
-              {renderRoomElements()}
-            </g>
+            {/* Layer 6: Static Room Elements (furniture, etc.) */}
+            {renderRoomElements()}
 
             {/* Layer 7: MLP Marker (Fixed point, generally on top of zones but under draggable items) */}
-            <g pointerEvents="none" data-layer="mlp-marker">
-              {MLPMarker}
-            </g>
+            {MLPMarker}
 
             {/* Layer 7.5: MLP Position Ruler (when enabled) */}
             {showMlpRuler && (() => {
@@ -5873,18 +5704,16 @@ return (
             })()}
 
 
-            {/* Layer 8: Subwoofers (generally non-draggable, but present) - non-interactive */}
-            <g pointerEvents="none" data-layer="subwoofers">
-              {Array.isArray(frontSubs) && frontSubs.length > 0 && (
-                <FrontSubsLayer
-                  frontSubs={frontSubs}
-                  toPx={toPx}
-                  getModelDimsM={getModelDimsM}
-                  scale={scale}
-                />
-              )}
-              {renderSubwoofers()}
-            </g>
+            {/* Layer 8: Subwoofers (generally non-draggable, but present) */}
+            {Array.isArray(frontSubs) && frontSubs.length > 0 && (
+              <FrontSubsLayer
+                frontSubs={frontSubs}
+                toPx={toPx}
+                getModelDimsM={getModelDimsM}
+                scale={scale}
+              />
+            )}
+            {renderSubwoofers()}
 
             {/* Layer 9: Draggable Seating Positions */}
             {renderSeatingPositions()}
@@ -5895,28 +5724,22 @@ return (
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
             {renderSpeakers()}
 
-            {/* Layer 11: Speaker Labels (on top of speakers) - non-interactive */}
-            <g pointerEvents="none" data-layer="speaker-labels">
-              {renderSpeakerLabels()}
-            </g>
+            {/* Layer 11: Speaker Labels (on top of speakers) */}
+            {renderSpeakerLabels()}
 
-            {/* RP22 Surround Angles Overlay - non-interactive */}
-            <g pointerEvents="none" data-overlay="rp22-angles">
-              {renderRp22AnglesOverlay()}
-            </g>
+            {/* RP22 Surround Angles Overlay */}
+            {renderRp22AnglesOverlay()}
 
-            {/* Speaker Positions Overlay - non-interactive */}
-            <g pointerEvents="none" data-overlay="speaker-positions">
-              <SpeakerPositionsOverlay
-                speakers={placedSpeakers}
-                seatingPositions={seatingPositions}
-                dimensions={{ width: widthM, length: lengthM }}
-                view={speakerPositionsView}
-                meterToCanvasX={meterToCanvasX}
-                meterToCanvasY={meterToCanvasY}
-                roomRect={roomRect}
-              />
-            </g>
+            {/* Speaker Positions Overlay */}
+            <SpeakerPositionsOverlay
+              speakers={placedSpeakers}
+              seatingPositions={seatingPositions}
+              dimensions={{ width: widthM, length: lengthM }}
+              view={speakerPositionsView}
+              meterToCanvasX={meterToCanvasX}
+              meterToCanvasY={meterToCanvasY}
+              roomRect={roomRect}
+            />
 
 <PlanMessages
   dragWarning={dragWarning}
