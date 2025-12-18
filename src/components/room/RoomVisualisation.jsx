@@ -2728,26 +2728,28 @@ React.useEffect(() => {
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
     
     const dims = getModelDimsM(sub.model);
-    const halfW = (dims.widthM || 0.5) / 2;
-    const halfD = (dims.depthM || 0.25) / 2;
-    const inset = 0.05;
+    const w = dims.widthM || 0.5;
+    const d = dims.depthM || 0.25;
+    const halfW = w / 2;
+    const halfD = d / 2;
+    const EPS = 0.001;
     
     let finalX = rawX;
     let finalY = rawY;
     
-    // Pin to wall and clamp along that wall
+    // Pin to wall using center-safe positioning (account for sub depth/width)
     if (wall === 'front') {
-      finalY = inset;
-      finalX = Math.max(halfW + inset, Math.min(widthM - halfW - inset, rawX));
+      finalY = halfD + EPS;
+      finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, rawX));
     } else if (wall === 'rear') {
-      finalY = lengthM - inset;
-      finalX = Math.max(halfW + inset, Math.min(widthM - halfW - inset, rawX));
+      finalY = lengthM - halfD - EPS;
+      finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, rawX));
     } else if (wall === 'left') {
-      finalX = inset;
-      finalY = Math.max(halfD + inset, Math.min(lengthM - halfD - inset, rawY));
+      finalX = halfW + EPS;
+      finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
     } else if (wall === 'right') {
-      finalX = widthM - inset;
-      finalY = Math.max(halfD + inset, Math.min(lengthM - halfD - inset, rawY));
+      finalX = widthM - halfW - EPS;
+      finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
     }
     
     const currentX = sub.position?.x ?? 0;
@@ -2774,7 +2776,7 @@ React.useEffect(() => {
         if (pairMode) {
           const otherIndex = subIndex === 0 ? 1 : 0;
           const mirrorX = widthM - finalX;
-          const clampedMirrorX = Math.max(halfW + inset, Math.min(widthM - halfW - inset, mirrorX));
+          const clampedMirrorX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, mirrorX));
           // CRITICAL: mirrored sub must use same wall-locked Y
           updatedPositions[otherIndex] = { x: clampedMirrorX, y: wallLockedY };
         }
