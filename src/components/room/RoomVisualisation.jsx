@@ -562,6 +562,7 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const hudDragRef = useRef(null);
   const hudElRef = useRef(null);
   const isHudPinned = Boolean(hudPinnedSeatId);
+  const draggedSubLastPosRef = useRef({});
 
   useEffect(() => {
     const onKey = (e) => {
