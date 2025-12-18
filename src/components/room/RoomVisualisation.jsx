@@ -5282,20 +5282,20 @@ return {
           const { widthM, depthM } = getModelDimsM(sub.model);
           const subId = sub.id || `rear-sub-${i}`;
           
+          const handlePointerDown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch (err) {}
+            handleMouseDown(e, subId, 'sub');
+          };
+          
           return (
             <g
               key={subId}
               style={{ cursor: 'grab', pointerEvents: 'all' }}
-              onPointerDown={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleMouseDown(e, subId, 'sub');
-                if (e.currentTarget && typeof e.currentTarget.setPointerCapture === 'function') {
-                  try {
-                    e.currentTarget.setPointerCapture(e.pointerId);
-                  } catch (err) {}
-                }
-              }}
+              onPointerDown={handlePointerDown}
             >
               <SpeakerRect
                 speaker={sub}
