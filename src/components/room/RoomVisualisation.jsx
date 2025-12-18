@@ -391,11 +391,25 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   } = props;
 
   const appState = useAppState();
+  
+  // [B44] DIMENSIONS SAFETY — normalize and validate room dimensions
   const widthM  = Number(appState?.roomDims?.widthM)  || 4.5;
   const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
   const heightM = Number(appState?.roomDims?.heightM) || 2.4;
+  const dimsOk = Number.isFinite(widthM) && Number.isFinite(lengthM) && widthM > 0 && lengthM > 0;
+  
   const screenFrontPlaneM = Number(appState?.screenFrontPlaneM ?? 0);
   const getSpeakerVisibility = appState?.getSpeakerVisibility || (() => true);
+  
+  // REMOVE AFTER FIX CONFIRMED
+  if (typeof console !== 'undefined' && Math.random() < 0.1) {
+    console.log('[B44] DIMENSIONS CHECK', {
+      raw_roomDims: appState?.roomDims,
+      widthM,
+      lengthM,
+      dimsOk,
+    });
+  }
 
   const speakersEpoch = appState?.speakersEpoch || 0;
   const enableFrontWides = appState?.enableFrontWides || false;
@@ -2725,12 +2739,17 @@ React.useEffect(() => {
     const wall = draggedSubWallRef.current;
     if (!wall) return;
     
-    // Room bounds safety checks
-    if (!Number.isFinite(widthM) || !Number.isFinite(lengthM)) return;
-    if (widthM <= 0 || lengthM <= 0) return;
+    // [B44] CRITICAL: Abort if room dimensions are invalid
+    if (!dimsOk) {
+      console.warn('[SUB DRAG] Aborting: invalid room dimensions', { widthM, lengthM, dimsOk });
+      return;
+    }
     
     const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
-    if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) return;
+    if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) {
+      console.warn('[SUB DRAG] Aborting: invalid canvas coords', { rawX, rawY });
+      return;
+    }
     
     // Safe dimension extraction with finite defaults
     const EPS = 0.01; // 1cm safety margin
@@ -2750,7 +2769,10 @@ React.useEffect(() => {
     const rearY = lengthM - halfD - EPS;
     
     // Abort if room too small for sub
-    if (maxX <= minX) return;
+    if (maxX <= minX) {
+      console.warn('[SUB DRAG] Aborting: room too small for sub', { widthM, minX, maxX });
+      return;
+    }
     
     let finalX = rawX;
     let finalY = rawY;
@@ -2771,7 +2793,10 @@ React.useEffect(() => {
     }
     
     // Final safety check on computed position
-    if (!Number.isFinite(finalX) || !Number.isFinite(finalY)) return;
+    if (!Number.isFinite(finalX) || !Number.isFinite(finalY)) {
+      console.warn('[SUB DRAG] Aborting: non-finite final position', { finalX, finalY, wall });
+      return;
+    }
     
     const currentX = sub.position?.x ?? 0;
     const currentY = sub.position?.y ?? 0;
@@ -2781,6 +2806,12 @@ React.useEffect(() => {
       const pairMode = subsList.length === 2;
       
       setter(prev => {
+        // [B44] Guard against invalid prev state
+        if (!prev || typeof prev !== 'object') {
+          console.warn('[SUB DRAG] Aborting: invalid prev state', prev);
+          return prev;
+        }
+        
         const positions = prev?.positions || [];
         const subIndex = subId === 'front-sub-left' || subId === 'rear-sub-left' ? 0 : 1;
         
@@ -2797,7 +2828,10 @@ React.useEffect(() => {
           const clampedMirrorX = Math.max(minX, Math.min(maxX, mirrorX));
           
           // Final safety check on mirrored position
-          if (!Number.isFinite(clampedMirrorX)) return prev;
+          if (!Number.isFinite(clampedMirrorX)) {
+            console.warn('[SUB DRAG] Aborting: non-finite mirror X', { mirrorX, clampedMirrorX });
+            return prev;
+          }
           
           // Mirrored sub uses same wall-locked Y
           updatedPositions[otherIndex] = { x: clampedMirrorX, y: finalY };
