@@ -5097,6 +5097,7 @@ return {
           return (
             <ellipse
               key={seat.id}
+              data-speaker-hit="true"
               cx={seatX}
               cy={seatY}
               rx={RX_M * scale}
@@ -5108,7 +5109,11 @@ return {
               strokeDasharray={isPinned ? '4 2' : 'none'}
               style={{ cursor: 'pointer' }}
               aria-label="Seat — hover for RP23 and P1 analysis"
-              onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
+              onPointerDown={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                handleMouseDown(e, seat.id, 'seat');
+              }}
               onMouseEnter={() => handleSeatMouseEnter(seat)}
               onMouseLeave={handleSeatMouseLeave}
               onClick={(e) => {
@@ -5634,8 +5639,8 @@ return (
 
 
 
-            {/* RP22 Zones Overlay - UNCONDITIONAL MOUNT */}
-            <g className="rp22-zones-layer" pointerEvents="none">
+            {/* RP22 Zones Overlay - UNCONDITIONAL MOUNT (non-interactive) */}
+            <g className="rp22-zones-layer" pointerEvents="none" data-overlay="rp22-zones">
               <RP22ZonesOverlay
                 overlays={overlaysForRendering}
                 zones={augmentedZones}
@@ -5650,18 +5655,20 @@ return (
               />
             </g>
 
-            {/* Layer 5: Other Informational Zone Overlays */}
-            {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
-            {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
-            {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
-            {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
-            
-            {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
-            {overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
+            {/* Layer 5: Other Informational Zone Overlays (all non-interactive) */}
+            <g pointerEvents="none" data-overlay="zones">
+              {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
+              {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
+              {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
+              {overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
+              {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
+              {overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
+            </g>
 
-            {/* Layer 6: Static Room Elements (furniture, etc.) */}
-            {renderRoomElements()}
+            {/* Layer 6: Static Room Elements (furniture, etc.) - non-interactive */}
+            <g pointerEvents="none" data-layer="room-elements">
+              {renderRoomElements()}
+            </g>
 
             {/* Layer 7: MLP Marker (Fixed point, generally on top of zones but under draggable items) */}
             {MLPMarker}
@@ -5849,16 +5856,18 @@ return (
             })()}
 
 
-            {/* Layer 8: Subwoofers (generally non-draggable, but present) */}
-            {Array.isArray(frontSubs) && frontSubs.length > 0 && (
-              <FrontSubsLayer
-                frontSubs={frontSubs}
-                toPx={toPx}
-                getModelDimsM={getModelDimsM}
-                scale={scale}
-              />
-            )}
-            {renderSubwoofers()}
+            {/* Layer 8: Subwoofers (generally non-draggable, but present) - non-interactive */}
+            <g pointerEvents="none" data-layer="subwoofers">
+              {Array.isArray(frontSubs) && frontSubs.length > 0 && (
+                <FrontSubsLayer
+                  frontSubs={frontSubs}
+                  toPx={toPx}
+                  getModelDimsM={getModelDimsM}
+                  scale={scale}
+                />
+              )}
+              {renderSubwoofers()}
+            </g>
 
             {/* Layer 9: Draggable Seating Positions */}
             {renderSeatingPositions()}
@@ -5869,22 +5878,28 @@ return (
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
             {renderSpeakers()}
 
-            {/* Layer 11: Speaker Labels (on top of speakers) */}
-            {renderSpeakerLabels()}
+            {/* Layer 11: Speaker Labels (on top of speakers) - non-interactive */}
+            <g pointerEvents="none" data-layer="speaker-labels">
+              {renderSpeakerLabels()}
+            </g>
 
-            {/* RP22 Surround Angles Overlay */}
-            {renderRp22AnglesOverlay()}
+            {/* RP22 Surround Angles Overlay - non-interactive */}
+            <g pointerEvents="none" data-overlay="rp22-angles">
+              {renderRp22AnglesOverlay()}
+            </g>
 
-            {/* Speaker Positions Overlay */}
-            <SpeakerPositionsOverlay
-              speakers={placedSpeakers}
-              seatingPositions={seatingPositions}
-              dimensions={{ width: widthM, length: lengthM }}
-              view={speakerPositionsView}
-              meterToCanvasX={meterToCanvasX}
-              meterToCanvasY={meterToCanvasY}
-              roomRect={roomRect}
-            />
+            {/* Speaker Positions Overlay - non-interactive */}
+            <g pointerEvents="none" data-overlay="speaker-positions">
+              <SpeakerPositionsOverlay
+                speakers={placedSpeakers}
+                seatingPositions={seatingPositions}
+                dimensions={{ width: widthM, length: lengthM }}
+                view={speakerPositionsView}
+                meterToCanvasX={meterToCanvasX}
+                meterToCanvasY={meterToCanvasY}
+                roomRect={roomRect}
+              />
+            </g>
 
 <PlanMessages
   dragWarning={dragWarning}
