@@ -13,7 +13,15 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
-export default function BassGraph({ responseData, schroederFrequency, rp22Levels, toggles, crossoverFrequency = 80 }) {
+export default function BassGraph({ 
+  responseData, 
+  schroederFrequency, 
+  rp22Levels, 
+  toggles, 
+  crossoverFrequency = 80,
+  modeFrequencies = [],
+  showModeMarkers = false
+}) {
     const data = toggles.smoothing
         ? responseData // Placeholder for actual smoothing logic
         : responseData;
@@ -73,6 +81,17 @@ export default function BassGraph({ responseData, schroederFrequency, rp22Levels
                             }} 
                         />
                     )}
+
+                    {/* Mode frequency markers */}
+                    {showModeMarkers && modeFrequencies.map((freq, i) => (
+                      <ReferenceLine 
+                        key={`mode-${i}`}
+                        x={freq} 
+                        stroke="#DCDBD6" 
+                        strokeWidth={1}
+                        strokeDasharray="1 2"
+                      />
+                    ))}
 
                     <Line type="monotone" dataKey="spl" stroke="#213428" strokeWidth={2} dot={false} />
                 </LineChart>
