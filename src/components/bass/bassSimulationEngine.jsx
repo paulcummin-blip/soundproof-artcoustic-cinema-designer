@@ -2,6 +2,11 @@
 // Pure calculation engine for bass simulation (no React)
 
 import { getSubwooferCurve } from "@/components/models/speakers/registry";
+import { 
+  computeP14MaxLfeSpl, 
+  computeP18InRoomF3, 
+  computeP19DeviationBelowSchroeder 
+} from "@/components/utils/rp22BassMetrics";
 
 const SPEED_OF_SOUND = 343; // m/s
 const MIN_DISTANCE = 0.5; // meters (prevent explosion at near-zero)
@@ -332,7 +337,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   });
   
   // Compute RP22 metrics
-  const metrics = computeRP22Metrics(seatResponses, seats, subs);
+  const metrics = computeRP22Metrics(seatResponses, seats, subs, roomDims);
   
   return { seatResponses, metrics };
 }
@@ -354,38 +359,8 @@ function checkTuningWarnings(subs) {
   return warnings;
 }
 
-// Apply 1/3 octave smoothing to response curve
-function apply13OctaveSmoothing(freqsHz, splDb) {
-  if (freqsHz.length === 0) return splDb;
-  
-  const smoothed = [];
-  
-  for (let i = 0; i < freqsHz.length; i++) {
-    const fc = freqsHz[i];
-    const fLow = fc / Math.pow(2, 1/6);  // Lower edge of 1/3 octave
-    const fHigh = fc * Math.pow(2, 1/6); // Upper edge of 1/3 octave
-    
-    // Find all points within this band
-    const bandPoints = [];
-    for (let j = 0; j < freqsHz.length; j++) {
-      if (freqsHz[j] >= fLow && freqsHz[j] <= fHigh) {
-        bandPoints.push(splDb[j]);
-      }
-    }
-    
-    // Average SPL in band
-    const avgSpl = bandPoints.length > 0 
-      ? bandPoints.reduce((a, b) => a + b, 0) / bandPoints.length
-      : splDb[i];
-    
-    smoothed.push(avgSpl);
-  }
-  
-  return smoothed;
-}
-
 // Compute RP22 P14, P18, P19 + Designer fairness metrics
-function computeRP22Metrics(seatResponses, seats, subs = []) {
+function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
   const seatIds = Object.keys(seatResponses);
   if (seatIds.length === 0) return null;
   
@@ -398,52 +373,41 @@ function computeRP22Metrics(seatResponses, seats, subs = []) {
   
   const { freqsHz, splDb } = mlpResponse;
   
+  // Calculate Schroeder frequency
+  const w = roomDims?.widthM ?? 0;
+  const l = roomDims?.lengthM ?? 0;
+  const h = roomDims?.heightM ?? 0;
+  const volume = w * l * h;
+  const rt60 = 0.4; // default RT60 estimate
+  const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
+  
+  // Target curve (flat 0 dB reference for now)
+  const targetDb = freqsHz.map(() => 0);
+  
+  // Compute RP22 metrics using new helpers
+  const p14Result = computeP14MaxLfeSpl({ freqsHz, splDb, band: [20, 80] });
+  const p18Result = computeP18InRoomF3({ freqsHz, splDb, targetDb, minHz: 10, maxHz: 200 });
+  const p19Result = computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, schroederHz });
+  
+  // Temporary debug logging
+  if (typeof window !== 'undefined' && window.console) {
+    console.log('[RP22 Bass Metrics]', {
+      p14_maxSpl: p14Result.maxSplDb,
+      p18_f3Hz: p18Result.f3Hz,
+      p19_maxDeviation: p19Result.resultDb,
+      schroederHz,
+      p14_details: p14Result.details,
+      p18_details: p18Result.details,
+      p19_details: p19Result.details
+    });
+  }
+  
   // Helper: find indices in band
   const getBandIndices = (fMin, fMax) => {
     return freqsHz.map((f, i) => f >= fMin && f <= fMax ? i : -1).filter(i => i >= 0);
   };
   
   const band20_80 = getBandIndices(20, 80);
-  const band50_80 = getBandIndices(50, 80);
-  
-  // P14: Maximum LFE-band SPL capability at RSP (20-80 Hz)
-  // This is the peak SPL the system can produce in the LFE band
-  const mlpBandSpl = band20_80.map(i => splDb[i]);
-  const p14MaxSplDb = mlpBandSpl.length > 0 ? Math.max(...mlpBandSpl) : 0;
-  
-  // P18: F3 extension at RSP (in-room -3dB point)
-  const refBandSpl = band50_80.map(i => splDb[i]);
-  const refLevel = refBandSpl.length > 0 ? refBandSpl.reduce((a, b) => a + b, 0) / refBandSpl.length : 0;
-  const targetF3 = refLevel - 3;
-  
-  let p18F3Hz = 15;
-  for (let i = 0; i < freqsHz.length; i++) {
-    if (splDb[i] >= targetF3) {
-      p18F3Hz = freqsHz[i];
-      break;
-    }
-  }
-  
-  // P19: Max deviation from target below transition frequency (1/3 oct smoothing)
-  // Assume transition frequency = Schroeder frequency (calculated elsewhere)
-  // For now, use 80 Hz as proxy for transition frequency
-  const transitionFreqHz = 80;
-  const belowTransition = getBandIndices(20, transitionFreqHz);
-  
-  // Apply 1/3 octave smoothing to RSP response
-  const smoothedSplDb = apply13OctaveSmoothing(freqsHz, splDb);
-  
-  // Target curve is flat (0 dB reference) - so deviation = smoothed response
-  // Calculate max absolute deviation in the band below transition
-  const deviations = belowTransition.map(i => {
-    const targetDb = 0; // Flat target
-    const actualDb = smoothedSplDb[i];
-    // Normalize to average level first
-    const avgInBand = belowTransition.reduce((sum, idx) => sum + smoothedSplDb[idx], 0) / belowTransition.length;
-    return Math.abs(actualDb - avgInBand);
-  });
-  
-  const p19MaxDeviationDb = deviations.length > 0 ? Math.max(...deviations) : 0;
   
   // Designer Fairness Metrics (separate from RP22 parameters)
   // Calculate seat-to-seat variance for fairness scoring
@@ -499,9 +463,18 @@ function computeRP22Metrics(seatResponses, seats, subs = []) {
   const tuningWarnings = checkTuningWarnings(subs);
   
   return {
-    p14: { maxSplDb: p14MaxSplDb },
-    p18: { f3Hz: p18F3Hz },
-    p19: { maxDeviationDb: p19MaxDeviationDb },
+    p14: { 
+      maxSplDb: p14Result.maxSplDb ?? 0,
+      details: p14Result.details
+    },
+    p18: { 
+      f3Hz: p18Result.f3Hz ?? 15,
+      details: p18Result.details
+    },
+    p19: { 
+      maxDeviationDb: p19Result.resultDb ?? 0,
+      details: p19Result.details
+    },
     fairness: {
       score: Math.round(fairnessScore),
       seatToSeatStdDevDb: p14AvgStdDevDb,
