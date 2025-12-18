@@ -32,7 +32,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     const frontModel = frontSubsCfg?.model;
     const frontCount = frontSubsCfg?.count || 0;
     const frontPositions = frontSubsCfg?.positions || [];
-    const frontTuning = frontSubsCfg?.tuning || [];
+    const frontSettingsById = frontSubsCfg?.settingsById || {};
     
     if (frontModel && frontCount > 0) {
       // Default positions if not saved
@@ -42,16 +42,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         { x: roomWidth * 0.67, y: 0.15 }
       ];
       
+      const frontIds = frontCount === 1 ? ['front-sub-left'] : ['front-sub-left', 'front-sub-right'];
+      
       for (let i = 0; i < frontCount; i++) {
+        const subId = frontIds[i];
         const pos = frontPositions[i] || defaultFrontPositions[i] || { x: roomWidth / 2, y: 0.15 };
-        const tuning = frontTuning[i] || { gainDb: 0, delayMs: 0, polarity: 0 };
+        const settings = frontSettingsById[subId] || { gainDb: 0, delayMs: 0, polarity: 'normal' };
+        
         subs.push({
-          id: `front-sub-${i}`,
+          id: subId,
           modelKey: frontModel,
           x: pos.x,
           y: pos.y,
           z: 0.35,
-          tuning
+          tuning: {
+            gainDb: settings.gainDb || 0,
+            delayMs: settings.delayMs || 0,
+            polarity: settings.polarity === 'invert' ? 180 : 0
+          }
         });
       }
     }
@@ -60,7 +68,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     const rearModel = rearSubsCfg?.model;
     const rearCount = rearSubsCfg?.count || 0;
     const rearPositions = rearSubsCfg?.positions || [];
-    const rearTuning = rearSubsCfg?.tuning || [];
+    const rearSettingsById = rearSubsCfg?.settingsById || {};
     
     if (rearModel && rearCount > 0) {
       const roomWidth = roomDims?.widthM || 4.5;
@@ -70,16 +78,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         { x: roomWidth * 0.67, y: roomLength - 0.15 }
       ];
       
+      const rearIds = rearCount === 1 ? ['rear-sub-left'] : ['rear-sub-left', 'rear-sub-right'];
+      
       for (let i = 0; i < rearCount; i++) {
+        const subId = rearIds[i];
         const pos = rearPositions[i] || defaultRearPositions[i] || { x: roomWidth / 2, y: roomLength - 0.15 };
-        const tuning = rearTuning[i] || { gainDb: 0, delayMs: 0, polarity: 0 };
+        const settings = rearSettingsById[subId] || { gainDb: 0, delayMs: 0, polarity: 'normal' };
+        
         subs.push({
-          id: `rear-sub-${i}`,
+          id: subId,
           modelKey: rearModel,
           x: pos.x,
           y: pos.y,
           z: 0.35,
-          tuning
+          tuning: {
+            gainDb: settings.gainDb || 0,
+            delayMs: settings.delayMs || 0,
+            polarity: settings.polarity === 'invert' ? 180 : 0
+          }
         });
       }
     }
@@ -425,21 +441,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             <SubTuningControls
               subsCfg={frontSubsCfg}
               groupLabel="Front"
-              onTuningChange={(newTuning) => {
-                setFrontSubsCfg(prev => ({ ...prev, tuning: newTuning }));
+              onSettingsChange={(newSettings) => {
+                setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}
             />
           </div>
         )}
-        
+
         {rearSubsCfg?.count > 0 && (
           <div>
             <div className="text-sm font-medium text-[#1B1A1A] mb-3">Rear Subwoofer Tuning</div>
             <SubTuningControls
               subsCfg={rearSubsCfg}
               groupLabel="Rear"
-              onTuningChange={(newTuning) => {
-                setRearSubsCfg(prev => ({ ...prev, tuning: newTuning }));
+              onSettingsChange={(newSettings) => {
+                setRearSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}
             />
           </div>
