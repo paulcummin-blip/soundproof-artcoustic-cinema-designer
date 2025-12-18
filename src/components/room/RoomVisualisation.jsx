@@ -2725,32 +2725,53 @@ React.useEffect(() => {
     const wall = draggedSubWallRef.current;
     if (!wall) return;
     
-    const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
+    // Room bounds safety checks
+    if (!Number.isFinite(widthM) || !Number.isFinite(lengthM)) return;
+    if (widthM <= 0 || lengthM <= 0) return;
     
-    const dims = getModelDimsM(sub.model);
-    const w = dims.widthM || 0.5;
-    const d = dims.depthM || 0.25;
+    const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
+    if (!Number.isFinite(rawX) || !Number.isFinite(rawY)) return;
+    
+    // Safe dimension extraction with finite defaults
+    const EPS = 0.01; // 1cm safety margin
+    const DEFAULT_W = 0.50;
+    const DEFAULT_D = 0.30;
+    
+    const dims = getModelDimsM(sub.model) || {};
+    const w = Number.isFinite(dims.widthM) ? dims.widthM : DEFAULT_W;
+    const d = Number.isFinite(dims.depthM) ? dims.depthM : DEFAULT_D;
     const halfW = w / 2;
     const halfD = d / 2;
-    const EPS = 0.001;
+    
+    // Room bounds in metres
+    const minX = halfW + EPS;
+    const maxX = widthM - halfW - EPS;
+    const frontY = halfD + EPS;
+    const rearY = lengthM - halfD - EPS;
+    
+    // Abort if room too small for sub
+    if (maxX <= minX) return;
     
     let finalX = rawX;
     let finalY = rawY;
     
-    // Pin to wall using center-safe positioning (account for sub depth/width)
+    // Pin to wall using center-safe positioning
     if (wall === 'front') {
-      finalY = halfD + EPS;
-      finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, rawX));
+      finalY = frontY;
+      finalX = Math.max(minX, Math.min(maxX, rawX));
     } else if (wall === 'rear') {
-      finalY = lengthM - halfD - EPS;
-      finalX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, rawX));
+      finalY = rearY;
+      finalX = Math.max(minX, Math.min(maxX, rawX));
     } else if (wall === 'left') {
-      finalX = halfW + EPS;
+      finalX = minX;
       finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
     } else if (wall === 'right') {
-      finalX = widthM - halfW - EPS;
+      finalX = maxX;
       finalY = Math.max(halfD + EPS, Math.min(lengthM - halfD - EPS, rawY));
     }
+    
+    // Final safety check on computed position
+    if (!Number.isFinite(finalX) || !Number.isFinite(finalY)) return;
     
     const currentX = sub.position?.x ?? 0;
     const currentY = sub.position?.y ?? 0;
@@ -2766,19 +2787,20 @@ React.useEffect(() => {
         // Initialize array with correct length if needed
         const updatedPositions = positions.length >= 2 ? [...positions] : [null, null];
         
-        // Always use the wall-locked Y value
-        const wallLockedY = finalY;
-        
         // Update dragged sub
-        updatedPositions[subIndex] = { x: finalX, y: wallLockedY };
+        updatedPositions[subIndex] = { x: finalX, y: finalY };
         
         // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
         if (pairMode) {
           const otherIndex = subIndex === 0 ? 1 : 0;
           const mirrorX = widthM - finalX;
-          const clampedMirrorX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, mirrorX));
-          // CRITICAL: mirrored sub must use same wall-locked Y
-          updatedPositions[otherIndex] = { x: clampedMirrorX, y: wallLockedY };
+          const clampedMirrorX = Math.max(minX, Math.min(maxX, mirrorX));
+          
+          // Final safety check on mirrored position
+          if (!Number.isFinite(clampedMirrorX)) return prev;
+          
+          // Mirrored sub uses same wall-locked Y
+          updatedPositions[otherIndex] = { x: clampedMirrorX, y: finalY };
         }
         
         return { ...prev, positions: updatedPositions };
