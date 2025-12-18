@@ -509,6 +509,9 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [zoom, setZoom] = React.useState(1.0);
   const [panX, setPanX] = React.useState(0);
   const [panY, setPanY] = React.useState(0);
+  const [viewOffsetPx, setViewOffsetPx] = React.useState({ x: 0, y: 0 });
+  const isPanningRef = useRef(false);
+  const panStartRef = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
   const zoomMode = zoomModeProp;
   const lastPointerRef = useRef({ x: 0, y: 0 });
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
@@ -1551,6 +1554,59 @@ React.useEffect(() => {
     
     zoomAtPoint(newZoom, e.clientX, e.clientY);
   }, [zoomMode, zoom, zoomAtPoint]);
+
+  // Pan handlers for background rect only
+  const onPanPointerDown = useCallback((e) => {
+    // Only pan when zoomed
+    if (zoom <= 1) return;
+    
+    // Left click only
+    if (e.button !== 0) return;
+    
+    // Avoid modifier conflicts
+    if (e.shiftKey || e.altKey || e.metaKey || e.ctrlKey) return;
+    
+    // Only proceed if clicking the rect itself (not a child element)
+    if (e.currentTarget !== e.target) return;
+    
+    isPanningRef.current = true;
+    panStartRef.current = {
+      x: e.clientX,
+      y: e.clientY,
+      ox: viewOffsetPx.x,
+      oy: viewOffsetPx.y
+    };
+    
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch (err) {
+      // Ignore capture errors
+    }
+  }, [zoom, viewOffsetPx]);
+
+  const onPanPointerMove = useCallback((e) => {
+    if (!isPanningRef.current) return;
+    
+    const dx = e.clientX - panStartRef.current.x;
+    const dy = e.clientY - panStartRef.current.y;
+    
+    setViewOffsetPx({
+      x: panStartRef.current.ox + dx,
+      y: panStartRef.current.oy + dy
+    });
+  }, []);
+
+  const onPanPointerUp = useCallback((e) => {
+    if (!isPanningRef.current) return;
+    
+    isPanningRef.current = false;
+    
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch (err) {
+      // Ignore release errors
+    }
+  }, []);
 
   // Memoize baffle and screen calculations for performance
   const { BaffleAndScreen, screenPlaneY, screenCenterX_m, visibleWidthM } = useMemo(() => {
@@ -5314,8 +5370,26 @@ return (
           {/* ZOOM GROUP — CLIPPED TO VIEWPORT, WITH ZOOM-TO-CURSOR */}
           <g
               clipPath={`url(#${idsClip})`}
-              transform={`translate(${panX}, ${panY}) scale(${zoom})`}
+              transform={`translate(${panX + viewOffsetPx.x}, ${panY + viewOffsetPx.y}) scale(${zoom})`}
           >
+            {/* Background hit area for pan (must be FIRST child, behind everything) */}
+            {Number.isFinite(roomRect?.x) && Number.isFinite(roomRect?.y) && (
+              <rect
+                x={roomRect.x - 1000}
+                y={roomRect.y - 1000}
+                width={roomRect.width + 2000}
+                height={roomRect.height + 2000}
+                fill="transparent"
+                pointerEvents="auto"
+                style={{ 
+                  cursor: zoom > 1 ? (isPanningRef.current ? "grabbing" : "grab") : "default" 
+                }}
+                onPointerDown={onPanPointerDown}
+                onPointerMove={onPanPointerMove}
+                onPointerUp={onPanPointerUp}
+                onPointerCancel={onPanPointerUp}
+              />
+            )}
             {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
             <g data-layer="grid">
               {/* Draw vertical grid lines (centre-anchored) */}
