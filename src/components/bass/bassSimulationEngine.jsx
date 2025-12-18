@@ -11,8 +11,6 @@ import {
 const SPEED_OF_SOUND = 343; // m/s
 const MIN_DISTANCE = 0.5; // meters (prevent explosion at near-zero)
 const MIN_SPL_FLOOR = 30; // dB (prevent -Infinity)
-const MODE_Q = 8; // Damping factor for room modes
-const MODE_MAX_GAIN_DB = 6; // Maximum mode influence per frequency
 
 // Build frequency array from curve points, clamped to 15-200 Hz
 export function buildBassFrequencyBins(curvePoints) {
@@ -98,37 +96,40 @@ function computeAxialModes(roomDims, fMax = 200) {
   for (let n = 1; n < 50; n++) {
     const f = (c / 2) * (n / roomDims.lengthM);
     if (f > fMax) break;
-    modes.push({ axis: 'L', n, fHz: f, dim: roomDims.lengthM });
+    modes.push({ axis: 'Y', n, fHz: f, dim: roomDims.lengthM });
   }
   
   // Width modes (along X axis)
   for (let n = 1; n < 50; n++) {
     const f = (c / 2) * (n / roomDims.widthM);
     if (f > fMax) break;
-    modes.push({ axis: 'W', n, fHz: f, dim: roomDims.widthM });
+    modes.push({ axis: 'X', n, fHz: f, dim: roomDims.widthM });
   }
   
   // Height modes (along Z axis)
   for (let n = 1; n < 50; n++) {
     const f = (c / 2) * (n / roomDims.heightM);
     if (f > fMax) break;
-    modes.push({ axis: 'H', n, fHz: f, dim: roomDims.heightM });
+    modes.push({ axis: 'Z', n, fHz: f, dim: roomDims.heightM });
   }
   
   return modes;
 }
 
-// Calculate mode coupling between source and receiver
+// Export for UI use
+export { computeAxialModes };
+
+// Calculate mode coupling between source and receiver (pressure-mode shape)
 function axisCoupling(axis, n, sourcePos, seatPos, dim) {
   let sourceU, seatU;
   
-  if (axis === 'L') {
+  if (axis === 'Y') {
     sourceU = sourcePos.y;
     seatU = seatPos.y;
-  } else if (axis === 'W') {
+  } else if (axis === 'X') {
     sourceU = sourcePos.x;
     seatU = seatPos.x;
-  } else { // H
+  } else { // Z
     sourceU = sourcePos.z;
     seatU = seatPos.z;
   }
@@ -140,45 +141,74 @@ function axisCoupling(axis, n, sourcePos, seatPos, dim) {
   return excite * receive;
 }
 
-// Apply mode filtering to complex sum
-function applyModesToMagnitude(magnitude, f, modes, subs, seatPos, roomDims) {
-  const bwHz = modes[0]?.fHz / MODE_Q || 5; // Fallback bandwidth
-  let totalGainDb = 0;
-  let modeCount = 0;
+// Compute modal resonator response (complex)
+function modalResonator(f, f0, Q, coupling, gain = 0.25) {
+  // Simple 2nd-order peaking filter centered at f0
+  // Returns complex multiplier: 1 + (gain * coupling * resonance)
   
-  for (const mode of modes) {
-    // Only evaluate modes within window
-    const df = Math.abs(f - mode.fHz);
-    const windowBw = 2 * (mode.fHz / MODE_Q);
-    if (df > windowBw) continue;
-    
-    // Calculate total coupling for this mode
-    let coupling = 0;
-    for (const sub of subs) {
-      coupling += axisCoupling(mode.axis, mode.n, 
-        { x: sub.x, y: sub.y, z: sub.z }, 
-        seatPos, 
-        mode.dim);
-    }
-    
-    // Normalize coupling to 0..1
-    coupling = Math.min(1, coupling / Math.max(1, subs.length));
-    
-    // Gaussian-shaped resonant gain
-    const bw = mode.fHz / MODE_Q;
-    const gaussFactor = Math.exp(-Math.pow((f - mode.fHz) / bw, 2));
-    const gainDb = MODE_MAX_GAIN_DB * coupling * gaussFactor;
-    
-    totalGainDb += gainDb;
-    modeCount++;
+  const w = 2 * Math.PI * f;
+  const w0 = 2 * Math.PI * f0;
+  const bw = w0 / Q;
+  
+  // Normalized frequency deviation
+  const dw = w - w0;
+  
+  // Complex resonance (simplified peaking response)
+  const denom = Math.sqrt(dw * dw + bw * bw);
+  const resonanceMag = (bw / denom);
+  const resonancePhase = -Math.atan2(dw, bw);
+  
+  // Scale by coupling and gain
+  const scaledMag = gain * coupling * resonanceMag;
+  
+  // Return as complex addition: 1 + (scaledMag * e^(j*phase))
+  const real = 1 + scaledMag * Math.cos(resonancePhase);
+  const imag = scaledMag * Math.sin(resonancePhase);
+  
+  return { real, imag };
+}
+
+// Apply modal filtering to complex pressure (per sub contribution)
+function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q, modesEnabled) {
+  if (!modesEnabled || !modes || modes.length === 0) {
+    return { real: sumReal, imag: sumImag };
   }
   
-  // Clamp total mode influence to ±8dB
-  totalGainDb = Math.max(-8, Math.min(8, totalGainDb));
+  // Start with unity multiplier
+  let modeMultReal = 1;
+  let modeMultImag = 0;
   
-  // Apply gain to magnitude
-  const gainLinear = Math.pow(10, totalGainDb / 20);
-  return magnitude * gainLinear;
+  // Accumulate modal contributions
+  for (const mode of modes) {
+    // Only evaluate modes near this frequency (within 3*BW)
+    const bw = mode.fHz / Q;
+    const df = Math.abs(f - mode.fHz);
+    if (df > 3 * bw) continue;
+    
+    // Calculate coupling for this sub-seat pair
+    const coupling = axisCoupling(mode.axis, mode.n, 
+      { x: sub.x, y: sub.y, z: sub.z }, 
+      seatPos, 
+      mode.dim);
+    
+    if (coupling < 0.01) continue; // Skip negligible couplings
+    
+    // Get complex resonator response
+    const resonator = modalResonator(f, mode.fHz, Q, coupling);
+    
+    // Multiply complex numbers: (a + jb) * (c + jd) = (ac - bd) + j(ad + bc)
+    const newReal = modeMultReal * resonator.real - modeMultImag * resonator.imag;
+    const newImag = modeMultReal * resonator.imag + modeMultImag * resonator.real;
+    
+    modeMultReal = newReal;
+    modeMultImag = newImag;
+  }
+  
+  // Apply modal multiplier to pressure
+  const finalReal = sumReal * modeMultReal - sumImag * modeMultImag;
+  const finalImag = sumReal * modeMultImag + sumImag * modeMultReal;
+  
+  return { real: finalReal, imag: finalImag };
 }
 
 // Detect nulls in frequency response (20-80 Hz band)
@@ -273,12 +303,14 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   const powerW = splConfig?.globalPowerW ?? 100;
   const eqHeadroomDb = splConfig?.globalEqHeadroomDb ?? 0;
   const radiationMode = splConfig?.radiationMode ?? 'half-space';
+  const modesEnabled = splConfig?.modesEnabled ?? false;
+  const roomDamping = splConfig?.roomDamping ?? 20; // Q value: 8 (dead) to 35 (lively)
   
   const dbPower = 10 * Math.log10(Math.max(1, powerW));
   const dbEq = -eqHeadroomDb;
   
   // Precompute room modes (do this once)
-  const modes = computeAxialModes(roomDims, 200);
+  const modes = modesEnabled ? computeAxialModes(roomDims, 200) : [];
   
   // Compute response for each seat
   const seatResponses = {};
@@ -290,60 +322,69 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
     const splDb = freqsHz.map(f => {
       let sumReal = 0;
       let sumImag = 0;
-      
+
       subs.forEach(sub => {
         const curve = modelCurves[sub.modelKey];
         if (!curve) return;
-        
+
         // Normalize tuning
         const tuning = normalizeSubTuning(sub.tuning);
-        
+
         // Distance
         const dx = sub.x - seatPos.x;
         const dy = sub.y - seatPos.y;
         const dz = sub.z - seatPos.z;
         const d = Math.max(MIN_DISTANCE, Math.sqrt(dx*dx + dy*dy + dz*dz));
-        
+
         // Baseline SPL from curve
         const db0 = interpolateCurveDb(curve, f);
-        
+
         // Distance loss
         const dbDist = -20 * Math.log10(d / 1);
-        
+
         // Boundary gain
         const dbBoundary = calculateBoundaryGain({ x: sub.x, y: sub.y, z: sub.z }, roomDims, radiationMode);
-        
+
         // Apply user gain adjustment
         const dbGain = tuning.gainDb;
-        
+
         // Total magnitude
         const dbMag = db0 + dbDist + dbPower + dbEq + dbBoundary + dbGain;
         const amplitude = Math.pow(10, dbMag / 20);
-        
+
         // Guard against non-finite amplitude
         if (!isFinite(amplitude)) return;
-        
+
         // Time-of-flight phase
         let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
-        
+
         // Apply user delay (adds phase lag)
         const delaySeconds = tuning.delayMs / 1000;
         const phaseDelayRadians = -2 * Math.PI * f * delaySeconds;
         phi += phaseDelayRadians;
-        
+
         // Apply polarity (180° phase shift if inverted)
         if (tuning.polarity === 180) {
           phi += Math.PI;
         }
-        
+
         // Guard against non-finite phase
         if (!isFinite(phi)) return;
-        
-        // Complex accumulation
-        sumReal += amplitude * Math.cos(phi);
-        sumImag += amplitude * Math.sin(phi);
+
+        // Complex contribution from this sub (before modal filtering)
+        const subReal = amplitude * Math.cos(phi);
+        const subImag = amplitude * Math.sin(phi);
+
+        // Apply modal filtering if enabled (per sub-seat path)
+        const { real: filteredReal, imag: filteredImag } = applyModesToComplexPressure(
+          subReal, subImag, f, modes, sub, seatPos, roomDamping, modesEnabled
+        );
+
+        // Accumulate
+        sumReal += filteredReal;
+        sumImag += filteredImag;
       });
-      
+
       // Convert complex sum to SPL (pure pressure summation)
       const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
       const spl = 20 * Math.log10(magnitude);

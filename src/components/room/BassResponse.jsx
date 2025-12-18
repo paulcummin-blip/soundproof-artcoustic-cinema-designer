@@ -4,10 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "../AppStateProvider";
 import BassGraph from "@/components/room/bass/BassGraph";
-import { simulateBassAtSeats } from "@/components/bass/bassSimulationEngine";
+import { simulateBassAtSeats, computeAxialModes } from "@/components/bass/bassSimulationEngine";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 
 const brand = {
   ink:   "#1B1A1A",
@@ -120,9 +122,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       },
       seats: seatingPositions,
       subs: subsForSimulation,
-      splConfig: splConfig || { globalPowerW: 100, globalEqHeadroomDb: 0, radiationMode: 'half-space' }
+      splConfig: {
+        globalPowerW: splConfig?.globalPowerW ?? 100,
+        globalEqHeadroomDb: splConfig?.globalEqHeadroomDb ?? 0,
+        radiationMode: splConfig?.radiationMode ?? 'half-space',
+        modesEnabled,
+        roomDamping
+      }
     });
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, hasNoSeats, hasNoSubs]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, modesEnabled, roomDamping, hasNoSeats, hasNoSubs]);
 
   // Find MLP seat for display
   const selectedSeat = useMemo(() => {
@@ -245,10 +253,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   const toggles = React.useMemo(() => ({ smoothing: false }), []);
 
+  // Compute mode frequencies for markers
+  const modeFrequencies = useMemo(() => {
+    if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) return [];
+    const modes = computeAxialModes({
+      widthM: roomDims.widthM,
+      lengthM: roomDims.lengthM,
+      heightM: roomDims.heightM
+    }, 200);
+    return modes.map(m => m.fHz);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
+
   // Auto-align state
   const [tryPolarity, setTryPolarity] = useState(false);
   const [hasAutoAlignedFront, setHasAutoAlignedFront] = useState(false);
   const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
+
+  // Room modes state
+  const [modesEnabled, setModesEnabled] = useState(false);
+  const [roomDamping, setRoomDamping] = useState(20); // Q: 8-35
+  const [showModeMarkers, setShowModeMarkers] = useState(false);
 
   // Auto-align function
   const autoAlignSubs = (groupLabel) => {
@@ -552,6 +576,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             rp22Levels={rp22Levels}
             toggles={toggles}
             crossoverFrequency={80}
+            modeFrequencies={modeFrequencies}
+            showModeMarkers={showModeMarkers}
           />
         </div>
       ) : (
@@ -611,6 +637,63 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         </Alert>
       )}
       
+      {/* Room Modes Controls */}
+      <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
+        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Modes (Axial)</div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="modes-toggle" className="text-xs text-[#3E4349]">
+              Enable Room Modes
+            </Label>
+            <Switch
+              id="modes-toggle"
+              checked={modesEnabled}
+              onCheckedChange={setModesEnabled}
+            />
+          </div>
+          
+          {modesEnabled && (
+            <>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-xs text-[#3E4349]">Room Damping (Q)</Label>
+                  <span className="text-xs font-mono text-[#1B1A1A]">
+                    {roomDamping.toFixed(0)}
+                  </span>
+                </div>
+                <Slider
+                  value={[roomDamping]}
+                  onValueChange={([v]) => setRoomDamping(v)}
+                  min={8}
+                  max={35}
+                  step={1}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs text-[#3E4349] mt-1">
+                  <span>Dead (8)</span>
+                  <span>Lively (35)</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="mode-markers" 
+                  checked={showModeMarkers}
+                  onCheckedChange={setShowModeMarkers}
+                />
+                <Label htmlFor="mode-markers" className="text-xs text-[#3E4349]">
+                  Show mode frequency markers
+                </Label>
+              </div>
+            </>
+          )}
+          
+          <div className="text-xs text-[#3E4349]">
+            Axial modes only (fast). Tangential/oblique later.
+          </div>
+        </div>
+      </div>
+
       {/* Auto Align Controls */}
       {totalSubCount > 1 && (
         <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
