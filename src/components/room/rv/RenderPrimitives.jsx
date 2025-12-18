@@ -155,7 +155,6 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
     
     return (
       <g
-        data-speaker-hit="true"
         pointerEvents="all"
         onMouseDown={speakerMouseDownHandler}
         onMouseEnter={() =>
@@ -186,7 +185,6 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
 
   return (
     <g
-      data-speaker-hit="true"
       transform={transform}
       pointerEvents="all"
       onMouseDown={speakerMouseDownHandler}
