@@ -29,6 +29,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   const dimsTxt = `${(roomDims?.widthM ?? 0).toFixed(1)}×${(roomDims?.lengthM ?? 0).toFixed(1)}×${(roomDims?.heightM ?? 0).toFixed(1)} m`;
 
+  // State declarations (must be before useMemo/useCallback that use them)
+  const [tryPolarity, setTryPolarity] = useState(false);
+  const [hasAutoAlignedFront, setHasAutoAlignedFront] = useState(false);
+  const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
+  const [modesEnabled, setModesEnabled] = useState(false);
+  const [roomDamping, setRoomDamping] = useState(20);
+  const [showModeMarkers, setShowModeMarkers] = useState(false);
+
   // Build subs array from frontSubsCfg + rearSubsCfg for engine
   const subsForSimulation = useMemo(() => {
     const subs = [];
@@ -263,16 +271,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }, 200);
     return modes.map(m => m.fHz);
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
-
-  // Auto-align state
-  const [tryPolarity, setTryPolarity] = useState(false);
-  const [hasAutoAlignedFront, setHasAutoAlignedFront] = useState(false);
-  const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
-
-  // Room modes state
-  const [modesEnabled, setModesEnabled] = useState(false);
-  const [roomDamping, setRoomDamping] = useState(20); // Q: 8-35
-  const [showModeMarkers, setShowModeMarkers] = useState(false);
 
   // Auto-align function (defined before useEffect hooks)
   const autoAlignSubs = React.useCallback((groupLabel) => {
