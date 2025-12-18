@@ -1,4 +1,5 @@
 import { subPerformance } from "@/components/data/subwooferData";
+import { getSubResponseCurve } from "@/components/models/speakers/registry";
 
 export class BassResponseEngine {
     constructor() {
@@ -40,6 +41,26 @@ export class BassResponseEngine {
         const specs = modelId ? subPerformance[modelId] : null;
         const sensitivity = specs?.sensitivity_db_1w_1m || subwoofer?.sensitivity || 90;
         
+        // PRIORITY 1: Check for real measured curve from registry
+        const curvePts = modelId ? getSubResponseCurve(modelId) : null;
+        if (curvePts && curvePts.length > 0) {
+            // Linear interpolation between curve points
+            let lowerIdx = 0, upperIdx = curvePts.length - 1;
+            for (let i = 0; i < curvePts.length - 1; i++) {
+                if (frequency >= curvePts[i].frequency && frequency <= curvePts[i + 1].frequency) {
+                    lowerIdx = i;
+                    upperIdx = i + 1;
+                    break;
+                }
+            }
+            const lower = curvePts[lowerIdx];
+            const upper = curvePts[upperIdx];
+            if (lower.frequency === upper.frequency) return lower.spl;
+            const ratio = (frequency - lower.frequency) / (upper.frequency - lower.frequency);
+            return lower.spl + (upper.spl - lower.spl) * ratio;
+        }
+        
+        // PRIORITY 2: Check for realSplData (legacy)
         if (subwoofer && subwoofer.realSplData) {
             const frequencies = Object.keys(subwoofer.realSplData).map(Number).sort((a, b) => a - b);
             let lowerFreq = frequencies[0], upperFreq = frequencies[frequencies.length - 1];
@@ -57,6 +78,7 @@ export class BassResponseEngine {
             return lowerSpl + (upperSpl - lowerSpl) * ratio;
         }
         
+        // FALLBACK: Generic roll-off calculation
         const f3 = specs?.frequency_range_hz?.[0] || subwoofer?.frequency_response_low || 20;
         if (frequency < f3) {
             const rolloff = (f3 - frequency) * 0.08;
