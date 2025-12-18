@@ -143,6 +143,69 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }));
   }, [selectedSeat]);
 
+  // Bass Metrics (20-80 Hz) for P14 reporting
+  const bassMetrics2080Hz = useMemo(() => {
+    const seatResponses = simulationResults.seatResponses;
+    if (!seatResponses || Object.keys(seatResponses).length === 0) {
+      return null;
+    }
+
+    const seatIds = Object.keys(seatResponses);
+    const firstSeat = seatResponses[seatIds[0]];
+    if (!firstSeat || !firstSeat.freqsHz || !firstSeat.splDb) {
+      return null;
+    }
+
+    // Filter to 20-80 Hz range
+    const freqIndices = firstSeat.freqsHz
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => f >= 20 && f <= 80);
+    
+    if (freqIndices.length === 0) {
+      return null;
+    }
+
+    // 1. Seat-to-seat variance (std dev across seats per freq, then average)
+    let sumStdDevs = 0;
+    freqIndices.forEach(({ i }) => {
+      const splValues = seatIds.map(sid => seatResponses[sid].splDb[i]);
+      const mean = splValues.reduce((a, b) => a + b, 0) / splValues.length;
+      const variance = splValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / splValues.length;
+      const stdDev = Math.sqrt(variance);
+      sumStdDevs += stdDev;
+    });
+    const avgVariance = sumStdDevs / freqIndices.length;
+
+    // 2. Best vs worst seat (avg level per seat over 20-80 Hz, then max-min)
+    const seatAverages = seatIds.map(sid => {
+      const seat = seatResponses[sid];
+      const sum = freqIndices.reduce((acc, { i }) => acc + seat.splDb[i], 0);
+      return sum / freqIndices.length;
+    });
+    const bestSeatAvg = Math.max(...seatAverages);
+    const worstSeatAvg = Math.min(...seatAverages);
+    const bestWorstDelta = bestSeatAvg - worstSeatAvg;
+
+    // 3. Null count (simple: dips >= 6dB below seat's own avg)
+    let totalNulls = 0;
+    seatIds.forEach(sid => {
+      const seat = seatResponses[sid];
+      const seatAvg = freqIndices.reduce((acc, { i }) => acc + seat.splDb[i], 0) / freqIndices.length;
+      freqIndices.forEach(({ i }) => {
+        const dip = seatAvg - seat.splDb[i];
+        if (dip >= 6) {
+          totalNulls++;
+        }
+      });
+    });
+
+    return {
+      variance: avgVariance,
+      bestWorstDelta,
+      nullCount: totalNulls
+    };
+  }, [simulationResults.seatResponses]);
+
   // Schroeder frequency (display only)
   const schroederFrequency = React.useMemo(() => {
     const w = roomDims?.widthM ?? 0;
@@ -273,6 +336,45 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       ) : (
         <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
           No bass response data yet. Add at least one sub and one seat, then check this panel again.
+        </div>
+      )}
+
+      {/* Bass Metrics (20-80 Hz) */}
+      {bassMetrics2080Hz && (
+        <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
+          <div className="text-sm font-bold text-[#1B1A1A] mb-3">
+            Bass Metrics (20–80 Hz)
+          </div>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <span className="text-[#3E4349]">Seat-to-seat variance:</span>
+                <Badge className="bg-[#F8F8F7] text-[#3E4349] border-[#DCDBD6] text-xs">
+                  RP22 P14: (pending thresholds)
+                </Badge>
+              </div>
+              <span className="font-medium text-[#1B1A1A]">
+                {bassMetrics2080Hz.variance.toFixed(2)} dB
+              </span>
+            </div>
+            <div className="text-xs text-[#3E4349] pl-4">
+              Lower is better (uniformity)
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-[#3E4349]">Best ↔ Worst seat:</span>
+              <span className="font-medium text-[#1B1A1A]">
+                {bassMetrics2080Hz.bestWorstDelta.toFixed(1)} dB
+              </span>
+            </div>
+            
+            <div className="flex justify-between items-center">
+              <span className="text-[#3E4349]">Null count (≥6dB dips):</span>
+              <span className="font-medium text-[#1B1A1A]">
+                {bassMetrics2080Hz.nullCount}
+              </span>
+            </div>
+          </div>
         </div>
       )}
 

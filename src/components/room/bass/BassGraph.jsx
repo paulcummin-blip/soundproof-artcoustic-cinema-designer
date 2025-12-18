@@ -1,5 +1,5 @@
 import React from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
@@ -41,13 +41,6 @@ export default function BassGraph({ responseData, schroederFrequency, rp22Levels
                         tick={{ fill: '#3E4349' }}
                     />
                     <Tooltip content={<CustomTooltip />} />
-                    <Legend 
-                        wrapperStyle={{ 
-                            fontFamily: 'Didact Gothic, sans-serif',
-                            fontSize: '12px',
-                            paddingTop: '8px'
-                        }} 
-                    />
 
                     {rp22Levels.map(level => (
                         <ReferenceLine 
