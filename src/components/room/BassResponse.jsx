@@ -42,6 +42,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [rewSmoothing, setRewSmoothing] = useState('1/3'); // 1/3 octave smoothing by default (REW + RP22 P19)
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(true);
+  const [rewView, setRewView] = useState('room'); // 'room' | 'room+product'
 
   // Build subs array from frontSubsCfg + rearSubsCfg for engine
   const subsForSimulation = useMemo(() => {
@@ -219,14 +220,70 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       normalizeToDb: 0
     });
 
+    // Get product response curve if Room+Product view
+    let combinedSplDb = result.splDb;
+    
+    if (rewView === 'room+product' && subsForSimulation.length > 0) {
+      const firstSubModel = subsForSimulation[0].modelKey;
+      
+      // Import product curve from registry
+      try {
+        const { getSubwooferCurve } = require('@/components/models/speakers/registry');
+        const productCurve = getSubwooferCurve(firstSubModel);
+        
+        if (productCurve && productCurve.length > 0) {
+          // Interpolate product response to REW frequency axis
+          const productDbInterpolated = result.freqs.map(f => {
+            // Find surrounding points
+            let lowPoint = null;
+            let highPoint = null;
+            
+            for (let i = 0; i < productCurve.length; i++) {
+              const freq = productCurve[i].hz || productCurve[i].frequency || productCurve[i][0];
+              const db = productCurve[i].db || productCurve[i].spl || productCurve[i][1];
+              
+              if (freq <= f) {
+                lowPoint = { freq, db };
+              }
+              if (freq >= f && !highPoint) {
+                highPoint = { freq, db };
+                break;
+              }
+            }
+            
+            // Interpolate or clamp
+            if (lowPoint && highPoint && lowPoint.freq !== highPoint.freq) {
+              const ratio = (f - lowPoint.freq) / (highPoint.freq - lowPoint.freq);
+              return lowPoint.db + (highPoint.db - lowPoint.db) * ratio;
+            } else if (lowPoint) {
+              return lowPoint.db;
+            } else if (highPoint) {
+              return highPoint.db;
+            }
+            return 90; // fallback
+          });
+          
+          // Combine: room modal response + product shaping
+          combinedSplDb = result.splDb.map((roomDb, i) => {
+            // Product curve relative to 90dB baseline
+            const productOffset = productDbInterpolated[i] - 90;
+            return roomDb + productOffset;
+          });
+        }
+      } catch (err) {
+        console.warn('[REW Room+Product] Failed to load product curve:', err);
+      }
+    }
+
     return {
       data: result.freqs.map((frequency, i) => ({
         frequency,
-        spl: result.splDb[i]
+        spl: combinedSplDb[i]
       })),
-      debug: result.debug
+      debug: result.debug,
+      productAvailable: rewView === 'room+product'
     };
-  }, [rewStyleMode, roomDims, seatingPositions, subsForSimulation, roomDamping, rewSmoothing]);
+  }, [rewStyleMode, roomDims, seatingPositions, subsForSimulation, roomDamping, rewSmoothing, rewView]);
 
   // Convert to chart format (product-based curve)
   const responseData = useMemo(() => {
@@ -326,40 +383,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   const toggles = React.useMemo(() => ({ smoothing: false }), []);
 
-  // Compute mode frequencies for markers (use room modes engine when in REW mode)
+  // Compute mode frequencies for markers (use SAME parity run to avoid drift)
   const modeFrequencies = useMemo(() => {
     if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) return [];
     
     if (rewStyleMode) {
-      // Use room modes engine for accurate markers
-      const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-      if (!seat) return [];
-      
-      const result = computeRoomModesResponse({
-        roomDims,
-        sourcePositions: [{ x: roomDims.widthM / 2, y: 0.2, z: 0.2 }],
-        seatPosition: { x: seat.x, y: seat.y, z: seat.z ?? 1.2 },
-        fMin: 15,
-        fMax: 200,
-        pointsPerOct: 24,
-        modeLimitHz: 200,
-        q: roomDamping,
-        includeAxial: true,
-        includeTangential: false,
-        includeOblique: false
-      });
-      
-      return result.debug.modeMarkersHz || [];
+      // Use mode markers from the same parity calculation (prevents drift)
+      return rewModesData?.debug?.modeMarkersHz || [];
     }
     
-    // Fallback to basic axial modes
+    // Fallback to basic axial modes for product simulation
     const modes = computeAxialModes({
       widthM: roomDims.widthM,
       lengthM: roomDims.lengthM,
       heightM: roomDims.heightM
     }, 200);
     return modes.map(m => m.fHz);
-  }, [rewStyleMode, roomDims, seatingPositions, roomDamping, rewSmoothing]);
+  }, [rewStyleMode, roomDims, rewModesData]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
@@ -746,7 +786,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           {rewStyleMode && (
             <>
               <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
-                <div className="font-semibold mb-1">REW Parity Mode (Room-Only Response)</div>
+                <div className="font-semibold mb-1">REW Parity Mode</div>
                 <div className="text-[11px] space-y-1">
                   <div>• Full 3D modal set with spatial coupling (source × receiver pressure)</div>
                   <div>• Sub forced to floor (z=0m), seat uses actual z-height</div>
@@ -771,6 +811,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   </div>
                 )}
               </div>
+              
+              {/* REW View Mode Selector */}
+              <div className="flex items-center gap-3 mb-2">
+                <Label className="text-xs text-[#3E4349] font-medium">View:</Label>
+                <div className="flex gap-2">
+                  <Button
+                    variant={rewView === 'room' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRewView('room')}
+                    className="text-xs"
+                  >
+                    Room-only
+                  </Button>
+                  <Button
+                    variant={rewView === 'room+product' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => setRewView('room+product')}
+                    className="text-xs"
+                  >
+                    Room + Product
+                  </Button>
+                </div>
+              </div>
+              
               <div className="flex items-center gap-4 mb-2">
                 <div className="flex items-center gap-2">
                   <Checkbox 
@@ -801,7 +865,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             rp22Levels={rp22Levels}
             toggles={toggles}
             crossoverFrequency={80}
-            modeFrequencies={modeFrequencies}
+            modeFrequencies={rewStyleMode ? [] : modeFrequencies}
             showModeMarkers={rewStyleMode ? showRewModeLines : showModeMarkers}
             modeMarkers={rewStyleMode ? (rewModesData?.debug?.modeMarkers || []) : []}
             linearHzAxis={rewStyleMode && linearHzAxis}
