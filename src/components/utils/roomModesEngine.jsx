@@ -67,7 +67,7 @@ export function computeRoomModesResponse({
   
   // Generate frequency axis (linear for REW parity)
   const freqs = rewParityMode 
-    ? generateLinearFrequencyAxis(fMin, fMax, 1.0) // 1 Hz steps
+    ? generateLinearFrequencyAxis(fMin, fMax, 0.5) // 0.5 Hz steps for modal detail
     : generateLogFrequencyAxis(fMin, fMax, pointsPerOct);
   
   // Compute room modes

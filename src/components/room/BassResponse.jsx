@@ -745,20 +745,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           </div>
           {rewStyleMode && (
             <>
-              <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded">
-                <strong>REW parity mode:</strong> Room-only response, 3D modes (axial+tangential+oblique) with spatial coupling, sub at floor (z=0m), normalized to 30-80Hz. Modal peaks/dips change with sub/seat position.
+              <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
+                <div className="font-semibold mb-1">REW Parity Mode (Room-Only Response)</div>
+                <div className="text-[11px] space-y-1">
+                  <div>• Full 3D modal set with spatial coupling (source × receiver pressure)</div>
+                  <div>• Sub forced to floor (z=0m), seat uses actual z-height</div>
+                  <div>• Lorentzian resonator per mode with Q-based damping</div>
+                  <div>• Normalized to average in {rewModesData?.debug?.normBandHz?.[0]}-{rewModesData?.debug?.normBandHz?.[1]} Hz band</div>
+                </div>
                 {rewModesData?.debug && (
-                  <>
-                    <div className="mt-2 text-[10px] opacity-70">
-                      Modes: {rewModesData.debug.modeCount} (Axial {rewModesData.debug.axialCount}, Tangential {rewModesData.debug.tangentialCount}, Oblique {rewModesData.debug.obliqueCount})
+                  <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
+                    <div className="text-[10px] font-mono opacity-80">
+                      <strong>Modes:</strong> {rewModesData.debug.modeCount} total 
+                      ({rewModesData.debug.axialCount} axial, {rewModesData.debug.tangentialCount} tangential, {rewModesData.debug.obliqueCount} oblique)
                     </div>
-                    <div className="text-[10px] opacity-70">
-                      First 8: {rewModesData.debug.firstTenModeHz?.slice(0, 8).join(', ')} Hz
+                    <div className="text-[10px] font-mono opacity-80">
+                      <strong>First 10:</strong> {rewModesData.debug.firstTenModeHz?.join(', ')} Hz
                     </div>
-                    <div className="text-[10px] opacity-70">
-                      Norm band: {rewModesData.debug.normBandHz?.[0]}-{rewModesData.debug.normBandHz?.[1]} Hz
+                    <div className="text-[10px] font-mono opacity-80">
+                      <strong>Normalization:</strong> Mean of {rewModesData.debug.normBandHz?.[0]}-{rewModesData.debug.normBandHz?.[1]} Hz = 0 dB
                     </div>
-                  </>
+                    <div className="text-[10px] font-mono opacity-80">
+                      <strong>Frequency step:</strong> 0.5 Hz (linear axis)
+                    </div>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-4 mb-2">
