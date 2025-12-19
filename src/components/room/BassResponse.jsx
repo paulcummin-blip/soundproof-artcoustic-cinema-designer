@@ -44,6 +44,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [linearHzAxis, setLinearHzAxis] = useState(true);
   const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
 
+  // Ensure smoothing is 1/3 octave when REW mode is enabled
+  useEffect(() => {
+    if (rewStyleMode && (!rewSmoothing || rewSmoothing === 'none')) {
+      setRewSmoothing('1/3');
+    }
+  }, [rewStyleMode]);
+
   // Build subs array from frontSubsCfg + rearSubsCfg for engine
   const subsForSimulation = useMemo(() => {
     const subs = [];
@@ -234,50 +241,62 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // REW-style room + product curve (modal response + sub FR)
   const rewRoomPlusProductData = useMemo(() => {
     if (!rewStyleMode || rewView !== 'roomPlusProduct') return null;
-    if (!rewModesData || !selectedSeat) return null;
+    if (!rewModesData || !subsForSimulation || subsForSimulation.length === 0) return null;
 
     const roomFreqs = rewModesData.freqs;
     const roomRelDb = rewModesData.splDb; // Already normalized to [30,80] = 0 dB
 
-    // Get product curve from selected seat (MLP)
-    const productFreqs = selectedSeat.freqsHz;
-    const productSplDb = selectedSeat.splDb;
-
-    if (!productFreqs || !productSplDb || productFreqs.length === 0) return null;
-
-    // Interpolate product curve to REW frequency axis
-    const productDbInterpolated = roomFreqs.map(f => {
-      // Find surrounding points
-      let lowIdx = -1;
-      let highIdx = -1;
-
-      for (let i = 0; i < productFreqs.length; i++) {
-        if (productFreqs[i] <= f) {
-          lowIdx = i;
-        }
-        if (productFreqs[i] >= f && highIdx === -1) {
-          highIdx = i;
-          break;
-        }
+    // Get product curve from subwoofer model registry
+    const firstSubModel = subsForSimulation[0].modelKey;
+    
+    let productDbInterpolated = null;
+    try {
+      const { getSubwooferCurve } = require('@/components/models/speakers/registry');
+      const productCurve = getSubwooferCurve(firstSubModel);
+      
+      if (!productCurve || productCurve.length === 0) {
+        console.warn('[REW Room+Product] No product curve found for model:', firstSubModel);
+        return null;
       }
 
-      // Linear interpolation
-      if (lowIdx >= 0 && highIdx >= 0 && lowIdx !== highIdx) {
-        const f1 = productFreqs[lowIdx];
-        const f2 = productFreqs[highIdx];
-        const db1 = productSplDb[lowIdx];
-        const db2 = productSplDb[highIdx];
-        const ratio = (f - f1) / (f2 - f1);
-        return db1 + (db2 - db1) * ratio;
-      } else if (lowIdx >= 0) {
-        return productSplDb[lowIdx];
-      } else if (highIdx >= 0) {
-        return productSplDb[highIdx];
-      }
-      return 90; // fallback
-    });
+      // Interpolate product curve to REW frequency axis
+      productDbInterpolated = roomFreqs.map(f => {
+        // Find surrounding points in product curve
+        let lowPoint = null;
+        let highPoint = null;
 
-    // Normalize product curve to mean 0 dB in [30, 80] Hz
+        for (let i = 0; i < productCurve.length; i++) {
+          const freq = productCurve[i].hz || productCurve[i].frequency || productCurve[i][0];
+          const db = productCurve[i].db || productCurve[i].spl || productCurve[i][1];
+          
+          if (freq <= f) {
+            lowPoint = { freq, db };
+          }
+          if (freq >= f && !highPoint) {
+            highPoint = { freq, db };
+            break;
+          }
+        }
+
+        // Linear interpolation
+        if (lowPoint && highPoint && lowPoint.freq !== highPoint.freq) {
+          const ratio = (f - lowPoint.freq) / (highPoint.freq - lowPoint.freq);
+          return lowPoint.db + (highPoint.db - lowPoint.db) * ratio;
+        } else if (lowPoint) {
+          return lowPoint.db;
+        } else if (highPoint) {
+          return highPoint.db;
+        }
+        return 90; // fallback baseline
+      });
+    } catch (err) {
+      console.warn('[REW Room+Product] Failed to load product curve:', err);
+      return null;
+    }
+
+    if (!productDbInterpolated) return null;
+
+    // Normalize product curve to mean 0 dB in [30, 80] Hz (same as room)
     const band3080Indices = roomFreqs
       .map((f, i) => (f >= 30 && f <= 80) ? i : -1)
       .filter(i => i >= 0);
@@ -302,10 +321,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       })),
       debug: {
         ...rewModesData.debug,
-        view: 'roomPlusProduct'
+        view: 'roomPlusProduct',
+        productModel: firstSubModel
       }
     };
-  }, [rewStyleMode, rewView, rewModesData, selectedSeat, rewSmoothing]);
+  }, [rewStyleMode, rewView, rewModesData, subsForSimulation, rewSmoothing]);
 
   // Helper: apply REW-style smoothing
   function applyRewSmoothing(freqs, splDb, smoothing) {
@@ -897,15 +917,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                     variant={rewView === 'roomPlusProduct' ? 'default' : 'outline'}
                     size="sm"
                     onClick={() => setRewView('roomPlusProduct')}
-                    disabled={!selectedSeat || !selectedSeat.freqsHz}
+                    disabled={!subsForSimulation || subsForSimulation.length === 0}
                     className="text-xs"
                   >
                     Room + Product
                   </Button>
                 </div>
-                {(!selectedSeat || !selectedSeat.freqsHz) && (
+                {(!subsForSimulation || subsForSimulation.length === 0) && (
                   <span className="text-[10px] text-[#3E4349] opacity-70">
-                    Select a subwoofer model to view Room + Product
+                    Add a subwoofer to view Room + Product
+                  </span>
+                )}
+                {rewView === 'roomPlusProduct' && !rewRoomPlusProductData && subsForSimulation.length > 0 && (
+                  <span className="text-[10px] text-[#C1B6AD] opacity-90">
+                    ⚠ No product response data for selected model
                   </span>
                 )}
               </div>

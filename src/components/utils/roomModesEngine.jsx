@@ -82,11 +82,28 @@ export function computeRoomModesResponse({
     includeOblique
   });
   
-  // Build response using Lorentzian modal resonators with spatial coupling
+  // Build response using baseline + modal resonators (REW-style)
   let splDb = freqs.map(f => {
-    let sumPressure = 0;
+    // Baseline direct path term (distance-based)
+    let baselineAmp = 0;
+    for (const source of sourcePositions) {
+      const dx = source.x - seatPosition.x;
+      const dy = source.y - seatPosition.y;
+      const dz = (source.z ?? 0) - (seatPosition.z ?? 1.2);
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      const safeDistance = Math.max(0.5, distance);
+      
+      // Simple inverse distance law for baseline (1/r)
+      baselineAmp += 1.0 / safeDistance;
+    }
     
-    // Sum all modal contributions (magnitude-based Lorentzian)
+    // Average baseline if multiple sources
+    if (sourcePositions.length > 1) {
+      baselineAmp /= sourcePositions.length;
+    }
+    
+    // Modal contributions (resonances)
+    let modalAmp = 0;
     for (const mode of modes) {
       const f0 = mode.freq;
       
@@ -121,11 +138,17 @@ export function computeRoomModesResponse({
       const denominator = Math.pow(f2 - f02, 2) + Math.pow(f0 * f / qMode, 2);
       
       const modeContribution = numerator / denominator;
-      sumPressure += modeContribution;
+      modalAmp += modeContribution;
     }
     
+    // Combine baseline + modal (magnitude-based, not pressure)
+    const totalAmp = baselineAmp + Math.abs(modalAmp);
+    
+    // Apply floor to prevent -Infinity
+    const safeAmp = Math.max(totalAmp, 1e-8);
+    
     // Convert to dB (20*log10 for pressure)
-    const db = 20 * Math.log10(Math.abs(sumPressure) + 1e-12);
+    const db = 20 * Math.log10(safeAmp);
     return isFinite(db) ? db : -120;
   });
   
