@@ -24,8 +24,8 @@ export function computeRoomModesResponse({
   rewParityMode = true,
   smoothing = 'none', // 'none', '1/12', '1/6', '1/3'
   subFloorHeight = 0.0, // REW default: subs at floor
-  normalizeBandHz = [20, 30], // REW-like normalization band
-  normalizeToDb = 90 // Target level for normalization
+  normalizeBandHz = [30, 80], // Normalization band (avoid first mode cliff)
+  normalizeToDb = 0 // Target level for normalization (0 = relative)
 }) {
   // Validate inputs
   if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
@@ -34,6 +34,13 @@ export function computeRoomModesResponse({
   
   if (!seatPosition || typeof seatPosition.x !== 'number' || typeof seatPosition.y !== 'number') {
     return { freqs: [], splDb: [], debug: { schroederHz: 0, modeMarkersHz: [] } };
+  }
+  
+  // REW parity mode forces 3D modes ON
+  if (rewParityMode) {
+    includeAxial = true;
+    includeTangential = true;
+    includeOblique = true;
   }
   
   // Default source if none provided
@@ -73,7 +80,7 @@ export function computeRoomModesResponse({
     includeOblique
   });
   
-  // Build complex response using spatial coupling and mode-order Q
+  // Build complex response using modal resonators with spatial coupling
   let splDb = freqs.map(f => {
     let sumReal = 0;
     let sumImag = 0;
@@ -86,10 +93,9 @@ export function computeRoomModesResponse({
       const order = Math.sqrt(mode.nx * mode.nx + mode.ny * mode.ny + mode.nz * mode.nz);
       const qMode = Math.max(8, Math.min(60, q / Math.max(1, order)));
       
+      // Skip distant modes (optimization)
       const bw = f0 / qMode;
       const df = Math.abs(f - f0);
-      
-      // Early out for distant modes
       if (df > 5 * bw) continue;
       
       // Compute spatial coupling for all sources
@@ -100,38 +106,42 @@ export function computeRoomModesResponse({
       }
       
       // Average coupling if multiple sources
-      if (sourcePositions.length > 0) {
+      if (sourcePositions.length > 1) {
         totalCoupling /= Math.sqrt(sourcePositions.length);
       }
       
       if (Math.abs(totalCoupling) < 0.001) continue;
       
-      // Deterministic per-mode phase offset (avoid artificial coherence)
-      const phaseOffsetDeg = (mode.nx * 37 + mode.ny * 73 + mode.nz * 19) % 360;
-      const phaseOffsetRad = phaseOffsetDeg * (Math.PI / 180);
-      
-      // Complex Lorentzian response: H(f) = W / (1 + j*(f-f0)/(bw/2))
-      const denomReal = 1;
-      const denomImag = (f - f0) / (bw / 2);
+      // 2nd-order resonator response (magnitude and phase)
+      const r = f / f0;
+      const denomReal = 1 - r * r;
+      const denomImag = r / qMode;
       const denomMagSq = denomReal * denomReal + denomImag * denomImag;
       
-      // Complex division: (totalCoupling + 0j) / (denomReal + j*denomImag)
-      let hReal = (totalCoupling * denomReal) / denomMagSq;
-      let hImag = -(totalCoupling * denomImag) / denomMagSq;
+      // Magnitude (linear pressure)
+      const magLin = Math.abs(totalCoupling) / Math.sqrt(denomMagSq);
       
-      // Apply phase offset rotation: (hReal + j*hImag) * e^(j*phaseOffset)
-      const cosPhase = Math.cos(phaseOffsetRad);
-      const sinPhase = Math.sin(phaseOffsetRad);
-      const rotatedReal = hReal * cosPhase - hImag * sinPhase;
-      const rotatedImag = hReal * sinPhase + hImag * cosPhase;
+      // Phase (with sign from coupling)
+      let phase = Math.atan2(denomImag, denomReal);
+      if (totalCoupling < 0) {
+        phase += Math.PI;
+      }
       
-      sumReal += rotatedReal;
-      sumImag += rotatedImag;
+      // Deterministic per-mode phase offset (avoid artificial coherence)
+      const phaseOffsetDeg = (mode.nx * 37 + mode.ny * 73 + mode.nz * 19) % 360;
+      phase += phaseOffsetDeg * (Math.PI / 180);
+      
+      // Convert to complex components
+      const modeReal = magLin * Math.cos(phase);
+      const modeImag = magLin * Math.sin(phase);
+      
+      sumReal += modeReal;
+      sumImag += modeImag;
     }
     
     // Magnitude in dB (relative)
     const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
-    return 20 * Math.log10(Math.max(magnitude, 1e-9));
+    return 20 * Math.log10(Math.max(magnitude, 1e-12));
   });
   
   // Apply smoothing if requested
@@ -139,9 +149,9 @@ export function computeRoomModesResponse({
     splDb = applySmoothing(freqs, splDb, smoothing);
   }
   
-  // Normalize in REW parity mode (anchor to specific band)
+  // Normalize in REW parity mode (relative curve, anchored to mid-band)
   if (rewParityMode) {
-    splDb = normalizeToReferenceLevel(freqs, splDb, normalizeBandHz, normalizeToDb);
+    splDb = normalizeToRelative(freqs, splDb, normalizeBandHz);
   }
   
   // Extract mode frequencies for markers (axial only for clarity)
@@ -155,7 +165,8 @@ export function computeRoomModesResponse({
     splDb,
     debug: {
       schroederHz,
-      modeMarkersHz
+      modeMarkersHz,
+      modeCount: modes.length
     }
   };
 }
@@ -180,6 +191,7 @@ function generateFrequencyAxis(fMin, fMax, pointsPerOct) {
 
 /**
  * Compute room modes (rectangular room)
+ * Returns all axial, tangential, and oblique modes up to fMax
  */
 function computeRoomModes({
   widthM,
@@ -247,21 +259,15 @@ function computeSpatialCoupling(mode, source, receiver, roomDims) {
   const { widthM, lengthM, heightM } = roomDims;
   const { nx, ny, nz } = mode;
   
-  // Wave numbers for this mode
-  const kx = nx * Math.PI / widthM;
-  const ky = ny * Math.PI / lengthM;
-  const kz = nz * Math.PI / heightM;
-  
-  // Source pressure shape
-  const srcX = nx > 0 ? Math.cos(kx * source.x) : 1;
-  const srcY = ny > 0 ? Math.cos(ky * source.y) : 1;
-  const srcZ = nz > 0 ? Math.cos(kz * (source.z ?? 0.0)) : 1;
+  // Cosine pressure mode shapes
+  const srcX = nx > 0 ? Math.cos(nx * Math.PI * source.x / widthM) : 1;
+  const srcY = ny > 0 ? Math.cos(ny * Math.PI * source.y / lengthM) : 1;
+  const srcZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / heightM) : 1;
   const S = srcX * srcY * srcZ;
   
-  // Receiver pressure shape
-  const rcvX = nx > 0 ? Math.cos(kx * receiver.x) : 1;
-  const rcvY = ny > 0 ? Math.cos(ky * receiver.y) : 1;
-  const rcvZ = nz > 0 ? Math.cos(kz * (receiver.z ?? 1.2)) : 1;
+  const rcvX = nx > 0 ? Math.cos(nx * Math.PI * receiver.x / widthM) : 1;
+  const rcvY = ny > 0 ? Math.cos(ny * Math.PI * receiver.y / lengthM) : 1;
+  const rcvZ = nz > 0 ? Math.cos(nz * Math.PI * (receiver.z ?? 1.2) / heightM) : 1;
   const R = rcvX * rcvY * rcvZ;
   
   // Coupling (signed - preserves interference effects)
@@ -305,9 +311,10 @@ function applySmoothing(freqs, splDb, smoothing) {
 }
 
 /**
- * Normalize response to specific reference level in band (REW-like)
+ * Normalize response to relative (0 dB) by removing median offset in band
+ * Avoids "cliff" at low frequencies by anchoring to mid-band where modes exist
  */
-function normalizeToReferenceLevel(freqs, splDb, bandHz, targetDb) {
+function normalizeToRelative(freqs, splDb, bandHz) {
   // Find median SPL in reference band (more robust than mean)
   const [fMin, fMax] = bandHz;
   const bandValues = freqs
@@ -318,9 +325,8 @@ function normalizeToReferenceLevel(freqs, splDb, bandHz, targetDb) {
   if (bandValues.length === 0) return splDb;
   
   // Use median for stability
-  const refLevel = bandValues[Math.floor(bandValues.length / 2)];
+  const medianDb = bandValues[Math.floor(bandValues.length / 2)];
   
-  // Offset to target level (anchor to 0 dB for relative mode)
-  const offset = targetDb - refLevel;
-  return splDb.map(spl => spl + offset);
+  // Subtract offset to make curve relative
+  return splDb.map(spl => spl - medianDb);
 }

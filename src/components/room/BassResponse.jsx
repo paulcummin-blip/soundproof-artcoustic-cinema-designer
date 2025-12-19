@@ -740,7 +740,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           </div>
           {rewStyleMode && (
             <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded">
-              <strong>REW parity mode:</strong> Room-only response, 3D modes (axial+tangential+oblique) with spatial coupling, sub at floor (z=0m), normalized to 20-25Hz. Curve changes with sub/seat position.
+              <strong>REW parity mode:</strong> Room-only response, 3D modes (axial+tangential+oblique) with spatial coupling, sub at floor (z=0m), normalized to 30-80Hz. Modal peaks/dips change with sub/seat position.
             </div>
           )}
           <BassGraph
