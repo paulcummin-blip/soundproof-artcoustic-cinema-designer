@@ -287,20 +287,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     const maxDb = Math.max(...finiteValues);
     const rangeDb = maxDb - minDb;
 
-    // Guard against flat or invalid curves
-    if (finiteCount < 10 || rangeDb < 0.25) {
-      return {
-        data: [],
-        debug: {
-          ...result.debug,
-          error: "REW curve invalid or flat",
-          finiteCount,
-          minDb: minDb.toFixed(2),
-          maxDb: maxDb.toFixed(2),
-          rangeDb: rangeDb.toFixed(2)
-        }
-      };
-    }
+    // If it's flat, that's still valid data. Plot it, but flag it.
+    const flatNote = (finiteCount < 10 || rangeDb < 0.25)
+      ? { warning: "REW curve looks flat (still plotted)", finiteCount, minDb, maxDb, rangeDb }
+      : null;
 
     return {
       data: result.freqs.map((frequency, i) => ({
@@ -312,7 +302,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         finiteCount,
         minDb: minDb.toFixed(2),
         maxDb: maxDb.toFixed(2),
-        rangeDb: rangeDb.toFixed(2)
+        rangeDb: rangeDb.toFixed(2),
+        ...(flatNote ? { flatNote } : {})
       },
       freqs: result.freqs,
       splDb: result.splDb
@@ -957,153 +948,153 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       )}
 
       {/* Bass Response Graph */}
-      {rewStyleMode && rewModesData?.data?.length === 0 ? (
-        <Alert className="border border-[#C1B6AD] bg-[#F8F8F7] text-[#3E4349]">
-          <AlertDescription className="text-sm">
-            <strong>REW curve failed</strong> — see debug info above for details.
-          </AlertDescription>
-        </Alert>
-      ) : displayData.length > 0 ? (
-        <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 12 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Label htmlFor="rew-mode" className="text-xs text-[#3E4349] whitespace-nowrap">
-                Room Modes (REW-style)
-              </Label>
-              <Switch
-                id="rew-mode"
-                checked={rewStyleMode}
-                onCheckedChange={setRewStyleMode}
-              />
+      <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 12 }}>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <Label htmlFor="rew-mode" className="text-xs text-[#3E4349] whitespace-nowrap">
+              Room Modes (REW-style)
+            </Label>
+            <Switch
+              id="rew-mode"
+              checked={rewStyleMode}
+              onCheckedChange={setRewStyleMode}
+            />
+          </div>
+
+          <div style={{ fontSize: 12, color: "#3E4349" }}>
+            Showing: {selectedSeat?.isPrimary ? "MLP" : `Seat ${selectedSeat?.id ?? ""}`}
+          </div>
+        </div>
+
+        {/* REW debug banner (only when REW is ON) */}
+        {rewStyleMode && (rewModesData?.debug?.error || rewModesData?.debug?.flatNote) && (
+          <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#C1B6AD]">
+            <div className="font-semibold mb-1">REW status</div>
+            {rewModesData?.debug?.error && (
+              <div className="text-[11px] font-mono opacity-80">Error: {rewModesData.debug.error}</div>
+            )}
+            {rewModesData?.debug?.flatNote && (
+              <div className="text-[11px] font-mono opacity-80">
+                {rewModesData.debug.flatNote.warning} (range {Number(rewModesData.debug.flatNote.rangeDb).toFixed(2)} dB)
+              </div>
+            )}
+            {rewModesData?.debug?.message && (
+              <div className="text-[11px] font-mono opacity-80">Message: {rewModesData.debug.message}</div>
+            )}
+          </div>
+        )}
+
+        {/* REW parity info (only when REW is ON and no error) */}
+        {rewStyleMode && !rewModesData?.debug?.error && (
+          <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
+            <div className="font-semibold mb-1">REW Parity Mode</div>
+            <div className="text-[11px] space-y-1">
+              <div>• Full 3D modal set with spatial coupling (source × receiver pressure)</div>
+              <div>• Sub forced to floor (z=0m), seat uses actual z-height</div>
+              <div>• Lorentzian resonator per mode with Q-based damping</div>
+              <div>• Normalized to average in {rewModesData?.debug?.normBandHz?.[0]}-{rewModesData?.debug?.normBandHz?.[1]} Hz band</div>
             </div>
-            <div style={{ fontSize: 12, color: "#3E4349" }}>
-              Showing: {selectedSeat?.isPrimary ? "MLP" : `Seat ${selectedSeat?.id ?? ""}`}
+            {rewModesData?.debug && (
+              <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Modes:</strong> {rewModesData.debug.modeCount} total 
+                  ({rewModesData.debug.axialCount} axial, {rewModesData.debug.tangentialCount} tangential, {rewModesData.debug.obliqueCount} oblique)
+                </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>First 10:</strong> {rewModesData.debug.firstTenModeHz?.join(', ')} Hz
+                </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Normalization:</strong> {rewModesData.debug.normApplied ? `Applied (${rewModesData.debug.normBandHz?.[0]}-${rewModesData.debug.normBandHz?.[1]} Hz)` : 'Skipped (insufficient data)'}
+                </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Data:</strong> {rewModesData.debug.finiteCount} points | Range: {rewModesData.debug.rangeDb} dB
+                  {rewModesData.debug.nonFiniteRepaired > 0 && ` | Repaired: ${rewModesData.debug.nonFiniteRepaired}`}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* REW view selector (only when REW is ON) */}
+        {rewStyleMode && (
+          <div className="flex items-center gap-3 mb-2">
+            <div className="text-xs text-[#3E4349]">View:</div>
+            <Button
+              variant={rewView === 'roomOnly' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setRewView('roomOnly')}
+              className="text-xs"
+            >
+              Room-only
+            </Button>
+            <Button
+              variant={rewView === 'roomPlusProduct' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setRewView('roomPlusProduct')}
+              className="text-xs"
+            >
+              Room + Product
+            </Button>
+          </div>
+        )}
+
+        {/* REW mode lines toggles (only when REW is ON) */}
+        {rewStyleMode && (
+          <div className="flex items-center gap-4 mb-2">
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="show-mode-lines" 
+                checked={showRewModeLines}
+                onCheckedChange={setShowRewModeLines}
+              />
+              <Label htmlFor="show-mode-lines" className="text-xs text-[#3E4349]">
+                Show mode lines (REW)
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="linear-hz-axis" 
+                checked={linearHzAxis}
+                onCheckedChange={setLinearHzAxis}
+              />
+              <Label htmlFor="linear-hz-axis" className="text-xs text-[#3E4349]">
+                Linear Hz axis (REW)
+              </Label>
             </div>
           </div>
-          {rewStyleMode && rewModesData?.debug?.error && (
-            <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#C1B6AD]">
-              <div className="font-semibold mb-1">REW curve failed</div>
-              <div className="text-[11px] font-mono opacity-80">{rewModesData.debug.error}</div>
-              {rewModesData.debug.message && (
-                <div className="text-[11px] font-mono opacity-80 mt-1">{rewModesData.debug.message}</div>
-              )}
-            </div>
-          )}
-          {rewStyleMode && !rewModesData?.debug?.error && (
-            <>
-              <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
-                <div className="font-semibold mb-1">REW Parity Mode</div>
-                <div className="text-[11px] space-y-1">
-                  <div>• Full 3D modal set with spatial coupling (source × receiver pressure)</div>
-                  <div>• Sub forced to floor (z=0m), seat uses actual z-height</div>
-                  <div>• Lorentzian resonator per mode with Q-based damping</div>
-                  <div>• Normalized to average in {rewModesData?.debug?.normBandHz?.[0]}-{rewModesData?.debug?.normBandHz?.[1]} Hz band</div>
-                </div>
-                {rewModesData?.debug?.error && (
-                  <div className="mt-2 p-2 bg-[#C1B6AD]/20 border border-[#C1B6AD] rounded">
-                    <div className="text-[11px] font-semibold text-[#C1B6AD]">
-                      ⚠ REW curve error: {rewModesData.debug.error}
-                    </div>
-                    <div className="text-[10px] font-mono mt-1 opacity-80">
-                      Range: {rewModesData.debug.rangeDb} dB | Finite: {rewModesData.debug.finiteCount}
-                    </div>
-                  </div>
-                )}
-                {rewModesData?.debug && !rewModesData.debug.error && (
-                  <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
-                    <div className="text-[10px] font-mono opacity-80">
-                      <strong>Modes:</strong> {rewModesData.debug.modeCount} total 
-                      ({rewModesData.debug.axialCount} axial, {rewModesData.debug.tangentialCount} tangential, {rewModesData.debug.obliqueCount} oblique)
-                    </div>
-                    <div className="text-[10px] font-mono opacity-80">
-                      <strong>First 10:</strong> {rewModesData.debug.firstTenModeHz?.join(', ')} Hz
-                    </div>
-                    <div className="text-[10px] font-mono opacity-80">
-                      <strong>Normalization:</strong> {rewModesData.debug.normApplied ? `Applied (${rewModesData.debug.normBandHz?.[0]}-${rewModesData.debug.normBandHz?.[1]} Hz)` : 'Skipped (insufficient data)'}
-                    </div>
-                    <div className="text-[10px] font-mono opacity-80">
-                      <strong>Data:</strong> {rewModesData.debug.finiteCount} points | Range: {rewModesData.debug.rangeDb} dB
-                      {rewModesData.debug.nonFiniteRepaired > 0 && ` | Repaired: ${rewModesData.debug.nonFiniteRepaired}`}
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              {/* REW View Mode Selector */}
-              <div className="flex items-center gap-3 mb-2">
-                <div className="text-xs text-[#3E4349]">View:</div>
-                <Button
-                  variant={rewView === 'roomOnly' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setRewView('roomOnly')}
-                  className="text-xs"
-                >
-                  Room-only
-                </Button>
-                <Button
-                  variant={rewView === 'roomPlusProduct' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setRewView('roomPlusProduct')}
-                  disabled={!subsForSimulation || subsForSimulation.length === 0}
-                  className="text-xs"
-                >
-                  Room + Product
-                </Button>
-                {(!subsForSimulation || subsForSimulation.length === 0) && (
-                  <span className="text-[10px] text-[#3E4349] opacity-70">
-                    Add a subwoofer to view Room + Product
-                  </span>
-                )}
-                {rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug?.productNote && (
-                  <span className="text-[10px] text-[#C1B6AD] opacity-90">
-                    ⚠ {rewRoomPlusProductData.debug.productNote}
-                  </span>
-                )}
-              </div>
-              
-              <div className="flex items-center gap-4 mb-2">
-                <div className="flex items-center gap-2">
-                  <Checkbox 
-                    id="show-mode-lines" 
-                    checked={showRewModeLines}
-                    onCheckedChange={setShowRewModeLines}
-                  />
-                  <Label htmlFor="show-mode-lines" className="text-xs text-[#3E4349]">
-                    Show mode lines (REW)
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox 
-                    id="linear-hz-axis" 
-                    checked={linearHzAxis}
-                    onCheckedChange={setLinearHzAxis}
-                  />
-                  <Label htmlFor="linear-hz-axis" className="text-xs text-[#3E4349]">
-                    Linear Hz axis (REW)
-                  </Label>
-                </div>
-              </div>
-            </>
-          )}
+        )}
+
+        {/* Graph or placeholder */}
+        {displayData.length > 0 ? (
           <BassGraph
             responseData={displayData}
             schroederFrequency={schroederFrequency}
             rp22Levels={rp22Levels}
             toggles={toggles}
             crossoverFrequency={80}
-            modeFrequencies={rewStyleMode ? [] : modeFrequencies}
+            modeFrequencies={modeFrequencies}
             showModeMarkers={rewStyleMode ? showRewModeLines : showModeMarkers}
             modeMarkers={rewStyleMode ? (rewModesData?.debug?.modeMarkers || []) : []}
             linearHzAxis={rewStyleMode && linearHzAxis}
             rewStyleMode={rewStyleMode}
           />
-        </div>
-      ) : (
-        <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
-          No bass response data yet. Add at least one sub and one seat, then check this panel again.
-        </div>
-      )}
+        ) : (
+          <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
+            No graph data yet.
+            {rewStyleMode ? (
+              <div className="text-xs mt-2">
+                REW mode is ON — if this stays blank, the debug banner above should say why.
+              </div>
+            ) : (
+              <div className="text-xs mt-2">
+                Add at least one sub and one seat, then check this panel again.
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Bass Metrics (20-80 Hz) */}
       {bassMetrics2080Hz && (
