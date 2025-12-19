@@ -119,7 +119,7 @@ function computeAxialModes(roomDims, fMax = 200) {
 // Export for UI use
 export { computeAxialModes };
 
-// Compute REW-style modes-only response (no product curve, just room behavior)
+// Compute REW-style modes-only response (axial modes with source/receiver coupling)
 export function computeModesOnlyResponse({ roomDims, seatPos, freqsHz, damping = 20 }) {
   if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
     return freqsHz.map(() => 90); // fallback flat
@@ -129,52 +129,87 @@ export function computeModesOnlyResponse({ roomDims, seatPos, freqsHz, damping =
     return freqsHz.map(() => 90); // fallback flat
   }
   
-  // Generic source: front wall center, floor level
+  // Generic reference source: front wall center, near floor
   const sourcePos = {
     x: roomDims.widthM / 2,
     y: 0.01,
-    z: 0.0
+    z: 0.1
   };
   
   // Compute axial modes up to 200 Hz
   const modes = computeAxialModes(roomDims, 200);
   
-  // Baseline flat response (90 dB)
+  // Baseline (flat response reference)
   const baselineDb = 90;
   
-  // Build response curve
+  // Build response curve with modal resonances
   return freqsHz.map(f => {
-    // Start with flat baseline
-    let sumReal = 1.0;
-    let sumImag = 0.0;
+    // Start with unity magnitude (0 dB contribution)
+    let totalDb = 0;
     
-    // Apply modal resonances
+    // Sum contributions from all modes
     for (const mode of modes) {
-      // Only evaluate modes near this frequency
-      const bw = mode.fHz / damping;
-      const df = Math.abs(f - mode.fHz);
-      if (df > 3 * bw) continue;
+      const f0 = mode.fHz;
+      const Q = damping;
       
-      // Calculate coupling
-      const coupling = axisCoupling(mode.axis, mode.n, sourcePos, seatPos, mode.dim);
+      // Bandwidth for filtering
+      const bw = f0 / Q;
+      const df = Math.abs(f - f0);
+      
+      // Skip modes too far away (optimization)
+      if (df > 5 * bw) continue;
+      
+      // Calculate source-receiver coupling for this mode
+      let coupling = 0;
+      const n = mode.n;
+      
+      if (mode.axis === 'Y') {
+        // Length mode
+        const L = roomDims.lengthM;
+        const excite = Math.abs(Math.cos(n * Math.PI * sourcePos.y / L));
+        const receive = Math.abs(Math.cos(n * Math.PI * seatPos.y / L));
+        coupling = excite * receive;
+      } else if (mode.axis === 'X') {
+        // Width mode
+        const W = roomDims.widthM;
+        const excite = Math.abs(Math.cos(n * Math.PI * sourcePos.x / W));
+        const receive = Math.abs(Math.cos(n * Math.PI * seatPos.x / W));
+        coupling = excite * receive;
+      } else if (mode.axis === 'Z') {
+        // Height mode
+        const H = roomDims.heightM;
+        const zS = sourcePos.z;
+        const zR = seatPos.z ?? 1.2;
+        const excite = Math.abs(Math.cos(n * Math.PI * zS / H));
+        const receive = Math.abs(Math.cos(n * Math.PI * zR / H));
+        coupling = excite * receive;
+      }
+      
+      // Skip if coupling is negligible
       if (coupling < 0.01) continue;
       
-      // Get resonator response
-      const resonator = modalResonator(f, mode.fHz, damping, coupling, 0.3);
+      // Compute smooth resonator response (2nd-order peaking)
+      // Normalized frequency deviation
+      const omega = 2 * Math.PI * f;
+      const omega0 = 2 * Math.PI * f0;
+      const domega = omega - omega0;
+      const bwRad = omega0 / Q;
       
-      // Multiply complex
-      const newReal = sumReal * resonator.real - sumImag * resonator.imag;
-      const newImag = sumReal * resonator.imag + sumImag * resonator.real;
+      // Magnitude response of peaking filter
+      const denom = Math.sqrt(domega * domega + bwRad * bwRad);
+      const peakMag = bwRad / denom;
       
-      sumReal = newReal;
-      sumImag = newImag;
+      // Scale by coupling (modal strength)
+      const gain = 12; // dB boost at peak (tunable)
+      const contribution = coupling * peakMag * gain;
+      
+      totalDb += contribution;
     }
     
-    // Convert to dB
-    const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
-    const db = baselineDb + 20 * Math.log10(magnitude);
+    // Final SPL = baseline + modal contributions
+    const finalDb = baselineDb + totalDb;
     
-    return Math.max(MIN_SPL_FLOOR, db);
+    return Math.max(MIN_SPL_FLOOR, Math.min(130, finalDb));
   });
 }
 
