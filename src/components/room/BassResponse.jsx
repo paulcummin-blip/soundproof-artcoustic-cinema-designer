@@ -173,30 +173,32 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // REW-style modes-only curve (when toggle is ON) - uses real room modes engine
   const rewModesData = useMemo(() => {
     if (!rewStyleMode) return null;
-    
+
     // Use selected seat (MLP or currently shown seat)
     const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
     if (!seat) return null;
-    
-    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
-    
-    // Build source positions from actual dragged subs (front + rear).
-    // If none exist, fall back to a single generic sub (computeRoomModesResponse will handle it).
-    const frontSubs = subsForSimulation.filter(s => s.id?.startsWith('front-'));
-    const rearSubs = subsForSimulation.filter(s => s.id?.startsWith('rear-'));
-    
-    const sourcePositions = [
-      ...(Array.isArray(frontSubs) ? frontSubs : []),
-      ...(Array.isArray(rearSubs) ? rearSubs : []),
-    ]
+
+    // Use actual seat z (don't force it)
+    const seatPos = { 
+      x: seat.x, 
+      y: seat.y, 
+      z: seat.z ?? 1.2 
+    };
+
+    // Build source positions from actual dragged subs (front + rear)
+    const sourcePositions = subsForSimulation
       .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
       .map(s => ({
         x: s.x,
         y: s.y,
-        // REW parity: sub on the floor
-        z: 0.0,
+        z: 0.0 // REW parity: sub on the floor
       }));
-    
+
+    // Convert damping slider (8-35) to REW-like percentage mapping
+    // User sees Q slider 8-35, internally we treat as damping%
+    const dampingPercent = ((35 - roomDamping) / (35 - 8)) * 100; // 8→100%, 35→0%
+    const qMapped = 6 + (1 - dampingPercent / 100) * 44;
+
     // Compute room modes response (REW parity: 3D modes with spatial coupling)
     const result = computeRoomModesResponse({
       roomDims,
@@ -206,22 +208,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       fMax: 200,
       pointsPerOct: 24,
       modeLimitHz: 200,
-      q: roomDamping, // UI slider value
+      q: qMapped,
       includeAxial: true,
       includeTangential: true,
       includeOblique: true,
       rewParityMode: true,
       smoothing: rewSmoothing,
       subFloorHeight: 0.0,
-      normalizeBandHz: [30, 50], // Avoid anchoring below first modes
-      normalizeToDb: 0 // Relative mode (0 dB baseline)
+      normalizeBandHz: [30, 80],
+      normalizeToDb: 0
     });
-    
-    return result.freqs.map((frequency, i) => ({
-      frequency,
-      spl: result.splDb[i]
-    }));
-  }, [rewStyleMode, roomDims, seatingPositions, frontSubsCfg, rearSubsCfg, roomDamping, rewSmoothing]);
+
+    return {
+      data: result.freqs.map((frequency, i) => ({
+        frequency,
+        spl: result.splDb[i]
+      })),
+      debug: result.debug
+    };
+  }, [rewStyleMode, roomDims, seatingPositions, subsForSimulation, roomDamping, rewSmoothing]);
 
   // Convert to chart format (product-based curve)
   const responseData = useMemo(() => {
@@ -236,7 +241,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   }, [selectedSeat]);
   
   // Choose which curve to display
-  const displayData = rewStyleMode ? (rewModesData || []) : responseData;
+  const displayData = rewStyleMode ? (rewModesData?.data || []) : responseData;
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
@@ -739,9 +744,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             </div>
           </div>
           {rewStyleMode && (
-            <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded">
-              <strong>REW parity mode:</strong> Room-only response, 3D modes (axial+tangential+oblique) with spatial coupling, sub at floor (z=0m), normalized to 30-80Hz. Modal peaks/dips change with sub/seat position.
-            </div>
+            <>
+              <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded">
+                <strong>REW parity mode:</strong> Room-only response, 3D modes (axial+tangential+oblique) with spatial coupling, sub at floor (z=0m), normalized to 30-80Hz. Modal peaks/dips change with sub/seat position.
+                {rewModesData?.debug && (
+                  <div className="mt-2 text-[10px] opacity-70">
+                    Debug: {rewModesData.debug.modeCount} modes • 
+                    First 10: {rewModesData.debug.firstTenModeHz?.join(', ')} Hz • 
+                    Norm band: {rewModesData.debug.normBandHz?.[0]}-{rewModesData.debug.normBandHz?.[1]} Hz
+                  </div>
+                )}
+              </div>
+            </>
           )}
           <BassGraph
             responseData={displayData}

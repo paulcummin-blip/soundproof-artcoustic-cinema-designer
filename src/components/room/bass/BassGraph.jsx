@@ -23,9 +23,23 @@ export default function BassGraph({
   showModeMarkers = false,
   rewStyleMode = false
 }) {
-    const data = toggles.smoothing
+    // Clamp and sanitize data for REW mode (prevent crazy Y-axis values)
+    let data = toggles.smoothing
         ? responseData // Placeholder for actual smoothing logic
         : responseData;
+    
+    if (rewStyleMode && data.length > 0) {
+        data = data.map(point => {
+            let spl = point.spl;
+            // Guard against non-finite values
+            if (!isFinite(spl)) {
+                spl = 0;
+            }
+            // Clamp to reasonable relative range
+            spl = Math.max(-40, Math.min(20, spl));
+            return { ...point, spl };
+        });
+    }
 
     return (
         <div className="w-full h-[400px]">
@@ -43,7 +57,7 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                     />
                     <YAxis
-                        domain={rewStyleMode ? [-30, 30] : [70, 130]}
+                        domain={rewStyleMode ? [-40, 20] : [70, 130]}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
                         label={{ value: rewStyleMode ? 'Relative (dB)' : 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
