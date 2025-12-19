@@ -81,6 +81,9 @@ export function computeRoomModesResponse({
     includeTangential,
     includeOblique
   });
+
+  // Lowest axial mode (used for sealed-room pressure behaviour)
+  const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
   // Build response using modal resonators (REW-style)
   let splDb = freqs.map(f => {
@@ -127,9 +130,43 @@ export function computeRoomModesResponse({
 
     const db = 20 * Math.log10(safe);
     return Number.isFinite(db) ? db : -120;
-  });
-  
-  // Capture RAW stats BEFORE any processing (critical for debugging)
+    });
+
+    // REW-like sealed-room pressure behaviour below lowest axial mode.
+    // This prevents an unrealistic LF "cliff" and gives a gentle, capped rise
+    // as frequency drops below the first axial mode.
+    if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
+    const f0 = lowestAxial;
+
+    // Target behaviour: below f0, add up to +12 dB maximum as we go down in frequency.
+    // Use a gentle 12 dB/oct slope cap (pressure-zone-like) but never exceed +12 dB.
+    const maxBoostDb = 12;
+
+    splDb = splDb.map((db, i) => {
+      const f = freqs[i];
+      if (!(Number.isFinite(f) && f > 0 && Number.isFinite(db))) return db;
+
+      if (f >= f0) return db;
+
+      // 12 dB/oct: boost = 12 * log2(f0/f), capped
+      const boost = Math.min(maxBoostDb, 12 * Math.log2(f0 / f));
+      return db + boost;
+    });
+    }
+
+    // Mild LF boundary gain feel (optional REW-ish flavour): below 40 Hz, add up to +3 dB
+    if (rewParityMode) {
+    splDb = splDb.map((db, i) => {
+      const f = freqs[i];
+      if (!(Number.isFinite(f) && Number.isFinite(db))) return db;
+      if (f >= 40) return db;
+      const t = (40 - f) / 25; // 40 -> 15 Hz
+      const add = Math.max(0, Math.min(3, 3 * t));
+      return db + add;
+    });
+    }
+
+    // Capture RAW stats BEFORE any processing (critical for debugging)
   const rawFinite = splDb.filter(v => isFinite(v));
   const rawMin = rawFinite.length > 0 ? Math.min(...rawFinite) : 0;
   const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;

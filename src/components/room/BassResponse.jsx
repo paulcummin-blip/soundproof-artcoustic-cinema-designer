@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
+import { getSubwooferCurve, normaliseModelKey } from "@/components/models/speakers/registry";
 
 const brand = {
   ink:   "#1B1A1A",
@@ -310,52 +311,50 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     };
   }, [rewStyleMode, roomDims, seatingPositions, subsForSimulation, roomDamping, rewSmoothing]);
 
-  // Helper: get subwoofer anechoic response curve (dB vs Hz)
-  // Returns a curve aligned to the requested frequency axis.
-  // IMPORTANT: we return a SHAPE curve (anchored at a reference frequency)
-  // so Room+Product visibly differs from Room-only.
-  const getSubAnechoicResponseDb = (modelKey, freqs, anchorHz = 50) => {
+  // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
+  const getSubAnechoicResponseDb = (modelKey, freqs) => {
     try {
-      const { getSubwooferCurve, normaliseModelKey } = require('@/components/models/speakers/registry');
       const key = normaliseModelKey ? normaliseModelKey(modelKey) : modelKey;
       const curve = getSubwooferCurve ? getSubwooferCurve(key) : null;
+
       if (!Array.isArray(curve) || curve.length < 2) return null;
 
-      // Extract points (Hz, dB)
+      // Normalise curve point format -> { hz, db }
       const pts = curve
-        .map(p => ({
-          hz: Number(p.hz ?? p.frequency ?? (Array.isArray(p) ? p[0] : NaN)),
-          db: Number(p.db ?? p.spl ?? (Array.isArray(p) ? p[1] : NaN)),
-        }))
+        .map(p => {
+          const hz = p?.hz ?? p?.frequency ?? (Array.isArray(p) ? p[0] : undefined);
+          const db = p?.db ?? p?.spl ?? (Array.isArray(p) ? p[1] : undefined);
+          return { hz: Number(hz), db: Number(db) };
+        })
         .filter(p => Number.isFinite(p.hz) && Number.isFinite(p.db))
         .sort((a, b) => a.hz - b.hz);
 
       if (pts.length < 2) return null;
 
-      const interpAt = (f) => {
-        if (f <= pts[0].hz) return pts[0].db;
-        if (f >= pts[pts.length - 1].hz) return pts[pts.length - 1].db;
+      // Linear interpolation in dB vs Hz (good enough for v1)
+      const out = freqs.map(f => {
+        const F = Number(f);
+        if (!Number.isFinite(F)) return 0;
 
+        // Clamp outside range
+        if (F <= pts[0].hz) return pts[0].db;
+        if (F >= pts[pts.length - 1].hz) return pts[pts.length - 1].db;
+
+        // Find bracket
+        let lo = pts[0], hi = pts[pts.length - 1];
         for (let i = 0; i < pts.length - 1; i++) {
-          const a = pts[i];
-          const b = pts[i + 1];
-          if (f >= a.hz && f <= b.hz) {
-            const t = (f - a.hz) / (b.hz - a.hz);
-            return a.db + (b.db - a.db) * t;
+          if (pts[i].hz <= F && F <= pts[i + 1].hz) {
+            lo = pts[i];
+            hi = pts[i + 1];
+            break;
           }
         }
-        return pts[pts.length - 1].db;
-      };
 
-      // Build interpolated curve at REW axis freqs
-      const raw = freqs.map(f => interpAt(f));
+        const t = (F - lo.hz) / Math.max(1e-9, (hi.hz - lo.hz));
+        return lo.db + (hi.db - lo.db) * t;
+      });
 
-      // Anchor to a reference frequency so it becomes a "shape" curve.
-      // This avoids "normalise to 30–80 = 0" wiping out the product influence.
-      const refDb = interpAt(anchorHz);
-      const shaped = raw.map(v => v - refDb);
-
-      return shaped;
+      return out;
     } catch (err) {
       console.warn("[getSubAnechoicResponseDb] Failed", modelKey, err);
       return null;
@@ -383,9 +382,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       };
     }
 
-    // Get product SHAPE curves (anchored at 50 Hz)
+    // Get product curves (anechoic response)
     const curves = uniqueKeys
-      .map(k => getSubAnechoicResponseDb(k, freqs, 50))
+      .map(k => getSubAnechoicResponseDb(k, freqs))
       .filter(arr => Array.isArray(arr) && arr.length === freqs.length);
 
     if (!curves.length) {
@@ -395,12 +394,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       };
     }
 
-    // Average the SHAPE curves (in dB, since they're already anchored)
-    const productShapeDb = freqs.map((_, i) => {
+    // Average product curves in magnitude domain
+    const avgMag = freqs.map((_, i) => {
       let sum = 0;
-      for (const c of curves) sum += c[i];
+      curves.forEach(c => { sum += Math.pow(10, c[i] / 20); });
       return sum / curves.length;
     });
+
+    // Back to dB
+    let productDb = avgMag.map(m => 20 * Math.log10(Math.max(1e-12, m)));
+
+    // IMPORTANT: do NOT normalise the product curve to the same 30–80 band.
+    // The room curve is already normalised (REW-style). If we normalise product too,
+    // we often cancel the product effect and Room+Product looks identical.
+    // Instead, we apply product shape relative to its own 60–120 Hz "midbass" anchor.
+    const anchorBand = freqs
+      .map((f, i) => ({ f, i }))
+      .filter(o => o.f >= 60 && o.f <= 120);
+
+    if (anchorBand.length) {
+      const mean = anchorBand.reduce((acc, o) => acc + productDb[o.i], 0) / anchorBand.length;
+      productDb = productDb.map(v => v - mean);
+    }
+
+    const productShapeDb = productDb;
 
     // Add product shape to room curve
     const out = freqs.map((f, i) => ({
@@ -480,6 +497,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       return rewModesData?.data || [];
     }
   }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, responseData]);
+
+  // Anchor REW-style curve to an absolute SPL reference so the axis matches RP22 intent
+  const rewSplAnchoredData = useMemo(() => {
+    if (!rewStyleMode) return displayData;
+
+    const target = simulationResults?.metrics?.p14?.maxSplDb;
+    if (!Number.isFinite(target)) return displayData;
+
+    // Find current curve max in 20–80 Hz (same band used for RP22 bass evaluation)
+    const band = displayData.filter(p => p.frequency >= 20 && p.frequency <= 80 && Number.isFinite(p.spl));
+    if (band.length < 5) return displayData;
+
+    const currentMax = Math.max(...band.map(p => p.spl));
+    if (!Number.isFinite(currentMax)) return displayData;
+
+    const offset = target - currentMax;
+
+    return displayData.map(p => ({
+      ...p,
+      spl: Number.isFinite(p.spl) ? (p.spl + offset) : p.spl
+    }));
+  }, [rewStyleMode, displayData, simulationResults?.metrics?.p14?.maxSplDb]);
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
@@ -1074,7 +1113,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         {/* Graph or placeholder */}
         {displayData.length > 0 ? (
           <BassGraph
-            responseData={displayData}
+            responseData={rewStyleMode ? rewSplAnchoredData : displayData}
             schroederFrequency={schroederFrequency}
             rp22Levels={rp22Levels}
             toggles={toggles}
