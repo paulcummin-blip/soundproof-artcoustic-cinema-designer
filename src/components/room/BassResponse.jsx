@@ -39,6 +39,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [roomDamping, setRoomDamping] = useState(20);
   const [showModeMarkers, setShowModeMarkers] = useState(false);
   const [rewStyleMode, setRewStyleMode] = useState(false);
+  const [rewSmoothing, setRewSmoothing] = useState('none');
 
   // Build subs array from frontSubsCfg + rearSubsCfg for engine
   const subsForSimulation = useMemo(() => {
@@ -219,7 +220,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       sourcePositions.push({ x: roomWidth / 2, y: 0.2, z: 0.2 });
     }
     
-    // Compute room modes response
+    // Compute room modes response (REW parity: axial + tangential + oblique)
     const result = computeRoomModesResponse({
       roomDims,
       sourcePositions,
@@ -230,15 +231,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       modeLimitHz: 200,
       q: roomDamping,
       includeAxial: true,
-      includeTangential: false,
-      includeOblique: false
+      includeTangential: true,
+      includeOblique: true,
+      rewParityMode: true,
+      smoothing: rewSmoothing,
+      subFloorHeight: 0.0
     });
     
     return result.freqs.map((frequency, i) => ({
       frequency,
       spl: result.splDb[i]
     }));
-  }, [rewStyleMode, roomDims, seatingPositions, frontSubsCfg, rearSubsCfg, roomDamping]);
+  }, [rewStyleMode, roomDims, seatingPositions, frontSubsCfg, rearSubsCfg, roomDamping, rewSmoothing]);
 
   // Convert to chart format (product-based curve)
   const responseData = useMemo(() => {
@@ -371,7 +375,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       heightM: roomDims.heightM
     }, 200);
     return modes.map(m => m.fHz);
-  }, [rewStyleMode, roomDims, seatingPositions, roomDamping]);
+  }, [rewStyleMode, roomDims, seatingPositions, roomDamping, rewSmoothing]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
@@ -756,8 +760,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             </div>
           </div>
           {rewStyleMode && (
-            <div className="text-xs text-[#3E4349] mb-2">
-              Shows room-only response using a generic flat sub (no product curve)
+            <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded">
+              <strong>REW parity assumptions:</strong> Room-only, relative curve, 3D modes (axial+tangential+oblique), sub at floor (z=0m), seats at true z.
             </div>
           )}
           <BassGraph
@@ -829,7 +833,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       
       {/* Room Modes Controls */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
-        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Modes (Axial)</div>
+        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Modes (Product Simulation)</div>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <Label htmlFor="modes-toggle" className="text-xs text-[#3E4349]">
@@ -841,7 +845,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               onCheckedChange={setModesEnabled}
             />
           </div>
-          
+
           {modesEnabled && (
             <>
               <div>
@@ -877,12 +881,37 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               </div>
             </>
           )}
-          
+
           <div className="text-xs text-[#3E4349]">
-            Axial modes only (fast). Tangential/oblique later.
+            Applies modal filtering to product-based simulation
           </div>
         </div>
       </div>
+
+      {/* REW Smoothing (only shown when REW mode is ON) */}
+      {rewStyleMode && (
+        <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
+          <div className="text-sm font-medium text-[#1B1A1A] mb-3">Smoothing</div>
+          <div className="space-y-2">
+            <div className="grid grid-cols-4 gap-2">
+              {['none', '1/12', '1/6', '1/3'].map(opt => (
+                <Button
+                  key={opt}
+                  variant={rewSmoothing === opt ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setRewSmoothing(opt)}
+                  className="text-xs"
+                >
+                  {opt === 'none' ? 'None' : opt + ' oct'}
+                </Button>
+              ))}
+            </div>
+            <div className="text-xs text-[#3E4349]">
+              Use 1/3 octave for RP22 P19 reporting
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Auto Align Controls */}
       {totalSubCount > 0 && (

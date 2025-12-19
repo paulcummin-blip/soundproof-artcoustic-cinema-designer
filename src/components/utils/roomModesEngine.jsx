@@ -20,7 +20,10 @@ export function computeRoomModesResponse({
   includeAxial = true,
   includeTangential = false,
   includeOblique = false,
-  c = SPEED_OF_SOUND
+  c = SPEED_OF_SOUND,
+  rewParityMode = true,
+  smoothing = 'none', // 'none', '1/12', '1/6', '1/3'
+  subFloorHeight = 0.0 // REW default: subs at floor
 }) {
   // Validate inputs
   if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
@@ -36,8 +39,14 @@ export function computeRoomModesResponse({
     sourcePositions = [{
       x: roomDims.widthM / 2,
       y: 0.2,
-      z: 0.2
+      z: rewParityMode ? subFloorHeight : 0.2
     }];
+  } else if (rewParityMode) {
+    // In REW parity mode, force subs to floor height
+    sourcePositions = sourcePositions.map(src => ({
+      ...src,
+      z: subFloorHeight
+    }));
   }
   
   const { widthM, lengthM, heightM } = roomDims;
@@ -62,9 +71,9 @@ export function computeRoomModesResponse({
     includeOblique
   });
   
-  // Build magnitude response
+  // Build magnitude response with proper modal weighting
   const baselineDb = 90; // reference level
-  const splDb = freqs.map(f => {
+  let splDb = freqs.map(f => {
     let totalContribution = 0;
     
     // Sum contributions from all modes
@@ -86,10 +95,10 @@ export function computeRoomModesResponse({
       
       // Average if multiple sources
       if (sourcePositions.length > 0) {
-        sourceCoupling /= sourcePositions.length;
+        sourceCoupling /= Math.sqrt(sourcePositions.length);
       }
       
-      if (Math.abs(sourceCoupling) < 0.01) continue;
+      if (Math.abs(sourceCoupling) < 0.001) continue;
       
       // Compute resonator magnitude response
       const omega = 2 * Math.PI * f;
@@ -101,8 +110,13 @@ export function computeRoomModesResponse({
       const denom = Math.sqrt(domega * domega + bwRad * bwRad);
       const peakMag = bwRad / denom;
       
-      // Modal gain (tunable for visual realism)
-      const modeGain = 10; // dB at peak
+      // Modal gain scaled by mode type (axial stronger than tangential)
+      let modeWeight = 1.0;
+      if (mode.type === 'axial') modeWeight = 1.0;
+      else if (mode.type === 'tangential') modeWeight = 0.5;
+      else if (mode.type === 'oblique') modeWeight = 0.25;
+      
+      const modeGain = 12 * modeWeight; // dB at peak
       const contribution = sourceCoupling * peakMag * modeGain;
       
       totalContribution += contribution;
@@ -110,6 +124,16 @@ export function computeRoomModesResponse({
     
     return Math.max(30, Math.min(130, baselineDb + totalContribution));
   });
+  
+  // Apply smoothing if requested
+  if (smoothing !== 'none') {
+    splDb = applySmoothing(freqs, splDb, smoothing);
+  }
+  
+  // Normalize in REW parity mode
+  if (rewParityMode) {
+    splDb = normalizeResponse(freqs, splDb);
+  }
   
   // Extract mode frequencies for markers (axial only for clarity)
   const modeMarkersHz = modes
@@ -213,7 +237,7 @@ function computeModalCoupling(mode, source, receiver, roomDims) {
   const { widthM, lengthM, heightM } = roomDims;
   const { nx, ny, nz } = mode;
   
-  // Source coupling
+  // Source coupling (pressure mode shape)
   let srcCoupling = 1;
   if (nx > 0) {
     srcCoupling *= Math.cos(nx * Math.PI * source.x / widthM);
@@ -222,7 +246,7 @@ function computeModalCoupling(mode, source, receiver, roomDims) {
     srcCoupling *= Math.cos(ny * Math.PI * source.y / lengthM);
   }
   if (nz > 0) {
-    const srcZ = source.z ?? 0.2;
+    const srcZ = source.z ?? 0.0;
     srcCoupling *= Math.cos(nz * Math.PI * srcZ / heightM);
   }
   
@@ -239,6 +263,59 @@ function computeModalCoupling(mode, source, receiver, roomDims) {
     rcvCoupling *= Math.cos(nz * Math.PI * rcvZ / heightM);
   }
   
-  // Combined coupling (use absolute value for magnitude, keep sign for phase later if needed)
-  return Math.abs(srcCoupling * rcvCoupling);
+  // Combined coupling (energy-like: square of pressure)
+  const coupling = srcCoupling * rcvCoupling;
+  return coupling * Math.abs(coupling); // preserves sign, scales by magnitude
+}
+
+/**
+ * Apply fractional octave smoothing to response
+ */
+function applySmoothing(freqs, splDb, smoothing) {
+  const octaveFraction = {
+    '1/12': 12,
+    '1/6': 6,
+    '1/3': 3
+  }[smoothing] || 1;
+  
+  const smoothed = [...splDb];
+  
+  for (let i = 0; i < freqs.length; i++) {
+    const fc = freqs[i];
+    const fLow = fc / Math.pow(2, 1 / (2 * octaveFraction));
+    const fHigh = fc * Math.pow(2, 1 / (2 * octaveFraction));
+    
+    // Find indices in smoothing window
+    let sum = 0;
+    let count = 0;
+    
+    for (let j = 0; j < freqs.length; j++) {
+      if (freqs[j] >= fLow && freqs[j] <= fHigh) {
+        sum += splDb[j];
+        count++;
+      }
+    }
+    
+    if (count > 0) {
+      smoothed[i] = sum / count;
+    }
+  }
+  
+  return smoothed;
+}
+
+/**
+ * Normalize response to 0 dB at reference frequency
+ */
+function normalizeResponse(freqs, splDb) {
+  // Find mean SPL in 40-60 Hz band (REW-style normalization)
+  const indices = freqs.map((f, i) => f >= 40 && f <= 60 ? i : -1).filter(i => i >= 0);
+  
+  if (indices.length === 0) return splDb;
+  
+  const refSum = indices.reduce((sum, i) => sum + splDb[i], 0);
+  const refLevel = refSum / indices.length;
+  
+  // Normalize to 0 dB at reference
+  return splDb.map(spl => spl - refLevel);
 }
