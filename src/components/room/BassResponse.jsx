@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useAppState } from "../AppStateProvider";
 import BassGraph from "@/components/room/bass/BassGraph";
 import { simulateBassAtSeats, computeAxialModes, computeModesOnlyResponse } from "@/components/bass/bassSimulationEngine";
+import { computeRoomModesResponse } from "@/components/utils/roomModesEngine";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -168,37 +169,76 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return null;
   }, [seatingPositions, simulationResults.seatResponses]);
 
-  // REW-style modes-only curve (when toggle is ON)
+  // REW-style modes-only curve (when toggle is ON) - uses real room modes engine
   const rewModesData = useMemo(() => {
     if (!rewStyleMode) return null;
     
-    // Use MLP seat or first seat
+    // Use selected seat (MLP or currently shown seat)
     const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
     if (!seat) return null;
     
-    // Use frequency range from first valid response OR default range
-    let freqsHz = selectedSeat?.freqsHz;
-    if (!freqsHz || freqsHz.length === 0) {
-      // Default frequency range if no simulation yet
-      freqsHz = [];
-      for (let f = 15; f <= 200; f += (f < 100 ? 1 : 5)) {
-        freqsHz.push(f);
+    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+    
+    // Build source positions from actual dragged subs
+    const sourcePositions = [];
+    
+    // Front subs
+    const frontCount = frontSubsCfg?.count || 0;
+    const frontPositions = frontSubsCfg?.positions || [];
+    if (frontCount > 0) {
+      const roomWidth = roomDims?.widthM || 4.5;
+      const defaultFrontPos = [
+        { x: roomWidth * 0.33, y: 0.15 },
+        { x: roomWidth * 0.67, y: 0.15 }
+      ];
+      for (let i = 0; i < frontCount; i++) {
+        const pos = frontPositions[i] || defaultFrontPos[i];
+        sourcePositions.push({ x: pos.x, y: pos.y, z: 0.2 });
       }
     }
     
-    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
-    const splDb = computeModesOnlyResponse({ 
-      roomDims, 
-      seatPos, 
-      freqsHz, 
-      damping: roomDamping 
+    // Rear subs
+    const rearCount = rearSubsCfg?.count || 0;
+    const rearPositions = rearSubsCfg?.positions || [];
+    if (rearCount > 0) {
+      const roomWidth = roomDims?.widthM || 4.5;
+      const roomLength = roomDims?.lengthM || 6.0;
+      const defaultRearPos = [
+        { x: roomWidth * 0.33, y: roomLength - 0.15 },
+        { x: roomWidth * 0.67, y: roomLength - 0.15 }
+      ];
+      for (let i = 0; i < rearCount; i++) {
+        const pos = rearPositions[i] || defaultRearPos[i];
+        sourcePositions.push({ x: pos.x, y: pos.y, z: 0.2 });
+      }
+    }
+    
+    // If no subs, use default front-center position
+    if (sourcePositions.length === 0) {
+      const roomWidth = roomDims?.widthM || 4.5;
+      sourcePositions.push({ x: roomWidth / 2, y: 0.2, z: 0.2 });
+    }
+    
+    // Compute room modes response
+    const result = computeRoomModesResponse({
+      roomDims,
+      sourcePositions,
+      seatPosition: seatPos,
+      fMin: 15,
+      fMax: 200,
+      pointsPerOct: 24,
+      modeLimitHz: 200,
+      q: roomDamping,
+      includeAxial: true,
+      includeTangential: false,
+      includeOblique: false
     });
     
-    return freqsHz.map((frequency, i) => ({
+    return result.freqs.map((frequency, i) => ({
       frequency,
-      spl: splDb[i]
+      spl: result.splDb[i]
     }));
-  }, [rewStyleMode, roomDims, seatingPositions, roomDamping, selectedSeat?.freqsHz]);
+  }, [rewStyleMode, roomDims, seatingPositions, frontSubsCfg, rearSubsCfg, roomDamping]);
 
   // Convert to chart format (product-based curve)
   const responseData = useMemo(() => {
@@ -298,16 +338,40 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   const toggles = React.useMemo(() => ({ smoothing: false }), []);
 
-  // Compute mode frequencies for markers
+  // Compute mode frequencies for markers (use room modes engine when in REW mode)
   const modeFrequencies = useMemo(() => {
     if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) return [];
+    
+    if (rewStyleMode) {
+      // Use room modes engine for accurate markers
+      const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+      if (!seat) return [];
+      
+      const result = computeRoomModesResponse({
+        roomDims,
+        sourcePositions: [{ x: roomDims.widthM / 2, y: 0.2, z: 0.2 }],
+        seatPosition: { x: seat.x, y: seat.y, z: seat.z ?? 1.2 },
+        fMin: 15,
+        fMax: 200,
+        pointsPerOct: 24,
+        modeLimitHz: 200,
+        q: roomDamping,
+        includeAxial: true,
+        includeTangential: false,
+        includeOblique: false
+      });
+      
+      return result.debug.modeMarkersHz || [];
+    }
+    
+    // Fallback to basic axial modes
     const modes = computeAxialModes({
       widthM: roomDims.widthM,
       lengthM: roomDims.lengthM,
       heightM: roomDims.heightM
     }, 200);
     return modes.map(m => m.fHz);
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
+  }, [rewStyleMode, roomDims, seatingPositions, roomDamping]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
