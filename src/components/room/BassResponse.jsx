@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useAppState } from "../AppStateProvider";
 import BassGraph from "@/components/room/bass/BassGraph";
-import { simulateBassAtSeats, computeAxialModes } from "@/components/bass/bassSimulationEngine";
+import { simulateBassAtSeats, computeAxialModes, computeModesOnlyResponse } from "@/components/bass/bassSimulationEngine";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -36,6 +36,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [modesEnabled, setModesEnabled] = useState(false);
   const [roomDamping, setRoomDamping] = useState(20);
   const [showModeMarkers, setShowModeMarkers] = useState(false);
+  const [rewStyleMode, setRewStyleMode] = useState(false);
 
   // Build subs array from frontSubsCfg + rearSubsCfg for engine
   const subsForSimulation = useMemo(() => {
@@ -166,7 +167,39 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return null;
   }, [seatingPositions, simulationResults.seatResponses]);
 
-  // Convert to chart format
+  // REW-style modes-only curve (when toggle is ON)
+  const rewModesData = useMemo(() => {
+    if (!rewStyleMode) return null;
+    
+    // Use MLP seat or first seat
+    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+    if (!seat) return null;
+    
+    // Use frequency range from first valid response OR default range
+    let freqsHz = selectedSeat?.freqsHz;
+    if (!freqsHz || freqsHz.length === 0) {
+      // Default frequency range if no simulation yet
+      freqsHz = [];
+      for (let f = 15; f <= 200; f += (f < 100 ? 1 : 5)) {
+        freqsHz.push(f);
+      }
+    }
+    
+    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+    const splDb = computeModesOnlyResponse({ 
+      roomDims, 
+      seatPos, 
+      freqsHz, 
+      damping: roomDamping 
+    });
+    
+    return freqsHz.map((frequency, i) => ({
+      frequency,
+      spl: splDb[i]
+    }));
+  }, [rewStyleMode, roomDims, seatingPositions, roomDamping, selectedSeat?.freqsHz]);
+
+  // Convert to chart format (product-based curve)
   const responseData = useMemo(() => {
     if (!selectedSeat || !selectedSeat.freqsHz || !selectedSeat.splDb) {
       return [];
@@ -177,6 +210,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       spl: selectedSeat.splDb[i]
     }));
   }, [selectedSeat]);
+  
+  // Choose which curve to display
+  const displayData = rewStyleMode ? (rewModesData || []) : responseData;
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
@@ -560,22 +596,37 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       )}
 
       {/* Bass Response Graph */}
-      {responseData.length > 0 ? (
+      {displayData.length > 0 ? (
         <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Label htmlFor="rew-mode" className="text-xs text-[#3E4349] whitespace-nowrap">
+                Room Modes (REW-style)
+              </Label>
+              <Switch
+                id="rew-mode"
+                checked={rewStyleMode}
+                onCheckedChange={setRewStyleMode}
+              />
+            </div>
             <div style={{ fontSize: 12, color: "#3E4349" }}>
               Showing: {selectedSeat?.isPrimary ? "MLP" : `Seat ${selectedSeat?.id ?? ""}`}
             </div>
           </div>
+          {rewStyleMode && (
+            <div className="text-xs text-[#3E4349] mb-2">
+              Shows room-only response using a generic flat sub (no product curve)
+            </div>
+          )}
           <BassGraph
-            responseData={responseData}
+            responseData={displayData}
             schroederFrequency={schroederFrequency}
             rp22Levels={rp22Levels}
             toggles={toggles}
             crossoverFrequency={80}
             modeFrequencies={modeFrequencies}
-            showModeMarkers={showModeMarkers}
+            showModeMarkers={rewStyleMode || showModeMarkers}
           />
         </div>
       ) : (

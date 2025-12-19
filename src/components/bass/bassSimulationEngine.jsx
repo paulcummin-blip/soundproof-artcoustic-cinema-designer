@@ -119,6 +119,65 @@ function computeAxialModes(roomDims, fMax = 200) {
 // Export for UI use
 export { computeAxialModes };
 
+// Compute REW-style modes-only response (no product curve, just room behavior)
+export function computeModesOnlyResponse({ roomDims, seatPos, freqsHz, damping = 20 }) {
+  if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
+    return freqsHz.map(() => 90); // fallback flat
+  }
+  
+  if (!seatPos || typeof seatPos.x !== 'number' || typeof seatPos.y !== 'number') {
+    return freqsHz.map(() => 90); // fallback flat
+  }
+  
+  // Generic source: front wall center, floor level
+  const sourcePos = {
+    x: roomDims.widthM / 2,
+    y: 0.01,
+    z: 0.0
+  };
+  
+  // Compute axial modes up to 200 Hz
+  const modes = computeAxialModes(roomDims, 200);
+  
+  // Baseline flat response (90 dB)
+  const baselineDb = 90;
+  
+  // Build response curve
+  return freqsHz.map(f => {
+    // Start with flat baseline
+    let sumReal = 1.0;
+    let sumImag = 0.0;
+    
+    // Apply modal resonances
+    for (const mode of modes) {
+      // Only evaluate modes near this frequency
+      const bw = mode.fHz / damping;
+      const df = Math.abs(f - mode.fHz);
+      if (df > 3 * bw) continue;
+      
+      // Calculate coupling
+      const coupling = axisCoupling(mode.axis, mode.n, sourcePos, seatPos, mode.dim);
+      if (coupling < 0.01) continue;
+      
+      // Get resonator response
+      const resonator = modalResonator(f, mode.fHz, damping, coupling, 0.3);
+      
+      // Multiply complex
+      const newReal = sumReal * resonator.real - sumImag * resonator.imag;
+      const newImag = sumReal * resonator.imag + sumImag * resonator.real;
+      
+      sumReal = newReal;
+      sumImag = newImag;
+    }
+    
+    // Convert to dB
+    const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+    const db = baselineDb + 20 * Math.log10(magnitude);
+    
+    return Math.max(MIN_SPL_FLOOR, db);
+  });
+}
+
 // Calculate mode coupling between source and receiver (pressure-mode shape)
 function axisCoupling(axis, n, sourcePos, seatPos, dim) {
   let sourceU, seatU;
