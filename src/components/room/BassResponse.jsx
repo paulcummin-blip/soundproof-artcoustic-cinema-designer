@@ -42,7 +42,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [rewSmoothing, setRewSmoothing] = useState('1/3'); // 1/3 octave smoothing by default (REW + RP22 P19)
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(true);
-  const [rewView, setRewView] = useState('room'); // 'room' | 'room+product'
+  const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
 
   // Build subs array from frontSubsCfg + rearSubsCfg for engine
   const subsForSimulation = useMemo(() => {
@@ -173,7 +173,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return null;
   }, [seatingPositions, simulationResults.seatResponses]);
 
-  // REW-style modes-only curve (when toggle is ON) - uses real room modes engine
+  // REW-style room-only curve (modal response only)
   const rewModesData = useMemo(() => {
     if (!rewStyleMode) return null;
 
@@ -220,70 +220,125 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       normalizeToDb: 0
     });
 
-    // Get product response curve if Room+Product view
-    let combinedSplDb = result.splDb;
-    
-    if (rewView === 'room+product' && subsForSimulation.length > 0) {
-      const firstSubModel = subsForSimulation[0].modelKey;
-      
-      // Import product curve from registry
-      try {
-        const { getSubwooferCurve } = require('@/components/models/speakers/registry');
-        const productCurve = getSubwooferCurve(firstSubModel);
-        
-        if (productCurve && productCurve.length > 0) {
-          // Interpolate product response to REW frequency axis
-          const productDbInterpolated = result.freqs.map(f => {
-            // Find surrounding points
-            let lowPoint = null;
-            let highPoint = null;
-            
-            for (let i = 0; i < productCurve.length; i++) {
-              const freq = productCurve[i].hz || productCurve[i].frequency || productCurve[i][0];
-              const db = productCurve[i].db || productCurve[i].spl || productCurve[i][1];
-              
-              if (freq <= f) {
-                lowPoint = { freq, db };
-              }
-              if (freq >= f && !highPoint) {
-                highPoint = { freq, db };
-                break;
-              }
-            }
-            
-            // Interpolate or clamp
-            if (lowPoint && highPoint && lowPoint.freq !== highPoint.freq) {
-              const ratio = (f - lowPoint.freq) / (highPoint.freq - lowPoint.freq);
-              return lowPoint.db + (highPoint.db - lowPoint.db) * ratio;
-            } else if (lowPoint) {
-              return lowPoint.db;
-            } else if (highPoint) {
-              return highPoint.db;
-            }
-            return 90; // fallback
-          });
-          
-          // Combine: room modal response + product shaping
-          combinedSplDb = result.splDb.map((roomDb, i) => {
-            // Product curve relative to 90dB baseline
-            const productOffset = productDbInterpolated[i] - 90;
-            return roomDb + productOffset;
-          });
-        }
-      } catch (err) {
-        console.warn('[REW Room+Product] Failed to load product curve:', err);
-      }
-    }
-
     return {
       data: result.freqs.map((frequency, i) => ({
         frequency,
-        spl: combinedSplDb[i]
+        spl: result.splDb[i]
       })),
       debug: result.debug,
-      productAvailable: rewView === 'room+product'
+      freqs: result.freqs,
+      splDb: result.splDb
     };
-  }, [rewStyleMode, roomDims, seatingPositions, subsForSimulation, roomDamping, rewSmoothing, rewView]);
+  }, [rewStyleMode, roomDims, seatingPositions, subsForSimulation, roomDamping, rewSmoothing]);
+
+  // REW-style room + product curve (modal response + sub FR)
+  const rewRoomPlusProductData = useMemo(() => {
+    if (!rewStyleMode || rewView !== 'roomPlusProduct') return null;
+    if (!rewModesData || !selectedSeat) return null;
+
+    const roomFreqs = rewModesData.freqs;
+    const roomRelDb = rewModesData.splDb; // Already normalized to [30,80] = 0 dB
+
+    // Get product curve from selected seat (MLP)
+    const productFreqs = selectedSeat.freqsHz;
+    const productSplDb = selectedSeat.splDb;
+
+    if (!productFreqs || !productSplDb || productFreqs.length === 0) return null;
+
+    // Interpolate product curve to REW frequency axis
+    const productDbInterpolated = roomFreqs.map(f => {
+      // Find surrounding points
+      let lowIdx = -1;
+      let highIdx = -1;
+
+      for (let i = 0; i < productFreqs.length; i++) {
+        if (productFreqs[i] <= f) {
+          lowIdx = i;
+        }
+        if (productFreqs[i] >= f && highIdx === -1) {
+          highIdx = i;
+          break;
+        }
+      }
+
+      // Linear interpolation
+      if (lowIdx >= 0 && highIdx >= 0 && lowIdx !== highIdx) {
+        const f1 = productFreqs[lowIdx];
+        const f2 = productFreqs[highIdx];
+        const db1 = productSplDb[lowIdx];
+        const db2 = productSplDb[highIdx];
+        const ratio = (f - f1) / (f2 - f1);
+        return db1 + (db2 - db1) * ratio;
+      } else if (lowIdx >= 0) {
+        return productSplDb[lowIdx];
+      } else if (highIdx >= 0) {
+        return productSplDb[highIdx];
+      }
+      return 90; // fallback
+    });
+
+    // Normalize product curve to mean 0 dB in [30, 80] Hz
+    const band3080Indices = roomFreqs
+      .map((f, i) => (f >= 30 && f <= 80) ? i : -1)
+      .filter(i => i >= 0);
+
+    if (band3080Indices.length === 0) return null;
+
+    const productMean = band3080Indices.reduce((sum, i) => sum + productDbInterpolated[i], 0) / band3080Indices.length;
+    const productRelDb = productDbInterpolated.map(db => db - productMean);
+
+    // Combine: room + product (both relative, in dB)
+    let combinedDb = roomRelDb.map((roomDb, i) => roomDb + productRelDb[i]);
+
+    // Apply smoothing (same as room-only)
+    if (rewSmoothing !== 'none') {
+      combinedDb = applyRewSmoothing(roomFreqs, combinedDb, rewSmoothing);
+    }
+
+    return {
+      data: roomFreqs.map((frequency, i) => ({
+        frequency,
+        spl: combinedDb[i]
+      })),
+      debug: {
+        ...rewModesData.debug,
+        view: 'roomPlusProduct'
+      }
+    };
+  }, [rewStyleMode, rewView, rewModesData, selectedSeat, rewSmoothing]);
+
+  // Helper: apply REW-style smoothing
+  function applyRewSmoothing(freqs, splDb, smoothing) {
+    const octaveFraction = {
+      '1/12': 12,
+      '1/6': 6,
+      '1/3': 3
+    }[smoothing] || 1;
+
+    const smoothed = [...splDb];
+
+    for (let i = 0; i < freqs.length; i++) {
+      const fc = freqs[i];
+      const fLow = fc / Math.pow(2, 1 / (2 * octaveFraction));
+      const fHigh = fc * Math.pow(2, 1 / (2 * octaveFraction));
+
+      let sum = 0;
+      let count = 0;
+
+      for (let j = 0; j < freqs.length; j++) {
+        if (freqs[j] >= fLow && freqs[j] <= fHigh) {
+          sum += splDb[j];
+          count++;
+        }
+      }
+
+      if (count > 0) {
+        smoothed[i] = sum / count;
+      }
+    }
+
+    return smoothed;
+  }
 
   // Convert to chart format (product-based curve)
   const responseData = useMemo(() => {
@@ -297,8 +352,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }));
   }, [selectedSeat]);
   
-  // Choose which curve to display
-  const displayData = rewStyleMode ? (rewModesData?.data || []) : responseData;
+  // Choose which curve to display based on mode and view
+  const displayData = useMemo(() => {
+    if (!rewStyleMode) {
+      // Product simulation mode
+      return responseData;
+    }
+
+    // REW parity mode
+    if (rewView === 'roomPlusProduct') {
+      return rewRoomPlusProductData?.data || rewModesData?.data || [];
+    } else {
+      // roomOnly
+      return rewModesData?.data || [];
+    }
+  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, responseData]);
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
@@ -389,6 +457,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     
     if (rewStyleMode) {
       // Use mode markers from the same parity calculation (prevents drift)
+      // These come from the actual REW parity run with correct source/seat positions
       return rewModesData?.debug?.modeMarkersHz || [];
     }
     
@@ -399,7 +468,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       heightM: roomDims.heightM
     }, 200);
     return modes.map(m => m.fHz);
-  }, [rewStyleMode, roomDims, rewModesData]);
+  }, [rewStyleMode, rewModesData]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
@@ -817,22 +886,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 <Label className="text-xs text-[#3E4349] font-medium">View:</Label>
                 <div className="flex gap-2">
                   <Button
-                    variant={rewView === 'room' ? 'default' : 'outline'}
+                    variant={rewView === 'roomOnly' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setRewView('room')}
+                    onClick={() => setRewView('roomOnly')}
                     className="text-xs"
                   >
                     Room-only
                   </Button>
                   <Button
-                    variant={rewView === 'room+product' ? 'default' : 'outline'}
+                    variant={rewView === 'roomPlusProduct' ? 'default' : 'outline'}
                     size="sm"
-                    onClick={() => setRewView('room+product')}
+                    onClick={() => setRewView('roomPlusProduct')}
+                    disabled={!selectedSeat || !selectedSeat.freqsHz}
                     className="text-xs"
                   >
                     Room + Product
                   </Button>
                 </div>
+                {(!selectedSeat || !selectedSeat.freqsHz) && (
+                  <span className="text-[10px] text-[#3E4349] opacity-70">
+                    Select a subwoofer model to view Room + Product
+                  </span>
+                )}
               </div>
               
               <div className="flex items-center gap-4 mb-2">
