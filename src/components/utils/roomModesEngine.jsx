@@ -82,72 +82,51 @@ export function computeRoomModesResponse({
     includeOblique
   });
   
-  // Build response using baseline + modal resonators (REW-style)
+  // Build response using modal resonators (REW-style)
   let splDb = freqs.map(f => {
-    // Baseline direct path term (distance-based, constant amplitude)
-    let baselineAmp = 0;
-    for (const source of sourcePositions) {
-      const dx = source.x - seatPosition.x;
-      const dy = source.y - seatPosition.y;
-      const dz = (source.z ?? 0) - (seatPosition.z ?? 1.2);
-      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-      const safeDistance = Math.max(0.5, distance);
-      
-      // Simple inverse distance law for baseline (1/r)
-      baselineAmp += 1.0 / safeDistance;
-    }
-    
-    // Average baseline if multiple sources
-    if (sourcePositions.length > 1) {
-      baselineAmp /= sourcePositions.length;
-    }
-    
-    // Modal contributions (frequency-dependent resonances via Lorentzian)
+    // In REW parity mode we want a *modal* curve that actually varies with frequency.
+    // So: compute a pressure-like sum of resonators, then convert to dB.
+    // (Baseline 1/r is constant with frequency and will flatten the plot.)
+
     let sumPressure = 0;
+
     for (const mode of modes) {
-      const fk = mode.freq;
-      
+      const f0 = mode.freq;
+
       // Mode-order dependent Q (higher order = more damped)
       const order = Math.sqrt(mode.nx * mode.nx + mode.ny * mode.ny + mode.nz * mode.nz);
       const qMode = Math.max(8, Math.min(60, q / Math.max(1, order)));
-      
-      // Skip distant modes (optimization)
-      const bw = fk / qMode;
-      const df = Math.abs(f - fk);
-      if (df > 10 * bw) continue; // expand search window
-      
-      // Compute spatial coupling (with sign preserved for pressure summation)
+
+      // Skip far-away modes (speed)
+      const bw = f0 / qMode;
+      const df = Math.abs(f - f0);
+      if (df > 5 * bw) continue;
+
+      // Spatial coupling (signed)
       let totalCoupling = 0;
       for (const source of sourcePositions) {
-        const coupling = computeSpatialCoupling(mode, source, seatPosition, roomDims);
-        totalCoupling += coupling;
+        totalCoupling += computeSpatialCoupling(mode, source, seatPosition, roomDims);
       }
-      
-      // Average if multiple sources
-      if (sourcePositions.length > 1) {
-        totalCoupling /= sourcePositions.length;
-      }
-      
+      if (sourcePositions.length > 1) totalCoupling /= sourcePositions.length;
+
       if (Math.abs(totalCoupling) < 0.001) continue;
-      
-      // Lorentzian frequency response (magnitude only, preserves coupling sign)
-      const r = f / fk;
+
+      // Dimensionless 2nd-order resonator magnitude (REW-ish)
+      // H(f) = 1 / sqrt( (1 - r^2)^2 + (r/Q)^2 )   where r = f/f0
+      const r = f / f0;
       const denom = Math.sqrt(Math.pow(1 - r * r, 2) + Math.pow(r / qMode, 2));
       const H = 1 / Math.max(1e-12, denom);
-      
-      // Contribution to pressure sum (spatial coupling × frequency response)
+
+      // Signed pressure-style sum (gives peaks + dips)
       sumPressure += totalCoupling * H;
     }
-    
-    // Combine baseline + modal (in magnitude/pressure domain)
-    const totalAmp = baselineAmp + Math.abs(sumPressure);
-    
-    // Apply floor to prevent -Infinity
-    const safeAmp = Math.max(totalAmp, 1e-8);
-    
-    // Convert to dB (20*log10 for pressure)
-    const db = 20 * Math.log10(safeAmp);
-    return isFinite(db) ? db : -120;
+
+    // Add a tiny floor so we never hit -Infinity (and so normalisation behaves)
+    const mag = Math.abs(sumPressure);
+    const safe = Math.max(1e-8, mag);
+
+    const db = 20 * Math.log10(safe);
+    return Number.isFinite(db) ? db : -120;
   });
   
   // Capture RAW stats BEFORE any processing (critical for debugging)
