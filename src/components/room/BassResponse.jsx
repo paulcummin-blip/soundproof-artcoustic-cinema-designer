@@ -1012,6 +1012,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   <strong>Data:</strong> {rewModesData.debug.finiteCount} points | Range: {rewModesData.debug.rangeDb} dB
                   {rewModesData.debug.nonFiniteRepaired > 0 && ` | Repaired: ${rewModesData.debug.nonFiniteRepaired}`}
                 </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Raw:</strong> {rewModesData.debug.rawRange} dB | <strong>Pre-norm:</strong> {rewModesData.debug.preNormRange} dB | <strong>Post-norm:</strong> {rewModesData.debug.postNormRange} dB
+                </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Smoothing:</strong> {rewModesData.debug.smoothingApplied || 'none'}
+                </div>
               </div>
             )}
           </div>

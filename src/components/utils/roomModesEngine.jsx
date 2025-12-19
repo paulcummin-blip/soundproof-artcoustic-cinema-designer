@@ -84,7 +84,7 @@ export function computeRoomModesResponse({
   
   // Build response using baseline + modal resonators (REW-style)
   let splDb = freqs.map(f => {
-    // Baseline direct path term (distance-based)
+    // Baseline direct path term (distance-based, constant amplitude)
     let baselineAmp = 0;
     for (const source of sourcePositions) {
       const dx = source.x - seatPosition.x;
@@ -102,21 +102,21 @@ export function computeRoomModesResponse({
       baselineAmp /= sourcePositions.length;
     }
     
-    // Modal contributions (resonances)
-    let modalAmp = 0;
+    // Modal contributions (frequency-dependent resonances via Lorentzian)
+    let sumPressure = 0;
     for (const mode of modes) {
-      const f0 = mode.freq;
+      const fk = mode.freq;
       
       // Mode-order dependent Q (higher order = more damped)
       const order = Math.sqrt(mode.nx * mode.nx + mode.ny * mode.ny + mode.nz * mode.nz);
       const qMode = Math.max(8, Math.min(60, q / Math.max(1, order)));
       
       // Skip distant modes (optimization)
-      const bw = f0 / qMode;
-      const df = Math.abs(f - f0);
-      if (df > 5 * bw) continue;
+      const bw = fk / qMode;
+      const df = Math.abs(f - fk);
+      if (df > 10 * bw) continue; // expand search window
       
-      // Compute spatial coupling (pressure weighting)
+      // Compute spatial coupling (with sign preserved for pressure summation)
       let totalCoupling = 0;
       for (const source of sourcePositions) {
         const coupling = computeSpatialCoupling(mode, source, seatPosition, roomDims);
@@ -130,19 +130,17 @@ export function computeRoomModesResponse({
       
       if (Math.abs(totalCoupling) < 0.001) continue;
       
-      // Lorentzian resonator response (REW-style)
-      // A(f) = G * (f0/Q)^2 / ( (f^2 - f0^2)^2 + (f0*f/Q)^2 )
-      const f2 = f * f;
-      const f02 = f0 * f0;
-      const numerator = totalCoupling * (f0 / qMode) * (f0 / qMode);
-      const denominator = Math.pow(f2 - f02, 2) + Math.pow(f0 * f / qMode, 2);
+      // Lorentzian frequency response (magnitude only, preserves coupling sign)
+      const r = f / fk;
+      const denom = Math.sqrt(Math.pow(1 - r * r, 2) + Math.pow(r / qMode, 2));
+      const H = 1 / Math.max(1e-12, denom);
       
-      const modeContribution = numerator / denominator;
-      modalAmp += modeContribution;
+      // Contribution to pressure sum (spatial coupling × frequency response)
+      sumPressure += totalCoupling * H;
     }
     
-    // Combine baseline + modal (magnitude-based, not pressure)
-    const totalAmp = baselineAmp + Math.abs(modalAmp);
+    // Combine baseline + modal (in magnitude/pressure domain)
+    const totalAmp = baselineAmp + Math.abs(sumPressure);
     
     // Apply floor to prevent -Infinity
     const safeAmp = Math.max(totalAmp, 1e-8);
@@ -152,6 +150,12 @@ export function computeRoomModesResponse({
     return isFinite(db) ? db : -120;
   });
   
+  // Capture RAW stats BEFORE any processing (critical for debugging)
+  const rawFinite = splDb.filter(v => isFinite(v));
+  const rawMin = rawFinite.length > 0 ? Math.min(...rawFinite) : 0;
+  const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;
+  const rawRange = rawMax - rawMin;
+
   // Clamp non-finite values before smoothing
   let nonFiniteRepaired = 0;
   let lastGoodValue = 0;
@@ -164,13 +168,14 @@ export function computeRoomModesResponse({
     }
   }
 
-  // Capture pre-normalization stats
+  // Capture pre-normalization stats (after repair, before smoothing/norm)
   const finitePreNorm = splDb.filter(v => isFinite(v));
   const preNormMin = finitePreNorm.length > 0 ? Math.min(...finitePreNorm) : 0;
   const preNormMax = finitePreNorm.length > 0 ? Math.max(...finitePreNorm) : 0;
   const preNormRange = preNormMax - preNormMin;
 
   // Apply smoothing if requested (post-process only)
+  const smoothingApplied = smoothing !== 'none' ? smoothing : 'none';
   if (smoothing !== 'none') {
     splDb = applySmoothing(freqs, splDb, smoothing);
   }
@@ -178,7 +183,7 @@ export function computeRoomModesResponse({
   // Normalize to 30-80 Hz average = 0 dB (REW-style)
   let actualNormBand = normalizeBandHz;
   let normApplied = false;
-  if (rewParityMode) {
+  if (rewParityMode && normalizeBandHz) {
     const result = normalizeToAverage(freqs, splDb, normalizeBandHz);
     splDb = result.splDb;
     actualNormBand = result.actualBand;
@@ -236,7 +241,11 @@ export function computeRoomModesResponse({
       firstTenModeHz,
       normBandHz: actualNormBand,
       normApplied,
+      smoothingApplied,
       nonFiniteRepaired,
+      rawMin: rawMin.toFixed(2),
+      rawMax: rawMax.toFixed(2),
+      rawRange: rawRange.toFixed(2),
       preNormMin: preNormMin.toFixed(2),
       preNormMax: preNormMax.toFixed(2),
       preNormRange: preNormRange.toFixed(2),
