@@ -310,44 +310,54 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     };
   }, [rewStyleMode, roomDims, seatingPositions, subsForSimulation, roomDamping, rewSmoothing]);
 
-  // Helper: get subwoofer anechoic response curve
-  const getSubAnechoicResponseDb = (modelKey, freqs) => {
+  // Helper: get subwoofer anechoic response curve (dB vs Hz)
+  // Returns a curve aligned to the requested frequency axis.
+  // IMPORTANT: we return a SHAPE curve (anchored at a reference frequency)
+  // so Room+Product visibly differs from Room-only.
+  const getSubAnechoicResponseDb = (modelKey, freqs, anchorHz = 50) => {
     try {
-      const { getSubwooferCurve } = require('@/components/models/speakers/registry');
-      const curve = getSubwooferCurve(modelKey);
-      
-      if (!curve || curve.length === 0) return null;
+      const { getSubwooferCurve, normaliseModelKey } = require('@/components/models/speakers/registry');
+      const key = normaliseModelKey ? normaliseModelKey(modelKey) : modelKey;
+      const curve = getSubwooferCurve ? getSubwooferCurve(key) : null;
+      if (!Array.isArray(curve) || curve.length < 2) return null;
 
-      // Interpolate curve to requested frequencies
-      return freqs.map(f => {
-        let lowPoint = null;
-        let highPoint = null;
+      // Extract points (Hz, dB)
+      const pts = curve
+        .map(p => ({
+          hz: Number(p.hz ?? p.frequency ?? (Array.isArray(p) ? p[0] : NaN)),
+          db: Number(p.db ?? p.spl ?? (Array.isArray(p) ? p[1] : NaN)),
+        }))
+        .filter(p => Number.isFinite(p.hz) && Number.isFinite(p.db))
+        .sort((a, b) => a.hz - b.hz);
 
-        for (let i = 0; i < curve.length; i++) {
-          const freq = curve[i].hz || curve[i].frequency || curve[i][0];
-          const db = curve[i].db || curve[i].spl || curve[i][1];
-          
-          if (freq <= f) {
-            lowPoint = { freq, db };
-          }
-          if (freq >= f && !highPoint) {
-            highPoint = { freq, db };
-            break;
+      if (pts.length < 2) return null;
+
+      const interpAt = (f) => {
+        if (f <= pts[0].hz) return pts[0].db;
+        if (f >= pts[pts.length - 1].hz) return pts[pts.length - 1].db;
+
+        for (let i = 0; i < pts.length - 1; i++) {
+          const a = pts[i];
+          const b = pts[i + 1];
+          if (f >= a.hz && f <= b.hz) {
+            const t = (f - a.hz) / (b.hz - a.hz);
+            return a.db + (b.db - a.db) * t;
           }
         }
+        return pts[pts.length - 1].db;
+      };
 
-        if (lowPoint && highPoint && lowPoint.freq !== highPoint.freq) {
-          const ratio = (f - lowPoint.freq) / (highPoint.freq - lowPoint.freq);
-          return lowPoint.db + (highPoint.db - lowPoint.db) * ratio;
-        } else if (lowPoint) {
-          return lowPoint.db;
-        } else if (highPoint) {
-          return highPoint.db;
-        }
-        return 90; // fallback
-      });
+      // Build interpolated curve at REW axis freqs
+      const raw = freqs.map(f => interpAt(f));
+
+      // Anchor to a reference frequency so it becomes a "shape" curve.
+      // This avoids "normalise to 30–80 = 0" wiping out the product influence.
+      const refDb = interpAt(anchorHz);
+      const shaped = raw.map(v => v - refDb);
+
+      return shaped;
     } catch (err) {
-      console.warn('[getSubAnechoicResponseDb] Failed for model:', modelKey, err);
+      console.warn("[getSubAnechoicResponseDb] Failed", modelKey, err);
       return null;
     }
   };
@@ -373,52 +383,41 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       };
     }
 
-    // Get anechoic response curves for each model
+    // Get product SHAPE curves (anchored at 50 Hz)
     const curves = uniqueKeys
-      .map(k => getSubAnechoicResponseDb(k, freqs))
+      .map(k => getSubAnechoicResponseDb(k, freqs, 50))
       .filter(arr => Array.isArray(arr) && arr.length === freqs.length);
 
     if (!curves.length) {
       return {
         ...rewModesData,
-        debug: { ...(rewModesData.debug || {}), productNote: "No anechoic response data found for selected sub(s)." }
+        debug: { ...(rewModesData.debug || {}), productNote: "No anechoic response data found for selected sub(s) (check modelKey mapping)." }
       };
     }
 
-    // Average in magnitude if multiple models
-    const avgMag = freqs.map((_, i) => {
+    // Average the SHAPE curves (in dB, since they're already anchored)
+    const productShapeDb = freqs.map((_, i) => {
       let sum = 0;
-      curves.forEach(c => { sum += Math.pow(10, c[i] / 20); });
+      for (const c of curves) sum += c[i];
       return sum / curves.length;
     });
 
-    // Back to dB
-    let productDb = avgMag.map(m => 20 * Math.log10(Math.max(1e-12, m)));
-
-    // Normalise product curve to 30–80 Hz mean = 0 dB (same as room)
-    const band = freqs
-      .map((f, i) => ({ f, i }))
-      .filter(o => o.f >= 30 && o.f <= 80);
-
-    if (band.length) {
-      const mean = band.reduce((acc, o) => acc + productDb[o.i], 0) / band.length;
-      productDb = productDb.map(v => v - mean);
-    }
-
-    // Add product shape to room-only curve (both relative)
+    // Add product shape to room curve
     const out = freqs.map((f, i) => ({
       frequency: f,
-      spl: (rewModesData.data[i]?.spl ?? 0) + productDb[i]
-    }));
+      spl: (rewModesData.data[i]?.spl ?? 0) + productShapeDb[i]
+      }));
 
-    return {
+      return {
       data: out,
       debug: { 
         ...(rewModesData.debug || {}), 
-        productApplied: true, 
+        productApplied: true,
+        productShapeApplied: true,
+        productShapeAnchorHz: 50,
         productModels: uniqueKeys 
       }
-    };
+      };
   }, [rewStyleMode, rewView, rewModesData, subsForSimulation]);
 
   // Helper: apply REW-style smoothing
@@ -1085,6 +1084,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             modeMarkers={rewStyleMode ? (rewModesData?.debug?.modeMarkers || []) : []}
             linearHzAxis={rewStyleMode && linearHzAxis}
             rewStyleMode={rewStyleMode}
+            yMin={rewStyleMode ? 40 : undefined}
+            yMax={rewStyleMode ? 110 : undefined}
           />
         ) : (
           <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>

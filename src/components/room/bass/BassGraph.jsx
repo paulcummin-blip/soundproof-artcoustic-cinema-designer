@@ -23,7 +23,9 @@ export default function BassGraph({
   showModeMarkers = false,
   modeMarkers = [],
   linearHzAxis = false,
-  rewStyleMode = false
+  rewStyleMode = false,
+  yMin,
+  yMax
 }) {
     // Clamp and sanitize data for REW mode (prevent crazy Y-axis values)
     let data = toggles.smoothing
@@ -89,9 +91,9 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                     />
                     <YAxis
-                        domain={rewStyleMode ? [-40, 20] : ['dataMin - 5', 'dataMax + 5']}
+                        domain={yMin !== undefined && yMax !== undefined ? [yMin, yMax] : (rewStyleMode ? [40, 110] : ['dataMin - 5', 'dataMax + 5'])}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
-                        label={{ value: rewStyleMode ? 'Relative (dB)' : 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
+                        label={{ value: rewStyleMode ? 'SPL (dB)' : 'Relative (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
                     />
