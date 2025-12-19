@@ -30,6 +30,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const dimsTxt = `${(roomDims?.widthM ?? 0).toFixed(1)}×${(roomDims?.lengthM ?? 0).toFixed(1)}×${(roomDims?.heightM ?? 0).toFixed(1)} m`;
 
   // State declarations (must be before useMemo/useCallback that use them)
+  const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
   const [tryPolarity, setTryPolarity] = useState(false);
   const [hasAutoAlignedFront, setHasAutoAlignedFront] = useState(false);
   const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
@@ -308,8 +309,69 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return modes.map(m => m.fHz);
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
+  // Compute geometric distances for readouts
+  const subDistances = useMemo(() => {
+    const mlpSeat = seatingPositions?.find(s => s.isPrimary);
+    if (!mlpSeat) return {};
+    
+    const mlpPoint = { x: mlpSeat.x, y: mlpSeat.y, z: mlpSeat.z ?? 1.2 };
+    const SPEED_OF_SOUND = 343;
+    const distances = {};
+    
+    // Front subs
+    const frontCount = frontSubsCfg?.count || 0;
+    const frontPositions = frontSubsCfg?.positions || [];
+    if (frontCount > 0) {
+      const roomWidth = roomDims?.widthM || 4.5;
+      const defaultFrontPos = [
+        { x: roomWidth * 0.33, y: 0.15 },
+        { x: roomWidth * 0.67, y: 0.15 }
+      ];
+      const frontIds = frontCount === 1 ? ['front-sub-left'] : ['front-sub-left', 'front-sub-right'];
+      frontIds.forEach((id, i) => {
+        const pos = frontPositions[i] || defaultFrontPos[i];
+        const dx = pos.x - mlpPoint.x;
+        const dy = pos.y - mlpPoint.y;
+        const dz = 0.35 - mlpPoint.z;
+        const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        distances[id] = {
+          distanceM: distance,
+          timeMs: (distance / SPEED_OF_SOUND) * 1000
+        };
+      });
+    }
+    
+    // Rear subs
+    const rearCount = rearSubsCfg?.count || 0;
+    const rearPositions = rearSubsCfg?.positions || [];
+    if (rearCount > 0) {
+      const roomWidth = roomDims?.widthM || 4.5;
+      const roomLength = roomDims?.lengthM || 6.0;
+      const defaultRearPos = [
+        { x: roomWidth * 0.33, y: roomLength - 0.15 },
+        { x: roomWidth * 0.67, y: roomLength - 0.15 }
+      ];
+      const rearIds = rearCount === 1 ? ['rear-sub-left'] : ['rear-sub-left', 'rear-sub-right'];
+      rearIds.forEach((id, i) => {
+        const pos = rearPositions[i] || defaultRearPos[i];
+        const dx = pos.x - mlpPoint.x;
+        const dy = pos.y - mlpPoint.y;
+        const dz = 0.35 - mlpPoint.z;
+        const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        distances[id] = {
+          distanceM: distance,
+          timeMs: (distance / SPEED_OF_SOUND) * 1000
+        };
+      });
+    }
+    
+    return distances;
+  }, [seatingPositions, frontSubsCfg, rearSubsCfg, roomDims]);
+
   // Auto-align function (defined before useEffect hooks)
   const autoAlignSubs = React.useCallback((groupLabel) => {
+    if (!autoAlignEnabled) return; // Skip if auto-align is disabled
+    
     const mlpSeat = seatingPositions?.find(s => s.isPrimary);
     if (!mlpSeat) return; // No MLP, skip
 
@@ -455,10 +517,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     } else {
       setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
     }
-  }, [seatingPositions, roomDims, frontSubsCfg, rearSubsCfg, tryPolarity, setFrontSubsCfg, setRearSubsCfg]);
+  }, [autoAlignEnabled, seatingPositions, roomDims, frontSubsCfg, rearSubsCfg, tryPolarity, setFrontSubsCfg, setRearSubsCfg]);
 
-  // Auto-align on first enable
+  // Auto-align on first enable or when auto-align is re-enabled
   useEffect(() => {
+    if (!autoAlignEnabled) return;
+    
     const frontCount = frontSubsCfg?.count || 0;
     if (frontCount > 0 && !hasAutoAlignedFront) {
       autoAlignSubs('Front');
@@ -466,9 +530,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     } else if (frontCount === 0) {
       setHasAutoAlignedFront(false);
     }
-  }, [frontSubsCfg?.count, hasAutoAlignedFront, autoAlignSubs]);
+  }, [autoAlignEnabled, frontSubsCfg?.count, hasAutoAlignedFront, autoAlignSubs]);
 
   useEffect(() => {
+    if (!autoAlignEnabled) return;
+    
     const rearCount = rearSubsCfg?.count || 0;
     if (rearCount > 0 && !hasAutoAlignedRear) {
       autoAlignSubs('Rear');
@@ -476,7 +542,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     } else if (rearCount === 0) {
       setHasAutoAlignedRear(false);
     }
-  }, [rearSubsCfg?.count, hasAutoAlignedRear, autoAlignSubs]);
+  }, [autoAlignEnabled, rearSubsCfg?.count, hasAutoAlignedRear, autoAlignSubs]);
+  
+  // Re-align when positions or dimensions change
+  useEffect(() => {
+    if (!autoAlignEnabled) return;
+    if (frontSubsCfg?.count > 0) {
+      autoAlignSubs('Front');
+    }
+    if (rearSubsCfg?.count > 0) {
+      autoAlignSubs('Rear');
+    }
+  }, [autoAlignEnabled, frontSubsCfg?.positions, rearSubsCfg?.positions, roomDims, seatingPositions, autoAlignSubs]);
 
   return (
     <div className="space-y-4" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
@@ -744,45 +821,66 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       </div>
 
       {/* Auto Align Controls */}
-      {totalSubCount > 1 && (
+      {totalSubCount > 0 && (
         <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
-          <div className="text-sm font-medium text-[#1B1A1A] mb-3">Auto Alignment</div>
+          <div className="text-sm font-medium text-[#1B1A1A] mb-3">Time Alignment</div>
           <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="try-polarity" 
-                checked={tryPolarity}
-                onCheckedChange={setTryPolarity}
-              />
-              <Label htmlFor="try-polarity" className="text-xs text-[#3E4349]">
-                Try polarity for best sum (MLP)
+            <div className="flex items-center justify-between">
+              <Label htmlFor="auto-align-toggle" className="text-xs text-[#3E4349]">
+                Auto time-align to MLP
               </Label>
+              <Switch
+                id="auto-align-toggle"
+                checked={autoAlignEnabled}
+                onCheckedChange={setAutoAlignEnabled}
+              />
             </div>
-            <div className="flex gap-2">
-              {frontSubsCfg?.count > 0 && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => autoAlignSubs('Front')}
-                  className="text-xs"
-                >
-                  Align Front Subs at MLP
-                </Button>
-              )}
-              {rearSubsCfg?.count > 0 && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => autoAlignSubs('Rear')}
-                  className="text-xs"
-                >
-                  Align Rear Subs at MLP
-                </Button>
-              )}
-            </div>
-            <div className="text-xs text-[#3E4349]">
-              Aligned by distance (good default). Fine-tune with delay/polarity if needed.
-            </div>
+            {autoAlignEnabled && (
+              <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
+                Subs are automatically aligned by distance to MLP for coherent summation. Disable to manually adjust delays.
+              </div>
+            )}
+            {!autoAlignEnabled && (
+              <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
+                Manual mode: adjust delays below to control phase alignment.
+              </div>
+            )}
+            {totalSubCount > 1 && (
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="try-polarity" 
+                  checked={tryPolarity}
+                  onCheckedChange={setTryPolarity}
+                />
+                <Label htmlFor="try-polarity" className="text-xs text-[#3E4349]">
+                  Try polarity inversion for best sum
+                </Label>
+              </div>
+            )}
+            {autoAlignEnabled && totalSubCount > 0 && (
+              <div className="flex gap-2">
+                {frontSubsCfg?.count > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => autoAlignSubs('Front')}
+                    className="text-xs"
+                  >
+                    Re-align Front
+                  </Button>
+                )}
+                {rearSubsCfg?.count > 0 && (
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => autoAlignSubs('Rear')}
+                    className="text-xs"
+                  >
+                    Re-align Rear
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -795,6 +893,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             <SubTuningControls
               subsCfg={frontSubsCfg}
               groupLabel="Front"
+              subDistances={subDistances}
+              autoAlignEnabled={autoAlignEnabled}
               onSettingsChange={(newSettings) => {
                 setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}
@@ -808,6 +908,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             <SubTuningControls
               subsCfg={rearSubsCfg}
               groupLabel="Rear"
+              subDistances={subDistances}
+              autoAlignEnabled={autoAlignEnabled}
               onSettingsChange={(newSettings) => {
                 setRearSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
               }}
