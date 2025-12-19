@@ -39,7 +39,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [roomDamping, setRoomDamping] = useState(20);
   const [showModeMarkers, setShowModeMarkers] = useState(false);
   const [rewStyleMode, setRewStyleMode] = useState(false);
-  const [rewSmoothing, setRewSmoothing] = useState('none'); // No smoothing by default in REW mode
+  const [rewSmoothing, setRewSmoothing] = useState('1/3'); // 1/3 octave smoothing by default (REW + RP22 P19)
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(true);
 
