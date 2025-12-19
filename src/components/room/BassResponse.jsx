@@ -213,7 +213,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       rewParityMode: true,
       smoothing: rewSmoothing,
       subFloorHeight: 0.0,
-      normalizeBandHz: [20, 25], // Tighter ref band for stability
+      normalizeBandHz: [30, 50], // Avoid anchoring below first modes
       normalizeToDb: 0 // Relative mode (0 dB baseline)
     });
     

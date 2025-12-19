@@ -106,17 +106,27 @@ export function computeRoomModesResponse({
       
       if (Math.abs(totalCoupling) < 0.001) continue;
       
+      // Deterministic per-mode phase offset (avoid artificial coherence)
+      const phaseOffsetDeg = (mode.nx * 37 + mode.ny * 73 + mode.nz * 19) % 360;
+      const phaseOffsetRad = phaseOffsetDeg * (Math.PI / 180);
+      
       // Complex Lorentzian response: H(f) = W / (1 + j*(f-f0)/(bw/2))
       const denomReal = 1;
       const denomImag = (f - f0) / (bw / 2);
       const denomMagSq = denomReal * denomReal + denomImag * denomImag;
       
       // Complex division: (totalCoupling + 0j) / (denomReal + j*denomImag)
-      const hReal = (totalCoupling * denomReal) / denomMagSq;
-      const hImag = -(totalCoupling * denomImag) / denomMagSq;
+      let hReal = (totalCoupling * denomReal) / denomMagSq;
+      let hImag = -(totalCoupling * denomImag) / denomMagSq;
       
-      sumReal += hReal;
-      sumImag += hImag;
+      // Apply phase offset rotation: (hReal + j*hImag) * e^(j*phaseOffset)
+      const cosPhase = Math.cos(phaseOffsetRad);
+      const sinPhase = Math.sin(phaseOffsetRad);
+      const rotatedReal = hReal * cosPhase - hImag * sinPhase;
+      const rotatedImag = hReal * sinPhase + hImag * cosPhase;
+      
+      sumReal += rotatedReal;
+      sumImag += rotatedImag;
     }
     
     // Magnitude in dB (relative)
