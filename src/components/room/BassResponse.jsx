@@ -40,6 +40,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [showModeMarkers, setShowModeMarkers] = useState(false);
   const [rewStyleMode, setRewStyleMode] = useState(false);
   const [rewSmoothing, setRewSmoothing] = useState('1/12'); // Default to 1/12 octave for REW mode
+  const [showRewModeLines, setShowRewModeLines] = useState(true);
+  const [linearHzAxis, setLinearHzAxis] = useState(true);
 
   // Build subs array from frontSubsCfg + rearSubsCfg for engine
   const subsForSimulation = useMemo(() => {
@@ -748,12 +750,40 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded">
                 <strong>REW parity mode:</strong> Room-only response, 3D modes (axial+tangential+oblique) with spatial coupling, sub at floor (z=0m), normalized to 30-80Hz. Modal peaks/dips change with sub/seat position.
                 {rewModesData?.debug && (
-                  <div className="mt-2 text-[10px] opacity-70">
-                    Debug: {rewModesData.debug.modeCount} modes • 
-                    First 10: {rewModesData.debug.firstTenModeHz?.join(', ')} Hz • 
-                    Norm band: {rewModesData.debug.normBandHz?.[0]}-{rewModesData.debug.normBandHz?.[1]} Hz
-                  </div>
+                  <>
+                    <div className="mt-2 text-[10px] opacity-70">
+                      Modes: {rewModesData.debug.modeCount} (Axial {rewModesData.debug.axialCount}, Tangential {rewModesData.debug.tangentialCount}, Oblique {rewModesData.debug.obliqueCount})
+                    </div>
+                    <div className="text-[10px] opacity-70">
+                      First 8: {rewModesData.debug.firstTenModeHz?.slice(0, 8).join(', ')} Hz
+                    </div>
+                    <div className="text-[10px] opacity-70">
+                      Norm band: {rewModesData.debug.normBandHz?.[0]}-{rewModesData.debug.normBandHz?.[1]} Hz
+                    </div>
+                  </>
                 )}
+              </div>
+              <div className="flex items-center gap-4 mb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="show-mode-lines" 
+                    checked={showRewModeLines}
+                    onCheckedChange={setShowRewModeLines}
+                  />
+                  <Label htmlFor="show-mode-lines" className="text-xs text-[#3E4349]">
+                    Show mode lines (REW)
+                  </Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="linear-hz-axis" 
+                    checked={linearHzAxis}
+                    onCheckedChange={setLinearHzAxis}
+                  />
+                  <Label htmlFor="linear-hz-axis" className="text-xs text-[#3E4349]">
+                    Linear Hz axis (REW)
+                  </Label>
+                </div>
               </div>
             </>
           )}
@@ -764,7 +794,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             toggles={toggles}
             crossoverFrequency={80}
             modeFrequencies={modeFrequencies}
-            showModeMarkers={rewStyleMode || showModeMarkers}
+            showModeMarkers={rewStyleMode ? showRewModeLines : showModeMarkers}
+            modeMarkers={rewStyleMode ? (rewModesData?.debug?.modeMarkers || []) : []}
+            linearHzAxis={rewStyleMode && linearHzAxis}
             rewStyleMode={rewStyleMode}
           />
         </div>

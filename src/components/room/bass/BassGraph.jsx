@@ -21,6 +21,8 @@ export default function BassGraph({
   crossoverFrequency = 80,
   modeFrequencies = [],
   showModeMarkers = false,
+  modeMarkers = [],
+  linearHzAxis = false,
   rewStyleMode = false
 }) {
     // Clamp and sanitize data for REW mode (prevent crazy Y-axis values)
@@ -41,16 +43,46 @@ export default function BassGraph({
         });
     }
 
+    // Render mode markers if enabled
+    const renderModeMarkers = () => {
+        if (!showModeMarkers || modeMarkers.length === 0) return null;
+        
+        return modeMarkers.map((marker, i) => {
+            // Different stroke styles for each family
+            let strokeDasharray = '1 0'; // solid for axial
+            let opacity = 0.3;
+            
+            if (marker.family === 'tangential') {
+                strokeDasharray = '4 2'; // dashed
+                opacity = 0.2;
+            } else if (marker.family === 'oblique') {
+                strokeDasharray = '2 2'; // dotted
+                opacity = 0.15;
+            }
+            
+            return (
+                <ReferenceLine 
+                    key={`mode-${i}`}
+                    x={marker.fHz}
+                    stroke="#213428"
+                    strokeWidth={1}
+                    strokeDasharray={strokeDasharray}
+                    opacity={opacity}
+                />
+            );
+        });
+    };
+
     return (
         <div className="w-full h-[400px]">
             <ResponsiveContainer>
-                <LineChart data={data} margin={{ top: 10, right: 50, left: 20, bottom: 30 }}>
+                <LineChart data={data} margin={{ top: 30, right: 50, left: 20, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#DCDBD6" />
                     <XAxis
                         dataKey="frequency"
                         type="number"
                         domain={['dataMin', 'dataMax']}
-                        scale="log"
+                        scale={linearHzAxis ? "linear" : "log"}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
                         label={{ value: "Frequency (Hz)", position: 'insideBottom', offset: -10, className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
@@ -97,8 +129,11 @@ export default function BassGraph({
                         />
                     )}
 
-                    {/* Mode frequency markers */}
-                    {showModeMarkers && modeFrequencies.map((freq, i) => (
+                    {/* REW-style mode markers */}
+                    {renderModeMarkers()}
+                    
+                    {/* Legacy mode markers (non-REW) */}
+                    {!rewStyleMode && showModeMarkers && modeFrequencies.map((freq, i) => (
                       <ReferenceLine 
                         key={`mode-${i}`}
                         x={freq} 
@@ -109,6 +144,13 @@ export default function BassGraph({
                     ))}
 
                     <Line type="monotone" dataKey="spl" stroke="#213428" strokeWidth={2} dot={false} />
+                    
+                    {/* Mode line legend (REW style) */}
+                    {showModeMarkers && modeMarkers.length > 0 && (
+                        <text x={60} y={20} fontSize={10} fill="#3E4349" className="font-body">
+                            Mode lines: Axial (—) / Tangential (- -) / Oblique (···)
+                        </text>
+                    )}
                 </LineChart>
             </ResponsiveContainer>
         </div>

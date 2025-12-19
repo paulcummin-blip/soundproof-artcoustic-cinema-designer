@@ -159,6 +159,23 @@ export function computeRoomModesResponse({
     actualNormBand = result.actualBand;
   }
   
+  // Build detailed mode markers (for REW-style overlay)
+  const modeMarkers = modes.map(m => {
+    let axisLabel = null;
+    if (m.type === 'axial') {
+      if (m.nx > 0) axisLabel = 'W';
+      else if (m.ny > 0) axisLabel = 'L';
+      else if (m.nz > 0) axisLabel = 'H';
+    }
+    
+    return {
+      fHz: m.freq,
+      family: m.type,
+      axisLabel,
+      n: [m.nx, m.ny, m.nz]
+    };
+  });
+  
   // Extract mode frequencies for markers (axial only for clarity)
   const modeMarkersHz = modes
     .filter(m => m.type === 'axial')
@@ -170,13 +187,22 @@ export function computeRoomModesResponse({
     .slice(0, 10)
     .map(m => m.freq.toFixed(1));
   
+  // Count by type
+  const axialCount = modes.filter(m => m.type === 'axial').length;
+  const tangentialCount = modes.filter(m => m.type === 'tangential').length;
+  const obliqueCount = modes.filter(m => m.type === 'oblique').length;
+  
   return {
     freqs,
     splDb,
     debug: {
       schroederHz,
       modeMarkersHz,
+      modeMarkers,
       modeCount: modes.length,
+      axialCount,
+      tangentialCount,
+      obliqueCount,
       firstTenModeHz,
       normBandHz: actualNormBand
     }
