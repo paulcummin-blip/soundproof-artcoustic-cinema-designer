@@ -39,7 +39,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [roomDamping, setRoomDamping] = useState(20);
   const [showModeMarkers, setShowModeMarkers] = useState(false);
   const [rewStyleMode, setRewStyleMode] = useState(false);
-  const [rewSmoothing, setRewSmoothing] = useState('none');
+  const [rewSmoothing, setRewSmoothing] = useState('1/12'); // Default to 1/12 octave for REW mode
 
   // Build subs array from frontSubsCfg + rearSubsCfg for engine
   const subsForSimulation = useMemo(() => {
@@ -197,7 +197,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         z: 0.0,
       }));
     
-    // Compute room modes response (REW parity: axial + tangential + oblique)
+    // Compute room modes response (REW parity: 3D modes with spatial coupling)
     const result = computeRoomModesResponse({
       roomDims,
       sourcePositions,
@@ -206,15 +206,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       fMax: 200,
       pointsPerOct: 24,
       modeLimitHz: 200,
-      q: roomDamping,
+      q: roomDamping, // UI slider value
       includeAxial: true,
       includeTangential: true,
       includeOblique: true,
       rewParityMode: true,
       smoothing: rewSmoothing,
       subFloorHeight: 0.0,
-      normalizeBandHz: [20, 30],
-      normalizeToDb: 90
+      normalizeBandHz: [20, 25], // Tighter ref band for stability
+      normalizeToDb: 0 // Relative mode (0 dB baseline)
     });
     
     return result.freqs.map((frequency, i) => ({
@@ -740,7 +740,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           </div>
           {rewStyleMode && (
             <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded">
-              <strong>REW parity assumptions:</strong> Room-only, relative curve, 3D modes (axial+tangential+oblique), sub at floor (z=0m), seats at true z.
+              <strong>REW parity mode:</strong> Room-only response, 3D modes (axial+tangential+oblique) with spatial coupling, sub at floor (z=0m), normalized to 20-25Hz. Curve changes with sub/seat position.
             </div>
           )}
           <BassGraph

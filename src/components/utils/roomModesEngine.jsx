@@ -73,58 +73,55 @@ export function computeRoomModesResponse({
     includeOblique
   });
   
-  // Build magnitude response with proper modal weighting
-  const baselineDb = 90; // reference level
+  // Build complex response using spatial coupling and mode-order Q
   let splDb = freqs.map(f => {
-    let totalContribution = 0;
+    let sumReal = 0;
+    let sumImag = 0;
     
-    // Sum contributions from all modes
+    // Complex sum across all modes
     for (const mode of modes) {
       const f0 = mode.freq;
-      const Q = q;
       
-      // Bandwidth for early-out optimization
-      const bw = f0 / Q;
+      // Mode-order dependent Q (higher order = more damped)
+      const order = Math.sqrt(mode.nx * mode.nx + mode.ny * mode.ny + mode.nz * mode.nz);
+      const qMode = Math.max(8, Math.min(60, q / Math.max(1, order)));
+      
+      const bw = f0 / qMode;
       const df = Math.abs(f - f0);
+      
+      // Early out for distant modes
       if (df > 5 * bw) continue;
       
-      // Compute modal contribution from all sources
-      let sourceCoupling = 0;
+      // Compute spatial coupling for all sources
+      let totalCoupling = 0;
       for (const source of sourcePositions) {
-        const coupling = computeModalCoupling(mode, source, seatPosition, roomDims);
-        sourceCoupling += coupling;
+        const coupling = computeSpatialCoupling(mode, source, seatPosition, roomDims);
+        totalCoupling += coupling;
       }
       
-      // Average if multiple sources
+      // Average coupling if multiple sources
       if (sourcePositions.length > 0) {
-        sourceCoupling /= Math.sqrt(sourcePositions.length);
+        totalCoupling /= Math.sqrt(sourcePositions.length);
       }
       
-      if (Math.abs(sourceCoupling) < 0.001) continue;
+      if (Math.abs(totalCoupling) < 0.001) continue;
       
-      // Compute resonator magnitude response
-      const omega = 2 * Math.PI * f;
-      const omega0 = 2 * Math.PI * f0;
-      const domega = omega - omega0;
-      const bwRad = omega0 / Q;
+      // Complex Lorentzian response: H(f) = W / (1 + j*(f-f0)/(bw/2))
+      const denomReal = 1;
+      const denomImag = (f - f0) / (bw / 2);
+      const denomMagSq = denomReal * denomReal + denomImag * denomImag;
       
-      // Magnitude of 2nd-order resonator
-      const denom = Math.sqrt(domega * domega + bwRad * bwRad);
-      const peakMag = bwRad / denom;
+      // Complex division: (totalCoupling + 0j) / (denomReal + j*denomImag)
+      const hReal = (totalCoupling * denomReal) / denomMagSq;
+      const hImag = -(totalCoupling * denomImag) / denomMagSq;
       
-      // Modal gain scaled by mode type (axial stronger than tangential)
-      let modeWeight = 1.0;
-      if (mode.type === 'axial') modeWeight = 1.0;
-      else if (mode.type === 'tangential') modeWeight = 0.5;
-      else if (mode.type === 'oblique') modeWeight = 0.25;
-      
-      const modeGain = 12 * modeWeight; // dB at peak
-      const contribution = sourceCoupling * peakMag * modeGain;
-      
-      totalContribution += contribution;
+      sumReal += hReal;
+      sumImag += hImag;
     }
     
-    return Math.max(30, Math.min(130, baselineDb + totalContribution));
+    // Magnitude in dB (relative)
+    const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+    return 20 * Math.log10(Math.max(magnitude, 1e-9));
   });
   
   // Apply smoothing if requested
@@ -233,41 +230,32 @@ function computeRoomModes({
 }
 
 /**
- * Compute modal coupling for source and receiver
+ * Compute spatial coupling between source and receiver for a given mode
+ * Uses cosine pressure mode shapes (signed for interference)
  */
-function computeModalCoupling(mode, source, receiver, roomDims) {
+function computeSpatialCoupling(mode, source, receiver, roomDims) {
   const { widthM, lengthM, heightM } = roomDims;
   const { nx, ny, nz } = mode;
   
-  // Source coupling (pressure mode shape)
-  let srcCoupling = 1;
-  if (nx > 0) {
-    srcCoupling *= Math.cos(nx * Math.PI * source.x / widthM);
-  }
-  if (ny > 0) {
-    srcCoupling *= Math.cos(ny * Math.PI * source.y / lengthM);
-  }
-  if (nz > 0) {
-    const srcZ = source.z ?? 0.0;
-    srcCoupling *= Math.cos(nz * Math.PI * srcZ / heightM);
-  }
+  // Wave numbers for this mode
+  const kx = nx * Math.PI / widthM;
+  const ky = ny * Math.PI / lengthM;
+  const kz = nz * Math.PI / heightM;
   
-  // Receiver coupling
-  let rcvCoupling = 1;
-  if (nx > 0) {
-    rcvCoupling *= Math.cos(nx * Math.PI * receiver.x / widthM);
-  }
-  if (ny > 0) {
-    rcvCoupling *= Math.cos(ny * Math.PI * receiver.y / lengthM);
-  }
-  if (nz > 0) {
-    const rcvZ = receiver.z ?? 1.2;
-    rcvCoupling *= Math.cos(nz * Math.PI * rcvZ / heightM);
-  }
+  // Source pressure shape
+  const srcX = nx > 0 ? Math.cos(kx * source.x) : 1;
+  const srcY = ny > 0 ? Math.cos(ky * source.y) : 1;
+  const srcZ = nz > 0 ? Math.cos(kz * (source.z ?? 0.0)) : 1;
+  const S = srcX * srcY * srcZ;
   
-  // Combined coupling (energy-like: square of pressure)
-  const coupling = srcCoupling * rcvCoupling;
-  return coupling * Math.abs(coupling); // preserves sign, scales by magnitude
+  // Receiver pressure shape
+  const rcvX = nx > 0 ? Math.cos(kx * receiver.x) : 1;
+  const rcvY = ny > 0 ? Math.cos(ky * receiver.y) : 1;
+  const rcvZ = nz > 0 ? Math.cos(kz * (receiver.z ?? 1.2)) : 1;
+  const R = rcvX * rcvY * rcvZ;
+  
+  // Coupling (signed - preserves interference effects)
+  return S * R;
 }
 
 /**
@@ -310,16 +298,19 @@ function applySmoothing(freqs, splDb, smoothing) {
  * Normalize response to specific reference level in band (REW-like)
  */
 function normalizeToReferenceLevel(freqs, splDb, bandHz, targetDb) {
-  // Find mean SPL in reference band
+  // Find median SPL in reference band (more robust than mean)
   const [fMin, fMax] = bandHz;
-  const indices = freqs.map((f, i) => f >= fMin && f <= fMax ? i : -1).filter(i => i >= 0);
+  const bandValues = freqs
+    .map((f, i) => f >= fMin && f <= fMax ? splDb[i] : null)
+    .filter(v => v !== null)
+    .sort((a, b) => a - b);
   
-  if (indices.length === 0) return splDb;
+  if (bandValues.length === 0) return splDb;
   
-  const refSum = indices.reduce((sum, i) => sum + splDb[i], 0);
-  const refLevel = refSum / indices.length;
+  // Use median for stability
+  const refLevel = bandValues[Math.floor(bandValues.length / 2)];
   
-  // Offset to target level
+  // Offset to target level (anchor to 0 dB for relative mode)
   const offset = targetDb - refLevel;
   return splDb.map(spl => spl + offset);
 }

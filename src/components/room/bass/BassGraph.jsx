@@ -43,9 +43,9 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                     />
                     <YAxis
-                        domain={rewStyleMode ? [40, 110] : [70, 130]}
+                        domain={rewStyleMode ? [-30, 30] : [70, 130]}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
-                        label={{ value: 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
+                        label={{ value: rewStyleMode ? 'Relative (dB)' : 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
                     />
