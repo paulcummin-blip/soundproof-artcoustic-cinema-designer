@@ -180,45 +180,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     
     const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
     
-    // Build source positions from actual dragged subs
-    const sourcePositions = [];
+    // Build source positions from actual dragged subs (front + rear).
+    // If none exist, fall back to a single generic sub (computeRoomModesResponse will handle it).
+    const frontSubs = subsForSimulation.filter(s => s.id?.startsWith('front-'));
+    const rearSubs = subsForSimulation.filter(s => s.id?.startsWith('rear-'));
     
-    // Front subs
-    const frontCount = frontSubsCfg?.count || 0;
-    const frontPositions = frontSubsCfg?.positions || [];
-    if (frontCount > 0) {
-      const roomWidth = roomDims?.widthM || 4.5;
-      const defaultFrontPos = [
-        { x: roomWidth * 0.33, y: 0.15 },
-        { x: roomWidth * 0.67, y: 0.15 }
-      ];
-      for (let i = 0; i < frontCount; i++) {
-        const pos = frontPositions[i] || defaultFrontPos[i];
-        sourcePositions.push({ x: pos.x, y: pos.y, z: 0.2 });
-      }
-    }
-    
-    // Rear subs
-    const rearCount = rearSubsCfg?.count || 0;
-    const rearPositions = rearSubsCfg?.positions || [];
-    if (rearCount > 0) {
-      const roomWidth = roomDims?.widthM || 4.5;
-      const roomLength = roomDims?.lengthM || 6.0;
-      const defaultRearPos = [
-        { x: roomWidth * 0.33, y: roomLength - 0.15 },
-        { x: roomWidth * 0.67, y: roomLength - 0.15 }
-      ];
-      for (let i = 0; i < rearCount; i++) {
-        const pos = rearPositions[i] || defaultRearPos[i];
-        sourcePositions.push({ x: pos.x, y: pos.y, z: 0.2 });
-      }
-    }
-    
-    // If no subs, use default front-center position
-    if (sourcePositions.length === 0) {
-      const roomWidth = roomDims?.widthM || 4.5;
-      sourcePositions.push({ x: roomWidth / 2, y: 0.2, z: 0.2 });
-    }
+    const sourcePositions = [
+      ...(Array.isArray(frontSubs) ? frontSubs : []),
+      ...(Array.isArray(rearSubs) ? rearSubs : []),
+    ]
+      .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
+      .map(s => ({
+        x: s.x,
+        y: s.y,
+        // REW parity: sub on the floor
+        z: 0.0,
+      }));
     
     // Compute room modes response (REW parity: axial + tangential + oblique)
     const result = computeRoomModesResponse({
