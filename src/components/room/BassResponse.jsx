@@ -39,7 +39,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [roomDamping, setRoomDamping] = useState(20);
   const [showModeMarkers, setShowModeMarkers] = useState(false);
   const [rewStyleMode, setRewStyleMode] = useState(false);
-  const [rewSmoothing, setRewSmoothing] = useState('1/12'); // Default to 1/12 octave for REW mode
+  const [rewSmoothing, setRewSmoothing] = useState('none'); // No smoothing by default in REW mode
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(true);
 
@@ -196,10 +196,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         z: 0.0 // REW parity: sub on the floor
       }));
 
-    // Convert damping slider (8-35) to REW-like percentage mapping
-    // User sees Q slider 8-35, internally we treat as damping%
-    const dampingPercent = ((35 - roomDamping) / (35 - 8)) * 100; // 8→100%, 35→0%
-    const qMapped = 6 + (1 - dampingPercent / 100) * 44;
+    // Use Q directly from slider (8-35 range matches REW reasonably)
+    const qMapped = roomDamping;
 
     // Compute room modes response (REW parity: 3D modes with spatial coupling)
     const result = computeRoomModesResponse({

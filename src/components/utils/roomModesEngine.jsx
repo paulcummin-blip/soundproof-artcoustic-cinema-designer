@@ -1,6 +1,6 @@
 // roomModesEngine.js
-// Fast room modes calculator for "REW-style" bass response
-// Uses rectangular room normal modes with source/receiver coupling
+// REW-parity room modes calculator for bass response
+// Uses rectangular room normal modes with source/receiver spatial coupling
 
 const SPEED_OF_SOUND = 343; // m/s
 
@@ -22,10 +22,10 @@ export function computeRoomModesResponse({
   includeOblique = false,
   c = SPEED_OF_SOUND,
   rewParityMode = true,
-  smoothing = 'none', // 'none', '1/12', '1/6', '1/3'
-  subFloorHeight = 0.0, // REW default: subs at floor
-  normalizeBandHz = [30, 80], // Normalization band (avoid first mode cliff)
-  normalizeToDb = 0 // Target level for normalization (0 = relative)
+  smoothing = 'none',
+  subFloorHeight = 0.0,
+  normalizeBandHz = [30, 80],
+  normalizeToDb = 0
 }) {
   // Validate inputs
   if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
@@ -36,7 +36,7 @@ export function computeRoomModesResponse({
     return { freqs: [], splDb: [], debug: { schroederHz: 0, modeMarkersHz: [], modeCount: 0 } };
   }
   
-  // REW parity mode forces 3D modes ON (regardless of UI toggles)
+  // REW parity mode forces 3D modes ON
   if (rewParityMode) {
     includeAxial = true;
     includeTangential = true;
@@ -51,7 +51,7 @@ export function computeRoomModesResponse({
       z: rewParityMode ? subFloorHeight : 0.2
     }];
   } else if (rewParityMode) {
-    // In REW parity mode, force subs to floor height
+    // In REW parity mode, force subs to floor
     sourcePositions = sourcePositions.map(src => ({
       ...src,
       z: subFloorHeight
@@ -62,11 +62,13 @@ export function computeRoomModesResponse({
   const volume = widthM * lengthM * heightM;
   
   // Compute Schroeder frequency
-  const rt60 = 0.4; // default estimate
+  const rt60 = 0.4;
   const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
   
-  // Generate frequency axis (log-spaced)
-  const freqs = generateFrequencyAxis(fMin, fMax, pointsPerOct);
+  // Generate frequency axis (linear for REW parity)
+  const freqs = rewParityMode 
+    ? generateLinearFrequencyAxis(fMin, fMax, 1.0) // 1 Hz steps
+    : generateLogFrequencyAxis(fMin, fMax, pointsPerOct);
   
   // Compute room modes
   const modes = computeRoomModes({
@@ -80,12 +82,11 @@ export function computeRoomModesResponse({
     includeOblique
   });
   
-  // Build complex response using modal resonators with spatial coupling
+  // Build response using Lorentzian modal resonators with spatial coupling
   let splDb = freqs.map(f => {
-    let sumReal = 0;
-    let sumImag = 0;
+    let sumPressure = 0;
     
-    // Complex sum across all modes
+    // Sum all modal contributions (magnitude-based Lorentzian)
     for (const mode of modes) {
       const f0 = mode.freq;
       
@@ -98,74 +99,56 @@ export function computeRoomModesResponse({
       const df = Math.abs(f - f0);
       if (df > 5 * bw) continue;
       
-      // Compute spatial coupling for all sources
+      // Compute spatial coupling (pressure weighting)
       let totalCoupling = 0;
       for (const source of sourcePositions) {
         const coupling = computeSpatialCoupling(mode, source, seatPosition, roomDims);
         totalCoupling += coupling;
       }
       
-      // Average coupling if multiple sources
+      // Average if multiple sources
       if (sourcePositions.length > 1) {
-        totalCoupling /= Math.sqrt(sourcePositions.length);
+        totalCoupling /= sourcePositions.length;
       }
       
       if (Math.abs(totalCoupling) < 0.001) continue;
       
-      // 2nd-order resonator response (complex)
-      // H(f) = W / [(f0^2 - f^2) + j*(f0*f/Q)]
+      // Lorentzian resonator response (REW-style)
+      // A(f) = G * (f0/Q)^2 / ( (f^2 - f0^2)^2 + (f0*f/Q)^2 )
       const f2 = f * f;
       const f02 = f0 * f0;
-      const denomReal = f02 - f2;
-      const denomImag = (f0 * f) / qMode;
-      const denomMagSq = denomReal * denomReal + denomImag * denomImag;
+      const numerator = totalCoupling * (f0 / qMode) * (f0 / qMode);
+      const denominator = Math.pow(f2 - f02, 2) + Math.pow(f0 * f / qMode, 2);
       
-      // Complex division: totalCoupling / (denomReal + j*denomImag)
-      const hReal = (totalCoupling * denomReal) / denomMagSq;
-      const hImag = -(totalCoupling * denomImag) / denomMagSq;
-      
-      // Deterministic per-mode phase offset (avoid artificial coherence)
-      const phaseOffsetDeg = (mode.nx * 37 + mode.ny * 73 + mode.nz * 19) % 360;
-      const phaseOffsetRad = phaseOffsetDeg * (Math.PI / 180);
-      
-      // Apply phase rotation: (hReal + j*hImag) * e^(j*phaseOffset)
-      const cosPhase = Math.cos(phaseOffsetRad);
-      const sinPhase = Math.sin(phaseOffsetRad);
-      const rotatedReal = hReal * cosPhase - hImag * sinPhase;
-      const rotatedImag = hReal * sinPhase + hImag * cosPhase;
-      
-      sumReal += rotatedReal;
-      sumImag += rotatedImag;
+      const modeContribution = numerator / denominator;
+      sumPressure += modeContribution;
     }
     
-    // Magnitude in dB (relative)
-    const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
-    const db = 20 * Math.log10(Math.max(magnitude, 1e-12));
-    
-    // Guard against non-finite values
-    return isFinite(db) ? db : 0;
+    // Convert to dB (20*log10 for pressure)
+    const db = 20 * Math.log10(Math.abs(sumPressure) + 1e-12);
+    return isFinite(db) ? db : -120;
   });
   
-  // Apply smoothing if requested
+  // Apply smoothing if requested (post-process only)
   if (smoothing !== 'none') {
     splDb = applySmoothing(freqs, splDb, smoothing);
   }
   
-  // Normalize in REW parity mode (relative curve, anchored to mid-band)
+  // Normalize to 30-80 Hz average = 0 dB (REW-style)
   let actualNormBand = normalizeBandHz;
   if (rewParityMode) {
-    const result = normalizeToRelative(freqs, splDb, normalizeBandHz);
+    const result = normalizeToAverage(freqs, splDb, normalizeBandHz);
     splDb = result.splDb;
     actualNormBand = result.actualBand;
   }
   
-  // Build detailed mode markers (for REW-style overlay)
+  // Build detailed mode markers for visualization
   const modeMarkers = modes.map(m => {
     let axisLabel = null;
     if (m.type === 'axial') {
-      if (m.nx > 0) axisLabel = 'W';
-      else if (m.ny > 0) axisLabel = 'L';
-      else if (m.nz > 0) axisLabel = 'H';
+      if (m.nx > 0 && m.ny === 0 && m.nz === 0) axisLabel = 'W';
+      else if (m.ny > 0 && m.nx === 0 && m.nz === 0) axisLabel = 'L';
+      else if (m.nz > 0 && m.nx === 0 && m.ny === 0) axisLabel = 'H';
     }
     
     return {
@@ -176,21 +159,19 @@ export function computeRoomModesResponse({
     };
   });
   
-  // Extract mode frequencies for markers (axial only for clarity)
+  // Mode markers (axial only for basic display)
   const modeMarkersHz = modes
     .filter(m => m.type === 'axial')
     .map(m => m.freq)
     .sort((a, b) => a - b);
   
-  // First ten mode frequencies for debug
-  const firstTenModeHz = modes
-    .slice(0, 10)
-    .map(m => m.freq.toFixed(1));
-  
   // Count by type
   const axialCount = modes.filter(m => m.type === 'axial').length;
   const tangentialCount = modes.filter(m => m.type === 'tangential').length;
   const obliqueCount = modes.filter(m => m.type === 'oblique').length;
+  
+  // First ten modes for debug
+  const firstTenModeHz = modes.slice(0, 10).map(m => m.freq.toFixed(1));
   
   return {
     freqs,
@@ -210,9 +191,20 @@ export function computeRoomModesResponse({
 }
 
 /**
+ * Generate linear frequency axis (REW default)
+ */
+function generateLinearFrequencyAxis(fMin, fMax, step) {
+  const freqs = [];
+  for (let f = fMin; f <= fMax; f += step) {
+    freqs.push(f);
+  }
+  return freqs;
+}
+
+/**
  * Generate log-spaced frequency axis
  */
-function generateFrequencyAxis(fMin, fMax, pointsPerOct) {
+function generateLogFrequencyAxis(fMin, fMax, pointsPerOct) {
   const freqs = [];
   const octaves = Math.log2(fMax / fMin);
   const totalPoints = Math.ceil(octaves * pointsPerOct);
@@ -229,7 +221,6 @@ function generateFrequencyAxis(fMin, fMax, pointsPerOct) {
 
 /**
  * Compute room modes (rectangular room)
- * Returns all axial, tangential, and oblique modes up to fMax
  */
 function computeRoomModes({
   widthM,
@@ -243,16 +234,16 @@ function computeRoomModes({
 }) {
   const modes = [];
   
-  // Maximum mode indices (prevent runaway)
+  // Maximum mode indices
   const nMax = Math.ceil((fMax / c) * 2 * Math.max(widthM, lengthM, heightM)) + 5;
   
   for (let nx = 0; nx <= nMax; nx++) {
     for (let ny = 0; ny <= nMax; ny++) {
       for (let nz = 0; nz <= nMax; nz++) {
-        // Skip (0,0,0) mode
+        // Skip (0,0,0)
         if (nx === 0 && ny === 0 && nz === 0) continue;
         
-        // Compute modal frequency
+        // Modal frequency: f = (c/2) * sqrt( (nx/Lx)^2 + (ny/Ly)^2 + (nz/Lz)^2 )
         const freq = (c / 2) * Math.sqrt(
           Math.pow(nx / widthM, 2) +
           Math.pow(ny / lengthM, 2) +
@@ -275,13 +266,7 @@ function computeRoomModes({
           if (!includeOblique) continue;
         }
         
-        modes.push({
-          nx,
-          ny,
-          nz,
-          freq,
-          type
-        });
+        modes.push({ nx, ny, nz, freq, type });
       }
     }
   }
@@ -290,30 +275,27 @@ function computeRoomModes({
 }
 
 /**
- * Compute spatial coupling between source and receiver for a given mode
- * Uses cosine pressure mode shapes (signed for interference)
+ * Compute spatial coupling using cosine pressure mode shapes
  */
 function computeSpatialCoupling(mode, source, receiver, roomDims) {
   const { widthM, lengthM, heightM } = roomDims;
   const { nx, ny, nz } = mode;
   
-  // Cosine pressure mode shapes (preserves sign for interference)
+  // Cosine pressure terms (preserves sign for interference)
   const srcX = nx > 0 ? Math.cos(nx * Math.PI * source.x / widthM) : 1;
   const srcY = ny > 0 ? Math.cos(ny * Math.PI * source.y / lengthM) : 1;
   const srcZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / heightM) : 1;
-  const S = srcX * srcY * srcZ;
   
   const rcvX = nx > 0 ? Math.cos(nx * Math.PI * receiver.x / widthM) : 1;
   const rcvY = ny > 0 ? Math.cos(ny * Math.PI * receiver.y / lengthM) : 1;
   const rcvZ = nz > 0 ? Math.cos(nz * Math.PI * (receiver.z ?? 1.2) / heightM) : 1;
-  const R = rcvX * rcvY * rcvZ;
   
-  // Coupling (signed - preserves interference effects)
-  return S * R;
+  // Total coupling = source pressure × receiver pressure
+  return (srcX * srcY * srcZ) * (rcvX * rcvY * rcvZ);
 }
 
 /**
- * Apply fractional octave smoothing to response
+ * Apply fractional octave smoothing
  */
 function applySmoothing(freqs, splDb, smoothing) {
   const octaveFraction = {
@@ -329,7 +311,6 @@ function applySmoothing(freqs, splDb, smoothing) {
     const fLow = fc / Math.pow(2, 1 / (2 * octaveFraction));
     const fHigh = fc * Math.pow(2, 1 / (2 * octaveFraction));
     
-    // Find indices in smoothing window
     let sum = 0;
     let count = 0;
     
@@ -349,36 +330,33 @@ function applySmoothing(freqs, splDb, smoothing) {
 }
 
 /**
- * Normalize response to relative (0 dB) by removing median offset in band
- * Avoids "cliff" at low frequencies by anchoring to mid-band where modes exist
- * Returns: { splDb: normalized array, actualBand: band used }
+ * Normalize to average in band = 0 dB (REW-style)
  */
-function normalizeToRelative(freqs, splDb, bandHz) {
-  // Helper to extract finite values in a band
-  const getFiniteValuesInBand = (fMin, fMax) => {
+function normalizeToAverage(freqs, splDb, bandHz) {
+  // Helper to get finite values in band
+  const getFiniteInBand = (fMin, fMax) => {
     return freqs
       .map((f, i) => f >= fMin && f <= fMax && isFinite(splDb[i]) ? splDb[i] : null)
-      .filter(v => v !== null)
-      .sort((a, b) => a - b);
+      .filter(v => v !== null);
   };
   
-  // Try primary band first (30-80 Hz)
-  let bandValues = getFiniteValuesInBand(bandHz[0], bandHz[1]);
+  // Try primary band (30-80 Hz)
+  let bandValues = getFiniteInBand(bandHz[0], bandHz[1]);
   let actualBand = bandHz;
   
-  // Fallback to 20-80 Hz if primary band is empty
+  // Fallback to 20-80 Hz
   if (bandValues.length === 0) {
-    bandValues = getFiniteValuesInBand(20, 80);
+    bandValues = getFiniteInBand(20, 80);
     actualBand = [20, 80];
   }
   
-  // Fallback to all finite values if still empty
+  // Fallback to all finite
   if (bandValues.length === 0) {
-    bandValues = splDb.filter(v => isFinite(v)).sort((a, b) => a - b);
+    bandValues = splDb.filter(v => isFinite(v));
     actualBand = [freqs[0], freqs[freqs.length - 1]];
   }
   
-  // If still no data, return zeros
+  // If no data, return zeros
   if (bandValues.length === 0) {
     return { 
       splDb: splDb.map(() => 0),
@@ -386,14 +364,14 @@ function normalizeToRelative(freqs, splDb, bandHz) {
     };
   }
   
-  // Use median for stability (robust to outliers)
-  const medianDb = bandValues[Math.floor(bandValues.length / 2)];
+  // Use average (not median) for REW-style normalization
+  const avgDb = bandValues.reduce((a, b) => a + b, 0) / bandValues.length;
   
-  // Normalize and sanitize
+  // Normalize
   const normalized = splDb.map(spl => {
-    if (!isFinite(spl)) return 0;
-    const normalized = spl - medianDb;
-    return isFinite(normalized) ? normalized : 0;
+    if (!isFinite(spl)) return -120;
+    const norm = spl - avgDb;
+    return isFinite(norm) ? norm : -120;
   });
   
   return {
