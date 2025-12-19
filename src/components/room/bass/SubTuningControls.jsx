@@ -6,7 +6,9 @@ import { Slider } from "@/components/ui/slider";
 export default function SubTuningControls({ 
   subsCfg, 
   onSettingsChange, 
-  groupLabel = "Front" 
+  groupLabel = "Front",
+  subDistances = {},
+  autoAlignEnabled = false
 }) {
   const count = subsCfg?.count || 0;
   const settingsById = subsCfg?.settingsById || {};
@@ -37,12 +39,26 @@ export default function SubTuningControls({
     <div className="space-y-4">
       {subIds.map((subId, i) => {
         const settings = settingsById[subId] || { gainDb: 0, delayMs: 0, polarity: 'normal' };
+        const distance = subDistances[subId];
         
         return (
           <div key={subId} className="p-3 rounded-lg border border-[#DCDBD6] bg-white space-y-3">
-            <div className="text-sm font-medium text-[#1B1A1A]">
-              {groupLabel} Sub {labels[i]}
+            <div className="flex items-baseline justify-between">
+              <div className="text-sm font-medium text-[#1B1A1A]">
+                {groupLabel} Sub {labels[i]}
+              </div>
+              {distance && (
+                <div className="text-xs text-[#3E4349]">
+                  {distance.distanceM.toFixed(2)}m • {distance.timeMs.toFixed(2)}ms
+                </div>
+              )}
             </div>
+            
+            {autoAlignEnabled && (
+              <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-1.5 rounded">
+                Auto-aligned to MLP
+              </div>
+            )}
             
             {/* Gain */}
             <div>
