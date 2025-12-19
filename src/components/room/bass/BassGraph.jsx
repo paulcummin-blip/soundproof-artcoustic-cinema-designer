@@ -20,7 +20,8 @@ export default function BassGraph({
   toggles, 
   crossoverFrequency = 80,
   modeFrequencies = [],
-  showModeMarkers = false
+  showModeMarkers = false,
+  rewStyleMode = false
 }) {
     const data = toggles.smoothing
         ? responseData // Placeholder for actual smoothing logic
@@ -42,7 +43,7 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                     />
                     <YAxis
-                        domain={['auto', 'auto']}
+                        domain={rewStyleMode ? [40, 110] : [70, 130]}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
                         label={{ value: 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"

@@ -212,7 +212,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       includeOblique: true,
       rewParityMode: true,
       smoothing: rewSmoothing,
-      subFloorHeight: 0.0
+      subFloorHeight: 0.0,
+      normalizeBandHz: [20, 30],
+      normalizeToDb: 90
     });
     
     return result.freqs.map((frequency, i) => ({
@@ -749,6 +751,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             crossoverFrequency={80}
             modeFrequencies={modeFrequencies}
             showModeMarkers={rewStyleMode || showModeMarkers}
+            rewStyleMode={rewStyleMode}
           />
         </div>
       ) : (

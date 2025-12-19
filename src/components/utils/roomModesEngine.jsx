@@ -23,7 +23,9 @@ export function computeRoomModesResponse({
   c = SPEED_OF_SOUND,
   rewParityMode = true,
   smoothing = 'none', // 'none', '1/12', '1/6', '1/3'
-  subFloorHeight = 0.0 // REW default: subs at floor
+  subFloorHeight = 0.0, // REW default: subs at floor
+  normalizeBandHz = [20, 30], // REW-like normalization band
+  normalizeToDb = 90 // Target level for normalization
 }) {
   // Validate inputs
   if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
@@ -130,9 +132,9 @@ export function computeRoomModesResponse({
     splDb = applySmoothing(freqs, splDb, smoothing);
   }
   
-  // Normalize in REW parity mode
+  // Normalize in REW parity mode (anchor to specific band)
   if (rewParityMode) {
-    splDb = normalizeResponse(freqs, splDb);
+    splDb = normalizeToReferenceLevel(freqs, splDb, normalizeBandHz, normalizeToDb);
   }
   
   // Extract mode frequencies for markers (axial only for clarity)
@@ -305,17 +307,19 @@ function applySmoothing(freqs, splDb, smoothing) {
 }
 
 /**
- * Normalize response to 0 dB at reference frequency
+ * Normalize response to specific reference level in band (REW-like)
  */
-function normalizeResponse(freqs, splDb) {
-  // Find mean SPL in 40-60 Hz band (REW-style normalization)
-  const indices = freqs.map((f, i) => f >= 40 && f <= 60 ? i : -1).filter(i => i >= 0);
+function normalizeToReferenceLevel(freqs, splDb, bandHz, targetDb) {
+  // Find mean SPL in reference band
+  const [fMin, fMax] = bandHz;
+  const indices = freqs.map((f, i) => f >= fMin && f <= fMax ? i : -1).filter(i => i >= 0);
   
   if (indices.length === 0) return splDb;
   
   const refSum = indices.reduce((sum, i) => sum + splDb[i], 0);
   const refLevel = refSum / indices.length;
   
-  // Normalize to 0 dB at reference
-  return splDb.map(spl => spl - refLevel);
+  // Offset to target level
+  const offset = targetDb - refLevel;
+  return splDb.map(spl => spl + offset);
 }
