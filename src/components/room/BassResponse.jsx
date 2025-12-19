@@ -227,12 +227,48 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       normalizeToDb: 0
     });
 
+    // Validate result data
+    const finiteValues = result.splDb.filter(v => isFinite(v));
+    const finiteCount = finiteValues.length;
+    
+    if (finiteCount === 0) {
+      return {
+        data: [],
+        debug: { ...result.debug, error: "REW curve has no finite values", finiteCount: 0 }
+      };
+    }
+    
+    const minDb = Math.min(...finiteValues);
+    const maxDb = Math.max(...finiteValues);
+    const rangeDb = maxDb - minDb;
+
+    // Guard against flat or invalid curves
+    if (finiteCount < 10 || rangeDb < 0.25) {
+      return {
+        data: [],
+        debug: {
+          ...result.debug,
+          error: "REW curve invalid or flat",
+          finiteCount,
+          minDb: minDb.toFixed(2),
+          maxDb: maxDb.toFixed(2),
+          rangeDb: rangeDb.toFixed(2)
+        }
+      };
+    }
+
     return {
       data: result.freqs.map((frequency, i) => ({
         frequency,
         spl: result.splDb[i]
       })),
-      debug: result.debug,
+      debug: {
+        ...result.debug,
+        finiteCount,
+        minDb: minDb.toFixed(2),
+        maxDb: maxDb.toFixed(2),
+        rangeDb: rangeDb.toFixed(2)
+      },
       freqs: result.freqs,
       splDb: result.splDb
     };
@@ -854,7 +890,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       )}
 
       {/* Bass Response Graph */}
-      {displayData.length > 0 ? (
+      {rewStyleMode && rewModesData?.data?.length === 0 ? (
+        <Alert className="border border-[#C1B6AD] bg-[#F8F8F7] text-[#3E4349]">
+          <AlertDescription className="text-sm">
+            <strong>REW curve failed</strong> — see debug info above for details.
+          </AlertDescription>
+        </Alert>
+      ) : displayData.length > 0 ? (
         <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
@@ -882,7 +924,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   <div>• Lorentzian resonator per mode with Q-based damping</div>
                   <div>• Normalized to average in {rewModesData?.debug?.normBandHz?.[0]}-{rewModesData?.debug?.normBandHz?.[1]} Hz band</div>
                 </div>
-                {rewModesData?.debug && (
+                {rewModesData?.debug?.error && (
+                  <div className="mt-2 p-2 bg-[#C1B6AD]/20 border border-[#C1B6AD] rounded">
+                    <div className="text-[11px] font-semibold text-[#C1B6AD]">
+                      ⚠ REW curve error: {rewModesData.debug.error}
+                    </div>
+                    <div className="text-[10px] font-mono mt-1 opacity-80">
+                      Range: {rewModesData.debug.rangeDb} dB | Finite: {rewModesData.debug.finiteCount}
+                    </div>
+                  </div>
+                )}
+                {rewModesData?.debug && !rewModesData.debug.error && (
                   <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
                     <div className="text-[10px] font-mono opacity-80">
                       <strong>Modes:</strong> {rewModesData.debug.modeCount} total 
@@ -892,10 +944,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                       <strong>First 10:</strong> {rewModesData.debug.firstTenModeHz?.join(', ')} Hz
                     </div>
                     <div className="text-[10px] font-mono opacity-80">
-                      <strong>Normalization:</strong> Mean of {rewModesData.debug.normBandHz?.[0]}-{rewModesData.debug.normBandHz?.[1]} Hz = 0 dB
+                      <strong>Normalization:</strong> {rewModesData.debug.normApplied ? `Applied (${rewModesData.debug.normBandHz?.[0]}-${rewModesData.debug.normBandHz?.[1]} Hz)` : 'Skipped (insufficient data)'}
                     </div>
                     <div className="text-[10px] font-mono opacity-80">
-                      <strong>Frequency step:</strong> 0.5 Hz (linear axis)
+                      <strong>Data:</strong> {rewModesData.debug.finiteCount} points | Range: {rewModesData.debug.rangeDb} dB
+                      {rewModesData.debug.nonFiniteRepaired > 0 && ` | Repaired: ${rewModesData.debug.nonFiniteRepaired}`}
                     </div>
                   </div>
                 )}

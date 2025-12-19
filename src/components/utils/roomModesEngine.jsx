@@ -152,6 +152,24 @@ export function computeRoomModesResponse({
     return isFinite(db) ? db : -120;
   });
   
+  // Clamp non-finite values before smoothing
+  let nonFiniteRepaired = 0;
+  let lastGoodValue = 0;
+  for (let i = 0; i < splDb.length; i++) {
+    if (!isFinite(splDb[i])) {
+      splDb[i] = lastGoodValue;
+      nonFiniteRepaired++;
+    } else {
+      lastGoodValue = splDb[i];
+    }
+  }
+
+  // Capture pre-normalization stats
+  const finitePreNorm = splDb.filter(v => isFinite(v));
+  const preNormMin = finitePreNorm.length > 0 ? Math.min(...finitePreNorm) : 0;
+  const preNormMax = finitePreNorm.length > 0 ? Math.max(...finitePreNorm) : 0;
+  const preNormRange = preNormMax - preNormMin;
+
   // Apply smoothing if requested (post-process only)
   if (smoothing !== 'none') {
     splDb = applySmoothing(freqs, splDb, smoothing);
@@ -159,11 +177,19 @@ export function computeRoomModesResponse({
   
   // Normalize to 30-80 Hz average = 0 dB (REW-style)
   let actualNormBand = normalizeBandHz;
+  let normApplied = false;
   if (rewParityMode) {
     const result = normalizeToAverage(freqs, splDb, normalizeBandHz);
     splDb = result.splDb;
     actualNormBand = result.actualBand;
+    normApplied = result.applied;
   }
+
+  // Capture post-normalization stats
+  const finitePostNorm = splDb.filter(v => isFinite(v));
+  const postNormMin = finitePostNorm.length > 0 ? Math.min(...finitePostNorm) : 0;
+  const postNormMax = finitePostNorm.length > 0 ? Math.max(...finitePostNorm) : 0;
+  const postNormRange = postNormMax - postNormMin;
   
   // Build detailed mode markers for visualization
   const modeMarkers = modes.map(m => {
@@ -208,7 +234,15 @@ export function computeRoomModesResponse({
       tangentialCount,
       obliqueCount,
       firstTenModeHz,
-      normBandHz: actualNormBand
+      normBandHz: actualNormBand,
+      normApplied,
+      nonFiniteRepaired,
+      preNormMin: preNormMin.toFixed(2),
+      preNormMax: preNormMax.toFixed(2),
+      preNormRange: preNormRange.toFixed(2),
+      postNormMin: postNormMin.toFixed(2),
+      postNormMax: postNormMax.toFixed(2),
+      postNormRange: postNormRange.toFixed(2)
     }
   };
 }
@@ -367,23 +401,12 @@ function normalizeToAverage(freqs, splDb, bandHz) {
   let bandValues = getFiniteInBand(bandHz[0], bandHz[1]);
   let actualBand = bandHz;
   
-  // Fallback to 20-80 Hz
-  if (bandValues.length === 0) {
-    bandValues = getFiniteInBand(20, 80);
-    actualBand = [20, 80];
-  }
-  
-  // Fallback to all finite
-  if (bandValues.length === 0) {
-    bandValues = splDb.filter(v => isFinite(v));
-    actualBand = [freqs[0], freqs[freqs.length - 1]];
-  }
-  
-  // If no data, return zeros
-  if (bandValues.length === 0) {
-    return { 
-      splDb: splDb.map(() => 0),
-      actualBand 
+  // Guard: if fewer than 10 points in band, skip normalization
+  if (bandValues.length < 10) {
+    return {
+      splDb,
+      actualBand,
+      applied: false
     };
   }
   
@@ -399,6 +422,7 @@ function normalizeToAverage(freqs, splDb, bandHz) {
   
   return {
     splDb: normalized,
-    actualBand
+    actualBand,
+    applied: true
   };
 }
