@@ -218,21 +218,18 @@ export function computeRoomModesResponse({
     }
 
     // Schroeder blend: above fs, reduce explicit modal contrast (statistical smoothing feel)
-    if (rewParityMode) {
-      const volume = roomDims.widthM * roomDims.lengthM * roomDims.heightM;
-      const rt60 = 0.4;
-      const fs = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 120;
-
+    if (rewParityMode && schroederHz > 0) {
       splDb = splDb.map((db, i) => {
         const f = freqs[i];
-        if (f <= fs) return db;
+        // Only apply above Schroeder frequency (never below lowest axial)
+        if (f < schroederHz) return db;
 
         // Blend to a gently smoothed "statistical" curve (no wild modal spikes)
-        const f2 = fs * 1.6;
-        const t = Math.max(0, Math.min(1, (f - fs) / Math.max(1e-6, (f2 - fs))));
+        const f2 = schroederHz * 1.6;
+        const t = Math.max(0, Math.min(1, (f - schroederHz) / Math.max(1e-6, (f2 - schroederHz))));
 
         // Simple target: a mild downward tilt
-        const target = dbAt(fs, freqs, splDb) - 3 * Math.log2(f / fs);
+        const target = dbAt(schroederHz, freqs, splDb) - 3 * Math.log2(f / schroederHz);
 
         return (1 - t) * db + t * target;
       });
