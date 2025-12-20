@@ -32,22 +32,31 @@ export default function BassGraph({
       ? responseData
       : responseData;
 
-    // Calculate data-driven Y-axis range for REW mode
+    // REW-style auto-windowing: focus on relevant data range
     let calculatedYMin = yMin;
     let calculatedYMax = yMax;
+    let calculatedXMax = 200;
 
     if (rewStyleMode && data.length > 0) {
       const validSpl = data.map(p => p.spl).filter(v => Number.isFinite(v));
       if (validSpl.length > 0) {
         const dataMin = Math.min(...validSpl);
         const dataMax = Math.max(...validSpl);
-        calculatedYMin = Math.min(dataMin - 10, 40);
-        calculatedYMax = Math.max(dataMax + 10, 115);
+        const dataMean = validSpl.reduce((a, b) => a + b, 0) / validSpl.length;
+        
+        // Auto-window: peak ± 25 dB (REW-like focused view)
+        calculatedYMin = Math.max(dataMax - 45, dataMin - 5, 40);
+        calculatedYMax = Math.min(dataMax + 5, dataMean + 30, 120);
+        
+        // Smart X-axis: up to Schroeder*1.2, but always show at least 120 Hz
+        if (schroederFrequency > 0) {
+          calculatedXMax = Math.max(120, Math.min(200, schroederFrequency * 1.2));
+        }
       }
     } else if (rewStyleMode) {
       // Default REW-like range when no data
-      calculatedYMin = 40;
-      calculatedYMax = 115;
+      calculatedYMin = 60;
+      calculatedYMax = 110;
     }
 
     // Render mode markers if enabled
@@ -88,7 +97,7 @@ export default function BassGraph({
                     <XAxis
                         dataKey="frequency"
                         type="number"
-                        domain={['dataMin', 'dataMax']}
+                        domain={rewStyleMode ? [15, calculatedXMax] : ['dataMin', 'dataMax']}
                         scale={linearHzAxis ? "linear" : "log"}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
                         label={{ value: "Frequency (Hz)", position: 'insideBottom', offset: -10, className: 'font-body text-[#3E4349]' }}
@@ -96,7 +105,7 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                     />
                     <YAxis
-                        domain={calculatedYMin !== undefined && calculatedYMax !== undefined ? [calculatedYMin, calculatedYMax] : (rewStyleMode ? [40, 110] : ['dataMin - 5', 'dataMax + 5'])}
+                        domain={calculatedYMin !== undefined && calculatedYMax !== undefined ? [calculatedYMin, calculatedYMax] : ['dataMin - 5', 'dataMax + 5']}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
                         label={{ value: rewStyleMode ? 'SPL (dB)' : 'Relative (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"

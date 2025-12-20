@@ -181,65 +181,48 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return null;
   }, [seatingPositions, simulationResults.seatResponses]);
 
-  // REW-style room-only curve (modal response only)
+  // REW-style room-only curve (modal response with flat/generic sub)
   const rewModesData = useMemo(() => {
     if (!rewStyleMode) return null;
 
-    // Hard guards (avoid REW graph failing / NaN explosions)
     const w = roomDims?.widthM;
     const l = roomDims?.lengthM;
     const h = roomDims?.heightM;
     if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h) && w > 0 && l > 0 && h > 0)) {
       return {
         data: [],
-        debug: {
-          error: "Invalid room dimensions (width/length/height missing).",
-          roomDims,
-        }
+        debug: { error: "Invalid room dimensions", roomDims }
       };
     }
 
-    // Use selected seat (MLP or currently shown seat)
     const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
     if (!seat) {
       return {
         data: [],
-        debug: {
-          error: "No seat position found (need at least one seat).",
-        }
+        debug: { error: "No seat position found" }
       };
     }
 
-    // Use actual seat z (don't force it)
-    const seatPos = { 
-      x: seat.x, 
-      y: seat.y, 
-      z: seat.z ?? 1.2 
-    };
+    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
 
-    // Build source positions from actual dragged subs (front + rear)
+    // Build source positions from actual subs
     const sourcePositions = subsForSimulation
       .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
       .map(s => ({
         x: s.x,
         y: s.y,
-        z: 0.0 // REW parity: sub on the floor
+        z: 0.0,
+        tuning: s.tuning || { gainDb: 0, delayMs: 0, polarity: 'normal' }
       }));
 
     if (!sourcePositions.length) {
       return {
         data: [],
-        debug: {
-          error: "No valid sub source positions to compute REW modes curve.",
-          subsForSimulation
-        }
+        debug: { error: "No valid sub positions" }
       };
     }
 
-    // Use Q directly from slider (8-35 range matches REW reasonably)
-    const qMapped = roomDamping;
-
-    // Compute room modes response (REW parity: 3D modes with spatial coupling)
+    // Room-only = flat/generic sub response (no product curves)
     let result;
     try {
       result = computeRoomModesResponse({
@@ -250,7 +233,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         fMax: 200,
         pointsPerOct: 24,
         modeLimitHz: 200,
-        q: qMapped,
+        q: roomDamping,
         includeAxial: true,
         includeTangential: true,
         includeOblique: true,
@@ -269,39 +252,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         },
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
+        subProductCurves: null, // Room-only: no product curves
+        absoluteSplMode: false
       });
     } catch (e) {
       return {
         data: [],
         debug: {
-          error: "computeRoomModesResponse threw an error",
-          message: String(e?.message || e),
-          roomDims: { widthM: w, lengthM: l, heightM: h },
-          seatPos,
-          sourcePositions
+          error: "computeRoomModesResponse failed",
+          message: String(e?.message || e)
         }
       };
     }
 
-    // Validate result data
     const finiteValues = result.splDb.filter(v => isFinite(v));
-    const finiteCount = finiteValues.length;
-    
-    if (finiteCount === 0) {
-      return {
-        data: [],
-        debug: { ...result.debug, error: "REW curve has no finite values", finiteCount: 0 }
-      };
+    if (finiteValues.length === 0) {
+      return { data: [], debug: { ...result.debug, error: "No finite values" } };
     }
-    
-    const minDb = Math.min(...finiteValues);
-    const maxDb = Math.max(...finiteValues);
-    const rangeDb = maxDb - minDb;
-
-    // If it's flat, that's still valid data. Plot it, but flag it.
-    const flatNote = (finiteCount < 10 || rangeDb < 0.25)
-      ? { warning: "REW curve looks flat (still plotted)", finiteCount, minDb, maxDb, rangeDb }
-      : null;
 
     return {
       data: result.freqs.map((frequency, i) => ({
@@ -310,11 +277,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       })),
       debug: {
         ...result.debug,
-        finiteCount,
-        minDb: minDb.toFixed(2),
-        maxDb: maxDb.toFixed(2),
-        rangeDb: rangeDb.toFixed(2),
-        ...(flatNote ? { flatNote } : {})
+        viewMode: 'Room-only (generic sub)',
+        curveType: 'Modal response + geometry',
       },
       freqs: result.freqs,
       splDb: result.splDb
@@ -371,73 +335,144 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }
   };
 
-  // REW-style room + product curve (modal response + sub FR)
+  // REW-style room + product curve (apply actual sub response before room interaction)
   const rewRoomPlusProductData = useMemo(() => {
     if (!rewStyleMode || rewView !== 'roomPlusProduct') return null;
-    if (!rewModesData?.data?.length) return rewModesData;
 
-    // Get frequencies from room-only curve
-    const freqs = rewModesData.data.map(p => p.frequency);
-
-    // Pick model keys actually in use (front + rear)
-    const modelKeys = (subsForSimulation || [])
-      .map(s => s?.modelKey)
-      .filter(Boolean);
-
-    const uniqueKeys = Array.from(new Set(modelKeys));
-    if (!uniqueKeys.length) {
-      return {
-        ...rewModesData,
-        debug: { ...(rewModesData.debug || {}), productNote: "No sub model keys found." }
-      };
+    const w = roomDims?.widthM;
+    const l = roomDims?.lengthM;
+    const h = roomDims?.heightM;
+    if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h) && w > 0 && l > 0 && h > 0)) {
+      return { data: [], debug: { error: "Invalid room dimensions" } };
     }
 
-    // Get product curves (anechoic response)
-    const curves = uniqueKeys
-      .map(k => getSubAnechoicResponseDb(k, freqs))
-      .filter(arr => Array.isArray(arr) && arr.length === freqs.length);
-
-    if (!curves.length) {
-      return {
-        ...rewModesData,
-        debug: { ...(rewModesData.debug || {}), productNote: "No anechoic data for selected sub model — Room + Product will match Room-only." }
-      };
+    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+    if (!seat) {
+      return { data: [], debug: { error: "No seat position" } };
     }
 
-    // Average product curves in dB domain
-    const avgProductDb = freqs.map((_, i) => {
-      let sum = 0;
-      curves.forEach(c => { sum += c[i]; });
-      return sum / curves.length;
-    });
+    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
 
-    // Convert to multiplicative gain relative to reference frequency (50 Hz)
-    const refIdx = freqs.findIndex(f => f >= 50);
-    const refDb = refIdx >= 0 ? avgProductDb[refIdx] : avgProductDb[Math.floor(freqs.length / 2)];
+    // Build source positions
+    const sourcePositions = subsForSimulation
+      .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
+      .map(s => ({
+        x: s.x,
+        y: s.y,
+        z: 0.0,
+        tuning: s.tuning || { gainDb: 0, delayMs: 0, polarity: 'normal' }
+      }));
+
+    if (!sourcePositions.length) {
+      return { data: [], debug: { error: "No valid sub positions" } };
+    }
+
+    // Get product curves for each sub
+    const subProductCurves = [];
+    let productDataFound = false;
     
-    // Apply product response as frequency-dependent gain (multiplicative, not additive)
-    // G(f) = 10^((subDb(f) - subDb(ref)) / 20)
-    // Then: SPL_total(f) = SPL_room(f) + 20*log10(G(f))
-    const out = freqs.map((f, i) => {
-      const roomSpl = rewModesData.data[i]?.spl ?? 0;
-      const productGainDb = avgProductDb[i] - refDb; // Relative gain vs reference
+    for (const sub of subsForSimulation) {
+      if (!sub?.modelKey) {
+        subProductCurves.push(null);
+        continue;
+      }
+
+      // Generate frequency axis (must match engine's axis)
+      const freqs = [];
+      for (let f = 15; f <= 200; f += 0.5) {
+        freqs.push(f);
+      }
+
+      const curveDb = getSubAnechoicResponseDb(sub.modelKey, freqs);
+      if (curveDb && curveDb.length === freqs.length) {
+        // Convert to relative gain (reference at 50 Hz)
+        const refIdx = freqs.findIndex(f => f >= 50) || Math.floor(freqs.length / 3);
+        const refDb = curveDb[refIdx];
+        const relativeGain = curveDb.map(db => db - refDb);
+        subProductCurves.push(relativeGain);
+        productDataFound = true;
+      } else {
+        subProductCurves.push(null);
+      }
+    }
+
+    if (!productDataFound) {
       return {
-        frequency: f,
-        spl: roomSpl + productGainDb
+        data: rewModesData?.data || [],
+        debug: {
+          ...(rewModesData?.debug || {}),
+          productNote: "No anechoic data for selected sub model(s) — Room + Product will match Room-only.",
+          viewMode: 'Room + Product (no product data)',
+        }
       };
-    });
+    }
+
+    // Run engine with product curves applied per-sub
+    let result;
+    try {
+      result = computeRoomModesResponse({
+        roomDims: { widthM: w, lengthM: l, heightM: h },
+        sourcePositions,
+        seatPosition: seatPos,
+        fMin: 15,
+        fMax: 200,
+        pointsPerOct: 24,
+        modeLimitHz: 200,
+        q: roomDamping,
+        includeAxial: true,
+        includeTangential: true,
+        includeOblique: true,
+        rewParityMode: true,
+        smoothing: rewSmoothing,
+        subFloorHeight: 0.0,
+        normalizeBandHz: [30, 80],
+        normalizeToDb: 0,
+        surfaceAbsorption: {
+          front: 0.30,
+          back: 0.30,
+          left: 0.30,
+          right: 0.30,
+          ceiling: 0.30,
+          floor: 0.30,
+        },
+        dampingScalar: Math.max(0.5, roomDamping / 20),
+        leakage: 0.05,
+        subProductCurves, // Apply per-sub product curves
+        absoluteSplMode: false
+      });
+    } catch (e) {
+      return {
+        data: [],
+        debug: {
+          error: "computeRoomModesResponse failed",
+          message: String(e?.message || e)
+        }
+      };
+    }
+
+    const finiteValues = result.splDb.filter(v => isFinite(v));
+    if (finiteValues.length === 0) {
+      return { data: [], debug: { ...result.debug, error: "No finite values" } };
+    }
+
+    const modelKeys = subsForSimulation.map(s => s?.modelKey).filter(Boolean);
+    const uniqueKeys = Array.from(new Set(modelKeys));
 
     return {
-      data: out,
-      debug: { 
-        ...(rewModesData.debug || {}), 
-        productApplied: true,
-        productGainApplied: true,
-        productRefHz: freqs[refIdx] || 50,
-        productModels: uniqueKeys 
-      }
+      data: result.freqs.map((frequency, i) => ({
+        frequency,
+        spl: result.splDb[i]
+      })),
+      debug: {
+        ...result.debug,
+        viewMode: 'Room + Product',
+        curveType: 'Modal response + product anechoic curves',
+        productModels: uniqueKeys,
+      },
+      freqs: result.freqs,
+      splDb: result.splDb
     };
-  }, [rewStyleMode, rewView, rewModesData, subsForSimulation]);
+  }, [rewStyleMode, rewView, roomDims, seatingPositions, subsForSimulation, roomDamping, rewSmoothing, rewModesData]);
 
   // Helper: apply REW-style smoothing
   function applyRewSmoothing(freqs, splDb, smoothing) {
@@ -1026,15 +1061,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           </div>
         )}
 
-        {/* REW parity info (only when REW is ON and no error) */}
+        {/* REW mode info (only when REW is ON and no error) */}
         {rewStyleMode && !rewModesData?.debug?.error && (
           <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
-            <div className="font-semibold mb-1">REW Parity Mode</div>
+            <div className="font-semibold mb-1">
+              {rewView === 'roomPlusProduct' ? 'Room + Product' : 'Room-only (generic sub)'}
+            </div>
             <div className="text-[11px] space-y-1">
-              <div>• Full 3D modal set with spatial coupling (source × receiver pressure)</div>
-              <div>• Sub forced to floor (z=0m), seat uses actual z-height</div>
-              <div>• Lorentzian resonator per mode with Q-based damping</div>
-              <div>• Normalized to average in {rewModesData?.debug?.normBandHz?.[0]}-{rewModesData?.debug?.normBandHz?.[1]} Hz band</div>
+              <div>• Complex modal summation with spatial coupling</div>
+              <div>• {rewModesData?.debug?.qMappingText || 'Q-based damping'}</div>
+              <div>• Lowest axial mode: {rewModesData?.debug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz</div>
+              {rewView === 'roomPlusProduct' && (
+                <div>• Product curves: {(rewRoomPlusProductData?.debug?.productModels || []).join(', ') || 'None'}</div>
+              )}
             </div>
             {rewModesData?.debug && (
               <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
@@ -1043,21 +1082,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   ({rewModesData.debug.axialCount} axial, {rewModesData.debug.tangentialCount} tangential, {rewModesData.debug.obliqueCount} oblique)
                 </div>
                 <div className="text-[10px] font-mono opacity-80">
-                  <strong>First 10:</strong> {rewModesData.debug.firstTenModeHz?.join(', ')} Hz
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Normalization:</strong> {rewModesData.debug.normApplied ? `Applied (${rewModesData.debug.normBandHz?.[0]}-${rewModesData.debug.normBandHz?.[1]} Hz)` : 'Skipped (insufficient data)'}
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Data:</strong> {rewModesData.debug.finiteCount} points | Range: {rewModesData.debug.rangeDb} dB
-                  {rewModesData.debug.nonFiniteRepaired > 0 && ` | Repaired: ${rewModesData.debug.nonFiniteRepaired}`}
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Raw:</strong> {rewModesData.debug.rawRange} dB | <strong>Pre-norm:</strong> {rewModesData.debug.preNormRange} dB | <strong>Post-norm:</strong> {rewModesData.debug.postNormRange} dB
+                  <strong>View:</strong> {rewModesData.debug.viewMode || rewView}
                 </div>
                 <div className="text-[10px] font-mono opacity-80">
                   <strong>Smoothing:</strong> {rewModesData.debug.smoothingApplied || 'none'}
                 </div>
+                {rewRoomPlusProductData?.debug?.productNote && (
+                  <div className="text-[10px] font-mono opacity-80 text-yellow-700">
+                    <strong>Note:</strong> {rewRoomPlusProductData.debug.productNote}
+                  </div>
+                )}
               </div>
             )}
           </div>

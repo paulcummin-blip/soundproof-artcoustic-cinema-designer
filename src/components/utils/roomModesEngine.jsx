@@ -36,6 +36,8 @@ export function computeRoomModesResponse({
   },
   dampingScalar = 1.0,
   leakage = 0.0,
+  subProductCurves = null,
+  absoluteSplMode = false,
 }) {
   // Validate inputs
   if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
@@ -95,52 +97,17 @@ export function computeRoomModesResponse({
   // Lowest axial mode (used for sealed-room pressure behaviour)
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
-  // Build response: complex pressure sum of modes + small direct term (REW-ish)
+  // Build response: complex pressure sum of modes (REW Room Simulator behavior)
   let splDb = freqs.map((f) => {
-    // 1) Small direct term (kept intentionally small so modes dominate below Schroeder)
-    let directRe = 0;
-    let directIm = 0;
-
-    for (const source of sourcePositions) {
-      const dx = source.x - seatPosition.x;
-      const dy = source.y - seatPosition.y;
-      const dz = (source.z ?? 0) - (seatPosition.z ?? 1.2);
-      const r = Math.max(0.5, Math.sqrt(dx*dx + dy*dy + dz*dz));
-
-      // 1/r pressure, with phase from distance (k*r)
-      const amp = 1.0 / r;
-      const phi = -2 * Math.PI * f * (r / c);
-
-      directRe += amp * Math.cos(phi);
-      directIm += amp * Math.sin(phi);
-    }
-
-    if (sourcePositions.length > 1) {
-      directRe /= sourcePositions.length;
-      directIm /= sourcePositions.length;
-    }
-
-    // 2) Modal complex sum
-    let sumRe = directRe;
-    let sumIm = directIm;
+    // Modal complex sum only (no direct term - room dominates at these frequencies)
+    let sumRe = 0;
+    let sumIm = 0;
 
     for (const mode of modes) {
       const f0 = mode.freq;
       if (!(f0 > 0)) continue;
 
-      // Skip far-away modes for speed
-      const df = Math.abs(f - f0);
-      if (df > 40) continue;
-
-      // Spatial coupling (signed)
-      let coupling = 0;
-      for (const source of sourcePositions) {
-        coupling += computeSpatialCoupling(mode, source, seatPosition, roomDims);
-      }
-      if (sourcePositions.length > 1) coupling /= sourcePositions.length;
-      if (Math.abs(coupling) < 1e-6) continue;
-
-      // Mode damping from surface absorption (REW-ish approximation)
+      // Skip far-away modes for speed (bandwidth-aware)
       const qMode = estimateModeQ({
         mode,
         roomDims,
@@ -149,21 +116,55 @@ export function computeRoomModesResponse({
         leakage,
         f0,
       });
+      const bandwidth = f0 / qMode;
+      const df = Math.abs(f - f0);
+      if (df > 5 * bandwidth && df > 20) continue;
 
-      // Second-order resonator (complex)
-      // H(f) = 1 / ( (f0^2 - f^2) + j*(f0*f/Q) )
-      const f2 = f * f;
-      const f02 = f0 * f0;
-      const re = (f02 - f2);
-      const im = (f0 * f / Math.max(1e-6, qMode));
+      // Complex pressure contribution per sub
+      for (let subIdx = 0; subIdx < sourcePositions.length; subIdx++) {
+        const source = sourcePositions[subIdx];
+        
+        // Spatial coupling (signed, preserves phase)
+        const coupling = computeSpatialCoupling(mode, source, seatPosition, roomDims);
+        if (Math.abs(coupling) < 1e-6) continue;
 
-      // Complex division: coupling / (re + j im)
-      const denom = (re*re + im*im);
-      const hRe = (coupling * re) / denom;
-      const hIm = (-coupling * im) / denom;
+        // Apply sub's product response if provided (frequency-dependent gain)
+        let productGainLinear = 1.0;
+        if (subProductCurves && subProductCurves[subIdx]) {
+          const curveDb = subProductCurves[subIdx][freqs.indexOf(f)];
+          if (Number.isFinite(curveDb)) {
+            productGainLinear = Math.pow(10, curveDb / 20);
+          }
+        }
 
-      sumRe += hRe;
-      sumIm += hIm;
+        // Apply sub tuning (gain, delay, polarity)
+        const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
+        const gainLinear = Math.pow(10, subTuning.gainDb / 20) * productGainLinear;
+        const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
+        const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
+        const totalPhase = delayPhase + polarityPhase;
+
+        // Complex weight for this sub
+        const weightRe = gainLinear * Math.cos(totalPhase);
+        const weightIm = gainLinear * Math.sin(totalPhase);
+
+        // Second-order resonator (complex)
+        // H(f) = 1 / ( (f0^2 - f^2) + j*(f0*f/Q) )
+        const f2 = f * f;
+        const f02 = f0 * f0;
+        const re = (f02 - f2);
+        const im = (f0 * f / Math.max(1e-6, qMode));
+        const denom = (re*re + im*im);
+        const hRe = re / denom;
+        const hIm = -im / denom;
+
+        // Weighted modal contribution: weight * H * coupling
+        const cRe = coupling * (weightRe * hRe - weightIm * hIm);
+        const cIm = coupling * (weightRe * hIm + weightIm * hRe);
+
+        sumRe += cRe;
+        sumIm += cIm;
+      }
     }
 
     // Magnitude -> dB
@@ -171,27 +172,32 @@ export function computeRoomModesResponse({
     return 20 * Math.log10(mag);
   });
 
-    // REW-like sealed-room pressure behaviour below lowest axial mode.
-    // Add smooth pressure rise (room gain) to prevent LF cliff
+    // REW-like sealed-room pressure behaviour below lowest axial mode
+    // Smooth transition to pressure-dominated region (no cliff)
     if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
       const f1 = lowestAxial;
-      const fTransition = f1 / 2; // Start transitioning below half the first mode
-      const maxBoostDb = 12; // Cap total boost at 12 dB
+      const fTransition = Math.max(15, f1 * 0.6); // Transition zone
 
       splDb = splDb.map((db, i) => {
         const f = freqs[i];
         if (!(Number.isFinite(f) && f > 0 && Number.isFinite(db))) return db;
         if (f >= f1) return db;
 
-        // Smooth transition from f1 down to fTransition
-        // +9 dB/oct slope (pressure-zone behavior), capped at +12 dB total
-        const octavesDown = Math.log2(f1 / f);
-        const boost = Math.min(maxBoostDb, 9 * octavesDown);
+        // Gentle pressure-zone rise: +6 dB/oct below f1, smoothly blended
+        const octavesDown = Math.log2(f1 / Math.max(f, 10));
+        const targetBoost = Math.min(10, 6 * octavesDown); // Cap at +10 dB
 
-        // Apply blend factor for smooth transition
-        const blendFactor = f < fTransition ? 1.0 : (f1 - f) / (f1 - fTransition);
+        // Smooth blend from f1 down to fTransition
+        let blendFactor;
+        if (f <= fTransition) {
+          blendFactor = 1.0;
+        } else {
+          // Cosine blend for smoothness
+          const t = (f - fTransition) / (f1 - fTransition);
+          blendFactor = 0.5 * (1 - Math.cos(Math.PI * (1 - t)));
+        }
 
-        return db + boost * blendFactor;
+        return db + targetBoost * blendFactor;
       });
     }
 
@@ -293,6 +299,10 @@ export function computeRoomModesResponse({
   // First ten modes for debug
   const firstTenModeHz = modes.slice(0, 10).map(m => m.freq.toFixed(1));
   
+  // Compute Q mapping for debug
+  const qBase = dampingScalar * 20;
+  const qMappingText = `Q base: ${qBase.toFixed(1)} (slider=${dampingScalar.toFixed(2)})`;
+
   return {
     freqs,
     splDb,
@@ -305,19 +315,18 @@ export function computeRoomModesResponse({
       tangentialCount,
       obliqueCount,
       firstTenModeHz,
+      lowestAxialHz: lowestAxial,
+      qBase: qBase.toFixed(1),
+      qMappingText,
+      absoluteMode: absoluteSplMode,
       normBandHz: actualNormBand,
       normApplied,
       smoothingApplied,
       nonFiniteRepaired,
-      rawMin: rawMin.toFixed(2),
-      rawMax: rawMax.toFixed(2),
       rawRange: rawRange.toFixed(2),
-      preNormMin: preNormMin.toFixed(2),
-      preNormMax: preNormMax.toFixed(2),
       preNormRange: preNormRange.toFixed(2),
-      postNormMin: postNormMin.toFixed(2),
-      postNormMax: postNormMax.toFixed(2),
-      postNormRange: postNormRange.toFixed(2)
+      postNormRange: postNormRange.toFixed(2),
+      productCurvesApplied: !!subProductCurves
     }
   };
 }
