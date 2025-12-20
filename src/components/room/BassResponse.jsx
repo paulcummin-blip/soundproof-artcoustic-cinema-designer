@@ -400,51 +400,43 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     if (!curves.length) {
       return {
         ...rewModesData,
-        debug: { ...(rewModesData.debug || {}), productNote: "No anechoic response data found for selected sub(s) (check modelKey mapping)." }
+        debug: { ...(rewModesData.debug || {}), productNote: "No anechoic data for selected sub model — Room + Product will match Room-only." }
       };
     }
 
-    // Average product curves in magnitude domain
-    const avgMag = freqs.map((_, i) => {
+    // Average product curves in dB domain
+    const avgProductDb = freqs.map((_, i) => {
       let sum = 0;
-      curves.forEach(c => { sum += Math.pow(10, c[i] / 20); });
+      curves.forEach(c => { sum += c[i]; });
       return sum / curves.length;
     });
 
-    // Back to dB
-    let productDb = avgMag.map(m => 20 * Math.log10(Math.max(1e-12, m)));
-
-    // IMPORTANT: do NOT normalise the product curve to the same 30–80 band.
-    // The room curve is already normalised (REW-style). If we normalise product too,
-    // we often cancel the product effect and Room+Product looks identical.
-    // Instead, we apply product shape relative to its own 60–120 Hz "midbass" anchor.
-    const anchorBand = freqs
-      .map((f, i) => ({ f, i }))
-      .filter(o => o.f >= 60 && o.f <= 120);
-
-    if (anchorBand.length) {
-      const mean = anchorBand.reduce((acc, o) => acc + productDb[o.i], 0) / anchorBand.length;
-      productDb = productDb.map(v => v - mean);
-    }
-
-    const productShapeDb = productDb;
-
-    // Add product shape to room curve
-    const out = freqs.map((f, i) => ({
-      frequency: f,
-      spl: (rewModesData.data[i]?.spl ?? 0) + productShapeDb[i]
-      }));
-
+    // Convert to multiplicative gain relative to reference frequency (50 Hz)
+    const refIdx = freqs.findIndex(f => f >= 50);
+    const refDb = refIdx >= 0 ? avgProductDb[refIdx] : avgProductDb[Math.floor(freqs.length / 2)];
+    
+    // Apply product response as frequency-dependent gain (multiplicative, not additive)
+    // G(f) = 10^((subDb(f) - subDb(ref)) / 20)
+    // Then: SPL_total(f) = SPL_room(f) + 20*log10(G(f))
+    const out = freqs.map((f, i) => {
+      const roomSpl = rewModesData.data[i]?.spl ?? 0;
+      const productGainDb = avgProductDb[i] - refDb; // Relative gain vs reference
       return {
+        frequency: f,
+        spl: roomSpl + productGainDb
+      };
+    });
+
+    return {
       data: out,
       debug: { 
         ...(rewModesData.debug || {}), 
         productApplied: true,
-        productShapeApplied: true,
-        productShapeAnchorHz: 50,
+        productGainApplied: true,
+        productRefHz: freqs[refIdx] || 50,
         productModels: uniqueKeys 
       }
-      };
+    };
   }, [rewStyleMode, rewView, rewModesData, subsForSimulation]);
 
   // Helper: apply REW-style smoothing

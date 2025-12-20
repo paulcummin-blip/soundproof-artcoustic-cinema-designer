@@ -42,8 +42,12 @@ export default function BassGraph({
         const dataMin = Math.min(...validSpl);
         const dataMax = Math.max(...validSpl);
         calculatedYMin = Math.min(dataMin - 10, 40);
-        calculatedYMax = Math.max(dataMax + 10, 110);
+        calculatedYMax = Math.max(dataMax + 10, 115);
       }
+    } else if (rewStyleMode) {
+      // Default REW-like range when no data
+      calculatedYMin = 40;
+      calculatedYMax = 115;
     }
 
     // Render mode markers if enabled
@@ -100,7 +104,7 @@ export default function BassGraph({
                     />
                     <Tooltip content={<CustomTooltip />} />
 
-                    {rp22Levels.map(level => (
+                    {rewStyleMode && rp22Levels.map(level => (
                         <ReferenceLine 
                             key={level.level} 
                             y={level.spl} 

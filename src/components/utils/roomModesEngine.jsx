@@ -172,19 +172,26 @@ export function computeRoomModesResponse({
   });
 
     // REW-like sealed-room pressure behaviour below lowest axial mode.
-    // Subtle boost to prevent cliff (cap at +6 dB, not +12)
+    // Add smooth pressure rise (room gain) to prevent LF cliff
     if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
-      const f0 = lowestAxial;
-      const maxBoostDb = 6;
+      const f1 = lowestAxial;
+      const fTransition = f1 / 2; // Start transitioning below half the first mode
+      const maxBoostDb = 12; // Cap total boost at 12 dB
 
       splDb = splDb.map((db, i) => {
         const f = freqs[i];
         if (!(Number.isFinite(f) && f > 0 && Number.isFinite(db))) return db;
-        if (f >= f0) return db;
+        if (f >= f1) return db;
 
-        // 12 dB/oct slope, capped at +6 dB
-        const boost = Math.min(maxBoostDb, 12 * Math.log2(f0 / f));
-        return db + boost;
+        // Smooth transition from f1 down to fTransition
+        // +9 dB/oct slope (pressure-zone behavior), capped at +12 dB total
+        const octavesDown = Math.log2(f1 / f);
+        const boost = Math.min(maxBoostDb, 9 * octavesDown);
+
+        // Apply blend factor for smooth transition
+        const blendFactor = f < fTransition ? 1.0 : (f1 - f) / (f1 - fTransition);
+
+        return db + boost * blendFactor;
       });
     }
 
@@ -509,44 +516,24 @@ function dbAt(fTarget, freqs, splDb) {
 }
 
 function estimateModeQ({ mode, roomDims, surfaceAbsorption, dampingScalar, leakage, f0 }) {
-  // Base: start from an RT60 estimate derived from average absorption
-  const { widthM, lengthM, heightM } = roomDims;
-
-  const S_floor = widthM * lengthM;
-  const S_ceiling = S_floor;
-  const S_front = widthM * heightM;
-  const S_back = S_front;
-  const S_left = lengthM * heightM;
-  const S_right = S_left;
-
-  const A =
-    S_floor   * clamp01(surfaceAbsorption.floor) +
-    S_ceiling * clamp01(surfaceAbsorption.ceiling) +
-    S_front   * clamp01(surfaceAbsorption.front) +
-    S_back    * clamp01(surfaceAbsorption.back) +
-    S_left    * clamp01(surfaceAbsorption.left) +
-    S_right   * clamp01(surfaceAbsorption.right);
-
-  const V = Math.max(0.1, widthM * lengthM * heightM);
-
-  // Sabine RT60 (rough, but REW-like in spirit). RT60 = 0.161 V / A
-  let rt60 = 0.161 * V / Math.max(0.1, A);
-
-  // Mode-specific weighting: higher order modes decay faster (more surface interaction)
+  // Direct Q control (REW-like): slider value is the base Q, with only mild frequency dependence
+  // This makes "Dead (8)" clearly broad and "Lively (35)" clearly resonant
+  
+  const baseQ = dampingScalar * 20; // Maps slider (0.5-1.75) to Q (10-35)
+  
+  // Mild frequency dependence: slightly lower Q at higher frequencies
+  const freqFactor = Math.pow(f0 / 50, -0.15);
+  
+  // Mode order weighting: higher order modes slightly more damped
   const order = Math.sqrt(mode.nx*mode.nx + mode.ny*mode.ny + mode.nz*mode.nz);
-  const orderLoss = 1 + 0.15 * Math.max(0, order - 1);
-
-  // Leakage adds uniform extra loss (reduces RT60)
-  const leakLoss = 1 + 3 * clamp01(leakage);
-
-  rt60 = rt60 / (orderLoss * leakLoss);
-
-  // Apply dampingScalar (slider maps to this)
-  rt60 = rt60 / Math.max(0.25, dampingScalar);
-
-  // Convert to Q: Q ≈ π f0 RT60
-  const q = Math.max(6, Math.min(80, Math.PI * f0 * rt60));
-  return q;
+  const orderFactor = 1 / (1 + 0.08 * Math.max(0, order - 1));
+  
+  // Leakage reduces Q uniformly
+  const leakageFactor = 1 / (1 + 2 * clamp01(leakage));
+  
+  const q = baseQ * freqFactor * orderFactor * leakageFactor;
+  
+  return Math.max(6, Math.min(80, q));
 }
 
 function clamp01(x) {
