@@ -269,6 +269,7 @@ export function computeRoomModesResponse({
   let actualNormBand = normalizeBandHz;
   let normApplied = false;
   let calibrationApplied = false;
+  let calibrationOffset = 0; // Define at function scope
   
   if (rewParityMode) {
     // Calculate calibration offset to match REW's implicit SPL reference
@@ -288,7 +289,7 @@ export function computeRoomModesResponse({
     const boundaryGain = 3;
     
     // Total calibration offset
-    const calibrationOffset = subSensitivity - distanceLoss + multiSubGain + boundaryGain;
+    calibrationOffset = subSensitivity - distanceLoss + multiSubGain + boundaryGain;
     
     // Apply calibration
     splDb = splDb.map(db => db + calibrationOffset);
