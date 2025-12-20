@@ -328,6 +328,11 @@ export function computeRoomModesResponse({
   const qBase = dampingScalar * 20;
   const qMappingText = `Q base: ${qBase.toFixed(1)} (slider=${dampingScalar.toFixed(2)})`;
 
+  const pressureEnabled = rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0;
+  const pressureBlendFromHz = pressureEnabled ? (lowestAxial * 0.7) : null;
+  const pressureBlendToHz = pressureEnabled ? lowestAxial : null;
+  const pressureMaxBoostDb = 6;
+
   return {
     freqs,
     splDb,
@@ -354,7 +359,11 @@ export function computeRoomModesResponse({
       postNormRange: postNormRange.toFixed(2),
       productCurvesApplied: !!subProductCurves,
       absoluteSplMode,
-      normalizeBandHz: actualNormBand
+      normalizeBandHz: actualNormBand,
+      pressureEnabled,
+      pressureBlendFromHz,
+      pressureBlendToHz,
+      pressureMaxBoostDb
     }
   };
 }
