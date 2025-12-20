@@ -385,11 +385,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
       const curveDb = getSubAnechoicResponseDb(sub.modelKey, freqs);
       if (curveDb && curveDb.length === freqs.length) {
-        // Convert to relative gain (reference at 50 Hz)
-        const refIdx = freqs.findIndex(f => f >= 50) || Math.floor(freqs.length / 3);
-        const refDb = curveDb[refIdx];
-        const relativeGain = curveDb.map(db => db - refDb);
-        subProductCurves.push(relativeGain);
+        // Apply product curve directly (no referencing to preserve extension/roll-off)
+        subProductCurves.push(curveDb);
         productDataFound = true;
       } else {
         subProductCurves.push(null);
@@ -535,27 +532,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }
   }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, responseData]);
 
-  // Anchor REW-style curve to an absolute SPL reference so the axis matches RP22 intent
+  // REW parity mode: no post-processing anchoring
+  // (preserves absolute SPL reference from engine for consistent Y-axis)
   const rewSplAnchoredData = useMemo(() => {
-    if (!rewStyleMode) return displayData;
-
-    const target = simulationResults?.metrics?.p14?.maxSplDb;
-    if (!Number.isFinite(target)) return displayData;
-
-    // Find current curve max in 20–80 Hz (same band used for RP22 bass evaluation)
-    const band = displayData.filter(p => p.frequency >= 20 && p.frequency <= 80 && Number.isFinite(p.spl));
-    if (band.length < 5) return displayData;
-
-    const currentMax = Math.max(...band.map(p => p.spl));
-    if (!Number.isFinite(currentMax)) return displayData;
-
-    const offset = target - currentMax;
-
-    return displayData.map(p => ({
-      ...p,
-      spl: Number.isFinite(p.spl) ? (p.spl + offset) : p.spl
-    }));
-  }, [rewStyleMode, displayData, simulationResults?.metrics?.p14?.maxSplDb]);
+    return displayData;
+  }, [displayData]);
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {

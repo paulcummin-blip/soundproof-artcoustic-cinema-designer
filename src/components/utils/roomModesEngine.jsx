@@ -173,39 +173,32 @@ export function computeRoomModesResponse({
   });
 
     // REW-like sealed-room pressure behaviour below lowest axial mode
-    // Add pressure-region support to prevent cliff (room compliance term)
+    // Add DC compliance term to prevent cliff (pressure-domain support)
     if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
       const f1 = lowestAxial;
       const fTransition = f1 * 0.7; // Transition zone at 70% of first mode
-
-      // Find reference level at first mode (for smooth blend)
-      const f1Idx = freqs.findIndex(f => f >= f1);
-      const refLevel = f1Idx >= 0 ? splDb[f1Idx] : splDb[Math.floor(splDb.length / 3)];
 
       splDb = splDb.map((db, i) => {
         const f = freqs[i];
         if (!(Number.isFinite(f) && f > 0 && Number.isFinite(db))) return db;
         if (f >= f1) return db;
 
-        // Below f1: blend toward pressure-region shelf (DC compliance)
-        // Target: gentle rise as we go down (+6 dB/oct max), capped at +6 dB total
+        // Below f1: add pressure-region support (room compliance)
+        // Gentle +6 dB/oct rise as we go down (sealed room behavior)
         const octavesDown = Math.log2(f1 / Math.max(f, 10));
-        const pressureBoost = Math.min(6, 6 * octavesDown);
+        const pressureGainDb = Math.min(6, 6 * octavesDown); // Cap at +6 dB total
 
-        // Blend factor: full pressure term below fTransition, cosine fade above
+        // Blend factor: smooth cosine transition
         let blend;
         if (f <= fTransition) {
           blend = 1.0;
         } else {
           const t = (f - fTransition) / (f1 - fTransition);
-          blend = Math.cos(t * Math.PI / 2); // Smooth cosine fade
+          blend = Math.cos(t * Math.PI / 2);
         }
 
-        // Target level = reference at f1 + pressure boost
-        const targetDb = refLevel + pressureBoost * blend;
-
-        // Blend between modal result and pressure target (favor target below fTransition)
-        return db * (1 - blend) + targetDb * blend;
+        // Apply pressure gain proportionally (adds support, doesn't replace modal result)
+        return db + (pressureGainDb * blend);
       });
     }
 
@@ -289,13 +282,9 @@ export function computeRoomModesResponse({
     splDb = splDb.map(db => db + calibrationOffset);
     calibrationApplied = true;
     
-    // For relative mode, also normalize to 30-80 Hz band
-    if (!absoluteSplMode && normalizeBandHz) {
-      const result = normalizeToAverage(freqs, splDb, normalizeBandHz);
-      splDb = result.splDb;
-      actualNormBand = result.actualBand;
-      normApplied = result.applied;
-    }
+    // REW parity mode: DO NOT normalize to band average
+    // (preserves absolute SPL for consistent Y-axis scaling)
+    normApplied = false;
   }
 
   // Capture post-normalization stats
