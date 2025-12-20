@@ -173,31 +173,39 @@ export function computeRoomModesResponse({
   });
 
     // REW-like sealed-room pressure behaviour below lowest axial mode
-    // Smooth transition to pressure-dominated region (no cliff)
+    // Add pressure-region support to prevent cliff (room compliance term)
     if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
       const f1 = lowestAxial;
-      const fTransition = Math.max(15, f1 * 0.6); // Transition zone
+      const fTransition = f1 * 0.7; // Transition zone at 70% of first mode
+
+      // Find reference level at first mode (for smooth blend)
+      const f1Idx = freqs.findIndex(f => f >= f1);
+      const refLevel = f1Idx >= 0 ? splDb[f1Idx] : splDb[Math.floor(splDb.length / 3)];
 
       splDb = splDb.map((db, i) => {
         const f = freqs[i];
         if (!(Number.isFinite(f) && f > 0 && Number.isFinite(db))) return db;
         if (f >= f1) return db;
 
-        // Gentle pressure-zone rise: +6 dB/oct below f1, smoothly blended
+        // Below f1: blend toward pressure-region shelf (DC compliance)
+        // Target: gentle rise as we go down (+6 dB/oct max), capped at +6 dB total
         const octavesDown = Math.log2(f1 / Math.max(f, 10));
-        const targetBoost = Math.min(10, 6 * octavesDown); // Cap at +10 dB
+        const pressureBoost = Math.min(6, 6 * octavesDown);
 
-        // Smooth blend from f1 down to fTransition
-        let blendFactor;
+        // Blend factor: full pressure term below fTransition, cosine fade above
+        let blend;
         if (f <= fTransition) {
-          blendFactor = 1.0;
+          blend = 1.0;
         } else {
-          // Cosine blend for smoothness
           const t = (f - fTransition) / (f1 - fTransition);
-          blendFactor = 0.5 * (1 - Math.cos(Math.PI * (1 - t)));
+          blend = Math.cos(t * Math.PI / 2); // Smooth cosine fade
         }
 
-        return db + targetBoost * blendFactor;
+        // Target level = reference at f1 + pressure boost
+        const targetDb = refLevel + pressureBoost * blend;
+
+        // Blend between modal result and pressure target (favor target below fTransition)
+        return db * (1 - blend) + targetDb * blend;
       });
     }
 
@@ -252,14 +260,42 @@ export function computeRoomModesResponse({
     splDb = applySmoothing(freqs, splDb, smoothing);
   }
   
-  // Normalize to 30-80 Hz average = 0 dB (REW-style)
+  // Apply SPL calibration (REW-style reference)
   let actualNormBand = normalizeBandHz;
   let normApplied = false;
-  if (rewParityMode && normalizeBandHz) {
-    const result = normalizeToAverage(freqs, splDb, normalizeBandHz);
-    splDb = result.splDb;
-    actualNormBand = result.actualBand;
-    normApplied = result.applied;
+  let calibrationApplied = false;
+  
+  if (rewParityMode) {
+    // Calculate calibration offset to match REW's implicit SPL reference
+    // Assumptions: 1 sub @ 1m in half-space = ~90 dB baseline at 50 Hz
+    const numSubs = sourcePositions.length;
+    const avgDistance = 3.5; // Typical MLP distance in meters
+    const subSensitivity = 90; // Typical subwoofer 1W/1m (dB)
+    const refPower = 1; // 1 watt reference
+    
+    // Distance loss: -20*log10(d)
+    const distanceLoss = 20 * Math.log10(avgDistance);
+    
+    // Multi-sub gain: +3 dB per doubling (coherent summation at modal frequencies)
+    const multiSubGain = 10 * Math.log10(numSubs);
+    
+    // Boundary gain: +3 dB for half-space (floor loading)
+    const boundaryGain = 3;
+    
+    // Total calibration offset
+    const calibrationOffset = subSensitivity - distanceLoss + multiSubGain + boundaryGain;
+    
+    // Apply calibration
+    splDb = splDb.map(db => db + calibrationOffset);
+    calibrationApplied = true;
+    
+    // For relative mode, also normalize to 30-80 Hz band
+    if (!absoluteSplMode && normalizeBandHz) {
+      const result = normalizeToAverage(freqs, splDb, normalizeBandHz);
+      splDb = result.splDb;
+      actualNormBand = result.actualBand;
+      normApplied = result.applied;
+    }
   }
 
   // Capture post-normalization stats
@@ -319,6 +355,7 @@ export function computeRoomModesResponse({
       qBase: qBase.toFixed(1),
       qMappingText,
       absoluteMode: absoluteSplMode,
+      calibrationApplied,
       normBandHz: actualNormBand,
       normApplied,
       smoothingApplied,

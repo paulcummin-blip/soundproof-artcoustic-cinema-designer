@@ -1069,8 +1069,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             </div>
             <div className="text-[11px] space-y-1">
               <div>• Complex modal summation with spatial coupling</div>
+              <div>• Pressure-region support below {rewModesData?.debug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz</div>
               <div>• {rewModesData?.debug?.qMappingText || 'Q-based damping'}</div>
-              <div>• Lowest axial mode: {rewModesData?.debug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz</div>
+              <div>• {rewModesData?.debug?.calibrationApplied ? 'Calibrated SPL' : 'Relative dB'} scale</div>
               {rewView === 'roomPlusProduct' && (
                 <div>• Product curves: {(rewRoomPlusProductData?.debug?.productModels || []).join(', ') || 'None'}</div>
               )}
