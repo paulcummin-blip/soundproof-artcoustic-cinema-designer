@@ -1080,6 +1080,36 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                     <strong>Note:</strong> {rewRoomPlusProductData.debug.productNote}
                   </div>
                 )}
+                {(() => {
+                  // Debug: inspect first sub's product curve
+                  const firstSubModel = subsForSimulation[0]?.modelKey;
+                  if (!firstSubModel) return null;
+
+                  const freqs = [];
+                  for (let f = 15; f <= 200; f += 0.5) freqs.push(f);
+
+                  const curveDb = getSubAnechoicResponseDb(firstSubModel, freqs);
+                  if (!curveDb || curveDb.length === 0) return null;
+
+                  const finite = curveDb.filter(v => Number.isFinite(v));
+                  if (finite.length === 0) return null;
+
+                  const minDb = Math.min(...finite);
+                  const maxDb = Math.max(...finite);
+                  const idx50 = freqs.findIndex(f => f >= 50);
+                  const valueAt50Hz = idx50 >= 0 ? curveDb[idx50] : null;
+
+                  const looksAbsolute = (minDb >= 70 && maxDb <= 140);
+                  const label = looksAbsolute ? "curve looks like ABSOLUTE SPL" : "curve looks like RELATIVE GAIN";
+
+                  return (
+                    <div className="text-[10px] font-mono opacity-80 text-blue-700 mt-1 pt-1 border-t border-blue-200">
+                      <strong>Product Curve Debug ({firstSubModel}):</strong><br/>
+                      min={minDb.toFixed(1)} dB, max={maxDb.toFixed(1)} dB, @50Hz={valueAt50Hz?.toFixed(1) || 'N/A'} dB<br/>
+                      → {label}
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
