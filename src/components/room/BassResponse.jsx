@@ -1184,9 +1184,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   );
                 })()}
               </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })()}
 
         {/* REW view selector (only when REW is ON) */}
         {rewStyleMode && (
