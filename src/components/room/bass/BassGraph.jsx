@@ -24,37 +24,39 @@ export default function BassGraph({
   modeMarkers = [],
   linearHzAxis = false,
   rewStyleMode = false,
-  yMin,
-  yMax
+  yDomain
 }) {
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
 
-    // REW-style auto-windowing: focus on relevant data range
-    let calculatedYMin = yMin;
-    let calculatedYMax = yMax;
+    // Determine Y-axis domain
+    let calculatedYMin, calculatedYMax;
     let calculatedXMax = 200;
 
-    if (rewStyleMode && data.length > 0) {
+    if (yDomain && yDomain.min !== undefined && yDomain.max !== undefined) {
+      // Use provided fixed domain
+      calculatedYMin = yDomain.min;
+      calculatedYMax = yDomain.max;
+    } else if (rewStyleMode && data.length > 0) {
+      // REW-style auto-windowing when no fixed domain
       const validSpl = data.map(p => p.spl).filter(v => Number.isFinite(v));
       if (validSpl.length > 0) {
         const dataMin = Math.min(...validSpl);
         const dataMax = Math.max(...validSpl);
         const dataMean = validSpl.reduce((a, b) => a + b, 0) / validSpl.length;
         
-        // Auto-window: peak ± 25 dB (REW-like focused view)
         calculatedYMin = Math.max(dataMax - 45, dataMin - 5, 40);
         calculatedYMax = Math.min(dataMax + 5, dataMean + 30, 120);
-        
-        // Smart X-axis: up to Schroeder*1.2, but always show at least 120 Hz
-        if (schroederFrequency > 0) {
-          calculatedXMax = Math.max(120, Math.min(200, schroederFrequency * 1.2));
-        }
       }
     } else if (rewStyleMode) {
       // Default REW-like range when no data
       calculatedYMin = 60;
       calculatedYMax = 110;
+    }
+
+    // Smart X-axis for REW mode
+    if (rewStyleMode && schroederFrequency > 0) {
+      calculatedXMax = Math.max(120, Math.min(200, schroederFrequency * 1.2));
     }
 
     // Render mode markers if enabled

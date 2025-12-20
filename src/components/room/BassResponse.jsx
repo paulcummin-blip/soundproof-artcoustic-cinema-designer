@@ -44,8 +44,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(true);
   const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
-  const [lockYAxis, setLockYAxis] = useState(false);
-  const [lockedYDomain, setLockedYDomain] = useState(null);
+  const [yAxisLocked, setYAxisLocked] = useState(true);
+  const [yAxisDomain, setYAxisDomain] = useState(null);
+  const [scaleEpoch, setScaleEpoch] = useState(0);
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -583,103 +584,94 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return displayData;
   }, [displayData]);
 
-  // Compute smart Y-axis domain for REW mode
-  const computeYAxisDomain = React.useCallback((data) => {
+  // Compute stable Y-axis domain using 30-80 Hz band intelligence
+  const computeStableYDomain = React.useCallback((data) => {
     if (!data || data.length === 0) return null;
 
-    const splValues = data.map(d => d.spl).filter(v => Number.isFinite(v));
-    if (splValues.length === 0) return null;
+    // Get points in 30-80 Hz band
+    const band30_80 = data
+      .filter(d => d.frequency >= 30 && d.frequency <= 80)
+      .map(d => d.spl)
+      .filter(v => Number.isFinite(v));
+    
+    if (band30_80.length === 0) return null;
 
-    // Get global min/max from curve
-    const minSpl = Math.min(...splValues);
-    const maxSpl = Math.max(...splValues);
+    // Compute band statistics
+    const bandAvg = band30_80.reduce((a, b) => a + b, 0) / band30_80.length;
+    const bandMin = Math.min(...band30_80);
+    const bandMax = Math.max(...band30_80);
 
-    // Add 3 dB padding
-    let yMin = minSpl - 3;
-    let yMax = maxSpl + 3;
+    // Propose initial range centered on band average
+    let min = Math.min(bandMin, bandAvg - 20);
+    let max = Math.max(bandMax, bandAvg + 20);
 
     // Enforce minimum span of 40 dB
-    const currentSpan = yMax - yMin;
+    const currentSpan = max - min;
     const minSpan = 40;
     
     if (currentSpan < minSpan) {
       const expansion = (minSpan - currentSpan) / 2;
-      yMin -= expansion;
-      yMax += expansion;
+      min = bandAvg - (minSpan / 2);
+      max = bandAvg + (minSpan / 2);
     }
 
-    // Round to whole dB
-    yMin = Math.floor(yMin);
-    yMax = Math.ceil(yMax);
+    // Add 2 dB padding
+    min -= 2;
+    max += 2;
 
-    return [yMin, yMax];
+    // Round to whole dB
+    min = Math.floor(min);
+    max = Math.ceil(max);
+
+    return { min, max };
   }, []);
 
   // Auto-enable Lock Y-axis when REW mode is turned ON
   React.useEffect(() => {
     if (rewStyleMode) {
-      setLockYAxis(true);
+      setYAxisLocked(true);
     }
   }, [rewStyleMode]);
 
-  // Compute initial locked domain when REW mode is enabled
+  // Compute Y-axis domain when needed
   React.useEffect(() => {
-    if (!rewStyleMode || !lockYAxis) {
-      setLockedYDomain(null);
+    if (!rewStyleMode) {
+      setYAxisDomain(null);
       return;
     }
 
-    // Only compute if we don't have a locked domain yet
-    if (!lockedYDomain && displayData.length > 0) {
-      const domain = computeYAxisDomain(displayData);
+    // Compute domain if:
+    // 1. Currently null (initial load)
+    // 2. scaleEpoch changed (user pressed Reset)
+    // 3. View changed (Room-only ↔ Room + Product)
+    // 4. Seat changed
+    if (yAxisDomain === null || scaleEpoch > 0) {
+      const domain = computeStableYDomain(displayData);
       if (domain) {
-        setLockedYDomain(domain);
+        setYAxisDomain(domain);
       }
     }
-  }, [rewStyleMode, lockYAxis, lockedYDomain, displayData, computeYAxisDomain]);
-
-  // Recompute locked domain when View changes (Room-only ↔ Room + Product)
-  React.useEffect(() => {
-    if (!rewStyleMode || !lockYAxis) return;
-
-    const domain = computeYAxisDomain(displayData);
-    if (domain) {
-      setLockedYDomain(domain);
-    }
-  }, [rewView]); // Only trigger on view change
-
-  // Recompute locked domain when seat selection changes
-  React.useEffect(() => {
-    if (!rewStyleMode || !lockYAxis) return;
-
-    const domain = computeYAxisDomain(displayData);
-    if (domain) {
-      setLockedYDomain(domain);
-    }
-  }, [selectedSeat?.id]); // Only trigger on seat change
+  }, [rewStyleMode, displayData, scaleEpoch, rewView, selectedSeat?.id, yAxisDomain, computeStableYDomain]);
 
   // Manual reset function
   const handleResetScale = React.useCallback(() => {
     if (!rewStyleMode) return;
     
-    const domain = computeYAxisDomain(displayData);
-    if (domain) {
-      setLockedYDomain(domain);
-    }
-  }, [rewStyleMode, displayData, computeYAxisDomain]);
+    setYAxisDomain(null);
+    setScaleEpoch(prev => prev + 1);
+  }, [rewStyleMode]);
 
-  // Determine Y-axis domain to pass to graph
-  const yAxisDomain = React.useMemo(() => {
-    if (!rewStyleMode) return undefined; // Auto-scale for product mode
+  // Determine final Y-axis domain to pass to graph
+  const finalYDomain = React.useMemo(() => {
+    if (!rewStyleMode) return undefined;
 
-    if (lockYAxis && lockedYDomain) {
-      return lockedYDomain; // Use locked domain
+    if (yAxisLocked && yAxisDomain) {
+      return yAxisDomain;
     }
 
-    // Lock OFF: compute with minimum span enforcement
-    const domain = computeYAxisDomain(displayData);
-    return domain || undefined;
-  }, [rewStyleMode, lockYAxis, lockedYDomain, displayData, computeYAxisDomain]);
+    // Lock OFF: compute fresh each time with minimum span
+    return computeStableYDomain(displayData);
+  }, [rewStyleMode, yAxisLocked, yAxisDomain, displayData, computeStableYDomain]);
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
@@ -1171,8 +1163,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   </Label>
                   <Switch
                     id="lock-y-axis"
-                    checked={lockYAxis}
-                    onCheckedChange={setLockYAxis}
+                    checked={yAxisLocked}
+                    onCheckedChange={setYAxisLocked}
                   />
                 </div>
                 <Button
@@ -1376,8 +1368,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             modeMarkers={rewStyleMode ? (rewModesData?.debug?.modeMarkers || []) : []}
             linearHzAxis={rewStyleMode && linearHzAxis}
             rewStyleMode={rewStyleMode}
-            yMin={yAxisDomain?.[0]}
-            yMax={yAxisDomain?.[1]}
+            yDomain={finalYDomain}
           />
         ) : (
           <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
