@@ -27,22 +27,23 @@ export default function BassGraph({
   yMin,
   yMax
 }) {
-    // Clamp and sanitize data for REW mode (prevent crazy Y-axis values)
+    // Sanitize data
     let data = toggles.smoothing
-        ? responseData // Placeholder for actual smoothing logic
-        : responseData;
-    
+      ? responseData
+      : responseData;
+
+    // Calculate data-driven Y-axis range for REW mode
+    let calculatedYMin = yMin;
+    let calculatedYMax = yMax;
+
     if (rewStyleMode && data.length > 0) {
-        data = data.map(point => {
-            let spl = point.spl;
-            // Guard against non-finite values
-            if (!isFinite(spl)) {
-                spl = 0;
-            }
-            // Clamp to reasonable relative range
-            spl = Math.max(-40, Math.min(20, spl));
-            return { ...point, spl };
-        });
+      const validSpl = data.map(p => p.spl).filter(v => Number.isFinite(v));
+      if (validSpl.length > 0) {
+        const dataMin = Math.min(...validSpl);
+        const dataMax = Math.max(...validSpl);
+        calculatedYMin = Math.min(dataMin - 10, 40);
+        calculatedYMax = Math.max(dataMax + 10, 110);
+      }
     }
 
     // Render mode markers if enabled
@@ -91,7 +92,7 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                     />
                     <YAxis
-                        domain={yMin !== undefined && yMax !== undefined ? [yMin, yMax] : (rewStyleMode ? [40, 110] : ['dataMin - 5', 'dataMax + 5'])}
+                        domain={calculatedYMin !== undefined && calculatedYMax !== undefined ? [calculatedYMin, calculatedYMax] : (rewStyleMode ? [40, 110] : ['dataMin - 5', 'dataMax + 5'])}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
                         label={{ value: rewStyleMode ? 'SPL (dB)' : 'Relative (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"

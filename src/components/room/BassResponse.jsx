@@ -258,7 +258,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         smoothing: rewSmoothing,
         subFloorHeight: 0.0,
         normalizeBandHz: [30, 80],
-        normalizeToDb: 0
+        normalizeToDb: 0,
+        surfaceAbsorption: {
+          front: 0.30,
+          back: 0.30,
+          left: 0.30,
+          right: 0.30,
+          ceiling: 0.30,
+          floor: 0.30,
+        },
+        dampingScalar: Math.max(0.5, roomDamping / 20),
+        leakage: 0.05,
       });
     } catch (e) {
       return {

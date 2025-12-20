@@ -25,7 +25,17 @@ export function computeRoomModesResponse({
   smoothing = 'none',
   subFloorHeight = 0.0,
   normalizeBandHz = [30, 80],
-  normalizeToDb = 0
+  normalizeToDb = 0,
+  surfaceAbsorption = {
+    front: 0.30,
+    back: 0.30,
+    left: 0.30,
+    right: 0.30,
+    ceiling: 0.30,
+    floor: 0.30,
+  },
+  dampingScalar = 1.0,
+  leakage = 0.0,
 }) {
   // Validate inputs
   if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
@@ -85,85 +95,118 @@ export function computeRoomModesResponse({
   // Lowest axial mode (used for sealed-room pressure behaviour)
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
-  // Build response using modal resonators (REW-style)
-  let splDb = freqs.map(f => {
-    // In REW parity mode we want a *modal* curve that actually varies with frequency.
-    // So: compute a pressure-like sum of resonators, then convert to dB.
-    // (Baseline 1/r is constant with frequency and will flatten the plot.)
+  // Build response: complex pressure sum of modes + small direct term (REW-ish)
+  let splDb = freqs.map((f) => {
+    // 1) Small direct term (kept intentionally small so modes dominate below Schroeder)
+    let directRe = 0;
+    let directIm = 0;
 
-    let sumPressure = 0;
+    for (const source of sourcePositions) {
+      const dx = source.x - seatPosition.x;
+      const dy = source.y - seatPosition.y;
+      const dz = (source.z ?? 0) - (seatPosition.z ?? 1.2);
+      const r = Math.max(0.5, Math.sqrt(dx*dx + dy*dy + dz*dz));
+
+      // 1/r pressure, with phase from distance (k*r)
+      const amp = 1.0 / r;
+      const phi = -2 * Math.PI * f * (r / c);
+
+      directRe += amp * Math.cos(phi);
+      directIm += amp * Math.sin(phi);
+    }
+
+    if (sourcePositions.length > 1) {
+      directRe /= sourcePositions.length;
+      directIm /= sourcePositions.length;
+    }
+
+    // 2) Modal complex sum
+    let sumRe = directRe;
+    let sumIm = directIm;
 
     for (const mode of modes) {
       const f0 = mode.freq;
+      if (!(f0 > 0)) continue;
 
-      // Mode-order dependent Q (higher order = more damped)
-      const order = Math.sqrt(mode.nx * mode.nx + mode.ny * mode.ny + mode.nz * mode.nz);
-      const qMode = Math.max(8, Math.min(60, q / Math.max(1, order)));
-
-      // Skip far-away modes (speed)
-      const bw = f0 / qMode;
+      // Skip far-away modes for speed
       const df = Math.abs(f - f0);
-      if (df > 5 * bw) continue;
+      if (df > 40) continue;
 
       // Spatial coupling (signed)
-      let totalCoupling = 0;
+      let coupling = 0;
       for (const source of sourcePositions) {
-        totalCoupling += computeSpatialCoupling(mode, source, seatPosition, roomDims);
+        coupling += computeSpatialCoupling(mode, source, seatPosition, roomDims);
       }
-      if (sourcePositions.length > 1) totalCoupling /= sourcePositions.length;
+      if (sourcePositions.length > 1) coupling /= sourcePositions.length;
+      if (Math.abs(coupling) < 1e-6) continue;
 
-      if (Math.abs(totalCoupling) < 0.001) continue;
+      // Mode damping from surface absorption (REW-ish approximation)
+      const qMode = estimateModeQ({
+        mode,
+        roomDims,
+        surfaceAbsorption,
+        dampingScalar,
+        leakage,
+        f0,
+      });
 
-      // Dimensionless 2nd-order resonator magnitude (REW-ish)
-      // H(f) = 1 / sqrt( (1 - r^2)^2 + (r/Q)^2 )   where r = f/f0
-      const r = f / f0;
-      const denom = Math.sqrt(Math.pow(1 - r * r, 2) + Math.pow(r / qMode, 2));
-      const H = 1 / Math.max(1e-12, denom);
+      // Second-order resonator (complex)
+      // H(f) = 1 / ( (f0^2 - f^2) + j*(f0*f/Q) )
+      const f2 = f * f;
+      const f02 = f0 * f0;
+      const re = (f02 - f2);
+      const im = (f0 * f / Math.max(1e-6, qMode));
 
-      // Signed pressure-style sum (gives peaks + dips)
-      sumPressure += totalCoupling * H;
+      // Complex division: coupling / (re + j im)
+      const denom = (re*re + im*im);
+      const hRe = (coupling * re) / denom;
+      const hIm = (-coupling * im) / denom;
+
+      sumRe += hRe;
+      sumIm += hIm;
     }
 
-    // Add a tiny floor so we never hit -Infinity (and so normalisation behaves)
-    const mag = Math.abs(sumPressure);
-    const safe = Math.max(1e-8, mag);
-
-    const db = 20 * Math.log10(safe);
-    return Number.isFinite(db) ? db : -120;
-    });
+    // Magnitude -> dB
+    const mag = Math.max(1e-12, Math.sqrt(sumRe*sumRe + sumIm*sumIm));
+    return 20 * Math.log10(mag);
+  });
 
     // REW-like sealed-room pressure behaviour below lowest axial mode.
-    // This prevents an unrealistic LF "cliff" and gives a gentle, capped rise
-    // as frequency drops below the first axial mode.
+    // Subtle boost to prevent cliff (cap at +6 dB, not +12)
     if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
-    const f0 = lowestAxial;
+      const f0 = lowestAxial;
+      const maxBoostDb = 6;
 
-    // Target behaviour: below f0, add up to +12 dB maximum as we go down in frequency.
-    // Use a gentle 12 dB/oct slope cap (pressure-zone-like) but never exceed +12 dB.
-    const maxBoostDb = 12;
+      splDb = splDb.map((db, i) => {
+        const f = freqs[i];
+        if (!(Number.isFinite(f) && f > 0 && Number.isFinite(db))) return db;
+        if (f >= f0) return db;
 
-    splDb = splDb.map((db, i) => {
-      const f = freqs[i];
-      if (!(Number.isFinite(f) && f > 0 && Number.isFinite(db))) return db;
-
-      if (f >= f0) return db;
-
-      // 12 dB/oct: boost = 12 * log2(f0/f), capped
-      const boost = Math.min(maxBoostDb, 12 * Math.log2(f0 / f));
-      return db + boost;
-    });
+        // 12 dB/oct slope, capped at +6 dB
+        const boost = Math.min(maxBoostDb, 12 * Math.log2(f0 / f));
+        return db + boost;
+      });
     }
 
-    // Mild LF boundary gain feel (optional REW-ish flavour): below 40 Hz, add up to +3 dB
+    // Schroeder blend: above fs, reduce explicit modal contrast (statistical smoothing feel)
     if (rewParityMode) {
-    splDb = splDb.map((db, i) => {
-      const f = freqs[i];
-      if (!(Number.isFinite(f) && Number.isFinite(db))) return db;
-      if (f >= 40) return db;
-      const t = (40 - f) / 25; // 40 -> 15 Hz
-      const add = Math.max(0, Math.min(3, 3 * t));
-      return db + add;
-    });
+      const volume = roomDims.widthM * roomDims.lengthM * roomDims.heightM;
+      const rt60 = 0.4;
+      const fs = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 120;
+
+      splDb = splDb.map((db, i) => {
+        const f = freqs[i];
+        if (f <= fs) return db;
+
+        // Blend to a gently smoothed "statistical" curve (no wild modal spikes)
+        const f2 = fs * 1.6;
+        const t = Math.max(0, Math.min(1, (f - fs) / Math.max(1e-6, (f2 - fs))));
+
+        // Simple target: a mild downward tilt
+        const target = dbAt(fs, freqs, splDb) - 3 * Math.log2(f / fs);
+
+        return (1 - t) * db + t * target;
+      });
     }
 
     // Capture RAW stats BEFORE any processing (critical for debugging)
@@ -450,4 +493,64 @@ function normalizeToAverage(freqs, splDb, bandHz) {
     actualBand,
     applied: true
   };
+}
+
+function dbAt(fTarget, freqs, splDb) {
+  let best = 0;
+  let bestDf = 1e9;
+  for (let i = 0; i < freqs.length; i++) {
+    const df = Math.abs(freqs[i] - fTarget);
+    if (df < bestDf) { 
+      bestDf = df; 
+      best = splDb[i]; 
+    }
+  }
+  return best;
+}
+
+function estimateModeQ({ mode, roomDims, surfaceAbsorption, dampingScalar, leakage, f0 }) {
+  // Base: start from an RT60 estimate derived from average absorption
+  const { widthM, lengthM, heightM } = roomDims;
+
+  const S_floor = widthM * lengthM;
+  const S_ceiling = S_floor;
+  const S_front = widthM * heightM;
+  const S_back = S_front;
+  const S_left = lengthM * heightM;
+  const S_right = S_left;
+
+  const A =
+    S_floor   * clamp01(surfaceAbsorption.floor) +
+    S_ceiling * clamp01(surfaceAbsorption.ceiling) +
+    S_front   * clamp01(surfaceAbsorption.front) +
+    S_back    * clamp01(surfaceAbsorption.back) +
+    S_left    * clamp01(surfaceAbsorption.left) +
+    S_right   * clamp01(surfaceAbsorption.right);
+
+  const V = Math.max(0.1, widthM * lengthM * heightM);
+
+  // Sabine RT60 (rough, but REW-like in spirit). RT60 = 0.161 V / A
+  let rt60 = 0.161 * V / Math.max(0.1, A);
+
+  // Mode-specific weighting: higher order modes decay faster (more surface interaction)
+  const order = Math.sqrt(mode.nx*mode.nx + mode.ny*mode.ny + mode.nz*mode.nz);
+  const orderLoss = 1 + 0.15 * Math.max(0, order - 1);
+
+  // Leakage adds uniform extra loss (reduces RT60)
+  const leakLoss = 1 + 3 * clamp01(leakage);
+
+  rt60 = rt60 / (orderLoss * leakLoss);
+
+  // Apply dampingScalar (slider maps to this)
+  rt60 = rt60 / Math.max(0.25, dampingScalar);
+
+  // Convert to Q: Q ≈ π f0 RT60
+  const q = Math.max(6, Math.min(80, Math.PI * f0 * rt60));
+  return q;
+}
+
+function clamp01(x) {
+  const v = Number(x);
+  if (!Number.isFinite(v)) return 0;
+  return Math.max(0, Math.min(1, v));
 }
