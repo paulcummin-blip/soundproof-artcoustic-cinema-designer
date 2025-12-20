@@ -367,20 +367,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       return { data: [], debug: { error: "No valid sub positions" } };
     }
 
+    // Generate frequency axis once (must match engine's axis)
+    const freqs = [];
+    for (let f = 15; f <= 200; f += 0.5) {
+      freqs.push(f);
+    }
+
     // Get product curves for each sub
     const subProductCurves = [];
     let productDataFound = false;
-    
+
     for (const sub of subsForSimulation) {
       if (!sub?.modelKey) {
         subProductCurves.push(null);
         continue;
-      }
-
-      // Generate frequency axis (must match engine's axis)
-      const freqs = [];
-      for (let f = 15; f <= 200; f += 0.5) {
-        freqs.push(f);
       }
 
       const curveDb = getSubAnechoicResponseDb(sub.modelKey, freqs);
