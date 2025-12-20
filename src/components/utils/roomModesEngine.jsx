@@ -117,11 +117,55 @@ export function computeRoomModesResponse({
     ? (subSensitivity - distanceLoss + multiSubGain + boundaryGain)
     : 0;
 
-  // Build response: complex pressure sum of modes (REW Room Simulator behavior)
+  // Build response: complex pressure sum with direct/modal blending
   let splDb = freqs.map((f) => {
-    // Modal complex sum only (no direct term - room dominates at these frequencies)
-    let sumRe = 0;
-    let sumIm = 0;
+    // 1. DIRECT-FIELD COMPLEX SUM (geometry-dependent, no modal filtering)
+    let sumRe_direct = 0;
+    let sumIm_direct = 0;
+
+    for (let subIdx = 0; subIdx < sourcePositions.length; subIdx++) {
+      const source = sourcePositions[subIdx];
+
+      // Distance to seat
+      const dx = source.x - seatPosition.x;
+      const dy = source.y - seatPosition.y;
+      const dz = (source.z ?? 0.0) - (seatPosition.z ?? 1.2);
+      const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+
+      // Inverse-distance amplitude (reference: 90 dB @ 1m)
+      const db0 = 90;
+      const dbDist = db0 - 20 * Math.log10(Math.max(0.5, d));
+      const amplitude = Math.pow(10, dbDist / 20);
+
+      // Apply sub's product response if provided
+      let productGainLinear = 1.0;
+      if (subProductCurves && subProductCurves[subIdx]) {
+        const curveDb = subProductCurves[subIdx][freqs.indexOf(f)];
+        if (Number.isFinite(curveDb)) {
+          productGainLinear = Math.pow(10, curveDb / 20);
+        }
+      }
+
+      // Apply sub tuning (gain, delay, polarity)
+      const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
+      const gainLinear = Math.pow(10, subTuning.gainDb / 20) * productGainLinear;
+
+      // Phase: propagation + delay + polarity
+      let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
+      phi += -2 * Math.PI * f * (subTuning.delayMs / 1000);
+      if (subTuning.polarity === 180 || subTuning.polarity === 'invert') {
+        phi += Math.PI;
+      }
+
+      // Complex contribution
+      const finalAmplitude = amplitude * gainLinear;
+      sumRe_direct += finalAmplitude * Math.cos(phi);
+      sumIm_direct += finalAmplitude * Math.sin(phi);
+    }
+
+    // 2. MODAL COMPLEX SUM (existing logic unchanged)
+    let sumRe_modal = 0;
+    let sumIm_modal = 0;
 
     for (const mode of modes) {
       const f0 = mode.freq;
@@ -144,7 +188,7 @@ export function computeRoomModesResponse({
       // Complex pressure contribution per sub
       for (let subIdx = 0; subIdx < sourcePositions.length; subIdx++) {
         const source = sourcePositions[subIdx];
-        
+
         // Spatial coupling (signed, preserves phase)
         const coupling = computeSpatialCoupling(mode, source, seatPosition, roomDims);
         if (Math.abs(coupling) < 1e-6) continue;
@@ -162,7 +206,7 @@ export function computeRoomModesResponse({
         const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
         const gainLinear = Math.pow(10, subTuning.gainDb / 20) * productGainLinear;
         const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
-        const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
+        const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.Pi : 0;
         const totalPhase = delayPhase + polarityPhase;
 
         // Complex weight for this sub
@@ -183,10 +227,24 @@ export function computeRoomModesResponse({
         const cRe = coupling * (weightRe * hRe - weightIm * hIm);
         const cIm = coupling * (weightRe * hIm + weightIm * hRe);
 
-        sumRe += cRe;
-        sumIm += cIm;
+        sumRe_modal += cRe;
+        sumIm_modal += cIm;
       }
     }
+
+    // 3. COMPLEX-DOMAIN CROSSFADE
+    const blendStartHz = lowestAxial * 0.7;
+    const blendEndHz = lowestAxial;
+
+    let w = 0; // Modal weight (0 = full direct, 1 = full modal)
+    if (f >= blendEndHz) {
+      w = 1.0;
+    } else if (f >= blendStartHz) {
+      w = (f - blendStartHz) / (blendEndHz - blendStartHz);
+    }
+
+    const sumRe = (1 - w) * sumRe_direct + w * sumRe_modal;
+    const sumIm = (1 - w) * sumIm_direct + w * sumIm_modal;
 
     // Magnitude -> dB (with source calibration applied here)
     const mag = Math.max(1e-12, Math.sqrt(sumRe*sumRe + sumIm*sumIm));
