@@ -1086,21 +1086,27 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         )}
 
         {/* REW mode info (only when REW is ON and no error) */}
-        {rewStyleMode && !rewModesData?.debug?.error && (
-          <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
-            <div className="font-semibold mb-1">
-              {rewView === 'roomPlusProduct' ? 'Room + Product' : 'Room-only (generic sub)'}
-            </div>
-            <div className="text-[11px] space-y-1">
-              <div>• Complex modal summation with spatial coupling</div>
-              <div>• Pressure-region support below {rewModesData?.debug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz</div>
-              <div>• {rewModesData?.debug?.qMappingText || 'Q-based damping'}</div>
-              <div>• {rewModesData?.debug?.calibrationApplied ? 'Calibrated SPL' : 'Relative dB'} scale</div>
-              {rewView === 'roomPlusProduct' && (
-                <div>• Product curves: {(rewRoomPlusProductData?.debug?.productModels || []).join(', ') || 'None'}</div>
-              )}
-            </div>
-            {activeDebug && (
+        {rewStyleMode && !rewModesData?.debug?.error && (() => {
+          // Select correct debug data based on view
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+          
+          return (
+            <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
+              <div className="font-semibold mb-1">
+                {rewView === 'roomPlusProduct' ? 'Room + Product' : 'Room-only (generic sub)'}
+              </div>
+              <div className="text-[11px] space-y-1">
+                <div>• Complex modal summation with spatial coupling</div>
+                <div>• Pressure-region support below {activeDebug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz</div>
+                <div>• {activeDebug?.qMappingText || 'Q-based damping'}</div>
+                <div>• {activeDebug?.calibrationApplied ? 'Calibrated SPL' : 'Relative dB'} scale</div>
+                {rewView === 'roomPlusProduct' && (
+                  <div>• Product curves: {(activeDebug?.productModels || []).join(', ') || 'None'}</div>
+                )}
+              </div>
+              {activeDebug && (
                 <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
                   <div className="text-[10px] font-mono opacity-80">
                     <strong>Modes:</strong> {activeDebug.modeCount} total 
