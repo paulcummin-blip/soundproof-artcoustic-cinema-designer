@@ -1106,7 +1106,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   <div>• Product curves: {(activeDebug?.productModels || []).join(', ') || 'None'}</div>
                 )}
               </div>
-              {activeDebug && (
+              {activeDebug ? (
                 <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
                   <div className="text-[10px] font-mono opacity-80">
                     <strong>Modes:</strong> {activeDebug.modeCount} total 
@@ -1184,7 +1184,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   );
                 })()}
               </div>
-              )}
+              ) : null}
             </div>
           );
         })()}
