@@ -246,8 +246,11 @@ export function computeRoomModesResponse({
     const sumRe = (1 - w) * sumRe_direct + w * sumRe_modal;
     const sumIm = (1 - w) * sumIm_direct + w * sumIm_modal;
 
+    // Avoid flattening the LF response: use a much smaller epsilon than 1e-12
+    // so tiny geometry/phase variations are not quantised into a fixed shelf.
+    const mag = Math.max(Number.EPSILON, Math.sqrt(sumRe * sumRe + sumIm * sumIm));
+
     // Magnitude -> dB (with source calibration applied here)
-    const mag = Math.max(1e-12, Math.sqrt(sumRe*sumRe + sumIm*sumIm));
     return 20 * Math.log10(mag) + sourceCalibrationDb;
   });
 
