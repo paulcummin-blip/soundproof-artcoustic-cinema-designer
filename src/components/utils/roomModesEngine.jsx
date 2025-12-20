@@ -331,7 +331,19 @@ export function computeRoomModesResponse({
     }
   }
 
-  // Compute final SPL stats
+  // Compute SPL stats before absolute calibration
+  const finiteBeforeCal = splDb.filter(v => isFinite(v));
+  const splMinBeforeDb = finiteBeforeCal.length > 0 ? Math.min(...finiteBeforeCal) : 0;
+  const splMaxBeforeDb = finiteBeforeCal.length > 0 ? Math.max(...finiteBeforeCal) : 0;
+
+  // Apply absolute SPL calibration if requested
+  let absoluteSplApplied = false;
+  if (absoluteSplMode && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
+    splDb = splDb.map(v => v + calibrationOffset);
+    absoluteSplApplied = true;
+  }
+
+  // Compute final SPL stats after calibration
   const finalFinite = splDb.filter(v => isFinite(v));
   const splMinDb = finalFinite.length > 0 ? Math.min(...finalFinite) : 0;
   const splMaxDb = finalFinite.length > 0 ? Math.max(...finalFinite) : 0;
@@ -396,7 +408,10 @@ export function computeRoomModesResponse({
       splMinDb: splMinDb.toFixed(1),
       splMaxDb: splMaxDb.toFixed(1),
       splRangeDb: splRangeDb.toFixed(1),
-      calibrationOffsetDb: calibrationApplied ? calibrationOffset.toFixed(1) : 'N/A',
+      calibrationOffsetDb: Number.isFinite(calibrationOffset) ? calibrationOffset.toFixed(1) : 'N/A',
+      splRangeBeforeDb: [splMinBeforeDb.toFixed(1), splMaxBeforeDb.toFixed(1)],
+      splRangeAfterDb: [splMinDb.toFixed(1), splMaxDb.toFixed(1)],
+      absoluteSplApplied,
       normalizeToDb: normalizeToDb !== undefined ? normalizeToDb : null,
       productCurveStats
     }
