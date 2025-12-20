@@ -1141,8 +1141,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             modeMarkers={rewStyleMode ? (rewModesData?.debug?.modeMarkers || []) : []}
             linearHzAxis={rewStyleMode && linearHzAxis}
             rewStyleMode={rewStyleMode}
-            yMin={rewStyleMode ? 40 : undefined}
-            yMax={rewStyleMode ? 110 : undefined}
           />
         ) : (
           <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
