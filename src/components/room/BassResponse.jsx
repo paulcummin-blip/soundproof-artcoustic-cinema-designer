@@ -44,6 +44,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(true);
   const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
+  const [lockYAxis, setLockYAxis] = useState(true);
+  const [lockedYDomain, setLockedYDomain] = useState(null);
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -581,6 +583,93 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return displayData;
   }, [displayData]);
 
+  // Compute smart Y-axis domain for REW mode
+  const computeYAxisDomain = React.useCallback((data) => {
+    if (!data || data.length === 0) return null;
+
+    const splValues = data.map(d => d.spl).filter(v => Number.isFinite(v));
+    if (splValues.length === 0) return null;
+
+    // Get SPL values in 30-80 Hz band for average reference
+    const band30_80 = data
+      .filter(d => d.frequency >= 30 && d.frequency <= 80)
+      .map(d => d.spl)
+      .filter(v => Number.isFinite(v));
+    
+    const avgSpl30_80 = band30_80.length > 0
+      ? band30_80.reduce((a, b) => a + b, 0) / band30_80.length
+      : splValues.reduce((a, b) => a + b, 0) / splValues.length;
+
+    // Get global min/max (15-200 Hz)
+    const minSpl = Math.min(...splValues);
+    const maxSpl = Math.max(...splValues);
+
+    // REW-like minimum span: 40 dB
+    const minSpan = 40;
+
+    // Center 40 dB window around 30-80 Hz average
+    let yMin = avgSpl30_80 - (minSpan / 2);
+    let yMax = avgSpl30_80 + (minSpan / 2);
+
+    // Expand if needed to include actual min/max
+    if (minSpl < yMin) {
+      const deficit = yMin - minSpl;
+      yMin -= deficit;
+      yMax -= deficit;
+    }
+    if (maxSpl > yMax) {
+      const excess = maxSpl - yMax;
+      yMax += excess;
+      yMin += excess;
+    }
+
+    // Ensure we still have at least the min span
+    const actualSpan = yMax - yMin;
+    if (actualSpan < minSpan) {
+      const expansion = (minSpan - actualSpan) / 2;
+      yMin -= expansion;
+      yMax += expansion;
+    }
+
+    // Round to nearest 1 dB
+    yMin = Math.floor(yMin);
+    yMax = Math.ceil(yMax);
+
+    return [yMin, yMax];
+  }, []);
+
+  // Auto-compute locked domain when REW mode is enabled or data changes significantly
+  React.useEffect(() => {
+    if (!rewStyleMode || !lockYAxis) {
+      setLockedYDomain(null);
+      return;
+    }
+
+    // Compute domain from current display data
+    const domain = computeYAxisDomain(displayData);
+    if (domain) {
+      setLockedYDomain(domain);
+    }
+  }, [rewStyleMode, lockYAxis, displayData, computeYAxisDomain]);
+
+  // Manual reset function
+  const handleResetScale = React.useCallback(() => {
+    if (!rewStyleMode) return;
+    
+    const domain = computeYAxisDomain(displayData);
+    if (domain) {
+      setLockedYDomain(domain);
+    }
+  }, [rewStyleMode, displayData, computeYAxisDomain]);
+
+  // Determine Y-axis domain to pass to graph
+  const yAxisDomain = React.useMemo(() => {
+    if (rewStyleMode && lockYAxis && lockedYDomain) {
+      return lockedYDomain;
+    }
+    return undefined; // Auto-scale
+  }, [rewStyleMode, lockYAxis, lockedYDomain]);
+
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
     const seatResponses = simulationResults.seatResponses;
@@ -1051,15 +1140,40 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <Label htmlFor="rew-mode" className="text-xs text-[#3E4349] whitespace-nowrap">
-              Room Modes (REW-style)
-            </Label>
-            <Switch
-              id="rew-mode"
-              checked={rewStyleMode}
-              onCheckedChange={setRewStyleMode}
-            />
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Label htmlFor="rew-mode" className="text-xs text-[#3E4349] whitespace-nowrap">
+                Room Modes (REW-style)
+              </Label>
+              <Switch
+                id="rew-mode"
+                checked={rewStyleMode}
+                onCheckedChange={setRewStyleMode}
+              />
+            </div>
+
+            {rewStyleMode && (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, borderLeft: "1px solid #DCDBD6", paddingLeft: 12 }}>
+                  <Label htmlFor="lock-y-axis" className="text-xs text-[#3E4349] whitespace-nowrap">
+                    Lock Y-axis
+                  </Label>
+                  <Switch
+                    id="lock-y-axis"
+                    checked={lockYAxis}
+                    onCheckedChange={setLockYAxis}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleResetScale}
+                  className="text-xs h-7 px-2"
+                >
+                  Reset scale
+                </Button>
+              </>
+            )}
           </div>
 
           <div style={{ fontSize: 12, color: "#3E4349" }}>
@@ -1251,6 +1365,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             modeMarkers={rewStyleMode ? (rewModesData?.debug?.modeMarkers || []) : []}
             linearHzAxis={rewStyleMode && linearHzAxis}
             rewStyleMode={rewStyleMode}
+            yMin={yAxisDomain?.[0]}
+            yMax={yAxisDomain?.[1]}
           />
         ) : (
           <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
