@@ -373,9 +373,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       freqs.push(f);
     }
 
-    // Get product curves for each sub
+    // Get product curves for each sub and normalize to relative gain
     const subProductCurves = [];
     let productDataFound = false;
+    const productCurveDebug = [];
 
     for (const sub of subsForSimulation) {
       if (!sub?.modelKey) {
@@ -385,8 +386,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
       const curveDb = getSubAnechoicResponseDb(sub.modelKey, freqs);
       if (curveDb && curveDb.length === freqs.length) {
-        // Apply product curve directly (no referencing to preserve extension/roll-off)
-        subProductCurves.push(curveDb);
+        // Find value at 50 Hz (or nearest bin)
+        const idx50 = freqs.findIndex(f => f >= 50);
+        const valueAt50Hz = idx50 >= 0 ? curveDb[idx50] : null;
+
+        // Make curve relative by subtracting 50 Hz value (normalize to 0 dB at 50 Hz)
+        const relativeCurve = curveDb.map(db => db - (valueAt50Hz || 0));
+
+        // Collect debug info
+        const finite = relativeCurve.filter(v => Number.isFinite(v));
+        const minDb = finite.length > 0 ? Math.min(...finite) : 0;
+        const maxDb = finite.length > 0 ? Math.max(...finite) : 0;
+        const isRelative = Math.abs(valueAt50Hz || 0) < 5; // Check if original was already ~0 dB centered
+
+        productCurveDebug.push({
+          modelKey: sub.modelKey,
+          originalAt50Hz: valueAt50Hz?.toFixed(1) || 'N/A',
+          relativeMinDb: minDb.toFixed(1),
+          relativeMaxDb: maxDb.toFixed(1),
+          isRelative
+        });
+
+        subProductCurves.push(relativeCurve);
         productDataFound = true;
       } else {
         subProductCurves.push(null);
@@ -400,6 +421,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           ...(rewModesData?.debug || {}),
           productNote: "No anechoic data for selected sub model(s) — Room + Product will match Room-only.",
           viewMode: 'Room + Product (no product data)',
+          productCurvesRequested: subsForSimulation.length,
+          productCurvesApplied: 0
         }
       };
     }
@@ -464,6 +487,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       scaleWarning = `Room-only range: ${roomOnlySplRange.toFixed(1)} dB, Room+Product range: ${productSplRange.toFixed(1)} dB — scale mismatch detected`;
     }
 
+    // Product curve application summary
+    const productCurvesApplied = subProductCurves.filter(c => c !== null).length;
+    const firstCurve = productCurveDebug[0] || null;
+
     return {
       data: result.freqs.map((frequency, i) => ({
         frequency,
@@ -474,7 +501,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         viewMode: 'Room + Product',
         curveType: 'Modal response + product anechoic curves',
         productModels: uniqueKeys,
-        scaleWarning
+        scaleWarning,
+        productCurvesRequested: subsForSimulation.length,
+        productCurvesApplied,
+        productCurveAt50HzDb: firstCurve?.originalAt50Hz || 'N/A',
+        productCurveMinMaxDb: firstCurve ? `${firstCurve.relativeMinDb} to ${firstCurve.relativeMaxDb}` : 'N/A',
+        productCurveIsRelative: firstCurve?.isRelative || false,
+        productCurveDebug
       },
       freqs: result.freqs,
       splDb: result.splDb
@@ -1067,46 +1100,51 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 <div>• Product curves: {(rewRoomPlusProductData?.debug?.productModels || []).join(', ') || 'None'}</div>
               )}
             </div>
-            {rewModesData?.debug && (
-              <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Modes:</strong> {rewModesData.debug.modeCount} total 
-                  ({rewModesData.debug.axialCount} axial, {rewModesData.debug.tangentialCount} tangential, {rewModesData.debug.obliqueCount} oblique)
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>View:</strong> {rewModesData.debug.viewMode || rewView}
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>SPL Range:</strong> {rewModesData.debug.splMinDb} to {rewModesData.debug.splMaxDb} dB (range: {rewModesData.debug.splRangeDb} dB)
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Calibration Offset:</strong> {rewModesData.debug.calibrationOffsetDb} dB
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Smoothing:</strong> {rewModesData.debug.smoothingApplied || 'none'}
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Absolute SPL:</strong> {rewModesData.debug.absoluteSplMode ? 'true' : 'false'}
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Normalize band:</strong> {rewModesData.debug.normalizeBandHz ? JSON.stringify(rewModesData.debug.normalizeBandHz) : 'none'}
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Product curves:</strong> {rewModesData.debug.productCurvesApplied ? 'applied' : 'none'}
-                </div>
-                {rewModesData.debug.productCurveStats && rewModesData.debug.productCurveStats.length > 0 && (
-                  <div className="text-[10px] font-mono opacity-80 text-blue-700">
-                    <strong>Product curve stats:</strong><br/>
-                    {rewModesData.debug.productCurveStats.map((stat, i) => (
-                      <div key={i}>
-                        Sub {stat.subIndex}: min={stat.productMinDb} dB, max={stat.productMaxDb} dB, @50Hz={stat.productAt50HzDb} dB
-                      </div>
-                    ))}
+            {activeDebug && (
+                <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>Modes:</strong> {activeDebug.modeCount} total 
+                    ({activeDebug.axialCount} axial, {activeDebug.tangentialCount} tangential, {activeDebug.obliqueCount} oblique)
+                  </div>
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>View:</strong> {activeDebug.viewMode || rewView}
+                  </div>
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>SPL Range:</strong> {activeDebug.splMinDb} to {activeDebug.splMaxDb} dB (range: {activeDebug.splRangeDb} dB)
+                  </div>
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>Calibration Offset:</strong> {activeDebug.calibrationOffsetDb} dB
+                  </div>
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>Smoothing:</strong> {activeDebug.smoothingApplied || 'none'}
+                  </div>
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>Absolute SPL:</strong> {activeDebug.absoluteSplMode ? 'true' : 'false'}
+                  </div>
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>Normalize band:</strong> {activeDebug.normalizeBandHz ? JSON.stringify(activeDebug.normalizeBandHz) : 'none'}
+                  </div>
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>Product curves:</strong> {activeDebug.productCurvesApplied ? 'applied' : 'none'}
+                  </div>
+                  {activeDebug.productCurveStats && activeDebug.productCurveStats.length > 0 && (
+                    <div className="text-[10px] font-mono opacity-80 text-blue-700">
+                      <strong>Product curve stats:</strong><br/>
+                      {activeDebug.productCurveStats.map((stat, i) => (
+                        <div key={i}>
+                          Sub {stat.subIndex}: min={stat.productMinDb} dB, max={stat.productMaxDb} dB, @50Hz={stat.productAt50HzDb} dB
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                {activeDebug?.scaleWarning && (
+                  <div className="text-[10px] font-mono opacity-80 text-yellow-700">
+                    <strong>Warning:</strong> {activeDebug.scaleWarning}
                   </div>
                 )}
-                {rewRoomPlusProductData?.debug?.productNote && (
+                {activeDebug?.productNote && (
                   <div className="text-[10px] font-mono opacity-80 text-yellow-700">
-                    <strong>Note:</strong> {rewRoomPlusProductData.debug.productNote}
+                    <strong>Note:</strong> {activeDebug.productNote}
                   </div>
                 )}
                 {(() => {
