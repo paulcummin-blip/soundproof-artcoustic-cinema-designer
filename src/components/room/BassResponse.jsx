@@ -44,7 +44,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(true);
   const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
-  const [lockYAxis, setLockYAxis] = useState(true);
+  const [lockYAxis, setLockYAxis] = useState(false);
   const [lockedYDomain, setLockedYDomain] = useState(null);
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
@@ -590,67 +590,73 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     const splValues = data.map(d => d.spl).filter(v => Number.isFinite(v));
     if (splValues.length === 0) return null;
 
-    // Get SPL values in 30-80 Hz band for average reference
-    const band30_80 = data
-      .filter(d => d.frequency >= 30 && d.frequency <= 80)
-      .map(d => d.spl)
-      .filter(v => Number.isFinite(v));
-    
-    const avgSpl30_80 = band30_80.length > 0
-      ? band30_80.reduce((a, b) => a + b, 0) / band30_80.length
-      : splValues.reduce((a, b) => a + b, 0) / splValues.length;
-
-    // Get global min/max (15-200 Hz)
+    // Get global min/max from curve
     const minSpl = Math.min(...splValues);
     const maxSpl = Math.max(...splValues);
 
-    // REW-like minimum span: 40 dB
+    // Add 3 dB padding
+    let yMin = minSpl - 3;
+    let yMax = maxSpl + 3;
+
+    // Enforce minimum span of 40 dB
+    const currentSpan = yMax - yMin;
     const minSpan = 40;
-
-    // Center 40 dB window around 30-80 Hz average
-    let yMin = avgSpl30_80 - (minSpan / 2);
-    let yMax = avgSpl30_80 + (minSpan / 2);
-
-    // Expand if needed to include actual min/max
-    if (minSpl < yMin) {
-      const deficit = yMin - minSpl;
-      yMin -= deficit;
-      yMax -= deficit;
-    }
-    if (maxSpl > yMax) {
-      const excess = maxSpl - yMax;
-      yMax += excess;
-      yMin += excess;
-    }
-
-    // Ensure we still have at least the min span
-    const actualSpan = yMax - yMin;
-    if (actualSpan < minSpan) {
-      const expansion = (minSpan - actualSpan) / 2;
+    
+    if (currentSpan < minSpan) {
+      const expansion = (minSpan - currentSpan) / 2;
       yMin -= expansion;
       yMax += expansion;
     }
 
-    // Round to nearest 1 dB
+    // Round to whole dB
     yMin = Math.floor(yMin);
     yMax = Math.ceil(yMax);
 
     return [yMin, yMax];
   }, []);
 
-  // Auto-compute locked domain when REW mode is enabled or data changes significantly
+  // Auto-enable Lock Y-axis when REW mode is turned ON
+  React.useEffect(() => {
+    if (rewStyleMode) {
+      setLockYAxis(true);
+    }
+  }, [rewStyleMode]);
+
+  // Compute initial locked domain when REW mode is enabled
   React.useEffect(() => {
     if (!rewStyleMode || !lockYAxis) {
       setLockedYDomain(null);
       return;
     }
 
-    // Compute domain from current display data
+    // Only compute if we don't have a locked domain yet
+    if (!lockedYDomain && displayData.length > 0) {
+      const domain = computeYAxisDomain(displayData);
+      if (domain) {
+        setLockedYDomain(domain);
+      }
+    }
+  }, [rewStyleMode, lockYAxis, lockedYDomain, displayData, computeYAxisDomain]);
+
+  // Recompute locked domain when View changes (Room-only ↔ Room + Product)
+  React.useEffect(() => {
+    if (!rewStyleMode || !lockYAxis) return;
+
     const domain = computeYAxisDomain(displayData);
     if (domain) {
       setLockedYDomain(domain);
     }
-  }, [rewStyleMode, lockYAxis, displayData, computeYAxisDomain]);
+  }, [rewView]); // Only trigger on view change
+
+  // Recompute locked domain when seat selection changes
+  React.useEffect(() => {
+    if (!rewStyleMode || !lockYAxis) return;
+
+    const domain = computeYAxisDomain(displayData);
+    if (domain) {
+      setLockedYDomain(domain);
+    }
+  }, [selectedSeat?.id]); // Only trigger on seat change
 
   // Manual reset function
   const handleResetScale = React.useCallback(() => {
@@ -664,11 +670,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   // Determine Y-axis domain to pass to graph
   const yAxisDomain = React.useMemo(() => {
-    if (rewStyleMode && lockYAxis && lockedYDomain) {
-      return lockedYDomain;
+    if (!rewStyleMode) return undefined; // Auto-scale for product mode
+
+    if (lockYAxis && lockedYDomain) {
+      return lockedYDomain; // Use locked domain
     }
-    return undefined; // Auto-scale
-  }, [rewStyleMode, lockYAxis, lockedYDomain]);
+
+    // Lock OFF: compute with minimum span enforcement
+    const domain = computeYAxisDomain(displayData);
+    return domain || undefined;
+  }, [rewStyleMode, lockYAxis, lockedYDomain, displayData, computeYAxisDomain]);
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
