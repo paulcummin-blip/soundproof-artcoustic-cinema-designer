@@ -345,6 +345,37 @@ export function computeRoomModesResponse({
   const pressureBlendToHz = pressureEnabled ? (lowestAxial * 0.50) : null;
   const pressureMaxBoostDb = 12;
 
+  // Compute final SPL stats
+  const finalFinite = splDb.filter(v => isFinite(v));
+  const splMinDb = finalFinite.length > 0 ? Math.min(...finalFinite) : 0;
+  const splMaxDb = finalFinite.length > 0 ? Math.max(...finalFinite) : 0;
+  const splRangeDb = splMaxDb - splMinDb;
+
+  // Product curve stats (if applied)
+  let productCurveStats = null;
+  if (subProductCurves && Array.isArray(subProductCurves)) {
+    productCurveStats = subProductCurves.map((curve, idx) => {
+      if (!curve || !Array.isArray(curve)) return null;
+      
+      const finite = curve.filter(v => Number.isFinite(v));
+      if (finite.length === 0) return null;
+      
+      const minDb = Math.min(...finite);
+      const maxDb = Math.max(...finite);
+      
+      // Find value at ~50 Hz
+      const idx50 = freqs.findIndex(f => f >= 50);
+      const at50Hz = (idx50 >= 0 && Number.isFinite(curve[idx50])) ? curve[idx50] : null;
+      
+      return {
+        subIndex: idx,
+        productMinDb: minDb.toFixed(1),
+        productMaxDb: maxDb.toFixed(1),
+        productAt50HzDb: at50Hz !== null ? at50Hz.toFixed(1) : 'N/A'
+      };
+    }).filter(s => s !== null);
+  }
+
   return {
     freqs,
     splDb,
@@ -375,7 +406,13 @@ export function computeRoomModesResponse({
       pressureEnabled,
       pressureBlendFromHz,
       pressureBlendToHz,
-      pressureMaxBoostDb
+      pressureMaxBoostDb,
+      splMinDb: splMinDb.toFixed(1),
+      splMaxDb: splMaxDb.toFixed(1),
+      splRangeDb: splRangeDb.toFixed(1),
+      calibrationOffsetDb: calibrationApplied ? calibrationOffset.toFixed(1) : 'N/A',
+      normalizeToDb: normalizeToDb !== undefined ? normalizeToDb : null,
+      productCurveStats
     }
   };
 }

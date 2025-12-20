@@ -27,10 +27,8 @@ export default function BassGraph({
   yMin,
   yMax
 }) {
-    // Sanitize data
-    let data = toggles.smoothing
-      ? responseData
-      : responseData;
+    // In REW mode, use data as-is (no baseline subtraction or normalization)
+    let data = responseData;
 
     // REW-style auto-windowing: focus on relevant data range
     let calculatedYMin = yMin;

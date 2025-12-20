@@ -455,6 +455,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     const modelKeys = subsForSimulation.map(s => s?.modelKey).filter(Boolean);
     const uniqueKeys = Array.from(new Set(modelKeys));
 
+    // Check for SPL range issues
+    const productSplRange = Number(result.debug?.splRangeDb) || 0;
+    const roomOnlySplRange = Number(rewModesData?.debug?.splRangeDb) || 0;
+    let scaleWarning = null;
+
+    if (Math.abs(productSplRange - roomOnlySplRange) > 20) {
+      scaleWarning = `Room-only range: ${roomOnlySplRange.toFixed(1)} dB, Room+Product range: ${productSplRange.toFixed(1)} dB — scale mismatch detected`;
+    }
+
     return {
       data: result.freqs.map((frequency, i) => ({
         frequency,
@@ -465,6 +474,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         viewMode: 'Room + Product',
         curveType: 'Modal response + product anechoic curves',
         productModels: uniqueKeys,
+        scaleWarning
       },
       freqs: result.freqs,
       splDb: result.splDb
@@ -1067,6 +1077,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   <strong>View:</strong> {rewModesData.debug.viewMode || rewView}
                 </div>
                 <div className="text-[10px] font-mono opacity-80">
+                  <strong>SPL Range:</strong> {rewModesData.debug.splMinDb} to {rewModesData.debug.splMaxDb} dB (range: {rewModesData.debug.splRangeDb} dB)
+                </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Calibration Offset:</strong> {rewModesData.debug.calibrationOffsetDb} dB
+                </div>
+                <div className="text-[10px] font-mono opacity-80">
                   <strong>Smoothing:</strong> {rewModesData.debug.smoothingApplied || 'none'}
                 </div>
                 <div className="text-[10px] font-mono opacity-80">
@@ -1075,6 +1091,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 <div className="text-[10px] font-mono opacity-80">
                   <strong>Normalize band:</strong> {rewModesData.debug.normalizeBandHz ? JSON.stringify(rewModesData.debug.normalizeBandHz) : 'none'}
                 </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Product curves:</strong> {rewModesData.debug.productCurvesApplied ? 'applied' : 'none'}
+                </div>
+                {rewModesData.debug.productCurveStats && rewModesData.debug.productCurveStats.length > 0 && (
+                  <div className="text-[10px] font-mono opacity-80 text-blue-700">
+                    <strong>Product curve stats:</strong><br/>
+                    {rewModesData.debug.productCurveStats.map((stat, i) => (
+                      <div key={i}>
+                        Sub {stat.subIndex}: min={stat.productMinDb} dB, max={stat.productMaxDb} dB, @50Hz={stat.productAt50HzDb} dB
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {rewRoomPlusProductData?.debug?.productNote && (
                   <div className="text-[10px] font-mono opacity-80 text-yellow-700">
                     <strong>Note:</strong> {rewRoomPlusProductData.debug.productNote}
