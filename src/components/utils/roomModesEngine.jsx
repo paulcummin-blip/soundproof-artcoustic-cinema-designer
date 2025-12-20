@@ -173,32 +173,47 @@ export function computeRoomModesResponse({
   });
 
     // REW-like sealed-room pressure behaviour below lowest axial mode
-    // Add DC compliance term to prevent cliff (pressure-domain support)
+    // Pressure shelf: rooms act as pressure vessels below first mode
     if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
       const f1 = lowestAxial;
-      const fTransition = f1 * 0.7; // Transition zone at 70% of first mode
+      const fFrom = f1 * 1.00; // Start of transition
+      const fTo = f1 * 0.50;   // Fully in pressure region
+      const maxBoostDb = 12;
 
-      splDb = splDb.map((db, i) => {
+      // Find SPL at f1 (reference point for pressure shelf)
+      let splAtF1Db = 0;
+      let closestIdx = 0;
+      let closestDf = Infinity;
+      for (let i = 0; i < freqs.length; i++) {
+        const df = Math.abs(freqs[i] - f1);
+        if (df < closestDf) {
+          closestDf = df;
+          closestIdx = i;
+          splAtF1Db = splDb[i];
+        }
+      }
+
+      splDb = splDb.map((modalDb, i) => {
         const f = freqs[i];
-        if (!(Number.isFinite(f) && f > 0 && Number.isFinite(db))) return db;
-        if (f >= f1) return db;
+        if (!(Number.isFinite(f) && f > 0 && Number.isFinite(modalDb))) return modalDb;
+        if (f >= fFrom) return modalDb;
 
-        // Below f1: add pressure-region support (room compliance)
-        // Gentle +6 dB/oct rise as we go down (sealed room behavior)
-        const octavesDown = Math.log2(f1 / Math.max(f, 10));
-        const pressureGainDb = Math.min(6, 6 * octavesDown); // Cap at +6 dB total
+        // Below fFrom: compute pressure-region target
+        const octDown = Math.log2(f1 / Math.max(f, 1e-6));
+        const pressureTargetDb = splAtF1Db + Math.min(maxBoostDb, 12 * octDown);
 
-        // Blend factor: smooth cosine transition
+        // Blend factor: smooth transition from fFrom to fTo
         let blend;
-        if (f <= fTransition) {
+        if (f <= fTo) {
           blend = 1.0;
         } else {
-          const t = (f - fTransition) / (f1 - fTransition);
-          blend = Math.cos(t * Math.PI / 2);
+          // Smoothstep between fTo and fFrom
+          const t = (f - fTo) / Math.max(1e-6, (fFrom - fTo));
+          blend = 1.0 - (3 * t * t - 2 * t * t * t); // smoothstep (inverted)
         }
 
-        // Apply pressure gain proportionally (adds support, doesn't replace modal result)
-        return db + (pressureGainDb * blend);
+        // Blend between modal response and pressure shelf (take max to avoid dips)
+        return (1 - blend) * modalDb + blend * Math.max(modalDb, pressureTargetDb);
       });
     }
 
@@ -329,9 +344,9 @@ export function computeRoomModesResponse({
   const qMappingText = `Q base: ${qBase.toFixed(1)} (slider=${dampingScalar.toFixed(2)})`;
 
   const pressureEnabled = rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0;
-  const pressureBlendFromHz = pressureEnabled ? (lowestAxial * 0.7) : null;
-  const pressureBlendToHz = pressureEnabled ? lowestAxial : null;
-  const pressureMaxBoostDb = 6;
+  const pressureBlendFromHz = pressureEnabled ? (lowestAxial * 1.00) : null;
+  const pressureBlendToHz = pressureEnabled ? (lowestAxial * 0.50) : null;
+  const pressureMaxBoostDb = 12;
 
   return {
     freqs,
