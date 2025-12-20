@@ -1069,6 +1069,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 <div className="text-[10px] font-mono opacity-80">
                   <strong>Smoothing:</strong> {rewModesData.debug.smoothingApplied || 'none'}
                 </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Absolute SPL:</strong> {rewModesData.debug.absoluteSplMode ? 'true' : 'false'}
+                </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Normalize band:</strong> {rewModesData.debug.normalizeBandHz ? JSON.stringify(rewModesData.debug.normalizeBandHz) : 'none'}
+                </div>
                 {rewRoomPlusProductData?.debug?.productNote && (
                   <div className="text-[10px] font-mono opacity-80 text-yellow-700">
                     <strong>Note:</strong> {rewRoomPlusProductData.debug.productNote}

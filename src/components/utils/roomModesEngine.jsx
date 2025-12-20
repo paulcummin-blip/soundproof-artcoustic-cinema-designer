@@ -352,7 +352,9 @@ export function computeRoomModesResponse({
       rawRange: rawRange.toFixed(2),
       preNormRange: preNormRange.toFixed(2),
       postNormRange: postNormRange.toFixed(2),
-      productCurvesApplied: !!subProductCurves
+      productCurvesApplied: !!subProductCurves,
+      absoluteSplMode,
+      normalizeBandHz: actualNormBand
     }
   };
 }
