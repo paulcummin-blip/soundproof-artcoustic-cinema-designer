@@ -97,25 +97,58 @@ export function computeRoomModesResponse({
   // Lowest axial mode (used for sealed-room pressure behaviour)
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
+  // SOURCE CALIBRATION (applied upstream, not after summation)
+  // REW reference: 1 sub @ 1m in half-space ≈ 90 dB at 50 Hz
+  const numSubs = sourcePositions.length;
+  const avgDistance = 3.5; // Typical MLP distance in meters
+  const subSensitivity = 90; // Typical subwoofer 1W/1m (dB)
+  
+  // Distance loss: -20*log10(d)
+  const distanceLoss = 20 * Math.log10(avgDistance);
+  
+  // Multi-sub gain: +3 dB per doubling (coherent summation at modal frequencies)
+  const multiSubGain = 10 * Math.log10(numSubs);
+  
+  // Boundary gain: +3 dB for half-space (floor loading)
+  const boundaryGain = 3;
+  
+  // Source calibration offset (applied to modal sum, not result)
+  const sourceCalibrationDb = rewParityMode 
+    ? (subSensitivity - distanceLoss + multiSubGain + boundaryGain)
+    : 0;
+
   // Build response: complex pressure sum of modes (REW Room Simulator behavior)
   let splDb = freqs.map((f) => {
     // Modal complex sum only (no direct term - room dominates at these frequencies)
     let sumRe = 0;
     let sumIm = 0;
 
+    // PRESSURE REGION LOGIC: Below lowest axial, bypass modal damping
+    const inPressureRegion = rewParityMode && lowestAxial && f < (lowestAxial * 0.5);
+
     for (const mode of modes) {
       const f0 = mode.freq;
       if (!(f0 > 0)) continue;
 
-      // Skip far-away modes for speed (bandwidth-aware)
-      const qMode = estimateModeQ({
-        mode,
-        roomDims,
-        surfaceAbsorption,
-        dampingScalar,
-        leakage,
-        f0,
-      });
+      // In pressure region: skip modes above lowest axial (they don't contribute)
+      if (inPressureRegion && f0 > lowestAxial) continue;
+
+      // Compute modal Q (or bypass in pressure region)
+      let qMode;
+      if (inPressureRegion) {
+        // Pressure region: minimal damping (rigid room, no losses)
+        qMode = 100; // Effectively undamped
+      } else {
+        qMode = estimateModeQ({
+          mode,
+          roomDims,
+          surfaceAbsorption,
+          dampingScalar,
+          leakage,
+          f0,
+        });
+      }
+
       const bandwidth = f0 / qMode;
       const df = Math.abs(f - f0);
       if (df > 5 * bandwidth && df > 20) continue;
@@ -167,55 +200,13 @@ export function computeRoomModesResponse({
       }
     }
 
-    // Magnitude -> dB
+    // Magnitude -> dB (with source calibration applied here)
     const mag = Math.max(1e-12, Math.sqrt(sumRe*sumRe + sumIm*sumIm));
-    return 20 * Math.log10(mag);
+    return 20 * Math.log10(mag) + sourceCalibrationDb;
   });
 
-    // REW-like sealed-room pressure behaviour below lowest axial mode
-    // Pressure shelf: rooms act as pressure vessels below first mode
-    if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
-      const f1 = lowestAxial;
-      const fFrom = f1 * 1.00; // Start of transition
-      const fTo = f1 * 0.50;   // Fully in pressure region
-      const maxBoostDb = 12;
-
-      // Find SPL at f1 (reference point for pressure shelf)
-      let splAtF1Db = 0;
-      let closestIdx = 0;
-      let closestDf = Infinity;
-      for (let i = 0; i < freqs.length; i++) {
-        const df = Math.abs(freqs[i] - f1);
-        if (df < closestDf) {
-          closestDf = df;
-          closestIdx = i;
-          splAtF1Db = splDb[i];
-        }
-      }
-
-      splDb = splDb.map((modalDb, i) => {
-        const f = freqs[i];
-        if (!(Number.isFinite(f) && f > 0 && Number.isFinite(modalDb))) return modalDb;
-        if (f >= fFrom) return modalDb;
-
-        // Below fFrom: compute pressure-region target
-        const octDown = Math.log2(f1 / Math.max(f, 1e-6));
-        const pressureTargetDb = splAtF1Db + Math.min(maxBoostDb, 12 * octDown);
-
-        // Blend factor: smooth transition from fFrom to fTo
-        let blend;
-        if (f <= fTo) {
-          blend = 1.0;
-        } else {
-          // Smoothstep between fTo and fFrom
-          const t = (f - fTo) / Math.max(1e-6, (fFrom - fTo));
-          blend = 1.0 - (3 * t * t - 2 * t * t * t); // smoothstep (inverted)
-        }
-
-        // Blend between modal response and pressure shelf (take max to avoid dips)
-        return (1 - blend) * modalDb + blend * Math.max(modalDb, pressureTargetDb);
-      });
-    }
+    // Pressure region is now handled inline during modal summation
+    // (No post-processing needed - losses already bypassed below lowest axial)
 
     // Schroeder blend: above fs, reduce explicit modal contrast (statistical smoothing feel)
     if (rewParityMode && schroederHz > 0) {
@@ -265,40 +256,11 @@ export function computeRoomModesResponse({
     splDb = applySmoothing(freqs, splDb, smoothing);
   }
   
-  // Apply SPL calibration (REW-style reference)
+  // Calibration now applied at source (upstream in modal summation)
   let actualNormBand = normalizeBandHz;
   let normApplied = false;
-  let calibrationApplied = false;
-  let calibrationOffset = 0; // Define at function scope
-  
-  if (rewParityMode) {
-    // Calculate calibration offset to match REW's implicit SPL reference
-    // Assumptions: 1 sub @ 1m in half-space = ~90 dB baseline at 50 Hz
-    const numSubs = sourcePositions.length;
-    const avgDistance = 3.5; // Typical MLP distance in meters
-    const subSensitivity = 90; // Typical subwoofer 1W/1m (dB)
-    const refPower = 1; // 1 watt reference
-    
-    // Distance loss: -20*log10(d)
-    const distanceLoss = 20 * Math.log10(avgDistance);
-    
-    // Multi-sub gain: +3 dB per doubling (coherent summation at modal frequencies)
-    const multiSubGain = 10 * Math.log10(numSubs);
-    
-    // Boundary gain: +3 dB for half-space (floor loading)
-    const boundaryGain = 3;
-    
-    // Total calibration offset
-    calibrationOffset = subSensitivity - distanceLoss + multiSubGain + boundaryGain;
-    
-    // Apply calibration
-    splDb = splDb.map(db => db + calibrationOffset);
-    calibrationApplied = true;
-    
-    // REW parity mode: DO NOT normalize to band average
-    // (preserves absolute SPL for consistent Y-axis scaling)
-    normApplied = false;
-  }
+  const calibrationApplied = rewParityMode;
+  const calibrationOffset = sourceCalibrationDb;
 
   // Capture post-normalization stats
   const finitePostNorm = splDb.filter(v => isFinite(v));
@@ -342,9 +304,7 @@ export function computeRoomModesResponse({
   const qMappingText = `Q base: ${qBase.toFixed(1)} (slider=${dampingScalar.toFixed(2)})`;
 
   const pressureEnabled = rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0;
-  const pressureBlendFromHz = pressureEnabled ? (lowestAxial * 1.00) : null;
-  const pressureBlendToHz = pressureEnabled ? (lowestAxial * 0.50) : null;
-  const pressureMaxBoostDb = 12;
+  const pressureThresholdHz = pressureEnabled ? (lowestAxial * 0.50) : null;
 
   // Compute final SPL stats
   const finalFinite = splDb.filter(v => isFinite(v));
@@ -405,9 +365,7 @@ export function computeRoomModesResponse({
       absoluteSplMode,
       normalizeBandHz: actualNormBand,
       pressureEnabled,
-      pressureBlendFromHz,
-      pressureBlendToHz,
-      pressureMaxBoostDb,
+      pressureThresholdHz,
       splMinDb: splMinDb.toFixed(1),
       splMaxDb: splMaxDb.toFixed(1),
       splRangeDb: splRangeDb.toFixed(1),
