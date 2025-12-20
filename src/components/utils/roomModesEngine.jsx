@@ -123,31 +123,19 @@ export function computeRoomModesResponse({
     let sumRe = 0;
     let sumIm = 0;
 
-    // PRESSURE REGION LOGIC: Below lowest axial, bypass modal damping
-    const inPressureRegion = rewParityMode && lowestAxial && f < (lowestAxial * 0.5);
-
     for (const mode of modes) {
       const f0 = mode.freq;
       if (!(f0 > 0)) continue;
 
-      // In pressure region: skip modes above lowest axial (they don't contribute)
-      if (inPressureRegion && f0 > lowestAxial) continue;
-
-      // Compute modal Q (or bypass in pressure region)
-      let qMode;
-      if (inPressureRegion) {
-        // Pressure region: minimal damping (rigid room, no losses)
-        qMode = 100; // Effectively undamped
-      } else {
-        qMode = estimateModeQ({
-          mode,
-          roomDims,
-          surfaceAbsorption,
-          dampingScalar,
-          leakage,
-          f0,
-        });
-      }
+      // Compute modal Q
+      const qMode = estimateModeQ({
+        mode,
+        roomDims,
+        surfaceAbsorption,
+        dampingScalar,
+        leakage,
+        f0,
+      });
 
       const bandwidth = f0 / qMode;
       const df = Math.abs(f - f0);
@@ -204,6 +192,33 @@ export function computeRoomModesResponse({
     const mag = Math.max(1e-12, Math.sqrt(sumRe*sumRe + sumIm*sumIm));
     return 20 * Math.log10(mag) + sourceCalibrationDb;
   });
+
+  // PRESSURE REGION FLOOR (REW-parity: flat response below lowest axial)
+  // Below the first room mode, the room acts as a rigid pressure vessel
+  if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
+    // Find SPL at lowest axial mode (reference level)
+    let splAtLowestAxialDb = 0;
+    let closestIdx = 0;
+    let closestDf = Infinity;
+    for (let i = 0; i < freqs.length; i++) {
+      const df = Math.abs(freqs[i] - lowestAxial);
+      if (df < closestDf) {
+        closestDf = df;
+        closestIdx = i;
+        splAtLowestAxialDb = splDb[i];
+      }
+    }
+
+    // Apply pressure floor: clamp response below lowest axial to reference level
+    splDb = splDb.map((db, i) => {
+      const f = freqs[i];
+      if (f >= lowestAxial) return db; // Above lowest mode: use modal response as-is
+      
+      // Below lowest mode: pressure region (no roll-off)
+      // Clamp to reference level (prevents LF attenuation)
+      return Math.max(db, splAtLowestAxialDb);
+    });
+  }
 
     // Pressure region is now handled inline during modal summation
     // (No post-processing needed - losses already bypassed below lowest axial)
@@ -304,7 +319,17 @@ export function computeRoomModesResponse({
   const qMappingText = `Q base: ${qBase.toFixed(1)} (slider=${dampingScalar.toFixed(2)})`;
 
   const pressureEnabled = rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0;
-  const pressureThresholdHz = pressureEnabled ? (lowestAxial * 0.50) : null;
+  const pressureThresholdHz = pressureEnabled ? lowestAxial : null;
+  
+  // Compute LF delta for debug (20-30 Hz flatness check)
+  let lfDeltaDb_20_30 = null;
+  if (rewParityMode && freqs.length > 0) {
+    const idx20 = freqs.findIndex(f => f >= 20);
+    const idx30 = freqs.findIndex(f => f >= 30);
+    if (idx20 >= 0 && idx30 >= 0) {
+      lfDeltaDb_20_30 = splDb[idx30] - splDb[idx20];
+    }
+  }
 
   // Compute final SPL stats
   const finalFinite = splDb.filter(v => isFinite(v));
@@ -366,6 +391,8 @@ export function computeRoomModesResponse({
       normalizeBandHz: actualNormBand,
       pressureEnabled,
       pressureThresholdHz,
+      pressureRegionModel: pressureEnabled ? "flat-below-lowest-axial" : "none",
+      lfDeltaDb_20_30: lfDeltaDb_20_30 !== null ? lfDeltaDb_20_30.toFixed(2) : 'N/A',
       splMinDb: splMinDb.toFixed(1),
       splMaxDb: splMaxDb.toFixed(1),
       splRangeDb: splRangeDb.toFixed(1),
