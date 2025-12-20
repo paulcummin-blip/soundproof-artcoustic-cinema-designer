@@ -193,30 +193,34 @@ export function computeRoomModesResponse({
     return 20 * Math.log10(mag) + sourceCalibrationDb;
   });
 
-  // PRESSURE REGION FLOOR (REW-parity: flat response below lowest axial)
-  // Below the first room mode, the room acts as a rigid pressure vessel
-  if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
-    // Find SPL at lowest axial mode (reference level)
-    let splAtLowestAxialDb = 0;
-    let closestIdx = 0;
-    let closestDf = Infinity;
-    for (let i = 0; i < freqs.length; i++) {
-      const df = Math.abs(freqs[i] - lowestAxial);
-      if (df < closestDf) {
-        closestDf = df;
-        closestIdx = i;
-        splAtLowestAxialDb = splDb[i];
-      }
-    }
+  // PRESSURE REGION SUPPORT (smooth blend with geometry preservation)
+  // Below the first room mode, add frequency-dependent room loading gain
+  // while preserving direct-field geometry sensitivity
+  const kDbPerOct = 4; // Pressure gain per octave below lowest axial
+  const maxPressureGainDb = 12; // Cap to prevent explosion
+  const blendStartHz = lowestAxial * 0.7;
+  const blendEndHz = lowestAxial * 1.0;
 
-    // Apply pressure floor: clamp response below lowest axial to reference level
+  if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
     splDb = splDb.map((db, i) => {
       const f = freqs[i];
-      if (f >= lowestAxial) return db; // Above lowest mode: use modal response as-is
-      
-      // Below lowest mode: pressure region (no roll-off)
-      // Clamp to reference level (prevents LF attenuation)
-      return Math.max(db, splAtLowestAxialDb);
+      if (f >= blendEndHz) return db; // Above blend end: use modal response as-is
+
+      // Compute pressure gain (room loading effect)
+      const octavesBelow = Math.log2(lowestAxial / Math.max(f, 10)); // Clamp to avoid log(0)
+      const pressureGainDb = Math.min(kDbPerOct * octavesBelow, maxPressureGainDb);
+
+      // Smooth blend from pressure region to modal region
+      let blendFactor = 0;
+      if (f < blendStartHz) {
+        blendFactor = 1.0; // Full pressure gain
+      } else if (f < blendEndHz) {
+        // Linear crossfade
+        blendFactor = (blendEndHz - f) / (blendEndHz - blendStartHz);
+      }
+
+      const appliedGainDb = pressureGainDb * blendFactor;
+      return db + appliedGainDb;
     });
   }
 
@@ -403,7 +407,14 @@ export function computeRoomModesResponse({
       normalizeBandHz: actualNormBand,
       pressureEnabled,
       pressureThresholdHz,
-      pressureRegionModel: pressureEnabled ? "flat-below-lowest-axial" : "none",
+      pressureRegion: pressureEnabled ? {
+        lowestAxialHz: lowestAxial,
+        blendStartHz: lowestAxial * 0.7,
+        blendEndHz: lowestAxial * 1.0,
+        kDbPerOct: 4,
+        maxGainDb: 12,
+        model: "smooth-blend-with-geometry"
+      } : null,
       lfDeltaDb_20_30: lfDeltaDb_20_30 !== null ? lfDeltaDb_20_30.toFixed(2) : 'N/A',
       splMinDb: splMinDb.toFixed(1),
       splMaxDb: splMaxDb.toFixed(1),
