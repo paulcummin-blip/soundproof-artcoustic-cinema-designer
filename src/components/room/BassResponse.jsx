@@ -644,7 +644,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     // Only compute domain if:
     // 1. Currently null (initial load with valid data)
     // 2. scaleEpoch changed (user pressed Reset scale button)
-    const shouldCompute = yAxisDomain === null || scaleEpoch > 0;
+    const shouldCompute = (yAxisDomain === null && displayData.length > 0) || (scaleEpoch > 0 && displayData.length > 0);
     
     if (shouldCompute && displayData.length > 0) {
       const domain = computeStableYDomain(displayData);
@@ -669,14 +669,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // Determine final Y-axis domain to pass to graph + clamp data + count out-of-window points
   const finalYDomain = React.useMemo(() => {
     if (!rewStyleMode) return undefined;
-
-    if (yAxisLocked && yAxisDomain) {
-      return yAxisDomain;
-    }
-
-    // Lock OFF: compute fresh each time with fixed 40 dB span
-    return computeStableYDomain(displayData);
-  }, [rewStyleMode, yAxisLocked, yAxisDomain, displayData, computeStableYDomain]);
+    return yAxisDomain || undefined;
+  }, [rewStyleMode, yAxisDomain]);
 
   // Clamp plotted data and count out-of-window points (using RAW data)
   const { clampedData, outBelow, outAbove } = React.useMemo(() => {

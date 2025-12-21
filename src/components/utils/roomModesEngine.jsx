@@ -155,6 +155,22 @@ export function computeRoomModesResponse({
       const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
       const gainLinear = Math.pow(10, subTuning.gainDb / 20) * productGainLinear;
 
+      // Generic (room-only) sub magnitude shaping:
+      // When no product curve is supplied, prevent a perfectly flat direct-field magnitude.
+      // This keeps LF behaviour realistic and removes the visible "shelf" effect.
+      let genericDb = 0;
+      if (!subProductCurves) {
+        // Mild natural roll-off below 45 Hz (acts like a generic sealed alignment)
+        // 0 dB at 45 Hz, ~ -6 dB at 22.5 Hz, ~ -12 dB at 11.25 Hz
+        const fRef = 45;
+        const fSafe = Math.max(5, f);
+        const octBelow = Math.max(0, Math.log2(fRef / fSafe));
+        genericDb = -6 * octBelow;
+        // Prevent insane attenuation
+        if (genericDb < -24) genericDb = -24;
+      }
+      const genericLinear = Math.pow(10, genericDb / 20);
+
       // Phase: propagation + delay + polarity
       let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
       phi += -2 * Math.PI * f * (subTuning.delayMs / 1000);
@@ -163,7 +179,7 @@ export function computeRoomModesResponse({
       }
 
       // Complex contribution
-      const finalAmplitude = amplitude * gainLinear;
+      const finalAmplitude = amplitude * gainLinear * genericLinear;
       sumRe_direct += finalAmplitude * Math.cos(phi);
       sumIm_direct += finalAmplitude * Math.sin(phi);
     }
@@ -214,9 +230,25 @@ export function computeRoomModesResponse({
         const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
         const totalPhase = delayPhase + polarityPhase;
 
+        // Generic (room-only) sub magnitude shaping:
+        // When no product curve is supplied, prevent a perfectly flat direct-field magnitude.
+        // This keeps LF behaviour realistic and removes the visible "shelf" effect.
+        let genericDb = 0;
+        if (!subProductCurves) {
+          // Mild natural roll-off below 45 Hz (acts like a generic sealed alignment)
+          // 0 dB at 45 Hz, ~ -6 dB at 22.5 Hz, ~ -12 dB at 11.25 Hz
+          const fRef = 45;
+          const fSafe = Math.max(5, f);
+          const octBelow = Math.max(0, Math.log2(fRef / fSafe));
+          genericDb = -6 * octBelow;
+          // Prevent insane attenuation
+          if (genericDb < -24) genericDb = -24;
+        }
+        const genericLinear = Math.pow(10, genericDb / 20);
+
         // Complex weight for this sub
-        const weightRe = gainLinear * Math.cos(totalPhase);
-        const weightIm = gainLinear * Math.sin(totalPhase);
+        const weightRe = gainLinear * genericLinear * Math.cos(totalPhase);
+        const weightIm = gainLinear * genericLinear * Math.sin(totalPhase);
 
         // Second-order resonator (complex)
         // H(f) = 1 / ( (f0^2 - f^2) + j*(f0*f/Q) )
