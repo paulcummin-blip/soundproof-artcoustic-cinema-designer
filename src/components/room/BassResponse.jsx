@@ -42,7 +42,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [rewStyleMode, setRewStyleMode] = useState(false);
   const [rewSmoothing, setRewSmoothing] = useState('1/3'); // 1/3 octave smoothing by default (REW + RP22 P19)
   const [showRewModeLines, setShowRewModeLines] = useState(true);
-  const [linearHzAxis, setLinearHzAxis] = useState(true);
+  const [linearHzAxis, setLinearHzAxis] = useState(false);
   const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
   const [yAxisLocked, setYAxisLocked] = useState(true);
   const [yAxisDomain, setYAxisDomain] = useState(null);
@@ -1387,11 +1387,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             <div className="flex items-center gap-2">
               <Checkbox 
                 id="linear-hz-axis" 
-                checked={linearHzAxis}
-                onCheckedChange={setLinearHzAxis}
+                checked={!linearHzAxis}
+                onCheckedChange={(v) => setLinearHzAxis(!v)}
               />
               <Label htmlFor="linear-hz-axis" className="text-xs text-[#3E4349]">
-                Linear Hz axis
+                Log Hz axis (REW-style)
               </Label>
             </div>
           </div>
@@ -1414,10 +1414,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             crossoverFrequency={80}
             modeFrequencies={modeFrequencies}
             showModeMarkers={rewStyleMode ? showRewModeLines : showModeMarkers}
-            modeMarkers={axialModeMarkersForGraph}
+            modeMarkers={rewStyleMode ? (rewModesData?.debug?.modeMarkers || []) : []}
             linearHzAxis={rewStyleMode && linearHzAxis}
             rewStyleMode={rewStyleMode}
             yDomain={finalYDomain}
+            showAxialOnly={rewStyleMode}
             />
         ) : (
           <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>

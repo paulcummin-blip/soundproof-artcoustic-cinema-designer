@@ -24,10 +24,20 @@ export default function BassGraph({
   modeMarkers = [],
   linearHzAxis = false,
   rewStyleMode = false,
-  yDomain
+  yDomain,
+  showAxialOnly = false
 }) {
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
+    
+    // Filter mode markers to axial only when requested (visual only, calculation unchanged)
+    const drawnModeMarkers = React.useMemo(() => {
+        if (!modeMarkers || modeMarkers.length === 0) return [];
+        if (showAxialOnly) {
+            return modeMarkers.filter(m => m.family === 'axial');
+        }
+        return modeMarkers;
+    }, [modeMarkers, showAxialOnly]);
 
     // Determine Y-axis domain
     let calculatedYMin, calculatedYMax;
@@ -61,9 +71,9 @@ export default function BassGraph({
 
     // Render mode markers if enabled
     const renderModeMarkers = () => {
-        if (!showModeMarkers || modeMarkers.length === 0) return null;
+        if (!showModeMarkers || drawnModeMarkers.length === 0) return null;
         
-        return modeMarkers.map((marker, i) => {
+        return drawnModeMarkers.map((marker, i) => {
             // Different stroke styles for each family
             let strokeDasharray = '1 0'; // solid for axial
             let opacity = 0.3;
@@ -91,6 +101,11 @@ export default function BassGraph({
 
     return (
         <div className="w-full h-[400px]">
+            {rewStyleMode && (
+                <div className="text-[10px] text-gray-500 mb-1">
+                    X-axis scale: {linearHzAxis ? 'LINEAR' : 'LOG'}
+                </div>
+            )}
             <ResponsiveContainer>
                 <LineChart data={data} margin={{ top: 30, right: 50, left: 20, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#DCDBD6" />
@@ -163,7 +178,7 @@ export default function BassGraph({
                     <Line type="monotone" dataKey="spl" stroke="#213428" strokeWidth={2} dot={false} />
                     
                     {/* Mode line legend (REW style) */}
-                    {showModeMarkers && modeMarkers.length > 0 && (
+                    {showModeMarkers && drawnModeMarkers.length > 0 && (
                         <text x={60} y={20} fontSize={10} fill="#3E4349" className="font-body">
                             Mode lines: Axial (—)
                         </text>
