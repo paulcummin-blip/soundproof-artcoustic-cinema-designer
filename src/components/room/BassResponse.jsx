@@ -915,11 +915,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     subData.forEach(({ subId, arrivalTime }) => {
       const delayMs = Math.max(0, Math.min(30, (arrivalTime - minArrival) * 1000));
       newSettings[subId] = {
-        gainDb: 0,
-        delayMs,
-        polarity: 'normal',
         ...newSettings[subId],
-        delayMs // overwrite delay
+        gainDb: newSettings[subId]?.gainDb ?? 0,
+        polarity: newSettings[subId]?.polarity ?? 'normal',
+        delayMs // overwrite delay with calculated value
       };
     });
 

@@ -436,12 +436,6 @@ export function computeRoomModesResponse({
   const qBase = dampingScalar * 20;
   const qMappingText = `Q base: ${qBase.toFixed(1)} (slider=${dampingScalar.toFixed(2)})`;
 
-  const pressureEnabled =
-    rewParityMode &&
-    Number.isFinite(lowestAxial) &&
-    lowestAxial > 0 &&
-    Array.isArray(subProductCurves) &&
-    subProductCurves.length > 0;
   const pressureThresholdHz = pressureEnabled ? lowestAxial : null;
   
   // Compute LF delta for debug (20-30 Hz flatness check)
