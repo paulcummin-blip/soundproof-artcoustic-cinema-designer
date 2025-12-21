@@ -302,12 +302,41 @@ export function computeRoomModesResponse({
     return 20 * Math.log10(mag);
   });
 
-  // PRESSURE REGION SUPPORT
-  // REW Room Simulator does NOT add an extra "room loading boost" shelf here.
-  // The LF behaviour should come from the modal/direct complex summation only.
-  // (This also removes the LF "wall" / shelf currently visible below ~lowestAxial.)
-  // Intentionally disabled:
-  // - no post-boost below lowestAxial
+  // PRESSURE REGION SUPPORT (smooth blend with geometry preservation)
+  // Below the first room mode, add frequency-dependent room loading gain
+  // while preserving direct-field geometry sensitivity
+  const kDbPerOct = 4; // Pressure gain per octave below lowest axial
+  const maxPressureGainDb = 12; // Cap to prevent explosion
+  const blendStartHz = lowestAxial * 0.7;
+  const blendEndHz = lowestAxial * 1.0;
+
+  // Apply pressure-region support ONLY when we have a real product curve.
+  // In Room-only (generic sub), this boost creates an unrealistic LF "wall" below the lowest axial.
+  const pressureEnabled =
+    rewParityMode &&
+    Number.isFinite(lowestAxial) &&
+    lowestAxial > 0 &&
+    Array.isArray(subProductCurves) &&
+    subProductCurves.length > 0;
+
+  if (pressureEnabled) {
+    splDb = splDb.map((db, i) => {
+      const f = freqs[i];
+      if (f >= blendEndHz) return db;
+
+      const octavesBelow = Math.log2(lowestAxial / Math.max(f, 10));
+      const pressureGainDb = Math.min(kDbPerOct * octavesBelow, maxPressureGainDb);
+
+      let blendFactor = 0;
+      if (f < blendStartHz) {
+        blendFactor = 1.0;
+      } else if (f < blendEndHz) {
+        blendFactor = (blendEndHz - f) / (blendEndHz - blendStartHz);
+      }
+
+      return db + (pressureGainDb * blendFactor);
+    });
+  }
 
     // Pressure region is now handled inline during modal summation
     // (No post-processing needed - losses already bypassed below lowest axial)
@@ -407,7 +436,12 @@ export function computeRoomModesResponse({
   const qBase = dampingScalar * 20;
   const qMappingText = `Q base: ${qBase.toFixed(1)} (slider=${dampingScalar.toFixed(2)})`;
 
-  const pressureEnabled = rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0;
+  const pressureEnabled =
+    rewParityMode &&
+    Number.isFinite(lowestAxial) &&
+    lowestAxial > 0 &&
+    Array.isArray(subProductCurves) &&
+    subProductCurves.length > 0;
   const pressureThresholdHz = pressureEnabled ? lowestAxial : null;
   
   // Compute LF delta for debug (20-30 Hz flatness check)
