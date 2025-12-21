@@ -97,8 +97,9 @@ export default function BassGraph({
                     <XAxis
                         dataKey="frequency"
                         type="number"
-                        domain={rewStyleMode ? [15, calculatedXMax] : ['dataMin', 'dataMax']}
+                        domain={rewStyleMode ? [20, calculatedXMax] : ['dataMin', 'dataMax']}
                         scale={linearHzAxis ? "linear" : "log"}
+                        ticks={linearHzAxis ? undefined : [20, 30, 40, 50, 60, 70, 80, 100, 120, 150, 200]}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
                         label={{ value: "Frequency (Hz)", position: 'insideBottom', offset: -10, className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"

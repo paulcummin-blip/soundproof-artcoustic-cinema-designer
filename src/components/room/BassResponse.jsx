@@ -1391,7 +1391,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 onCheckedChange={setLinearHzAxis}
               />
               <Label htmlFor="linear-hz-axis" className="text-xs text-[#3E4349]">
-                Linear Hz axis (REW)
+                Linear Hz axis
               </Label>
             </div>
           </div>
