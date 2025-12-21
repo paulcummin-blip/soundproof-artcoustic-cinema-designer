@@ -302,36 +302,12 @@ export function computeRoomModesResponse({
     return 20 * Math.log10(mag);
   });
 
-  // PRESSURE REGION SUPPORT (smooth blend with geometry preservation)
-  // Below the first room mode, add frequency-dependent room loading gain
-  // while preserving direct-field geometry sensitivity
-  const kDbPerOct = 4; // Pressure gain per octave below lowest axial
-  const maxPressureGainDb = 12; // Cap to prevent explosion
-  const blendStartHz = lowestAxial * 0.7;
-  const blendEndHz = lowestAxial * 1.0;
-
-  if (rewParityMode && Number.isFinite(lowestAxial) && lowestAxial > 0) {
-    splDb = splDb.map((db, i) => {
-      const f = freqs[i];
-      if (f >= blendEndHz) return db; // Above blend end: use modal response as-is
-
-      // Compute pressure gain (room loading effect)
-      const octavesBelow = Math.log2(lowestAxial / Math.max(f, 10)); // Clamp to avoid log(0)
-      const pressureGainDb = Math.min(kDbPerOct * octavesBelow, maxPressureGainDb);
-
-      // Smooth blend from pressure region to modal region
-      let blendFactor = 0;
-      if (f < blendStartHz) {
-        blendFactor = 1.0; // Full pressure gain
-      } else if (f < blendEndHz) {
-        // Linear crossfade
-        blendFactor = (blendEndHz - f) / (blendEndHz - blendStartHz);
-      }
-
-      const appliedGainDb = pressureGainDb * blendFactor;
-      return db + appliedGainDb;
-    });
-  }
+  // PRESSURE REGION SUPPORT
+  // REW Room Simulator does NOT add an extra "room loading boost" shelf here.
+  // The LF behaviour should come from the modal/direct complex summation only.
+  // (This also removes the LF "wall" / shelf currently visible below ~lowestAxial.)
+  // Intentionally disabled:
+  // - no post-boost below lowestAxial
 
     // Pressure region is now handled inline during modal summation
     // (No post-processing needed - losses already bypassed below lowest axial)
