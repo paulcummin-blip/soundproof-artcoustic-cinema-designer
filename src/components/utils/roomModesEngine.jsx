@@ -322,7 +322,7 @@ export function computeRoomModesResponse({
     Array.isArray(subProductCurves) &&
     subProductCurves.length > 0;
 
-  if (pressureEnabled) {
+  if (false) {
     splDb = splDb.map((db, i) => {
       const f = freqs[i];
       if (f >= blendEndHz) return db;

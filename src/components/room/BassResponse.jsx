@@ -243,8 +243,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         rewParityMode: true,
         smoothing: rewSmoothing,
         subFloorHeight: 0.0,
-        normalizeBandHz: [30, 80],
-        normalizeToDb: 0,
+        normalizeBandHz: null,
+        normalizeToDb: null,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
@@ -256,7 +256,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves: null, // Room-only: no product curves
-        absoluteSplMode: false
+        absoluteSplMode: true
       });
     } catch (e) {
       return {
@@ -448,8 +448,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         rewParityMode: true,
         smoothing: rewSmoothing,
         subFloorHeight: 0.0,
-        normalizeBandHz: [30, 80],
-        normalizeToDb: 0,
+        normalizeBandHz: null,
+        normalizeToDb: null,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
@@ -461,7 +461,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves, // Apply per-sub product curves
-        absoluteSplMode: false
+        absoluteSplMode: true
       });
     } catch (e) {
       return {
