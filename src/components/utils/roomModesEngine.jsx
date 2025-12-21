@@ -499,6 +499,25 @@ export function computeRoomModesResponse({
   const blendedMagMin = lfDebug.blendedMag15_45.length > 0 ? Math.min(...lfDebug.blendedMag15_45).toFixed(1) : 'N/A';
   const blendedMagMax = lfDebug.blendedMag15_45.length > 0 ? Math.max(...lfDebug.blendedMag15_45).toFixed(1) : 'N/A';
 
+  // LF PROBE: detailed frequency-by-frequency audit for "wall" diagnosis
+  const probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45];
+  const lfProbe = probeFreqs.map(fProbe => {
+    const idx = freqs.findIndex(f => Math.abs(f - fProbe) < 0.6);
+    if (idx < 0) return { freq: fProbe, error: 'not found' };
+    
+    const rawDb = splDb[idx]; // after pressure, before calibration
+    const finalDb = absoluteSplMode && Number.isFinite(sourceCalibrationDb) 
+      ? rawDb + sourceCalibrationDb 
+      : rawDb;
+    
+    return {
+      freq: fProbe,
+      rawDbBeforeCal: rawDb.toFixed(2),
+      finalDbAfterCal: finalDb.toFixed(2),
+      belowLowestAxial: lowestAxial && fProbe < lowestAxial
+    };
+  });
+
   return {
     freqs,
     splDb,
@@ -555,6 +574,17 @@ export function computeRoomModesResponse({
         modalMagDb: `${modalMagMin} to ${modalMagMax}`,
         blendedMagDb: `${blendedMagMin} to ${blendedMagMax}`,
         note: "Magnitudes before sourceCalibrationDb applied"
+      },
+      lfProbe: {
+        probeFrequencies: probeFreqs,
+        measurements: lfProbe,
+        pressureRegionActive: pressureEnabled,
+        lowestAxialHz: lowestAxial,
+        blendStartHz: lowestAxial ? (lowestAxial * 0.7).toFixed(1) : 'N/A',
+        blendEndHz: lowestAxial ? lowestAxial.toFixed(1) : 'N/A',
+        sourceCalibrationDb: sourceCalibrationDb.toFixed(2),
+        absoluteSplMode,
+        subProductCurvesPresent: !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0)
       }
     }
   };
