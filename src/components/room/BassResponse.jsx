@@ -243,8 +243,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         rewParityMode: true,
         smoothing: rewSmoothing,
         subFloorHeight: 0.0,
-        normalizeBandHz: null,
-        normalizeToDb: null,
+        normalizeBandHz: [30, 80],
+        normalizeToDb: 0,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
@@ -256,7 +256,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves: null, // Room-only: no product curves
-        absoluteSplMode: true
+        absoluteSplMode: false
       });
     } catch (e) {
       return {
@@ -448,8 +448,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         rewParityMode: true,
         smoothing: rewSmoothing,
         subFloorHeight: 0.0,
-        normalizeBandHz: null,
-        normalizeToDb: null,
+        normalizeBandHz: [30, 80],
+        normalizeToDb: 0,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
@@ -461,7 +461,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves, // Apply per-sub product curves
-        absoluteSplMode: true
+        absoluteSplMode: false
       });
     } catch (e) {
       return {
@@ -1249,9 +1249,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               </div>
               <div className="text-[11px] space-y-1">
                 <div>• Complex modal summation with spatial coupling</div>
-                <div>• Lowest axial mode: {activeDebug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz</div>
+                <div>• Pressure-region support below {activeDebug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz</div>
                 <div>• {activeDebug?.qMappingText || 'Q-based damping'}</div>
-                <div>• {activeDebug?.absoluteSplMode ? 'Absolute SPL' : 'Relative dB'} scale</div>
+                <div>• {activeDebug?.calibrationApplied ? 'Calibrated SPL' : 'Relative dB'} scale</div>
                 {rewView === 'roomPlusProduct' && (
                   <div>• Product curves: {(activeDebug?.productModels || []).join(', ') || 'None'}</div>
                 )}
@@ -1275,13 +1275,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                     <strong>Smoothing:</strong> {activeDebug.smoothingApplied || 'none'}
                   </div>
                   <div className="text-[10px] font-mono opacity-80">
-                    <strong>Absolute SPL:</strong> {activeDebug.absoluteSplMode ? 'YES' : 'NO'}
+                    <strong>Absolute SPL:</strong> {activeDebug.absoluteSplMode ? 'true' : 'false'}
                   </div>
                   <div className="text-[10px] font-mono opacity-80">
-                    <strong>Normalize band:</strong> {activeDebug.normalizeBandHz ? JSON.stringify(activeDebug.normalizeBandHz) : 'none (absolute mode)'}
-                  </div>
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>Pressure region boost:</strong> {activeDebug.pressureEnabled ? 'ACTIVE' : 'OFF'}
+                    <strong>Normalize band:</strong> {activeDebug.normalizeBandHz ? JSON.stringify(activeDebug.normalizeBandHz) : 'none'}
                   </div>
                   <div className="text-[10px] font-mono opacity-80">
                     <strong>Product curves:</strong> {activeDebug.productCurvesApplied ? 'applied' : 'none'}
@@ -1422,7 +1419,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             rewStyleMode={rewStyleMode}
             yDomain={finalYDomain}
             showAxialOnly={rewStyleMode}
-            absoluteSplMode={rewStyleMode ? (rewModesData?.debug?.absoluteSplMode ?? false) : false}
             />
         ) : (
           <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
