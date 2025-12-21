@@ -25,7 +25,8 @@ export default function BassGraph({
   linearHzAxis = false,
   rewStyleMode = false,
   yDomain,
-  showAxialOnly = false
+  showAxialOnly = false,
+  absoluteSplMode = false
 }) {
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
@@ -123,7 +124,7 @@ export default function BassGraph({
                     <YAxis
                         domain={calculatedYMin !== undefined && calculatedYMax !== undefined ? [calculatedYMin, calculatedYMax] : ['dataMin - 5', 'dataMax + 5']}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
-                        label={{ value: rewStyleMode ? 'SPL (dB)' : 'Relative (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
+                        label={{ value: (rewStyleMode && absoluteSplMode) ? 'SPL (dB)' : 'Relative (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
                     />
