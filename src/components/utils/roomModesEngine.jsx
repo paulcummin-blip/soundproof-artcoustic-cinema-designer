@@ -117,6 +117,13 @@ export function computeRoomModesResponse({
     ? (subSensitivity - distanceLoss + multiSubGain + boundaryGain)
     : 0;
 
+  // LF debugging stats collectors
+  const lfDebug = {
+    directMag15_45: [],
+    modalMag15_45: [],
+    blendedMag15_45: []
+  };
+
   // Build response: complex pressure sum with direct/modal blending
   let splDb = freqs.map((f) => {
     // 1. DIRECT-FIELD COMPLEX SUM (geometry-dependent, no modal filtering)
@@ -132,7 +139,7 @@ export function computeRoomModesResponse({
       const dz = (source.z ?? 0.0) - (seatPosition.z ?? 1.2);
       const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
-      // Inverse-distance amplitude (relative only; absolute SPL is handled by sourceCalibrationDb)
+      // Pure geometry/phase term only (no absolute SPL reference)
       const amplitude = 1 / Math.max(0.5, d);
 
       // Apply sub's product response if provided
@@ -243,6 +250,17 @@ export function computeRoomModesResponse({
 
     const sumRe = (1 - w) * sumRe_direct + w * sumRe_modal;
     const sumIm = (1 - w) * sumIm_direct + w * sumIm_modal;
+
+    // LF debugging: capture magnitudes before calibration in 15-45 Hz band
+    if (f >= 15 && f <= 45) {
+      const directMag = Math.sqrt(sumRe_direct * sumRe_direct + sumIm_direct * sumIm_direct);
+      const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
+      const blendedMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+      
+      lfDebug.directMag15_45.push(20 * Math.log10(Math.max(Number.EPSILON, directMag)));
+      lfDebug.modalMag15_45.push(20 * Math.log10(Math.max(Number.EPSILON, modalMag)));
+      lfDebug.blendedMag15_45.push(20 * Math.log10(Math.max(Number.EPSILON, blendedMag)));
+    }
 
     // Avoid flattening the LF response: use a much smaller epsilon than 1e-12
     // so tiny geometry/phase variations are not quantised into a fixed shelf.
@@ -437,6 +455,14 @@ export function computeRoomModesResponse({
     }).filter(s => s !== null);
   }
 
+  // Compute LF debug stats
+  const directMagMin = lfDebug.directMag15_45.length > 0 ? Math.min(...lfDebug.directMag15_45).toFixed(1) : 'N/A';
+  const directMagMax = lfDebug.directMag15_45.length > 0 ? Math.max(...lfDebug.directMag15_45).toFixed(1) : 'N/A';
+  const modalMagMin = lfDebug.modalMag15_45.length > 0 ? Math.min(...lfDebug.modalMag15_45).toFixed(1) : 'N/A';
+  const modalMagMax = lfDebug.modalMag15_45.length > 0 ? Math.max(...lfDebug.modalMag15_45).toFixed(1) : 'N/A';
+  const blendedMagMin = lfDebug.blendedMag15_45.length > 0 ? Math.min(...lfDebug.blendedMag15_45).toFixed(1) : 'N/A';
+  const blendedMagMax = lfDebug.blendedMag15_45.length > 0 ? Math.max(...lfDebug.blendedMag15_45).toFixed(1) : 'N/A';
+
   return {
     freqs,
     splDb,
@@ -450,6 +476,8 @@ export function computeRoomModesResponse({
       obliqueCount,
       firstTenModeHz,
       lowestAxialHz: lowestAxial,
+      blendStartHz: lowestAxial * 0.7,
+      blendEndHz: lowestAxial,
       qBase: qBase.toFixed(1),
       qMappingText,
       absoluteMode: absoluteSplMode,
@@ -485,7 +513,13 @@ export function computeRoomModesResponse({
       normalizeToDb: normalizeToDb !== undefined ? normalizeToDb : null,
       productCurveStats,
       directFieldUsesDb0: false,
-      calibrationMode: "sourceCalibrationDb only"
+      calibrationMode: "sourceCalibrationDb only",
+      lfDebug15_45Hz: {
+        directMagDb: `${directMagMin} to ${directMagMax}`,
+        modalMagDb: `${modalMagMin} to ${modalMagMax}`,
+        blendedMagDb: `${blendedMagMin} to ${blendedMagMax}`,
+        note: "Magnitudes before sourceCalibrationDb applied"
+      }
     }
   };
 }
