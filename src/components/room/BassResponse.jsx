@@ -786,13 +786,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   // Compute mode frequencies for markers (use SAME parity run to avoid drift)
   const modeFrequencies = useMemo(() => {
     if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) return [];
-    
+
     if (rewStyleMode) {
       // Use mode markers from the same parity calculation (prevents drift)
       // These come from the actual REW parity run with correct source/seat positions
       return rewModesData?.debug?.modeMarkersHz || [];
     }
-    
+
     // Fallback to basic axial modes for product simulation
     const modes = computeAxialModes({
       widthM: roomDims.widthM,
@@ -800,6 +800,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       heightM: roomDims.heightM
     }, 200);
     return modes.map(m => m.fHz);
+  }, [rewStyleMode, rewModesData]);
+
+  // Filter mode markers to axial only for graph overlay (visual clarity)
+  const axialModeMarkersForGraph = useMemo(() => {
+    if (!rewStyleMode) return [];
+    const allMarkers = rewModesData?.debug?.modeMarkers || [];
+    return allMarkers.filter(m => m.family === 'axial');
   }, [rewStyleMode, rewModesData]);
 
   // Compute geometric distances for readouts
@@ -1407,11 +1414,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
             crossoverFrequency={80}
             modeFrequencies={modeFrequencies}
             showModeMarkers={rewStyleMode ? showRewModeLines : showModeMarkers}
-            modeMarkers={rewStyleMode ? (rewModesData?.debug?.modeMarkers || []) : []}
+            modeMarkers={axialModeMarkersForGraph}
             linearHzAxis={rewStyleMode && linearHzAxis}
             rewStyleMode={rewStyleMode}
             yDomain={finalYDomain}
-          />
+            />
         ) : (
           <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
             No graph data yet.

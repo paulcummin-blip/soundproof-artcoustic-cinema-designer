@@ -164,7 +164,7 @@ export default function BassGraph({
                     {/* Mode line legend (REW style) */}
                     {showModeMarkers && modeMarkers.length > 0 && (
                         <text x={60} y={20} fontSize={10} fill="#3E4349" className="font-body">
-                            Mode lines: Axial (—) / Tangential (- -) / Oblique (···)
+                            Mode lines: Axial (—)
                         </text>
                     )}
                 </LineChart>
