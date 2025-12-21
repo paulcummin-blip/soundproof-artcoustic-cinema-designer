@@ -584,44 +584,38 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return displayData;
   }, [displayData]);
 
-  // Compute stable Y-axis domain using 30-80 Hz band intelligence
+  // Compute FIXED 40 dB Y-axis domain (REW-style problem-solving view)
+  // - Always returns a domain with exactly 40 dB span
+  // - Anchors the window using a robust statistic in the 30–80 Hz band
+  // - Prioritises showing deep nulls (bottom of the window) so designers fix issues
   const computeStableYDomain = React.useCallback((data) => {
     if (!data || data.length === 0) return null;
 
-    // Get points in 30-80 Hz band
-    const band30_80 = data
+    const FIXED_SPAN_DB = 40;
+
+    // Helper: median of finite values
+    const median = (arr) => {
+      const a = arr.filter(v => Number.isFinite(v)).slice().sort((x, y) => x - y);
+      if (a.length === 0) return null;
+      const mid = Math.floor(a.length / 2);
+      return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
+    };
+
+    // Prefer 30–80 Hz band; fallback to all data if band empty
+    const band = data
       .filter(d => d.frequency >= 30 && d.frequency <= 80)
       .map(d => d.spl)
       .filter(v => Number.isFinite(v));
-    
-    if (band30_80.length === 0) return null;
 
-    // Compute band statistics
-    const bandAvg = band30_80.reduce((a, b) => a + b, 0) / band30_80.length;
-    const bandMin = Math.min(...band30_80);
-    const bandMax = Math.max(...band30_80);
+    const all = data.map(d => d.spl).filter(v => Number.isFinite(v));
 
-    // Propose initial range centered on band average
-    let min = Math.min(bandMin, bandAvg - 20);
-    let max = Math.max(bandMax, bandAvg + 20);
+    const anchor = median(band) ?? median(all);
+    if (!Number.isFinite(anchor)) return null;
 
-    // Enforce minimum span of 40 dB
-    const currentSpan = max - min;
-    const minSpan = 40;
-    
-    if (currentSpan < minSpan) {
-      const expansion = (minSpan - currentSpan) / 2;
-      min = bandAvg - (minSpan / 2);
-      max = bandAvg + (minSpan / 2);
-    }
-
-    // Add 2 dB padding
-    min -= 2;
-    max += 2;
-
-    // Round to whole dB
-    min = Math.floor(min);
-    max = Math.ceil(max);
+    // Fixed 40 dB window: show nulls (more room below the anchor)
+    // Window is [anchor - 30, anchor + 10]
+    const min = Math.floor(anchor - 30);
+    const max = min + FIXED_SPAN_DB; // EXACT 40 dB span, no padding
 
     return { min, max };
   }, []);
@@ -661,7 +655,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     setScaleEpoch(prev => prev + 1);
   }, [rewStyleMode]);
 
-  // Determine final Y-axis domain to pass to graph
+  // Determine final Y-axis domain to pass to graph + clamp data + count out-of-window points
   const finalYDomain = React.useMemo(() => {
     if (!rewStyleMode) return undefined;
 
@@ -669,9 +663,34 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       return yAxisDomain;
     }
 
-    // Lock OFF: compute fresh each time with minimum span
+    // Lock OFF: compute fresh each time with fixed 40 dB span
     return computeStableYDomain(displayData);
   }, [rewStyleMode, yAxisLocked, yAxisDomain, displayData, computeStableYDomain]);
+
+  // Clamp data and count out-of-window points
+  const { clampedData, outBelow, outAbove } = React.useMemo(() => {
+    if (!rewStyleMode || !finalYDomain) {
+      return { clampedData: displayData, outBelow: 0, outAbove: 0 };
+    }
+
+    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+    let below = 0;
+    let above = 0;
+
+    const clamped = displayData.map(p => {
+      const v = p.spl;
+      if (Number.isFinite(v)) {
+        if (v < finalYDomain.min) below++;
+        else if (v > finalYDomain.max) above++;
+      }
+      return {
+        ...p,
+        spl: Number.isFinite(v) ? clamp(v, finalYDomain.min, finalYDomain.max) : v
+      };
+    });
+
+    return { clampedData: clamped, outBelow: below, outAbove: above };
+  }, [rewStyleMode, finalYDomain, displayData]);
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
@@ -1355,10 +1374,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           </div>
         )}
 
+        {/* Out of window warning (only when REW is ON and points are clamped) */}
+        {rewStyleMode && (outBelow + outAbove) > 0 && (
+          <div style={{ marginTop: 6, marginBottom: 8, fontSize: 12, color: "#8a2b2b", background: "#fff3cd", padding: "6px 10px", borderRadius: 6, border: "1px solid #ffc107" }}>
+            ⚠️ Out of window: {outBelow} below, {outAbove} above (fix placement / phase / quantity)
+          </div>
+        )}
+
         {/* Graph or placeholder */}
         {displayData.length > 0 ? (
           <BassGraph
-            responseData={rewStyleMode ? rewSplAnchoredData : displayData}
+            responseData={rewStyleMode ? clampedData : displayData}
             schroederFrequency={schroederFrequency}
             rp22Levels={rp22Levels}
             toggles={toggles}
