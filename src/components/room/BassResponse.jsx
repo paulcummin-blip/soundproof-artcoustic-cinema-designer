@@ -584,27 +584,45 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return displayData;
   }, [displayData]);
 
-  // Compute FIXED 40 dB Y-axis domain (REW-style problem-solving view)
-  // - Always returns a domain with exactly 40 dB span
-  // - Anchors the window using band average from 30–80 Hz
-  // - Window is centered: [bandAvg - 20, bandAvg + 20]
+  // Compute stable Y-axis domain using 30–80 Hz band intelligence
+  // IMPORTANT: ALWAYS return EXACTLY a 40 dB window (no padding).
   const computeStableYDomain = React.useCallback((data) => {
     if (!data || data.length === 0) return null;
 
-    // Get points in 30-80 Hz band
-    const band30_80 = data
+    // 30–80 Hz band (designer-relevant reference)
+    const band = data
       .filter(d => d.frequency >= 30 && d.frequency <= 80)
       .map(d => d.spl)
       .filter(v => Number.isFinite(v));
-    
-    if (band30_80.length === 0) return null;
 
-    // Compute band average
-    const bandAvg = band30_80.reduce((a, b) => a + b, 0) / band30_80.length;
+    if (band.length === 0) return null;
 
-    // STRICT 40 dB window centered on bandAvg
-    const min = Math.floor(bandAvg - 20);
-    const max = min + 40;
+    const bandAvg = band.reduce((a, b) => a + b, 0) / band.length;
+
+    // Exact 40 dB window
+    const span = 40;
+    let min = bandAvg - span / 2;
+    let max = bandAvg + span / 2;
+
+    // Keep window "intelligent": if the 30–80 Hz band itself sits outside the window,
+    // shift the whole window up/down BUT KEEP span fixed at 40 dB.
+    const bandMin = Math.min(...band);
+    const bandMax = Math.max(...band);
+
+    if (bandMax > max) {
+      const shiftUp = bandMax - max;
+      min += shiftUp;
+      max += shiftUp;
+    }
+    if (bandMin < min) {
+      const shiftDown = min - bandMin;
+      min -= shiftDown;
+      max -= shiftDown;
+    }
+
+    // Round to whole dB and re-enforce exact span after rounding
+    min = Math.floor(min);
+    max = min + span;
 
     return { min, max };
   }, []);
@@ -616,31 +634,35 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }
   }, [rewStyleMode]);
 
-  // Compute Y-axis domain when needed
+  // Compute Y-axis domain ONCE on first valid data, then only on manual reset
   React.useEffect(() => {
     if (!rewStyleMode) {
       setYAxisDomain(null);
       return;
     }
 
-    // Compute domain if:
-    // 1. Currently null (initial load)
-    // 2. scaleEpoch changed (user pressed Reset)
-    // 3. View changed (Room-only ↔ Room + Product)
-    // 4. Seat changed
-    if (yAxisDomain === null || scaleEpoch > 0) {
+    // Only compute domain if:
+    // 1. Currently null (initial load with valid data)
+    // 2. scaleEpoch changed (user pressed Reset scale button)
+    const shouldCompute = yAxisDomain === null || scaleEpoch > 0;
+    
+    if (shouldCompute && displayData.length > 0) {
       const domain = computeStableYDomain(displayData);
       if (domain) {
         setYAxisDomain(domain);
+        // Reset epoch after applying
+        if (scaleEpoch > 0) {
+          setScaleEpoch(0);
+        }
       }
     }
-  }, [rewStyleMode, displayData, scaleEpoch, rewView, selectedSeat?.id, yAxisDomain, computeStableYDomain]);
+  }, [rewStyleMode, displayData.length, scaleEpoch, yAxisDomain, computeStableYDomain]);
 
   // Manual reset function
   const handleResetScale = React.useCallback(() => {
     if (!rewStyleMode) return;
     
-    setYAxisDomain(null);
+    // Trigger recompute by incrementing epoch
     setScaleEpoch(prev => prev + 1);
   }, [rewStyleMode]);
 
@@ -656,7 +678,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return computeStableYDomain(displayData);
   }, [rewStyleMode, yAxisLocked, yAxisDomain, displayData, computeStableYDomain]);
 
-  // Clamp data and count out-of-window points
+  // Clamp plotted data and count out-of-window points (using RAW data)
   const { clampedData, outBelow, outAbove } = React.useMemo(() => {
     if (!rewStyleMode || !finalYDomain) {
       return { clampedData: displayData, outBelow: 0, outAbove: 0 };
@@ -666,12 +688,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     let below = 0;
     let above = 0;
 
-    const clamped = displayData.map(p => {
+    // Count violations using RAW spl values
+    displayData.forEach(p => {
       const v = p.spl;
       if (Number.isFinite(v)) {
         if (v < finalYDomain.min) below++;
         else if (v > finalYDomain.max) above++;
       }
+    });
+
+    // Create clamped version for plotting only
+    const clamped = displayData.map(p => {
+      const v = p.spl;
       return {
         ...p,
         spl: Number.isFinite(v) ? clamp(v, finalYDomain.min, finalYDomain.max) : v
