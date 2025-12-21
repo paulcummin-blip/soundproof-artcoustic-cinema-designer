@@ -132,10 +132,8 @@ export function computeRoomModesResponse({
       const dz = (source.z ?? 0.0) - (seatPosition.z ?? 1.2);
       const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
-      // Inverse-distance amplitude (reference: 90 dB @ 1m)
-      const db0 = 90;
-      const dbDist = db0 - 20 * Math.log10(Math.max(0.5, d));
-      const amplitude = Math.pow(10, dbDist / 20);
+      // Inverse-distance amplitude (relative only; absolute SPL is handled by sourceCalibrationDb)
+      const amplitude = 1 / Math.max(0.5, d);
 
       // Apply sub's product response if provided
       let productGainLinear = 1.0;
@@ -206,7 +204,7 @@ export function computeRoomModesResponse({
         const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
         const gainLinear = Math.pow(10, subTuning.gainDb / 20) * productGainLinear;
         const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
-        const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.Pi : 0;
+        const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
         const totalPhase = delayPhase + polarityPhase;
 
         // Complex weight for this sub
@@ -485,7 +483,9 @@ export function computeRoomModesResponse({
       splRangeAfterDb: [splMinDb.toFixed(1), splMaxDb.toFixed(1)],
       absoluteSplApplied,
       normalizeToDb: normalizeToDb !== undefined ? normalizeToDb : null,
-      productCurveStats
+      productCurveStats,
+      directFieldUsesDb0: false,
+      calibrationMode: "sourceCalibrationDb only"
     }
   };
 }
