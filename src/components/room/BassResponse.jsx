@@ -1258,6 +1258,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   <div className="text-[10px] font-mono opacity-80">
                     <strong>Product curves:</strong> {activeDebug.productCurvesApplied ? 'applied' : 'none'}
                   </div>
+                  {activeDebug.lfDebug15_45Hz && (
+                    <div className="text-[10px] font-mono opacity-80 text-green-700 mt-1 pt-1 border-t border-green-200">
+                      <strong>LF Debug (15-45 Hz):</strong><br/>
+                      Direct: {activeDebug.lfDebug15_45Hz.directMagDb} dB<br/>
+                      Modal: {activeDebug.lfDebug15_45Hz.modalMagDb} dB<br/>
+                      Blended: {activeDebug.lfDebug15_45Hz.blendedMagDb} dB<br/>
+                      <span className="text-[9px] opacity-70">{activeDebug.lfDebug15_45Hz.note}</span>
+                    </div>
+                  )}
                   {activeDebug.productCurveStats && activeDebug.productCurveStats.length > 0 && (
                     <div className="text-[10px] font-mono opacity-80 text-blue-700">
                       <strong>Product curve stats:</strong><br/>
