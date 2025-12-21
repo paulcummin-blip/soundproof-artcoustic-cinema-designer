@@ -586,36 +586,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
 
   // Compute FIXED 40 dB Y-axis domain (REW-style problem-solving view)
   // - Always returns a domain with exactly 40 dB span
-  // - Anchors the window using a robust statistic in the 30–80 Hz band
-  // - Prioritises showing deep nulls (bottom of the window) so designers fix issues
+  // - Anchors the window using band average from 30–80 Hz
+  // - Window is centered: [bandAvg - 20, bandAvg + 20]
   const computeStableYDomain = React.useCallback((data) => {
     if (!data || data.length === 0) return null;
 
-    const FIXED_SPAN_DB = 40;
-
-    // Helper: median of finite values
-    const median = (arr) => {
-      const a = arr.filter(v => Number.isFinite(v)).slice().sort((x, y) => x - y);
-      if (a.length === 0) return null;
-      const mid = Math.floor(a.length / 2);
-      return a.length % 2 ? a[mid] : (a[mid - 1] + a[mid]) / 2;
-    };
-
-    // Prefer 30–80 Hz band; fallback to all data if band empty
-    const band = data
+    // Get points in 30-80 Hz band
+    const band30_80 = data
       .filter(d => d.frequency >= 30 && d.frequency <= 80)
       .map(d => d.spl)
       .filter(v => Number.isFinite(v));
+    
+    if (band30_80.length === 0) return null;
 
-    const all = data.map(d => d.spl).filter(v => Number.isFinite(v));
+    // Compute band average
+    const bandAvg = band30_80.reduce((a, b) => a + b, 0) / band30_80.length;
 
-    const anchor = median(band) ?? median(all);
-    if (!Number.isFinite(anchor)) return null;
-
-    // Fixed 40 dB window: show nulls (more room below the anchor)
-    // Window is [anchor - 30, anchor + 10]
-    const min = Math.floor(anchor - 30);
-    const max = min + FIXED_SPAN_DB; // EXACT 40 dB span, no padding
+    // STRICT 40 dB window centered on bandAvg
+    const min = Math.floor(bandAvg - 20);
+    const max = min + 40;
 
     return { min, max };
   }, []);
