@@ -640,23 +640,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       setYAxisDomain(null);
       return;
     }
-
-    // Only compute domain if:
-    // 1. Currently null (initial load with valid data)
-    // 2. scaleEpoch changed (user pressed Reset scale button)
-    const shouldCompute = (yAxisDomain === null && displayData.length > 0) || (scaleEpoch > 0 && displayData.length > 0);
-    
-    if (shouldCompute && displayData.length > 0) {
-      const domain = computeStableYDomain(displayData);
-      if (domain) {
-        setYAxisDomain(domain);
-        // Reset epoch after applying
-        if (scaleEpoch > 0) {
-          setScaleEpoch(0);
-        }
-      }
+    // Set once when we first get valid data, and again only on Reset scale.
+    const shouldCompute = yAxisDomain === null || scaleEpoch > 0;
+    if (!shouldCompute) return;
+    if (!displayData || displayData.length === 0) return;
+    const domain = computeStableYDomain(displayData);
+    if (domain) {
+      setYAxisDomain(domain);
+      if (scaleEpoch > 0) setScaleEpoch(0);
     }
-  }, [rewStyleMode, displayData.length, scaleEpoch, yAxisDomain, computeStableYDomain]);
+  }, [rewStyleMode, displayData, yAxisDomain, scaleEpoch, computeStableYDomain]);
 
   // Manual reset function
   const handleResetScale = React.useCallback(() => {
