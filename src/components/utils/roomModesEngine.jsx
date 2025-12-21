@@ -305,14 +305,17 @@ export function computeRoomModesResponse({
   // PRESSURE REGION SUPPORT (smooth blend with geometry preservation)
   // Below the first room mode, add frequency-dependent room loading gain
   // while preserving direct-field geometry sensitivity
+  // DISABLED FOR REW PARITY: REW's Room Simulator does not apply this artificial boost
+  const enablePressureRegionGain = false; // REW parity: OFF
   const kDbPerOct = 4; // Pressure gain per octave below lowest axial
   const maxPressureGainDb = 12; // Cap to prevent explosion
   const blendStartHz = lowestAxial * 0.7;
   const blendEndHz = lowestAxial * 1.0;
 
-  // Apply pressure-region support ONLY when we have a real product curve.
+  // Apply pressure-region support ONLY when enabled AND we have a real product curve.
   // In Room-only (generic sub), this boost creates an unrealistic LF "wall" below the lowest axial.
   const pressureEnabled =
+    enablePressureRegionGain &&
     rewParityMode &&
     Number.isFinite(lowestAxial) &&
     lowestAxial > 0 &&
