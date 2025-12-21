@@ -224,6 +224,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         debug: { error: "No valid sub positions" }
       };
     }
+    
+    // Build signatures for dependency tracking
+    const subSig = sourcePositions.map(s => 
+      `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${s.z.toFixed(2)}_g${(s.tuning?.gainDb||0).toFixed(1)}_d${(s.tuning?.delayMs||0).toFixed(1)}_p${s.tuning?.polarity||'normal'}`
+    ).join('|');
+    const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
 
     // Room-only = flat/generic sub response (no product curves)
     let result;
@@ -284,9 +290,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         curveType: 'Modal response + geometry',
       },
       freqs: result.freqs,
-      splDb: result.splDb
+      splDb: result.splDb,
+      subSig,
+      seatSig
     };
-  }, [rewStyleMode, roomDims, seatingPositions, subsForSimulation, roomDamping, rewSmoothing]);
+  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, roomDamping, rewSmoothing]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
@@ -369,6 +377,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     if (!sourcePositions.length) {
       return { data: [], debug: { error: "No valid sub positions" } };
     }
+    
+    // Build signatures for dependency tracking
+    const subSig = sourcePositions.map(s => 
+      `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${s.z.toFixed(2)}_g${(s.tuning?.gainDb||0).toFixed(1)}_d${(s.tuning?.delayMs||0).toFixed(1)}_p${s.tuning?.polarity||'normal'}`
+    ).join('|');
+    const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
 
     // Generate frequency axis once (must match engine's axis)
     const freqs = [];
@@ -1241,7 +1255,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
           const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
             ? rewRoomPlusProductData.debug
             : rewModesData?.debug;
-          
+
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
               <div className="font-semibold mb-1">
@@ -1255,6 +1269,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 {rewView === 'roomPlusProduct' && (
                   <div>• Product curves: {(activeDebug?.productModels || []).join(', ') || 'None'}</div>
                 )}
+              </div>
+              <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
+                <div className="text-[10px] font-mono opacity-80 font-semibold text-blue-700">
+                  REW Inputs (Live Tracking):
+                </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Sources used:</strong> {activeDebug?.sourceCountUsed || 0}
+                </div>
+                {activeDebug?.sourcePositionsUsed && activeDebug.sourcePositionsUsed.length > 0 && (
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>Positions:</strong> {activeDebug.sourcePositionsUsed.map((p, i) => 
+                      `[${p.x},${p.y},${p.z}]`
+                    ).join(' ')}
+                  </div>
+                )}
+                <div className="text-[9px] font-mono opacity-70 break-all">
+                  <strong>SourceSig:</strong> {activeDebug?.sourceSigUsed || 'N/A'}
+                </div>
+                <div className="text-[9px] font-mono opacity-70">
+                  <strong>SeatSig:</strong> {activeDebug?.seatSigUsed || 'N/A'}
+                </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Lowest axial:</strong> {activeDebug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz
+                </div>
               </div>
               {activeDebug ? (
                 <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
@@ -1283,6 +1321,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   <div className="text-[10px] font-mono opacity-80">
                     <strong>Product curves:</strong> {activeDebug.productCurvesApplied ? 'applied' : 'none'}
                   </div>
+                  {activeDebug?.lfProbe?.measurements && (
+                    <div className="text-[10px] font-mono opacity-80 text-purple-700 mt-1 pt-1 border-t border-purple-200">
+                      <strong>LF Probe (Hz → SPL):</strong><br/>
+                      {activeDebug.lfProbe.measurements.map((m, i) => (
+                        <div key={i}>
+                          {m.freq} Hz: {m.finalDbAfterCal || m.rawDbBeforeCal || 'N/A'} dB
+                          {m.belowLowestAxial && <span className="text-red-600"> (below axial)</span>}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {activeDebug.lfDebug15_45Hz && (
                     <div className="text-[10px] font-mono opacity-80 text-green-700 mt-1 pt-1 border-t border-green-200">
                       <strong>LF Debug (15-45 Hz):</strong><br/>

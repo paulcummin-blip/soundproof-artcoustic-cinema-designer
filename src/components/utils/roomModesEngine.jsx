@@ -521,6 +521,20 @@ export function computeRoomModesResponse({
     };
   });
 
+  // Build source/seat signatures for dependency tracking
+  const sourceCountUsed = sourcePositions.length;
+  const sourcePositionsUsed = sourcePositions.slice(0, 3).map(s => ({
+    x: Number(s.x).toFixed(2),
+    y: Number(s.y).toFixed(2),
+    z: Number(s.z || 0).toFixed(2)
+  }));
+
+  const sourceSigUsed = sourcePositions.map(s => 
+    `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${(s.z||0).toFixed(2)}_g${(s.tuning?.gainDb||0).toFixed(1)}_d${(s.tuning?.delayMs||0).toFixed(1)}_p${s.tuning?.polarity||'normal'}`
+  ).join('|');
+
+  const seatSigUsed = `${seatPosition.x.toFixed(2)}_${seatPosition.y.toFixed(2)}_${(seatPosition.z||1.2).toFixed(2)}`;
+
   return {
     freqs,
     splDb,
@@ -572,6 +586,10 @@ export function computeRoomModesResponse({
       productCurveStats,
       directFieldUsesDb0: false,
       calibrationMode: "Applied in absoluteSplMode stage only",
+      sourceCountUsed,
+      sourcePositionsUsed,
+      sourceSigUsed,
+      seatSigUsed,
       lfDebug15_45Hz: {
         directMagDb: `${directMagMin} to ${directMagMax}`,
         modalMagDb: `${modalMagMin} to ${modalMagMax}`,
