@@ -665,13 +665,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     return yAxisDomain || undefined;
   }, [rewStyleMode, yAxisDomain]);
 
-  // Clamp plotted data and count out-of-window points (using RAW data)
+  // Break line at out-of-window points (using RAW data for counts)
   const { clampedData, outBelow, outAbove } = React.useMemo(() => {
     if (!rewStyleMode || !finalYDomain) {
       return { clampedData: displayData, outBelow: 0, outAbove: 0 };
     }
 
-    const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     let below = 0;
     let above = 0;
 
@@ -684,16 +683,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       }
     });
 
-    // Create clamped version for plotting only
-    const clamped = displayData.map(p => {
+    // IMPORTANT:
+    // Do NOT clamp to min/max (that draws a fake "shelf").
+    // Instead, break the line by using null when outside the 40 dB window.
+    const clipped = displayData.map(p => {
       const v = p.spl;
-      return {
-        ...p,
-        spl: Number.isFinite(v) ? clamp(v, finalYDomain.min, finalYDomain.max) : v
-      };
+      if (!Number.isFinite(v)) return { ...p, spl: null };
+
+      if (v < finalYDomain.min || v > finalYDomain.max) {
+        return { ...p, spl: null };
+      }
+
+      return { ...p, spl: v };
     });
 
-    return { clampedData: clamped, outBelow: below, outAbove: above };
+    return { clampedData: clipped, outBelow: below, outAbove: above };
   }, [rewStyleMode, finalYDomain, displayData]);
 
   // Bass Metrics (20-80 Hz) for P14 reporting
