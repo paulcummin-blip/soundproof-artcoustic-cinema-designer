@@ -298,8 +298,8 @@ export function computeRoomModesResponse({
     // so tiny geometry/phase variations are not quantised into a fixed shelf.
     const mag = Math.max(Number.EPSILON, Math.sqrt(sumRe * sumRe + sumIm * sumIm));
 
-    // Magnitude -> dB (with source calibration applied here)
-    return 20 * Math.log10(mag) + sourceCalibrationDb;
+    // Magnitude -> dB (calibration applied later in absoluteSplMode stage)
+    return 20 * Math.log10(mag);
   });
 
   // PRESSURE REGION SUPPORT (smooth blend with geometry preservation)
@@ -384,7 +384,7 @@ export function computeRoomModesResponse({
     splDb = applySmoothing(freqs, splDb, smoothing);
   }
   
-  // Calibration now applied at source (upstream in modal summation)
+  // Calibration applied in absoluteSplMode stage only (not per-frequency)
   let actualNormBand = normalizeBandHz;
   let normApplied = false;
   const calibrationApplied = rewParityMode;
@@ -545,7 +545,7 @@ export function computeRoomModesResponse({
       normalizeToDb: normalizeToDb !== undefined ? normalizeToDb : null,
       productCurveStats,
       directFieldUsesDb0: false,
-      calibrationMode: "sourceCalibrationDb only",
+      calibrationMode: "Applied in absoluteSplMode stage only",
       lfDebug15_45Hz: {
         directMagDb: `${directMagMin} to ${directMagMax}`,
         modalMagDb: `${modalMagMin} to ${modalMagMax}`,
