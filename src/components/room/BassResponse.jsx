@@ -73,6 +73,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }).join("|");
   }, [rearSubsLive]);
 
+  // Incrementing epoch to force modal recomputation when subs move
+  const subPositionEpoch = useMemo(() => {
+    return `${frontLiveSig}||${rearLiveSig}`;
+  }, [frontLiveSig, rearLiveSig]);
+
   // Build subs array from LIVE dragged positions (frontSubsLive + rearSubsLive)
   const subsForSimulation = useMemo(() => {
     const liveFront = Array.isArray(frontSubsLive) ? frontSubsLive : [];
@@ -293,7 +298,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       subSig,
       seatSig
     };
-  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, roomDamping, rewSmoothing, rewRelativeView]);
+  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
@@ -529,7 +534,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       freqs: result.freqs,
       splDb: result.splDb
     };
-  }, [rewStyleMode, rewView, roomDims, seatingPositions, subsForSimulation, roomDamping, rewSmoothing, rewModesData]);
+  }, [rewStyleMode, rewView, roomDims, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewModesData]);
 
   // Helper: apply REW-style smoothing
   function applyRewSmoothing(freqs, splDb, smoothing) {
