@@ -86,7 +86,7 @@ export const SelectTrigger = forwardRef(function SelectTrigger({ className, chil
       onClick={() => setOpen(!open)}
       ref={(node) => { triggerRef.current = node; if (typeof ref === "function") ref(node); else if (ref) ref.current = node; }}
       className={cn(
-        "flex h-10 w-full items-center justify-between rounded-md border border-[#DCDBD6] bg-white px-3 py-2 text-sm",
+        "flex h-10 w-full items-center justify-between rounded-md border border-[#DCDBD6] bg-white px-3 py-2",
         "focus:outline-none focus:ring-1 focus:ring-[#213428] hover:border-[#213428]",
         className
       )}
