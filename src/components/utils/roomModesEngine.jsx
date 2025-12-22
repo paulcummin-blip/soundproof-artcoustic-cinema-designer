@@ -97,6 +97,9 @@ export function computeRoomModesResponse({
   // Lowest axial mode (used for sealed-room pressure behaviour)
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
+  // Pressure-region support flag (used by debug only - gain disabled)
+  const pressureEnabled = false;
+  
   // SOURCE CALIBRATION (applied upstream, not after summation)
   // REW reference: 1 sub @ 1m in half-space ≈ 90 dB at 50 Hz
   const numSubs = sourcePositions.length;
@@ -413,8 +416,6 @@ export function computeRoomModesResponse({
   // Compute Q mapping for debug
   const qBase = dampingScalar * 20;
   const qMappingText = `Q base: ${qBase.toFixed(1)} (slider=${dampingScalar.toFixed(2)})`;
-
-  const pressureThresholdHz = pressureEnabled ? lowestAxial : null;
   
   // Compute LF delta for debug (20-30 Hz flatness check)
   let lfDeltaDb_20_30 = null;
