@@ -260,6 +260,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         subFloorHeight: 0.0,
         normalizeBandHz: rewRelativeView ? [30, 80] : null,
         normalizeToDb: rewRelativeView ? 0 : null,
+        relativeViewEnabled: rewRelativeView,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
