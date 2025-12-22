@@ -435,6 +435,7 @@ export function computeRoomModesResponse({
   }
   
   // Step 2: Apply relative normalization if requested (30-80 Hz band)
+  // REW-style: use MEDIAN of band for robustness against nulls
   let normAppliedActual = false;
   let normRefDb = 0;
   if (!absoluteSplMode && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
@@ -444,7 +445,9 @@ export function computeRoomModesResponse({
       .filter(v => v !== null);
     
     if (bandValues.length >= 10) {
-      normRefDb = bandValues.reduce((a, b) => a + b, 0) / bandValues.length;
+      // Use MEDIAN instead of MEAN (more REW-like, robust to nulls)
+      const sorted = [...bandValues].sort((a, b) => a - b);
+      normRefDb = sorted[Math.floor(sorted.length / 2)];
       finalDb = finalDb.map(v => isFinite(v) ? v - normRefDb : v);
       normAppliedActual = true;
     }
