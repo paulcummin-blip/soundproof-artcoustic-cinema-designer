@@ -159,18 +159,18 @@ export function computeRoomModesResponse({
       const gainLinear = Math.pow(10, subTuning.gainDb / 20) * productGainLinear;
 
       // Generic (room-only) sub magnitude shaping:
-      // When no product curve is supplied, prevent a perfectly flat direct-field magnitude.
-      // This keeps LF behaviour realistic and removes the visible "shelf" effect.
+      // When no product curve is supplied, use realistic sealed-sub roll-off
       let genericDb = 0;
       if (!subProductCurves) {
-        // Mild natural roll-off below 45 Hz (acts like a generic sealed alignment)
-        // 0 dB at 45 Hz, ~ -6 dB at 22.5 Hz, ~ -12 dB at 11.25 Hz
-        const fRef = 45;
-        const fSafe = Math.max(5, f);
-        const octBelow = Math.max(0, Math.log2(fRef / fSafe));
-        genericDb = -6 * octBelow;
-        // Prevent insane attenuation
-        if (genericDb < -24) genericDb = -24;
+        // Realistic sealed sub: flat above 30 Hz, 12 dB/oct roll-off below
+        const f3Hz = 30; // -3dB point
+        if (f < f3Hz) {
+          // Second-order roll-off: -12 dB/oct below f3
+          const octBelow = Math.log2(f3Hz / Math.max(5, f));
+          genericDb = -12 * octBelow;
+          // Cap extreme attenuation
+          if (genericDb < -30) genericDb = -30;
+        }
       }
       const genericLinear = Math.pow(10, genericDb / 20);
 
@@ -234,18 +234,18 @@ export function computeRoomModesResponse({
         const totalPhase = delayPhase + polarityPhase;
 
         // Generic (room-only) sub magnitude shaping:
-        // When no product curve is supplied, prevent a perfectly flat direct-field magnitude.
-        // This keeps LF behaviour realistic and removes the visible "shelf" effect.
+        // When no product curve is supplied, use realistic sealed-sub roll-off
         let genericDb = 0;
         if (!subProductCurves) {
-          // Mild natural roll-off below 45 Hz (acts like a generic sealed alignment)
-          // 0 dB at 45 Hz, ~ -6 dB at 22.5 Hz, ~ -12 dB at 11.25 Hz
-          const fRef = 45;
-          const fSafe = Math.max(5, f);
-          const octBelow = Math.max(0, Math.log2(fRef / fSafe));
-          genericDb = -6 * octBelow;
-          // Prevent insane attenuation
-          if (genericDb < -24) genericDb = -24;
+          // Realistic sealed sub: flat above 30 Hz, 12 dB/oct roll-off below
+          const f3Hz = 30; // -3dB point
+          if (f < f3Hz) {
+            // Second-order roll-off: -12 dB/oct below f3
+            const octBelow = Math.log2(f3Hz / Math.max(5, f));
+            genericDb = -12 * octBelow;
+            // Cap extreme attenuation
+            if (genericDb < -30) genericDb = -30;
+          }
         }
         const genericLinear = Math.pow(10, genericDb / 20);
 
@@ -272,15 +272,16 @@ export function computeRoomModesResponse({
       }
     }
 
-    // 3. COMPLEX-DOMAIN CROSSFADE
+    // 3. COMPLEX-DOMAIN CROSSFADE (with minimum modal contribution)
     const blendStartHz = lowestAxial * 0.7;
     const blendEndHz = lowestAxial;
+    const minModalWeight = 0.15; // Keep modal field active even below lowest axial
 
-    let w = 0; // Modal weight (0 = full direct, 1 = full modal)
+    let w = minModalWeight; // Modal weight (never goes to pure direct)
     if (f >= blendEndHz) {
       w = 1.0;
     } else if (f >= blendStartHz) {
-      w = (f - blendStartHz) / (blendEndHz - blendStartHz);
+      w = minModalWeight + (1.0 - minModalWeight) * ((f - blendStartHz) / (blendEndHz - blendStartHz));
     }
 
     const sumRe = (1 - w) * sumRe_direct + w * sumRe_modal;
@@ -569,6 +570,7 @@ export function computeRoomModesResponse({
         probeFrequencies: probeFreqs,
         measurements: lfProbe,
         pressureRegionActive: pressureEnabled,
+        minModalWeight: 0.15,
         lowestAxialHz: lowestAxial,
         blendStartHz: lowestAxial ? (lowestAxial * 0.7).toFixed(1) : 'N/A',
         blendEndHz: lowestAxial ? lowestAxial.toFixed(1) : 'N/A',

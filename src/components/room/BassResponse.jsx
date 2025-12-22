@@ -44,6 +44,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(false);
   const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
+  const [rewRelativeView, setRewRelativeView] = useState(false); // Normalize toggle
   const [yAxisLocked, setYAxisLocked] = useState(true);
   const [yAxisDomain, setYAxisDomain] = useState(null);
   const [scaleEpoch, setScaleEpoch] = useState(0);
@@ -232,7 +233,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
 
     // Room-only = flat/generic sub response (no product curves)
-    // ALWAYS use relative/normalized mode for REW-style consistency
+    // Default to absolute SPL, optional normalize via checkbox
     let result;
     try {
       result = computeRoomModesResponse({
@@ -250,8 +251,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         rewParityMode: true,
         smoothing: rewSmoothing,
         subFloorHeight: 0.0,
-        normalizeBandHz: [30, 80],
-        normalizeToDb: 0,
+        normalizeBandHz: rewRelativeView ? [30, 80] : null,
+        normalizeToDb: rewRelativeView ? 0 : null,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
@@ -263,7 +264,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves: null, // Room-only: no product curves
-        absoluteSplMode: false
+        absoluteSplMode: !rewRelativeView
       });
     } catch (e) {
       return {
@@ -295,7 +296,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
       subSig,
       seatSig
     };
-  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, roomDamping, rewSmoothing]);
+  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, roomDamping, rewSmoothing, rewRelativeView]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
@@ -446,7 +447,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }
 
     // Run engine with product curves applied per-sub
-    // ALWAYS use relative/normalized mode for REW-style consistency
+    // Default to absolute SPL, optional normalize via checkbox
     let result;
     try {
       result = computeRoomModesResponse({
@@ -464,8 +465,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         rewParityMode: true,
         smoothing: rewSmoothing,
         subFloorHeight: 0.0,
-        normalizeBandHz: [30, 80],
-        normalizeToDb: 0,
+        normalizeBandHz: rewRelativeView ? [30, 80] : null,
+        normalizeToDb: rewRelativeView ? 0 : null,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
@@ -477,7 +478,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves, // Apply per-sub product curves
-        absoluteSplMode: false
+        absoluteSplMode: !rewRelativeView
       });
     } catch (e) {
       return {
@@ -1265,9 +1266,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               </div>
               <div className="text-[11px] space-y-1">
                 <div>• Complex modal summation with spatial coupling</div>
-                <div>• Normalized to 0 dB average in 30–80 Hz band</div>
                 <div>• {activeDebug?.qMappingText || 'Q-based damping'}</div>
-                <div>• Relative (dB) scale (REW-style)</div>
+                <div>• {rewRelativeView ? 'Relative (normalized to 0 dB @ 30–80 Hz)' : 'Absolute SPL'} scale</div>
                 {rewView === 'roomPlusProduct' && (
                   <div>• Product curves: {(activeDebug?.productModels || []).join(', ') || 'None'}</div>
                 )}
@@ -1443,6 +1443,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               />
               <Label htmlFor="linear-hz-axis" className="text-xs text-[#3E4349]">
                 Log Hz axis (REW-style)
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="rew-relative-view" 
+                checked={rewRelativeView}
+                onCheckedChange={setRewRelativeView}
+              />
+              <Label htmlFor="rew-relative-view" className="text-xs text-[#3E4349]">
+                Relative view (normalise 30–80 Hz)
               </Label>
             </div>
           </div>

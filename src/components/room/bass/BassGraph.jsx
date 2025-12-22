@@ -128,7 +128,7 @@ export default function BassGraph({
                     <YAxis
                         domain={calculatedYMin !== undefined && calculatedYMax !== undefined ? [calculatedYMin, calculatedYMax] : ['dataMin - 5', 'dataMax + 5']}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
-                        label={{ value: rewStyleMode ? 'Relative (dB)' : 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
+                        label={{ value: 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
                     />
