@@ -312,34 +312,9 @@ export function computeRoomModesResponse({
   const blendStartHz = lowestAxial * 0.7;
   const blendEndHz = lowestAxial * 1.0;
 
-  // Apply pressure-region support ONLY when enabled AND we have a real product curve.
-  // In Room-only (generic sub), this boost creates an unrealistic LF "wall" below the lowest axial.
-  const pressureEnabled =
-    enablePressureRegionGain &&
-    rewParityMode &&
-    Number.isFinite(lowestAxial) &&
-    lowestAxial > 0 &&
-    Array.isArray(subProductCurves) &&
-    subProductCurves.length > 0;
-
-  if (false) {
-    splDb = splDb.map((db, i) => {
-      const f = freqs[i];
-      if (f >= blendEndHz) return db;
-
-      const octavesBelow = Math.log2(lowestAxial / Math.max(f, 10));
-      const pressureGainDb = Math.min(kDbPerOct * octavesBelow, maxPressureGainDb);
-
-      let blendFactor = 0;
-      if (f < blendStartHz) {
-        blendFactor = 1.0;
-      } else if (f < blendEndHz) {
-        blendFactor = (blendEndHz - f) / (blendEndHz - blendStartHz);
-      }
-
-      return db + (pressureGainDb * blendFactor);
-    });
-  }
+  // PRESSURE REGION SUPPORT: DISABLED (causes false LF wall)
+  // Future: re-enable with proper room-gain model matching REW
+  const pressureRegionDisabled = true;
 
     // Pressure region is now handled inline during modal summation
     // (No post-processing needed - losses already bypassed below lowest axial)
@@ -564,16 +539,9 @@ export function computeRoomModesResponse({
       productCurvesApplied: !!subProductCurves,
       absoluteSplMode,
       normalizeBandHz: actualNormBand,
-      pressureEnabled,
-      pressureThresholdHz,
-      pressureRegion: pressureEnabled ? {
-        lowestAxialHz: lowestAxial,
-        blendStartHz: lowestAxial * 0.7,
-        blendEndHz: lowestAxial * 1.0,
-        kDbPerOct: 4,
-        maxGainDb: 12,
-        model: "smooth-blend-with-geometry"
-      } : null,
+      pressureEnabled: false,
+      pressureThresholdHz: null,
+      pressureRegion: null,
       lfDeltaDb_20_30: lfDeltaDb_20_30 !== null ? lfDeltaDb_20_30.toFixed(2) : 'N/A',
       splMinDb: splMinDb.toFixed(1),
       splMaxDb: splMaxDb.toFixed(1),

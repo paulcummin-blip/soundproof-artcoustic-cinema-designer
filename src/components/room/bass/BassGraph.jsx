@@ -69,15 +69,20 @@ export default function BassGraph({
       calculatedXMax = Math.max(120, Math.min(200, schroederFrequency * 1.2));
     }
 
-    // Render mode markers if enabled
+    // Render mode markers if enabled (axial only for visual clarity)
     const renderModeMarkers = () => {
         if (!showModeMarkers || drawnModeMarkers.length === 0) return null;
-        
-        return drawnModeMarkers.map((marker, i) => {
+
+        // In REW mode, only show axial markers
+        const markersToRender = rewStyleMode 
+          ? drawnModeMarkers.filter(m => m.family === 'axial')
+          : drawnModeMarkers;
+
+        return markersToRender.map((marker, i) => {
             // Different stroke styles for each family
             let strokeDasharray = '1 0'; // solid for axial
             let opacity = 0.3;
-            
+
             if (marker.family === 'tangential') {
                 strokeDasharray = '4 2'; // dashed
                 opacity = 0.2;
@@ -85,7 +90,7 @@ export default function BassGraph({
                 strokeDasharray = '2 2'; // dotted
                 opacity = 0.15;
             }
-            
+
             return (
                 <ReferenceLine 
                     key={`mode-${i}`}
@@ -123,7 +128,7 @@ export default function BassGraph({
                     <YAxis
                         domain={calculatedYMin !== undefined && calculatedYMax !== undefined ? [calculatedYMin, calculatedYMax] : ['dataMin - 5', 'dataMax + 5']}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
-                        label={{ value: 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
+                        label={{ value: rewStyleMode ? 'Relative (dB)' : 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
                     />

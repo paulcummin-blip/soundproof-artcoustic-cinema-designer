@@ -232,6 +232,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
 
     // Room-only = flat/generic sub response (no product curves)
+    // ALWAYS use relative/normalized mode for REW-style consistency
     let result;
     try {
       result = computeRoomModesResponse({
@@ -249,8 +250,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         rewParityMode: true,
         smoothing: rewSmoothing,
         subFloorHeight: 0.0,
-        normalizeBandHz: null,
-        normalizeToDb: null,
+        normalizeBandHz: [30, 80],
+        normalizeToDb: 0,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
@@ -262,7 +263,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves: null, // Room-only: no product curves
-        absoluteSplMode: true
+        absoluteSplMode: false
       });
     } catch (e) {
       return {
@@ -445,6 +446,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }
 
     // Run engine with product curves applied per-sub
+    // ALWAYS use relative/normalized mode for REW-style consistency
     let result;
     try {
       result = computeRoomModesResponse({
@@ -462,8 +464,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         rewParityMode: true,
         smoothing: rewSmoothing,
         subFloorHeight: 0.0,
-        normalizeBandHz: null,
-        normalizeToDb: null,
+        normalizeBandHz: [30, 80],
+        normalizeToDb: 0,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
@@ -475,7 +477,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves, // Apply per-sub product curves
-        absoluteSplMode: true
+        absoluteSplMode: false
       });
     } catch (e) {
       return {
@@ -1263,9 +1265,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
               </div>
               <div className="text-[11px] space-y-1">
                 <div>• Complex modal summation with spatial coupling</div>
-                <div>• Pressure-region support below {activeDebug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz</div>
+                <div>• Normalized to 0 dB average in 30–80 Hz band</div>
                 <div>• {activeDebug?.qMappingText || 'Q-based damping'}</div>
-                <div>• {activeDebug?.calibrationApplied ? 'Calibrated SPL' : 'Relative dB'} scale</div>
+                <div>• Relative (dB) scale (REW-style)</div>
                 {rewView === 'roomPlusProduct' && (
                   <div>• Product curves: {(activeDebug?.productModels || []).join(', ') || 'None'}</div>
                 )}
