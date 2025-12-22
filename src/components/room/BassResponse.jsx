@@ -23,7 +23,7 @@ const brand = {
   sand:  "#C1B6AD",
 };
 
-export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings }) {
+export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
   const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg } = useAppState();
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
   const totalSubCount = (frontSubsCfg?.count || 0) + (rearSubsCfg?.count || 0);
@@ -56,84 +56,57 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
     }
   }, [rewStyleMode]);
 
-  // Build subs array from frontSubsCfg + rearSubsCfg for engine
+  // Build subs array from LIVE dragged positions (frontSubsLive + rearSubsLive)
   const subsForSimulation = useMemo(() => {
-    const subs = [];
-    
-    // Front subs
-    const frontModel = frontSubsCfg?.model;
-    const frontCount = frontSubsCfg?.count || 0;
-    const frontPositions = frontSubsCfg?.positions || [];
-    const frontSettingsById = frontSubsCfg?.settingsById || {};
-    
-    if (frontModel && frontCount > 0) {
-      // Default positions if not saved
-      const roomWidth = roomDims?.widthM || 4.5;
-      const defaultFrontPositions = [
-        { x: roomWidth * 0.33, y: 0.15 },
-        { x: roomWidth * 0.67, y: 0.15 }
-      ];
-      
-      const frontIds = frontCount === 1 ? ['front-sub-left'] : ['front-sub-left', 'front-sub-right'];
-      
-      for (let i = 0; i < frontCount; i++) {
-        const subId = frontIds[i];
-        const pos = frontPositions[i] || defaultFrontPositions[i] || { x: roomWidth / 2, y: 0.15 };
-        const settings = frontSettingsById[subId] || { gainDb: 0, delayMs: 0, polarity: 'normal' };
-        
-        subs.push({
-          id: subId,
-          modelKey: frontModel,
-          x: pos.x,
-          y: pos.y,
-          z: 0.35,
-          tuning: {
-            gainDb: settings.gainDb || 0,
-            delayMs: settings.delayMs || 0,
-            polarity: settings.polarity === 'invert' ? 180 : 0
-          }
-        });
-      }
-    }
-    
-    // Rear subs
-    const rearModel = rearSubsCfg?.model;
-    const rearCount = rearSubsCfg?.count || 0;
-    const rearPositions = rearSubsCfg?.positions || [];
-    const rearSettingsById = rearSubsCfg?.settingsById || {};
-    
-    if (rearModel && rearCount > 0) {
-      const roomWidth = roomDims?.widthM || 4.5;
-      const roomLength = roomDims?.lengthM || 6.0;
-      const defaultRearPositions = [
-        { x: roomWidth * 0.33, y: roomLength - 0.15 },
-        { x: roomWidth * 0.67, y: roomLength - 0.15 }
-      ];
-      
-      const rearIds = rearCount === 1 ? ['rear-sub-left'] : ['rear-sub-left', 'rear-sub-right'];
-      
-      for (let i = 0; i < rearCount; i++) {
-        const subId = rearIds[i];
-        const pos = rearPositions[i] || defaultRearPositions[i] || { x: roomWidth / 2, y: roomLength - 0.15 };
-        const settings = rearSettingsById[subId] || { gainDb: 0, delayMs: 0, polarity: 'normal' };
-        
-        subs.push({
-          id: subId,
-          modelKey: rearModel,
-          x: pos.x,
-          y: pos.y,
-          z: 0.35,
-          tuning: {
-            gainDb: settings.gainDb || 0,
-            delayMs: settings.delayMs || 0,
-            polarity: settings.polarity === 'invert' ? 180 : 0
-          }
-        });
-      }
-    }
-    
-    return subs;
-  }, [frontSubsCfg, rearSubsCfg, roomDims?.widthM, roomDims?.lengthM]);
+    const liveFront = Array.isArray(frontSubsLive) ? frontSubsLive : [];
+    const liveRear = Array.isArray(rearSubsLive) ? rearSubsLive : [];
+
+    // Helper to get tuning settings from config
+    const getTuning = (subId, cfg) => {
+      const settings = cfg?.settingsById?.[subId] || {};
+      return {
+        gainDb: settings.gainDb || 0,
+        delayMs: settings.delayMs || 0,
+        polarity: settings.polarity === 'invert' ? 180 : 0
+      };
+    };
+
+    // Only use subs that actually have a position (no silent fallback defaults).
+    const toSource = (s, group, idx, cfg) => {
+      const p = s?.position;
+      if (!p || typeof p.x !== "number" || typeof p.y !== "number") return null;
+
+      const subId = s?.id ?? `${group}-sub-${idx}`;
+      const tuning = getTuning(subId, cfg);
+
+      return {
+        id: subId,
+        modelKey: s?.model ?? "SUB2-12",
+        x: p.x,
+        y: p.y,
+        z: typeof p.z === "number" ? p.z : 0.35,
+        tuning,
+      };
+    };
+
+    const sources = [
+      ...liveFront.map((s, i) => toSource(s, "front", i, frontSubsCfg)),
+      ...liveRear.map((s, i) => toSource(s, "rear", i, rearSubsCfg)),
+    ].filter(Boolean);
+
+    return sources;
+  }, [
+    // ensure re-run when the live arrays or any positions change
+    frontSubsLive,
+    rearSubsLive,
+    // also watch config for tuning settings
+    frontSubsCfg?.settingsById,
+    rearSubsCfg?.settingsById,
+    // plus room dims if you need them elsewhere in the pipeline
+    roomDims?.widthM,
+    roomDims?.lengthM,
+    roomDims?.heightM,
+  ]);
 
   // Run bass simulation engine
   const simulationResults = useMemo(() => {

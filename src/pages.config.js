@@ -1,25 +1,27 @@
-import Projects from './pages/Projects';
 import Calculator from './pages/Calculator';
-import RoomDesigner from './pages/RoomDesigner';
+import CinemaAgent from './pages/CinemaAgent';
+import Home from './pages/Home';
 import PrintableReport from './pages/PrintableReport';
+import Projects from './pages/Projects';
 import RP22Report from './pages/RP22Report';
-import SpeakerDatabase from './pages/SpeakerDatabase';
+import RoomDesigner from './pages/RoomDesigner';
 import SPLCalculator from './pages/SPLCalculator';
 import SPLCalculatorV2 from './pages/SPLCalculatorV2';
-import CinemaAgent from './pages/CinemaAgent';
+import SpeakerDatabase from './pages/SpeakerDatabase';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
-    "Projects": Projects,
     "Calculator": Calculator,
-    "RoomDesigner": RoomDesigner,
+    "CinemaAgent": CinemaAgent,
+    "Home": Home,
     "PrintableReport": PrintableReport,
+    "Projects": Projects,
     "RP22Report": RP22Report,
-    "SpeakerDatabase": SpeakerDatabase,
+    "RoomDesigner": RoomDesigner,
     "SPLCalculator": SPLCalculator,
     "SPLCalculatorV2": SPLCalculatorV2,
-    "CinemaAgent": CinemaAgent,
+    "SpeakerDatabase": SpeakerDatabase,
 }
 
 export const pagesConfig = {

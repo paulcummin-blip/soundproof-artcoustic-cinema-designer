@@ -3678,6 +3678,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         rearSubsCfg={rearSubsCfg}
                         setRearSubsCfg={setRearSubsCfg}
                         subWarnings={subWarnings}
+                        frontSubsLive={frontSubsForRendering}
+                        rearSubsLive={rearSubsForRendering}
                       />
                   </Suspense>
               </CollapsiblePanel>
