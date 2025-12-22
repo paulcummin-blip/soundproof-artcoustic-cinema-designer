@@ -56,6 +56,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewStyleMode]);
 
+  // Position signatures to detect in-place array mutations
+  const frontLiveSig = useMemo(() => {
+    const a = Array.isArray(frontSubsLive) ? frontSubsLive : [];
+    return a.map((s) => {
+      const p = s?.position ?? s;
+      return `${Number(p?.x).toFixed(4)},${Number(p?.y).toFixed(4)},${Number(p?.z ?? 0).toFixed(4)}`;
+    }).join("|");
+  }, [frontSubsLive]);
+
+  const rearLiveSig = useMemo(() => {
+    const a = Array.isArray(rearSubsLive) ? rearSubsLive : [];
+    return a.map((s) => {
+      const p = s?.position ?? s;
+      return `${Number(p?.x).toFixed(4)},${Number(p?.y).toFixed(4)},${Number(p?.z ?? 0).toFixed(4)}`;
+    }).join("|");
+  }, [rearSubsLive]);
+
   // Build subs array from LIVE dragged positions (frontSubsLive + rearSubsLive)
   const subsForSimulation = useMemo(() => {
     const liveFront = Array.isArray(frontSubsLive) ? frontSubsLive : [];
@@ -73,8 +90,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // Only use subs that actually have a position (no silent fallback defaults).
     const toSource = (s, group, idx, cfg) => {
-      const p = s?.position;
-      if (!p || typeof p.x !== "number" || typeof p.y !== "number") return null;
+      const p = s?.position ?? s; // support both {position:{x,y,z}} and {x,y,z}
+      
+      const x = Number(p?.x);
+      const y = Number(p?.y);
+      const z = p?.z;
+
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
 
       const subId = s?.id ?? `${group}-sub-${idx}`;
       const tuning = getTuning(subId, cfg);
@@ -82,9 +104,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return {
         id: subId,
         modelKey: s?.model ?? "SUB2-12",
-        x: p.x,
-        y: p.y,
-        z: typeof p.z === "number" ? p.z : 0.35,
+        x,
+        y,
+        z: Number.isFinite(Number(z)) ? Number(z) : 0.35,
         tuning,
       };
     };
@@ -97,6 +119,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return sources;
   }, [
     // ensure re-run when the live arrays or any positions change
+    frontLiveSig,
+    rearLiveSig,
     frontSubsLive,
     rearSubsLive,
     // also watch config for tuning settings
