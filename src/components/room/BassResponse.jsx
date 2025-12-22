@@ -236,6 +236,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     ).join('|');
     const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
 
+    engineCallCountRef.current += 1;
+
+    const sourcesSigForDebug = (subsForSimulation || [])
+      .map(s => `${s.id}:${s.x.toFixed(3)},${s.y.toFixed(3)},${(s.z ?? 0).toFixed(3)}`)
+      .join(" | ");
+
+    console.log("[BassResponse] computeRoomModesResponse call", engineCallCountRef.current);
+    console.log("[BassResponse] sourcesSig", sourcesSigForDebug);
+
     // Room-only = flat/generic sub response (no product curves)
     // Default to absolute SPL, optional normalize via checkbox
     let result;
@@ -1279,6 +1288,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
                 <div className="text-[10px] font-mono opacity-80 font-semibold text-blue-700">
                   REW Inputs (Live Tracking):
+                </div>
+                <div className="text-[10px] font-mono opacity-80">
+                  <strong>Engine calls:</strong> {engineCallCountRef.current}
+                </div>
+                <div className="text-[10px] font-mono opacity-80 break-all">
+                  <strong>Sources:</strong> {(subsForSimulation || []).map(s => `${s.id}:${s.x.toFixed(3)},${s.y.toFixed(3)},${(s.z ?? 0).toFixed(3)}`).join(" | ")}
                 </div>
                 <div className="text-[10px] font-mono opacity-80">
                   <strong>Sources used:</strong> {activeDebug?.sourceCountUsed || 0}
