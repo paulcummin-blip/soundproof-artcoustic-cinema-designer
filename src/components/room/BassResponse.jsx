@@ -79,6 +79,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [frontLiveSig, rearLiveSig]);
 
   const engineCallCountRef = useRef(0);
+  const [engineCallsUi, setEngineCallsUi] = useState(0);
 
   // Build subs array from LIVE dragged positions (frontSubsLive + rearSubsLive)
   const subsForSimulation = useMemo(() => {
@@ -237,13 +238,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
 
     engineCallCountRef.current += 1;
-
-    const sourcesSigForDebug = (subsForSimulation || [])
-      .map(s => `${s.id}:${s.x.toFixed(3)},${s.y.toFixed(3)},${(s.z ?? 0).toFixed(3)}`)
-      .join(" | ");
-
-    console.log("[BassResponse] computeRoomModesResponse call", engineCallCountRef.current);
-    console.log("[BassResponse] sourcesSig", sourcesSigForDebug);
 
     // Room-only = flat/generic sub response (no product curves)
     // Default to absolute SPL, optional normalize via checkbox
@@ -614,6 +608,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return displayData;
   }, [displayData]);
 
+  // Update engine calls UI only when deps change (not on every render)
+  useEffect(() => {
+    setEngineCallsUi(engineCallCountRef.current);
+  }, [subPositionEpoch, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, rewSmoothing, rewRelativeView, rewView, roomDamping]);
+
   // Compute stable Y-axis domain using 30–80 Hz band intelligence
   // IMPORTANT: ALWAYS return EXACTLY a 40 dB window (no padding).
   const computeStableYDomain = React.useCallback((data) => {
@@ -676,7 +675,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (!displayData || displayData.length === 0) return;
     const domain = computeStableYDomain(displayData);
     if (domain) {
-      setYAxisDomain(domain);
+      // Only update if domain changed by more than 0.1 dB
+      const changed = !yAxisDomain || 
+        Math.abs(domain.min - yAxisDomain.min) > 0.1 || 
+        Math.abs(domain.max - yAxisDomain.max) > 0.1;
+      if (changed) {
+        setYAxisDomain(domain);
+      }
       if (scaleEpoch > 0) setScaleEpoch(0);
     }
   }, [rewStyleMode, displayData, yAxisDomain, scaleEpoch, computeStableYDomain]);
@@ -1290,7 +1295,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   REW Inputs (Live Tracking):
                 </div>
                 <div className="text-[10px] font-mono opacity-80">
-                  <strong>Engine calls:</strong> {engineCallCountRef.current}
+                  <strong>Engine calls:</strong> {engineCallsUi}
                 </div>
                 <div className="text-[10px] font-mono opacity-80 break-all">
                   <strong>Sources:</strong> {(subsForSimulation || []).map(s => `${s.id}:${s.x.toFixed(3)},${s.y.toFixed(3)},${(s.z ?? 0).toFixed(3)}`).join(" | ")}
