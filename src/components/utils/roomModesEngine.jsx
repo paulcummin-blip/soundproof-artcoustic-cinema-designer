@@ -26,6 +26,7 @@ export function computeRoomModesResponse({
   subFloorHeight = 0.0,
   normalizeBandHz = [30, 80],
   normalizeToDb = 0,
+  relativeViewEnabled = false,
   surfaceAbsorption = {
     front: 0.30,
     back: 0.30,
@@ -286,8 +287,9 @@ export function computeRoomModesResponse({
       w = minModalWeight + (1.0 - minModalWeight) * ((f - blendStartHz) / (blendEndHz - blendStartHz));
     }
 
-    const sumRe = sumRe_direct + w * sumRe_modal;
-    const sumIm = sumIm_direct + w * sumIm_modal;
+    const modalScale = 6000;
+    const sumRe = sumRe_direct + w * modalScale * sumRe_modal;
+    const sumIm = sumIm_direct + w * modalScale * sumIm_modal;
 
     // LF debugging: capture magnitudes before calibration in 15-45 Hz band
     if (f >= 15 && f <= 45) {
@@ -438,7 +440,7 @@ export function computeRoomModesResponse({
   // REW-style: use MEDIAN of band for robustness against nulls
   let normAppliedActual = false;
   let normRefDb = 0;
-  if (!absoluteSplMode && normalizeToDb !== null && normalizeToDb !== undefined && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
+  if (!absoluteSplMode && relativeViewEnabled && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
     const [fMin, fMax] = normalizeBandHz;
     const bandValues = freqs
       .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb[i]) ? finalDb[i] : null)
