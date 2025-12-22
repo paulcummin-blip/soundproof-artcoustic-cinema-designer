@@ -97,8 +97,10 @@ export function computeRoomModesResponse({
   // Lowest axial mode (used for sealed-room pressure behaviour)
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
-  // Pressure-region support flag (used by debug only - gain disabled)
+  // Pressure-region support flag (DISABLED for REW parity - causes false LF boost)
   const pressureEnabled = false;
+  const kDbPerOct = 0; // REW mode: no artificial room gain below lowest axial
+  const maxPressureGainDb = 0; // Capped to prevent LF explosion
   
   // SOURCE CALIBRATION (applied upstream, not after summation)
   // REW reference: 1 sub @ 1m in half-space ≈ 90 dB at 50 Hz
@@ -306,19 +308,9 @@ export function computeRoomModesResponse({
     return 20 * Math.log10(mag);
   });
 
-  // PRESSURE REGION SUPPORT (smooth blend with geometry preservation)
-  // Below the first room mode, add frequency-dependent room loading gain
-  // while preserving direct-field geometry sensitivity
-  // DISABLED FOR REW PARITY: REW's Room Simulator does not apply this artificial boost
-  const enablePressureRegionGain = false; // REW parity: OFF
-  const kDbPerOct = 4; // Pressure gain per octave below lowest axial
-  const maxPressureGainDb = 12; // Cap to prevent explosion
-  const blendStartHz = lowestAxial * 0.7;
-  const blendEndHz = lowestAxial * 1.0;
-
-  // PRESSURE REGION SUPPORT: DISABLED (causes false LF wall)
-  // Future: re-enable with proper room-gain model matching REW
-  const pressureRegionDisabled = true;
+  // PRESSURE REGION SUPPORT: FULLY DISABLED (REW parity)
+  // REW's Room Simulator does not apply artificial pressure-zone boost
+  // Kept for future reference only - all gain values set to zero
 
     // Pressure region is now handled inline during modal summation
     // (No post-processing needed - losses already bypassed below lowest axial)
@@ -490,13 +482,30 @@ export function computeRoomModesResponse({
       ? rawDb + sourceCalibrationDb 
       : rawDb;
     
+    // Calculate pressure gain applied (should be 0 in REW mode)
+    const pressureGainDb = pressureEnabled && lowestAxial && fProbe < lowestAxial
+      ? Math.min(maxPressureGainDb, kDbPerOct * Math.log2(lowestAxial / Math.max(5, fProbe)))
+      : 0;
+    
     return {
       freq: fProbe,
       rawDbBeforeCal: rawDb.toFixed(2),
       finalDbAfterCal: finalDb.toFixed(2),
+      pressureGainDb: pressureGainDb.toFixed(2),
       belowLowestAxial: lowestAxial && fProbe < lowestAxial
     };
   });
+  
+  // LF sanity check: 20 Hz should NOT be hotter than 30 Hz in generic sub mode
+  const idx20 = freqs.findIndex(f => Math.abs(f - 20) < 0.6);
+  const idx30 = freqs.findIndex(f => Math.abs(f - 30) < 0.6);
+  let lfSanityCheck = 'N/A';
+  if (idx20 >= 0 && idx30 >= 0 && !subProductCurves) {
+    const spl20 = splDb[idx20];
+    const spl30 = splDb[idx30];
+    const delta = spl20 - spl30;
+    lfSanityCheck = delta > 6 ? `FAIL: 20Hz is ${delta.toFixed(1)}dB above 30Hz (generic sub should roll off)` : 'PASS';
+  }
 
   // Build source/seat signatures for dependency tracking
   const sourceCountUsed = sourcePositions.length;
@@ -570,13 +579,19 @@ export function computeRoomModesResponse({
         probeFrequencies: probeFreqs,
         measurements: lfProbe,
         pressureRegionActive: pressureEnabled,
+        pressureGainSettings: {
+          kDbPerOct: kDbPerOct.toFixed(1),
+          maxGainDb: maxPressureGainDb.toFixed(1),
+          enabled: pressureEnabled
+        },
         minModalWeight: 0.15,
         lowestAxialHz: lowestAxial,
         blendStartHz: lowestAxial ? (lowestAxial * 0.7).toFixed(1) : 'N/A',
         blendEndHz: lowestAxial ? lowestAxial.toFixed(1) : 'N/A',
         sourceCalibrationDb: sourceCalibrationDb.toFixed(2),
         absoluteSplMode,
-        subProductCurvesPresent: !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0)
+        subProductCurvesPresent: !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0),
+        lfSanityCheck
       }
     }
   };

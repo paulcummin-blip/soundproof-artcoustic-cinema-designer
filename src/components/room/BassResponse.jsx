@@ -1295,6 +1295,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                 <div className="text-[10px] font-mono opacity-80">
                   <strong>Lowest axial:</strong> {activeDebug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz
                 </div>
+                {activeDebug?.lfProbe?.lfSanityCheck && (
+                  <div className={`text-[10px] font-mono opacity-80 ${activeDebug.lfProbe.lfSanityCheck.startsWith('FAIL') ? 'text-red-600 font-bold' : 'text-green-600'}`}>
+                    <strong>LF Sanity:</strong> {activeDebug.lfProbe.lfSanityCheck}
+                  </div>
+                )}
               </div>
               {activeDebug ? (
                 <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
@@ -1325,13 +1330,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings })
                   </div>
                   {activeDebug?.lfProbe?.measurements && (
                     <div className="text-[10px] font-mono opacity-80 text-purple-700 mt-1 pt-1 border-t border-purple-200">
-                      <strong>LF Probe (Hz → SPL):</strong><br/>
+                      <strong>LF Probe (Hz → SPL + Pressure Gain):</strong><br/>
                       {activeDebug.lfProbe.measurements.map((m, i) => (
                         <div key={i}>
                           {m.freq} Hz: {m.finalDbAfterCal || m.rawDbBeforeCal || 'N/A'} dB
+                          {m.pressureGainDb && Number(m.pressureGainDb) > 0 && (
+                            <span className="text-orange-600"> (+{m.pressureGainDb} dB pressure)</span>
+                          )}
                           {m.belowLowestAxial && <span className="text-red-600"> (below axial)</span>}
                         </div>
                       ))}
+                      {activeDebug.lfProbe.pressureGainSettings && (
+                        <div className="text-[9px] opacity-70 mt-1">
+                          Pressure: {activeDebug.lfProbe.pressureGainSettings.enabled ? 'ON' : 'OFF'} 
+                          (k={activeDebug.lfProbe.pressureGainSettings.kDbPerOct} dB/oct, 
+                          max={activeDebug.lfProbe.pressureGainSettings.maxGainDb} dB)
+                        </div>
+                      )}
                     </div>
                   )}
                   {activeDebug.lfDebug15_45Hz && (
