@@ -363,11 +363,10 @@ export function computeRoomModesResponse({
     splDb = applySmoothing(freqs, splDb, smoothing);
   }
   
-  // Calibration applied in absoluteSplMode stage only (not per-frequency)
-  let actualNormBand = normalizeBandHz;
-  let normApplied = false;
+  // Track what processing was applied
   const calibrationApplied = rewParityMode;
   const calibrationOffset = sourceCalibrationDb;
+  let actualNormBand = normalizeBandHz;
 
   // Capture post-normalization stats
   const finitePostNorm = splDb.filter(v => isFinite(v));
@@ -425,15 +424,34 @@ export function computeRoomModesResponse({
   const splMinBeforeDb = finiteBeforeCal.length > 0 ? Math.min(...finiteBeforeCal) : 0;
   const splMaxBeforeDb = finiteBeforeCal.length > 0 ? Math.max(...finiteBeforeCal) : 0;
 
-  // Apply absolute SPL calibration if requested
+  // Build FINAL curve pipeline (single source of truth)
+  let finalDb = [...splDb];
+  
+  // Step 1: Apply absolute SPL calibration if requested
   let absoluteSplApplied = false;
   if (absoluteSplMode && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
-    splDb = splDb.map(v => v + calibrationOffset);
+    finalDb = finalDb.map(v => v + calibrationOffset);
     absoluteSplApplied = true;
   }
+  
+  // Step 2: Apply relative normalization if requested (30-80 Hz band)
+  let normAppliedActual = false;
+  let normRefDb = 0;
+  if (!absoluteSplMode && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
+    const [fMin, fMax] = normalizeBandHz;
+    const bandValues = freqs
+      .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb[i]) ? finalDb[i] : null)
+      .filter(v => v !== null);
+    
+    if (bandValues.length >= 10) {
+      normRefDb = bandValues.reduce((a, b) => a + b, 0) / bandValues.length;
+      finalDb = finalDb.map(v => isFinite(v) ? v - normRefDb : v);
+      normAppliedActual = true;
+    }
+  }
 
-  // Compute final SPL stats after calibration
-  const finalFinite = splDb.filter(v => isFinite(v));
+  // Compute final SPL stats after all processing
+  const finalFinite = finalDb.filter(v => isFinite(v));
   const splMinDb = finalFinite.length > 0 ? Math.min(...finalFinite) : 0;
   const splMaxDb = finalFinite.length > 0 ? Math.max(...finalFinite) : 0;
   const splRangeDb = splMaxDb - splMinDb;
@@ -471,26 +489,22 @@ export function computeRoomModesResponse({
   const blendedMagMin = lfDebug.blendedMag15_45.length > 0 ? Math.min(...lfDebug.blendedMag15_45).toFixed(1) : 'N/A';
   const blendedMagMax = lfDebug.blendedMag15_45.length > 0 ? Math.max(...lfDebug.blendedMag15_45).toFixed(1) : 'N/A';
 
-  // LF PROBE: detailed frequency-by-frequency audit for "wall" diagnosis
+  // LF PROBE: detailed frequency-by-frequency audit using FINAL curve
   const probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45];
   const lfProbe = probeFreqs.map(fProbe => {
     const idx = freqs.findIndex(f => Math.abs(f - fProbe) < 0.6);
     if (idx < 0) return { freq: fProbe, error: 'not found' };
     
-    const rawDb = splDb[idx]; // after pressure, before calibration
-    const finalDb = absoluteSplMode && Number.isFinite(sourceCalibrationDb) 
-      ? rawDb + sourceCalibrationDb 
-      : rawDb;
+    const rawDbBeforeCal = splDb[idx]; // Before any calibration
+    const finalDbValue = finalDb[idx]; // After all processing (calibration + normalization)
     
-    // Calculate pressure gain applied (should be 0 in REW mode)
-    const pressureGainDb = pressureEnabled && lowestAxial && fProbe < lowestAxial
-      ? Math.min(maxPressureGainDb, kDbPerOct * Math.log2(lowestAxial / Math.max(5, fProbe)))
-      : 0;
+    // Pressure gain is always 0 (disabled)
+    const pressureGainDb = 0;
     
     return {
       freq: fProbe,
-      rawDbBeforeCal: rawDb.toFixed(2),
-      finalDbAfterCal: finalDb.toFixed(2),
+      rawDbBeforeCal: rawDbBeforeCal.toFixed(2),
+      finalDbAfterCal: finalDbValue.toFixed(2),
       pressureGainDb: pressureGainDb.toFixed(2),
       belowLowestAxial: lowestAxial && fProbe < lowestAxial
     };
@@ -523,7 +537,7 @@ export function computeRoomModesResponse({
 
   return {
     freqs,
-    splDb,
+    splDb: finalDb, // Return FINAL processed curve
     debug: {
       schroederHz,
       modeMarkersHz,
@@ -541,7 +555,8 @@ export function computeRoomModesResponse({
       absoluteMode: absoluteSplMode,
       calibrationApplied,
       normBandHz: actualNormBand,
-      normApplied,
+      normApplied: normAppliedActual,
+      normRefDb: normAppliedActual ? normRefDb.toFixed(2) : 'N/A',
       smoothingApplied,
       nonFiniteRepaired,
       rawRange: rawRange.toFixed(2),
@@ -564,7 +579,7 @@ export function computeRoomModesResponse({
       normalizeToDb: normalizeToDb !== undefined ? normalizeToDb : null,
       productCurveStats,
       directFieldUsesDb0: false,
-      calibrationMode: "Applied in absoluteSplMode stage only",
+      calibrationMode: absoluteSplMode ? "Absolute SPL" : "Relative (normalized)",
       sourceCountUsed,
       sourcePositionsUsed,
       sourceSigUsed,
@@ -578,11 +593,11 @@ export function computeRoomModesResponse({
       lfProbe: {
         probeFrequencies: probeFreqs,
         measurements: lfProbe,
-        pressureRegionActive: pressureEnabled,
+        pressureRegionActive: false,
         pressureGainSettings: {
-          kDbPerOct: kDbPerOct.toFixed(1),
-          maxGainDb: maxPressureGainDb.toFixed(1),
-          enabled: pressureEnabled
+          kDbPerOct: '0.0',
+          maxGainDb: '0.0',
+          enabled: false
         },
         minModalWeight: 0.15,
         lowestAxialHz: lowestAxial,
