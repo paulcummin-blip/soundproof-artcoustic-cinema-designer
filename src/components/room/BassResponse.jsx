@@ -1,4 +1,4 @@
-import React, { useMemo, useEffect, useState } from "react";
+import React, { useMemo, useEffect, useState, useRef } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,6 +77,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const subPositionEpoch = useMemo(() => {
     return `${frontLiveSig}||${rearLiveSig}`;
   }, [frontLiveSig, rearLiveSig]);
+
+  const engineCallCountRef = useRef(0);
 
   // Build subs array from LIVE dragged positions (frontSubsLive + rearSubsLive)
   const subsForSimulation = useMemo(() => {
