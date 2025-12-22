@@ -63,7 +63,7 @@ export default function OverheadChannelSelector({
           disabled={disabled}
         >
           <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-            <SelectValue placeholder="Select overhead model..." />
+            <SelectValue placeholder="Select overhead model..." className="text-2xl font-semibold" style={{ color: "#213428" }} />
           </SelectTrigger>
           <SelectContent className="bg-white border-[#DCDBD6]">
             <SelectItem value="OFF" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: "#213428" }}>
