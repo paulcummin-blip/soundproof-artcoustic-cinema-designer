@@ -2509,8 +2509,8 @@ function SpeakerPlacementImpl(props) {
                       }
                     }}
                   >
-                    <SelectTrigger className="h-8 w-full px-3 text-sm justify-between bg-white border-[#DCDBD6]">
-                      <SelectValue placeholder="Select model" />
+                    <SelectTrigger className="h-10 w-full px-3 justify-between bg-white border-[#DCDBD6]">
+                      <SelectValue placeholder="Select model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={null}>No Subwoofer</SelectItem>
@@ -2531,8 +2531,8 @@ function SpeakerPlacementImpl(props) {
                     }}
                     disabled={!frontSubsCfg?.model}
                   >
-                    <SelectTrigger className="h-8 w-[64px] px-2 text-sm justify-between bg-white border-[#DCDBD6]">
-                      <SelectValue placeholder="0" />
+                    <SelectTrigger className="h-10 w-[90px] px-3 justify-between bg-white border-[#DCDBD6]">
+                      <SelectValue placeholder="0" className="text-2xl font-semibold" style={{ color: "#213428" }} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0">0</SelectItem>
@@ -2565,8 +2565,8 @@ function SpeakerPlacementImpl(props) {
                       }
                     }}
                   >
-                    <SelectTrigger className="h-8 w-full text-sm px-3 bg-white border-[#DCDBD6]">
-                      <SelectValue placeholder="Select model" />
+                    <SelectTrigger className="h-10 w-full px-3 justify-between bg-white border-[#DCDBD6]">
+                      <SelectValue placeholder="Select model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={null}>No Subwoofer</SelectItem>
@@ -2587,8 +2587,8 @@ function SpeakerPlacementImpl(props) {
                     }}
                     disabled={!rearSubsCfg?.model}
                   >
-                    <SelectTrigger className="h-8 w-[64px] px-2 text-sm justify-between bg-white border-[#DCDBD6]">
-                      <SelectValue />
+                    <SelectTrigger className="h-10 w-[90px] px-3 justify-between bg-white border-[#DCDBD6]">
+                      <SelectValue placeholder="0" className="text-2xl font-semibold" style={{ color: "#213428" }} />
                     </SelectTrigger>
                     <SelectContent align="end" className="w-[64px]">
                       <SelectItem value="0">0</SelectItem>
