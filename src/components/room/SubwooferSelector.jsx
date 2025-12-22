@@ -44,8 +44,8 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
             disabled={disabled}
             onValueChange={(val) => commit({ count: Number(val) })}
           >
-            <SelectTrigger className="h-8 w-[90px] bg-white border-[#DCDBD6]">
-              <SelectValue className="text-2xl font-semibold" style={{ color: "#213428" }} />
+            <SelectTrigger className="h-8 w-[90px] bg-white border-[#DCDBD6] text-2xl font-semibold" style={{ color: "#213428" }}>
+              <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {[0,1,2,3,4].map(n => (
@@ -68,8 +68,8 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
                 commit({ items: nextItems });
               }}
             >
-              <SelectTrigger className="h-8 bg-white border-[#DCDBD6]">
-                <SelectValue placeholder="Choose model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
+              <SelectTrigger className="h-8 bg-white border-[#DCDBD6] text-2xl font-semibold" style={{ color: "#213428" }}>
+                <SelectValue placeholder="Choose model" />
               </SelectTrigger>
               <SelectContent>
                 {SUB_MODELS.map(m => (
