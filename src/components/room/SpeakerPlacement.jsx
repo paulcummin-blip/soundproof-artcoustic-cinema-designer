@@ -1934,7 +1934,20 @@ function SpeakerPlacementImpl(props) {
         return userVersion || speaker;
       });
       
-      return speakersShallowEqual(prev, merged) ? prev : merged;
+      // CRITICAL: Only update if speakers actually changed
+      if (speakersShallowEqual(prev, merged)) return prev;
+      
+      // Additional guard: check if positions differ by meaningful amount (>1mm)
+      const hasSignificantChange = merged.some((m, i) => {
+        const p = prev?.[i];
+        if (!p) return true;
+        const dx = Math.abs((m.position?.x ?? 0) - (p.position?.x ?? 0));
+        const dy = Math.abs((m.position?.y ?? 0) - (p.position?.y ?? 0));
+        const dz = Math.abs((m.position?.z ?? 0) - (p.position?.z ?? 0));
+        return dx > 0.001 || dy > 0.001 || dz > 0.001;
+      });
+      
+      return hasSignificantChange ? merged : prev;
     });
 
     lastPresetRef.current = effectivePreset;
