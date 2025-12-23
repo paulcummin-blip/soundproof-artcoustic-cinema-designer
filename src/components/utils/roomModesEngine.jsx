@@ -131,7 +131,7 @@ export function computeRoomModesResponse({
   };
 
   // Build response: complex pressure sum with direct/modal blending
-  let splDb = freqs.map((f) => {
+  let splDb = freqs.map((f, i) => {
     // 1. DIRECT-FIELD COMPLEX SUM (geometry-dependent, no modal filtering)
     let sumRe_direct = 0;
     let sumIm_direct = 0;
@@ -151,7 +151,7 @@ export function computeRoomModesResponse({
       // Apply sub's product response if provided
       let productGainLinear = 1.0;
       if (subProductCurves && subProductCurves[subIdx]) {
-        const curveDb = subProductCurves[subIdx][freqs.indexOf(f)];
+        const curveDb = subProductCurves[subIdx][i];
         if (Number.isFinite(curveDb)) {
           productGainLinear = Math.pow(10, curveDb / 20);
         }
@@ -221,7 +221,7 @@ export function computeRoomModesResponse({
         // Apply sub's product response if provided (frequency-dependent gain)
         let productGainLinear = 1.0;
         if (subProductCurves && subProductCurves[subIdx]) {
-          const curveDb = subProductCurves[subIdx][freqs.indexOf(f)];
+          const curveDb = subProductCurves[subIdx][i];
           if (Number.isFinite(curveDb)) {
             productGainLinear = Math.pow(10, curveDb / 20);
           }
@@ -252,15 +252,22 @@ export function computeRoomModesResponse({
         const weightRe = gainLinear * genericLinear * Math.cos(totalPhase);
         const weightIm = gainLinear * genericLinear * Math.sin(totalPhase);
 
-        // Second-order resonator (complex)
-        // H(f) = 1 / ( (f0^2 - f^2) + j*(f0*f/Q) )
-        const f2 = f * f;
-        const f02 = f0 * f0;
-        const re = (f02 - f2);
-        const im = (f0 * f / Math.max(1e-6, qMode));
-        const denom = (re*re + im*im);
-        const hRe = re / denom;
-        const hIm = -im / denom;
+        // Second-order resonator (dimensionless, REW-style behaviour)
+        // Use normalised form so numbers don't explode/shrink with Hz^2 scaling.
+        // H(f) = 1 / ( (1 - (f/f0)^2) + j*(f/(f0*Q)) )
+        const r = f / Math.max(1e-6, f0);
+        const re = (1 - r * r);
+        const im = (r / Math.max(1e-6, qMode));
+        const denom = (re * re + im * im);
+
+        // Complex H
+        let hRe = re / denom;
+        let hIm = -im / denom;
+
+        // Normalise peak so modes don't "lock" the first axial family unrealistically.
+        // At resonance, |H| ~= Q, so divide by Q to keep peak ~ 1.
+        hRe /= Math.max(1e-6, qMode);
+        hIm /= Math.max(1e-6, qMode);
 
         // Weighted modal contribution: weight * H * coupling
         const cRe = coupling * (weightRe * hRe - weightIm * hIm);
