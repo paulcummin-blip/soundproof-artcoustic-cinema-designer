@@ -597,7 +597,7 @@ export function computeRoomModesResponse({
       smoothing,
       normalizeBandHz,
       normalizeToDb,
-      absoluteSplMode,
+      absoluteSplMode: absoluteSplModeLocal,
       rewParityMode
     });
 
@@ -756,7 +756,7 @@ export function computeRoomModesResponse({
       preNormRange: preNormRange.toFixed(2),
       postNormRange: postNormRange.toFixed(2),
       productCurvesApplied: !!subProductCurves,
-      absoluteSplMode,
+      absoluteSplMode: absoluteSplModeLocal,
       normalizeBandHz: actualNormBand,
       pressureEnabled: false,
       pressureThresholdHz: null,
