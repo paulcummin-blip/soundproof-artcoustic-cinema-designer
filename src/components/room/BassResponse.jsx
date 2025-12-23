@@ -51,6 +51,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [rewCompareView, setRewCompareView] = useState(false); // REW Compare View toggle
   const [seatNudgeTest, setSeatNudgeTest] = useState(false); // Diagnostic seat nudge
 
+  // Sensitivity audit refs (track previous run)
+  const prevSourceSigRef = useRef(null);
+  const prevFinalDbRef = useRef(null);
+  const prevFreqsRef = useRef(null);
+  const prevCouplingRef = useRef(null);
+
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
     if (rewStyleMode && (!rewSmoothing || rewSmoothing === 'none')) {
@@ -200,6 +206,97 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     
     return null;
   }, [seatingPositions, simulationResults.seatResponses]);
+
+  // Helper: compute axial coupling for sensitivity audit
+  const computeAxialCoupling = useCallback((source, seat, roomDims) => {
+    const { widthM, lengthM, heightM } = roomDims;
+    
+    // Width axial (nx=1, ny=0, nz=0)
+    const widthCoupling = 
+      Math.cos(1 * Math.PI * source.x / widthM) * 
+      Math.cos(1 * Math.PI * seat.x / widthM);
+    
+    // Length axial (nx=0, ny=1, nz=0)
+    const lengthCoupling = 
+      Math.cos(1 * Math.PI * source.y / lengthM) * 
+      Math.cos(1 * Math.PI * seat.y / lengthM);
+    
+    // Height axial (nx=0, ny=0, nz=1)
+    const heightCoupling = 
+      Math.cos(1 * Math.PI * source.z / heightM) * 
+      Math.cos(1 * Math.PI * seat.z / heightM);
+    
+    return { W: widthCoupling, L: lengthCoupling, H: heightCoupling };
+  }, []);
+
+  // Audit curve (no smoothing, no normalization) for sensitivity testing
+  const rewModesDataAudit = useMemo(() => {
+    if (!rewStyleMode || !rewCompareView) return null;
+
+    const w = roomDims?.widthM;
+    const l = roomDims?.lengthM;
+    const h = roomDims?.heightM;
+    if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h) && w > 0 && l > 0 && h > 0)) {
+      return null;
+    }
+
+    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+    if (!seat) return null;
+
+    let seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && seatNudgeTest) {
+      seatPos = { ...seatPos, x: seatPos.x - 0.30 };
+    }
+
+    const sourcePositions = subsForSimulation
+      .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
+      .map(s => ({
+        x: s.x,
+        y: s.y,
+        z: 0.0,
+        tuning: s.tuning || { gainDb: 0, delayMs: 0, polarity: 'normal' }
+      }));
+
+    if (!sourcePositions.length) return null;
+
+    try {
+      const result = computeRoomModesResponse({
+        roomDims: { widthM: w, lengthM: l, heightM: h },
+        sourcePositions,
+        seatPosition: seatPos,
+        fMin: 15,
+        fMax: 200,
+        pointsPerOct: 24,
+        modeLimitHz: 200,
+        q: roomDamping,
+        includeAxial: true,
+        includeTangential: true,
+        includeOblique: true,
+        rewParityMode: true,
+        smoothing: 'none', // NO SMOOTHING for audit
+        subFloorHeight: 0.0,
+        normalizeBandHz: null, // NO NORMALIZATION for audit
+        normalizeToDb: null,
+        relativeViewEnabled: false,
+        surfaceAbsorption: {
+          front: 0.30, back: 0.30, left: 0.30,
+          right: 0.30, ceiling: 0.30, floor: 0.30,
+        },
+        dampingScalar: Math.max(0.5, roomDamping / 20),
+        leakage: 0.05,
+        subProductCurves: null,
+        absoluteSplMode: false
+      });
+
+      return {
+        freqs: result.freqs,
+        splDb: result.splDb,
+        debug: result.debug
+      };
+    } catch (e) {
+      return null;
+    }
+  }, [rewStyleMode, rewCompareView, roomDims, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, seatNudgeTest, computeRoomModesResponse]);
 
   // REW-style room-only curve (modal response with flat/generic sub)
   const rewModesData = useMemo(() => {
@@ -672,6 +769,95 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   useEffect(() => {
     setEngineCallsUi(engineCallCountRef.current);
   }, [subPositionEpoch, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, rewSmoothing, rewRelativeView, rewView, roomDamping]);
+
+  // Sensitivity audit: compute deltas when source position changes
+  const sensitivityAudit = useMemo(() => {
+    if (!rewCompareView || !rewModesDataAudit || !subsForSimulation.length) return null;
+
+    const currentSourceSig = subsForSimulation.map(s => 
+      `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${(s.z ?? 0).toFixed(2)}`
+    ).join('|');
+
+    const currentFinalDb = rewModesDataAudit.splDb;
+    const currentFreqs = rewModesDataAudit.freqs;
+
+    // Compute axial coupling for first sub
+    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+    if (!seat) return null;
+
+    let seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && seatNudgeTest) {
+      seatPos = { ...seatPos, x: seatPos.x - 0.30 };
+    }
+
+    const firstSub = subsForSimulation[0];
+    const currentCoupling = computeAxialCoupling(
+      { x: firstSub.x, y: firstSub.y, z: firstSub.z ?? 0.0 },
+      seatPos,
+      roomDims
+    );
+
+    // Check if source changed
+    const sourceChanged = prevSourceSigRef.current !== null && 
+                          prevSourceSigRef.current !== currentSourceSig;
+
+    let probeDeltas = null;
+    let couplingDeltas = null;
+    let maxDelta = 0;
+    let avgDelta = 0;
+
+    if (sourceChanged && prevFinalDbRef.current && prevFreqsRef.current) {
+      const probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45];
+      probeDeltas = [];
+
+      for (const fProbe of probeFreqs) {
+        const currIdx = currentFreqs.findIndex(f => Math.abs(f - fProbe) < 0.6);
+        const prevIdx = prevFreqsRef.current.findIndex(f => Math.abs(f - fProbe) < 0.6);
+
+        if (currIdx >= 0 && prevIdx >= 0) {
+          const delta = currentFinalDb[currIdx] - prevFinalDbRef.current[prevIdx];
+          probeDeltas.push({ freq: fProbe, delta });
+        }
+      }
+
+      if (probeDeltas.length > 0) {
+        const absDeltasFinite = probeDeltas
+          .map(p => p.delta)
+          .filter(d => Number.isFinite(d))
+          .map(d => Math.abs(d));
+        
+        maxDelta = absDeltasFinite.length > 0 ? Math.max(...absDeltasFinite) : 0;
+        avgDelta = absDeltasFinite.length > 0 
+          ? absDeltasFinite.reduce((a, b) => a + b, 0) / absDeltasFinite.length 
+          : 0;
+      }
+
+      if (prevCouplingRef.current) {
+        couplingDeltas = {
+          W: currentCoupling.W - prevCouplingRef.current.W,
+          L: currentCoupling.L - prevCouplingRef.current.L,
+          H: currentCoupling.H - prevCouplingRef.current.H
+        };
+      }
+    }
+
+    // Store current values for next comparison
+    prevSourceSigRef.current = currentSourceSig;
+    prevFinalDbRef.current = currentFinalDb;
+    prevFreqsRef.current = currentFreqs;
+    prevCouplingRef.current = currentCoupling;
+
+    return {
+      sourceChanged,
+      currentSourceSig,
+      probeDeltas,
+      couplingDeltas,
+      currentCoupling,
+      maxDelta,
+      avgDelta,
+      verdict: maxDelta < 0.5 ? 'NOT RESPONDING (likely stale data or structural bug)' : 'RESPONDING (engine reacts to position)'
+    };
+  }, [rewCompareView, rewModesDataAudit, subsForSimulation, seatingPositions, roomDims, seatNudgeTest, computeAxialCoupling]);
 
   // Compute stable Y-axis domain using 30–80 Hz band intelligence
   // IMPORTANT: ALWAYS return EXACTLY a 40 dB window (no padding).
@@ -1414,6 +1600,54 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
           );
         })()}
+
+        {/* Sensitivity Audit (only when REW Compare View is ON) */}
+        {rewCompareView && sensitivityAudit && (
+          <div className="text-xs text-[#3E4349] mb-2 bg-yellow-50 p-2 rounded border border-yellow-400">
+            <div className="font-semibold mb-1 text-yellow-800">Sensitivity Audit (last move)</div>
+            <div className="text-[9px] space-y-0.5 font-mono">
+              <div className="mb-1"><strong>Audit curve:</strong> no smoothing, no normalisation</div>
+              <div><strong>SourceSig changed:</strong> {sensitivityAudit.sourceChanged ? 'YES' : 'NO (first run)'}</div>
+              
+              {sensitivityAudit.sourceChanged && sensitivityAudit.probeDeltas && (
+                <>
+                  <div className="mt-2 font-semibold">Probe ΔdB (current - previous):</div>
+                  {sensitivityAudit.probeDeltas.map((p, i) => (
+                    <div key={i}>
+                      {p.freq} Hz: {p.delta >= 0 ? '+' : ''}{p.delta.toFixed(2)} dB
+                    </div>
+                  ))}
+                  <div className="mt-1">
+                    <strong>Max |Δ|:</strong> {sensitivityAudit.maxDelta.toFixed(2)} dB
+                  </div>
+                  <div>
+                    <strong>Avg |Δ|:</strong> {sensitivityAudit.avgDelta.toFixed(2)} dB
+                  </div>
+                </>
+              )}
+
+              <div className="mt-2 font-semibold">Modal Coupling (axial, n=1):</div>
+              <div>W: {sensitivityAudit.currentCoupling.W.toFixed(3)}</div>
+              <div>L: {sensitivityAudit.currentCoupling.L.toFixed(3)}</div>
+              <div>H: {sensitivityAudit.currentCoupling.H.toFixed(3)}</div>
+
+              {sensitivityAudit.sourceChanged && sensitivityAudit.couplingDeltas && (
+                <>
+                  <div className="mt-1 font-semibold">Coupling Δ:</div>
+                  <div>W Δ: {sensitivityAudit.couplingDeltas.W >= 0 ? '+' : ''}{sensitivityAudit.couplingDeltas.W.toFixed(3)}</div>
+                  <div>L Δ: {sensitivityAudit.couplingDeltas.L >= 0 ? '+' : ''}{sensitivityAudit.couplingDeltas.L.toFixed(3)}</div>
+                  <div>H Δ: {sensitivityAudit.couplingDeltas.H >= 0 ? '+' : ''}{sensitivityAudit.couplingDeltas.H.toFixed(3)}</div>
+                </>
+              )}
+
+              {sensitivityAudit.sourceChanged && (
+                <div className={`mt-2 font-semibold ${sensitivityAudit.verdict.includes('NOT RESPONDING') ? 'text-red-600' : 'text-green-600'}`}>
+                  Sensitivity verdict: {sensitivityAudit.verdict}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* REW debug banner (only when REW is ON) */}
         {rewStyleMode && (rewModesData?.debug?.error || rewModesData?.debug?.flatNote) && (
