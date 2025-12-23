@@ -239,23 +239,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     engineCallCountRef.current += 1;
 
-    // [BASS ENGINE INPUT CHECK] - Room-only path
-    console.log("[BASS ENGINE INPUT CHECK - Room-only]", {
-      roomDims,
-      roomDimsKeys: Object.keys(roomDims || {}),
-      widthM: roomDims?.widthM,
-      lengthM: roomDims?.lengthM,
-      heightM: roomDims?.heightM,
-      rawFromAppState: roomDims,
-      w, l, h,
-      seatPosition: seatPos,
-      sourcePositionsLength: sourcePositions?.length
-    });
-    if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
-      console.warn("[BASS ENGINE INPUT FAIL] roomDims missing — bass sim will early-return", { 
-        roomDims, 
-        rawSource: roomDims 
+    // [BASS ENGINE INPUT CHECK] - Room-only path (only if debug enabled)
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_INPUT_DEBUG) {
+      console.log("[BASS ENGINE INPUT CHECK - Room-only]", {
+        roomDims,
+        roomDimsKeys: Object.keys(roomDims || {}),
+        widthM: roomDims?.widthM,
+        lengthM: roomDims?.lengthM,
+        heightM: roomDims?.heightM,
+        rawFromAppState: roomDims,
+        w, l, h,
+        seatPosition: seatPos,
+        sourcePositionsLength: sourcePositions?.length
       });
+      if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
+        console.warn("[BASS ENGINE INPUT FAIL] roomDims missing — bass sim will early-return", { 
+          roomDims, 
+          rawSource: roomDims 
+        });
+      }
     }
 
     // Room-only = flat/generic sub response (no product curves)
@@ -473,23 +475,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       };
     }
 
-    // [BASS ENGINE INPUT CHECK] - Room + Product path
-    console.log("[BASS ENGINE INPUT CHECK - Room+Product]", {
-      roomDims,
-      roomDimsKeys: Object.keys(roomDims || {}),
-      widthM: roomDims?.widthM,
-      lengthM: roomDims?.lengthM,
-      heightM: roomDims?.heightM,
-      rawFromAppState: roomDims,
-      w, l, h,
-      seatPosition: seatPos,
-      sourcePositionsLength: sourcePositions?.length
-    });
-    if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
-      console.warn("[BASS ENGINE INPUT FAIL] roomDims missing — bass sim will early-return", { 
-        roomDims, 
-        rawSource: roomDims 
+    // [BASS ENGINE INPUT CHECK] - Room + Product path (only if debug enabled)
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_INPUT_DEBUG) {
+      console.log("[BASS ENGINE INPUT CHECK - Room+Product]", {
+        roomDims,
+        roomDimsKeys: Object.keys(roomDims || {}),
+        widthM: roomDims?.widthM,
+        lengthM: roomDims?.lengthM,
+        heightM: roomDims?.heightM,
+        rawFromAppState: roomDims,
+        w, l, h,
+        seatPosition: seatPos,
+        sourcePositionsLength: sourcePositions?.length
       });
+      if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
+        console.warn("[BASS ENGINE INPUT FAIL] roomDims missing — bass sim will early-return", { 
+          roomDims, 
+          rawSource: roomDims 
+        });
+      }
     }
 
     // Run engine with product curves applied per-sub

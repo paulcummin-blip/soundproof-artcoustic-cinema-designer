@@ -265,27 +265,38 @@ function useProjectLoader(
     //
     // 1) ROOM DIMS (single source of truth)
     //
-    if (appState?.setRoomDims) {
+    if (appState?.setRoomDims && appState?.roomDims) {
+      let nextWidthM, nextLengthM, nextHeightM;
+      
       if (p.roomDims) {
         try {
           const parsed = JSON.parse(p.roomDims);
-          appState.setRoomDims({
-            widthM: Number(parsed?.widthM) || Number(p?.room_width) || 4.5,
-            lengthM: Number(parsed?.lengthM) || Number(p?.room_length) || 6.0,
-            heightM: Number(parsed?.heightM) || Number(p?.room_height) || 2.4,
-          });
+          // Map legacy width/length/height to widthM/lengthM/heightM if needed
+          nextWidthM = Number(parsed?.widthM ?? parsed?.width) || Number(p?.room_width) || 4.5;
+          nextLengthM = Number(parsed?.lengthM ?? parsed?.length) || Number(p?.room_length) || 6.0;
+          nextHeightM = Number(parsed?.heightM ?? parsed?.height) || Number(p?.room_height) || 2.4;
         } catch {
-          appState.setRoomDims({
-            widthM: Number(p?.room_width) || 4.5,
-            lengthM: Number(p?.room_length) || 6.0,
-            heightM: Number(p?.room_height) || 2.4,
-          });
+          nextWidthM = Number(p?.room_width) || 4.5;
+          nextLengthM = Number(p?.room_length) || 6.0;
+          nextHeightM = Number(p?.room_height) || 2.4;
         }
       } else {
+        nextWidthM = Number(p?.room_width) || 4.5;
+        nextLengthM = Number(p?.room_length) || 6.0;
+        nextHeightM = Number(p?.room_height) || 2.4;
+      }
+      
+      // Only update if any dimension differs by >= 0.001m (1mm)
+      const current = appState.roomDims;
+      const widthChanged = Math.abs((current?.widthM ?? 0) - nextWidthM) >= 0.001;
+      const lengthChanged = Math.abs((current?.lengthM ?? 0) - nextLengthM) >= 0.001;
+      const heightChanged = Math.abs((current?.heightM ?? 0) - nextHeightM) >= 0.001;
+      
+      if (widthChanged || lengthChanged || heightChanged) {
         appState.setRoomDims({
-          widthM: Number(p?.room_width) || 4.5,
-          lengthM: Number(p?.room_length) || 6.0,
-          heightM: Number(p?.room_height) || 2.4,
+          widthM: nextWidthM,
+          lengthM: nextLengthM,
+          heightM: nextHeightM,
         });
       }
     }

@@ -164,15 +164,30 @@ function useDesignerState() {
   });
 
   const setRoomWidthM = useCallback((v) => {
-    setRoomDims(d => ({ ...d, widthM: Number(v) }));
+    const newVal = Number(v);
+    if (!Number.isFinite(newVal)) return;
+    setRoomDims(d => {
+      if (Math.abs((d?.widthM ?? 0) - newVal) < 0.001) return d;
+      return { ...d, widthM: newVal };
+    });
   }, []);
   
   const setRoomLengthM = useCallback((v) => {
-    setRoomDims(d => ({ ...d, lengthM: Number(v) }));
+    const newVal = Number(v);
+    if (!Number.isFinite(newVal)) return;
+    setRoomDims(d => {
+      if (Math.abs((d?.lengthM ?? 0) - newVal) < 0.001) return d;
+      return { ...d, lengthM: newVal };
+    });
   }, []);
   
   const setRoomHeightM = useCallback((v) => {
-    setRoomDims(d => ({ ...d, heightM: Number(v) }));
+    const newVal = Number(v);
+    if (!Number.isFinite(newVal)) return;
+    setRoomDims(d => {
+      if (Math.abs((d?.heightM ?? 0) - newVal) < 0.001) return d;
+      return { ...d, heightM: newVal };
+    });
   }, []);
 
   const [dimensions, setDimensions] = useState({}); 
