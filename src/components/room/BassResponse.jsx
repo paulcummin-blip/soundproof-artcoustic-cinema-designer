@@ -1714,6 +1714,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             {rewModesData?.debug?.message && (
               <div className="text-[11px] font-mono opacity-80">Message: {rewModesData.debug.message}</div>
             )}
+            {rewModesData?.debug?.stack && (
+              <div className="text-[11px] font-mono opacity-80 text-red-600">
+                Stack: {rewModesData.debug.stack.split('\n')[0]}
+              </div>
+            )}
           </div>
         )}
 

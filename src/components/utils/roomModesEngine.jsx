@@ -40,6 +40,7 @@ export function computeRoomModesResponse({
   subProductCurves = null,
   absoluteSplMode = false,
 }) {
+  try {
   // Validate inputs
   if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
     return { freqs: [], splDb: [], debug: { schroederHz: 0, modeMarkersHz: [], modeCount: 0 } };
@@ -449,17 +450,19 @@ export function computeRoomModesResponse({
   const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;
   const rawRange = rawMax - rawMin;
 
-  // Clamp non-finite values before smoothing
+  // Clamp non-finite values before smoothing (non-mutating)
   let nonFiniteRepaired = 0;
   let lastGoodValue = 0;
-  for (let i = 0; i < splDb.length; i++) {
-    if (!isFinite(splDb[i])) {
-      splDb[i] = lastGoodValue;
+  const repairedSplDb = splDb.map(v => {
+    if (!isFinite(v)) {
       nonFiniteRepaired++;
+      return lastGoodValue;
     } else {
-      lastGoodValue = splDb[i];
+      lastGoodValue = v;
+      return v;
     }
-  }
+  });
+  splDb = repairedSplDb;
 
   // Capture pre-normalization stats (after repair, before smoothing/norm)
   const finitePreNorm = splDb.filter(v => isFinite(v));
@@ -897,6 +900,19 @@ export function computeRoomModesResponse({
   }
 
   return baseReturn;
+
+  } catch (e) {
+    // Safe error return with stack trace for debugging
+    return {
+      freqs: [],
+      splDb: [],
+      debug: {
+        error: "computeRoomModesResponse failed",
+        message: String(e?.message || e),
+        stack: String(e?.stack || "")
+      }
+    };
+  }
 }
 
 /**
