@@ -61,6 +61,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const prevFreqsRef = useRef(null);
   const prevCouplingRef = useRef(null);
 
+  // REW failure cache (prevent same-input errors from looping)
+  const lastRewFailSigRef = useRef(null);
+  const lastRewFailResultRef = useRef(null);
+
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
     if (rewStyleMode && (!rewSmoothing || rewSmoothing === 'none')) {
@@ -257,6 +261,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     if (!sourcePositions.length) return null;
 
+    // Build signature for failure caching
+    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatPos.x.toFixed(2)},${seatPos.y.toFixed(2)},${seatPos.z.toFixed(2)}|subs=${sourcePositions.map(s => `${s.x.toFixed(2)},${s.y.toFixed(2)},${s.z.toFixed(2)},g${(s.tuning?.gainDb||0).toFixed(1)},d${(s.tuning?.delayMs||0).toFixed(1)},p${s.tuning?.polarity||'normal'}`).join('|')}|damp=${roomDamping}`;
+
+    // Check failure cache
+    if (lastRewFailSigRef.current === sig) {
+      return lastRewFailResultRef.current || null;
+    }
+
     try {
       const result = computeRoomModesResponse({
         roomDims: { widthM: w, lengthM: l, heightM: h },
@@ -286,15 +298,31 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         absoluteSplMode: false
       });
 
+      // Clear failure cache on success
+      lastRewFailSigRef.current = null;
+      lastRewFailResultRef.current = null;
+
       return {
         freqs: result.freqs,
         splDb: result.splDb,
         debug: result.debug
       };
     } catch (e) {
-      return null;
+      // Cache this failure
+      const failResult = {
+        freqs: [],
+        splDb: [],
+        debug: {
+          error: "computeRoomModesResponse failed (audit)",
+          message: String(e?.message || e),
+          sig
+        }
+      };
+      lastRewFailSigRef.current = sig;
+      lastRewFailResultRef.current = failResult;
+      return failResult;
     }
-  }, [rewStyleMode, rewCompareView, roomDims, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, seatNudgeTest, computeRoomModesResponse]);
+  }, [rewStyleMode, rewCompareView, roomDims, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, seatNudgeTest]);
 
   // REW-style room-only curve (modal response with flat/generic sub)
   const rewModesData = useMemo(() => {
@@ -347,6 +375,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${s.z.toFixed(2)}_g${(s.tuning?.gainDb||0).toFixed(1)}_d${(s.tuning?.delayMs||0).toFixed(1)}_p${s.tuning?.polarity||'normal'}`
     ).join('|');
     const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
+
+    // Build signature for failure caching
+    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${rewSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}`;
+
+    // Check failure cache
+    if (lastRewFailSigRef.current === sig) {
+      return lastRewFailResultRef.current || { data: [], debug: { error: "computeRoomModesResponse failed (cached)" } };
+    }
 
     engineCallCountRef.current += 1;
 
@@ -420,6 +456,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (finiteValues.length === 0) {
       return { data: [], debug: { ...result.debug, error: "No finite values" } };
     }
+
+    // Clear failure cache on success
+    lastRewFailSigRef.current = null;
+    lastRewFailResultRef.current = null;
 
     return {
       data: result.freqs.map((frequency, i) => ({
@@ -525,6 +565,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${s.z.toFixed(2)}_g${(s.tuning?.gainDb||0).toFixed(1)}_d${(s.tuning?.delayMs||0).toFixed(1)}_p${s.tuning?.polarity||'normal'}`
     ).join('|');
     const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
+
+    // Build signature for failure caching
+    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${rewSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}|view=product`;
+
+    // Check failure cache
+    if (lastRewFailSigRef.current === sig) {
+      return lastRewFailResultRef.current || { data: [], debug: { error: "computeRoomModesResponse failed (cached)" } };
+    }
 
     // Generate frequency axis once (must match engine's axis)
     const freqs = [];
@@ -657,6 +705,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return { data: [], debug: { ...result.debug, error: "No finite values" } };
     }
 
+    // Clear failure cache on success
+    lastRewFailSigRef.current = null;
+    lastRewFailResultRef.current = null;
+
     const modelKeys = subsForSimulation.map(s => s?.modelKey).filter(Boolean);
     const uniqueKeys = Array.from(new Set(modelKeys));
 
@@ -694,7 +746,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       freqs: result.freqs,
       splDb: result.splDb
     };
-  }, [rewStyleMode, rewView, roomDims, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewModesData]);
+  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView]);
 
   // Helper: apply REW-style smoothing
   function applyRewSmoothing(freqs, splDb, smoothing) {
