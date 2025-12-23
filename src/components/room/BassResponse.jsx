@@ -832,9 +832,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       if (prevCouplingRef.current) {
         couplingDeltas = {
-          W: currentCoupling.W - prevCouplingRef.current.W,
-          L: currentCoupling.L - prevCouplingRef.current.L,
-          H: currentCoupling.H - prevCouplingRef.current.H
+          src: currentCoupling.src - prevCouplingRef.current.src,
+          rcv: currentCoupling.rcv - prevCouplingRef.current.rcv,
+          total: currentCoupling.total - prevCouplingRef.current.total
         };
       }
     }
@@ -1624,17 +1624,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </>
               )}
 
-              <div className="mt-2 font-semibold">Modal Coupling (axial, n=1):</div>
-              <div>W: {sensitivityAudit.currentCoupling.W.toFixed(3)}</div>
-              <div>L: {sensitivityAudit.currentCoupling.L.toFixed(3)}</div>
-              <div>H: {sensitivityAudit.currentCoupling.H.toFixed(3)}</div>
+              <div className="mt-2 font-semibold">Modal Coupling (axial, n=1, first sub):</div>
+              <div>Source term: {fmtFixed(sensitivityAudit?.currentCoupling?.src, 3)}</div>
+              <div>Receiver term: {fmtFixed(sensitivityAudit?.currentCoupling?.rcv, 3)}</div>
+              <div>Total: {fmtFixed(sensitivityAudit?.currentCoupling?.total, 3)}</div>
 
               {sensitivityAudit.sourceChanged && sensitivityAudit.couplingDeltas && (
                 <>
                   <div className="mt-1 font-semibold">Coupling Δ:</div>
-                  <div>W Δ: {sensitivityAudit.couplingDeltas.W >= 0 ? '+' : ''}{sensitivityAudit.couplingDeltas.W.toFixed(3)}</div>
-                  <div>L Δ: {sensitivityAudit.couplingDeltas.L >= 0 ? '+' : ''}{sensitivityAudit.couplingDeltas.L.toFixed(3)}</div>
-                  <div>H Δ: {sensitivityAudit.couplingDeltas.H >= 0 ? '+' : ''}{sensitivityAudit.couplingDeltas.H.toFixed(3)}</div>
+                  <div>Source Δ: {fmtFixed(sensitivityAudit?.couplingDeltas?.src, 3, '0.000') >= 0 ? '+' : ''}{fmtFixed(sensitivityAudit?.couplingDeltas?.src, 3)}</div>
+                  <div>Receiver Δ: {fmtFixed(sensitivityAudit?.couplingDeltas?.rcv, 3, '0.000') >= 0 ? '+' : ''}{fmtFixed(sensitivityAudit?.couplingDeltas?.rcv, 3)}</div>
+                  <div>Total Δ: {fmtFixed(sensitivityAudit?.couplingDeltas?.total, 3, '0.000') >= 0 ? '+' : ''}{fmtFixed(sensitivityAudit?.couplingDeltas?.total, 3)}</div>
                 </>
               )}
 
