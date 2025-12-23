@@ -48,6 +48,19 @@ export function computeRoomModesResponse({
   if (!seatPosition || typeof seatPosition.x !== 'number' || typeof seatPosition.y !== 'number') {
     return { freqs: [], splDb: [], debug: { schroederHz: 0, modeMarkersHz: [], modeCount: 0 } };
   }
+
+  // DEBUG (off by default)
+  // To enable in preview: run in browser console once: globalThis.__B44_BASS_DEBUG = true
+  const __debugBass = !!globalThis.__B44_BASS_DEBUG;
+
+  // Probe frequencies we care about
+  const __probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45];
+
+  // Helper: treat 0.5 Hz step as exact bin lookup
+  const __isProbeFreq = (f) => __probeFreqs.includes(Math.round(f));
+
+  // Collected probe rows (pre-smoothing + post-smoothing + final)
+  const __probeRows = __debugBass ? [] : null;
   
   // REW parity mode forces 3D modes ON
   if (rewParityMode) {
@@ -286,6 +299,32 @@ export function computeRoomModesResponse({
     const sumRe = (1 - w) * sumRe_direct + w * modalScale * sumRe_modal;
     const sumIm = (1 - w) * sumIm_direct + w * modalScale * sumIm_modal;
 
+    // DEBUG: capture pre-smoothing component magnitudes for probe bins only
+    if (__debugBass && __isProbeFreq(f)) {
+      const directMag = Math.sqrt(sumRe_direct * sumRe_direct + sumIm_direct * sumIm_direct);
+      const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
+      const scaledModalMag = Math.sqrt(
+        (modalScale * sumRe_modal) * (modalScale * sumRe_modal) +
+        (modalScale * sumIm_modal) * (modalScale * sumIm_modal)
+      );
+      const blendedMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+
+      const toDb = (x) => 20 * Math.log10(Math.max(Number.EPSILON, x));
+
+      __probeRows.push({
+        fProbe: f,
+        idx: i,
+        binHz: Number(freqs[i].toFixed(2)),
+        w: Number.isFinite(w) ? Number(w.toFixed(3)) : w,
+        directMagDb_pre: Number(toDb(directMag).toFixed(2)),
+        modalMagDb_pre: Number(toDb(modalMag).toFixed(2)),
+        scaledModalMagDb_pre: Number(toDb(scaledModalMag).toFixed(2)),
+        blendedMagDb_pre: Number(toDb(blendedMag).toFixed(2)),
+        splDb_postSmooth: null,
+        finalDb: null,
+      });
+    }
+
     // LF debugging: capture magnitudes before calibration in 15-45 Hz band
     if (f >= 15 && f <= 45) {
       const directMag = Math.sqrt(sumRe_direct * sumRe_direct + sumIm_direct * sumIm_direct);
@@ -358,6 +397,16 @@ export function computeRoomModesResponse({
   const smoothingApplied = smoothing !== 'none' ? smoothing : 'none';
   if (smoothing !== 'none') {
     splDb = applySmoothing(freqs, splDb, smoothing);
+  }
+
+  // DEBUG: record post-smoothing splDb at probe bins
+  if (__debugBass && __probeRows && __probeRows.length) {
+    for (const row of __probeRows) {
+      const i = row.idx;
+      if (i >= 0 && i < splDb.length) {
+        row.splDb_postSmooth = Number.isFinite(splDb[i]) ? Number(splDb[i].toFixed(2)) : splDb[i];
+      }
+    }
   }
   
   // Track what processing was applied
@@ -449,6 +498,38 @@ export function computeRoomModesResponse({
       finalDb = finalDb.map(v => (isFinite(v) ? (v - normRefDb + targetDb) : v));
       normAppliedActual = true;
     }
+  }
+
+  // DEBUG: record finalDb + print a single forensic table
+  if (__debugBass && __probeRows && __probeRows.length) {
+    for (const row of __probeRows) {
+      const i = row.idx;
+      if (i >= 0 && i < finalDb.length) {
+        row.finalDb = Number.isFinite(finalDb[i]) ? Number(finalDb[i].toFixed(2)) : finalDb[i];
+      }
+    }
+
+    const lowest = Number.isFinite(lowestAxial) ? Number(lowestAxial.toFixed(2)) : lowestAxial;
+    const blendStart = Number.isFinite(lowestAxial) ? Number((lowestAxial * 0.7).toFixed(2)) : null;
+    const blendEnd = Number.isFinite(lowestAxial) ? Number(lowestAxial.toFixed(2)) : null;
+
+    console.log("B44_BASS_DEBUG_RUN", {
+      roomDims,
+      seatPosition,
+      sourceCount: sourcePositions?.length || 0,
+      lowestAxialHz: lowest,
+      blendStartHz: blendStart,
+      blendEndHz: blendEnd,
+      smoothing,
+      normalizeBandHz,
+      normalizeToDb,
+      absoluteSplMode,
+      rewParityMode
+    });
+
+    // Sort by frequency, print as table
+    const rows = [...__probeRows].sort((a, b) => a.binHz - b.binHz);
+    console.table(rows);
   }
 
   // Compute final SPL stats after all processing
