@@ -2370,7 +2370,7 @@ function SpeakerPlacementImpl(props) {
         />
       </CollapsiblePanel>
 
-      <CollapsiblePanel title="Surround Channels" icon={<Speaker className="w-5 h-5 text-[#625143]" />} defaultOpen={false}>
+      <CollapsiblePanel title="Surround Channels" defaultOpen={false}>
         {!isNineBed && is7xBed && ( 
           <div className="mb-4 p-3 rounded-lg border border-[#E6E4DD] bg-[#F8F8F7]">
             <div className="flex items-center justify-between">
