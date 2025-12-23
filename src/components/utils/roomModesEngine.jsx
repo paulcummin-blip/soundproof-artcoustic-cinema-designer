@@ -450,19 +450,22 @@ export function computeRoomModesResponse({
   const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;
   const rawRange = rawMax - rawMin;
 
-  // Clamp non-finite values before smoothing (non-mutating)
+  // Clamp non-finite values before smoothing (IMMUTABLE - do not mutate in place)
   let nonFiniteRepaired = 0;
   let lastGoodValue = 0;
-  const repairedSplDb = splDb.map(v => {
+
+  const repaired = [];
+  for (let i = 0; i < splDb.length; i++) {
+    const v = splDb[i];
     if (!isFinite(v)) {
-      nonFiniteRepaired++;
-      return lastGoodValue;
+      repaired.push(lastGoodValue);
+      nonFiniteRepaired += 1;
     } else {
+      repaired.push(v);
       lastGoodValue = v;
-      return v;
     }
-  });
-  splDb = repairedSplDb;
+  }
+  splDb = repaired;
 
   // Capture pre-normalization stats (after repair, before smoothing/norm)
   const finitePreNorm = splDb.filter(v => isFinite(v));
