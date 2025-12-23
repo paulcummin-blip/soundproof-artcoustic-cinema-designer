@@ -532,6 +532,42 @@ export function computeRoomModesResponse({
     console.table(rows);
   }
 
+  // Build lfProbeRaw from __probeRows (for variation testing)
+  let lfProbeRaw = null;
+  if (__debugBass && __probeRows && __probeRows.length) {
+    lfProbeRaw = [...__probeRows]
+      .sort((a, b) => a.fProbe - b.fProbe)
+      .map(row => ({
+        freq: row.fProbe,
+        blendedMagDb_pre: row.blendedMagDb_pre,
+        w: row.w,
+        directMagDb_pre: row.directMagDb_pre,
+        scaledModalMagDb_pre: row.scaledModalMagDb_pre
+      }));
+  }
+
+  // Compute seat node check (for diagnosing mode suppression)
+  let seatNodeCheck = null;
+  if (__debugBass) {
+    const tol = 0.01; // 1 cm tolerance
+    const seatX_frac = seatPosition.x / widthM;
+    const seatY_frac = seatPosition.y / lengthM;
+    const seatZ_frac = seatPosition.z / heightM;
+
+    const widthOddModesSuppressed = Math.abs(seatPosition.x - widthM / 2) < tol;
+    const lengthOddModesSuppressed = Math.abs(seatPosition.y - lengthM / 2) < tol;
+    const heightOddModesSuppressed = Math.abs(seatPosition.z - heightM / 2) < tol;
+
+    seatNodeCheck = {
+      seatX_frac: Number(seatX_frac.toFixed(3)),
+      seatY_frac: Number(seatY_frac.toFixed(3)),
+      seatZ_frac: Number(seatZ_frac.toFixed(3)),
+      widthOddModesSuppressed,
+      lengthOddModesSuppressed,
+      heightOddModesSuppressed
+    };
+  }
+
   // Compute final SPL stats after all processing
   const finalFinite = finalDb.filter(v => isFinite(v));
   const splMinDb = finalFinite.length > 0 ? Math.min(...finalFinite) : 0;
@@ -689,7 +725,9 @@ export function computeRoomModesResponse({
         absoluteSplMode,
         subProductCurvesPresent: !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0),
         lfSanityCheck
-      }
+      },
+      lfProbeRaw,
+      seatNodeCheck
     }
   };
 }

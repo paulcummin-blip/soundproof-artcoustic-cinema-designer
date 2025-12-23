@@ -49,6 +49,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [yAxisDomain, setYAxisDomain] = useState(null);
   const [scaleEpoch, setScaleEpoch] = useState(0);
   const [rewCompareView, setRewCompareView] = useState(false); // REW Compare View toggle
+  const [seatNudgeTest, setSeatNudgeTest] = useState(false); // Diagnostic seat nudge
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -222,7 +223,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       };
     }
 
-    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+    let seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+
+    // Apply seat nudge for diagnostics (only if debug mode enabled)
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && seatNudgeTest) {
+      seatPos = { ...seatPos, x: seatPos.x - 0.30 };
+    }
 
     // Build source positions from actual subs
     const sourcePositions = subsForSimulation
