@@ -25,7 +25,9 @@ export default function BassGraph({
   linearHzAxis = false,
   rewStyleMode = false,
   yDomain,
-  showAxialOnly = false
+  showAxialOnly = false,
+  refDb = null,
+  showRefLine = false
 }) {
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
@@ -179,6 +181,23 @@ export default function BassGraph({
                         strokeDasharray="1 2"
                       />
                     ))}
+
+                    {/* REW Compare View reference line */}
+                    {showRefLine && refDb !== null && (
+                      <ReferenceLine 
+                        y={refDb} 
+                        stroke="#2563eb" 
+                        strokeWidth={1.5}
+                        strokeDasharray="4 4"
+                        label={{ 
+                          value: 'Ref', 
+                          position: 'right', 
+                          fill: '#2563eb', 
+                          className: 'font-body text-xs',
+                          offset: 5
+                        }} 
+                      />
+                    )}
 
                     <Line type="monotone" dataKey="spl" stroke="#213428" strokeWidth={2} dot={false} />
                     

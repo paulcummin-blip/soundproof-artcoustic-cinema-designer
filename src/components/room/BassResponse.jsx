@@ -48,6 +48,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [yAxisLocked, setYAxisLocked] = useState(true);
   const [yAxisDomain, setYAxisDomain] = useState(null);
   const [scaleEpoch, setScaleEpoch] = useState(0);
+  const [rewCompareView, setRewCompareView] = useState(false); // REW Compare View toggle
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -55,6 +56,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       setRewSmoothing('1/3');
     }
   }, [rewStyleMode]);
+
+  // Force settings when REW Compare View is enabled
+  useEffect(() => {
+    if (rewCompareView) {
+      setRewRelativeView(true);
+      setRewSmoothing('1/3');
+      setYAxisLocked(true);
+    }
+  }, [rewCompareView]);
 
   // Position signatures to detect in-place array mutations
   const frontLiveSig = useMemo(() => {
@@ -670,12 +680,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     if (band.length === 0) return null;
 
-    const bandAvg = band.reduce((a, b) => a + b, 0) / band.length;
+    // Use MEDIAN for refDb (REW-style, robust to nulls)
+    const sorted = [...band].sort((a, b) => a - b);
+    const refDb = sorted[Math.floor(sorted.length / 2)];
 
     // Exact 40 dB window
     const span = 40;
-    let min = bandAvg - span / 2;
-    let max = bandAvg + span / 2;
+    let min = refDb - span / 2;
+    let max = refDb + span / 2;
 
     // Keep window "intelligent": if the 30–80 Hz band itself sits outside the window,
     // shift the whole window up/down BUT KEEP span fixed at 40 dB.
@@ -697,7 +709,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     min = Math.floor(min);
     max = min + span;
 
-    return { min, max };
+    return { refDb, min, max };
+  }, []);
+
+  // REW Compare View: asymmetric window (refDb - 10, refDb + 40)
+  const computeRewCompareYDomain = React.useCallback((data) => {
+    if (!data || data.length === 0) return null;
+
+    // 30–80 Hz band median as reference
+    const band = data
+      .filter(d => d.frequency >= 30 && d.frequency <= 80)
+      .map(d => d.spl)
+      .filter(v => Number.isFinite(v));
+
+    if (band.length === 0) return null;
+
+    const sorted = [...band].sort((a, b) => a - b);
+    const refDb = sorted[Math.floor(sorted.length / 2)];
+
+    // REW-style asymmetric window
+    let min = refDb - 10;
+    let max = refDb + 40;
+
+    // Round to whole dB
+    min = Math.floor(min);
+    max = Math.ceil(max);
+
+    return { refDb, min, max };
   }, []);
 
   // Auto-enable Lock Y-axis when REW mode is turned ON
@@ -717,7 +755,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const shouldCompute = yAxisDomain === null || scaleEpoch > 0;
     if (!shouldCompute) return;
     if (!displayData || displayData.length === 0) return;
-    const domain = computeStableYDomain(displayData);
+    
+    // Use REW Compare domain if enabled, otherwise use standard domain
+    const domain = rewCompareView 
+      ? computeRewCompareYDomain(displayData)
+      : computeStableYDomain(displayData);
+    
     if (domain) {
       // Only update if domain changed by more than 0.1 dB
       const changed = !yAxisDomain || 
@@ -728,7 +771,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       }
       if (scaleEpoch > 0) setScaleEpoch(0);
     }
-  }, [rewStyleMode, displayData, yAxisDomain, scaleEpoch, computeStableYDomain]);
+  }, [rewStyleMode, displayData, yAxisDomain, scaleEpoch, computeStableYDomain, computeRewCompareYDomain, rewCompareView]);
 
   // Manual reset function
   const handleResetScale = React.useCallback(() => {
@@ -1268,6 +1311,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
 
             {rewStyleMode && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <Label htmlFor="rew-compare" className="text-xs text-[#3E4349] whitespace-nowrap">
+                  REW Compare View
+                </Label>
+                <Switch
+                  id="rew-compare"
+                  checked={rewCompareView}
+                  onCheckedChange={setRewCompareView}
+                />
+              </div>
+            )}
+
+            {rewStyleMode && (
               <>
                 <div style={{ display: "flex", alignItems: "center", gap: 6, borderLeft: "1px solid #DCDBD6", paddingLeft: 12 }}>
                   <Label htmlFor="lock-y-axis" className="text-xs text-[#3E4349] whitespace-nowrap">
@@ -1295,6 +1351,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             Showing: {selectedSeat?.isPrimary ? "MLP" : `Seat ${selectedSeat?.id ?? ""}`}
           </div>
         </div>
+
+        {/* REW Compare View readout (only when REW Compare is ON) */}
+        {rewCompareView && rewStyleMode && (
+          <div className="text-xs text-[#1B1A1A] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
+            <div className="font-semibold mb-1">REW Compare View</div>
+            <div className="text-[10px] space-y-0.5">
+              <div>• Room: {(roomDims?.widthM || 0).toFixed(1)}×{(roomDims?.lengthM || 0).toFixed(1)}×{(roomDims?.heightM || 0).toFixed(1)} m</div>
+              <div>• Smoothing: {rewSmoothing}</div>
+              <div>• Relative normalisation: ON (30–80 Hz)</div>
+              <div>• RefDb (median 30–80): {yAxisDomain?.refDb?.toFixed(1) || 'N/A'} dB</div>
+              <div>• Y window: {yAxisDomain?.min} to {yAxisDomain?.max} dB</div>
+            </div>
+          </div>
+        )}
 
         {/* REW debug banner (only when REW is ON) */}
         {rewStyleMode && (rewModesData?.debug?.error || rewModesData?.debug?.flatNote) && (
@@ -1563,6 +1633,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             rewStyleMode={rewStyleMode}
             yDomain={finalYDomain}
             showAxialOnly={rewStyleMode}
+            refDb={rewCompareView && yAxisDomain?.refDb ? yAxisDomain.refDb : null}
+            showRefLine={rewCompareView}
             />
         ) : (
           <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
