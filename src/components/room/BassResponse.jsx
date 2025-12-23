@@ -1444,6 +1444,31 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <strong>LF Sanity:</strong> {activeDebug.lfProbe.lfSanityCheck}
                   </div>
                 )}
+                {(() => {
+                  const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+                  if (!seat) return null;
+                  let seatUsed = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+                  if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && seatNudgeTest) {
+                    seatUsed = { ...seatUsed, x: seatUsed.x - 0.30 };
+                  }
+                  return (
+                    <div className="text-[10px] font-mono opacity-80">
+                      <strong>Seat used (engine):</strong> {seatUsed.x.toFixed(2)}, {seatUsed.y.toFixed(2)}, {seatUsed.z.toFixed(2)}
+                    </div>
+                  );
+                })()}
+                {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
+                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#DCDBD6]">
+                    <Checkbox 
+                      id="seat-nudge-test" 
+                      checked={seatNudgeTest}
+                      onCheckedChange={setSeatNudgeTest}
+                    />
+                    <Label htmlFor="seat-nudge-test" className="text-[10px] text-[#3E4349]">
+                      Seat nudge (test) [-0.30m X]
+                    </Label>
+                  </div>
+                )}
               </div>
               {activeDebug ? (
                 <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
