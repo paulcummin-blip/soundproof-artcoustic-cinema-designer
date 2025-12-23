@@ -31,6 +31,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   const dimsTxt = `${(roomDims?.widthM ?? 0).toFixed(1)}×${(roomDims?.lengthM ?? 0).toFixed(1)}×${(roomDims?.heightM ?? 0).toFixed(1)} m`;
 
+  // Safe formatter for numbers that might be undefined/null
+  const fmtFixed = (v, dp = 1, fallback = "—") =>
+    (typeof v === "number" && Number.isFinite(v)) ? v.toFixed(dp) : fallback;
+
   // State declarations (must be before useMemo/useCallback that use them)
   const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
   const [tryPolarity, setTryPolarity] = useState(false);
@@ -1612,10 +1616,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     </div>
                   ))}
                   <div className="mt-1">
-                    <strong>Max |Δ|:</strong> {sensitivityAudit.maxDelta.toFixed(2)} dB
+                    <strong>Max |Δ|:</strong> {fmtFixed(sensitivityAudit?.maxDelta, 2)} dB
                   </div>
                   <div>
-                    <strong>Avg |Δ|:</strong> {sensitivityAudit.avgDelta.toFixed(2)} dB
+                    <strong>Avg |Δ|:</strong> {fmtFixed(sensitivityAudit?.avgDelta, 2)} dB
                   </div>
                 </>
               )}
@@ -1712,7 +1716,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </div>
                 {activeDebug?.modeCouplingSanity && (
                   <div className="text-[10px] font-mono opacity-80 bg-yellow-100 px-1 rounded">
-                    <strong>ModeCoupling (1,0,0):</strong> seat={activeDebug.modeCouplingSanity.seatShape_100.toFixed(3)} src={activeDebug.modeCouplingSanity.srcShape_100.toFixed(3)} cpl={activeDebug.modeCouplingSanity.coupling_100.toFixed(3)}
+                    <strong>ModeCoupling (1,0,0):</strong> seat={fmtFixed(activeDebug.modeCouplingSanity.seatShape_100, 3)} src={fmtFixed(activeDebug.modeCouplingSanity.srcShape_100, 3)} cpl={fmtFixed(activeDebug.modeCouplingSanity.coupling_100, 3)}
                   </div>
                 )}
                 {activeDebug?.lfProbe?.lfSanityCheck && (
