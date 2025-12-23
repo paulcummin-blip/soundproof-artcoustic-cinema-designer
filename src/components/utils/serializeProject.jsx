@@ -6,6 +6,30 @@
 // INPUT: plain JS values from appState + local state
 // OUTPUT: flat object that matches entities/Project.json
 
+// Helper: safely parse JSON strings or return native types unchanged
+function safeParseJson(value) {
+  if (typeof value === 'string') {
+    try {
+      return JSON.parse(value);
+    } catch (e) {
+      return null;
+    }
+  }
+  return value;
+}
+
+// Helper: ensure array return (backward compatible with stringified arrays)
+function asArray(value) {
+  const parsed = safeParseJson(value);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+// Helper: ensure object return (backward compatible with stringified objects)
+function asObject(value) {
+  const parsed = safeParseJson(value);
+  return (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) ? parsed : {};
+}
+
 export function serializeProject(input = {}) {
   const {
     // Meta (RoomDesigner is NOT allowed to rename an existing project)
@@ -135,15 +159,9 @@ export function serializeProject(input = {}) {
     screen_front_plane_m: Number(screenFrontPlaneM) || 0,
 
     // Seating & layout
-    seating_positions: j(
-      Array.isArray(seatingPositions) ? seatingPositions : [],
-      "[]"
-    ),
+    seating_positions: asArray(seatingPositions),
     row_spacing_m: Number(rowSpacingM) || 1.8,
-    seats_per_row_by_row: j(
-      Array.isArray(seatsPerRowByRow) ? seatsPerRowByRow : [],
-      "[]"
-    ),
+    seats_per_row_by_row: asArray(seatsPerRowByRow),
 
     // Dolby / bed layout
     dolby_config: dolbyLayout || "5.1",
@@ -152,36 +170,18 @@ export function serializeProject(input = {}) {
     enable_front_wides: !!enableFrontWides,
 
     // Speakers & subs
-    selected_speakers: j(
-      Array.isArray(placedSpeakers) ? placedSpeakers : [],
-      "[]"
-    ),
-    selected_speakers_by_role: j(
-      typeof selectedSpeakersByRole === "object" &&
-        selectedSpeakersByRole !== null
-        ? selectedSpeakersByRole
-        : {},
-      "{}"
-    ),
-    spl_speaker_nodes: j(
-      Array.isArray(speakerNodes) ? speakerNodes : [],
-      "[]"
-    ),
-    room_elements: j(
-      Array.isArray(roomElements) ? roomElements : [],
-      "[]"
-    ),
-    subwoofers: j(
-      Array.isArray(subwoofers) ? subwoofers : [],
-      "[]"
-    ),
+    selected_speakers: asArray(placedSpeakers),
+    selected_speakers_by_role: asObject(selectedSpeakersByRole),
+    spl_speaker_nodes: asArray(speakerNodes),
+    room_elements: asArray(roomElements),
+    subwoofers: asArray(subwoofers),
 
     // Sub configs stored as JSON blobs for now
-    front_subs_cfg: j(frontSubsCfg, null),
-    rear_subs_cfg: j(rearSubsCfg, null),
+    front_subs_cfg: safeParseJson(frontSubsCfg) || null,
+    rear_subs_cfg: safeParseJson(rearSubsCfg) || null,
 
     // Overlays / UI state
-    overlays: j(overlays || {}, "{}"),
+    overlays: asObject(overlays),
     frozen_tabs: j(frozenTabs || {}, "{}"),
 
     // Overheads
@@ -194,6 +194,6 @@ export function serializeProject(input = {}) {
     use_rear_global: !!useRearGlobal,
 
     // SPL config
-    spl_config: j(splConfig || {}, "{}"),
+    spl_config: asObject(splConfig),
   };
 }
