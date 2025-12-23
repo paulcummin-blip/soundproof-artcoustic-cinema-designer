@@ -165,14 +165,12 @@ export function computeRoomModesResponse({
       // When no product curve is supplied, use realistic sealed-sub roll-off
       let genericDb = 0;
       if (!subProductCurves) {
-        // Realistic sealed sub: flat above 30 Hz, 12 dB/oct roll-off below
-        const f3Hz = 30; // -3dB point
+        // Realistic sealed sub: flat above 20 Hz, softer roll-off below
+        const f3Hz = 20; // push generic roll-off lower (closer to a "capable" cinema sub)
         if (f < f3Hz) {
-          // Second-order roll-off: -12 dB/oct below f3
-          const octBelow = Math.log2(f3Hz / Math.max(5, f));
-          genericDb = -12 * octBelow;
-          // Cap extreme attenuation
-          if (genericDb < -30) genericDb = -30;
+          const octBelow = Math.log2(f3Hz / Math.max(10, f));
+          genericDb = -6 * octBelow;   // softer slope so it doesn't cliff-dive
+          if (genericDb < -18) genericDb = -18; // cap so 15 Hz isn't annihilated
         }
       }
       const genericLinear = Math.pow(10, genericDb / 20);
@@ -240,14 +238,12 @@ export function computeRoomModesResponse({
         // When no product curve is supplied, use realistic sealed-sub roll-off
         let genericDb = 0;
         if (!subProductCurves) {
-          // Realistic sealed sub: flat above 30 Hz, 12 dB/oct roll-off below
-          const f3Hz = 30; // -3dB point
+          // Realistic sealed sub: flat above 20 Hz, softer roll-off below
+          const f3Hz = 20; // push generic roll-off lower (closer to a "capable" cinema sub)
           if (f < f3Hz) {
-            // Second-order roll-off: -12 dB/oct below f3
-            const octBelow = Math.log2(f3Hz / Math.max(5, f));
-            genericDb = -12 * octBelow;
-            // Cap extreme attenuation
-            if (genericDb < -30) genericDb = -30;
+            const octBelow = Math.log2(f3Hz / Math.max(10, f));
+            genericDb = -6 * octBelow;   // softer slope so it doesn't cliff-dive
+            if (genericDb < -18) genericDb = -18; // cap so 15 Hz isn't annihilated
           }
         }
         const genericLinear = Math.pow(10, genericDb / 20);
@@ -288,8 +284,8 @@ export function computeRoomModesResponse({
     }
 
     const modalScale = 6000;
-    const sumRe = sumRe_direct + w * modalScale * sumRe_modal;
-    const sumIm = sumIm_direct + w * modalScale * sumIm_modal;
+    const sumRe = (1 - w) * sumRe_direct + w * modalScale * sumRe_modal;
+    const sumIm = (1 - w) * sumIm_direct + w * modalScale * sumIm_modal;
 
     // LF debugging: capture magnitudes before calibration in 15-45 Hz band
     if (f >= 15 && f <= 45) {
