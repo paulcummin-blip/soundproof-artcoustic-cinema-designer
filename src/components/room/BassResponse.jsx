@@ -1372,6 +1372,49 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
+        {/* Seat Node Check (only when debug enabled) */}
+        {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+
+          if (!activeDebug?.seatNodeCheck) return null;
+
+          return (
+            <div className="text-xs text-[#3E4349] mb-2 bg-purple-50 p-2 rounded border border-purple-300">
+              <div className="font-semibold mb-1 text-purple-700">Seat Node Check</div>
+              <div className="text-[10px] space-y-0.5">
+                <div><strong>Seat X/Y/Z frac:</strong> {activeDebug.seatNodeCheck.seatX_frac}, {activeDebug.seatNodeCheck.seatY_frac}, {activeDebug.seatNodeCheck.seatZ_frac}</div>
+                <div><strong>Width odd modes suppressed:</strong> {activeDebug.seatNodeCheck.widthOddModesSuppressed ? 'TRUE' : 'FALSE'}</div>
+                <div><strong>Length odd modes suppressed:</strong> {activeDebug.seatNodeCheck.lengthOddModesSuppressed ? 'TRUE' : 'FALSE'}</div>
+                <div><strong>Height odd modes suppressed:</strong> {activeDebug.seatNodeCheck.heightOddModesSuppressed ? 'TRUE' : 'FALSE'}</div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* LF Probe Raw (only when debug enabled) */}
+        {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+
+          if (!activeDebug?.lfProbeRaw) return null;
+
+          return (
+            <div className="text-xs text-[#3E4349] mb-2 bg-orange-50 p-2 rounded border border-orange-300">
+              <div className="font-semibold mb-1 text-orange-700">LF Probe Raw (Pre-smoothing)</div>
+              <div className="text-[9px] space-y-0.5 font-mono">
+                {activeDebug.lfProbeRaw.map((probe, i) => (
+                  <div key={i}>
+                    {probe.freq} Hz: blended={probe.blendedMagDb_pre} (w={probe.w}, direct={probe.directMagDb_pre}, modal={probe.scaledModalMagDb_pre})
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* REW debug banner (only when REW is ON) */}
         {rewStyleMode && (rewModesData?.debug?.error || rewModesData?.debug?.flatNote) && (
           <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#C1B6AD]">
