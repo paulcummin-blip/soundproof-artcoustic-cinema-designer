@@ -719,79 +719,8 @@ export function computeRoomModesResponse({
 
   const seatSigUsed = `${seatPosition.x.toFixed(2)}_${seatPosition.y.toFixed(2)}_${(seatPosition.z||1.2).toFixed(2)}`;
 
-  // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)
-  if (DIAG_POS) {
-    const mirrored = mirrorSources(sourcePositions, roomDims);
-    const splDb2 = runOnce(mirrored);
-    
-    // Apply same post-processing to mirrored run for fair comparison
-    let finalDb2 = [...splDb2];
-    
-    // Apply smoothing
-    if (smoothing !== 'none') {
-      finalDb2 = applySmoothing(freqs, finalDb2, smoothing);
-    }
-    
-    // Apply calibration
-    if (absoluteSplMode && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
-      finalDb2 = finalDb2.map(v => v + calibrationOffset);
-    }
-    
-    // Apply normalization
-    if (!absoluteSplMode && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
-      const [fMin, fMax] = normalizeBandHz;
-      const bandValues = freqs
-        .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb2[i]) ? finalDb2[i] : null)
-        .filter(v => v !== null);
-      
-      if (bandValues.length >= 10) {
-        const sorted = [...bandValues].sort((a, b) => a - b);
-        const normRefDb = sorted[Math.floor(sorted.length / 2)];
-        const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 80;
-        finalDb2 = finalDb2.map(v => (isFinite(v) ? (v - normRefDb + targetDb) : v));
-      }
-    }
-    
-    // Compare at LF probe frequencies
-    const probeHz = [20, 25, 30, 34, 36, 38, 40, 42, 45];
-    const idxFor = (hz) => {
-      let bestI = -1, bestD = 1e9;
-      for (let i = 0; i < freqs.length; i++) {
-        const d = Math.abs(freqs[i] - hz);
-        if (d < bestD) { bestD = d; bestI = i; }
-      }
-      return bestI;
-    };
-    
-    let maxDelta = 0;
-    const rows = probeHz.map(hz => {
-      const i1 = idxFor(hz);
-      const a = i1 >= 0 ? finalDb[i1] : null;
-      const b = i1 >= 0 ? finalDb2[i1] : null;
-      const d = (typeof a === "number" && typeof b === "number") ? Math.abs(a - b) : null;
-      if (typeof d === "number") maxDelta = Math.max(maxDelta, d);
-      return { 
-        hz, 
-        normal: a !== null ? a.toFixed(2) : 'N/A', 
-        mirrored: b !== null ? b.toFixed(2) : 'N/A', 
-        delta: d !== null ? d.toFixed(3) : 'N/A' 
-      };
-    });
-    
-    if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
-      console.groupCollapsed("[B44][POS DIAG] source-coupling sensitivity");
-      console.log("SourceSig normal:", sourceSig(sourcePositions));
-      console.log("SourceSig mirrored:", sourceSig(mirrored));
-      console.table(rows);
-      console.log("Max Δ(dB) across probes:", maxDelta.toFixed(3));
-      if (maxDelta < 0.5) {
-        console.warn("[B44][POS DIAG] ALERT: moving source had <0.5 dB effect at LF probes. Source coupling may be missing or stale.");
-      }
-      console.groupEnd();
-    }
-  }
-
-  return {
+  // Build base return object
+  const baseReturn = {
     freqs,
     splDb: finalDb, // Return FINAL processed curve
     debug: {
@@ -865,9 +794,93 @@ export function computeRoomModesResponse({
         lfSanityCheck
       },
       lfProbeRaw,
-      seatNodeCheck
+      seatNodeCheck,
+      modeCouplingSanity: __b44ModeCouplingSanity
     }
   };
+
+  // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)
+  if (DIAG_POS) {
+    const mirrored = mirrorSources(sourcePositions, roomDims);
+    const splDb2 = runOnce(mirrored);
+    
+    // Apply same post-processing to mirrored run for fair comparison
+    let finalDb2 = [...splDb2];
+    
+    // Apply smoothing
+    if (smoothing !== 'none') {
+      finalDb2 = applySmoothing(freqs, finalDb2, smoothing);
+    }
+    
+    // Apply calibration
+    if (absoluteSplMode && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
+      finalDb2 = finalDb2.map(v => v + calibrationOffset);
+    }
+    
+    // Apply normalization
+    if (!absoluteSplMode && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
+      const [fMin, fMax] = normalizeBandHz;
+      const bandValues = freqs
+        .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb2[i]) ? finalDb2[i] : null)
+        .filter(v => v !== null);
+      
+      if (bandValues.length >= 10) {
+        const sorted = [...bandValues].sort((a, b) => a - b);
+        const normRefDb = sorted[Math.floor(sorted.length / 2)];
+        const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 80;
+        finalDb2 = finalDb2.map(v => (isFinite(v) ? (v - normRefDb + targetDb) : v));
+      }
+    }
+    
+    // Compare at LF probe frequencies
+    const probeHz = [20, 25, 30, 34, 36, 38, 40, 42, 45];
+    const idxFor = (hz, freqsArr) => {
+      let bestI = -1, bestD = 1e9;
+      for (let i = 0; i < freqsArr.length; i++) {
+        const d = Math.abs(freqsArr[i] - hz);
+        if (d < bestD) { bestD = d; bestI = i; }
+      }
+      return bestI;
+    };
+    
+    let maxDelta = 0;
+    const rows = probeHz.map(hz => {
+      const i1 = idxFor(hz, freqs);
+      const a = i1 >= 0 ? finalDb[i1] : null;
+      const b = i1 >= 0 ? finalDb2[i1] : null;
+      const d = (typeof a === "number" && typeof b === "number") ? Math.abs(a - b) : null;
+      if (typeof d === "number") maxDelta = Math.max(maxDelta, d);
+      return { 
+        hz, 
+        normal: a !== null ? a.toFixed(2) : 'N/A', 
+        mirrored: b !== null ? b.toFixed(2) : 'N/A', 
+        delta: d !== null ? d.toFixed(3) : 'N/A' 
+      };
+    });
+    
+    if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
+      console.groupCollapsed("[B44][POS DIAG] source-coupling sensitivity");
+      console.log("SourceSig normal:", sourceSig(sourcePositions));
+      console.log("SourceSig mirrored:", sourceSig(mirrored));
+      console.table(rows);
+      console.log("Max Δ(dB) across probes:", maxDelta.toFixed(3));
+      if (maxDelta < 0.5) {
+        console.warn("[B44][POS DIAG] ALERT: moving source had <0.5 dB effect at LF probes. Source coupling may be missing or stale.");
+      }
+      console.groupEnd();
+    }
+
+    // ✅ IMPORTANT: Return new object with posDiag, DO NOT mutate baseReturn
+    return {
+      ...baseReturn,
+      debug: {
+        ...(baseReturn.debug || {}),
+        posDiag: { maxDeltaDb: maxDelta, rows }
+      }
+    };
+  }
+
+  return baseReturn;
 }
 
 /**
