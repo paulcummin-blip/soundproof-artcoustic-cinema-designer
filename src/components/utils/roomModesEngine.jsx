@@ -171,18 +171,9 @@ export function computeRoomModesResponse({
       const gainLinear = Math.pow(10, subTuning.gainDb / 20) * productGainLinear;
 
       // Generic (room-only) sub magnitude shaping:
-      // When no product curve is supplied, use realistic sealed-sub roll-off
+      // When no product curve is supplied, stay flat (no artificial roll-off)
       let genericDb = 0;
-      if (!subProductCurves) {
-        // Realistic sealed sub: flat above 20 Hz, softer roll-off below
-        const f3Hz = 20; // push generic roll-off lower (closer to a "capable" cinema sub)
-        if (f < f3Hz) {
-          const octBelow = Math.log2(f3Hz / Math.max(10, f));
-          genericDb = -6 * octBelow;   // softer slope so it doesn't cliff-dive
-          if (genericDb < -18) genericDb = -18; // cap so 15 Hz isn't annihilated
-        }
-      }
-      const genericLinear = Math.pow(10, genericDb / 20);
+      const genericLinear = 1.0;
 
       // Phase: propagation + delay + polarity
       let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
@@ -244,18 +235,9 @@ export function computeRoomModesResponse({
         const totalPhase = delayPhase + polarityPhase;
 
         // Generic (room-only) sub magnitude shaping:
-        // When no product curve is supplied, use realistic sealed-sub roll-off
+        // When no product curve is supplied, stay flat (no artificial roll-off)
         let genericDb = 0;
-        if (!subProductCurves) {
-          // Realistic sealed sub: flat above 20 Hz, softer roll-off below
-          const f3Hz = 20; // push generic roll-off lower (closer to a "capable" cinema sub)
-          if (f < f3Hz) {
-            const octBelow = Math.log2(f3Hz / Math.max(10, f));
-            genericDb = -6 * octBelow;   // softer slope so it doesn't cliff-dive
-            if (genericDb < -18) genericDb = -18; // cap so 15 Hz isn't annihilated
-          }
-        }
-        const genericLinear = Math.pow(10, genericDb / 20);
+        const genericLinear = 1.0;
 
         // Complex weight for this sub
         const weightRe = gainLinear * genericLinear * Math.cos(totalPhase);
