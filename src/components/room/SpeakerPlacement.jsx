@@ -1937,14 +1937,23 @@ function SpeakerPlacementImpl(props) {
       // CRITICAL: Only update if speakers actually changed
       if (speakersShallowEqual(prev, merged)) return prev;
       
-      // Additional guard: check if positions differ by meaningful amount (>1mm)
-      const hasSignificantChange = merged.some((m, i) => {
-        const p = prev?.[i];
+      // Additional guard: check if positions differ by meaningful amount (>1mm or >0.1deg)
+      if (!prev || !Array.isArray(prev) || prev.length !== merged.length) {
+        return merged;
+      }
+
+      const hasSignificantChange = merged.some(m => {
+        const p = prev.find(s => getCanonicalRole(s?.role) === getCanonicalRole(m?.role));
         if (!p) return true;
+        
         const dx = Math.abs((m.position?.x ?? 0) - (p.position?.x ?? 0));
         const dy = Math.abs((m.position?.y ?? 0) - (p.position?.y ?? 0));
         const dz = Math.abs((m.position?.z ?? 0) - (p.position?.z ?? 0));
-        return dx > 0.001 || dy > 0.001 || dz > 0.001;
+        const dRx = Math.abs((m.rotation?.x ?? 0) - (p.rotation?.x ?? 0));
+        const dRy = Math.abs((m.rotation?.y ?? 0) - (p.rotation?.y ?? 0));
+        const dRz = Math.abs((m.rotation?.z ?? 0) - (p.rotation?.z ?? 0));
+        
+        return dx > 0.001 || dy > 0.001 || dz > 0.001 || dRx > 0.1 || dRy > 0.1 || dRz > 0.1;
       });
       
       return hasSignificantChange ? merged : prev;

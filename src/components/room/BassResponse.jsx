@@ -207,26 +207,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return null;
   }, [seatingPositions, simulationResults.seatResponses]);
 
-  // Helper: compute axial coupling for sensitivity audit
+  // Helper: compute axial coupling for sensitivity audit (mode 1,0,0)
   const computeAxialCoupling = useCallback((source, seat, roomDims) => {
     const { widthM, lengthM, heightM } = roomDims;
     
     // Width axial (nx=1, ny=0, nz=0)
-    const widthCoupling = 
-      Math.cos(1 * Math.PI * source.x / widthM) * 
-      Math.cos(1 * Math.PI * seat.x / widthM);
+    const srcShape = Math.cos(1 * Math.PI * source.x / widthM);
+    const rcvShape = Math.cos(1 * Math.PI * seat.x / widthM);
+    const totalCoupling = srcShape * rcvShape;
     
-    // Length axial (nx=0, ny=1, nz=0)
-    const lengthCoupling = 
-      Math.cos(1 * Math.PI * source.y / lengthM) * 
-      Math.cos(1 * Math.PI * seat.y / lengthM);
-    
-    // Height axial (nx=0, ny=0, nz=1)
-    const heightCoupling = 
-      Math.cos(1 * Math.PI * source.z / heightM) * 
-      Math.cos(1 * Math.PI * seat.z / heightM);
-    
-    return { W: widthCoupling, L: lengthCoupling, H: heightCoupling };
+    return { 
+      src: srcShape, 
+      rcv: rcvShape, 
+      total: totalCoupling 
+    };
   }, []);
 
   // Audit curve (no smoothing, no normalization) for sensitivity testing
@@ -845,7 +839,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     prevSourceSigRef.current = currentSourceSig;
     prevFinalDbRef.current = currentFinalDb;
     prevFreqsRef.current = currentFreqs;
-    prevCouplingRef.current = currentCoupling;
+    prevCouplingRef.current = { src: currentCoupling.src, rcv: currentCoupling.rcv, total: currentCoupling.total };
 
     return {
       sourceChanged,
@@ -1716,6 +1710,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div className="text-[10px] font-mono opacity-80">
                   <strong>Lowest axial:</strong> {activeDebug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz
                 </div>
+                {activeDebug?.modeCouplingSanity && (
+                  <div className="text-[10px] font-mono opacity-80 bg-yellow-100 px-1 rounded">
+                    <strong>ModeCoupling (1,0,0):</strong> seat={activeDebug.modeCouplingSanity.seatShape_100.toFixed(3)} src={activeDebug.modeCouplingSanity.srcShape_100.toFixed(3)} cpl={activeDebug.modeCouplingSanity.coupling_100.toFixed(3)}
+                  </div>
+                )}
                 {activeDebug?.lfProbe?.lfSanityCheck && (
                   <div className={`text-[10px] font-mono opacity-80 ${activeDebug.lfProbe.lfSanityCheck.startsWith('FAIL') ? 'text-red-600 font-bold' : 'text-green-600'}`}>
                     <strong>LF Sanity:</strong> {activeDebug.lfProbe.lfSanityCheck}

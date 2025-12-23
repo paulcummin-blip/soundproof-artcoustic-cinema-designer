@@ -152,6 +152,36 @@ export function computeRoomModesResponse({
     blendedMag15_45: []
   };
 
+  // --- B44: modal coupling sanity (single mode 1,0,0) ---
+  const __b44Clamp01 = (t) => Math.max(0, Math.min(1, t));
+  const __b44Seat = seatPosition || { x: 0, y: 0, z: 0 };
+  const __b44Src = (Array.isArray(sourcePositions) && sourcePositions[0]) ? sourcePositions[0] : { x: 0, y: 0, z: 0 };
+
+  // normalised 0..1
+  const __sx = __b44Clamp01((__b44Seat.x || 0) / (widthM || 1));
+  const __sy = __b44Clamp01((__b44Seat.y || 0) / (lengthM || 1));
+  const __sz = __b44Clamp01((__b44Seat.z || 0) / (heightM || 1));
+
+  const __qx = __b44Clamp01((__b44Src.x || 0) / (widthM || 1));
+  const __qy = __b44Clamp01((__b44Src.y || 0) / (lengthM || 1));
+  const __qz = __b44Clamp01((__b44Src.z || 0) / (heightM || 1));
+
+  // Mode (1,0,0): cos(pi*x) along width, constant along others
+  const __seatShape_100 = Math.cos(Math.PI * 1 * __sx);
+  const __srcShape_100  = Math.cos(Math.PI * 1 * __qx);
+  const __coupling_100  = __seatShape_100 * __srcShape_100;
+
+  // Expose live values (do not spam console)
+  const __b44ModeCouplingSanity = {
+    seatM: { x: __b44Seat.x, y: __b44Seat.y, z: __b44Seat.z },
+    srcM:  { x: __b44Src.x,  y: __b44Src.y,  z: __b44Src.z  },
+    normSeat: { x: __sx, y: __sy, z: __sz },
+    normSrc:  { x: __qx, y: __qy, z: __qz },
+    seatShape_100: __seatShape_100,
+    srcShape_100: __srcShape_100,
+    coupling_100: __coupling_100,
+  };
+
   // Build response: complex pressure sum with direct/modal blending
   let splDb = freqs.map((f, i) => {
     // 1. DIRECT-FIELD COMPLEX SUM (geometry-dependent, no modal filtering)
@@ -818,6 +848,7 @@ function computeRoomModes({
 
 /**
  * Compute spatial coupling using cosine pressure mode shapes
+ * Returns total coupling (for engine use) and individual terms (for debug)
  */
 function computeSpatialCoupling(mode, source, receiver, roomDims) {
   const { widthM, lengthM, heightM } = roomDims;
@@ -834,6 +865,30 @@ function computeSpatialCoupling(mode, source, receiver, roomDims) {
   
   // Total coupling = source pressure × receiver pressure
   return (srcX * srcY * srcZ) * (rcvX * rcvY * rcvZ);
+}
+
+/**
+ * Compute spatial coupling terms separately (for debug visibility)
+ */
+function getSpatialCouplingTerms(mode, source, receiver, roomDims) {
+  const { widthM, lengthM, heightM } = roomDims;
+  const { nx, ny, nz } = mode;
+  
+  const srcX = nx > 0 ? Math.cos(nx * Math.PI * source.x / widthM) : 1;
+  const srcY = ny > 0 ? Math.cos(ny * Math.PI * source.y / lengthM) : 1;
+  const srcZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / heightM) : 1;
+  const srcCouplingTerm = srcX * srcY * srcZ;
+  
+  const rcvX = nx > 0 ? Math.cos(nx * Math.PI * receiver.x / widthM) : 1;
+  const rcvY = ny > 0 ? Math.cos(ny * Math.PI * receiver.y / lengthM) : 1;
+  const rcvZ = nz > 0 ? Math.cos(nz * Math.PI * (receiver.z ?? 1.2) / heightM) : 1;
+  const rcvCouplingTerm = rcvX * rcvY * rcvZ;
+
+  return {
+    srcCouplingTerm,
+    rcvCouplingTerm,
+    totalCoupling: srcCouplingTerm * rcvCouplingTerm,
+  };
 }
 
 /**
