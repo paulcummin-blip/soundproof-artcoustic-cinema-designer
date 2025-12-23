@@ -121,8 +121,10 @@ export function computeRoomModesResponse({
   const hasProductCurves =
     !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0);
 
+  // Use local copy to avoid mutating input parameter
+  let absoluteSplModeLocal = absoluteSplMode;
   if (!hasProductCurves) {
-    absoluteSplMode = false;
+    absoluteSplModeLocal = false;
   }
   
   const { widthM, lengthM, heightM } = roomDims;
@@ -547,7 +549,7 @@ export function computeRoomModesResponse({
   
   // Step 1: Apply absolute SPL calibration if requested
   let absoluteSplApplied = false;
-  if (absoluteSplMode && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
+  if (absoluteSplModeLocal && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
     finalDb = finalDb.map(v => v + calibrationOffset);
     absoluteSplApplied = true;
   }
@@ -556,7 +558,7 @@ export function computeRoomModesResponse({
   // REW-style: use MEDIAN of band for robustness against nulls
   let normAppliedActual = false;
   let normRefDb = 0;
-  if (!absoluteSplMode && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
+  if (!absoluteSplModeLocal && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
     const [fMin, fMax] = normalizeBandHz;
     const bandValues = freqs
       .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb[i]) ? finalDb[i] : null)
@@ -743,7 +745,7 @@ export function computeRoomModesResponse({
       blendEndHz: lowestAxial,
       qBase: qBase.toFixed(1),
       qMappingText,
-      absoluteMode: absoluteSplMode,
+      absoluteMode: absoluteSplModeLocal,
       calibrationApplied,
       normBandHz: actualNormBand,
       normApplied: normAppliedActual,
@@ -770,7 +772,7 @@ export function computeRoomModesResponse({
       normalizeToDb: normalizeToDb !== undefined ? normalizeToDb : null,
       productCurveStats,
       directFieldUsesDb0: false,
-      calibrationMode: absoluteSplMode ? "Absolute SPL" : "Relative (normalized)",
+      calibrationMode: absoluteSplModeLocal ? "Absolute SPL" : "Relative (normalized)",
       sourceCountUsed,
       sourcePositionsUsed: [...sourcePositionsUsed],
       sourceSigUsed,
@@ -795,7 +797,7 @@ export function computeRoomModesResponse({
         blendStartHz: lowestAxial ? (lowestAxial * 0.7).toFixed(1) : 'N/A',
         blendEndHz: lowestAxial ? lowestAxial.toFixed(1) : 'N/A',
         sourceCalibrationDb: sourceCalibrationDb.toFixed(2),
-        absoluteSplMode,
+        absoluteSplMode: absoluteSplModeLocal,
         subProductCurvesPresent: !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0),
         lfSanityCheck
       },
@@ -827,12 +829,12 @@ export function computeRoomModesResponse({
     }
     
     // Apply calibration
-    if (absoluteSplMode && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
+    if (absoluteSplModeLocal && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
       finalDb2 = finalDb2.map(v => v + calibrationOffset);
     }
     
     // Apply normalization
-    if (!absoluteSplMode && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
+    if (!absoluteSplModeLocal && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
       const [fMin, fMax] = normalizeBandHz;
       const bandValues = freqs
         .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb2[i]) ? finalDb2[i] : null)
