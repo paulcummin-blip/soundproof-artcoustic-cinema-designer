@@ -25,7 +25,7 @@ export function computeRoomModesResponse({
   smoothing = 'none',
   subFloorHeight = 0.0,
   normalizeBandHz = [30, 80],
-  normalizeToDb = 0,
+  normalizeToDb = 80,
   relativeViewEnabled = false,
   surfaceAbsorption = {
     front: 0.30,
@@ -69,6 +69,15 @@ export function computeRoomModesResponse({
       ...src,
       z: subFloorHeight
     }));
+  }
+
+  // If there is NO product curve, we never want "absolute SPL" behaviour.
+  // Generic view should be normalised to a sensible reference level.
+  const hasProductCurves =
+    !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0);
+
+  if (!hasProductCurves) {
+    absoluteSplMode = false;
   }
   
   const { widthM, lengthM, heightM } = roomDims;
@@ -291,6 +300,7 @@ export function computeRoomModesResponse({
     }
 
     const modalScale = 6000;
+    // Correct crossfade: as w rises, we move from direct -> modal
     const sumRe = (1 - w) * sumRe_direct + w * modalScale * sumRe_modal;
     const sumIm = (1 - w) * sumIm_direct + w * modalScale * sumIm_modal;
 
@@ -443,7 +453,7 @@ export function computeRoomModesResponse({
   // REW-style: use MEDIAN of band for robustness against nulls
   let normAppliedActual = false;
   let normRefDb = 0;
-  if (!absoluteSplMode && relativeViewEnabled && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
+  if (!absoluteSplMode && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
     const [fMin, fMax] = normalizeBandHz;
     const bandValues = freqs
       .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb[i]) ? finalDb[i] : null)
@@ -453,7 +463,8 @@ export function computeRoomModesResponse({
       // Use MEDIAN instead of MEAN (more REW-like, robust to nulls)
       const sorted = [...bandValues].sort((a, b) => a - b);
       normRefDb = sorted[Math.floor(sorted.length / 2)];
-      finalDb = finalDb.map(v => isFinite(v) ? v - normRefDb : v);
+      const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 80;
+      finalDb = finalDb.map(v => (isFinite(v) ? (v - normRefDb + targetDb) : v));
       normAppliedActual = true;
     }
   }
