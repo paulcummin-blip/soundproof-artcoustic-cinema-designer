@@ -52,6 +52,9 @@ export function computeRoomModesResponse({
   // DEBUG (off by default)
   // To enable in preview: run in browser console once: globalThis.__B44_BASS_DEBUG = true
   const __debugBass = !!globalThis.__B44_BASS_DEBUG;
+  
+  // DIAGNOSTIC: Source position sensitivity test
+  const DIAG_POS = Boolean(globalThis.__B44_BASS_DIAG_POS);
 
   // Probe frequencies we care about
   const __probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45];
@@ -61,6 +64,29 @@ export function computeRoomModesResponse({
 
   // Collected probe rows (pre-smoothing + post-smoothing + final)
   const __probeRows = __debugBass ? [] : null;
+  
+  // Source signature helper (for diagnostics)
+  const sourceSig = (sources = []) =>
+    sources
+      .map(s => {
+        const x = Number(s?.x ?? 0);
+        const y = Number(s?.y ?? 0);
+        const z = Number(s?.z ?? 0);
+        return `${x.toFixed(3)},${y.toFixed(3)},${z.toFixed(3)}`;
+      })
+      .join(" | ");
+  
+  // Mirror sources helper (for sensitivity testing)
+  const mirrorSources = (sources = [], roomDims) => {
+    const W = Number(roomDims?.widthM);
+    const L = Number(roomDims?.lengthM);
+    return sources.map(s => {
+      const x = Number(s?.x ?? 0);
+      const y = Number(s?.y ?? 0);
+      const z = Number(s?.z ?? 0);
+      return { ...s, x: (W - x), y: (L - y), z };
+    });
+  };
   
   // REW parity mode forces 3D modes ON
   if (rewParityMode) {
@@ -182,14 +208,18 @@ export function computeRoomModesResponse({
     coupling_100: __coupling_100,
   };
 
+  // Extract computation into runOnce for diagnostic double-run
+  const runOnce = (sourcesOverride) => {
+    const sourcesUsed = sourcesOverride ?? sourcePositions;
+
   // Build response: complex pressure sum with direct/modal blending
   let splDb = freqs.map((f, i) => {
     // 1. DIRECT-FIELD COMPLEX SUM (geometry-dependent, no modal filtering)
     let sumRe_direct = 0;
     let sumIm_direct = 0;
 
-    for (let subIdx = 0; subIdx < sourcePositions.length; subIdx++) {
-      const source = sourcePositions[subIdx];
+    for (let subIdx = 0; subIdx < sourcesUsed.length; subIdx++) {
+      const source = sourcesUsed[subIdx];
 
       // Distance to seat
       const dx = source.x - seatPosition.x;
@@ -254,8 +284,8 @@ export function computeRoomModesResponse({
       if (df > 5 * bandwidth && df > 20) continue;
 
       // Complex pressure contribution per sub
-      for (let subIdx = 0; subIdx < sourcePositions.length; subIdx++) {
-        const source = sourcePositions[subIdx];
+      for (let subIdx = 0; subIdx < sourcesUsed.length; subIdx++) {
+        const source = sourcesUsed[subIdx];
 
         // Spatial coupling (signed, preserves phase)
         const coupling = computeSpatialCoupling(mode, source, seatPosition, roomDims);
@@ -373,6 +403,12 @@ export function computeRoomModesResponse({
     // Magnitude -> dB (calibration applied later in absoluteSplMode stage)
     return 20 * Math.log10(mag);
   });
+  
+  return splDb;
+  }; // End of runOnce
+
+  // Run engine with normal sources
+  const splDb = runOnce(null);
 
   // PRESSURE REGION SUPPORT: FULLY DISABLED (REW parity)
   // REW's Room Simulator does not apply artificial pressure-zone boost
@@ -682,6 +718,78 @@ export function computeRoomModesResponse({
   ).join('|');
 
   const seatSigUsed = `${seatPosition.x.toFixed(2)}_${seatPosition.y.toFixed(2)}_${(seatPosition.z||1.2).toFixed(2)}`;
+
+  // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)
+  if (DIAG_POS) {
+    const mirrored = mirrorSources(sourcePositions, roomDims);
+    const splDb2 = runOnce(mirrored);
+    
+    // Apply same post-processing to mirrored run for fair comparison
+    let finalDb2 = [...splDb2];
+    
+    // Apply smoothing
+    if (smoothing !== 'none') {
+      finalDb2 = applySmoothing(freqs, finalDb2, smoothing);
+    }
+    
+    // Apply calibration
+    if (absoluteSplMode && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
+      finalDb2 = finalDb2.map(v => v + calibrationOffset);
+    }
+    
+    // Apply normalization
+    if (!absoluteSplMode && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
+      const [fMin, fMax] = normalizeBandHz;
+      const bandValues = freqs
+        .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb2[i]) ? finalDb2[i] : null)
+        .filter(v => v !== null);
+      
+      if (bandValues.length >= 10) {
+        const sorted = [...bandValues].sort((a, b) => a - b);
+        const normRefDb = sorted[Math.floor(sorted.length / 2)];
+        const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 80;
+        finalDb2 = finalDb2.map(v => (isFinite(v) ? (v - normRefDb + targetDb) : v));
+      }
+    }
+    
+    // Compare at LF probe frequencies
+    const probeHz = [20, 25, 30, 34, 36, 38, 40, 42, 45];
+    const idxFor = (hz) => {
+      let bestI = -1, bestD = 1e9;
+      for (let i = 0; i < freqs.length; i++) {
+        const d = Math.abs(freqs[i] - hz);
+        if (d < bestD) { bestD = d; bestI = i; }
+      }
+      return bestI;
+    };
+    
+    let maxDelta = 0;
+    const rows = probeHz.map(hz => {
+      const i1 = idxFor(hz);
+      const a = i1 >= 0 ? finalDb[i1] : null;
+      const b = i1 >= 0 ? finalDb2[i1] : null;
+      const d = (typeof a === "number" && typeof b === "number") ? Math.abs(a - b) : null;
+      if (typeof d === "number") maxDelta = Math.max(maxDelta, d);
+      return { 
+        hz, 
+        normal: a !== null ? a.toFixed(2) : 'N/A', 
+        mirrored: b !== null ? b.toFixed(2) : 'N/A', 
+        delta: d !== null ? d.toFixed(3) : 'N/A' 
+      };
+    });
+    
+    if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
+      console.groupCollapsed("[B44][POS DIAG] source-coupling sensitivity");
+      console.log("SourceSig normal:", sourceSig(sourcePositions));
+      console.log("SourceSig mirrored:", sourceSig(mirrored));
+      console.table(rows);
+      console.log("Max Δ(dB) across probes:", maxDelta.toFixed(3));
+      if (maxDelta < 0.5) {
+        console.warn("[B44][POS DIAG] ALERT: moving source had <0.5 dB effect at LF probes. Source coupling may be missing or stale.");
+      }
+      console.groupEnd();
+    }
+  }
 
   return {
     freqs,
