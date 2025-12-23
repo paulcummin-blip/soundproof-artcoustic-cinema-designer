@@ -88,25 +88,31 @@ export function computeRoomModesResponse({
     });
   };
   
-  // REW parity mode forces 3D modes ON
+  // --- Local copies only (never mutate inputs passed in) ---
+  let includeAxialLocal = includeAxial;
+  let includeTangentialLocal = includeTangential;
+  let includeObliqueLocal = includeOblique;
+
   if (rewParityMode) {
-    includeAxial = true;
-    includeTangential = true;
-    includeOblique = true;
+    includeAxialLocal = true;
+    includeTangentialLocal = true;
+    includeObliqueLocal = true;
   }
-  
-  // Default source if none provided
-  if (!sourcePositions || sourcePositions.length === 0) {
-    sourcePositions = [{
+
+  // Build a local sources array (never reassign/mutate caller sourcePositions)
+  let sources = Array.isArray(sourcePositions) ? sourcePositions : [];
+
+  if (sources.length === 0) {
+    sources = [{
       x: roomDims.widthM / 2,
       y: 0.2,
-      z: rewParityMode ? subFloorHeight : 0.2
+      z: rewParityMode ? subFloorHeight : 0.2,
     }];
   } else if (rewParityMode) {
-    // In REW parity mode, force subs to floor
-    sourcePositions = sourcePositions.map(src => ({
+    // Force subs to floor in REW parity mode (new objects only)
+    sources = sources.map(src => ({
       ...src,
-      z: subFloorHeight
+      z: subFloorHeight,
     }));
   }
 
@@ -138,9 +144,9 @@ export function computeRoomModesResponse({
     heightM,
     fMax: modeLimitHz,
     c,
-    includeAxial,
-    includeTangential,
-    includeOblique
+    includeAxial: includeAxialLocal,
+    includeTangential: includeTangentialLocal,
+    includeOblique: includeObliqueLocal
   });
 
   // Lowest axial mode (used for sealed-room pressure behaviour)
@@ -153,7 +159,7 @@ export function computeRoomModesResponse({
   
   // SOURCE CALIBRATION (applied upstream, not after summation)
   // REW reference: 1 sub @ 1m in half-space ≈ 90 dB at 50 Hz
-  const numSubs = sourcePositions.length;
+  const numSubs = sources.length;
   const avgDistance = 3.5; // Typical MLP distance in meters
   const subSensitivity = 90; // Typical subwoofer 1W/1m (dB)
   
@@ -181,7 +187,7 @@ export function computeRoomModesResponse({
   // --- B44: modal coupling sanity (single mode 1,0,0) ---
   const __b44Clamp01 = (t) => Math.max(0, Math.min(1, t));
   const __b44Seat = seatPosition || { x: 0, y: 0, z: 0 };
-  const __b44Src = (Array.isArray(sourcePositions) && sourcePositions[0]) ? sourcePositions[0] : { x: 0, y: 0, z: 0 };
+  const __b44Src = (Array.isArray(sources) && sources[0]) ? sources[0] : { x: 0, y: 0, z: 0 };
 
   // normalised 0..1
   const __sx = __b44Clamp01((__b44Seat.x || 0) / (widthM || 1));
@@ -210,7 +216,7 @@ export function computeRoomModesResponse({
 
   // Extract computation into runOnce for diagnostic double-run
   const runOnce = (sourcesOverride) => {
-    const sourcesUsed = sourcesOverride ?? sourcePositions;
+    const sourcesUsed = sourcesOverride ?? sources;
 
   // Build response: complex pressure sum with direct/modal blending
   let splDb = freqs.map((f, i) => {
@@ -706,32 +712,32 @@ export function computeRoomModesResponse({
   }
 
   // Build source/seat signatures for dependency tracking
-  const sourceCountUsed = sourcePositions.length;
-  const sourcePositionsUsed = sourcePositions.slice(0, 3).map(s => ({
+  const sourceCountUsed = sources.length;
+  const sourcePositionsUsed = sources.slice(0, 3).map(s => ({
     x: Number(s.x).toFixed(2),
     y: Number(s.y).toFixed(2),
     z: Number(s.z || 0).toFixed(2)
   }));
 
-  const sourceSigUsed = sourcePositions.map(s => 
+  const sourceSigUsed = sources.map(s => 
     `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${(s.z||0).toFixed(2)}_g${(s.tuning?.gainDb||0).toFixed(1)}_d${(s.tuning?.delayMs||0).toFixed(1)}_p${s.tuning?.polarity||'normal'}`
   ).join('|');
 
   const seatSigUsed = `${seatPosition.x.toFixed(2)}_${seatPosition.y.toFixed(2)}_${(seatPosition.z||1.2).toFixed(2)}`;
 
-  // Build base return object
+  // Build base return object (all fresh arrays/objects to avoid frozen mutations)
   const baseReturn = {
-    freqs,
-    splDb: finalDb, // Return FINAL processed curve
+    freqs: [...freqs],
+    splDb: [...finalDb],
     debug: {
       schroederHz,
-      modeMarkersHz,
-      modeMarkers,
+      modeMarkersHz: [...modeMarkersHz],
+      modeMarkers: modeMarkers.map(m => ({ ...m, n: [...m.n] })),
       modeCount: modes.length,
       axialCount,
       tangentialCount,
       obliqueCount,
-      firstTenModeHz,
+      firstTenModeHz: [...firstTenModeHz],
       lowestAxialHz: lowestAxial,
       blendStartHz: lowestAxial * 0.7,
       blendEndHz: lowestAxial,
@@ -766,7 +772,7 @@ export function computeRoomModesResponse({
       directFieldUsesDb0: false,
       calibrationMode: absoluteSplMode ? "Absolute SPL" : "Relative (normalized)",
       sourceCountUsed,
-      sourcePositionsUsed,
+      sourcePositionsUsed: [...sourcePositionsUsed],
       sourceSigUsed,
       seatSigUsed,
       lfDebug15_45Hz: {
@@ -793,15 +799,23 @@ export function computeRoomModesResponse({
         subProductCurvesPresent: !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0),
         lfSanityCheck
       },
-      lfProbeRaw,
-      seatNodeCheck,
-      modeCouplingSanity: __b44ModeCouplingSanity
+      lfProbeRaw: Array.isArray(lfProbeRaw) ? lfProbeRaw.map(r => ({ ...r })) : lfProbeRaw,
+      seatNodeCheck: seatNodeCheck ? { ...seatNodeCheck } : null,
+      modeCouplingSanity: __b44ModeCouplingSanity ? { 
+        seatM: { ...__b44ModeCouplingSanity.seatM },
+        srcM: { ...__b44ModeCouplingSanity.srcM },
+        normSeat: { ...__b44ModeCouplingSanity.normSeat },
+        normSrc: { ...__b44ModeCouplingSanity.normSrc },
+        seatShape_100: __b44ModeCouplingSanity.seatShape_100,
+        srcShape_100: __b44ModeCouplingSanity.srcShape_100,
+        coupling_100: __b44ModeCouplingSanity.coupling_100,
+      } : null
     }
   };
 
   // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)
   if (DIAG_POS) {
-    const mirrored = mirrorSources(sourcePositions, roomDims);
+    const mirrored = mirrorSources(sources, roomDims);
     const splDb2 = runOnce(mirrored);
     
     // Apply same post-processing to mirrored run for fair comparison
@@ -860,7 +874,7 @@ export function computeRoomModesResponse({
     
     if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
       console.groupCollapsed("[B44][POS DIAG] source-coupling sensitivity");
-      console.log("SourceSig normal:", sourceSig(sourcePositions));
+      console.log("SourceSig normal:", sourceSig(sources));
       console.log("SourceSig mirrored:", sourceSig(mirrored));
       console.table(rows);
       console.log("Max Δ(dB) across probes:", maxDelta.toFixed(3));
