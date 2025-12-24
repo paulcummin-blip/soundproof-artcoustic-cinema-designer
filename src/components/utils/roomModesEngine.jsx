@@ -262,9 +262,7 @@ export function computeRoomModesResponse({
 
   // LF debugging stats collectors
   const lfDebug = {
-    directMag15_45: [],
-    modalMag15_45: [],
-    blendedMag15_45: []
+    modalMag15_45: []
   };
 
   // --- B44: modal coupling sanity (single mode 1,0,0) ---
@@ -297,48 +295,73 @@ export function computeRoomModesResponse({
     coupling_100: __coupling_100,
   };
 
-  // REW-style MLP auto level alignment (compute per-sub gain corrections)
+  // REW-style MLP auto level alignment (compute per-sub gain corrections using modal sum)
   let mlpAutoLevelGainsDb = [];
   
   if (autoLevelEnabled && sourcesLocal.length > 1) {
     const mlpBand = [30, 80];
     const perSubMedians = [];
     
-    // For each sub, compute its solo response at MLP in 30-80 Hz
+    // For each sub, compute its solo modal response at MLP in 30-80 Hz
     for (let subIdx = 0; subIdx < sourcesLocal.length; subIdx++) {
       const soloSource = [sourcesLocal[subIdx]];
       
-      // Compute solo curve (no user gain, no delay)
+      // Compute solo modal curve (no user gain, no delay)
       const soloCurve = freqs.map((f, i) => {
-        let sumRe = 0;
-        let sumIm = 0;
+        let sumRe_modal = 0;
+        let sumIm_modal = 0;
         
-        const source = soloSource[0];
-        const dx = source.x - seat.x;
-        const dy = source.y - seat.y;
-        const dz = (source.z ?? 0.0) - (seat.z ?? 1.2);
-        const d = Math.max(0.5, Math.sqrt(dx*dx + dy*dy + dz*dz));
-        
-        const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
-        const baseSplAt1m_50Hz = meta?.baseSplAt1m_50Hz || 90;
-        
-        let productRelativeDb = 0;
-        if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
-          productRelativeDb = meta.relativeCurve[i];
+        for (const mode of modes) {
+          const f0 = mode.freq;
+          if (!(f0 > 0)) continue;
+          
+          const qMode = estimateModeQ({
+            mode,
+            roomDims: room,
+            surfaceAbsorption: absorption,
+            dampingScalar,
+            leakage,
+            f0,
+          });
+          
+          const bandwidth = f0 / qMode;
+          const df = Math.abs(f - f0);
+          if (df > 5 * bandwidth && df > 20) continue;
+          
+          const source = soloSource[0];
+          const coupling = computeSpatialCoupling(mode, source, seat, room);
+          if (Math.abs(coupling) < 1e-6) continue;
+          
+          const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
+          
+          // Product curve as magnitude multiplier (relative)
+          let productRelativeDb = 0;
+          if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
+            productRelativeDb = meta.relativeCurve[i];
+          }
+          const productMagScale = Math.pow(10, productRelativeDb / 20);
+          
+          // Modal transfer function (normalized)
+          const r = f / Math.max(1e-6, f0);
+          const re = (1 - r * r);
+          const im = (r / Math.max(1e-6, qMode));
+          const denom = (re * re + im * im);
+          let hRe = re / denom;
+          let hIm = -im / denom;
+          hRe /= Math.max(1e-6, qMode);
+          hIm /= Math.max(1e-6, qMode);
+          
+          // No delay, no polarity for calibration
+          const weightMag = productMagScale;
+          const cRe = coupling * weightMag * hRe;
+          const cIm = coupling * weightMag * hIm;
+          
+          sumRe_modal += cRe;
+          sumIm_modal += cIm;
         }
         
-        const splAt1m = baseSplAt1m_50Hz + productRelativeDb;
-        const amp1m = Math.pow(10, splAt1m / 20);
-        const amplitude = amp1m / d;
-        
-        // No user gain, no delay for auto-level calibration
-        let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
-        
-        sumRe += amplitude * Math.cos(phi);
-        sumIm += amplitude * Math.sin(phi);
-        
-        const mag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
-        return 20 * Math.log10(Math.max(Number.EPSILON, mag));
+        const mag = Math.max(Number.EPSILON, Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal));
+        return 20 * Math.log10(mag);
       });
       
       // Extract 30-80 Hz median
@@ -375,64 +398,8 @@ export function computeRoomModesResponse({
   const runOnce = (sourcesOverride) => {
     const sourcesUsed = sourcesOverride ?? sourcesLocal;
 
-  // Build response: complex pressure sum with direct/modal blending
+  // Build response: pure MODAL PRESSURE SUM (REW-style room curve)
   let splDb = freqs.map((f, i) => {
-    // 1. DIRECT-FIELD COMPLEX SUM (REW-style: source SPL at 1m + distance loss)
-    let sumRe_direct = 0;
-    let sumIm_direct = 0;
-
-    for (let subIdx = 0; subIdx < sourcesUsed.length; subIdx++) {
-      const source = sourcesUsed[subIdx];
-
-      // Distance to seat
-      const dx = source.x - seat.x;
-      const dy = source.y - seat.y;
-      const dz = (source.z ?? 0.0) - (seat.z ?? 1.2);
-      const d = Math.max(0.5, Math.sqrt(dx*dx + dy*dy + dz*dz));
-
-      // Get product metadata for this sub
-      const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
-      const baseSplAt1m_50Hz = meta?.baseSplAt1m_50Hz || 90;
-
-      // Get product response at this frequency (relative dB)
-      let productRelativeDb = 0;
-      if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
-        productRelativeDb = meta.relativeCurve[i];
-      }
-
-      // REW-style source modeling: SPL at 1m (at this frequency)
-      const splAt1m = baseSplAt1m_50Hz + productRelativeDb;
-
-      // Convert to linear pressure magnitude at 1m
-      const amp1m = Math.pow(10, splAt1m / 20);
-
-      // Distance attenuation (inverse distance law)
-      const amplitude = amp1m / d;
-
-      // Apply sub tuning (gain, delay, polarity)
-      const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
-      const userGainLinear = Math.pow(10, subTuning.gainDb / 20);
-
-      // Apply MLP auto-level correction
-      const autoLevelGainDb = mlpAutoLevelGainsDb[subIdx] || 0;
-      const autoLevelGainLinear = Math.pow(10, autoLevelGainDb / 20);
-
-      const gainLinear = userGainLinear * autoLevelGainLinear;
-
-      // Phase: propagation + delay + polarity
-      let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
-      phi += -2 * Math.PI * f * (subTuning.delayMs / 1000);
-      if (subTuning.polarity === 180 || subTuning.polarity === 'invert') {
-        phi += Math.PI;
-      }
-
-      // Complex contribution
-      const finalAmplitude = amplitude * gainLinear;
-      sumRe_direct += finalAmplitude * Math.cos(phi);
-      sumIm_direct += finalAmplitude * Math.sin(phi);
-      }
-
-    // 2. MODAL COMPLEX SUM (REW-style: source SPL at 1m + modal filtering)
     let sumRe_modal = 0;
     let sumIm_modal = 0;
 
@@ -464,19 +431,13 @@ export function computeRoomModesResponse({
 
         // Get product metadata for this sub
         const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
-        const baseSplAt1m_50Hz = meta?.baseSplAt1m_50Hz || 90;
 
-        // Get product response at this frequency (relative dB)
+        // Product curve as magnitude multiplier (relative dB → linear scale)
         let productRelativeDb = 0;
         if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
           productRelativeDb = meta.relativeCurve[i];
         }
-
-        // REW-style source modeling: SPL at 1m (at this frequency)
-        const splAt1m = baseSplAt1m_50Hz + productRelativeDb;
-
-        // Convert to linear pressure magnitude at 1m
-        const amp1m = Math.pow(10, splAt1m / 20);
+        const productMagScale = Math.pow(10, productRelativeDb / 20);
 
         // Apply sub tuning (gain, delay, polarity)
         const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
@@ -488,16 +449,17 @@ export function computeRoomModesResponse({
 
         const gainLinear = userGainLinear * autoLevelGainLinear;
 
+        // Phase: delay + polarity only (distance/time-of-flight is in the coupling)
         const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
         const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
         const totalPhase = delayPhase + polarityPhase;
 
-        // Complex weight for this sub (includes source SPL modeling)
-        const weightRe = amp1m * gainLinear * Math.cos(totalPhase);
-        const weightIm = amp1m * gainLinear * Math.sin(totalPhase);
+        // Complex weight for this sub (magnitude shaping only)
+        const weightMag = productMagScale * gainLinear;
+        const weightRe = weightMag * Math.cos(totalPhase);
+        const weightIm = weightMag * Math.sin(totalPhase);
 
         // Second-order resonator (dimensionless, REW-style behaviour)
-        // Use normalised form so numbers don't explode/shrink with Hz^2 scaling.
         // H(f) = 1 / ( (1 - (f/f0)^2) + j*(f/(f0*Q)) )
         const r = f / Math.max(1e-6, f0);
         const re = (1 - r * r);
@@ -522,44 +484,16 @@ export function computeRoomModesResponse({
       }
     }
 
-    // 3. COMPLEX-DOMAIN CROSSFADE (with minimum modal contribution)
-    const blendStartHz = lowestAxial * 0.7;
-    const blendEndHz = lowestAxial;
-    const minModalWeight = 0.15; // Keep modal field active even below lowest axial
-
-    let w = minModalWeight; // Modal weight (never goes to pure direct)
-    if (f >= blendEndHz) {
-      w = 1.0;
-    } else if (f >= blendStartHz) {
-      w = minModalWeight + (1.0 - minModalWeight) * ((f - blendStartHz) / (blendEndHz - blendStartHz));
-    }
-
-    const modalScale = 6000;
-    // Correct crossfade: as w rises, we move from direct -> modal
-    const sumRe = (1 - w) * sumRe_direct + w * modalScale * sumRe_modal;
-    const sumIm = (1 - w) * sumIm_direct + w * modalScale * sumIm_modal;
-
-    // DEBUG: capture pre-smoothing component magnitudes for probe bins only
+    // DEBUG: capture pre-smoothing magnitudes for probe bins only
     if (__debugBass && __isProbeFreq(f)) {
-      const directMag = Math.sqrt(sumRe_direct * sumRe_direct + sumIm_direct * sumIm_direct);
       const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
-      const scaledModalMag = Math.sqrt(
-        (modalScale * sumRe_modal) * (modalScale * sumRe_modal) +
-        (modalScale * sumIm_modal) * (modalScale * sumIm_modal)
-      );
-      const blendedMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
-
       const toDb = (x) => 20 * Math.log10(Math.max(Number.EPSILON, x));
 
       __probeRows.push({
         fProbe: f,
         idx: i,
         binHz: Number(freqs[i].toFixed(2)),
-        w: Number.isFinite(w) ? Number(w.toFixed(3)) : w,
-        directMagDb_pre: Number(toDb(directMag).toFixed(2)),
         modalMagDb_pre: Number(toDb(modalMag).toFixed(2)),
-        scaledModalMagDb_pre: Number(toDb(scaledModalMag).toFixed(2)),
-        blendedMagDb_pre: Number(toDb(blendedMag).toFixed(2)),
         splDb_postSmooth: null,
         finalDb: null,
       });
@@ -567,20 +501,12 @@ export function computeRoomModesResponse({
 
     // LF debugging: capture magnitudes before calibration in 15-45 Hz band
     if (f >= 15 && f <= 45) {
-      const directMag = Math.sqrt(sumRe_direct * sumRe_direct + sumIm_direct * sumIm_direct);
       const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
-      const blendedMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
-      
-      lfDebug.directMag15_45.push(20 * Math.log10(Math.max(Number.EPSILON, directMag)));
       lfDebug.modalMag15_45.push(20 * Math.log10(Math.max(Number.EPSILON, modalMag)));
-      lfDebug.blendedMag15_45.push(20 * Math.log10(Math.max(Number.EPSILON, blendedMag)));
     }
 
-    // Avoid flattening the LF response: use a much smaller epsilon than 1e-12
-    // so tiny geometry/phase variations are not quantised into a fixed shelf.
-    const mag = Math.max(Number.EPSILON, Math.sqrt(sumRe * sumRe + sumIm * sumIm));
-
-    // Magnitude -> dB (calibration applied later in absoluteSplMode stage)
+    // Pure modal pressure magnitude → dB (calibration offset applied later)
+    const mag = Math.max(Number.EPSILON, Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal));
     return 20 * Math.log10(mag);
   });
   
@@ -713,29 +639,37 @@ export function computeRoomModesResponse({
   }
 
   // Build FINAL curve pipeline (single source of truth) - create NEW arrays at each step
-  // Step 1: Relative normalization (if requested)
-  // REW-style: use MEDIAN of 30-80 Hz band for robustness against nulls
+  // Absolute SPL calibration: anchor curve to sensible reference at MLP
+  let calibrationOffsetDb = 0;
   let normAppliedActual = false;
   let normRefDb = 0;
   let finalDb = splDbSmoothed;
 
-  if (isRelative && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
-    const [fMin, fMax] = normalizeBandHz;
-    const bandValues = freqs
-      .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb[i]) ? finalDb[i] : null)
-      .filter(v => v !== null);
+  // Always compute MLP reference (30-80 Hz median) for anchoring
+  const mlpBand = [30, 80];
+  const mlpBandValues = freqs
+    .map((f, i) => f >= mlpBand[0] && f <= mlpBand[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
+    .filter(v => v !== null);
 
-    if (bandValues.length >= 10) {
-      // Use MEDIAN instead of MEAN (more REW-like, robust to nulls)
-      const sorted = [...bandValues].sort((a, b) => a - b);
-      normRefDb = sorted[Math.floor(sorted.length / 2)];
+  if (mlpBandValues.length >= 10) {
+    const sorted = [...mlpBandValues].sort((a, b) => a - b);
+    const mlpMedianDb = sorted[Math.floor(sorted.length / 2)];
+    normRefDb = mlpMedianDb;
+
+    if (isRelative) {
+      // Relative view: normalize to 0 dB
       const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
-      finalDb = finalDb.map(v => (isFinite(v) ? (v - normRefDb + targetDb) : v));
+      calibrationOffsetDb = targetDb - mlpMedianDb;
       normAppliedActual = true;
+    } else {
+      // Absolute view: calibrate so MLP 30-80 Hz median = 85 dB (reference cinema level)
+      const targetAbsoluteDb = 85;
+      calibrationOffsetDb = targetAbsoluteDb - mlpMedianDb;
     }
-  }
 
-  // Step 2: If absolute mode, curve is already in absolute SPL (no normalization)
+    // Apply calibration offset
+    finalDb = finalDb.map(v => (isFinite(v) ? (v + calibrationOffsetDb) : v));
+  }
 
   // DEBUG: record finalDb + print a single forensic table
   if (__debugBass && __probeRows && __probeRows.length) {
@@ -828,12 +762,8 @@ export function computeRoomModesResponse({
   }
 
   // Compute LF debug stats
-  const directMagMin = lfDebug.directMag15_45.length > 0 ? Math.min(...lfDebug.directMag15_45).toFixed(1) : 'N/A';
-  const directMagMax = lfDebug.directMag15_45.length > 0 ? Math.max(...lfDebug.directMag15_45).toFixed(1) : 'N/A';
   const modalMagMin = lfDebug.modalMag15_45.length > 0 ? Math.min(...lfDebug.modalMag15_45).toFixed(1) : 'N/A';
   const modalMagMax = lfDebug.modalMag15_45.length > 0 ? Math.max(...lfDebug.modalMag15_45).toFixed(1) : 'N/A';
-  const blendedMagMin = lfDebug.blendedMag15_45.length > 0 ? Math.min(...lfDebug.blendedMag15_45).toFixed(1) : 'N/A';
-  const blendedMagMax = lfDebug.blendedMag15_45.length > 0 ? Math.max(...lfDebug.blendedMag15_45).toFixed(1) : 'N/A';
 
   // LF PROBE: detailed frequency-by-frequency audit using FINAL curve
   const probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45];
@@ -941,10 +871,8 @@ export function computeRoomModesResponse({
       sourceSigUsed,
       seatSigUsed,
       lfDebug15_45Hz: {
-        directMagDb: `${directMagMin} to ${directMagMax}`,
         modalMagDb: `${modalMagMin} to ${modalMagMax}`,
-        blendedMagDb: `${blendedMagMin} to ${blendedMagMax}`,
-        note: "Magnitudes before sourceCalibrationDb applied"
+        note: "Pure modal pressure magnitudes before calibration offset"
       },
       lfProbe: {
         probeFrequencies: probeFreqs,
