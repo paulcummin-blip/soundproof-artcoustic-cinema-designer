@@ -404,6 +404,7 @@ export function computeRoomModesResponse({
   let splDb = freqs.map((f, i) => {
     let sumRe_modal = 0;
     let sumIm_modal = 0;
+    let activeTerms = 0;
 
     for (const mode of modes) {
       const f0 = mode.freq;
@@ -483,6 +484,7 @@ export function computeRoomModesResponse({
 
         sumRe_modal += cRe;
         sumIm_modal += cIm;
+        activeTerms += 1;
       }
     }
 
@@ -509,6 +511,13 @@ export function computeRoomModesResponse({
 
     // Pure modal pressure magnitude → dB
     let modalDb = 20 * Math.log10(Math.max(Number.EPSILON, Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal)));
+    
+    // Apply mode density compensation (REW-ish): above 70 Hz, subtract incoherent sum growth
+    if (rewParityMode && f >= 70 && activeTerms > 1) {
+      const n = Math.max(1, activeTerms);
+      const compDb = 10 * Math.log10(n);
+      modalDb -= compDb * 0.85; // 0.85 = gentle application factor
+    }
     
     // Apply sealed room LF boost below lowest axial (if enabled)
     if (sealedBoostEnabled && lowestAxial && f < lowestAxial) {
@@ -795,12 +804,49 @@ export function computeRoomModesResponse({
       pressureGainDb = Math.min(sealedBoostMaxGainDb, sealedBoostKDbPerOct * octavesBelow);
     }
     
+    // Count active terms at this frequency (for debug)
+    let activeTermsAtFreq = 0;
+    for (const mode of modes) {
+      const f0 = mode.freq;
+      if (!(f0 > 0)) continue;
+      
+      const qMode = estimateModeQ({
+        mode,
+        roomDims: room,
+        surfaceAbsorption: absorption,
+        dampingScalar,
+        leakage,
+        f0,
+      });
+      
+      const bandwidth = f0 / qMode;
+      const df = Math.abs(fProbe - f0);
+      if (df > 5 * bandwidth && df > 20) continue;
+      
+      for (let subIdx = 0; subIdx < sourcesLocal.length; subIdx++) {
+        const source = sourcesLocal[subIdx];
+        const coupling = computeSpatialCoupling(mode, source, seat, room);
+        if (Math.abs(coupling) >= 1e-6) {
+          activeTermsAtFreq += 1;
+        }
+      }
+    }
+    
+    // Compute mode density compensation at this frequency
+    let modeDensityCompDb = 0;
+    if (rewParityMode && fProbe >= 70 && activeTermsAtFreq > 1) {
+      const n = Math.max(1, activeTermsAtFreq);
+      modeDensityCompDb = 10 * Math.log10(n) * 0.85;
+    }
+    
     return {
       freq: fProbe,
       rawDbBeforeCal: rawDbBeforeCal.toFixed(2),
       finalDbAfterCal: finalDbValue.toFixed(2),
       pressureGainDb: pressureGainDb.toFixed(2),
-      belowLowestAxial: lowestAxial && fProbe < lowestAxial
+      belowLowestAxial: lowestAxial && fProbe < lowestAxial,
+      activeTerms: activeTermsAtFreq,
+      modeDensityCompDb: modeDensityCompDb.toFixed(2)
     };
   });
   
