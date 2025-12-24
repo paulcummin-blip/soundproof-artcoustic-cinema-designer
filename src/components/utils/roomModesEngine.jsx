@@ -39,6 +39,7 @@ export function computeRoomModesResponse({
   leakage = 0.0,
   subProductCurves = null,
   absoluteSplMode = false,
+  autoLevelToMLP = true,
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -160,6 +161,9 @@ export function computeRoomModesResponse({
   // Define absolute/relative mode clearly (matches REW's logic)
   const isRelative = !!relativeViewEnabled;
   const isAbsolute = !isRelative;
+  
+  // Auto level to MLP: default true when REW mode is on
+  const autoLevelEnabled = rewParityMode ? (autoLevelToMLP ?? true) : false;
   
   const { widthM, lengthM, heightM } = room;
   
@@ -293,6 +297,80 @@ export function computeRoomModesResponse({
     coupling_100: __coupling_100,
   };
 
+  // REW-style MLP auto level alignment (compute per-sub gain corrections)
+  let mlpAutoLevelGainsDb = [];
+  
+  if (autoLevelEnabled && sourcesLocal.length > 1) {
+    const mlpBand = [30, 80];
+    const perSubMedians = [];
+    
+    // For each sub, compute its solo response at MLP in 30-80 Hz
+    for (let subIdx = 0; subIdx < sourcesLocal.length; subIdx++) {
+      const soloSource = [sourcesLocal[subIdx]];
+      
+      // Compute solo curve (no user gain, no delay)
+      const soloCurve = freqs.map((f, i) => {
+        let sumRe = 0;
+        let sumIm = 0;
+        
+        const source = soloSource[0];
+        const dx = source.x - seat.x;
+        const dy = source.y - seat.y;
+        const dz = (source.z ?? 0.0) - (seat.z ?? 1.2);
+        const d = Math.max(0.5, Math.sqrt(dx*dx + dy*dy + dz*dz));
+        
+        const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
+        const baseSplAt1m_50Hz = meta?.baseSplAt1m_50Hz || 90;
+        
+        let productRelativeDb = 0;
+        if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
+          productRelativeDb = meta.relativeCurve[i];
+        }
+        
+        const splAt1m = baseSplAt1m_50Hz + productRelativeDb;
+        const amp1m = Math.pow(10, splAt1m / 20);
+        const amplitude = amp1m / d;
+        
+        // No user gain, no delay for auto-level calibration
+        let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
+        
+        sumRe += amplitude * Math.cos(phi);
+        sumIm += amplitude * Math.sin(phi);
+        
+        const mag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+        return 20 * Math.log10(Math.max(Number.EPSILON, mag));
+      });
+      
+      // Extract 30-80 Hz median
+      const bandValues = freqs
+        .map((f, i) => f >= mlpBand[0] && f <= mlpBand[1] && isFinite(soloCurve[i]) ? soloCurve[i] : null)
+        .filter(v => v !== null);
+      
+      if (bandValues.length >= 10) {
+        const sorted = [...bandValues].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        perSubMedians.push(median);
+      } else {
+        perSubMedians.push(0);
+      }
+    }
+    
+    // Compute average median across all subs
+    const validMedians = perSubMedians.filter(m => Number.isFinite(m) && m !== 0);
+    const avgMedian = validMedians.length > 0 
+      ? validMedians.reduce((a, b) => a + b, 0) / validMedians.length 
+      : 0;
+    
+    // Compute gain corrections (dB) for each sub
+    mlpAutoLevelGainsDb = perSubMedians.map(median => {
+      if (!Number.isFinite(median) || median === 0) return 0;
+      return avgMedian - median;
+    });
+  } else {
+    // No auto-level: all gains are 0 dB
+    mlpAutoLevelGainsDb = sourcesLocal.map(() => 0);
+  }
+  
   // Extract computation into runOnce for diagnostic double-run
   const runOnce = (sourcesOverride) => {
     const sourcesUsed = sourcesOverride ?? sourcesLocal;
@@ -333,7 +411,13 @@ export function computeRoomModesResponse({
 
       // Apply sub tuning (gain, delay, polarity)
       const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
-      const gainLinear = Math.pow(10, subTuning.gainDb / 20);
+      const userGainLinear = Math.pow(10, subTuning.gainDb / 20);
+
+      // Apply MLP auto-level correction
+      const autoLevelGainDb = mlpAutoLevelGainsDb[subIdx] || 0;
+      const autoLevelGainLinear = Math.pow(10, autoLevelGainDb / 20);
+
+      const gainLinear = userGainLinear * autoLevelGainLinear;
 
       // Phase: propagation + delay + polarity
       let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
@@ -346,7 +430,7 @@ export function computeRoomModesResponse({
       const finalAmplitude = amplitude * gainLinear;
       sumRe_direct += finalAmplitude * Math.cos(phi);
       sumIm_direct += finalAmplitude * Math.sin(phi);
-    }
+      }
 
     // 2. MODAL COMPLEX SUM (REW-style: source SPL at 1m + modal filtering)
     let sumRe_modal = 0;
@@ -396,7 +480,14 @@ export function computeRoomModesResponse({
 
         // Apply sub tuning (gain, delay, polarity)
         const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
-        const gainLinear = Math.pow(10, subTuning.gainDb / 20);
+        const userGainLinear = Math.pow(10, subTuning.gainDb / 20);
+
+        // Apply MLP auto-level correction
+        const autoLevelGainDb = mlpAutoLevelGainsDb[subIdx] || 0;
+        const autoLevelGainLinear = Math.pow(10, autoLevelGainDb / 20);
+
+        const gainLinear = userGainLinear * autoLevelGainLinear;
+
         const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
         const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
         const totalPhase = delayPhase + polarityPhase;
@@ -875,6 +966,9 @@ export function computeRoomModesResponse({
       },
       lfProbeRaw: Array.isArray(lfProbeRaw) ? lfProbeRaw.map(r => ({ ...r })) : lfProbeRaw,
       seatNodeCheck: seatNodeCheck ? { ...seatNodeCheck } : null,
+      autoLevelToMLP: autoLevelEnabled,
+      mlpAutoLevelGainsDb: mlpAutoLevelGainsDb.map(g => Number.isFinite(g) ? g.toFixed(2) : '0.00'),
+      mlpBand: [30, 80],
       modeCouplingSanity: __b44ModeCouplingSanity ? { 
         seatM: { ...__b44ModeCouplingSanity.seatM },
         srcM: { ...__b44ModeCouplingSanity.srcM },
