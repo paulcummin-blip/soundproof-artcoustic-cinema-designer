@@ -640,6 +640,11 @@ export function computeRoomModesResponse({
 
   // Build FINAL curve pipeline (single source of truth) - create NEW arrays at each step
   // Absolute SPL calibration: anchor curve to sensible reference at MLP
+  
+  // ✅ Legacy debug/UI expects this name sometimes (REW Compare View).
+  // Define it early so it can never be "not found" even if we exit early.
+  let normRefDb = 0;
+  
   let calibrationOffsetDb = 0;
   let normAppliedActual = false;
   let calRefMedianDbBefore = 0;
@@ -660,9 +665,8 @@ export function computeRoomModesResponse({
     const sorted = [...mlpBandValues].sort((a, b) => a - b);
     const mlpMedianDb = sorted[Math.floor(sorted.length / 2)];
     calRefMedianDbBefore = mlpMedianDb;
-
-    // Keep legacy name used by REW Compare UI/debug so we don't crash
-    const normRefDb = mlpMedianDb;
+    
+    normRefDb = mlpMedianDb;
 
     if (isRelative) {
       // Relative view: normalize to 0 dB
