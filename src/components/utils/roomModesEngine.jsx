@@ -642,19 +642,20 @@ export function computeRoomModesResponse({
   // Absolute SPL calibration: anchor curve to sensible reference at MLP
   let calibrationOffsetDb = 0;
   let normAppliedActual = false;
-  let normRefDb = 0;
+  let calRefMedianDbBefore = 0;
+  let calRefMedianDbAfter = 0;
   let finalDb = splDbSmoothed;
 
   // Always compute MLP reference (30-80 Hz median) for anchoring
-  const mlpBand = [30, 80];
+  const calRefBandHz = [30, 80];
   const mlpBandValues = freqs
-    .map((f, i) => f >= mlpBand[0] && f <= mlpBand[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
+    .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
     .filter(v => v !== null);
 
   if (mlpBandValues.length >= 10) {
     const sorted = [...mlpBandValues].sort((a, b) => a - b);
     const mlpMedianDb = sorted[Math.floor(sorted.length / 2)];
-    normRefDb = mlpMedianDb;
+    calRefMedianDbBefore = mlpMedianDb;
 
     if (isRelative) {
       // Relative view: normalize to 0 dB
@@ -669,6 +670,15 @@ export function computeRoomModesResponse({
 
     // Apply calibration offset
     finalDb = finalDb.map(v => (isFinite(v) ? (v + calibrationOffsetDb) : v));
+    
+    // Compute after-calibration median for debug
+    const afterBandValues = freqs
+      .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
+      .filter(v => v !== null);
+    if (afterBandValues.length >= 10) {
+      const sortedAfter = [...afterBandValues].sort((a, b) => a - b);
+      calRefMedianDbAfter = sortedAfter[Math.floor(sortedAfter.length / 2)];
+    }
   }
 
   // DEBUG: record finalDb + print a single forensic table
@@ -897,6 +907,12 @@ export function computeRoomModesResponse({
       autoLevelToMLP: autoLevelEnabled,
       mlpAutoLevelGainsDb: mlpAutoLevelGainsDb.map(g => Number.isFinite(g) ? g.toFixed(2) : '0.00'),
       mlpBand: [30, 80],
+      rewParityMode: rewParityMode,
+      modalOnly: rewParityMode,
+      calRefBandHz: calRefBandHz,
+      calRefMedianDbBefore: Number.isFinite(calRefMedianDbBefore) ? calRefMedianDbBefore.toFixed(2) : 'N/A',
+      calOffsetAppliedDb: Number.isFinite(calibrationOffsetDb) ? calibrationOffsetDb.toFixed(2) : '0.00',
+      calRefMedianDbAfter: Number.isFinite(calRefMedianDbAfter) ? calRefMedianDbAfter.toFixed(2) : 'N/A',
       modeCouplingSanity: __b44ModeCouplingSanity ? { 
         seatM: { ...__b44ModeCouplingSanity.seatM },
         srcM: { ...__b44ModeCouplingSanity.srcM },
@@ -1088,20 +1104,25 @@ function computeRoomModes({
 
 /**
  * Compute spatial coupling using cosine pressure mode shapes
- * Returns total coupling (for engine use) and individual terms (for debug)
+ * Returns total coupling (for engine use) - uses direct meters, no normalization
  */
 function computeSpatialCoupling(mode, source, receiver, roomDims) {
   const { widthM, lengthM, heightM } = roomDims;
   const { nx, ny, nz } = mode;
   
-  // Cosine pressure terms (preserves sign for interference)
-  const srcX = nx > 0 ? Math.cos(nx * Math.PI * source.x / widthM) : 1;
-  const srcY = ny > 0 ? Math.cos(ny * Math.PI * source.y / lengthM) : 1;
-  const srcZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / heightM) : 1;
+  // Safe guard: prevent division by zero
+  const W = Math.max(1e-6, widthM);
+  const L = Math.max(1e-6, lengthM);
+  const H = Math.max(1e-6, heightM);
   
-  const rcvX = nx > 0 ? Math.cos(nx * Math.PI * receiver.x / widthM) : 1;
-  const rcvY = ny > 0 ? Math.cos(ny * Math.PI * receiver.y / lengthM) : 1;
-  const rcvZ = nz > 0 ? Math.cos(nz * Math.PI * (receiver.z ?? 1.2) / heightM) : 1;
+  // Cosine pressure terms (direct meters, no 0-1 normalization)
+  const srcX = nx > 0 ? Math.cos(nx * Math.PI * source.x / W) : 1;
+  const srcY = ny > 0 ? Math.cos(ny * Math.PI * source.y / L) : 1;
+  const srcZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / H) : 1;
+  
+  const rcvX = nx > 0 ? Math.cos(nx * Math.PI * receiver.x / W) : 1;
+  const rcvY = ny > 0 ? Math.cos(ny * Math.PI * receiver.y / L) : 1;
+  const rcvZ = nz > 0 ? Math.cos(nz * Math.PI * (receiver.z ?? 1.2) / H) : 1;
   
   // Total coupling = source pressure × receiver pressure
   return (srcX * srcY * srcZ) * (rcvX * rcvY * rcvZ);
