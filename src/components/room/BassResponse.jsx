@@ -64,6 +64,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // REW failure cache (prevent same-input errors from looping)
   const lastRewFailSigRef = useRef(null);
   const lastRewFailResultRef = useRef(null);
+  
+  // Throttled debug state (prevent jumping during drag)
+  const lastStableDebugRef = useRef(null);
+  const lastDebugUpdateTimeRef = useRef(0);
+  const isDraggingRef = useRef(false);
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -820,9 +825,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     setEngineCallsUi(engineCallCountRef.current);
   }, [subPositionEpoch, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, rewSmoothing, rewRelativeView, rewView, roomDamping]);
 
-  // Sensitivity audit: compute deltas when source position changes
+  // Sensitivity audit: compute deltas when source position changes (throttled during drag)
   const sensitivityAudit = useMemo(() => {
-    if (!rewCompareView || !rewModesDataAudit || !subsForSimulation.length) return null;
+    if (!rewCompareView || !rewModesDataAudit || !subsForSimulation.length) {
+      return lastStableDebugRef.current;
+    }
+    
+    // Throttle updates: max once per 250ms during drag
+    const now = Date.now();
+    const timeSinceLastUpdate = now - lastDebugUpdateTimeRef.current;
+    const shouldUpdate = !isDraggingRef.current || timeSinceLastUpdate >= 250;
+    
+    if (!shouldUpdate && lastStableDebugRef.current) {
+      return lastStableDebugRef.current;
+    }
 
     const currentSourceSig = subsForSimulation.map(s => 
       `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${(s.z ?? 0).toFixed(2)}`
@@ -897,7 +913,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     prevFreqsRef.current = currentFreqs;
     prevCouplingRef.current = { src: currentCoupling.src, rcv: currentCoupling.rcv, total: currentCoupling.total };
 
-    return {
+    const auditResult = {
       sourceChanged,
       currentSourceSig,
       probeDeltas,
@@ -907,6 +923,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       avgDelta,
       verdict: maxDelta < 0.5 ? 'NOT RESPONDING (likely stale data or structural bug)' : 'RESPONDING (engine reacts to position)'
     };
+    
+    // Update stable ref and timestamp
+    lastStableDebugRef.current = auditResult;
+    lastDebugUpdateTimeRef.current = now;
+    
+    return auditResult;
   }, [rewCompareView, rewModesDataAudit, subsForSimulation, seatingPositions, roomDims, seatNudgeTest, computeAxialCoupling]);
 
   // Compute stable Y-axis domain using 30–80 Hz band intelligence
@@ -1595,18 +1617,36 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </div>
 
         {/* REW Compare View readout (only when REW Compare is ON) */}
-        {rewCompareView && rewStyleMode && (
-          <div className="text-xs text-[#1B1A1A] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
-            <div className="font-semibold mb-1">REW Compare View</div>
-            <div className="text-[10px] space-y-0.5">
-              <div>• Room: {(roomDims?.widthM || 0).toFixed(1)}×{(roomDims?.lengthM || 0).toFixed(1)}×{(roomDims?.heightM || 0).toFixed(1)} m</div>
-              <div>• Smoothing: {rewSmoothing}</div>
-              <div>• Relative normalisation: ON (30–80 Hz)</div>
-              <div>• RefDb (median 30–80): {yAxisDomain?.refDb?.toFixed(1) || 'N/A'} dB</div>
-              <div>• Y window: {yAxisDomain?.min} to {yAxisDomain?.max} dB</div>
+        {rewCompareView && rewStyleMode && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+          
+          // Safe refDb: use debug.normRefDb or fallback to display mode target
+          const refDbDisplay = activeDebug?.normRefDb 
+            ? (typeof activeDebug.normRefDb === 'string' ? activeDebug.normRefDb : activeDebug.normRefDb.toFixed(1))
+            : (rewRelativeView ? "0.0" : "85.0");
+          
+          return (
+            <div className="text-xs text-[#1B1A1A] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
+              <div className="font-semibold mb-1">REW Compare View (Display Preset)</div>
+              <div className="text-[10px] space-y-0.5">
+                <div>• Room: {(roomDims?.widthM || 0).toFixed(1)}×{(roomDims?.lengthM || 0).toFixed(1)}×{(roomDims?.heightM || 0).toFixed(1)} m</div>
+                <div>• Smoothing: {rewSmoothing}</div>
+                <div>• Sealed room: ALWAYS (cinemas are sealed)</div>
+                <div>• Relative normalisation: {rewRelativeView ? 'ON' : 'OFF'} (30–80 Hz)</div>
+                <div>• RefDb (median 30–80): {refDbDisplay} dB</div>
+                <div>• Y window: {yAxisDomain?.min || '—'} to {yAxisDomain?.max || '—'} dB</div>
+                <div className="text-[9px] opacity-70 mt-1">Engine SPL range (raw): {activeDebug?.splMinDb || '—'} to {activeDebug?.splMaxDb || '—'} dB</div>
+                <div className="text-[9px] opacity-70">Display SPL range: {(() => {
+                  const finite = displayData.filter(d => Number.isFinite(d.spl)).map(d => d.spl);
+                  if (finite.length === 0) return 'N/A';
+                  return `${Math.min(...finite).toFixed(1)} to ${Math.max(...finite).toFixed(1)} dB`;
+                })()}</div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Seat Node Check (only when debug enabled) */}
         {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
