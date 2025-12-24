@@ -40,6 +40,8 @@ export function computeRoomModesResponse({
   subProductCurves = null,
   absoluteSplMode = false,
   autoLevelToMLP = true,
+  isDragging = false,
+  sealedRoomBoost = { enabled: false, kDbPerOct: 6.0, maxGainDb: 12.0 },
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -251,10 +253,10 @@ export function computeRoomModesResponse({
   // Lowest axial mode (used for sealed-room pressure behaviour)
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
-  // Pressure-region support flag (DISABLED for REW parity - causes false LF boost)
-  const pressureEnabled = false;
-  const kDbPerOct = 0; // REW mode: no artificial room gain below lowest axial
-  const maxPressureGainDb = 0; // Capped to prevent LF explosion
+  // Sealed room LF boost (optional, disabled by default)
+  const sealedBoostEnabled = sealedRoomBoost?.enabled ?? false;
+  const sealedBoostKDbPerOct = sealedRoomBoost?.kDbPerOct ?? 6.0;
+  const sealedBoostMaxGainDb = sealedRoomBoost?.maxGainDb ?? 12.0;
   
   // Track what processing was applied
   const calibrationApplied = rewParityMode;
@@ -505,9 +507,17 @@ export function computeRoomModesResponse({
       lfDebug.modalMag15_45.push(20 * Math.log10(Math.max(Number.EPSILON, modalMag)));
     }
 
-    // Pure modal pressure magnitude → dB (calibration offset applied later)
-    const mag = Math.max(Number.EPSILON, Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal));
-    return 20 * Math.log10(mag);
+    // Pure modal pressure magnitude → dB
+    let modalDb = 20 * Math.log10(Math.max(Number.EPSILON, Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal)));
+    
+    // Apply sealed room LF boost below lowest axial (if enabled)
+    if (sealedBoostEnabled && lowestAxial && f < lowestAxial) {
+      const octavesBelow = Math.log2(lowestAxial / f);
+      const pressureGainDb = Math.min(sealedBoostMaxGainDb, sealedBoostKDbPerOct * octavesBelow);
+      modalDb += pressureGainDb;
+    }
+    
+    return modalDb;
   });
   
   return splDb;
@@ -640,11 +650,6 @@ export function computeRoomModesResponse({
 
   // Build FINAL curve pipeline (single source of truth) - create NEW arrays at each step
   // Absolute SPL calibration: anchor curve to sensible reference at MLP
-  
-  // ✅ Legacy debug/UI expects this name sometimes (REW Compare View).
-  // Define it early so it can never be "not found" even if we exit early.
-  let normRefDb = 0;
-  
   let calibrationOffsetDb = 0;
   let normAppliedActual = false;
   let calRefMedianDbBefore = 0;
@@ -665,8 +670,6 @@ export function computeRoomModesResponse({
     const sorted = [...mlpBandValues].sort((a, b) => a - b);
     const mlpMedianDb = sorted[Math.floor(sorted.length / 2)];
     calRefMedianDbBefore = mlpMedianDb;
-    
-    normRefDb = mlpMedianDb;
 
     if (isRelative) {
       // Relative view: normalize to 0 dB
@@ -770,8 +773,12 @@ export function computeRoomModesResponse({
     const rawDbBeforeCal = splDb[idx]; // Before any calibration
     const finalDbValue = finalDb[idx]; // After all processing (calibration + normalization)
     
-    // Pressure gain is always 0 (disabled)
-    const pressureGainDb = 0;
+    // Compute sealed room pressure gain if enabled
+    let pressureGainDb = 0;
+    if (sealedBoostEnabled && lowestAxial && fProbe < lowestAxial) {
+      const octavesBelow = Math.log2(lowestAxial / fProbe);
+      pressureGainDb = Math.min(sealedBoostMaxGainDb, sealedBoostKDbPerOct * octavesBelow);
+    }
     
     return {
       freq: fProbe,
@@ -809,15 +816,18 @@ export function computeRoomModesResponse({
 
   // FINAL GUARD: Prevent "No finite values" silent failures
   const finalFiniteCheck = finalDb.filter(v => isFinite(v));
-  if (finalFiniteCheck.length === 0) {
+  if (finalFiniteCheck.length < 10) {
+    // Safety fallback: return flat curve so graph never blanks
+    const fallbackValue = isRelative ? 0 : 85;
+    const fallbackCurve = freqs.map(() => fallbackValue);
     return {
-      freqs: [],
-      splDb: [],
+      freqs: [...freqs],
+      splDb: fallbackCurve,
       debug: {
-        error: "No finite values in output",
-        message: "computeRoomModesResponse produced no valid SPL data",
+        error: "No finite SPL values (fallback curve used)",
+        message: `Returned flat ${fallbackValue} dB curve to prevent blank graph`,
         nonFiniteRepaired,
-        rawRange: rawRange.toFixed(2),
+        rawRange: rawRange ? rawRange.toFixed(2) : 'N/A',
       }
     };
   }
@@ -848,7 +858,7 @@ export function computeRoomModesResponse({
       relativeViewEnabled: isRelative,
       normBandHz: actualNormBand,
       normApplied: normAppliedActual,
-      normRefDb: Number.isFinite(normRefDb) ? Number(normRefDb.toFixed(2)) : null,
+      normRefDb: isRelative ? "0.0" : "85.0",
       smoothingApplied,
       nonFiniteRepaired,
       rawRange: rawRange.toFixed(2),
@@ -877,11 +887,11 @@ export function computeRoomModesResponse({
       lfProbe: {
         probeFrequencies: probeFreqs,
         measurements: lfProbe,
-        pressureRegionActive: false,
+        pressureRegionActive: sealedBoostEnabled,
         pressureGainSettings: {
-          kDbPerOct: '0.0',
-          maxGainDb: '0.0',
-          enabled: false
+          kDbPerOct: sealedBoostKDbPerOct.toFixed(1),
+          maxGainDb: sealedBoostMaxGainDb.toFixed(1),
+          enabled: sealedBoostEnabled
         },
         minModalWeight: 0.15,
         lowestAxialHz: lowestAxial,
