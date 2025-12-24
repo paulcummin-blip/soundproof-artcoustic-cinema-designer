@@ -539,20 +539,24 @@ export function computeRoomModesResponse({
     if (rewParityMode && schroederHz > 0) {
       splDbSchroeder = splDb.map((db, i) => {
         const f = freqs[i];
-        // Only apply above Schroeder frequency (never below lowest axial)
-        if (f < schroederHz) return db;
+
+        // Start blend earlier: 0.7 × Schroeder (so 120 Hz is affected in typical rooms)
+        const blendStart = schroederHz * 0.7;
+        const blendEnd = schroederHz * 1.6;
+
+        // Only apply above blend start (never below lowest axial)
+        if (f < blendStart) return db;
 
         // Blend to a gently smoothed "statistical" curve (no wild modal spikes)
-        const f2 = schroederHz * 1.6;
-        const t = Math.max(0, Math.min(1, (f - schroederHz) / Math.max(1e-6, (f2 - schroederHz))));
+        const t = Math.max(0, Math.min(1, (f - blendStart) / Math.max(1e-6, (blendEnd - blendStart))));
 
         // Gentle roll-off to prevent upper bass inflation (fix 80-200 Hz region)
-        // Apply -1 dB per octave above Schroeder to keep mid-bass realistic
-        const octavesAbove = Math.log2(f / schroederHz);
+        // Apply -1 dB per octave above blend start to keep mid-bass realistic
+        const octavesAbove = Math.log2(f / blendStart);
         const rolloffDb = -1.0 * octavesAbove;
-        
+
         // Simple target: a mild downward tilt + rolloff
-        const target = dbAt(schroederHz, freqs, splDb) - 3 * Math.log2(f / schroederHz) + rolloffDb;
+        const target = dbAt(blendStart, freqs, splDb) - 3 * Math.log2(f / blendStart) + rolloffDb;
 
         return (1 - t) * db + t * target;
       });
@@ -1286,8 +1290,13 @@ function estimateModeQ({ mode, roomDims, surfaceAbsorption, dampingScalar, leaka
   
   const baseQ = dampingScalar * 20; // Maps slider (0.5-1.75) to Q (10-35)
   
-  // Mild frequency dependence: slightly lower Q at higher frequencies
-  const freqFactor = Math.pow(f0 / 50, -0.15);
+  // Stronger frequency dependence: reduce Q faster above 80 Hz (tames upper-bass peaks)
+  const freqFactor = Math.pow(f0 / 50, -0.30);
+  
+  // Mode type weighting: tangential/oblique modes more damped than axial
+  let modeTypeFactor = 1.0;
+  if (mode.type === 'tangential') modeTypeFactor = 0.85;
+  else if (mode.type === 'oblique') modeTypeFactor = 0.75;
   
   // Mode order weighting: higher order modes slightly more damped
   const order = Math.sqrt(mode.nx*mode.nx + mode.ny*mode.ny + mode.nz*mode.nz);
@@ -1296,7 +1305,7 @@ function estimateModeQ({ mode, roomDims, surfaceAbsorption, dampingScalar, leaka
   // Leakage reduces Q uniformly
   const leakageFactor = 1 / (1 + 2 * clamp01(leakage));
   
-  const q = baseQ * freqFactor * orderFactor * leakageFactor;
+  const q = baseQ * freqFactor * modeTypeFactor * orderFactor * leakageFactor;
   
   return Math.max(6, Math.min(80, q));
 }
