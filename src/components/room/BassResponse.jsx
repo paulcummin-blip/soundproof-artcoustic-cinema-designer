@@ -80,6 +80,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewStyleMode, rewSmoothing]);
 
+  // Auto-enable Lock Y-axis when REW mode is turned ON
+  React.useEffect(() => {
+    if (rewStyleMode) {
+      setYAxisLocked(true);
+    }
+  }, [rewStyleMode]);
+
   // Position signatures to detect in-place array mutations
   const frontLiveSig = useMemo(() => {
     const a = Array.isArray(frontSubsLive) ? frontSubsLive : [];
@@ -477,29 +484,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     };
   }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView]);
 
-  // Force settings when REW Compare View is enabled (moved after rewModesData definition)
-  useEffect(() => {
-    if (rewCompareView) {
-      setRewRelativeView(false); // Absolute SPL for REW Compare
-      setRewSmoothing('1/3');
-      setYAxisLocked(true);
-      
-      // Capture baseline snapshot on first enable (if valid data exists)
-      if (!rewCompareBaselineRef.current && rewModesData?.splDb && rewModesData.debug?.splDbRepaired) {
-        rewCompareBaselineRef.current = {
-          splDbRepaired: [...rewModesData.debug.splDbRepaired],
-          freqs: [...rewModesData.freqs],
-          sourceSigRounded: rewModesData.debug?.sourceSigRounded,
-          seatSigRounded: rewModesData.debug?.seatSigRounded,
-          timestamp: Date.now()
-        };
-      }
-    } else {
-      // Clear baseline when Compare View is disabled
-      rewCompareBaselineRef.current = null;
-    }
-  }, [rewCompareView, rewModesData]);
-
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
     try {
@@ -770,6 +754,29 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     };
   }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView]);
 
+  // Force settings when REW Compare View is enabled (moved after rewModesData definition)
+  useEffect(() => {
+    if (rewCompareView) {
+      setRewRelativeView(false); // Absolute SPL for REW Compare
+      setRewSmoothing('1/3');
+      setYAxisLocked(true);
+      
+      // Capture baseline snapshot on first enable (if valid data exists)
+      if (!rewCompareBaselineRef.current && rewModesData?.splDb && rewModesData.debug?.splDbRepaired) {
+        rewCompareBaselineRef.current = {
+          splDbRepaired: [...rewModesData.debug.splDbRepaired],
+          freqs: [...rewModesData.freqs],
+          sourceSigRounded: rewModesData.debug?.sourceSigRounded,
+          seatSigRounded: rewModesData.debug?.seatSigRounded,
+          timestamp: Date.now()
+        };
+      }
+    } else {
+      // Clear baseline when Compare View is disabled
+      rewCompareBaselineRef.current = null;
+    }
+  }, [rewCompareView, rewModesData]);
+
   // Helper: apply REW-style smoothing
   function applyRewSmoothing(freqs, splDb, smoothing) {
     const octaveFraction = {
@@ -1035,13 +1042,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     return { refDb, min, max };
   }, []);
-
-  // Auto-enable Lock Y-axis when REW mode is turned ON
-  React.useEffect(() => {
-    if (rewStyleMode) {
-      setYAxisLocked(true);
-    }
-  }, [rewStyleMode]);
 
   // Compute Y-axis domain ONCE on first valid data, then only on manual reset
   React.useEffect(() => {
