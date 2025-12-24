@@ -2628,11 +2628,7 @@ function SpeakerPlacementImpl(props) {
               )}
             </div>
 
-            <div className="col-span-12 pt-1">
-              <p className="text-[12px] leading-snug text-[#625143]">
-                Select model and quantity (0–2) for front and rear subwoofers. Changes are reflected immediately in the plan view.
-              </p>
-            </div>
+
           </div>
         </div>
       </CollapsiblePanel>
