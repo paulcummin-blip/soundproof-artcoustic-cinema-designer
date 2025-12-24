@@ -823,9 +823,13 @@ export function computeRoomModesResponse({
   }
 
   // Build base return object (all fresh arrays/objects to avoid frozen mutations)
+  // CRITICAL: Always return valid arrays so REW Compare can't blank the graph
+  const safeFreqs = Array.isArray(freqs) && freqs.length > 0 ? freqs : [];
+  const safeFinalDb = Array.isArray(finalDb) && finalDb.length > 0 ? finalDb : (Array.isArray(splDb) ? splDb : []);
+  
   const baseReturn = {
-    freqs: [...freqs],
-    splDb: [...finalDb],
+    freqs: [...safeFreqs],
+    splDb: [...safeFinalDb],
     debug: {
       schroederHz,
       modeMarkersHz: [...modeMarkersHz],
