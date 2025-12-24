@@ -41,12 +41,48 @@ export function computeRoomModesResponse({
   absoluteSplMode = false,
 }) {
   try {
-  // Validate inputs
-  if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
+  // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
+  const room = roomDims ? { 
+    widthM: roomDims.widthM, 
+    lengthM: roomDims.lengthM, 
+    heightM: roomDims.heightM 
+  } : null;
+  
+  const seat = seatPosition ? { 
+    x: seatPosition.x, 
+    y: seatPosition.y, 
+    z: seatPosition.z 
+  } : null;
+  
+  const sources = (sourcePositions || []).map(s => ({
+    x: s?.x,
+    y: s?.y,
+    z: s?.z,
+    id: s?.id,
+    modelKey: s?.modelKey,
+    tuning: s?.tuning ? {
+      gainDb: s.tuning.gainDb ?? 0,
+      delayMs: s.tuning.delayMs ?? 0,
+      polarity: s.tuning.polarity ?? 'normal'
+    } : { gainDb: 0, delayMs: 0, polarity: 'normal' }
+  }));
+  
+  const absorption = surfaceAbsorption ? { ...surfaceAbsorption } : {
+    front: 0.30, back: 0.30, left: 0.30,
+    right: 0.30, ceiling: 0.30, floor: 0.30,
+  };
+  
+  // Create local copies of product curves to prevent mutation
+  const productCurves = subProductCurves && Array.isArray(subProductCurves)
+    ? subProductCurves.map(curve => curve ? [...curve] : null)
+    : null;
+  
+  // Validate inputs (use local copies)
+  if (!room?.widthM || !room?.lengthM || !room?.heightM) {
     return { freqs: [], splDb: [], debug: { schroederHz: 0, modeMarkersHz: [], modeCount: 0 } };
   }
   
-  if (!seatPosition || typeof seatPosition.x !== 'number' || typeof seatPosition.y !== 'number') {
+  if (!seat || typeof seat.x !== 'number' || typeof seat.y !== 'number') {
     return { freqs: [], splDb: [], debug: { schroederHz: 0, modeMarkersHz: [], modeCount: 0 } };
   }
 
@@ -100,18 +136,17 @@ export function computeRoomModesResponse({
     includeObliqueLocal = true;
   }
 
-  // Build a local sources array (never reassign/mutate caller sourcePositions)
-  let sources = Array.isArray(sourcePositions) ? sourcePositions : [];
-
-  if (sources.length === 0) {
-    sources = [{
-      x: roomDims.widthM / 2,
-      y: 0.2,
-      z: rewParityMode ? subFloorHeight : 0.2,
-    }];
-  } else if (rewParityMode) {
-    // Force subs to floor in REW parity mode (new objects only)
-    sources = sources.map(src => ({
+  // Sources array already created as safe copy above - apply defaults if needed
+  let sourcesLocal = sources.length > 0 ? sources : [{
+    x: room.widthM / 2,
+    y: 0.2,
+    z: rewParityMode ? subFloorHeight : 0.2,
+    tuning: { gainDb: 0, delayMs: 0, polarity: 'normal' }
+  }];
+  
+  // Force subs to floor in REW parity mode (create new objects)
+  if (rewParityMode) {
+    sourcesLocal = sourcesLocal.map(src => ({
       ...src,
       z: subFloorHeight,
     }));
@@ -128,7 +163,7 @@ export function computeRoomModesResponse({
     absoluteSplModeLocal = false;
   }
   
-  const { widthM, lengthM, heightM } = roomDims;
+  const { widthM, lengthM, heightM } = room;
   const volume = widthM * lengthM * heightM;
   
   // Compute Schroeder frequency
@@ -162,7 +197,7 @@ export function computeRoomModesResponse({
   
   // SOURCE CALIBRATION (applied upstream, not after summation)
   // REW reference: 1 sub @ 1m in half-space ≈ 90 dB at 50 Hz
-  const numSubs = sources.length;
+  const numSubs = sourcesLocal.length;
   const avgDistance = 3.5; // Typical MLP distance in meters
   const subSensitivity = 90; // Typical subwoofer 1W/1m (dB)
   
@@ -189,8 +224,8 @@ export function computeRoomModesResponse({
 
   // --- B44: modal coupling sanity (single mode 1,0,0) ---
   const __b44Clamp01 = (t) => Math.max(0, Math.min(1, t));
-  const __b44Seat = seatPosition || { x: 0, y: 0, z: 0 };
-  const __b44Src = (Array.isArray(sources) && sources[0]) ? sources[0] : { x: 0, y: 0, z: 0 };
+  const __b44Seat = seat || { x: 0, y: 0, z: 0 };
+  const __b44Src = (sourcesLocal.length > 0) ? sourcesLocal[0] : { x: 0, y: 0, z: 0 };
 
   // normalised 0..1
   const __sx = __b44Clamp01((__b44Seat.x || 0) / (widthM || 1));
@@ -219,7 +254,7 @@ export function computeRoomModesResponse({
 
   // Extract computation into runOnce for diagnostic double-run
   const runOnce = (sourcesOverride) => {
-    const sourcesUsed = sourcesOverride ?? sources;
+    const sourcesUsed = sourcesOverride ?? sourcesLocal;
 
   // Build response: complex pressure sum with direct/modal blending
   let splDb = freqs.map((f, i) => {
@@ -231,9 +266,9 @@ export function computeRoomModesResponse({
       const source = sourcesUsed[subIdx];
 
       // Distance to seat
-      const dx = source.x - seatPosition.x;
-      const dy = source.y - seatPosition.y;
-      const dz = (source.z ?? 0.0) - (seatPosition.z ?? 1.2);
+      const dx = source.x - seat.x;
+      const dy = source.y - seat.y;
+      const dz = (source.z ?? 0.0) - (seat.z ?? 1.2);
       const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
       // Pure geometry/phase term only (no absolute SPL reference)
@@ -241,8 +276,8 @@ export function computeRoomModesResponse({
 
       // Apply sub's product response if provided
       let productGainLinear = 1.0;
-      if (subProductCurves && subProductCurves[subIdx]) {
-        const curveDb = subProductCurves[subIdx][i];
+      if (productCurves && productCurves[subIdx]) {
+        const curveDb = productCurves[subIdx][i];
         if (Number.isFinite(curveDb)) {
           productGainLinear = Math.pow(10, curveDb / 20);
         }
@@ -297,13 +332,13 @@ export function computeRoomModesResponse({
         const source = sourcesUsed[subIdx];
 
         // Spatial coupling (signed, preserves phase)
-        const coupling = computeSpatialCoupling(mode, source, seatPosition, roomDims);
+        const coupling = computeSpatialCoupling(mode, source, seat, room);
         if (Math.abs(coupling) < 1e-6) continue;
 
         // Apply sub's product response if provided (frequency-dependent gain)
         let productGainLinear = 1.0;
-        if (subProductCurves && subProductCurves[subIdx]) {
-          const curveDb = subProductCurves[subIdx][i];
+        if (productCurves && productCurves[subIdx]) {
+          const curveDb = productCurves[subIdx][i];
           if (Number.isFinite(curveDb)) {
             productGainLinear = Math.pow(10, curveDb / 20);
           }
@@ -427,8 +462,9 @@ export function computeRoomModesResponse({
     // (No post-processing needed - losses already bypassed below lowest axial)
 
     // Schroeder blend: above fs, reduce explicit modal contrast (statistical smoothing feel)
+    let splDbSchroeder = splDb;
     if (rewParityMode && schroederHz > 0) {
-      splDb = splDb.map((db, i) => {
+      splDbSchroeder = splDb.map((db, i) => {
         const f = freqs[i];
         // Only apply above Schroeder frequency (never below lowest axial)
         if (f < schroederHz) return db;
@@ -445,18 +481,18 @@ export function computeRoomModesResponse({
     }
 
     // Capture RAW stats BEFORE any processing (critical for debugging)
-  const rawFinite = splDb.filter(v => isFinite(v));
-  const rawMin = rawFinite.length > 0 ? Math.min(...rawFinite) : 0;
-  const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;
-  const rawRange = rawMax - rawMin;
+    const rawFinite = splDbSchroeder.filter(v => isFinite(v));
+    const rawMin = rawFinite.length > 0 ? Math.min(...rawFinite) : 0;
+    const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;
+    const rawRange = rawMax - rawMin;
 
-  // Clamp non-finite values before smoothing (IMMUTABLE - do not mutate in place)
-  let nonFiniteRepaired = 0;
-  let lastGoodValue = 0;
+    // Clamp non-finite values before smoothing (IMMUTABLE - do not mutate in place)
+    let nonFiniteRepaired = 0;
+    let lastGoodValue = 0;
 
-  const repaired = [];
-  for (let i = 0; i < splDb.length; i++) {
-    const v = splDb[i];
+    const repaired = [];
+    for (let i = 0; i < splDbSchroeder.length; i++) {
+    const v = splDbSchroeder[i];
     if (!isFinite(v)) {
       repaired.push(lastGoodValue);
       nonFiniteRepaired += 1;
@@ -464,27 +500,27 @@ export function computeRoomModesResponse({
       repaired.push(v);
       lastGoodValue = v;
     }
-  }
-  splDb = repaired;
+    }
+    const splDbRepaired = repaired;
 
   // Capture pre-normalization stats (after repair, before smoothing/norm)
-  const finitePreNorm = splDb.filter(v => isFinite(v));
+  const finitePreNorm = splDbRepaired.filter(v => isFinite(v));
   const preNormMin = finitePreNorm.length > 0 ? Math.min(...finitePreNorm) : 0;
   const preNormMax = finitePreNorm.length > 0 ? Math.max(...finitePreNorm) : 0;
   const preNormRange = preNormMax - preNormMin;
 
-  // Apply smoothing if requested (post-process only)
+  // Apply smoothing if requested (create NEW array, never mutate)
   const smoothingApplied = smoothing !== 'none' ? smoothing : 'none';
-  if (smoothing !== 'none') {
-    splDb = applySmoothing(freqs, splDb, smoothing);
-  }
+  const splDbSmoothed = smoothing !== 'none' 
+    ? applySmoothing(freqs, splDbRepaired, smoothing)
+    : splDbRepaired;
 
   // DEBUG: record post-smoothing splDb at probe bins
   if (__debugBass && __probeRows && __probeRows.length) {
     for (const row of __probeRows) {
       const i = row.idx;
-      if (i >= 0 && i < splDb.length) {
-        row.splDb_postSmooth = Number.isFinite(splDb[i]) ? Number(splDb[i].toFixed(2)) : splDb[i];
+      if (i >= 0 && i < splDbSmoothed.length) {
+        row.splDb_postSmooth = Number.isFinite(splDbSmoothed[i]) ? Number(splDbSmoothed[i].toFixed(2)) : splDbSmoothed[i];
       }
     }
   }
@@ -495,12 +531,12 @@ export function computeRoomModesResponse({
   let actualNormBand = normalizeBandHz;
 
   // Capture post-normalization stats
-  const finitePostNorm = splDb.filter(v => isFinite(v));
+  const finitePostNorm = splDbSmoothed.filter(v => isFinite(v));
   const postNormMin = finitePostNorm.length > 0 ? Math.min(...finitePostNorm) : 0;
   const postNormMax = finitePostNorm.length > 0 ? Math.max(...finitePostNorm) : 0;
   const postNormRange = postNormMax - postNormMin;
   
-  // Build detailed mode markers for visualization
+  // Build detailed mode markers for visualization (create new array)
   const modeMarkers = modes.map(m => {
     let axisLabel = null;
     if (m.type === 'axial') {
@@ -517,8 +553,8 @@ export function computeRoomModesResponse({
     };
   });
   
-  // Mode markers (axial only for basic display)
-  const modeMarkersHz = modes
+  // Mode markers (axial only for basic display) - create new sorted array
+  const modeMarkersHz = [...modes]
     .filter(m => m.type === 'axial')
     .map(m => m.freq)
     .sort((a, b) => a - b);
@@ -528,8 +564,8 @@ export function computeRoomModesResponse({
   const tangentialCount = modes.filter(m => m.type === 'tangential').length;
   const obliqueCount = modes.filter(m => m.type === 'oblique').length;
   
-  // First ten modes for debug
-  const firstTenModeHz = modes.slice(0, 10).map(m => m.freq.toFixed(1));
+  // First ten modes for debug (create new array)
+  const firstTenModeHz = [...modes].slice(0, 10).map(m => m.freq.toFixed(1));
   
   // Compute Q mapping for debug
   const qBase = dampingScalar * 20;
@@ -546,20 +582,19 @@ export function computeRoomModesResponse({
   }
 
   // Compute SPL stats before absolute calibration
-  const finiteBeforeCal = splDb.filter(v => isFinite(v));
+  const finiteBeforeCal = splDbSmoothed.filter(v => isFinite(v));
   const splMinBeforeDb = finiteBeforeCal.length > 0 ? Math.min(...finiteBeforeCal) : 0;
   const splMaxBeforeDb = finiteBeforeCal.length > 0 ? Math.max(...finiteBeforeCal) : 0;
 
-  // Build FINAL curve pipeline (single source of truth)
-  let finalDb = [...splDb];
-  
+  // Build FINAL curve pipeline (single source of truth) - create NEW arrays at each step
   // Step 1: Apply absolute SPL calibration if requested
   let absoluteSplApplied = false;
+  let finalDb = splDbSmoothed;
   if (absoluteSplModeLocal && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
-    finalDb = finalDb.map(v => v + calibrationOffset);
+    finalDb = splDbSmoothed.map(v => v + calibrationOffset);
     absoluteSplApplied = true;
   }
-  
+
   // Step 2: Apply relative normalization if requested (30-80 Hz band)
   // REW-style: use MEDIAN of band for robustness against nulls
   let normAppliedActual = false;
@@ -569,7 +604,7 @@ export function computeRoomModesResponse({
     const bandValues = freqs
       .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb[i]) ? finalDb[i] : null)
       .filter(v => v !== null);
-    
+
     if (bandValues.length >= 10) {
       // Use MEDIAN instead of MEAN (more REW-like, robust to nulls)
       const sorted = [...bandValues].sort((a, b) => a - b);
@@ -630,13 +665,13 @@ export function computeRoomModesResponse({
   let seatNodeCheck = null;
   if (__debugBass) {
     const tol = 0.01; // 1 cm tolerance
-    const seatX_frac = seatPosition.x / widthM;
-    const seatY_frac = seatPosition.y / lengthM;
-    const seatZ_frac = seatPosition.z / heightM;
+    const seatX_frac = seat.x / widthM;
+    const seatY_frac = seat.y / lengthM;
+    const seatZ_frac = (seat.z ?? 1.2) / heightM;
 
-    const widthOddModesSuppressed = Math.abs(seatPosition.x - widthM / 2) < tol;
-    const lengthOddModesSuppressed = Math.abs(seatPosition.y - lengthM / 2) < tol;
-    const heightOddModesSuppressed = Math.abs(seatPosition.z - heightM / 2) < tol;
+    const widthOddModesSuppressed = Math.abs(seat.x - widthM / 2) < tol;
+    const lengthOddModesSuppressed = Math.abs(seat.y - lengthM / 2) < tol;
+    const heightOddModesSuppressed = Math.abs((seat.z ?? 1.2) - heightM / 2) < tol;
 
     seatNodeCheck = {
       seatX_frac: Number(seatX_frac.toFixed(3)),
@@ -720,18 +755,33 @@ export function computeRoomModesResponse({
   }
 
   // Build source/seat signatures for dependency tracking
-  const sourceCountUsed = sources.length;
-  const sourcePositionsUsed = sources.slice(0, 3).map(s => ({
+  const sourceCountUsed = sourcesLocal.length;
+  const sourcePositionsUsed = sourcesLocal.slice(0, 3).map(s => ({
     x: Number(s.x).toFixed(2),
     y: Number(s.y).toFixed(2),
     z: Number(s.z || 0).toFixed(2)
   }));
 
-  const sourceSigUsed = sources.map(s => 
+  const sourceSigUsed = sourcesLocal.map(s => 
     `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${(s.z||0).toFixed(2)}_g${(s.tuning?.gainDb||0).toFixed(1)}_d${(s.tuning?.delayMs||0).toFixed(1)}_p${s.tuning?.polarity||'normal'}`
   ).join('|');
 
-  const seatSigUsed = `${seatPosition.x.toFixed(2)}_${seatPosition.y.toFixed(2)}_${(seatPosition.z||1.2).toFixed(2)}`;
+  const seatSigUsed = `${seat.x.toFixed(2)}_${seat.y.toFixed(2)}_${(seat.z||1.2).toFixed(2)}`;
+
+  // FINAL GUARD: Prevent "No finite values" silent failures
+  const finalFiniteCheck = finalDb.filter(v => isFinite(v));
+  if (finalFiniteCheck.length === 0) {
+    return {
+      freqs: [],
+      splDb: [],
+      debug: {
+        error: "No finite values in output",
+        message: "computeRoomModesResponse produced no valid SPL data",
+        nonFiniteRepaired,
+        rawRange: rawRange.toFixed(2),
+      }
+    };
+  }
 
   // Build base return object (all fresh arrays/objects to avoid frozen mutations)
   const baseReturn = {
@@ -823,7 +873,7 @@ export function computeRoomModesResponse({
 
   // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)
   if (DIAG_POS) {
-    const mirrored = mirrorSources(sources, roomDims);
+    const mirrored = mirrorSources(sourcesLocal, room);
     const splDb2 = runOnce(mirrored);
     
     // Apply same post-processing to mirrored run for fair comparison
@@ -864,7 +914,7 @@ export function computeRoomModesResponse({
       }
       return bestI;
     };
-    
+
     let maxDelta = 0;
     const rows = probeHz.map(hz => {
       const i1 = idxFor(hz, freqs);
@@ -879,10 +929,10 @@ export function computeRoomModesResponse({
         delta: d !== null ? d.toFixed(3) : 'N/A' 
       };
     });
-    
+
     if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
       console.groupCollapsed("[B44][POS DIAG] source-coupling sensitivity");
-      console.log("SourceSig normal:", sourceSig(sources));
+      console.log("SourceSig normal:", sourceSig(sourcesLocal));
       console.log("SourceSig mirrored:", sourceSig(mirrored));
       console.table(rows);
       console.log("Max Δ(dB) across probes:", maxDelta.toFixed(3));
@@ -999,7 +1049,8 @@ function computeRoomModes({
     }
   }
   
-  return modes.sort((a, b) => a.freq - b.freq);
+  // IMMUTABLE: Create new sorted array instead of sorting in place
+  return [...modes].sort((a, b) => a.freq - b.freq);
 }
 
 /**
@@ -1057,7 +1108,8 @@ function applySmoothing(freqs, splDb, smoothing) {
     '1/3': 3
   }[smoothing] || 1;
   
-  const smoothed = [...splDb];
+  // IMMUTABLE: Build new array instead of mutating
+  const smoothed = [];
   
   for (let i = 0; i < freqs.length; i++) {
     const fc = freqs[i];
@@ -1074,9 +1126,7 @@ function applySmoothing(freqs, splDb, smoothing) {
       }
     }
     
-    if (count > 0) {
-      smoothed[i] = sum / count;
-    }
+    smoothed.push(count > 0 ? (sum / count) : splDb[i]);
   }
   
   return smoothed;
