@@ -662,18 +662,18 @@ export function computeRoomModesResponse({
   let calRefMedianDbAfter = 0;
   let finalDb = splDbSmoothed;
 
-  // Define normRefDb early (REW Compare View needs this to never crash)
-  let normRefDb = isRelative ? 0 : 85;
-
   if (!Array.isArray(finalDb) || finalDb.length === 0) {
-    finalDb = Array.isArray(splDb) ? [...splDb] : [];
+  finalDb = Array.isArray(splDb) ? [...splDb] : [];
   }
 
   // Always compute MLP reference (30-80 Hz median) for anchoring
   const calRefBandHz = [30, 80];
   const mlpBandValues = freqs
-    .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
-    .filter(v => v !== null);
+  .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
+  .filter(v => v !== null);
+
+  // Define normRefDb early (REW Compare View needs this to never crash)
+  let normRefDb = isRelative ? 0 : 85;
 
   if (mlpBandValues.length >= 10) {
     const sorted = [...mlpBandValues].sort((a, b) => a - b);
