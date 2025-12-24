@@ -646,6 +646,10 @@ export function computeRoomModesResponse({
   let calRefMedianDbAfter = 0;
   let finalDb = splDbSmoothed;
 
+  if (!Array.isArray(finalDb) || finalDb.length === 0) {
+    finalDb = Array.isArray(splDb) ? [...splDb] : [];
+  }
+
   // Always compute MLP reference (30-80 Hz median) for anchoring
   const calRefBandHz = [30, 80];
   const mlpBandValues = freqs
@@ -681,49 +685,24 @@ export function computeRoomModesResponse({
     }
   }
 
-  // DEBUG: record finalDb + print a single forensic table
-  if (__debugBass && __probeRows && __probeRows.length) {
+  // DEBUG: record finalDb without risking a crash
+  if (__debugBass && Array.isArray(__probeRows) && __probeRows.length) {
     for (const row of __probeRows) {
       const i = row.idx;
       if (i >= 0 && i < finalDb.length) {
         row.finalDb = Number.isFinite(finalDb[i]) ? Number(finalDb[i].toFixed(2)) : finalDb[i];
       }
     }
-
-    const lowest = Number.isFinite(lowestAxial) ? Number(lowestAxial.toFixed(2)) : lowestAxial;
-    const blendStart = Number.isFinite(lowestAxial) ? Number((lowestAxial * 0.7).toFixed(2)) : null;
-    const blendEnd = Number.isFinite(lowestAxial) ? Number(lowestAxial.toFixed(2)) : null;
-
-    console.log("B44_BASS_DEBUG_RUN", {
-      roomDims,
-      seatPosition,
-      sourceCount: sourcePositions?.length || 0,
-      lowestAxialHz: lowest,
-      blendStartHz: blendStart,
-      blendEndHz: blendEnd,
-      smoothing,
-      normalizeBandHz,
-      normalizeToDb,
-      absoluteSplMode: isAbsolute,
-      rewParityMode
-    });
-
-    // Sort by frequency, print as table
-    const rows = [...__probeRows].sort((a, b) => a.binHz - b.binHz);
-    console.table(rows);
   }
 
   // Build lfProbeRaw from __probeRows (for variation testing)
   let lfProbeRaw = null;
-  if (__debugBass && __probeRows && __probeRows.length) {
+  if (__debugBass && Array.isArray(__probeRows) && __probeRows.length) {
     lfProbeRaw = [...__probeRows]
       .sort((a, b) => a.fProbe - b.fProbe)
       .map(row => ({
         freq: row.fProbe,
-        blendedMagDb_pre: row.blendedMagDb_pre,
-        w: row.w,
-        directMagDb_pre: row.directMagDb_pre,
-        scaledModalMagDb_pre: row.scaledModalMagDb_pre
+        modalMagDb_pre: row.modalMagDb_pre
       }));
   }
 
@@ -905,7 +884,7 @@ export function computeRoomModesResponse({
       lfProbeRaw: Array.isArray(lfProbeRaw) ? lfProbeRaw.map(r => ({ ...r })) : lfProbeRaw,
       seatNodeCheck: seatNodeCheck ? { ...seatNodeCheck } : null,
       autoLevelToMLP: autoLevelEnabled,
-      mlpAutoLevelGainsDb: mlpAutoLevelGainsDb.map(g => Number.isFinite(g) ? g.toFixed(2) : '0.00'),
+      mlpAutoLevelGainsDb: Array.isArray(mlpAutoLevelGainsDb) ? mlpAutoLevelGainsDb.map(g => (Number.isFinite(g) ? g.toFixed(2) : "0.00")) : [],
       mlpBand: [30, 80],
       rewParityMode: rewParityMode,
       modalOnly: rewParityMode,
