@@ -662,6 +662,9 @@ export function computeRoomModesResponse({
   let calRefMedianDbAfter = 0;
   let finalDb = splDbSmoothed;
 
+  // Define normRefDb early (REW Compare View needs this to never crash)
+  let normRefDb = isRelative ? 0 : 85;
+
   if (!Array.isArray(finalDb) || finalDb.length === 0) {
     finalDb = Array.isArray(splDb) ? [...splDb] : [];
   }
@@ -672,9 +675,6 @@ export function computeRoomModesResponse({
     .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
     .filter(v => v !== null);
 
-  // Define normRefDb early (REW Compare View needs this to never crash)
-  let normRefDb = isRelative ? 0 : 85;
-  
   if (mlpBandValues.length >= 10) {
     const sorted = [...mlpBandValues].sort((a, b) => a - b);
     const mlpMedianDb = sorted[Math.floor(sorted.length / 2)];
