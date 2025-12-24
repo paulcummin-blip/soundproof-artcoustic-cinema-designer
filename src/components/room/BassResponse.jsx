@@ -77,10 +77,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewStyleMode]);
 
-  // Force settings when REW Compare View is enabled
+  // Force settings when REW Compare View is enabled (display preset)
   useEffect(() => {
     if (rewCompareView) {
-      setRewRelativeView(true);
+      setRewRelativeView(false); // Absolute SPL for REW Compare
       setRewSmoothing('1/3');
       setYAxisLocked(true);
     }
@@ -976,7 +976,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { refDb, min, max };
   }, []);
 
-  // REW Compare View: asymmetric window (refDb - 10, refDb + 40)
+  // REW Compare View: fixed window for absolute SPL (65-105 dB)
   const computeRewCompareYDomain = React.useCallback((data) => {
     if (!data || data.length === 0) return null;
 
@@ -986,18 +986,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       .map(d => d.spl)
       .filter(v => Number.isFinite(v));
 
-    if (band.length === 0) return null;
+    if (band.length === 0) {
+      // Fallback: use default absolute window
+      return { refDb: 85, min: 65, max: 105 };
+    }
 
     const sorted = [...band].sort((a, b) => a - b);
     const refDb = sorted[Math.floor(sorted.length / 2)];
 
-    // REW-style asymmetric window
-    let min = refDb - 10;
-    let max = refDb + 40;
-
-    // Round to whole dB
-    min = Math.floor(min);
-    max = Math.ceil(max);
+    // Fixed absolute SPL window (65-105 dB) for REW Compare View
+    const min = 65;
+    const max = 105;
 
     return { refDb, min, max };
   }, []);
@@ -1632,17 +1631,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="font-semibold mb-1">REW Compare View (Display Preset)</div>
               <div className="text-[10px] space-y-0.5">
                 <div>• Room: {(roomDims?.widthM || 0).toFixed(1)}×{(roomDims?.lengthM || 0).toFixed(1)}×{(roomDims?.heightM || 0).toFixed(1)} m</div>
-                <div>• Smoothing: {rewSmoothing}</div>
+                <div>• Smoothing: 1/3 octave (fixed)</div>
                 <div>• Sealed room: ALWAYS (cinemas are sealed)</div>
-                <div>• Relative normalisation: {rewRelativeView ? 'ON' : 'OFF'} (30–80 Hz)</div>
+                <div>• Absolute SPL mode (30–80 Hz → 85 dB reference)</div>
                 <div>• RefDb (median 30–80): {refDbDisplay} dB</div>
-                <div>• Y window: {yAxisDomain?.min || '—'} to {yAxisDomain?.max || '—'} dB</div>
+                <div>• Y window: 65–105 dB (fixed for comparison)</div>
                 <div className="text-[9px] opacity-70 mt-1">Engine SPL range (raw): {activeDebug?.splMinDb || '—'} to {activeDebug?.splMaxDb || '—'} dB</div>
                 <div className="text-[9px] opacity-70">Display SPL range: {(() => {
                   const finite = displayData.filter(d => Number.isFinite(d.spl)).map(d => d.spl);
                   if (finite.length === 0) return 'N/A';
                   return `${Math.min(...finite).toFixed(1)} to ${Math.max(...finite).toFixed(1)} dB`;
                 })()}</div>
+                <div className="text-[9px] opacity-70 text-purple-700 font-semibold mt-1">
+                  LF delta (25→69 Hz): {activeDebug?.lfProbe?.lfDelta_25_69 || 'N/A'} dB | 
+                  Upper-bass delta (69→120 Hz): {activeDebug?.lfProbe?.upperBassDelta_69_120 || 'N/A'} dB
+                </div>
               </div>
             </div>
           );

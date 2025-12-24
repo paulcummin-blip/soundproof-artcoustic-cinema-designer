@@ -672,10 +672,14 @@ export function computeRoomModesResponse({
     .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
     .filter(v => v !== null);
 
+  // Define normRefDb early (REW Compare View needs this to never crash)
+  let normRefDb = isRelative ? 0 : 85;
+  
   if (mlpBandValues.length >= 10) {
     const sorted = [...mlpBandValues].sort((a, b) => a - b);
     const mlpMedianDb = sorted[Math.floor(sorted.length / 2)];
     calRefMedianDbBefore = mlpMedianDb;
+    normRefDb = mlpMedianDb; // Actual computed reference for this run
 
     if (isRelative) {
       // Relative view: normalize to 0 dB
@@ -771,8 +775,8 @@ export function computeRoomModesResponse({
   const modalMagMax = lfDebug.modalMag15_45.length > 0 ? Math.max(...lfDebug.modalMag15_45).toFixed(1) : 'N/A';
 
   // LF PROBE: detailed frequency-by-frequency audit using FINAL curve
-  // Extended probes for acceptance test (25, 40, 60, 120 Hz)
-  const probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45, 60, 120];
+  // Extended probes for acceptance test (25, 40, 60, 69, 120 Hz)
+  const probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45, 60, 69, 120];
   const lfProbe = probeFreqs.map(fProbe => {
     const idx = freqs.findIndex(f => Math.abs(f - fProbe) < 0.6);
     if (idx < 0) return { freq: fProbe, error: 'not found' };
@@ -795,6 +799,18 @@ export function computeRoomModesResponse({
       belowLowestAxial: lowestAxial && fProbe < lowestAxial
     };
   });
+  
+  // Diagnostic deltas for LF vs upper-bass balance
+  const idx25 = freqs.findIndex(f => Math.abs(f - 25) < 0.6);
+  const idx69 = freqs.findIndex(f => Math.abs(f - 69) < 0.6);
+  const idx120 = freqs.findIndex(f => Math.abs(f - 120) < 0.6);
+  
+  const lfDelta_25_69 = (idx25 >= 0 && idx69 >= 0) 
+    ? (finalDb[idx25] - finalDb[idx69]).toFixed(2) 
+    : 'N/A';
+  const upperBassDelta_69_120 = (idx69 >= 0 && idx120 >= 0) 
+    ? (finalDb[idx69] - finalDb[idx120]).toFixed(2) 
+    : 'N/A';
   
   // LF sanity check: 20 Hz should NOT be hotter than 30 Hz in generic sub mode
   const idx20 = freqs.findIndex(f => Math.abs(f - 20) < 0.6);
@@ -868,7 +884,7 @@ export function computeRoomModesResponse({
       relativeViewEnabled: isRelative,
       normBandHz: actualNormBand,
       normApplied: normAppliedActual,
-      normRefDb: Number.isFinite(calRefMedianDbBefore) ? calRefMedianDbBefore.toFixed(2) : (isRelative ? "0.0" : "85.0"),
+      normRefDb: Number.isFinite(normRefDb) ? normRefDb.toFixed(2) : (isRelative ? "0.0" : "85.0"),
       smoothingApplied,
       inputSig,
       nonFiniteRepaired,
@@ -911,7 +927,9 @@ export function computeRoomModesResponse({
         absoluteSplMode: isAbsolute,
         relativeViewEnabled: isRelative,
         subProductCurvesPresent: !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0),
-        lfSanityCheck
+        lfSanityCheck,
+        lfDelta_25_69,
+        upperBassDelta_69_120
       },
       lfProbeRaw: Array.isArray(lfProbeRaw) ? lfProbeRaw.map(r => ({ ...r })) : lfProbeRaw,
       seatNodeCheck: seatNodeCheck ? { ...seatNodeCheck } : null,
