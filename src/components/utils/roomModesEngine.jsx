@@ -157,11 +157,9 @@ export function computeRoomModesResponse({
   const hasProductCurves =
     !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0);
 
-  // Use local copy to avoid mutating input parameter
-  let absoluteSplModeLocal = absoluteSplMode;
-  if (!hasProductCurves) {
-    absoluteSplModeLocal = false;
-  }
+  // Define absolute/relative mode clearly (matches REW's logic)
+  const isRelative = !!relativeViewEnabled;
+  const isAbsolute = !isRelative;
   
   const { widthM, lengthM, heightM } = room;
   const volume = widthM * lengthM * heightM;
@@ -169,6 +167,50 @@ export function computeRoomModesResponse({
   // Compute Schroeder frequency
   const rt60 = 0.4;
   const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
+  
+  // Detect product curve type and extract reference SPL
+  const subProductMeta = productCurves ? productCurves.map((curve, idx) => {
+    if (!curve || !Array.isArray(curve)) {
+      return { type: 'NONE', baseSplAt1m_50Hz: 90 };
+    }
+    
+    const finite = curve.filter(v => Number.isFinite(v));
+    if (finite.length === 0) {
+      return { type: 'NONE', baseSplAt1m_50Hz: 90 };
+    }
+    
+    const minDb = Math.min(...finite);
+    const maxDb = Math.max(...finite);
+    
+    // Detect if this is ABSOLUTE SPL (range ~60-140 dB) or RELATIVE GAIN (range ~-20 to +20 dB)
+    const isAbsoluteCurve = (minDb >= 60 && maxDb <= 140);
+    
+    // Find value at 50 Hz (or nearest bin)
+    const idx50 = freqs.findIndex(f => f >= 50);
+    const valueAt50Hz = idx50 >= 0 && idx50 < curve.length ? curve[idx50] : null;
+    
+    if (isAbsoluteCurve) {
+      // ABSOLUTE SPL curve: extract reference SPL, convert to relative
+      const baseSpl = valueAt50Hz || 90;
+      const relativeCurve = curve.map(db => db - baseSpl);
+      return {
+        type: 'ABSOLUTE',
+        baseSplAt1m_50Hz: baseSpl,
+        productDbAt50Hz: valueAt50Hz,
+        relativeCurve,
+        originalRange: { min: minDb, max: maxDb }
+      };
+    } else {
+      // RELATIVE GAIN curve: use default reference SPL
+      return {
+        type: 'RELATIVE',
+        baseSplAt1m_50Hz: 90, // Generic REW-ish anchor
+        productDbAt50Hz: valueAt50Hz,
+        relativeCurve: curve, // Already relative
+        originalRange: { min: minDb, max: maxDb }
+      };
+    }
+  }) : null;
   
   // Generate frequency axis (linear for REW parity)
   const freqs = rewParityMode 
@@ -194,26 +236,6 @@ export function computeRoomModesResponse({
   const pressureEnabled = false;
   const kDbPerOct = 0; // REW mode: no artificial room gain below lowest axial
   const maxPressureGainDb = 0; // Capped to prevent LF explosion
-  
-  // SOURCE CALIBRATION (applied upstream, not after summation)
-  // REW reference: 1 sub @ 1m in half-space ≈ 90 dB at 50 Hz
-  const numSubs = sourcesLocal.length;
-  const avgDistance = 3.5; // Typical MLP distance in meters
-  const subSensitivity = 90; // Typical subwoofer 1W/1m (dB)
-  
-  // Distance loss: -20*log10(d)
-  const distanceLoss = 20 * Math.log10(avgDistance);
-  
-  // Multi-sub gain: +3 dB per doubling (coherent summation at modal frequencies)
-  const multiSubGain = 10 * Math.log10(numSubs);
-  
-  // Boundary gain: +3 dB for half-space (floor loading)
-  const boundaryGain = 3;
-  
-  // Source calibration offset (applied to modal sum, not result)
-  const sourceCalibrationDb = rewParityMode 
-    ? (subSensitivity - distanceLoss + multiSubGain + boundaryGain)
-    : 0;
 
   // LF debugging stats collectors
   const lfDebug = {
@@ -258,7 +280,7 @@ export function computeRoomModesResponse({
 
   // Build response: complex pressure sum with direct/modal blending
   let splDb = freqs.map((f, i) => {
-    // 1. DIRECT-FIELD COMPLEX SUM (geometry-dependent, no modal filtering)
+    // 1. DIRECT-FIELD COMPLEX SUM (REW-style: source SPL at 1m + distance loss)
     let sumRe_direct = 0;
     let sumIm_direct = 0;
 
@@ -269,28 +291,30 @@ export function computeRoomModesResponse({
       const dx = source.x - seat.x;
       const dy = source.y - seat.y;
       const dz = (source.z ?? 0.0) - (seat.z ?? 1.2);
-      const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      const d = Math.max(0.5, Math.sqrt(dx*dx + dy*dy + dz*dz));
 
-      // Pure geometry/phase term only (no absolute SPL reference)
-      const amplitude = 1 / Math.max(0.5, d);
+      // Get product metadata for this sub
+      const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
+      const baseSplAt1m_50Hz = meta?.baseSplAt1m_50Hz || 90;
 
-      // Apply sub's product response if provided
-      let productGainLinear = 1.0;
-      if (productCurves && productCurves[subIdx]) {
-        const curveDb = productCurves[subIdx][i];
-        if (Number.isFinite(curveDb)) {
-          productGainLinear = Math.pow(10, curveDb / 20);
-        }
+      // Get product response at this frequency (relative dB)
+      let productRelativeDb = 0;
+      if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
+        productRelativeDb = meta.relativeCurve[i];
       }
+
+      // REW-style source modeling: SPL at 1m (at this frequency)
+      const splAt1m = baseSplAt1m_50Hz + productRelativeDb;
+
+      // Convert to linear pressure magnitude at 1m
+      const amp1m = Math.pow(10, splAt1m / 20);
+
+      // Distance attenuation (inverse distance law)
+      const amplitude = amp1m / d;
 
       // Apply sub tuning (gain, delay, polarity)
       const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
-      const gainLinear = Math.pow(10, subTuning.gainDb / 20) * productGainLinear;
-
-      // Generic (room-only) sub magnitude shaping:
-      // When no product curve is supplied, stay flat (no artificial roll-off)
-      let genericDb = 0;
-      const genericLinear = 1.0;
+      const gainLinear = Math.pow(10, subTuning.gainDb / 20);
 
       // Phase: propagation + delay + polarity
       let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
@@ -300,12 +324,12 @@ export function computeRoomModesResponse({
       }
 
       // Complex contribution
-      const finalAmplitude = amplitude * gainLinear * genericLinear;
+      const finalAmplitude = amplitude * gainLinear;
       sumRe_direct += finalAmplitude * Math.cos(phi);
       sumIm_direct += finalAmplitude * Math.sin(phi);
     }
 
-    // 2. MODAL COMPLEX SUM (existing logic unchanged)
+    // 2. MODAL COMPLEX SUM (REW-style: source SPL at 1m + modal filtering)
     let sumRe_modal = 0;
     let sumIm_modal = 0;
 
@@ -316,8 +340,8 @@ export function computeRoomModesResponse({
       // Compute modal Q
       const qMode = estimateModeQ({
         mode,
-        roomDims,
-        surfaceAbsorption,
+        roomDims: room,
+        surfaceAbsorption: absorption,
         dampingScalar,
         leakage,
         f0,
@@ -335,30 +359,32 @@ export function computeRoomModesResponse({
         const coupling = computeSpatialCoupling(mode, source, seat, room);
         if (Math.abs(coupling) < 1e-6) continue;
 
-        // Apply sub's product response if provided (frequency-dependent gain)
-        let productGainLinear = 1.0;
-        if (productCurves && productCurves[subIdx]) {
-          const curveDb = productCurves[subIdx][i];
-          if (Number.isFinite(curveDb)) {
-            productGainLinear = Math.pow(10, curveDb / 20);
-          }
+        // Get product metadata for this sub
+        const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
+        const baseSplAt1m_50Hz = meta?.baseSplAt1m_50Hz || 90;
+
+        // Get product response at this frequency (relative dB)
+        let productRelativeDb = 0;
+        if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
+          productRelativeDb = meta.relativeCurve[i];
         }
+
+        // REW-style source modeling: SPL at 1m (at this frequency)
+        const splAt1m = baseSplAt1m_50Hz + productRelativeDb;
+
+        // Convert to linear pressure magnitude at 1m
+        const amp1m = Math.pow(10, splAt1m / 20);
 
         // Apply sub tuning (gain, delay, polarity)
         const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
-        const gainLinear = Math.pow(10, subTuning.gainDb / 20) * productGainLinear;
+        const gainLinear = Math.pow(10, subTuning.gainDb / 20);
         const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
         const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
         const totalPhase = delayPhase + polarityPhase;
 
-        // Generic (room-only) sub magnitude shaping:
-        // When no product curve is supplied, stay flat (no artificial roll-off)
-        let genericDb = 0;
-        const genericLinear = 1.0;
-
-        // Complex weight for this sub
-        const weightRe = gainLinear * genericLinear * Math.cos(totalPhase);
-        const weightIm = gainLinear * genericLinear * Math.sin(totalPhase);
+        // Complex weight for this sub (includes source SPL modeling)
+        const weightRe = amp1m * gainLinear * Math.cos(totalPhase);
+        const weightIm = amp1m * gainLinear * Math.sin(totalPhase);
 
         // Second-order resonator (dimensionless, REW-style behaviour)
         // Use normalised form so numbers don't explode/shrink with Hz^2 scaling.
@@ -581,25 +607,14 @@ export function computeRoomModesResponse({
     }
   }
 
-  // Compute SPL stats before absolute calibration
-  const finiteBeforeCal = splDbSmoothed.filter(v => isFinite(v));
-  const splMinBeforeDb = finiteBeforeCal.length > 0 ? Math.min(...finiteBeforeCal) : 0;
-  const splMaxBeforeDb = finiteBeforeCal.length > 0 ? Math.max(...finiteBeforeCal) : 0;
-
   // Build FINAL curve pipeline (single source of truth) - create NEW arrays at each step
-  // Step 1: Apply absolute SPL calibration if requested
-  let absoluteSplApplied = false;
-  let finalDb = splDbSmoothed;
-  if (absoluteSplModeLocal && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
-    finalDb = splDbSmoothed.map(v => v + calibrationOffset);
-    absoluteSplApplied = true;
-  }
-
-  // Step 2: Apply relative normalization if requested (30-80 Hz band)
-  // REW-style: use MEDIAN of band for robustness against nulls
+  // Step 1: Relative normalization (if requested)
+  // REW-style: use MEDIAN of 30-80 Hz band for robustness against nulls
   let normAppliedActual = false;
   let normRefDb = 0;
-  if (!absoluteSplModeLocal && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
+  let finalDb = splDbSmoothed;
+
+  if (isRelative && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
     const [fMin, fMax] = normalizeBandHz;
     const bandValues = freqs
       .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb[i]) ? finalDb[i] : null)
@@ -609,11 +624,13 @@ export function computeRoomModesResponse({
       // Use MEDIAN instead of MEAN (more REW-like, robust to nulls)
       const sorted = [...bandValues].sort((a, b) => a - b);
       normRefDb = sorted[Math.floor(sorted.length / 2)];
-      const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 80;
+      const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
       finalDb = finalDb.map(v => (isFinite(v) ? (v - normRefDb + targetDb) : v));
       normAppliedActual = true;
     }
   }
+
+  // Step 2: If absolute mode, curve is already in absolute SPL (no normalization)
 
   // DEBUG: record finalDb + print a single forensic table
   if (__debugBass && __probeRows && __probeRows.length) {
@@ -689,27 +706,18 @@ export function computeRoomModesResponse({
   const splMaxDb = finalFinite.length > 0 ? Math.max(...finalFinite) : 0;
   const splRangeDb = splMaxDb - splMinDb;
 
-  // Product curve stats (if applied)
+  // Product curve stats (if applied) - use metadata
   let productCurveStats = null;
-  if (subProductCurves && Array.isArray(subProductCurves)) {
-    productCurveStats = subProductCurves.map((curve, idx) => {
-      if (!curve || !Array.isArray(curve)) return null;
-      
-      const finite = curve.filter(v => Number.isFinite(v));
-      if (finite.length === 0) return null;
-      
-      const minDb = Math.min(...finite);
-      const maxDb = Math.max(...finite);
-      
-      // Find value at ~50 Hz
-      const idx50 = freqs.findIndex(f => f >= 50);
-      const at50Hz = (idx50 >= 0 && Number.isFinite(curve[idx50])) ? curve[idx50] : null;
-      
+  if (subProductMeta && Array.isArray(subProductMeta)) {
+    productCurveStats = subProductMeta.map((meta, idx) => {
+      if (!meta) return null;
+
       return {
         subIndex: idx,
-        productMinDb: minDb.toFixed(1),
-        productMaxDb: maxDb.toFixed(1),
-        productAt50HzDb: at50Hz !== null ? at50Hz.toFixed(1) : 'N/A'
+        productCurveType: meta.type,
+        baseSplAt1m_50Hz: meta.baseSplAt1m_50Hz.toFixed(1),
+        productDbAt50Hz: meta.productDbAt50Hz !== null ? meta.productDbAt50Hz.toFixed(1) : 'N/A',
+        originalRange: meta.originalRange ? `${meta.originalRange.min.toFixed(1)} to ${meta.originalRange.max.toFixed(1)} dB` : 'N/A'
       };
     }).filter(s => s !== null);
   }
@@ -801,8 +809,8 @@ export function computeRoomModesResponse({
       blendEndHz: lowestAxial,
       qBase: qBase.toFixed(1),
       qMappingText,
-      absoluteMode: absoluteSplModeLocal,
-      calibrationApplied,
+      absoluteSplMode: isAbsolute,
+      relativeViewEnabled: isRelative,
       normBandHz: actualNormBand,
       normApplied: normAppliedActual,
       normRefDb: normAppliedActual ? normRefDb.toFixed(2) : 'N/A',
@@ -812,7 +820,6 @@ export function computeRoomModesResponse({
       preNormRange: preNormRange.toFixed(2),
       postNormRange: postNormRange.toFixed(2),
       productCurvesApplied: !!subProductCurves,
-      absoluteSplMode: absoluteSplModeLocal,
       normalizeBandHz: actualNormBand,
       pressureEnabled: false,
       pressureThresholdHz: null,
@@ -821,14 +828,9 @@ export function computeRoomModesResponse({
       splMinDb: splMinDb.toFixed(1),
       splMaxDb: splMaxDb.toFixed(1),
       splRangeDb: splRangeDb.toFixed(1),
-      calibrationOffsetDb: Number.isFinite(calibrationOffset) ? calibrationOffset.toFixed(1) : 'N/A',
-      splRangeBeforeDb: [splMinBeforeDb.toFixed(1), splMaxBeforeDb.toFixed(1)],
-      splRangeAfterDb: [splMinDb.toFixed(1), splMaxDb.toFixed(1)],
-      absoluteSplApplied,
       normalizeToDb: normalizeToDb !== undefined ? normalizeToDb : null,
       productCurveStats,
-      directFieldUsesDb0: false,
-      calibrationMode: absoluteSplModeLocal ? "Absolute SPL" : "Relative (normalized)",
+      calibrationMode: isAbsolute ? "Absolute SPL" : "Relative (normalized)",
       sourceCountUsed,
       sourcePositionsUsed: [...sourcePositionsUsed],
       sourceSigUsed,
@@ -852,8 +854,8 @@ export function computeRoomModesResponse({
         lowestAxialHz: lowestAxial,
         blendStartHz: lowestAxial ? (lowestAxial * 0.7).toFixed(1) : 'N/A',
         blendEndHz: lowestAxial ? lowestAxial.toFixed(1) : 'N/A',
-        sourceCalibrationDb: sourceCalibrationDb.toFixed(2),
-        absoluteSplMode: absoluteSplModeLocal,
+        absoluteSplMode: isAbsolute,
+        relativeViewEnabled: isRelative,
         subProductCurvesPresent: !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0),
         lfSanityCheck
       },
@@ -878,29 +880,24 @@ export function computeRoomModesResponse({
     
     // Apply same post-processing to mirrored run for fair comparison
     let finalDb2 = [...splDb2];
-    
+
     // Apply smoothing
     if (smoothing !== 'none') {
       finalDb2 = applySmoothing(freqs, finalDb2, smoothing);
     }
-    
-    // Apply calibration
-    if (absoluteSplModeLocal && Number.isFinite(calibrationOffset) && calibrationOffset !== 0) {
-      finalDb2 = finalDb2.map(v => v + calibrationOffset);
-    }
-    
-    // Apply normalization
-    if (!absoluteSplModeLocal && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
+
+    // Apply normalization (if relative mode)
+    if (isRelative && normalizeBandHz && Array.isArray(normalizeBandHz) && normalizeBandHz.length === 2) {
       const [fMin, fMax] = normalizeBandHz;
       const bandValues = freqs
         .map((f, i) => f >= fMin && f <= fMax && isFinite(finalDb2[i]) ? finalDb2[i] : null)
         .filter(v => v !== null);
-      
+
       if (bandValues.length >= 10) {
         const sorted = [...bandValues].sort((a, b) => a - b);
-        const normRefDb = sorted[Math.floor(sorted.length / 2)];
-        const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 80;
-        finalDb2 = finalDb2.map(v => (isFinite(v) ? (v - normRefDb + targetDb) : v));
+        const normRefDb2 = sorted[Math.floor(sorted.length / 2)];
+        const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
+        finalDb2 = finalDb2.map(v => (isFinite(v) ? (v - normRefDb2 + targetDb) : v));
       }
     }
     
@@ -1187,6 +1184,8 @@ function dbAt(fTarget, freqs, splDb) {
 }
 
 function estimateModeQ({ mode, roomDims, surfaceAbsorption, dampingScalar, leakage, f0 }) {
+  // Handle both roomDims formats (object or direct properties)
+  const dims = roomDims?.widthM ? roomDims : { widthM: roomDims?.width, lengthM: roomDims?.length, heightM: roomDims?.height };
   // Direct Q control (REW-like): slider value is the base Q, with only mild frequency dependence
   // This makes "Dead (8)" clearly broad and "Lively (35)" clearly resonant
   
