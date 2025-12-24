@@ -661,6 +661,9 @@ export function computeRoomModesResponse({
     const mlpMedianDb = sorted[Math.floor(sorted.length / 2)];
     calRefMedianDbBefore = mlpMedianDb;
 
+    // Keep legacy name used by REW Compare UI/debug so we don't crash
+    const normRefDb = mlpMedianDb;
+
     if (isRelative) {
       // Relative view: normalize to 0 dB
       const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
@@ -684,13 +687,6 @@ export function computeRoomModesResponse({
       calRefMedianDbAfter = sortedAfter[Math.floor(sortedAfter.length / 2)];
     }
   }
-
-  // REW Compare: reference dB used for display (must always exist)
-  const normRefDb =
-    Number.isFinite(calRefMedianDbAfter) ? calRefMedianDbAfter :
-    (isRelative
-      ? (Number.isFinite(normalizeToDb) ? normalizeToDb : 0)
-      : 85);
 
   // DEBUG: record finalDb without risking a crash
   if (__debugBass && Array.isArray(__probeRows) && __probeRows.length) {
