@@ -78,30 +78,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (rewStyleMode && (!rewSmoothing || rewSmoothing === 'none')) {
       setRewSmoothing('1/3');
     }
-  }, [rewStyleMode]);
-
-  // Force settings when REW Compare View is enabled (display preset)
-  useEffect(() => {
-    if (rewCompareView) {
-      setRewRelativeView(false); // Absolute SPL for REW Compare
-      setRewSmoothing('1/3');
-      setYAxisLocked(true);
-      
-      // Capture baseline snapshot on first enable (if valid data exists)
-      if (!rewCompareBaselineRef.current && rewModesData?.splDb && rewModesData.debug?.splDbRepaired) {
-        rewCompareBaselineRef.current = {
-          splDbRepaired: [...rewModesData.debug.splDbRepaired],
-          freqs: [...rewModesData.freqs],
-          sourceSigRounded: rewModesData.debug?.sourceSigRounded,
-          seatSigRounded: rewModesData.debug?.seatSigRounded,
-          timestamp: Date.now()
-        };
-      }
-    } else {
-      // Clear baseline when Compare View is disabled
-      rewCompareBaselineRef.current = null;
-    }
-  }, [rewCompareView, rewModesData]);
+  }, [rewStyleMode, rewSmoothing]);
 
   // Position signatures to detect in-place array mutations
   const frontLiveSig = useMemo(() => {
@@ -499,6 +476,29 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       seatSig
     };
   }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView]);
+
+  // Force settings when REW Compare View is enabled (moved after rewModesData definition)
+  useEffect(() => {
+    if (rewCompareView) {
+      setRewRelativeView(false); // Absolute SPL for REW Compare
+      setRewSmoothing('1/3');
+      setYAxisLocked(true);
+      
+      // Capture baseline snapshot on first enable (if valid data exists)
+      if (!rewCompareBaselineRef.current && rewModesData?.splDb && rewModesData.debug?.splDbRepaired) {
+        rewCompareBaselineRef.current = {
+          splDbRepaired: [...rewModesData.debug.splDbRepaired],
+          freqs: [...rewModesData.freqs],
+          sourceSigRounded: rewModesData.debug?.sourceSigRounded,
+          seatSigRounded: rewModesData.debug?.seatSigRounded,
+          timestamp: Date.now()
+        };
+      }
+    } else {
+      // Clear baseline when Compare View is disabled
+      rewCompareBaselineRef.current = null;
+    }
+  }, [rewCompareView, rewModesData]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
