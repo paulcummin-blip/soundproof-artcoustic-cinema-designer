@@ -162,11 +162,30 @@ export function computeRoomModesResponse({
   const isAbsolute = !isRelative;
   
   const { widthM, lengthM, heightM } = room;
+  
+  // Safe guard: ensure dimensions are valid
+  if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM) || 
+      widthM <= 0 || lengthM <= 0 || heightM <= 0) {
+    return { 
+      freqs: [], 
+      splDb: [], 
+      debug: { 
+        error: "Invalid room dimensions",
+        roomDims: { widthM, lengthM, heightM }
+      } 
+    };
+  }
+  
   const volume = widthM * lengthM * heightM;
   
   // Compute Schroeder frequency
   const rt60 = 0.4;
   const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
+  
+  // Generate frequency axis FIRST (needed by subProductMeta)
+  const freqs = rewParityMode 
+    ? generateLinearFrequencyAxis(fMin, fMax, 0.5) // 0.5 Hz steps for modal detail
+    : generateLogFrequencyAxis(fMin, fMax, pointsPerOct);
   
   // Detect product curve type and extract reference SPL
   const subProductMeta = productCurves ? productCurves.map((curve, idx) => {
@@ -211,11 +230,7 @@ export function computeRoomModesResponse({
       };
     }
   }) : null;
-  
-  // Generate frequency axis (linear for REW parity)
-  const freqs = rewParityMode 
-    ? generateLinearFrequencyAxis(fMin, fMax, 0.5) // 0.5 Hz steps for modal detail
-    : generateLogFrequencyAxis(fMin, fMax, pointsPerOct);
+
   
   // Compute room modes
   const modes = computeRoomModes({
@@ -228,7 +243,7 @@ export function computeRoomModesResponse({
     includeTangential: includeTangentialLocal,
     includeOblique: includeObliqueLocal
   });
-
+  
   // Lowest axial mode (used for sealed-room pressure behaviour)
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
@@ -236,6 +251,10 @@ export function computeRoomModesResponse({
   const pressureEnabled = false;
   const kDbPerOct = 0; // REW mode: no artificial room gain below lowest axial
   const maxPressureGainDb = 0; // Capped to prevent LF explosion
+  
+  // Track what processing was applied
+  const calibrationApplied = rewParityMode;
+  let actualNormBand = normalizeBandHz;
 
   // LF debugging stats collectors
   const lfDebug = {
