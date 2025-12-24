@@ -674,7 +674,7 @@ export function computeRoomModesResponse({
       smoothing,
       normalizeBandHz,
       normalizeToDb,
-      absoluteSplMode: absoluteSplModeLocal,
+      absoluteSplMode: isAbsolute,
       rewParityMode
     });
 
