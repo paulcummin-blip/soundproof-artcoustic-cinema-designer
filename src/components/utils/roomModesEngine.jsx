@@ -837,6 +837,12 @@ export function computeRoomModesResponse({
 
   const seatSigUsed = `${seat.x.toFixed(2)}_${seat.y.toFixed(2)}_${(seat.z||1.2).toFixed(2)}`;
   
+  // Rounded signatures for stable comparison (1cm resolution)
+  const sourceSigRounded = sourcesLocal.map(s => 
+    `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${(s.z||0).toFixed(2)}`
+  ).join('|');
+  const seatSigRounded = `${seat.x.toFixed(2)}_${seat.y.toFixed(2)}_${(seat.z||1.2).toFixed(2)}`;
+  
   // Compute stable input signature for debug memoization
   const inputSig = `${sourceSigUsed}|${seatSigUsed}|${smoothing}|${isRelative?'rel':'abs'}`;
 
@@ -907,6 +913,9 @@ export function computeRoomModesResponse({
       sourcePositionsUsed: [...sourcePositionsUsed],
       sourceSigUsed,
       seatSigUsed,
+      sourceSigRounded,
+      seatSigRounded,
+      splDbRepaired: rewParityMode ? [...splDbRepaired] : null,
       lfDebug15_45Hz: {
         modalMagDb: `${modalMagMin} to ${modalMagMax}`,
         note: "Pure modal pressure magnitudes before calibration offset"

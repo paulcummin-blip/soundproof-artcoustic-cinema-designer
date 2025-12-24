@@ -69,6 +69,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const lastStableDebugRef = useRef(null);
   const lastDebugUpdateTimeRef = useRef(0);
   const isDraggingRef = useRef(false);
+  
+  // REW Compare baseline snapshot (captured once when Compare View is enabled)
+  const rewCompareBaselineRef = useRef(null);
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -83,8 +86,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       setRewRelativeView(false); // Absolute SPL for REW Compare
       setRewSmoothing('1/3');
       setYAxisLocked(true);
+      
+      // Capture baseline snapshot on first enable (if valid data exists)
+      if (!rewCompareBaselineRef.current && rewModesData?.splDb && rewModesData.debug?.splDbRepaired) {
+        rewCompareBaselineRef.current = {
+          splDbRepaired: [...rewModesData.debug.splDbRepaired],
+          freqs: [...rewModesData.freqs],
+          sourceSigRounded: rewModesData.debug?.sourceSigRounded,
+          seatSigRounded: rewModesData.debug?.seatSigRounded,
+          timestamp: Date.now()
+        };
+      }
+    } else {
+      // Clear baseline when Compare View is disabled
+      rewCompareBaselineRef.current = null;
     }
-  }, [rewCompareView]);
+  }, [rewCompareView, rewModesData]);
 
   // Position signatures to detect in-place array mutations
   const frontLiveSig = useMemo(() => {
@@ -831,25 +848,27 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return lastStableDebugRef.current;
     }
     
-    // Throttle updates: max once per 250ms during drag
+    // Throttle updates: max once per 140ms
     const now = Date.now();
     const timeSinceLastUpdate = now - lastDebugUpdateTimeRef.current;
-    const shouldUpdate = !isDraggingRef.current || timeSinceLastUpdate >= 250;
+    const shouldUpdate = timeSinceLastUpdate >= 140;
     
     if (!shouldUpdate && lastStableDebugRef.current) {
       return lastStableDebugRef.current;
     }
 
-    const currentSourceSig = subsForSimulation.map(s => 
+    // Use ROUNDED signatures (1cm resolution) to prevent float noise
+    const currentSourceSigRounded = subsForSimulation.map(s => 
       `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${(s.z ?? 0).toFixed(2)}`
     ).join('|');
 
-    const currentFinalDb = rewModesDataAudit.splDb;
+    // Use splDbRepaired for consistent comparison (pre-smoothing, pre-normalization)
+    const currentRepairedDb = rewModesDataAudit.debug?.splDbRepaired || rewModesDataAudit.splDb;
     const currentFreqs = rewModesDataAudit.freqs;
 
-    // Compute axial coupling for first sub
+    // Compute axial coupling for first sub (rounded to 3 decimals for stability)
     const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-    if (!seat) return null;
+    if (!seat) return lastStableDebugRef.current || null;
 
     let seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
     if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && seatNudgeTest) {
@@ -857,15 +876,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
 
     const firstSub = subsForSimulation[0];
-    const currentCoupling = computeAxialCoupling(
+    const coupling = computeAxialCoupling(
       { x: firstSub.x, y: firstSub.y, z: firstSub.z ?? 0.0 },
       seatPos,
       roomDims
     );
+    
+    // Round coupling to 3 decimals for display stability
+    const currentCoupling = {
+      src: Number(coupling.src.toFixed(3)),
+      rcv: Number(coupling.rcv.toFixed(3)),
+      total: Number(coupling.total.toFixed(3))
+    };
 
-    // Check if source changed
+    // Check if source changed significantly (>1cm)
     const sourceChanged = prevSourceSigRef.current !== null && 
-                          prevSourceSigRef.current !== currentSourceSig;
+                          prevSourceSigRef.current !== currentSourceSigRounded;
 
     let probeDeltas = null;
     let couplingDeltas = null;
@@ -880,8 +906,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         const currIdx = currentFreqs.findIndex(f => Math.abs(f - fProbe) < 0.6);
         const prevIdx = prevFreqsRef.current.findIndex(f => Math.abs(f - fProbe) < 0.6);
 
-        if (currIdx >= 0 && prevIdx >= 0) {
-          const delta = currentFinalDb[currIdx] - prevFinalDbRef.current[prevIdx];
+        if (currIdx >= 0 && prevIdx >= 0 && 
+            Number.isFinite(currentRepairedDb[currIdx]) && 
+            Number.isFinite(prevFinalDbRef.current[prevIdx])) {
+          const delta = currentRepairedDb[currIdx] - prevFinalDbRef.current[prevIdx];
           probeDeltas.push({ freq: fProbe, delta });
         }
       }
@@ -907,21 +935,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       }
     }
 
-    // Store current values for next comparison
-    prevSourceSigRef.current = currentSourceSig;
-    prevFinalDbRef.current = currentFinalDb;
-    prevFreqsRef.current = currentFreqs;
-    prevCouplingRef.current = { src: currentCoupling.src, rcv: currentCoupling.rcv, total: currentCoupling.total };
+    // Only update refs if source actually changed (prevents jitter)
+    if (sourceChanged) {
+      prevSourceSigRef.current = currentSourceSigRounded;
+      prevFinalDbRef.current = currentRepairedDb;
+      prevFreqsRef.current = currentFreqs;
+      prevCouplingRef.current = currentCoupling;
+    }
+
+    // Stable verdict logic (requires meaningful change)
+    const couplingChanged = couplingDeltas && Math.abs(couplingDeltas.total) >= 0.02;
+    const splChanged = maxDelta >= 0.20;
+    const responding = couplingChanged || splChanged;
 
     const auditResult = {
       sourceChanged,
-      currentSourceSig,
+      currentSourceSig: currentSourceSigRounded,
       probeDeltas,
       couplingDeltas,
       currentCoupling,
       maxDelta,
       avgDelta,
-      verdict: maxDelta < 0.5 ? 'NOT RESPONDING (likely stale data or structural bug)' : 'RESPONDING (engine reacts to position)'
+      verdict: responding ? 'RESPONDING (engine reacts to position)' : 'NOT RESPONDING (change too small or structural bug)'
     };
     
     // Update stable ref and timestamp
@@ -1646,6 +1681,29 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   LF delta (25→69 Hz): {activeDebug?.lfProbe?.lfDelta_25_69 || 'N/A'} dB | 
                   Upper-bass delta (69→120 Hz): {activeDebug?.lfProbe?.upperBassDelta_69_120 || 'N/A'} dB
                 </div>
+                {rewCompareBaselineRef.current && (
+                  <div className="text-[9px] opacity-70 mt-1 pt-1 border-t border-blue-200">
+                    Baseline: captured at {new Date(rewCompareBaselineRef.current.timestamp).toLocaleTimeString()}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        if (rewModesData?.splDb && rewModesData.debug?.splDbRepaired) {
+                          rewCompareBaselineRef.current = {
+                            splDbRepaired: [...rewModesData.debug.splDbRepaired],
+                            freqs: [...rewModesData.freqs],
+                            sourceSigRounded: rewModesData.debug?.sourceSigRounded,
+                            seatSigRounded: rewModesData.debug?.seatSigRounded,
+                            timestamp: Date.now()
+                          };
+                        }
+                      }}
+                      className="text-[9px] h-5 px-2 ml-2"
+                    >
+                      Update baseline
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           );
