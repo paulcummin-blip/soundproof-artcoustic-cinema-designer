@@ -569,11 +569,6 @@ export function computeRoomModesResponse({
       }
     }
   }
-  
-  // Track what processing was applied
-  const calibrationApplied = rewParityMode;
-  const calibrationOffset = sourceCalibrationDb;
-  let actualNormBand = normalizeBandHz;
 
   // Capture post-normalization stats
   const finitePostNorm = splDbSmoothed.filter(v => isFinite(v));
