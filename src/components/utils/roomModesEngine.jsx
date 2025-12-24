@@ -253,10 +253,10 @@ export function computeRoomModesResponse({
   // Lowest axial mode (used for sealed-room pressure behaviour)
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
-  // Sealed room LF boost (optional, disabled by default)
-  const sealedBoostEnabled = sealedRoomBoost?.enabled ?? false;
-  const sealedBoostKDbPerOct = sealedRoomBoost?.kDbPerOct ?? 6.0;
-  const sealedBoostMaxGainDb = sealedRoomBoost?.maxGainDb ?? 12.0;
+  // Sealed room LF boost (ALWAYS ENABLED - cinemas are sealed by design)
+  const sealedBoostEnabled = true;
+  const sealedBoostKDbPerOct = 6.0;
+  const sealedBoostMaxGainDb = 12.0;
   
   // Track what processing was applied
   const calibrationApplied = rewParityMode;
@@ -534,6 +534,7 @@ export function computeRoomModesResponse({
     // (No post-processing needed - losses already bypassed below lowest axial)
 
     // Schroeder blend: above fs, reduce explicit modal contrast (statistical smoothing feel)
+    // PLUS: gentle roll-off to fix "upper bass too high" symptom
     let splDbSchroeder = splDb;
     if (rewParityMode && schroederHz > 0) {
       splDbSchroeder = splDb.map((db, i) => {
@@ -545,8 +546,13 @@ export function computeRoomModesResponse({
         const f2 = schroederHz * 1.6;
         const t = Math.max(0, Math.min(1, (f - schroederHz) / Math.max(1e-6, (f2 - schroederHz))));
 
-        // Simple target: a mild downward tilt
-        const target = dbAt(schroederHz, freqs, splDb) - 3 * Math.log2(f / schroederHz);
+        // Gentle roll-off to prevent upper bass inflation (fix 80-200 Hz region)
+        // Apply -1 dB per octave above Schroeder to keep mid-bass realistic
+        const octavesAbove = Math.log2(f / schroederHz);
+        const rolloffDb = -1.0 * octavesAbove;
+        
+        // Simple target: a mild downward tilt + rolloff
+        const target = dbAt(schroederHz, freqs, splDb) - 3 * Math.log2(f / schroederHz) + rolloffDb;
 
         return (1 - t) * db + t * target;
       });
@@ -765,7 +771,8 @@ export function computeRoomModesResponse({
   const modalMagMax = lfDebug.modalMag15_45.length > 0 ? Math.max(...lfDebug.modalMag15_45).toFixed(1) : 'N/A';
 
   // LF PROBE: detailed frequency-by-frequency audit using FINAL curve
-  const probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45];
+  // Extended probes for acceptance test (25, 40, 60, 120 Hz)
+  const probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45, 60, 120];
   const lfProbe = probeFreqs.map(fProbe => {
     const idx = freqs.findIndex(f => Math.abs(f - fProbe) < 0.6);
     if (idx < 0) return { freq: fProbe, error: 'not found' };
@@ -813,6 +820,9 @@ export function computeRoomModesResponse({
   ).join('|');
 
   const seatSigUsed = `${seat.x.toFixed(2)}_${seat.y.toFixed(2)}_${(seat.z||1.2).toFixed(2)}`;
+  
+  // Compute stable input signature for debug memoization
+  const inputSig = `${sourceSigUsed}|${seatSigUsed}|${smoothing}|${isRelative?'rel':'abs'}`;
 
   // FINAL GUARD: Prevent "No finite values" silent failures
   const finalFiniteCheck = finalDb.filter(v => isFinite(v));
@@ -858,8 +868,9 @@ export function computeRoomModesResponse({
       relativeViewEnabled: isRelative,
       normBandHz: actualNormBand,
       normApplied: normAppliedActual,
-      normRefDb: isRelative ? "0.0" : "85.0",
+      normRefDb: Number.isFinite(calRefMedianDbBefore) ? calRefMedianDbBefore.toFixed(2) : (isRelative ? "0.0" : "85.0"),
       smoothingApplied,
+      inputSig,
       nonFiniteRepaired,
       rawRange: rawRange.toFixed(2),
       preNormRange: preNormRange.toFixed(2),
