@@ -685,6 +685,13 @@ export function computeRoomModesResponse({
     }
   }
 
+  // REW Compare: reference dB used for display (must always exist)
+  const normRefDb =
+    Number.isFinite(calRefMedianDbAfter) ? calRefMedianDbAfter :
+    (isRelative
+      ? (Number.isFinite(normalizeToDb) ? normalizeToDb : 0)
+      : 85);
+
   // DEBUG: record finalDb without risking a crash
   if (__debugBass && Array.isArray(__probeRows) && __probeRows.length) {
     for (const row of __probeRows) {
@@ -837,7 +844,7 @@ export function computeRoomModesResponse({
       relativeViewEnabled: isRelative,
       normBandHz: actualNormBand,
       normApplied: normAppliedActual,
-      normRefDb: normAppliedActual ? normRefDb.toFixed(2) : 'N/A',
+      normRefDb: Number.isFinite(normRefDb) ? Number(normRefDb.toFixed(2)) : null,
       smoothingApplied,
       nonFiniteRepaired,
       rawRange: rawRange.toFixed(2),
