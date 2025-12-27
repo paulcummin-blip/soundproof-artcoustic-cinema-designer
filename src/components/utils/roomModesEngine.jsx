@@ -296,6 +296,9 @@ export function computeRoomModesResponse({
   
   // Per-mode contribution tracking (for REW parity debugging)
   const modeContributions = {};
+  
+  // LF Movement Probe: track source/seat coupling at key frequencies
+  const lfMovementProbe = {};
 
   // --- B44: modal coupling sanity (single mode 1,0,0) ---
   const __b44Clamp01 = (t) => Math.max(0, Math.min(1, t));
@@ -549,6 +552,34 @@ export function computeRoomModesResponse({
       // Only store for probe frequencies to avoid bloat
       if (__isProbeFreq(f)) {
         modeContributions[f.toFixed(1)] = top3;
+      }
+    }
+    
+    // LF Movement Probe: capture coupling terms at key frequencies
+    const probeFreqs = [25, 35, 45];
+    if (probeFreqs.includes(Math.round(f))) {
+      // Find dominant mode near this frequency
+      const nearestMode = modes
+        .filter(m => Math.abs(m.freq - f) < 5)
+        .sort((a, b) => Math.abs(a.freq - f) - Math.abs(b.freq - f))[0];
+      
+      if (nearestMode && sourcesUsed.length > 0) {
+        const source = sourcesUsed[0];
+        const coupling = computeSpatialCoupling(nearestMode, source, seat, room);
+        const { srcCouplingTerm, rcvCouplingTerm } = getSpatialCouplingTerms(nearestMode, source, seat, room);
+        
+        const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
+        const modalDbVal = 20 * Math.log10(Math.max(Number.EPSILON, modalMag));
+        
+        lfMovementProbe[f.toFixed(0)] = {
+          nearestModeHz: nearestMode.freq.toFixed(1),
+          modeIndices: [nearestMode.nx, nearestMode.ny, nearestMode.nz],
+          sourceTerm: srcCouplingTerm.toFixed(4),
+          seatTerm: rcvCouplingTerm.toFixed(4),
+          totalCoupling: coupling.toFixed(4),
+          modalMag: modalMag.toFixed(6),
+          modalSplDb: modalDbVal.toFixed(2)
+        };
       }
     }
     
@@ -1257,7 +1288,8 @@ export function computeRoomModesResponse({
         srcShape_100: __b44ModeCouplingSanity.srcShape_100,
         coupling_100: __b44ModeCouplingSanity.coupling_100,
       } : null,
-      warnings: warnings.length > 0 ? warnings : null
+      warnings: warnings.length > 0 ? warnings : null,
+      lfMovementProbe: Object.keys(lfMovementProbe).length > 0 ? lfMovementProbe : null
     }
   };
 

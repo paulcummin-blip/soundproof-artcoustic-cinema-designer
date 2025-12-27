@@ -1883,6 +1883,34 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
 
+        {/* LF Movement Probe (spatial coupling verification) */}
+        {rewStyleMode && !modalOnlyDebugView && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+
+          const movementProbe = activeDebug?.lfMovementProbe;
+          if (!movementProbe || Object.keys(movementProbe).length === 0) return null;
+
+          return (
+            <div className="text-xs text-[#3E4349] mb-2 bg-green-50 p-2 rounded border border-green-300">
+              <div className="font-semibold mb-1 text-green-700">LF Movement Probe (25/35/45 Hz)</div>
+              <div className="text-[9px] font-mono space-y-1">
+                {Object.entries(movementProbe).map(([freq, data]) => (
+                  <div key={freq} className="border-t border-green-200 pt-1 first:border-t-0 first:pt-0">
+                    <div className="font-semibold">{freq} Hz (mode {data.nearestModeHz} Hz):</div>
+                    <div className="pl-2 space-y-0.5">
+                      <div>Source term: {data.sourceTerm}, Seat term: {data.seatTerm}</div>
+                      <div>Total coupling: {data.totalCoupling}</div>
+                      <div>Modal SPL: {data.modalSplDb} dB</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Per-mode contributions (phase debug) */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
           const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
