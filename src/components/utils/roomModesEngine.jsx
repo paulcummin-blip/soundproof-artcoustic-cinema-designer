@@ -645,6 +645,29 @@ export function computeRoomModesResponse({
     .map(m => m.freq)
     .sort((a, b) => a - b);
   
+  // All mode markers (for REW parity overlay)
+  const modeMarkersAllHz = [...modes]
+    .map(m => m.freq)
+    .sort((a, b) => a - b);
+  
+  // First 60 modes for debug list
+  const modeListFirst60 = [...modes].slice(0, 60).map(m => {
+    let axisLabel = null;
+    if (m.type === 'axial') {
+      if (m.nx > 0 && m.ny === 0 && m.nz === 0) axisLabel = 'W';
+      else if (m.ny > 0 && m.nx === 0 && m.nz === 0) axisLabel = 'L';
+      else if (m.nz > 0 && m.nx === 0 && m.ny === 0) axisLabel = 'H';
+    }
+    return {
+      fHz: Number(m.freq.toFixed(1)),
+      type: m.type,
+      nx: m.nx,
+      ny: m.ny,
+      nz: m.nz,
+      axisLabel
+    };
+  });
+  
   // Count by type
   const axialCount = modes.filter(m => m.type === 'axial').length;
   const tangentialCount = modes.filter(m => m.type === 'tangential').length;
@@ -925,7 +948,9 @@ export function computeRoomModesResponse({
     debug: {
       schroederHz,
       modeMarkersHz: [...modeMarkersHz],
+      modeMarkersAllHz: [...modeMarkersAllHz],
       modeMarkers: modeMarkers.map(m => ({ ...m, n: [...m.n] })),
+      modeListFirst60: [...modeListFirst60],
       modeCount: modes.length,
       axialCount,
       tangentialCount,

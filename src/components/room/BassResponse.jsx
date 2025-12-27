@@ -1222,12 +1222,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return modes.map(m => m.fHz);
   }, [rewStyleMode, rewModesData]);
 
-  // Filter mode markers to axial only for graph overlay (visual clarity)
-  const axialModeMarkersForGraph = useMemo(() => {
-    if (!rewStyleMode) return [];
-    const allMarkers = rewModesData?.debug?.modeMarkers || [];
-    return allMarkers.filter(m => m.family === 'axial');
-  }, [rewStyleMode, rewModesData]);
+  // Mode markers for graph overlay (REW parity)
+  const modeMarkersForGraph = useMemo(() => {
+    if (!rewStyleMode) return { axial: [], tangential: [], oblique: [] };
+    
+    const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+      ? rewRoomPlusProductData.debug
+      : rewModesData?.debug;
+    
+    if (!activeDebug?.modeMarkers) return { axial: [], tangential: [], oblique: [] };
+    
+    const allMarkers = activeDebug.modeMarkers || [];
+    return {
+      axial: allMarkers.filter(m => m.family === 'axial'),
+      tangential: allMarkers.filter(m => m.family === 'tangential'),
+      oblique: allMarkers.filter(m => m.family === 'oblique')
+    };
+  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
@@ -1800,6 +1811,32 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
+        {/* Mode list (first 30) - REW parity check */}
+        {rewStyleMode && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+
+          const modeList = activeDebug?.modeListFirst60;
+          if (!modeList || modeList.length === 0) return null;
+
+          const first30 = modeList.slice(0, 30);
+
+          return (
+            <div className="text-xs text-[#3E4349] mb-2 bg-blue-50 p-2 rounded border border-blue-200">
+              <div className="font-semibold mb-1 text-blue-700">Mode List (first 30)</div>
+              <div className="text-[9px] font-mono space-y-0.5 max-h-32 overflow-y-auto">
+                {first30.map((mode, i) => (
+                  <div key={i} className={mode.type === 'axial' ? 'font-semibold' : 'opacity-70'}>
+                    {mode.fHz.toFixed(1)} Hz: {mode.type} ({mode.nx},{mode.ny},{mode.nz})
+                    {mode.axisLabel && ` [${mode.axisLabel}]`}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* REW debug banner (only when REW is ON) */}
         {rewStyleMode && (rewModesData?.debug?.error || rewModesData?.debug?.flatNote) && (
           <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#C1B6AD]">
@@ -2097,11 +2134,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             crossoverFrequency={80}
             modeFrequencies={modeFrequencies}
             showModeMarkers={rewStyleMode ? showRewModeLines : showModeMarkers}
-            modeMarkers={rewStyleMode ? (rewModesData?.debug?.modeMarkers || []) : []}
+            modeMarkers={modeMarkersForGraph}
             linearHzAxis={rewStyleMode && linearHzAxis}
             rewStyleMode={rewStyleMode}
             yDomain={finalYDomain}
-            showAxialOnly={rewStyleMode}
+            showAxialOnly={false}
             refDb={rewCompareView && yAxisDomain?.refDb ? yAxisDomain.refDb : null}
             showRefLine={rewCompareView}
             />
