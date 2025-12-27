@@ -21,7 +21,7 @@ export default function BassGraph({
   crossoverFrequency = 80,
   modeFrequencies = [],
   showModeMarkers = false,
-  modeMarkers = [],
+  modeMarkers = { axial: [], tangential: [], oblique: [] },
   linearHzAxis = false,
   rewStyleMode = false,
   yDomain,
@@ -32,14 +32,30 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Filter mode markers to axial only when requested (visual only, calculation unchanged)
-    const drawnModeMarkers = React.useMemo(() => {
-        if (!modeMarkers || modeMarkers.length === 0) return [];
-        if (showAxialOnly) {
-            return modeMarkers.filter(m => m.family === 'axial');
+    // Normalize modeMarkers input (support both old array format and new grouped format)
+    const normalizedMarkers = React.useMemo(() => {
+        if (!modeMarkers) return { axial: [], tangential: [], oblique: [] };
+        
+        // New format: already grouped
+        if (modeMarkers.axial || modeMarkers.tangential || modeMarkers.oblique) {
+            return {
+                axial: modeMarkers.axial || [],
+                tangential: modeMarkers.tangential || [],
+                oblique: modeMarkers.oblique || []
+            };
         }
-        return modeMarkers;
-    }, [modeMarkers, showAxialOnly]);
+        
+        // Old format: array of markers
+        if (Array.isArray(modeMarkers)) {
+            return {
+                axial: modeMarkers.filter(m => m.family === 'axial'),
+                tangential: modeMarkers.filter(m => m.family === 'tangential'),
+                oblique: modeMarkers.filter(m => m.family === 'oblique')
+            };
+        }
+        
+        return { axial: [], tangential: [], oblique: [] };
+    }, [modeMarkers]);
 
     // Determine Y-axis domain
     let calculatedYMin, calculatedYMax;
@@ -71,39 +87,78 @@ export default function BassGraph({
       calculatedXMax = Math.max(120, Math.min(200, schroederFrequency * 1.2));
     }
 
-    // Render mode markers if enabled (axial only for visual clarity)
+    // Render mode markers with hover tooltips (REW parity overlay)
     const renderModeMarkers = () => {
-        if (!showModeMarkers || drawnModeMarkers.length === 0) return null;
+        if (!showModeMarkers) return null;
 
-        // In REW mode, only show axial markers
-        const markersToRender = rewStyleMode 
-          ? drawnModeMarkers.filter(m => m.family === 'axial')
-          : drawnModeMarkers;
+        const hasMarkers = normalizedMarkers.axial.length > 0 || 
+                          normalizedMarkers.tangential.length > 0 || 
+                          normalizedMarkers.oblique.length > 0;
+        
+        if (!hasMarkers) return null;
 
-        return markersToRender.map((marker, i) => {
-            // Different stroke styles for each family
-            let strokeDasharray = '1 0'; // solid for axial
-            let opacity = 0.3;
-
-            if (marker.family === 'tangential') {
-                strokeDasharray = '4 2'; // dashed
-                opacity = 0.2;
-            } else if (marker.family === 'oblique') {
-                strokeDasharray = '2 2'; // dotted
-                opacity = 0.15;
-            }
-
-            return (
-                <ReferenceLine 
-                    key={`mode-${i}`}
-                    x={marker.fHz}
-                    stroke="#213428"
-                    strokeWidth={1}
-                    strokeDasharray={strokeDasharray}
-                    opacity={opacity}
-                />
-            );
-        });
+        return (
+            <>
+                {/* Axial modes (stronger style) */}
+                {normalizedMarkers.axial.map((marker, i) => {
+                    const modeStr = `(${marker.n[0]},${marker.n[1]},${marker.n[2]})`;
+                    const label = marker.axisLabel 
+                        ? `axial [${marker.axisLabel}] ${modeStr} ${marker.fHz.toFixed(1)} Hz`
+                        : `axial ${modeStr} ${marker.fHz.toFixed(1)} Hz`;
+                    
+                    return (
+                        <ReferenceLine 
+                            key={`mode-axial-${i}`}
+                            x={marker.fHz}
+                            stroke="#8B7F76"
+                            strokeWidth={1.5}
+                            strokeDasharray="3 3"
+                            opacity={0.7}
+                        >
+                            <title>{label}</title>
+                        </ReferenceLine>
+                    );
+                })}
+                
+                {/* Tangential modes (lighter style) */}
+                {normalizedMarkers.tangential.map((marker, i) => {
+                    const modeStr = `(${marker.n[0]},${marker.n[1]},${marker.n[2]})`;
+                    const label = `tangential ${modeStr} ${marker.fHz.toFixed(1)} Hz`;
+                    
+                    return (
+                        <ReferenceLine 
+                            key={`mode-tangential-${i}`}
+                            x={marker.fHz}
+                            stroke="#C1B6AD"
+                            strokeWidth={1.0}
+                            strokeDasharray="2 2"
+                            opacity={0.4}
+                        >
+                            <title>{label}</title>
+                        </ReferenceLine>
+                    );
+                })}
+                
+                {/* Oblique modes (lightest style) */}
+                {normalizedMarkers.oblique.map((marker, i) => {
+                    const modeStr = `(${marker.n[0]},${marker.n[1]},${marker.n[2]})`;
+                    const label = `oblique ${modeStr} ${marker.fHz.toFixed(1)} Hz`;
+                    
+                    return (
+                        <ReferenceLine 
+                            key={`mode-oblique-${i}`}
+                            x={marker.fHz}
+                            stroke="#DCDBD6"
+                            strokeWidth={0.8}
+                            strokeDasharray="1 1"
+                            opacity={0.3}
+                        >
+                            <title>{label}</title>
+                        </ReferenceLine>
+                    );
+                })}
+            </>
+        );
     };
 
     return (
@@ -202,9 +257,9 @@ export default function BassGraph({
                     <Line type="monotone" dataKey="spl" stroke="#213428" strokeWidth={2} dot={false} />
                     
                     {/* Mode line legend (REW style) */}
-                    {showModeMarkers && drawnModeMarkers.length > 0 && (
+                    {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && (
                         <text x={60} y={20} fontSize={10} fill="#3E4349" className="font-body">
-                            Mode lines: Axial (—)
+                            Modes: Axial (━━) Tangential (- -) Oblique (···)
                         </text>
                     )}
                 </LineChart>
