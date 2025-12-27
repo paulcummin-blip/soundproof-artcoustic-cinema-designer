@@ -459,7 +459,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         subProductCurves: null, // Room-only: no product curves
         absoluteSplMode: !rewRelativeView,
         rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
-        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null // Part H - mode isolation
+        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
+        complexEigenfunctions: complexEigenfunctions // Part H3 - complex eigenfunctions
       });
     } catch (e) {
       return {
@@ -709,7 +710,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         subProductCurves, // Apply per-sub product curves
         absoluteSplMode: !rewRelativeView,
         rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
-        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null // Part H - mode isolation
+        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
+        complexEigenfunctions: complexEigenfunctions // Part H3 - complex eigenfunctions
       });
     } catch (e) {
       return {
