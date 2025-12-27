@@ -83,6 +83,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // Complex eigenfunctions toggle (Part H3 - REW parity phase behaviour)
   const [complexEigenfunctions, setComplexEigenfunctions] = useState(false);
+  
+  // Coupling phase probe (Part HB - verify complex eigenfunctions are active)
+  const [couplingProbeMode, setCouplingProbeMode] = useState('auto'); // 'auto' or '1,0,0' etc
+  const [couplingProbeUseComplex, setCouplingProbeUseComplex] = useState(false);
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -1986,6 +1990,40 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </Label>
               </div>
             )}
+            
+            {/* Coupling Phase Probe (Part HB - verify complex eigenfunctions) */}
+            {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
+              <div className="space-y-2 mt-2 pt-2 border-t border-gray-300">
+                <div className="font-semibold text-xs text-[#1B1A1A]">Coupling Phase Probe</div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="probe-mode" className="text-xs text-[#3E4349]">
+                    Probe mode:
+                  </Label>
+                  <select
+                    id="probe-mode"
+                    value={couplingProbeMode}
+                    onChange={(e) => setCouplingProbeMode(e.target.value)}
+                    className="text-xs border border-[#DCDBD6] rounded px-2 py-1 bg-white"
+                  >
+                    <option value="auto">Auto (first isolated mode)</option>
+                    <option value="1,0,0">(1,0,0)</option>
+                    <option value="2,0,0">(2,0,0)</option>
+                    <option value="0,1,0">(0,1,0)</option>
+                    <option value="0,0,1">(0,0,1)</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox 
+                    id="probe-use-complex" 
+                    checked={couplingProbeUseComplex}
+                    onCheckedChange={setCouplingProbeUseComplex}
+                  />
+                  <Label htmlFor="probe-use-complex" className="text-xs text-[#3E4349]">
+                    Use Complex eigenfunctions
+                  </Label>
+                </div>
+              </div>
+            )}
           </div>
         )}
         
@@ -2155,6 +2193,163 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   Phase check at 34 Hz available in console: <code>globalThis.__B44_PHASE_CHECK</code>
                 </div>
               )}
+            </div>
+          );
+        })()}
+
+        {/* Coupling Phase Probe (Part HB - verify complex eigenfunctions) */}
+        {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+          
+          const modeList = activeDebug?.modeListFirst60;
+          if (!modeList || modeList.length === 0 || subsForSimulation.length === 0) return null;
+          
+          const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+          if (!seat) return null;
+          
+          const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+          const source = subsForSimulation[0];
+          
+          const W = roomDims?.widthM || 1;
+          const L = roomDims?.lengthM || 1;
+          const H = roomDims?.heightM || 1;
+          
+          // Determine which mode to probe
+          let probeModeDef = null;
+          if (couplingProbeMode === 'auto') {
+            // Use first isolated mode if isolation is active
+            if (modeIsolation !== 'off') {
+              const firstSpec = modeIsolation.split('|')[0];
+              const [nx, ny, nz] = firstSpec.split(',').map(n => parseInt(n, 10));
+              probeModeDef = modeList.find(m => m.nx === nx && m.ny === ny && m.nz === nz);
+            } else {
+              // Default to (1,0,0)
+              probeModeDef = modeList.find(m => m.nx === 1 && m.ny === 0 && m.nz === 0);
+            }
+          } else {
+            const [nx, ny, nz] = couplingProbeMode.split(',').map(n => parseInt(n, 10));
+            probeModeDef = modeList.find(m => m.nx === nx && m.ny === ny && m.nz === nz);
+          }
+          
+          if (!probeModeDef) return null;
+          
+          const { nx, ny, nz, fHz } = probeModeDef;
+          const probeFreqs = [fHz - 1, fHz, fHz + 1];
+          
+          // Helper: compute eigenfunction (real or complex)
+          const computeEigen = (n, x, dim, useComplex) => {
+            if (n === 0) {
+              return useComplex ? { re: 1, im: 0 } : 1;
+            }
+            
+            if (useComplex) {
+              const arg = n * Math.PI * x / dim;
+              return { re: Math.cos(arg), im: Math.sin(arg) };
+            } else {
+              return Math.cos(n * Math.PI * x / dim);
+            }
+          };
+          
+          // Compute at probe frequencies
+          const probeResults = probeFreqs.map(f => {
+            if (couplingProbeUseComplex) {
+              // Complex eigenfunctions
+              const srcX = computeEigen(nx, source.x, W, true);
+              const srcY = computeEigen(ny, source.y, L, true);
+              const srcZ = computeEigen(nz, source.z ?? 0.0, H, true);
+              
+              const rcvX = computeEigen(nx, seatPos.x, W, true);
+              const rcvY = computeEigen(ny, seatPos.y, L, true);
+              const rcvZ = computeEigen(nz, seatPos.z, H, true);
+              
+              // Multiply srcX * srcY * srcZ
+              let srcRe = srcX.re * srcY.re - srcX.im * srcY.im;
+              let srcIm = srcX.re * srcY.im + srcX.im * srcY.re;
+              const tmpRe = srcRe * srcZ.re - srcIm * srcZ.im;
+              const tmpIm = srcRe * srcZ.im + srcIm * srcZ.re;
+              srcRe = tmpRe;
+              srcIm = tmpIm;
+              const srcMag = Math.sqrt(srcRe * srcRe + srcIm * srcIm);
+              const srcPhase = Math.atan2(srcIm, srcRe) * (180 / Math.PI);
+              
+              // Multiply rcvX * rcvY * rcvZ
+              let rcvRe = rcvX.re * rcvY.re - rcvX.im * rcvY.im;
+              let rcvIm = rcvX.re * rcvY.im + rcvX.im * rcvY.re;
+              const tmpRe2 = rcvRe * rcvZ.re - rcvIm * rcvZ.im;
+              const tmpIm2 = rcvRe * rcvZ.im + rcvIm * rcvZ.re;
+              rcvRe = tmpRe2;
+              rcvIm = tmpIm2;
+              const rcvMag = Math.sqrt(rcvRe * rcvRe + rcvIm * rcvIm);
+              const rcvPhase = Math.atan2(rcvIm, rcvRe) * (180 / Math.PI);
+              
+              // Multiply src * rcv (coupling)
+              const couplingRe = srcRe * rcvRe - srcIm * rcvIm;
+              const couplingIm = srcRe * rcvIm + srcIm * rcvRe;
+              const couplingMag = Math.sqrt(couplingRe * couplingRe + couplingIm * couplingIm);
+              const couplingPhase = Math.atan2(couplingIm, couplingRe) * (180 / Math.PI);
+              
+              return {
+                freq: f,
+                src: { re: srcRe, im: srcIm, mag: srcMag, phase: srcPhase },
+                rcv: { re: rcvRe, im: rcvIm, mag: rcvMag, phase: rcvPhase },
+                coupling: { re: couplingRe, im: couplingIm, mag: couplingMag, phase: couplingPhase }
+              };
+            } else {
+              // Real eigenfunctions
+              const srcX = computeEigen(nx, source.x, W, false);
+              const srcY = computeEigen(ny, source.y, L, false);
+              const srcZ = computeEigen(nz, source.z ?? 0.0, H, false);
+              const srcReal = srcX * srcY * srcZ;
+              
+              const rcvX = computeEigen(nx, seatPos.x, W, false);
+              const rcvY = computeEigen(ny, seatPos.y, L, false);
+              const rcvZ = computeEigen(nz, seatPos.z, H, false);
+              const rcvReal = rcvX * rcvY * rcvZ;
+              
+              const couplingReal = srcReal * rcvReal;
+              
+              return {
+                freq: f,
+                src: { re: srcReal, im: 0, mag: Math.abs(srcReal), phase: srcReal >= 0 ? 0 : 180 },
+                rcv: { re: rcvReal, im: 0, mag: Math.abs(rcvReal), phase: rcvReal >= 0 ? 0 : 180 },
+                coupling: { re: couplingReal, im: 0, mag: Math.abs(couplingReal), phase: couplingReal >= 0 ? 0 : 180 }
+              };
+            }
+          });
+          
+          return (
+            <div className="text-xs mb-2 bg-cyan-50 p-2 rounded border border-cyan-400">
+              <div className="font-semibold mb-1 text-cyan-700">
+                🔬 Coupling Phase Probe (Part HB)
+              </div>
+              <div className="text-[10px] space-y-1">
+                <div className="font-semibold">
+                  Probing mode: ({nx},{ny},{nz}) @ {fHz.toFixed(1)} Hz
+                  {probeModeDef.axisLabel && ` [${probeModeDef.axisLabel}]`}
+                </div>
+                <div className="text-[9px] opacity-70">
+                  Mode: {couplingProbeUseComplex ? 'COMPLEX' : 'REAL'} eigenfunctions
+                </div>
+                <div className="mt-2 space-y-2 font-mono text-[8px]">
+                  {probeResults.map((result, i) => (
+                    <div key={i} className="border-t border-cyan-200 pt-1 first:border-t-0 first:pt-0">
+                      <div className="font-semibold">{result.freq.toFixed(1)} Hz:</div>
+                      <div className="pl-2 space-y-0.5">
+                        <div>srcEigen: (Re={result.src.re.toFixed(4)}, Im={result.src.im.toFixed(4)}) | {result.src.phase.toFixed(1)}°</div>
+                        <div>rcvEigen: (Re={result.rcv.re.toFixed(4)}, Im={result.rcv.im.toFixed(4)}) | {result.rcv.phase.toFixed(1)}°</div>
+                        <div className="font-semibold text-cyan-800">
+                          coupling: (Re={result.coupling.re.toFixed(4)}, Im={result.coupling.im.toFixed(4)}) | mag={result.coupling.mag.toFixed(4)} @ {result.coupling.phase.toFixed(1)}°
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-1 pt-1 border-t border-cyan-300 text-[9px]">
+                  <strong>Test:</strong> Drag sub 0.5m → Complex OFF: phase stays 0/180 | Complex ON: phase changes smoothly
+                </div>
+              </div>
             </div>
           );
         })()}
