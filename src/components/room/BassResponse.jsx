@@ -1860,15 +1860,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
               <div className="font-semibold mb-1 text-blue-700">
-                SBIR: {activeDebug.sbirEnabled ? 'ON' : 'OFF'}, order={activeDebug.sbirMaxOrder || 1}
-              </div>
-              <div className="text-[9px] font-mono">
-                Blend: {activeDebug.sbirBlendStartHz} Hz → {activeDebug.sbirBlendEndHz} Hz
+                SBIR: {activeDebug.sbirEnabled ? 'ON' : 'OFF'}, order={activeDebug.sbirMaxOrder || 2}
               </div>
               {probe40 && (
-                <div className="text-[9px] font-mono mt-1 pt-1 border-t border-blue-200">
-                  40 Hz probe: direct={probe40.directDb} dB, total={probe40.totalDb} dB, result={probe40.resultDb} dB
-                </div>
+                <>
+                  <div className="text-[9px] font-mono">
+                    Paths used: {probe40.pathsUsed || 'N/A'}
+                  </div>
+                  {probe40.strongestReflection && (
+                    <div className="text-[9px] font-mono">
+                      Strongest reflection at 40 Hz: {probe40.strongestReflection.surface} ({probe40.strongestReflection.magDb.toFixed(1)} dB)
+                    </div>
+                  )}
+                  <div className="text-[9px] font-mono mt-1 pt-1 border-t border-blue-200 space-y-0.5">
+                    <div>Direct only: {probe40.directOnlyDb.toFixed(1)} dB</div>
+                    <div>SBIR total: {probe40.sbirTotalDb.toFixed(1)} dB</div>
+                    <div>Combined result: {probe40.combinedResultDb} dB</div>
+                  </div>
+                </>
               )}
             </div>
           );

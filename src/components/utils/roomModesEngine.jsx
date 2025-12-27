@@ -553,6 +553,9 @@ export function computeRoomModesResponse({
     }
     
     // SBIR (image source) calculation - integrated into modal summation
+    let sbirPathsUsed = 0;
+    let sbirStrongestReflection = null;
+    
     if (sbirEnabled) {
       for (let subIdx = 0; subIdx < sourcesUsed.length; subIdx++) {
         const source = sourcesUsed[subIdx];
@@ -579,8 +582,8 @@ export function computeRoomModesResponse({
         const weightRe = weightMag * Math.cos(totalPhase);
         const weightIm = weightMag * Math.sin(totalPhase);
         
-        // Compute SBIR complex pressure
-        const sbirComplex = computeSBIRComplexAtFreq({
+        // Compute SBIR complex pressure (order 2 for live use, keeps it smooth)
+        const sbirResult = computeSBIRComplexAtFreq({
           f,
           source,
           receiver: seat,
@@ -589,11 +592,18 @@ export function computeRoomModesResponse({
           c,
           includeWalls: sbirIncludeWalls,
           includeFloorCeiling: sbirIncludeFloorCeiling,
+          maxOrder: isDragging ? 1 : 2, // Reduce order while dragging for performance
         });
         
         // Apply weight to SBIR contribution
-        sumRe_sbir += weightRe * sbirComplex.re - weightIm * sbirComplex.im;
-        sumIm_sbir += weightRe * sbirComplex.im + weightIm * sbirComplex.re;
+        sumRe_sbir += weightRe * sbirResult.re - weightIm * sbirResult.im;
+        sumIm_sbir += weightRe * sbirResult.im + weightIm * sbirResult.re;
+        
+        // Track debug info (only at 40 Hz probe)
+        if (Math.abs(f - 40) < 0.6) {
+          sbirPathsUsed = sbirResult.pathsUsed;
+          sbirStrongestReflection = sbirResult.strongestReflection;
+        }
       }
     }
 
@@ -637,19 +647,17 @@ export function computeRoomModesResponse({
       }
     }
     
-    // Blend modal + SBIR with frequency-dependent weight
+    // Combine modal + SBIR in complex domain (no frequency weighting - SBIR strongest in modal region)
     let sumRe_total = sumRe_modal;
     let sumIm_total = sumIm_modal;
     
-    if (sbirEnabled && schroederHz > 0) {
-      // SBIR blend weight: 0 → 1 from sbirBlendStartHz to sbirBlendEndHz
-      const w = Math.max(0, Math.min(1, (f - sbirBlendStartHzActual) / Math.max(1e-6, (sbirBlendEndHzActual - sbirBlendStartHzActual))));
-      
-      sumRe_total = sumRe_modal + w * sumRe_sbir;
-      sumIm_total = sumIm_modal + w * sumIm_sbir;
+    if (sbirEnabled) {
+      // Direct complex sum - SBIR contributes throughout bass region
+      sumRe_total += sumRe_sbir;
+      sumIm_total += sumIm_sbir;
     }
 
-    // Pure modal pressure magnitude → dB
+    // Combined pressure magnitude → dB
     let modalDb = 20 * Math.log10(Math.max(Number.EPSILON, Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total)));
     
     // Apply mode density compensation (REW-ish): above 70 Hz, subtract incoherent sum growth
@@ -681,7 +689,16 @@ export function computeRoomModesResponse({
     const idx40 = freqs.findIndex(f => Math.abs(f - 40) < 0.6);
     if (idx40 >= 0) {
       const source = sourcesLocal[0];
-      const sbirComplex = computeSBIRComplexAtFreq({
+      
+      // Compute direct-only magnitude
+      const dx = source.x - seat.x;
+      const dy = source.y - seat.y;
+      const dz = (source.z ?? 0) - (seat.z ?? 1.2);
+      const directDist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      const directMag = 1 / Math.max(0.25, directDist);
+      
+      // Compute SBIR field (direct + reflections)
+      const sbirResult = computeSBIRComplexAtFreq({
         f: 40,
         source,
         receiver: seat,
@@ -690,19 +707,20 @@ export function computeRoomModesResponse({
         c,
         includeWalls: sbirIncludeWalls,
         includeFloorCeiling: sbirIncludeFloorCeiling,
+        maxOrder: 2,
       });
       
-      const directMag = 1 / Math.max(0.25, Math.sqrt(
-        Math.pow(source.x - seat.x, 2) + 
-        Math.pow(source.y - seat.y, 2) + 
-        Math.pow((source.z ?? 0) - (seat.z ?? 1.2), 2)
-      ));
-      const totalMag = Math.sqrt(sbirComplex.re * sbirComplex.re + sbirComplex.im * sbirComplex.im);
+      const sbirTotalMag = Math.sqrt(sbirResult.re * sbirResult.re + sbirResult.im * sbirResult.im);
+      
+      // Compute modal-only at 40 Hz (from stored complex sums during loop)
+      // We'll need to track this separately - for now use the combined result
       
       sbirDebugProbe40Hz = {
-        directDb: 20 * Math.log10(directMag),
-        totalDb: 20 * Math.log10(totalMag),
-        resultDb: splDb[idx40].toFixed(2)
+        directOnlyDb: 20 * Math.log10(directMag),
+        sbirTotalDb: 20 * Math.log10(sbirTotalMag),
+        combinedResultDb: splDb[idx40].toFixed(2),
+        pathsUsed: sbirResult.pathsUsed,
+        strongestReflection: sbirResult.strongestReflection
       };
     }
   }
@@ -1422,7 +1440,8 @@ function computeRoomModes({
 
 /**
  * Compute SBIR (image source) complex pressure at one frequency
- * Returns { re, im } for complex pressure sum including direct + reflected paths
+ * REW-style: direct + reflected paths with lossy boundaries up to 2nd order
+ * Returns { re, im, pathsUsed, strongestReflection }
  */
 function computeSBIRComplexAtFreq({
   f,
@@ -1433,14 +1452,27 @@ function computeSBIRComplexAtFreq({
   c,
   includeWalls,
   includeFloorCeiling,
+  maxOrder = 2,
 }) {
   const k = (2 * Math.PI * f) / c;
   const { widthM, lengthM, heightM } = roomDims;
   
   let sumRe = 0;
   let sumIm = 0;
+  let pathsUsed = 0;
+  const reflections = []; // Track for debug
   
-  // Direct path
+  // Reflection coefficients (amplitude)
+  const R = {
+    left: Math.sqrt(Math.max(0, 1 - surfaceAbsorption.left)),
+    right: Math.sqrt(Math.max(0, 1 - surfaceAbsorption.right)),
+    front: Math.sqrt(Math.max(0, 1 - surfaceAbsorption.front)),
+    back: Math.sqrt(Math.max(0, 1 - surfaceAbsorption.back)),
+    floor: Math.sqrt(Math.max(0, 1 - surfaceAbsorption.floor)),
+    ceiling: Math.sqrt(Math.max(0, 1 - surfaceAbsorption.ceiling)),
+  };
+  
+  // Order 0: Direct path
   const dx0 = source.x - receiver.x;
   const dy0 = source.y - receiver.y;
   const dz0 = (source.z ?? 0.0) - (receiver.z ?? 1.2);
@@ -1451,51 +1483,95 @@ function computeSBIRComplexAtFreq({
     const phase0 = -k * r0;
     sumRe += A0 * Math.cos(phase0);
     sumIm += A0 * Math.sin(phase0);
+    pathsUsed++;
   }
   
-  // First-order image sources
-  const images = [];
-  
-  if (includeWalls) {
-    const Rleft = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.left));
-    const Rright = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.right));
-    const Rfront = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.front));
-    const Rback = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.back));
+  // Order 1: First-order reflections (single bounce)
+  if (maxOrder >= 1) {
+    const order1Images = [];
     
-    images.push(
-      { x: -source.x, y: source.y, z: source.z ?? 0.0, R: Rleft },
-      { x: 2*widthM - source.x, y: source.y, z: source.z ?? 0.0, R: Rright },
-      { x: source.x, y: -source.y, z: source.z ?? 0.0, R: Rfront },
-      { x: source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, R: Rback }
-    );
-  }
-  
-  if (includeFloorCeiling) {
-    const Rfloor = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.floor));
-    const Rceiling = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.ceiling));
+    if (includeWalls) {
+      order1Images.push(
+        { x: -source.x, y: source.y, z: source.z ?? 0.0, loss: R.left, surface: 'left' },
+        { x: 2*widthM - source.x, y: source.y, z: source.z ?? 0.0, loss: R.right, surface: 'right' },
+        { x: source.x, y: -source.y, z: source.z ?? 0.0, loss: R.front, surface: 'front' },
+        { x: source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, loss: R.back, surface: 'back' }
+      );
+    }
     
-    images.push(
-      { x: source.x, y: source.y, z: -(source.z ?? 0.0), R: Rfloor },
-      { x: source.x, y: source.y, z: 2*heightM - (source.z ?? 0.0), R: Rceiling }
-    );
-  }
-  
-  // Sum reflected contributions
-  for (const img of images) {
-    const dxi = img.x - receiver.x;
-    const dyi = img.y - receiver.y;
-    const dzi = img.z - (receiver.z ?? 1.2);
-    const ri = Math.sqrt(dxi*dxi + dyi*dyi + dzi*dzi);
+    if (includeFloorCeiling) {
+      order1Images.push(
+        { x: source.x, y: source.y, z: -(source.z ?? 0.0), loss: R.floor, surface: 'floor' },
+        { x: source.x, y: source.y, z: 2*heightM - (source.z ?? 0.0), loss: R.ceiling, surface: 'ceiling' }
+      );
+    }
     
-    if (ri > 0) {
-      const Ai = img.R / Math.max(0.25, ri);
-      const phasei = -k * ri;
-      sumRe += Ai * Math.cos(phasei);
-      sumIm += Ai * Math.sin(phasei);
+    for (const img of order1Images) {
+      const dxi = img.x - receiver.x;
+      const dyi = img.y - receiver.y;
+      const dzi = img.z - (receiver.z ?? 1.2);
+      const ri = Math.sqrt(dxi*dxi + dyi*dyi + dzi*dzi);
+      
+      if (ri > 0) {
+        const Ai = img.loss / Math.max(0.25, ri);
+        const phasei = -k * ri;
+        const contrib_re = Ai * Math.cos(phasei);
+        const contrib_im = Ai * Math.sin(phasei);
+        
+        sumRe += contrib_re;
+        sumIm += contrib_im;
+        pathsUsed++;
+        
+        const contribMag = Math.sqrt(contrib_re * contrib_re + contrib_im * contrib_im);
+        reflections.push({ surface: img.surface, order: 1, mag: contribMag });
+      }
     }
   }
   
-  return { re: sumRe, im: sumIm };
+  // Order 2: Second-order reflections (two bounces, corner paths)
+  if (maxOrder >= 2 && includeWalls) {
+    // Only do wall-wall corners for performance (4 horizontal corners)
+    const order2Images = [
+      { x: -source.x, y: -source.y, z: source.z ?? 0.0, loss: R.left * R.front, surface: 'left+front' },
+      { x: -source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, loss: R.left * R.back, surface: 'left+back' },
+      { x: 2*widthM - source.x, y: -source.y, z: source.z ?? 0.0, loss: R.right * R.front, surface: 'right+front' },
+      { x: 2*widthM - source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, loss: R.right * R.back, surface: 'right+back' },
+    ];
+    
+    for (const img of order2Images) {
+      const dxi = img.x - receiver.x;
+      const dyi = img.y - receiver.y;
+      const dzi = img.z - (receiver.z ?? 1.2);
+      const ri = Math.sqrt(dxi*dxi + dyi*dyi + dzi*dzi);
+      
+      if (ri > 0) {
+        const Ai = img.loss / Math.max(0.25, ri);
+        const phasei = -k * ri;
+        const contrib_re = Ai * Math.cos(phasei);
+        const contrib_im = Ai * Math.sin(phasei);
+        
+        sumRe += contrib_re;
+        sumIm += contrib_im;
+        pathsUsed++;
+        
+        const contribMag = Math.sqrt(contrib_re * contrib_re + contrib_im * contrib_im);
+        reflections.push({ surface: img.surface, order: 2, mag: contribMag });
+      }
+    }
+  }
+  
+  // Find strongest reflection for debug
+  let strongestReflection = null;
+  if (reflections.length > 0) {
+    const strongest = reflections.reduce((max, r) => r.mag > max.mag ? r : max, reflections[0]);
+    strongestReflection = {
+      surface: strongest.surface,
+      order: strongest.order,
+      magDb: 20 * Math.log10(Math.max(Number.EPSILON, strongest.mag))
+    };
+  }
+  
+  return { re: sumRe, im: sumIm, pathsUsed, strongestReflection };
 }
 
 /**
