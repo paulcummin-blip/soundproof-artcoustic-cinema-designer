@@ -1826,6 +1826,27 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
+        {/* Seat node warnings */}
+        {rewStyleMode && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+
+          const warnings = activeDebug?.warnings;
+          if (!warnings || warnings.length === 0) return null;
+
+          return (
+            <div className="text-xs text-[#3E4349] mb-2 bg-amber-50 p-2 rounded border border-amber-300">
+              <div className="font-semibold mb-1 text-amber-700">⚠️ Seat Position Warning</div>
+              <div className="text-[10px] space-y-1">
+                {warnings.map((warning, i) => (
+                  <div key={i}>{warning}</div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* SBIR debug info */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
           const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug

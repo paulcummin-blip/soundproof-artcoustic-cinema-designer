@@ -940,16 +940,28 @@ export function computeRoomModesResponse({
 
   // Compute seat node check (for diagnosing mode suppression)
   let seatNodeCheck = null;
+  const warnings = [];
+  
+  const tol = 0.01; // 1 cm tolerance
+  const seatX_frac = seat.x / widthM;
+  const seatY_frac = seat.y / lengthM;
+  const seatZ_frac = (seat.z ?? 1.2) / heightM;
+
+  const widthOddModesSuppressed = Math.abs(seat.x - widthM / 2) < tol;
+  const lengthOddModesSuppressed = Math.abs(seat.y - lengthM / 2) < tol;
+  const heightOddModesSuppressed = Math.abs((seat.z ?? 1.2) - heightM / 2) < tol;
+
+  if (widthOddModesSuppressed) {
+    warnings.push("Seat is near width centre; odd width modes suppressed. L/R sub moves may show reduced LF change at this seat.");
+  }
+  if (lengthOddModesSuppressed) {
+    warnings.push("Seat is near length centre; odd length modes suppressed. Front/back sub moves may show reduced LF change at this seat.");
+  }
+  if (heightOddModesSuppressed) {
+    warnings.push("Seat is near height centre; odd height modes suppressed. Floor/ceiling sub moves may show reduced LF change at this seat.");
+  }
+
   if (__debugBass) {
-    const tol = 0.01; // 1 cm tolerance
-    const seatX_frac = seat.x / widthM;
-    const seatY_frac = seat.y / lengthM;
-    const seatZ_frac = (seat.z ?? 1.2) / heightM;
-
-    const widthOddModesSuppressed = Math.abs(seat.x - widthM / 2) < tol;
-    const lengthOddModesSuppressed = Math.abs(seat.y - lengthM / 2) < tol;
-    const heightOddModesSuppressed = Math.abs((seat.z ?? 1.2) - heightM / 2) < tol;
-
     seatNodeCheck = {
       seatX_frac: Number(seatX_frac.toFixed(3)),
       seatY_frac: Number(seatY_frac.toFixed(3)),
@@ -1226,7 +1238,8 @@ export function computeRoomModesResponse({
         seatShape_100: __b44ModeCouplingSanity.seatShape_100,
         srcShape_100: __b44ModeCouplingSanity.srcShape_100,
         coupling_100: __b44ModeCouplingSanity.coupling_100,
-      } : null
+      } : null,
+      warnings: warnings.length > 0 ? warnings : null
     }
   };
 
