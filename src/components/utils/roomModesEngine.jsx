@@ -42,6 +42,7 @@ export function computeRoomModesResponse({
   autoLevelToMLP = true,
   isDragging = false,
   sealedRoomBoost = { enabled: false, kDbPerOct: 6.0, maxGainDb: 12.0 },
+  imageFieldEnabled = null,
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -258,6 +259,19 @@ export function computeRoomModesResponse({
   const sealedBoostKDbPerOct = 6.0;
   const sealedBoostMaxGainDb = 12.0;
   
+  // Image field (first-order reflections) - default ON in REW mode
+  const imageFieldEnabledActual = imageFieldEnabled !== null ? imageFieldEnabled : rewParityMode;
+  
+  // Compute pressure reflection coefficients from absorption
+  const beta = imageFieldEnabledActual ? {
+    front: Math.sqrt(Math.max(0, 1 - absorption.front)),
+    back: Math.sqrt(Math.max(0, 1 - absorption.back)),
+    left: Math.sqrt(Math.max(0, 1 - absorption.left)),
+    right: Math.sqrt(Math.max(0, 1 - absorption.right)),
+    ceiling: Math.sqrt(Math.max(0, 1 - absorption.ceiling)),
+    floor: Math.sqrt(Math.max(0, 1 - absorption.floor)),
+  } : null;
+  
   // Track what processing was applied
   const calibrationApplied = rewParityMode;
   let actualNormBand = normalizeBandHz;
@@ -405,6 +419,10 @@ export function computeRoomModesResponse({
     let sumRe_modal = 0;
     let sumIm_modal = 0;
     let activeTerms = 0;
+    
+    // Image field (first-order reflections) for SBIR nulls
+    let sumRe_field = 0;
+    let sumIm_field = 0;
 
     for (const mode of modes) {
       const f0 = mode.freq;
@@ -488,6 +506,80 @@ export function computeRoomModesResponse({
       }
     }
 
+    // Image field calculation (first-order reflections)
+    if (imageFieldEnabledActual) {
+      const k = (2 * Math.PI * f) / c;
+      
+      for (let subIdx = 0; subIdx < sourcesUsed.length; subIdx++) {
+        const source = sourcesUsed[subIdx];
+        
+        // Get product metadata and tuning
+        const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
+        let productRelativeDb = 0;
+        if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
+          productRelativeDb = meta.relativeCurve[i];
+        }
+        const productMagScale = Math.pow(10, productRelativeDb / 20);
+        
+        const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
+        const userGainLinear = Math.pow(10, subTuning.gainDb / 20);
+        const autoLevelGainDb = mlpAutoLevelGainsDb[subIdx] || 0;
+        const autoLevelGainLinear = Math.pow(10, autoLevelGainDb / 20);
+        const gainLinear = userGainLinear * autoLevelGainLinear;
+        
+        const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
+        const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
+        const totalPhase = delayPhase + polarityPhase;
+        
+        const weightMag = productMagScale * gainLinear;
+        const weightRe = weightMag * Math.cos(totalPhase);
+        const weightIm = weightMag * Math.sin(totalPhase);
+        
+        // Direct path
+        const dx0 = source.x - seat.x;
+        const dy0 = source.y - seat.y;
+        const dz0 = (source.z ?? 0.0) - (seat.z ?? 1.2);
+        const R0 = Math.sqrt(dx0*dx0 + dy0*dy0 + dz0*dz0);
+        
+        if (R0 > 0) {
+          const P0_amp = 1 / R0;
+          const phase0 = -k * R0;
+          const P0_re = P0_amp * Math.cos(phase0);
+          const P0_im = P0_amp * Math.sin(phase0);
+          
+          sumRe_field += weightRe * P0_re - weightIm * P0_im;
+          sumIm_field += weightRe * P0_im + weightIm * P0_re;
+        }
+        
+        // Six first-order image sources
+        const images = [
+          { x: -source.x, y: source.y, z: source.z ?? 0.0, beta: beta.left },   // left wall
+          { x: 2*widthM - source.x, y: source.y, z: source.z ?? 0.0, beta: beta.right }, // right wall
+          { x: source.x, y: -source.y, z: source.z ?? 0.0, beta: beta.front },  // front wall
+          { x: source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, beta: beta.back }, // back wall
+          { x: source.x, y: source.y, z: -(source.z ?? 0.0), beta: beta.floor }, // floor
+          { x: source.x, y: source.y, z: 2*heightM - (source.z ?? 0.0), beta: beta.ceiling } // ceiling
+        ];
+        
+        for (const img of images) {
+          const dxi = img.x - seat.x;
+          const dyi = img.y - seat.y;
+          const dzi = img.z - (seat.z ?? 1.2);
+          const Ri = Math.sqrt(dxi*dxi + dyi*dyi + dzi*dzi);
+          
+          if (Ri > 0) {
+            const Pi_amp = img.beta / Ri;
+            const phasei = -k * Ri;
+            const Pi_re = Pi_amp * Math.cos(phasei);
+            const Pi_im = Pi_amp * Math.sin(phasei);
+            
+            sumRe_field += weightRe * Pi_re - weightIm * Pi_im;
+            sumIm_field += weightRe * Pi_im + weightIm * Pi_re;
+          }
+        }
+      }
+    }
+
     // DEBUG: capture pre-smoothing magnitudes for probe bins only
     if (__debugBass && __isProbeFreq(f)) {
       const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
@@ -509,8 +601,29 @@ export function computeRoomModesResponse({
       lfDebug.modalMag15_45.push(20 * Math.log10(Math.max(Number.EPSILON, modalMag)));
     }
 
+    // Blend modal + image field with frequency-dependent weight
+    let sumRe_total = sumRe_modal;
+    let sumIm_total = sumIm_modal;
+    
+    if (imageFieldEnabledActual && schroederHz > 0) {
+      // Field weight: 0.35 below Schroeder, ramp to 1.0 by 1.2*Schroeder
+      const blendStart = schroederHz;
+      const blendEnd = schroederHz * 1.2;
+      let fieldWeight = 0.35;
+      
+      if (f >= blendEnd) {
+        fieldWeight = 1.0;
+      } else if (f > blendStart) {
+        const t = (f - blendStart) / (blendEnd - blendStart);
+        fieldWeight = 0.35 + (1.0 - 0.35) * t;
+      }
+      
+      sumRe_total = sumRe_modal + fieldWeight * sumRe_field;
+      sumIm_total = sumIm_modal + fieldWeight * sumIm_field;
+    }
+
     // Pure modal pressure magnitude → dB
-    let modalDb = 20 * Math.log10(Math.max(Number.EPSILON, Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal)));
+    let modalDb = 20 * Math.log10(Math.max(Number.EPSILON, Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total)));
     
     // Apply mode density compensation (REW-ish): above 70 Hz, subtract incoherent sum growth
     if (rewParityMode && f >= 70 && activeTerms > 1) {
@@ -1022,6 +1135,15 @@ export function computeRoomModesResponse({
       mlpBand: [30, 80],
       rewParityMode: rewParityMode,
       modalOnly: rewParityMode,
+      imageFieldEnabled: imageFieldEnabledActual,
+      reflectionBeta: beta ? {
+        front: beta.front.toFixed(3),
+        back: beta.back.toFixed(3),
+        left: beta.left.toFixed(3),
+        right: beta.right.toFixed(3),
+        ceiling: beta.ceiling.toFixed(3),
+        floor: beta.floor.toFixed(3)
+      } : null,
       calRefBandHz: calRefBandHz,
       calRefMedianDbBefore: Number.isFinite(calRefMedianDbBefore) ? calRefMedianDbBefore.toFixed(2) : 'N/A',
       calOffsetAppliedDb: Number.isFinite(calibrationOffsetDb) ? calibrationOffsetDb.toFixed(2) : '0.00',
