@@ -1964,6 +1964,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 >
                   <option value="off">Off (all modes)</option>
                   <option value="1,0,0">Axial (1,0,0) - Width</option>
+                  <option value="2,0,0">Width even: Axial (2,0,0)</option>
                   <option value="0,1,0">Axial (0,1,0) - Length</option>
                   <option value="0,0,1">Axial (0,0,1) - Height</option>
                   <option value="1,0,0|0,1,0">Axial pair: (1,0,0) + (0,1,0)</option>
