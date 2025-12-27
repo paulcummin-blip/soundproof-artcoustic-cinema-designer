@@ -27,6 +27,7 @@ export function computeRoomModesResponse({
   normalizeBandHz = [30, 80],
   normalizeToDb = 80,
   relativeViewEnabled = false,
+  rawEngineOutput = false,
   surfaceAbsorption = {
     front: 0.30,
     back: 0.30,
@@ -691,15 +692,18 @@ export function computeRoomModesResponse({
     // Combined pressure magnitude → dB
     let modalDb = 20 * Math.log10(Math.max(Number.EPSILON, Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total)));
     
-    // Apply mode density compensation (REW-ish): above 70 Hz, subtract incoherent sum growth
-    if (rewParityMode && f >= 70 && activeTerms > 1) {
+    // Apply mode density compensation (REW-ish): above 70 Hz AND above blendStart, subtract incoherent sum growth
+    // CRITICAL: Never apply below Schroeder frequency - this flattens modal nulls
+    const blendStart = schroederHz * 1.0;
+    
+    if (!rawEngineOutput && rewParityMode && f >= Math.max(70, blendStart) && activeTerms > 1) {
       const n = Math.max(1, activeTerms);
       const compDb = 10 * Math.log10(n);
       modalDb -= compDb * 0.85; // 0.85 = gentle application factor
     }
     
-    // Apply sealed room LF boost below lowest axial (if enabled)
-    if (sealedBoostEnabled && lowestAxial && f < lowestAxial) {
+    // Apply sealed room LF boost below lowest axial (if enabled AND not raw mode)
+    if (!rawEngineOutput && sealedBoostEnabled && lowestAxial && f < lowestAxial) {
       const octavesBelow = Math.log2(lowestAxial / f);
       const pressureGainDb = Math.min(sealedBoostMaxGainDb, sealedBoostKDbPerOct * octavesBelow);
       modalDb += pressureGainDb;
@@ -763,32 +767,37 @@ export function computeRoomModesResponse({
     // Pressure region is now handled inline during modal summation
     // (No post-processing needed - losses already bypassed below lowest axial)
 
-    // Schroeder blend: above fs, reduce explicit modal contrast (statistical smoothing feel)
-    // PLUS: gentle roll-off to fix "upper bass too high" symptom
+    // Schroeder blend: FIXED RULES to preserve modal nulls
+    // NEW: Start at 1.0 × Schroeder (not 0.7), never fill nulls, only tame peaks
     let splDbSchroeder = splDb;
-    if (rewParityMode && schroederHz > 0) {
+    if (!rawEngineOutput && rewParityMode && schroederHz > 0) {
       splDbSchroeder = splDb.map((db, i) => {
         const f = freqs[i];
 
-        // Start blend earlier: 0.7 × Schroeder (so 120 Hz is affected in typical rooms)
-        const blendStart = schroederHz * 0.7;
-        const blendEnd = schroederHz * 1.6;
+        // NEW BLEND RULES (Part B):
+        // - blendStart = 1.0 × Schroeder (protects modal region)
+        // - blendEnd = 1.8 × Schroeder (gentle transition)
+        const blendStart = schroederHz * 1.0;
+        const blendEnd = schroederHz * 1.8;
 
-        // Only apply above blend start (never below lowest axial)
+        // Below blendStart: NO blending at all (preserve coherent result)
         if (f < blendStart) return db;
 
-        // Blend to a gently smoothed "statistical" curve (no wild modal spikes)
+        // Above blendEnd: allow diffuse/statistical target to dominate
         const t = Math.max(0, Math.min(1, (f - blendStart) / Math.max(1e-6, (blendEnd - blendStart))));
 
-        // Gentle roll-off to prevent upper bass inflation (fix 80-200 Hz region)
-        // Apply -1 dB per octave above blend start to keep mid-bass realistic
+        // Gentle roll-off to prevent upper bass inflation
         const octavesAbove = Math.log2(f / blendStart);
         const rolloffDb = -1.0 * octavesAbove;
 
         // Simple target: a mild downward tilt + rolloff
         const target = dbAt(blendStart, freqs, splDb) - 3 * Math.log2(f / blendStart) + rolloffDb;
 
-        return (1 - t) * db + t * target;
+        const blendedDb = (1 - t) * db + t * target;
+
+        // CRITICAL (Part B2): Preserve null depth by capping blend
+        // Never allow blend to rise more than +2 dB above coherent curve
+        return Math.min(blendedDb, db + 2.0);
       });
     }
 
@@ -821,9 +830,9 @@ export function computeRoomModesResponse({
   const preNormMax = finitePreNorm.length > 0 ? Math.max(...finitePreNorm) : 0;
   const preNormRange = preNormMax - preNormMin;
 
-  // Apply smoothing if requested (create NEW array, never mutate)
-  const smoothingApplied = smoothing !== 'none' ? smoothing : 'none';
-  const splDbSmoothed = smoothing !== 'none' 
+  // Apply smoothing if requested AND not raw mode (create NEW array, never mutate)
+  const smoothingApplied = (!rawEngineOutput && smoothing !== 'none') ? smoothing : 'none';
+  const splDbSmoothed = (!rawEngineOutput && smoothing !== 'none') 
     ? applySmoothing(freqs, splDbRepaired, smoothing)
     : splDbRepaired;
 
@@ -1279,6 +1288,10 @@ export function computeRoomModesResponse({
       calRefMedianDbBefore: Number.isFinite(calRefMedianDbBefore) ? calRefMedianDbBefore.toFixed(2) : 'N/A',
       calOffsetAppliedDb: Number.isFinite(calibrationOffsetDb) ? calibrationOffsetDb.toFixed(2) : '0.00',
       calRefMedianDbAfter: Number.isFinite(calRefMedianDbAfter) ? calRefMedianDbAfter.toFixed(2) : 'N/A',
+      rawEngineOutputMode: rawEngineOutput,
+      blendStartHz: !rawEngineOutput && schroederHz > 0 ? (schroederHz * 1.0).toFixed(1) : 'N/A',
+      blendEndHz: !rawEngineOutput && schroederHz > 0 ? (schroederHz * 1.8).toFixed(1) : 'N/A',
+      modeDensityCompActive: !rawEngineOutput && rewParityMode,
       modeCouplingSanity: __b44ModeCouplingSanity ? { 
         seatM: { ...__b44ModeCouplingSanity.seatM },
         srcM: { ...__b44ModeCouplingSanity.srcM },

@@ -447,7 +447,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves: null, // Room-only: no product curves
-        absoluteSplMode: !rewRelativeView
+        absoluteSplMode: !rewRelativeView,
+        rawEngineOutput: modalOnlyDebugView // Pass raw mode flag
       });
     } catch (e) {
       return {
@@ -695,7 +696,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves, // Apply per-sub product curves
-        absoluteSplMode: !rewRelativeView
+        absoluteSplMode: !rewRelativeView,
+        rawEngineOutput: modalOnlyDebugView // Pass raw mode flag
       });
     } catch (e) {
       return {
@@ -1812,22 +1814,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Modal-only debug view toggle */}
+        {/* Raw engine output toggle */}
         {rewStyleMode && (
           <div className="flex items-center gap-2 mb-2">
             <Checkbox 
-              id="modal-only-debug" 
+              id="raw-engine-output" 
               checked={modalOnlyDebugView}
               onCheckedChange={setModalOnlyDebugView}
             />
-            <Label htmlFor="modal-only-debug" className="text-xs text-[#3E4349]">
-              Modal-only (debug) — no SBIR, no smoothing, no sealed boost
+            <Label htmlFor="raw-engine-output" className="text-xs text-[#3E4349] font-semibold">
+              Raw engine output (no blend / no compensation / no smoothing / no sealed boost)
             </Label>
           </div>
         )}
 
-        {/* Seat node warnings */}
-        {rewStyleMode && (() => {
+        {/* Seat node info (Part D - changed from warning to info) */}
+        {rewStyleMode && !modalOnlyDebugView && (() => {
           const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
             ? rewRoomPlusProductData.debug
             : rewModesData?.debug;
@@ -1835,9 +1837,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           const warnings = activeDebug?.warnings;
           if (!warnings || warnings.length === 0) return null;
 
+          // Check if positions are stable (not dragging)
+          const sourceSigStable = activeDebug?.sourceSigRounded;
+          const seatSigStable = activeDebug?.seatSigRounded;
+          const isStable = sourceSigStable && seatSigStable;
+
+          // Only show if stable (prevents jitter during drag)
+          if (!isStable) return null;
+
           return (
-            <div className="text-xs text-[#3E4349] mb-2 bg-amber-50 p-2 rounded border border-amber-300">
-              <div className="font-semibold mb-1 text-amber-700">⚠️ Seat Position Warning</div>
+            <div className="text-xs text-[#3E4349] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
+              <div className="font-semibold mb-1 text-blue-700">ℹ️ Seat Position Note</div>
               <div className="text-[10px] space-y-1">
                 {warnings.map((warning, i) => (
                   <div key={i}>{warning}</div>
