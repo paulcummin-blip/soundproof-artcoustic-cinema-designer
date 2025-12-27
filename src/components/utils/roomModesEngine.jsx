@@ -436,6 +436,7 @@ export function computeRoomModesResponse({
 
   // Build response: pure MODAL PRESSURE SUM (REW-style room curve)
   // Store BOTH coherent raw AND processed curves
+  // CRITICAL: coherentRawDb is the REFERENCE TRUTH - if nulls don't move with sub position, coupling is broken
   const coherentRawDb = [];
   let splDb = freqs.map((f, i) => {
     let sumRe_modal = 0;
@@ -692,14 +693,16 @@ export function computeRoomModesResponse({
     }
 
     // COHERENT PRESSURE RAW: Pure complex magnitude (no processing)
+    // This is the REFERENCE PHYSICS - position-dependent nulls come from here
     const coherentMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
     const coherentPressureRaw = 20 * Math.log10(Math.max(Number.EPSILON, coherentMag));
     
-    // Start with coherent pressure, then apply processing layers
+    // Start with coherent pressure, then apply processing layers (ONLY if not raw mode)
     let modalDb = coherentPressureRaw;
     
     // Apply mode density compensation (REW-ish): above 70 Hz AND above blendStart, subtract incoherent sum growth
     // CRITICAL: Never apply below Schroeder frequency - this flattens modal nulls
+    // PART C1: This is DISABLED in RAW mode (rawEngineOutput flag blocks it)
     const blendStart = schroederHz * 1.0;
     
     if (!rawEngineOutput && rewParityMode && f >= Math.max(70, blendStart) && activeTerms > 1) {
@@ -709,6 +712,7 @@ export function computeRoomModesResponse({
     }
     
     // Apply sealed room LF boost below lowest axial (if enabled AND not raw mode)
+    // PART C1: This is DISABLED in RAW mode (rawEngineOutput flag blocks it)
     if (!rawEngineOutput && sealedBoostEnabled && lowestAxial && f < lowestAxial) {
       const octavesBelow = Math.log2(lowestAxial / f);
       const pressureGainDb = Math.min(sealedBoostMaxGainDb, sealedBoostKDbPerOct * octavesBelow);
@@ -806,11 +810,15 @@ export function computeRoomModesResponse({
 
         // CRITICAL (Part B2): Preserve null depth by capping blend
         // Never allow blend to rise more than +2 dB above coherent curve
+        // NULLS MUST STAY DEEP - this is physical, not aesthetic
         return Math.min(blendedDb, db + 2.0);
-      });
-    }
+        });
+        }
 
-    // Capture RAW stats BEFORE any processing (critical for debugging)
+        // AUDIT CHECKPOINT: Schroeder blend should preserve nulls below 1.0×Schroeder
+        // If you're seeing nulls get filled in, the blend logic above is broken
+
+        // Capture RAW stats BEFORE any processing (critical for debugging)
     const rawFinite = splDbSchroeder.filter(v => isFinite(v));
     const rawMin = rawFinite.length > 0 ? Math.min(...rawFinite) : 0;
     const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;
@@ -945,7 +953,8 @@ export function computeRoomModesResponse({
     finalDb = Array.isArray(splDb) ? [...splDb] : [];
   }
 
-  // Always compute MLP reference (30-80 Hz median) for anchoring
+  // Always compute MLP reference (30-80 Hz median) for anchoring (Part D1)
+  // CRITICAL: This is ONLY applied to the processed output, NEVER to RAW
   const calRefBandHz = [30, 80];
   const mlpBandValues = freqs
   .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] : null)

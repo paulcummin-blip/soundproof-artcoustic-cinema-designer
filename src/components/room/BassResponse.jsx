@@ -1664,6 +1664,46 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         </div>
 
+        {/* REW Parity Test Case (Part E) */}
+        {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_REW_TEST && (() => {
+          // Test room: 5.0 × 5.0 × 3.0 m
+          const testRoomOk = Math.abs((roomDims?.widthM || 0) - 5.0) < 0.1 &&
+                             Math.abs((roomDims?.lengthM || 0) - 5.0) < 0.1 &&
+                             Math.abs((roomDims?.heightM || 0) - 3.0) < 0.1;
+          
+          // Test seat: centre (2.5, 2.5, 1.2)
+          const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+          const testSeatOk = seat && 
+                             Math.abs(seat.x - 2.5) < 0.1 &&
+                             Math.abs(seat.y - 2.5) < 0.1 &&
+                             Math.abs((seat.z || 1.2) - 1.2) < 0.1;
+          
+          // Test sub positions (should be movable along front wall)
+          const testSubOk = subsForSimulation.length > 0;
+          
+          const testStatus = testRoomOk && testSeatOk && testSubOk ? 'READY' : 'NOT_READY';
+          
+          return (
+            <div className="text-xs mb-2 bg-purple-50 p-2 rounded border border-purple-400">
+              <div className="font-semibold mb-1 text-purple-700">🧪 REW Parity Test (Part E)</div>
+              <div className="text-[10px] space-y-0.5">
+                <div><strong>Test room:</strong> {testRoomOk ? '✓' : '✗'} 5.0×5.0×3.0 m (current: {(roomDims?.widthM || 0).toFixed(1)}×{(roomDims?.lengthM || 0).toFixed(1)}×{(roomDims?.heightM || 0).toFixed(1)})</div>
+                <div><strong>Test seat:</strong> {testSeatOk ? '✓' : '✗'} Centre (2.5, 2.5, 1.2) (current: {seat?.x.toFixed(1)}, {seat?.y.toFixed(1)}, {(seat?.z || 1.2).toFixed(1)})</div>
+                <div><strong>Test sub:</strong> {testSubOk ? '✓' : '✗'} At least one sub (current: {subsForSimulation.length})</div>
+                <div className="mt-1 pt-1 border-t border-purple-300">
+                  <strong>Status:</strong> {testStatus}
+                </div>
+                {testStatus === 'READY' && (
+                  <div className="mt-1 pt-1 border-t border-purple-300 font-semibold text-purple-800">
+                    Test ready! Move sub along front wall (Y=0.5-4.5m) and watch RAW curve change.
+                    Expected: null frequencies shift, peak/null depth changes, curve shape changes.
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* REW Compare View readout (only when REW Compare is ON) */}
         {rewCompareView && rewStyleMode && (() => {
           const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
