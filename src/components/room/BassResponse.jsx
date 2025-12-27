@@ -2109,6 +2109,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           const modeContribs = activeDebug?.modeContributions;
           if (!modeContribs || Object.keys(modeContribs).length === 0) return null;
 
+          // Get seat and source for eigenfunction debug
+          const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+          const source = subsForSimulation.length > 0 ? subsForSimulation[0] : null;
+          
+          if (!seat || !source || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
+            return null;
+          }
+          
+          const W = roomDims.widthM;
+          const L = roomDims.lengthM;
+          const H = roomDims.heightM;
+          const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+
           // Show contributions for key probe frequencies
           const probeFreqs = ['34.0', '40.0', '45.0', '60.0'];
           const relevantContribs = probeFreqs
@@ -2120,15 +2133,37 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-purple-50 p-2 rounded border border-purple-300">
               <div className="font-semibold mb-1 text-purple-700">Per-Mode Contributions (Top 3)</div>
-              <div className="text-[9px] font-mono space-y-1 max-h-32 overflow-y-auto">
+              <div className="text-[9px] font-mono space-y-1 max-h-48 overflow-y-auto">
                 {relevantContribs.map((entry, i) => (
                   <div key={i}>
                     <div className="font-semibold">{entry.freq} Hz:</div>
-                    {entry.modes.map((mode, j) => (
-                      <div key={j} className="pl-2">
-                        {mode.type} ({mode.n[0]},{mode.n[1]},{mode.n[2]}): {mode.magDb.toFixed(1)} dB @ {mode.phaseDeg.toFixed(0)}°
-                      </div>
-                    ))}
+                    {entry.modes.map((mode, j) => {
+                      const [nx, ny, nz] = mode.n;
+                      
+                      // Compute eigenfunction values (Part H2 - eigenfunction debug readout)
+                      const srcEigenX = nx > 0 ? Math.cos(nx * Math.PI * source.x / W) : 1;
+                      const srcEigenY = ny > 0 ? Math.cos(ny * Math.PI * source.y / L) : 1;
+                      const srcEigenZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / H) : 1;
+                      
+                      const rcvEigenX = nx > 0 ? Math.cos(nx * Math.PI * seatPos.x / W) : 1;
+                      const rcvEigenY = ny > 0 ? Math.cos(ny * Math.PI * seatPos.y / L) : 1;
+                      const rcvEigenZ = nz > 0 ? Math.cos(nz * Math.PI * seatPos.z / H) : 1;
+                      
+                      const computedCoupling = (srcEigenX * srcEigenY * srcEigenZ) * (rcvEigenX * rcvEigenY * rcvEigenZ);
+                      
+                      return (
+                        <div key={j} className="pl-2 border-l-2 border-purple-200 mb-1">
+                          <div>
+                            {mode.type} ({mode.n[0]},{mode.n[1]},{mode.n[2]}): {mode.magDb.toFixed(1)} dB @ {mode.phaseDeg.toFixed(0)}°
+                          </div>
+                          <div className="pl-2 text-[8px] opacity-80 space-y-0.5 mt-0.5">
+                            <div>src: X={srcEigenX.toFixed(4)} Y={srcEigenY.toFixed(4)} Z={srcEigenZ.toFixed(4)}</div>
+                            <div>rcv: X={rcvEigenX.toFixed(4)} Y={rcvEigenY.toFixed(4)} Z={rcvEigenZ.toFixed(4)}</div>
+                            <div>coupling = {computedCoupling.toFixed(4)} (engine: {mode.coupling?.toFixed(4) || 'N/A'})</div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>
