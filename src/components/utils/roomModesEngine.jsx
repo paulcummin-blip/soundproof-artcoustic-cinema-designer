@@ -50,6 +50,7 @@ export function computeRoomModesResponse({
   sbirBlendEnabled = true,
   sbirBlendStartHz = null,
   sbirBlendEndHz = null,
+  modalOnlyDebugView = false,
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -280,9 +281,9 @@ export function computeRoomModesResponse({
   } : null;
   
   // SBIR (image source) settings - default ON in REW mode
-  const sbirEnabled = includeSBIR && rewParityMode;
+  const sbirEnabled = includeSBIR && rewParityMode && !modalOnlyDebugView;
   const sbirBlendStartHzActual = sbirBlendStartHz !== null ? sbirBlendStartHz : (schroederHz * 0.7);
-  const sbirBlendEndHzActual = sbirBlendEndHz !== null ? sbirBlendEndHz : (schroederHz * 1.3);
+  const sbirBlendEndHzActual = sbirBlendEndHz !== null ? sbirBlendEndHz : (schroederHz * 1.2);
   
   // Track what processing was applied
   const calibrationApplied = rewParityMode;
@@ -438,9 +439,9 @@ export function computeRoomModesResponse({
     // Per-mode contribution tracking (top 3 contributors per bin)
     const modeContribsThisBin = [];
     
-    // Image field (first-order reflections) for SBIR nulls
-    let sumRe_field = 0;
-    let sumIm_field = 0;
+    // SBIR (image source) complex pressure sum
+    let sumRe_sbir = 0;
+    let sumIm_sbir = 0;
 
     for (const mode of modes) {
       const f0 = mode.freq;
@@ -551,10 +552,8 @@ export function computeRoomModesResponse({
       }
     }
     
-    // Image field calculation (first-order reflections)
-    if (imageFieldEnabledActual) {
-      const k = (2 * Math.PI * f) / c;
-      
+    // SBIR (image source) calculation - integrated into modal summation
+    if (sbirEnabled) {
       for (let subIdx = 0; subIdx < sourcesUsed.length; subIdx++) {
         const source = sourcesUsed[subIdx];
         
@@ -580,48 +579,21 @@ export function computeRoomModesResponse({
         const weightRe = weightMag * Math.cos(totalPhase);
         const weightIm = weightMag * Math.sin(totalPhase);
         
-        // Direct path
-        const dx0 = source.x - seat.x;
-        const dy0 = source.y - seat.y;
-        const dz0 = (source.z ?? 0.0) - (seat.z ?? 1.2);
-        const R0 = Math.sqrt(dx0*dx0 + dy0*dy0 + dz0*dz0);
+        // Compute SBIR complex pressure
+        const sbirComplex = computeSBIRComplexAtFreq({
+          f,
+          source,
+          receiver: seat,
+          roomDims: room,
+          surfaceAbsorption: absorption,
+          c,
+          includeWalls: sbirIncludeWalls,
+          includeFloorCeiling: sbirIncludeFloorCeiling,
+        });
         
-        if (R0 > 0) {
-          const P0_amp = 1 / R0;
-          const phase0 = -k * R0;
-          const P0_re = P0_amp * Math.cos(phase0);
-          const P0_im = P0_amp * Math.sin(phase0);
-          
-          sumRe_field += weightRe * P0_re - weightIm * P0_im;
-          sumIm_field += weightRe * P0_im + weightIm * P0_re;
-        }
-        
-        // Six first-order image sources
-        const images = [
-          { x: -source.x, y: source.y, z: source.z ?? 0.0, beta: beta.left },   // left wall
-          { x: 2*widthM - source.x, y: source.y, z: source.z ?? 0.0, beta: beta.right }, // right wall
-          { x: source.x, y: -source.y, z: source.z ?? 0.0, beta: beta.front },  // front wall
-          { x: source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, beta: beta.back }, // back wall
-          { x: source.x, y: source.y, z: -(source.z ?? 0.0), beta: beta.floor }, // floor
-          { x: source.x, y: source.y, z: 2*heightM - (source.z ?? 0.0), beta: beta.ceiling } // ceiling
-        ];
-        
-        for (const img of images) {
-          const dxi = img.x - seat.x;
-          const dyi = img.y - seat.y;
-          const dzi = img.z - (seat.z ?? 1.2);
-          const Ri = Math.sqrt(dxi*dxi + dyi*dyi + dzi*dzi);
-          
-          if (Ri > 0) {
-            const Pi_amp = img.beta / Ri;
-            const phasei = -k * Ri;
-            const Pi_re = Pi_amp * Math.cos(phasei);
-            const Pi_im = Pi_amp * Math.sin(phasei);
-            
-            sumRe_field += weightRe * Pi_re - weightIm * Pi_im;
-            sumIm_field += weightRe * Pi_im + weightIm * Pi_re;
-          }
-        }
+        // Apply weight to SBIR contribution
+        sumRe_sbir += weightRe * sbirComplex.re - weightIm * sbirComplex.im;
+        sumIm_sbir += weightRe * sbirComplex.im + weightIm * sbirComplex.re;
       }
     }
 
@@ -665,25 +637,16 @@ export function computeRoomModesResponse({
       }
     }
     
-    // Blend modal + image field with frequency-dependent weight
+    // Blend modal + SBIR with frequency-dependent weight
     let sumRe_total = sumRe_modal;
     let sumIm_total = sumIm_modal;
     
-    if (imageFieldEnabledActual && schroederHz > 0) {
-      // Field weight: 0.35 below Schroeder, ramp to 1.0 by 1.2*Schroeder
-      const blendStart = schroederHz;
-      const blendEnd = schroederHz * 1.2;
-      let fieldWeight = 0.35;
+    if (sbirEnabled && schroederHz > 0) {
+      // SBIR blend weight: 0 → 1 from sbirBlendStartHz to sbirBlendEndHz
+      const w = Math.max(0, Math.min(1, (f - sbirBlendStartHzActual) / Math.max(1e-6, (sbirBlendEndHzActual - sbirBlendStartHzActual))));
       
-      if (f >= blendEnd) {
-        fieldWeight = 1.0;
-      } else if (f > blendStart) {
-        const t = (f - blendStart) / (blendEnd - blendStart);
-        fieldWeight = 0.35 + (1.0 - 0.35) * t;
-      }
-      
-      sumRe_total = sumRe_modal + fieldWeight * sumRe_field;
-      sumIm_total = sumIm_modal + fieldWeight * sumIm_field;
+      sumRe_total = sumRe_modal + w * sumRe_sbir;
+      sumIm_total = sumIm_modal + w * sumIm_sbir;
     }
 
     // Pure modal pressure magnitude → dB
@@ -911,40 +874,7 @@ export function computeRoomModesResponse({
   const postNormMax = finitePostNorm.length > 0 ? Math.max(...finitePostNorm) : 0;
   const postNormRange = postNormMax - postNormMin;
   
-  // Blend SBIR with modal curve (if enabled)
-  let finalDbBlended = splDbSmoothed;
-  
-  if (sbirEnabled && sbirBlendEnabled && sbirDb.length === splDbSmoothed.length) {
-    finalDbBlended = splDbSmoothed.map((modalDbVal, i) => {
-      const f = freqs[i];
-      const sbirDbVal = sbirDb[i];
-      
-      if (!Number.isFinite(modalDbVal) || !Number.isFinite(sbirDbVal)) {
-        return modalDbVal;
-      }
-      
-      // Blend based on frequency
-      if (f < sbirBlendStartHzActual) {
-        return modalDbVal; // Pure modal
-      } else if (f > sbirBlendEndHzActual) {
-        return sbirDbVal; // Pure SBIR
-      } else {
-        // Crossfade in dB
-        const t = Math.max(0, Math.min(1, (f - sbirBlendStartHzActual) / Math.max(1e-6, (sbirBlendEndHzActual - sbirBlendStartHzActual))));
-        return (1 - t) * modalDbVal + t * sbirDbVal;
-      }
-    });
-    
-    // Update SBIR debug probes with blend values
-    if (!isDragging && sbirDebugProbes.length > 0) {
-      for (const probe of sbirDebugProbes) {
-        const idx = freqs.findIndex(f => Math.abs(f - probe.freq) < 0.6);
-        if (idx >= 0) {
-          probe.blendDb = finalDbBlended[idx].toFixed(2);
-        }
-      }
-    }
-  }
+
   
   // Build detailed mode markers for visualization (create new array)
   const modeMarkers = modes.map(m => {
@@ -1021,8 +951,8 @@ export function computeRoomModesResponse({
   let calRefMedianDbBefore = 0;
   let calRefMedianDbAfter = 0;
   
-  // Choose base curve: blended if SBIR enabled, otherwise modal smoothed
-  let finalDb = sbirEnabled && sbirBlendEnabled ? finalDbBlended : splDbSmoothed;
+  // Use smoothed modal curve (SBIR is now integrated into splDb during summation)
+  let finalDb = splDbSmoothed;
 
   if (!Array.isArray(finalDb) || finalDb.length === 0) {
     finalDb = Array.isArray(splDb) ? [...splDb] : [];
@@ -1115,17 +1045,6 @@ export function computeRoomModesResponse({
   const splMinDb = finalFinite.length > 0 ? Math.min(...finalFinite) : 0;
   const splMaxDb = finalFinite.length > 0 ? Math.max(...finalFinite) : 0;
   const splRangeDb = splMaxDb - splMinDb;
-  
-  // SBIR stats
-  let sbirMinDb = 0, sbirMaxDb = 0, sbirRangeDb = 0;
-  if (sbirEnabled && sbirDb.length > 0) {
-    const sbirFinite = sbirDb.filter(v => isFinite(v));
-    if (sbirFinite.length > 0) {
-      sbirMinDb = Math.min(...sbirFinite);
-      sbirMaxDb = Math.max(...sbirFinite);
-      sbirRangeDb = sbirMaxDb - sbirMinDb;
-    }
-  }
 
   // Product curve stats (if applied) - use metadata
   let productCurveStats = null;
@@ -1369,13 +1288,10 @@ export function computeRoomModesResponse({
         floor: beta.floor.toFixed(3)
       } : null,
       sbirEnabled,
-      sbirBlendEnabled,
+      sbirMaxOrder: sbirMaxOrder,
       sbirBlendStartHz: sbirEnabled ? sbirBlendStartHzActual.toFixed(1) : 'N/A',
       sbirBlendEndHz: sbirEnabled ? sbirBlendEndHzActual.toFixed(1) : 'N/A',
-      sbirMinDb: sbirEnabled ? sbirMinDb.toFixed(1) : 'N/A',
-      sbirMaxDb: sbirEnabled ? sbirMaxDb.toFixed(1) : 'N/A',
-      sbirRangeDb: sbirEnabled ? sbirRangeDb.toFixed(1) : 'N/A',
-      sbirDebugProbes: !isDragging ? sbirDebugProbes : null,
+      sbirDebugProbe40Hz: !isDragging ? sbirDebugProbe40Hz : null,
       modeContributions: !isDragging ? modeContributions : null,
       phaseCheckAvailable: typeof globalThis !== 'undefined' && globalThis.__B44_PHASE_CHECK ? true : false,
       calRefBandHz: calRefBandHz,
@@ -1569,6 +1485,84 @@ function computeRoomModes({
   
   // IMMUTABLE: Create new sorted array instead of sorting in place
   return [...modes].sort((a, b) => a.freq - b.freq);
+}
+
+/**
+ * Compute SBIR (image source) complex pressure at one frequency
+ * Returns { re, im } for complex pressure sum including direct + reflected paths
+ */
+function computeSBIRComplexAtFreq({
+  f,
+  source,
+  receiver,
+  roomDims,
+  surfaceAbsorption,
+  c,
+  includeWalls,
+  includeFloorCeiling,
+}) {
+  const k = (2 * Math.PI * f) / c;
+  const { widthM, lengthM, heightM } = roomDims;
+  
+  let sumRe = 0;
+  let sumIm = 0;
+  
+  // Direct path
+  const dx0 = source.x - receiver.x;
+  const dy0 = source.y - receiver.y;
+  const dz0 = (source.z ?? 0.0) - (receiver.z ?? 1.2);
+  const r0 = Math.sqrt(dx0*dx0 + dy0*dy0 + dz0*dz0);
+  
+  if (r0 > 0) {
+    const A0 = 1 / Math.max(0.25, r0);
+    const phase0 = -k * r0;
+    sumRe += A0 * Math.cos(phase0);
+    sumIm += A0 * Math.sin(phase0);
+  }
+  
+  // First-order image sources
+  const images = [];
+  
+  if (includeWalls) {
+    const Rleft = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.left));
+    const Rright = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.right));
+    const Rfront = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.front));
+    const Rback = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.back));
+    
+    images.push(
+      { x: -source.x, y: source.y, z: source.z ?? 0.0, R: Rleft },
+      { x: 2*widthM - source.x, y: source.y, z: source.z ?? 0.0, R: Rright },
+      { x: source.x, y: -source.y, z: source.z ?? 0.0, R: Rfront },
+      { x: source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, R: Rback }
+    );
+  }
+  
+  if (includeFloorCeiling) {
+    const Rfloor = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.floor));
+    const Rceiling = Math.sqrt(Math.max(0, 1 - surfaceAbsorption.ceiling));
+    
+    images.push(
+      { x: source.x, y: source.y, z: -(source.z ?? 0.0), R: Rfloor },
+      { x: source.x, y: source.y, z: 2*heightM - (source.z ?? 0.0), R: Rceiling }
+    );
+  }
+  
+  // Sum reflected contributions
+  for (const img of images) {
+    const dxi = img.x - receiver.x;
+    const dyi = img.y - receiver.y;
+    const dzi = img.z - (receiver.z ?? 1.2);
+    const ri = Math.sqrt(dxi*dxi + dyi*dyi + dzi*dzi);
+    
+    if (ri > 0) {
+      const Ai = img.R / Math.max(0.25, ri);
+      const phasei = -k * ri;
+      sumRe += Ai * Math.cos(phasei);
+      sumIm += Ai * Math.sin(phasei);
+    }
+  }
+  
+  return { re: sumRe, im: sumIm };
 }
 
 /**

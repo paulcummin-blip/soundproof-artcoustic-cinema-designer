@@ -1826,6 +1826,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
+        {/* SBIR debug info */}
+        {rewStyleMode && !modalOnlyDebugView && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+
+          if (!activeDebug?.sbirEnabled) return null;
+
+          const probe40 = activeDebug?.sbirDebugProbe40Hz;
+
+          return (
+            <div className="text-xs text-[#3E4349] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
+              <div className="font-semibold mb-1 text-blue-700">
+                SBIR: {activeDebug.sbirEnabled ? 'ON' : 'OFF'}, order={activeDebug.sbirMaxOrder || 1}
+              </div>
+              <div className="text-[9px] font-mono">
+                Blend: {activeDebug.sbirBlendStartHz} Hz → {activeDebug.sbirBlendEndHz} Hz
+              </div>
+              {probe40 && (
+                <div className="text-[9px] font-mono mt-1 pt-1 border-t border-blue-200">
+                  40 Hz probe: direct={probe40.directDb} dB, total={probe40.totalDb} dB, result={probe40.resultDb} dB
+                </div>
+              )}
+            </div>
+          );
+        })()}
+
         {/* Per-mode contributions (phase debug) */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
           const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
