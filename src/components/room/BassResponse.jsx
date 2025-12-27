@@ -77,6 +77,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Per-mode excitation tracking (Part G - diagnostic overlay)
   const lastModeExcitationsRef = useRef(null);
   const [showModeExcitationDiag, setShowModeExcitationDiag] = useState(false);
+  
+  // Mode isolation toggle (Part H - single mode test harness)
+  const [modeIsolation, setModeIsolation] = useState('off'); // 'off' | '1,0,0' | '0,1,0' | '0,0,1'
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -452,7 +455,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         leakage: 0.05,
         subProductCurves: null, // Room-only: no product curves
         absoluteSplMode: !rewRelativeView,
-        rawEngineOutput: modalOnlyDebugView // Pass raw mode flag
+        rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
+        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null // Part H - mode isolation
       });
     } catch (e) {
       return {
@@ -488,7 +492,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       subSig,
       seatSig
     };
-  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView]);
+  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
@@ -701,7 +705,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         leakage: 0.05,
         subProductCurves, // Apply per-sub product curves
         absoluteSplMode: !rewRelativeView,
-        rawEngineOutput: modalOnlyDebugView // Pass raw mode flag
+        rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
+        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null // Part H - mode isolation
       });
     } catch (e) {
       return {
@@ -759,7 +764,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       freqs: result.freqs,
       splDb: result.splDb
     };
-  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView]);
+  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation]);
 
   // Force settings when REW Compare View is enabled (moved after rewModesData definition)
   useEffect(() => {
@@ -1958,6 +1963,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </Label>
               </div>
             )}
+            
+            {/* Mode isolation selector (Part H - single mode test harness) */}
+            {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
+              <div className="flex items-center gap-2">
+                <Label htmlFor="mode-isolation" className="text-xs text-[#3E4349]">
+                  Mode Isolation (debug):
+                </Label>
+                <select
+                  id="mode-isolation"
+                  value={modeIsolation}
+                  onChange={(e) => setModeIsolation(e.target.value)}
+                  className="text-xs border border-[#DCDBD6] rounded px-2 py-1 bg-white"
+                >
+                  <option value="off">Off (all modes)</option>
+                  <option value="1,0,0">Axial (1,0,0) - Width</option>
+                  <option value="0,1,0">Axial (0,1,0) - Length</option>
+                  <option value="0,0,1">Axial (0,0,1) - Height</option>
+                </select>
+              </div>
+            )}
           </div>
         )}
         
@@ -2232,10 +2257,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           if (!modeList || modeList.length === 0) return null;
 
           const first30 = modeList.slice(0, 30);
+          
+          // Show mode isolation status if active
+          const isolationActive = modeIsolation !== 'off';
 
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-blue-50 p-2 rounded border border-blue-200">
-              <div className="font-semibold mb-1 text-blue-700">Mode List (first 30)</div>
+              <div className="font-semibold mb-1 text-blue-700">
+                Mode List (first 30)
+                {isolationActive && (
+                  <span className="ml-2 text-red-600 font-bold">
+                    — MODE ISOLATION ACTIVE: ({modeIsolation})
+                  </span>
+                )}
+              </div>
+              <div className="text-[9px] font-mono opacity-80 mb-1">
+                <strong>Modes:</strong> {activeDebug.modeCount || 0} total
+              </div>
               <div className="text-[9px] font-mono space-y-0.5 max-h-32 overflow-y-auto">
                 {first30.map((mode, i) => (
                   <div key={i} className={mode.type === 'axial' ? 'font-semibold' : 'opacity-70'}>

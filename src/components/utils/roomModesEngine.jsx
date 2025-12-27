@@ -52,6 +52,7 @@ export function computeRoomModesResponse({
   sbirBlendStartHz = null,
   sbirBlendEndHz = null,
   modalOnlyDebugView = false,
+  modeIsolation = null,
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -249,7 +250,7 @@ export function computeRoomModesResponse({
 
   
   // Compute room modes
-  const modes = computeRoomModes({
+  let modes = computeRoomModes({
     widthM,
     lengthM,
     heightM,
@@ -259,6 +260,12 @@ export function computeRoomModesResponse({
     includeTangential: includeTangentialLocal,
     includeOblique: includeObliqueLocal
   });
+
+  // PART H: Mode isolation filter (single mode test harness)
+  if (modeIsolation && modeIsolation !== 'off') {
+    const [targetNx, targetNy, targetNz] = modeIsolation.split(',').map(n => parseInt(n, 10));
+    modes = modes.filter(m => m.nx === targetNx && m.ny === targetNy && m.nz === targetNz);
+  }
   
   // Lowest axial mode (used for sealed-room pressure behaviour)
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
