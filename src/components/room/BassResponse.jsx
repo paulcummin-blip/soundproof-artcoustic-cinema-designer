@@ -826,13 +826,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [selectedSeat]);
   
   // Choose which curve to display based on mode and view
+  // AUDIT CHECKPOINT (Part D2): This is a PASS-THROUGH - no processing applied here
   const displayData = useMemo(() => {
     if (!rewStyleMode) {
       // Product simulation mode
       return responseData;
     }
 
-    // REW parity mode
+    // REW parity mode - data comes DIRECTLY from engine with NO post-processing
     if (rewView === 'roomPlusProduct') {
       return rewRoomPlusProductData?.data || [];
     } else {
@@ -841,10 +842,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, responseData]);
 
-  // REW parity mode: no post-processing anchoring
-  // (preserves absolute SPL reference from engine for consistent Y-axis)
+  // AUDIT CHECKPOINT (Part D2): rewSplAnchoredData is UNUSED - kept for legacy compatibility
+  // All display paths use displayData directly (no anchoring, no normalization)
   const rewSplAnchoredData = useMemo(() => {
-    return displayData;
+    return displayData; // Pass-through only, NO processing
   }, [displayData]);
 
   // Update engine calls UI only when deps change (not on every render)
@@ -1664,7 +1665,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         </div>
 
-        {/* REW Parity Test Case (Part E) */}
+        {/* REW Parity Test Case (Part E - VALIDATION) */}
         {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_REW_TEST && (() => {
           // Test room: 5.0 × 5.0 × 3.0 m
           const testRoomOk = Math.abs((roomDims?.widthM || 0) - 5.0) < 0.1 &&
@@ -1678,25 +1679,97 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                              Math.abs(seat.y - 2.5) < 0.1 &&
                              Math.abs((seat.z || 1.2) - 1.2) < 0.1;
           
-          // Test sub positions (should be movable along front wall)
+          // Test sub positions (capture current position for validation)
           const testSubOk = subsForSimulation.length > 0;
+          const currentSubPos = testSubOk ? {
+            x: subsForSimulation[0].x,
+            y: subsForSimulation[0].y,
+            z: subsForSimulation[0].z ?? 0.0
+          } : null;
           
-          const testStatus = testRoomOk && testSeatOk && testSubOk ? 'READY' : 'NOT_READY';
+          // Check if RAW mode is enabled
+          const rawModeOk = modalOnlyDebugView;
+          
+          // Compute test positions for manual validation
+          const testPositions = [
+            { label: 'Front wall centre', x: 2.5, y: 0.5, z: 0.0 },
+            { label: 'Front wall 0.5m left', x: 2.0, y: 0.5, z: 0.0 },
+            { label: 'Front wall 1.0m left', x: 1.5, y: 0.5, z: 0.0 },
+            { label: 'Front wall corner', x: 0.5, y: 0.5, z: 0.0 }
+          ];
+          
+          // Find closest test position to current sub
+          let closestTest = null;
+          let minDist = Infinity;
+          if (currentSubPos) {
+            testPositions.forEach(tp => {
+              const dx = tp.x - currentSubPos.x;
+              const dy = tp.y - currentSubPos.y;
+              const dist = Math.sqrt(dx*dx + dy*dy);
+              if (dist < minDist && dist < 0.2) { // within 20cm
+                minDist = dist;
+                closestTest = tp;
+              }
+            });
+          }
+          
+          const allReady = testRoomOk && testSeatOk && testSubOk && rawModeOk;
+          
+          // Capture probe frequencies for validation
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+          
+          const probeFreqs = [34, 68]; // First two length axial modes in 5m room
+          const probeValues = allReady ? probeFreqs.map(fProbe => {
+            const idx = displayData.findIndex(d => Math.abs(d.frequency - fProbe) < 1);
+            return idx >= 0 ? displayData[idx].spl : null;
+          }) : [];
           
           return (
             <div className="text-xs mb-2 bg-purple-50 p-2 rounded border border-purple-400">
-              <div className="font-semibold mb-1 text-purple-700">🧪 REW Parity Test (Part E)</div>
+              <div className="font-semibold mb-1 text-purple-700">🧪 REW Parity Test (Part E - VALIDATION)</div>
               <div className="text-[10px] space-y-0.5">
-                <div><strong>Test room:</strong> {testRoomOk ? '✓' : '✗'} 5.0×5.0×3.0 m (current: {(roomDims?.widthM || 0).toFixed(1)}×{(roomDims?.lengthM || 0).toFixed(1)}×{(roomDims?.heightM || 0).toFixed(1)})</div>
-                <div><strong>Test seat:</strong> {testSeatOk ? '✓' : '✗'} Centre (2.5, 2.5, 1.2) (current: {seat?.x.toFixed(1)}, {seat?.y.toFixed(1)}, {(seat?.z || 1.2).toFixed(1)})</div>
-                <div><strong>Test sub:</strong> {testSubOk ? '✓' : '✗'} At least one sub (current: {subsForSimulation.length})</div>
+                <div><strong>Test room:</strong> {testRoomOk ? '✅' : '❌'} 5.0×5.0×3.0 m (current: {(roomDims?.widthM || 0).toFixed(1)}×{(roomDims?.lengthM || 0).toFixed(1)}×{(roomDims?.heightM || 0).toFixed(1)})</div>
+                <div><strong>Test seat:</strong> {testSeatOk ? '✅' : '❌'} Centre (2.5, 2.5, 1.2) (current: {seat?.x.toFixed(1)}, {seat?.y.toFixed(1)}, {(seat?.z || 1.2).toFixed(1)})</div>
+                <div><strong>Test sub:</strong> {testSubOk ? '✅' : '❌'} At least one sub (current: {subsForSimulation.length})</div>
+                <div><strong>RAW mode:</strong> {rawModeOk ? '✅ ENABLED' : '❌ DISABLED (toggle above)'}</div>
                 <div className="mt-1 pt-1 border-t border-purple-300">
-                  <strong>Status:</strong> {testStatus}
+                  <strong>Status:</strong> {allReady ? '🟢 READY' : '🔴 NOT READY'}
                 </div>
-                {testStatus === 'READY' && (
-                  <div className="mt-1 pt-1 border-t border-purple-300 font-semibold text-purple-800">
-                    Test ready! Move sub along front wall (Y=0.5-4.5m) and watch RAW curve change.
-                    Expected: null frequencies shift, peak/null depth changes, curve shape changes.
+                {allReady && currentSubPos && (
+                  <>
+                    <div className="mt-1 pt-1 border-t border-purple-300 font-semibold text-purple-800">
+                      Current sub position: ({currentSubPos.x.toFixed(2)}, {currentSubPos.y.toFixed(2)})
+                      {closestTest && ` ≈ ${closestTest.label}`}
+                    </div>
+                    <div className="mt-1 pt-1 border-t border-purple-300">
+                      <strong>Probe frequencies (1st/2nd length axial):</strong>
+                      <div className="pl-2 space-y-0.5 mt-1">
+                        <div>34 Hz: {probeValues[0] !== null ? probeValues[0].toFixed(1) + ' dB' : 'N/A'}</div>
+                        <div>68 Hz: {probeValues[1] !== null ? probeValues[1].toFixed(1) + ' dB' : 'N/A'}</div>
+                      </div>
+                    </div>
+                    <div className="mt-1 pt-1 border-t border-purple-300 font-semibold text-purple-800">
+                      Test procedure:
+                      <div className="pl-2 space-y-0.5 mt-1 font-normal">
+                        <div>1. Move sub to front wall centre (2.5, 0.5) → record 34/68 Hz SPL</div>
+                        <div>2. Move sub 0.5m left (2.0, 0.5) → record 34/68 Hz SPL</div>
+                        <div>3. Move sub 1.0m left (1.5, 0.5) → record 34/68 Hz SPL</div>
+                        <div>4. Move sub to corner (0.5, 0.5) → record 34/68 Hz SPL</div>
+                        <div className="mt-1 text-red-700 font-semibold">
+                          Expected: 34 Hz SPL must change by &gt;3 dB across positions
+                        </div>
+                        <div className="text-red-700 font-semibold">
+                          Expected: Null locations must shift visibly on graph
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+                {!allReady && (
+                  <div className="mt-1 pt-1 border-t border-purple-300 text-red-700">
+                    Fix missing items above, then drag sub along front wall to validate null migration.
                   </div>
                 )}
               </div>
