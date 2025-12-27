@@ -73,6 +73,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // REW Compare baseline snapshot (captured once when Compare View is enabled)
   const rewCompareBaselineRef = useRef(null);
+  
+  // Per-mode excitation tracking (Part G - diagnostic overlay)
+  const lastModeExcitationsRef = useRef(null);
+  const [showModeExcitationDiag, setShowModeExcitationDiag] = useState(false);
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -1929,15 +1933,31 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Raw engine output toggle (Part A1 - TRUE PHYSICS SWITCH) */}
         {rewStyleMode && (
-          <div className="flex items-center gap-2 mb-2">
-            <Checkbox 
-              id="raw-engine-output" 
-              checked={modalOnlyDebugView}
-              onCheckedChange={setModalOnlyDebugView}
-            />
-            <Label htmlFor="raw-engine-output" className="text-xs font-semibold" style={{ color: modalOnlyDebugView ? '#dc2626' : '#3E4349' }}>
-              RAW ENGINE OUTPUT — Pure coherent pressure (modal+SBIR), zero processing
-            </Label>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="raw-engine-output" 
+                checked={modalOnlyDebugView}
+                onCheckedChange={setModalOnlyDebugView}
+              />
+              <Label htmlFor="raw-engine-output" className="text-xs font-semibold" style={{ color: modalOnlyDebugView ? '#dc2626' : '#3E4349' }}>
+                RAW ENGINE OUTPUT — Pure coherent pressure (modal+SBIR), zero processing
+              </Label>
+            </div>
+            
+            {/* Mode excitation diagnostic toggle (Part G) */}
+            {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="mode-excitation-diag" 
+                  checked={showModeExcitationDiag}
+                  onCheckedChange={setShowModeExcitationDiag}
+                />
+                <Label htmlFor="mode-excitation-diag" className="text-xs text-[#3E4349]">
+                  Show per-mode excitation diagnostic (dev only)
+                </Label>
+              </div>
+            )}
           </div>
         )}
         
@@ -2092,6 +2112,112 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   Phase check at 34 Hz available in console: <code>globalThis.__B44_PHASE_CHECK</code>
                 </div>
               )}
+            </div>
+          );
+        })()}
+
+        {/* Per-Mode Excitation Diagnostic (Part G - DIAGNOSTIC OVERLAY) */}
+        {rewStyleMode && showModeExcitationDiag && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+          
+          const modeList = activeDebug?.modeListFirst60;
+          if (!modeList || modeList.length === 0 || subsForSimulation.length === 0) return null;
+          
+          const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+          if (!seat) return null;
+          
+          const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+          const source = subsForSimulation[0];
+          
+          const W = roomDims?.widthM || 1;
+          const L = roomDims?.lengthM || 1;
+          const H = roomDims?.heightM || 1;
+          
+          // Compute current excitations for first 20 modes
+          const currentExcitations = modeList.slice(0, 20).map(mode => {
+            const [nx, ny, nz] = [mode.nx, mode.ny, mode.nz];
+            
+            // Spatial coupling
+            const srcX = nx > 0 ? Math.cos(nx * Math.PI * source.x / W) : 1;
+            const srcY = ny > 0 ? Math.cos(ny * Math.PI * source.y / L) : 1;
+            const srcZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / H) : 1;
+            const srcCoupling = srcX * srcY * srcZ;
+            
+            const rcvX = nx > 0 ? Math.cos(nx * Math.PI * seatPos.x / W) : 1;
+            const rcvY = ny > 0 ? Math.cos(ny * Math.PI * seatPos.y / L) : 1;
+            const rcvZ = nz > 0 ? Math.cos(nz * Math.PI * seatPos.z / H) : 1;
+            const rcvCoupling = rcvX * rcvY * rcvZ;
+            
+            const totalCoupling = srcCoupling * rcvCoupling;
+            const excitationDb = 20 * Math.log10(Math.abs(totalCoupling) + Number.EPSILON);
+            
+            return {
+              fHz: mode.fHz,
+              type: mode.type,
+              n: [nx, ny, nz],
+              axisLabel: mode.axisLabel,
+              excitationDb
+            };
+          });
+          
+          // Compare with previous if available
+          let excitationChanges = [];
+          if (lastModeExcitationsRef.current) {
+            excitationChanges = currentExcitations.map((curr, i) => {
+              const prev = lastModeExcitationsRef.current[i];
+              if (!prev) return { ...curr, deltaDb: 0, changed: false };
+              
+              const deltaDb = curr.excitationDb - prev.excitationDb;
+              const changed = Math.abs(deltaDb) > 6.0; // >6 dB change threshold
+              
+              return { ...curr, deltaDb, changed };
+            });
+          } else {
+            excitationChanges = currentExcitations.map(e => ({ ...e, deltaDb: 0, changed: false }));
+          }
+          
+          // Store current as previous for next comparison
+          lastModeExcitationsRef.current = currentExcitations;
+          
+          // Count significant changes
+          const changedCount = excitationChanges.filter(e => e.changed).length;
+          
+          return (
+            <div className="text-xs mb-2 bg-orange-50 p-2 rounded border border-orange-400">
+              <div className="font-semibold mb-1 text-orange-700">
+                🔬 Per-Mode Excitation Diagnostic (Part G)
+              </div>
+              <div className="text-[10px] space-y-0.5">
+                <div className="mb-1">
+                  <strong>Modes with &gt;6 dB excitation change:</strong> {changedCount}/20
+                  {changedCount === 0 && <span className="text-red-600 font-semibold"> (WARNING: No modes responding to sub movement)</span>}
+                </div>
+                <div className="max-h-48 overflow-y-auto space-y-1 font-mono text-[9px]">
+                  {excitationChanges.map((mode, i) => (
+                    <div 
+                      key={i} 
+                      className={`pl-2 ${mode.changed ? 'bg-yellow-200 font-semibold' : 'opacity-70'}`}
+                    >
+                      <span className={mode.type === 'axial' ? 'font-bold' : ''}>
+                        {mode.fHz.toFixed(1)} Hz {mode.type} ({mode.n[0]},{mode.n[1]},{mode.n[2]})
+                        {mode.axisLabel && ` [${mode.axisLabel}]`}
+                      </span>
+                      : {mode.excitationDb.toFixed(1)} dB
+                      {mode.deltaDb !== 0 && (
+                        <span className={mode.changed ? 'text-red-700 font-semibold' : ''}>
+                          {' '}({mode.deltaDb >= 0 ? '+' : ''}{mode.deltaDb.toFixed(1)} dB)
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-1 pt-1 border-t border-orange-300 text-[9px]">
+                  <strong>How to use:</strong> Move sub along front wall. Highlighted rows should change &gt;6 dB.
+                  If nothing changes, modal coupling is broken.
+                </div>
+              </div>
             </div>
           );
         })()}
