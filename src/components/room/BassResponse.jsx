@@ -80,6 +80,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // Mode isolation toggle (Part H - single mode test harness)
   const [modeIsolation, setModeIsolation] = useState('off'); // 'off' | '1,0,0' | '0,1,0' | '0,0,1'
+  
+  // Complex eigenfunctions toggle (Part H3 - REW parity phase behaviour)
+  const [complexEigenfunctions, setComplexEigenfunctions] = useState(false);
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -492,7 +495,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       subSig,
       seatSig
     };
-  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation]);
+  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
@@ -764,7 +767,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       freqs: result.freqs,
       splDb: result.splDb
     };
-  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation]);
+  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions]);
 
   // Force settings when REW Compare View is enabled (moved after rewModesData definition)
   useEffect(() => {
@@ -1983,6 +1986,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </select>
               </div>
             )}
+            
+            {/* Complex eigenfunctions toggle (Part H3 - REW parity phase) */}
+            {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
+              <div className="flex items-center gap-2">
+                <Checkbox 
+                  id="complex-eigenfunctions" 
+                  checked={complexEigenfunctions}
+                  onCheckedChange={setComplexEigenfunctions}
+                />
+                <Label htmlFor="complex-eigenfunctions" className="text-xs font-semibold" style={{ color: complexEigenfunctions ? '#2563eb' : '#3E4349' }}>
+                  Complex eigenfunctions (REW parity)
+                </Label>
+              </div>
+            )}
           </div>
         )}
         
@@ -2159,7 +2176,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                           <div className="pl-2 text-[8px] opacity-80 space-y-0.5 mt-0.5">
                             <div>src: X={srcEigenX.toFixed(4)} Y={srcEigenY.toFixed(4)} Z={srcEigenZ.toFixed(4)}</div>
                             <div>rcv: X={rcvEigenX.toFixed(4)} Y={rcvEigenY.toFixed(4)} Z={rcvEigenZ.toFixed(4)}</div>
-                            <div>coupling = {computedCoupling.toFixed(4)} (engine: {mode.coupling?.toFixed(4) || 'N/A'})</div>
+                            <div>coupling (real) = {computedCoupling.toFixed(4)} (engine: {mode.coupling?.toFixed(4) || 'N/A'})</div>
+                            {mode.couplingInfo?.complexMag !== undefined && (
+                              <div className="text-blue-600 font-semibold">
+                                coupling (complex): mag={mode.couplingInfo.complexMag.toFixed(4)} @ {mode.couplingInfo.complexPhase.toFixed(1)}°
+                              </div>
+                            )}
+                            {mode.couplingInfo?.complexRe !== undefined && (
+                              <div className="text-blue-600">
+                                (re={mode.couplingInfo.complexRe.toFixed(4)}, im={mode.couplingInfo.complexIm.toFixed(4)})
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

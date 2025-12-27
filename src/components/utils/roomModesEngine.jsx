@@ -53,6 +53,7 @@ export function computeRoomModesResponse({
   sbirBlendEndHz = null,
   modalOnlyDebugView = false,
   modeIsolation = null,
+  complexEigenfunctions = false,
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -479,9 +480,18 @@ export function computeRoomModesResponse({
       for (let subIdx = 0; subIdx < sourcesUsed.length; subIdx++) {
         const source = sourcesUsed[subIdx];
 
-        // Spatial coupling (signed, preserves phase)
-        const coupling = computeSpatialCoupling(mode, source, seat, room);
-        if (Math.abs(coupling) < 1e-6) continue;
+        // Spatial coupling (Part H3 - switch between real and complex eigenfunctions)
+        let coupling, couplingComplex;
+        if (complexEigenfunctions) {
+          couplingComplex = computeSpatialCouplingComplex(mode, source, seat, room);
+          // For magnitude check only
+          coupling = Math.sqrt(couplingComplex.re * couplingComplex.re + couplingComplex.im * couplingComplex.im);
+          if (Math.abs(coupling) < 1e-6) continue;
+        } else {
+          coupling = computeSpatialCoupling(mode, source, seat, room);
+          if (Math.abs(coupling) < 1e-6) continue;
+          couplingComplex = null; // Not used in real mode
+        }
 
         // Get product metadata for this sub
         const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
@@ -530,8 +540,22 @@ export function computeRoomModesResponse({
         hIm /= Math.max(1e-6, qMode);
 
         // Weighted modal contribution: weight * H * coupling
-        const cRe = coupling * (weightRe * hRe - weightIm * hIm);
-        const cIm = coupling * (weightRe * hIm + weightIm * hRe);
+        let cRe, cIm;
+        
+        if (complexEigenfunctions && couplingComplex) {
+          // Complex coupling: couplingComplex * (weightRe + j*weightIm) * (hRe + j*hIm)
+          // First: coupling * weight
+          const cwRe = couplingComplex.re * weightRe - couplingComplex.im * weightIm;
+          const cwIm = couplingComplex.re * weightIm + couplingComplex.im * weightRe;
+          
+          // Then: (coupling*weight) * H
+          cRe = cwRe * hRe - cwIm * hIm;
+          cIm = cwRe * hIm + cwIm * hRe;
+        } else {
+          // Real coupling (existing behaviour)
+          cRe = coupling * (weightRe * hRe - weightIm * hIm);
+          cIm = coupling * (weightRe * hIm + weightIm * hRe);
+        }
 
         sumRe_modal += cRe;
         sumIm_modal += cIm;
@@ -542,13 +566,28 @@ export function computeRoomModesResponse({
         const cPhase = Math.atan2(cIm, cRe) * (180 / Math.PI); // degrees
         
         if (cMag > 1e-6) {
+          // Store coupling info for debug (Part H3)
+          let couplingInfo = { real: coupling };
+          if (complexEigenfunctions && couplingComplex) {
+            const couplingMag = Math.sqrt(couplingComplex.re * couplingComplex.re + couplingComplex.im * couplingComplex.im);
+            const couplingPhase = Math.atan2(couplingComplex.im, couplingComplex.re) * (180 / Math.PI);
+            couplingInfo = {
+              real: coupling,
+              complexMag: couplingMag,
+              complexPhase: couplingPhase,
+              complexRe: couplingComplex.re,
+              complexIm: couplingComplex.im
+            };
+          }
+          
           modeContribsThisBin.push({
             freq: mode.freq,
             type: mode.type,
             n: [mode.nx, mode.ny, mode.nz],
             magDb: 20 * Math.log10(cMag),
             phaseDeg: cPhase,
-            coupling: coupling
+            coupling: coupling,
+            couplingInfo: couplingInfo
           });
         }
       }
@@ -1645,7 +1684,7 @@ function computeSBIRComplexAtFreq({
 }
 
 /**
- * Compute spatial coupling using cosine pressure mode shapes
+ * Compute spatial coupling using cosine pressure mode shapes (real eigenfunctions)
  * Returns total coupling (for engine use) - uses direct meters, no normalization
  */
 function computeSpatialCoupling(mode, source, receiver, roomDims) {
@@ -1668,6 +1707,61 @@ function computeSpatialCoupling(mode, source, receiver, roomDims) {
   
   // Total coupling = source pressure × receiver pressure
   return (srcX * srcY * srcZ) * (rcvX * rcvY * rcvZ);
+}
+
+/**
+ * Compute spatial coupling using complex eigenfunctions (Part H3 - REW parity)
+ * Returns { re, im } for complex coupling
+ */
+function computeSpatialCouplingComplex(mode, source, receiver, roomDims) {
+  const { widthM, lengthM, heightM } = roomDims;
+  const { nx, ny, nz } = mode;
+  
+  // Safe guard: prevent division by zero
+  const W = Math.max(1e-6, widthM);
+  const L = Math.max(1e-6, lengthM);
+  const H = Math.max(1e-6, heightM);
+  
+  // Complex eigenfunction helper: cos(n*pi*x/L) + j*sin(n*pi*x/L)
+  const complexEigen = (n, x, dim) => {
+    if (n === 0) return { re: 1, im: 0 };
+    const arg = n * Math.PI * x / dim;
+    return { re: Math.cos(arg), im: Math.sin(arg) };
+  };
+  
+  // Source complex eigenfunctions
+  const srcX = complexEigen(nx, source.x, W);
+  const srcY = complexEigen(ny, source.y, L);
+  const srcZ = complexEigen(nz, source.z ?? 0.0, H);
+  
+  // Multiply srcX * srcY * srcZ (complex)
+  let srcRe = srcX.re * srcY.re - srcX.im * srcY.im;
+  let srcIm = srcX.re * srcY.im + srcX.im * srcY.re;
+  
+  const tmpRe = srcRe * srcZ.re - srcIm * srcZ.im;
+  const tmpIm = srcRe * srcZ.im + srcIm * srcZ.re;
+  srcRe = tmpRe;
+  srcIm = tmpIm;
+  
+  // Receiver complex eigenfunctions
+  const rcvX = complexEigen(nx, receiver.x, W);
+  const rcvY = complexEigen(ny, receiver.y, L);
+  const rcvZ = complexEigen(nz, receiver.z ?? 1.2, H);
+  
+  // Multiply rcvX * rcvY * rcvZ (complex)
+  let rcvRe = rcvX.re * rcvY.re - rcvX.im * rcvY.im;
+  let rcvIm = rcvX.re * rcvY.im + rcvX.im * rcvY.re;
+  
+  const tmpRe2 = rcvRe * rcvZ.re - rcvIm * rcvZ.im;
+  const tmpIm2 = rcvRe * rcvZ.im + rcvIm * rcvZ.re;
+  rcvRe = tmpRe2;
+  rcvIm = tmpIm2;
+  
+  // Multiply srcEigen * rcvEigen (complex)
+  const couplingRe = srcRe * rcvRe - srcIm * rcvIm;
+  const couplingIm = srcRe * rcvIm + srcIm * rcvRe;
+  
+  return { re: couplingRe, im: couplingIm };
 }
 
 /**
