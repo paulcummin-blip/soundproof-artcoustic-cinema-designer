@@ -1814,7 +1814,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Raw engine output toggle */}
+        {/* Raw engine output toggle (Part A1 - TRUE PHYSICS SWITCH) */}
         {rewStyleMode && (
           <div className="flex items-center gap-2 mb-2">
             <Checkbox 
@@ -1822,9 +1822,27 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               checked={modalOnlyDebugView}
               onCheckedChange={setModalOnlyDebugView}
             />
-            <Label htmlFor="raw-engine-output" className="text-xs text-[#3E4349] font-semibold">
-              Raw engine output (no blend / no compensation / no smoothing / no sealed boost)
+            <Label htmlFor="raw-engine-output" className="text-xs font-semibold" style={{ color: modalOnlyDebugView ? '#dc2626' : '#3E4349' }}>
+              RAW ENGINE OUTPUT — Pure coherent pressure (modal+SBIR), zero processing
             </Label>
+          </div>
+        )}
+        
+        {/* RAW mode active banner */}
+        {rewStyleMode && modalOnlyDebugView && (
+          <div className="text-xs mb-2 bg-red-50 p-2 rounded border border-red-400">
+            <div className="font-semibold mb-1 text-red-700">🔴 RAW MODE ACTIVE</div>
+            <div className="text-[10px] space-y-0.5">
+              <div>• No Schroeder blending</div>
+              <div>• No mode density compensation</div>
+              <div>• No sealed room boost</div>
+              <div>• No smoothing (even if UI slider is set)</div>
+              <div>• No calibration offsets</div>
+              <div>• No normalization</div>
+              <div className="mt-1 pt-1 border-t border-red-300 font-semibold">
+                This is the PURE physics output. If nulls don't move when sub moves, the modal coupling is broken.
+              </div>
+            </div>
           </div>
         )}
 
@@ -1849,9 +1867,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div className="text-xs text-[#3E4349] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
               <div className="font-semibold mb-1 text-blue-700">ℹ️ Seat Position Note</div>
               <div className="text-[10px] space-y-1">
-                {warnings.map((warning, i) => (
-                  <div key={i}>{warning}</div>
-                ))}
+               {warnings.map((warning, i) => (
+                 <div key={i}>• {warning}</div>
+               ))}
+               <div className="mt-1 pt-1 border-t border-blue-200 text-[9px] opacity-70">
+                 This is expected behaviour for centreline seating and does not indicate poor bass quality.
+               </div>
               </div>
             </div>
           );
@@ -2206,6 +2227,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <div className="text-[10px] font-mono opacity-80">
                     <strong>Product curves:</strong> {activeDebug.productCurvesApplied ? 'applied' : 'none'}
                   </div>
+                  {/* Part C2: Mode density compensation status */}
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>Mode density comp:</strong> {activeDebug.modeDensityCompActive ? 'ON' : 'OFF'}
+                    {activeDebug.blendStartHz && activeDebug.blendStartHz !== 'N/A' && (
+                      <span> (above {activeDebug.blendStartHz} Hz)</span>
+                    )}
+                  </div>
+                  {/* Schroeder blend status */}
+                  {activeDebug.blendStartHz && activeDebug.blendStartHz !== 'N/A' && (
+                    <div className="text-[10px] font-mono opacity-80">
+                      <strong>Schroeder blend:</strong> {activeDebug.blendStartHz} Hz → {activeDebug.blendEndHz} Hz (null-preserving)
+                    </div>
+                  )}
                   {activeDebug?.lfProbe?.measurements && (
                     <div className="text-[10px] font-mono opacity-80 text-purple-700 mt-1 pt-1 border-t border-purple-200">
                       <strong>LF Probe (Hz → SPL + Pressure Gain):</strong><br/>
