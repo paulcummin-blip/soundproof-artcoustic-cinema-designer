@@ -675,116 +675,36 @@ export function computeRoomModesResponse({
   // Run engine with normal sources
   const splDb = runOnce(null);
   
-  // SBIR (early field using first-order image sources)
-  let sbirDb = [];
-  let sbirDebugProbes = [];
-  
-  if (sbirEnabled && sourcesLocal.length > 0 && seat) {
-    sbirDb = freqs.map((f, i) => {
-      const k = (2 * Math.PI * f) / c;
-      let sumRe_sbir = 0;
-      let sumIm_sbir = 0;
-      
-      for (let subIdx = 0; subIdx < sourcesLocal.length; subIdx++) {
-        const source = sourcesLocal[subIdx];
-        
-        // Get product metadata and tuning
-        const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
-        let productRelativeDb = 0;
-        if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
-          productRelativeDb = meta.relativeCurve[i];
-        }
-        const productMagScale = Math.pow(10, productRelativeDb / 20);
-        
-        const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
-        const userGainLinear = Math.pow(10, subTuning.gainDb / 20);
-        const autoLevelGainDb = mlpAutoLevelGainsDb[subIdx] || 0;
-        const autoLevelGainLinear = Math.pow(10, autoLevelGainDb / 20);
-        const gainLinear = userGainLinear * autoLevelGainLinear;
-        
-        const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
-        const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
-        const totalPhase = delayPhase + polarityPhase;
-        
-        const weightMag = productMagScale * gainLinear;
-        const weightRe = weightMag * Math.cos(totalPhase);
-        const weightIm = weightMag * Math.sin(totalPhase);
-        
-        // Direct path
-        const dx0 = source.x - seat.x;
-        const dy0 = source.y - seat.y;
-        const dz0 = (source.z ?? 0.0) - (seat.z ?? 1.2);
-        const r0 = Math.sqrt(dx0*dx0 + dy0*dy0 + dz0*dz0);
-        
-        if (r0 > 0) {
-          const A0 = 1 / r0;
-          const phase0 = -k * r0;
-          const P0_re = A0 * Math.cos(phase0);
-          const P0_im = A0 * Math.sin(phase0);
-          
-          sumRe_sbir += weightRe * P0_re - weightIm * P0_im;
-          sumIm_sbir += weightRe * P0_im + weightIm * P0_re;
-        }
-        
-        // First-order image sources
-        const images = [];
-        
-        if (sbirIncludeWalls) {
-          images.push(
-            { x: -source.x, y: source.y, z: source.z ?? 0.0, R: Math.sqrt(Math.max(0, 1 - absorption.left)) },
-            { x: 2*widthM - source.x, y: source.y, z: source.z ?? 0.0, R: Math.sqrt(Math.max(0, 1 - absorption.right)) },
-            { x: source.x, y: -source.y, z: source.z ?? 0.0, R: Math.sqrt(Math.max(0, 1 - absorption.front)) },
-            { x: source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, R: Math.sqrt(Math.max(0, 1 - absorption.back)) }
-          );
-        }
-        
-        if (sbirIncludeFloorCeiling) {
-          images.push(
-            { x: source.x, y: source.y, z: -(source.z ?? 0.0), R: Math.sqrt(Math.max(0, 1 - absorption.floor)) },
-            { x: source.x, y: source.y, z: 2*heightM - (source.z ?? 0.0), R: Math.sqrt(Math.max(0, 1 - absorption.ceiling)) }
-          );
-        }
-        
-        for (const img of images) {
-          const dxi = img.x - seat.x;
-          const dyi = img.y - seat.y;
-          const dzi = img.z - (seat.z ?? 1.2);
-          const ri = Math.sqrt(dxi*dxi + dyi*dyi + dzi*dzi);
-          
-          if (ri > 0) {
-            const Ai = img.R / ri;
-            const phasei = -k * ri;
-            const Pi_re = Ai * Math.cos(phasei);
-            const Pi_im = Ai * Math.sin(phasei);
-            
-            sumRe_sbir += weightRe * Pi_re - weightIm * Pi_im;
-            sumIm_sbir += weightRe * Pi_im + weightIm * Pi_re;
-          }
-        }
-      }
-      
-      const mag = Math.max(Number.EPSILON, Math.sqrt(sumRe_sbir * sumRe_sbir + sumIm_sbir * sumIm_sbir));
-      return 20 * Math.log10(mag);
-    });
-    
-    // SBIR debug probes (only when not dragging)
-    if (!isDragging) {
-      const probeFreqs = [20, 30, 40, 50, 60, 80, 100, 120];
-      sbirDebugProbes = probeFreqs.map(fProbe => {
-        const idx = freqs.findIndex(f => Math.abs(f - fProbe) < 0.6);
-        if (idx < 0) return { freq: fProbe, modalDb: 'N/A', sbirDb: 'N/A', blendDb: 'N/A' };
-        
-        return {
-          freq: fProbe,
-          modalDb: splDb[idx].toFixed(2),
-          sbirDb: sbirDb[idx].toFixed(2),
-          blendDb: 'pending'
-        };
+  // SBIR debug probe (40 Hz for acceptance test)
+  let sbirDebugProbe40Hz = null;
+  if (sbirEnabled && !isDragging && sourcesLocal.length > 0 && seat) {
+    const idx40 = freqs.findIndex(f => Math.abs(f - 40) < 0.6);
+    if (idx40 >= 0) {
+      const source = sourcesLocal[0];
+      const sbirComplex = computeSBIRComplexAtFreq({
+        f: 40,
+        source,
+        receiver: seat,
+        roomDims: room,
+        surfaceAbsorption: absorption,
+        c,
+        includeWalls: sbirIncludeWalls,
+        includeFloorCeiling: sbirIncludeFloorCeiling,
       });
+      
+      const directMag = 1 / Math.max(0.25, Math.sqrt(
+        Math.pow(source.x - seat.x, 2) + 
+        Math.pow(source.y - seat.y, 2) + 
+        Math.pow((source.z ?? 0) - (seat.z ?? 1.2), 2)
+      ));
+      const totalMag = Math.sqrt(sbirComplex.re * sbirComplex.re + sbirComplex.im * sbirComplex.im);
+      
+      sbirDebugProbe40Hz = {
+        directDb: 20 * Math.log10(directMag),
+        totalDb: 20 * Math.log10(totalMag),
+        resultDb: splDb[idx40].toFixed(2)
+      };
     }
-  } else {
-    // SBIR disabled: use zeros
-    sbirDb = freqs.map(() => 0);
   }
 
   // PRESSURE REGION SUPPORT: FULLY DISABLED (REW parity)
