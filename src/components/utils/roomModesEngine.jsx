@@ -435,6 +435,8 @@ export function computeRoomModesResponse({
     const sourcesUsed = sourcesOverride ?? sourcesLocal;
 
   // Build response: pure MODAL PRESSURE SUM (REW-style room curve)
+  // Store BOTH coherent raw AND processed curves
+  const coherentRawDb = [];
   let splDb = freqs.map((f, i) => {
     let sumRe_modal = 0;
     let sumIm_modal = 0;
@@ -689,8 +691,12 @@ export function computeRoomModesResponse({
       sumIm_total += sumIm_sbir;
     }
 
-    // Combined pressure magnitude → dB
-    let modalDb = 20 * Math.log10(Math.max(Number.EPSILON, Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total)));
+    // COHERENT PRESSURE RAW: Pure complex magnitude (no processing)
+    const coherentMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
+    const coherentPressureRaw = 20 * Math.log10(Math.max(Number.EPSILON, coherentMag));
+    
+    // Start with coherent pressure, then apply processing layers
+    let modalDb = coherentPressureRaw;
     
     // Apply mode density compensation (REW-ish): above 70 Hz AND above blendStart, subtract incoherent sum growth
     // CRITICAL: Never apply below Schroeder frequency - this flattens modal nulls
@@ -708,6 +714,9 @@ export function computeRoomModesResponse({
       const pressureGainDb = Math.min(sealedBoostMaxGainDb, sealedBoostKDbPerOct * octavesBelow);
       modalDb += pressureGainDb;
     }
+    
+    // Store coherent raw for RAW mode output
+    coherentRawDb.push(coherentPressureRaw);
     
     return modalDb;
   });

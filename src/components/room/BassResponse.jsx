@@ -2011,6 +2011,77 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
+        {/* Coupling trace diagnostic (Part E1) */}
+        {rewStyleMode && !modalOnlyDebugView && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+          
+          // Show coupling for key modes: (0,1,0), (0,2,0), (1,1,0)
+          const targetModes = [
+            { n: [0, 1, 0], label: 'axial L (0,1,0)' },
+            { n: [0, 2, 0], label: 'axial L (0,2,0)' },
+            { n: [1, 1, 0], label: 'tangential (1,1,0)' }
+          ];
+          
+          const modeListFirst60 = activeDebug?.modeListFirst60;
+          if (!modeListFirst60 || subsForSimulation.length === 0) return null;
+          
+          const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+          if (!seat) return null;
+          
+          const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+          const source = subsForSimulation[0];
+          
+          const W = roomDims?.widthM || 1;
+          const L = roomDims?.lengthM || 1;
+          const H = roomDims?.heightM || 1;
+          
+          const couplingData = targetModes.map(({ n, label }) => {
+            const mode = modeListFirst60.find(m => m.nx === n[0] && m.ny === n[1] && m.nz === n[2]);
+            if (!mode) return null;
+            
+            const [nx, ny, nz] = n;
+            
+            // Compute coupling terms
+            const srcX = nx > 0 ? Math.cos(nx * Math.PI * source.x / W) : 1;
+            const srcY = ny > 0 ? Math.cos(ny * Math.PI * source.y / L) : 1;
+            const srcZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / H) : 1;
+            const srcCoupling = srcX * srcY * srcZ;
+            
+            const rcvX = nx > 0 ? Math.cos(nx * Math.PI * seatPos.x / W) : 1;
+            const rcvY = ny > 0 ? Math.cos(ny * Math.PI * seatPos.y / L) : 1;
+            const rcvZ = nz > 0 ? Math.cos(nz * Math.PI * seatPos.z / H) : 1;
+            const rcvCoupling = rcvX * rcvY * rcvZ;
+            
+            const totalCoupling = srcCoupling * rcvCoupling;
+            
+            return {
+              label,
+              fHz: mode.fHz,
+              srcCoupling: srcCoupling.toFixed(4),
+              rcvCoupling: rcvCoupling.toFixed(4),
+              totalCoupling: totalCoupling.toFixed(4)
+            };
+          }).filter(Boolean);
+          
+          if (couplingData.length === 0) return null;
+          
+          return (
+            <div className="text-xs text-[#3E4349] mb-2 bg-cyan-50 p-2 rounded border border-cyan-300">
+              <div className="font-semibold mb-1 text-cyan-700">Coupling Trace (Key Modes)</div>
+              <div className="text-[9px] font-mono space-y-1">
+                {couplingData.map((data, i) => (
+                  <div key={i} className="border-t border-cyan-200 pt-1 first:border-t-0 first:pt-0">
+                    <div className="font-semibold">{data.label} @ {data.fHz} Hz:</div>
+                    <div className="pl-2">src={data.srcCoupling}, rcv={data.rcvCoupling}, total={data.totalCoupling}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* REW mode info (only when REW is ON and no error) */}
         {rewStyleMode && !rewModesData?.debug?.error && (() => {
           // Select correct debug data based on view
@@ -2108,9 +2179,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <div className="text-[10px] font-mono opacity-80">
                     <strong>SPL Range:</strong> {activeDebug.splMinDb} to {activeDebug.splMaxDb} dB (range: {activeDebug.splRangeDb} dB)
                   </div>
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>Calibration Offset:</strong> {activeDebug.calibrationOffsetDb} dB
-                  </div>
+                  {activeDebug.rawEngineOutputMode && (
+                    <div className="text-[10px] font-mono opacity-80 text-red-600 font-semibold">
+                      <strong>RAW MODE:</strong> Unanchored, free-running SPL (no calibration)
+                    </div>
+                  )}
+                  {!activeDebug.rawEngineOutputMode && (
+                    <div className="text-[10px] font-mono opacity-80">
+                      <strong>Calibration:</strong> {activeDebug.calibrationMode || 'N/A'}
+                    </div>
+                  )}
+                  {!activeDebug.rawEngineOutputMode && activeDebug.calOffsetAppliedDb && (
+                    <div className="text-[10px] font-mono opacity-80">
+                      <strong>Calibration Offset:</strong> {activeDebug.calOffsetAppliedDb} dB
+                    </div>
+                  )}
                   <div className="text-[10px] font-mono opacity-80">
                     <strong>Smoothing:</strong> {activeDebug.smoothingApplied || 'none'}
                   </div>
