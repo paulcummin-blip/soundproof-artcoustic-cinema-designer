@@ -292,6 +292,9 @@ export function computeRoomModesResponse({
   const lfDebug = {
     modalMag15_45: []
   };
+  
+  // Per-mode contribution tracking (for REW parity debugging)
+  const modeContributions = {};
 
   // --- B44: modal coupling sanity (single mode 1,0,0) ---
   const __b44Clamp01 = (t) => Math.max(0, Math.min(1, t));
@@ -432,6 +435,9 @@ export function computeRoomModesResponse({
     let sumIm_modal = 0;
     let activeTerms = 0;
     
+    // Per-mode contribution tracking (top 3 contributors per bin)
+    const modeContribsThisBin = [];
+    
     // Image field (first-order reflections) for SBIR nulls
     let sumRe_field = 0;
     let sumIm_field = 0;
@@ -515,9 +521,36 @@ export function computeRoomModesResponse({
         sumRe_modal += cRe;
         sumIm_modal += cIm;
         activeTerms += 1;
+        
+        // Track per-mode contribution (magnitude + phase)
+        const cMag = Math.sqrt(cRe * cRe + cIm * cIm);
+        const cPhase = Math.atan2(cIm, cRe) * (180 / Math.PI); // degrees
+        
+        if (cMag > 1e-6) {
+          modeContribsThisBin.push({
+            freq: mode.freq,
+            type: mode.type,
+            n: [mode.nx, mode.ny, mode.nz],
+            magDb: 20 * Math.log10(cMag),
+            phaseDeg: cPhase,
+            coupling: coupling
+          });
+        }
       }
     }
 
+    // Store top 3 mode contributors for this bin (for phase debug)
+    if (modeContribsThisBin.length > 0) {
+      const top3 = modeContribsThisBin
+        .sort((a, b) => b.magDb - a.magDb)
+        .slice(0, 3);
+      
+      // Only store for probe frequencies to avoid bloat
+      if (__isProbeFreq(f)) {
+        modeContributions[f.toFixed(1)] = top3;
+      }
+    }
+    
     // Image field calculation (first-order reflections)
     if (imageFieldEnabledActual) {
       const k = (2 * Math.PI * f) / c;
@@ -613,6 +646,25 @@ export function computeRoomModesResponse({
       lfDebug.modalMag15_45.push(20 * Math.log10(Math.max(Number.EPSILON, modalMag)));
     }
 
+    // Phase check probe (34 Hz for REW parity verification)
+    if (Math.abs(f - 34.3) < 0.6) {
+      const sumMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
+      const individualMags = modeContribsThisBin.map(m => Math.pow(10, m.magDb / 20));
+      const maxIndividual = individualMags.length > 0 ? Math.max(...individualMags) : 0;
+      
+      if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG) {
+        globalThis.__B44_PHASE_CHECK = {
+          f: f.toFixed(1),
+          sumRe: sumRe_modal.toFixed(6),
+          sumIm: sumIm_modal.toFixed(6),
+          sumMag: sumMag.toFixed(6),
+          maxIndividualMag: maxIndividual.toFixed(6),
+          cancelled: sumMag < (maxIndividual * 0.5),
+          topModes: modeContribsThisBin.slice(0, 3)
+        };
+      }
+    }
+    
     // Blend modal + image field with frequency-dependent weight
     let sumRe_total = sumRe_modal;
     let sumIm_total = sumIm_modal;
@@ -1324,6 +1376,8 @@ export function computeRoomModesResponse({
       sbirMaxDb: sbirEnabled ? sbirMaxDb.toFixed(1) : 'N/A',
       sbirRangeDb: sbirEnabled ? sbirRangeDb.toFixed(1) : 'N/A',
       sbirDebugProbes: !isDragging ? sbirDebugProbes : null,
+      modeContributions: !isDragging ? modeContributions : null,
+      phaseCheckAvailable: typeof globalThis !== 'undefined' && globalThis.__B44_PHASE_CHECK ? true : false,
       calRefBandHz: calRefBandHz,
       calRefMedianDbBefore: Number.isFinite(calRefMedianDbBefore) ? calRefMedianDbBefore.toFixed(2) : 'N/A',
       calOffsetAppliedDb: Number.isFinite(calibrationOffsetDb) ? calibrationOffsetDb.toFixed(2) : '0.00',

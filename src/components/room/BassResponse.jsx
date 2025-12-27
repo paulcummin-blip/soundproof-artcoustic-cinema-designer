@@ -54,6 +54,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [scaleEpoch, setScaleEpoch] = useState(0);
   const [rewCompareView, setRewCompareView] = useState(false); // REW Compare View toggle
   const [seatNudgeTest, setSeatNudgeTest] = useState(false); // Diagnostic seat nudge
+  const [modalOnlyDebugView, setModalOnlyDebugView] = useState(false); // Modal-only debug view (no SBIR, no smoothing)
 
   // Sensitivity audit refs (track previous run)
   const prevSourceSigRef = useRef(null);
@@ -1810,6 +1811,61 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
           </div>
         )}
+
+        {/* Modal-only debug view toggle */}
+        {rewStyleMode && (
+          <div className="flex items-center gap-2 mb-2">
+            <Checkbox 
+              id="modal-only-debug" 
+              checked={modalOnlyDebugView}
+              onCheckedChange={setModalOnlyDebugView}
+            />
+            <Label htmlFor="modal-only-debug" className="text-xs text-[#3E4349]">
+              Modal-only (debug) — no SBIR, no smoothing, no sealed boost
+            </Label>
+          </div>
+        )}
+
+        {/* Per-mode contributions (phase debug) */}
+        {rewStyleMode && !modalOnlyDebugView && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+
+          const modeContribs = activeDebug?.modeContributions;
+          if (!modeContribs || Object.keys(modeContribs).length === 0) return null;
+
+          // Show contributions for key probe frequencies
+          const probeFreqs = ['34.0', '40.0', '45.0', '60.0'];
+          const relevantContribs = probeFreqs
+            .map(fStr => ({ freq: fStr, modes: modeContribs[fStr] }))
+            .filter(entry => entry.modes && entry.modes.length > 0);
+
+          if (relevantContribs.length === 0) return null;
+
+          return (
+            <div className="text-xs text-[#3E4349] mb-2 bg-purple-50 p-2 rounded border border-purple-300">
+              <div className="font-semibold mb-1 text-purple-700">Per-Mode Contributions (Top 3)</div>
+              <div className="text-[9px] font-mono space-y-1 max-h-32 overflow-y-auto">
+                {relevantContribs.map((entry, i) => (
+                  <div key={i}>
+                    <div className="font-semibold">{entry.freq} Hz:</div>
+                    {entry.modes.map((mode, j) => (
+                      <div key={j} className="pl-2">
+                        {mode.type} ({mode.n[0]},{mode.n[1]},{mode.n[2]}): {mode.magDb.toFixed(1)} dB @ {mode.phaseDeg.toFixed(0)}°
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              {activeDebug?.phaseCheckAvailable && (
+                <div className="text-[9px] mt-1 pt-1 border-t border-purple-200">
+                  Phase check at 34 Hz available in console: <code>globalThis.__B44_PHASE_CHECK</code>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Mode list (first 30) - REW parity check */}
         {rewStyleMode && (() => {
