@@ -262,10 +262,17 @@ export function computeRoomModesResponse({
     includeOblique: includeObliqueLocal
   });
 
-  // PART H: Mode isolation filter (single mode test harness)
+  // PART H: Mode isolation filter (single/multi-mode test harness)
   if (modeIsolation && modeIsolation !== 'off') {
-    const [targetNx, targetNy, targetNz] = modeIsolation.split(',').map(n => parseInt(n, 10));
-    modes = modes.filter(m => m.nx === targetNx && m.ny === targetNy && m.nz === targetNz);
+    // Support both single mode "1,0,0" and multi-mode "1,0,0|0,1,0"
+    const modeSpecs = modeIsolation.split('|').map(spec => {
+      const [nx, ny, nz] = spec.split(',').map(n => parseInt(n, 10));
+      return { nx, ny, nz };
+    });
+
+    modes = modes.filter(m => 
+      modeSpecs.some(spec => m.nx === spec.nx && m.ny === spec.ny && m.nz === spec.nz)
+    );
   }
   
   // Lowest axial mode (used for sealed-room pressure behaviour)

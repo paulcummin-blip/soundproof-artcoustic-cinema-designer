@@ -1850,26 +1850,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
 
-        {/* Seat Node Check (only when debug enabled) */}
-        {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
 
-          if (!activeDebug?.seatNodeCheck) return null;
-
-          return (
-            <div className="text-xs text-[#3E4349] mb-2 bg-purple-50 p-2 rounded border border-purple-300">
-              <div className="font-semibold mb-1 text-purple-700">Seat Node Check</div>
-              <div className="text-[10px] space-y-0.5">
-                <div><strong>Seat X/Y/Z frac:</strong> {activeDebug.seatNodeCheck.seatX_frac}, {activeDebug.seatNodeCheck.seatY_frac}, {activeDebug.seatNodeCheck.seatZ_frac}</div>
-                <div><strong>Width odd modes suppressed:</strong> {activeDebug.seatNodeCheck.widthOddModesSuppressed ? 'TRUE' : 'FALSE'}</div>
-                <div><strong>Length odd modes suppressed:</strong> {activeDebug.seatNodeCheck.lengthOddModesSuppressed ? 'TRUE' : 'FALSE'}</div>
-                <div><strong>Height odd modes suppressed:</strong> {activeDebug.seatNodeCheck.heightOddModesSuppressed ? 'TRUE' : 'FALSE'}</div>
-              </div>
-            </div>
-          );
-        })()}
 
         {/* LF Probe Raw (only when debug enabled) */}
         {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
@@ -1985,6 +1966,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <option value="1,0,0">Axial (1,0,0) - Width</option>
                   <option value="0,1,0">Axial (0,1,0) - Length</option>
                   <option value="0,0,1">Axial (0,0,1) - Height</option>
+                  <option value="1,0,0|0,1,0">Axial pair: (1,0,0) + (0,1,0)</option>
+                  <option value="1,0,0|2,0,0">Axial pair: (1,0,0) + (2,0,0)</option>
                 </select>
               </div>
             )}
@@ -2023,37 +2006,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Seat node info (Part D - changed from warning to info) */}
-        {rewStyleMode && !modalOnlyDebugView && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
 
-          const warnings = activeDebug?.warnings;
-          if (!warnings || warnings.length === 0) return null;
-
-          // Check if positions are stable (not dragging)
-          const sourceSigStable = activeDebug?.sourceSigRounded;
-          const seatSigStable = activeDebug?.seatSigRounded;
-          const isStable = sourceSigStable && seatSigStable;
-
-          // Only show if stable (prevents jitter during drag)
-          if (!isStable) return null;
-
-          return (
-            <div className="text-xs text-[#3E4349] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
-              <div className="font-semibold mb-1 text-blue-700">ℹ️ Seat Position Note</div>
-              <div className="text-[10px] space-y-1">
-               {warnings.map((warning, i) => (
-                 <div key={i}>• {warning}</div>
-               ))}
-               <div className="mt-1 pt-1 border-t border-blue-200 text-[9px] opacity-70">
-                 This is expected behaviour for centreline seating and does not indicate poor bass quality.
-               </div>
-              </div>
-            </div>
-          );
-        })()}
 
         {/* SBIR debug info */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
