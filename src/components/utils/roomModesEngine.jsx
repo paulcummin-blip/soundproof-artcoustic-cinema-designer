@@ -43,6 +43,13 @@ export function computeRoomModesResponse({
   isDragging = false,
   sealedRoomBoost = { enabled: false, kDbPerOct: 6.0, maxGainDb: 12.0 },
   imageFieldEnabled = null,
+  includeSBIR = true,
+  sbirMaxOrder = 1,
+  sbirIncludeWalls = true,
+  sbirIncludeFloorCeiling = true,
+  sbirBlendEnabled = true,
+  sbirBlendStartHz = null,
+  sbirBlendEndHz = null,
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -271,6 +278,11 @@ export function computeRoomModesResponse({
     ceiling: Math.sqrt(Math.max(0, 1 - absorption.ceiling)),
     floor: Math.sqrt(Math.max(0, 1 - absorption.floor)),
   } : null;
+  
+  // SBIR (image source) settings - default ON in REW mode
+  const sbirEnabled = includeSBIR && rewParityMode;
+  const sbirBlendStartHzActual = sbirBlendStartHz !== null ? sbirBlendStartHz : (schroederHz * 0.7);
+  const sbirBlendEndHzActual = sbirBlendEndHz !== null ? sbirBlendEndHz : (schroederHz * 1.3);
   
   // Track what processing was applied
   const calibrationApplied = rewParityMode;
@@ -647,6 +659,118 @@ export function computeRoomModesResponse({
 
   // Run engine with normal sources
   const splDb = runOnce(null);
+  
+  // SBIR (early field using first-order image sources)
+  let sbirDb = [];
+  let sbirDebugProbes = [];
+  
+  if (sbirEnabled && sourcesLocal.length > 0 && seat) {
+    sbirDb = freqs.map((f, i) => {
+      const k = (2 * Math.PI * f) / c;
+      let sumRe_sbir = 0;
+      let sumIm_sbir = 0;
+      
+      for (let subIdx = 0; subIdx < sourcesLocal.length; subIdx++) {
+        const source = sourcesLocal[subIdx];
+        
+        // Get product metadata and tuning
+        const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
+        let productRelativeDb = 0;
+        if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
+          productRelativeDb = meta.relativeCurve[i];
+        }
+        const productMagScale = Math.pow(10, productRelativeDb / 20);
+        
+        const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
+        const userGainLinear = Math.pow(10, subTuning.gainDb / 20);
+        const autoLevelGainDb = mlpAutoLevelGainsDb[subIdx] || 0;
+        const autoLevelGainLinear = Math.pow(10, autoLevelGainDb / 20);
+        const gainLinear = userGainLinear * autoLevelGainLinear;
+        
+        const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
+        const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
+        const totalPhase = delayPhase + polarityPhase;
+        
+        const weightMag = productMagScale * gainLinear;
+        const weightRe = weightMag * Math.cos(totalPhase);
+        const weightIm = weightMag * Math.sin(totalPhase);
+        
+        // Direct path
+        const dx0 = source.x - seat.x;
+        const dy0 = source.y - seat.y;
+        const dz0 = (source.z ?? 0.0) - (seat.z ?? 1.2);
+        const r0 = Math.sqrt(dx0*dx0 + dy0*dy0 + dz0*dz0);
+        
+        if (r0 > 0) {
+          const A0 = 1 / r0;
+          const phase0 = -k * r0;
+          const P0_re = A0 * Math.cos(phase0);
+          const P0_im = A0 * Math.sin(phase0);
+          
+          sumRe_sbir += weightRe * P0_re - weightIm * P0_im;
+          sumIm_sbir += weightRe * P0_im + weightIm * P0_re;
+        }
+        
+        // First-order image sources
+        const images = [];
+        
+        if (sbirIncludeWalls) {
+          images.push(
+            { x: -source.x, y: source.y, z: source.z ?? 0.0, R: Math.sqrt(Math.max(0, 1 - absorption.left)) },
+            { x: 2*widthM - source.x, y: source.y, z: source.z ?? 0.0, R: Math.sqrt(Math.max(0, 1 - absorption.right)) },
+            { x: source.x, y: -source.y, z: source.z ?? 0.0, R: Math.sqrt(Math.max(0, 1 - absorption.front)) },
+            { x: source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, R: Math.sqrt(Math.max(0, 1 - absorption.back)) }
+          );
+        }
+        
+        if (sbirIncludeFloorCeiling) {
+          images.push(
+            { x: source.x, y: source.y, z: -(source.z ?? 0.0), R: Math.sqrt(Math.max(0, 1 - absorption.floor)) },
+            { x: source.x, y: source.y, z: 2*heightM - (source.z ?? 0.0), R: Math.sqrt(Math.max(0, 1 - absorption.ceiling)) }
+          );
+        }
+        
+        for (const img of images) {
+          const dxi = img.x - seat.x;
+          const dyi = img.y - seat.y;
+          const dzi = img.z - (seat.z ?? 1.2);
+          const ri = Math.sqrt(dxi*dxi + dyi*dyi + dzi*dzi);
+          
+          if (ri > 0) {
+            const Ai = img.R / ri;
+            const phasei = -k * ri;
+            const Pi_re = Ai * Math.cos(phasei);
+            const Pi_im = Ai * Math.sin(phasei);
+            
+            sumRe_sbir += weightRe * Pi_re - weightIm * Pi_im;
+            sumIm_sbir += weightRe * Pi_im + weightIm * Pi_re;
+          }
+        }
+      }
+      
+      const mag = Math.max(Number.EPSILON, Math.sqrt(sumRe_sbir * sumRe_sbir + sumIm_sbir * sumIm_sbir));
+      return 20 * Math.log10(mag);
+    });
+    
+    // SBIR debug probes (only when not dragging)
+    if (!isDragging) {
+      const probeFreqs = [20, 30, 40, 50, 60, 80, 100, 120];
+      sbirDebugProbes = probeFreqs.map(fProbe => {
+        const idx = freqs.findIndex(f => Math.abs(f - fProbe) < 0.6);
+        if (idx < 0) return { freq: fProbe, modalDb: 'N/A', sbirDb: 'N/A', blendDb: 'N/A' };
+        
+        return {
+          freq: fProbe,
+          modalDb: splDb[idx].toFixed(2),
+          sbirDb: sbirDb[idx].toFixed(2),
+          blendDb: 'pending'
+        };
+      });
+    }
+  } else {
+    // SBIR disabled: use zeros
+    sbirDb = freqs.map(() => 0);
+  }
 
   // PRESSURE REGION SUPPORT: FULLY DISABLED (REW parity)
   // REW's Room Simulator does not apply artificial pressure-zone boost
@@ -735,6 +859,41 @@ export function computeRoomModesResponse({
   const postNormMax = finitePostNorm.length > 0 ? Math.max(...finitePostNorm) : 0;
   const postNormRange = postNormMax - postNormMin;
   
+  // Blend SBIR with modal curve (if enabled)
+  let finalDbBlended = splDbSmoothed;
+  
+  if (sbirEnabled && sbirBlendEnabled && sbirDb.length === splDbSmoothed.length) {
+    finalDbBlended = splDbSmoothed.map((modalDbVal, i) => {
+      const f = freqs[i];
+      const sbirDbVal = sbirDb[i];
+      
+      if (!Number.isFinite(modalDbVal) || !Number.isFinite(sbirDbVal)) {
+        return modalDbVal;
+      }
+      
+      // Blend based on frequency
+      if (f < sbirBlendStartHzActual) {
+        return modalDbVal; // Pure modal
+      } else if (f > sbirBlendEndHzActual) {
+        return sbirDbVal; // Pure SBIR
+      } else {
+        // Crossfade in dB
+        const t = Math.max(0, Math.min(1, (f - sbirBlendStartHzActual) / Math.max(1e-6, (sbirBlendEndHzActual - sbirBlendStartHzActual))));
+        return (1 - t) * modalDbVal + t * sbirDbVal;
+      }
+    });
+    
+    // Update SBIR debug probes with blend values
+    if (!isDragging && sbirDebugProbes.length > 0) {
+      for (const probe of sbirDebugProbes) {
+        const idx = freqs.findIndex(f => Math.abs(f - probe.freq) < 0.6);
+        if (idx >= 0) {
+          probe.blendDb = finalDbBlended[idx].toFixed(2);
+        }
+      }
+    }
+  }
+  
   // Build detailed mode markers for visualization (create new array)
   const modeMarkers = modes.map(m => {
     let axisLabel = null;
@@ -809,10 +968,12 @@ export function computeRoomModesResponse({
   let normAppliedActual = false;
   let calRefMedianDbBefore = 0;
   let calRefMedianDbAfter = 0;
-  let finalDb = splDbSmoothed;
+  
+  // Choose base curve: blended if SBIR enabled, otherwise modal smoothed
+  let finalDb = sbirEnabled && sbirBlendEnabled ? finalDbBlended : splDbSmoothed;
 
   if (!Array.isArray(finalDb) || finalDb.length === 0) {
-  finalDb = Array.isArray(splDb) ? [...splDb] : [];
+    finalDb = Array.isArray(splDb) ? [...splDb] : [];
   }
 
   // Always compute MLP reference (30-80 Hz median) for anchoring
@@ -902,6 +1063,17 @@ export function computeRoomModesResponse({
   const splMinDb = finalFinite.length > 0 ? Math.min(...finalFinite) : 0;
   const splMaxDb = finalFinite.length > 0 ? Math.max(...finalFinite) : 0;
   const splRangeDb = splMaxDb - splMinDb;
+  
+  // SBIR stats
+  let sbirMinDb = 0, sbirMaxDb = 0, sbirRangeDb = 0;
+  if (sbirEnabled && sbirDb.length > 0) {
+    const sbirFinite = sbirDb.filter(v => isFinite(v));
+    if (sbirFinite.length > 0) {
+      sbirMinDb = Math.min(...sbirFinite);
+      sbirMaxDb = Math.max(...sbirFinite);
+      sbirRangeDb = sbirMaxDb - sbirMinDb;
+    }
+  }
 
   // Product curve stats (if applied) - use metadata
   let productCurveStats = null;
@@ -1144,6 +1316,14 @@ export function computeRoomModesResponse({
         ceiling: beta.ceiling.toFixed(3),
         floor: beta.floor.toFixed(3)
       } : null,
+      sbirEnabled,
+      sbirBlendEnabled,
+      sbirBlendStartHz: sbirEnabled ? sbirBlendStartHzActual.toFixed(1) : 'N/A',
+      sbirBlendEndHz: sbirEnabled ? sbirBlendEndHzActual.toFixed(1) : 'N/A',
+      sbirMinDb: sbirEnabled ? sbirMinDb.toFixed(1) : 'N/A',
+      sbirMaxDb: sbirEnabled ? sbirMaxDb.toFixed(1) : 'N/A',
+      sbirRangeDb: sbirEnabled ? sbirRangeDb.toFixed(1) : 'N/A',
+      sbirDebugProbes: !isDragging ? sbirDebugProbes : null,
       calRefBandHz: calRefBandHz,
       calRefMedianDbBefore: Number.isFinite(calRefMedianDbBefore) ? calRefMedianDbBefore.toFixed(2) : 'N/A',
       calOffsetAppliedDb: Number.isFinite(calibrationOffsetDb) ? calibrationOffsetDb.toFixed(2) : '0.00',
