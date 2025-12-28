@@ -93,6 +93,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // Component view mode (Part 3 - SBIR isolation)
   const [componentView, setComponentView] = useState('modalPlusSbir'); // 'modalOnly' | 'sbirOnly' | 'modalPlusSbir'
+  
+  // REW-style time alignment (align all subs to MLP arrival time)
+  const [rewTimeAlign, setRewTimeAlign] = useState(false);
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -285,6 +288,41 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }).join('|');
   }, [subsForSimulation]);
 
+  // Compute REW-style time alignment delays (when enabled)
+  const rewAlignmentDelays = useMemo(() => {
+    if (!rewStyleMode || !rewTimeAlign) return {};
+    
+    const mlpSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+    if (!mlpSeat) return {};
+    
+    const mlpPos = { x: mlpSeat.x, y: mlpSeat.y, z: mlpSeat.z ?? 1.2 };
+    const SPEED_OF_SOUND = 343; // m/s
+    
+    const delays = {};
+    let minArrivalTime = Infinity;
+    
+    // First pass: compute arrival times
+    const arrivalTimes = {};
+    subsForSimulation.forEach(sub => {
+      const dx = sub.x - mlpPos.x;
+      const dy = sub.y - mlpPos.y;
+      const dz = (sub.z ?? 0) - mlpPos.z;
+      const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      const arrivalTime = distance / SPEED_OF_SOUND;
+      
+      arrivalTimes[sub.id] = arrivalTime;
+      minArrivalTime = Math.min(minArrivalTime, arrivalTime);
+    });
+    
+    // Second pass: compute alignment delays (earliest sub = 0ms, others delayed)
+    subsForSimulation.forEach(sub => {
+      const alignDelayMs = (arrivalTimes[sub.id] - minArrivalTime) * 1000;
+      delays[sub.id] = alignDelayMs;
+    });
+    
+    return delays;
+  }, [rewStyleMode, rewTimeAlign, seatingPositions, subsForSimulation]);
+
   // Audit curve (no smoothing, no normalization) for sensitivity testing
   const rewModesDataAudit = useMemo(() => {
     if (!rewStyleMode || !rewCompareView) return null;
@@ -407,15 +445,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       seatPos = { ...seatPos, x: seatPos.x - 0.30 };
     }
 
-    // Build source positions from actual subs
+    // Build source positions from actual subs (with REW time alignment if enabled)
     const sourcePositions = subsForSimulation
       .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
-      .map(s => ({
-        x: s.x,
-        y: s.y,
-        z: 0.0,
-        tuning: s.tuning || { gainDb: 0, delayMs: 0, polarity: 'normal' }
-      }));
+      .map(s => {
+        const userDelayMs = s.tuning?.delayMs || 0;
+        const alignDelayMs = rewAlignmentDelays[s.id] || 0;
+        const effectiveDelayMs = userDelayMs + alignDelayMs;
+        
+        return {
+          x: s.x,
+          y: s.y,
+          z: 0.0,
+          tuning: {
+            gainDb: s.tuning?.gainDb || 0,
+            delayMs: effectiveDelayMs,
+            polarity: s.tuning?.polarity || 'normal'
+          }
+        };
+      });
 
     if (!sourcePositions.length) {
       return {
@@ -619,15 +667,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
 
-    // Build source positions
+    // Build source positions (with REW time alignment if enabled)
     const sourcePositions = subsForSimulation
       .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
-      .map(s => ({
-        x: s.x,
-        y: s.y,
-        z: 0.0,
-        tuning: s.tuning || { gainDb: 0, delayMs: 0, polarity: 'normal' }
-      }));
+      .map(s => {
+        const userDelayMs = s.tuning?.delayMs || 0;
+        const alignDelayMs = rewAlignmentDelays[s.id] || 0;
+        const effectiveDelayMs = userDelayMs + alignDelayMs;
+        
+        return {
+          x: s.x,
+          y: s.y,
+          z: 0.0,
+          tuning: {
+            gainDb: s.tuning?.gainDb || 0,
+            delayMs: effectiveDelayMs,
+            polarity: s.tuning?.polarity || 'normal'
+          }
+        };
+      });
 
     if (!sourcePositions.length) {
       return { data: [], debug: { error: "No valid sub positions" } };
@@ -2991,9 +3049,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </Button>
             </div>
 
+            {/* REW-style time alignment toggle */}
+            <div className="flex items-center gap-2 mt-2">
+              <Checkbox 
+                id="rew-time-align" 
+                checked={rewTimeAlign}
+                onCheckedChange={setRewTimeAlign}
+              />
+              <Label htmlFor="rew-time-align" className="text-xs text-[#3E4349]">
+                Time align subs (MLP) — REW-style
+              </Label>
+            </div>
+
             {/* Live state readout (audit) */}
             <div className="text-[9px] font-mono bg-yellow-50 p-1 rounded border border-yellow-300 mt-2">
-              <strong>Live State:</strong> componentView={componentView} | rewView={rewView} | engineCalls={engineCallCountRef.current} | dataset={rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'}
+              <strong>Live State:</strong> componentView={componentView} | rewView={rewView} | engineCalls={engineCallCountRef.current} | dataset={rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'} | timeAlign={rewTimeAlign ? 'ON' : 'OFF'}
             </div>
           </div>
         )}
@@ -3074,6 +3144,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="text-[9px] opacity-70">
                 <strong>Engine componentView:</strong> {activeDebug?.componentView || 'N/A'}
               </div>
+              {activeDebug?.subDistancesToMLP && (
+                <div className="text-[9px] opacity-70 mt-1 border-t border-purple-300 pt-1">
+                  <strong>Sub distances + effective delays:</strong><br/>
+                  {activeDebug.subDistancesToMLP.map((sub, i) => (
+                    <div key={i}>
+                      {sub.subId}: {sub.distanceM}m, delay={sub.effectiveDelayMs}ms
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })()}

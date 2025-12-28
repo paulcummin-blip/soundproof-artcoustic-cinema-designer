@@ -55,6 +55,8 @@ export function computeRoomModesResponse({
   modeIsolation = null,
   complexEigenfunctions = false,
   componentView = 'modalPlusSbir', // 'modalOnly' | 'sbirOnly' | 'modalPlusSbir'
+  sealedRoom = true, // REW-style: cinemas are sealed by default
+  mlpPosition = null, // MLP position for distance debug
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -279,10 +281,13 @@ export function computeRoomModesResponse({
   // Lowest axial mode (used for sealed-room pressure behaviour)
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
-  // Sealed room LF boost (ALWAYS ENABLED - cinemas are sealed by design)
-  const sealedBoostEnabled = true;
-  const sealedBoostKDbPerOct = 6.0;
-  const sealedBoostMaxGainDb = 12.0;
+  // Sealed room LF boost (REW-style: enabled by default, can be disabled for leaky rooms)
+  const sealedBoostEnabled = sealedRoom;
+  const sealedBoostKDbPerOct = sealedRoom ? 6.0 : 0.0;
+  const sealedBoostMaxGainDb = sealedRoom ? 12.0 : 0.0;
+
+  // Leaky room LF roll-off (if not sealed, reduce LF below ~35 Hz)
+  const leakyRolloffEnabled = !sealedRoom;
   
   // Image field (first-order reflections) - default ON in REW mode
   const imageFieldEnabledActual = imageFieldEnabled !== null ? imageFieldEnabled : rewParityMode;
@@ -810,6 +815,14 @@ export function computeRoomModesResponse({
       const octavesBelow = Math.log2(lowestAxial / f);
       const pressureGainDb = Math.min(sealedBoostMaxGainDb, sealedBoostKDbPerOct * octavesBelow);
       modalDb += pressureGainDb;
+    }
+
+    // Apply leaky room LF roll-off (if room is not sealed)
+    // Reduce LF below ~35 Hz with gentle shelving (REW-like behaviour)
+    if (!rawEngineOutput && leakyRolloffEnabled && f < 35) {
+      const octavesBelow = Math.log2(35 / f);
+      const rolloffDb = -3.0 * octavesBelow; // -3 dB/octave below 35 Hz
+      modalDb += Math.max(-9.0, rolloffDb); // Cap at -9 dB max reduction
     }
     
     // Store coherent raw for RAW mode output
@@ -1435,9 +1448,21 @@ export function computeRoomModesResponse({
       componentView: componentView, // Part 3 - track which component is being plotted
       modalRmsDb_20_200: modalRmsDb_20_200.toFixed(1), // DO THIS 5 - modal RMS
       sbirRmsDb_20_200: sbirRmsDb_20_200.toFixed(1), // DO THIS 5 - SBIR RMS
-      totalRmsDb_20_200: totalRmsDb_20_200.toFixed(1) // DO THIS 5 - total RMS
-    }
-  };
+      totalRmsDb_20_200: totalRmsDb_20_200.toFixed(1), // DO THIS 5 - total RMS
+      sealedRoom: sealedRoom,
+      subDistancesToMLP: mlpPosition ? sourcePositions.map(s => {
+        const dx = s.x - mlpPosition.x;
+        const dy = s.y - mlpPosition.y;
+        const dz = (s.z ?? 0) - (mlpPosition.z ?? 1.2);
+        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
+        return {
+          subId: s.id || 'unknown',
+          distanceM: dist.toFixed(3),
+          effectiveDelayMs: (s.tuning?.delayMs ?? 0).toFixed(2)
+        };
+      }) : null
+      }
+      };
 
   // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)
   if (DIAG_POS) {
