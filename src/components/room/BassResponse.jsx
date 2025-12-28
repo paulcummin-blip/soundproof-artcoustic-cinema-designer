@@ -2438,10 +2438,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Per-Mode Excitation Diagnostic (Part G - DIAGNOSTIC OVERLAY) */}
         {rewStyleMode && showModeExcitationDiag && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-          
           const modeList = activeDebug?.modeListFirst60;
           if (!modeList || modeList.length === 0 || subsForSimulation.length === 0) return null;
           
@@ -2669,11 +2665,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* REW mode info (only when REW is ON and no error) */}
         {rewStyleMode && !rewModesData?.debug?.error && (() => {
-          // Select correct debug data based on view
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
               <div className="font-semibold mb-1">
@@ -3014,8 +3005,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div>Modal RMS: <strong>{activeDebug?.modalRmsDb_20_200 || '—'} dB</strong></div>
               <div>SBIR RMS: <strong>{activeDebug?.sbirRmsDb_20_200 || '—'} dB</strong></div>
               <div>Total RMS: <strong>{activeDebug?.totalRmsDb_20_200 || '—'} dB</strong></div>
-              <div className="text-[9px] opacity-70 mt-1">UI componentView: <strong>{componentView}</strong></div>
-              <div className="text-[9px] opacity-70">Engine componentView: <strong>{activeDebug?.componentView || '—'}</strong></div>
+              <div className="text-[9px] opacity-70 mt-1 border-t border-purple-300 pt-1">
+                <strong>UI componentView:</strong> {componentView}
+              </div>
+              <div className="text-[9px] opacity-70">
+                <strong>Engine componentView:</strong> {activeDebug?.componentView || 'N/A'}
+              </div>
             </div>
           );
         })()}
