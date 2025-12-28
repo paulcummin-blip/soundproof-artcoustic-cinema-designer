@@ -410,6 +410,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     engineCallCountRef.current += 1;
 
+    // [REW ENGINE RUN][ROOM-ONLY] - Audit log
+    console.log('[REW ENGINE RUN][ROOM-ONLY]', {
+      componentView,
+      rewView,
+      sig,
+      engineCallCount: engineCallCountRef.current
+    });
+
     // [BASS ENGINE INPUT CHECK] - Room-only path (only if debug enabled)
     if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_INPUT_DEBUG) {
       console.log("[BASS ENGINE INPUT CHECK - Room-only]", {
@@ -2932,6 +2940,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 Modal + SBIR
               </Button>
             </div>
+
+            {/* Live state readout (audit) */}
+            <div className="text-[9px] font-mono bg-yellow-50 p-1 rounded border border-yellow-300 mt-2">
+              <strong>Live State:</strong> componentView={componentView} | rewView={rewView} | engineCalls={engineCallCountRef.current} | dataset={rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'}
+            </div>
           </div>
         )}
 
@@ -3016,7 +3029,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         })()}
 
         {/* Graph or placeholder */}
-        {displayData.length > 0 ? (
+        {displayData.length > 0 ? (() => {
+          // [BASSGRAPH INPUT] - Audit log
+          console.log('[BASSGRAPH INPUT]', {
+            rewStyleMode,
+            rewView,
+            componentView,
+            displayDataLength: displayData.length,
+            first5Spl: displayData.slice(0, 5).map(d => d.spl)
+          });
+          
+          return (
           <BassGraph
             responseData={rewStyleMode ? clampedData : displayData}
             schroederFrequency={schroederFrequency}
@@ -3033,7 +3056,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             refDb={rewCompareView && yAxisDomain?.refDb ? yAxisDomain.refDb : null}
             showRefLine={rewCompareView}
             />
-        ) : (
+          );
+        })() : (
           <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
             No graph data yet.
             {rewStyleMode ? (

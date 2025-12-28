@@ -773,10 +773,23 @@ export function computeRoomModesResponse({
     // Store component magnitudes for RMS calculation (DO THIS 5)
     const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
     const sbirMag = Math.sqrt(sumRe_sbir * sumRe_sbir + sumIm_sbir * sumIm_sbir);
-    modalMagDb_all.push(20 * Math.log10(Math.max(Number.EPSILON, modalMag)));
-    sbirMagDb_all.push(20 * Math.log10(Math.max(Number.EPSILON, sbirMag)));
+    const modalMagDb = 20 * Math.log10(Math.max(Number.EPSILON, modalMag));
+    const sbirMagDb = 20 * Math.log10(Math.max(Number.EPSILON, sbirMag));
+    modalMagDb_all.push(modalMagDb);
+    sbirMagDb_all.push(sbirMagDb);
     totalMagDb_all.push(coherentPressureRaw);
-    
+
+    // [ENGINE OUTPUT PROBE] - Audit log (gated to 40 Hz probe)
+    if (Math.abs(f - 40) < 0.6) {
+      console.log('[ENGINE OUTPUT PROBE]', {
+        componentView,
+        f: f.toFixed(1),
+        coherentPressureRaw: coherentPressureRaw.toFixed(2),
+        modalMagDb: modalMagDb.toFixed(2),
+        sbirMagDb: sbirMagDb.toFixed(2)
+      });
+    }
+
     // Start with coherent pressure, then apply processing layers (ONLY if not raw mode)
     let modalDb = coherentPressureRaw;
     
