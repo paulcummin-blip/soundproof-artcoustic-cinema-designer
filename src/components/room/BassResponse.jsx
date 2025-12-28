@@ -3020,9 +3020,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </Button>
             </div>
 
-            {/* Component view selector (Part 3 - SBIR isolation) */}
+            {/* Component view selector (debug lens only - does NOT change calibration) */}
             <div className="flex items-center gap-3">
-              <div className="text-xs text-[#3E4349]">Component:</div>
+              <div className="text-xs text-[#3E4349]">Component (debug):</div>
               <Button
                 variant={componentView === 'modalOnly' ? 'default' : 'outline'}
                 size="sm"
@@ -3045,7 +3045,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 onClick={() => setComponentView('modalPlusSbir')}
                 className="text-xs"
               >
-                Modal + SBIR
+                Total (REW)
               </Button>
             </div>
 

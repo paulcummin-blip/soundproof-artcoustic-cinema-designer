@@ -747,27 +747,36 @@ export function computeRoomModesResponse({
       }
     }
     
-    // Combine modal + SBIR based on component view (Part 3)
+    // REW-style authoritative terms (computed ONCE per frequency):
+    // - modalTerm: eigenmode summation (Allen-Berkley style)
+    // - sbirTerm: direct + reflections (image source method, includes direct path at order 0)
+    // - totalTerm: modal + sbir (coherent complex sum)
+
+    const modalTerm_re = sumRe_modal;
+    const modalTerm_im = sumIm_modal;
+
+    const sbirTerm_re = sumRe_sbir; // Includes direct path (order 0)
+    const sbirTerm_im = sumIm_sbir;
+
+    const totalTerm_re = modalTerm_re + sbirTerm_re;
+    const totalTerm_im = modalTerm_im + sbirTerm_im;
+
+    // componentView is a DEBUG LENS ONLY (term selection, no calibration changes)
     let sumRe_total = 0;
     let sumIm_total = 0;
-    
+
     if (componentView === 'modalOnly') {
-      // Modal only: use modal sum, ignore SBIR
-      sumRe_total = sumRe_modal;
-      sumIm_total = sumIm_modal;
+      // Debug view: modal term only
+      sumRe_total = modalTerm_re;
+      sumIm_total = modalTerm_im;
     } else if (componentView === 'sbirOnly') {
-      // SBIR only: use SBIR sum, ignore modal
-      sumRe_total = sumRe_sbir;
-      sumIm_total = sumIm_sbir;
+      // Debug view: SBIR term only (includes direct + reflections, REW-like)
+      sumRe_total = sbirTerm_re;
+      sumIm_total = sbirTerm_im;
     } else {
-      // Modal + SBIR (default): combine both
-      sumRe_total = sumRe_modal;
-      sumIm_total = sumIm_modal;
-      
-      if (sbirEnabled) {
-        sumRe_total += sumRe_sbir;
-        sumIm_total += sumIm_sbir;
-      }
+      // Default REW view: total coherent sum (modal + sbir)
+      sumRe_total = totalTerm_re;
+      sumIm_total = totalTerm_im;
     }
 
     // COHERENT PRESSURE RAW: Pure complex magnitude (no processing)
@@ -775,23 +784,27 @@ export function computeRoomModesResponse({
     const coherentMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
     const coherentPressureRaw = 20 * Math.log10(Math.max(Number.EPSILON, coherentMag));
     
-    // Store component magnitudes for RMS calculation (DO THIS 5)
-    const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
-    const sbirMag = Math.sqrt(sumRe_sbir * sumRe_sbir + sumIm_sbir * sumIm_sbir);
+    // Store component magnitudes for RMS calculation and debug visibility
+    const modalMag = Math.sqrt(modalTerm_re * modalTerm_re + modalTerm_im * modalTerm_im);
+    const sbirMag = Math.sqrt(sbirTerm_re * sbirTerm_re + sbirTerm_im * sbirTerm_im);
+    const totalMag = Math.sqrt(totalTerm_re * totalTerm_re + totalTerm_im * totalTerm_im);
+
     const modalMagDb = 20 * Math.log10(Math.max(Number.EPSILON, modalMag));
     const sbirMagDb = 20 * Math.log10(Math.max(Number.EPSILON, sbirMag));
+    const totalMagDb = 20 * Math.log10(Math.max(Number.EPSILON, totalMag));
+
     modalMagDb_all.push(modalMagDb);
     sbirMagDb_all.push(sbirMagDb);
-    totalMagDb_all.push(coherentPressureRaw);
+    totalMagDb_all.push(totalMagDb);
 
-    // [ENGINE OUTPUT PROBE] - Audit log (gated to 40 Hz probe)
-    if (Math.abs(f - 40) < 0.6) {
-      console.log('[ENGINE OUTPUT PROBE]', {
+    // [ENGINE OUTPUT PROBE] - Audit log (gated to 40 Hz probe, only when global debug enabled)
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 40) < 0.6) {
+      console.log('[ENGINE OUTPUT PROBE @40Hz]', {
         componentView,
-        f: f.toFixed(1),
-        coherentPressureRaw: coherentPressureRaw.toFixed(2),
         modalMagDb: modalMagDb.toFixed(2),
-        sbirMagDb: sbirMagDb.toFixed(2)
+        sbirMagDb: sbirMagDb.toFixed(2),
+        totalMagDb: totalMagDb.toFixed(2),
+        outputMagDb: coherentPressureRaw.toFixed(2)
       });
     }
 
@@ -1445,10 +1458,11 @@ export function computeRoomModesResponse({
       } : null,
       warnings: warnings.length > 0 ? warnings : null,
       lfMovementProbe: Object.keys(lfMovementProbe).length > 0 ? lfMovementProbe : null,
-      componentView: componentView, // Part 3 - track which component is being plotted
-      modalRmsDb_20_200: modalRmsDb_20_200.toFixed(1), // DO THIS 5 - modal RMS
-      sbirRmsDb_20_200: sbirRmsDb_20_200.toFixed(1), // DO THIS 5 - SBIR RMS
-      totalRmsDb_20_200: totalRmsDb_20_200.toFixed(1), // DO THIS 5 - total RMS
+      componentView: componentView, // Debug lens: which term is being plotted
+      componentViewNote: "Modal/SBIR/Total are debug views of the same simulation - calibration never changes",
+      modalRmsDb_20_200: modalRmsDb_20_200.toFixed(1), // Modal term RMS (20-200 Hz)
+      sbirRmsDb_20_200: sbirRmsDb_20_200.toFixed(1), // SBIR term RMS (includes direct)
+      totalRmsDb_20_200: totalRmsDb_20_200.toFixed(1), // Total term RMS (modal + sbir)
       sealedRoom: sealedRoom,
       subDistancesToMLP: mlpPosition ? sourcePositions.map(s => {
         const dx = s.x - mlpPosition.x;
