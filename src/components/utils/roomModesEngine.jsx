@@ -491,8 +491,8 @@ export function computeRoomModesResponse({
         let coupling, couplingComplex;
         if (complexEigenfunctions) {
           couplingComplex = computeSpatialCouplingComplex(mode, source, seat, room);
-          // For magnitude check only
-          coupling = Math.sqrt(couplingComplex.re * couplingComplex.re + couplingComplex.im * couplingComplex.im);
+          // Use amplitude for magnitude check (preserves position dependence)
+          coupling = Math.abs(couplingComplex.amp);
           if (Math.abs(coupling) < 1e-6) continue;
         } else {
           coupling = computeSpatialCoupling(mode, source, seat, room);
@@ -580,6 +580,8 @@ export function computeRoomModesResponse({
             const couplingPhase = Math.atan2(couplingComplex.im, couplingComplex.re) * (180 / Math.PI);
             couplingInfo = {
               real: coupling,
+              amp: couplingComplex.amp,
+              phaseDeg: couplingComplex.phaseDeg,
               complexMag: couplingMag,
               complexPhase: couplingPhase,
               complexRe: couplingComplex.re,
@@ -1719,8 +1721,12 @@ function computeSpatialCoupling(mode, source, receiver, roomDims) {
 }
 
 /**
- * Compute spatial coupling using complex eigenfunctions (Part H3 - REW parity)
- * Returns { re, im } for complex coupling
+ * Compute spatial coupling with phase-only complex behaviour (Part H3 - Phase debug)
+ * Returns { re, im, amp, phaseDeg } for complex coupling
+ * 
+ * CRITICAL: Amplitude uses COSINE terms (position-dependent, correct physics)
+ * Phase uses eigenfunction phase difference (smooth variation for debugging)
+ * This is NOT REW parity - it's a debug mode to observe phase without breaking amplitude
  */
 function computeSpatialCouplingComplex(mode, source, receiver, roomDims) {
   const { widthM, lengthM, heightM } = roomDims;
@@ -1731,46 +1737,35 @@ function computeSpatialCouplingComplex(mode, source, receiver, roomDims) {
   const L = Math.max(1e-6, lengthM);
   const H = Math.max(1e-6, heightM);
   
-  // Complex eigenfunction helper: cos(n*pi*x/L) + j*sin(n*pi*x/L)
-  const complexEigen = (n, x, dim) => {
-    if (n === 0) return { re: 1, im: 0 };
-    const arg = n * Math.PI * x / dim;
-    return { re: Math.cos(arg), im: Math.sin(arg) };
+  // AMPLITUDE: Use cosine terms (exactly like real coupling)
+  const srcCosX = nx > 0 ? Math.cos(nx * Math.PI * source.x / W) : 1;
+  const srcCosY = ny > 0 ? Math.cos(ny * Math.PI * source.y / L) : 1;
+  const srcCosZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / H) : 1;
+  
+  const rcvCosX = nx > 0 ? Math.cos(nx * Math.PI * receiver.x / W) : 1;
+  const rcvCosY = ny > 0 ? Math.cos(ny * Math.PI * receiver.y / L) : 1;
+  const rcvCosZ = nz > 0 ? Math.cos(nz * Math.PI * (receiver.z ?? 1.2) / H) : 1;
+  
+  // Total amplitude (position-dependent, preserves null migration)
+  const amp = (srcCosX * srcCosY * srcCosZ) * (rcvCosX * rcvCosY * rcvCosZ);
+  
+  // PHASE: Eigenfunction phase difference (for smooth phase variation debug)
+  const srcPhase = (nx * Math.PI * source.x / W) + (ny * Math.PI * source.y / L) + (nz * Math.PI * (source.z ?? 0.0) / H);
+  const rcvPhase = (nx * Math.PI * receiver.x / W) + (ny * Math.PI * receiver.y / L) + (nz * Math.PI * (receiver.z ?? 1.2) / H);
+  const phi = srcPhase - rcvPhase;
+  
+  // Complex coupling: amp * exp(j*phi) = amp * (cos(phi) + j*sin(phi))
+  const couplingRe = amp * Math.cos(phi);
+  const couplingIm = amp * Math.sin(phi);
+  
+  const phaseDeg = (phi * 180 / Math.PI) % 360;
+  
+  return { 
+    re: couplingRe, 
+    im: couplingIm,
+    amp: amp,
+    phaseDeg: phaseDeg
   };
-  
-  // Source complex eigenfunctions
-  const srcX = complexEigen(nx, source.x, W);
-  const srcY = complexEigen(ny, source.y, L);
-  const srcZ = complexEigen(nz, source.z ?? 0.0, H);
-  
-  // Multiply srcX * srcY * srcZ (complex)
-  let srcRe = srcX.re * srcY.re - srcX.im * srcY.im;
-  let srcIm = srcX.re * srcY.im + srcX.im * srcY.re;
-  
-  const tmpRe = srcRe * srcZ.re - srcIm * srcZ.im;
-  const tmpIm = srcRe * srcZ.im + srcIm * srcZ.re;
-  srcRe = tmpRe;
-  srcIm = tmpIm;
-  
-  // Receiver complex eigenfunctions
-  const rcvX = complexEigen(nx, receiver.x, W);
-  const rcvY = complexEigen(ny, receiver.y, L);
-  const rcvZ = complexEigen(nz, receiver.z ?? 1.2, H);
-  
-  // Multiply rcvX * rcvY * rcvZ (complex)
-  let rcvRe = rcvX.re * rcvY.re - rcvX.im * rcvY.im;
-  let rcvIm = rcvX.re * rcvY.im + rcvX.im * rcvY.re;
-  
-  const tmpRe2 = rcvRe * rcvZ.re - rcvIm * rcvZ.im;
-  const tmpIm2 = rcvRe * rcvZ.im + rcvIm * rcvZ.re;
-  rcvRe = tmpRe2;
-  rcvIm = tmpIm2;
-  
-  // Multiply srcEigen * rcvEigen (complex)
-  const couplingRe = srcRe * rcvRe - srcIm * rcvIm;
-  const couplingIm = srcRe * rcvIm + srcIm * rcvRe;
-  
-  return { re: couplingRe, im: couplingIm };
 }
 
 /**

@@ -2253,6 +2253,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                             <div>src: X={srcEigenX.toFixed(4)} Y={srcEigenY.toFixed(4)} Z={srcEigenZ.toFixed(4)}</div>
                             <div>rcv: X={rcvEigenX.toFixed(4)} Y={rcvEigenY.toFixed(4)} Z={rcvEigenZ.toFixed(4)}</div>
                             <div>coupling (real) = {computedCoupling.toFixed(4)} (engine: {mode.coupling?.toFixed(4) || 'N/A'})</div>
+                            {mode.couplingInfo?.amp !== undefined && (
+                              <div className="text-green-600 font-semibold">
+                                amplitude (cosine): {mode.couplingInfo.amp.toFixed(4)}
+                              </div>
+                            )}
+                            {mode.couplingInfo?.phaseDeg !== undefined && (
+                              <div className="text-purple-600 font-semibold">
+                                phase: {mode.couplingInfo.phaseDeg.toFixed(1)}°
+                              </div>
+                            )}
                             {mode.couplingInfo?.complexMag !== undefined && (
                               <div className="text-blue-600 font-semibold">
                                 coupling (complex): mag={mode.couplingInfo.complexMag.toFixed(4)} @ {mode.couplingInfo.complexPhase.toFixed(1)}°
@@ -2337,46 +2347,38 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           // Compute at probe frequencies
           const probeResults = probeFreqs.map(f => {
             if (couplingProbeUseComplex) {
-              // Complex eigenfunctions
-              const srcX = computeEigen(nx, source.x, W, true);
-              const srcY = computeEigen(ny, source.y, L, true);
-              const srcZ = computeEigen(nz, source.z ?? 0.0, H, true);
+              // AMPLITUDE: Cosine terms (position-dependent)
+              const srcCosX = nx > 0 ? Math.cos(nx * Math.PI * source.x / W) : 1;
+              const srcCosY = ny > 0 ? Math.cos(ny * Math.PI * source.y / L) : 1;
+              const srcCosZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / H) : 1;
+              const srcAmp = srcCosX * srcCosY * srcCosZ;
               
-              const rcvX = computeEigen(nx, seatPos.x, W, true);
-              const rcvY = computeEigen(ny, seatPos.y, L, true);
-              const rcvZ = computeEigen(nz, seatPos.z, H, true);
+              const rcvCosX = nx > 0 ? Math.cos(nx * Math.PI * seatPos.x / W) : 1;
+              const rcvCosY = ny > 0 ? Math.cos(ny * Math.PI * seatPos.y / L) : 1;
+              const rcvCosZ = nz > 0 ? Math.cos(nz * Math.PI * seatPos.z / H) : 1;
+              const rcvAmp = rcvCosX * rcvCosY * rcvCosZ;
               
-              // Multiply srcX * srcY * srcZ
-              let srcRe = srcX.re * srcY.re - srcX.im * srcY.im;
-              let srcIm = srcX.re * srcY.im + srcX.im * srcY.re;
-              const tmpRe = srcRe * srcZ.re - srcIm * srcZ.im;
-              const tmpIm = srcRe * srcZ.im + srcIm * srcZ.re;
-              srcRe = tmpRe;
-              srcIm = tmpIm;
-              const srcMag = Math.sqrt(srcRe * srcRe + srcIm * srcIm);
-              const srcPhase = Math.atan2(srcIm, srcRe) * (180 / Math.PI);
+              const amp = srcAmp * rcvAmp;
               
-              // Multiply rcvX * rcvY * rcvZ
-              let rcvRe = rcvX.re * rcvY.re - rcvX.im * rcvY.im;
-              let rcvIm = rcvX.re * rcvY.im + rcvX.im * rcvY.re;
-              const tmpRe2 = rcvRe * rcvZ.re - rcvIm * rcvZ.im;
-              const tmpIm2 = rcvRe * rcvZ.im + rcvIm * rcvZ.re;
-              rcvRe = tmpRe2;
-              rcvIm = tmpIm2;
-              const rcvMag = Math.sqrt(rcvRe * rcvRe + rcvIm * rcvIm);
-              const rcvPhase = Math.atan2(rcvIm, rcvRe) * (180 / Math.PI);
+              // PHASE: Eigenfunction phase difference
+              const srcPhase = (nx * Math.PI * source.x / W) + (ny * Math.PI * source.y / L) + (nz * Math.PI * (source.z ?? 0.0) / H);
+              const rcvPhase = (nx * Math.PI * seatPos.x / W) + (ny * Math.PI * seatPos.y / L) + (nz * Math.PI * seatPos.z / H);
+              const phi = srcPhase - rcvPhase;
+              const phiDeg = (phi * 180 / Math.PI) % 360;
               
-              // Multiply src * rcv (coupling)
-              const couplingRe = srcRe * rcvRe - srcIm * rcvIm;
-              const couplingIm = srcRe * rcvIm + srcIm * rcvRe;
-              const couplingMag = Math.sqrt(couplingRe * couplingRe + couplingIm * couplingIm);
-              const couplingPhase = Math.atan2(couplingIm, couplingRe) * (180 / Math.PI);
+              // Coupling: amp * exp(j*phi)
+              const couplingRe = amp * Math.cos(phi);
+              const couplingIm = amp * Math.sin(phi);
+              const couplingMag = Math.abs(amp); // Magnitude is just amplitude
+              const couplingPhase = phiDeg;
               
               return {
                 freq: f,
-                src: { re: srcRe, im: srcIm, mag: srcMag, phase: srcPhase },
-                rcv: { re: rcvRe, im: rcvIm, mag: rcvMag, phase: rcvPhase },
-                coupling: { re: couplingRe, im: couplingIm, mag: couplingMag, phase: couplingPhase }
+                amp: amp,
+                phi: phiDeg,
+                src: { amp: srcAmp, cosX: srcCosX, cosY: srcCosY, cosZ: srcCosZ },
+                rcv: { amp: rcvAmp, cosX: rcvCosX, cosY: rcvCosY, cosZ: rcvCosZ },
+                coupling: { re: couplingRe, im: couplingIm, mag: couplingMag, phase: couplingPhase, amp: amp, phi: phiDeg }
               };
             } else {
               // Real eigenfunctions
@@ -2394,9 +2396,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               
               return {
                 freq: f,
+                amp: Math.abs(couplingReal),
+                phi: couplingReal >= 0 ? 0 : 180,
                 src: { re: srcReal, im: 0, mag: Math.abs(srcReal), phase: srcReal >= 0 ? 0 : 180 },
                 rcv: { re: rcvReal, im: 0, mag: Math.abs(rcvReal), phase: rcvReal >= 0 ? 0 : 180 },
-                coupling: { re: couplingReal, im: 0, mag: Math.abs(couplingReal), phase: couplingReal >= 0 ? 0 : 180 }
+                coupling: { re: couplingReal, im: 0, mag: Math.abs(couplingReal), phase: couplingReal >= 0 ? 0 : 180, amp: Math.abs(couplingReal), phi: couplingReal >= 0 ? 0 : 180 }
               };
             }
           });
@@ -2419,8 +2423,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <div key={i} className="border-t border-cyan-200 pt-1 first:border-t-0 first:pt-0">
                       <div className="font-semibold">{result.freq.toFixed(1)} Hz:</div>
                       <div className="pl-2 space-y-0.5">
-                        <div>srcEigen: (Re={result.src.re.toFixed(4)}, Im={result.src.im.toFixed(4)}) | {result.src.phase.toFixed(1)}°</div>
-                        <div>rcvEigen: (Re={result.rcv.re.toFixed(4)}, Im={result.rcv.im.toFixed(4)}) | {result.rcv.phase.toFixed(1)}°</div>
+                        {couplingProbeUseComplex ? (
+                          <>
+                            <div className="text-green-600">amp (cosine): {result.amp.toFixed(4)}</div>
+                            <div className="text-purple-600">phi: {result.phi.toFixed(1)}°</div>
+                            <div>src cosines: X={result.src.cosX.toFixed(4)} Y={result.src.cosY.toFixed(4)} Z={result.src.cosZ.toFixed(4)} → amp={result.src.amp.toFixed(4)}</div>
+                            <div>rcv cosines: X={result.rcv.cosX.toFixed(4)} Y={result.rcv.cosY.toFixed(4)} Z={result.rcv.cosZ.toFixed(4)} → amp={result.rcv.amp.toFixed(4)}</div>
+                          </>
+                        ) : (
+                          <>
+                            <div>srcEigen: {result.src.re.toFixed(4)} | {result.src.phase.toFixed(1)}°</div>
+                            <div>rcvEigen: {result.rcv.re.toFixed(4)} | {result.rcv.phase.toFixed(1)}°</div>
+                          </>
+                        )}
                         <div className="font-semibold text-cyan-800">
                           coupling: (Re={result.coupling.re.toFixed(4)}, Im={result.coupling.im.toFixed(4)}) | mag={result.coupling.mag.toFixed(4)} @ {result.coupling.phase.toFixed(1)}°
                         </div>
@@ -2429,7 +2444,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   ))}
                 </div>
                 <div className="mt-1 pt-1 border-t border-cyan-300 text-[9px]">
-                  <strong>Test:</strong> Drag sub 0.5m → Complex OFF: phase stays 0/180 | Complex ON: phase changes smoothly
+                  <strong>Test:</strong> Drag sub 0.5m → Complex OFF: phase stays 0/180 | Complex ON: amp changes (position-dependent), phi changes smoothly
                 </div>
               </div>
             </div>
