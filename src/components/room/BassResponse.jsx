@@ -903,7 +903,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   useEffect(() => {
     if (rewCompareView) {
       setRewRelativeView(false); // Absolute SPL for REW Compare
-      setRewSmoothing('1/3');
+      setRewSmoothing('1/3'); // Force RP22 smoothing for compare view
       setYAxisLocked(true);
       
       // Capture baseline snapshot on first enable (if valid data exists)
@@ -1825,7 +1825,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     }
 
                     // Force REW settings
-                    setRewSmoothing('1/3');
+                    setRewSmoothing('1/48'); // Test preset uses high-resolution view
                     setRewRelativeView(false); // Absolute SPL
                     setShowRewModeLines(true);
                     setLinearHzAxis(false); // Log Hz axis

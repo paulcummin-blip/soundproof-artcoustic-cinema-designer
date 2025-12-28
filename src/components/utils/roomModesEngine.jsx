@@ -304,8 +304,12 @@ export function computeRoomModesResponse({
   
   // SBIR (image source) settings - default ON in REW mode
   const sbirEnabled = includeSBIR && rewParityMode && !modalOnlyDebugView;
-  const sbirBlendStartHzActual = sbirBlendStartHz !== null ? sbirBlendStartHz : (schroederHz * 0.7);
-  const sbirBlendEndHzActual = sbirBlendEndHz !== null ? sbirBlendEndHz : (schroederHz * 1.2);
+  
+  // REW parity: SBIR transition region (image source → modal crossover)
+  // LF (15-50 Hz): SBIR at full strength (deep nulls, interference)
+  // HF (>Schroeder): Modal eigenmode dominates (statistical behaviour)
+  const sbirBlendStartHzActual = sbirBlendStartHz !== null ? sbirBlendStartHz : (schroederHz * 0.8);
+  const sbirBlendEndHzActual = sbirBlendEndHz !== null ? sbirBlendEndHz : (schroederHz * 1.3);
   
   // Track what processing was applied
   const calibrationApplied = rewParityMode;
@@ -656,6 +660,22 @@ export function computeRoomModesResponse({
     let sbirPathsUsed = 0;
     let sbirStrongestReflection = null;
     
+    // Compute SBIR frequency blend weight (REW-style transition)
+    let sbirWeight = 1.0; // Default: full strength
+    if (sbirEnabled && sbirBlendEnabled) {
+      if (f <= sbirBlendStartHzActual) {
+        // Below blend start: SBIR fully active (LF interference)
+        sbirWeight = 1.0;
+      } else if (f >= sbirBlendEndHzActual) {
+        // Above blend end: SBIR fades out (modal dominates)
+        sbirWeight = 0.0;
+      } else {
+        // Smooth transition (cosine taper)
+        const t = (f - sbirBlendStartHzActual) / (sbirBlendEndHzActual - sbirBlendStartHzActual);
+        sbirWeight = 0.5 * (1 + Math.cos(Math.PI * t)); // 1.0 → 0.0
+      }
+    }
+    
     if (sbirEnabled) {
       for (let subIdx = 0; subIdx < sourcesUsed.length; subIdx++) {
         const source = sourcesUsed[subIdx];
@@ -705,6 +725,10 @@ export function computeRoomModesResponse({
           sbirStrongestReflection = sbirResult.strongestReflection;
         }
       }
+      
+      // Apply frequency-dependent SBIR blend weight (REW-style transition)
+      sumRe_sbir *= sbirWeight;
+      sumIm_sbir *= sbirWeight;
     }
 
     // DEBUG: capture pre-smoothing magnitudes for probe bins only
@@ -805,20 +829,24 @@ export function computeRoomModesResponse({
         sbirMagDb: sbirMagDb.toFixed(2),
         totalMagDb: totalMagDb.toFixed(2),
         outputMagDb: coherentPressureRaw.toFixed(2),
-        sbirWeight: sbirEnabled ? '1.0 (full strength)' : '0.0 (disabled)',
+        sbirWeightApplied: sbirWeight.toFixed(3),
+        sbirBlendActive: sbirBlendEnabled,
         directPathUsed: sbirEnabled
       });
     }
     
-    // [LF SBIR PROBE @20Hz] - Verify SBIR is active at low frequencies
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 20) < 0.6) {
-      console.log('[LF SBIR PROBE @20Hz]', {
+    // [LF SBIR PROBE @20Hz, 25Hz, 30Hz] - Verify SBIR is active at low frequencies
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && 
+        (Math.abs(f - 20) < 0.6 || Math.abs(f - 25) < 0.6 || Math.abs(f - 30) < 0.6)) {
+      console.log(`[LF SBIR PROBE @${f.toFixed(0)}Hz]`, {
         sbirEnabled,
-        sbirMagDb: sbirMagDb.toFixed(2),
+        sbirWeight: sbirWeight.toFixed(3),
         modalMagDb: modalMagDb.toFixed(2),
+        sbirMagDb: sbirMagDb.toFixed(2),
         totalMagDb: totalMagDb.toFixed(2),
-        sbirWeight: sbirEnabled ? '1.0 (no LF taper)' : '0.0',
-        sbirContribution: sbirEnabled ? 'FULL STRENGTH' : 'OFF'
+        sumRe_total: sumRe_total.toFixed(6),
+        sumIm_total: sumIm_total.toFixed(6),
+        sbirContribution: sbirEnabled && sbirWeight > 0.5 ? 'ACTIVE' : (sbirEnabled ? 'PARTIAL' : 'OFF')
       });
     }
 
@@ -836,13 +864,30 @@ export function computeRoomModesResponse({
       modalDb -= compDb * 0.85; // 0.85 = gentle application factor
     }
     
-    // Apply sealed room LF boost below lowest axial (if enabled AND not raw mode)
-    // PART C1: This is DISABLED in RAW mode (rawEngineOutput flag blocks it)
+    // SEALED ROOM PRESSURE GAIN - Apply to TOTAL complex pressure (not just modal)
+    // REW parity: sealed room boosts LF below lowest axial across ALL acoustic paths
+    // This must be applied BEFORE converting to dB (as magnitude multiplier on complex pressure)
+    let sealedRoomGainLinear = 1.0;
     if (!rawEngineOutput && sealedBoostEnabled && lowestAxial && f < lowestAxial) {
       const octavesBelow = Math.log2(lowestAxial / f);
       const pressureGainDb = Math.min(sealedBoostMaxGainDb, sealedBoostKDbPerOct * octavesBelow);
-      modalDb += pressureGainDb;
+      sealedRoomGainLinear = Math.pow(10, pressureGainDb / 20);
     }
+    
+    // Apply sealed room gain to TOTAL complex pressure (modal + sbir)
+    // CRITICAL: This is a MAGNITUDE multiplier, not a dB offset
+    const totalWithSealedGain_re = sumRe_total * sealedRoomGainLinear;
+    const totalWithSealedGain_im = sumIm_total * sealedRoomGainLinear;
+    
+    // Recompute coherent magnitude with sealed room gain applied
+    const coherentMagWithGain = Math.sqrt(
+      totalWithSealedGain_re * totalWithSealedGain_re + 
+      totalWithSealedGain_im * totalWithSealedGain_im
+    );
+    const coherentPressureWithGain = 20 * Math.log10(Math.max(Number.EPSILON, coherentMagWithGain));
+    
+    // Use sealed-room-corrected pressure as base (replaces old modalDb)
+    modalDb = coherentPressureWithGain;
 
     // Apply leaky room LF roll-off (if room is not sealed)
     // Reduce LF below ~35 Hz with gentle shelving (REW-like behaviour)
