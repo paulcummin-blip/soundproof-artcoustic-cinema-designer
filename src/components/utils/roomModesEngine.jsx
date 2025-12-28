@@ -804,7 +804,21 @@ export function computeRoomModesResponse({
         modalMagDb: modalMagDb.toFixed(2),
         sbirMagDb: sbirMagDb.toFixed(2),
         totalMagDb: totalMagDb.toFixed(2),
-        outputMagDb: coherentPressureRaw.toFixed(2)
+        outputMagDb: coherentPressureRaw.toFixed(2),
+        sbirWeight: sbirEnabled ? '1.0 (full strength)' : '0.0 (disabled)',
+        directPathUsed: sbirEnabled
+      });
+    }
+    
+    // [LF SBIR PROBE @20Hz] - Verify SBIR is active at low frequencies
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 20) < 0.6) {
+      console.log('[LF SBIR PROBE @20Hz]', {
+        sbirEnabled,
+        sbirMagDb: sbirMagDb.toFixed(2),
+        modalMagDb: modalMagDb.toFixed(2),
+        totalMagDb: totalMagDb.toFixed(2),
+        sbirWeight: sbirEnabled ? '1.0 (no LF taper)' : '0.0',
+        sbirContribution: sbirEnabled ? 'FULL STRENGTH' : 'OFF'
       });
     }
 
