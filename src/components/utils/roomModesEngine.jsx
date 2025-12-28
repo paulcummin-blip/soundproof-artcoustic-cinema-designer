@@ -54,6 +54,7 @@ export function computeRoomModesResponse({
   modalOnlyDebugView = false,
   modeIsolation = null,
   complexEigenfunctions = false,
+  componentView = 'modalPlusSbir', // 'modalOnly' | 'sbirOnly' | 'modalPlusSbir'
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -737,14 +738,27 @@ export function computeRoomModesResponse({
       }
     }
     
-    // Combine modal + SBIR in complex domain (no frequency weighting - SBIR strongest in modal region)
-    let sumRe_total = sumRe_modal;
-    let sumIm_total = sumIm_modal;
+    // Combine modal + SBIR based on component view (Part 3)
+    let sumRe_total = 0;
+    let sumIm_total = 0;
     
-    if (sbirEnabled) {
-      // Direct complex sum - SBIR contributes throughout bass region
-      sumRe_total += sumRe_sbir;
-      sumIm_total += sumIm_sbir;
+    if (componentView === 'modalOnly') {
+      // Modal only: use modal sum, ignore SBIR
+      sumRe_total = sumRe_modal;
+      sumIm_total = sumIm_modal;
+    } else if (componentView === 'sbirOnly') {
+      // SBIR only: use SBIR sum, ignore modal
+      sumRe_total = sumRe_sbir;
+      sumIm_total = sumIm_sbir;
+    } else {
+      // Modal + SBIR (default): combine both
+      sumRe_total = sumRe_modal;
+      sumIm_total = sumIm_modal;
+      
+      if (sbirEnabled) {
+        sumRe_total += sumRe_sbir;
+        sumIm_total += sumIm_sbir;
+      }
     }
 
     // COHERENT PRESSURE RAW: Pure complex magnitude (no processing)
@@ -1377,7 +1391,8 @@ export function computeRoomModesResponse({
         coupling_100: __b44ModeCouplingSanity.coupling_100,
       } : null,
       warnings: warnings.length > 0 ? warnings : null,
-      lfMovementProbe: Object.keys(lfMovementProbe).length > 0 ? lfMovementProbe : null
+      lfMovementProbe: Object.keys(lfMovementProbe).length > 0 ? lfMovementProbe : null,
+      componentView: componentView // Part 3 - track which component is being plotted
     }
   };
 

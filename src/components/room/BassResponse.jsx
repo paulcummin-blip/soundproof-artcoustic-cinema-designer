@@ -87,6 +87,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Coupling phase probe (Part HB - verify complex eigenfunctions are active)
   const [couplingProbeMode, setCouplingProbeMode] = useState('auto'); // 'auto' or '1,0,0' etc
   const [couplingProbeUseComplex, setCouplingProbeUseComplex] = useState(false);
+  
+  // Component view mode (Part 3 - SBIR isolation)
+  const [componentView, setComponentView] = useState('modalPlusSbir'); // 'modalOnly' | 'sbirOnly' | 'modalPlusSbir'
 
   // Ensure smoothing is 1/3 octave when REW mode is enabled
   useEffect(() => {
@@ -715,7 +718,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         absoluteSplMode: !rewRelativeView,
         rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
         modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
-        complexEigenfunctions: complexEigenfunctions // Part H3 - complex eigenfunctions
+        complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
+        componentView: componentView // Part 3 - component isolation
       });
     } catch (e) {
       return {
@@ -2915,24 +2919,55 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* REW view selector (only when REW is ON) */}
         {rewStyleMode && (
-          <div className="flex items-center gap-3 mb-2">
-            <div className="text-xs text-[#3E4349]">View:</div>
-            <Button
-              variant={rewView === 'roomOnly' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setRewView('roomOnly')}
-              className="text-xs"
-            >
-              Room-only
-            </Button>
-            <Button
-              variant={rewView === 'roomPlusProduct' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setRewView('roomPlusProduct')}
-              className="text-xs"
-            >
-              Room + Product
-            </Button>
+          <div className="space-y-2 mb-2">
+            <div className="flex items-center gap-3">
+              <div className="text-xs text-[#3E4349]">Product:</div>
+              <Button
+                variant={rewView === 'roomOnly' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setRewView('roomOnly')}
+                className="text-xs"
+              >
+                Room-only
+              </Button>
+              <Button
+                variant={rewView === 'roomPlusProduct' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setRewView('roomPlusProduct')}
+                className="text-xs"
+              >
+                Room + Product
+              </Button>
+            </div>
+
+            {/* Component view selector (Part 3 - SBIR isolation) */}
+            <div className="flex items-center gap-3">
+              <div className="text-xs text-[#3E4349]">Component:</div>
+              <Button
+                variant={componentView === 'modalOnly' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setComponentView('modalOnly')}
+                className="text-xs"
+              >
+                Modal only
+              </Button>
+              <Button
+                variant={componentView === 'sbirOnly' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setComponentView('sbirOnly')}
+                className="text-xs"
+              >
+                SBIR only
+              </Button>
+              <Button
+                variant={componentView === 'modalPlusSbir' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setComponentView('modalPlusSbir')}
+                className="text-xs"
+              >
+                Modal + SBIR
+              </Button>
+            </div>
           </div>
         )}
 
