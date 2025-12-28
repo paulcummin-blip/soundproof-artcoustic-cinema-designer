@@ -1642,16 +1642,98 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
 
             {rewStyleMode && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Label htmlFor="rew-compare" className="text-xs text-[#3E4349] whitespace-nowrap">
-                  REW Compare View
-                </Label>
-                <Switch
-                  id="rew-compare"
-                  checked={rewCompareView}
-                  onCheckedChange={setRewCompareView}
-                />
-              </div>
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <Label htmlFor="rew-compare" className="text-xs text-[#3E4349] whitespace-nowrap">
+                    REW Compare View
+                  </Label>
+                  <Switch
+                    id="rew-compare"
+                    checked={rewCompareView}
+                    onCheckedChange={setRewCompareView}
+                  />
+                </div>
+
+                {/* REW Movement Test Preset (Part D) */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Set standardized test environment
+                    const { setRoomDims, setSeatingPositions, setFrontSubsCfg, setRearSubsCfg } = useAppState.getState ? useAppState.getState() : {};
+
+                    // Room: 5.0 × 5.0 × 3.0
+                    if (setRoomDims) {
+                      setRoomDims({ widthM: 5.0, lengthM: 5.0, heightM: 3.0 });
+                    }
+
+                    // MLP at (2.50, 2.62, 1.20)
+                    if (setSeatingPositions) {
+                      setSeatingPositions([{
+                        id: 'mlp-test',
+                        x: 2.50,
+                        y: 2.62,
+                        z: 1.20,
+                        isPrimary: true
+                      }]);
+                    }
+
+                    // One sub at front wall (2.5, 0.15, 0.0)
+                    if (setFrontSubsCfg) {
+                      setFrontSubsCfg({
+                        count: 1,
+                        model: 'SUB2-12',
+                        positions: [{ x: 2.5, y: 0.15 }],
+                        settingsById: {
+                          'front-sub-left': { gainDb: 0, delayMs: 0, polarity: 'normal' }
+                        }
+                      });
+                    }
+
+                    if (setRearSubsCfg) {
+                      setRearSubsCfg({ count: 0 });
+                    }
+
+                    // Force REW settings
+                    setRewSmoothing('1/3');
+                    setRewRelativeView(false); // Absolute SPL
+                    setShowRewModeLines(true);
+                    setLinearHzAxis(false); // Log Hz axis
+                    setYAxisLocked(true);
+                  }}
+                  className="text-xs h-7 px-3 whitespace-nowrap"
+                >
+                  REW Movement Test Preset
+                </Button>
+
+                {/* MLP Nudge (Part D) */}
+                {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentSeats = seatingPositions || [];
+                      const mlpSeat = currentSeats.find(s => s.isPrimary) || currentSeats[0];
+
+                      if (mlpSeat) {
+                        const { setSeatingPositions } = useAppState.getState ? useAppState.getState() : {};
+
+                        if (setSeatingPositions) {
+                          const newSeats = currentSeats.map(s => 
+                            s.isPrimary || s.id === mlpSeat.id
+                              ? { ...s, x: (s.x || 0) + 0.25 }
+                              : s
+                          );
+                          setSeatingPositions(newSeats);
+                        }
+                      }
+                    }}
+                    className="text-xs h-7 px-3 whitespace-nowrap"
+                  >
+                    Nudge MLP width +0.25m
+                  </Button>
+                )}
+              </>
             )}
 
             {rewStyleMode && (
