@@ -401,7 +401,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
 
     // Build signature for failure caching
-    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${rewSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}`;
+    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${rewSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}|cv:${componentView}`;
 
     // Check failure cache
     if (lastRewFailSigRef.current === sig) {
@@ -467,7 +467,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         absoluteSplMode: !rewRelativeView,
         rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
         modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
-        complexEigenfunctions: complexEigenfunctions // Part H3 - complex eigenfunctions
+        complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
+        componentView: componentView // Part 3 - component isolation
       });
     } catch (e) {
       return {
@@ -3045,7 +3046,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div>Modal RMS: <strong>{activeDebug?.modalRmsDb_20_200 || '—'} dB</strong></div>
               <div>SBIR RMS: <strong>{activeDebug?.sbirRmsDb_20_200 || '—'} dB</strong></div>
               <div>Total RMS: <strong>{activeDebug?.totalRmsDb_20_200 || '—'} dB</strong></div>
-              <div className="text-[9px] opacity-70 mt-1">componentView: {activeDebug?.componentView || '—'}</div>
+              <div className="text-[9px] opacity-70 mt-1">UI componentView: <strong>{componentView}</strong></div>
+              <div className="text-[9px] opacity-70">Engine componentView: <strong>{activeDebug?.componentView || '—'}</strong></div>
             </div>
           );
         })()}
