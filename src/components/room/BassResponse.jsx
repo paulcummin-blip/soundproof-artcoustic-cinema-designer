@@ -2882,6 +2882,27 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
+        {/* Mode isolation plot source debug (Part C) */}
+        {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
+          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+            ? rewRoomPlusProductData.debug
+            : rewModesData?.debug;
+
+          const isolationActive = modeIsolation !== 'off';
+          const modeCountUsed = activeDebug?.modalModeCountUsed || activeDebug?.modeCount || 0;
+
+          return (
+            <div className="text-xs mb-2 bg-purple-50 p-2 rounded border border-purple-400">
+              <div className="font-semibold text-purple-700">
+                Plot source: {isolationActive ? 'ISOLATED MODES' : 'ALL MODES'}
+              </div>
+              <div className="text-[10px] mt-1">
+                Modal mode count used by plot: {modeCountUsed}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Graph or placeholder */}
         {displayData.length > 0 ? (
           <BassGraph
