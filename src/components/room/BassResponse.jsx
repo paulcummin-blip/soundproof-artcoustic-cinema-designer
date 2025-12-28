@@ -3039,6 +3039,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div>Plot uses: <strong>{plotDataSource}</strong> (REW {rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'}, {componentLabel})</div>
               <div>Mode isolation active: <strong>{isolationActive ? 'YES' : 'NO'}</strong> {isolationActive && `(value: ${modeIsolation})`}</div>
               <div>Modal modes actually used this run: <strong>{modeCountUsed}</strong></div>
+              <div className="mt-1 pt-1 border-t border-purple-300 font-semibold">
+                Component RMS 20–200 Hz:
+              </div>
+              <div>Modal RMS: <strong>{activeDebug?.modalRmsDb_20_200 || '—'} dB</strong></div>
+              <div>SBIR RMS: <strong>{activeDebug?.sbirRmsDb_20_200 || '—'} dB</strong></div>
+              <div>Total RMS: <strong>{activeDebug?.totalRmsDb_20_200 || '—'} dB</strong></div>
+              <div className="text-[9px] opacity-70 mt-1">componentView: {activeDebug?.componentView || '—'}</div>
             </div>
           );
         })()}

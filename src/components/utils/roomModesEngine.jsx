@@ -445,6 +445,10 @@ export function computeRoomModesResponse({
     // No auto-level: all gains are 0 dB
     mlpAutoLevelGainsDb = sourcesLocal.map(() => 0);
   }
+  // Component magnitude tracking for RMS debug
+  const modalMagDb_all = [];
+  const sbirMagDb_all = [];
+  const totalMagDb_all = [];
   
   // Extract computation into runOnce for diagnostic double-run
   const runOnce = (sourcesOverride) => {
@@ -766,6 +770,13 @@ export function computeRoomModesResponse({
     const coherentMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
     const coherentPressureRaw = 20 * Math.log10(Math.max(Number.EPSILON, coherentMag));
     
+    // Store component magnitudes for RMS calculation (DO THIS 5)
+    const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
+    const sbirMag = Math.sqrt(sumRe_sbir * sumRe_sbir + sumIm_sbir * sumIm_sbir);
+    modalMagDb_all.push(20 * Math.log10(Math.max(Number.EPSILON, modalMag)));
+    sbirMagDb_all.push(20 * Math.log10(Math.max(Number.EPSILON, sbirMag)));
+    totalMagDb_all.push(coherentPressureRaw);
+    
     // Start with coherent pressure, then apply processing layers (ONLY if not raw mode)
     let modalDb = coherentPressureRaw;
     
@@ -799,6 +810,22 @@ export function computeRoomModesResponse({
 
   // Run engine with normal sources
   const splDb = runOnce(null);
+  
+  // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
+  const computeRmsDb = (dbArray, freqsArr) => {
+    const band = dbArray
+      .map((db, i) => freqsArr[i] >= 20 && freqsArr[i] <= 200 ? db : null)
+      .filter(v => v !== null && Number.isFinite(v));
+    
+    if (band.length === 0) return 0;
+    
+    const sumSq = band.reduce((acc, db) => acc + db * db, 0);
+    return Math.sqrt(sumSq / band.length);
+  };
+
+  const modalRmsDb_20_200 = computeRmsDb(modalMagDb_all, freqs);
+  const sbirRmsDb_20_200 = computeRmsDb(sbirMagDb_all, freqs);
+  const totalRmsDb_20_200 = computeRmsDb(totalMagDb_all, freqs);
   
   // SBIR debug probe (40 Hz for acceptance test)
   let sbirDebugProbe40Hz = null;
@@ -1392,7 +1419,10 @@ export function computeRoomModesResponse({
       } : null,
       warnings: warnings.length > 0 ? warnings : null,
       lfMovementProbe: Object.keys(lfMovementProbe).length > 0 ? lfMovementProbe : null,
-      componentView: componentView // Part 3 - track which component is being plotted
+      componentView: componentView, // Part 3 - track which component is being plotted
+      modalRmsDb_20_200: modalRmsDb_20_200.toFixed(1), // DO THIS 5 - modal RMS
+      sbirRmsDb_20_200: sbirRmsDb_20_200.toFixed(1), // DO THIS 5 - SBIR RMS
+      totalRmsDb_20_200: totalRmsDb_20_200.toFixed(1) // DO THIS 5 - total RMS
     }
   };
 
