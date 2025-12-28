@@ -503,7 +503,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       subSig,
       seatSig
     };
-  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions]);
+  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
@@ -777,7 +777,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       freqs: result.freqs,
       splDb: result.splDb
     };
-  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions]);
+  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
 
   // Force settings when REW Compare View is enabled (moved after rewModesData definition)
   useEffect(() => {
