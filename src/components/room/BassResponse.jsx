@@ -2979,8 +2979,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Mode isolation plot source debug (Part C) */}
-        {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
+        {/* Mode isolation plot source debug (Part C2 - prove isolation drives plot) */}
+        {rewStyleMode && (() => {
           const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
             ? rewRoomPlusProductData.debug
             : rewModesData?.debug;
@@ -2988,14 +2988,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           const isolationActive = modeIsolation !== 'off';
           const modeCountUsed = activeDebug?.modalModeCountUsed || activeDebug?.modeCount || 0;
 
+          // Determine exact data array being plotted
+          const plotDataSource = rewView === 'roomPlusProduct' 
+            ? 'rewRoomPlusProductData.data' 
+            : 'rewModesData.data';
+
           return (
-            <div className="text-xs mb-2 bg-purple-50 p-2 rounded border border-purple-400">
-              <div className="font-semibold text-purple-700">
-                Plot source: {isolationActive ? 'ISOLATED MODES' : 'ALL MODES'}
-              </div>
-              <div className="text-[10px] mt-1">
-                Modal mode count used by plot: {modeCountUsed}
-              </div>
+            <div className="text-[10px] font-mono mb-1 bg-purple-50 p-1 rounded border border-purple-300 space-y-0.5">
+              <div>Plot uses: <strong>{plotDataSource}</strong> (REW {rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'})</div>
+              <div>Mode isolation active: <strong>{isolationActive ? 'YES' : 'NO'}</strong> {isolationActive && `(value: ${modeIsolation})`}</div>
+              <div>Modal modes actually used this run: <strong>{modeCountUsed}</strong></div>
             </div>
           );
         })()}
