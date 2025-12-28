@@ -1192,14 +1192,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     });
 
     // IMPORTANT:
-    // Do NOT clamp to min/max (that draws a fake "shelf").
-    // Instead, break the line by using null when outside the 40 dB window.
+    // When Y-axis is locked: break line at out-of-window points (nulls preserve modal structure)
+    // When Y-axis is unlocked: soft-clamp to window (keep curve continuous when switching Component views)
     const clipped = displayData.map(p => {
       const v = p.spl;
       if (!Number.isFinite(v)) return { ...p, spl: null };
 
       if (v < finalYDomain.min || v > finalYDomain.max) {
-        return { ...p, spl: null };
+        if (yAxisLocked) {
+          // Locked: break line (preserve modal nulls)
+          return { ...p, spl: null };
+        } else {
+          // Unlocked: soft-clamp to window (keep curve visible when switching views)
+          return { ...p, spl: Math.min(finalYDomain.max, Math.max(finalYDomain.min, v)) };
+        }
       }
 
       return { ...p, spl: v };
