@@ -780,6 +780,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     };
   }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
 
+  // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
+  const activeDebug = useMemo(() => {
+    if (!rewStyleMode) return null;
+    
+    return rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+      ? rewRoomPlusProductData.debug
+      : rewModesData?.debug;
+  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData]);
+
   // Force settings when REW Compare View is enabled (moved after rewModesData definition)
   useEffect(() => {
     if (rewCompareView) {
@@ -1820,11 +1829,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           
           const allReady = testRoomOk && testSeatOk && testSubOk && rawModeOk;
           
-          // Capture probe frequencies for validation
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-          
           const probeFreqs = [34, 68]; // First two length axial modes in 5m room
           const probeValues = allReady ? probeFreqs.map(fProbe => {
             const idx = displayData.findIndex(d => Math.abs(d.frequency - fProbe) < 1);
@@ -1884,10 +1888,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* REW Compare View readout (only when REW Compare is ON) */}
         {rewCompareView && rewStyleMode && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-          
           // Safe refDb: use debug.normRefDb or fallback to display mode target
           const refDbDisplay = activeDebug?.normRefDb 
             ? (typeof activeDebug.normRefDb === 'string' ? activeDebug.normRefDb : activeDebug.normRefDb.toFixed(1))
@@ -1945,10 +1945,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* LF Probe Raw (only when debug enabled) */}
         {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-
           if (!activeDebug?.lfProbeRaw) return null;
 
           return (
@@ -2136,10 +2132,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* SBIR debug info */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-
           if (!activeDebug?.sbirEnabled) return null;
 
           const probe40 = activeDebug?.sbirDebugProbe40Hz;
@@ -2172,10 +2164,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* LF Movement Probe (spatial coupling verification) */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-
           const movementProbe = activeDebug?.lfMovementProbe;
           if (!movementProbe || Object.keys(movementProbe).length === 0) return null;
 
@@ -2200,10 +2188,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Per-mode contributions (phase debug) */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-
           const modeContribs = activeDebug?.modeContributions;
           if (!modeContribs || Object.keys(modeContribs).length === 0) return null;
 
@@ -2296,10 +2280,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Coupling Phase Probe (Part HB - verify complex eigenfunctions) */}
         {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-          
           const modeList = activeDebug?.modeListFirst60;
           if (!modeList || modeList.length === 0 || subsForSimulation.length === 0) return null;
           
@@ -2564,10 +2544,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Mode list (first 30) - REW parity check */}
         {rewStyleMode && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-
           const modeList = activeDebug?.modeListFirst60;
           if (!modeList || modeList.length === 0) return null;
 
@@ -2626,10 +2602,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Coupling trace diagnostic (Part E1) */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-          
           // Show coupling for key modes: (0,1,0), (0,2,0), (1,1,0)
           const targetModes = [
             { n: [0, 1, 0], label: 'axial L (0,1,0)' },
@@ -3017,10 +2989,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Mode isolation plot source debug (Part C2 - prove isolation drives plot) */}
         {rewStyleMode && (() => {
-          const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-            ? rewRoomPlusProductData.debug
-            : rewModesData?.debug;
-
           const isolationActive = modeIsolation !== 'off';
           const modeCountUsed = activeDebug?.modalModeCountUsed || activeDebug?.modeCount || 0;
 
