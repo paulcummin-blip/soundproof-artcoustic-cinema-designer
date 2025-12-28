@@ -595,7 +595,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
 
     // Build signature for failure caching
-    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${rewSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}|view=product`;
+    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${rewSmoothing}|rel=${rewRelativeView ? 1 : 0}|damp=${roomDamping}|view=product|cv:${componentView}`;
 
     // Check failure cache
     if (lastRewFailSigRef.current === sig) {
