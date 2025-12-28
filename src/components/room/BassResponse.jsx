@@ -899,15 +899,27 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       : rewModesData?.debug;
   }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, componentView]);
 
-  // Force settings when REW Compare View is enabled (moved after rewModesData definition)
+  // Force settings ONLY when REW Compare View is toggled ON (not on every engine update)
+  const rewComparePrevRef = React.useRef(false);
+  const lastUserSmoothingRef = React.useRef(rewSmoothing);
+
+  // Track last user smoothing whenever Compare View is OFF
   useEffect(() => {
-    if (rewCompareView) {
-      setRewRelativeView(false); // Absolute SPL for REW Compare
-      setRewSmoothing('1/3'); // Force RP22 smoothing for compare view
+    if (!rewCompareView) lastUserSmoothingRef.current = rewSmoothing;
+  }, [rewCompareView, rewSmoothing]);
+
+  useEffect(() => {
+    const was = rewComparePrevRef.current;
+    const now = rewCompareView;
+
+    // Only act on the transition
+    if (!was && now) {
+      setRewRelativeView(false);     // Absolute SPL for compare
+      setRewSmoothing('1/3');        // Compare is ALWAYS 1/3
       setYAxisLocked(true);
-      
-      // Capture baseline snapshot on first enable (if valid data exists)
-      if (!rewCompareBaselineRef.current && rewModesData?.splDb && rewModesData.debug?.splDbRepaired) {
+
+      // Capture baseline snapshot once (if valid data exists)
+      if (!rewCompareBaselineRef.current && rewModesData?.splDb && rewModesData?.debug?.splDbRepaired) {
         rewCompareBaselineRef.current = {
           splDbRepaired: [...rewModesData.debug.splDbRepaired],
           freqs: [...rewModesData.freqs],
@@ -916,11 +928,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           timestamp: Date.now()
         };
       }
-    } else {
-      // Clear baseline when Compare View is disabled
-      rewCompareBaselineRef.current = null;
     }
-  }, [rewCompareView, rewModesData]);
+
+    // When Compare View is turned OFF, restore whatever the user last chose (usually 1/48)
+    if (was && !now) {
+      rewCompareBaselineRef.current = null;
+      setRewSmoothing(lastUserSmoothingRef.current || '1/48');
+    }
+
+    rewComparePrevRef.current = now;
+  }, [rewCompareView]); // IMPORTANT: do NOT depend on rewModesData
 
   // Helper: apply REW-style smoothing
   function applyRewSmoothing(freqs, splDb, smoothing) {
@@ -1789,6 +1806,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   variant="outline"
                   size="sm"
                   onClick={() => {
+                    // Skip if Compare View is active (Compare forces its own smoothing)
+                    if (rewCompareView) return;
+                    
                     // Set standardized test environment
                     const { setRoomDims, setSeatingPositions, setFrontSubsCfg, setRearSubsCfg } = useAppState.getState ? useAppState.getState() : {};
 
