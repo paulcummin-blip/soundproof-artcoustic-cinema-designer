@@ -787,7 +787,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
       ? rewRoomPlusProductData.debug
       : rewModesData?.debug;
-  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData]);
+  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, componentView]);
 
   // Force settings when REW Compare View is enabled (moved after rewModesData definition)
   useEffect(() => {
