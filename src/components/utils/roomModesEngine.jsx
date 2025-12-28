@@ -1269,6 +1269,8 @@ export function computeRoomModesResponse({
       modeMarkers: modeMarkers.map(m => ({ ...m, n: [...m.n] })),
       modeListFirst60: [...modeListFirst60],
       modeCount: modes.length,
+      modalModeCountUsed: modes.length, // Tracks actual mode count used in plot (Part C)
+      modeIsolationActive: modeIsolation && modeIsolation !== 'off',
       axialCount,
       tangentialCount,
       obliqueCount,
