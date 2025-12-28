@@ -3158,8 +3158,58 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
 
-
-      </div>
+        {/* Graph area */}
+        <div className="mt-6">
+          {rewStyleMode && yAxisLocked && (
+            <div className="text-[10px] text-gray-500 mb-2 italic">
+              Gaps are expected when values fall outside the locked Y window (line breaks use null).
+            </div>
+          )}
+          
+          {/* Graph or placeholder */}
+          {displayData.length > 0 ? (() => {
+            // [BASSGRAPH INPUT] - Audit log
+            console.log('[BASSGRAPH INPUT]', {
+              rewStyleMode,
+              rewView,
+              componentView,
+              displayDataLength: displayData.length,
+              first5Spl: displayData.slice(0, 5).map(d => d.spl)
+            });
+            
+            return (
+              <BassGraph
+                responseData={rewStyleMode ? clampedData : displayData}
+                schroederFrequency={schroederFrequency}
+                rp22Levels={rp22Levels}
+                toggles={toggles}
+                crossoverFrequency={80}
+                modeFrequencies={modeFrequencies}
+                showModeMarkers={rewStyleMode ? showRewModeLines : showModeMarkers}
+                modeMarkers={modeMarkersForGraph}
+                linearHzAxis={rewStyleMode && linearHzAxis}
+                rewStyleMode={rewStyleMode}
+                yDomain={finalYDomain}
+                showAxialOnly={false}
+                refDb={rewCompareView && yAxisDomain?.refDb ? yAxisDomain.refDb : null}
+                showRefLine={rewCompareView}
+              />
+            );
+          })() : (
+            <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
+              No graph data yet.
+              {rewStyleMode ? (
+                <div className="text-xs mt-2">
+                  REW mode is ON — if this stays blank, the debug banner above should say why.
+                </div>
+              ) : (
+                <div className="text-xs mt-2">
+                  Add at least one sub and one seat, then check this panel again.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Bass Metrics (20-80 Hz) */}
