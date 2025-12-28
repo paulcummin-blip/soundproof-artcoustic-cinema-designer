@@ -66,6 +66,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const lastRewFailSigRef = useRef(null);
   const lastRewFailResultRef = useRef(null);
   
+  // REW bounce detector (track stable run key to prevent unnecessary reruns)
+  const lastRewRunKeyRef = useRef("");
+  
   // Throttled debug state (prevent jumping during drag)
   const lastStableDebugRef = useRef(null);
   const lastDebugUpdateTimeRef = useRef(0);
@@ -255,6 +258,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     };
   }, []);
 
+  // Stable signatures for REW engine dependencies (prevent unnecessary reruns)
+  const stableSeatSig = useMemo(() => {
+    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+    if (!seat) return "";
+    
+    const x = Number(seat.x).toFixed(2);
+    const y = Number(seat.y).toFixed(2);
+    const z = Number(seat.z ?? 1.2).toFixed(2);
+    
+    return `${x}_${y}_${z}`;
+  }, [seatingPositions]);
+
+  const stableSubSig = useMemo(() => {
+    if (!subsForSimulation || subsForSimulation.length === 0) return "";
+    
+    return subsForSimulation.map(s => {
+      const x = Number(s.x).toFixed(2);
+      const y = Number(s.y).toFixed(2);
+      const z = Number(s.z ?? 0).toFixed(2);
+      const gainDb = Number(s.tuning?.gainDb ?? 0).toFixed(1);
+      const delayMs = Number(s.tuning?.delayMs ?? 0).toFixed(1);
+      const polarity = s.tuning?.polarity || 'normal';
+      
+      return `${x}_${y}_${z}_g${gainDb}_d${delayMs}_p${polarity}`;
+    }).join('|');
+  }, [subsForSimulation]);
+
   // Audit curve (no smoothing, no normalization) for sensitivity testing
   const rewModesDataAudit = useMemo(() => {
     if (!rewStyleMode || !rewCompareView) return null;
@@ -394,14 +424,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       };
     }
     
-    // Build signatures for dependency tracking
-    const subSig = sourcePositions.map(s => 
-      `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${s.z.toFixed(2)}_g${(s.tuning?.gainDb||0).toFixed(1)}_d${(s.tuning?.delayMs||0).toFixed(1)}_p${s.tuning?.polarity||'normal'}`
-    ).join('|');
-    const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
+    // Use stable signatures from outer scope
+    const subSig = stableSubSig;
+    const seatSig = stableSeatSig;
 
     // Build signature for failure caching
     const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${rewSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}|cv:${componentView}`;
+    
+    // Build run key for bounce detection
+    const runKey = `${w.toFixed(2)}x${l.toFixed(2)}x${h.toFixed(2)}|${seatSig}|${subSig}|${rewSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}`;
+    
+    // Bounce detector: only log when deps actually change
+    if (runKey !== lastRewRunKeyRef.current) {
+      console.log('[REW RUN KEY CHANGED][ROOM-ONLY]', runKey);
+      lastRewRunKeyRef.current = runKey;
+    }
 
     // Check failure cache
     if (lastRewFailSigRef.current === sig) {
@@ -512,7 +549,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       subSig,
       seatSig
     };
-  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
+  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
@@ -596,14 +633,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return { data: [], debug: { error: "No valid sub positions" } };
     }
     
-    // Build signatures for dependency tracking
-    const subSig = sourcePositions.map(s => 
-      `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${s.z.toFixed(2)}_g${(s.tuning?.gainDb||0).toFixed(1)}_d${(s.tuning?.delayMs||0).toFixed(1)}_p${s.tuning?.polarity||'normal'}`
-    ).join('|');
-    const seatSig = `${seatPos.x.toFixed(2)}_${seatPos.y.toFixed(2)}_${seatPos.z.toFixed(2)}`;
+    // Use stable signatures from outer scope
+    const subSig = stableSubSig;
+    const seatSig = stableSeatSig;
 
     // Build signature for failure caching
     const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${rewSmoothing}|rel=${rewRelativeView ? 1 : 0}|damp=${roomDamping}|view=product|cv:${componentView}`;
+    
+    // Build run key for bounce detection
+    const runKey = `${w.toFixed(2)}x${l.toFixed(2)}x${h.toFixed(2)}|${seatSig}|${subSig}|${rewSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}|view:product`;
+    
+    // Bounce detector: only log when deps actually change
+    if (runKey !== lastRewRunKeyRef.current) {
+      console.log('[REW RUN KEY CHANGED][ROOM+PRODUCT]', runKey);
+      lastRewRunKeyRef.current = runKey;
+    }
 
     // Check failure cache
     if (lastRewFailSigRef.current === sig) {
@@ -786,7 +830,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       freqs: result.freqs,
       splDb: result.splDb
     };
-  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
+  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
 
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
   const activeDebug = useMemo(() => {
