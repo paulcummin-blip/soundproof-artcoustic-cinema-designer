@@ -44,7 +44,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [roomDamping, setRoomDamping] = useState(20);
   const [showModeMarkers, setShowModeMarkers] = useState(false);
   const [rewStyleMode, setRewStyleMode] = useState(false);
-  const [rewSmoothing, setRewSmoothing] = useState('1/3'); // 1/3 octave smoothing by default (REW + RP22 P19)
+  const [rewSmoothing, setRewSmoothing] = useState('1/48'); // Default: high resolution for simulation
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(false);
   const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
@@ -97,10 +97,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // REW-style time alignment (align all subs to MLP arrival time)
   const [rewTimeAlign, setRewTimeAlign] = useState(false);
 
-  // Ensure smoothing is 1/3 octave when REW mode is enabled
+  // Set default smoothing when REW mode is enabled
   useEffect(() => {
     if (rewStyleMode && (!rewSmoothing || rewSmoothing === 'none')) {
-      setRewSmoothing('1/3');
+      setRewSmoothing('1/48'); // Default to high-resolution simulation view
     }
   }, [rewStyleMode, rewSmoothing]);
 
@@ -3325,21 +3325,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
           <div className="text-sm font-medium text-[#1B1A1A] mb-3">Smoothing</div>
           <div className="space-y-2">
-            <div className="grid grid-cols-4 gap-2">
-              {['none', '1/12', '1/6', '1/3'].map(opt => (
-                <Button
-                  key={opt}
-                  variant={rewSmoothing === opt ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setRewSmoothing(opt)}
-                  className="text-xs"
-                >
-                  {opt === 'none' ? 'None' : opt + ' oct'}
-                </Button>
-              ))}
+            <div className="flex gap-2">
+              <Button
+                variant={rewSmoothing === '1/48' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setRewSmoothing('1/48')}
+                className="text-xs flex-1"
+              >
+                1/48 oct (Simulation)
+              </Button>
+              <Button
+                variant={rewSmoothing === '1/3' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setRewSmoothing('1/3')}
+                className="text-xs flex-1"
+              >
+                1/3 oct (RP22)
+              </Button>
             </div>
             <div className="text-xs text-[#3E4349]">
-              Use 1/3 octave for RP22 P19 reporting
+              Use 1/48 for diagnostic detail, 1/3 for RP22 reporting
             </div>
           </div>
         </div>

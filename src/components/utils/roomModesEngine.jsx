@@ -1908,6 +1908,7 @@ function getSpatialCouplingTerms(mode, source, receiver, roomDims) {
  */
 function applySmoothing(freqs, splDb, smoothing) {
   const octaveFraction = {
+    '1/48': 48,
     '1/12': 12,
     '1/6': 6,
     '1/3': 3
