@@ -3028,9 +3028,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             ? 'rewRoomPlusProductData.data' 
             : 'rewModesData.data';
 
+          const componentLabel = {
+            'modalOnly': 'Modal only',
+            'sbirOnly': 'SBIR only',
+            'modalPlusSbir': 'Modal + SBIR'
+          }[componentView] || componentView;
+
           return (
             <div className="text-[10px] font-mono mb-1 bg-purple-50 p-1 rounded border border-purple-300 space-y-0.5">
-              <div>Plot uses: <strong>{plotDataSource}</strong> (REW {rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'})</div>
+              <div>Plot uses: <strong>{plotDataSource}</strong> (REW {rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'}, {componentLabel})</div>
               <div>Mode isolation active: <strong>{isolationActive ? 'YES' : 'NO'}</strong> {isolationActive && `(value: ${modeIsolation})`}</div>
               <div>Modal modes actually used this run: <strong>{modeCountUsed}</strong></div>
             </div>
