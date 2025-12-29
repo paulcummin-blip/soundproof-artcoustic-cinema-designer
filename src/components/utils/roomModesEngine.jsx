@@ -578,29 +578,6 @@ export function computeRoomModesResponse({
           cIm = coupling * (weightRe * hIm + weightIm * hRe);
         }
 
-        // Debug probe at 63 Hz to verify coupling responds to position changes
-        if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 63) < 0.6) {
-          if (!globalThis.__B44_COUPLING_63) globalThis.__B44_COUPLING_63 = [];
-          if (globalThis.__B44_COUPLING_63.length < 8) {
-            const srcX = mode.nx > 0 ? Math.cos(mode.nx * Math.PI * source.x / Math.max(1e-6, room.widthM)) : 1;
-            const srcY = mode.ny > 0 ? Math.cos(mode.ny * Math.PI * source.y / Math.max(1e-6, room.lengthM)) : 1;
-            const srcZ = mode.nz > 0 ? Math.cos(mode.nz * Math.PI * (source.z ?? 0.0) / Math.max(1e-6, room.heightM)) : 1;
-            const srcShape = srcX * srcY * srcZ;
-            
-            const rcvX = mode.nx > 0 ? Math.cos(mode.nx * Math.PI * seat.x / Math.max(1e-6, room.widthM)) : 1;
-            const rcvY = mode.ny > 0 ? Math.cos(mode.ny * Math.PI * seat.y / Math.max(1e-6, room.lengthM)) : 1;
-            const rcvZ = mode.nz > 0 ? Math.cos(mode.nz * Math.PI * (seat.z ?? 1.2) / Math.max(1e-6, room.heightM)) : 1;
-            const seatShape = rcvX * rcvY * rcvZ;
-            
-            globalThis.__B44_COUPLING_63.push({
-              nx: mode.nx, ny: mode.ny, nz: mode.nz,
-              srcShape: Number(srcShape.toFixed(3)),
-              seatShape: Number(seatShape.toFixed(3)),
-              coupling: Number(coupling.toFixed(3)),
-            });
-          }
-        }
-
         sumRe_modal += cRe;
         sumIm_modal += cIm;
         activeTerms += 1;
