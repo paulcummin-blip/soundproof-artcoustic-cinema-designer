@@ -3099,11 +3099,17 @@ React.useEffect(() => {
       }
     }
 
+    // Compute directional arrows for position display
+    const distLeft = seatX;
+    const distRight = roomWidth - seatX;
+    const xArrow = distLeft <= distRight ? '⬅️' : '➡️';
+    const yArrow = '⬆️';
+    
     // Build base tooltip data
     const data = {
       seatId: effectiveHoveredSeat.id || 'Seat',
       isPrimary: effectiveHoveredSeat.isPrimary || false,
-      position: `(${seatX.toFixed(2)}m, ${seatY.toFixed(2)}m)`,
+      position: `(${xArrow} ${seatX.toFixed(2)}m, ${yArrow} ${seatY.toFixed(2)}m)`,
       distanceToScreen: Number.isFinite(distanceToScreen) ? `${distanceToScreen.toFixed(2)}m` : '—',
       distanceToMLP: Number.isFinite(distanceToMLP) ? `${distanceToMLP.toFixed(2)}m` : '—',
       rp23: {
