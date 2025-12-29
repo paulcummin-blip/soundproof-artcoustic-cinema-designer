@@ -97,6 +97,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // REW-style time alignment (align all subs to MLP arrival time)
   const [rewTimeAlign, setRewTimeAlign] = useState(false);
 
+  // Graph smoothing used for the plotted dataset (REW Compare can force display without mutating the user's choice)
+  const graphSmoothing = rewCompareView ? "1/3" : rewSmoothing;
+
   // Set default smoothing when REW mode is enabled
   useEffect(() => {
     if (rewStyleMode && (!rewSmoothing || rewSmoothing === 'none')) {
@@ -909,9 +912,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       setLinearHzAxis(false);        // REW-style log axis
     }
   }, [rewCompareView]);
-
-  // Derived smoothing for graph/engine: use 1/3 when Compare View is ON, otherwise user choice
-  const graphSmoothing = rewCompareView ? '1/3' : rewSmoothing;
 
   // Helper: apply REW-style smoothing
   function applyRewSmoothing(freqs, splDb, smoothing) {
