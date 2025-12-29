@@ -3099,9 +3099,10 @@ React.useEffect(() => {
       }
     }
 
-    // Compute directional arrows for position display
+    // Compute directional arrows and distance to nearest wall
     const distLeft = seatX;
     const distRight = roomWidth - seatX;
+    const xNearest = Math.min(distLeft, distRight);
     const xArrow = distLeft <= distRight ? '⬅️' : '➡️';
     const yArrow = '⬆️';
     
@@ -3109,7 +3110,7 @@ React.useEffect(() => {
     const data = {
       seatId: effectiveHoveredSeat.id || 'Seat',
       isPrimary: effectiveHoveredSeat.isPrimary || false,
-      position: `(${xArrow} ${seatX.toFixed(2)}m, ${yArrow} ${seatY.toFixed(2)}m)`,
+      position: `(${xArrow} ${xNearest.toFixed(2)}m, ${yArrow} ${seatY.toFixed(2)}m)`,
       distanceToScreen: Number.isFinite(distanceToScreen) ? `${distanceToScreen.toFixed(2)}m` : '—',
       distanceToMLP: Number.isFinite(distanceToMLP) ? `${distanceToMLP.toFixed(2)}m` : '—',
       rp23: {
