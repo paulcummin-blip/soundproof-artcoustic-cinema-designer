@@ -459,13 +459,13 @@ export function computeRoomModesResponse({
   const sbirMagDb_all = [];
   const totalMagDb_all = [];
 
-  // Component magnitude tracking for SBIR level matching (30-80 Hz band)
-  const modalBandDb = [];
-  const sbirBandDb = [];
-  
   // Extract computation into runOnce for diagnostic double-run
-  const runOnce = (sourcesOverride) => {
+  const runOnce = (sourcesOverride, sbirTrimLinearArg = 1.0) => {
     const sourcesUsed = sourcesOverride ?? sourcesLocal;
+
+    // Component magnitude tracking for SBIR level matching (30-80 Hz band)
+    const modalBandDb = [];
+    const sbirBandDb = [];
 
   // Build response: pure MODAL PRESSURE SUM (REW-style room curve)
   // Store BOTH coherent raw AND processed curves
@@ -793,10 +793,10 @@ export function computeRoomModesResponse({
     const modalTerm_re = sumRe_modal * sealedRoomGainLinear;
     const modalTerm_im = sumIm_modal * sealedRoomGainLinear;
 
-    // Apply SBIR level matching trim (computed from outer scope after first pass)
+    // Apply SBIR level matching trim (passed in from outer scope)
     // This ensures SBIR and modal terms are on the same "scale" in 30-80 Hz
-    const sbirTerm_re = sumRe_sbir * sbirTrimLinear; // Includes direct path (order 0)
-    const sbirTerm_im = sumIm_sbir * sbirTrimLinear;
+    const sbirTerm_re = sumRe_sbir * sbirTrimLinearArg; // Includes direct path (order 0)
+    const sbirTerm_im = sumIm_sbir * sbirTrimLinearArg;
 
     const totalTerm_re = modalTerm_re + sbirTerm_re;
     const totalTerm_im = modalTerm_im + sbirTerm_im;
@@ -951,8 +951,7 @@ export function computeRoomModesResponse({
   }; // End of runOnce
 
   // Run engine with normal sources - FIRST PASS to collect statistics
-  const firstPass = runOnce(null);
-  let splDb = firstPass.splDb;
+  const firstPass = runOnce(null, 1.0);
   const modalBandDbPass1 = firstPass.modalBandDb;
   const sbirBandDbPass1 = firstPass.sbirBandDb;
 
@@ -960,31 +959,37 @@ export function computeRoomModesResponse({
   let sbirTrimDb = 0;
   let sbirTrimLinear = 1.0;
   let sbirMatchingApplied = false;
+  let modalMedianDb = 0;
+  let sbirMedianDb = 0;
 
   if (rewParityMode && sbirEnabled && modalBandDbPass1.length >= 10 && sbirBandDbPass1.length >= 10) {
     // Compute medians
     const sortedModal = [...modalBandDbPass1].sort((a, b) => a - b);
     const sortedSbir = [...sbirBandDbPass1].sort((a, b) => a - b);
 
-    const modalMedian = sortedModal[Math.floor(sortedModal.length / 2)];
-    const sbirMedian = sortedSbir[Math.floor(sortedSbir.length / 2)];
+    modalMedianDb = sortedModal[Math.floor(sortedModal.length / 2)];
+    sbirMedianDb = sortedSbir[Math.floor(sortedSbir.length / 2)];
 
     // Compute trim: bring SBIR median to match modal median
-    sbirTrimDb = modalMedian - sbirMedian;
+    sbirTrimDb = modalMedianDb - sbirMedianDb;
     sbirTrimLinear = Math.pow(10, sbirTrimDb / 20);
     sbirMatchingApplied = true;
 
     // Log the trim computation for audit
     if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG) {
       console.log('[SBIR LEVEL MATCHING]', {
-        modalMedian: modalMedian.toFixed(2),
-        sbirMedian: sbirMedian.toFixed(2),
+        modalMedian: modalMedianDb.toFixed(2),
+        sbirMedian: sbirMedianDb.toFixed(2),
         trimDb: sbirTrimDb.toFixed(2),
         trimLinear: sbirTrimLinear.toFixed(4),
         bandSamples: modalBandDbPass1.length
       });
     }
   }
+
+  // SECOND PASS: Run engine again with computed SBIR trim
+  const secondPass = runOnce(null, sbirTrimLinear);
+  const splDb = secondPass.splDb;
   
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
