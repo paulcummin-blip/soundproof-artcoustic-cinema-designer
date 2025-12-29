@@ -776,8 +776,18 @@ export function computeRoomModesResponse({
     // - sbirTerm: direct + reflections (image source method, includes direct path at order 0)
     // - totalTerm: modal + sbir (coherent complex sum)
 
-    const modalTerm_re = sumRe_modal;
-    const modalTerm_im = sumIm_modal;
+    // SEALED ROOM PRESSURE GAIN - Apply ONLY to modal term (not SBIR)
+    // REW parity: modal pressure boosted below lowest axial, SBIR stays geometry-driven
+    let sealedRoomGainLinear = 1.0;
+    if (!rawEngineOutput && sealedBoostEnabled && lowestAxial && f < lowestAxial) {
+      const octavesBelow = Math.log2(lowestAxial / f);
+      const pressureGainDb = Math.min(sealedBoostMaxGainDb, sealedBoostKDbPerOct * octavesBelow);
+      sealedRoomGainLinear = Math.pow(10, pressureGainDb / 20);
+    }
+
+    // Apply sealed gain to MODAL term only (SBIR remains unboosted)
+    const modalTerm_re = sumRe_modal * sealedRoomGainLinear;
+    const modalTerm_im = sumIm_modal * sealedRoomGainLinear;
 
     const sbirTerm_re = sumRe_sbir; // Includes direct path (order 0)
     const sbirTerm_im = sumIm_sbir;
@@ -863,31 +873,6 @@ export function computeRoomModesResponse({
       const compDb = 10 * Math.log10(n);
       modalDb -= compDb * 0.85; // 0.85 = gentle application factor
     }
-    
-    // SEALED ROOM PRESSURE GAIN - Apply to TOTAL complex pressure (not just modal)
-    // REW parity: sealed room boosts LF below lowest axial across ALL acoustic paths
-    // This must be applied BEFORE converting to dB (as magnitude multiplier on complex pressure)
-    let sealedRoomGainLinear = 1.0;
-    if (!rawEngineOutput && sealedBoostEnabled && lowestAxial && f < lowestAxial) {
-      const octavesBelow = Math.log2(lowestAxial / f);
-      const pressureGainDb = Math.min(sealedBoostMaxGainDb, sealedBoostKDbPerOct * octavesBelow);
-      sealedRoomGainLinear = Math.pow(10, pressureGainDb / 20);
-    }
-    
-    // Apply sealed room gain to TOTAL complex pressure (modal + sbir)
-    // CRITICAL: This is a MAGNITUDE multiplier, not a dB offset
-    const totalWithSealedGain_re = sumRe_total * sealedRoomGainLinear;
-    const totalWithSealedGain_im = sumIm_total * sealedRoomGainLinear;
-    
-    // Recompute coherent magnitude with sealed room gain applied
-    const coherentMagWithGain = Math.sqrt(
-      totalWithSealedGain_re * totalWithSealedGain_re + 
-      totalWithSealedGain_im * totalWithSealedGain_im
-    );
-    const coherentPressureWithGain = 20 * Math.log10(Math.max(Number.EPSILON, coherentMagWithGain));
-    
-    // Use sealed-room-corrected pressure as base (replaces old modalDb)
-    modalDb = coherentPressureWithGain;
 
     // Apply leaky room LF roll-off (if room is not sealed)
     // Reduce LF below ~35 Hz with gentle shelving (REW-like behaviour)
