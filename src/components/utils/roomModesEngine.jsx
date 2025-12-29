@@ -845,6 +845,40 @@ export function computeRoomModesResponse({
       });
     }
     
+    // [63 Hz CANCELLATION PROBE] - Verify modal/SBIR interference at REW null frequency
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 63) < 0.6) {
+      const modalPhaseRad = Math.atan2(modalTerm_im, modalTerm_re);
+      const sbirPhaseRad = Math.atan2(sbirTerm_im, sbirTerm_re);
+      const totalPhaseRad = Math.atan2(totalTerm_im, totalTerm_re);
+      
+      console.log('[63 Hz CANCELLATION PROBE]', {
+        freq: f.toFixed(1),
+        modal: {
+          re: modalTerm_re.toFixed(6),
+          im: modalTerm_im.toFixed(6),
+          magDb: modalMagDb.toFixed(2),
+          phaseRad: modalPhaseRad.toFixed(4),
+          phaseDeg: (modalPhaseRad * 180 / Math.PI).toFixed(1)
+        },
+        sbir: {
+          re: sbirTerm_re.toFixed(6),
+          im: sbirTerm_im.toFixed(6),
+          magDb: sbirMagDb.toFixed(2),
+          phaseRad: sbirPhaseRad.toFixed(4),
+          phaseDeg: (sbirPhaseRad * 180 / Math.PI).toFixed(1)
+        },
+        total: {
+          re: totalTerm_re.toFixed(6),
+          im: totalTerm_im.toFixed(6),
+          magDb: totalMagDb.toFixed(2),
+          phaseRad: totalPhaseRad.toFixed(4),
+          phaseDeg: (totalPhaseRad * 180 / Math.PI).toFixed(1)
+        },
+        engineSmoothing: smoothing,
+        componentView
+      });
+    }
+    
     // [LF SBIR PROBE @20Hz, 25Hz, 30Hz] - Verify SBIR is active at low frequencies
     if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && 
         (Math.abs(f - 20) < 0.6 || Math.abs(f - 25) < 0.6 || Math.abs(f - 30) < 0.6)) {
@@ -1752,12 +1786,14 @@ function computeSBIRComplexAtFreq({
   const dz0 = (source.z ?? 0.0) - (receiver.z ?? 1.2);
   const r0 = Math.sqrt(dx0*dx0 + dy0*dy0 + dz0*dz0);
   
+  let directPath = null;
   if (r0 > 0) {
     const A0 = 1 / Math.max(0.25, r0);
     const phase0 = -k * r0;
     sumRe += A0 * Math.cos(phase0);
     sumIm += A0 * Math.sin(phase0);
     pathsUsed++;
+    directPath = { r: r0, A: A0, phase: phase0, surface: 'direct' };
   }
   
   // Order 1: First-order reflections (single bounce)
@@ -1843,6 +1879,40 @@ function computeSBIRComplexAtFreq({
       order: strongest.order,
       magDb: 20 * Math.log10(Math.max(Number.EPSILON, strongest.mag))
     };
+  }
+  
+  // [SBIR SANITY CHECK @80Hz] - Verify SBIR uses actual source positions (combing test)
+  if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 80) < 0.6) {
+    const allPaths = [
+      directPath,
+      ...reflections.map(r => ({ 
+        surface: r.surface, 
+        order: r.order, 
+        A: Math.sqrt(r.mag), 
+        r: null // Distance not stored in reflection tracking
+      }))
+    ].filter(Boolean);
+    
+    const top3 = allPaths
+      .sort((a, b) => (b.A || 0) - (a.A || 0))
+      .slice(0, 3);
+    
+    console.log('[SBIR SANITY CHECK @80Hz]', {
+      freq: f.toFixed(1),
+      sourcePos: { x: source.x.toFixed(3), y: source.y.toFixed(3), z: (source.z ?? 0).toFixed(3) },
+      receiverPos: { x: receiver.x.toFixed(3), y: receiver.y.toFixed(3), z: (receiver.z ?? 1.2).toFixed(3) },
+      directPathDistance: r0.toFixed(3),
+      pathsUsed,
+      top3Paths: top3.map(p => ({
+        surface: p.surface,
+        order: p.order || 0,
+        distance: p.r !== null ? p.r.toFixed(3) : 'N/A',
+        amplitude: p.A.toFixed(6),
+        phase: p.phase !== undefined ? (p.phase * 180 / Math.PI).toFixed(1) + '°' : 'N/A'
+      })),
+      strongestReflectionSurface: strongestReflection?.surface || 'none',
+      strongestReflectionMagDb: strongestReflection?.magDb.toFixed(1) || 'N/A'
+    });
   }
   
   return { re: sumRe, im: sumIm, pathsUsed, strongestReflection };

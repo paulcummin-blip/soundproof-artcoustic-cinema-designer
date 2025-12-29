@@ -477,10 +477,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const seatSig = stableSeatSig;
 
     // Build signature for failure caching
-    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${rewSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}|cv:${componentView}`;
+    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}|cv:${componentView}`;
     
     // Build run key for bounce detection
-    const runKey = `${w.toFixed(2)}x${l.toFixed(2)}x${h.toFixed(2)}|${seatSig}|${subSig}|${rewSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}`;
+    const runKey = `${w.toFixed(2)}x${l.toFixed(2)}x${h.toFixed(2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}`;
     
     // Bounce detector: only log when deps actually change
     if (runKey !== lastRewRunKeyRef.current) {
@@ -541,7 +541,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         includeTangential: true,
         includeOblique: true,
         rewParityMode: true,
-        smoothing: rewSmoothing,
+        smoothing: graphSmoothing,
         subFloorHeight: 0.0,
         normalizeBandHz: rewRelativeView ? [30, 80] : null,
         normalizeToDb: rewRelativeView ? 0 : null,
@@ -597,7 +597,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       subSig,
       seatSig
     };
-  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
+  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, graphSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
@@ -696,10 +696,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const seatSig = stableSeatSig;
 
     // Build signature for failure caching
-    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${rewSmoothing}|rel=${rewRelativeView ? 1 : 0}|damp=${roomDamping}|view=product|cv:${componentView}`;
+    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView ? 1 : 0}|damp=${roomDamping}|view=product|cv:${componentView}`;
     
     // Build run key for bounce detection
-    const runKey = `${w.toFixed(2)}x${l.toFixed(2)}x${h.toFixed(2)}|${seatSig}|${subSig}|${rewSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}|view:product`;
+    const runKey = `${w.toFixed(2)}x${l.toFixed(2)}x${h.toFixed(2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}|view:product`;
     
     // Bounce detector: only log when deps actually change
     if (runKey !== lastRewRunKeyRef.current) {
@@ -810,7 +810,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         includeTangential: true,
         includeOblique: true,
         rewParityMode: true,
-        smoothing: rewSmoothing,
+        smoothing: graphSmoothing,
         subFloorHeight: 0.0,
         normalizeBandHz: rewRelativeView ? [30, 80] : null,
         normalizeToDb: rewRelativeView ? 0 : null,
@@ -888,7 +888,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       freqs: result.freqs,
       splDb: result.splDb
     };
-  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, rewSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
+  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, graphSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
 
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
   const activeDebug = useMemo(() => {
@@ -899,27 +899,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       : rewModesData?.debug;
   }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, componentView]);
 
-  // Force settings when REW Compare View is enabled (and ONLY then)
-  const lastUserSmoothingRef = useRef(null);
-
+  // REW Compare View display preset (does NOT mutate user smoothing state)
+  // Compare view forces display to 1/3, but user's saved choice (1/48 or 1/3) remains intact
   useEffect(() => {
     if (rewCompareView) {
-      // remember what the user had before compare view
-      if (!lastUserSmoothingRef.current) lastUserSmoothingRef.current = rewSmoothing;
-
       setRewRelativeView(false);     // absolute SPL for compare
-      setRewSmoothing('1/3');        // fixed compare smoothing
       setYAxisLocked(true);
       setShowRewModeLines(true);
       setLinearHzAxis(false);        // REW-style log axis
-    } else {
-      // compare view off → restore user smoothing (if we captured one)
-      if (lastUserSmoothingRef.current) {
-        setRewSmoothing(lastUserSmoothingRef.current);
-        lastUserSmoothingRef.current = null;
-      }
     }
   }, [rewCompareView]);
+
+  // Derived smoothing for graph/engine: use 1/3 when Compare View is ON, otherwise user choice
+  const graphSmoothing = rewCompareView ? '1/3' : rewSmoothing;
 
   // Helper: apply REW-style smoothing
   function applyRewSmoothing(freqs, splDb, smoothing) {
@@ -2891,6 +2883,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <strong>UI smoothing selected:</strong> {rewSmoothing}
                   </div>
                   <div className="text-[10px] font-mono opacity-80">
+                    <strong>Graph smoothing (effective):</strong> {graphSmoothing}
+                  </div>
+                  <div className="text-[10px] font-mono opacity-80">
                     <strong>Engine smoothing applied:</strong> {activeDebug.smoothingApplied || 'none'}
                   </div>
                   <div className="text-[10px] font-mono opacity-80">
@@ -3172,14 +3167,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           
           {/* Graph or placeholder */}
           {displayData.length > 0 ? (() => {
-            // [BASSGRAPH INPUT] - Audit log
-            console.log('[BASSGRAPH INPUT]', {
-              rewStyleMode,
-              rewView,
-              componentView,
-              displayDataLength: displayData.length,
-              first5Spl: displayData.slice(0, 5).map(d => d.spl)
-            });
+            // [PLOT AUDIT] - Verify what's actually being plotted
+            const dataToPlot = rewStyleMode ? clampedData : displayData;
+            const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
+            const __plotAudit = {
+              using: rewStyleMode ? "clampedData" : "displayData",
+              len: dataToPlot.length,
+              min: finiteSpl.length > 0 ? Math.min(...finiteSpl).toFixed(2) : 'N/A',
+              max: finiteSpl.length > 0 ? Math.max(...finiteSpl).toFixed(2) : 'N/A',
+              smoothing: graphSmoothing,
+              rewCompareView,
+              userSmoothingChoice: rewSmoothing
+            };
+            console.log("[PLOT AUDIT]", __plotAudit);
             
             return (
               <BassGraph
@@ -3331,18 +3331,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div className="space-y-2">
             <div className="flex gap-2">
               <Button
-                variant={rewSmoothing === '1/48' ? 'default' : 'outline'}
+                variant={(rewCompareView ? graphSmoothing === '1/48' : rewSmoothing === '1/48') ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setRewSmoothing('1/48')}
                 className="text-xs flex-1"
+                disabled={rewCompareView}
               >
                 1/48 oct (Simulation)
               </Button>
               <Button
-                variant={rewSmoothing === '1/3' ? 'default' : 'outline'}
+                variant={(rewCompareView ? graphSmoothing === '1/3' : rewSmoothing === '1/3') ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setRewSmoothing('1/3')}
                 className="text-xs flex-1"
+                disabled={rewCompareView}
               >
                 1/3 oct (RP22)
               </Button>
