@@ -505,8 +505,8 @@ export function computeRoomModesResponse({
         let coupling, couplingComplex;
         if (complexEigenfunctions) {
           couplingComplex = computeSpatialCouplingComplex(mode, source, seat, room);
-          // Use amplitude for magnitude check (preserves position dependence)
-          coupling = Math.abs(couplingComplex.amp);
+          // Keep signed amplitude (allows cancellations)
+          coupling = couplingComplex.amp;
           if (Math.abs(coupling) < 1e-6) continue;
         } else {
           coupling = computeSpatialCoupling(mode, source, seat, room);
