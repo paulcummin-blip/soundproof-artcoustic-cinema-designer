@@ -863,15 +863,28 @@ export function computeRoomModesResponse({
     // Start with coherent pressure, then apply processing layers (ONLY if not raw mode)
     let modalDb = coherentPressureRaw;
     
-    // Apply mode density compensation (REW-ish): above 70 Hz AND above blendStart, subtract incoherent sum growth
-    // CRITICAL: Never apply below Schroeder frequency - this flattens modal nulls
-    // PART C1: This is DISABLED in RAW mode (rawEngineOutput flag blocks it)
-    const blendStart = schroederHz * 1.0;
-    
-    if (!rawEngineOutput && rewParityMode && f >= Math.max(70, blendStart) && activeTerms > 1) {
+    // Mode density compensation (REW-ish) — MUST ramp in smoothly to avoid a cliff at Schroeder.
+    const mdCompEnabled = (!rawEngineOutput && rewParityMode && activeTerms > 1);
+
+    // Use a smooth transition window around Schroeder (starts a bit before, fully in a bit after).
+    const mdCompStartHz = Math.max(70, schroederHz * 0.85);
+    const mdCompEndHz   = Math.max(mdCompStartHz + 1, schroederHz * 1.15);
+
+    let mdCompWeight = 0.0;
+    if (mdCompEnabled) {
+      if (f <= mdCompStartHz) mdCompWeight = 0.0;
+      else if (f >= mdCompEndHz) mdCompWeight = 1.0;
+      else {
+        const t = (f - mdCompStartHz) / (mdCompEndHz - mdCompStartHz);
+        // cosine ease-in (0 → 1) with no kink
+        mdCompWeight = 0.5 * (1 - Math.cos(Math.PI * t));
+      }
+
       const n = Math.max(1, activeTerms);
-      const compDb = 10 * Math.log10(n);
-      modalDb -= compDb * 0.85; // 0.85 = gentle application factor
+      const compDb = 10 * Math.log10(n) * 0.85;
+
+      // Apply gradually (this prevents the sudden 150 Hz step)
+      modalDb -= compDb * mdCompWeight;
     }
 
     // Apply leaky room LF roll-off (if room is not sealed)
