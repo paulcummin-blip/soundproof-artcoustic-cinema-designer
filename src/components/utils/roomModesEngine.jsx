@@ -4,6 +4,16 @@
 
 const SPEED_OF_SOUND = 343; // m/s
 
+// Helper: clamp value to 0-1 range
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+// Helper: normalize position to 0-1 range (no wall folding)
+const normPos = (p, room) => ({
+  x: clamp01((p.x ?? 0) / Math.max(0.001, room.widthM)),
+  y: clamp01((p.y ?? 0) / Math.max(0.001, room.lengthM)),
+  z: clamp01((p.z ?? 0) / Math.max(0.001, room.heightM)),
+});
+
 /**
  * Compute room modes response (axial, tangential, oblique)
  * Returns frequency response based on room geometry and positions
@@ -502,16 +512,45 @@ export function computeRoomModesResponse({
         const source = sourcesUsed[subIdx];
 
         // Spatial coupling (Part H3 - switch between real and complex eigenfunctions)
+        // CRITICAL: coupling MUST be signed (can be negative) for nulls to form
         let coupling, couplingComplex;
         if (complexEigenfunctions) {
           couplingComplex = computeSpatialCouplingComplex(mode, source, seat, room);
           // Use amplitude for magnitude check (preserves position dependence)
-          coupling = Math.abs(couplingComplex.amp);
-          if (Math.abs(coupling) < 1e-6) continue;
+          coupling = couplingComplex.amp; // SIGNED amplitude (not abs)
+          if (Math.abs(coupling) < 1e-6) continue; // Skip negligible only
         } else {
           coupling = computeSpatialCoupling(mode, source, seat, room);
-          if (Math.abs(coupling) < 1e-6) continue;
+          if (Math.abs(coupling) < 1e-6) continue; // Skip negligible only
           couplingComplex = null; // Not used in real mode
+        }
+
+        // Debug probe at 63 Hz (verify signed coupling)
+        if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 63) < 0.6) {
+          if (!globalThis.__B44_COUPLING_63) globalThis.__B44_COUPLING_63 = [];
+          if (globalThis.__B44_COUPLING_63.length < 8) {
+            // Compute shapes for visibility
+            const W = Math.max(1e-6, room.widthM);
+            const L = Math.max(1e-6, room.lengthM);
+            const H = Math.max(1e-6, room.heightM);
+
+            const srcShape = 
+              (mode.nx > 0 ? Math.cos(mode.nx * Math.PI * source.x / W) : 1) *
+              (mode.ny > 0 ? Math.cos(mode.ny * Math.PI * source.y / L) : 1) *
+              (mode.nz > 0 ? Math.cos(mode.nz * Math.PI * (source.z ?? 0.0) / H) : 1);
+
+            const seatShape = 
+              (mode.nx > 0 ? Math.cos(mode.nx * Math.PI * seat.x / W) : 1) *
+              (mode.ny > 0 ? Math.cos(mode.ny * Math.PI * seat.y / L) : 1) *
+              (mode.nz > 0 ? Math.cos(mode.nz * Math.PI * (seat.z ?? 1.2) / H) : 1);
+
+            globalThis.__B44_COUPLING_63.push({
+              nx: mode.nx, ny: mode.ny, nz: mode.nz,
+              srcShape: Number(srcShape.toFixed(3)),
+              seatShape: Number(seatShape.toFixed(3)),
+              coupling: Number(coupling.toFixed(3)),
+            });
+          }
         }
 
         // Get product metadata for this sub
