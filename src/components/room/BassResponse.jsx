@@ -899,45 +899,27 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       : rewModesData?.debug;
   }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, componentView]);
 
-  // Force settings ONLY when REW Compare View is toggled ON (not on every engine update)
-  const rewComparePrevRef = React.useRef(false);
-  const lastUserSmoothingRef = React.useRef(rewSmoothing);
-
-  // Track last user smoothing whenever Compare View is OFF
-  useEffect(() => {
-    if (!rewCompareView) lastUserSmoothingRef.current = rewSmoothing;
-  }, [rewCompareView, rewSmoothing]);
+  // Force settings when REW Compare View is enabled (and ONLY then)
+  const lastUserSmoothingRef = useRef(null);
 
   useEffect(() => {
-    const was = rewComparePrevRef.current;
-    const now = rewCompareView;
+    if (rewCompareView) {
+      // remember what the user had before compare view
+      if (!lastUserSmoothingRef.current) lastUserSmoothingRef.current = rewSmoothing;
 
-    // Only act on the transition
-    if (!was && now) {
-      setRewRelativeView(false);     // Absolute SPL for compare
-      setRewSmoothing('1/3');        // Compare is ALWAYS 1/3
+      setRewRelativeView(false);     // absolute SPL for compare
+      setRewSmoothing('1/3');        // fixed compare smoothing
       setYAxisLocked(true);
-
-      // Capture baseline snapshot once (if valid data exists)
-      if (!rewCompareBaselineRef.current && rewModesData?.splDb && rewModesData?.debug?.splDbRepaired) {
-        rewCompareBaselineRef.current = {
-          splDbRepaired: [...rewModesData.debug.splDbRepaired],
-          freqs: [...rewModesData.freqs],
-          sourceSigRounded: rewModesData.debug?.sourceSigRounded,
-          seatSigRounded: rewModesData.debug?.seatSigRounded,
-          timestamp: Date.now()
-        };
+      setShowRewModeLines(true);
+      setLinearHzAxis(false);        // REW-style log axis
+    } else {
+      // compare view off → restore user smoothing (if we captured one)
+      if (lastUserSmoothingRef.current) {
+        setRewSmoothing(lastUserSmoothingRef.current);
+        lastUserSmoothingRef.current = null;
       }
     }
-
-    // When Compare View is turned OFF, restore whatever the user last chose (usually 1/48)
-    if (was && !now) {
-      rewCompareBaselineRef.current = null;
-      setRewSmoothing(lastUserSmoothingRef.current || '1/48');
-    }
-
-    rewComparePrevRef.current = now;
-  }, [rewCompareView]); // IMPORTANT: do NOT depend on rewModesData
+  }, [rewCompareView]);
 
   // Helper: apply REW-style smoothing
   function applyRewSmoothing(freqs, splDb, smoothing) {
@@ -1845,7 +1827,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     }
 
                     // Force REW settings
-                    setRewSmoothing('1/48'); // Test preset uses high-resolution view
                     setRewRelativeView(false); // Absolute SPL
                     setShowRewModeLines(true);
                     setLinearHzAxis(false); // Log Hz axis
@@ -2907,7 +2888,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     </div>
                   )}
                   <div className="text-[10px] font-mono opacity-80">
-                    <strong>Smoothing:</strong> {activeDebug.smoothingApplied || 'none'}
+                    <strong>UI smoothing selected:</strong> {rewSmoothing}
+                  </div>
+                  <div className="text-[10px] font-mono opacity-80">
+                    <strong>Engine smoothing applied:</strong> {activeDebug.smoothingApplied || 'none'}
                   </div>
                   <div className="text-[10px] font-mono opacity-80">
                     <strong>Absolute SPL:</strong> {activeDebug.absoluteSplMode ? 'true' : 'false'}

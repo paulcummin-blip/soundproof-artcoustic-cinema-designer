@@ -1934,7 +1934,54 @@ function getSpatialCouplingTerms(mode, source, receiver, roomDims) {
 }
 
 /**
- * Apply fractional octave smoothing
+ * Apply fractional octave smoothing in MAGNITUDE domain (REW-style, preserves nulls)
+ */
+function smoothFractionalOctaveMagnitude(freqs, dbArray, fraction /* e.g. 48 or 3 */) {
+  // Returns dB, smoothed in linear magnitude domain over log-frequency.
+  // Nulls remain null; we do not smear across null gaps.
+  const out = new Array(dbArray.length).fill(null);
+
+  const ln2 = Math.log(2);
+  const halfWindow = 0.5 / fraction; // +/- half a band in octaves
+
+  // Precompute log2(freq)
+  const log2f = freqs.map(f => Math.log(f) / ln2);
+
+  // Convert dB -> magnitude (keep null)
+  const mag = dbArray.map(v => (Number.isFinite(v) ? Math.pow(10, v / 20) : null));
+
+  for (let i = 0; i < freqs.length; i++) {
+    if (mag[i] === null) continue;
+
+    const centre = log2f[i];
+    const lo = centre - halfWindow;
+    const hi = centre + halfWindow;
+
+    let sum = 0;
+    let n = 0;
+
+    // simple window over log2 frequency
+    for (let j = 0; j < freqs.length; j++) {
+      const mj = mag[j];
+      if (mj === null) continue;
+      const lj = log2f[j];
+      if (lj >= lo && lj <= hi) {
+        sum += mj;
+        n++;
+      }
+    }
+
+    if (n > 0) {
+      const avg = sum / n;
+      out[i] = 20 * Math.log10(Math.max(Number.EPSILON, avg));
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Apply fractional octave smoothing (legacy dB-domain smoothing)
  */
 function applySmoothing(freqs, splDb, smoothing) {
   const octaveFraction = {
@@ -1944,28 +1991,8 @@ function applySmoothing(freqs, splDb, smoothing) {
     '1/3': 3
   }[smoothing] || 1;
   
-  // IMMUTABLE: Build new array instead of mutating
-  const smoothed = [];
-  
-  for (let i = 0; i < freqs.length; i++) {
-    const fc = freqs[i];
-    const fLow = fc / Math.pow(2, 1 / (2 * octaveFraction));
-    const fHigh = fc * Math.pow(2, 1 / (2 * octaveFraction));
-    
-    let sum = 0;
-    let count = 0;
-    
-    for (let j = 0; j < freqs.length; j++) {
-      if (freqs[j] >= fLow && freqs[j] <= fHigh) {
-        sum += splDb[j];
-        count++;
-      }
-    }
-    
-    smoothed.push(count > 0 ? (sum / count) : splDb[i]);
-  }
-  
-  return smoothed;
+  // Use new magnitude-domain smoothing
+  return smoothFractionalOctaveMagnitude(freqs, splDb, octaveFraction);
 }
 
 /**
