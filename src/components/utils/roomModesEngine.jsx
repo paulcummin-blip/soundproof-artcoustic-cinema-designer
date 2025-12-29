@@ -458,6 +458,10 @@ export function computeRoomModesResponse({
   const modalMagDb_all = [];
   const sbirMagDb_all = [];
   const totalMagDb_all = [];
+
+  // Component magnitude tracking for SBIR level matching (30-80 Hz band)
+  const modalBandDb = [];
+  const sbirBandDb = [];
   
   // Extract computation into runOnce for diagnostic double-run
   const runOnce = (sourcesOverride) => {
@@ -789,8 +793,10 @@ export function computeRoomModesResponse({
     const modalTerm_re = sumRe_modal * sealedRoomGainLinear;
     const modalTerm_im = sumIm_modal * sealedRoomGainLinear;
 
-    const sbirTerm_re = sumRe_sbir; // Includes direct path (order 0)
-    const sbirTerm_im = sumIm_sbir;
+    // Apply SBIR level matching trim (computed from outer scope after first pass)
+    // This ensures SBIR and modal terms are on the same "scale" in 30-80 Hz
+    const sbirTerm_re = sumRe_sbir * sbirTrimLinear; // Includes direct path (order 0)
+    const sbirTerm_im = sumIm_sbir * sbirTrimLinear;
 
     const totalTerm_re = modalTerm_re + sbirTerm_re;
     const totalTerm_im = modalTerm_im + sbirTerm_im;
@@ -830,6 +836,12 @@ export function computeRoomModesResponse({
     modalMagDb_all.push(modalMagDb);
     sbirMagDb_all.push(sbirMagDb);
     totalMagDb_all.push(totalMagDb);
+
+    // Collect component magnitudes in calibration band (30-80 Hz) for SBIR level matching
+    if (f >= 30 && f <= 80 && Number.isFinite(modalMagDb) && Number.isFinite(sbirMagDb)) {
+      modalBandDb.push(modalMagDb);
+      sbirBandDb.push(sbirMagDb);
+    }
 
     // [ENGINE OUTPUT PROBE] - Audit log (gated to 40 Hz probe, only when global debug enabled)
     if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 40) < 0.6) {
@@ -935,11 +947,44 @@ export function computeRoomModesResponse({
     return modalDb;
   });
   
-  return splDb;
+  return { splDb, modalBandDb, sbirBandDb };
   }; // End of runOnce
 
-  // Run engine with normal sources
-  const splDb = runOnce(null);
+  // Run engine with normal sources - FIRST PASS to collect statistics
+  const firstPass = runOnce(null);
+  let splDb = firstPass.splDb;
+  const modalBandDbPass1 = firstPass.modalBandDb;
+  const sbirBandDbPass1 = firstPass.sbirBandDb;
+
+  // SBIR Level Matching (Part B): Compute trim to match SBIR to modal scale in 30-80 Hz
+  let sbirTrimDb = 0;
+  let sbirTrimLinear = 1.0;
+  let sbirMatchingApplied = false;
+
+  if (rewParityMode && sbirEnabled && modalBandDbPass1.length >= 10 && sbirBandDbPass1.length >= 10) {
+    // Compute medians
+    const sortedModal = [...modalBandDbPass1].sort((a, b) => a - b);
+    const sortedSbir = [...sbirBandDbPass1].sort((a, b) => a - b);
+
+    const modalMedian = sortedModal[Math.floor(sortedModal.length / 2)];
+    const sbirMedian = sortedSbir[Math.floor(sortedSbir.length / 2)];
+
+    // Compute trim: bring SBIR median to match modal median
+    sbirTrimDb = modalMedian - sbirMedian;
+    sbirTrimLinear = Math.pow(10, sbirTrimDb / 20);
+    sbirMatchingApplied = true;
+
+    // Log the trim computation for audit
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG) {
+      console.log('[SBIR LEVEL MATCHING]', {
+        modalMedian: modalMedian.toFixed(2),
+        sbirMedian: sbirMedian.toFixed(2),
+        trimDb: sbirTrimDb.toFixed(2),
+        trimLinear: sbirTrimLinear.toFixed(4),
+        bandSamples: modalBandDbPass1.length
+      });
+    }
+  }
   
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
@@ -1554,6 +1599,12 @@ export function computeRoomModesResponse({
       modalRmsDb_20_200: modalRmsDb_20_200.toFixed(1), // Modal term RMS (20-200 Hz)
       sbirRmsDb_20_200: sbirRmsDb_20_200.toFixed(1), // SBIR term RMS (includes direct)
       totalRmsDb_20_200: totalRmsDb_20_200.toFixed(1), // Total term RMS (modal + sbir)
+      sbirLevelMatching: sbirMatchingApplied ? {
+        modalMedianDb: modalMedianDb.toFixed(2),
+        sbirMedianDb: sbirMedianDb.toFixed(2),
+        trimAppliedDb: sbirTrimDb.toFixed(2),
+        trimLinear: sbirTrimLinear.toFixed(4)
+      } : null,
       sealedRoom: sealedRoom,
       subDistancesToMLP: mlpPosition ? sourcePositions.map(s => {
         const dx = s.x - mlpPosition.x;
