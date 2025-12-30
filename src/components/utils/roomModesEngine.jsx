@@ -1256,7 +1256,11 @@ export function computeRoomModesResponse({
     calRefMedianDbBefore = mlpMedianDb;
     normRefDb = mlpMedianDb; // Actual computed reference for this run
 
-    if (isRelative) {
+    // REW Compare mode: no calibration offset (keep curve as-computed)
+    if (rewParityMode) {
+      calibrationOffsetDb = 0;
+      normAppliedActual = false;
+    } else if (isRelative) {
       // Relative view: normalize to 0 dB
       const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
       calibrationOffsetDb = targetDb - mlpMedianDb;
@@ -1267,7 +1271,7 @@ export function computeRoomModesResponse({
       calibrationOffsetDb = targetAbsoluteDb - mlpMedianDb;
     }
 
-    // Apply calibration offset
+    // Apply calibration offset (will be 0 in REW Compare mode)
     finalDb = finalDb.map(v => (isFinite(v) ? (v + calibrationOffsetDb) : v));
     
     // Compute after-calibration median for debug
