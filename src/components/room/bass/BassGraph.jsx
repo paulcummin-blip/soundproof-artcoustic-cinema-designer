@@ -31,47 +31,78 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Build chart data with lineOk/lineBad properties per row
+    // Build chart data with goodLine/badLine, inserting exact threshold-crossing points
     const chartData = React.useMemo(() => {
         if (!data || data.length === 0) return [];
-        
-        // Fixed thresholds: 85 ± 6 dB (reference to the fixed 85 dB line)
-        const LOWER = refDb - 6;
-        const UPPER = refDb + 6;
-        
+
+        const LOWER = (Number.isFinite(refDb) ? refDb : 85) - 6;
+        const UPPER = (Number.isFinite(refDb) ? refDb : 85) + 6;
+
         const rows = [];
-        let prevBad = null;
-        
-        for (let i = 0; i < data.length; i++) {
-            const pt = data[i];
-            const yi = pt.spl;
-            
-            // Threshold-band classification relative to 85 dB reference
-            const isBad = Number.isFinite(yi) && (yi < LOWER || yi > UPPER);
-            
-            let lineOk = null;
-            let lineBad = null;
-            
-            if (isBad) {
-                lineBad = yi;
-                // Boundary duplication for continuity
-                if (prevBad === false) lineOk = yi;
-            } else {
-                lineOk = yi;
-                // Boundary duplication for continuity
-                if (prevBad === true) lineBad = yi;
-            }
-            
+
+        const isBad = (y) => Number.isFinite(y) && (y < LOWER || y > UPPER);
+
+        // Helper: add a point as either good or bad (never both)
+        const pushPoint = (f, y) => {
+            const bad = isBad(y);
             rows.push({
-                frequency: pt.frequency,
-                spl: yi,
-                lineOk,
-                lineBad
+                frequency: f,
+                spl: y,
+                goodLine: bad ? null : y,
+                badLine: bad ? y : null,
             });
-            
-            prevBad = isBad;
+        };
+
+        for (let i = 0; i < data.length; i++) {
+            const p1 = data[i];
+            const f1 = p1.frequency;
+            const y1 = p1.spl;
+
+            if (i === 0) {
+                pushPoint(f1, y1);
+                continue;
+            }
+
+            const p0 = data[i - 1];
+            const f0 = p0.frequency;
+            const y0 = p0.spl;
+
+            // If either y is non-finite, just push and move on
+            if (!Number.isFinite(y0) || !Number.isFinite(y1) || !Number.isFinite(f0) || !Number.isFinite(f1)) {
+                pushPoint(f1, y1);
+                continue;
+            }
+
+            // Detect crossings of LOWER/UPPER between y0 -> y1, and insert exact crossing points
+            const crossings = [];
+
+            const addCrossingIfBetween = (limit) => {
+                const d0 = y0 - limit;
+                const d1 = y1 - limit;
+                // Strict sign change => crossing
+                if ((d0 < 0 && d1 > 0) || (d0 > 0 && d1 < 0)) {
+                    const t = (limit - y0) / (y1 - y0); // 0..1
+                    const fx = f0 + t * (f1 - f0);
+                    crossings.push({ f: fx, y: limit });
+                }
+            };
+
+            addCrossingIfBetween(LOWER);
+            addCrossingIfBetween(UPPER);
+
+            // Sort crossings by frequency
+            crossings.sort((a, b) => a.f - b.f);
+
+            // If there are crossings, we need to split this segment at each crossing
+            if (crossings.length) {
+                // Push each crossing point
+                for (const c of crossings) pushPoint(c.f, c.y);
+            }
+
+            // Finally push p1
+            pushPoint(f1, y1);
         }
-        
+
         return rows;
     }, [data, refDb]);
     
@@ -283,7 +314,7 @@ export default function BassGraph({
 
                     {/* 85 dB Reference Line (Always Visible) */}
                     <ReferenceLine 
-                        y={refDb} 
+                        y={Number.isFinite(refDb) ? refDb : 85} 
                         stroke="#2563eb" 
                         strokeWidth={1.5}
                         strokeDasharray="4 4"
@@ -298,8 +329,8 @@ export default function BassGraph({
 
                     {/* Black segments (within ±6 dB of 85 dB) */}
                     <Line 
-                        type="monotone" 
-                        dataKey="lineOk"
+                        type="linear" 
+                        dataKey="goodLine"
                         stroke="#213428" 
                         strokeWidth={2} 
                         dot={false}
@@ -310,8 +341,8 @@ export default function BassGraph({
 
                     {/* Red segments (outside ±6 dB of 85 dB) */}
                     <Line 
-                        type="monotone" 
-                        dataKey="lineBad"
+                        type="linear" 
+                        dataKey="badLine"
                         stroke="#dc2626" 
                         strokeWidth={2} 
                         dot={false}
