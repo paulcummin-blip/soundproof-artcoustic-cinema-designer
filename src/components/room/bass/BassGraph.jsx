@@ -45,7 +45,7 @@ export default function BassGraph({
         return band.reduce((sum, v) => sum + v, 0) / band.length;
     }, [data, refDb]);
     
-    // Split data into good/bad masked datasets (nulls break the line)
+    // Split data into good/bad masked datasets with boundary duplication for continuity
     const { goodLine, badLine } = React.useMemo(() => {
         if (!data || data.length === 0) {
             return { goodLine: [], badLine: [] };
@@ -55,19 +55,38 @@ export default function BassGraph({
         const good = [];
         const bad = [];
         
-        data.forEach((point) => {
+        let prevIsBad = null;
+        
+        data.forEach((point, i) => {
             const spl = point.spl;
             const isBad = Number.isFinite(spl) && Math.abs(spl - avg3080) > PROBLEM_THRESHOLD;
             
-            good.push({
-                frequency: point.frequency,
-                spl: isBad ? null : spl
-            });
+            // Duplicate boundary points in both datasets for continuity
+            if (isBad) {
+                // This point is bad
+                badLine.push({
+                    frequency: point.frequency,
+                    spl: spl
+                });
+                // Include in good line only if transitioning from good to bad
+                goodLine.push({
+                    frequency: point.frequency,
+                    spl: (prevIsBad === false) ? spl : null
+                });
+            } else {
+                // This point is good
+                goodLine.push({
+                    frequency: point.frequency,
+                    spl: spl
+                });
+                // Include in bad line only if transitioning from bad to good
+                badLine.push({
+                    frequency: point.frequency,
+                    spl: (prevIsBad === true) ? spl : null
+                });
+            }
             
-            bad.push({
-                frequency: point.frequency,
-                spl: isBad ? spl : null
-            });
+            prevIsBad = isBad;
         });
         
         return { goodLine: good, badLine: bad };
