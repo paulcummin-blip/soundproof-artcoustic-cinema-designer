@@ -53,7 +53,10 @@ export default function BassGraph({
         for (let i = 0; i < data.length; i++) {
             const pt = data[i];
             const yi = pt.spl;
-            const isBad = Number.isFinite(yi) ? Math.abs(yi - avg) > PROBLEM_THRESHOLD : false;
+            
+            // Use 0.1 dB resolution for stable red-zone detection
+            const delta = Number.isFinite(yi) ? Math.round((yi - avg) * 10) / 10 : 0;
+            const isBad = Math.abs(delta) > PROBLEM_THRESHOLD;
             
             let goodLine = null;
             let badLine = null;
