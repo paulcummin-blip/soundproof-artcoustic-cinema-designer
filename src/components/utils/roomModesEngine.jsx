@@ -2050,6 +2050,9 @@ function computeSBIRComplexAtFreq({
 /**
  * Compute spatial coupling using cosine pressure mode shapes (real eigenfunctions)
  * Returns total coupling (for engine use) - uses direct meters, no normalization
+ * 
+ * REW-style spatial averaging: averages coupling over a small region (±10cm) to prevent
+ * perfect nulls at nodal planes. Real mics and sources have finite size.
  */
 function computeSpatialCoupling(mode, source, receiver, roomDims) {
   const { widthM, lengthM, heightM } = roomDims;
@@ -2060,17 +2063,63 @@ function computeSpatialCoupling(mode, source, receiver, roomDims) {
   const L = Math.max(1e-6, lengthM);
   const H = Math.max(1e-6, heightM);
   
-  // Cosine pressure terms (direct meters, no 0-1 normalization)
-  const srcX = nx > 0 ? Math.cos(nx * Math.PI * source.x / W) : 1;
-  const srcY = ny > 0 ? Math.cos(ny * Math.PI * source.y / L) : 1;
-  const srcZ = nz > 0 ? Math.cos(nz * Math.PI * (source.z ?? 0.0) / H) : 1;
+  // Helper: compute coupling at a single point
+  const couplingAtPoint = (srcPos, rcvPos) => {
+    const srcX = nx > 0 ? Math.cos(nx * Math.PI * srcPos.x / W) : 1;
+    const srcY = ny > 0 ? Math.cos(ny * Math.PI * srcPos.y / L) : 1;
+    const srcZ = nz > 0 ? Math.cos(nz * Math.PI * (srcPos.z ?? 0.0) / H) : 1;
+    
+    const rcvX = nx > 0 ? Math.cos(nx * Math.PI * rcvPos.x / W) : 1;
+    const rcvY = ny > 0 ? Math.cos(ny * Math.PI * rcvPos.y / L) : 1;
+    const rcvZ = nz > 0 ? Math.cos(nz * Math.PI * (rcvPos.z ?? 1.2) / H) : 1;
+    
+    return (srcX * srcY * srcZ) * (rcvX * rcvY * rcvZ);
+  };
   
-  const rcvX = nx > 0 ? Math.cos(nx * Math.PI * receiver.x / W) : 1;
-  const rcvY = ny > 0 ? Math.cos(ny * Math.PI * receiver.y / L) : 1;
-  const rcvZ = nz > 0 ? Math.cos(nz * Math.PI * (receiver.z ?? 1.2) / H) : 1;
+  // Helper: clamp position to room bounds
+  const clamp = (pos, dims) => ({
+    x: Math.max(0.01, Math.min(dims.widthM - 0.01, pos.x)),
+    y: Math.max(0.01, Math.min(dims.lengthM - 0.01, pos.y)),
+    z: Math.max(0.01, Math.min(dims.heightM - 0.01, pos.z ?? 0.0))
+  });
   
-  // Total coupling = source pressure × receiver pressure
-  return (srcX * srcY * srcZ) * (rcvX * rcvY * rcvZ);
+  // REW-style spatial averaging: 7-point stencil (centre + 6 directions)
+  const r = SPATIAL_AVG_RADIUS_M;
+  const offsets = [
+    { x: 0, y: 0, z: 0 },      // centre
+    { x: r, y: 0, z: 0 },      // +X
+    { x: -r, y: 0, z: 0 },     // -X
+    { x: 0, y: r, z: 0 },      // +Y
+    { x: 0, y: -r, z: 0 },     // -Y
+    { x: 0, y: 0, z: r },      // +Z
+    { x: 0, y: 0, z: -r }      // -Z
+  ];
+  
+  // Average coupling over source and receiver regions
+  let sumCoupling = 0;
+  let count = 0;
+  
+  for (const srcOffset of offsets) {
+    const srcPos = clamp({
+      x: source.x + srcOffset.x,
+      y: source.y + srcOffset.y,
+      z: (source.z ?? 0.0) + srcOffset.z
+    }, roomDims);
+    
+    for (const rcvOffset of offsets) {
+      const rcvPos = clamp({
+        x: receiver.x + rcvOffset.x,
+        y: receiver.y + rcvOffset.y,
+        z: (receiver.z ?? 1.2) + rcvOffset.z
+      }, roomDims);
+      
+      sumCoupling += couplingAtPoint(srcPos, rcvPos);
+      count++;
+    }
+  }
+  
+  // Return averaged coupling (49 points total: 7 source × 7 receiver)
+  return sumCoupling / count;
 }
 
 /**
