@@ -13,6 +13,41 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
+const ThresholdLine = ({ points }) => {
+    if (!points || points.length < 2) return null;
+
+    const LOWER = 79;
+    const UPPER = 91;
+
+    const segments = [];
+
+    for (let i = 1; i < points.length; i++) {
+        const p0 = points[i - 1];
+        const p1 = points[i];
+
+        if (!Number.isFinite(p0.value) || !Number.isFinite(p1.value)) continue;
+
+        const isBad =
+            p0.value < LOWER || p0.value > UPPER ||
+            p1.value < LOWER || p1.value > UPPER;
+
+        segments.push(
+            <line
+                key={i}
+                x1={p0.x}
+                y1={p0.y}
+                x2={p1.x}
+                y2={p1.y}
+                stroke={isBad ? '#dc2626' : '#213428'}
+                strokeWidth={2}
+                fill="none"
+            />
+        );
+    }
+
+    return <g>{segments}</g>;
+};
+
 export default function BassGraph({ 
   responseData, 
   schroederFrequency, 
@@ -31,48 +66,14 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Build chart data with goodLine/badLine properties per row
+    // Build chart data with frequency and spl only
     const chartData = React.useMemo(() => {
         if (!data || data.length === 0) return [];
         
-        // Fixed thresholds: 85 ± 6 dB
-        const LOWER_LIMIT = 79;
-        const UPPER_LIMIT = 91;
-        
-        const rows = [];
-        let prevBad = null;
-        
-        for (let i = 0; i < data.length; i++) {
-            const pt = data[i];
-            const yi = pt.spl;
-            
-            // Deterministic threshold-band classification
-            const isBad = Number.isFinite(yi) && (yi < LOWER_LIMIT || yi > UPPER_LIMIT);
-            
-            let goodLine = null;
-            let badLine = null;
-            
-            if (isBad) {
-                badLine = yi;
-                // Boundary duplication for continuity
-                if (prevBad === false) goodLine = yi;
-            } else {
-                goodLine = yi;
-                // Boundary duplication for continuity
-                if (prevBad === true) badLine = yi;
-            }
-            
-            rows.push({
-                frequency: pt.frequency,
-                spl: yi,
-                goodLine,
-                badLine
-            });
-            
-            prevBad = isBad;
-        }
-        
-        return rows;
+        return data.map(pt => ({
+            frequency: pt.frequency,
+            spl: pt.spl
+        }));
     }, [data]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
@@ -295,28 +296,15 @@ export default function BassGraph({
                         }} 
                       />
 
-                    {/* Good segments (within ±6 dB of avg3080) */}
+                    {/* Single continuous line with threshold-based coloring */}
                     <Line 
-                        type="monotone" 
-                        dataKey="goodLine"
-                        stroke="#213428" 
-                        strokeWidth={2} 
+                        type="linear"
+                        dataKey="spl"
+                        stroke="none"
                         dot={false}
                         activeDot={false}
-                        connectNulls={false}
                         isAnimationActive={false}
-                    />
-                    
-                    {/* Bad segments (outside ±6 dB of avg3080) */}
-                    <Line 
-                        type="monotone" 
-                        dataKey="badLine"
-                        stroke="#dc2626" 
-                        strokeWidth={2} 
-                        dot={false}
-                        activeDot={false}
-                        connectNulls={false}
-                        isAnimationActive={false}
+                        shape={<ThresholdLine />}
                     />
                     
                     {/* Mode line legend (REW style) */}
