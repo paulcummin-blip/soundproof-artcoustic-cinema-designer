@@ -93,7 +93,24 @@ function RP22ReportInner() {
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <div className="max-w-7xl mx-auto space-y-6">
                 <div className="flex justify-between items-center">
-                    <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
+                    <div>
+                        <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
+                        <div className="text-sm text-[#3E4349] mt-1">
+                            System: {(() => {
+                                const dolbyPreset = app?.dolbyLayout || "5.1";
+                                const base = String(dolbyPreset).split(" ")[0]; // "5.1.4" or "5.1"
+                                const parts = base.split(".");
+                                const bed = parts[0] || "5";
+                                const heights = parts[2] || "";
+                                
+                                const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
+                                const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
+                                const totalSubs = frontCount + rearCount;
+                                
+                                return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+                            })()}
+                        </div>
+                    </div>
                     <div className="text-right">
                         <div className="text-2xl font-bold text-[#213428]">Overall: {overallLevel()}</div>
                         <div className="text-sm text-[#3E4349]">
