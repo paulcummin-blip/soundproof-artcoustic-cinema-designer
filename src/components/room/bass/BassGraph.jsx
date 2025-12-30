@@ -31,13 +31,13 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Build chart data with goodLine/badLine properties per row
+    // Build chart data with lineOk/lineBad properties per row
     const chartData = React.useMemo(() => {
         if (!data || data.length === 0) return [];
         
-        // Fixed thresholds: 85 ± 6 dB
-        const LOWER_LIMIT = 79;
-        const UPPER_LIMIT = 91;
+        // Fixed thresholds: 85 ± 6 dB (reference to the fixed 85 dB line)
+        const LOWER = refDb - 6;
+        const UPPER = refDb + 6;
         
         const rows = [];
         let prevBad = null;
@@ -46,34 +46,34 @@ export default function BassGraph({
             const pt = data[i];
             const yi = pt.spl;
             
-            // Deterministic threshold-band classification
-            const isBad = Number.isFinite(yi) && (yi < LOWER_LIMIT || yi > UPPER_LIMIT);
+            // Threshold-band classification relative to 85 dB reference
+            const isBad = Number.isFinite(yi) && (yi < LOWER || yi > UPPER);
             
-            let goodLine = null;
-            let badLine = null;
+            let lineOk = null;
+            let lineBad = null;
             
             if (isBad) {
-                badLine = yi;
+                lineBad = yi;
                 // Boundary duplication for continuity
-                if (prevBad === false) goodLine = yi;
+                if (prevBad === false) lineOk = yi;
             } else {
-                goodLine = yi;
+                lineOk = yi;
                 // Boundary duplication for continuity
-                if (prevBad === true) badLine = yi;
+                if (prevBad === true) lineBad = yi;
             }
             
             rows.push({
                 frequency: pt.frequency,
                 spl: yi,
-                goodLine,
-                badLine
+                lineOk,
+                lineBad
             });
             
             prevBad = isBad;
         }
         
         return rows;
-    }, [data]);
+    }, [data, refDb]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
     const normalizedMarkers = React.useMemo(() => {
@@ -232,7 +232,7 @@ export default function BassGraph({
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
                     />
-                    <Tooltip content={<CustomTooltip />} />
+                    <Tooltip content={<CustomTooltip />} shared={false} />
 
                     {rewStyleMode && rp22Levels.map(level => (
                         <ReferenceLine 
@@ -250,6 +250,7 @@ export default function BassGraph({
                         />
                     ))}
                     
+                    {/* Schroeder frequency line (always visible when > 0) */}
                     {schroederFrequency > 0 && (
                         <ReferenceLine 
                             x={schroederFrequency} 
@@ -282,7 +283,7 @@ export default function BassGraph({
 
                     {/* 85 dB Reference Line (Always Visible) */}
                     <ReferenceLine 
-                        y={85} 
+                        y={refDb} 
                         stroke="#2563eb" 
                         strokeWidth={1.5}
                         strokeDasharray="4 4"
@@ -295,10 +296,10 @@ export default function BassGraph({
                         }} 
                       />
 
-                    {/* Good segments (within ±6 dB of avg3080) */}
+                    {/* Black segments (within ±6 dB of 85 dB) */}
                     <Line 
                         type="monotone" 
-                        dataKey="goodLine"
+                        dataKey="lineOk"
                         stroke="#213428" 
                         strokeWidth={2} 
                         dot={false}
@@ -306,11 +307,11 @@ export default function BassGraph({
                         connectNulls={false}
                         isAnimationActive={false}
                     />
-                    
-                    {/* Bad segments (outside ±6 dB of avg3080) */}
+
+                    {/* Red segments (outside ±6 dB of 85 dB) */}
                     <Line 
                         type="monotone" 
-                        dataKey="badLine"
+                        dataKey="lineBad"
                         stroke="#dc2626" 
                         strokeWidth={2} 
                         dot={false}
