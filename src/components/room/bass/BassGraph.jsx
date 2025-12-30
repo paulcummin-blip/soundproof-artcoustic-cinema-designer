@@ -31,28 +31,55 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Split data into normal and problem segments for highlighting
-    const { normalSegments, problemSegments } = React.useMemo(() => {
+    // Split data into contiguous segments for color highlighting
+    const coloredSegments = React.useMemo(() => {
         if (!data || data.length === 0) {
-            return { normalSegments: [], problemSegments: [] };
+            return [];
         }
         
         const PROBLEM_THRESHOLD = 6; // ±6 dB from refDb
-        const normalSegs = [];
-        const problemSegs = [];
+        const segments = [];
+        let currentSegment = null;
         
         data.forEach((point, i) => {
             const deviation = Math.abs((point.spl || 0) - refDb);
             const isProblem = Number.isFinite(point.spl) && deviation > PROBLEM_THRESHOLD;
+            const isNull = !Number.isFinite(point.spl);
             
-            if (isProblem) {
-                problemSegs.push(point);
-            } else {
-                normalSegs.push(point);
+            // Start new segment if:
+            // - no current segment
+            // - problem state changed
+            // - hit a null (break line)
+            const stateChanged = currentSegment && currentSegment.isProblem !== isProblem;
+            
+            if (!currentSegment || stateChanged || isNull) {
+                // Save previous segment if it has at least 2 points
+                if (currentSegment && currentSegment.points.length >= 2) {
+                    segments.push(currentSegment);
+                }
+                
+                // Start new segment (include previous point at boundary for continuity)
+                if (!isNull) {
+                    const startPoints = (stateChanged && i > 0) ? [data[i - 1], point] : [point];
+                    currentSegment = {
+                        isProblem,
+                        points: startPoints
+                    };
+                } else {
+                    currentSegment = null;
+                }
+            } else if (!isNull) {
+                // Continue current segment
+                currentSegment.points.push(point);
             }
         });
         
-        return { normalSegments: normalSegs, problemSegments: problemSegs };
+        // Save final segment
+        if (currentSegment && currentSegment.points.length >= 2) {
+            segments.push(currentSegment);
+        }
+        
+        return segments;
     }, [data, refDb]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
@@ -275,27 +302,20 @@ export default function BassGraph({
                         }} 
                       />
 
-                    {/* Normal segments (within ±6 dB of refDb) */}
-                    <Line 
-                        type="monotone" 
-                        dataKey="spl" 
-                        data={normalSegments}
-                        stroke="#213428" 
-                        strokeWidth={2} 
-                        dot={false}
-                        connectNulls={false}
-                    />
-                    
-                    {/* Problem segments (>±6 dB from refDb) */}
-                    <Line 
-                        type="monotone" 
-                        dataKey="spl" 
-                        data={problemSegments}
-                        stroke="#dc2626" 
-                        strokeWidth={2} 
-                        dot={false}
-                        connectNulls={false}
-                    />
+                    {/* SPL curve with color-coded segments */}
+                    {coloredSegments.map((segment, idx) => (
+                        <Line 
+                            key={`segment-${idx}`}
+                            type="monotone" 
+                            dataKey="spl" 
+                            data={segment.points}
+                            stroke={segment.isProblem ? "#dc2626" : "#213428"} 
+                            strokeWidth={2} 
+                            dot={false}
+                            connectNulls={false}
+                            isAnimationActive={false}
+                        />
+                    ))}
                     
                     {/* Mode line legend (REW style) */}
                     {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && (
