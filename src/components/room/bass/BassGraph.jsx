@@ -31,80 +31,99 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Build chart data with red/black split at refDb ± 6 dB (with threshold-crossing interpolation)
+    // Build chart data with red/black split at refDb ± 6 dB
+    // Handles: inside↔outside AND outside↔outside that crosses through the band (two crossings)
     const chartData = React.useMemo(() => {
-        if (!data || data.length === 0) return [];
+      if (!data || data.length === 0) return [];
 
-        const LOWER = refDb - 6;
-        const UPPER = refDb + 6;
+      // Safety: ensure data is monotonic in frequency (Recharts can misbehave otherwise)
+      const sorted = [...data].sort((a, b) => (a.frequency ?? 0) - (b.frequency ?? 0));
 
-        const rows = [];
-        
-        // Helper: push two rows at crossing point (finish old color, start new color)
-        const pushCross = (crossFreq, thr, prevInside, currInside) => {
-            if (prevInside && !currInside) {
-                // black → red
-                rows.push({ frequency: crossFreq, spl: thr, splGood: thr, splBad: null });
-                rows.push({ frequency: crossFreq, spl: thr, splGood: null, splBad: thr });
-            } else if (!prevInside && currInside) {
-                // red → black
-                rows.push({ frequency: crossFreq, spl: thr, splGood: null, splBad: thr });
-                rows.push({ frequency: crossFreq, spl: thr, splGood: thr, splBad: null });
-            }
-        };
-        
-        for (let i = 0; i < data.length; i++) {
-            const curr = data[i];
-            const currSpl = curr.spl;
-            const currFreq = curr.frequency;
-            
-            // Check if current point is inside or outside band
-            const currInside = Number.isFinite(currSpl) && currSpl >= LOWER && currSpl <= UPPER;
-            
-            // If this is not the first point, check for threshold crossings
-            if (i > 0) {
-                const prev = data[i - 1];
-                const prevSpl = prev.spl;
-                const prevFreq = prev.frequency;
-                const prevInside = Number.isFinite(prevSpl) && prevSpl >= LOWER && prevSpl <= UPPER;
-                
-                // Detect crossing and insert interpolated points
-                if (Number.isFinite(prevSpl) && Number.isFinite(currSpl) && prevInside !== currInside) {
-                    const crossings = [];
-                    
-                    // Check for lower threshold crossing
-                    if ((prevSpl >= LOWER && currSpl < LOWER) || (prevSpl < LOWER && currSpl >= LOWER)) {
-                        const t = (LOWER - prevSpl) / (currSpl - prevSpl);
-                        crossings.push({ thr: LOWER, t });
-                    }
-                    
-                    // Check for upper threshold crossing
-                    if ((prevSpl <= UPPER && currSpl > UPPER) || (prevSpl > UPPER && currSpl <= UPPER)) {
-                        const t = (UPPER - prevSpl) / (currSpl - prevSpl);
-                        crossings.push({ thr: UPPER, t });
-                    }
-                    
-                    // Sort crossings by t and insert in order
-                    crossings
-                        .filter(c => Number.isFinite(c.t) && c.t > 0 && c.t < 1)
-                        .sort((a, b) => a.t - b.t)
-                        .forEach(c => {
-                            const crossFreq = prevFreq + c.t * (currFreq - prevFreq);
-                            pushCross(crossFreq, c.thr, prevInside, currInside);
-                        });
-                }
-            }
-            
-            // Add current point with strict good/bad assignment
-            rows.push({
-                frequency: currFreq,
-                spl: currSpl,
-                splGood: currInside ? currSpl : null,
-                splBad: currInside ? null : currSpl
-            });
+      const LOWER = refDb - 6;
+      const UPPER = refDb + 6;
+
+      const rows = [];
+
+      const isFiniteNum = (v) => typeof v === "number" && Number.isFinite(v);
+
+      // Push two rows at a crossing to end the old colour and start the new colour
+      const pushCross = (crossFreq, thr, fromInside, toInside) => {
+        if (fromInside && !toInside) {
+          // black → red
+          rows.push({ frequency: crossFreq, spl: thr, splGood: thr, splBad: null });
+          rows.push({ frequency: crossFreq, spl: thr, splGood: null, splBad: thr });
+        } else if (!fromInside && toInside) {
+          // red → black
+          rows.push({ frequency: crossFreq, spl: thr, splGood: null, splBad: thr });
+          rows.push({ frequency: crossFreq, spl: thr, splGood: thr, splBad: null });
+        }
+      };
+
+      for (let i = 0; i < sorted.length; i++) {
+        const curr = sorted[i];
+        const currSpl = curr.spl;
+        const currFreq = curr.frequency;
+
+        // If SPL isn't finite, put a clean break (no NaN values in either series)
+        if (!isFiniteNum(currFreq) || !isFiniteNum(currSpl)) {
+          rows.push({
+            frequency: currFreq,
+            spl: null,
+            splGood: null,
+            splBad: null
+          });
+          continue;
         }
 
-        return rows;
+        const currInside = currSpl >= LOWER && currSpl <= UPPER;
+
+        if (i > 0) {
+          const prev = sorted[i - 1];
+          const prevSpl = prev.spl;
+          const prevFreq = prev.frequency;
+
+          if (isFiniteNum(prevFreq) && isFiniteNum(prevSpl)) {
+            const prevInside = prevSpl >= LOWER && prevSpl <= UPPER;
+
+            // Find all threshold crossings between prev and curr (can be 0, 1, or 2)
+            const crossings = [];
+
+            const denom = (currSpl - prevSpl);
+            if (denom !== 0) {
+              const tLower = (LOWER - prevSpl) / denom;
+              const tUpper = (UPPER - prevSpl) / denom;
+
+              // Only accept crossings that occur strictly between the two points
+              if (tLower > 0 && tLower < 1) crossings.push({ thr: LOWER, t: tLower });
+              if (tUpper > 0 && tUpper < 1) crossings.push({ thr: UPPER, t: tUpper });
+            }
+
+            // Sort crossings in travel order and toggle inside/outside state at each one
+            if (crossings.length > 0) {
+              crossings.sort((a, b) => a.t - b.t);
+
+              let stateInside = prevInside;
+
+              for (const c of crossings) {
+                const crossFreq = prevFreq + c.t * (currFreq - prevFreq);
+                const nextInside = !stateInside; // crossing toggles state
+                pushCross(crossFreq, c.thr, stateInside, nextInside);
+                stateInside = nextInside;
+              }
+            }
+          }
+        }
+
+        // Add the actual current sample point
+        rows.push({
+          frequency: currFreq,
+          spl: currSpl,
+          splGood: currInside ? currSpl : null,
+          splBad: currInside ? null : currSpl
+        });
+      }
+
+      return rows;
     }, [data, refDb]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
