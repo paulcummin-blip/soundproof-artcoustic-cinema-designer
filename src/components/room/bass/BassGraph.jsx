@@ -31,47 +31,25 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Build chart data with red/black split at fixed thresholds (85 ± 6 dB)
+    // Build chart data with red/black split at refDb ± 6 dB
     const chartData = React.useMemo(() => {
         if (!data || data.length === 0) return [];
 
-        const LOWER_LIMIT = refDb - 6; // 79 dB for refDb=85
-        const UPPER_LIMIT = refDb + 6; // 91 dB for refDb=85
+        const LOWER_LIMIT = refDb - 6;
+        const UPPER_LIMIT = refDb + 6;
 
-        // Build rows with spl, splGood, splBad
-        const rows = [];
-        
-        for (let i = 0; i < data.length; i++) {
-            const pt = data[i];
+        // Build rows with strict good/bad split (no boundary duplication)
+        const rows = data.map(pt => {
             const spl = pt.spl;
             const isGood = Number.isFinite(spl) && spl >= LOWER_LIMIT && spl <= UPPER_LIMIT;
-            const isBad = Number.isFinite(spl) && !isGood;
             
-            // Normal point
-            rows.push({
+            return {
                 frequency: pt.frequency,
                 spl: spl,
                 splGood: isGood ? spl : null,
-                splBad: isBad ? spl : null
-            });
-            
-            // Duplicate boundary points where color changes (prevents gaps)
-            if (i < data.length - 1) {
-                const nextSpl = data[i + 1].spl;
-                const nextIsGood = Number.isFinite(nextSpl) && nextSpl >= LOWER_LIMIT && nextSpl <= UPPER_LIMIT;
-                const nextIsBad = Number.isFinite(nextSpl) && !nextIsGood;
-                
-                // If color changes at this boundary, duplicate the point
-                if ((isGood && nextIsBad) || (isBad && nextIsGood)) {
-                    rows.push({
-                        frequency: pt.frequency,
-                        spl: spl,
-                        splGood: spl,
-                        splBad: spl
-                    });
-                }
-            }
-        }
+                splBad: isGood ? null : spl
+            };
+        });
 
         return rows;
     }, [data, refDb]);
@@ -233,7 +211,7 @@ export default function BassGraph({
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
                     />
-                    <Tooltip content={<CustomTooltip />} shared={false} />
+                    <Tooltip content={<CustomTooltip />} shared={false} cursor={false} />
 
                     {rewStyleMode && rp22Levels.map(level => (
                         <ReferenceLine 
@@ -282,14 +260,14 @@ export default function BassGraph({
                       />
                     ))}
 
-                    {/* 85 dB Reference Line (Always Visible) */}
+                    {/* Reference Line (Always Visible) */}
                     <ReferenceLine 
-                        y={Number.isFinite(refDb) ? refDb : 85} 
+                        y={refDb} 
                         stroke="#2563eb" 
                         strokeWidth={1.5}
                         strokeDasharray="4 4"
                         label={{ 
-                          value: '85 dB Reference', 
+                          value: `${refDb} dB Reference`, 
                           position: 'right', 
                           fill: '#2563eb', 
                           className: 'font-body text-xs',
@@ -297,7 +275,7 @@ export default function BassGraph({
                         }} 
                       />
 
-                    {/* Black curve (inside limits: 79-91 dB) */}
+                    {/* Black curve (inside limits: refDb ± 6 dB) */}
                     <Line 
                         type="linear" 
                         dataKey="splGood"
@@ -305,11 +283,11 @@ export default function BassGraph({
                         strokeWidth={2} 
                         dot={false}
                         activeDot={false}
-                        connectNulls={true}
+                        connectNulls={false}
                         isAnimationActive={false}
                     />
 
-                    {/* Red curve (outside limits: <79 or >91 dB) */}
+                    {/* Red curve (outside limits: > refDb+6 or < refDb-6) */}
                     <Line 
                         type="linear" 
                         dataKey="splBad"
@@ -317,7 +295,7 @@ export default function BassGraph({
                         strokeWidth={2} 
                         dot={false}
                         activeDot={false}
-                        connectNulls={true}
+                        connectNulls={false}
                         isAnimationActive={false}
                     />
                     
