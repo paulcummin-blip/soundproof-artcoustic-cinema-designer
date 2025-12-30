@@ -393,7 +393,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves: null,
-        absoluteSplMode: false
+        absoluteSplMode: false,
+        sbirDebugSingleFrontWall: sbirDebugSingleFrontWall // DIAGNOSTIC: single reflection mode
       });
 
       // Clear failure cache on success
@@ -836,7 +837,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
         modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
         complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
-        componentView: componentView // Part 3 - component isolation
+        componentView: componentView, // Part 3 - component isolation
+        sbirDebugSingleFrontWall: sbirDebugSingleFrontWall // DIAGNOSTIC: single reflection mode
       });
     } catch (e) {
       return {
