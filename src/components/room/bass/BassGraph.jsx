@@ -40,6 +40,19 @@ export default function BassGraph({
 
         const rows = [];
         
+        // Helper: push two rows at crossing point (finish old color, start new color)
+        const pushCross = (crossFreq, thr, prevInside, currInside) => {
+            if (prevInside && !currInside) {
+                // black → red
+                rows.push({ frequency: crossFreq, spl: thr, splGood: thr, splBad: null });
+                rows.push({ frequency: crossFreq, spl: thr, splGood: null, splBad: thr });
+            } else if (!prevInside && currInside) {
+                // red → black
+                rows.push({ frequency: crossFreq, spl: thr, splGood: null, splBad: thr });
+                rows.push({ frequency: crossFreq, spl: thr, splGood: thr, splBad: null });
+            }
+        };
+        
         for (let i = 0; i < data.length; i++) {
             const curr = data[i];
             const currSpl = curr.spl;
@@ -55,33 +68,30 @@ export default function BassGraph({
                 const prevFreq = prev.frequency;
                 const prevInside = Number.isFinite(prevSpl) && prevSpl >= LOWER && prevSpl <= UPPER;
                 
-                // Detect crossing
+                // Detect crossing and insert interpolated points
                 if (Number.isFinite(prevSpl) && Number.isFinite(currSpl) && prevInside !== currInside) {
-                    // Determine which threshold was crossed
-                    const crossedLower = (prevSpl >= LOWER && currSpl < LOWER) || (prevSpl < LOWER && currSpl >= LOWER);
-                    const crossedUpper = (prevSpl <= UPPER && currSpl > UPPER) || (prevSpl > UPPER && currSpl <= UPPER);
+                    const crossings = [];
                     
-                    if (crossedLower) {
+                    // Check for lower threshold crossing
+                    if ((prevSpl >= LOWER && currSpl < LOWER) || (prevSpl < LOWER && currSpl >= LOWER)) {
                         const t = (LOWER - prevSpl) / (currSpl - prevSpl);
-                        const crossFreq = prevFreq + t * (currFreq - prevFreq);
-                        rows.push({
-                            frequency: crossFreq,
-                            spl: LOWER,
-                            splGood: LOWER,
-                            splBad: LOWER
-                        });
+                        crossings.push({ thr: LOWER, t });
                     }
                     
-                    if (crossedUpper) {
+                    // Check for upper threshold crossing
+                    if ((prevSpl <= UPPER && currSpl > UPPER) || (prevSpl > UPPER && currSpl <= UPPER)) {
                         const t = (UPPER - prevSpl) / (currSpl - prevSpl);
-                        const crossFreq = prevFreq + t * (currFreq - prevFreq);
-                        rows.push({
-                            frequency: crossFreq,
-                            spl: UPPER,
-                            splGood: UPPER,
-                            splBad: UPPER
-                        });
+                        crossings.push({ thr: UPPER, t });
                     }
+                    
+                    // Sort crossings by t and insert in order
+                    crossings
+                        .filter(c => Number.isFinite(c.t) && c.t > 0 && c.t < 1)
+                        .sort((a, b) => a.t - b.t)
+                        .forEach(c => {
+                            const crossFreq = prevFreq + c.t * (currFreq - prevFreq);
+                            pushCross(crossFreq, c.thr, prevInside, currInside);
+                        });
                 }
             }
             
