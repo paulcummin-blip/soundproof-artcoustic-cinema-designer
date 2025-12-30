@@ -31,66 +31,55 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Compute reference average from 30-80 Hz band (for ±6 dB threshold)
-    const avg3080 = React.useMemo(() => {
-        if (!data || data.length === 0) return refDb;
+    // Build chart data with goodLine/badLine properties per row
+    const chartData = React.useMemo(() => {
+        if (!data || data.length === 0) return [];
         
-        const band = data
-            .filter(d => d.frequency >= 30 && d.frequency <= 80)
-            .map(d => d.spl)
-            .filter(v => Number.isFinite(v));
-        
-        if (band.length === 0) return refDb;
-        
-        return band.reduce((sum, v) => sum + v, 0) / band.length;
-    }, [data, refDb]);
-    
-    // Split data into good/bad masked datasets with boundary duplication for continuity
-    const { goodLine, badLine } = React.useMemo(() => {
-        if (!data || data.length === 0) {
-            return { goodLine: [], badLine: [] };
+        // Compute avg3080 (30-80 Hz average)
+        let sum = 0, n = 0;
+        for (let i = 0; i < data.length; i++) {
+            const pt = data[i];
+            if (pt.frequency >= 30 && pt.frequency <= 80 && Number.isFinite(pt.spl)) {
+                sum += pt.spl;
+                n++;
+            }
         }
+        const avg = n > 0 ? sum / n : refDb;
         
-        const PROBLEM_THRESHOLD = 6; // ±6 dB from avg3080
-        const good = [];
-        const bad = [];
+        const PROBLEM_THRESHOLD = 6;
+        const rows = [];
+        let prevBad = null;
         
-        let prevIsBad = null;
-        
-        data.forEach((point, i) => {
-            const spl = point.spl;
-            const isBad = Number.isFinite(spl) && Math.abs(spl - avg3080) > PROBLEM_THRESHOLD;
+        for (let i = 0; i < data.length; i++) {
+            const pt = data[i];
+            const yi = pt.spl;
+            const isBad = Number.isFinite(yi) ? Math.abs(yi - avg) > PROBLEM_THRESHOLD : false;
             
-            // Duplicate boundary points in both datasets for continuity
+            let goodLine = null;
+            let badLine = null;
+            
             if (isBad) {
-                // This point is bad
-                badLine.push({
-                    frequency: point.frequency,
-                    spl: spl
-                });
-                // Include in good line only if transitioning from good to bad
-                goodLine.push({
-                    frequency: point.frequency,
-                    spl: (prevIsBad === false) ? spl : null
-                });
+                badLine = yi;
+                // Boundary duplication for continuity
+                if (prevBad === false) goodLine = yi;
             } else {
-                // This point is good
-                goodLine.push({
-                    frequency: point.frequency,
-                    spl: spl
-                });
-                // Include in bad line only if transitioning from bad to good
-                badLine.push({
-                    frequency: point.frequency,
-                    spl: (prevIsBad === true) ? spl : null
-                });
+                goodLine = yi;
+                // Boundary duplication for continuity
+                if (prevBad === true) badLine = yi;
             }
             
-            prevIsBad = isBad;
-        });
+            rows.push({
+                frequency: pt.frequency,
+                spl: yi,
+                goodLine,
+                badLine
+            });
+            
+            prevBad = isBad;
+        }
         
-        return { goodLine: good, badLine: bad };
-    }, [data, avg3080]);
+        return rows;
+    }, [data, refDb]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
     const normalizedMarkers = React.useMemo(() => {
@@ -229,7 +218,7 @@ export default function BassGraph({
                 </div>
             )}
             <ResponsiveContainer>
-                <LineChart data={data} margin={{ top: 30, right: 50, left: 20, bottom: 30 }}>
+                <LineChart data={chartData} margin={{ top: 30, right: 50, left: 20, bottom: 30 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#DCDBD6" />
                     <XAxis
                         dataKey="frequency"
@@ -315,8 +304,7 @@ export default function BassGraph({
                     {/* Good segments (within ±6 dB of avg3080) */}
                     <Line 
                         type="monotone" 
-                        dataKey="spl" 
-                        data={goodLine}
+                        dataKey="goodLine"
                         stroke="#213428" 
                         strokeWidth={2} 
                         dot={false}
@@ -328,8 +316,7 @@ export default function BassGraph({
                     {/* Bad segments (outside ±6 dB of avg3080) */}
                     <Line 
                         type="monotone" 
-                        dataKey="spl" 
-                        data={badLine}
+                        dataKey="badLine"
                         stroke="#dc2626" 
                         strokeWidth={2} 
                         dot={false}
