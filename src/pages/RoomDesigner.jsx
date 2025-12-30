@@ -3301,7 +3301,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   const rearCount  = Number(_rearSubsCfg?.count ?? 0);
                   const totalSubs  = frontCount + rearCount;
 
-                  const subDisplay = totalSubs > 0 ? totalSubs : 1;
+                  const subDisplay = totalSubs; // Show actual count (including 0)
 
                   // If there are heights, show bed.sub.heights. If not, show bed.sub.
                   return heights ? `${bed}.${subDisplay}.${heights}` : `${bed}.${subDisplay}`;
