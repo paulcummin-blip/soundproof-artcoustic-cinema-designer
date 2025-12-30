@@ -356,7 +356,7 @@ export default function BassGraph({
                         strokeWidth={2} 
                         dot={false}
                         activeDot={false}
-                        connectNulls={false}
+                        connectNulls={true}
                         isAnimationActive={false}
                     />
 
@@ -368,7 +368,7 @@ export default function BassGraph({
                         strokeWidth={2} 
                         dot={false}
                         activeDot={false}
-                        connectNulls={false}
+                        connectNulls={true}
                         isAnimationActive={false}
                     />
                     

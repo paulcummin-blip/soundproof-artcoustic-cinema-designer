@@ -965,29 +965,57 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }));
   }, [selectedSeat]);
   
-  // Derived REW relative datasets (normalize 30–80 Hz to ~0 dB)
-  const normalizeDataset = React.useCallback((dataset) => {
-    if (!dataset || !Array.isArray(dataset.data) || dataset.data.length === 0) return { data: [], debug: dataset?.debug };
+  // Derived REW relative datasets: normalise 30–80 Hz POWER-DOMAIN average to 85 dB
+  // This keeps the curve in SPL units (sensible Y-axis) while aligning the band to a fixed reference.
+  const normalizeDatasetTo85 = React.useCallback((dataset) => {
+    if (!dataset || !Array.isArray(dataset.data) || dataset.data.length === 0) {
+      return { data: [], debug: dataset?.debug };
+    }
+    
+    // Extract 30–80 Hz band SPL values
     const band = dataset.data
       .filter(d => d.frequency >= 30 && d.frequency <= 80)
       .map(d => d.spl)
       .filter(v => Number.isFinite(v));
-    if (band.length < 3) return { data: dataset.data, debug: dataset.debug };
-    const sorted = [...band].sort((a,b)=>a-b);
-    const ref = sorted[Math.floor(sorted.length/2)];
-    const rel = dataset.data.map(p => ({ frequency: p.frequency, spl: p.spl - ref }));
-    return { data: rel, debug: { ...(dataset.debug||{}), normRefDb: ref } };
+    
+    if (band.length < 3) {
+      return { data: dataset.data, debug: dataset.debug };
+    }
+    
+    // POWER-DOMAIN average: convert dB → linear power, average, convert back
+    const powers = band.map(db => Math.pow(10, db / 10));
+    const avgPower = powers.reduce((a, b) => a + b, 0) / powers.length;
+    const avgDb = 10 * Math.log10(avgPower);
+    
+    // Compute offset so that avgDb becomes 85 dB
+    const offsetDb = 85 - avgDb;
+    
+    // Apply offset to entire curve (keeps sensible SPL values on Y-axis)
+    const shifted = dataset.data.map(p => ({
+      frequency: p.frequency,
+      spl: Number.isFinite(p.spl) ? p.spl + offsetDb : p.spl
+    }));
+    
+    return {
+      data: shifted,
+      debug: {
+        ...(dataset.debug || {}),
+        normRefDb: 85,
+        normOffsetAppliedDb: offsetDb.toFixed(2),
+        normBandAvgDb: avgDb.toFixed(2)
+      }
+    };
   }, []);
 
   const rewModesDataRel = useMemo(() => {
     if (!rewStyleMode) return null;
-    return normalizeDataset(rewModesDataAbs || { data: [] });
-  }, [rewStyleMode, rewModesDataAbs, normalizeDataset]);
+    return normalizeDatasetTo85(rewModesDataAbs || { data: [] });
+  }, [rewStyleMode, rewModesDataAbs, normalizeDatasetTo85]);
 
   const rewRoomPlusProductDataRel = useMemo(() => {
     if (!rewStyleMode) return null;
-    return normalizeDataset(rewRoomPlusProductDataAbs || { data: [] });
-  }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDataset]);
+    return normalizeDatasetTo85(rewRoomPlusProductDataAbs || { data: [] });
+  }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDatasetTo85]);
 
   // Aliases switch Abs/Rel based on UI toggle
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
@@ -1010,8 +1038,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, responseData, rewCompareView, rewRelativeView]);
 
-  // TEMP DEBUG
-  console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
+  // TEMP DEBUG (can remove later)
+  // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
 
   // AUDIT CHECKPOINT (Part D2): rewSplAnchoredData is UNUSED - kept for legacy compatibility
   // All display paths use displayData directly (no anchoring, no normalization)
