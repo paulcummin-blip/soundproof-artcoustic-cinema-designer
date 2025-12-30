@@ -33,8 +33,7 @@ export default function BassGraph({
     let data = responseData;
     
     // Build chart data with red/black split at refDb ± 6 dB
-    // Simple approach: no crossing-point interpolation (avoids gaps)
-    // connectNulls on both Lines will keep curves continuous
+    // Uses threshold-crossing interpolation to ensure clean color transitions without gaps
     const chartData = React.useMemo(() => {
       if (!data || data.length === 0) return [];
 
@@ -44,28 +43,75 @@ export default function BassGraph({
       const LOWER = refDb - 6;
       const UPPER = refDb + 6;
 
-      return sorted.map(p => {
+      const result = [];
+
+      for (let i = 0; i < sorted.length; i++) {
+        const p = sorted[i];
         const f = p.frequency;
         const v = p.spl;
 
         if (!Number.isFinite(f) || !Number.isFinite(v)) {
-          return { frequency: f, spl: null, splGood: null, splBad: null };
+          result.push({ frequency: f, spl: null, splGood: null, splBad: null });
+          continue;
         }
 
-        // If highlight is disabled (Relative view already normalised to 85), just show black
+        // If highlight is disabled, just show black
         if (disableHighlight) {
-          return { frequency: f, spl: v, splGood: v, splBad: null };
+          result.push({ frequency: f, spl: v, splGood: v, splBad: null });
+          continue;
         }
 
         const inside = v >= LOWER && v <= UPPER;
 
-        return {
+        // Check for threshold crossing with next point
+        if (i < sorted.length - 1) {
+          const nextP = sorted[i + 1];
+          const nextF = nextP.frequency;
+          const nextV = nextP.spl;
+
+          if (Number.isFinite(nextF) && Number.isFinite(nextV)) {
+            const nextInside = nextV >= LOWER && nextV <= UPPER;
+
+            // If we're crossing a threshold, insert an interpolated point
+            if (inside !== nextInside) {
+              // Determine which threshold we're crossing
+              const crossingThreshold = v < LOWER || nextV < LOWER ? LOWER : UPPER;
+              
+              // Linear interpolation to find crossing frequency
+              const t = (crossingThreshold - v) / (nextV - v);
+              const crossingF = f + t * (nextF - f);
+
+              // Add current point
+              result.push({
+                frequency: f,
+                spl: v,
+                splGood: inside ? v : null,
+                splBad: inside ? null : v
+              });
+
+              // Add crossing point (both lines have value here for clean transition)
+              result.push({
+                frequency: crossingF,
+                spl: crossingThreshold,
+                splGood: crossingThreshold,
+                splBad: crossingThreshold
+              });
+
+              continue;
+            }
+          }
+        }
+
+        // Normal point (no crossing)
+        result.push({
           frequency: f,
           spl: v,
           splGood: inside ? v : null,
           splBad: inside ? null : v
-        };
-      });
+        });
+      }
+
+      return result;
     }, [data, refDb, disableHighlight]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
@@ -297,7 +343,7 @@ export default function BassGraph({
                         strokeWidth={2} 
                         dot={false}
                         activeDot={false}
-                        connectNulls={true}
+                        connectNulls={false}
                         isAnimationActive={false}
                     />
 
@@ -309,7 +355,7 @@ export default function BassGraph({
                         strokeWidth={2} 
                         dot={false}
                         activeDot={false}
-                        connectNulls={true}
+                        connectNulls={false}
                         isAnimationActive={false}
                     />
                     
