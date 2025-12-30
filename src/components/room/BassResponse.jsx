@@ -425,7 +425,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [rewStyleMode, rewCompareView, roomDims, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, seatNudgeTest]);
 
   // REW-style room-only curve (modal response with flat/generic sub)
-  const rewModesData = useMemo(() => {
+  const rewModesDataAbs = useMemo(() => {
     if (!rewStyleMode) return null;
 
     const w = roomDims?.widthM;
@@ -902,11 +902,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
   const activeDebug = useMemo(() => {
     if (!rewStyleMode) return null;
-    
-    return rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-      ? rewRoomPlusProductData.debug
-      : rewModesData?.debug;
-  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, componentView]);
+    const useRel = rewRelativeView;
+    const dbg = rewView === 'roomPlusProduct'
+      ? (useRel ? rewRoomPlusProductDataAbs?.debug : rewRoomPlusProductDataAbs?.debug)
+      : (useRel ? rewModesDataAbs?.debug : rewModesDataAbs?.debug);
+    return dbg || null;
+  }, [rewStyleMode, rewView, rewRelativeView, rewModesDataAbs, rewRoomPlusProductDataAbs, componentView]);
 
   // REW Compare View display preset (does NOT mutate user smoothing state)
   // Compare view forces display to 1/3, but user's saved choice (1/48 or 1/3) remains intact

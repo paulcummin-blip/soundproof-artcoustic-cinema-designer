@@ -26,7 +26,8 @@ export default function BassGraph({
   rewStyleMode = false,
   yDomain,
   showAxialOnly = false,
-  refDb = 85
+  refDb = 85,
+  disableHighlight = false
 }) {
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
