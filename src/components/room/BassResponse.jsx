@@ -3221,7 +3221,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             
             return (
               <BassGraph
-                responseData={rewStyleMode ? clampedData : displayData}
+                responseData={displayData}
                 schroederFrequency={schroederFrequency}
                 rp22Levels={rp22Levels}
                 toggles={toggles}
@@ -3233,7 +3233,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 rewStyleMode={rewStyleMode}
                 yDomain={finalYDomain}
                 showAxialOnly={false}
-                refDb={yAxisDomain?.refDb || 85}
+                refDb={85}
               />
             );
           })() : (
