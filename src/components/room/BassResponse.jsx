@@ -3252,8 +3252,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 rewStyleMode={rewStyleMode}
                 yDomain={finalYDomain}
                 showAxialOnly={false}
-                refDb={rewCompareView && yAxisDomain?.refDb ? yAxisDomain.refDb : null}
-                showRefLine={rewCompareView}
               />
             );
           })() : (
