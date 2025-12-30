@@ -289,22 +289,45 @@ export default function BassGraph({
                         />
                     ))}
                     
-                    {/* Schroeder frequency line (always visible when > 0) */}
-                    {schroederFrequency > 0 && (
-                        <ReferenceLine 
-                            x={schroederFrequency} 
-                            stroke="#4A230F" 
-                            strokeDasharray="4 4" 
-                            label={{ 
-                                value: 'Schroeder', 
-                                position: 'insideTopRight', 
-                                fill: '#4A230F', 
-                                className: 'font-body text-xs',
-                                offset: 10,
-                                style: { textAnchor: 'end' }
-                            }} 
-                        />
-                    )}
+                    {/* Schroeder frequency line (always visible when > 0, with off-scale indicator) */}
+                    {schroederFrequency > 0 && (() => {
+                        const isOffScale = schroederFrequency > 200;
+                        const labelValue = isOffScale 
+                            ? `Schroeder (${schroederFrequency.toFixed(0)} Hz off-scale)` 
+                            : 'Schroeder';
+
+                        // If off-scale, show label without line
+                        if (isOffScale) {
+                            return (
+                                <text 
+                                    x={180} 
+                                    y={30} 
+                                    fontSize={10} 
+                                    fill="#4A230F" 
+                                    className="font-body"
+                                >
+                                    {labelValue}
+                                </text>
+                            );
+                        }
+
+                        // On-scale: show line + label
+                        return (
+                            <ReferenceLine 
+                                x={schroederFrequency} 
+                                stroke="#4A230F" 
+                                strokeDasharray="4 4" 
+                                label={{ 
+                                    value: labelValue, 
+                                    position: 'insideTopRight', 
+                                    fill: '#4A230F', 
+                                    className: 'font-body text-xs',
+                                    offset: 10,
+                                    style: { textAnchor: 'end' }
+                                }} 
+                            />
+                        );
+                    })()}
 
                     {/* REW-style mode markers */}
                     {renderModeMarkers()}

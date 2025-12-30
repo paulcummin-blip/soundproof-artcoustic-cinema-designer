@@ -2891,6 +2891,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* REW mode info (only when REW is ON and no error) */}
         {rewStyleMode && !activeDebug?.error && (() => {
+          // Format Schroeder frequency with off-scale indicator
+          const schroederHz = activeDebug?.schroederHz || schroederFrequency;
+          const schroederDisplay = schroederHz > 0
+            ? (schroederHz > 200 ? `${schroederHz.toFixed(1)} Hz (off-scale)` : `${schroederHz.toFixed(1)} Hz`)
+            : 'N/A';
+          
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
               <div className="font-semibold mb-1">
@@ -2899,6 +2905,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="text-[11px] space-y-1">
                 <div>• Complex modal summation with spatial coupling</div>
                 <div>• {activeDebug?.qMappingText || 'Q-based damping'}</div>
+                <div>• Schroeder: <strong>{schroederDisplay}</strong></div>
                 <div>• {rewRelativeView ? 'Relative (normalized to 0 dB @ 30–80 Hz)' : 'Absolute SPL'} scale</div>
                 {rewView === 'roomPlusProduct' && (
                   <div>• Product curves: {(activeDebug?.productModels || []).join(', ') || 'None'}</div>
