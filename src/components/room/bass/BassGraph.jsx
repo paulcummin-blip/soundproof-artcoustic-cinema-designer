@@ -31,25 +31,68 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Build chart data with red/black split at refDb ± 6 dB
+    // Build chart data with red/black split at refDb ± 6 dB (with threshold-crossing interpolation)
     const chartData = React.useMemo(() => {
         if (!data || data.length === 0) return [];
 
-        const LOWER_LIMIT = refDb - 6;
-        const UPPER_LIMIT = refDb + 6;
+        const LOWER = refDb - 6;
+        const UPPER = refDb + 6;
 
-        // Build rows with strict good/bad split (no boundary duplication)
-        const rows = data.map(pt => {
-            const spl = pt.spl;
-            const isGood = Number.isFinite(spl) && spl >= LOWER_LIMIT && spl <= UPPER_LIMIT;
+        const rows = [];
+        
+        for (let i = 0; i < data.length; i++) {
+            const curr = data[i];
+            const currSpl = curr.spl;
+            const currFreq = curr.frequency;
             
-            return {
-                frequency: pt.frequency,
-                spl: spl,
-                splGood: isGood ? spl : null,
-                splBad: isGood ? null : spl
-            };
-        });
+            // Check if current point is inside or outside band
+            const currInside = Number.isFinite(currSpl) && currSpl >= LOWER && currSpl <= UPPER;
+            
+            // If this is not the first point, check for threshold crossings
+            if (i > 0) {
+                const prev = data[i - 1];
+                const prevSpl = prev.spl;
+                const prevFreq = prev.frequency;
+                const prevInside = Number.isFinite(prevSpl) && prevSpl >= LOWER && prevSpl <= UPPER;
+                
+                // Detect crossing
+                if (Number.isFinite(prevSpl) && Number.isFinite(currSpl) && prevInside !== currInside) {
+                    // Determine which threshold was crossed
+                    const crossedLower = (prevSpl >= LOWER && currSpl < LOWER) || (prevSpl < LOWER && currSpl >= LOWER);
+                    const crossedUpper = (prevSpl <= UPPER && currSpl > UPPER) || (prevSpl > UPPER && currSpl <= UPPER);
+                    
+                    if (crossedLower) {
+                        const t = (LOWER - prevSpl) / (currSpl - prevSpl);
+                        const crossFreq = prevFreq + t * (currFreq - prevFreq);
+                        rows.push({
+                            frequency: crossFreq,
+                            spl: LOWER,
+                            splGood: LOWER,
+                            splBad: LOWER
+                        });
+                    }
+                    
+                    if (crossedUpper) {
+                        const t = (UPPER - prevSpl) / (currSpl - prevSpl);
+                        const crossFreq = prevFreq + t * (currFreq - prevFreq);
+                        rows.push({
+                            frequency: crossFreq,
+                            spl: UPPER,
+                            splGood: UPPER,
+                            splBad: UPPER
+                        });
+                    }
+                }
+            }
+            
+            // Add current point with strict good/bad assignment
+            rows.push({
+                frequency: currFreq,
+                spl: currSpl,
+                splGood: currInside ? currSpl : null,
+                splBad: currInside ? null : currSpl
+            });
+        }
 
         return rows;
     }, [data, refDb]);
