@@ -965,8 +965,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }));
   }, [selectedSeat]);
   
-  // Derived REW relative datasets: normalise 30–80 Hz median to 0 dB baseline
-  // This makes the curve "relative" for comparison while keeping real SPL units on Y-axis
+  // Derived REW relative datasets: normalise 30–80 Hz to 0 dB baseline
+  // Uses mean in linear PRESSURE domain (REW-like visual balance point)
   const normalizeDatasetToRelative = React.useCallback((dataset) => {
     if (!dataset || !Array.isArray(dataset.data) || dataset.data.length === 0) {
       return { data: [], debug: dataset?.debug };
@@ -982,14 +982,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return { data: dataset.data, debug: dataset.debug };
     }
     
-    // Use MEDIAN for robustness (REW-style)
-    const sorted = [...band].sort((a, b) => a - b);
-    const medianDb = sorted[Math.floor(sorted.length / 2)];
+    // Use MEAN in LINEAR PRESSURE domain for visual balance point (REW-style)
+    // Convert dB → linear pressure, average, convert back to dB
+    const pressures = band.map(db => Math.pow(10, db / 20));
+    const meanPressure = pressures.reduce((a, b) => a + b, 0) / pressures.length;
+    const baselineDb = 20 * Math.log10(meanPressure);
     
-    // Subtract median from entire curve (30-80 Hz band becomes 0 dB centered)
+    // Subtract baseline from entire curve (30-80 Hz band centers at 0 dB)
     const shifted = dataset.data.map(p => ({
       frequency: p.frequency,
-      spl: Number.isFinite(p.spl) ? p.spl - medianDb : p.spl
+      spl: Number.isFinite(p.spl) ? p.spl - baselineDb : p.spl
     }));
     
     return {
@@ -997,8 +999,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       debug: {
         ...(dataset.debug || {}),
         normRefDb: 0,
-        normOffsetAppliedDb: (-medianDb).toFixed(2),
-        normBandMedianDb: medianDb.toFixed(2)
+        normOffsetAppliedDb: (-baselineDb).toFixed(2),
+        normBandPressureMeanDb: baselineDb.toFixed(2)
       }
     };
   }, []);
@@ -1174,6 +1176,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   // Compute stable Y-axis domain using 30–80 Hz band intelligence
   // Auto window: refDb ± 20 dB (40 dB total span)
+  // Uses MEAN in linear PRESSURE domain for consistent visual centering
   const computeStableYDomain = React.useCallback((data) => {
     if (!data || data.length === 0) return null;
 
@@ -1183,11 +1186,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       .map(d => d.spl)
       .filter(v => Number.isFinite(v));
 
-    if (band.length < 3) return null; // Need at least 3 points for meaningful median
+    if (band.length < 3) return null; // Need at least 3 points for meaningful average
 
-    // Use MEDIAN for refDb (REW-style, robust to nulls)
-    const sorted = [...band].sort((a, b) => a - b);
-    const refDb = sorted[Math.floor(sorted.length / 2)];
+    // Use MEAN in LINEAR PRESSURE domain for visual balance point
+    const pressures = band.map(db => Math.pow(10, db / 20));
+    const meanPressure = pressures.reduce((a, b) => a + b, 0) / pressures.length;
+    const refDb = 20 * Math.log10(meanPressure);
 
     // Auto window: refDb ± 20 dB (40 dB total span)
     const span = 40;
@@ -1197,11 +1201,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { refDb, min, max };
   }, []);
 
-  // REW Compare View: auto window centered on 30-80 Hz median
+  // REW Compare View: auto window centered on 30-80 Hz pressure mean
   const computeRewCompareYDomain = React.useCallback((data) => {
     if (!data || data.length === 0) return null;
 
-    // 30–80 Hz band median as reference
+    // 30–80 Hz band pressure mean as reference
     const band = data
       .filter(d => d.frequency >= 30 && d.frequency <= 80)
       .map(d => d.spl)
@@ -1212,8 +1216,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return { refDb: 85, min: 65, max: 105 };
     }
 
-    const sorted = [...band].sort((a, b) => a - b);
-    const refDb = sorted[Math.floor(sorted.length / 2)];
+    // Use MEAN in LINEAR PRESSURE domain for visual balance point
+    const pressures = band.map(db => Math.pow(10, db / 20));
+    const meanPressure = pressures.reduce((a, b) => a + b, 0) / pressures.length;
+    const refDb = 20 * Math.log10(meanPressure);
 
     // Auto window: refDb ± 20 dB
     const min = refDb - 20;
