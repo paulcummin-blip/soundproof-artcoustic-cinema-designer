@@ -3,6 +3,7 @@
 // Uses rectangular room normal modes with source/receiver spatial coupling
 
 const SPEED_OF_SOUND = 343; // m/s
+const SPATIAL_AVG_RADIUS_M = 0.10; // REW-style mic/source spatial averaging (10cm)
 
 /**
  * Compute room modes response (axial, tangential, oblique)
