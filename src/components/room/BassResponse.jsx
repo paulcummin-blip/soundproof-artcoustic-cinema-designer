@@ -965,9 +965,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }));
   }, [selectedSeat]);
   
-  // Derived REW relative datasets: normalise 30–80 Hz POWER-DOMAIN average to 85 dB
-  // This keeps the curve in SPL units (sensible Y-axis) while aligning the band to a fixed reference.
-  const normalizeDatasetTo85 = React.useCallback((dataset) => {
+  // Derived REW relative datasets: normalise 30–80 Hz median to 0 dB baseline
+  // This makes the curve "relative" for comparison while keeping real SPL units on Y-axis
+  const normalizeDatasetToRelative = React.useCallback((dataset) => {
     if (!dataset || !Array.isArray(dataset.data) || dataset.data.length === 0) {
       return { data: [], debug: dataset?.debug };
     }
@@ -982,40 +982,36 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return { data: dataset.data, debug: dataset.debug };
     }
     
-    // POWER-DOMAIN average: convert dB → linear power, average, convert back
-    const powers = band.map(db => Math.pow(10, db / 10));
-    const avgPower = powers.reduce((a, b) => a + b, 0) / powers.length;
-    const avgDb = 10 * Math.log10(avgPower);
+    // Use MEDIAN for robustness (REW-style)
+    const sorted = [...band].sort((a, b) => a - b);
+    const medianDb = sorted[Math.floor(sorted.length / 2)];
     
-    // Compute offset so that avgDb becomes 85 dB
-    const offsetDb = 85 - avgDb;
-    
-    // Apply offset to entire curve (keeps sensible SPL values on Y-axis)
+    // Subtract median from entire curve (30-80 Hz band becomes 0 dB centered)
     const shifted = dataset.data.map(p => ({
       frequency: p.frequency,
-      spl: Number.isFinite(p.spl) ? p.spl + offsetDb : p.spl
+      spl: Number.isFinite(p.spl) ? p.spl - medianDb : p.spl
     }));
     
     return {
       data: shifted,
       debug: {
         ...(dataset.debug || {}),
-        normRefDb: 85,
-        normOffsetAppliedDb: offsetDb.toFixed(2),
-        normBandAvgDb: avgDb.toFixed(2)
+        normRefDb: 0,
+        normOffsetAppliedDb: (-medianDb).toFixed(2),
+        normBandMedianDb: medianDb.toFixed(2)
       }
     };
   }, []);
 
   const rewModesDataRel = useMemo(() => {
     if (!rewStyleMode) return null;
-    return normalizeDatasetTo85(rewModesDataAbs || { data: [] });
-  }, [rewStyleMode, rewModesDataAbs, normalizeDatasetTo85]);
+    return normalizeDatasetToRelative(rewModesDataAbs || { data: [] });
+  }, [rewStyleMode, rewModesDataAbs, normalizeDatasetToRelative]);
 
   const rewRoomPlusProductDataRel = useMemo(() => {
     if (!rewStyleMode) return null;
-    return normalizeDatasetTo85(rewRoomPlusProductDataAbs || { data: [] });
-  }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDatasetTo85]);
+    return normalizeDatasetToRelative(rewRoomPlusProductDataAbs || { data: [] });
+  }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDatasetToRelative]);
 
   // Aliases switch Abs/Rel based on UI toggle
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
@@ -1306,7 +1302,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // IMPORTANT:
     // When Y-axis is locked: break line at out-of-window points (nulls preserve modal structure)
-    // When Y-axis is unlocked: soft-clamp to window (keep curve continuous when switching Component views)
+    // When Y-axis is unlocked: pass data through unchanged (no clamping, no nulls)
     const clipped = displayData.map(p => {
       const v = p.spl;
       if (!Number.isFinite(v)) return { ...p, spl: null };
@@ -1316,8 +1312,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           // Locked: break line (preserve modal nulls)
           return { ...p, spl: null };
         } else {
-          // Unlocked: soft-clamp to window (keep curve visible when switching views)
-          return { ...p, spl: Math.min(finalYDomain.max, Math.max(finalYDomain.min, v)) };
+          // Unlocked: pass through unchanged
+          return { ...p, spl: v };
         }
       }
 
@@ -1325,7 +1321,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     });
 
     return { clampedData: clipped, outBelow: below, outAbove: above };
-  }, [rewStyleMode, finalYDomain, displayData]);
+  }, [rewStyleMode, finalYDomain, displayData, yAxisLocked, rewCompareView, rewView, rewRelativeView]);
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
@@ -3298,7 +3294,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             
             return (
               <BassGraph
-                responseData={displayData}
+                responseData={clampedData}
                 schroederFrequency={schroederFrequency}
                 rp22Levels={rp22Levels}
                 toggles={toggles}
@@ -3310,8 +3306,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 rewStyleMode={rewStyleMode}
                 yDomain={finalYDomain}
                 showAxialOnly={false}
-                refDb={85}
-                disableHighlight={rewStyleMode && rewRelativeView}
+                refDb={rewStyleMode && rewRelativeView ? 0 : 85}
+                disableHighlight={false}
               />
             );
           })() : (

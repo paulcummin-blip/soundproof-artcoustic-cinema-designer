@@ -281,7 +281,7 @@ export default function BassGraph({
                         strokeWidth={1.5}
                         strokeDasharray="4 4"
                         label={{ 
-                          value: `${refDb} dB Reference`, 
+                          value: refDb === 0 ? `${refDb} dB (Relative)` : `${refDb} dB Reference`, 
                           position: 'right', 
                           fill: '#2563eb', 
                           className: 'font-body text-xs',
