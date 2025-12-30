@@ -1301,16 +1301,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     });
 
     // IMPORTANT:
-    // When Y-axis is locked: break line at out-of-window points (nulls preserve modal structure)
-    // When Y-axis is unlocked: pass data through unchanged (no clamping, no nulls)
+    // When Y-axis is locked: clamp to window edges (no line breaks, continuous curve)
+    // When Y-axis is unlocked: pass data through unchanged
     const clipped = displayData.map(p => {
       const v = p.spl;
       if (!Number.isFinite(v)) return { ...p, spl: null };
 
       if (v < finalYDomain.min || v > finalYDomain.max) {
         if (yAxisLocked) {
-          // Locked: break line (preserve modal nulls)
-          return { ...p, spl: null };
+          // Locked: clamp to window edges (no gaps)
+          return { ...p, spl: Math.min(finalYDomain.max, Math.max(finalYDomain.min, v)) };
         } else {
           // Unlocked: pass through unchanged
           return { ...p, spl: v };
