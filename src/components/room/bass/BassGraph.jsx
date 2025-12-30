@@ -35,18 +35,10 @@ export default function BassGraph({
     const chartData = React.useMemo(() => {
         if (!data || data.length === 0) return [];
         
-        // Compute avg3080 (30-80 Hz average)
-        let sum = 0, n = 0;
-        for (let i = 0; i < data.length; i++) {
-            const pt = data[i];
-            if (pt.frequency >= 30 && pt.frequency <= 80 && Number.isFinite(pt.spl)) {
-                sum += pt.spl;
-                n++;
-            }
-        }
-        const avg = n > 0 ? sum / n : refDb;
+        // Fixed thresholds: 85 ± 6 dB
+        const LOWER_LIMIT = 79;
+        const UPPER_LIMIT = 91;
         
-        const PROBLEM_THRESHOLD = 6;
         const rows = [];
         let prevBad = null;
         
@@ -54,9 +46,8 @@ export default function BassGraph({
             const pt = data[i];
             const yi = pt.spl;
             
-            // Use 0.1 dB resolution for stable red-zone detection
-            const delta = Number.isFinite(yi) ? Math.round((yi - avg) * 10) / 10 : 0;
-            const isBad = Math.abs(delta) > PROBLEM_THRESHOLD;
+            // Deterministic threshold-band classification
+            const isBad = Number.isFinite(yi) && (yi < LOWER_LIMIT || yi > UPPER_LIMIT);
             
             let goodLine = null;
             let badLine = null;
@@ -82,7 +73,7 @@ export default function BassGraph({
         }
         
         return rows;
-    }, [data, refDb]);
+    }, [data]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
     const normalizedMarkers = React.useMemo(() => {
