@@ -31,40 +31,47 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Compute live baseline and build chart data with red overlay only for out-of-band sections
+    // Build chart data with red/black split at fixed thresholds (85 ± 6 dB)
     const chartData = React.useMemo(() => {
         if (!data || data.length === 0) return [];
 
-        // Compute baseline from 30-80 Hz median
-        const band = data
-            .filter(pt => pt.frequency >= 30 && pt.frequency <= 80 && Number.isFinite(pt.spl))
-            .map(pt => pt.spl);
+        const LOWER_LIMIT = refDb - 6; // 79 dB for refDb=85
+        const UPPER_LIMIT = refDb + 6; // 91 dB for refDb=85
+
+        // Build rows with spl, splGood, splBad
+        const rows = [];
         
-        let baselineDb;
-        if (band.length === 0) {
-            baselineDb = Number.isFinite(refDb) ? refDb : 85;
-        } else {
-            const sorted = [...band].sort((a, b) => a - b);
-            const mid = Math.floor(sorted.length / 2);
-            baselineDb = sorted.length % 2 === 0 
-                ? (sorted[mid - 1] + sorted[mid]) / 2 
-                : sorted[mid];
-        }
-
-        const LOW = baselineDb - 6;
-        const HIGH = baselineDb + 6;
-
-        // Build rows with spl and redOverlay
-        const rows = data.map(pt => {
+        for (let i = 0; i < data.length; i++) {
+            const pt = data[i];
             const spl = pt.spl;
-            const isBad = Number.isFinite(spl) && (spl < LOW || spl > HIGH);
+            const isGood = Number.isFinite(spl) && spl >= LOWER_LIMIT && spl <= UPPER_LIMIT;
+            const isBad = Number.isFinite(spl) && !isGood;
             
-            return {
+            // Normal point
+            rows.push({
                 frequency: pt.frequency,
                 spl: spl,
-                redOverlay: isBad ? spl : null
-            };
-        });
+                splGood: isGood ? spl : null,
+                splBad: isBad ? spl : null
+            });
+            
+            // Duplicate boundary points where color changes (prevents gaps)
+            if (i < data.length - 1) {
+                const nextSpl = data[i + 1].spl;
+                const nextIsGood = Number.isFinite(nextSpl) && nextSpl >= LOWER_LIMIT && nextSpl <= UPPER_LIMIT;
+                const nextIsBad = Number.isFinite(nextSpl) && !nextIsGood;
+                
+                // If color changes at this boundary, duplicate the point
+                if ((isGood && nextIsBad) || (isBad && nextIsGood)) {
+                    rows.push({
+                        frequency: pt.frequency,
+                        spl: spl,
+                        splGood: spl,
+                        splBad: spl
+                    });
+                }
+            }
+        }
 
         return rows;
     }, [data, refDb]);
@@ -290,10 +297,10 @@ export default function BassGraph({
                         }} 
                       />
 
-                    {/* Main curve (always black, always continuous) */}
+                    {/* Black curve (inside limits: 79-91 dB) */}
                     <Line 
                         type="linear" 
-                        dataKey="spl"
+                        dataKey="splGood"
                         stroke="#213428" 
                         strokeWidth={2} 
                         dot={false}
@@ -302,15 +309,15 @@ export default function BassGraph({
                         isAnimationActive={false}
                     />
 
-                    {/* Red overlay (only out-of-band sections) */}
+                    {/* Red curve (outside limits: <79 or >91 dB) */}
                     <Line 
                         type="linear" 
-                        dataKey="redOverlay"
+                        dataKey="splBad"
                         stroke="#dc2626" 
-                        strokeWidth={2.5} 
+                        strokeWidth={2} 
                         dot={false}
                         activeDot={false}
-                        connectNulls={false}
+                        connectNulls={true}
                         isAnimationActive={false}
                     />
                     

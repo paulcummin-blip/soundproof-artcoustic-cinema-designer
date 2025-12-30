@@ -44,7 +44,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [roomDamping, setRoomDamping] = useState(20);
   const [showModeMarkers, setShowModeMarkers] = useState(false);
   const [rewStyleMode, setRewStyleMode] = useState(false);
-  const [rewSmoothing, setRewSmoothing] = useState('1/48'); // Default: high resolution for simulation
+  const [rewSmoothing, setRewSmoothing] = useState('1/3'); // Default: RP22 standard for normal use
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(false);
   const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
@@ -107,7 +107,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Set default smoothing when REW mode is enabled
   useEffect(() => {
     if (rewStyleMode && (!rewSmoothing || rewSmoothing === 'none')) {
-      setRewSmoothing('1/48'); // Default to high-resolution simulation view
+      setRewSmoothing('1/3'); // Default to RP22 standard
     }
   }, [rewStyleMode, rewSmoothing]);
 
@@ -1750,6 +1750,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
             {rewStyleMode && (
               <>
+                {/* Advanced controls visible only when REW mode is ON */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                   <Label htmlFor="rew-compare" className="text-xs text-[#3E4349] whitespace-nowrap">
                     REW Compare View
@@ -2104,7 +2105,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Raw engine output toggle (Part A1 - TRUE PHYSICS SWITCH) */}
+        {/* Advanced debug controls (only visible when REW mode is ON) */}
         {rewStyleMode && (
           <div className="space-y-2">
             <div className="flex items-center gap-2">
@@ -3033,7 +3034,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
 
-        {/* REW view selector (only when REW is ON) */}
+        {/* REW advanced controls (visible only when REW is ON) */}
         {rewStyleMode && (
           <div className="space-y-2 mb-2">
             <div className="flex items-center gap-3">
