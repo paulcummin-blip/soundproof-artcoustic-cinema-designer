@@ -99,8 +99,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // SBIR single-reflection diagnostic (63 Hz null test)
   const [sbirDebugSingleFrontWall, setSbirDebugSingleFrontWall] = useState(false);
-
+  
   // Graph smoothing used for the plotted dataset (REW Compare can force display without mutating the user's choice)
+  // MUST be defined AFTER rewSmoothing state declaration
   const graphSmoothing = rewCompareView ? "1/3" : rewSmoothing;
 
   // Set default smoothing when REW mode is enabled
