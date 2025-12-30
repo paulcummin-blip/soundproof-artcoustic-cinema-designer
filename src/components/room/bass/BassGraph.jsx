@@ -31,77 +31,40 @@ export default function BassGraph({
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
-    // Build chart data with goodLine/badLine, inserting exact threshold-crossing points
+    // Compute live baseline and build chart data with red overlay only for out-of-band sections
     const chartData = React.useMemo(() => {
         if (!data || data.length === 0) return [];
 
-        const LOWER = (Number.isFinite(refDb) ? refDb : 85) - 6;
-        const UPPER = (Number.isFinite(refDb) ? refDb : 85) + 6;
-
-        const rows = [];
-
-        const isBad = (y) => Number.isFinite(y) && (y < LOWER || y > UPPER);
-
-        // Helper: add a point as either good or bad (never both)
-        const pushPoint = (f, y) => {
-            const bad = isBad(y);
-            rows.push({
-                frequency: f,
-                spl: y,
-                goodLine: bad ? null : y,
-                badLine: bad ? y : null,
-            });
-        };
-
-        for (let i = 0; i < data.length; i++) {
-            const p1 = data[i];
-            const f1 = p1.frequency;
-            const y1 = p1.spl;
-
-            if (i === 0) {
-                pushPoint(f1, y1);
-                continue;
-            }
-
-            const p0 = data[i - 1];
-            const f0 = p0.frequency;
-            const y0 = p0.spl;
-
-            // If either y is non-finite, just push and move on
-            if (!Number.isFinite(y0) || !Number.isFinite(y1) || !Number.isFinite(f0) || !Number.isFinite(f1)) {
-                pushPoint(f1, y1);
-                continue;
-            }
-
-            // Detect crossings of LOWER/UPPER between y0 -> y1, and insert exact crossing points
-            const crossings = [];
-
-            const addCrossingIfBetween = (limit) => {
-                const d0 = y0 - limit;
-                const d1 = y1 - limit;
-                // Strict sign change => crossing
-                if ((d0 < 0 && d1 > 0) || (d0 > 0 && d1 < 0)) {
-                    const t = (limit - y0) / (y1 - y0); // 0..1
-                    const fx = f0 + t * (f1 - f0);
-                    crossings.push({ f: fx, y: limit });
-                }
-            };
-
-            addCrossingIfBetween(LOWER);
-            addCrossingIfBetween(UPPER);
-
-            // Sort crossings by frequency
-            crossings.sort((a, b) => a.f - b.f);
-
-            // If there are crossings, we need to split this segment at each crossing
-            if (crossings.length) {
-                // Push each crossing point
-                for (const c of crossings) pushPoint(c.f, c.y);
-            }
-
-            // Finally push p1
-            pushPoint(f1, y1);
+        // Compute baseline from 30-80 Hz median
+        const band = data
+            .filter(pt => pt.frequency >= 30 && pt.frequency <= 80 && Number.isFinite(pt.spl))
+            .map(pt => pt.spl);
+        
+        let baselineDb;
+        if (band.length === 0) {
+            baselineDb = Number.isFinite(refDb) ? refDb : 85;
+        } else {
+            const sorted = [...band].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            baselineDb = sorted.length % 2 === 0 
+                ? (sorted[mid - 1] + sorted[mid]) / 2 
+                : sorted[mid];
         }
+
+        const LOW = baselineDb - 6;
+        const HIGH = baselineDb + 6;
+
+        // Build rows with spl and redOverlay
+        const rows = data.map(pt => {
+            const spl = pt.spl;
+            const isBad = Number.isFinite(spl) && (spl < LOW || spl > HIGH);
+            
+            return {
+                frequency: pt.frequency,
+                spl: spl,
+                redOverlay: isBad ? spl : null
+            };
+        });
 
         return rows;
     }, [data, refDb]);
@@ -327,24 +290,24 @@ export default function BassGraph({
                         }} 
                       />
 
-                    {/* Black segments (within ±6 dB of 85 dB) */}
+                    {/* Main curve (always black, always continuous) */}
                     <Line 
                         type="linear" 
-                        dataKey="goodLine"
+                        dataKey="spl"
                         stroke="#213428" 
                         strokeWidth={2} 
                         dot={false}
                         activeDot={false}
-                        connectNulls={false}
+                        connectNulls={true}
                         isAnimationActive={false}
                     />
 
-                    {/* Red segments (outside ±6 dB of 85 dB) */}
+                    {/* Red overlay (only out-of-band sections) */}
                     <Line 
                         type="linear" 
-                        dataKey="badLine"
+                        dataKey="redOverlay"
                         stroke="#dc2626" 
-                        strokeWidth={2} 
+                        strokeWidth={2.5} 
                         dot={false}
                         activeDot={false}
                         connectNulls={false}
