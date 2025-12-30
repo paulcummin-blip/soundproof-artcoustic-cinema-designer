@@ -460,6 +460,9 @@ export function computeRoomModesResponse({
   const sbirMagDb_all = [];
   const totalMagDb_all = [];
 
+  // SBIR 63 Hz diagnostic probe (track across passes)
+  let sbirDebugProbe63Hz_captured = null;
+
   // Extract computation into runOnce for diagnostic double-run
   const runOnce = (sourcesOverride, sbirTrimLinearArg = 1.0) => {
     const sourcesUsed = sourcesOverride ?? sourcesLocal;
@@ -467,9 +470,6 @@ export function computeRoomModesResponse({
     // Component magnitude tracking for SBIR level matching (30-80 Hz band)
     const modalBandDb = [];
     const sbirBandDb = [];
-
-    // SBIR 63 Hz diagnostic probe
-    let sbirDebugProbe63Hz = null;
 
   // Build response: pure MODAL PRESSURE SUM (REW-style room curve)
   // Store BOTH coherent raw AND processed curves
@@ -735,8 +735,8 @@ export function computeRoomModesResponse({
         }
 
         // Track 63 Hz debug info (for single reflection test)
-        if (sbirResult.debugAt63Hz && !sbirDebugProbe63Hz) {
-          sbirDebugProbe63Hz = sbirResult.debugAt63Hz;
+        if (sbirResult.debugAt63Hz && !sbirDebugProbe63Hz_captured) {
+          sbirDebugProbe63Hz_captured = sbirResult.debugAt63Hz;
         }
       }
       
@@ -957,7 +957,7 @@ export function computeRoomModesResponse({
     return modalDb;
   });
   
-  return { splDb, modalBandDb, sbirBandDb, sbirDebugProbe63Hz };
+  return { splDb, modalBandDb, sbirBandDb };
   }; // End of runOnce
 
   // Run engine with normal sources - FIRST PASS to collect statistics
@@ -1000,7 +1000,6 @@ export function computeRoomModesResponse({
   // SECOND PASS: Run engine again with computed SBIR trim
   const secondPass = runOnce(null, sbirTrimLinear);
   const splDb = secondPass.splDb;
-  const sbirDebugProbe63Hz = secondPass.sbirDebugProbe63Hz;
   
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
@@ -1589,7 +1588,7 @@ export function computeRoomModesResponse({
       sbirBlendStartHz: sbirEnabled ? sbirBlendStartHzActual.toFixed(1) : 'N/A',
       sbirBlendEndHz: sbirEnabled ? sbirBlendEndHzActual.toFixed(1) : 'N/A',
       sbirDebugProbe40Hz: !isDragging ? sbirDebugProbe40Hz : null,
-      sbirDebugProbe63Hz: !isDragging && sbirDebugProbe63Hz ? sbirDebugProbe63Hz : null,
+      sbirDebugProbe63Hz: !isDragging && sbirDebugProbe63Hz_captured ? sbirDebugProbe63Hz_captured : null,
       modeContributions: !isDragging ? modeContributions : null,
       phaseCheckAvailable: typeof globalThis !== 'undefined' && globalThis.__B44_PHASE_CHECK ? true : false,
       calRefBandHz: calRefBandHz,
