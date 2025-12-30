@@ -1117,7 +1117,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [rewCompareView, rewModesDataAudit, subsForSimulation, seatingPositions, roomDims, seatNudgeTest, computeAxialCoupling]);
 
   // Compute stable Y-axis domain using 30–80 Hz band intelligence
-  // IMPORTANT: ALWAYS return EXACTLY a 40 dB window (no padding).
+  // Auto window: refDb ± 20 dB (40 dB total span)
   const computeStableYDomain = React.useCallback((data) => {
     if (!data || data.length === 0) return null;
 
@@ -1127,41 +1127,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       .map(d => d.spl)
       .filter(v => Number.isFinite(v));
 
-    if (band.length === 0) return null;
+    if (band.length < 3) return null; // Need at least 3 points for meaningful median
 
     // Use MEDIAN for refDb (REW-style, robust to nulls)
     const sorted = [...band].sort((a, b) => a - b);
     const refDb = sorted[Math.floor(sorted.length / 2)];
 
-    // Exact 40 dB window
+    // Auto window: refDb ± 20 dB (40 dB total span)
     const span = 40;
-    let min = refDb - span / 2;
-    let max = refDb + span / 2;
-
-    // Keep window "intelligent": if the 30–80 Hz band itself sits outside the window,
-    // shift the whole window up/down BUT KEEP span fixed at 40 dB.
-    const bandMin = Math.min(...band);
-    const bandMax = Math.max(...band);
-
-    if (bandMax > max) {
-      const shiftUp = bandMax - max;
-      min += shiftUp;
-      max += shiftUp;
-    }
-    if (bandMin < min) {
-      const shiftDown = min - bandMin;
-      min -= shiftDown;
-      max -= shiftDown;
-    }
-
-    // Round to whole dB and re-enforce exact span after rounding
-    min = Math.floor(min);
-    max = min + span;
+    const min = refDb - 20;
+    const max = refDb + 20;
 
     return { refDb, min, max };
   }, []);
 
-  // REW Compare View: fixed window for absolute SPL (65-105 dB)
+  // REW Compare View: auto window centered on 30-80 Hz median
   const computeRewCompareYDomain = React.useCallback((data) => {
     if (!data || data.length === 0) return null;
 
@@ -1171,17 +1151,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       .map(d => d.spl)
       .filter(v => Number.isFinite(v));
 
-    if (band.length === 0) {
-      // Fallback: use default absolute window
+    if (band.length < 3) {
+      // Fallback: use default reference
       return { refDb: 85, min: 65, max: 105 };
     }
 
     const sorted = [...band].sort((a, b) => a - b);
     const refDb = sorted[Math.floor(sorted.length / 2)];
 
-    // Fixed absolute SPL window (65-105 dB) for REW Compare View
-    const min = 65;
-    const max = 105;
+    // Auto window: refDb ± 20 dB
+    const min = refDb - 20;
+    const max = refDb + 20;
 
     return { refDb, min, max };
   }, []);
@@ -3252,6 +3232,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 rewStyleMode={rewStyleMode}
                 yDomain={finalYDomain}
                 showAxialOnly={false}
+                refDb={yAxisDomain?.refDb || 85}
               />
             );
           })() : (

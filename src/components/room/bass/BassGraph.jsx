@@ -25,10 +25,35 @@ export default function BassGraph({
   linearHzAxis = false,
   rewStyleMode = false,
   yDomain,
-  showAxialOnly = false
+  showAxialOnly = false,
+  refDb = 85
 }) {
     // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
+    
+    // Split data into normal and problem segments for highlighting
+    const { normalSegments, problemSegments } = React.useMemo(() => {
+        if (!data || data.length === 0) {
+            return { normalSegments: [], problemSegments: [] };
+        }
+        
+        const PROBLEM_THRESHOLD = 6; // ±6 dB from refDb
+        const normalSegs = [];
+        const problemSegs = [];
+        
+        data.forEach((point, i) => {
+            const deviation = Math.abs((point.spl || 0) - refDb);
+            const isProblem = Number.isFinite(point.spl) && deviation > PROBLEM_THRESHOLD;
+            
+            if (isProblem) {
+                problemSegs.push(point);
+            } else {
+                normalSegs.push(point);
+            }
+        });
+        
+        return { normalSegments: normalSegs, problemSegments: problemSegs };
+    }, [data, refDb]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
     const normalizedMarkers = React.useMemo(() => {
@@ -250,7 +275,27 @@ export default function BassGraph({
                         }} 
                       />
 
-                    <Line type="monotone" dataKey="spl" stroke="#213428" strokeWidth={2} dot={false} />
+                    {/* Normal segments (within ±6 dB of refDb) */}
+                    <Line 
+                        type="monotone" 
+                        dataKey="spl" 
+                        data={normalSegments}
+                        stroke="#213428" 
+                        strokeWidth={2} 
+                        dot={false}
+                        connectNulls={false}
+                    />
+                    
+                    {/* Problem segments (>±6 dB from refDb) */}
+                    <Line 
+                        type="monotone" 
+                        dataKey="spl" 
+                        data={problemSegments}
+                        stroke="#dc2626" 
+                        strokeWidth={2} 
+                        dot={false}
+                        connectNulls={false}
+                    />
                     
                     {/* Mode line legend (REW style) */}
                     {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && (
