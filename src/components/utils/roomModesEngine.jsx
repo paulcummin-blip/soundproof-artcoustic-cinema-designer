@@ -468,6 +468,9 @@ export function computeRoomModesResponse({
     const modalBandDb = [];
     const sbirBandDb = [];
 
+    // SBIR 63 Hz diagnostic probe
+    let sbirDebugProbe63Hz = null;
+
   // Build response: pure MODAL PRESSURE SUM (REW-style room curve)
   // Store BOTH coherent raw AND processed curves
   // CRITICAL: coherentRawDb is the REFERENCE TRUTH - if nulls don't move with sub position, coupling is broken
@@ -483,7 +486,6 @@ export function computeRoomModesResponse({
     // SBIR (image source) complex pressure sum
     let sumRe_sbir = 0;
     let sumIm_sbir = 0;
-    let sbirDebugProbe63Hz = null; // 63 Hz diagnostic probe
 
     for (const mode of modes) {
       const f0 = mode.freq;
@@ -955,7 +957,7 @@ export function computeRoomModesResponse({
     return modalDb;
   });
   
-  return { splDb, modalBandDb, sbirBandDb };
+  return { splDb, modalBandDb, sbirBandDb, sbirDebugProbe63Hz };
   }; // End of runOnce
 
   // Run engine with normal sources - FIRST PASS to collect statistics
@@ -998,6 +1000,7 @@ export function computeRoomModesResponse({
   // SECOND PASS: Run engine again with computed SBIR trim
   const secondPass = runOnce(null, sbirTrimLinear);
   const splDb = secondPass.splDb;
+  const sbirDebugProbe63Hz = secondPass.sbirDebugProbe63Hz;
   
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
@@ -1586,7 +1589,7 @@ export function computeRoomModesResponse({
       sbirBlendStartHz: sbirEnabled ? sbirBlendStartHzActual.toFixed(1) : 'N/A',
       sbirBlendEndHz: sbirEnabled ? sbirBlendEndHzActual.toFixed(1) : 'N/A',
       sbirDebugProbe40Hz: !isDragging ? sbirDebugProbe40Hz : null,
-      sbirDebugProbe63Hz: !isDragging ? sbirDebugProbe63Hz : null,
+      sbirDebugProbe63Hz: !isDragging && sbirDebugProbe63Hz ? sbirDebugProbe63Hz : null,
       modeContributions: !isDragging ? modeContributions : null,
       phaseCheckAvailable: typeof globalThis !== 'undefined' && globalThis.__B44_PHASE_CHECK ? true : false,
       calRefBandHz: calRefBandHz,
