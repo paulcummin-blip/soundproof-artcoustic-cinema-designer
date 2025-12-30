@@ -2261,7 +2261,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           if (!activeDebug?.sbirEnabled) return null;
 
           const probe40 = activeDebug?.sbirDebugProbe40Hz;
-          const probe63 = activeDebug?.sbirDebugProbe63Hz;
+          const probe63 = (activeDebug && activeDebug.sbirDebugProbe63Hz) ? activeDebug.sbirDebugProbe63Hz : null;
 
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
@@ -2288,7 +2288,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               )}
               
               {/* 63 Hz DIAGNOSTIC - Single Reflection Interference Test */}
-              {probe63 && (
+              {probe63 ? (
                 <div className="mt-2 pt-2 border-t border-red-300 bg-red-50 rounded p-2">
                   <div className="font-semibold mb-1 text-red-700">
                     🔬 63 Hz Null Test {probe63.diagnosticMode === 'SINGLE FRONT WALL ONLY' ? '(DIAGNOSTIC MODE)' : '(ALL REFLECTIONS)'}
@@ -2317,6 +2317,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       Expected: If phase diff ≈180° and reflected mag is within ~12 dB of direct, combined should show deep null.
                     </div>
                   </div>
+                </div>
+              ) : (
+                <div className="mt-2 pt-2 border-t border-gray-300 text-[9px] text-gray-500">
+                  63 Hz probe: (no data yet)
                 </div>
               )}
             </div>
