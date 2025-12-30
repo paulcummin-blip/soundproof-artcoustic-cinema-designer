@@ -981,6 +981,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, responseData]);
 
+  // TEMP DEBUG
+  console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
+
   // AUDIT CHECKPOINT (Part D2): rewSplAnchoredData is UNUSED - kept for legacy compatibility
   // All display paths use displayData directly (no anchoring, no normalization)
   const rewSplAnchoredData = useMemo(() => {
