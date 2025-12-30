@@ -57,6 +57,7 @@ export function computeRoomModesResponse({
   componentView = 'modalPlusSbir', // 'modalOnly' | 'sbirOnly' | 'modalPlusSbir'
   sealedRoom = true, // REW-style: cinemas are sealed by default
   mlpPosition = null, // MLP position for distance debug
+  sbirDebugSingleFrontWall = false, // DIAGNOSTIC: Only use direct + front wall reflection
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -482,6 +483,7 @@ export function computeRoomModesResponse({
     // SBIR (image source) complex pressure sum
     let sumRe_sbir = 0;
     let sumIm_sbir = 0;
+    let sbirDebugProbe63Hz = null; // 63 Hz diagnostic probe
 
     for (const mode of modes) {
       const f0 = mode.freq;
@@ -717,6 +719,7 @@ export function computeRoomModesResponse({
           includeWalls: sbirIncludeWalls,
           includeFloorCeiling: sbirIncludeFloorCeiling,
           maxOrder: isDragging ? 1 : 2, // Reduce order while dragging for performance
+          sbirDebugSingleFrontWall: sbirDebugSingleFrontWall, // DIAGNOSTIC: single reflection mode
         });
         
         // Apply weight to SBIR contribution
@@ -727,6 +730,11 @@ export function computeRoomModesResponse({
         if (Math.abs(f - 40) < 0.6) {
           sbirPathsUsed = sbirResult.pathsUsed;
           sbirStrongestReflection = sbirResult.strongestReflection;
+        }
+
+        // Track 63 Hz debug info (for single reflection test)
+        if (sbirResult.debugAt63Hz && !sbirDebugProbe63Hz) {
+          sbirDebugProbe63Hz = sbirResult.debugAt63Hz;
         }
       }
       
@@ -1578,6 +1586,7 @@ export function computeRoomModesResponse({
       sbirBlendStartHz: sbirEnabled ? sbirBlendStartHzActual.toFixed(1) : 'N/A',
       sbirBlendEndHz: sbirEnabled ? sbirBlendEndHzActual.toFixed(1) : 'N/A',
       sbirDebugProbe40Hz: !isDragging ? sbirDebugProbe40Hz : null,
+      sbirDebugProbe63Hz: !isDragging ? sbirDebugProbe63Hz : null,
       modeContributions: !isDragging ? modeContributions : null,
       phaseCheckAvailable: typeof globalThis !== 'undefined' && globalThis.__B44_PHASE_CHECK ? true : false,
       calRefBandHz: calRefBandHz,
@@ -1805,7 +1814,7 @@ function computeRoomModes({
 /**
  * Compute SBIR (image source) complex pressure at one frequency
  * REW-style: direct + reflected paths with lossy boundaries up to 2nd order
- * Returns { re, im, pathsUsed, strongestReflection }
+ * Returns { re, im, pathsUsed, strongestReflection, debugAt63Hz }
  */
 function computeSBIRComplexAtFreq({
   f,
@@ -1817,6 +1826,7 @@ function computeSBIRComplexAtFreq({
   includeWalls,
   includeFloorCeiling,
   maxOrder = 2,
+  sbirDebugSingleFrontWall = false, // DIAGNOSTIC: only direct + front wall reflection
 }) {
   const k = (2 * Math.PI * f) / c;
   const { widthM, lengthM, heightM } = roomDims;
@@ -1825,6 +1835,7 @@ function computeSBIRComplexAtFreq({
   let sumIm = 0;
   let pathsUsed = 0;
   const reflections = []; // Track for debug
+  let debugAt63Hz = null; // Detailed debug at 63 Hz probe
   
   // Reflection coefficients (amplitude)
   const R = {
@@ -1841,7 +1852,7 @@ function computeSBIRComplexAtFreq({
   const dy0 = source.y - receiver.y;
   const dz0 = (source.z ?? 0.0) - (receiver.z ?? 1.2);
   const r0 = Math.sqrt(dx0*dx0 + dy0*dy0 + dz0*dz0);
-  
+
   let directPath = null;
   if (r0 > 0) {
     const A0 = 1 / Math.max(0.25, r0);
@@ -1849,53 +1860,80 @@ function computeSBIRComplexAtFreq({
     sumRe += A0 * Math.cos(phase0);
     sumIm += A0 * Math.sin(phase0);
     pathsUsed++;
-    directPath = { r: r0, A: A0, phase: phase0, surface: 'direct' };
+    directPath = { r: r0, A: A0, phase: phase0, surface: 'direct', re: A0 * Math.cos(phase0), im: A0 * Math.sin(phase0) };
   }
+
+  // DIAGNOSTIC MODE: If single-front-wall mode is ON, only process front wall reflection
+  const diagnosticSingleReflectionMode = sbirDebugSingleFrontWall;
   
   // Order 1: First-order reflections (single bounce)
+  let frontWallReflection = null; // For diagnostic tracking
   if (maxOrder >= 1) {
     const order1Images = [];
-    
-    if (includeWalls) {
-      order1Images.push(
-        { x: -source.x, y: source.y, z: source.z ?? 0.0, loss: R.left, surface: 'left' },
-        { x: 2*widthM - source.x, y: source.y, z: source.z ?? 0.0, loss: R.right, surface: 'right' },
-        { x: source.x, y: -source.y, z: source.z ?? 0.0, loss: R.front, surface: 'front' },
-        { x: source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, loss: R.back, surface: 'back' }
-      );
+
+    if (diagnosticSingleReflectionMode) {
+      // DIAGNOSTIC: Only front wall reflection
+      if (includeWalls) {
+        order1Images.push(
+          { x: source.x, y: -source.y, z: source.z ?? 0.0, loss: R.front, surface: 'front' }
+        );
+      }
+    } else {
+      // Normal mode: all reflections
+      if (includeWalls) {
+        order1Images.push(
+          { x: -source.x, y: source.y, z: source.z ?? 0.0, loss: R.left, surface: 'left' },
+          { x: 2*widthM - source.x, y: source.y, z: source.z ?? 0.0, loss: R.right, surface: 'right' },
+          { x: source.x, y: -source.y, z: source.z ?? 0.0, loss: R.front, surface: 'front' },
+          { x: source.x, y: 2*lengthM - source.y, z: source.z ?? 0.0, loss: R.back, surface: 'back' }
+        );
+      }
+
+      if (includeFloorCeiling) {
+        order1Images.push(
+          { x: source.x, y: source.y, z: -(source.z ?? 0.0), loss: R.floor, surface: 'floor' },
+          { x: source.x, y: source.y, z: 2*heightM - (source.z ?? 0.0), loss: R.ceiling, surface: 'ceiling' }
+        );
+      }
     }
-    
-    if (includeFloorCeiling) {
-      order1Images.push(
-        { x: source.x, y: source.y, z: -(source.z ?? 0.0), loss: R.floor, surface: 'floor' },
-        { x: source.x, y: source.y, z: 2*heightM - (source.z ?? 0.0), loss: R.ceiling, surface: 'ceiling' }
-      );
-    }
-    
+
     for (const img of order1Images) {
       const dxi = img.x - receiver.x;
       const dyi = img.y - receiver.y;
       const dzi = img.z - (receiver.z ?? 1.2);
       const ri = Math.sqrt(dxi*dxi + dyi*dyi + dzi*dzi);
-      
+
       if (ri > 0) {
         const Ai = img.loss / Math.max(0.25, ri);
         const phasei = -k * ri;
         const contrib_re = Ai * Math.cos(phasei);
         const contrib_im = Ai * Math.sin(phasei);
-        
+
         sumRe += contrib_re;
         sumIm += contrib_im;
         pathsUsed++;
-        
+
         const contribMag = Math.sqrt(contrib_re * contrib_re + contrib_im * contrib_im);
         reflections.push({ surface: img.surface, order: 1, mag: contribMag });
+
+        // Track front wall reflection for diagnostic
+        if (img.surface === 'front') {
+          frontWallReflection = {
+            r: ri,
+            A: Ai,
+            phase: phasei,
+            re: contrib_re,
+            im: contrib_im,
+            mag: contribMag
+          };
+        }
       }
     }
   }
   
   // Order 2: Second-order reflections (two bounces, corner paths)
-  if (maxOrder >= 2 && includeWalls) {
+  // Skip in diagnostic single-reflection mode
+  if (maxOrder >= 2 && includeWalls && !diagnosticSingleReflectionMode) {
     // Only do wall-wall corners for performance (4 horizontal corners)
     const order2Images = [
       { x: -source.x, y: -source.y, z: source.z ?? 0.0, loss: R.left * R.front, surface: 'left+front' },
@@ -1936,7 +1974,39 @@ function computeSBIRComplexAtFreq({
       magDb: 20 * Math.log10(Math.max(Number.EPSILON, strongest.mag))
     };
   }
-  
+
+  // [63 Hz DIAGNOSTIC] - Single reflection interference test
+  if (Math.abs(f - 63) < 0.6 && directPath && frontWallReflection) {
+    const directMag = directPath.A;
+    const reflectedMag = frontWallReflection.A;
+    const directPhase = directPath.phase * (180 / Math.PI); // radians to degrees
+    const reflectedPhase = frontWallReflection.phase * (180 / Math.PI);
+    const phaseDiff = ((reflectedPhase - directPhase) % 360 + 360) % 360; // Normalize to 0-360
+
+    const combinedMag = Math.sqrt(sumRe * sumRe + sumIm * sumIm);
+
+    debugAt63Hz = {
+      freq: f.toFixed(1),
+      directDistance: directPath.r.toFixed(3),
+      reflectedDistance: frontWallReflection.r.toFixed(3),
+      directMagLinear: directMag.toFixed(6),
+      directMagDb: (20 * Math.log10(directMag)).toFixed(2),
+      reflectedMagLinear: reflectedMag.toFixed(6),
+      reflectedMagDb: (20 * Math.log10(reflectedMag)).toFixed(2),
+      phaseDiffDeg: phaseDiff.toFixed(1),
+      combinedMagLinear: combinedMag.toFixed(6),
+      combinedMagDb: (20 * Math.log10(Math.max(Number.EPSILON, combinedMag))).toFixed(2),
+      directRe: directPath.re.toFixed(6),
+      directIm: directPath.im.toFixed(6),
+      reflectedRe: frontWallReflection.re.toFixed(6),
+      reflectedIm: frontWallReflection.im.toFixed(6),
+      sumRe: sumRe.toFixed(6),
+      sumIm: sumIm.toFixed(6),
+      reflectionCoeff: R.front.toFixed(3),
+      diagnosticMode: diagnosticSingleReflectionMode ? 'SINGLE FRONT WALL ONLY' : 'ALL REFLECTIONS'
+    };
+  }
+
   // [SBIR SANITY CHECK @80Hz] - Verify SBIR uses actual source positions (combing test)
   if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 80) < 0.6) {
     const allPaths = [
@@ -1971,8 +2041,8 @@ function computeSBIRComplexAtFreq({
     });
   }
   
-  return { re: sumRe, im: sumIm, pathsUsed, strongestReflection };
-}
+  return { re: sumRe, im: sumIm, pathsUsed, strongestReflection, debugAt63Hz };
+  }
 
 /**
  * Compute spatial coupling using cosine pressure mode shapes (real eigenfunctions)

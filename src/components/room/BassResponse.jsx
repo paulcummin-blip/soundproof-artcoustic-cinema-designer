@@ -96,6 +96,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // REW-style time alignment (align all subs to MLP arrival time)
   const [rewTimeAlign, setRewTimeAlign] = useState(false);
+  
+  // SBIR single-reflection diagnostic (63 Hz null test)
+  const [sbirDebugSingleFrontWall, setSbirDebugSingleFrontWall] = useState(false);
 
   // Graph smoothing used for the plotted dataset (REW Compare can force display without mutating the user's choice)
   const graphSmoothing = rewCompareView ? "1/3" : rewSmoothing;
@@ -2183,6 +2186,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </div>
             )}
             
+            {/* SBIR single-reflection diagnostic (63 Hz null test) */}
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="sbir-debug-single-front-wall" 
+                checked={sbirDebugSingleFrontWall}
+                onCheckedChange={setSbirDebugSingleFrontWall}
+              />
+              <Label htmlFor="sbir-debug-single-front-wall" className="text-xs font-semibold" style={{ color: sbirDebugSingleFrontWall ? '#dc2626' : '#3E4349' }}>
+                🔬 SBIR: Single front wall reflection only (63 Hz null test)
+              </Label>
+            </div>
+            
             {/* Coupling Phase Probe (Part HB - verify complex eigenfunctions) */}
             {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
               <div className="space-y-2 mt-2 pt-2 border-t border-gray-300">
@@ -2244,11 +2259,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           if (!activeDebug?.sbirEnabled) return null;
 
           const probe40 = activeDebug?.sbirDebugProbe40Hz;
+          const probe63 = activeDebug?.sbirDebugProbe63Hz;
 
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
               <div className="font-semibold mb-1 text-blue-700">
                 SBIR: {activeDebug.sbirEnabled ? 'ON' : 'OFF'}, order={activeDebug.sbirMaxOrder || 2}
+                {sbirDebugSingleFrontWall && <span className="ml-2 text-red-600 font-bold">— DIAGNOSTIC: FRONT WALL ONLY</span>}
               </div>
               {probe40 && (
                 <>
@@ -2266,6 +2283,39 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <div>Combined result: {probe40.combinedResultDb} dB</div>
                   </div>
                 </>
+              )}
+              
+              {/* 63 Hz DIAGNOSTIC - Single Reflection Interference Test */}
+              {probe63 && (
+                <div className="mt-2 pt-2 border-t border-red-300 bg-red-50 rounded p-2">
+                  <div className="font-semibold mb-1 text-red-700">
+                    🔬 63 Hz Null Test {probe63.diagnosticMode === 'SINGLE FRONT WALL ONLY' ? '(DIAGNOSTIC MODE)' : '(ALL REFLECTIONS)'}
+                  </div>
+                  <div className="text-[9px] font-mono space-y-0.5">
+                    <div className="font-semibold">Direct path:</div>
+                    <div className="pl-2">Distance: {probe63.directDistance} m</div>
+                    <div className="pl-2">Magnitude: {probe63.directMagLinear} ({probe63.directMagDb} dB)</div>
+                    <div className="pl-2">Complex: Re={probe63.directRe}, Im={probe63.directIm}</div>
+                    
+                    <div className="font-semibold mt-1">Front wall reflection:</div>
+                    <div className="pl-2">Distance: {probe63.reflectedDistance} m</div>
+                    <div className="pl-2">Magnitude: {probe63.reflectedMagLinear} ({probe63.reflectedMagDb} dB)</div>
+                    <div className="pl-2">Reflection coeff: {probe63.reflectionCoeff}</div>
+                    <div className="pl-2">Complex: Re={probe63.reflectedRe}, Im={probe63.reflectedIm}</div>
+                    
+                    <div className="font-semibold mt-1 text-red-800">Interference:</div>
+                    <div className="pl-2">Phase difference: {probe63.phaseDiffDeg}° {Math.abs(parseFloat(probe63.phaseDiffDeg) - 180) < 30 ? '(near 180° → CANCELLATION)' : ''}</div>
+                    <div className="pl-2">Coherent sum: Re={probe63.sumRe}, Im={probe63.sumIm}</div>
+                    <div className="pl-2 font-bold text-red-700">
+                      Combined: {probe63.combinedMagLinear} ({probe63.combinedMagDb} dB)
+                      {parseFloat(probe63.combinedMagDb) < parseFloat(probe63.directMagDb) - 6 ? ' ← DEEP NULL (>6 dB)' : ''}
+                    </div>
+                    
+                    <div className="mt-1 pt-1 border-t border-red-300 text-[8px]">
+                      Expected: If phase diff ≈180° and reflected mag is within ~12 dB of direct, combined should show deep null.
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           );
