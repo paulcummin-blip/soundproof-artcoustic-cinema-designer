@@ -551,9 +551,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         rewParityMode: true,
         smoothing: graphSmoothing,
         subFloorHeight: 0.0,
-        normalizeBandHz: rewRelativeView ? [30, 80] : null,
-        normalizeToDb: rewRelativeView ? 0 : null,
-        relativeViewEnabled: rewRelativeView,
+        normalizeBandHz: null,
+        normalizeToDb: null,
+        relativeViewEnabled: false,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
@@ -565,7 +565,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves: null, // Room-only: no product curves
-        absoluteSplMode: !rewRelativeView,
+        absoluteSplMode: true,
         rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
         modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
         complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
@@ -658,7 +658,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   };
 
   // REW-style room + product curve (apply actual sub response before room interaction)
-  const rewRoomPlusProductData = useMemo(() => {
+  const rewRoomPlusProductDataAbs = useMemo(() => {
     if (!rewStyleMode || rewView !== 'roomPlusProduct') return null;
 
     const w = roomDims?.widthM;
@@ -820,9 +820,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         rewParityMode: true,
         smoothing: graphSmoothing,
         subFloorHeight: 0.0,
-        normalizeBandHz: rewRelativeView ? [30, 80] : null,
-        normalizeToDb: rewRelativeView ? 0 : null,
-        relativeViewEnabled: rewRelativeView,
+        normalizeBandHz: null,
+        normalizeToDb: null,
+        relativeViewEnabled: false,
         surfaceAbsorption: {
           front: 0.30,
           back: 0.30,
@@ -834,7 +834,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
         subProductCurves, // Apply per-sub product curves
-        absoluteSplMode: !rewRelativeView,
+        absoluteSplMode: true,
         rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
         modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
         complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
@@ -965,6 +965,34 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }));
   }, [selectedSeat]);
   
+  // Derived REW relative datasets (normalize 30–80 Hz to ~0 dB)
+  const normalizeDataset = React.useCallback((dataset) => {
+    if (!dataset || !Array.isArray(dataset.data) || dataset.data.length === 0) return { data: [], debug: dataset?.debug };
+    const band = dataset.data
+      .filter(d => d.frequency >= 30 && d.frequency <= 80)
+      .map(d => d.spl)
+      .filter(v => Number.isFinite(v));
+    if (band.length < 3) return { data: dataset.data, debug: dataset.debug };
+    const sorted = [...band].sort((a,b)=>a-b);
+    const ref = sorted[Math.floor(sorted.length/2)];
+    const rel = dataset.data.map(p => ({ frequency: p.frequency, spl: p.spl - ref }));
+    return { data: rel, debug: { ...(dataset.debug||{}), normRefDb: ref } };
+  }, []);
+
+  const rewModesDataRel = useMemo(() => {
+    if (!rewStyleMode) return null;
+    return normalizeDataset(rewModesDataAbs || { data: [] });
+  }, [rewStyleMode, rewModesDataAbs, normalizeDataset]);
+
+  const rewRoomPlusProductDataRel = useMemo(() => {
+    if (!rewStyleMode) return null;
+    return normalizeDataset(rewRoomPlusProductDataAbs || { data: [] });
+  }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDataset]);
+
+  // Aliases switch Abs/Rel based on UI toggle
+  const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
+  const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
+
   // Choose which curve to display based on mode and view
   // AUDIT CHECKPOINT (Part D2): This is a PASS-THROUGH - no processing applied here
   const displayData = useMemo(() => {
@@ -973,14 +1001,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return responseData;
     }
 
-    // REW parity mode - data comes DIRECTLY from engine with NO post-processing
+    // REW parity mode: switch between Abs/Rel + RoomOnly/Product via aliases above
     if (rewView === 'roomPlusProduct') {
       return rewRoomPlusProductData?.data || [];
     } else {
       // roomOnly
       return rewModesData?.data || [];
     }
-  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, responseData]);
+  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, responseData, rewCompareView, rewRelativeView]);
 
   // TEMP DEBUG
   console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
@@ -1170,33 +1198,51 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { refDb, min, max };
   }, []);
 
-  // Compute Y-axis domain ONCE on first valid data, then only on manual reset
+  // Domain hysteresis for smoother auto-windowing when Lock Y is OFF
+  const lastAutoDomainRef = useRef(null);
   React.useEffect(() => {
     if (!rewStyleMode) {
       setYAxisDomain(null);
+      lastAutoDomainRef.current = null;
       return;
     }
-    // Set once when we first get valid data, and again only on Reset scale.
-    const shouldCompute = yAxisDomain === null || scaleEpoch > 0;
-    if (!shouldCompute) return;
     if (!displayData || displayData.length === 0) return;
-    
-    // Use REW Compare domain if enabled, otherwise use standard domain
-    const domain = rewCompareView 
+
+    const proposed = rewCompareView 
       ? computeRewCompareYDomain(displayData)
       : computeStableYDomain(displayData);
-    
-    if (domain) {
-      // Only update if domain changed by more than 0.1 dB
-      const changed = !yAxisDomain || 
-        Math.abs(domain.min - yAxisDomain.min) > 0.1 || 
-        Math.abs(domain.max - yAxisDomain.max) > 0.1;
-      if (changed) {
-        setYAxisDomain(domain);
+    if (!proposed) return;
+
+    // If locked: only set on first compute or manual reset
+    if (yAxisLocked) {
+      const shouldCompute = yAxisDomain === null || scaleEpoch > 0;
+      if (shouldCompute) {
+        setYAxisDomain(proposed);
+        lastAutoDomainRef.current = proposed;
+        if (scaleEpoch > 0) setScaleEpoch(0);
       }
-      if (scaleEpoch > 0) setScaleEpoch(0);
+      return;
     }
-  }, [rewStyleMode, displayData, yAxisDomain, scaleEpoch, computeStableYDomain, computeRewCompareYDomain, rewCompareView]);
+
+    // Unlocked: apply hysteresis (2 dB threshold) and 3 dB slew limit per update
+    const last = lastAutoDomainRef.current || yAxisDomain || proposed;
+    const diffMin = Math.abs(proposed.min - last.min);
+    const diffMax = Math.abs(proposed.max - last.max);
+    const threshold = 2; // dB
+
+    if (diffMin <= threshold && diffMax <= threshold) return; // keep current domain
+
+    const clampDelta = (d) => Math.max(-3, Math.min(3, d));
+    const next = {
+      refDb: proposed.refDb,
+      min: last.min + clampDelta(proposed.min - last.min),
+      max: last.max + clampDelta(proposed.max - last.max)
+    };
+
+    setYAxisDomain(next);
+    lastAutoDomainRef.current = next;
+    if (scaleEpoch > 0) setScaleEpoch(0);
+  }, [rewStyleMode, displayData, yAxisLocked, yAxisDomain, scaleEpoch, computeStableYDomain, computeRewCompareYDomain, rewCompareView]);
 
   // Manual reset function
   const handleResetScale = React.useCallback(() => {
@@ -1341,9 +1387,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) return [];
 
     if (rewStyleMode) {
-      // Use mode markers from the same parity calculation (prevents drift)
-      // These come from the actual REW parity run with correct source/seat positions
-      return rewModesData?.debug?.modeMarkersHz || [];
+      // Use mode markers from the active debug payload (prevents drift)
+      return activeDebug?.modeMarkersHz || [];
     }
 
     // Fallback to basic axial modes for product simulation
@@ -2815,7 +2860,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         })()}
 
         {/* REW mode info (only when REW is ON and no error) */}
-        {rewStyleMode && !rewModesData?.debug?.error && (() => {
+        {rewStyleMode && !activeDebug?.error && (() => {
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
               <div className="font-semibold mb-1">
@@ -3210,7 +3255,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           {/* Graph or placeholder */}
           {displayData.length > 0 ? (() => {
             // [PLOT AUDIT] - Verify what's actually being plotted
-            const dataToPlot = rewStyleMode ? clampedData : displayData;
+            const dataToPlot = displayData;
             const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
             const __plotAudit = {
               using: rewStyleMode ? "clampedData" : "displayData",
@@ -3238,6 +3283,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 yDomain={finalYDomain}
                 showAxialOnly={false}
                 refDb={85}
+                disableHighlight={rewStyleMode && rewRelativeView}
               />
             );
           })() : (
