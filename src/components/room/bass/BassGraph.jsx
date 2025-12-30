@@ -33,99 +33,40 @@ export default function BassGraph({
     let data = responseData;
     
     // Build chart data with red/black split at refDb ± 6 dB
-    // Handles: inside↔outside AND outside↔outside that crosses through the band (two crossings)
+    // Simple approach: no crossing-point interpolation (avoids gaps)
+    // connectNulls on both Lines will keep curves continuous
     const chartData = React.useMemo(() => {
       if (!data || data.length === 0) return [];
 
-      // Safety: ensure data is monotonic in frequency (Recharts can misbehave otherwise)
+      // Sort by frequency for monotonic axis
       const sorted = [...data].sort((a, b) => (a.frequency ?? 0) - (b.frequency ?? 0));
 
       const LOWER = refDb - 6;
       const UPPER = refDb + 6;
 
-      const rows = [];
+      return sorted.map(p => {
+        const f = p.frequency;
+        const v = p.spl;
 
-      const isFiniteNum = (v) => typeof v === "number" && Number.isFinite(v);
-
-      // Push two rows at a crossing to end the old colour and start the new colour
-      const pushCross = (crossFreq, thr, fromInside, toInside) => {
-        if (fromInside && !toInside) {
-          // black → red
-          rows.push({ frequency: crossFreq, spl: thr, splGood: thr, splBad: null });
-          rows.push({ frequency: crossFreq, spl: thr, splGood: null, splBad: thr });
-        } else if (!fromInside && toInside) {
-          // red → black
-          rows.push({ frequency: crossFreq, spl: thr, splGood: null, splBad: thr });
-          rows.push({ frequency: crossFreq, spl: thr, splGood: thr, splBad: null });
-        }
-      };
-
-      for (let i = 0; i < sorted.length; i++) {
-        const curr = sorted[i];
-        const currSpl = curr.spl;
-        const currFreq = curr.frequency;
-
-        // If SPL isn't finite, put a clean break (no NaN values in either series)
-        if (!isFiniteNum(currFreq) || !isFiniteNum(currSpl)) {
-          rows.push({
-            frequency: currFreq,
-            spl: null,
-            splGood: null,
-            splBad: null
-          });
-          continue;
+        if (!Number.isFinite(f) || !Number.isFinite(v)) {
+          return { frequency: f, spl: null, splGood: null, splBad: null };
         }
 
-        const currInside = currSpl >= LOWER && currSpl <= UPPER;
-
-        if (i > 0) {
-          const prev = sorted[i - 1];
-          const prevSpl = prev.spl;
-          const prevFreq = prev.frequency;
-
-          if (isFiniteNum(prevFreq) && isFiniteNum(prevSpl)) {
-            const prevInside = prevSpl >= LOWER && prevSpl <= UPPER;
-
-            // Find all threshold crossings between prev and curr (can be 0, 1, or 2)
-            const crossings = [];
-
-            const denom = (currSpl - prevSpl);
-            if (denom !== 0) {
-              const tLower = (LOWER - prevSpl) / denom;
-              const tUpper = (UPPER - prevSpl) / denom;
-
-              // Only accept crossings that occur strictly between the two points
-              if (tLower > 0 && tLower < 1) crossings.push({ thr: LOWER, t: tLower });
-              if (tUpper > 0 && tUpper < 1) crossings.push({ thr: UPPER, t: tUpper });
-            }
-
-            // Sort crossings in travel order and toggle inside/outside state at each one
-            if (crossings.length > 0) {
-              crossings.sort((a, b) => a.t - b.t);
-
-              let stateInside = prevInside;
-
-              for (const c of crossings) {
-                const crossFreq = prevFreq + c.t * (currFreq - prevFreq);
-                const nextInside = !stateInside; // crossing toggles state
-                pushCross(crossFreq, c.thr, stateInside, nextInside);
-                stateInside = nextInside;
-              }
-            }
-          }
+        // If highlight is disabled (Relative view already normalised to 85), just show black
+        if (disableHighlight) {
+          return { frequency: f, spl: v, splGood: v, splBad: null };
         }
 
-        // Add the actual current sample point
-        rows.push({
-          frequency: currFreq,
-          spl: currSpl,
-          splGood: currInside ? currSpl : null,
-          splBad: currInside ? null : currSpl
-        });
-      }
+        const inside = v >= LOWER && v <= UPPER;
 
-      return rows;
-    }, [data, refDb]);
+        return {
+          frequency: f,
+          spl: v,
+          splGood: inside ? v : null,
+          splBad: inside ? null : v
+        };
+      });
+    }, [data, refDb, disableHighlight]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
     const normalizedMarkers = React.useMemo(() => {
