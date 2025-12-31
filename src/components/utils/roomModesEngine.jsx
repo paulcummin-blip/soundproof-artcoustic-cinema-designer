@@ -465,8 +465,9 @@ export function computeRoomModesResponse({
   let sbirDebugProbe63Hz_captured = null;
 
   // Extract computation into runOnce for diagnostic double-run
-  const runOnce = (sourcesOverride, sbirTrimLinearArg = 1.0) => {
+  const runOnce = (sourcesOverride, sbirTrimLinearArg = 1.0, componentViewOverride = null) => {
     const sourcesUsed = sourcesOverride ?? sourcesLocal;
+    const view = componentViewOverride ?? componentView;
 
     // Component magnitude tracking for SBIR level matching (30-80 Hz band)
     const modalBandDb = [];
@@ -816,11 +817,11 @@ export function computeRoomModesResponse({
     let sumRe_total = 0;
     let sumIm_total = 0;
 
-    if (componentView === 'modalOnly') {
+    if (view === 'modalOnly') {
       // Debug view: modal term only
       sumRe_total = modalTerm_re;
       sumIm_total = modalTerm_im;
-    } else if (componentView === 'sbirOnly') {
+    } else if (view === 'sbirOnly') {
       // Debug view: SBIR term only (includes direct + reflections, REW-like)
       sumRe_total = sbirTerm_re;
       sumIm_total = sbirTerm_im;
@@ -958,7 +959,7 @@ export function computeRoomModesResponse({
     return modalDb;
   });
   
-  return { splDb, modalBandDb, sbirBandDb };
+  return { splDb, modalBandDb, sbirBandDb, coherentRawDb };
   }; // End of runOnce
 
   // Run engine with normal sources - FIRST PASS to collect statistics
@@ -1001,6 +1002,7 @@ export function computeRoomModesResponse({
   // SECOND PASS: Run engine again with computed SBIR trim
   const secondPass = runOnce(null, sbirTrimLinear);
   const splDb = secondPass.splDb;
+  const coherentRawDb = secondPass.coherentRawDb;
   
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
@@ -1474,6 +1476,59 @@ export function computeRoomModesResponse({
   // Compute stable input signature for debug memoization
   const inputSig = `${sourceSigUsed}|${seatSigUsed}|${smoothing}|${isRelative?'rel':'abs'}`;
 
+  // Parity debug helpers (analyze arrays without modifying them)
+  const peakDipDelta = (freqs, dbArr, fMin, fMax) => {
+    const band = freqs.map((f, i) => ({ f, spl: dbArr[i] }))
+      .filter(d => d.f >= fMin && d.f <= fMax && Number.isFinite(d.spl));
+    if (band.length === 0) return { peakDb: 'N/A', dipDb: 'N/A', peakFreq: 'N/A', dipFreq: 'N/A', deltaDb: 'N/A' };
+    
+    let peak = -Infinity, dip = Infinity, peakF = 'N/A', dipF = 'N/A';
+    for (const d of band) {
+      if (d.spl > peak) { peak = d.spl; peakF = d.f; }
+      if (d.spl < dip) { dip = d.spl; dipF = d.f; }
+    }
+    return { 
+      peakDb: peak.toFixed(2), 
+      dipDb: dip.toFixed(2), 
+      peakFreq: peakF.toFixed(1), 
+      dipFreq: dipF.toFixed(1), 
+      deltaDb: (peak - dip).toFixed(2) 
+    };
+  };
+
+  const avgDb = (freqs, dbArr, fMin, fMax) => {
+    const band = freqs.map((f, i) => ({ f, spl: dbArr[i] }))
+      .filter(d => d.f >= fMin && d.f <= fMax && Number.isFinite(d.spl));
+    if (band.length === 0) return 'N/A';
+    const sum = band.reduce((acc, d) => acc + d.spl, 0);
+    return (sum / band.length).toFixed(2);
+  };
+
+  // Compute parity audits (raw coherent vs final plotted)
+  const parityAudits = {};
+  
+  // modalPlusSbir parity (always computed)
+  parityAudits.modalPlusSbir = {
+    raw: {
+      band40_70Hz: peakDipDelta(freqs, coherentRawDb, 40, 70),
+      band20_40Hz_avgDb: avgDb(freqs, coherentRawDb, 20, 40),
+      band100_160Hz_avgDb: avgDb(freqs, coherentRawDb, 100, 160)
+    },
+    final: {
+      band40_70Hz: peakDipDelta(freqs, finalDb, 40, 70),
+      band20_40Hz_avgDb: avgDb(freqs, finalDb, 20, 40),
+      band100_160Hz_avgDb: avgDb(freqs, finalDb, 100, 160)
+    }
+  };
+
+  // Compute delta shrink (raw vs final peak-to-dip in 40-70 Hz)
+  const rawDelta = parityAudits.modalPlusSbir.raw.band40_70Hz.deltaDb;
+  const finalDelta = parityAudits.modalPlusSbir.final.band40_70Hz.deltaDb;
+  parityAudits.modalPlusSbir.deltaShrinkDb_40_70 = 
+    (rawDelta !== 'N/A' && finalDelta !== 'N/A') 
+      ? (parseFloat(rawDelta) - parseFloat(finalDelta)).toFixed(2) 
+      : 'N/A';
+
   // FINAL GUARD: Prevent "No finite values" silent failures
   const finalFiniteCheck = finalDb.filter(v => isFinite(v));
   if (finalFiniteCheck.length < 10) {
@@ -1637,7 +1692,8 @@ export function computeRoomModesResponse({
           distanceM: dist.toFixed(3),
           effectiveDelayMs: (s.tuning?.delayMs ?? 0).toFixed(2)
         };
-      }) : null
+      }) : null,
+      parityAudits: parityAudits
       }
       };
 
