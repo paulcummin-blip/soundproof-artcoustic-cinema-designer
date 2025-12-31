@@ -1028,14 +1028,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
 
-  // Define modeMarkersHz (after data objects are defined to prevent initialization errors)
-  const modeMarkersHz = useMemo(() => {
-    const dbg = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-      ? rewRoomPlusProductData.debug
-      : rewModesData?.debug;
-    return dbg?.modeMarkersHz || [];
-  }, [rewView, rewModesData, rewRoomPlusProductData]);
-
   // Choose which curve to display based on view (REW-style is now the only mode)
   // Apply display-only offset in REW mode (REW shows on ~90 dB scale, not 0 dB)
   const displayData = useMemo(() => {
@@ -1457,7 +1449,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     if (rewStyleMode) {
       // Use mode markers from the active debug payload (prevents drift)
-      return modeMarkersHz;
+      return activeDebug?.modeMarkersHz || [];
     }
 
     // Fallback to basic axial modes for product simulation
@@ -1467,7 +1459,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       heightM: roomDims.heightM
     }, 200);
     return modes.map(m => m.fHz);
-  }, [rewStyleMode, rewModesData, modeMarkersHz]);
+  }, [rewStyleMode, rewModesData]);
 
   // Mode markers for graph overlay (REW parity)
   const modeMarkersForGraph = useMemo(() => {
@@ -3397,25 +3389,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             // [PLOT AUDIT] - Verify what's actually being plotted
             const dataToPlot = rewStyleMode ? displayData : clampedData;
             const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
-            const hasFinite = finiteSpl.length > 0;
-            
-            // Safety guard: if no finite values, show error instead of blank graph
-            if (!hasFinite) {
-              return (
-                <div className="text-xs text-red-600 mb-2 bg-red-50 p-2 rounded border border-red-400">
-                  <div className="font-semibold mb-1">⚠️ No finite SPL values</div>
-                  <div className="text-[10px]">
-                    Engine returned empty/NaN series. Check debug info above for details.
-                  </div>
-                </div>
-              );
-            }
-            
             const __plotAudit = {
               using: rewStyleMode ? "displayData" : "clampedData",
               len: dataToPlot.length,
-              min: Math.min(...finiteSpl).toFixed(2),
-              max: Math.max(...finiteSpl).toFixed(2),
+              min: finiteSpl.length > 0 ? Math.min(...finiteSpl).toFixed(2) : 'N/A',
+              max: finiteSpl.length > 0 ? Math.max(...finiteSpl).toFixed(2) : 'N/A',
               smoothing: graphSmoothing,
               rewCompareView,
               userSmoothingChoice: rewSmoothing
