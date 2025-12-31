@@ -160,6 +160,51 @@ export default function BassGraph({
       calculatedYMax = 130;
     }
 
+    // Nice ticks policy: snap Y domain to clean numbers for designer readability
+    let snappedYMin = calculatedYMin;
+    let snappedYMax = calculatedYMax;
+    let yTicks = undefined;
+
+    if (Number.isFinite(calculatedYMin) && Number.isFinite(calculatedYMax) && calculatedYMax > calculatedYMin) {
+      const rawMin = calculatedYMin;
+      const rawMax = calculatedYMax;
+      const span = rawMax - rawMin;
+
+      // Determine tick step based on span
+      let step;
+      if (span <= 30) {
+        step = 5;
+      } else if (span <= 60) {
+        step = 10;
+      } else {
+        step = 20;
+      }
+
+      // Snap min/max to tick boundaries
+      snappedYMin = Math.floor(rawMin / step) * step;
+      snappedYMax = Math.ceil(rawMax / step) * step;
+
+      // Generate ticks array
+      const ticks = [];
+      for (let i = snappedYMin; i <= snappedYMax; i += step) {
+        ticks.push(i);
+      }
+
+      // Guard: if too many ticks, fall back to step=20
+      if (ticks.length > 50) {
+        step = 20;
+        snappedYMin = Math.floor(rawMin / step) * step;
+        snappedYMax = Math.ceil(rawMax / step) * step;
+        const safeTicks = [];
+        for (let i = snappedYMin; i <= snappedYMax; i += step) {
+          safeTicks.push(i);
+        }
+        yTicks = safeTicks;
+      } else {
+        yTicks = ticks;
+      }
+    }
+
     // Smart X-axis for REW mode
     if (rewStyleMode && schroederFrequency > 0) {
       calculatedXMax = Math.max(120, Math.min(200, schroederFrequency * 1.2));
@@ -264,11 +309,13 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                     />
                     <YAxis
-                        domain={[calculatedYMin, calculatedYMax]}
+                        domain={[snappedYMin, snappedYMax]}
+                        ticks={yTicks}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
                         label={{ value: 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
+                        allowDecimals={false}
                     />
                     <Tooltip content={<CustomTooltip />} shared={false} cursor={false} />
 
