@@ -836,7 +836,7 @@ export function computeRoomModesResponse({
     // This is the REFERENCE PHYSICS - position-dependent nulls come from here
     const coherentMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
     const coherentPressureRaw = 20 * Math.log10(Math.max(Number.EPSILON, coherentMag));
-    
+
     // Store component magnitudes for RMS calculation and debug visibility
     const modalMag = Math.sqrt(modalTerm_re * modalTerm_re + modalTerm_im * modalTerm_im);
     const sbirMag = Math.sqrt(sbirTerm_re * sbirTerm_re + sbirTerm_im * sbirTerm_im);
@@ -855,6 +855,9 @@ export function computeRoomModesResponse({
       modalBandDb.push(modalMagDb);
       sbirBandDb.push(sbirMagDb);
     }
+
+    // Store RAW coherent for REW parity (zero processing path)
+    coherentRawDb.push(coherentPressureRaw);
 
     // Start with coherent pressure, then apply processing layers (ONLY if not raw mode)
     let modalDb = coherentPressureRaw;
@@ -890,12 +893,9 @@ export function computeRoomModesResponse({
       const rolloffDb = -3.0 * octavesBelow; // -3 dB/octave below 35 Hz
       modalDb += Math.max(-9.0, rolloffDb); // Cap at -9 dB max reduction
     }
-    
-    // Store coherent raw for RAW mode output
-    coherentRawDb.push(coherentPressureRaw);
-    
+
     return modalDb;
-  });
+    });
   
   return { splDb, modalBandDb, sbirBandDb, coherentRawDb };
   }; // End of runOnce
@@ -1073,6 +1073,82 @@ export function computeRoomModesResponse({
   const preNormMin = finitePreNorm.length > 0 ? Math.min(...finitePreNorm) : 0;
   const preNormMax = finitePreNorm.length > 0 ? Math.max(...finitePreNorm) : 0;
   const preNormRange = preNormMax - preNormMin;
+
+  // REW PARITY MODE: Skip all processing, use raw coherent physics
+  if (rewParityMode && !rawEngineOutput) {
+    // REW physics path: zero processing (finalDb = raw coherent)
+    const rewPhysicsDb = [...rawCoherentDb];
+
+    // Skip to end, bypass smoothing/blending/calibration
+    const finalDb = rewPhysicsDb;
+    const plottedDb = rewPhysicsDb; // Same array for plotting
+
+    // Build minimal return (no processing stats needed)
+    return {
+      freqs: [...freqs],
+      splDb: [...finalDb],
+      plottedDb: [...plottedDb],
+      coherentRawDb: [...rawCoherentDb],
+      debug: {
+        schroederHz,
+        modeMarkersHz: [...modeMarkersHz],
+        modeMarkersAllHz: [...modeMarkersAllHz],
+        modeMarkers: modeMarkers.map(m => ({ ...m, n: [...m.n] })),
+        modeListFirst60: [...modeListFirst60],
+        modeCount: modes.length,
+        modalModeCountUsed: modes.length,
+        modeIsolationActive: modeIsolation && modeIsolation !== 'off',
+        axialCount,
+        tangentialCount,
+        obliqueCount,
+        firstTenModeHz: [...firstTenModeHz],
+        lowestAxialHz: lowestAxial,
+        rewParityMode: true,
+        rawEngineOutputMode: false,
+        rewPhysicsPath: true, // Flag to indicate zero-processing path
+        smoothingApplied: 'none',
+        normApplied: false,
+        normRefDb: "N/A (REW physics path)",
+        splMinDb: finitePreNorm.length > 0 ? preNormMin.toFixed(1) : '0.0',
+        splMaxDb: finitePreNorm.length > 0 ? preNormMax.toFixed(1) : '0.0',
+        splRangeDb: finitePreNorm.length > 0 ? preNormRange.toFixed(1) : '0.0',
+        imageFieldEnabled: imageFieldEnabledActual,
+        sbirEnabled,
+        sbirMaxOrder: sbirMaxOrder,
+        sbirBlendStartHz: sbirEnabled ? sbirBlendStartHzActual.toFixed(1) : 'N/A',
+        sbirBlendEndHz: sbirEnabled ? sbirBlendEndHzActual.toFixed(1) : 'N/A',
+        sbirDebugProbe40Hz: sbirDebugProbe40Hz,
+        sbirDebugProbe63Hz: sbirDebugProbe63Hz_captured,
+        modeContributions: modeContributions,
+        componentView: componentView,
+        modalRmsDb_20_200: modalRmsDb_20_200.toFixed(1),
+        sbirRmsDb_20_200: sbirRmsDb_20_200.toFixed(1),
+        totalRmsDb_20_200: totalRmsDb_20_200.toFixed(1),
+        sbirLevelMatching: sbirMatchingApplied ? {
+          modalMedianDb: modalMedianDb.toFixed(2),
+          sbirMedianDb: sbirMedianDb.toFixed(2),
+          trimAppliedDb: sbirTrimDb.toFixed(2),
+          trimLinear: sbirTrimLinear.toFixed(4)
+        } : null,
+        sealedRoom: sealedRoom,
+        parityAudits: {
+          modalPlusSbir: {
+            raw: {
+              band40_70Hz: peakDipDelta(freqs, rawCoherentDb, 40, 70),
+              band20_40Hz_avgDb: avgDb(freqs, rawCoherentDb, 20, 40),
+              band100_160Hz_avgDb: avgDb(freqs, rawCoherentDb, 100, 160),
+            },
+            final: {
+              band40_70Hz: peakDipDelta(freqs, rewPhysicsDb, 40, 70),
+              band20_40Hz_avgDb: avgDb(freqs, rewPhysicsDb, 20, 40),
+              band100_160Hz_avgDb: avgDb(freqs, rewPhysicsDb, 100, 160),
+            },
+            deltaShrinkDb_40_70: '0.00', // Zero processing = zero shrink
+          }
+        }
+      }
+    };
+  }
 
   // Apply smoothing if requested AND not raw mode (create NEW array, never mutate)
   const smoothingApplied = (!rawEngineOutput && smoothing !== 'none') ? smoothing : 'none';
