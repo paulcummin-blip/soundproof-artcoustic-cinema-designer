@@ -105,15 +105,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // MUST be defined AFTER rewSmoothing state declaration
   const graphSmoothing = rewCompareView ? "1/3" : rewSmoothing;
 
-  // Define modeMarkersHz early (before all useMemo blocks that might reference it)
-  const modeMarkersHz = useMemo(() => {
-    // Safe access: activeDebug is defined later but this memo will run after all deps are ready
-    const dbg = rewView === 'roomPlusProduct' && rewRoomPlusProductDataAbs?.debug
-      ? rewRoomPlusProductDataAbs.debug
-      : rewModesDataAbs?.debug;
-    return dbg?.modeMarkersHz || [];
-  }, [rewView, rewModesDataAbs, rewRoomPlusProductDataAbs]);
-
   // Set default smoothing when REW mode is enabled
   useEffect(() => {
     if (rewStyleMode && (!rewSmoothing || rewSmoothing === 'none')) {
@@ -1036,6 +1027,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Aliases switch Abs/Rel based on UI toggle
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
+
+  // Define modeMarkersHz (after data objects are defined to prevent initialization errors)
+  const modeMarkersHz = useMemo(() => {
+    const dbg = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+      ? rewRoomPlusProductData.debug
+      : rewModesData?.debug;
+    return dbg?.modeMarkersHz || [];
+  }, [rewView, rewModesData, rewRoomPlusProductData]);
 
   // Choose which curve to display based on view (REW-style is now the only mode)
   // Apply display-only offset in REW mode (REW shows on ~90 dB scale, not 0 dB)
