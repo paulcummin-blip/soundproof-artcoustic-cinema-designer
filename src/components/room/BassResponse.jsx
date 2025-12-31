@@ -591,8 +591,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     lastRewFailSigRef.current = null;
     lastRewFailResultRef.current = null;
 
-    // Use plottedDb for display (smoothed if requested), coherentRawDb for audit
-    const plotArray = result.plottedDb || result.splDb;
+    // REW parity: use rewParityDb if available (zero processing), else fall back
+    const plotArray = result.rewParityDb || result.plottedDb || result.splDb;
+    const plottedSource = result.rewParityDb ? 'rewParityDb (true parity)' 
+                         : (result.plottedDb ? 'plottedDb (processed)' 
+                         : 'splDb (fallback)');
     
     return {
       data: result.freqs.map((frequency, i) => ({
@@ -603,10 +606,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         ...result.debug,
         viewMode: 'Room-only (generic sub)',
         curveType: 'Modal response + geometry',
+        plottedSource,
       },
       freqs: result.freqs,
       splDb: plotArray,
       coherentRawDb: result.coherentRawDb,
+      rewParityDb: result.rewParityDb,
       subSig,
       seatSig
     };
@@ -881,8 +886,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const productCurvesApplied = subProductCurves.filter(c => c !== null).length;
     const firstCurve = productCurveDebug[0] || null;
 
-    // Use plottedDb for display (smoothed if requested), coherentRawDb for audit
-    const plotArray = result.plottedDb || result.splDb;
+    // REW parity: use rewParityDb if available (zero processing), else fall back
+    const plotArray = result.rewParityDb || result.plottedDb || result.splDb;
+    const plottedSource = result.rewParityDb ? 'rewParityDb (true parity)' 
+                         : (result.plottedDb ? 'plottedDb (processed)' 
+                         : 'splDb (fallback)');
 
     return {
       data: result.freqs.map((frequency, i) => ({
@@ -900,11 +908,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         productCurveAt50HzDb: firstCurve?.originalAt50Hz || 'N/A',
         productCurveMinMaxDb: firstCurve ? `${firstCurve.relativeMinDb} to ${firstCurve.relativeMaxDb}` : 'N/A',
         productCurveIsRelative: firstCurve?.isRelative || false,
-        productCurveDebug
+        productCurveDebug,
+        plottedSource,
       },
       freqs: result.freqs,
       splDb: plotArray,
-      coherentRawDb: result.coherentRawDb
+      coherentRawDb: result.coherentRawDb,
+      rewParityDb: result.rewParityDb
     };
   }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, graphSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView, rewSmoothing]);
 
@@ -3033,6 +3043,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <strong>Engine smoothing applied:</strong> {activeDebug.smoothingApplied || 'none'}
                   </div>
                   <div className="text-[10px] font-mono opacity-80">
+                    <strong>Plotted source:</strong> {activeDebug.plottedSource || 'N/A'}
+                  </div>
+                  {activeDebug.rewParityError && (
+                    <div className="text-[10px] font-mono text-yellow-700 font-semibold">
+                      ⚠️ {activeDebug.rewParityError}
+                    </div>
+                  )}
+                  <div className="text-[10px] font-mono opacity-80">
                     <strong>Absolute SPL:</strong> {activeDebug.absoluteSplMode ? 'true' : 'false'}
                   </div>
                   <div className="text-[10px] font-mono opacity-80">
@@ -3272,7 +3290,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         {/* Out of window warning (non-REW mode only) */}
         {!rewStyleMode && yAxisLocked && (outBelow + outAbove) > 0 && (
           <div style={{ marginTop: 6, marginBottom: 8, fontSize: 12, color: "#8a2b2b", background: "#fff3cd", padding: "6px 10px", borderRadius: 6, border: "1px solid #ffc107" }}>
-            ⚠️ Out of view window: {outBelow} below, {outAbove} above. This is expected with a locked Y-axis; unlock or reset scale to view the full curve.
+            ⚠️ Out of view window: {outBelow} below, {outAbove} above. Gaps are expected with a locked Y-axis; unlock or reset scale to view the full curve.
           </div>
         )}
 

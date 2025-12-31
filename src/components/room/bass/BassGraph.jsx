@@ -384,10 +384,10 @@ export default function BassGraph({
                       />
                     ))}
 
-                    {/* REW mode: single true-value curve with monotone interpolation */}
+                    {/* REW mode: single true-value curve with monotone interpolation (visual smoothing only) */}
                     {rewStyleMode && (
                       <Line 
-                          type="monotone" 
+                          type="monotone"
                           dataKey="spl"
                           stroke="#213428" 
                           strokeWidth={2} 

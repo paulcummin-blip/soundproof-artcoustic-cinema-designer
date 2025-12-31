@@ -894,7 +894,12 @@ export function computeRoomModesResponse({
     // Store coherent raw for RAW mode output
     coherentRawDb.push(coherentPressureRaw);
     
-    return modalDb;
+    // REW PARITY OUTPUT: capture raw coherent SPL BEFORE any processing
+    // When rewParityMode is ON, this becomes the plotted curve (zero smoothing/blending/compensation)
+    // This array is NEVER processed - it's the reference physics
+    const rewParityRawDb = coherentPressureRaw;
+    
+    return { modalDb, rewParityRawDb };
   });
   
   return { splDb, modalBandDb, sbirBandDb, coherentRawDb };
@@ -941,6 +946,171 @@ export function computeRoomModesResponse({
   const secondPass = runOnce(null, sbirTrimLinear);
   const splDb = secondPass.splDb;
   const rawCoherentDb = secondPass.coherentRawDb;
+  
+  // Collect REW parity raw data (pure coherent SPL, zero processing)
+  const rewParityDbFromPass = freqs.map((f, i) => {
+    let sumRe_modal = 0;
+    let sumIm_modal = 0;
+    
+    // SBIR (image source) complex pressure sum
+    let sumRe_sbir = 0;
+    let sumIm_sbir = 0;
+
+    for (const mode of modes) {
+      const f0 = mode.freq;
+      if (!(f0 > 0)) continue;
+
+      // Compute modal Q
+      const qMode = estimateModeQ({
+        mode,
+        roomDims: room,
+        surfaceAbsorption: absorption,
+        dampingScalar,
+        leakage,
+        f0,
+      });
+
+      const bandwidth = f0 / qMode;
+      const df = Math.abs(f - f0);
+      if (df > 5 * bandwidth && df > 20) continue;
+
+      // Complex pressure contribution per sub
+      for (let subIdx = 0; subIdx < sourcesLocal.length; subIdx++) {
+        const source = sourcesLocal[subIdx];
+
+        // Spatial coupling (use same mode as main engine)
+        let coupling;
+        if (complexEigenfunctions) {
+          const couplingComplex = computeSpatialCouplingComplex(mode, source, seat, room);
+          coupling = couplingComplex.amp;
+          if (Math.abs(coupling) < 1e-6) continue;
+        } else {
+          coupling = computeSpatialCoupling(mode, source, seat, room);
+          if (Math.abs(coupling) < 1e-6) continue;
+        }
+
+        // Get product metadata for this sub
+        const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
+
+        // Product curve as magnitude multiplier (relative dB → linear scale)
+        let productRelativeDb = 0;
+        if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
+          productRelativeDb = meta.relativeCurve[i];
+        }
+        const productMagScale = Math.pow(10, productRelativeDb / 20);
+
+        // Apply sub tuning (gain, delay, polarity)
+        const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
+        const userGainLinear = Math.pow(10, subTuning.gainDb / 20);
+
+        // Apply MLP auto-level correction
+        const autoLevelGainDb = mlpAutoLevelGainsDb[subIdx] || 0;
+        const autoLevelGainLinear = Math.pow(10, autoLevelGainDb / 20);
+
+        const gainLinear = userGainLinear * autoLevelGainLinear;
+
+        // Phase: delay + polarity only (distance/time-of-flight is in the coupling)
+        const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
+        const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
+        const totalPhase = delayPhase + polarityPhase;
+
+        // Complex weight for this sub (magnitude shaping only)
+        const weightMag = productMagScale * gainLinear;
+        const weightRe = weightMag * Math.cos(totalPhase);
+        const weightIm = weightMag * Math.sin(totalPhase);
+
+        // Second-order resonator (dimensionless, REW-style behaviour)
+        const r = f / Math.max(1e-6, f0);
+        const re = (1 - r * r);
+        const im = (r / Math.max(1e-6, qMode));
+        const denom = (re * re + im * im);
+
+        // Complex H
+        let hRe = re / denom;
+        let hIm = -im / denom;
+
+        hRe /= Math.max(1e-6, qMode);
+        hIm /= Math.max(1e-6, qMode);
+
+        // Weighted modal contribution: weight * H * coupling
+        const cRe = coupling * (weightRe * hRe - weightIm * hIm);
+        const cIm = coupling * (weightRe * hIm + weightIm * hRe);
+
+        sumRe_modal += cRe;
+        sumIm_modal += cIm;
+      }
+    }
+    
+    // SBIR contribution (if enabled)
+    if (sbirEnabled) {
+      for (let subIdx = 0; subIdx < sourcesLocal.length; subIdx++) {
+        const source = sourcesLocal[subIdx];
+        
+        const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
+        let productRelativeDb = 0;
+        if (meta && meta.relativeCurve && meta.relativeCurve[i] !== undefined) {
+          productRelativeDb = meta.relativeCurve[i];
+        }
+        const productMagScale = Math.pow(10, productRelativeDb / 20);
+        
+        const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
+        const userGainLinear = Math.pow(10, subTuning.gainDb / 20);
+        const autoLevelGainDb = mlpAutoLevelGainsDb[subIdx] || 0;
+        const autoLevelGainLinear = Math.pow(10, autoLevelGainDb / 20);
+        const gainLinear = userGainLinear * autoLevelGainLinear;
+        
+        const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
+        const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
+        const totalPhase = delayPhase + polarityPhase;
+        
+        const weightMag = productMagScale * gainLinear;
+        const weightRe = weightMag * Math.cos(totalPhase);
+        const weightIm = weightMag * Math.sin(totalPhase);
+        
+        // Compute SBIR complex pressure
+        const sbirResult = computeSBIRComplexAtFreq({
+          f,
+          source,
+          receiver: seat,
+          roomDims: room,
+          surfaceAbsorption: absorption,
+          c,
+          includeWalls: sbirIncludeWalls,
+          includeFloorCeiling: sbirIncludeFloorCeiling,
+          maxOrder: isDragging ? 1 : 2,
+          sbirDebugSingleFrontWall: sbirDebugSingleFrontWall,
+        });
+        
+        // Apply weight to SBIR contribution
+        sumRe_sbir += weightRe * sbirResult.re - weightIm * sbirResult.im;
+        sumIm_sbir += weightRe * sbirResult.im + weightIm * sbirResult.re;
+      }
+      
+      // Apply SBIR blend weight (if enabled)
+      let sbirWeight = 1.0;
+      if (sbirBlendEnabled) {
+        if (f <= sbirBlendStartHzActual) {
+          sbirWeight = 1.0;
+        } else if (f >= sbirBlendEndHzActual) {
+          sbirWeight = 0.0;
+        } else {
+          const t = (f - sbirBlendStartHzActual) / (sbirBlendEndHzActual - sbirBlendStartHzActual);
+          sbirWeight = 0.5 * (1 + Math.cos(Math.PI * t));
+        }
+      }
+      
+      sumRe_sbir *= sbirWeight;
+      sumIm_sbir *= sbirTrimLinear; // Apply SBIR level matching
+    }
+    
+    // Total coherent sum (modal + sbir)
+    const totalRe = sumRe_modal + sumRe_sbir;
+    const totalIm = sumIm_modal + sumIm_sbir;
+    
+    // Pure coherent magnitude (NO processing)
+    const coherentMag = Math.sqrt(totalRe * totalRe + totalIm * totalIm);
+    return 20 * Math.log10(Math.max(Number.EPSILON, coherentMag));
+  });
   
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
@@ -1173,10 +1343,27 @@ export function computeRoomModesResponse({
   let calRefMedianDbBefore = 0;
   let calRefMedianDbAfter = 0;
 
-  // Use smoothed modal curve (SBIR is now integrated into splDb during summation)
-  // REW parity: always use unsmoothed data for plotting (preserve null depth)
-  // Smoothing happens visually via chart interpolation, not data mutation
-  let finalDb = rewParityMode ? splDbRepaired : splDbSmoothed;
+  // REW PARITY MODE: bypass ALL processing, plot raw coherent SPL
+  // When rewParityMode is ON, finalDb uses pure physics (no blend, no smoothing, no compensation)
+  // Smoothing is visual-only via chart interpolation (monotone line type)
+  let finalDb;
+  let rewParityError = null;
+  
+  if (rewParityMode) {
+    // Use raw coherent SPL (zero processing)
+    finalDb = rewParityDbFromPass;
+    
+    // Guard: if no finite values, fall back to processed path
+    const finiteCheck = finalDb.filter(v => Number.isFinite(v));
+    if (finiteCheck.length < 10) {
+      rewParityError = "No finite values in rewParityDb (fallback to processed)";
+      finalDb = splDbRepaired;
+    }
+  } else {
+    // Non-REW mode: use existing processed pipeline
+    finalDb = splDbSmoothed;
+  }
+  
   const plottedDb = (!rawEngineOutput && smoothing !== 'none') ? splDbSmoothed : splDbRepaired;
 
   if (!Array.isArray(finalDb) || finalDb.length === 0) {
@@ -1565,7 +1752,9 @@ export function computeRoomModesResponse({
     splDb: [...safeFinalDb],
     plottedDb: [...safePlottedDb],
     coherentRawDb: rewParityMode ? [...rawCoherentDb] : null,
+    rewParityDb: rewParityMode ? [...rewParityDbFromPass] : null,
     debug: {
+      rewParityError,
       schroederHz,
       modeMarkersHz: [...modeMarkersHz],
       modeMarkersAllHz: [...modeMarkersAllHz],
