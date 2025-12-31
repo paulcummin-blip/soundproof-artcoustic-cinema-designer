@@ -105,6 +105,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // MUST be defined AFTER rewSmoothing state declaration
   const graphSmoothing = rewCompareView ? "1/3" : rewSmoothing;
 
+  // Define modeMarkersHz early (before all useMemo blocks that might reference it)
+  const modeMarkersHz = useMemo(() => {
+    // Safe access: activeDebug is defined later but this memo will run after all deps are ready
+    const dbg = rewView === 'roomPlusProduct' && rewRoomPlusProductDataAbs?.debug
+      ? rewRoomPlusProductDataAbs.debug
+      : rewModesDataAbs?.debug;
+    return dbg?.modeMarkersHz || [];
+  }, [rewView, rewModesDataAbs, rewRoomPlusProductDataAbs]);
+
   // Set default smoothing when REW mode is enabled
   useEffect(() => {
     if (rewStyleMode && (!rewSmoothing || rewSmoothing === 'none')) {
@@ -1442,11 +1451,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   ]), []);
 
   const toggles = React.useMemo(() => ({ smoothing: false }), []);
-
-  // Define modeMarkersHz early to prevent "before initialization" errors
-  const modeMarkersHz = useMemo(() => {
-    return activeDebug?.modeMarkersHz || [];
-  }, [activeDebug]);
 
   // Compute mode frequencies for markers (use SAME parity run to avoid drift)
   const modeFrequencies = useMemo(() => {
