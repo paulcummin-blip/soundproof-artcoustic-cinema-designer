@@ -3,10 +3,14 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
+        const freqDisplay = Number.isFinite(label) ? `${label.toFixed(1)} Hz` : String(label);
+        const splValue = payload[0]?.value;
+        const splDisplay = Number.isFinite(splValue) ? `${splValue.toFixed(1)} dB` : 'N/A';
+        
         return (
             <div className="bg-white/80 backdrop-blur-sm p-3 border border-[#DCDBD6] rounded-lg shadow-lg font-body">
-                <p className="font-bold text-[#1B1A1A]">{`${label.toFixed(1)} Hz`}</p>
-                <p className="text-[#213428]">{`SPL: ${payload[0].value.toFixed(1)} dB`}</p>
+                <p className="font-bold text-[#1B1A1A]">{freqDisplay}</p>
+                <p className="text-[#213428]">{`SPL: ${splDisplay}`}</p>
             </div>
         );
     }
@@ -15,9 +19,9 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function BassGraph({ 
   responseData, 
-  schroederFrequency, 
-  rp22Levels, 
-  toggles, 
+  schroederFrequency = 0, 
+  rp22Levels = [], 
+  toggles = {}, 
   crossoverFrequency = 80,
   modeFrequencies = [],
   showModeMarkers = false,
@@ -29,7 +33,6 @@ export default function BassGraph({
   refDb = 85,
   disableHighlight = false
 }) {
-    // In REW mode, use data as-is (no baseline subtraction or normalization)
     let data = responseData;
     
     // Build chart data with red/black split at refDb ± 6 dB
@@ -147,25 +150,14 @@ export default function BassGraph({
     let calculatedYMin, calculatedYMax;
     let calculatedXMax = 200;
 
-    if (yDomain && yDomain.min !== undefined && yDomain.max !== undefined) {
+    if (yDomain && Number.isFinite(yDomain.min) && Number.isFinite(yDomain.max)) {
       // Use provided fixed domain
       calculatedYMin = yDomain.min;
       calculatedYMax = yDomain.max;
-    } else if (rewStyleMode && data.length > 0) {
-      // REW-style auto-windowing when no fixed domain
-      const validSpl = data.map(p => p.spl).filter(v => Number.isFinite(v));
-      if (validSpl.length > 0) {
-        const dataMin = Math.min(...validSpl);
-        const dataMax = Math.max(...validSpl);
-        const dataMean = validSpl.reduce((a, b) => a + b, 0) / validSpl.length;
-        
-        calculatedYMin = Math.max(dataMax - 45, dataMin - 5, 40);
-        calculatedYMax = Math.min(dataMax + 5, dataMean + 30, 120);
-      }
-    } else if (rewStyleMode) {
-      // Default REW-like range when no data
-      calculatedYMin = 60;
-      calculatedYMax = 110;
+    } else {
+      // Default Y range
+      calculatedYMin = 90;
+      calculatedYMax = 130;
     }
 
     // Smart X-axis for REW mode
@@ -262,14 +254,17 @@ export default function BassGraph({
                         type="number"
                         domain={rewStyleMode ? [20, calculatedXMax] : ['dataMin', 'dataMax']}
                         scale={linearHzAxis ? "linear" : "log"}
-                        ticks={linearHzAxis ? undefined : [20, 30, 40, 50, 60, 70, 80, 100, 120, 150, 200]}
+                        ticks={linearHzAxis 
+                          ? [20, 30, 40, 50, 60, 80, 100, 120, 160, 200] 
+                          : [20, 30, 40, 50, 60, 70, 80, 100, 120, 150, 200]
+                        }
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
                         label={{ value: "Frequency (Hz)", position: 'insideBottom', offset: -10, className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
                     />
                     <YAxis
-                        domain={calculatedYMin !== undefined && calculatedYMax !== undefined ? [calculatedYMin, calculatedYMax] : ['dataMin - 5', 'dataMax + 5']}
+                        domain={[calculatedYMin, calculatedYMax]}
                         tickFormatter={(tick) => Number(tick).toFixed(0)}
                         label={{ value: 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
@@ -277,7 +272,7 @@ export default function BassGraph({
                     />
                     <Tooltip content={<CustomTooltip />} shared={false} cursor={false} />
 
-                    {rewStyleMode && rp22Levels.map(level => (
+                    {rewStyleMode && rp22Levels && rp22Levels.map(level => (
                         <ReferenceLine 
                             key={level.level} 
                             y={level.spl} 
@@ -299,7 +294,7 @@ export default function BassGraph({
                         const labelValue = isOffScale 
                             ? `Schroeder (${schroederFrequency.toFixed(0)} Hz off-scale)` 
                             : 'Schroeder';
-
+                        
                         // If off-scale, show label without line
                         if (isOffScale) {
                             return (
@@ -314,7 +309,7 @@ export default function BassGraph({
                                 </text>
                             );
                         }
-
+                        
                         // On-scale: show line + label
                         return (
                             <ReferenceLine 
@@ -333,17 +328,18 @@ export default function BassGraph({
                         );
                     })()}
 
-                    {/* REW-style mode markers */}
-                    {renderModeMarkers()}
+                    {/* REW-style mode markers (prefer detailed modeMarkers data) */}
+                    {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && renderModeMarkers()}
                     
-                    {/* Legacy mode markers (non-REW) */}
-                    {!rewStyleMode && showModeMarkers && modeFrequencies.map((freq, i) => (
+                    {/* Legacy mode markers (fallback to modeFrequencies array) */}
+                    {showModeMarkers && normalizedMarkers.axial.length === 0 && modeFrequencies.length > 0 && modeFrequencies.map((freq, i) => (
                       <ReferenceLine 
-                        key={`mode-${i}`}
+                        key={`mode-legacy-${i}`}
                         x={freq} 
                         stroke="#DCDBD6" 
                         strokeWidth={1}
                         strokeDasharray="1 2"
+                        opacity={0.3}
                       />
                     ))}
 
