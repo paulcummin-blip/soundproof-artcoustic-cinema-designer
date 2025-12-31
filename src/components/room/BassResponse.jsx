@@ -1220,59 +1220,99 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { refDb, min, max };
   }, []);
 
-  // Domain hysteresis for smoother auto-windowing when Lock Y is OFF
-  const lastAutoDomainRef = useRef(null);
+  // Dynamic Y domain from pre-clamp plotted data (designer-friendly)
+  const computeDynamicYDomain = (points, isRelative) => {
+    const finite = (points || []).map(p => p?.spl).filter(v => Number.isFinite(v));
+    if (finite.length === 0) {
+      return isRelative
+        ? { min: -30, max: 12, refDb: 0 }
+        : { min: 65, max: 105, refDb: 85 };
+    }
+
+    let minV = Math.min(...finite);
+    let maxV = Math.max(...finite);
+
+    // Add padding so the curve isn't pressed against the edges
+    minV = minV - 6;
+    maxV = maxV + 6;
+
+    // Hard caps to keep the chart sane
+    if (isRelative) {
+      minV = Math.max(-60, minV);
+      maxV = Math.min(20, maxV);
+      // Ensure not inverted / too narrow
+      if (maxV - minV < 20) {
+        const mid = (maxV + minV) / 2;
+        minV = mid - 10;
+        maxV = mid + 10;
+      }
+    } else {
+      minV = Math.max(40, minV);
+      maxV = Math.min(130, maxV);
+      if (maxV - minV < 20) {
+        const mid = (maxV + minV) / 2;
+        minV = mid - 10;
+        maxV = mid + 10;
+      }
+    }
+
+    return { min: minV, max: maxV, refDb: (minV + maxV) / 2 };
+  };
+
+  // Y-axis domain policy: fixed designer windows when locked, auto-fit when unlocked
   React.useEffect(() => {
     if (!rewStyleMode) {
       setYAxisDomain(null);
-      lastAutoDomainRef.current = null;
       return;
     }
-    if (!displayData || displayData.length === 0) return;
 
-    const proposed = rewCompareView 
-      ? computeRewCompareYDomain(displayData)
-      : computeStableYDomain(displayData);
-    if (!proposed) return;
+    let nextDomain = null;
 
-    // If locked: only set on first compute or manual reset
+    // RULE A: Locked = fixed designer windows
     if (yAxisLocked) {
-      const shouldCompute = yAxisDomain === null || scaleEpoch > 0;
-      if (shouldCompute) {
-        setYAxisDomain(proposed);
-        lastAutoDomainRef.current = proposed;
-        if (scaleEpoch > 0) setScaleEpoch(0);
+      if (rewCompareView) {
+        nextDomain = { min: 65, max: 105, refDb: 85 };
+      } else if (rewRelativeView) {
+        nextDomain = { min: -30, max: 12, refDb: 0 };
+      } else {
+        nextDomain = { min: 65, max: 105, refDb: 85 };
       }
-      return;
+    } else {
+      // RULE B: Unlocked = auto from pre-clamp plotted data
+      nextDomain = computeDynamicYDomain(displayData, !!rewRelativeView);
     }
 
-    // Unlocked: apply hysteresis (2 dB threshold) and 3 dB slew limit per update
-    const last = lastAutoDomainRef.current || yAxisDomain || proposed;
-    const diffMin = Math.abs(proposed.min - last.min);
-    const diffMax = Math.abs(proposed.max - last.max);
-    const threshold = 2; // dB
+    // Only apply if meaningfully different (prevents jitter / loops)
+    const curMin = yAxisDomain?.min;
+    const curMax = yAxisDomain?.max;
+    const nextMin = nextDomain?.min;
+    const nextMax = nextDomain?.max;
 
-    if (diffMin <= threshold && diffMax <= threshold) return; // keep current domain
+    const shouldSet =
+      !yAxisDomain ||
+      !Number.isFinite(curMin) ||
+      !Number.isFinite(curMax) ||
+      Math.abs(nextMin - curMin) > 0.1 ||
+      Math.abs(nextMax - curMax) > 0.1;
 
-    const clampDelta = (d) => Math.max(-3, Math.min(3, d));
-    const next = {
-      refDb: proposed.refDb,
-      min: last.min + clampDelta(proposed.min - last.min),
-      max: last.max + clampDelta(proposed.max - last.max)
-    };
-
-    setYAxisDomain(next);
-    lastAutoDomainRef.current = next;
-    if (scaleEpoch > 0) setScaleEpoch(0);
-  }, [rewStyleMode, displayData, yAxisLocked, yAxisDomain, scaleEpoch, computeStableYDomain, computeRewCompareYDomain, rewCompareView]);
+    if (shouldSet) {
+      setYAxisDomain(nextDomain);
+    }
+  }, [rewStyleMode, yAxisLocked, rewCompareView, rewRelativeView, displayData, yAxisDomain]);
 
   // Manual reset function
   const handleResetScale = React.useCallback(() => {
     if (!rewStyleMode) return;
-    
-    // Trigger recompute by incrementing epoch
-    setScaleEpoch(prev => prev + 1);
-  }, [rewStyleMode]);
+
+    // Reset should always snap to the designer-friendly default for the current view
+    if (rewCompareView) {
+      setYAxisDomain({ min: 65, max: 105, refDb: 85 });
+    } else if (rewRelativeView) {
+      setYAxisDomain({ min: -30, max: 12, refDb: 0 });
+    } else {
+      setYAxisDomain({ min: 65, max: 105, refDb: 85 });
+    }
+  }, [rewStyleMode, rewCompareView, rewRelativeView]);
 
   // Determine final Y-axis domain to pass to graph + clamp data + count out-of-window points
   const finalYDomain = React.useMemo(() => {
