@@ -3208,10 +3208,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Out of window warning (only when REW is ON and points are clamped) */}
-        {rewStyleMode && (outBelow + outAbove) > 0 && (
+        {/* Out of window warning (REW + locked Y-axis only) */}
+        {rewStyleMode && yAxisLocked && (outBelow + outAbove) > 0 && (
           <div style={{ marginTop: 6, marginBottom: 8, fontSize: 12, color: "#8a2b2b", background: "#fff3cd", padding: "6px 10px", borderRadius: 6, border: "1px solid #ffc107" }}>
-            ⚠️ Out of window: {outBelow} below, {outAbove} above (fix placement / phase / quantity)
+            ⚠️ Out of view window: {outBelow} below, {outAbove} above. This is expected with a locked Y-axis; unlock or reset scale to view the full curve.
           </div>
         )}
 
