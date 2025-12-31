@@ -1267,15 +1267,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { min: minV, max: maxV, refDb: (minV + maxV) / 2 };
   };
 
-  // Y-axis domain policy: REW mode uses auto, non-REW uses fixed windows
+  // Y-axis domain policy: REW mode computes from data, non-REW uses fixed windows
   React.useEffect(() => {
     if (!rewStyleMode) {
       setYAxisDomain(null);
       return;
     }
 
-    // REW mode: always use auto Y-axis (no fixed windows, show true nulls)
-    setYAxisDomain('auto');
+    // REW mode: Y-axis auto-computed from data in BassGraph (pass null)
+    setYAxisDomain(null);
   }, [rewStyleMode]);
 
   // Manual reset function
@@ -1295,8 +1295,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Determine final Y-axis domain to pass to graph
   const finalYDomain = React.useMemo(() => {
     if (!rewStyleMode) return undefined;
-    // REW mode: use auto Y-axis (dataMin/dataMax) to show true nulls
-    return yAxisDomain === 'auto' ? undefined : yAxisDomain;
+    // REW mode: pass null so BassGraph computes from data
+    return null;
   }, [rewStyleMode, yAxisDomain]);
 
   // REW mode: no clamping, pass data through unchanged
@@ -3233,8 +3233,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Out of window warning (REW + locked Y-axis only) */}
-        {rewStyleMode && yAxisLocked && (outBelow + outAbove) > 0 && (
+        {/* Out of window warning (non-REW mode only) */}
+        {!rewStyleMode && yAxisLocked && (outBelow + outAbove) > 0 && (
           <div style={{ marginTop: 6, marginBottom: 8, fontSize: 12, color: "#8a2b2b", background: "#fff3cd", padding: "6px 10px", borderRadius: 6, border: "1px solid #ffc107" }}>
             ⚠️ Out of view window: {outBelow} below, {outAbove} above. This is expected with a locked Y-axis; unlock or reset scale to view the full curve.
           </div>

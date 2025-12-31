@@ -35,19 +35,17 @@ export default function BassGraph({
 }) {
     let data = responseData;
     
-    // Build chart data with red/black split at refDb ± 6 dB
-    // Uses threshold-crossing interpolation to ensure clean color transitions without gaps
+    // Build chart data: REW mode = one true series, non-REW = good/bad split
     const chartData = React.useMemo(() => {
       if (!data || data.length === 0) return [];
 
       const sorted = [...data].sort((a, b) => (a.frequency ?? 0) - (b.frequency ?? 0));
 
-      // REW mode: plot true values without any windowing/splitting
+      // REW mode: plot true values without any windowing/splitting/clamping
       if (rewStyleMode) {
         return sorted.map(d => ({
           frequency: d.frequency,
-          spl: d.spl,
-          splRew: Number.isFinite(d.spl) ? d.spl : null
+          spl: Number.isFinite(d.spl) ? d.spl : null
         }));
       }
 
@@ -160,8 +158,25 @@ export default function BassGraph({
     let calculatedYMin, calculatedYMax;
     let calculatedXMax = 200;
 
-    if (yDomain && Number.isFinite(yDomain.min) && Number.isFinite(yDomain.max)) {
-      // Use provided fixed domain
+    // REW mode: compute Y domain from actual data
+    if (rewStyleMode) {
+      const splValues = chartData
+        .map(d => d.spl)
+        .filter(v => Number.isFinite(v));
+
+      if (splValues.length > 0) {
+        const dataMin = Math.min(...splValues);
+        const dataMax = Math.max(...splValues);
+        const padding = 5; // 5 dB padding top and bottom
+        calculatedYMin = dataMin - padding;
+        calculatedYMax = dataMax + padding;
+      } else {
+        // Fallback if no data
+        calculatedYMin = 60;
+        calculatedYMax = 110;
+      }
+    } else if (yDomain && Number.isFinite(yDomain.min) && Number.isFinite(yDomain.max)) {
+      // Non-REW mode: use provided fixed domain
       calculatedYMin = yDomain.min;
       calculatedYMax = yDomain.max;
     } else {
@@ -369,26 +384,11 @@ export default function BassGraph({
                       />
                     ))}
 
-                    {/* Reference Line (Always Visible) */}
-                    <ReferenceLine 
-                        y={refDb} 
-                        stroke="#2563eb" 
-                        strokeWidth={1.5}
-                        strokeDasharray="4 4"
-                        label={{ 
-                          value: refDb === 0 ? `${refDb} dB (Relative)` : `${refDb} dB Reference`, 
-                          position: 'right', 
-                          fill: '#2563eb', 
-                          className: 'font-body text-xs',
-                          offset: 5
-                        }} 
-                      />
-
                     {/* REW mode: single true-value curve with monotone interpolation */}
                     {rewStyleMode && (
                       <Line 
                           type="monotone" 
-                          dataKey="splRew"
+                          dataKey="spl"
                           stroke="#213428" 
                           strokeWidth={2} 
                           dot={false}
@@ -426,6 +426,21 @@ export default function BassGraph({
                         />
                       </>
                     )}
+
+                    {/* Reference Line (Always Visible) */}
+                    <ReferenceLine 
+                        y={refDb} 
+                        stroke="#2563eb" 
+                        strokeWidth={1.5}
+                        strokeDasharray="4 4"
+                        label={{ 
+                          value: refDb === 0 ? `${refDb} dB (Relative)` : `${refDb} dB Reference`, 
+                          position: 'right', 
+                          fill: '#2563eb', 
+                          className: 'font-body text-xs',
+                          offset: 5
+                        }} 
+                      />
                     
                     {/* Mode line legend (REW style) */}
                     {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && (
