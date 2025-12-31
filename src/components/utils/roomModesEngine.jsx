@@ -464,37 +464,6 @@ export function computeRoomModesResponse({
   // SBIR 63 Hz diagnostic probe (track across passes)
   let sbirDebugProbe63Hz_captured = null;
 
-  // Helper: compute peak-to-dip delta in a frequency band
-  const peakDipDelta = (freqs, splDb, fMin, fMax) => {
-    const bandData = freqs.map((f, i) => ({ f, spl: splDb[i] }))
-                         .filter(d => d.f >= fMin && d.f <= fMax && Number.isFinite(d.spl));
-    if (bandData.length === 0) return { peakDb: 'N/A', dipDb: 'N/A', peakHz: 'N/A', dipHz: 'N/A', deltaDb: 'N/A' };
-
-    let peak = -Infinity, dip = Infinity;
-    let peakF = 'N/A', dipF = 'N/A';
-
-    for (const d of bandData) {
-      if (d.spl > peak) { peak = d.spl; peakF = d.f; }
-      if (d.spl < dip) { dip = d.spl; dipF = d.f; }
-    }
-    return { 
-      peakDb: peak.toFixed(2), 
-      dipDb: dip.toFixed(2), 
-      peakHz: peakF.toFixed(1), 
-      dipHz: dipF.toFixed(1), 
-      deltaDb: (peak - dip).toFixed(2) 
-    };
-  };
-
-  // Helper: compute average dB in a frequency band
-  const avgDb = (freqs, splDb, fMin, fMax) => {
-    const bandValues = freqs.map((f, i) => ({ f, spl: splDb[i] }))
-                            .filter(d => d.f >= fMin && d.f <= fMax && Number.isFinite(d.spl));
-    if (bandValues.length === 0) return 'N/A';
-    const sum = bandValues.reduce((acc, d) => acc + d.spl, 0);
-    return (sum / bandValues.length).toFixed(2);
-  };
-
   // Extract computation into runOnce for diagnostic double-run
   const runOnce = (sourcesOverride, sbirTrimLinearArg = 1.0) => {
     const sourcesUsed = sourcesOverride ?? sourcesLocal;
@@ -989,14 +958,13 @@ export function computeRoomModesResponse({
     return modalDb;
   });
   
-  return { splDb, modalBandDb, sbirBandDb, coherentRawDb };
+  return { splDb, modalBandDb, sbirBandDb };
   }; // End of runOnce
 
   // Run engine with normal sources - FIRST PASS to collect statistics
   const firstPass = runOnce(null, 1.0);
   const modalBandDbPass1 = firstPass.modalBandDb;
   const sbirBandDbPass1 = firstPass.sbirBandDb;
-  const coherentRawDbPass1 = firstPass.coherentRawDb;
 
   // SBIR Level Matching (Part B): Compute trim to match SBIR to modal scale in 30-80 Hz
   let sbirTrimDb = 0;
@@ -1033,7 +1001,6 @@ export function computeRoomModesResponse({
   // SECOND PASS: Run engine again with computed SBIR trim
   const secondPass = runOnce(null, sbirTrimLinear);
   const splDb = secondPass.splDb;
-  const coherentRawDb = secondPass.coherentRawDb;
   
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
@@ -1507,52 +1474,6 @@ export function computeRoomModesResponse({
   // Compute stable input signature for debug memoization
   const inputSig = `${sourceSigUsed}|${seatSigUsed}|${smoothing}|${isRelative?'rel':'abs'}`;
 
-  // Parity debug: compare raw coherent vs final plotted
-  const parityAudits = {
-    raw: {
-      band40_70Hz: peakDipDelta(freqs, coherentRawDb, 40, 70),
-      band20_40Hz_avgDb: avgDb(freqs, coherentRawDb, 20, 40),
-      band100_160Hz_avgDb: avgDb(freqs, coherentRawDb, 100, 160)
-    },
-    final: {
-      band40_70Hz: peakDipDelta(freqs, finalDb, 40, 70),
-      band20_40Hz_avgDb: avgDb(freqs, finalDb, 20, 40),
-      band100_160Hz_avgDb: avgDb(freqs, finalDb, 100, 160)
-    }
-  };
-
-  // Component view debug (only when debug enabled)
-  if (__debugBass) {
-    const componentViewsDebug = {};
-    
-    for (const view of ['modalOnly', 'sbirOnly', 'modalPlusSbir']) {
-      const viewPass = runOnce(null, sbirTrimLinear);
-      // Apply the same post-processing as main pipeline
-      let viewRaw = viewPass.coherentRawDb;
-      let viewFinal = viewPass.splDb;
-      
-      // Apply smoothing if enabled
-      if (smoothing !== 'none') {
-        viewFinal = applySmoothing(freqs, viewFinal, smoothing);
-      }
-      
-      componentViewsDebug[view] = {
-        raw: {
-          band40_70Hz: peakDipDelta(freqs, viewRaw, 40, 70),
-          band20_40Hz_avgDb: avgDb(freqs, viewRaw, 20, 40),
-          band100_160Hz_avgDb: avgDb(freqs, viewRaw, 100, 160)
-        },
-        final: {
-          band40_70Hz: peakDipDelta(freqs, viewFinal, 40, 70),
-          band20_40Hz_avgDb: avgDb(freqs, viewFinal, 20, 40),
-          band100_160Hz_avgDb: avgDb(freqs, viewFinal, 100, 160)
-        }
-      };
-    }
-    
-    parityAudits.componentViews = componentViewsDebug;
-  }
-
   // FINAL GUARD: Prevent "No finite values" silent failures
   const finalFiniteCheck = finalDb.filter(v => isFinite(v));
   if (finalFiniteCheck.length < 10) {
@@ -1716,8 +1637,7 @@ export function computeRoomModesResponse({
           distanceM: dist.toFixed(3),
           effectiveDelayMs: (s.tuning?.delayMs ?? 0).toFixed(2)
         };
-      }) : null,
-      parityAudits: parityAudits
+      }) : null
       }
       };
 
