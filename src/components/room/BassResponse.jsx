@@ -43,7 +43,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [modesEnabled, setModesEnabled] = useState(false);
   const [roomDamping, setRoomDamping] = useState(20);
   const [showModeMarkers, setShowModeMarkers] = useState(false);
-  const [rewStyleMode, setRewStyleMode] = useState(false);
+  const [rewStyleMode, setRewStyleMode] = useState(true);
   const [rewSmoothing, setRewSmoothing] = useState('1/3'); // Default: RP22 standard for normal use
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(false);
@@ -1019,22 +1019,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
 
-  // Choose which curve to display based on mode and view
-  // AUDIT CHECKPOINT (Part D2): This is a PASS-THROUGH - no processing applied here
+  // Choose which curve to display based on view (REW-style is now the only mode)
   const displayData = useMemo(() => {
-    if (!rewStyleMode) {
-      // Product simulation mode
-      return responseData;
-    }
-
-    // REW parity mode: switch between Abs/Rel + RoomOnly/Product via aliases above
+    // Always drive the graph from REW datasets
     if (rewView === 'roomPlusProduct') {
-      return rewRoomPlusProductData?.data || [];
-    } else {
-      // roomOnly
-      return rewModesData?.data || [];
+      return rewRoomPlusProductData?.data?.length ? rewRoomPlusProductData.data : (rewModesData?.data || []);
     }
-  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, responseData, rewCompareView, rewRelativeView]);
+    return rewModesData?.data?.length ? rewModesData.data : (rewRoomPlusProductData?.data || []);
+  }, [rewView, rewModesData, rewRoomPlusProductData]);
 
   // TEMP DEBUG (can remove later)
   // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
@@ -1816,17 +1808,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Label htmlFor="rew-mode" className="text-xs text-[#3E4349] whitespace-nowrap">
-                Room Modes (REW-style)
-              </Label>
-              <Switch
-                id="rew-mode"
-                checked={rewStyleMode}
-                onCheckedChange={setRewStyleMode}
-              />
-            </div>
-
             {rewStyleMode && (
               <>
                 {/* Advanced controls visible only when REW mode is ON */}
@@ -3319,8 +3300,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 rewStyleMode={rewStyleMode}
                 yDomain={finalYDomain}
                 showAxialOnly={false}
-                refDb={rewStyleMode && rewRelativeView ? 0 : 85}
-                disableHighlight={false}
+                refDb={rewRelativeView ? 0 : 85}
+                disableHighlight={rewRelativeView}
               />
             );
           })() : (

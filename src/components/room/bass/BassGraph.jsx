@@ -37,81 +37,85 @@ export default function BassGraph({
     const chartData = React.useMemo(() => {
       if (!data || data.length === 0) return [];
 
-      // Sort by frequency for monotonic axis
       const sorted = [...data].sort((a, b) => (a.frequency ?? 0) - (b.frequency ?? 0));
 
       const LOWER = refDb - 6;
       const UPPER = refDb + 6;
 
-      const result = [];
+      const rows = [];
+
+      const isInside = (v) => Number.isFinite(v) && v >= LOWER && v <= UPPER;
+
+      const pushCross = (crossFreq, thr, prevInside, currInside) => {
+        if (prevInside && !currInside) {
+          // black → red
+          rows.push({ frequency: crossFreq, spl: thr, splGood: thr, splBad: null });
+          rows.push({ frequency: crossFreq, spl: thr, splGood: null, splBad: thr });
+        } else if (!prevInside && currInside) {
+          // red → black
+          rows.push({ frequency: crossFreq, spl: thr, splGood: null, splBad: thr });
+          rows.push({ frequency: crossFreq, spl: thr, splGood: thr, splBad: null });
+        }
+      };
 
       for (let i = 0; i < sorted.length; i++) {
-        const p = sorted[i];
-        const f = p.frequency;
-        const v = p.spl;
+        const curr = sorted[i];
+        const currFreq = curr.frequency;
+        const currSpl = curr.spl;
 
-        if (!Number.isFinite(f) || !Number.isFinite(v)) {
-          result.push({ frequency: f, spl: null, splGood: null, splBad: null });
-          continue;
-        }
+        if (!Number.isFinite(currFreq)) continue;
 
-        // If highlight is disabled, just show black
+        // If highlight disabled: always black
         if (disableHighlight) {
-          result.push({ frequency: f, spl: v, splGood: v, splBad: null });
+          rows.push({
+            frequency: currFreq,
+            spl: Number.isFinite(currSpl) ? currSpl : null,
+            splGood: Number.isFinite(currSpl) ? currSpl : null,
+            splBad: null
+          });
           continue;
         }
 
-        const inside = v >= LOWER && v <= UPPER;
+        const currInside = isInside(currSpl);
 
-        // Check for threshold crossing with next point
-        if (i < sorted.length - 1) {
-          const nextP = sorted[i + 1];
-          const nextF = nextP.frequency;
-          const nextV = nextP.spl;
+        if (i > 0) {
+          const prev = sorted[i - 1];
+          const prevFreq = prev.frequency;
+          const prevSpl = prev.spl;
+          const prevInside = isInside(prevSpl);
 
-          if (Number.isFinite(nextF) && Number.isFinite(nextV)) {
-            const nextInside = nextV >= LOWER && nextV <= UPPER;
+          if (Number.isFinite(prevFreq) && Number.isFinite(prevSpl) && Number.isFinite(currSpl) && prevInside !== currInside) {
+            const crossings = [];
 
-            // If we're crossing a threshold, insert an interpolated point
-            if (inside !== nextInside) {
-              // Determine which threshold we're crossing
-              const crossingThreshold = v < LOWER || nextV < LOWER ? LOWER : UPPER;
-              
-              // Linear interpolation to find crossing frequency
-              const t = (crossingThreshold - v) / (nextV - v);
-              const crossingF = f + t * (nextF - f);
-
-              // Add current point
-              result.push({
-                frequency: f,
-                spl: v,
-                splGood: inside ? v : null,
-                splBad: inside ? null : v
-              });
-
-              // Add crossing point (both lines have value here for clean transition)
-              result.push({
-                frequency: crossingF,
-                spl: crossingThreshold,
-                splGood: crossingThreshold,
-                splBad: crossingThreshold
-              });
-
-              continue;
+            if ((prevSpl >= LOWER && currSpl < LOWER) || (prevSpl < LOWER && currSpl >= LOWER)) {
+              const t = (LOWER - prevSpl) / (currSpl - prevSpl);
+              crossings.push({ thr: LOWER, t });
             }
+
+            if ((prevSpl <= UPPER && currSpl > UPPER) || (prevSpl > UPPER && currSpl <= UPPER)) {
+              const t = (UPPER - prevSpl) / (currSpl - prevSpl);
+              crossings.push({ thr: UPPER, t });
+            }
+
+            crossings
+              .filter(c => Number.isFinite(c.t) && c.t > 0 && c.t < 1)
+              .sort((a, b) => a.t - b.t)
+              .forEach(c => {
+                const crossFreq = prevFreq + c.t * (currFreq - prevFreq);
+                pushCross(crossFreq, c.thr, prevInside, currInside);
+              });
           }
         }
 
-        // Normal point (no crossing)
-        result.push({
-          frequency: f,
-          spl: v,
-          splGood: inside ? v : null,
-          splBad: inside ? null : v
+        rows.push({
+          frequency: currFreq,
+          spl: Number.isFinite(currSpl) ? currSpl : null,
+          splGood: currInside ? currSpl : null,
+          splBad: currInside ? null : currSpl
         });
       }
 
-      return result;
+      return rows;
     }, [data, refDb, disableHighlight]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
