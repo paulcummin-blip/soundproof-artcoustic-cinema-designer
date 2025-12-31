@@ -288,45 +288,14 @@ export default function BassGraph({
                         />
                     ))}
                     
-                    {/* Schroeder frequency line (always visible when > 0, with off-scale indicator) */}
-                    {schroederFrequency > 0 && (() => {
-                        const isOffScale = schroederFrequency > 200;
-                        const labelValue = isOffScale 
-                            ? `Schroeder (${schroederFrequency.toFixed(0)} Hz off-scale)` 
-                            : 'Schroeder';
-                        
-                        // If off-scale, show label without line
-                        if (isOffScale) {
-                            return (
-                                <text 
-                                    x={180} 
-                                    y={30} 
-                                    fontSize={10} 
-                                    fill="#4A230F" 
-                                    className="font-body"
-                                >
-                                    {labelValue}
-                                </text>
-                            );
-                        }
-                        
-                        // On-scale: show line + label
-                        return (
-                            <ReferenceLine 
-                                x={schroederFrequency} 
-                                stroke="#4A230F" 
-                                strokeDasharray="4 4" 
-                                label={{ 
-                                    value: labelValue, 
-                                    position: 'insideTopRight', 
-                                    fill: '#4A230F', 
-                                    className: 'font-body text-xs',
-                                    offset: 10,
-                                    style: { textAnchor: 'end' }
-                                }} 
-                            />
-                        );
-                    })()}
+                    {/* Schroeder frequency line (on-scale only) */}
+                    {schroederFrequency > 0 && schroederFrequency <= 200 && (
+                        <ReferenceLine 
+                            x={schroederFrequency} 
+                            stroke="#4A230F" 
+                            strokeDasharray="4 4"
+                        />
+                    )}
 
                     {/* REW-style mode markers (prefer detailed modeMarkers data) */}
                     {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && renderModeMarkers()}
@@ -386,6 +355,22 @@ export default function BassGraph({
                     {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && (
                         <text x={60} y={20} fontSize={10} fill="#3E4349" className="font-body">
                             Modes: Axial (━━) Tangential (- -) Oblique (···)
+                        </text>
+                    )}
+
+                    {/* Schroeder frequency header label (top-right) */}
+                    {schroederFrequency > 0 && (
+                        <text
+                            x="98%"
+                            y={20}
+                            fontSize={10}
+                            fill="#4A230F"
+                            className="font-body"
+                            textAnchor="end"
+                        >
+                            {schroederFrequency > 200
+                                ? `Schroeder (${schroederFrequency.toFixed(0)} Hz off-scale)`
+                                : `Schroeder (${schroederFrequency.toFixed(1)} Hz)`}
                         </text>
                     )}
                 </LineChart>
