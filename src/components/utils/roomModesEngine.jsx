@@ -856,69 +856,6 @@ export function computeRoomModesResponse({
       sbirBandDb.push(sbirMagDb);
     }
 
-    // [ENGINE OUTPUT PROBE] - Audit log (gated to 40 Hz probe, only when global debug enabled)
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 40) < 0.6) {
-      console.log('[ENGINE OUTPUT PROBE @40Hz]', {
-        componentView,
-        modalMagDb: modalMagDb.toFixed(2),
-        sbirMagDb: sbirMagDb.toFixed(2),
-        totalMagDb: totalMagDb.toFixed(2),
-        outputMagDb: coherentPressureRaw.toFixed(2),
-        sbirWeightApplied: sbirWeight.toFixed(3),
-        sbirBlendActive: sbirBlendEnabled,
-        directPathUsed: sbirEnabled
-      });
-    }
-    
-    // [63 Hz CANCELLATION PROBE] - Verify modal/SBIR interference at REW null frequency
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && Math.abs(f - 63) < 0.6) {
-      const modalPhaseRad = Math.atan2(modalTerm_im, modalTerm_re);
-      const sbirPhaseRad = Math.atan2(sbirTerm_im, sbirTerm_re);
-      const totalPhaseRad = Math.atan2(totalTerm_im, totalTerm_re);
-      
-      console.log('[63 Hz CANCELLATION PROBE]', {
-        freq: f.toFixed(1),
-        modal: {
-          re: modalTerm_re.toFixed(6),
-          im: modalTerm_im.toFixed(6),
-          magDb: modalMagDb.toFixed(2),
-          phaseRad: modalPhaseRad.toFixed(4),
-          phaseDeg: (modalPhaseRad * 180 / Math.PI).toFixed(1)
-        },
-        sbir: {
-          re: sbirTerm_re.toFixed(6),
-          im: sbirTerm_im.toFixed(6),
-          magDb: sbirMagDb.toFixed(2),
-          phaseRad: sbirPhaseRad.toFixed(4),
-          phaseDeg: (sbirPhaseRad * 180 / Math.PI).toFixed(1)
-        },
-        total: {
-          re: totalTerm_re.toFixed(6),
-          im: totalTerm_im.toFixed(6),
-          magDb: totalMagDb.toFixed(2),
-          phaseRad: totalPhaseRad.toFixed(4),
-          phaseDeg: (totalPhaseRad * 180 / Math.PI).toFixed(1)
-        },
-        engineSmoothing: smoothing,
-        componentView
-      });
-    }
-    
-    // [LF SBIR PROBE @20Hz, 25Hz, 30Hz] - Verify SBIR is active at low frequencies
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && 
-        (Math.abs(f - 20) < 0.6 || Math.abs(f - 25) < 0.6 || Math.abs(f - 30) < 0.6)) {
-      console.log(`[LF SBIR PROBE @${f.toFixed(0)}Hz]`, {
-        sbirEnabled,
-        sbirWeight: sbirWeight.toFixed(3),
-        modalMagDb: modalMagDb.toFixed(2),
-        sbirMagDb: sbirMagDb.toFixed(2),
-        totalMagDb: totalMagDb.toFixed(2),
-        sumRe_total: sumRe_total.toFixed(6),
-        sumIm_total: sumIm_total.toFixed(6),
-        sbirContribution: sbirEnabled && sbirWeight > 0.5 ? 'ACTIVE' : (sbirEnabled ? 'PARTIAL' : 'OFF')
-      });
-    }
-
     // Start with coherent pressure, then apply processing layers (ONLY if not raw mode)
     let modalDb = coherentPressureRaw;
     
@@ -1479,18 +1416,28 @@ export function computeRoomModesResponse({
 
   // ---- Parity debug helpers (read-only, no DSP changes) ----
   const peakDipDelta = (freqsArr, dbArr, fMin, fMax) => {
-    const band = freqsArr
-      .map((f, i) => ({ f, v: dbArr?.[i] }))
-      .filter(d => d.f >= fMin && d.f <= fMax && Number.isFinite(d.v));
-
-    if (!band.length) {
+    if (!Array.isArray(freqsArr) || !Array.isArray(dbArr)) {
       return { peakDb: "N/A", dipDb: "N/A", peakFreq: "N/A", dipFreq: "N/A", deltaDb: "N/A" };
     }
 
-    let peak = -Infinity, dip = Infinity, peakF = band[0].f, dipF = band[0].f;
-    for (const d of band) {
-      if (d.v > peak) { peak = d.v; peakF = d.f; }
-      if (d.v < dip)  { dip  = d.v; dipF  = d.f; }
+    let peak = -Infinity, dip = Infinity;
+    let peakF = null, dipF = null;
+    let found = 0;
+
+    for (let i = 0; i < freqsArr.length; i++) {
+      const f = freqsArr[i];
+      if (f < fMin || f > fMax) continue;
+
+      const v = dbArr[i];
+      if (!Number.isFinite(v)) continue;
+
+      found++;
+      if (v > peak) { peak = v; peakF = f; }
+      if (v < dip)  { dip  = v; dipF  = f; }
+    }
+
+    if (!found) {
+      return { peakDb: "N/A", dipDb: "N/A", peakFreq: "N/A", dipFreq: "N/A", deltaDb: "N/A" };
     }
 
     return {
@@ -1503,20 +1450,30 @@ export function computeRoomModesResponse({
   };
 
   const avgDb = (freqsArr, dbArr, fMin, fMax) => {
-    const vals = freqsArr
-      .map((f, i) => ({ f, v: dbArr?.[i] }))
-      .filter(d => d.f >= fMin && d.f <= fMax && Number.isFinite(d.v))
-      .map(d => d.v);
+    if (!Array.isArray(freqsArr) || !Array.isArray(dbArr)) return "N/A";
 
-    if (!vals.length) return "N/A";
-    const sum = vals.reduce((a, b) => a + b, 0);
-    return (sum / vals.length).toFixed(2);
+    let sum = 0;
+    let n = 0;
+
+    for (let i = 0; i < freqsArr.length; i++) {
+      const f = freqsArr[i];
+      if (f < fMin || f > fMax) continue;
+
+      const v = dbArr[i];
+      if (!Number.isFinite(v)) continue;
+
+      sum += v;
+      n++;
+    }
+
+    if (!n) return "N/A";
+    return (sum / n).toFixed(2);
   };
 
   // ---- Parity audits: raw coherent vs final plotted ----
   let parityAudits = null;
 
-  const finalPlottedDb = finalDb; // what is actually plotted (returned as baseReturn.splDb)
+  const finalPlottedDb = (Array.isArray(finalDb) && finalDb.length > 0) ? finalDb : splDb; // what is actually plotted (returned as baseReturn.splDb)
 
   const buildParityStats = (rawDb, finalDbArr) => {
     const raw40_70 = peakDipDelta(freqs, rawDb, 40, 70);
@@ -1551,7 +1508,7 @@ export function computeRoomModesResponse({
   };
 
   // When debug is enabled, also include RAW-only component view stats (no final pipeline duplication)
-  if (__debugBass) {
+  if (__debugBass && !isDragging) {
     const modalOnlyPass = runOnce(null, sbirTrimLinear, "modalOnly");
     const sbirOnlyPass  = runOnce(null, sbirTrimLinear, "sbirOnly");
 
