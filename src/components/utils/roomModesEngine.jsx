@@ -942,6 +942,34 @@ export function computeRoomModesResponse({
   const splDb = secondPass.splDb;
   const rawCoherentDb = secondPass.coherentRawDb;
   
+  // REW-style coherence loss: transition from coherent pressure sum to energy-like behaviour above ~100-140 Hz
+  // This makes the curve "come back down" at HF like REW does
+  const shouldApplyCoherenceLoss = rewParityMode && componentView === 'modalPlusSbir';
+  let splDbRew = splDb;
+  let coherenceLossApplied = false;
+  const cohStartHz = 90;
+  const cohEndHz = 140;
+  
+  if (shouldApplyCoherenceLoss) {
+    splDbRew = splDb.map((coherentDb, i) => {
+      const f = freqs[i];
+      if (!Number.isFinite(f) || !Number.isFinite(coherentDb)) return coherentDb;
+      
+      // Smooth transition from coherent (LF) to energy-like (HF)
+      const t = Math.max(0, Math.min(1, (f - cohStartHz) / Math.max(1e-6, (cohEndHz - cohStartHz))));
+      const smoothT = t * t * (3 - 2 * t); // Smoothstep
+      
+      // Progressive penalty: by 140 Hz, reduce by ~10 dB
+      const penaltyDb = smoothT * 10.0;
+      
+      return coherentDb - penaltyDb;
+    });
+    coherenceLossApplied = true;
+  }
+  
+  // Use REW-processed array for rest of pipeline when coherence loss is active
+  const splDbForPipeline = coherenceLossApplied ? splDbRew : splDb;
+  
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
     const band = dbArray
@@ -1009,9 +1037,9 @@ export function computeRoomModesResponse({
 
     // Schroeder blend: FIXED RULES to preserve modal nulls
     // NEW: Start at 1.0 × Schroeder (not 0.7), never fill nulls, only tame peaks
-    let splDbSchroeder = splDb;
+    let splDbSchroeder = splDbForPipeline;
     if (!rawEngineOutput && rewParityMode && schroederHz > 0) {
-      splDbSchroeder = splDb.map((db, i) => {
+      splDbSchroeder = splDbForPipeline.map((db, i) => {
         const f = freqs[i];
 
         // NEW BLEND RULES (Part B):
@@ -1031,7 +1059,7 @@ export function computeRoomModesResponse({
         const rolloffDb = -1.0 * octavesAbove;
 
         // Simple target: a mild downward tilt + rolloff
-        const target = dbAt(blendStart, freqs, splDb) - 3 * Math.log2(f / blendStart) + rolloffDb;
+        const target = dbAt(blendStart, freqs, splDbForPipeline) - 3 * Math.log2(f / blendStart) + rolloffDb;
 
         const blendedDb = (1 - t) * db + t * target;
 
@@ -1315,7 +1343,7 @@ export function computeRoomModesResponse({
     const idx = freqs.findIndex(f => Math.abs(f - fProbe) < 0.6);
     if (idx < 0) return { freq: fProbe, error: 'not found' };
     
-    const rawDbBeforeCal = splDb[idx]; // Before any calibration
+    const rawDbBeforeCal = splDbForPipeline[idx]; // Before any calibration
     const finalDbValue = finalDb[idx]; // After all processing (calibration + normalization)
     
     // Compute sealed room pressure gain if enabled
@@ -1550,6 +1578,7 @@ export function computeRoomModesResponse({
         message: `Returned flat ${fallbackValue} dB curve to prevent blank graph`,
         nonFiniteRepaired,
         rawRange: rawRange ? rawRange.toFixed(2) : 'N/A',
+        coherenceLossApplied: false,
       }
     };
   }
@@ -1682,6 +1711,8 @@ export function computeRoomModesResponse({
       lfMovementProbe: Object.keys(lfMovementProbe).length > 0 ? lfMovementProbe : null,
       componentView: componentView, // Debug lens: which term is being plotted
       componentViewNote: "Modal/SBIR/Total are debug views of the same simulation - calibration never changes",
+      coherenceLossApplied: coherenceLossApplied,
+      coherenceLossParams: coherenceLossApplied ? { cohStartHz, cohEndHz, maxPenaltyDb: 10.0 } : null,
       modalRmsDb_20_200: modalRmsDb_20_200.toFixed(1), // Modal term RMS (20-200 Hz)
       sbirRmsDb_20_200: sbirRmsDb_20_200.toFixed(1), // SBIR term RMS (includes direct)
       totalRmsDb_20_200: totalRmsDb_20_200.toFixed(1), // Total term RMS (modal + sbir)
