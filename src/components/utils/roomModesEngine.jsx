@@ -461,11 +461,6 @@ export function computeRoomModesResponse({
   const sbirMagDb_all = [];
   const totalMagDb_all = [];
 
-  // PARITY DEBUG: Track component terms across all frequencies (before blend/smooth)
-  const modalTerms_all = []; // { re, im } per frequency
-  const sbirTerms_all = [];  // { re, im } per frequency
-  const totalTerms_all = [];  // { re, im } per frequency
-
   // SBIR 63 Hz diagnostic probe (track across passes)
   let sbirDebugProbe63Hz_captured = null;
 
@@ -884,11 +879,6 @@ export function computeRoomModesResponse({
     sbirMagDb_all.push(sbirMagDb);
     totalMagDb_all.push(totalMagDb);
 
-    // PARITY DEBUG: Store component terms for raw coherent calculation
-    modalTerms_all.push({ re: modalTerm_re, im: modalTerm_im });
-    sbirTerms_all.push({ re: sbirTerm_re, im: sbirTerm_im });
-    totalTerms_all.push({ re: totalTerm_re, im: totalTerm_im });
-
     // Collect component magnitudes in calibration band (30-80 Hz) for SBIR level matching
     if (f >= 30 && f <= 80 && Number.isFinite(modalMagDb) && Number.isFinite(sbirMagDb)) {
       modalBandDb.push(modalMagDb);
@@ -999,13 +989,14 @@ export function computeRoomModesResponse({
     return modalDb;
   });
   
-  return { splDb, modalBandDb, sbirBandDb };
+  return { splDb, modalBandDb, sbirBandDb, coherentRawDb };
   }; // End of runOnce
 
   // Run engine with normal sources - FIRST PASS to collect statistics
   const firstPass = runOnce(null, 1.0);
   const modalBandDbPass1 = firstPass.modalBandDb;
   const sbirBandDbPass1 = firstPass.sbirBandDb;
+  const coherentRawDbPass1 = firstPass.coherentRawDb;
 
   // SBIR Level Matching (Part B): Compute trim to match SBIR to modal scale in 30-80 Hz
   let sbirTrimDb = 0;
@@ -1042,6 +1033,7 @@ export function computeRoomModesResponse({
   // SECOND PASS: Run engine again with computed SBIR trim
   const secondPass = runOnce(null, sbirTrimLinear);
   const splDb = secondPass.splDb;
+  const coherentRawDb = secondPass.coherentRawDb;
   
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
@@ -1515,123 +1507,50 @@ export function computeRoomModesResponse({
   // Compute stable input signature for debug memoization
   const inputSig = `${sourceSigUsed}|${seatSigUsed}|${smoothing}|${isRelative?'rel':'abs'}`;
 
-  // PARITY DEBUG: Build raw coherent SPL arrays for each component view
-  // These are captured from modalTerms_all/sbirTerms_all/totalTerms_all which store 
-  // complex terms for every frequency BEFORE Schroeder blend, smoothing, calibration
-  const buildRawCoherent = (terms) => {
-    return terms.map(t => {
-      const mag = Math.sqrt(t.re * t.re + t.im * t.im);
-      return 20 * Math.log10(Math.max(Number.EPSILON, mag));
-    });
+  // Parity debug: compare raw coherent vs final plotted
+  const parityAudits = {
+    raw: {
+      band40_70Hz: peakDipDelta(freqs, coherentRawDb, 40, 70),
+      band20_40Hz_avgDb: avgDb(freqs, coherentRawDb, 20, 40),
+      band100_160Hz_avgDb: avgDb(freqs, coherentRawDb, 100, 160)
+    },
+    final: {
+      band40_70Hz: peakDipDelta(freqs, finalDb, 40, 70),
+      band20_40Hz_avgDb: avgDb(freqs, finalDb, 20, 40),
+      band100_160Hz_avgDb: avgDb(freqs, finalDb, 100, 160)
+    }
   };
 
-  const coherentRawDb_modal = buildRawCoherent(modalTerms_all);
-  const coherentRawDb_sbir = buildRawCoherent(sbirTerms_all);
-  const coherentRawDb_total = buildRawCoherent(totalTerms_all);
-
-  // Parity debug: compare raw coherent vs final plotted
-  let parityAudits = null;
-  
+  // Component view debug (only when debug enabled)
   if (__debugBass) {
-    // Build final arrays for each component view (apply same post-processing)
-    // For modalOnly: use coherentRawDb_modal as base, then apply Schroeder blend + smoothing + calibration
-    // For sbirOnly: use coherentRawDb_sbir as base
-    // For modalPlusSbir: use coherentRawDb_total as base (this is the default componentView)
+    const componentViewsDebug = {};
     
-    const buildFinalForView = (rawDb) => {
-      // Apply Schroeder blend (if enabled)
-      let afterBlend = rawDb;
-      if (!rawEngineOutput && rewParityMode && schroederHz > 0) {
-        afterBlend = rawDb.map((db, i) => {
-          const f = freqs[i];
-          const blendStart = schroederHz * 1.0;
-          const blendEnd = schroederHz * 1.8;
-          if (f < blendStart) return db;
-          
-          const t = Math.max(0, Math.min(1, (f - blendStart) / Math.max(1e-6, (blendEnd - blendStart))));
-          const octavesAbove = Math.log2(f / blendStart);
-          const rolloffDb = -1.0 * octavesAbove;
-          const target = dbAt(blendStart, freqs, rawDb) - 3 * Math.log2(f / blendStart) + rolloffDb;
-          const blendedDb = (1 - t) * db + t * target;
-          return Math.min(blendedDb, db + 2.0);
-        });
-      }
+    for (const view of ['modalOnly', 'sbirOnly', 'modalPlusSbir']) {
+      const viewPass = runOnce(null, sbirTrimLinear);
+      // Apply the same post-processing as main pipeline
+      let viewRaw = viewPass.coherentRawDb;
+      let viewFinal = viewPass.splDb;
       
-      // Apply smoothing (if enabled)
-      let afterSmooth = afterBlend;
+      // Apply smoothing if enabled
       if (smoothing !== 'none') {
-        afterSmooth = applySmoothing(freqs, afterBlend, smoothing);
+        viewFinal = applySmoothing(freqs, viewFinal, smoothing);
       }
       
-      // Apply calibration offset (same logic as main pipeline)
-      const bandValues = freqs
-        .map((f, i) => f >= 30 && f <= 80 && isFinite(afterSmooth[i]) ? afterSmooth[i] : null)
-        .filter(v => v !== null);
-      
-      if (bandValues.length >= 10 && !rewParityMode) {
-        const sorted = [...bandValues].sort((a, b) => a - b);
-        const median = sorted[Math.floor(sorted.length / 2)];
-        const targetDb = isRelative ? 0 : 85;
-        const offset = targetDb - median;
-        return afterSmooth.map(v => (isFinite(v) ? (v + offset) : v));
-      }
-      
-      return afterSmooth;
-    };
-
-    parityAudits = {
-      modalPlusSbir: {
+      componentViewsDebug[view] = {
         raw: {
-          band40_70: peakDipDelta(freqs, coherentRawDb_total, 40, 70),
-          band20_40_avgDb: avgDb(freqs, coherentRawDb_total, 20, 40),
-          band100_160_avgDb: avgDb(freqs, coherentRawDb_total, 100, 160)
+          band40_70Hz: peakDipDelta(freqs, viewRaw, 40, 70),
+          band20_40Hz_avgDb: avgDb(freqs, viewRaw, 20, 40),
+          band100_160Hz_avgDb: avgDb(freqs, viewRaw, 100, 160)
         },
         final: {
-          band40_70: peakDipDelta(freqs, finalDb, 40, 70),
-          band20_40_avgDb: avgDb(freqs, finalDb, 20, 40),
-          band100_160_avgDb: avgDb(freqs, finalDb, 100, 160)
+          band40_70Hz: peakDipDelta(freqs, viewFinal, 40, 70),
+          band20_40Hz_avgDb: avgDb(freqs, viewFinal, 20, 40),
+          band100_160Hz_avgDb: avgDb(freqs, viewFinal, 100, 160)
         }
-      },
-      modalOnly: {
-        raw: {
-          band40_70: peakDipDelta(freqs, coherentRawDb_modal, 40, 70),
-          band20_40_avgDb: avgDb(freqs, coherentRawDb_modal, 20, 40),
-          band100_160_avgDb: avgDb(freqs, coherentRawDb_modal, 100, 160)
-        },
-        final: {
-          band40_70: peakDipDelta(freqs, buildFinalForView(coherentRawDb_modal), 40, 70),
-          band20_40_avgDb: avgDb(freqs, buildFinalForView(coherentRawDb_modal), 20, 40),
-          band100_160_avgDb: avgDb(freqs, buildFinalForView(coherentRawDb_modal), 100, 160)
-        }
-      },
-      sbirOnly: {
-        raw: {
-          band40_70: peakDipDelta(freqs, coherentRawDb_sbir, 40, 70),
-          band20_40_avgDb: avgDb(freqs, coherentRawDb_sbir, 20, 40),
-          band100_160_avgDb: avgDb(freqs, coherentRawDb_sbir, 100, 160)
-        },
-        final: {
-          band40_70: peakDipDelta(freqs, buildFinalForView(coherentRawDb_sbir), 40, 70),
-          band20_40_avgDb: avgDb(freqs, buildFinalForView(coherentRawDb_sbir), 20, 40),
-          band100_160_avgDb: avgDb(freqs, buildFinalForView(coherentRawDb_sbir), 100, 160)
-        }
-      }
-    };
-
-    // Add delta shrink metric for each view
-    const addDeltaShrink = (viewStats) => {
-      const rawDelta = parseFloat(viewStats.raw.band40_70.deltaDb);
-      const finalDelta = parseFloat(viewStats.final.band40_70.deltaDb);
-      if (Number.isFinite(rawDelta) && Number.isFinite(finalDelta)) {
-        viewStats.deltaShrinkDb_40_70 = (rawDelta - finalDelta).toFixed(2);
-      } else {
-        viewStats.deltaShrinkDb_40_70 = 'N/A';
-      }
-    };
-
-    addDeltaShrink(parityAudits.modalPlusSbir);
-    addDeltaShrink(parityAudits.modalOnly);
-    addDeltaShrink(parityAudits.sbirOnly);
+      };
+    }
+    
+    parityAudits.componentViews = componentViewsDebug;
   }
 
   // FINAL GUARD: Prevent "No finite values" silent failures
