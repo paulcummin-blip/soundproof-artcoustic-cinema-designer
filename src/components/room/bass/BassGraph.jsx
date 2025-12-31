@@ -376,7 +376,7 @@ export default function BassGraph({
 
                     {/* Black curve (inside limits: refDb ± 6 dB) */}
                     <Line 
-                        type="linear" 
+                        type={rewStyleMode ? "monotone" : "linear"} 
                         dataKey="splGood"
                         stroke="#213428" 
                         strokeWidth={2} 
@@ -388,7 +388,7 @@ export default function BassGraph({
 
                     {/* Red curve (outside limits: > refDb+6 or < refDb-6) */}
                     <Line 
-                        type="linear" 
+                        type={rewStyleMode ? "monotone" : "linear"} 
                         dataKey="splBad"
                         stroke="#dc2626" 
                         strokeWidth={2} 

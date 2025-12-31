@@ -1172,9 +1172,9 @@ export function computeRoomModesResponse({
   let normAppliedActual = false;
   let calRefMedianDbBefore = 0;
   let calRefMedianDbAfter = 0;
-  
+
   // Use smoothed modal curve (SBIR is now integrated into splDb during summation)
-  let finalDb = splDbSmoothed;
+  let finalDb = (rewParityMode && smoothing !== 'none' && !rawEngineOutput) ? splDbRepaired : splDbSmoothed;
 
   if (!Array.isArray(finalDb) || finalDb.length === 0) {
     finalDb = Array.isArray(splDb) ? [...splDb] : [];
