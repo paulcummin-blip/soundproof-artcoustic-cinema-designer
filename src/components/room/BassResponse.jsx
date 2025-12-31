@@ -3188,11 +3188,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div className="flex items-center gap-2">
               <Checkbox 
                 id="linear-hz-axis" 
-                checked={!linearHzAxis}
-                onCheckedChange={(v) => setLinearHzAxis(!v)}
+                checked={linearHzAxis}
+                onCheckedChange={(v) => setLinearHzAxis(!!v)}
               />
               <Label htmlFor="linear-hz-axis" className="text-xs text-[#3E4349]">
-                Log Hz axis (REW-style)
+                Linear Hz axis (debug)
               </Label>
             </div>
             <div className="flex items-center gap-2">
