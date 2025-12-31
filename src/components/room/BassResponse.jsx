@@ -3255,6 +3255,56 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
+        {/* Parity Audit Readout (raw coherent vs final plotted) */}
+        {rewStyleMode && activeDebug?.parityAudits?.modalPlusSbir && (() => {
+          const audit = activeDebug.parityAudits.modalPlusSbir;
+          const raw = audit.raw;
+          const final = audit.final;
+          const deltaShrink = audit.deltaShrinkDb_40_70;
+          
+          return (
+            <div className="text-xs mb-2 bg-teal-50 p-2 rounded border border-teal-400">
+              <div className="font-semibold mb-1 text-teal-700">🔬 Parity Audit (Raw Coherent vs Final Plotted)</div>
+              <div className="text-[10px] font-mono space-y-1">
+                <div className="font-semibold text-teal-800">40–70 Hz Band:</div>
+                <div className="pl-2 space-y-0.5">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <div className="font-semibold text-teal-700">RAW:</div>
+                      <div>Peak: {raw?.band40_70Hz?.peakDb || 'N/A'} dB @ {raw?.band40_70Hz?.peakFreq || 'N/A'} Hz</div>
+                      <div>Dip: {raw?.band40_70Hz?.dipDb || 'N/A'} dB @ {raw?.band40_70Hz?.dipFreq || 'N/A'} Hz</div>
+                      <div className="font-bold">Delta: {raw?.band40_70Hz?.deltaDb || 'N/A'} dB</div>
+                    </div>
+                    <div>
+                      <div className="font-semibold text-teal-700">FINAL:</div>
+                      <div>Peak: {final?.band40_70Hz?.peakDb || 'N/A'} dB @ {final?.band40_70Hz?.peakFreq || 'N/A'} Hz</div>
+                      <div>Dip: {final?.band40_70Hz?.dipDb || 'N/A'} dB @ {final?.band40_70Hz?.dipFreq || 'N/A'} Hz</div>
+                      <div className="font-bold">Delta: {final?.band40_70Hz?.deltaDb || 'N/A'} dB</div>
+                    </div>
+                  </div>
+                  <div className="mt-1 pt-1 border-t border-teal-300 font-semibold text-red-700">
+                    Null Depth Shrink: {deltaShrink !== 'N/A' && parseFloat(deltaShrink) > 1 ? `${deltaShrink} dB (processing is reducing nulls)` : deltaShrink}
+                  </div>
+                </div>
+                
+                <div className="mt-2 pt-2 border-t border-teal-300 space-y-0.5">
+                  <div className="font-semibold text-teal-800">Band Averages:</div>
+                  <div className="pl-2">
+                    <div>20–40 Hz: RAW={raw?.band20_40Hz_avgDb || 'N/A'} dB, FINAL={final?.band20_40Hz_avgDb || 'N/A'} dB</div>
+                    <div>100–160 Hz: RAW={raw?.band100_160Hz_avgDb || 'N/A'} dB, FINAL={final?.band100_160Hz_avgDb || 'N/A'} dB</div>
+                  </div>
+                </div>
+                
+                <div className="mt-2 pt-2 border-t border-teal-300 text-[9px] space-y-0.5">
+                  <div><strong>Smoothing:</strong> {activeDebug?.smoothingApplied || 'none'}</div>
+                  <div><strong>REW Parity Mode:</strong> {activeDebug?.rewParityMode ? 'ON' : 'OFF'}</div>
+                  <div><strong>Calibration Offset:</strong> {activeDebug?.calOffsetAppliedDb || '0.00'} dB</div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Mode isolation plot source debug (Part C2 - prove isolation drives plot) */}
         {rewStyleMode && (() => {
           const isolationActive = modeIsolation !== 'off';
