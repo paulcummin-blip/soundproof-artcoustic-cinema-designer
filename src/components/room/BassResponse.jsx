@@ -590,10 +590,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     lastRewFailSigRef.current = null;
     lastRewFailResultRef.current = null;
 
+    // Use plottedDb for display (smoothed if requested), coherentRawDb for audit
+    const plotArray = result.plottedDb || result.splDb;
+    
     return {
       data: result.freqs.map((frequency, i) => ({
         frequency,
-        spl: result.splDb[i]
+        spl: plotArray[i]
       })),
       debug: {
         ...result.debug,
@@ -601,11 +604,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         curveType: 'Modal response + geometry',
       },
       freqs: result.freqs,
-      splDb: result.splDb,
+      splDb: plotArray,
+      coherentRawDb: result.coherentRawDb,
       subSig,
       seatSig
     };
-  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, graphSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
+  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, graphSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView, rewSmoothing]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
@@ -876,10 +880,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const productCurvesApplied = subProductCurves.filter(c => c !== null).length;
     const firstCurve = productCurveDebug[0] || null;
 
+    // Use plottedDb for display (smoothed if requested), coherentRawDb for audit
+    const plotArray = result.plottedDb || result.splDb;
+
     return {
       data: result.freqs.map((frequency, i) => ({
         frequency,
-        spl: result.splDb[i]
+        spl: plotArray[i]
       })),
       debug: {
         ...result.debug,
@@ -895,9 +902,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         productCurveDebug
       },
       freqs: result.freqs,
-      splDb: result.splDb
+      splDb: plotArray,
+      coherentRawDb: result.coherentRawDb
     };
-  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, graphSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView]);
+  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, graphSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView, rewSmoothing]);
 
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
   const activeDebug = useMemo(() => {
@@ -3207,7 +3215,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
             {/* Live state readout (audit) */}
             <div className="text-[9px] font-mono bg-yellow-50 p-1 rounded border border-yellow-300 mt-2">
-              <strong>Live State:</strong> componentView={componentView} | rewView={rewView} | engineCalls={engineCallCountRef.current} | dataset={rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'} | timeAlign={rewTimeAlign ? 'ON' : 'OFF'}
+              <strong>Live State:</strong> componentView={componentView} | rewView={rewView} | engineCalls={engineCallCountRef.current} | dataset={rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'} | timeAlign={rewTimeAlign ? 'ON' : 'OFF'} | smoothingSelected={rewSmoothing} | smoothingPassedToEngine={graphSmoothing}
             </div>
           </div>
         )}
@@ -3284,6 +3292,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   </div>
                   <div className="mt-1 pt-1 border-t border-teal-300 font-semibold text-red-700">
                     Null Depth Shrink: {deltaShrink !== 'N/A' && parseFloat(deltaShrink) > 1 ? `${deltaShrink} dB (processing is reducing nulls)` : deltaShrink}
+                  </div>
+                  <div className="mt-1 text-[9px] text-teal-600">
+                    Smoothing delta (40–70 Hz): {raw?.band40_70Hz?.deltaDb || 'N/A'} dB (raw) → {final?.band40_70Hz?.deltaDb || 'N/A'} dB (plotted)
                   </div>
                 </div>
                 

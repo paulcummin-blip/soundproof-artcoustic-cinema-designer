@@ -1174,7 +1174,10 @@ export function computeRoomModesResponse({
   let calRefMedianDbAfter = 0;
 
   // Use smoothed modal curve (SBIR is now integrated into splDb during summation)
-  let finalDb = (rewParityMode && smoothing !== 'none' && !rawEngineOutput) ? splDbRepaired : splDbSmoothed;
+  // REW parity: always use unsmoothed data for plotting (preserve null depth)
+  // Smoothing happens visually via chart interpolation, not data mutation
+  let finalDb = rewParityMode ? splDbRepaired : splDbSmoothed;
+  const plottedDb = (!rawEngineOutput && smoothing !== 'none') ? splDbSmoothed : splDbRepaired;
 
   if (!Array.isArray(finalDb) || finalDb.length === 0) {
     finalDb = Array.isArray(splDb) ? [...splDb] : [];
@@ -1473,7 +1476,8 @@ export function computeRoomModesResponse({
   // ---- Parity audits: raw coherent vs final plotted ----
   let parityAudits = null;
 
-  const finalPlottedDb = (Array.isArray(finalDb) && finalDb.length > 0) ? finalDb : splDb; // what is actually plotted (returned as baseReturn.splDb)
+  // Use plottedDb for parity audit (shows what smoothing is doing)
+  const finalPlottedDb = (Array.isArray(plottedDb) && plottedDb.length > 0) ? plottedDb : finalDb;
 
   const buildParityStats = (rawDb, finalDbArr) => {
     const raw40_70 = peakDipDelta(freqs, rawDb, 40, 70);
@@ -1554,10 +1558,13 @@ export function computeRoomModesResponse({
   // CRITICAL: Always return valid arrays so REW Compare can't blank the graph
   const safeFreqs = Array.isArray(freqs) && freqs.length > 0 ? freqs : [];
   const safeFinalDb = Array.isArray(finalDb) && finalDb.length > 0 ? finalDb : (Array.isArray(splDb) ? splDb : []);
-  
+  const safePlottedDb = Array.isArray(plottedDb) && plottedDb.length > 0 ? plottedDb : safeFinalDb;
+
   const baseReturn = {
     freqs: [...safeFreqs],
     splDb: [...safeFinalDb],
+    plottedDb: [...safePlottedDb],
+    coherentRawDb: rewParityMode ? [...rawCoherentDb] : null,
     debug: {
       schroederHz,
       modeMarkersHz: [...modeMarkersHz],
