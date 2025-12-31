@@ -53,6 +53,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [yAxisDomain, setYAxisDomain] = useState(null);
   const [scaleEpoch, setScaleEpoch] = useState(0);
   const [rewCompareView, setRewCompareView] = useState(false); // REW Compare View toggle
+  const [rewDisplayRefDb, setRewDisplayRefDb] = useState(90); // REW display reference level (dB)
   const [seatNudgeTest, setSeatNudgeTest] = useState(false); // Diagnostic seat nudge
   const [modalOnlyDebugView, setModalOnlyDebugView] = useState(false); // Modal-only debug view (no SBIR, no smoothing)
 
@@ -1028,13 +1029,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
 
   // Choose which curve to display based on view (REW-style is now the only mode)
+  // Apply display-only offset in REW mode (REW shows on ~90 dB scale, not 0 dB)
   const displayData = useMemo(() => {
-    // Always drive the graph from REW datasets
+    // Select base dataset
+    let baseData;
     if (rewView === 'roomPlusProduct') {
-      return rewRoomPlusProductData?.data?.length ? rewRoomPlusProductData.data : (rewModesData?.data || []);
+      baseData = rewRoomPlusProductData?.data?.length ? rewRoomPlusProductData.data : (rewModesData?.data || []);
+    } else {
+      baseData = rewModesData?.data?.length ? rewModesData.data : (rewRoomPlusProductData?.data || []);
     }
-    return rewModesData?.data?.length ? rewModesData.data : (rewRoomPlusProductData?.data || []);
-  }, [rewView, rewModesData, rewRoomPlusProductData]);
+    
+    // Apply display offset in REW mode (visual only, does not affect audits)
+    if (rewStyleMode && !rewRelativeView) {
+      return baseData.map(d => ({
+        frequency: d.frequency,
+        spl: Number.isFinite(d.spl) ? d.spl + rewDisplayRefDb : d.spl
+      }));
+    }
+    
+    return baseData;
+  }, [rewView, rewModesData, rewRoomPlusProductData, rewStyleMode, rewRelativeView, rewDisplayRefDb]);
 
   // TEMP DEBUG (can remove later)
   // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
@@ -3230,6 +3244,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 Relative view (normalise 30–80 Hz)
               </Label>
             </div>
+            
+            {/* REW Display Reference Level (only when absolute mode) */}
+            {!rewRelativeView && (
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-[#3E4349] whitespace-nowrap">
+                  Display ref:
+                </Label>
+                <div className="flex gap-1">
+                  {[85, 90, 95, 100].map(val => (
+                    <Button
+                      key={val}
+                      variant={rewDisplayRefDb === val ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setRewDisplayRefDb(val)}
+                      className="text-xs h-6 px-2"
+                    >
+                      {val} dB
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -3378,7 +3414,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 rewStyleMode={rewStyleMode}
                 yDomain={finalYDomain}
                 showAxialOnly={false}
-                refDb={rewRelativeView ? 0 : 85}
+                refDb={rewStyleMode ? (rewRelativeView ? 0 : rewDisplayRefDb) : (rewRelativeView ? 0 : 85)}
                 disableHighlight={rewRelativeView}
               />
             );
