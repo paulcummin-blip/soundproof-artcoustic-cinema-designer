@@ -958,7 +958,7 @@ export function computeRoomModesResponse({
     return modalDb;
   });
   
-  return { splDb, modalBandDb, sbirBandDb };
+  return { splDb, modalBandDb, sbirBandDb, coherentRawDb };
   }; // End of runOnce
 
   // Run engine with normal sources - FIRST PASS to collect statistics
@@ -1226,6 +1226,72 @@ export function computeRoomModesResponse({
     }
   }
 
+  // Helper: extract post-processing pipeline (Schroeder blend + repair + smoothing + calibration)
+  // This allows debug component views to use the same exact processing as the main output
+  const postProcessSplDbToFinalDb = (splDbInput) => {
+    // Schroeder blend
+    let splDbSchroeder_local = splDbInput;
+    if (!rawEngineOutput && rewParityMode && schroederHz > 0) {
+      splDbSchroeder_local = splDbInput.map((db, i) => {
+        const f = freqs[i];
+        const blendStart = schroederHz * 1.0;
+        const blendEnd = schroederHz * 1.8;
+        if (f < blendStart) return db;
+        const t = Math.max(0, Math.min(1, (f - blendStart) / Math.max(1e-6, (blendEnd - blendStart))));
+        const octavesAbove = Math.log2(f / blendStart);
+        const rolloffDb = -1.0 * octavesAbove;
+        const target = dbAt(blendStart, freqs, splDbInput) - 3 * Math.log2(f / blendStart) + rolloffDb;
+        const blendedDb = (1 - t) * db + t * target;
+        return Math.min(blendedDb, db + 2.0);
+      });
+    }
+    
+    // Non-finite repair
+    let lastGoodValue_local = 0;
+    const repaired_local = [];
+    for (let i = 0; i < splDbSchroeder_local.length; i++) {
+      const v = splDbSchroeder_local[i];
+      if (!isFinite(v)) {
+        repaired_local.push(lastGoodValue_local);
+      } else {
+        repaired_local.push(v);
+        lastGoodValue_local = v;
+      }
+    }
+    
+    // Smoothing
+    const splDbSmoothed_local = (!rawEngineOutput && smoothing !== 'none') 
+      ? applySmoothing(freqs, repaired_local, smoothing)
+      : repaired_local;
+    
+    // Calibration offset
+    let finalDb_local = splDbSmoothed_local;
+    const calRefBandHz_local = [30, 80];
+    const mlpBandValues_local = freqs
+      .map((f, i) => f >= calRefBandHz_local[0] && f <= calRefBandHz_local[1] && isFinite(finalDb_local[i]) ? finalDb_local[i] : null)
+      .filter(v => v !== null);
+    
+    if (mlpBandValues_local.length >= 10) {
+      const sorted_local = [...mlpBandValues_local].sort((a, b) => a - b);
+      const mlpMedianDb_local = sorted_local[Math.floor(sorted_local.length / 2)];
+      let calibrationOffsetDb_local = 0;
+      
+      if (rewParityMode) {
+        calibrationOffsetDb_local = 0;
+      } else if (isRelative) {
+        const targetDb_local = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
+        calibrationOffsetDb_local = targetDb_local - mlpMedianDb_local;
+      } else {
+        const targetAbsoluteDb_local = 85;
+        calibrationOffsetDb_local = targetAbsoluteDb_local - mlpMedianDb_local;
+      }
+      
+      finalDb_local = finalDb_local.map(v => (isFinite(v) ? (v + calibrationOffsetDb_local) : v));
+    }
+    
+    return finalDb_local;
+  };
+
   // Build FINAL curve pipeline (single source of truth) - create NEW arrays at each step
   // Absolute SPL calibration: anchor curve to sensible reference at MLP
   let calibrationOffsetDb = 0;
@@ -1474,6 +1540,117 @@ export function computeRoomModesResponse({
   // Compute stable input signature for debug memoization
   const inputSig = `${sourceSigUsed}|${seatSigUsed}|${smoothing}|${isRelative?'rel':'abs'}`;
 
+  // Parity audit helpers (local, debug-only)
+  const peakDipDelta = (freqs, dbArr, fMin, fMax) => {
+    const bandData = freqs.map((f, i) => ({ f, spl: dbArr[i] }))
+      .filter(d => d.f >= fMin && d.f <= fMax && Number.isFinite(d.spl));
+    if (bandData.length === 0) return { peakDb: 'N/A', dipDb: 'N/A', peakFreq: 'N/A', dipFreq: 'N/A', deltaDb: 'N/A' };
+    
+    let peak = -Infinity, dip = Infinity, peakF = 0, dipF = 0;
+    for (const d of bandData) {
+      if (d.spl > peak) { peak = d.spl; peakF = d.f; }
+      if (d.spl < dip) { dip = d.spl; dipF = d.f; }
+    }
+    return { 
+      peakDb: peak.toFixed(2), 
+      dipDb: dip.toFixed(2), 
+      peakFreq: peakF.toFixed(1), 
+      dipFreq: dipF.toFixed(1), 
+      deltaDb: (peak - dip).toFixed(2) 
+    };
+  };
+  
+  const avgDb = (freqs, dbArr, fMin, fMax) => {
+    const bandValues = freqs.map((f, i) => ({ f, spl: dbArr[i] }))
+      .filter(d => d.f >= fMin && d.f <= fMax && Number.isFinite(d.spl));
+    if (bandValues.length === 0) return 'N/A';
+    const sum = bandValues.reduce((acc, d) => acc + d.spl, 0);
+    return (sum / bandValues.length).toFixed(2);
+  };
+  
+  // Build parity audits (raw coherent vs final plotted)
+  const parityAudits = {};
+  
+  // modalPlusSbir: main output path (always available)
+  const rawCoherent_modalPlusSbir = secondPass.coherentRawDb;
+  const finalPlotted_modalPlusSbir = finalDb;
+  
+  const raw_40_70 = peakDipDelta(freqs, rawCoherent_modalPlusSbir, 40, 70);
+  const final_40_70 = peakDipDelta(freqs, finalPlotted_modalPlusSbir, 40, 70);
+  const deltaShrink = (raw_40_70.deltaDb !== 'N/A' && final_40_70.deltaDb !== 'N/A') 
+    ? (parseFloat(raw_40_70.deltaDb) - parseFloat(final_40_70.deltaDb)).toFixed(2)
+    : 'N/A';
+  
+  parityAudits.modalPlusSbir = {
+    raw: {
+      band40_70Hz: raw_40_70,
+      band20_40Hz_avgDb: avgDb(freqs, rawCoherent_modalPlusSbir, 20, 40),
+      band100_160Hz_avgDb: avgDb(freqs, rawCoherent_modalPlusSbir, 100, 160)
+    },
+    final: {
+      band40_70Hz: final_40_70,
+      band20_40Hz_avgDb: avgDb(freqs, finalPlotted_modalPlusSbir, 20, 40),
+      band100_160Hz_avgDb: avgDb(freqs, finalPlotted_modalPlusSbir, 100, 160)
+    },
+    deltaShrinkDb_40_70: deltaShrink
+  };
+  
+  // Component view debug (only when __debugBass is true)
+  if (__debugBass) {
+    // Save current componentView
+    const originalComponentView = componentView;
+    
+    // Run modalOnly
+    const modalOnlyPass = runOnce(null, sbirTrimLinear);
+    const rawCoherent_modalOnly = modalOnlyPass.coherentRawDb;
+    const finalPlotted_modalOnly = postProcessSplDbToFinalDb(modalOnlyPass.splDb);
+    
+    const raw_40_70_modal = peakDipDelta(freqs, rawCoherent_modalOnly, 40, 70);
+    const final_40_70_modal = peakDipDelta(freqs, finalPlotted_modalOnly, 40, 70);
+    const deltaShrink_modal = (raw_40_70_modal.deltaDb !== 'N/A' && final_40_70_modal.deltaDb !== 'N/A') 
+      ? (parseFloat(raw_40_70_modal.deltaDb) - parseFloat(final_40_70_modal.deltaDb)).toFixed(2)
+      : 'N/A';
+    
+    parityAudits.modalOnly = {
+      raw: {
+        band40_70Hz: raw_40_70_modal,
+        band20_40Hz_avgDb: avgDb(freqs, rawCoherent_modalOnly, 20, 40),
+        band100_160Hz_avgDb: avgDb(freqs, rawCoherent_modalOnly, 100, 160)
+      },
+      final: {
+        band40_70Hz: final_40_70_modal,
+        band20_40Hz_avgDb: avgDb(freqs, finalPlotted_modalOnly, 20, 40),
+        band100_160Hz_avgDb: avgDb(freqs, finalPlotted_modalOnly, 100, 160)
+      },
+      deltaShrinkDb_40_70: deltaShrink_modal
+    };
+    
+    // Run sbirOnly
+    const sbirOnlyPass = runOnce(null, sbirTrimLinear);
+    const rawCoherent_sbirOnly = sbirOnlyPass.coherentRawDb;
+    const finalPlotted_sbirOnly = postProcessSplDbToFinalDb(sbirOnlyPass.splDb);
+    
+    const raw_40_70_sbir = peakDipDelta(freqs, rawCoherent_sbirOnly, 40, 70);
+    const final_40_70_sbir = peakDipDelta(freqs, finalPlotted_sbirOnly, 40, 70);
+    const deltaShrink_sbir = (raw_40_70_sbir.deltaDb !== 'N/A' && final_40_70_sbir.deltaDb !== 'N/A') 
+      ? (parseFloat(raw_40_70_sbir.deltaDb) - parseFloat(final_40_70_sbir.deltaDb)).toFixed(2)
+      : 'N/A';
+    
+    parityAudits.sbirOnly = {
+      raw: {
+        band40_70Hz: raw_40_70_sbir,
+        band20_40Hz_avgDb: avgDb(freqs, rawCoherent_sbirOnly, 20, 40),
+        band100_160Hz_avgDb: avgDb(freqs, rawCoherent_sbirOnly, 100, 160)
+      },
+      final: {
+        band40_70Hz: final_40_70_sbir,
+        band20_40Hz_avgDb: avgDb(freqs, finalPlotted_sbirOnly, 20, 40),
+        band100_160Hz_avgDb: avgDb(freqs, finalPlotted_sbirOnly, 100, 160)
+      },
+      deltaShrinkDb_40_70: deltaShrink_sbir
+    };
+  }
+
   // FINAL GUARD: Prevent "No finite values" silent failures
   const finalFiniteCheck = finalDb.filter(v => isFinite(v));
   if (finalFiniteCheck.length < 10) {
@@ -1637,7 +1814,8 @@ export function computeRoomModesResponse({
           distanceM: dist.toFixed(3),
           effectiveDelayMs: (s.tuning?.delayMs ?? 0).toFixed(2)
         };
-      }) : null
+      }) : null,
+      parityAudits: parityAudits
       }
       };
 
