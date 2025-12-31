@@ -991,9 +991,9 @@ export function computeRoomModesResponse({
       // We'll need to track this separately - for now use the combined result
       
       sbirDebugProbe40Hz = {
-        directOnlyDb: 20 * Math.log10(directMag),
-        sbirTotalDb: 20 * Math.log10(sbirTotalMag),
-        combinedResultDb: splDb[idx40].toFixed(2),
+        directOnlyDb: Number.isFinite(directMag) ? (20 * Math.log10(Math.max(Number.EPSILON, directMag))) : 'N/A',
+        sbirTotalDb: Number.isFinite(sbirTotalMag) ? (20 * Math.log10(Math.max(Number.EPSILON, sbirTotalMag))) : 'N/A',
+        combinedResultDb: Number.isFinite(splDb?.[idx40]) ? splDb[idx40].toFixed(2) : 'N/A',
         pathsUsed: sbirResult.pathsUsed,
         strongestReflection: sbirResult.strongestReflection
       };
