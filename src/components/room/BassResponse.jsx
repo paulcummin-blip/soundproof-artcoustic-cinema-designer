@@ -3387,10 +3387,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           {/* Graph or placeholder */}
           {displayData.length > 0 ? (() => {
             // [PLOT AUDIT] - Verify what's actually being plotted
-            const dataToPlot = displayData;
+            const dataToPlot = rewStyleMode ? displayData : clampedData;
             const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
             const __plotAudit = {
-              using: rewStyleMode ? "clampedData" : "displayData",
+              using: rewStyleMode ? "displayData" : "clampedData",
               len: dataToPlot.length,
               min: finiteSpl.length > 0 ? Math.min(...finiteSpl).toFixed(2) : 'N/A',
               max: finiteSpl.length > 0 ? Math.max(...finiteSpl).toFixed(2) : 'N/A',
@@ -3402,7 +3402,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             
             return (
               <BassGraph
-                responseData={clampedData}
+                responseData={rewStyleMode ? displayData : clampedData}
                 schroederFrequency={schroederFrequency}
                 rp22Levels={rp22Levels}
                 toggles={toggles}
