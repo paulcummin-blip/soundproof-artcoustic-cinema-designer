@@ -1226,72 +1226,6 @@ export function computeRoomModesResponse({
     }
   }
 
-  // Helper: extract post-processing pipeline (Schroeder blend + repair + smoothing + calibration)
-  // This allows debug component views to use the same exact processing as the main output
-  const postProcessSplDbToFinalDb = (splDbInput) => {
-    // Schroeder blend
-    let splDbSchroeder_local = splDbInput;
-    if (!rawEngineOutput && rewParityMode && schroederHz > 0) {
-      splDbSchroeder_local = splDbInput.map((db, i) => {
-        const f = freqs[i];
-        const blendStart = schroederHz * 1.0;
-        const blendEnd = schroederHz * 1.8;
-        if (f < blendStart) return db;
-        const t = Math.max(0, Math.min(1, (f - blendStart) / Math.max(1e-6, (blendEnd - blendStart))));
-        const octavesAbove = Math.log2(f / blendStart);
-        const rolloffDb = -1.0 * octavesAbove;
-        const target = dbAt(blendStart, freqs, splDbInput) - 3 * Math.log2(f / blendStart) + rolloffDb;
-        const blendedDb = (1 - t) * db + t * target;
-        return Math.min(blendedDb, db + 2.0);
-      });
-    }
-    
-    // Non-finite repair
-    let lastGoodValue_local = 0;
-    const repaired_local = [];
-    for (let i = 0; i < splDbSchroeder_local.length; i++) {
-      const v = splDbSchroeder_local[i];
-      if (!isFinite(v)) {
-        repaired_local.push(lastGoodValue_local);
-      } else {
-        repaired_local.push(v);
-        lastGoodValue_local = v;
-      }
-    }
-    
-    // Smoothing
-    const splDbSmoothed_local = (!rawEngineOutput && smoothing !== 'none') 
-      ? applySmoothing(freqs, repaired_local, smoothing)
-      : repaired_local;
-    
-    // Calibration offset
-    let finalDb_local = splDbSmoothed_local;
-    const calRefBandHz_local = [30, 80];
-    const mlpBandValues_local = freqs
-      .map((f, i) => f >= calRefBandHz_local[0] && f <= calRefBandHz_local[1] && isFinite(finalDb_local[i]) ? finalDb_local[i] : null)
-      .filter(v => v !== null);
-    
-    if (mlpBandValues_local.length >= 10) {
-      const sorted_local = [...mlpBandValues_local].sort((a, b) => a - b);
-      const mlpMedianDb_local = sorted_local[Math.floor(sorted_local.length / 2)];
-      let calibrationOffsetDb_local = 0;
-      
-      if (rewParityMode) {
-        calibrationOffsetDb_local = 0;
-      } else if (isRelative) {
-        const targetDb_local = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
-        calibrationOffsetDb_local = targetDb_local - mlpMedianDb_local;
-      } else {
-        const targetAbsoluteDb_local = 85;
-        calibrationOffsetDb_local = targetAbsoluteDb_local - mlpMedianDb_local;
-      }
-      
-      finalDb_local = finalDb_local.map(v => (isFinite(v) ? (v + calibrationOffsetDb_local) : v));
-    }
-    
-    return finalDb_local;
-  };
-
   // Build FINAL curve pipeline (single source of truth) - create NEW arrays at each step
   // Absolute SPL calibration: anchor curve to sensible reference at MLP
   let calibrationOffsetDb = 0;
@@ -1539,6 +1473,72 @@ export function computeRoomModesResponse({
   
   // Compute stable input signature for debug memoization
   const inputSig = `${sourceSigUsed}|${seatSigUsed}|${smoothing}|${isRelative?'rel':'abs'}`;
+
+  // Helper: extract post-processing pipeline (Schroeder blend + repair + smoothing + calibration)
+  // This allows debug component views to use the same exact processing as the main output
+  const postProcessSplDbToFinalDb = (splDbInput) => {
+    // Schroeder blend
+    let splDbSchroeder_local = splDbInput;
+    if (!rawEngineOutput && rewParityMode && schroederHz > 0) {
+      splDbSchroeder_local = splDbInput.map((db, i) => {
+        const f = freqs[i];
+        const blendStart = schroederHz * 1.0;
+        const blendEnd = schroederHz * 1.8;
+        if (f < blendStart) return db;
+        const t = Math.max(0, Math.min(1, (f - blendStart) / Math.max(1e-6, (blendEnd - blendStart))));
+        const octavesAbove = Math.log2(f / blendStart);
+        const rolloffDb = -1.0 * octavesAbove;
+        const target = dbAt(blendStart, freqs, splDbInput) - 3 * Math.log2(f / blendStart) + rolloffDb;
+        const blendedDb = (1 - t) * db + t * target;
+        return Math.min(blendedDb, db + 2.0);
+      });
+    }
+    
+    // Non-finite repair
+    let lastGoodValue_local = 0;
+    const repaired_local = [];
+    for (let i = 0; i < splDbSchroeder_local.length; i++) {
+      const v = splDbSchroeder_local[i];
+      if (!isFinite(v)) {
+        repaired_local.push(lastGoodValue_local);
+      } else {
+        repaired_local.push(v);
+        lastGoodValue_local = v;
+      }
+    }
+    
+    // Smoothing
+    const splDbSmoothed_local = (!rawEngineOutput && smoothing !== 'none') 
+      ? applySmoothing(freqs, repaired_local, smoothing)
+      : repaired_local;
+    
+    // Calibration offset
+    let finalDb_local = splDbSmoothed_local;
+    const calRefBandHz_local = [30, 80];
+    const mlpBandValues_local = freqs
+      .map((f, i) => f >= calRefBandHz_local[0] && f <= calRefBandHz_local[1] && isFinite(finalDb_local[i]) ? finalDb_local[i] : null)
+      .filter(v => v !== null);
+    
+    if (mlpBandValues_local.length >= 10) {
+      const sorted_local = [...mlpBandValues_local].sort((a, b) => a - b);
+      const mlpMedianDb_local = sorted_local[Math.floor(sorted_local.length / 2)];
+      let calibrationOffsetDb_local = 0;
+      
+      if (rewParityMode) {
+        calibrationOffsetDb_local = 0;
+      } else if (isRelative) {
+        const targetDb_local = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
+        calibrationOffsetDb_local = targetDb_local - mlpMedianDb_local;
+      } else {
+        const targetAbsoluteDb_local = 85;
+        calibrationOffsetDb_local = targetAbsoluteDb_local - mlpMedianDb_local;
+      }
+      
+      finalDb_local = finalDb_local.map(v => (isFinite(v) ? (v + calibrationOffsetDb_local) : v));
+    }
+    
+    return finalDb_local;
+  };
 
   // Parity audit helpers (local, debug-only)
   const peakDipDelta = (freqs, dbArr, fMin, fMax) => {
