@@ -42,6 +42,16 @@ export default function BassGraph({
 
       const sorted = [...data].sort((a, b) => (a.frequency ?? 0) - (b.frequency ?? 0));
 
+      // REW mode: plot true values without any windowing/splitting
+      if (rewStyleMode) {
+        return sorted.map(d => ({
+          frequency: d.frequency,
+          spl: d.spl,
+          splRew: Number.isFinite(d.spl) ? d.spl : null
+        }));
+      }
+
+      // Non-REW mode: use good/bad splitting
       const LOWER = refDb - 6;
       const UPPER = refDb + 6;
 
@@ -119,7 +129,7 @@ export default function BassGraph({
       }
 
       return rows;
-    }, [data, refDb, disableHighlight]);
+    }, [data, refDb, disableHighlight, rewStyleMode]);
     
     // Normalize modeMarkers input (support both old array format and new grouped format)
     const normalizedMarkers = React.useMemo(() => {
@@ -374,29 +384,48 @@ export default function BassGraph({
                         }} 
                       />
 
-                    {/* Black curve (inside limits: refDb ± 6 dB) */}
-                    <Line 
-                        type={rewStyleMode ? "monotone" : "linear"} 
-                        dataKey="splGood"
-                        stroke="#213428" 
-                        strokeWidth={2} 
-                        dot={false}
-                        activeDot={false}
-                        connectNulls={false}
-                        isAnimationActive={false}
-                    />
+                    {/* REW mode: single true-value curve with monotone interpolation */}
+                    {rewStyleMode && (
+                      <Line 
+                          type="monotone" 
+                          dataKey="splRew"
+                          stroke="#213428" 
+                          strokeWidth={2} 
+                          dot={false}
+                          activeDot={false}
+                          connectNulls={false}
+                          isAnimationActive={false}
+                      />
+                    )}
 
-                    {/* Red curve (outside limits: > refDb+6 or < refDb-6) */}
-                    <Line 
-                        type={rewStyleMode ? "monotone" : "linear"} 
-                        dataKey="splBad"
-                        stroke="#dc2626" 
-                        strokeWidth={2} 
-                        dot={false}
-                        activeDot={false}
-                        connectNulls={false}
-                        isAnimationActive={false}
-                    />
+                    {/* Non-REW mode: good/bad splitting curves */}
+                    {!rewStyleMode && (
+                      <>
+                        {/* Black curve (inside limits: refDb ± 6 dB) */}
+                        <Line 
+                            type="linear" 
+                            dataKey="splGood"
+                            stroke="#213428" 
+                            strokeWidth={2} 
+                            dot={false}
+                            activeDot={false}
+                            connectNulls={false}
+                            isAnimationActive={false}
+                        />
+
+                        {/* Red curve (outside limits: > refDb+6 or < refDb-6) */}
+                        <Line 
+                            type="linear" 
+                            dataKey="splBad"
+                            stroke="#dc2626" 
+                            strokeWidth={2} 
+                            dot={false}
+                            activeDot={false}
+                            connectNulls={false}
+                            isAnimationActive={false}
+                        />
+                      </>
+                    )}
                     
                     {/* Mode line legend (REW style) */}
                     {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && (

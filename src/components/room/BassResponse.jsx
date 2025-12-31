@@ -1267,46 +1267,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { min: minV, max: maxV, refDb: (minV + maxV) / 2 };
   };
 
-  // Y-axis domain policy: fixed designer windows when locked, auto-fit when unlocked
+  // Y-axis domain policy: REW mode uses auto, non-REW uses fixed windows
   React.useEffect(() => {
     if (!rewStyleMode) {
       setYAxisDomain(null);
       return;
     }
 
-    let nextDomain = null;
-
-    // RULE A: Locked = fixed designer windows
-    if (yAxisLocked) {
-      if (rewCompareView) {
-        nextDomain = { min: 65, max: 105, refDb: 85 };
-      } else if (rewRelativeView) {
-        nextDomain = { min: -30, max: 12, refDb: 0 };
-      } else {
-        nextDomain = { min: 65, max: 105, refDb: 85 };
-      }
-    } else {
-      // RULE B: Unlocked = auto from pre-clamp plotted data
-      nextDomain = computeDynamicYDomain(displayData, !!rewRelativeView);
-    }
-
-    // Only apply if meaningfully different (prevents jitter / loops)
-    const curMin = yAxisDomain?.min;
-    const curMax = yAxisDomain?.max;
-    const nextMin = nextDomain?.min;
-    const nextMax = nextDomain?.max;
-
-    const shouldSet =
-      !yAxisDomain ||
-      !Number.isFinite(curMin) ||
-      !Number.isFinite(curMax) ||
-      Math.abs(nextMin - curMin) > 0.1 ||
-      Math.abs(nextMax - curMax) > 0.1;
-
-    if (shouldSet) {
-      setYAxisDomain(nextDomain);
-    }
-  }, [rewStyleMode, yAxisLocked, rewCompareView, rewRelativeView, displayData, yAxisDomain]);
+    // REW mode: always use auto Y-axis (no fixed windows, show true nulls)
+    setYAxisDomain('auto');
+  }, [rewStyleMode]);
 
   // Manual reset function
   const handleResetScale = React.useCallback(() => {
@@ -1322,15 +1292,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewStyleMode, rewCompareView, rewRelativeView]);
 
-  // Determine final Y-axis domain to pass to graph + clamp data + count out-of-window points
+  // Determine final Y-axis domain to pass to graph
   const finalYDomain = React.useMemo(() => {
     if (!rewStyleMode) return undefined;
-    return yAxisDomain || undefined;
+    // REW mode: use auto Y-axis (dataMin/dataMax) to show true nulls
+    return yAxisDomain === 'auto' ? undefined : yAxisDomain;
   }, [rewStyleMode, yAxisDomain]);
 
-  // Break line at out-of-window points (using RAW data for counts)
+  // REW mode: no clamping, pass data through unchanged
   const { clampedData, outBelow, outAbove } = React.useMemo(() => {
-    if (!rewStyleMode || !finalYDomain) {
+    // REW mode: no clamping at all
+    if (rewStyleMode) {
+      return { clampedData: displayData, outBelow: 0, outAbove: 0 };
+    }
+
+    // Non-REW mode: apply old windowing logic if needed
+    if (!finalYDomain) {
       return { clampedData: displayData, outBelow: 0, outAbove: 0 };
     }
 
