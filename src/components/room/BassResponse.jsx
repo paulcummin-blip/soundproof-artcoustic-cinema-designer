@@ -1443,13 +1443,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   const toggles = React.useMemo(() => ({ smoothing: false }), []);
 
+  // Define modeMarkersHz early to prevent "before initialization" errors
+  const modeMarkersHz = useMemo(() => {
+    return activeDebug?.modeMarkersHz || [];
+  }, [activeDebug]);
+
   // Compute mode frequencies for markers (use SAME parity run to avoid drift)
   const modeFrequencies = useMemo(() => {
     if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) return [];
 
     if (rewStyleMode) {
       // Use mode markers from the active debug payload (prevents drift)
-      return activeDebug?.modeMarkersHz || [];
+      return modeMarkersHz;
     }
 
     // Fallback to basic axial modes for product simulation
@@ -1459,7 +1464,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       heightM: roomDims.heightM
     }, 200);
     return modes.map(m => m.fHz);
-  }, [rewStyleMode, rewModesData]);
+  }, [rewStyleMode, rewModesData, modeMarkersHz]);
 
   // Mode markers for graph overlay (REW parity)
   const modeMarkersForGraph = useMemo(() => {
@@ -3389,11 +3394,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             // [PLOT AUDIT] - Verify what's actually being plotted
             const dataToPlot = rewStyleMode ? displayData : clampedData;
             const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
+            const hasFinite = finiteSpl.length > 0;
+            
+            // Safety guard: if no finite values, show error instead of blank graph
+            if (!hasFinite) {
+              return (
+                <div className="text-xs text-red-600 mb-2 bg-red-50 p-2 rounded border border-red-400">
+                  <div className="font-semibold mb-1">⚠️ No finite SPL values</div>
+                  <div className="text-[10px]">
+                    Engine returned empty/NaN series. Check debug info above for details.
+                  </div>
+                </div>
+              );
+            }
+            
             const __plotAudit = {
               using: rewStyleMode ? "displayData" : "clampedData",
               len: dataToPlot.length,
-              min: finiteSpl.length > 0 ? Math.min(...finiteSpl).toFixed(2) : 'N/A',
-              max: finiteSpl.length > 0 ? Math.max(...finiteSpl).toFixed(2) : 'N/A',
+              min: Math.min(...finiteSpl).toFixed(2),
+              max: Math.max(...finiteSpl).toFixed(2),
               smoothing: graphSmoothing,
               rewCompareView,
               userSmoothingChoice: rewSmoothing
