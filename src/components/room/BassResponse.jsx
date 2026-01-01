@@ -1069,7 +1069,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       : rewModesDataAbs?.data?.length ? rewModesDataAbs.data : (rewRoomPlusProductDataAbs?.data || []);
     
     return baseData;
-  }, [rewStyleMode, rewPlotSeries, rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries, rewView, rewModesDataAbs, rewRoomPlusProductData]);
+  }, [rewStyleMode, rewPlotSeries, rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries, rewView, rewModesDataAbs, rewRoomPlusProductDataAbs]);
 
   // TEMP DEBUG (can remove later)
   // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesDataAbs?.data?.length, hasRoomPlus: !!rewRoomPlusProductDataAbs?.data?.length, displayLen: displayData?.length });
