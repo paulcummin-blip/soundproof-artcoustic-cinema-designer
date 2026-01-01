@@ -538,6 +538,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Default to absolute SPL, optional normalize via checkbox
     let result;
     try {
+      const engineSmoothingSetting = rewStyleMode ? 'none' : graphSmoothing;
       result = computeRoomModesResponse({
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
@@ -551,7 +552,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         includeTangential: true,
         includeOblique: true,
         rewParityMode: true,
-        smoothing: graphSmoothing,
+        smoothing: engineSmoothingSetting,
         subFloorHeight: 0.0,
         normalizeBandHz: null,
         normalizeToDb: null,
@@ -811,6 +812,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Default to absolute SPL, optional normalize via checkbox
     let result;
     try {
+      const engineSmoothingSetting = rewStyleMode ? 'none' : graphSmoothing;
       result = computeRoomModesResponse({
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
@@ -824,7 +826,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         includeTangential: true,
         includeOblique: true,
         rewParityMode: true,
-        smoothing: graphSmoothing,
+        smoothing: engineSmoothingSetting,
         subFloorHeight: 0.0,
         normalizeBandHz: null,
         normalizeToDb: null,
@@ -3571,7 +3573,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               len: dataToPlot.length,
               min: finiteSpl.length > 0 ? Math.min(...finiteSpl).toFixed(2) : 'N/A',
               max: finiteSpl.length > 0 ? Math.max(...finiteSpl).toFixed(2) : 'N/A',
-              smoothing: graphSmoothing,
+              smoothing: engineSmoothingSetting,
               rewCompareView,
               userSmoothingChoice: rewSmoothing
             };
