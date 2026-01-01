@@ -3410,20 +3410,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 )}
                 <BassGraph
                   responseData={rewStyleMode ? displayData : clampedData}
-                schroederFrequency={schroederFrequency}
-                rp22Levels={rp22Levels}
-                toggles={toggles}
-                crossoverFrequency={80}
-                modeFrequencies={modeFrequencies}
-                showModeMarkers={rewStyleMode ? showRewModeLines : showModeMarkers}
-                modeMarkers={modeMarkersForGraph}
-                linearHzAxis={rewStyleMode && linearHzAxis}
-                rewStyleMode={rewStyleMode}
-                yDomain={rewStyleMode ? undefined : finalYDomain}
-                showAxialOnly={false}
-                refDb={rewStyleMode ? (rewRelativeView ? 0 : rewDisplayRefDb) : (rewRelativeView ? 0 : 85)}
-                disableHighlight={rewRelativeView}
-              />
+                  schroederFrequency={schroederFrequency}
+                  rp22Levels={rp22Levels}
+                  toggles={toggles}
+                  crossoverFrequency={80}
+                  modeFrequencies={modeFrequencies}
+                  showModeMarkers={rewStyleMode ? showRewModeLines : showModeMarkers}
+                  modeMarkers={modeMarkersForGraph}
+                  linearHzAxis={rewStyleMode && linearHzAxis}
+                  rewStyleMode={rewStyleMode}
+                  yDomain={rewStyleMode ? undefined : finalYDomain}
+                  showAxialOnly={false}
+                  refDb={rewStyleMode ? (rewRelativeView ? 0 : rewDisplayRefDb) : (rewRelativeView ? 0 : 85)}
+                  disableHighlight={rewRelativeView}
+                />
+              </>
             );
           })() : (
             <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 12, color: "#3E4349", fontSize: 13 }}>
