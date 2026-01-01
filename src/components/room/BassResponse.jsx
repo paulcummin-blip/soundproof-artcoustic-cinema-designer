@@ -1501,7 +1501,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (!rewStyleMode) return { axial: [], tangential: [], oblique: [] };
     
     const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductDataAbs?.debug
-      ? rewRoomPlusProductData.debug
+      ? rewRoomPlusProductDataAbs.debug
       : rewModesDataAbs?.debug;
     
     if (!activeDebug?.modeMarkers) return { axial: [], tangential: [], oblique: [] };
@@ -1512,7 +1512,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       tangential: allMarkers.filter(m => m.family === 'tangential'),
       oblique: allMarkers.filter(m => m.family === 'oblique')
     };
-  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData]);
+  }, [rewStyleMode, rewView, rewModesDataAbs, rewRoomPlusProductDataAbs]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
