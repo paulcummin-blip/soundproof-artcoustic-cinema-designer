@@ -1029,7 +1029,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
 
   // Choose which curve to display based on view (REW-style is now the only mode)
-  // Apply display-only offset in REW mode (REW shows on ~90 dB scale, not 0 dB)
+  // REW mode: NO display offsets or reference adjustments — plot engine output directly
   const displayData = useMemo(() => {
     // Select base dataset
     let baseData;
@@ -1039,16 +1039,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       baseData = rewModesData?.data?.length ? rewModesData.data : (rewRoomPlusProductData?.data || []);
     }
     
-    // Apply display offset in REW mode (visual only, does not affect audits)
-    if (rewStyleMode && !rewRelativeView) {
-      return baseData.map(d => ({
-        frequency: d.frequency,
-        spl: Number.isFinite(d.spl) ? d.spl + rewDisplayRefDb : d.spl
-      }));
-    }
-    
+    // REW mode: pass through engine output unchanged (Parity Audit and graph must use same data)
     return baseData;
-  }, [rewView, rewModesData, rewRoomPlusProductData, rewStyleMode, rewRelativeView, rewDisplayRefDb]);
+  }, [rewView, rewModesData, rewRoomPlusProductData]);
 
   // TEMP DEBUG (can remove later)
   // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
