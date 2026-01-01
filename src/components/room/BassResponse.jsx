@@ -56,6 +56,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [rewDisplayRefDb, setRewDisplayRefDb] = useState(90); // REW display reference level (dB)
   const [seatNudgeTest, setSeatNudgeTest] = useState(false); // Diagnostic seat nudge
   const [modalOnlyDebugView, setModalOnlyDebugView] = useState(false); // Modal-only debug view (no SBIR, no smoothing)
+  const [rewPlotSeries, setRewPlotSeries] = useState('DISPLAY'); // 'RAW' | 'ENGINE' | 'DISPLAY'
 
   // Sensitivity audit refs (track previous run)
   const prevSourceSigRef = useRef(null);
@@ -1028,20 +1029,59 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
 
-  // Choose which curve to display based on view (REW-style is now the only mode)
-  // REW mode: NO display offsets or reference adjustments — plot engine output directly
-  const displayData = useMemo(() => {
-    // Select base dataset
-    let baseData;
-    if (rewView === 'roomPlusProduct') {
-      baseData = rewRoomPlusProductData?.data?.length ? rewRoomPlusProductData.data : (rewModesData?.data || []);
-    } else {
-      baseData = rewModesData?.data?.length ? rewModesData.data : (rewRoomPlusProductData?.data || []);
+  // REW mode: Three distinct series for plotting (RAW, ENGINE, DISPLAY)
+  const { rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries } = useMemo(() => {
+    // Select active dataset (Room-only or Room+Product)
+    const activeDataset = rewView === 'roomPlusProduct' 
+      ? rewRoomPlusProductData 
+      : rewModesDataAbs;
+    
+    if (!activeDataset || !activeDataset.data || activeDataset.data.length === 0) {
+      return { rewRawSeries: [], rewEngineFinalSeries: [], rewDisplayFinalSeries: [] };
     }
     
-    // REW mode: pass through engine output unchanged (Parity Audit and graph must use same data)
+    // RAW: coherent pressure before any processing (from engine debug)
+    const rawDb = activeDataset.coherentRawDb;
+    const rawSeries = rawDb && Array.isArray(rawDb) && rawDb.length > 0
+      ? activeDataset.freqs.map((frequency, i) => ({
+          frequency,
+          spl: rawDb[i]
+        }))
+      : [];
+    
+    // ENGINE FINAL: smoothed/processed output from engine (plottedDb or splDb)
+    const engineFinalSeries = activeDataset.data || [];
+    
+    // DISPLAY FINAL: ENGINE FINAL + display offset (only in absolute mode)
+    const displayOffset = (!rewRelativeView && rewStyleMode) ? rewDisplayRefDb : 0;
+    const displaySeries = engineFinalSeries.map(d => ({
+      frequency: d.frequency,
+      spl: Number.isFinite(d.spl) ? d.spl + displayOffset : d.spl
+    }));
+    
+    return {
+      rewRawSeries: rawSeries,
+      rewEngineFinalSeries: engineFinalSeries,
+      rewDisplayFinalSeries: displaySeries
+    };
+  }, [rewView, rewModesDataAbs, rewRoomPlusProductData, rewRelativeView, rewStyleMode, rewDisplayRefDb]);
+
+  // Choose which curve to display based on view
+  const displayData = useMemo(() => {
+    if (rewStyleMode) {
+      // REW mode: use series selector
+      if (rewPlotSeries === 'RAW') return rewRawSeries;
+      if (rewPlotSeries === 'ENGINE') return rewEngineFinalSeries;
+      return rewDisplayFinalSeries; // Default: DISPLAY
+    }
+    
+    // Non-REW mode: use old logic
+    const baseData = rewView === 'roomPlusProduct'
+      ? rewRoomPlusProductData?.data?.length ? rewRoomPlusProductData.data : (rewModesDataAbs?.data || [])
+      : rewModesDataAbs?.data?.length ? rewModesDataAbs.data : (rewRoomPlusProductData?.data || []);
+    
     return baseData;
-  }, [rewView, rewModesData, rewRoomPlusProductData]);
+  }, [rewStyleMode, rewPlotSeries, rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries, rewView, rewModesDataAbs, rewRoomPlusProductData]);
 
   // TEMP DEBUG (can remove later)
   // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
@@ -3342,6 +3382,47 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   </div>
                   <div className="mt-1 pt-1 border-t border-teal-300 font-semibold text-red-700">
                     Null Depth Shrink (RAW→ENGINE FINAL): {deltaShrink !== 'N/A' && parseFloat(deltaShrink) > 1 ? `${deltaShrink} dB (smoothing effect)` : deltaShrink}
+                  </div>
+                  
+                  <div className="mt-2 pt-2 border-t border-teal-300">
+                    <div className="font-semibold text-blue-700">PLOTTED SERIES (this graph): {rewPlotSeries}</div>
+                    <div className="text-[9px] text-blue-600 mt-1">
+                      {rewPlotSeries === 'RAW' && 'Shows coherent pressure before any processing (deepest nulls, unsmoothed)'}
+                      {rewPlotSeries === 'ENGINE' && 'Shows engine output after smoothing, before display offset (matches ENGINE FINAL)'}
+                      {rewPlotSeries === 'DISPLAY' && 'Shows final display values with offset applied (matches DISPLAY FINAL)'}
+                    </div>
+                    {(() => {
+                      // Compute peak/dip from currently plotted series
+                      const band = displayData.filter(p =>
+                        Number.isFinite(p?.frequency) &&
+                        p.frequency >= 40 &&
+                        p.frequency <= 70 &&
+                        Number.isFinite(p?.spl)
+                      );
+
+                      if (band.length < 3) return <div className="text-gray-400 text-[9px] mt-1">N/A</div>;
+
+                      let peak = band[0];
+                      let dip = band[0];
+
+                      for (const p of band) {
+                        if (p.spl > peak.spl) peak = p;
+                        if (p.spl < dip.spl) dip = p;
+                      }
+
+                      const delta = peak.spl - dip.spl;
+
+                      return (
+                        <div className="mt-1 text-[9px] font-mono space-y-0.5">
+                          <div>Peak: {peak.spl.toFixed(2)} dB @ {peak.frequency.toFixed(1)} Hz</div>
+                          <div>Dip:  {dip.spl.toFixed(2)} dB @ {dip.frequency.toFixed(1)} Hz</div>
+                          <div>Delta: {delta.toFixed(2)} dB</div>
+                          <div className="text-green-600 font-semibold mt-1">
+                            ✓ These values should match tooltips exactly
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
                 
