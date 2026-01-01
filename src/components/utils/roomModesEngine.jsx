@@ -385,6 +385,7 @@ export function computeRoomModesResponse({
             dampingScalar,
             leakage,
             f0,
+            rewParityMode,
           });
           
           const bandwidth = f0 / qMode;
@@ -1182,7 +1183,57 @@ export function computeRoomModesResponse({
   
   // Compute Q mapping for debug
   const qBase = dampingScalar * 20;
-  const qMappingText = `Q base: ${qBase.toFixed(1)} (slider=${dampingScalar.toFixed(2)})`;
+  let qMappingText = `Q base: ${qBase.toFixed(1)} (slider=${dampingScalar.toFixed(2)})`;
+  let rewParityDamping = null;
+
+  // REW-parity damping: compute RT60 and Q range for debug
+  if (rewParityMode) {
+    const V = room.widthM * room.lengthM * room.heightM;
+
+    const S_floor = room.lengthM * room.widthM;
+    const S_ceiling = room.lengthM * room.widthM;
+    const S_front = room.widthM * room.heightM;
+    const S_back = room.widthM * room.heightM;
+    const S_left = room.lengthM * room.heightM;
+    const S_right = room.lengthM * room.heightM;
+
+    const alpha_floor = absorption?.floor ?? 0.30;
+    const alpha_ceiling = absorption?.ceiling ?? 0.30;
+    const alpha_front = absorption?.front ?? 0.30;
+    const alpha_back = absorption?.back ?? 0.30;
+    const alpha_left = absorption?.left ?? 0.30;
+    const alpha_right = absorption?.right ?? 0.30;
+
+    const A = S_floor * alpha_floor + 
+              S_ceiling * alpha_ceiling + 
+              S_front * alpha_front + 
+              S_back * alpha_back + 
+              S_left * alpha_left + 
+              S_right * alpha_right;
+
+    const RT60 = 0.161 * V / Math.max(A, 1e-6);
+    const tau = RT60 / 13.815;
+
+    // Compute Q at min/max mode frequencies for debug
+    const modeFreqs = modes.map(m => m.freq).filter(f => f > 0);
+    const fMin = modeFreqs.length > 0 ? Math.min(...modeFreqs) : 20;
+    const fMax = modeFreqs.length > 0 ? Math.max(...modeFreqs) : 200;
+
+    const Q_min = Math.max(5, Math.min(80, Math.PI * fMin * tau));
+    const Q_max = Math.max(5, Math.min(80, Math.PI * fMax * tau));
+
+    rewParityDamping = {
+      alphaDefault: 0.30,
+      RT60: RT60.toFixed(3),
+      tau: tau.toFixed(4),
+      Q_at_20Hz: Math.max(5, Math.min(80, Math.PI * 20 * tau)).toFixed(1),
+      Q_at_50Hz: Math.max(5, Math.min(80, Math.PI * 50 * tau)).toFixed(1),
+      Q_at_100Hz: Math.max(5, Math.min(80, Math.PI * 100 * tau)).toFixed(1),
+      Q_range: `${Q_min.toFixed(1)} to ${Q_max.toFixed(1)}`
+    };
+
+    qMappingText = `Q (REW-parity): RT60=${RT60.toFixed(2)}s, Q@50Hz=${Math.max(5, Math.min(80, Math.PI * 50 * tau)).toFixed(1)}`;
+  }
   
   // Compute LF delta for debug (20-30 Hz flatness check)
   let lfDeltaDb_20_30 = null;
@@ -1612,6 +1663,7 @@ export function computeRoomModesResponse({
       blendEndHz: lowestAxial,
       qBase: qBase.toFixed(1),
       qMappingText,
+      rewParityDamping,
       absoluteSplMode: isAbsolute,
       relativeViewEnabled: isRelative,
       normBandHz: actualNormBand,
@@ -2476,12 +2528,57 @@ function dbAt(fTarget, freqs, splDb) {
   return best;
 }
 
-function estimateModeQ({ mode, roomDims, surfaceAbsorption, dampingScalar, leakage, f0 }) {
+function estimateModeQ({ mode, roomDims, surfaceAbsorption, dampingScalar, leakage, f0, rewParityMode }) {
   // Handle both roomDims formats (object or direct properties)
   const dims = roomDims?.widthM ? roomDims : { widthM: roomDims?.width, lengthM: roomDims?.length, heightM: roomDims?.height };
-  // Direct Q control (REW-like): slider value is the base Q, with only mild frequency dependence
-  // This makes "Dead (8)" clearly broad and "Lively (35)" clearly resonant
   
+  // REW-parity path: derive Q from surface absorption using Sabine RT60
+  if (rewParityMode) {
+    const W = dims.widthM || 1;
+    const L = dims.lengthM || 1;
+    const H = dims.heightM || 1;
+    const V = W * L * H;
+    
+    // Surface areas
+    const S_floor = L * W;
+    const S_ceiling = L * W;
+    const S_front = W * H;
+    const S_back = W * H;
+    const S_left = L * H;
+    const S_right = L * H;
+    
+    // Use absorption coefficients from surfaceAbsorption (or default to 0.30)
+    const alpha_floor = surfaceAbsorption?.floor ?? 0.30;
+    const alpha_ceiling = surfaceAbsorption?.ceiling ?? 0.30;
+    const alpha_front = surfaceAbsorption?.front ?? 0.30;
+    const alpha_back = surfaceAbsorption?.back ?? 0.30;
+    const alpha_left = surfaceAbsorption?.left ?? 0.30;
+    const alpha_right = surfaceAbsorption?.right ?? 0.30;
+    
+    // Equivalent absorption area (Sabine)
+    const A = S_floor * alpha_floor + 
+              S_ceiling * alpha_ceiling + 
+              S_front * alpha_front + 
+              S_back * alpha_back + 
+              S_left * alpha_left + 
+              S_right * alpha_right;
+    
+    // Sabine RT60 (0.161 is the constant for metric units)
+    const RT60 = 0.161 * V / Math.max(A, 1e-6);
+    
+    // Convert RT60 to modal time constant tau (60 dB = 13.815 tau)
+    const tau = RT60 / 13.815;
+    
+    // Modal Q at this frequency: Q = π * f * tau
+    const Q_sabine = Math.PI * f0 * tau;
+    
+    // Clamp to safe range
+    const Q_final = Math.max(5, Math.min(80, Q_sabine));
+    
+    return Q_final;
+  }
+  
+  // Original slider-based Q control (non-REW mode)
   const baseQ = dampingScalar * 20; // Maps slider (0.5-1.75) to Q (10-35)
   
   // Stronger frequency dependence: reduce Q faster above 80 Hz (tames upper-bass peaks)
