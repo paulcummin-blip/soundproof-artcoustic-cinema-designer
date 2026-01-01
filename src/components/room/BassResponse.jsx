@@ -933,46 +933,76 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [rewCompareView]);
 
   // Helper: apply REW-style smoothing
-  function applyRewSmoothing(freqs, splDb, smoothing) {
-    const octaveFraction = {
-      '1/12': 12,
-      '1/6': 6,
-      '1/3': 3
-    }[smoothing] || 1;
+  // REW-style display smoothing (fractional octave) in LINEAR PRESSURE domain.
+  // This is display-only. Do not feed this back into the engine.
+  const applyRewStyleDisplaySmoothing = (points, smoothingSetting) => {
+    if (!points || points.length === 0) return points || [];
 
-    const smoothed = [...splDb];
+    // Treat these as "no smoothing"
+    if (!smoothingSetting || smoothingSetting === 'none' || smoothingSetting === '0') return points;
 
-    for (let i = 0; i < freqs.length; i++) {
-      const fc = freqs[i];
-      const fLow = fc / Math.pow(2, 1 / (2 * octaveFraction));
-      const fHigh = fc * Math.pow(2, 1 / (2 * octaveFraction));
+    // Map UI tokens to fractional octave width N
+    // 1/48 = very light, 1/3 = heavy (RP22)
+    const frac =
+      smoothingSetting === '1/48' ? 48 :
+      smoothingSetting === '1/24' ? 24 :
+      smoothingSetting === '1/12' ? 12 :
+      smoothingSetting === '1/6'  ? 6  :
+      smoothingSetting === '1/3'  ? 3  :
+      null;
+
+    if (!frac) return points;
+
+    // Build arrays
+    const freqs = points.map(p => p.frequency);
+    const dbIn  = points.map(p => (Number.isFinite(p.spl) ? p.spl : null));
+
+    // Convert dB -> linear pressure
+    const pIn = dbIn.map(db => (db === null ? null : Math.pow(10, db / 20)));
+
+    // Fractional-octave smoothing window:
+    // For each f0, include bins within f0 * 2^(±1/(2*frac))
+    const outDb = freqs.map((f0, i) => {
+      const p0 = pIn[i];
+      if (!Number.isFinite(f0) || p0 === null) return null;
+
+      const ratio = Math.pow(2, 1 / (2 * frac));
+      const fLo = f0 / ratio;
+      const fHi = f0 * ratio;
 
       let sum = 0;
       let count = 0;
 
+      // Simple scan; dataset is small enough
       for (let j = 0; j < freqs.length; j++) {
-        if (freqs[j] >= fLow && freqs[j] <= fHigh) {
-          sum += splDb[j];
+        const fj = freqs[j];
+        const pj = pIn[j];
+        if (pj === null) continue;
+        if (fj >= fLo && fj <= fHi) {
+          sum += pj;
           count++;
         }
       }
 
-      if (count > 0) {
-        smoothed[i] = sum / count;
-      }
-    }
+      if (count < 1) return null;
 
-    return smoothed;
-  }
+      const meanP = sum / count;
+      // linear pressure -> dB
+      return 20 * Math.log10(Math.max(meanP, 1e-12));
+    });
+
+    // Rebuild points
+    return points.map((p, i) => ({
+      ...p,
+      spl: outDb[i]
+    }));
+  };
 
   // Display-only smoothing for REW mode series (ENGINE/DISPLAY only; never RAW)
   const applyDisplaySmoothing = (series, smoothingSetting) => {
     if (!Array.isArray(series) || series.length === 0) return series;
     try {
-      const freqs = series.map(p => p.frequency);
-      const splDb = series.map(p => p.spl);
-      const smoothed = applyRewSmoothing(freqs, splDb, smoothingSetting);
-      return series.map((p, i) => ({ ...p, spl: smoothed[i] }));
+      return applyRewStyleDisplaySmoothing(series, smoothingSetting);
     } catch (e) {
       return series;
     }
@@ -1111,7 +1141,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       // In REW mode, smoothing tabs should be DISPLAY-ONLY smoothing.
       // Apply to ENGINE/DISPLAY only (never RAW).
-      const shouldSmooth = (rewPlotSeries !== 'RAW') && (rewSmoothing && rewSmoothing !== 'none');
+      const shouldSmooth = (rewPlotSeries === 'DISPLAY') && (rewSmoothing && rewSmoothing !== 'none');
 
       if (!shouldSmooth) return base;
 
