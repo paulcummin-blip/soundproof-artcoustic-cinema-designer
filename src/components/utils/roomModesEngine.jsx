@@ -2585,11 +2585,21 @@ function estimateModeQ({ mode, roomDims, surfaceAbsorption, dampingScalar, leaka
     const tau = RT60 / 13.815;
     
     // Modal Q at this frequency: Q = π * f * tau
-    const Q_sabine = Math.PI * f0 * tau;
+    const Q_sabine = 2 * Math.PI * f0 * tau;
     
     // Clamp to safe range
     const Q_final = Math.max(5, Math.min(80, Q_sabine));
-    
+
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG) {
+      console.log('[MODE Q (SABINE)]', {
+        f0: Number(f0?.toFixed?.(2) ?? f0),
+        RT60: Number(RT60?.toFixed?.(3) ?? RT60),
+        tau: Number(tau?.toFixed?.(4) ?? tau),
+        Q_sabine: Number(Q_sabine?.toFixed?.(2) ?? Q_sabine),
+        Q_final: Number(Q_final?.toFixed?.(2) ?? Q_final),
+      });
+    }
+
     return Q_final;
   }
   
