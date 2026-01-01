@@ -1053,6 +1053,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const engineFinalSeries = activeDataset.data || [];
     
     // DISPLAY FINAL: ENGINE FINAL + display offset (only in absolute mode)
+    // When Relative view is ON, force display ref offset to 0 (don't add +85/+100 etc)
     const displayOffset = (!rewRelativeView && rewStyleMode) ? rewDisplayRefDb : 0;
     const displaySeries = engineFinalSeries.map(d => ({
       frequency: d.frequency,
@@ -1086,11 +1087,53 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // TEMP DEBUG (can remove later)
   // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
 
-  // AUDIT CHECKPOINT (Part D2): rewSplAnchoredData is UNUSED - kept for legacy compatibility
-  // All display paths use displayData directly (no anchoring, no normalization)
+  // REW-style display processing (display only)
+  // - If Relative view is ON: normalise 30–80 Hz band so its median becomes 0 dB (REW overlay style)
+  // - If Relative view is OFF: pass through unchanged
   const rewSplAnchoredData = useMemo(() => {
-    return displayData; // Pass-through only, NO processing
-  }, [displayData]);
+    const data = Array.isArray(displayData) ? displayData : [];
+    if (!data.length) return data;
+
+    // Only apply relative normalisation in REW-style mode when the toggle is on
+    if (!(rewStyleMode && rewRelativeView)) return data;
+
+    // Collect 30–80 Hz band SPL samples (finite only)
+    const band = data
+      .filter(d => d && Number.isFinite(d.frequency) && d.frequency >= 30 && d.frequency <= 80)
+      .map(d => d.spl)
+      .filter(v => Number.isFinite(v));
+
+    // Need enough points to be meaningful (avoid "offset = 0" by accident)
+    if (band.length < 10) return data;
+
+    // Median (REW-like, stable, not skewed by deep nulls)
+    const sorted = [...band].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const medianDb =
+      sorted.length % 2 === 1
+        ? sorted[mid]
+        : (sorted[mid - 1] + sorted[mid]) / 2;
+
+    // Shift so 30–80 Hz median becomes 0 dB
+    const offsetDb = -medianDb;
+
+    // Apply constant shift to the plotted series (display-only)
+    const shifted = data.map(d => {
+      if (!d || !Number.isFinite(d.spl)) return d;
+      return { ...d, spl: d.spl + offsetDb };
+    });
+
+    // Optional debug hook (matches your existing pattern)
+    if (typeof globalThis !== "undefined" && globalThis.__B44_BASS_DEBUG) {
+      console.log("[RELATIVE VIEW NORMALISE 30–80]", {
+        bandCount: band.length,
+        medianDb: Number(medianDb.toFixed(2)),
+        offsetDb: Number(offsetDb.toFixed(2)),
+      });
+    }
+
+    return shifted;
+  }, [displayData, rewStyleMode, rewRelativeView]);
 
   // Update engine calls UI only when deps change (not on every render)
   useEffect(() => {
