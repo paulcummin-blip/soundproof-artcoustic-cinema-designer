@@ -775,9 +775,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     if (!productDataFound) {
       return {
-        data: rewModesData?.data || [],
+        data: rewModesDataAbs?.data || [],
         debug: {
-          ...(rewModesData?.debug || {}),
+          ...(rewModesDataAbs?.debug || {}),
           productNote: "No anechoic data for selected sub model(s) — Room + Product will match Room-only.",
           viewMode: 'Room + Product (no product data)',
           productCurvesRequested: subsForSimulation.length,
@@ -871,7 +871,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // Check for SPL range issues
     const productSplRange = Number(result.debug?.splRangeDb) || 0;
-    const roomOnlySplRange = Number(rewModesData?.debug?.splRangeDb) || 0;
+    const roomOnlySplRange = Number(rewModesDataAbs?.debug?.splRangeDb) || 0;
     let scaleWarning = null;
 
     if (Math.abs(productSplRange - roomOnlySplRange) > 20) {
@@ -1065,14 +1065,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     
     // Non-REW mode: use old logic
     const baseData = rewView === 'roomPlusProduct'
-      ? rewRoomPlusProductData?.data?.length ? rewRoomPlusProductData.data : (rewModesDataAbs?.data || [])
-      : rewModesDataAbs?.data?.length ? rewModesDataAbs.data : (rewRoomPlusProductData?.data || []);
+      ? rewRoomPlusProductDataAbs?.data?.length ? rewRoomPlusProductDataAbs.data : (rewModesDataAbs?.data || [])
+      : rewModesDataAbs?.data?.length ? rewModesDataAbs.data : (rewRoomPlusProductDataAbs?.data || []);
     
     return baseData;
   }, [rewStyleMode, rewPlotSeries, rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries, rewView, rewModesDataAbs, rewRoomPlusProductData]);
 
   // TEMP DEBUG (can remove later)
-  // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
+  // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesDataAbs?.data?.length, hasRoomPlus: !!rewRoomPlusProductDataAbs?.data?.length, displayLen: displayData?.length });
 
   const rewSplAnchoredData = useMemo(() => {
     // REW parity: relative view is DISPLAY ONLY (normalise 30–80 Hz to 0 dB)
@@ -1393,7 +1393,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     });
 
     return { clampedData: clipped, outBelow: below, outAbove: above };
-  }, [rewStyleMode, finalYDomain, displayData, yAxisLocked, rewCompareView, rewView, rewRelativeView]);
+  }, [rewStyleMode, finalYDomain, rewSplAnchoredData, yAxisLocked]);
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
@@ -1500,9 +1500,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const modeMarkersForGraph = useMemo(() => {
     if (!rewStyleMode) return { axial: [], tangential: [], oblique: [] };
     
-    const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+    const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductDataAbs?.debug
       ? rewRoomPlusProductData.debug
-      : rewModesData?.debug;
+      : rewModesDataAbs?.debug;
     
     if (!activeDebug?.modeMarkers) return { axial: [], tangential: [], oblique: [] };
     
@@ -2150,12 +2150,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        if (rewModesData?.splDb && rewModesData.debug?.splDbRepaired) {
+                        if (rewModesData?.splDb && rewModesDataAbs.debug?.splDbRepaired) {
                           rewCompareBaselineRef.current = {
-                            splDbRepaired: [...rewModesData.debug.splDbRepaired],
+                            splDbRepaired: [...rewModesDataAbs.debug.splDbRepaired],
                             freqs: [...rewModesData.freqs],
-                            sourceSigRounded: rewModesData.debug?.sourceSigRounded,
-                            seatSigRounded: rewModesData.debug?.seatSigRounded,
+                            sourceSigRounded: rewModesDataAbs.debug?.sourceSigRounded,
+                            seatSigRounded: rewModesDataAbs.debug?.seatSigRounded,
                             timestamp: Date.now()
                           };
                         }
@@ -2855,23 +2855,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         })()}
 
         {/* REW debug banner (only when REW is ON) */}
-        {rewStyleMode && (rewModesData?.debug?.error || rewModesData?.debug?.flatNote) && (
+        {rewStyleMode && (rewModesDataAbs?.debug?.error || rewModesDataAbs?.debug?.flatNote) && (
           <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#C1B6AD]">
             <div className="font-semibold mb-1">REW status</div>
-            {rewModesData?.debug?.error && (
-              <div className="text-[11px] font-mono opacity-80">Error: {rewModesData.debug.error}</div>
+            {rewModesDataAbs?.debug?.error && (
+              <div className="text-[11px] font-mono opacity-80">Error: {rewModesDataAbs.debug.error}</div>
             )}
-            {rewModesData?.debug?.flatNote && (
+            {rewModesDataAbs?.debug?.flatNote && (
               <div className="text-[11px] font-mono opacity-80">
-                {rewModesData.debug.flatNote.warning} (range {Number(rewModesData.debug.flatNote.rangeDb).toFixed(2)} dB)
+                {rewModesDataAbs.debug.flatNote.warning} (range {Number(rewModesDataAbs.debug.flatNote.rangeDb).toFixed(2)} dB)
               </div>
             )}
-            {rewModesData?.debug?.message && (
-              <div className="text-[11px] font-mono opacity-80">Message: {rewModesData.debug.message}</div>
+            {rewModesDataAbs?.debug?.message && (
+              <div className="text-[11px] font-mono opacity-80">Message: {rewModesDataAbs.debug.message}</div>
             )}
-            {rewModesData?.debug?.stack && (
+            {rewModesDataAbs?.debug?.stack && (
               <div className="text-[11px] font-mono opacity-80 text-red-600">
-                Stack: {rewModesData.debug.stack.split('\n')[0]}
+                Stack: {rewModesDataAbs.debug.stack.split('\n')[0]}
               </div>
             )}
           </div>
@@ -3453,8 +3453,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
           // Determine exact data array being plotted
           const plotDataSource = rewView === 'roomPlusProduct' 
-            ? 'rewRoomPlusProductData.data' 
-            : 'rewModesData.data';
+            ? 'rewRoomPlusProductDataAbs.data' 
+            : 'rewModesDataAbs.data';
 
           const componentLabel = {
             'modalOnly': 'Modal only',
