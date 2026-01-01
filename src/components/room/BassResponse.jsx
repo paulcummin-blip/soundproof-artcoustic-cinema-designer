@@ -1052,12 +1052,31 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // ENGINE FINAL: smoothed/processed output from engine (plottedDb or splDb)
     const engineFinalSeries = activeDataset.data || [];
     
-    // DISPLAY FINAL: ENGINE FINAL + display offset (only in absolute mode)
-    // When Relative view is ON, force display ref offset to 0 (don't add +85/+100 etc)
-    const displayOffset = (!rewRelativeView && rewStyleMode) ? rewDisplayRefDb : 0;
-    const displaySeries = engineFinalSeries.map(d => ({
+    // DISPLAY FINAL:
+    // - Absolute view: ENGINE FINAL + display ref (e.g. 85/90/95/100 dB)
+    // - Relative view: DISPLAY-ONLY reference shift so median(30–80 Hz) becomes 0 dB (REW-style overlay alignment)
+    let displayOffset = (!rewRelativeView && rewStyleMode) ? rewDisplayRefDb : 0;
+
+    // Relative shift (median 30–80 Hz -> 0 dB)
+    let relShiftDb = 0;
+
+    if (rewRelativeView) {
+      const band = (engineFinalSeries || [])
+        .filter(p => p && p.frequency >= 30 && p.frequency <= 80 && Number.isFinite(p.spl))
+        .map(p => p.spl);
+
+      if (band.length >= 3) {
+        const sorted = [...band].sort((a, b) => a - b);
+        const median = sorted[Math.floor(sorted.length / 2)];
+        relShiftDb = -median;
+      } else {
+        relShiftDb = 0; // safe fallback
+      }
+    }
+
+    const displaySeries = (engineFinalSeries || []).map(d => ({
       frequency: d.frequency,
-      spl: Number.isFinite(d.spl) ? d.spl + displayOffset : d.spl
+      spl: Number.isFinite(d.spl) ? (d.spl + displayOffset + relShiftDb) : d.spl
     }));
     
     return {
