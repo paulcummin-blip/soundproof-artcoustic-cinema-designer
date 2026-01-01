@@ -965,6 +965,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return smoothed;
   }
 
+  // Display-only smoothing for REW mode series (ENGINE/DISPLAY only; never RAW)
+  const applyDisplaySmoothing = (series, smoothingSetting) => {
+    if (!Array.isArray(series) || series.length === 0) return series;
+    try {
+      const freqs = series.map(p => p.frequency);
+      const splDb = series.map(p => p.spl);
+      const smoothed = applyRewSmoothing(freqs, splDb, smoothingSetting);
+      return series.map((p, i) => ({ ...p, spl: smoothed[i] }));
+    } catch (e) {
+      return series;
+    }
+  };
+
   // Convert to chart format (product-based curve)
   const responseData = useMemo(() => {
     if (!selectedSeat || !selectedSeat.freqsHz || !selectedSeat.splDb) {
@@ -1091,10 +1104,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Choose which curve to display based on view
   const displayData = useMemo(() => {
     if (rewStyleMode) {
-      // REW mode: use series selector
-      if (rewPlotSeries === 'RAW') return rewRawSeries;
-      if (rewPlotSeries === 'ENGINE') return rewEngineFinalSeries;
-      return rewDisplayFinalSeries; // Default: DISPLAY
+      const base =
+        (rewPlotSeries === 'RAW') ? rewRawSeries
+        : (rewPlotSeries === 'ENGINE') ? rewEngineFinalSeries
+        : rewDisplayFinalSeries;
+
+      // In REW mode, smoothing tabs should be DISPLAY-ONLY smoothing.
+      // Apply to ENGINE/DISPLAY only (never RAW).
+      const shouldSmooth = (rewPlotSeries !== 'RAW') && (rewSmoothing && rewSmoothing !== 'none');
+
+      if (!shouldSmooth) return base;
+
+      // If a smoothing helper already exists in this file, use it.
+      // Otherwise, call the existing smoothing utility used by the main graph.
+      return applyDisplaySmoothing(base, rewSmoothing);
     }
     
     // Non-REW mode: use old logic
@@ -1103,7 +1126,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       : rewModesDataAbs?.data?.length ? rewModesDataAbs.data : (rewRoomPlusProductData?.data || []);
     
     return baseData;
-  }, [rewStyleMode, rewPlotSeries, rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries, rewView, rewModesDataAbs, rewRoomPlusProductData]);
+  }, [rewStyleMode, rewPlotSeries, rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries, rewView, rewModesDataAbs, rewRoomPlusProductData, rewSmoothing]);
 
   // TEMP DEBUG (can remove later)
   // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
