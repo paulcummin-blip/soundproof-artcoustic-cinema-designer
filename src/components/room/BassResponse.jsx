@@ -775,9 +775,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     if (!productDataFound) {
       return {
-        data: rewModesDataAbs?.data || [],
+        data: rewModesData?.data || [],
         debug: {
-          ...(rewModesDataAbs?.debug || {}),
+          ...(rewModesData?.debug || {}),
           productNote: "No anechoic data for selected sub model(s) — Room + Product will match Room-only.",
           viewMode: 'Room + Product (no product data)',
           productCurvesRequested: subsForSimulation.length,
@@ -871,7 +871,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // Check for SPL range issues
     const productSplRange = Number(result.debug?.splRangeDb) || 0;
-    const roomOnlySplRange = Number(rewModesDataAbs?.debug?.splRangeDb) || 0;
+    const roomOnlySplRange = Number(rewModesData?.debug?.splRangeDb) || 0;
     let scaleWarning = null;
 
     if (Math.abs(productSplRange - roomOnlySplRange) > 20) {
@@ -1015,12 +1015,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     };
   }, []);
 
+  const rewModesDataRel = useMemo(() => {
+    if (!rewStyleMode) return null;
+    return normalizeDatasetToRelative(rewModesDataAbs || { data: [] });
+  }, [rewStyleMode, rewModesDataAbs, normalizeDatasetToRelative]);
+
+  const rewRoomPlusProductDataRel = useMemo(() => {
+    if (!rewStyleMode) return null;
+    return normalizeDatasetToRelative(rewRoomPlusProductDataAbs || { data: [] });
+  }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDatasetToRelative]);
+
+  // Aliases switch Abs/Rel based on UI toggle
+  const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
+  const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
 
   // REW mode: Three distinct series for plotting (RAW, ENGINE, DISPLAY)
   const { rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries } = useMemo(() => {
     // Select active dataset (Room-only or Room+Product)
-    const activeDataset = rewView === 'roomPlusProduct'
-      ? rewRoomPlusProductDataAbs
+    const activeDataset = rewView === 'roomPlusProduct' 
+      ? rewRoomPlusProductData 
       : rewModesDataAbs;
     
     if (!activeDataset || !activeDataset.data || activeDataset.data.length === 0) {
@@ -1052,7 +1065,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       rewEngineFinalSeries: engineFinalSeries,
       rewDisplayFinalSeries: displaySeries
     };
-  }, [rewView, rewModesDataAbs, rewRoomPlusProductDataAbs, rewRelativeView, rewStyleMode, rewDisplayRefDb]);
+  }, [rewView, rewModesDataAbs, rewRoomPlusProductData, rewRelativeView, rewStyleMode, rewDisplayRefDb]);
 
   // Choose which curve to display based on view
   const displayData = useMemo(() => {
@@ -1065,33 +1078,61 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     
     // Non-REW mode: use old logic
     const baseData = rewView === 'roomPlusProduct'
-      ? rewRoomPlusProductDataAbs?.data?.length ? rewRoomPlusProductDataAbs.data : (rewModesDataAbs?.data || [])
-      : rewModesDataAbs?.data?.length ? rewModesDataAbs.data : (rewRoomPlusProductDataAbs?.data || []);
+      ? rewRoomPlusProductData?.data?.length ? rewRoomPlusProductData.data : (rewModesDataAbs?.data || [])
+      : rewModesDataAbs?.data?.length ? rewModesDataAbs.data : (rewRoomPlusProductData?.data || []);
     
     return baseData;
-  }, [rewStyleMode, rewPlotSeries, rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries, rewView, rewModesDataAbs, rewRoomPlusProductDataAbs]);
+  }, [rewStyleMode, rewPlotSeries, rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries, rewView, rewModesDataAbs, rewRoomPlusProductData]);
 
   // TEMP DEBUG (can remove later)
-  // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesDataAbs?.data?.length, hasRoomPlus: !!rewRoomPlusProductDataAbs?.data?.length, displayLen: displayData?.length });
+  // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
 
+  // REW-style display processing (display only)
+  // - If Relative view is ON: normalise 30–80 Hz band so its median becomes 0 dB (REW overlay style)
+  // - If Relative view is OFF: pass through unchanged
   const rewSplAnchoredData = useMemo(() => {
-    // REW parity: relative view is DISPLAY ONLY (normalise 30–80 Hz to 0 dB)
-    if (!rewStyleMode || !rewRelativeView) return displayData;
+    const data = Array.isArray(displayData) ? displayData : [];
+    if (!data.length) return data;
 
-    const band = (displayData || [])
-      .filter(d => d && d.frequency >= 30 && d.frequency <= 80 && Number.isFinite(d.spl))
+    // Only apply relative normalisation in REW-style mode when the toggle is on
+    if (!(rewStyleMode && rewRelativeView)) return data;
+
+    // Collect 30–80 Hz band SPL samples (finite only)
+    const band = data
+      .filter(d => d && Number.isFinite(d.frequency) && d.frequency >= 30 && d.frequency <= 80)
       .map(d => d.spl)
-      .sort((a, b) => a - b);
+      .filter(v => Number.isFinite(v));
 
-    if (band.length < 5) return displayData; // not enough points, bail out safely
+    // Need enough points to be meaningful (avoid "offset = 0" by accident)
+    if (band.length < 10) return data;
 
-    const median = band[Math.floor(band.length / 2)];
-    const offset = -median;
+    // Median (REW-like, stable, not skewed by deep nulls)
+    const sorted = [...band].sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    const medianDb =
+      sorted.length % 2 === 1
+        ? sorted[mid]
+        : (sorted[mid - 1] + sorted[mid]) / 2;
 
-    return (displayData || []).map(d => ({
-      ...d,
-      spl: Number.isFinite(d?.spl) ? d.spl + offset : d?.spl
-    }));
+    // Shift so 30–80 Hz median becomes 0 dB
+    const offsetDb = -medianDb;
+
+    // Apply constant shift to the plotted series (display-only)
+    const shifted = data.map(d => {
+      if (!d || !Number.isFinite(d.spl)) return d;
+      return { ...d, spl: d.spl + offsetDb };
+    });
+
+    // Optional debug hook (matches your existing pattern)
+    if (typeof globalThis !== "undefined" && globalThis.__B44_BASS_DEBUG) {
+      console.log("[RELATIVE VIEW NORMALISE 30–80]", {
+        bandCount: band.length,
+        medianDb: Number(medianDb.toFixed(2)),
+        offsetDb: Number(offsetDb.toFixed(2)),
+      });
+    }
+
+    return shifted;
   }, [displayData, rewStyleMode, rewRelativeView]);
 
   // Update engine calls UI only when deps change (not on every render)
@@ -1352,7 +1393,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const { clampedData, outBelow, outAbove } = React.useMemo(() => {
     // REW mode: no clamping at all
     if (rewStyleMode) {
-      return { clampedData: rewSplAnchoredData, outBelow: 0, outAbove: 0 };
+      return { clampedData: displayData, outBelow: 0, outAbove: 0 };
     }
 
     // Non-REW mode: apply old windowing logic if needed
@@ -1393,7 +1434,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     });
 
     return { clampedData: clipped, outBelow: below, outAbove: above };
-  }, [rewStyleMode, finalYDomain, rewSplAnchoredData, yAxisLocked]);
+  }, [rewStyleMode, finalYDomain, displayData, yAxisLocked, rewCompareView, rewView, rewRelativeView]);
 
   // Bass Metrics (20-80 Hz) for P14 reporting
   const bassMetrics2080Hz = useMemo(() => {
@@ -1500,9 +1541,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const modeMarkersForGraph = useMemo(() => {
     if (!rewStyleMode) return { axial: [], tangential: [], oblique: [] };
     
-    const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductDataAbs?.debug
-      ? rewRoomPlusProductDataAbs.debug
-      : rewModesDataAbs?.debug;
+    const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
+      ? rewRoomPlusProductData.debug
+      : rewModesData?.debug;
     
     if (!activeDebug?.modeMarkers) return { axial: [], tangential: [], oblique: [] };
     
@@ -1512,7 +1553,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       tangential: allMarkers.filter(m => m.family === 'tangential'),
       oblique: allMarkers.filter(m => m.family === 'oblique')
     };
-  }, [rewStyleMode, rewView, rewModesDataAbs, rewRoomPlusProductDataAbs]);
+  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
@@ -2150,12 +2191,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        if (rewModesData?.splDb && rewModesDataAbs.debug?.splDbRepaired) {
+                        if (rewModesData?.splDb && rewModesData.debug?.splDbRepaired) {
                           rewCompareBaselineRef.current = {
-                            splDbRepaired: [...rewModesDataAbs.debug.splDbRepaired],
+                            splDbRepaired: [...rewModesData.debug.splDbRepaired],
                             freqs: [...rewModesData.freqs],
-                            sourceSigRounded: rewModesDataAbs.debug?.sourceSigRounded,
-                            seatSigRounded: rewModesDataAbs.debug?.seatSigRounded,
+                            sourceSigRounded: rewModesData.debug?.sourceSigRounded,
+                            seatSigRounded: rewModesData.debug?.seatSigRounded,
                             timestamp: Date.now()
                           };
                         }
@@ -2855,23 +2896,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         })()}
 
         {/* REW debug banner (only when REW is ON) */}
-        {rewStyleMode && (rewModesDataAbs?.debug?.error || rewModesDataAbs?.debug?.flatNote) && (
+        {rewStyleMode && (rewModesData?.debug?.error || rewModesData?.debug?.flatNote) && (
           <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#C1B6AD]">
             <div className="font-semibold mb-1">REW status</div>
-            {rewModesDataAbs?.debug?.error && (
-              <div className="text-[11px] font-mono opacity-80">Error: {rewModesDataAbs.debug.error}</div>
+            {rewModesData?.debug?.error && (
+              <div className="text-[11px] font-mono opacity-80">Error: {rewModesData.debug.error}</div>
             )}
-            {rewModesDataAbs?.debug?.flatNote && (
+            {rewModesData?.debug?.flatNote && (
               <div className="text-[11px] font-mono opacity-80">
-                {rewModesDataAbs.debug.flatNote.warning} (range {Number(rewModesDataAbs.debug.flatNote.rangeDb).toFixed(2)} dB)
+                {rewModesData.debug.flatNote.warning} (range {Number(rewModesData.debug.flatNote.rangeDb).toFixed(2)} dB)
               </div>
             )}
-            {rewModesDataAbs?.debug?.message && (
-              <div className="text-[11px] font-mono opacity-80">Message: {rewModesDataAbs.debug.message}</div>
+            {rewModesData?.debug?.message && (
+              <div className="text-[11px] font-mono opacity-80">Message: {rewModesData.debug.message}</div>
             )}
-            {rewModesDataAbs?.debug?.stack && (
+            {rewModesData?.debug?.stack && (
               <div className="text-[11px] font-mono opacity-80 text-red-600">
-                Stack: {rewModesDataAbs.debug.stack.split('\n')[0]}
+                Stack: {rewModesData.debug.stack.split('\n')[0]}
               </div>
             )}
           </div>
@@ -3453,8 +3494,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
           // Determine exact data array being plotted
           const plotDataSource = rewView === 'roomPlusProduct' 
-            ? 'rewRoomPlusProductDataAbs.data' 
-            : 'rewModesDataAbs.data';
+            ? 'rewRoomPlusProductData.data' 
+            : 'rewModesData.data';
 
           const componentLabel = {
             'modalOnly': 'Modal only',
@@ -3504,7 +3545,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           {/* Graph or placeholder */}
           {displayData.length > 0 ? (() => {
             // [PLOT AUDIT] - Verify what's actually being plotted
-            const dataToPlot = rewStyleMode ? rewSplAnchoredData : clampedData;
+            const dataToPlot = rewStyleMode ? displayData : clampedData;
             const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
             const __plotAudit = {
               using: rewStyleMode ? "displayData" : "clampedData",
@@ -3521,12 +3562,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <>
                 {rewStyleMode && (
                   <div className="text-[10px] text-gray-500 mb-1">
-                    Plot source: {Array.isArray(rewSplAnchoredData) ? `rewSplAnchoredData (${rewSplAnchoredData.length})` : 'rewSplAnchoredData missing'} | 
+                    Plot source: {Array.isArray(displayData) ? `displayData (${displayData.length})` : 'displayData missing'} | 
                     clampedData ({Array.isArray(clampedData) ? clampedData.length : 0})
                   </div>
                 )}
                 <BassGraph
-                  responseData={rewStyleMode ? rewSplAnchoredData : clampedData}
+                  responseData={rewStyleMode ? displayData : clampedData}
                   schroederFrequency={schroederFrequency}
                   rp22Levels={rp22Levels}
                   toggles={toggles}
