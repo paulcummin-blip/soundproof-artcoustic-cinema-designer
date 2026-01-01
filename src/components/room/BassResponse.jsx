@@ -1015,25 +1015,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     };
   }, []);
 
-  const rewModesDataRel = useMemo(() => {
-    if (!rewStyleMode) return null;
-    return normalizeDatasetToRelative(rewModesDataAbs || { data: [] });
-  }, [rewStyleMode, rewModesDataAbs, normalizeDatasetToRelative]);
-
-  const rewRoomPlusProductDataRel = useMemo(() => {
-    if (!rewStyleMode) return null;
-    return normalizeDatasetToRelative(rewRoomPlusProductDataAbs || { data: [] });
-  }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDatasetToRelative]);
-
-  // Aliases switch Abs/Rel based on UI toggle
-  const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
-  const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
 
   // REW mode: Three distinct series for plotting (RAW, ENGINE, DISPLAY)
   const { rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries } = useMemo(() => {
     // Select active dataset (Room-only or Room+Product)
-    const activeDataset = rewView === 'roomPlusProduct' 
-      ? rewRoomPlusProductData 
+    const activeDataset = rewView === 'roomPlusProduct'
+      ? rewRoomPlusProductDataAbs
       : rewModesDataAbs;
     
     if (!activeDataset || !activeDataset.data || activeDataset.data.length === 0) {
@@ -1065,7 +1052,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       rewEngineFinalSeries: engineFinalSeries,
       rewDisplayFinalSeries: displaySeries
     };
-  }, [rewView, rewModesDataAbs, rewRoomPlusProductData, rewRelativeView, rewStyleMode, rewDisplayRefDb]);
+  }, [rewView, rewModesDataAbs, rewRoomPlusProductDataAbs, rewRelativeView, rewStyleMode, rewDisplayRefDb]);
 
   // Choose which curve to display based on view
   const displayData = useMemo(() => {
@@ -1087,52 +1074,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // TEMP DEBUG (can remove later)
   // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
 
-  // REW-style display processing (display only)
-  // - If Relative view is ON: normalise 30–80 Hz band so its median becomes 0 dB (REW overlay style)
-  // - If Relative view is OFF: pass through unchanged
   const rewSplAnchoredData = useMemo(() => {
-    const data = Array.isArray(displayData) ? displayData : [];
-    if (!data.length) return data;
+    // REW parity: relative view is DISPLAY ONLY (normalise 30–80 Hz to 0 dB)
+    if (!rewStyleMode || !rewRelativeView) return displayData;
 
-    // Only apply relative normalisation in REW-style mode when the toggle is on
-    if (!(rewStyleMode && rewRelativeView)) return data;
-
-    // Collect 30–80 Hz band SPL samples (finite only)
-    const band = data
-      .filter(d => d && Number.isFinite(d.frequency) && d.frequency >= 30 && d.frequency <= 80)
+    const band = (displayData || [])
+      .filter(d => d && d.frequency >= 30 && d.frequency <= 80 && Number.isFinite(d.spl))
       .map(d => d.spl)
-      .filter(v => Number.isFinite(v));
+      .sort((a, b) => a - b);
 
-    // Need enough points to be meaningful (avoid "offset = 0" by accident)
-    if (band.length < 10) return data;
+    if (band.length < 5) return displayData; // not enough points, bail out safely
 
-    // Median (REW-like, stable, not skewed by deep nulls)
-    const sorted = [...band].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    const medianDb =
-      sorted.length % 2 === 1
-        ? sorted[mid]
-        : (sorted[mid - 1] + sorted[mid]) / 2;
+    const median = band[Math.floor(band.length / 2)];
+    const offset = -median;
 
-    // Shift so 30–80 Hz median becomes 0 dB
-    const offsetDb = -medianDb;
-
-    // Apply constant shift to the plotted series (display-only)
-    const shifted = data.map(d => {
-      if (!d || !Number.isFinite(d.spl)) return d;
-      return { ...d, spl: d.spl + offsetDb };
-    });
-
-    // Optional debug hook (matches your existing pattern)
-    if (typeof globalThis !== "undefined" && globalThis.__B44_BASS_DEBUG) {
-      console.log("[RELATIVE VIEW NORMALISE 30–80]", {
-        bandCount: band.length,
-        medianDb: Number(medianDb.toFixed(2)),
-        offsetDb: Number(offsetDb.toFixed(2)),
-      });
-    }
-
-    return shifted;
+    return (displayData || []).map(d => ({
+      ...d,
+      spl: Number.isFinite(d?.spl) ? d.spl + offset : d?.spl
+    }));
   }, [displayData, rewStyleMode, rewRelativeView]);
 
   // Update engine calls UI only when deps change (not on every render)
@@ -1393,7 +1352,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const { clampedData, outBelow, outAbove } = React.useMemo(() => {
     // REW mode: no clamping at all
     if (rewStyleMode) {
-      return { clampedData: displayData, outBelow: 0, outAbove: 0 };
+      return { clampedData: rewSplAnchoredData, outBelow: 0, outAbove: 0 };
     }
 
     // Non-REW mode: apply old windowing logic if needed
@@ -3545,7 +3504,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           {/* Graph or placeholder */}
           {displayData.length > 0 ? (() => {
             // [PLOT AUDIT] - Verify what's actually being plotted
-            const dataToPlot = rewStyleMode ? displayData : clampedData;
+            const dataToPlot = rewStyleMode ? rewSplAnchoredData : clampedData;
             const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
             const __plotAudit = {
               using: rewStyleMode ? "displayData" : "clampedData",
@@ -3562,12 +3521,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <>
                 {rewStyleMode && (
                   <div className="text-[10px] text-gray-500 mb-1">
-                    Plot source: {Array.isArray(displayData) ? `displayData (${displayData.length})` : 'displayData missing'} | 
+                    Plot source: {Array.isArray(rewSplAnchoredData) ? `rewSplAnchoredData (${rewSplAnchoredData.length})` : 'rewSplAnchoredData missing'} | 
                     clampedData ({Array.isArray(clampedData) ? clampedData.length : 0})
                   </div>
                 )}
                 <BassGraph
-                  responseData={rewStyleMode ? displayData : clampedData}
+                  responseData={rewStyleMode ? rewSplAnchoredData : clampedData}
                   schroederFrequency={schroederFrequency}
                   rp22Levels={rp22Levels}
                   toggles={toggles}
