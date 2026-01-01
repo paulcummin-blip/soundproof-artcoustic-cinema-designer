@@ -1246,10 +1246,10 @@ export function computeRoomModesResponse({
   }
 
   // Build FINAL curve pipeline (single source of truth) - create NEW arrays at each step
-  // REW parity mode: Keep engine output unchanged, apply display offset separately
-  let displayOffsetDb = 0;
   let calRefMedianDbBefore = 0;
   let calRefMedianDbAfter = 0;
+  let calibrationOffsetDb = 0; // Legacy, only for non-REW mode
+  let normAppliedActual = false;
 
   // Use smoothed modal curve (SBIR is now integrated into splDb during summation)
   // REW parity: always use unsmoothed data for plotting (preserve null depth)
@@ -1259,6 +1259,23 @@ export function computeRoomModesResponse({
 
   if (!Array.isArray(finalDb) || finalDb.length === 0) {
     finalDb = Array.isArray(splDb) ? [...splDb] : [];
+  }
+
+  // DISPLAY-ONLY REW RELATIVE SHIFT (median 30–80 Hz -> 0 dB)
+  // Engine curve (finalDb) stays unchanged in REW parity mode.
+  let displayOffsetDb = 0;
+
+  if (rewParityMode && isRelative) {
+    const displayBand = [30, 80];
+    const bandVals = freqs
+      .map((f, i) => (f >= displayBand[0] && f <= displayBand[1] && Number.isFinite(finalDb[i])) ? finalDb[i] : null)
+      .filter(v => v !== null);
+
+    if (bandVals.length >= 10) {
+      const sorted = [...bandVals].sort((a, b) => a - b);
+      const med = sorted[Math.floor(sorted.length / 2)];
+      displayOffsetDb = -med; // target is 0 dB
+    }
   }
 
   // Always compute MLP reference (30-80 Hz median) for anchoring
@@ -1276,25 +1293,26 @@ export function computeRoomModesResponse({
     calRefMedianDbBefore = mlpMedianDb;
     normRefDb = mlpMedianDb; // Actual computed reference for this run
 
-    // REW parity mode: compute display offset for Relative view ONLY
-    if (rewParityMode) {
-      if (isRelative) {
-        // Relative view: shift median to 0 dB (display-only, engine unchanged)
-        const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
-        displayOffsetDb = targetDb - mlpMedianDb;
-      } else {
-        // Absolute view: no display offset
-        displayOffsetDb = 0;
-      }
+    // Calibration offset is ONLY for non-REW modes.
+    // In REW parity mode we keep ENGINE FINAL untouched, and do display shifting separately.
+    if (!rewParityMode && isRelative) {
+      // Relative view: normalize to 0 dB
+      const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
+      calibrationOffsetDb = targetDb - mlpMedianDb;
+      normAppliedActual = true;
+    } else if (!rewParityMode && !isRelative) {
+      // Absolute view (non-REW): calibrate so MLP 30–80 Hz median = 85 dB
+      const targetAbsoluteDb = 85;
+      calibrationOffsetDb = targetAbsoluteDb - mlpMedianDb;
     } else {
-      // Non-REW mode: use legacy calibration logic
-      if (isRelative) {
-        const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
-        displayOffsetDb = targetDb - mlpMedianDb;
-      } else {
-        const targetAbsoluteDb = 85;
-        displayOffsetDb = targetAbsoluteDb - mlpMedianDb;
-      }
+      // REW parity: no engine calibration offset
+      calibrationOffsetDb = 0;
+      normAppliedActual = false;
+    }
+
+    // Apply legacy calibration offset (only non-REW mode)
+    if (!rewParityMode) {
+      finalDb = finalDb.map(v => (isFinite(v) ? (v + calibrationOffsetDb) : v));
     }
     
     // Compute after-offset median for debug
@@ -1306,9 +1324,6 @@ export function computeRoomModesResponse({
       calRefMedianDbAfter = sortedAfter[Math.floor(sortedAfter.length / 2)];
     }
   }
-
-  // Create display curve (engine final + display offset)
-  const displayDb = finalDb.map(v => (isFinite(v) ? (v + displayOffsetDb) : v));
 
   // DEBUG: record finalDb without risking a crash
   if (__debugBass && Array.isArray(__probeRows) && __probeRows.length) {
@@ -1641,15 +1656,23 @@ export function computeRoomModesResponse({
   // Build base return object (all fresh arrays/objects to avoid frozen mutations)
   // CRITICAL: Always return valid arrays so REW Compare can't blank the graph
   const safeFreqs = Array.isArray(freqs) && freqs.length > 0 ? freqs : [];
-  const safeDisplayDb = Array.isArray(displayDb) && displayDb.length > 0 ? displayDb : (Array.isArray(finalDb) ? finalDb : (Array.isArray(splDb) ? splDb : []));
   const safeFinalDb = Array.isArray(finalDb) && finalDb.length > 0 ? finalDb : (Array.isArray(splDb) ? splDb : []);
-  const safePlottedDb = Array.isArray(plottedDb) && plottedDb.length > 0 ? plottedDb : safeFinalDb;
+  const safePlottedDbRaw = Array.isArray(plottedDb) && plottedDb.length > 0 ? plottedDb : safeFinalDb;
+
+  // Apply display-only offset ONLY for REW parity + Relative view
+  const safeDisplayDb = (rewParityMode && isRelative)
+    ? safeFinalDb.map(v => (Number.isFinite(v) ? (v + displayOffsetDb) : v))
+    : safeFinalDb;
+
+  const safeDisplayPlottedDb = (rewParityMode && isRelative)
+    ? safePlottedDbRaw.map(v => (Number.isFinite(v) ? (v + displayOffsetDb) : v))
+    : safePlottedDbRaw;
 
   const baseReturn = {
     freqs: [...safeFreqs],
-    splDb: [...safeDisplayDb], // Display version (with offset applied)
+    splDb: [...safeDisplayDb], // Display version (with offset applied in REW+Relative)
     engineFinalDb: rewParityMode ? [...safeFinalDb] : null, // Engine truth (no offset)
-    plottedDb: [...safePlottedDb],
+    plottedDb: [...safeDisplayPlottedDb],
     coherentRawDb: rewParityMode ? [...rawCoherentDb] : null,
     debug: {
       schroederHz,
@@ -1750,7 +1773,8 @@ export function computeRoomModesResponse({
       phaseCheckAvailable: typeof globalThis !== 'undefined' && globalThis.__B44_PHASE_CHECK ? true : false,
       calRefBandHz: calRefBandHz,
       calRefMedianDbBefore: Number.isFinite(calRefMedianDbBefore) ? calRefMedianDbBefore.toFixed(2) : 'N/A',
-      displayOffsetDb: Number.isFinite(displayOffsetDb) ? displayOffsetDb.toFixed(2) : '0.00',
+      displayOffsetDb: (rewParityMode && isRelative) ? displayOffsetDb.toFixed(2) : "0.00",
+      displayShiftMode: (rewParityMode && isRelative) ? "REW relative (median 30–80 Hz -> 0 dB)" : "none",
       calRefMedianDbAfter: Number.isFinite(calRefMedianDbAfter) ? calRefMedianDbAfter.toFixed(2) : 'N/A',
       rawEngineOutputMode: rawEngineOutput,
       blendStartHz: !rawEngineOutput && schroederHz > 0 ? (schroederHz * 1.0).toFixed(1) : 'N/A',
