@@ -3278,11 +3278,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           
           return (
             <div className="text-xs mb-2 bg-teal-50 p-2 rounded border border-teal-400">
-              <div className="font-semibold mb-1 text-teal-700">🔬 Parity Audit (Raw Coherent vs Final Plotted)</div>
+              <div className="font-semibold mb-1 text-teal-700">🔬 Parity Audit (Engine vs Display)</div>
               <div className="text-[10px] font-mono space-y-1">
                 <div className="font-semibold text-teal-800">40–70 Hz Band:</div>
                 <div className="pl-2 space-y-0.5">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <div>
                       <div className="font-semibold text-teal-700">RAW:</div>
                       <div>Peak: {raw?.band40_70Hz?.peakDb || 'N/A'} dB @ {raw?.band40_70Hz?.peakFreq || 'N/A'} Hz</div>
@@ -3290,17 +3290,58 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       <div className="font-bold">Delta: {raw?.band40_70Hz?.deltaDb || 'N/A'} dB</div>
                     </div>
                     <div>
-                      <div className="font-semibold text-teal-700">FINAL:</div>
+                      <div className="font-semibold text-teal-700">ENGINE FINAL (pre-display):</div>
                       <div>Peak: {final?.band40_70Hz?.peakDb || 'N/A'} dB @ {final?.band40_70Hz?.peakFreq || 'N/A'} Hz</div>
                       <div>Dip: {final?.band40_70Hz?.dipDb || 'N/A'} dB @ {final?.band40_70Hz?.dipFreq || 'N/A'} Hz</div>
                       <div className="font-bold">Delta: {final?.band40_70Hz?.deltaDb || 'N/A'} dB</div>
                     </div>
+                    <div>
+                      {(() => {
+                        const band = displayData.filter(p =>
+                          Number.isFinite(p?.frequency) &&
+                          p.frequency >= 40 &&
+                          p.frequency <= 70 &&
+                          Number.isFinite(p?.spl)
+                        );
+
+                        if (band.length < 3) return <div className="text-gray-400">N/A</div>;
+
+                        let peak = band[0];
+                        let dip = band[0];
+
+                        for (const p of band) {
+                          if (p.spl > peak.spl) peak = p;
+                          if (p.spl < dip.spl) dip = p;
+                        }
+
+                        const delta = peak.spl - dip.spl;
+                        
+                        // Compute offset from engine final
+                        const engineFinalPeak = parseFloat(final?.band40_70Hz?.peakDb);
+                        const engineFinalDip = parseFloat(final?.band40_70Hz?.dipDb);
+                        const offsetFromPeak = Number.isFinite(engineFinalPeak) ? peak.spl - engineFinalPeak : null;
+                        const offsetFromDip = Number.isFinite(engineFinalDip) ? dip.spl - engineFinalDip : null;
+                        const offsetIsConstant = offsetFromPeak !== null && offsetFromDip !== null && Math.abs(offsetFromDip - offsetFromPeak) < 0.2;
+
+                        return (
+                          <>
+                            <div className="font-semibold text-teal-700">DISPLAY FINAL (graph):</div>
+                            <div>Peak: {peak.spl.toFixed(2)} dB @ {peak.frequency.toFixed(1)} Hz</div>
+                            <div>Dip:  {dip.spl.toFixed(2)} dB @ {dip.frequency.toFixed(1)} Hz</div>
+                            <div className="font-bold">Delta: {delta.toFixed(2)} dB</div>
+                            {offsetFromPeak !== null && (
+                              <div className="text-[9px] text-blue-600 mt-1 pt-1 border-t border-teal-300">
+                                Display offset: {offsetFromPeak >= 0 ? '+' : ''}{offsetFromPeak.toFixed(2)} dB
+                                {offsetIsConstant && <div className="text-green-600">✓ Constant (reference shift only)</div>}
+                              </div>
+                            )}
+                          </>
+                        );
+                      })()}
+                    </div>
                   </div>
                   <div className="mt-1 pt-1 border-t border-teal-300 font-semibold text-red-700">
-                    Null Depth Shrink: {deltaShrink !== 'N/A' && parseFloat(deltaShrink) > 1 ? `${deltaShrink} dB (processing is reducing nulls)` : deltaShrink}
-                  </div>
-                  <div className="mt-1 text-[9px] text-teal-600">
-                    Smoothing delta (40–70 Hz): {raw?.band40_70Hz?.deltaDb || 'N/A'} dB (raw) → {final?.band40_70Hz?.deltaDb || 'N/A'} dB (plotted)
+                    Null Depth Shrink (RAW→ENGINE FINAL): {deltaShrink !== 'N/A' && parseFloat(deltaShrink) > 1 ? `${deltaShrink} dB (smoothing effect)` : deltaShrink}
                   </div>
                 </div>
                 
