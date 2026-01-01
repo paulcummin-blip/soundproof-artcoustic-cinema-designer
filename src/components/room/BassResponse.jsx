@@ -3412,7 +3412,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 modeMarkers={modeMarkersForGraph}
                 linearHzAxis={rewStyleMode && linearHzAxis}
                 rewStyleMode={rewStyleMode}
-                yDomain={finalYDomain}
+                yDomain={rewStyleMode ? undefined : finalYDomain}
                 showAxialOnly={false}
                 refDb={rewStyleMode ? (rewRelativeView ? 0 : rewDisplayRefDb) : (rewRelativeView ? 0 : 85)}
                 disableHighlight={rewRelativeView}
