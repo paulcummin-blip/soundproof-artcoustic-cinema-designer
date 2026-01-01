@@ -538,7 +538,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Default to absolute SPL, optional normalize via checkbox
     let result;
     try {
-      const engineSmoothingSetting = rewStyleMode ? 'none' : graphSmoothing;
+      
       result = computeRoomModesResponse({
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
@@ -812,7 +812,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Default to absolute SPL, optional normalize via checkbox
     let result;
     try {
-      const engineSmoothingSetting = rewStyleMode ? 'none' : graphSmoothing;
+      
       result = computeRoomModesResponse({
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
