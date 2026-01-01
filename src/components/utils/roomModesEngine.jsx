@@ -1105,7 +1105,7 @@ export function computeRoomModesResponse({
   // Apply smoothing if requested AND not raw mode (create NEW array, never mutate)
   const smoothingApplied = (!rawEngineOutput && smoothing !== 'none') ? smoothing : 'none';
   const splDbSmoothed = (!rawEngineOutput && smoothing !== 'none') 
-    ? applySmoothing(freqs, splDbRepaired, smoothing)
+    ? (rewParityMode ? applyRewStyleSmoothing(freqs, splDbRepaired, smoothing) : applySmoothing(freqs, splDbRepaired, smoothing))
     : splDbRepaired;
 
   // DEBUG: record post-smoothing splDb at probe bins
@@ -2293,6 +2293,71 @@ function getSpatialCouplingTerms(mode, source, receiver, roomDims) {
     rcvCouplingTerm,
     totalCoupling: srcCouplingTerm * rcvCouplingTerm,
   };
+}
+
+/**
+ * Apply REW-style fractional octave smoothing (linear magnitude domain, log-frequency window)
+ * This preserves null depth better than dB-domain averaging
+ */
+function applyRewStyleSmoothing(freqs, splDb, smoothingSetting) {
+  // Parse smoothing setting to get N (e.g., '1/3' → 3, '1/48' → 48)
+  const settingMap = {
+    '1/48': 48,
+    '1/24': 24,
+    '1/12': 12,
+    '1/6': 6,
+    '1/3': 3,
+    '1/1': 1
+  };
+  
+  const N = settingMap[smoothingSetting] || 3;
+  
+  // Smoothing window in octaves (half-width)
+  const halfWindowOct = 1 / (2 * N);
+  
+  const smoothed = new Array(splDb.length);
+  
+  for (let i = 0; i < freqs.length; i++) {
+    const f0 = freqs[i];
+    const dbOriginal = splDb[i];
+    
+    // Fallback for non-finite centre value
+    if (!Number.isFinite(f0) || !Number.isFinite(dbOriginal)) {
+      smoothed[i] = dbOriginal;
+      continue;
+    }
+    
+    // Window bounds in Hz
+    const fLo = f0 / Math.pow(2, halfWindowOct);
+    const fHi = f0 * Math.pow(2, halfWindowOct);
+    
+    // Collect linear magnitudes in window
+    let sumMagnitude = 0;
+    let count = 0;
+    
+    for (let j = 0; j < freqs.length; j++) {
+      const fj = freqs[j];
+      const dbj = splDb[j];
+      
+      // Only include finite values in window
+      if (Number.isFinite(fj) && Number.isFinite(dbj) && fj >= fLo && fj <= fHi) {
+        const magnitude = Math.pow(10, dbj / 20);
+        sumMagnitude += magnitude;
+        count++;
+      }
+    }
+    
+    // Compute smoothed value
+    if (count > 0) {
+      const avgMagnitude = sumMagnitude / count;
+      smoothed[i] = 20 * Math.log10(Math.max(Number.EPSILON, avgMagnitude));
+    } else {
+      // No valid values in window: use original
+      smoothed[i] = dbOriginal;
+    }
+  }
+  
+  return smoothed;
 }
 
 /**
