@@ -3319,6 +3319,42 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   </div>
                 </div>
                 
+                {/* PLOT AUDIT (must match tooltip/curve): derived from displayData */}
+                {rewStyleMode && Array.isArray(displayData) && displayData.length > 0 && (() => {
+                  const band = displayData.filter(p =>
+                    Number.isFinite(p?.frequency) &&
+                    p.frequency >= 40 &&
+                    p.frequency <= 70 &&
+                    Number.isFinite(p?.spl)
+                  );
+
+                  if (band.length < 3) return null;
+
+                  let peak = band[0];
+                  let dip = band[0];
+
+                  for (const p of band) {
+                    if (p.spl > peak.spl) peak = p;
+                    if (p.spl < dip.spl) dip = p;
+                  }
+
+                  const delta = peak.spl - dip.spl;
+
+                  return (
+                    <div className="mt-2 pt-2 border-t border-teal-300 text-[10px] font-mono">
+                      <div className="font-semibold text-teal-800">PLOT (what the graph is actually showing) 40–70 Hz:</div>
+                      <div className="pl-2">
+                        <div>Peak: {peak.spl.toFixed(2)} dB @ {peak.frequency.toFixed(1)} Hz</div>
+                        <div>Dip:  {dip.spl.toFixed(2)} dB @ {dip.frequency.toFixed(1)} Hz</div>
+                        <div className="font-bold">Delta: {delta.toFixed(2)} dB</div>
+                      </div>
+                      <div className="mt-1 text-[9px] text-teal-600">
+                        This is computed from displayData, so it should match the tooltip values exactly.
+                      </div>
+                    </div>
+                  );
+                })()}
+                
                 <div className="mt-2 pt-2 border-t border-teal-300 text-[9px] space-y-0.5">
                   <div><strong>Smoothing:</strong> {activeDebug?.smoothingApplied || 'none'}</div>
                   <div><strong>REW Parity Mode:</strong> {activeDebug?.rewParityMode ? 'ON' : 'OFF'}</div>
