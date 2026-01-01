@@ -3401,8 +3401,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             console.log("[PLOT AUDIT]", __plotAudit);
             
             return (
-              <BassGraph
-                responseData={rewStyleMode ? displayData : clampedData}
+              <>
+                {rewStyleMode && (
+                  <div className="text-[10px] text-gray-500 mb-1">
+                    Plot source: {Array.isArray(displayData) ? `displayData (${displayData.length})` : 'displayData missing'} | 
+                    clampedData ({Array.isArray(clampedData) ? clampedData.length : 0})
+                  </div>
+                )}
+                <BassGraph
+                  responseData={rewStyleMode ? displayData : clampedData}
                 schroederFrequency={schroederFrequency}
                 rp22Levels={rp22Levels}
                 toggles={toggles}
