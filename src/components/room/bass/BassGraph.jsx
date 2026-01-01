@@ -17,6 +17,21 @@ const CustomTooltip = ({ active, payload, label }) => {
     return null;
 };
 
+// REW mode plot range debug (proof we're plotting the right numbers)
+const RewPlotRangeDebug = ({ chartData }) => {
+  const finite = chartData.map(p => p?.spl).filter(v => Number.isFinite(v));
+  if (finite.length === 0) return null;
+  
+  const min = Math.min(...finite);
+  const max = Math.max(...finite);
+  
+  return (
+    <div className="text-[9px] text-gray-500 mb-1">
+      Plot min/max: {min.toFixed(2)} / {max.toFixed(2)} dB
+    </div>
+  );
+};
+
 export default function BassGraph({ 
   responseData, 
   schroederFrequency = 0, 
@@ -35,17 +50,17 @@ export default function BassGraph({
 }) {
     let data = responseData;
     
-    // Build chart data: REW mode = one true series, non-REW = good/bad split
+    // Build chart data: REW mode = one true series (ZERO processing), non-REW = good/bad split
     const chartData = React.useMemo(() => {
       if (!data || data.length === 0) return [];
 
       const sorted = [...data].sort((a, b) => (a.frequency ?? 0) - (b.frequency ?? 0));
 
-      // REW mode: plot true values without any windowing/splitting/clamping
+      // REW mode: plot true values with ZERO processing (no windowing, no splitting, no clamping)
       if (rewStyleMode) {
         return sorted.map(d => ({
           frequency: d.frequency,
-          spl: Number.isFinite(d.spl) ? d.spl : null
+          spl: d.spl // Raw value from engine (can be null/undefined/non-finite)
         }));
       }
 
@@ -312,9 +327,12 @@ export default function BassGraph({
     return (
         <div className="w-full h-[400px]">
             {rewStyleMode && (
-                <div className="text-[10px] text-gray-500 mb-1">
-                    X-axis scale: {linearHzAxis ? 'LINEAR' : 'LOG'}
-                </div>
+                <>
+                    <div className="text-[10px] text-gray-500 mb-1">
+                        X-axis scale: {linearHzAxis ? 'LINEAR' : 'LOG'}
+                    </div>
+                    <RewPlotRangeDebug chartData={chartData} />
+                </>
             )}
             <ResponsiveContainer>
                 <LineChart data={chartData} margin={{ top: 30, right: 50, left: 20, bottom: 30 }}>
@@ -384,7 +402,7 @@ export default function BassGraph({
                       />
                     ))}
 
-                    {/* REW mode: single true-value curve with monotone interpolation */}
+                    {/* REW mode: single true-value curve with monotone interpolation (ZERO processing) */}
                     {rewStyleMode && (
                       <Line 
                           type="monotone" 
@@ -393,7 +411,7 @@ export default function BassGraph({
                           strokeWidth={2} 
                           dot={false}
                           activeDot={false}
-                          connectNulls={false}
+                          connectNulls={true}
                           isAnimationActive={false}
                       />
                     )}
