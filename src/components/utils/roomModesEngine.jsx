@@ -1246,9 +1246,8 @@ export function computeRoomModesResponse({
   }
 
   // Build FINAL curve pipeline (single source of truth) - create NEW arrays at each step
-  // Absolute SPL calibration: anchor curve to sensible reference at MLP
-  let calibrationOffsetDb = 0;
-  let normAppliedActual = false;
+  // REW parity mode: Keep engine output unchanged, apply display offset separately
+  let displayOffsetDb = 0;
   let calRefMedianDbBefore = 0;
   let calRefMedianDbAfter = 0;
 
@@ -1262,12 +1261,11 @@ export function computeRoomModesResponse({
     finalDb = Array.isArray(splDb) ? [...splDb] : [];
   }
 
-  // Always compute MLP reference (30-80 Hz median) for anchoring (Part D1)
-  // CRITICAL: This is ONLY applied to the processed output, NEVER to RAW
+  // Always compute MLP reference (30-80 Hz median) for anchoring
   const calRefBandHz = [30, 80];
   const mlpBandValues = freqs
-  .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
-  .filter(v => v !== null);
+    .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
+    .filter(v => v !== null);
 
   // Define normRefDb early (REW Compare View needs this to never crash)
   let normRefDb = isRelative ? 0 : 85;
@@ -1278,33 +1276,39 @@ export function computeRoomModesResponse({
     calRefMedianDbBefore = mlpMedianDb;
     normRefDb = mlpMedianDb; // Actual computed reference for this run
 
-    // REW Compare mode: no calibration offset (keep curve as-computed)
+    // REW parity mode: compute display offset for Relative view ONLY
     if (rewParityMode) {
-      calibrationOffsetDb = 0;
-      normAppliedActual = false;
-    } else if (isRelative) {
-      // Relative view: normalize to 0 dB
-      const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
-      calibrationOffsetDb = targetDb - mlpMedianDb;
-      normAppliedActual = true;
+      if (isRelative) {
+        // Relative view: shift median to 0 dB (display-only, engine unchanged)
+        const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
+        displayOffsetDb = targetDb - mlpMedianDb;
+      } else {
+        // Absolute view: no display offset
+        displayOffsetDb = 0;
+      }
     } else {
-      // Absolute view: calibrate so MLP 30-80 Hz median = 85 dB (reference cinema level)
-      const targetAbsoluteDb = 85;
-      calibrationOffsetDb = targetAbsoluteDb - mlpMedianDb;
+      // Non-REW mode: use legacy calibration logic
+      if (isRelative) {
+        const targetDb = Number.isFinite(normalizeToDb) ? normalizeToDb : 0;
+        displayOffsetDb = targetDb - mlpMedianDb;
+      } else {
+        const targetAbsoluteDb = 85;
+        displayOffsetDb = targetAbsoluteDb - mlpMedianDb;
+      }
     }
-
-    // Apply calibration offset (will be 0 in REW Compare mode)
-    finalDb = finalDb.map(v => (isFinite(v) ? (v + calibrationOffsetDb) : v));
     
-    // Compute after-calibration median for debug
+    // Compute after-offset median for debug
     const afterBandValues = freqs
-      .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] : null)
+      .map((f, i) => f >= calRefBandHz[0] && f <= calRefBandHz[1] && isFinite(finalDb[i]) ? finalDb[i] + displayOffsetDb : null)
       .filter(v => v !== null);
     if (afterBandValues.length >= 10) {
       const sortedAfter = [...afterBandValues].sort((a, b) => a - b);
       calRefMedianDbAfter = sortedAfter[Math.floor(sortedAfter.length / 2)];
     }
   }
+
+  // Create display curve (engine final + display offset)
+  const displayDb = finalDb.map(v => (isFinite(v) ? (v + displayOffsetDb) : v));
 
   // DEBUG: record finalDb without risking a crash
   if (__debugBass && Array.isArray(__probeRows) && __probeRows.length) {
@@ -1637,12 +1641,14 @@ export function computeRoomModesResponse({
   // Build base return object (all fresh arrays/objects to avoid frozen mutations)
   // CRITICAL: Always return valid arrays so REW Compare can't blank the graph
   const safeFreqs = Array.isArray(freqs) && freqs.length > 0 ? freqs : [];
+  const safeDisplayDb = Array.isArray(displayDb) && displayDb.length > 0 ? displayDb : (Array.isArray(finalDb) ? finalDb : (Array.isArray(splDb) ? splDb : []));
   const safeFinalDb = Array.isArray(finalDb) && finalDb.length > 0 ? finalDb : (Array.isArray(splDb) ? splDb : []);
   const safePlottedDb = Array.isArray(plottedDb) && plottedDb.length > 0 ? plottedDb : safeFinalDb;
 
   const baseReturn = {
     freqs: [...safeFreqs],
-    splDb: [...safeFinalDb],
+    splDb: [...safeDisplayDb], // Display version (with offset applied)
+    engineFinalDb: rewParityMode ? [...safeFinalDb] : null, // Engine truth (no offset)
     plottedDb: [...safePlottedDb],
     coherentRawDb: rewParityMode ? [...rawCoherentDb] : null,
     debug: {
@@ -1744,7 +1750,7 @@ export function computeRoomModesResponse({
       phaseCheckAvailable: typeof globalThis !== 'undefined' && globalThis.__B44_PHASE_CHECK ? true : false,
       calRefBandHz: calRefBandHz,
       calRefMedianDbBefore: Number.isFinite(calRefMedianDbBefore) ? calRefMedianDbBefore.toFixed(2) : 'N/A',
-      calOffsetAppliedDb: Number.isFinite(calibrationOffsetDb) ? calibrationOffsetDb.toFixed(2) : '0.00',
+      displayOffsetDb: Number.isFinite(displayOffsetDb) ? displayOffsetDb.toFixed(2) : '0.00',
       calRefMedianDbAfter: Number.isFinite(calRefMedianDbAfter) ? calRefMedianDbAfter.toFixed(2) : 'N/A',
       rawEngineOutputMode: rawEngineOutput,
       blendStartHz: !rawEngineOutput && schroederHz > 0 ? (schroederHz * 1.0).toFixed(1) : 'N/A',
