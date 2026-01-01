@@ -914,29 +914,14 @@ export function computeRoomModesResponse({
   let sbirMedianDb = 0;
 
   if (rewParityMode && sbirEnabled && modalBandDbPass1.length >= 10 && sbirBandDbPass1.length >= 10) {
-    // Compute medians
-    const sortedModal = [...modalBandDbPass1].sort((a, b) => a - b);
-    const sortedSbir = [...sbirBandDbPass1].sort((a, b) => a - b);
-
-    modalMedianDb = sortedModal[Math.floor(sortedModal.length / 2)];
-    sbirMedianDb = sortedSbir[Math.floor(sortedSbir.length / 2)];
-
-    // Compute trim: bring SBIR median to match modal median
-    sbirTrimDb = modalMedianDb - sbirMedianDb;
-    sbirTrimLinear = Math.pow(10, sbirTrimDb / 20);
-    sbirMatchingApplied = true;
-
-    // Log the trim computation for audit
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG) {
-      console.log('[SBIR LEVEL MATCHING]', {
-        modalMedian: modalMedianDb.toFixed(2),
-        sbirMedian: sbirMedianDb.toFixed(2),
-        trimDb: sbirTrimDb.toFixed(2),
-        trimLinear: sbirTrimLinear.toFixed(4),
-        bandSamples: modalBandDbPass1.length
-      });
-    }
-  }
+            // REW parity: do NOT level-match SBIR to modal.
+            // REW sums components as-is; any “matching” distorts the curve shape.
+            sbirTrimDb = 0;
+            sbirTrimLinear = 1.0;
+            sbirMatchingApplied = false;
+            modalMedianDb = 0;
+            sbirMedianDb = 0;
+          }
 
   // SECOND PASS: Run engine again with computed SBIR trim
   const secondPass = runOnce(null, sbirTrimLinear);
