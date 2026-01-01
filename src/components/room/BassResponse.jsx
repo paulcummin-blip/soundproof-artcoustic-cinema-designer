@@ -552,7 +552,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         includeTangential: true,
         includeOblique: true,
         rewParityMode: true,
-        smoothing: rewStyleMode ? 'none' : graphSmoothing,
+        smoothing: rewStyleMode ? 'none' : rewSmoothing,
         subFloorHeight: 0.0,
         normalizeBandHz: null,
         normalizeToDb: null,
@@ -826,7 +826,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         includeTangential: true,
         includeOblique: true,
         rewParityMode: true,
-        smoothing: rewStyleMode ? 'none' : graphSmoothing,
+        smoothing: rewStyleMode ? 'none' : rewSmoothing,
         subFloorHeight: 0.0,
         normalizeBandHz: null,
         normalizeToDb: null,
@@ -3573,7 +3573,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               len: dataToPlot.length,
               min: finiteSpl.length > 0 ? Math.min(...finiteSpl).toFixed(2) : 'N/A',
               max: finiteSpl.length > 0 ? Math.max(...finiteSpl).toFixed(2) : 'N/A',
-              smoothing: rewStyleMode ? 'none' : graphSmoothing,
+              smoothing: rewStyleMode ? 'none' : rewSmoothing,
               rewCompareView,
               userSmoothingChoice: rewSmoothing
             };
