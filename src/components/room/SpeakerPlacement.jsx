@@ -2014,7 +2014,8 @@ function SpeakerPlacementImpl(props) {
       return;
     }
 
-    console.log('[SP FW MEDIAN] RUNNING (unconditional)', {
+    if (globalThis.__B44_DEBUG_PLACEMENT) {
+      console.log('[SP FW MEDIAN] RUNNING (unconditional)', {
       canWides,
       dimensionsW: dimensions?.width,
       dimensionsL: dimensions?.length,
