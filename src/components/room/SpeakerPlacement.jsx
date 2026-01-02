@@ -1289,6 +1289,7 @@ function SpeakerPlacementImpl(props) {
 
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
   const lastPresetRef = useRef(effectivePreset);
+  const lastPlacementSigRef = React.useRef("");
 
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
@@ -1910,6 +1911,14 @@ function SpeakerPlacementImpl(props) {
   useEffect(() => {
     if (!mlpPoint || !dimensions) return;
 
+    // Guard A: dimensions must be valid
+    const w = Number(dimensions?.widthM ?? dimensions?.width ?? roomDims?.widthM ?? roomDims?.width);
+    const l = Number(dimensions?.lengthM ?? dimensions?.length ?? roomDims?.lengthM ?? roomDims?.length);
+    const h = Number(dimensions?.heightM ?? dimensions?.height ?? roomDims?.heightM ?? roomDims?.height);
+    if (!Number.isFinite(w) || !Number.isFinite(l) || !Number.isFinite(h) || w <= 0 || l <= 0 || h <= 0) {
+      return;
+    }
+
     setSpeakers(prev => {
       // Only auto-adjust speakers that haven't been manually positioned
       const preserveUserPositions = (prev || []).filter(s => {
@@ -1956,7 +1965,20 @@ function SpeakerPlacementImpl(props) {
         return dx > 0.001 || dy > 0.001 || dz > 0.001 || dRx > 0.1 || dRy > 0.1 || dRz > 0.1;
       });
       
-      return hasSignificantChange ? merged : prev;
+      if (!hasSignificantChange) return prev;
+
+      const nextSig = JSON.stringify((merged || []).map(s => ({
+        id: s?.id,
+        role: s?.role,
+        x: Number(s?.position?.x ?? s?.x ?? 0).toFixed(3),
+        y: Number(s?.position?.y ?? s?.y ?? 0).toFixed(3),
+        z: Number(s?.position?.z ?? s?.z ?? 0).toFixed(3),
+      })) ?? []);
+      if (nextSig === lastPlacementSigRef.current) {
+        return prev;
+      }
+      lastPlacementSigRef.current = nextSig;
+      return merged;
     });
 
     lastPresetRef.current = effectivePreset;
@@ -1988,6 +2010,14 @@ function SpeakerPlacementImpl(props) {
       dimensionsL: dimensions?.length,
       enableFrontWides // This variable is now intentionally unused in deps
     });
+
+    // Guard A: dimensions must be valid
+    const w = Number(dimensions?.widthM ?? dimensions?.width ?? roomDims?.widthM ?? roomDims?.width);
+    const l = Number(dimensions?.lengthM ?? dimensions?.length ?? roomDims?.lengthM ?? roomDims?.length);
+    const h = Number(dimensions?.heightM ?? dimensions?.height ?? roomDims?.heightM ?? roomDims?.height);
+    if (!Number.isFinite(w) || !Number.isFinite(l) || !Number.isFinite(h) || w <= 0 || l <= 0 || h <= 0) {
+      return;
+    }
 
     setSpeakers((prev) => {
       const list = Array.isArray(prev) ? prev : [];
@@ -2101,6 +2131,13 @@ function SpeakerPlacementImpl(props) {
   // wall-pinned by the hugging logic.
   // [B44 POSITION LOCK] Only adjusts auto-positioned speakers
   useEffect(() => {
+    // Guard A: dimensions must be valid
+    const w = Number(dimensions?.widthM ?? dimensions?.width ?? roomDims?.widthM ?? roomDims?.width);
+    const l = Number(dimensions?.lengthM ?? dimensions?.length ?? roomDims?.lengthM ?? roomDims?.length);
+    const h = Number(dimensions?.heightM ?? dimensions?.height ?? roomDims?.heightM ?? roomDims?.height);
+    if (!Number.isFinite(w) || !Number.isFinite(l) || !Number.isFinite(h) || w <= 0 || l <= 0 || h <= 0) {
+      return;
+    }
     setSpeakers(prev => {
       if (!Array.isArray(prev) || prev.length === 0) return prev;
 
@@ -2131,7 +2168,7 @@ function SpeakerPlacementImpl(props) {
         return prev; // already correct — avoid infinite loops
       }
 
-      return prev.map(sp => {
+      const result = prev.map(sp => {
         if (!sp || !sp.position) return sp;
 
         if (sp.role === 'LW' && needsLeftAdjust) {
@@ -2156,6 +2193,19 @@ function SpeakerPlacementImpl(props) {
 
         return sp;
       });
+
+      const nextSig = JSON.stringify((result || []).map(s => ({
+        id: s?.id,
+        role: s?.role,
+        x: Number(s?.position?.x ?? s?.x ?? 0).toFixed(3),
+        y: Number(s?.position?.y ?? s?.y ?? 0).toFixed(3),
+        z: Number(s?.position?.z ?? s?.z ?? 0).toFixed(3),
+      })) ?? []);
+      if (nextSig === lastPlacementSigRef.current) {
+        return prev;
+      }
+      lastPlacementSigRef.current = nextSig;
+      return result;
     });
     // Depend on room geometry / toggles so this runs when things change,
     // but the EPS guard above prevents unnecessary setState loops.
