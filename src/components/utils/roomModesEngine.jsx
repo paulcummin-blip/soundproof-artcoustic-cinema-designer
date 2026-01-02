@@ -5,6 +5,41 @@
 const SPEED_OF_SOUND = 343; // m/s
 const SPATIAL_AVG_RADIUS_M = 0.10; // REW-style mic/source spatial averaging (10cm)
 
+// Helper to compute peak/dip/delta for a given frequency band
+function peakDipDelta(freqs, dbArray, loHz, hiHz) {
+  if (!Array.isArray(freqs) || !Array.isArray(dbArray) || freqs.length !== dbArray.length) {
+    return null;
+  }
+
+  let peak = -Infinity, dip = Infinity;
+  let peakHz = null, dipHz = null;
+  let found = 0;
+
+  for (let i = 0; i < freqs.length; i++) {
+    const f = freqs[i];
+    if (f < loHz || f > hiHz) continue;
+
+    const v = dbArray[i];
+    if (!Number.isFinite(v)) continue;
+
+    found++;
+    if (v > peak) { peak = v; peakHz = f; }
+    if (v < dip)  { dip  = v; dipHz  = f; }
+  }
+
+  if (!found) {
+    return null;
+  }
+
+  return {
+    peakDb: peak,
+    dipDb: dip,
+    peakHz,
+    dipHz,
+    deltaDb: peak - dip,
+  };
+}
+
 /**
  * Compute room modes response (axial, tangential, oblique)
  * Returns frequency response based on room geometry and positions
@@ -927,6 +962,12 @@ export function computeRoomModesResponse({
   const secondPass = runOnce(null, sbirTrimLinear);
   const splDb = secondPass.splDb;
   const rawCoherentDb = secondPass.coherentRawDb;
+
+  if (globalThis.__B44_BASS_AUDIT) {
+    if (!baseReturn.debug.audit40_70) baseReturn.debug.audit40_70 = {};
+    baseReturn.debug.audit40_70.coherentRawDb = peakDipDelta(freqs, rawCoherentDb, 40, 70);
+    baseReturn.debug.audit40_70.splDb = peakDipDelta(freqs, splDb, 40, 70);
+  }
   
   // REW-style coherence loss: transition from coherent pressure sum to energy-like behaviour above ~100-140 Hz
   // This makes the curve "come back down" at HF like REW does
@@ -955,6 +996,10 @@ export function computeRoomModesResponse({
   
   // Use REW-processed array for rest of pipeline when coherence loss is active
   const splDbForPipeline = coherenceLossApplied ? splDbRew : splDb;
+  if (globalThis.__B44_BASS_AUDIT) {
+    if (!baseReturn.debug.audit40_70) baseReturn.debug.audit40_70 = {};
+    baseReturn.debug.audit40_70.splDbForPipeline = peakDipDelta(freqs, splDbForPipeline, 40, 70);
+  }
   
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
@@ -1026,6 +1071,12 @@ export function computeRoomModesResponse({
     let splDbSchroeder = splDbForPipeline;
     if (!rawEngineOutput && rewParityMode && schroederHz > 0) {
       splDbSchroeder = splDbForPipeline.map((db, i) => {
+        // ... existing map logic
+      });
+      if (globalThis.__B44_BASS_AUDIT) {
+        if (!baseReturn.debug.audit40_70) baseReturn.debug.audit40_70 = {};
+        baseReturn.debug.audit40_70.splDbSchroeder = peakDipDelta(freqs, splDbSchroeder, 40, 70);
+      }
         const f = freqs[i];
 
         // NEW BLEND RULES (Part B):
@@ -1081,6 +1132,10 @@ export function computeRoomModesResponse({
     }
     }
     const splDbRepaired = repaired;
+  if (globalThis.__B44_BASS_AUDIT) {
+    if (!baseReturn.debug.audit40_70) baseReturn.debug.audit40_70 = {};
+    baseReturn.debug.audit40_70.splDbRepaired = peakDipDelta(freqs, splDbRepaired, 40, 70);
+  }
 
   // Capture pre-normalization stats (after repair, before smoothing/norm)
   const finitePreNorm = splDbRepaired.filter(v => isFinite(v));
@@ -1241,6 +1296,10 @@ export function computeRoomModesResponse({
   // Smoothing happens visually via chart interpolation, not data mutation
   let finalDb = rewParityMode ? splDbRepaired : splDbSmoothed;
   const plottedDb = (!rawEngineOutput && smoothing !== 'none') ? splDbSmoothed : splDbRepaired;
+  if (globalThis.__B44_BASS_AUDIT) {
+    if (!baseReturn.debug.audit40_70) baseReturn.debug.audit40_70 = {};
+    baseReturn.debug.audit40_70.plottedDb = peakDipDelta(freqs, plottedDb, 40, 70);
+  }
 
   if (!Array.isArray(finalDb) || finalDb.length === 0) {
     finalDb = Array.isArray(splDb) ? [...splDb] : [];
@@ -1654,6 +1713,12 @@ export function computeRoomModesResponse({
     : safePlottedDbRaw;
 
   const baseReturn = {
+    // ... existing properties
+    debug: {
+      // ... existing debug properties
+      audit40_70: {},
+    }
+  };
     freqs: [...safeFreqs],
     splDb: [...safeDisplayDb], // Display version (with offset applied in REW+Relative)
     engineFinalDb: rewParityMode ? [...safeFinalDb] : null, // Engine truth (no offset)
