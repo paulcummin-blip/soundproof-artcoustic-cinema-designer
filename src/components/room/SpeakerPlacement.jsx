@@ -1634,6 +1634,7 @@ function SpeakerPlacementImpl(props) {
         globalSurroundModelParam
       });
       }
+      }
 
       if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
         console.warn('[SP] resetSurroundPositions ABORT: missing data');
@@ -1664,6 +1665,7 @@ function SpeakerPlacementImpl(props) {
         localRoles: Array.from(localAllowedRoles),
         globalSurroundModel: globalSurroundModelParam
       });
+      }
     }
 
       const next = currentSpeakers.filter(
