@@ -265,7 +265,7 @@ function logPlacedSpeakers(message, speakers) {
   }));
   safeGroup(message);
   safeTable(rows);
-  if (globalThis.__B44_LOGS) safeGroupEnd();
+  safeGroupEnd();
 }
 
 function buildRoleMap(list) {
@@ -1609,7 +1609,7 @@ function SpeakerPlacementImpl(props) {
       });
 
       if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
-        if (globalThis.__B44_LOGS) console.warn('[SP] resetSurroundPositions ABORT: missing data');
+        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn('[SP] resetSurroundPositions ABORT: missing data');
         return currentSpeakers || [];
       }
 
@@ -1888,10 +1888,7 @@ function SpeakerPlacementImpl(props) {
       if (globalThis.__B44_LOGS) console.warn('[SP] resetSurroundPositions ABORT: invalid dimensions', dimensions);
       return currentSpeakers || [];
     }
-      if (showToast) {
-        if (globalThis.__B44_LOGS) console.error('Cannot reset speakers: Room dimensions or MLP not set.');
-        showToast('Cannot reset speakers: Room dimensions or MLP not set.', 'error');
-      }
+      if (showToast) showToast('Cannot reset speakers: Room dimensions or MLP not set.', 'error');
       return;
     }
     
@@ -2243,10 +2240,7 @@ function SpeakerPlacementImpl(props) {
 
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
     if (!mlpPoint || !dimensions || !canWides) {
-        if (showToast) {
-        if (globalThis.__B44_LOGS) console.info('Front-Wide speakers are not enabled or room data missing.');
-        showToast('Front-Wide speakers are not enabled or room data missing.', 'info');
-    }
+        if (showToast) showToast('Front-Wide speakers are not enabled or room data missing.', 'info');
         return;
     }
 
@@ -2300,10 +2294,7 @@ function SpeakerPlacementImpl(props) {
 
         return [...otherSpeakers, ...newFWSpeakers];
     });
-    if (showToast) {
-      if (globalThis.__B44_LOGS) console.log('Front-Wide speakers reset to median positions.');
-      showToast('Front-Wide speakers reset to median positions.', 'success');
-    }
+    if (showToast) showToast('Front-Wide speakers reset to median positions.', 'success');
   }, [mlpPoint, dimensions, canWides, setSpeakers, showToast, getHuggingCenterLines]);
 
   useEffect(() => {

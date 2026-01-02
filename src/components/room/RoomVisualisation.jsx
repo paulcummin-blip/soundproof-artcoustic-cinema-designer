@@ -476,7 +476,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
           picked = pickMLP(mlpBasis || 'all', seatingPositions);
         }
       } catch (err) {
-        if (globalThis.__B44_LOGS) console.error('pickMLP failed in RoomVisualisation:', err);
+        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error('pickMLP failed in RoomVisualisation:', err);
         picked = null;
       }
 
@@ -759,7 +759,7 @@ const onHudHeaderMouseDown = useCallback((event) => {
       // If buildRoleMap is not a function or returned a non-Map, use the safe fallback.
       return _safeBuildRoleMapFallback(speakersToMap);
     } catch (e) {
-      if (globalThis.__B44_LOGS) console.error("Error in buildRoleMap:", e);
+      if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Error in buildRoleMap:", e);
       // If any error occurs during the call, use the fallback.
       return _safeBuildRoleMapFallback(Array.isArray(placedSpeakers) ? placedSpeakers : []);
     }
@@ -5077,7 +5077,7 @@ return {
       window.Base44Overlay = window.Base44Overlay || {};
       window.Base44Overlay.setLCR = applyLcrFromDetail;
     } catch (e) {
-      if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.error("Failed to attach Base44Overlay.setLCR:", e);
+      if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Failed to attach Base44Overlay.setLCR:", e);
     }
 
     return () => {
@@ -5087,7 +5087,7 @@ return {
           delete window.Base44Overlay.setLCR;
         }
       } catch (e) {
-        if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.error("Failed to detach Base44Overlay.setLCR:", e);
+        if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Failed to detach Base44Overlay.setLCR:", e);
       }
     };
   }, [applyLcrFromDetail]);
