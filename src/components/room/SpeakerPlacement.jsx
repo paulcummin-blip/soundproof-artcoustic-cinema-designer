@@ -1209,6 +1209,7 @@ function SpeakerPlacementImpl(props) {
     setUseRearGlobal,
     enableFrontWides, // <-- FW overlay state
   } = app || {};
+  const roomDims = app?.dimensions || dimensions;
 
   console.log("[B44] DIMENSIONS CHECK", {
     raw: dimensions,
@@ -2103,7 +2104,20 @@ function SpeakerPlacementImpl(props) {
         return { ...s, position: pos };
       });
 
-      return changed ? updated : prev;
+      if (!changed) return prev;
+
+      const nextSig = JSON.stringify((updated || []).map(s => ({
+        id: s?.id,
+        role: s?.role,
+        x: Number(s?.position?.x ?? s?.x ?? 0).toFixed(3),
+        y: Number(s?.position?.y ?? s?.y ?? 0).toFixed(3),
+        z: Number(s?.position?.z ?? s?.z ?? 0).toFixed(3),
+      })) ?? []);
+      if (nextSig === lastPlacementSigRef.current) {
+        return prev;
+      }
+      lastPlacementSigRef.current = nextSig;
+      return updated;
     });
   }, [
     canWides,
@@ -2277,7 +2291,20 @@ function SpeakerPlacementImpl(props) {
         return speaker;
       });
       
-      return changed ? updated : prev;
+      if (!changed) return prev;
+
+      const nextSig = JSON.stringify((updated || []).map(s => ({
+        id: s?.id,
+        role: s?.role,
+        x: Number(s?.position?.x ?? s?.x ?? 0).toFixed(3),
+        y: Number(s?.position?.y ?? s?.y ?? 0).toFixed(3),
+        z: Number(s?.position?.z ?? s?.z ?? 0).toFixed(3),
+      })) ?? []);
+      if (nextSig === lastPlacementSigRef.current) {
+        return prev;
+      }
+      lastPlacementSigRef.current = nextSig;
+      return updated;
     });
   }, [
     overheadCount,
