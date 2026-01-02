@@ -1687,7 +1687,9 @@ function SpeakerPlacementImpl(props) {
         let p = { x: base.x, y: base.y, z: 1.1 };
 
         p = applyCornerClearance(p, canon, safeModel, dims, {});
-        console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
+        if (globalThis.__B44_DEBUG_PLACEMENT) {
+          console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
+        }
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[finalisePos] NaN after applyCornerClearance', { p, canon, base });
