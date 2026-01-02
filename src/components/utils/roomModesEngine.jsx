@@ -1910,6 +1910,65 @@ export function computeRoomModesResponse({
     };
   }
 
+  // --- B44 AUDIT (guarded, no UI, no logs) ---
+  if (globalThis.__B44_BASS_AUDIT === true && baseReturn && baseReturn.debug && Array.isArray(baseReturn.freqs)) {
+    try {
+      const peakDipDelta = (freqs, dbArr, fLo, fHi) => {
+        let peakDb = -Infinity, dipDb = Infinity;
+        let peakHz = null, dipHz = null;
+
+        for (let i = 0; i < freqs.length; i++) {
+          const f = freqs[i];
+          if (!(f >= fLo && f <= fHi)) continue;
+          const v = dbArr?.[i];
+          if (!Number.isFinite(v)) continue;
+
+          if (v > peakDb) { peakDb = v; peakHz = f; }
+          if (v < dipDb)  { dipDb = v;  dipHz  = f; }
+        }
+
+        if (!Number.isFinite(peakDb) || !Number.isFinite(dipDb)) return null;
+
+        return {
+          peakDb,
+          peakHz,
+          dipDb,
+          dipHz,
+          deltaDb: peakDb - dipDb
+        };
+      };
+
+      // IMPORTANT: do not read from console-stored arrays; only from the arrays we already have here
+      baseReturn.debug.audit40_70 = {
+        coherentRawDb: Array.isArray(baseReturn.coherentRawDb)
+          ? peakDipDelta(baseReturn.freqs, baseReturn.coherentRawDb, 40, 70)
+          : null,
+
+        splDb: Array.isArray(baseReturn.splDb)
+          ? peakDipDelta(baseReturn.freqs, baseReturn.splDb, 40, 70)
+          : null,
+
+        splDbForPipeline: Array.isArray(splDbForPipeline)
+          ? peakDipDelta(baseReturn.freqs, splDbForPipeline, 40, 70)
+          : null,
+
+        splDbSchroeder: Array.isArray(splDbSchroeder)
+          ? peakDipDelta(baseReturn.freqs, splDbSchroeder, 40, 70)
+          : null,
+
+        splDbRepaired: Array.isArray(splDbRepaired)
+          ? peakDipDelta(baseReturn.freqs, splDbRepaired, 40, 70)
+          : null,
+
+        plottedDb: Array.isArray(baseReturn.plottedDb)
+          ? peakDipDelta(baseReturn.freqs, baseReturn.plottedDb, 40, 70)
+          : null
+      };
+    } catch {
+      // absolute fail-safe: audit must never break rendering
+    }
+  }
+
   return baseReturn;
 
   } catch (e) {
