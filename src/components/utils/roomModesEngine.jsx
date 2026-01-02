@@ -1819,6 +1819,21 @@ export function computeRoomModesResponse({
     };
   }
 
+  // Attach 40–70 Hz stage audit when enabled (no UI, no console)
+  if (globalThis.__B44_BASS_AUDIT === true) {
+    const audit = {
+      coherentRawDb: Array.isArray(rawCoherentDb) ? peakDipDelta(freqs, rawCoherentDb, 40, 70) : null,
+      splDb: Array.isArray(splDb) ? peakDipDelta(freqs, splDb, 40, 70) : null,
+      splDbForPipeline: Array.isArray(splDbForPipeline) ? peakDipDelta(freqs, splDbForPipeline, 40, 70) : null,
+      splDbSchroeder: Array.isArray(splDbSchroeder) ? peakDipDelta(freqs, splDbSchroeder, 40, 70) : null,
+      splDbRepaired: Array.isArray(splDbRepaired) ? peakDipDelta(freqs, splDbRepaired, 40, 70) : null,
+      plottedDb: Array.isArray(plottedDb) ? peakDipDelta(freqs, plottedDb, 40, 70) : null,
+    };
+    if (baseReturn && baseReturn.debug) {
+      baseReturn.debug.audit40_70 = audit;
+    }
+  }
+
   // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)
   if (DIAG_POS) {
     const mirrored = mirrorSources(sourcesLocal, room);
