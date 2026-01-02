@@ -2021,6 +2021,7 @@ function SpeakerPlacementImpl(props) {
       dimensionsL: dimensions?.length,
       enableFrontWides // This variable is now intentionally unused in deps
     });
+    }
 
     // Guard A: dimensions must be valid
     const w = Number(dimensions?.widthM ?? dimensions?.width ?? roomDims?.widthM ?? roomDims?.width);
