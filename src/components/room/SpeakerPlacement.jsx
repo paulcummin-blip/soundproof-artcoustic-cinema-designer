@@ -1814,7 +1814,9 @@ function SpeakerPlacementImpl(props) {
           const base = { x: baseWithWall.x, y: baseWithWall.y };
           const hitWall = baseWithWall.wall;
           
-          console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
+          if (globalThis.__B44_DEBUG_PLACEMENT) {
+      console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
+    }
           
           let pos  = finalisePos(base, canon, resolvedModel, hitWall);
 
