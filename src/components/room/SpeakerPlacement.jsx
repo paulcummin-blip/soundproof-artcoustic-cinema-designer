@@ -74,7 +74,7 @@ function RP22LevelPill({ parameter, level, label }) {
 const EPS = 1e-4;
 const almostEq = (a, b) => Math.abs((a ?? 0) - (b ?? 0)) <= EPS;
 
-function speakersShallowEqual(a = [], b = []) {
+function speakersEqual(a = [], b = []) {
   if (a === b) return true;
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
@@ -1884,7 +1884,10 @@ function SpeakerPlacementImpl(props) {
   );
 
   const handleResetPositions = useCallback(() => {
-    if (!mlpPoint || !dimensions) {
+    if (!mlpPoint || !dimensions || !Number.isFinite(dimensions.width) || !Number.isFinite(dimensions.length) || !Number.isFinite(dimensions.height)) {
+      if (globalThis.__B44_LOGS) console.warn('[SP] resetSurroundPositions ABORT: invalid dimensions', dimensions);
+      return currentSpeakers || [];
+    }
       if (showToast) showToast('Cannot reset speakers: Room dimensions or MLP not set.', 'error');
       return;
     }
@@ -1929,7 +1932,7 @@ function SpeakerPlacementImpl(props) {
       });
       
       // CRITICAL: Only update if speakers actually changed
-      if (speakersShallowEqual(prev, merged)) return prev;
+      if (speakersEqual(prev, merged)) return prev;
       
       // Additional guard: check if positions differ by meaningful amount (>1mm or >0.1deg)
       if (!prev || !Array.isArray(prev) || prev.length !== merged.length) {

@@ -2584,8 +2584,12 @@ function RoomDesignerWithState() {
       if (globalThis.__B44_LOGS) safeGroup('[Speakers] swap/reseed merge check (wides)', () => {
         if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
       });
-      if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
-      setSpeakers(prev => mergePreserveOverheads(prev, nextList));
+            if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
+      setSpeakers(prev => {
+        const merged = mergePreserveOverheads(prev, nextList);
+        if (speakersEqual(prev, merged)) return prev;
+        return merged;
+      });
 
     } else if (_sevenBedLayoutType === 'rears' && hasWides && !hasRears) {
       if (globalThis.__B44_LOGS) debug('[Speakers] Switching from Front Wides (LW/RW) to Rear Surrounds (SBL/SBR).');
@@ -2603,8 +2607,12 @@ function RoomDesignerWithState() {
       if (globalThis.__B44_LOGS) safeGroup('[Speakers] swap/reseed merge check (rears)', () => {
         if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
       });
-      if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
-      setSpeakers(prev => mergePreserveOverheads(prev, nextList));
+            if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
+      setSpeakers(prev => {
+        const merged = mergePreserveOverheads(prev, nextList);
+        if (speakersEqual(prev, merged)) return prev;
+        return merged;
+      });
     }
   }, [_sevenBedLayoutType, dolbyPreset, placedSpeakers, setSpeakers, stableDimensions.width, stableDimensions.length, _isFrozen]);
 
