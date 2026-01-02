@@ -1637,16 +1637,15 @@ function SpeakerPlacementImpl(props) {
       }
 
       if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
-        console.warn('[SP] resetSurroundPositions ABORT: missing data');
-        return currentSpeakers || [];
-      }
+  return currentSpeakers || [];
+}
 
-      const layoutNormalized =
-        (typeof layoutString === 'string' && layoutString.trim()) ? layoutString.trim() :
-        (typeof dolbyConfig === 'string' && dolbyConfig.trim()) ? dolbyConfig.trim() :
-        (dolbyConfig && typeof dolbyConfig === 'object' && typeof dolbyConfig.layout === 'string')
-          ? dolbyConfig.layout.trim()
-          : '5.1';
+const layoutNormalized =
+  (typeof layoutString === 'string' && layoutString.trim())
+    ? layoutString.trim()
+    : (typeof dolbyConfig === 'string' && dolbyConfig.trim())
+      ? dolbyConfig.trim()
+      : '5.1';
 
       const major = parseInt(layoutNormalized.split('.')[0], 10) || 5;
 
