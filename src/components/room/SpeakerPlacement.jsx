@@ -1697,7 +1697,9 @@ function SpeakerPlacementImpl(props) {
         }
         
         p = applyRoomBoundsClamp(p, safeModel, dims);
-        console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
+        if (globalThis.__B44_DEBUG_PLACEMENT) {
+          console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
+        }
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[finalisePos] NaN after applyRoomBoundsClamp', { p, canon, base });
