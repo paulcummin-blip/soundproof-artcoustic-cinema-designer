@@ -127,6 +127,7 @@ export const MODELS = [
     depthMm: 255, 
     sensitivity_dB_1w1m: 94, 
     max_power: 350,
+    price_gbp_exVat: 2190,
     frequency_response_curve: [[15, 80], [20, 86], [25, 90], [30, 92], [40, 94], [50, 94], [63, 93], [80, 91], [100, 87], [125, 82], [160, 75], [200, 68]]
   },
   { 
@@ -138,6 +139,7 @@ export const MODELS = [
     depthMm: 255, 
     sensitivity_dB_1w1m: 97, 
     max_power: 700,
+    price_gbp_exVat: 3740,
     frequency_response_curve: [[15, 83], [20, 89], [25, 93], [30, 95], [40, 97], [50, 97], [63, 96], [80, 94], [100, 90], [125, 85], [160, 78], [200, 71]]
   },
   { 
@@ -149,6 +151,7 @@ export const MODELS = [
     depthMm: 270, 
     sensitivity_dB_1w1m: 99, 
     max_power: 1400,
+    price_gbp_exVat: 6000,
     frequency_response_curve: [[15, 85], [20, 91], [25, 95], [30, 97], [40, 99], [50, 99], [63, 98], [80, 96], [100, 92], [125, 87], [160, 80], [200, 73]]
   },
 ];
@@ -238,6 +241,7 @@ export function getSpeakerModelMeta(modelName) {
     builtInTiltDeg: hit.builtInTiltDeg ?? null,
     dispersion: hit.dispersion ?? null,
     frequency_response_curve: hit.frequency_response_curve ?? null,
+    price_gbp_exVat: hit.price_gbp_exVat ?? null,
   };
 }
 
