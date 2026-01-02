@@ -1623,7 +1623,9 @@ function SpeakerPlacementImpl(props) {
         height: heightSafe
       };
 
+      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.log("[B44] resetSurroundPositions using safeDims", safeDims);
+    }
       dims = safeDims;
 
       console.log('[SP] resetSurroundPositions START', {
