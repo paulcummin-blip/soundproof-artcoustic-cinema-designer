@@ -476,7 +476,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
           picked = pickMLP(mlpBasis || 'all', seatingPositions);
         }
       } catch (err) {
-        console.error('pickMLP failed in RoomVisualisation:', err);
+        if (globalThis.__B44_LOGS) console.error('pickMLP failed in RoomVisualisation:', err);
         picked = null;
       }
 
@@ -759,7 +759,7 @@ const onHudHeaderMouseDown = useCallback((event) => {
       // If buildRoleMap is not a function or returned a non-Map, use the safe fallback.
       return _safeBuildRoleMapFallback(speakersToMap);
     } catch (e) {
-      console.error("Error in buildRoleMap:", e);
+      if (globalThis.__B44_LOGS) console.error("Error in buildRoleMap:", e);
       // If any error occurs during the call, use the fallback.
       return _safeBuildRoleMapFallback(Array.isArray(placedSpeakers) ? placedSpeakers : []);
     }
@@ -1230,7 +1230,7 @@ React.useEffect(() => {
     } catch (e) {
       result = { status: 'error', reason: 'exception', error: e.message };
       if (appState_DBG_FW) {
-        console.warn('[FW zones] compute failed', e);
+        if (globalThis.__B44_LOGS) console.warn('[FW zones] compute failed', e);
       }
     }
 
@@ -1238,9 +1238,9 @@ React.useEffect(() => {
     if (typeof window !== 'undefined') {
       window.FW_DBG = result;
       if (appState_DBG_FW) {
-        console.log('[FW] zones ->', result);
+        if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
         if (result.status === 'ok') {
-          console.log('[FW] L =', result.left, 'R =', result.right);
+          if (globalThis.__B44_LOGS) console.log('[FW] L =', result.left, 'R =', result.right);
         }
       }
     }
@@ -1591,7 +1591,7 @@ React.useEffect(() => {
         return;
       }
 
-      console.log("[DRAG] START", { id, type, role: target?.role, hasTarget: !!target });
+      if (globalThis.__B44_LOGS) console.log("[DRAG] START", { id, type, role: target?.role, hasTarget: !!target });
       
       // Get SVG point for offset calculation
       if (!svgRef.current) return;
@@ -1970,16 +1970,16 @@ React.useEffect(() => {
 
   // Drag state management
   const handleSpeakerDrag = useCallback((speakerId, newCanvasPos) => {
-    console.log("[DRAG] handleSpeakerDrag ENTER", { speakerId, role: byId.get(speakerId)?.role, newCanvasPos });
+    if (globalThis.__B44_LOGS) console.log("[DRAG] handleSpeakerDrag ENTER", { speakerId, role: byId.get(speakerId)?.role, newCanvasPos });
 
     if (!onSetSpeakers) {
-      console.log("[DRAG] STOP: no onSetSpeakers");
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: no onSetSpeakers");
       return;
     }
 
     const spk = byId.get(speakerId);
     if (!spk) {
-      console.log("[DRAG] STOP: spk not found", speakerId);
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: spk not found", speakerId);
       return;
     }
 
@@ -1991,7 +1991,7 @@ React.useEffect(() => {
     // [B44 PROMPT 2] Overheads ALWAYS allowed to move - bypass all drag guards
     // For bed speakers only, apply existing draggable/renderable rules
     if (!isOverhead && !isDraggable(spk)) {
-      console.log("[DRAG] STOP: blocked by isDraggable", { speakerId, role: spk?.role });
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: blocked by isDraggable", { speakerId, role: spk?.role });
       return;
     }
 
@@ -2041,7 +2041,7 @@ React.useEffect(() => {
         if (!needsUpdate) return;
         
         // Apply positions
-        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+        if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
         onSetSpeakers(prev => {
           return prev.map(s => {
             const currentCanonRole = getCanonicalRole(s.role);
@@ -2056,7 +2056,7 @@ React.useEffect(() => {
         });
       }
       lastInteractionEpoch.current = timeNowMs();
-      console.log("[DRAG] STOP: LCR logic complete");
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: LCR logic complete");
       return;
     }
 
@@ -2099,7 +2099,7 @@ React.useEffect(() => {
 
       if (DBG_SS) {
         try {
-          console.log('[SS drag] modeDecision', {
+          if (globalThis.__B44_LOGS) console.log('[SS drag] modeDecision', {
             role: canonicalRole, yPtr: yPtr?.toFixed?.(3),
             yMax_side: yMax_clamp?.toFixed?.(3),
             hysteresis: BACKWALL_HYSTERESIS_M,
@@ -2148,7 +2148,7 @@ React.useEffect(() => {
           try {
             const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
             const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
-            console.log('[SS drag] rear proximity inputs', {
+            if (globalThis.__B44_LOGS) console.log('[SS drag] rear proximity inputs', {
               hasSBL: !!sbl, hasSBR: !!sbr,
               slsrYPtr: yPtr?.toFixed?.(3),
               ssBand: { minY: yMin?.toFixed?.(3), maxY: yMax?.toFixed?.(3) },
@@ -2161,14 +2161,14 @@ React.useEffect(() => {
 
         lastInteractionEpoch.current = timeNowMs();
 
-        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+        if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
         onSetSpeakers(prev => prev.map(s => {
           const role = getCanonicalRole(s.role);
           if (role === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_side, y: yStar } };
           if (role === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_side, y: yStar } };
           return s;
         }));
-        console.log("[DRAG] STOP: SL/SR side mode complete");
+        if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: SL/SR side mode complete");
         return;
       }
 
@@ -2198,7 +2198,7 @@ React.useEffect(() => {
 
       if (DBG_SS) {
         try {
-          console.log('[SS back] lanes', {
+          if (globalThis.__B44_LOGS) console.log('[SS back] lanes', {
             laneL: rearSurroundVisualLanes?.left,
             laneR: rearSurroundVisualLanes?.right,
             W: roomWidth?.toFixed?.(3),
@@ -2215,7 +2215,7 @@ React.useEffect(() => {
 
 
       // write positions (Y stays at back-wall Y you already computed: y_back_m)
-      console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+      if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
       onSetSpeakers(prev =>
         prev.map(s => {
           const r = getCanonicalRole(s.role);
@@ -2224,7 +2224,7 @@ React.useEffect(() => {
           return s;
         })
       );
-      console.log("[DRAG] STOP: SL/SR back mode complete");
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: SL/SR back mode complete");
       return;
     }
 
@@ -2262,7 +2262,7 @@ React.useEffect(() => {
       const partnerY = cPartner.y; // Always back wall Y
 
       // Update both speakers
-      console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+      if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
       onSetSpeakers(prev => prev.map(s => {
         if (s.id === speakerId) {
           return { ...s, position: { ...s.position, x: finalX, y: finalY } };
@@ -2274,7 +2274,7 @@ React.useEffect(() => {
       }));
 
       lastInteractionEpoch.current = timeNowMs();
-      console.log("[DRAG] STOP: SBL/SBR complete");
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: SBL/SBR complete");
       return;
     }
 
@@ -2321,7 +2321,7 @@ React.useEffect(() => {
 
       // Update both speakers simultaneously, marking both as user-positioned
       if (nextPos && onSetSpeakers) {
-        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+        if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
         onSetSpeakers(prev => {
           // CRITICAL: Find partner from prev (current state), NOT from stale placedSpeakers
           const partner = prev.find(s => getCanonicalRole(s.role) === partnerRole);
@@ -2381,7 +2381,7 @@ React.useEffect(() => {
       } catch (_) { /* silent */ }
 
       lastInteractionEpoch.current = timeNowMs();
-      console.log("[DRAG] STOP: LW/RW complete");
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: LW/RW complete");
       return;
     }
 
@@ -2397,12 +2397,12 @@ React.useEffect(() => {
       // [B44 PROMPT] Allow overhead drag even when zones are missing/invalid
       // RP22 zones constrain final placement (on mouse up), not interaction.
       if (!overheadZones || overheadZones.status !== "ok") {
-        console.log("[DRAG] overhead bypass: zone missing/invalid, allowing drag");
+        if (globalThis.__B44_LOGS) console.log("[DRAG] overhead bypass: zone missing/invalid, allowing drag");
         
         // Proceed with basic movement using canvasToRoom conversion
         const rawRoomPos = canvasToRoom(newCanvasPos);
         
-        console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+        if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
         onSetSpeakers(prev => prev.map(s => {
           if (s.id === speakerId) {
             return { 
@@ -2418,7 +2418,7 @@ React.useEffect(() => {
         }));
         
         lastInteractionEpoch.current = timeNowMs();
-        console.log("[DRAG] STOP: overhead drag without zones complete");
+        if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: overhead drag without zones complete");
         return;
       }
 
@@ -2434,7 +2434,7 @@ React.useEffect(() => {
 
       let zone = zoneKey && overheadZones[zoneKey];
       if (!zone) {
-        console.log("[DRAG] overhead bypass: zone missing/invalid, allowing drag");
+        if (globalThis.__B44_LOGS) console.log("[DRAG] overhead bypass: zone missing/invalid, allowing drag");
         // Create fallback zone using full room bounds (no clamping)
         zone = {
           xMin: 0,
@@ -2543,7 +2543,7 @@ React.useEffect(() => {
           }
           
           // Update all four overheads
-          console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+          if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
           onSetSpeakers(prev => {
             if (!Array.isArray(prev)) return prev;
 
@@ -2576,7 +2576,7 @@ React.useEffect(() => {
           });
 
           lastInteractionEpoch.current = timeNowMs();
-          console.log("[DRAG] STOP: 5.1.4 overhead complete");
+          if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: 5.1.4 overhead complete");
           return;
         }
       }
@@ -2643,7 +2643,7 @@ React.useEffect(() => {
       }
 
       // Write positions for all six overheads
-      console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+      if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
       onSetSpeakers(prev => {
         if (!Array.isArray(prev)) return prev;
 
@@ -2678,7 +2678,7 @@ React.useEffect(() => {
       });
 
       lastInteractionEpoch.current = timeNowMs();
-      console.log("[DRAG] STOP: overhead general complete");
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: overhead general complete");
       return;
     }
 
@@ -2688,7 +2688,7 @@ React.useEffect(() => {
     
     // Only update if meaningful movement
     if (Math.abs(rawX - currentX) > 0.001 || Math.abs(rawY - currentY) > 0.001) {
-      console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+      if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
       onSetSpeakers(prev => {
         let updated = prev.map(s => {
           if (s.id === speakerId) {
@@ -2700,7 +2700,7 @@ React.useEffect(() => {
       });
     }
     lastInteractionEpoch.current = timeNowMs();
-    console.log("[DRAG] STOP: generic fallback complete");
+    if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: generic fallback complete");
   }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, dolbyLayout, placedSpeakers]);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
@@ -2814,7 +2814,7 @@ React.useEffect(() => {
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
-    console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
+    if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
 
@@ -2839,7 +2839,7 @@ React.useEffect(() => {
     const targetCanvasPos = roomToCanvas(targetRoomPos);
 
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
-    console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
+    if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
 
     if (dragType === 'speaker' && speaker) {
       const canonicalRole = getCanonicalRole(speaker.role);
@@ -3417,7 +3417,7 @@ useEffect(() => {
 
           Object.entries(constraints).forEach(([role, data]) => {
             const { clamp, currentX, iconWidthM, travelDistance, canMove } = data;
-            console.log(`${role}:`, {
+            if (globalThis.__B44_LOGS) console.log(`${role}:`, {
               currentX: currentX.toFixed(3),
               allowedRange: `[${clamp.minX.toFixed(3)}, ${clamp.maxX.toFixed(3)}]`,
               iconWidth: `${iconWidthM.toFixed(3)}m`,
@@ -3432,7 +3432,7 @@ useEffect(() => {
       }
     } catch (error) {
       if (typeof console !== "undefined" && typeof console.warn === "function") {
-        console.warn('[LCR Constraints] Error calculating constraints:', error);
+        if (globalThis.__B44_LOGS) console.warn('[LCR Constraints] Error calculating constraints:', error);
       }
     }
   }, [placedSpeakers, widthM, lengthM, heightM, screen, visualConstraintZones, getModelDimsM]); // Use new dimension variables
@@ -3618,12 +3618,12 @@ useEffect(() => {
     if (currentRefMode === 'back') {
       if (curY_sl < (yMax_side_for_hysteresis - BACKWALL_HYSTERESIS_M)) {
         nextModeBasedOnPosition = 'side';
-        if (DBG_SS) console.log('[SS live] position implies side mode: back -> side');
+        if (DBG_SS) if (globalThis.__B44_LOGS) console.log('[SS live] position implies side mode: back -> side');
       }
     } else if (currentRefMode === 'side') {
       if (curY_sl > (yMax_side_for_hysteresis + BACKWALL_HYSTERESIS_M)) {
         nextModeBasedOnPosition = 'back';
-        if (DBG_SS) console.log('[SS live] position implies back mode: side -> back');
+        if (DBG_SS) if (globalThis.__B44_LOGS) console.log('[SS live] position implies back mode: side -> back');
       }
     }
     slsrModeRef.current = nextModeBasedOnPosition;
@@ -3633,7 +3633,7 @@ useEffect(() => {
         const yMax_side_live = Number(sideSurroundVisualSpanM?.maxY) || 0;
         const onBackCheck = isOnBackWall(curY_sl, dimsL, L);
 
-        console.log('[SS live] snapshot', {
+        if (globalThis.__B44_LOGS) console.log('[SS live] snapshot', {
           currentRefMode: currentRefMode,
           nextModeBasedOnPosition: nextModeBasedOnPosition,
           ySL: curY_sl?.toFixed?.(3), ySR: curY_sr?.toFixed?.(3),
@@ -3696,11 +3696,11 @@ useEffect(() => {
         }
 
         if (DBG_SS) {
-          console.log('[SS live] yStar with clearance', { yStar: yStar?.toFixed?.(3) });
+          if (globalThis.__B44_LOGS) console.log('[SS live] yStar with clearance', { yStar: yStar?.toFixed?.(3) });
         }
 
       } catch (_e) {
-        console.warn("Error applying SL/SR vs SBL/SBR clearance during auto-adjust:", _e);
+        if (globalThis.__B44_LOGS) console.warn("Error applying SL/SR vs SBL/SBR clearance during auto-adjust:", _e);
       }
 
       const xL_cur = Number(sl?.position?.x);
@@ -3749,7 +3749,7 @@ useEffect(() => {
                           Math.abs(yR_cur - yR) > RS_EPS;
 
     if (DBG_SS) {
-      console.log('[SS live] back-wall enforcement', {
+      if (globalThis.__B44_LOGS) console.log('[SS live] back-wall enforcement', {
         curXL: curXL?.toFixed?.(3), xL_star: xL_star?.toFixed?.(3),
         curYL: yL_cur?.toFixed?.(3), yL: yL?.toFixed?.(3),
         curXR: xR_cur?.toFixed?.(3), yR: yR?.toFixed?.(3),
@@ -3815,12 +3815,12 @@ useEffect(() => {
     if (currentRefMode === 'back') {
         if (yL_sbl_cur < (yMax_side_for_hysteresis - BACKWALL_HYSTERESIS_M)) {
             nextModeBasedOnPosition = 'side';
-            if (DBG_RS) console.log('[RS live] position implies side mode: back -> side');
+            if (DBG_RS) if (globalThis.__B44_LOGS) console.log('[RS live] position implies side mode: back -> side');
         }
     } else if (currentRefMode === 'side') {
         if (yL_sbl_cur > (yMax_side_for_hysteresis + BACKWALL_HYSTERESIS_M)) {
             nextModeBasedOnPosition = 'back';
-            if (DBG_RS) console.log('[RS live] position implies back mode: side -> back');
+            if (DBG_RS) if (globalThis.__B44_LOGS) console.log('[RS live] position implies back mode: side -> back');
         }
     }
 
@@ -3831,7 +3831,7 @@ useEffect(() => {
         const yMax_side_live = Number(sideSurroundVisualSpanM?.maxY) || 0;
         const onBackCheck = isOnBackWall(yL_sbl_cur, dimsL, L);
 
-        console.log('[RS live] snapshot', {
+        if (globalThis.__B44_LOGS) console.log('[RS live] snapshot', {
           currentRefMode: currentRefMode,
           nextModeBasedOnPosition: nextModeBasedOnPosition,
           ySBL: yL_sbl_cur?.toFixed?.(3), ySBR: yR_sbr_cur?.toFixed?.(3),
@@ -3900,7 +3900,7 @@ useEffect(() => {
                    Math.abs(yR_sbr_cur - yStar) > RS_EPS;
 
       if (DBG_RS && need) {
-        console.log('[RS live] side-wall auto-correct:', {
+        if (globalThis.__B44_LOGS) console.log('[RS live] side-wall auto-correct:', {
           curXL: curXL?.toFixed?.(3), xL_target: xL_target?.toFixed?.(3),
           curXR: curXR?.toFixed?.(3), xR_target: xR_target?.toFixed?.(3),
           curYL: yL_sbl_cur?.toFixed?.(3), curYR: yR_sbr_cur?.toFixed?.(3),
@@ -3974,7 +3974,7 @@ useEffect(() => {
                  Math.abs(yR_sbr_cur - yBack) > RS_EPS;
 
     if (DBG_RS && need) {
-      console.log('[RS live] back-wall auto-correct:', {
+      if (globalThis.__B44_LOGS) console.log('[RS live] back-wall auto-correct:', {
         curXL: curXL?.toFixed?.(3), xL_star: xL_star?.toFixed?.(3),
         curXR: (sbr?.position?.x||0)?.toFixed?.(3), xR_star: xR_star?.toFixed?.(3),
         curYL: yL_sbl_cur?.toFixed?.(3), yBackL: yBackL?.toFixed?.(3),
@@ -4053,7 +4053,7 @@ useEffect(() => {
 
     // Debug: Log overlay state for diagnostics
     if (typeof console !== 'undefined') {
-      console.log('[RV] overlaysForRendering built', {
+      if (globalThis.__B44_LOGS) console.log('[RV] overlaysForRendering built', {
         overheadToggles: {
           OVERHEADS_2: !!_overlays?.OVERHEADS_2,
           OVERHEADS_4: !!_overlays?.OVERHEADS_4,
@@ -4096,7 +4096,7 @@ useEffect(() => {
 
   // Light diagnostics (temporary)
   if (appState_DBG_FW) {
-    if (typeof console !== 'undefined') console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
+    if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
   }
 
   // Get overhead count from dolbyLayout
@@ -4184,7 +4184,7 @@ useEffect(() => {
         const modelId = resolveModelForSpeaker(spk);
 
         // Debug – keep this for now
-        console.log(
+        if (globalThis.__B44_LOGS) console.log(
           "[RV overhead-icons]",
           spk.role,
           "modelId:",
@@ -5077,7 +5077,7 @@ return {
       window.Base44Overlay = window.Base44Overlay || {};
       window.Base44Overlay.setLCR = applyLcrFromDetail;
     } catch (e) {
-      if (typeof console !== 'undefined') console.error("Failed to attach Base44Overlay.setLCR:", e);
+      if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.error("Failed to attach Base44Overlay.setLCR:", e);
     }
 
     return () => {
@@ -5087,7 +5087,7 @@ return {
           delete window.Base44Overlay.setLCR;
         }
       } catch (e) {
-        if (typeof console !== 'undefined') console.error("Failed to detach Base44Overlay.setLCR:", e);
+        if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.error("Failed to detach Base44Overlay.setLCR:", e);
       }
     };
   }, [applyLcrFromDetail]);
@@ -5099,7 +5099,7 @@ return {
   // Add grouped debug logging
   if (typeof console !== 'undefined' && console.groupCollapsed) {
     console.groupCollapsed('[RV] renderSpeakers DEBUG');
-    console.log('Raw speakers from prop:', rawSpeakers.map(s => ({
+    if (globalThis.__B44_LOGS) console.log('Raw speakers from prop:', rawSpeakers.map(s => ({
       role: s.role,
       canon: rvSafeCanonRole(s.role),
       isOverhead: rvIsOverheadRole(s.role),
@@ -5125,7 +5125,7 @@ return {
       
       // TEMP DEBUG: Log each visibility check
       if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-        console.log('[RV filter]', {
+        if (globalThis.__B44_LOGS) console.log('[RV filter]', {
           role: canon,
           model: spk.model,
           visibilityResult: result
@@ -5134,7 +5134,7 @@ return {
       
       return result;
     } catch (err) {
-      console.warn("[RV] getSpeakerVisibility error; allowing speaker through", {
+      if (globalThis.__B44_LOGS) console.warn("[RV] getSpeakerVisibility error; allowing speaker through", {
         role: spk.role,
         model: spk.model,
         err,
@@ -5155,7 +5155,7 @@ return {
 
   // DEBUG: Table of afterVisibility with positions
   if (typeof console !== 'undefined') {
-    console.log('After visibility filter:', afterVisibility.map(s => ({
+    if (globalThis.__B44_LOGS) console.log('After visibility filter:', afterVisibility.map(s => ({
       role: s.role,
       canon: rvSafeCanonRole(s.role),
       isOverhead: rvIsOverheadRole(s.role),
@@ -5257,7 +5257,7 @@ return {
 
     // Log any invalid coordinates
     if (!Number.isFinite(canvasX) || !Number.isFinite(canvasY)) {
-      console.warn('[RV] INVALID CANVAS COORDS', {
+      if (globalThis.__B44_LOGS) console.warn('[RV] INVALID CANVAS COORDS', {
         id,
         role,
         pos: position,
@@ -5270,7 +5270,7 @@ return {
 
     // DEBUG: Log icon generation for rear/wide speakers
     if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-      console.log('[RV icon]', {
+      if (globalThis.__B44_LOGS) console.log('[RV icon]', {
         id,
         role,
         canon,
@@ -5419,14 +5419,14 @@ return {
   // --- Seats: always render from the latest seatingPositions prop ---
   const renderSeatingPositions = () => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
-      console.log('RoomVisualisation: rendering seats = 0');
+      if (globalThis.__B44_LOGS) console.log('RoomVisualisation: rendering seats = 0');
       return null;
     }
 
     const RX_M = 0.10;
     const RY_M = 0.125;
 
-    console.log('RoomVisualisation: rendering seats =', seatingPositions.length);
+    if (globalThis.__B44_LOGS) console.log('RoomVisualisation: rendering seats =', seatingPositions.length);
 
     return (
       <g className="seats-layer" style={{ pointerEvents: 'auto' }}>

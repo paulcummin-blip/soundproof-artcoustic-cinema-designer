@@ -494,7 +494,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     
     // Bounce detector: only log when deps actually change
     if (runKey !== lastRewRunKeyRef.current) {
-      console.log('[REW RUN KEY CHANGED][ROOM-ONLY]', runKey);
+      if (globalThis.__B44_LOGS) console.log('[REW RUN KEY CHANGED][ROOM-ONLY]', runKey);
       lastRewRunKeyRef.current = runKey;
     }
 
@@ -506,7 +506,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     engineCallCountRef.current += 1;
 
     // [REW ENGINE RUN][ROOM-ONLY] - Audit log
-    console.log('[REW ENGINE RUN][ROOM-ONLY]', {
+    if (globalThis.__B44_LOGS) console.log('[REW ENGINE RUN][ROOM-ONLY]', {
       componentView,
       rewView,
       sig,
@@ -515,7 +515,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // [BASS ENGINE INPUT CHECK] - Room-only path (only if debug enabled)
     if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_INPUT_DEBUG) {
-      console.log("[BASS ENGINE INPUT CHECK - Room-only]", {
+      if (globalThis.__B44_LOGS) console.log("[BASS ENGINE INPUT CHECK - Room-only]", {
         roomDims,
         roomDimsKeys: Object.keys(roomDims || {}),
         widthM: roomDims?.widthM,
@@ -527,7 +527,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         sourcePositionsLength: sourcePositions?.length
       });
       if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
-        console.warn("[BASS ENGINE INPUT FAIL] roomDims missing — bass sim will early-return", { 
+        if (globalThis.__B44_LOGS) console.warn("[BASS ENGINE INPUT FAIL] roomDims missing — bass sim will early-return", { 
           roomDims, 
           rawSource: roomDims 
         });
@@ -659,7 +659,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       return out;
     } catch (err) {
-      console.warn("[getSubAnechoicResponseDb] Failed", modelKey, err);
+      if (globalThis.__B44_LOGS) console.warn("[getSubAnechoicResponseDb] Failed", modelKey, err);
       return null;
     }
   };
@@ -718,7 +718,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     
     // Bounce detector: only log when deps actually change
     if (runKey !== lastRewRunKeyRef.current) {
-      console.log('[REW RUN KEY CHANGED][ROOM+PRODUCT]', runKey);
+      if (globalThis.__B44_LOGS) console.log('[REW RUN KEY CHANGED][ROOM+PRODUCT]', runKey);
       lastRewRunKeyRef.current = runKey;
     }
 
@@ -789,7 +789,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // [BASS ENGINE INPUT CHECK] - Room + Product path (only if debug enabled)
     if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_INPUT_DEBUG) {
-      console.log("[BASS ENGINE INPUT CHECK - Room+Product]", {
+      if (globalThis.__B44_LOGS) console.log("[BASS ENGINE INPUT CHECK - Room+Product]", {
         roomDims,
         roomDimsKeys: Object.keys(roomDims || {}),
         widthM: roomDims?.widthM,
@@ -801,7 +801,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         sourcePositionsLength: sourcePositions?.length
       });
       if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
-        console.warn("[BASS ENGINE INPUT FAIL] roomDims missing — bass sim will early-return", { 
+        if (globalThis.__B44_LOGS) console.warn("[BASS ENGINE INPUT FAIL] roomDims missing — bass sim will early-return", { 
           roomDims, 
           rawSource: roomDims 
         });
@@ -1159,7 +1159,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [rewStyleMode, rewPlotSeries, rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries, rewView, rewModesDataAbs, rewRoomPlusProductData, rewSmoothing]);
 
   // TEMP DEBUG (can remove later)
-  // console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
+  // if (globalThis.__B44_LOGS) console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
 
   // REW-style display processing (display only)
   // - If Relative view is ON: normalise 30–80 Hz band so its median becomes 0 dB (REW overlay style)
@@ -1199,7 +1199,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // Optional debug hook (matches your existing pattern)
     if (typeof globalThis !== "undefined" && globalThis.__B44_BASS_DEBUG) {
-      console.log("[RELATIVE VIEW NORMALISE 30–80]", {
+      if (globalThis.__B44_LOGS) console.log("[RELATIVE VIEW NORMALISE 30–80]", {
         bandCount: band.length,
         medianDb: Number(medianDb.toFixed(2)),
         offsetDb: Number(offsetDb.toFixed(2)),
@@ -3630,7 +3630,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               rewCompareView,
               userSmoothingChoice: rewSmoothing
             };
-            console.log("[PLOT AUDIT]", __plotAudit);
+            if (globalThis.__B44_LOGS) console.log("[PLOT AUDIT]", __plotAudit);
             
             return (
               <>

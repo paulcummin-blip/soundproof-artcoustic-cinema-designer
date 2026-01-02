@@ -470,7 +470,7 @@ function safeLog(label, data) {
     if (typeof console.table === 'function' && data) console.table(data);
     if (typeof console.groupEnd === 'function') console.groupEnd();
   } else if (typeof console !== 'undefined' && typeof console.log === 'function') {
-    console.log(label, data || '');
+    if (globalThis.__B44_LOGS) console.log(label, data || '');
   }
 }
 
@@ -786,7 +786,7 @@ function UnifiedSurroundsConfig({
         useWidesInsteadOfRears: !!useWides
       }).filter(r => ["SL","SR","SBL","SBR","LW","RW"].includes(r));
 
-      console.log('[B44] handleSurroundModelChange', {
+      if (globalThis.__B44_LOGS) console.log('[B44] handleSurroundModelChange', {
         modelKey,
         layout,
         useWides,
@@ -827,7 +827,7 @@ function UnifiedSurroundsConfig({
         });
         
         const result = Array.from(byRole.values());
-        console.log('[B44] handleSurroundModelChange OUTPUT (OFF):', result
+        if (globalThis.__B44_LOGS) console.log('[B44] handleSurroundModelChange OUTPUT (OFF):', result
           .filter(s => ALL_SURROUND_ROLES.has(getCanonicalRole(s.role)))
           .map(s => ({ role: s.role, model: s.model || '(null)' }))
         );
@@ -860,7 +860,7 @@ function UnifiedSurroundsConfig({
 
       const updated = Array.from(byRole.values());
       
-      console.log('[B44] handleSurroundModelChange OUTPUT (before reset):', updated
+      if (globalThis.__B44_LOGS) console.log('[B44] handleSurroundModelChange OUTPUT (before reset):', updated
         .filter(s => ALL_SURROUND_ROLES.has(getCanonicalRole(s.role)))
         .map(s => ({ role: s.role, model: s.model || '(null)', hasPosition: !!s.position }))
       );
@@ -1210,7 +1210,7 @@ function SpeakerPlacementImpl(props) {
     enableFrontWides, // <-- FW overlay state
   } = app || {};
 
-  console.log("[B44] DIMENSIONS CHECK", {
+  if (globalThis.__B44_LOGS) console.log("[B44] DIMENSIONS CHECK", {
     raw: dimensions,
     width: dimensions?.width,
     length: dimensions?.length,
@@ -1595,20 +1595,14 @@ function SpeakerPlacementImpl(props) {
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
       // --- B44 FIX: ensure dims is always valid ---
-      const widthSafe  = Number.isFinite(dims?.width)  ? dims.width  : 4.5;
-      const lengthSafe = Number.isFinite(dims?.length) ? dims.length : 6.0;
-      const heightSafe = Number.isFinite(dims?.height) ? dims.height : 2.7;
+      if (!dims || !Number.isFinite(dims.width) || !Number.isFinite(dims.length) || !Number.isFinite(dims.height)) {
+        if (globalThis.__B44_LOGS) {
+            console.warn('[resetSurroundPositions] ABORT: invalid dimensions', dims);
+        }
+        return currentSpeakers || [];
+      }
 
-      const safeDims = {
-        width:  widthSafe,
-        length: lengthSafe,
-        height: heightSafe
-      };
-
-      console.log("[B44] resetSurroundPositions using safeDims", safeDims);
-      dims = safeDims;
-
-      console.log('[SP] resetSurroundPositions START', {
+      if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions START', {
         layoutString, mlp, dims,
         currentSpeakersCount: currentSpeakers?.length,
         globalSurroundModelParam
@@ -1636,7 +1630,7 @@ function SpeakerPlacementImpl(props) {
       
       const localAllowedRoles = new Set(localAllowedRolesArray.map(getCanonicalRole));
 
-      console.log('[SP] resetSurroundPositions CONFIG', {
+      if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions CONFIG', {
         layoutNormalized, major,
         useWidesInsteadOfRear: useWides,
         localRoles: Array.from(localAllowedRoles),
@@ -1652,7 +1646,7 @@ function SpeakerPlacementImpl(props) {
 
       // [B44 FIX] finalisePos with safety fallbacks
       const finalisePos = (base, canon, model, hitWall) => {
-        console.log(`[finalisePos] ENTRY: canon=${canon}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}, W=${dims.width}, L=${dims.length}`);
+        if (globalThis.__B44_LOGS) console.log(`[finalisePos] ENTRY: canon=${canon}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}, W=${dims.width}, L=${dims.length}`);
         
         const safeModel = model || 'evolve-2-1_s';
         
@@ -1664,7 +1658,7 @@ function SpeakerPlacementImpl(props) {
         let p = { x: base.x, y: base.y, z: 1.1 };
 
         p = applyCornerClearance(p, canon, safeModel, dims, {});
-        console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
+        if (globalThis.__B44_LOGS) console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[finalisePos] NaN after applyCornerClearance', { p, canon, base });
@@ -1672,7 +1666,7 @@ function SpeakerPlacementImpl(props) {
         }
         
         p = applyRoomBoundsClamp(p, safeModel, dims);
-        console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
+        if (globalThis.__B44_LOGS) console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[finalisePos] NaN after applyRoomBoundsClamp', { p, canon, base });
@@ -1740,7 +1734,7 @@ function SpeakerPlacementImpl(props) {
         if (!Number.isFinite(p.y)) p.y = dims.length / 2;
         if (!Number.isFinite(p.z)) p.z = 1.1; // Default height
 
-        console.log(
+        if (globalThis.__B44_LOGS) console.log(
           '[finalisePos] AFTER wall-hugging & corner guard:',
           'canon=', canon,
           'p.x=', Number.isFinite(p.x) ? p.x.toFixed(3) : p.x,
@@ -1791,7 +1785,7 @@ function SpeakerPlacementImpl(props) {
           const base = { x: baseWithWall.x, y: baseWithWall.y };
           const hitWall = baseWithWall.wall;
           
-          console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
+          if (globalThis.__B44_LOGS) console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
           
           let pos  = finalisePos(base, canon, resolvedModel, hitWall);
 
@@ -1865,7 +1859,7 @@ function SpeakerPlacementImpl(props) {
         }
 
       // [B44 DIAGNOSTIC] Log all surround outputs before return
-      console.log(
+      if (globalThis.__B44_LOGS) console.log(
         "[SP] resetSurroundPositions OUTPUT",
         next.map((s) => ({
           role: s.role,
@@ -1876,7 +1870,7 @@ function SpeakerPlacementImpl(props) {
         }))
       );
 
-      console.log('[SP] resetSurroundPositions END. Final Speakers:');
+      if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions END. Final Speakers:');
       console.table(next.map(s => ({
         role: s.role, model: s.model,
         x: s.position?.x?.toFixed(3),
@@ -1978,11 +1972,11 @@ function SpeakerPlacementImpl(props) {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!canWides || !dimensions) {
-      console.log('[SP FW MEDIAN] SKIP: no wides or dimensions', { canWides, dimensions: !!dimensions });
+      if (globalThis.__B44_LOGS) console.log('[SP FW MEDIAN] SKIP: no wides or dimensions', { canWides, dimensions: !!dimensions });
       return;
     }
 
-    console.log('[SP FW MEDIAN] RUNNING (unconditional)', {
+    if (globalThis.__B44_LOGS) console.log('[SP FW MEDIAN] RUNNING (unconditional)', {
       canWides,
       dimensionsW: dimensions?.width,
       dimensionsL: dimensions?.length,

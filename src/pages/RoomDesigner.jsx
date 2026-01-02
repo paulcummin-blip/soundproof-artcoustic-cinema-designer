@@ -62,6 +62,28 @@ const CANON_MAP = {
 };
 const canon = r => CANON_MAP[String(r||'').toUpperCase()] || String(r||'').toUpperCase();
 
+// Shallow speaker list equality check
+const speakersEqual = (listA, listB) => {
+  if (!listA || !listB) return listA === listB;
+  if (listA.length !== listB.length) return false;
+  
+  const aMap = new Map(listA.map(s => [s.id, s]));
+  
+  for (const speakerB of listB) {
+    const speakerA = aMap.get(speakerB.id);
+    if (!speakerA) return false; // a speaker was added/removed
+    if (speakerA.role !== speakerB.role || speakerA.model !== speakerB.model) return false;
+    
+    const posA = speakerA.position || {};
+    const posB = speakerB.position || {};
+    if (Math.abs((posA.x ?? 0) - (posB.x ?? 0)) > 0.001) return false;
+    if (Math.abs((posA.y ?? 0) - (posB.y ?? 0)) > 0.001) return false;
+    if (Math.abs((posA.z ?? 0) - (posB.z ?? 0)) > 0.001) return false;
+  }
+  
+  return true;
+};
+
 // Safe wrapper for role canonicalization
 const safeCanon = (r) => {
   try { return canon(r); } catch { return String(r || "").toUpperCase(); }
@@ -109,7 +131,7 @@ function mergePreserveOverheads(prevList, draftNextList) {
   const mergedOverheads = Array.from(overheadMap.values());
   const finalList = [...nextBeds, ...mergedOverheads];
 
-  console.log('[RD] mergePreserveOverheads', {
+  if (globalThis.__B44_LOGS) console.log('[RD] mergePreserveOverheads', {
     prevCount: prev.length,
     nextCount: next.length,
     finalCount: finalList.length,
@@ -142,7 +164,7 @@ function logPlacedSpeakers(message, speakers) {
     if (typeof console.table === 'function') console.table(rows);
     if (typeof console.groupEnd === 'function') console.groupEnd();
   } else if (typeof console !== 'undefined' && typeof console.log === 'function') {
-    console.log(message, rows);
+    if (globalThis.__B44_LOGS) console.log(message, rows);
   }
 }
 
@@ -153,7 +175,7 @@ function parseProjectJson(value, defaultValue = null) {
       const parsed = JSON.parse(value);
       return parsed;
     } catch (e) {
-      console.warn("Failed to parse project JSON:", e);
+      if (globalThis.__B44_LOGS) console.warn("Failed to parse project JSON:", e);
       return defaultValue;
     }
   }
@@ -250,7 +272,7 @@ function useProjectLoader(
     if (!p) return;
 
     // DEBUG: Log what we're loading
-    console.log('[RD] hydrateFromProject', {
+    if (globalThis.__B44_LOGS) console.log('[RD] hydrateFromProject', {
       id: p.id,
       name: p.name,
       client_name: p.client_name,
@@ -554,13 +576,13 @@ function useProjectLoader(
 
       if (Array.isArray(projects) && projects.length) {
         const p = projects[0] || null;
-        console.log('[RD] loadProject result', { projectIdState, id: p?.id, name: p?.name });
+        if (globalThis.__B44_LOGS) console.log('[RD] loadProject result', { projectIdState, id: p?.id, name: p?.name });
         hydrateFromProject(p);
         setProjectNameState(p?.name || "Project"); // Update internal projectName state
         setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
       } else {
         // Project not found in cloud; keeping id so user can still save into it
-        console.log('[RoomDesigner] Project not found in cloud; keeping id so user can continue working.');
+        if (globalThis.__B44_LOGS) console.log('[RoomDesigner] Project not found in cloud; keeping id so user can continue working.');
         setLoadState({ phase: "idle", error: null, name: null });
       }
     } catch (err) {
@@ -574,7 +596,7 @@ function useProjectLoader(
 
       // Stale / invalid ID / 404 – don't keep retrying, mark as error
       if (errMsg.includes("Invalid id value") || errMsg.includes("Object not found") || errMsg.includes("404")) {
-        console.log("[RoomDesigner] Invalid project ID detected, keeping it but stopping auto-reload.");
+        if (globalThis.__B44_LOGS) console.log("[RoomDesigner] Invalid project ID detected, keeping it but stopping auto-reload.");
         setLoadState({ phase: "error", error: errMsg, name: null });
         return;
       }
@@ -582,7 +604,7 @@ function useProjectLoader(
       // Any other load error (including 429 rate limit) – stop auto-reload
       window.__APP_DEBUG = window.__APP_DEBUG || [];
       window.__APP_DEBUG.push(`[RoomDesigner] Project load error: ${errMsg}`);
-      console.error("[RoomDesigner] Failed to load project:", err);
+      if (globalThis.__B44_LOGS) console.error("[RoomDesigner] Failed to load project:", err);
       setLoadState({ phase: "error", error: errMsg, name: null });
     }
   }, [projectIdState, hydrateFromProject, setProjectNameState]);
@@ -599,7 +621,7 @@ function useProjectLoader(
       url.searchParams.set("project", id);
       window.history.replaceState({}, "", url.toString());
     } catch (e) {
-        console.error("Failed to update URL:", e);
+        if (globalThis.__B44_LOGS) console.error("Failed to update URL:", e);
     }
     setProjectIdState(id);
   }, []);
@@ -678,7 +700,7 @@ function useProjectLoader(
         }
         setAutosaveStatus("saved");
       } catch (e) {
-        console.error("Error during autosave:", e);
+        if (globalThis.__B44_LOGS) console.error("Error during autosave:", e);
         setAutosaveStatus("error");
       }
     }, 800);
@@ -753,7 +775,7 @@ function useProjectLoader(
         }
       }
     } catch (e) {
-      console.error("[RoomDesigner] boot init error:", e);
+      if (globalThis.__B44_LOGS) console.error("[RoomDesigner] boot init error:", e);
     }
 
     return () => controller.abort();
@@ -818,14 +840,14 @@ function useProjectLoader(
       });
 
       // DEBUG: Log what we're about to save
-      console.log('[RD] manualSaveProject payload', effectiveProjectId, {
+      if (globalThis.__B44_LOGS) console.log('[RD] manualSaveProject payload', effectiveProjectId, {
         room: { w: projectData.room_width, l: projectData.room_length, h: projectData.room_height },
         seating_count: projectData.seating_positions ? JSON.parse(projectData.seating_positions).length : 0,
         speakers_count: projectData.selected_speakers ? JSON.parse(projectData.selected_speakers).length : 0,
         screen_size: projectData.screen_size,
         dolby: projectData.dolby_config,
       });
-      console.log('[RD] manualSaveProject payload', {
+      if (globalThis.__B44_LOGS) console.log('[RD] manualSaveProject payload', {
         debugSnapshot,
         projectDataPreview: {
           effectiveProjectId,
@@ -869,14 +891,14 @@ function useProjectLoader(
             url.searchParams.set("project", newId);
             window.history.replaceState({}, "", url.toString());
           } catch (e) {
-            console.error("Failed to update URL with new project id:", e);
+            if (globalThis.__B44_LOGS) console.error("Failed to update URL with new project id:", e);
           }
         }
       }
 
       if (savedProject) {
         // DEBUG: Log what came back from save
-        console.log('[RD] manualSaveProject result', {
+        if (globalThis.__B44_LOGS) console.log('[RD] manualSaveProject result', {
           projectIdState,
           effectiveProjectId,
           savedId: savedProject?.id,
@@ -886,11 +908,11 @@ function useProjectLoader(
 
         // DEBUG: One-shot reload to verify we can read back what we wrote
         if (effectiveProjectId && typeof loadProject === 'function') {
-          console.log('[RD] manualSaveProject -> reloading project after save', { effectiveProjectId });
+          if (globalThis.__B44_LOGS) console.log('[RD] manualSaveProject -> reloading project after save', { effectiveProjectId });
           try {
             await loadProject(undefined, effectiveProjectId);
           } catch (e) {
-            console.error('[RD] reload after save failed', e);
+            if (globalThis.__B44_LOGS) console.error('[RD] reload after save failed', e);
           }
         }
 
@@ -898,12 +920,12 @@ function useProjectLoader(
         return { success: true };
       } else {
         setAutosaveStatus("error");
-        console.error("Failed to save project: No response from server.");
+        if (globalThis.__B44_LOGS) console.error("Failed to save project: No response from server.");
         return { success: false, error: "Save operation failed." };
       }
     } catch (e) {
       setAutosaveStatus("error");
-      console.error("Error during manual save:", e);
+      if (globalThis.__B44_LOGS) console.error("Error during manual save:", e);
       return { success: false, error: e.message || String(e) };
     }
   }, [
@@ -1042,7 +1064,7 @@ const OVERHEAD_IDS_BY_LAYOUT = {
 
 // DEBUG: log the available preset keys once at module load
 if (typeof window !== "undefined" && window.console) {
-  console.log("[RD PRESETS] keys:", Object.keys(DOLBY_PRESETS || {}));
+  if (globalThis.__B44_LOGS) console.log("[RD PRESETS] keys:", Object.keys(DOLBY_PRESETS || {}));
 }
 
 function getTargetOverheadIds(preset) {
@@ -1148,7 +1170,7 @@ function ensureAtmosOverheads({
     if (seededSpk) {
       nextOverheads.push(seededSpk);
     } else if (typeof window !== "undefined" && window.console) {
-      console.warn(
+      if (globalThis.__B44_LOGS) console.warn(
         "[RD ATMOS FAILSAFE] No seeded overhead for role",
         canon,
         "in preset",
@@ -1203,7 +1225,7 @@ function ensureAtmosOverheads({
   }
 
   if (typeof window !== "undefined" && window.console) {
-    console.log("[RD ATMOS FAILSAFE] sync overheads for preset",
+    if (globalThis.__B44_LOGS) console.log("[RD ATMOS FAILSAFE] sync overheads for preset",
       normalizedPreset,
       "target=",
       targetOverheadIds,
@@ -1223,7 +1245,7 @@ export function seedSpeakersFromPreset({
   roomDimensions,
   listeningArea = null,
 }) {
-  console.log(
+  if (globalThis.__B44_LOGS) console.log(
     "[RD SEED] called with preset =",
     preset,
     "DOLBY_PRESETS[preset] =",
@@ -1300,7 +1322,7 @@ export function seedSpeakersFromPreset({
     position: posForRole(role),
   }));
 
-  console.log(
+  if (globalThis.__B44_LOGS) console.log(
     "[RD SEED] result roles =",
     Array.isArray(seeded) ? seeded.map(s => s.role) : "(not array)"
   );
@@ -1360,7 +1382,7 @@ export function useSpeakerSystemStore() {
       // DEBUG: log what we're actually sending into AppStateProvider
       // (keep this for now while we verify overhead behaviour)
       // eslint-disable-next-line no-console
-      console.log("[RD] setSpeakers sending to AppStateProvider:", {
+      if (globalThis.__B44_LOGS) console.log("[RD] setSpeakers sending to AppStateProvider:", {
         count: finalList.length,
         roles: finalList.map(s => s.role),
       });
@@ -1423,7 +1445,7 @@ export function useSpeakerSystemStore() {
         roomDimensions: room,
         listeningArea: null,
       });
-      console.log("[RD] SEED RESULT:", seeded.map(s => s.role));
+      if (globalThis.__B44_LOGS) console.log("[RD] SEED RESULT:", seeded.map(s => s.role));
       setSpeakerSystem((prev) => ({ ...(prev || {}), placedSpeakers: seeded }));
     }
   }, [roomDims, seatingPositions, dolbyLayout, setRoomDims, setScreen, setSeatingPositions, setSpeakerSystem]);
@@ -1602,7 +1624,7 @@ function RoomDesignerWithState() {
     // SAFETY: if buildRowCenters misbehaves or returns wrong length, force one centre per row
     if (!Array.isArray(centersRaw) || centersRaw.length !== rows) {
       if (SHOW_DEBUG_LOGS) {
-        console.warn(`[Seats] buildRowCenters returned ${centersRaw?.length ?? 'null'} centers for ${rows} rows. Using fallback.`);
+        if (globalThis.__B44_LOGS) console.warn(`[Seats] buildRowCenters returned ${centersRaw?.length ?? 'null'} centers for ${rows} rows. Using fallback.`);
       }
       centersRaw = [];
       for (let i = 0; i < rows; i++) {
@@ -1636,13 +1658,13 @@ function RoomDesignerWithState() {
 
     // Temporary telemetry (remove after verify)
     if (SHOW_DEBUG_LOGS && typeof console !== 'undefined' && Math.random() < 0.05) {
-      console.log('[MLP]', {
+      if (globalThis.__B44_LOGS) console.log('[MLP]', {
         frontY: screenFrontPlaneM.toFixed(3),
         idealM: idealDistM.toFixed(3),
         offset: viewingOffsetM.toFixed(3),
         fixedMlpY: mlpRounded.toFixed(3)
       });
-      console.log('[ROWS]', {
+      if (globalThis.__B44_LOGS) console.log('[ROWS]', {
         mode: mlpReference,
         count: rows,
         spacing: rowSpacing.toFixed(3),
@@ -1862,7 +1884,7 @@ function RoomDesignerWithState() {
       return subsToRender;
 
     } catch (e) {
-      console.warn("Error calculating front subs for rendering:", e);
+      if (globalThis.__B44_LOGS) console.warn("Error calculating front subs for rendering:", e);
       setSubWarnings(prev => ({ ...prev, front: ["Error calculating position."] }));
       return [];
     }
@@ -1950,7 +1972,7 @@ function RoomDesignerWithState() {
       return subsToRender;
 
     } catch (e) {
-      console.warn("Error calculating rear subs for rendering:", e);
+      if (globalThis.__B44_LOGS) console.warn("Error calculating rear subs for rendering:", e);
       setSubWarnings(prev => ({ ...prev, rear: ["Error calculating position."] }));
       return [];
     }
@@ -1984,7 +2006,7 @@ function RoomDesignerWithState() {
       const result = { status: 'disabled' };
       if (typeof window !== 'undefined') {
         window.FW_DBG = result;
-        if (SHOW_DEBUG_LOGS && window.DBG_FW) console.log('[FW] zones ->', result);
+        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
       }
       return result;
     }
@@ -1993,7 +2015,7 @@ function RoomDesignerWithState() {
       const result = { status: 'no-mlp' };
       if (typeof window !== 'undefined') {
         window.FW_DBG = result;
-        if (SHOW_DEBUG_LOGS && window.DBG_FW) console.log('[FW] zones ->', result);
+        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
       }
       return result;
     }
@@ -2004,7 +2026,7 @@ function RoomDesignerWithState() {
       const result = { status: 'invalid-geom', reason: 'room dims' };
       if (typeof window !== 'undefined') {
         window.FW_DBG = result;
-        if (SHOW_DEBUG_LOGS && window.DBG_FW) console.log('[FW] zones ->', result);
+        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
       }
       return result;
     }
@@ -2017,7 +2039,7 @@ function RoomDesignerWithState() {
       const result = { status: 'no-sides' };
       if (typeof window !== 'undefined') {
         window.FW_DBG = result;
-        if (SHOW_DEBUG_LOGS && window.DBG_FW) console.log('[FW] zones ->', result);
+        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
       }
       return result;
     }
@@ -2037,7 +2059,7 @@ function RoomDesignerWithState() {
     } catch (e) {
       result = { status: 'invalid-geom', reason: 'exception', error: e.message };
       if (typeof window !== 'undefined' && window.DBG_FW && SHOW_DEBUG_LOGS) {
-        console.warn('[FW zones] compute failed', e);
+        if (globalThis.__B44_LOGS) console.warn('[FW zones] compute failed', e);
       }
     }
 
@@ -2045,9 +2067,9 @@ function RoomDesignerWithState() {
     if (typeof window !== 'undefined') {
       window.FW_DBG = result;
       if (SHOW_DEBUG_LOGS && window.DBG_FW) {
-        console.log('[FW] zones ->', result);
+        if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
         if (result.status === 'ok') {
-          console.log('[FW] L =', result.left, 'R =', result.right);
+          if (globalThis.__B44_LOGS) console.log('[FW] L =', result.left, 'R =', result.right);
         }
       }
     }
@@ -2108,7 +2130,12 @@ function RoomDesignerWithState() {
       cfg: { ..._rearSubsCfg, qty: (_rearSubsCfg?.qty ?? _rearSubsCfg?.count ?? 0) }
     });
     
-    if (typeof setSubwoofers === 'function') setSubwoofers([...front.placed, ...rear.placed]);
+        if (typeof setSubwoofers === 'function') {
+      const newSubs = [...front.placed, ...rear.placed];
+      if (!speakersEqual(appState.subwoofers || [], newSubs)) {
+        setSubwoofers(newSubs);
+      }
+    }
     
     setSubWarnings(prev => ({ ...prev, rear: rear.warnings }));
     
@@ -2152,7 +2179,7 @@ function RoomDesignerWithState() {
 
     // Only hydrate from handoff if no 5.1 bed speakers exist yet in the current design
     if (!has51BedRoles && setSpeakers) {
-      debug('[Speakers] Hydrating speakers from SPL handoff data (speakerNodes).');
+      if (globalThis.__B44_LOGS) debug('[Speakers] Hydrating speakers from SPL handoff data (speakerNodes).');
       const hydratedSpeakers = _speakerNodes.map(node => ({
         id: node.id || node.role, // Use ID or role for unique ID
         role: canon(node.role), // Canonicalize roles (e.g., L -> FL, Ls -> SL)
@@ -2168,7 +2195,7 @@ function RoomDesignerWithState() {
 
       setSpeakers(hydratedSpeakers);
     } else if (_speakerNodes && _speakerNodes.length > 0 && has51BedRoles) {
-      debug('[Speakers] Skipping SPL handoff hydration: 5.1 speakers already present.');
+      if (globalThis.__B44_LOGS) debug('[Speakers] Skipping SPL handoff hydration: 5.1 speakers already present.');
     }
   }, [_speakerNodes, placedSpeakers, setSpeakers, setDolbyPreset]); // Dependencies: _speakerNodes, placedSpeakers (to check existence), setSpeakers, setDolbyPreset
 
@@ -2277,7 +2304,7 @@ function RoomDesignerWithState() {
         if (currentX < minX || currentX > maxX) {
           needsUpdate = true;
           const newX = Math.max(minX, Math.min(maxX, currentX));
-          debug(`[Resize Re-clamp] Clamping ${speaker.role} X from ${currentX} to ${newX} (range: [${minX}, ${maxX}]).`);
+          if (globalThis.__B44_LOGS) debug(`[Resize Re-clamp] Clamping ${speaker.role} X from ${currentX} to ${newX} (range: [${minX}, ${maxX}]).`);
           return { ...speaker, position: { ...speaker.position, x: newX } };
         }
         
@@ -2285,12 +2312,12 @@ function RoomDesignerWithState() {
       });
       
       if (needsUpdate) {
-        debug('[Resize Re-clamp] Adjusting LCR positions due to model change or constraint violation.');
+        if (globalThis.__B44_LOGS) debug('[Resize Re-clamp] Adjusting LCR positions due to model change or constraint violation.');
         setSpeakers(prev => mergePreserveOverheads(prev, updatedSpeakers));
       }
     } catch (error) {
       if (typeof console !== 'undefined' && typeof console.warn === 'function') {
-        console.warn('[Resize Re-clamp] Error during re-clamping:', error);
+        if (globalThis.__B44_LOGS) console.warn('[Resize Re-clamp] Error during re-clamping:', error);
       }
     }
   }, [placedSpeakers, analysisResult?.zones, stableDimensions, stableScreen, setSpeakers, loadState.phase]);
@@ -2341,7 +2368,7 @@ function RoomDesignerWithState() {
       const clampedX = Math.max(INSET, Math.min(W - INSET, x));
       const clampedY = Math.max(INSET, Math.min(L - INSET, y));
       
-      debug(`[Rescue] ${spk.role} was outside bounds (${x.toFixed(3)}, ${y.toFixed(3)}), clamped to (${clampedX.toFixed(3)}, ${clampedY.toFixed(3)})`);
+      if (globalThis.__B44_LOGS) debug(`[Rescue] ${spk.role} was outside bounds (${x.toFixed(3)}, ${y.toFixed(3)}), clamped to (${clampedX.toFixed(3)}, ${clampedY.toFixed(3)})`);
       
       return {
         ...spk,
@@ -2367,7 +2394,7 @@ function RoomDesignerWithState() {
       return false;
     });
     if (hasLCRChanges) {
-      debug(`[Speakers] Adjusting LCR Y-position to ${yLCR}m for floating screen.`);
+      if (globalThis.__B44_LOGS) debug(`[Speakers] Adjusting LCR Y-position to ${yLCR}m for floating screen.`);
       setSpeakers(prevSpeakers => prevSpeakers.map(spk => {
         const role = String(spk.role).toUpperCase();
         if (['FL', 'FC', 'FR'].includes(role)) {
@@ -2386,7 +2413,7 @@ function RoomDesignerWithState() {
     const centerX = stableDimensions.width / 2;
 
     if (fcSpeaker && Math.abs(fcSpeaker.position.x - centerX) > 0.001) { // 1mm tolerance
-      debug('[Speakers] Locking FC speaker to room centerline.');
+      if (globalThis.__B44_LOGS) debug('[Speakers] Locking FC speaker to room centerline.');
       setSpeakers(prevSpeakers => prevSpeakers.map(s => {
         if (safeCanon(s.role) === 'FC') {
           return { ...s, position: { ...(s.position || {}), x: centerX } };
@@ -2542,7 +2569,7 @@ function RoomDesignerWithState() {
     const byRole = new Map(currentSpeakers.map(s => [s.role, s]));
 
     if (_sevenBedLayoutType === 'wides' && !hasWides && hasRears) {
-      debug('[Speakers] Switching from Rear Surrounds (SBL/SBR) to Front Wides (LW/RW).');
+      if (globalThis.__B44_LOGS) debug('[Speakers] Switching from Rear Surrounds (SBL/SBR) to Front Wides (LW/RW).');
       
       const lw = cloneRoleWithModel(byRole, 'SBL', 'LW', hint);
       lw.position = { x: stableDimensions.width * 0.15, y: stableDimensions.length * 0.4, z: earZ };
@@ -2554,14 +2581,14 @@ function RoomDesignerWithState() {
         .filter(s => s.role !== 'SBL' && s.role !== 'SBR')
         .concat([lw, rw]);
       
-      safeGroup('[Speakers] swap/reseed merge check (wides)', () => {
-        safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
+      if (globalThis.__B44_LOGS) safeGroup('[Speakers] swap/reseed merge check (wides)', () => {
+        if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
       });
-      console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
+      if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
       setSpeakers(prev => mergePreserveOverheads(prev, nextList));
 
     } else if (_sevenBedLayoutType === 'rears' && hasWides && !hasRears) {
-      debug('[Speakers] Switching from Front Wides (LW/RW) to Rear Surrounds (SBL/SBR).');
+      if (globalThis.__B44_LOGS) debug('[Speakers] Switching from Front Wides (LW/RW) to Rear Surrounds (SBL/SBR).');
       
       const sbl = cloneRoleWithModel(byRole, 'LW', 'SBL', hint);
       sbl.position = { x: stableDimensions.width * 0.25, y: stableDimensions.length - 0.1, z: earZ };
@@ -2573,10 +2600,10 @@ function RoomDesignerWithState() {
         .filter(s => s.role !== 'LW' && s.role !== 'RW')
         .concat([sbl, sbr]);
 
-      safeGroup('[Speakers] swap/reseed merge check (rears)', () => {
-        safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
+      if (globalThis.__B44_LOGS) safeGroup('[Speakers] swap/reseed merge check (rears)', () => {
+        if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
       });
-      console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
+      if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
       setSpeakers(prev => mergePreserveOverheads(prev, nextList));
     }
   }, [_sevenBedLayoutType, dolbyPreset, placedSpeakers, setSpeakers, stableDimensions.width, stableDimensions.length, _isFrozen]);
@@ -2595,7 +2622,7 @@ function RoomDesignerWithState() {
       ? String(dolbyPreset).split(" ")[0].split("_")[0]
       : "";
 
-    console.log(
+    if (globalThis.__B44_LOGS) console.log(
       "[RD RECON] ENTER",
       {
         dolbyPreset,
@@ -2604,7 +2631,7 @@ function RoomDesignerWithState() {
       }
     );
 
-    console.log(
+    if (globalThis.__B44_LOGS) console.log(
       "[RD RECON] placed roles BEFORE =",
       Array.isArray(placedSpeakers)
         ? placedSpeakers.map(s => s.role)
@@ -2633,7 +2660,7 @@ function RoomDesignerWithState() {
         roomDimensions: stableDimensions,
         listeningArea: null,
       });
-      console.log('[RD] early reseed -> roles', seeded.map(s => safeCanon(s.role)));
+      if (globalThis.__B44_LOGS) console.log('[RD] early reseed -> roles', seeded.map(s => safeCanon(s.role)));
       setSpeakers(seeded);
       return;
     }
@@ -2657,7 +2684,7 @@ function RoomDesignerWithState() {
     const hasCorrectRoles = currentRolesSet.size === expectedRolesSet.size &&
       [...expectedRolesSet].every(role => currentRolesSet.has(role));
 
-    console.log(
+    if (globalThis.__B44_LOGS) console.log(
       "[RD RECON] expectedRoles =",
       expectedRoles,
       "hasCorrectRoles =",
@@ -2667,11 +2694,11 @@ function RoomDesignerWithState() {
     );
 
     if (!hasCorrectRoles || noSpeakers) {
-      console.log(
+      if (globalThis.__B44_LOGS) console.log(
         "[RD RECON] about to reseed using normalizedPreset =",
         normalizedPreset
       ); 
-       debug(`[Speakers] Reconciling speakers for ${dolbyPreset} (${presetChanged ? 'preset changed' : 'role mismatch'})`);
+       if (globalThis.__B44_LOGS) debug(`[Speakers] Reconciling speakers for ${dolbyPreset} (${presetChanged ? 'preset changed' : 'role mismatch'})`);
        // Seed with the canonical Dolby preset (which means SBL/SBR for 7.x)
        let seededSpeakers = seedSpeakersFromPreset({
          preset: normalizedPreset,
@@ -2695,7 +2722,7 @@ function RoomDesignerWithState() {
          // targetOverheadIds already computed above, reuse it
          const targetSet = new Set(targetOverheadIds.map(id => id.toUpperCase()));
          
-         debug(`[Speakers] Target overheads for ${dolbyPreset}: [${targetOverheadIds.join(', ')}]`);
+         if (globalThis.__B44_LOGS) debug(`[Speakers] Target overheads for ${dolbyPreset}: [${targetOverheadIds.join(', ')}]`);
          
          // Known overhead roles (for filtering)
          const knownOverheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR', 'TL', 'TR', 'TFC', 'TRC', 'TBC', 'TBL', 'TBR']);
@@ -2704,7 +2731,7 @@ function RoomDesignerWithState() {
          const bedSpeakers = (prev || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
          const existingOverheads = (prev || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
          
-         debug(`[Speakers] Existing: ${bedSpeakers.length} bed + ${existingOverheads.length} overhead (${existingOverheads.map(s => s.role).join(', ')})`);
+         if (globalThis.__B44_LOGS) debug(`[Speakers] Existing: ${bedSpeakers.length} bed + ${existingOverheads.length} overhead (${existingOverheads.map(s => s.role).join(', ')})`);
          
          // Keep only overheads that are in the target set
          const keptOverheads = existingOverheads.filter(s => targetSet.has(safeCanon(s.role)));
@@ -2719,7 +2746,7 @@ function RoomDesignerWithState() {
          const seededBed = (seededSpeakers || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
          const seededOverheads = (seededSpeakers || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
          
-         debug(`[Speakers] Seeded: ${seededBed.length} bed + ${seededOverheads.length} overhead (${seededOverheads.map(s => s.role).join(', ')})`);
+         if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${seededBed.length} bed + ${seededOverheads.length} overhead (${seededOverheads.map(s => s.role).join(', ')})`);
          
          // Process bed-layer speakers (preserve models from previous)
          const nextBed = seededBed.map(seed => {
@@ -2736,7 +2763,7 @@ function RoomDesignerWithState() {
            
            if (existing) {
              // Reuse existing overhead speaker with its position
-             debug(`[Speakers] Reusing existing overhead: ${canonId}`);
+             if (globalThis.__B44_LOGS) debug(`[Speakers] Reusing existing overhead: ${canonId}`);
              nextOverheads.push(existing);
            } else {
              // Create new overhead speaker from seed
@@ -2753,25 +2780,25 @@ function RoomDesignerWithState() {
                }
 
                const finalModel = modelFromOverrides || _overheadGlobalModel || seeded.model;
-               debug(`[Speakers] Creating new overhead: ${canonId} with model ${finalModel}`);
+               if (globalThis.__B44_LOGS) debug(`[Speakers] Creating new overhead: ${canonId} with model ${finalModel}`);
                nextOverheads.push({ ...seeded, model: finalModel, draggable: true });
              } else {
-               debug(`[Speakers] WARNING: Target overhead ${canonId} not found in seeded speakers!`);
+               if (globalThis.__B44_LOGS) debug(`[Speakers] WARNING: Target overhead ${canonId} not found in seeded speakers!`);
              }
            }
          }
          
          const nextList = [...nextBed, ...nextOverheads];
 
-         debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
-         console.log("[RD] RECONCILE nextList:", nextList.map(s => s.role));
-         console.log(
+         if (globalThis.__B44_LOGS) debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
+         if (globalThis.__B44_LOGS) console.log("[RD] RECONCILE nextList:", nextList.map(s => s.role));
+         if (globalThis.__B44_LOGS) console.log(
            "[RD RECON] OUTPUT roles =",
            nextList.map(s => s.role)
          );
          
-         safeGroup('[Speakers] Reconciliation result', () => {
-           safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
+         if (globalThis.__B44_LOGS) safeGroup('[Speakers] Reconciliation result', () => {
+           if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
          });
 
          // NEW: guarantee Atmos overheads exist & have models,
@@ -2789,6 +2816,7 @@ function RoomDesignerWithState() {
            useRearGlobal: _useRearGlobal,
          });
 
+         if (speakersEqual(prev, withOverheads)) return prev;
          return withOverheads;
          });
          }
@@ -2913,7 +2941,7 @@ function RoomDesignerWithState() {
     // 5) Commit to app state
     setSeats(seats);
 
-    console.log(
+    if (globalThis.__B44_LOGS) console.log(
       '[RD] seating rebuilt: rows=',
       list.length,
       'seats=',
@@ -3095,10 +3123,10 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
         return { ...s, position: { ...(s.position || {}), x: u.position.x, y: u.position.y } };
       });
 
-      console.log('[RD] optimiseAll -> roles', merged.map(s => safeCanon(s.role)));
+      if (globalThis.__B44_LOGS) console.log('[RD] optimiseAll -> roles', merged.map(s => safeCanon(s.role)));
       setSpeakers(prev => mergePreserveOverheads(prev, merged));
     } catch (e) {
-      console.error("[OptimiseAll] failed:", e);
+      if (globalThis.__B44_LOGS) console.error("[OptimiseAll] failed:", e);
     }
   }, [placedSpeakers, stableDimensions, _seatingPositions, _mlpBasis, _isFrozen, setSpeakers, mlpAnchorEffective]);
 
@@ -3407,7 +3435,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
             <ErrorBoundary name="RoomVisualisation">
               <Suspense fallback={<div className="p-4">Loading 3D View...</div>}>
                 {(() => {
-                  console.log('[RD] passing placedSpeakers to RoomVisualisation', {
+                  if (globalThis.__B44_LOGS) console.log('[RD] passing placedSpeakers to RoomVisualisation', {
                     count: Array.isArray(placedSpeakers) ? placedSpeakers.length : 0,
                     roles: (placedSpeakers || []).map(s => safeCanon(s.role)),
                     dolbyPreset,
