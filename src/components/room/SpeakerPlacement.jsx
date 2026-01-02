@@ -1212,7 +1212,6 @@ function SpeakerPlacementImpl(props) {
   const roomDims = app?.dimensions || dimensions;
 
   if (globalThis.__B44_DEBUG_PLACEMENT) {
-    if (globalThis.__B44_DEBUG_PLACEMENT) {
     console.log("[B44] DIMENSIONS CHECK", {
       raw: dimensions,
       width: dimensions?.width,
