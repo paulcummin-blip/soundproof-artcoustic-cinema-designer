@@ -1289,7 +1289,32 @@ function SpeakerPlacementImpl(props) {
 
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
   const lastPresetRef = useRef(effectivePreset);
-  const lastPlacedSpeakersSigRef = useRef(null);
+
+  // --- B44 refresh-loop guard helpers (local only) ---
+  const __B44_EPS = 0.001; // ~1mm
+  const __b44Num = (v) => (Number.isFinite(v) ? v : null);
+  const __b44SigFor = (arr) => {
+    if (!Array.isArray(arr)) return "none";
+    return arr
+      .map(s => {
+        const id = s?.id ?? s?.role ?? "";
+        const x = __b44Num(s?.position?.x);
+        const y = __b44Num(s?.position?.y);
+        const z = __b44Num(s?.position?.z);
+        const yaw = __b44Num(s?.yaw);
+        return `${id}:${x},${y},${z},${yaw}`;
+      })
+      .sort()
+      .join("|");
+  };
+  const __b44SameSpeakers = (a, b) => {
+    if (!Array.isArray(a) || !Array.isArray(b)) return false;
+    if (a.length !== b.length) return false;
+    const sa = __b44SigFor(a);
+    const sb = __b44SigFor(b);
+    return sa === sb;
+  };
+  const __b44LastApplySigRef = useRef(null);
 
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
@@ -1916,7 +1941,17 @@ function SpeakerPlacementImpl(props) {
     }
     if (!mlpPoint || !dimensions) return;
 
-    // Build next array based on current state (not prev) so we can signature-check before updating
+    // ---- build a stable input signature for this effect ----
+    const w = dimensions?.width;
+    const l = dimensions?.length;
+    const mlpX = mlpPoint?.x;
+    const mlpY = mlpPoint?.y;
+    const inputSig = `w=${Number(w).toFixed?.(3)}|l=${Number(l).toFixed?.(3)}|mlp=${Number(mlpX).toFixed?.(3)},${Number(mlpY).toFixed?.(3)}|cur=${__b44SigFor(placedSpeakers)}`;
+
+    if (__b44LastApplySigRef.current === inputSig) return;
+    __b44LastApplySigRef.current = inputSig;
+
+    // ---- existing logic: compute the next speakers array ----
     const preserveUserPositions = (placedSpeakers || []).filter(s => {
       const canon = getCanonicalRole(s.role);
       return SURROUND_BED_ROLES.has(canon) && s.positionSource === 'user';
@@ -1939,24 +1974,10 @@ function SpeakerPlacementImpl(props) {
       return userVersion || speaker;
     });
 
-    // Signature guard: only update if array meaningfully changed
-    const sig = Array.isArray(nextSpeakers)
-      ? nextSpeakers.map(s => {
-          const x = Number.isFinite(s?.position?.x) ? s.position.x.toFixed(3) : "na";
-          const y = Number.isFinite(s?.position?.y) ? s.position.y.toFixed(3) : "na";
-          const z = Number.isFinite(s?.position?.z) ? s.position.z.toFixed(3) : "na";
-          const r = String(s?.role ?? s?.id ?? "");
-          return `${r}:${x},${y},${z}`;
-        }).join("|")
-      : "not-array";
-
-    if (lastPlacedSpeakersSigRef.current === sig) {
-      return; // do not set state again
+    // ---- only set when meaningfully changed ----
+    if (!__b44SameSpeakers(placedSpeakers, nextSpeakers)) {
+      setSpeakers(nextSpeakers);
     }
-    lastPlacedSpeakersSigRef.current = sig;
-
-    // Apply update exactly once
-    setSpeakers(nextSpeakers);
 
     lastPresetRef.current = effectivePreset;
   // eslint-disable-next-line react-hooks/exhaustive-deps
