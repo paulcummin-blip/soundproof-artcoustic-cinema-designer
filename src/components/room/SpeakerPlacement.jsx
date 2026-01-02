@@ -1289,32 +1289,7 @@ function SpeakerPlacementImpl(props) {
 
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
   const lastPresetRef = useRef(effectivePreset);
-
-  // --- B44 refresh-loop guard helpers (local only) ---
-  const __B44_EPS = 0.001; // ~1mm
-  const __b44Num = (v) => (Number.isFinite(v) ? v : null);
-  const __b44SigFor = (arr) => {
-    if (!Array.isArray(arr)) return "none";
-    return arr
-      .map(s => {
-        const id = s?.id ?? s?.role ?? "";
-        const x = __b44Num(s?.position?.x);
-        const y = __b44Num(s?.position?.y);
-        const z = __b44Num(s?.position?.z);
-        const yaw = __b44Num(s?.yaw);
-        return `${id}:${x},${y},${z},${yaw}`;
-      })
-      .sort()
-      .join("|");
-  };
-  const __b44SameSpeakers = (a, b) => {
-    if (!Array.isArray(a) || !Array.isArray(b)) return false;
-    if (a.length !== b.length) return false;
-    const sa = __b44SigFor(a);
-    const sb = __b44SigFor(b);
-    return sa === sb;
-  };
-  const __b44LastApplySigRef = useRef(null);
+  const lastEffectSigRef = React.useRef(null);
 
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
