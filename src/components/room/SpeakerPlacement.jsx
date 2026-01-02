@@ -1289,6 +1289,7 @@ function SpeakerPlacementImpl(props) {
 
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
   const lastPresetRef = useRef(effectivePreset);
+  const lastPlacedSpeakersSigRef = useRef(null);
 
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
@@ -1915,63 +1916,47 @@ function SpeakerPlacementImpl(props) {
     }
     if (!mlpPoint || !dimensions) return;
 
-    setSpeakers((prev) => {
-      // Only auto-adjust speakers that haven't been manually positioned
-      const preserveUserPositions = (prev || []).filter(s => {
-        const canon = getCanonicalRole(s.role);
-        return SURROUND_BED_ROLES.has(canon) && s.positionSource === 'user';
-      });
-
-      // Reset non-user speakers and compute next array
-      const resetOut = (Array.isArray(prev) && prev.length > 0)
-        ? resetSurroundPositions(
-            effectivePreset,
-            mlpPoint,
-            dimensions,
-            prev,
-            globalSurroundModel
-          )
-        : (prev || []);
-
-      // Merge: keep user positions, update auto positions
-      const nextSpeakers = resetOut.map(speaker => {
-        const userVersion = preserveUserPositions.find(u =>
-          getCanonicalRole(u.role) === getCanonicalRole(speaker.role)
-        );
-        return userVersion || speaker;
-      });
-
-      // Guarded state update: only commit when something truly changed
-      if (!Array.isArray(prev)) return nextSpeakers;
-      if (prev.length !== nextSpeakers.length) return nextSpeakers;
-
-      for (let i = 0; i < prev.length; i++) {
-        const a = prev[i];
-        const b = nextSpeakers[i];
-
-        if ((a?.id ?? '') !== (b?.id ?? '')) return nextSpeakers;
-
-        const ax = Number(a?.position?.x);
-        const ay = Number(a?.position?.y);
-        const az = Number(a?.position?.z);
-        const bx = Number(b?.position?.x);
-        const by = Number(b?.position?.y);
-        const bz = Number(b?.position?.z);
-
-        if (
-          !Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(bx) || !Number.isFinite(by) ||
-          Math.abs(ax - bx) > 0.001 ||
-          Math.abs(ay - by) > 0.001 ||
-          (Number.isFinite(az) && Number.isFinite(bz) && Math.abs(az - bz) > 0.001) ||
-          (Number.isFinite(a?.yaw) && Number.isFinite(b?.yaw) && Math.abs(a.yaw - b.yaw) > 0.1)
-        ) {
-          return nextSpeakers;
-        }
-      }
-
-      // Identical: returning prev prevents render loop
-      return prev;
+    // Build next array based on current state (not prev) so we can signature-check before updating
+    const preserveUserPositions = (placedSpeakers || []).filter(s => {
+      const canon = getCanonicalRole(s.role);
+      return SURROUND_BED_ROLES.has(canon) && s.positionSource === 'user';
     });
+
+    const resetOut = (Array.isArray(placedSpeakers) && placedSpeakers.length > 0)
+      ? resetSurroundPositions(
+          effectivePreset,
+          mlpPoint,
+          dimensions,
+          placedSpeakers,
+          globalSurroundModel
+        )
+      : (placedSpeakers || []);
+
+    const nextSpeakers = resetOut.map(speaker => {
+      const userVersion = preserveUserPositions.find(u =>
+        getCanonicalRole(u.role) === getCanonicalRole(speaker.role)
+      );
+      return userVersion || speaker;
+    });
+
+    // Signature guard: only update if array meaningfully changed
+    const sig = Array.isArray(nextSpeakers)
+      ? nextSpeakers.map(s => {
+          const x = Number.isFinite(s?.position?.x) ? s.position.x.toFixed(3) : "na";
+          const y = Number.isFinite(s?.position?.y) ? s.position.y.toFixed(3) : "na";
+          const z = Number.isFinite(s?.position?.z) ? s.position.z.toFixed(3) : "na";
+          const r = String(s?.role ?? s?.id ?? "");
+          return `${r}:${x},${y},${z}`;
+        }).join("|")
+      : "not-array";
+
+    if (lastPlacedSpeakersSigRef.current === sig) {
+      return; // do not set state again
+    }
+    lastPlacedSpeakersSigRef.current = sig;
+
+    // Apply update exactly once
+    setSpeakers(nextSpeakers);
 
     lastPresetRef.current = effectivePreset;
   // eslint-disable-next-line react-hooks/exhaustive-deps
