@@ -2027,7 +2027,9 @@ function SpeakerPlacementImpl(props) {
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!canWides || !dimensions) {
+      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.log('[SP FW MEDIAN] SKIP: no wides or dimensions', { canWides, dimensions: !!dimensions });
+    }
       return;
     }
 
