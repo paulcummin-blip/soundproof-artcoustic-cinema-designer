@@ -5092,19 +5092,25 @@ return {
     };
   }, [applyLcrFromDetail]);
 
+  const lastRvLogSigRef = React.useRef(null);
+
   const renderSpeakers = useCallback(() => {
   // Start from the prop (single source of truth)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
-  // Add grouped debug logging
-  if (typeof console !== 'undefined' && console.groupCollapsed) {
-    console.groupCollapsed('[RV] renderSpeakers DEBUG');
-    if (globalThis.__B44_LOGS) console.log('Raw speakers from prop:', rawSpeakers.map(s => ({
-      role: s.role,
-      canon: rvSafeCanonRole(s.role),
-      isOverhead: rvIsOverheadRole(s.role),
-      hasPos: !!(s.position),
-    })));
+  // Add grouped debug logging (guarded + one-shot)
+  if (globalThis.__B44_LOGS && typeof console !== 'undefined' && console.groupCollapsed) {
+    const sig = JSON.stringify(rawSpeakers.map(s => ({ role: s.role, hasPos: !!s.position })));
+    if (lastRvLogSigRef.current !== sig) {
+      lastRvLogSigRef.current = sig;
+      console.groupCollapsed('[RV] renderSpeakers DEBUG');
+      console.log('Raw speakers from prop:', rawSpeakers.map(s => ({
+        role: s.role,
+        canon: rvSafeCanonRole(s.role),
+        isOverhead: rvIsOverheadRole(s.role),
+        hasPos: !!(s.position),
+      })));
+    }
   }
 
   // 1) Basic structural filter (existing helper)
@@ -5153,9 +5159,9 @@ return {
     window.__LAST_RV__ = { rawSpeakers, afterVisibility };
   }
 
-  // DEBUG: Table of afterVisibility with positions
-  if (typeof console !== 'undefined') {
-    if (globalThis.__B44_LOGS) console.log('After visibility filter:', afterVisibility.map(s => ({
+  // DEBUG: Table of afterVisibility with positions (guarded + one-shot)
+  if (globalThis.__B44_LOGS && typeof console !== 'undefined') {
+    console.log('After visibility filter:', afterVisibility.map(s => ({
       role: s.role,
       canon: rvSafeCanonRole(s.role),
       isOverhead: rvIsOverheadRole(s.role),
