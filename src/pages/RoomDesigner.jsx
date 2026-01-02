@@ -2826,6 +2826,7 @@ function RoomDesignerWithState() {
 
          if (speakersEqual(prev, withOverheads)) return prev;
          return withOverheads;
+         return withOverheads;
          });
          }
   }, [

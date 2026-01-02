@@ -265,7 +265,7 @@ function logPlacedSpeakers(message, speakers) {
   }));
   safeGroup(message);
   safeTable(rows);
-  safeGroupEnd();
+  if (globalThis.__B44_LOGS) safeGroupEnd();
 }
 
 function buildRoleMap(list) {
@@ -795,7 +795,7 @@ function UnifiedSurroundsConfig({
 
       // [B44 FIX] Guard against empty layoutRoles
       if (!Array.isArray(layoutRoles) || layoutRoles.length === 0) {
-        console.warn('[B44] handleSurroundModelChange: no bed surround roles for layout', {
+        if (globalThis.__B44_LOGS) console.warn('[B44] handleSurroundModelChange: no bed surround roles for layout', {
           layout,
           useWides
         });
@@ -986,7 +986,7 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
 
 function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics }) {
   const { speakerSystem, setScreen, splConfig, updateGlobalSpl, seatingPositions } = useAppState();
-  const { LCR: lcrModelOptions } = getModelsByCategoryOrdered();
+  const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
 
   const LCR_CANONICAL_ROLES = useMemo(() => new Set(["FL", "FC", "FR"]), []);
   const lcrRoles = useMemo(() => ['FL', 'FC', 'FR'], []);
@@ -1432,7 +1432,7 @@ function SpeakerPlacementImpl(props) {
       
       // [B44] If constraints are impossible (min > max), use safe mid-zone position
       if (xMinWithClearance >= xMaxWithClearance) {
-        console.warn(`[applyCornerClearance] Impossible X range for ${role} on back wall. Using safe center.`, {
+        if (globalThis.__B44_LOGS) console.warn(`[applyCornerClearance] Impossible X range for ${role} on back wall. Using safe center.`, {
           xMinWithClearance,
           xMaxWithClearance,
           W,
@@ -1472,7 +1472,7 @@ function SpeakerPlacementImpl(props) {
       
       // [B44] If constraints are impossible (min > max), use safe mid-zone position
       if (yMinFromZone >= yMaxWithRearClearance) {
-        console.warn(`[applyCornerClearance] Impossible Y range for ${role} on side wall. Using safe center.`, {
+        if (globalThis.__B44_LOGS) console.warn(`[applyCornerClearance] Impossible Y range for ${role} on side wall. Using safe center.`, {
           yMinFromZone,
           yMaxWithRearClearance,
           L,
@@ -1492,7 +1492,7 @@ function SpeakerPlacementImpl(props) {
     
     // [B44] Final safety check
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      console.error('[applyCornerClearance] FINAL NaN DETECTED. Using room center fallback.', { x, y, role });
+      if (globalThis.__B44_LOGS) console.error('[applyCornerClearance] FINAL NaN DETECTED. Using room center fallback.', { x, y, role });
       return { x: W / 2, y: L / 2, z };
     }
     
@@ -1508,7 +1508,7 @@ function SpeakerPlacementImpl(props) {
     // [B44] Defensive check: ensure all values are finite
     if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(W) || 
         !Number.isFinite(L) || !Number.isFinite(shortEdge)) {
-      console.warn('[applyRoomBoundsClamp] Non-finite input detected', { x, y, W, L, shortEdge });
+      if (globalThis.__B44_LOGS) console.warn('[applyRoomBoundsClamp] Non-finite input detected', { x, y, W, L, shortEdge });
       // Return unclamped position to preserve any partial validity
       return { x, y, z };
     }
@@ -1520,7 +1520,7 @@ function SpeakerPlacementImpl(props) {
     
     // [B44] Safety check: if room is too small for speaker, use room center
     if (minX >= maxX || minY >= maxY) {
-      console.warn('[applyRoomBoundsClamp] Room too small for speaker dimensions', {
+      if (globalThis.__B44_LOGS) console.warn('[applyRoomBoundsClamp] Room too small for speaker dimensions', {
         W, L, shortEdge, minX, maxX, minY, maxY
       });
       return { x: W / 2, y: L / 2, z };
@@ -1531,7 +1531,7 @@ function SpeakerPlacementImpl(props) {
     
     // [B44] Final safety check
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      console.error('[applyRoomBoundsClamp] FINAL NaN DETECTED after clamping', { x, y });
+      if (globalThis.__B44_LOGS) console.error('[applyRoomBoundsClamp] FINAL NaN DETECTED after clamping', { x, y });
       return { x: W / 2, y: L / 2, z };
     }
     
@@ -1550,7 +1550,7 @@ function SpeakerPlacementImpl(props) {
 
     // Debug warning when coordinates are invalid (temporary)
     if (!Number.isFinite(x) || !Number.isFinite(y)) {
-      console.warn('[SP safePos] Non-finite coordinates detected (will NOT fallback to MLP):', {
+      if (globalThis.__B44_LOGS) console.warn('[SP safePos] Non-finite coordinates detected (will NOT fallback to MLP):', {
         pos: p,
         x,
         y,
@@ -1602,14 +1602,14 @@ function SpeakerPlacementImpl(props) {
         return currentSpeakers || [];
       }
 
-      if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions START', {
+            if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions START', {
         layoutString, mlp, dims,
         currentSpeakersCount: currentSpeakers?.length,
         globalSurroundModelParam
       });
 
       if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
-        console.warn('[SP] resetSurroundPositions ABORT: missing data');
+        if (globalThis.__B44_LOGS) console.warn('[SP] resetSurroundPositions ABORT: missing data');
         return currentSpeakers || [];
       }
 
@@ -1661,7 +1661,7 @@ function SpeakerPlacementImpl(props) {
         if (globalThis.__B44_LOGS) console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-          console.warn('[finalisePos] NaN after applyCornerClearance', { p, canon, base });
+          if (globalThis.__B44_LOGS) console.warn('[finalisePos] NaN after applyCornerClearance', { p, canon, base });
           return null;
         }
         
@@ -1669,7 +1669,7 @@ function SpeakerPlacementImpl(props) {
         if (globalThis.__B44_LOGS) console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-          console.warn('[finalisePos] NaN after applyRoomBoundsClamp', { p, canon, base });
+          if (globalThis.__B44_LOGS) console.warn('[finalisePos] NaN after applyRoomBoundsClamp', { p, canon, base });
           return null;
         }
 
@@ -1717,7 +1717,7 @@ function SpeakerPlacementImpl(props) {
 
           if ((R === 'LW' && isNearLeftWall && isNearFrontWall) ||
               (R === 'RW' && isNearRightWall && isNearFrontWall)) {
-            console.warn(`[finalisePos] Front-Wide (${R}) detected near front corner (${p.x.toFixed(2)}, ${p.y.toFixed(2)}). Nudging back.`);
+            if (globalThis.__B44_LOGS) console.warn(`[finalisePos] Front-Wide (${R}) detected near front corner (${p.x.toFixed(2)}, ${p.y.toFixed(2)}). Nudging back.`);
             // Nudge back along the Y-axis to prevent corner pinning.
             const defaultNudgeY = Math.max(dims.length / 3, mlp?.y + 0.5 || 1.5);
 
@@ -1742,7 +1742,7 @@ function SpeakerPlacementImpl(props) {
         );
 
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-          console.warn('[SP resetSurroundPositions] dropping surround with invalid position', {
+          if (globalThis.__B44_LOGS) console.warn('[SP resetSurroundPositions] dropping surround with invalid position', {
             base,
             canon,
             safeModel,
@@ -1824,7 +1824,7 @@ function SpeakerPlacementImpl(props) {
           });
         };
 
-      console.table(next.map(s => ({
+      if (globalThis.__B44_LOGS) console.table(next.map(s => ({
         role: s.role, model: s.model,
         x: s.position?.x?.toFixed(3),
         y: s.position?.y?.toFixed(3),
@@ -1871,7 +1871,7 @@ function SpeakerPlacementImpl(props) {
       );
 
       if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions END. Final Speakers:');
-      console.table(next.map(s => ({
+      if (globalThis.__B44_LOGS) console.table(next.map(s => ({
         role: s.role, model: s.model,
         x: s.position?.x?.toFixed(3),
         y: s.position?.y?.toFixed(3),
@@ -1888,7 +1888,10 @@ function SpeakerPlacementImpl(props) {
       if (globalThis.__B44_LOGS) console.warn('[SP] resetSurroundPositions ABORT: invalid dimensions', dimensions);
       return currentSpeakers || [];
     }
-      if (showToast) showToast('Cannot reset speakers: Room dimensions or MLP not set.', 'error');
+      if (showToast) {
+        if (globalThis.__B44_LOGS) console.error('Cannot reset speakers: Room dimensions or MLP not set.');
+        showToast('Cannot reset speakers: Room dimensions or MLP not set.', 'error');
+      }
       return;
     }
     
@@ -2240,7 +2243,10 @@ function SpeakerPlacementImpl(props) {
 
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
     if (!mlpPoint || !dimensions || !canWides) {
-        if (showToast) showToast('Front-Wide speakers are not enabled or room data missing.', 'info');
+        if (showToast) {
+        if (globalThis.__B44_LOGS) console.info('Front-Wide speakers are not enabled or room data missing.');
+        showToast('Front-Wide speakers are not enabled or room data missing.', 'info');
+    }
         return;
     }
 
@@ -2294,7 +2300,10 @@ function SpeakerPlacementImpl(props) {
 
         return [...otherSpeakers, ...newFWSpeakers];
     });
-    if (showToast) showToast('Front-Wide speakers reset to median positions.', 'success');
+    if (showToast) {
+      if (globalThis.__B44_LOGS) console.log('Front-Wide speakers reset to median positions.');
+      showToast('Front-Wide speakers reset to median positions.', 'success');
+    }
   }, [mlpPoint, dimensions, canWides, setSpeakers, showToast, getHuggingCenterLines]);
 
   useEffect(() => {
