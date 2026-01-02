@@ -10,34 +10,20 @@ function peakDipDelta(freqs, dbArray, loHz, hiHz) {
   if (!Array.isArray(freqs) || !Array.isArray(dbArray) || freqs.length !== dbArray.length) {
     return null;
   }
-
   let peak = -Infinity, dip = Infinity;
   let peakHz = null, dipHz = null;
   let found = 0;
-
   for (let i = 0; i < freqs.length; i++) {
     const f = freqs[i];
     if (f < loHz || f > hiHz) continue;
-
     const v = dbArray[i];
     if (!Number.isFinite(v)) continue;
-
     found++;
     if (v > peak) { peak = v; peakHz = f; }
     if (v < dip)  { dip  = v; dipHz  = f; }
   }
-
-  if (!found) {
-    return null;
-  }
-
-  return {
-    peakDb: peak,
-    dipDb: dip,
-    peakHz,
-    dipHz,
-    deltaDb: peak - dip,
-  };
+  if (!found) return null;
+  return { peakDb: peak, dipDb: dip, peakHz, dipHz, deltaDb: peak - dip };
 }
 
 /**
@@ -963,11 +949,7 @@ export function computeRoomModesResponse({
   const splDb = secondPass.splDb;
   const rawCoherentDb = secondPass.coherentRawDb;
 
-  if (globalThis.__B44_BASS_AUDIT) {
-    if (!baseReturn.debug.audit40_70) baseReturn.debug.audit40_70 = {};
-    baseReturn.debug.audit40_70.coherentRawDb = peakDipDelta(freqs, rawCoherentDb, 40, 70);
-    baseReturn.debug.audit40_70.splDb = peakDipDelta(freqs, splDb, 40, 70);
-  }
+  
   
   // REW-style coherence loss: transition from coherent pressure sum to energy-like behaviour above ~100-140 Hz
   // This makes the curve "come back down" at HF like REW does
@@ -996,10 +978,7 @@ export function computeRoomModesResponse({
   
   // Use REW-processed array for rest of pipeline when coherence loss is active
   const splDbForPipeline = coherenceLossApplied ? splDbRew : splDb;
-  if (globalThis.__B44_BASS_AUDIT) {
-    if (!baseReturn.debug.audit40_70) baseReturn.debug.audit40_70 = {};
-    baseReturn.debug.audit40_70.splDbForPipeline = peakDipDelta(freqs, splDbForPipeline, 40, 70);
-  }
+  
   
   // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
   const computeRmsDb = (dbArray, freqsArr) => {
@@ -1071,43 +1050,20 @@ export function computeRoomModesResponse({
     let splDbSchroeder = splDbForPipeline;
     if (!rawEngineOutput && rewParityMode && schroederHz > 0) {
       splDbSchroeder = splDbForPipeline.map((db, i) => {
-        // ... existing map logic
-      });
-      if (globalThis.__B44_BASS_AUDIT) {
-        if (!baseReturn.debug.audit40_70) baseReturn.debug.audit40_70 = {};
-        baseReturn.debug.audit40_70.splDbSchroeder = peakDipDelta(freqs, splDbSchroeder, 40, 70);
-      }
         const f = freqs[i];
-
-        // NEW BLEND RULES (Part B):
-        // - blendStart = 1.0 × Schroeder (protects modal region)
-        // - blendEnd = 1.8 × Schroeder (gentle transition)
         const blendStart = schroederHz * 1.0;
         const blendEnd = schroederHz * 1.8;
-
-        // Below blendStart: NO blending at all (preserve coherent result)
         if (f < blendStart) return db;
-
-        // Above blendEnd: allow diffuse/statistical target to dominate
         const t = Math.max(0, Math.min(1, (f - blendStart) / Math.max(1e-6, (blendEnd - blendStart))));
-
-        // Gentle roll-off to prevent upper bass inflation
         const octavesAbove = Math.log2(f / blendStart);
         const rolloffDb = -1.0 * octavesAbove;
-
-        // Simple target: a mild downward tilt + rolloff
         const target = dbAt(blendStart, freqs, splDbForPipeline) - 3 * Math.log2(f / blendStart) + rolloffDb;
-
         const blendedDb = (1 - t) * db + t * target;
-
-        // CRITICAL (Part B2): Preserve null depth by capping blend
-        // Never allow blend to rise more than +2 dB above coherent curve
-        // NULLS MUST STAY DEEP - this is physical, not aesthetic
         return Math.min(blendedDb, db + 2.0);
-        });
-        }
+      });
+    }
 
-        // AUDIT CHECKPOINT: Schroeder blend should preserve nulls below 1.0×Schroeder
+    // AUDIT CHECKPOINT: Schroeder blend should preserve nulls below 1.0×Schroeder
         // If you're seeing nulls get filled in, the blend logic above is broken
 
         // Capture RAW stats BEFORE any processing (critical for debugging)
@@ -1132,10 +1088,7 @@ export function computeRoomModesResponse({
     }
     }
     const splDbRepaired = repaired;
-  if (globalThis.__B44_BASS_AUDIT) {
-    if (!baseReturn.debug.audit40_70) baseReturn.debug.audit40_70 = {};
-    baseReturn.debug.audit40_70.splDbRepaired = peakDipDelta(freqs, splDbRepaired, 40, 70);
-  }
+  
 
   // Capture pre-normalization stats (after repair, before smoothing/norm)
   const finitePreNorm = splDbRepaired.filter(v => isFinite(v));
@@ -1296,10 +1249,7 @@ export function computeRoomModesResponse({
   // Smoothing happens visually via chart interpolation, not data mutation
   let finalDb = rewParityMode ? splDbRepaired : splDbSmoothed;
   const plottedDb = (!rawEngineOutput && smoothing !== 'none') ? splDbSmoothed : splDbRepaired;
-  if (globalThis.__B44_BASS_AUDIT) {
-    if (!baseReturn.debug.audit40_70) baseReturn.debug.audit40_70 = {};
-    baseReturn.debug.audit40_70.plottedDb = peakDipDelta(freqs, plottedDb, 40, 70);
-  }
+  
 
   if (!Array.isArray(finalDb) || finalDb.length === 0) {
     finalDb = Array.isArray(splDb) ? [...splDb] : [];
@@ -1560,39 +1510,7 @@ export function computeRoomModesResponse({
   const inputSig = `${sourceSigUsed}|${seatSigUsed}|${smoothing}|${isRelative?'rel':'abs'}`;
 
   // ---- Parity debug helpers (read-only, no DSP changes) ----
-  const peakDipDelta = (freqsArr, dbArr, fMin, fMax) => {
-    if (!Array.isArray(freqsArr) || !Array.isArray(dbArr)) {
-      return { peakDb: "N/A", dipDb: "N/A", peakFreq: "N/A", dipFreq: "N/A", deltaDb: "N/A" };
-    }
-
-    let peak = -Infinity, dip = Infinity;
-    let peakF = null, dipF = null;
-    let found = 0;
-
-    for (let i = 0; i < freqsArr.length; i++) {
-      const f = freqsArr[i];
-      if (f < fMin || f > fMax) continue;
-
-      const v = dbArr[i];
-      if (!Number.isFinite(v)) continue;
-
-      found++;
-      if (v > peak) { peak = v; peakF = f; }
-      if (v < dip)  { dip  = v; dipF  = f; }
-    }
-
-    if (!found) {
-      return { peakDb: "N/A", dipDb: "N/A", peakFreq: "N/A", dipFreq: "N/A", deltaDb: "N/A" };
-    }
-
-    return {
-      peakDb: peak.toFixed(2),
-      dipDb: dip.toFixed(2),
-      peakFreq: peakF.toFixed(1),
-      dipFreq: dipF.toFixed(1),
-      deltaDb: (peak - dip).toFixed(2),
-    };
-  };
+  
 
   const avgDb = (freqsArr, dbArr, fMin, fMax) => {
     if (!Array.isArray(freqsArr) || !Array.isArray(dbArr)) return "N/A";
@@ -1713,12 +1631,6 @@ export function computeRoomModesResponse({
     : safePlottedDbRaw;
 
   const baseReturn = {
-    // ... existing properties
-    debug: {
-      // ... existing debug properties
-      audit40_70: {},
-    }
-  };
     freqs: [...safeFreqs],
     splDb: [...safeDisplayDb], // Display version (with offset applied in REW+Relative)
     engineFinalDb: rewParityMode ? [...safeFinalDb] : null, // Engine truth (no offset)
@@ -1867,8 +1779,21 @@ export function computeRoomModesResponse({
         };
       }) : null,
       parityAudits,
-      }
-      };
+    }
+  };
+
+  // Attach 40–70 Hz stage audit when enabled
+  if (globalThis.__B44_BASS_AUDIT === true) {
+    const audit = {
+      coherentRawDb: Array.isArray(rawCoherentDb) ? peakDipDelta(freqs, rawCoherentDb, 40, 70) : null,
+      splDb: Array.isArray(splDb) ? peakDipDelta(freqs, splDb, 40, 70) : null,
+      splDbForPipeline: Array.isArray(splDbForPipeline) ? peakDipDelta(freqs, splDbForPipeline, 40, 70) : null,
+      splDbSchroeder: Array.isArray(splDbSchroeder) ? peakDipDelta(freqs, splDbSchroeder, 40, 70) : null,
+      splDbRepaired: Array.isArray(splDbRepaired) ? peakDipDelta(freqs, splDbRepaired, 40, 70) : null,
+      plottedDb: Array.isArray(plottedDb) ? peakDipDelta(freqs, plottedDb, 40, 70) : null,
+    };
+    baseReturn.debug.audit40_70 = audit;
+  }
 
   // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)
   if (DIAG_POS) {
