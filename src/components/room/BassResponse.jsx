@@ -3621,6 +3621,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             // [PLOT AUDIT] - Verify what's actually being plotted
             const dataToPlot = rewStyleMode ? displayData : clampedData;
             const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
+            const audit40_70 =
+              (activeDebug?.audit40_70) ||
+              (rewModesDataAudit?.debug?.audit40_70) ||
+              (rewModesDataAbs?.debug?.audit40_70) ||
+              (rewRoomPlusProductDataAbs?.debug?.audit40_70) ||
+              null;
+
             const __plotAudit = {
               using: rewStyleMode ? "displayData" : "clampedData",
               len: dataToPlot.length,
@@ -3628,9 +3635,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               max: finiteSpl.length > 0 ? Math.max(...finiteSpl).toFixed(2) : 'N/A',
               smoothing: rewStyleMode ? 'none' : rewSmoothing,
               rewCompareView,
-              userSmoothingChoice: rewSmoothing
+              userSmoothingChoice: rewSmoothing,
+              audit40_70,
             };
-            if (globalThis.__B44_LOGS) console.log("[PLOT AUDIT]", __plotAudit);
+            if (globalThis.__B44_LOGS) {
+              globalThis.__B44_LAST_PLOT_AUDIT = __plotAudit;
+            }
             
             return (
               <>
