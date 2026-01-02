@@ -1664,6 +1664,7 @@ function SpeakerPlacementImpl(props) {
         localRoles: Array.from(localAllowedRoles),
         globalSurroundModel: globalSurroundModelParam
       });
+    }
 
       const next = currentSpeakers.filter(
         s => !SURROUND_BED_ROLES.has(getCanonicalRole(s.role))
