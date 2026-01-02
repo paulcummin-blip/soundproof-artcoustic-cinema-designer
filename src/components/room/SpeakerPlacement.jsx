@@ -1853,12 +1853,14 @@ function SpeakerPlacementImpl(props) {
           });
         };
 
+      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.table(next.map(s => ({
         role: s.role, model: s.model,
         x: s.position?.x?.toFixed(3),
         y: s.position?.y?.toFixed(3),
         yaw: s.rotation?.z
       })));
+    }
 
         const sideAngle = (major >= 7) ? 100 : 115;
 
@@ -1888,6 +1890,7 @@ function SpeakerPlacementImpl(props) {
         }
 
       // [B44 DIAGNOSTIC] Log all surround outputs before return
+      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.log(
         "[SP] resetSurroundPositions OUTPUT",
         next.map((s) => ({
@@ -1906,6 +1909,7 @@ function SpeakerPlacementImpl(props) {
         y: s.position?.y?.toFixed(3),
         yaw: s.rotation?.z
       })));
+    }
 
       return next;
     },
