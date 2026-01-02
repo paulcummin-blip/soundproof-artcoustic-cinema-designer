@@ -1291,6 +1291,19 @@ function SpeakerPlacementImpl(props) {
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
   const lastPresetRef = useRef(effectivePreset);
   const lastPlacementSigRef = React.useRef("");
+  
+  // LOOP GUARD signature helper
+  const makeSig = (arr) => JSON.stringify(
+    (arr || []).map(s => ({
+      id: s?.id,
+      role: s?.role,
+      x: Number(s?.position?.x ?? s?.x ?? 0).toFixed(3),
+      y: Number(s?.position?.y ?? s?.y ?? 0).toFixed(3),
+      z: Number(s?.position?.z ?? s?.z ?? 0).toFixed(3),
+      yaw: Number(s?.yaw ?? 0).toFixed(2),
+      pitch: Number(s?.pitch ?? 0).toFixed(2),
+    }))
+  );
 
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
@@ -1968,17 +1981,10 @@ function SpeakerPlacementImpl(props) {
       
       if (!hasSignificantChange) return prev;
 
-      const nextSig = JSON.stringify((merged || []).map(s => ({
-        id: s?.id,
-        role: s?.role,
-        x: Number(s?.position?.x ?? s?.x ?? 0).toFixed(3),
-        y: Number(s?.position?.y ?? s?.y ?? 0).toFixed(3),
-        z: Number(s?.position?.z ?? s?.z ?? 0).toFixed(3),
-      })) ?? []);
-      if (nextSig === lastPlacementSigRef.current) {
-        return prev;
-      }
-      lastPlacementSigRef.current = nextSig;
+      // LOOP GUARD: do not update state if placement did not materially change
+      const prevSig = makeSig(prev);
+      const nextSig = makeSig(merged);
+      if (nextSig === prevSig) return prev;
       return merged;
     });
 
