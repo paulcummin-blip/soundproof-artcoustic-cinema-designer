@@ -1893,6 +1893,9 @@ function SpeakerPlacementImpl(props) {
     }
 
     setSpeakers(currentSpeakers => {
+      if (!Array.isArray(currentSpeakers) || currentSpeakers.length === 0) {
+        return currentSpeakers;
+      }
       const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, globalSurroundModel);
       // Clear positionSource for all speakers (return to auto mode)
       return reset.map(s => ({ ...s, positionSource: 'auto' }));
@@ -1905,6 +1908,11 @@ function SpeakerPlacementImpl(props) {
   }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast, globalSurroundModel]);
 
   useEffect(() => {
+    // HARD GUARD: if there are no speakers, SpeakerPlacement must do nothing.
+    // Subs can exist independently; we must not “seed” or “reset” surrounds here.
+    if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) {
+      return;
+    }
     if (!mlpPoint || !dimensions) return;
 
     setSpeakers((prev) => {
@@ -1915,13 +1923,15 @@ function SpeakerPlacementImpl(props) {
       });
 
       // Reset non-user speakers and compute next array
-      const resetOut = resetSurroundPositions(
-        effectivePreset,
-        mlpPoint,
-        dimensions,
-        prev,
-        globalSurroundModel
-      );
+      const resetOut = (Array.isArray(prev) && prev.length > 0)
+        ? resetSurroundPositions(
+            effectivePreset,
+            mlpPoint,
+            dimensions,
+            prev,
+            globalSurroundModel
+          )
+        : (prev || []);
 
       // Merge: keep user positions, update auto positions
       const nextSpeakers = resetOut.map(speaker => {
