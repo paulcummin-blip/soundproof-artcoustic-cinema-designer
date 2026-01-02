@@ -1907,53 +1907,60 @@ function SpeakerPlacementImpl(props) {
   useEffect(() => {
     if (!mlpPoint || !dimensions) return;
 
-    setSpeakers(prev => {
+    setSpeakers((prev) => {
       // Only auto-adjust speakers that haven't been manually positioned
       const preserveUserPositions = (prev || []).filter(s => {
         const canon = getCanonicalRole(s.role);
         return SURROUND_BED_ROLES.has(canon) && s.positionSource === 'user';
       });
-      
-      // Reset non-user speakers
-      const next = resetSurroundPositions(
+
+      // Reset non-user speakers and compute next array
+      const resetOut = resetSurroundPositions(
         effectivePreset,
         mlpPoint,
         dimensions,
         prev,
         globalSurroundModel
       );
-      
+
       // Merge: keep user positions, update auto positions
-      const merged = next.map(speaker => {
-        const userVersion = preserveUserPositions.find(u => 
+      const nextSpeakers = resetOut.map(speaker => {
+        const userVersion = preserveUserPositions.find(u =>
           getCanonicalRole(u.role) === getCanonicalRole(speaker.role)
         );
         return userVersion || speaker;
       });
-      
-      // CRITICAL: Only update if speakers actually changed
-      if (speakersEqual(prev, merged)) return prev;
-      
-      // Additional guard: check if positions differ by meaningful amount (>1mm or >0.1deg)
-      if (!prev || !Array.isArray(prev) || prev.length !== merged.length) {
-        return merged;
+
+      // Guarded state update: only commit when something truly changed
+      if (!Array.isArray(prev)) return nextSpeakers;
+      if (prev.length !== nextSpeakers.length) return nextSpeakers;
+
+      for (let i = 0; i < prev.length; i++) {
+        const a = prev[i];
+        const b = nextSpeakers[i];
+
+        if ((a?.id ?? '') !== (b?.id ?? '')) return nextSpeakers;
+
+        const ax = Number(a?.position?.x);
+        const ay = Number(a?.position?.y);
+        const az = Number(a?.position?.z);
+        const bx = Number(b?.position?.x);
+        const by = Number(b?.position?.y);
+        const bz = Number(b?.position?.z);
+
+        if (
+          !Number.isFinite(ax) || !Number.isFinite(ay) || !Number.isFinite(bx) || !Number.isFinite(by) ||
+          Math.abs(ax - bx) > 0.001 ||
+          Math.abs(ay - by) > 0.001 ||
+          (Number.isFinite(az) && Number.isFinite(bz) && Math.abs(az - bz) > 0.001) ||
+          (Number.isFinite(a?.yaw) && Number.isFinite(b?.yaw) && Math.abs(a.yaw - b.yaw) > 0.1)
+        ) {
+          return nextSpeakers;
+        }
       }
 
-      const hasSignificantChange = merged.some(m => {
-        const p = prev.find(s => getCanonicalRole(s?.role) === getCanonicalRole(m?.role));
-        if (!p) return true;
-        
-        const dx = Math.abs((m.position?.x ?? 0) - (p.position?.x ?? 0));
-        const dy = Math.abs((m.position?.y ?? 0) - (p.position?.y ?? 0));
-        const dz = Math.abs((m.position?.z ?? 0) - (p.position?.z ?? 0));
-        const dRx = Math.abs((m.rotation?.x ?? 0) - (p.rotation?.x ?? 0));
-        const dRy = Math.abs((m.rotation?.y ?? 0) - (p.rotation?.y ?? 0));
-        const dRz = Math.abs((m.rotation?.z ?? 0) - (p.rotation?.z ?? 0));
-        
-        return dx > 0.001 || dy > 0.001 || dz > 0.001 || dRx > 0.1 || dRy > 0.1 || dRz > 0.1;
-      });
-      
-      return hasSignificantChange ? merged : prev;
+      // Identical: returning prev prevents render loop
+      return prev;
     });
 
     lastPresetRef.current = effectivePreset;
