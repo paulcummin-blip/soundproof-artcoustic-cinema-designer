@@ -476,7 +476,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
           picked = pickMLP(mlpBasis || 'all', seatingPositions);
         }
       } catch (err) {
-        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error('pickMLP failed in RoomVisualisation:', err);
+        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error('pickMLP failed in RoomVisualisation:', err);
         picked = null;
       }
 
@@ -759,7 +759,7 @@ const onHudHeaderMouseDown = useCallback((event) => {
       // If buildRoleMap is not a function or returned a non-Map, use the safe fallback.
       return _safeBuildRoleMapFallback(speakersToMap);
     } catch (e) {
-      if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Error in buildRoleMap:", e);
+      if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Error in buildRoleMap:", e);
       // If any error occurs during the call, use the fallback.
       return _safeBuildRoleMapFallback(Array.isArray(placedSpeakers) ? placedSpeakers : []);
     }
@@ -1230,7 +1230,7 @@ React.useEffect(() => {
     } catch (e) {
       result = { status: 'error', reason: 'exception', error: e.message };
       if (appState_DBG_FW) {
-        if (globalThis.__B44_LOGS) console.warn('[FW zones] compute failed', e);
+        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn('[FW zones] compute failed', e);
       }
     }
 
@@ -3432,7 +3432,7 @@ useEffect(() => {
       }
     } catch (error) {
       if (typeof console !== "undefined" && typeof console.warn === "function") {
-        if (globalThis.__B44_LOGS) console.warn('[LCR Constraints] Error calculating constraints:', error);
+        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn('[LCR Constraints] Error calculating constraints:', error);
       }
     }
   }, [placedSpeakers, widthM, lengthM, heightM, screen, visualConstraintZones, getModelDimsM]); // Use new dimension variables
@@ -3700,7 +3700,7 @@ useEffect(() => {
         }
 
       } catch (_e) {
-        if (globalThis.__B44_LOGS) console.warn("Error applying SL/SR vs SBL/SBR clearance during auto-adjust:", _e);
+        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn("Error applying SL/SR vs SBL/SBR clearance during auto-adjust:", _e);
       }
 
       const xL_cur = Number(sl?.position?.x);
@@ -5077,7 +5077,7 @@ return {
       window.Base44Overlay = window.Base44Overlay || {};
       window.Base44Overlay.setLCR = applyLcrFromDetail;
     } catch (e) {
-      if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Failed to attach Base44Overlay.setLCR:", e);
+      if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Failed to attach Base44Overlay.setLCR:", e);
     }
 
     return () => {
@@ -5087,7 +5087,7 @@ return {
           delete window.Base44Overlay.setLCR;
         }
       } catch (e) {
-        if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Failed to detach Base44Overlay.setLCR:", e);
+        if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Failed to detach Base44Overlay.setLCR:", e);
       }
     };
   }, [applyLcrFromDetail]);
@@ -5134,7 +5134,7 @@ return {
       
       return result;
     } catch (err) {
-      if (globalThis.__B44_LOGS) console.warn("[RV] getSpeakerVisibility error; allowing speaker through", {
+      if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn("[RV] getSpeakerVisibility error; allowing speaker through", {
         role: spk.role,
         model: spk.model,
         err,
@@ -5257,7 +5257,7 @@ return {
 
     // Log any invalid coordinates
     if (!Number.isFinite(canvasX) || !Number.isFinite(canvasY)) {
-      if (globalThis.__B44_LOGS) console.warn('[RV] INVALID CANVAS COORDS', {
+      if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn('[RV] INVALID CANVAS COORDS', {
         id,
         role,
         pos: position,
