@@ -1209,17 +1209,14 @@ function SpeakerPlacementImpl(props) {
     setUseRearGlobal,
     enableFrontWides, // <-- FW overlay state
   } = app || {};
-  const roomDims = app?.dimensions || dimensions;
 
-  if (globalThis.__B44_DEBUG_PLACEMENT) {
-    console.log("[B44] DIMENSIONS CHECK", {
-      raw: dimensions,
-      width: dimensions?.width,
-      length: dimensions?.length,
-      height: dimensions?.height,
-      keys: dimensions ? Object.keys(dimensions) : null
-    });
-  }
+  console.log("[B44] DIMENSIONS CHECK", {
+    raw: dimensions,
+    width: dimensions?.width,
+    length: dimensions?.length,
+    height: dimensions?.height,
+    keys: dimensions ? Object.keys(dimensions) : null
+  });
 
   const frontSubsCfg = app?.frontSubsCfg || props?.frontSubsCfg || { 
     enabled: false, count: 0, model: null, placement: "front" 
@@ -1292,20 +1289,6 @@ function SpeakerPlacementImpl(props) {
 
   const placedSpeakers = useMemo(() => speakerSystem?.placedSpeakers || [], [speakerSystem?.placedSpeakers]);
   const lastPresetRef = useRef(effectivePreset);
-  const lastPlacementSigRef = React.useRef("");
-  
-  // LOOP GUARD signature helper
-  const makeSig = (arr) => JSON.stringify(
-    (arr || []).map(s => ({
-      id: s?.id,
-      role: s?.role,
-      x: Number(s?.position?.x ?? s?.x ?? 0).toFixed(3),
-      y: Number(s?.position?.y ?? s?.y ?? 0).toFixed(3),
-      z: Number(s?.position?.z ?? s?.z ?? 0).toFixed(3),
-      yaw: Number(s?.yaw ?? 0).toFixed(2),
-      pitch: Number(s?.pitch ?? 0).toFixed(2),
-    }))
-  );
 
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
@@ -1622,30 +1605,26 @@ function SpeakerPlacementImpl(props) {
         height: heightSafe
       };
 
-      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.log("[B44] resetSurroundPositions using safeDims", safeDims);
-    }
       dims = safeDims;
 
-      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.log('[SP] resetSurroundPositions START', {
         layoutString, mlp, dims,
         currentSpeakersCount: currentSpeakers?.length,
         globalSurroundModelParam
       });
-      }
-      }
 
       if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
-  return currentSpeakers || [];
-}
+        console.warn('[SP] resetSurroundPositions ABORT: missing data');
+        return currentSpeakers || [];
+      }
 
-const layoutNormalized =
-  (typeof layoutString === 'string' && layoutString.trim())
-    ? layoutString.trim()
-    : (typeof dolbyConfig === 'string' && dolbyConfig.trim())
-      ? dolbyConfig.trim()
-      : '5.1';
+      const layoutNormalized =
+        (typeof layoutString === 'string' && layoutString.trim()) ? layoutString.trim() :
+        (typeof dolbyConfig === 'string' && dolbyConfig.trim()) ? dolbyConfig.trim() :
+        (dolbyConfig && typeof dolbyConfig === 'object' && typeof dolbyConfig.layout === 'string')
+          ? dolbyConfig.layout.trim()
+          : '5.1';
 
       const major = parseInt(layoutNormalized.split('.')[0], 10) || 5;
 
@@ -1657,15 +1636,12 @@ const layoutNormalized =
       
       const localAllowedRoles = new Set(localAllowedRolesArray.map(getCanonicalRole));
 
-      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.log('[SP] resetSurroundPositions CONFIG', {
         layoutNormalized, major,
         useWidesInsteadOfRear: useWides,
         localRoles: Array.from(localAllowedRoles),
         globalSurroundModel: globalSurroundModelParam
       });
-      }
-    }
 
       const next = currentSpeakers.filter(
         s => !SURROUND_BED_ROLES.has(getCanonicalRole(s.role))
@@ -1688,9 +1664,7 @@ const layoutNormalized =
         let p = { x: base.x, y: base.y, z: 1.1 };
 
         p = applyCornerClearance(p, canon, safeModel, dims, {});
-        if (globalThis.__B44_DEBUG_PLACEMENT) {
-          console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
-        }
+        console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[finalisePos] NaN after applyCornerClearance', { p, canon, base });
@@ -1698,9 +1672,7 @@ const layoutNormalized =
         }
         
         p = applyRoomBoundsClamp(p, safeModel, dims);
-        if (globalThis.__B44_DEBUG_PLACEMENT) {
-          console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
-        }
+        console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[finalisePos] NaN after applyRoomBoundsClamp', { p, canon, base });
@@ -1768,14 +1740,12 @@ const layoutNormalized =
         if (!Number.isFinite(p.y)) p.y = dims.length / 2;
         if (!Number.isFinite(p.z)) p.z = 1.1; // Default height
 
-        if (globalThis.__B44_DEBUG_PLACEMENT) {
-          console.log(
-            '[finalisePos] AFTER wall-hugging & corner guard:',
-            'canon=', canon,
-            'p.x=', Number.isFinite(p.x) ? p.x.toFixed(3) : p.x,
-            'p.y=', Number.isFinite(p.y) ? p.y.toFixed(3) : p.y
-          );
-        }
+        console.log(
+          '[finalisePos] AFTER wall-hugging & corner guard:',
+          'canon=', canon,
+          'p.x=', Number.isFinite(p.x) ? p.x.toFixed(3) : p.x,
+          'p.y=', Number.isFinite(p.y) ? p.y.toFixed(3) : p.y
+        );
 
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[SP resetSurroundPositions] dropping surround with invalid position', {
@@ -1821,9 +1791,7 @@ const layoutNormalized =
           const base = { x: baseWithWall.x, y: baseWithWall.y };
           const hitWall = baseWithWall.wall;
           
-          if (globalThis.__B44_DEBUG_PLACEMENT) {
-      console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
-    }
+          console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
           
           let pos  = finalisePos(base, canon, resolvedModel, hitWall);
 
@@ -1862,14 +1830,12 @@ const layoutNormalized =
           });
         };
 
-      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.table(next.map(s => ({
         role: s.role, model: s.model,
         x: s.position?.x?.toFixed(3),
         y: s.position?.y?.toFixed(3),
         yaw: s.rotation?.z
       })));
-    }
 
         const sideAngle = (major >= 7) ? 100 : 115;
 
@@ -1899,7 +1865,6 @@ const layoutNormalized =
         }
 
       // [B44 DIAGNOSTIC] Log all surround outputs before return
-      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.log(
         "[SP] resetSurroundPositions OUTPUT",
         next.map((s) => ({
@@ -1918,7 +1883,6 @@ const layoutNormalized =
         y: s.position?.y?.toFixed(3),
         yaw: s.rotation?.z
       })));
-    }
 
       return next;
     },
@@ -1945,14 +1909,6 @@ const layoutNormalized =
 
   useEffect(() => {
     if (!mlpPoint || !dimensions) return;
-
-    // Guard A: dimensions must be valid
-    const w = Number(dimensions?.widthM ?? dimensions?.width ?? roomDims?.widthM ?? roomDims?.width);
-    const l = Number(dimensions?.lengthM ?? dimensions?.length ?? roomDims?.lengthM ?? roomDims?.length);
-    const h = Number(dimensions?.heightM ?? dimensions?.height ?? roomDims?.heightM ?? roomDims?.height);
-    if (!Number.isFinite(w) || !Number.isFinite(l) || !Number.isFinite(h) || w <= 0 || l <= 0 || h <= 0) {
-      return;
-    }
 
     setSpeakers(prev => {
       // Only auto-adjust speakers that haven't been manually positioned
@@ -2000,13 +1956,7 @@ const layoutNormalized =
         return dx > 0.001 || dy > 0.001 || dz > 0.001 || dRx > 0.1 || dRy > 0.1 || dRz > 0.1;
       });
       
-      if (!hasSignificantChange) return prev;
-
-      // LOOP GUARD: do not update state if placement did not materially change
-      const prevSig = makeSig(prev);
-      const nextSig = makeSig(merged);
-      if (nextSig === prevSig) return prev;
-      return merged;
+      return hasSignificantChange ? merged : prev;
     });
 
     lastPresetRef.current = effectivePreset;
@@ -2028,28 +1978,16 @@ const layoutNormalized =
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (!canWides || !dimensions) {
-      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.log('[SP FW MEDIAN] SKIP: no wides or dimensions', { canWides, dimensions: !!dimensions });
-    }
       return;
     }
 
-    if (globalThis.__B44_DEBUG_PLACEMENT) {
-      console.log('[SP FW MEDIAN] RUNNING (unconditional)', {
+    console.log('[SP FW MEDIAN] RUNNING (unconditional)', {
       canWides,
       dimensionsW: dimensions?.width,
       dimensionsL: dimensions?.length,
       enableFrontWides // This variable is now intentionally unused in deps
     });
-    }
-
-    // Guard A: dimensions must be valid
-    const w = Number(dimensions?.widthM ?? dimensions?.width ?? roomDims?.widthM ?? roomDims?.width);
-    const l = Number(dimensions?.lengthM ?? dimensions?.length ?? roomDims?.lengthM ?? roomDims?.length);
-    const h = Number(dimensions?.heightM ?? dimensions?.height ?? roomDims?.heightM ?? roomDims?.height);
-    if (!Number.isFinite(w) || !Number.isFinite(l) || !Number.isFinite(h) || w <= 0 || l <= 0 || h <= 0) {
-      return;
-    }
 
     setSpeakers((prev) => {
       const list = Array.isArray(prev) ? prev : [];
@@ -2135,13 +2073,7 @@ const layoutNormalized =
         return { ...s, position: pos };
       });
 
-      if (!changed) return prev;
-
-      // LOOP GUARD: do not update state if placement did not materially change
-      const prevSig = makeSig(prev);
-      const nextSig = makeSig(updated);
-      if (nextSig === prevSig) return prev;
-      return updated;
+      return changed ? updated : prev;
     });
   }, [
     canWides,
@@ -2169,13 +2101,6 @@ const layoutNormalized =
   // wall-pinned by the hugging logic.
   // [B44 POSITION LOCK] Only adjusts auto-positioned speakers
   useEffect(() => {
-    // Guard A: dimensions must be valid
-    const w = Number(dimensions?.widthM ?? dimensions?.width ?? roomDims?.widthM ?? roomDims?.width);
-    const l = Number(dimensions?.lengthM ?? dimensions?.length ?? roomDims?.lengthM ?? roomDims?.length);
-    const h = Number(dimensions?.heightM ?? dimensions?.height ?? roomDims?.heightM ?? roomDims?.height);
-    if (!Number.isFinite(w) || !Number.isFinite(l) || !Number.isFinite(h) || w <= 0 || l <= 0 || h <= 0) {
-      return;
-    }
     setSpeakers(prev => {
       if (!Array.isArray(prev) || prev.length === 0) return prev;
 
@@ -2206,7 +2131,7 @@ const layoutNormalized =
         return prev; // already correct — avoid infinite loops
       }
 
-      const result = prev.map(sp => {
+      return prev.map(sp => {
         if (!sp || !sp.position) return sp;
 
         if (sp.role === 'LW' && needsLeftAdjust) {
@@ -2231,19 +2156,6 @@ const layoutNormalized =
 
         return sp;
       });
-
-      const nextSig = JSON.stringify((result || []).map(s => ({
-        id: s?.id,
-        role: s?.role,
-        x: Number(s?.position?.x ?? s?.x ?? 0).toFixed(3),
-        y: Number(s?.position?.y ?? s?.y ?? 0).toFixed(3),
-        z: Number(s?.position?.z ?? s?.z ?? 0).toFixed(3),
-      })) ?? []);
-      if (nextSig === lastPlacementSigRef.current) {
-        return prev;
-      }
-      lastPlacementSigRef.current = nextSig;
-      return result;
     });
     // Depend on room geometry / toggles so this runs when things change,
     // but the EPS guard above prevents unnecessary setState loops.
@@ -2315,13 +2227,7 @@ const layoutNormalized =
         return speaker;
       });
       
-      if (!changed) return prev;
-
-      // LOOP GUARD: do not update state if placement did not materially change
-      const prevSig = makeSig(prev);
-      const nextSig = makeSig(updated);
-      if (nextSig === prevSig) return prev;
-      return updated;
+      return changed ? updated : prev;
     });
   }, [
     overheadCount,

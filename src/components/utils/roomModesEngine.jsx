@@ -109,9 +109,6 @@ export function computeRoomModesResponse({
   // DEBUG (off by default)
   // To enable in preview: run in browser console once: globalThis.__B44_BASS_DEBUG = true
   const __debugBass = !!globalThis.__B44_BASS_DEBUG;
-
-const auditEnabled = (typeof globalThis !== "undefined" && globalThis.__B44_BASS_AUDIT === true);
-const audit40_70 = auditEnabled ? {} : null;
   
   // DIAGNOSTIC: Source position sensitivity test
   const DIAG_POS = Boolean(globalThis.__B44_BASS_DIAG_POS);
@@ -1597,16 +1594,6 @@ const audit40_70 = auditEnabled ? {} : null;
     modalPlusSbir: buildParityStats(rawCoherentDb, finalPlottedDb),
   };
 
-  // Guarded 40–70 Hz stage audit (no math/UI changes)
-  if (auditEnabled && audit40_70) {
-    audit40_70.coherentRawDb = peakDipDelta(freqs, rawCoherentDb, 40, 70);
-    audit40_70.splDb = peakDipDelta(freqs, splDb, 40, 70);
-    audit40_70.splDbForPipeline = peakDipDelta(freqs, splDbForPipeline, 40, 70);
-    audit40_70.splDbSchroeder = peakDipDelta(freqs, splDbSchroeder, 40, 70);
-    audit40_70.splDbRepaired = peakDipDelta(freqs, splDbRepaired, 40, 70);
-    audit40_70.plottedDb = peakDipDelta(freqs, plottedDb, 40, 70);
-  }
-
   // When debug is enabled, also include RAW-only component view stats (no final pipeline duplication)
   if (__debugBass && !isDragging) {
     const modalOnlyPass = runOnce(null, sbirTrimLinear, "modalOnly");
@@ -1815,7 +1802,6 @@ const audit40_70 = auditEnabled ? {} : null;
         };
       }) : null,
       parityAudits,
-      audit40_70: auditEnabled ? audit40_70 : null,
       }
       };
 
