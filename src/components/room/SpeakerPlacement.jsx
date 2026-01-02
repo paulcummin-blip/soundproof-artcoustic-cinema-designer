@@ -1658,6 +1658,7 @@ function SpeakerPlacementImpl(props) {
       
       const localAllowedRoles = new Set(localAllowedRolesArray.map(getCanonicalRole));
 
+      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.log('[SP] resetSurroundPositions CONFIG', {
         layoutNormalized, major,
         useWidesInsteadOfRear: useWides,
