@@ -109,6 +109,13 @@ export function computeRoomModesResponse({
   // DEBUG (off by default)
   // To enable in preview: run in browser console once: globalThis.__B44_BASS_DEBUG = true
   const __debugBass = !!globalThis.__B44_BASS_DEBUG;
+
+// AUDIT ENABLE (no console needed): add ?b44Audit=1 to the URL
+const __audit40_70_enabled =
+  (typeof window !== 'undefined' &&
+   typeof window.location?.search === 'string' &&
+   window.location.search.includes('b44Audit=1'));
+
   
   // DIAGNOSTIC: Source position sensitivity test
   const DIAG_POS = Boolean(globalThis.__B44_BASS_DIAG_POS);
@@ -1653,7 +1660,28 @@ export function computeRoomModesResponse({
     ? safePlottedDbRaw.map(v => (Number.isFinite(v) ? (v + displayOffsetDb) : v))
     : safePlottedDbRaw;
 
-  const baseReturn = {
+  // ------------------------------
+// 40–70 Hz AUDIT (guarded, no console)
+// Captures stage-by-stage peak–dip delta so we can see where range collapses
+// Enabled only when URL includes ?b44Audit=1
+// ------------------------------
+let audit40_70 = null;
+
+if (__audit40_70_enabled) {
+  const pickStage = (arr) => (Array.isArray(arr) && arr.length ? arr : null);
+
+  audit40_70 = {
+    coherentRawDb: peakDipDelta(freqs, pickStage(coherentRawDb), 40, 70),
+    splDb: peakDipDelta(freqs, pickStage(splDb), 40, 70),
+    splDbForPipeline: peakDipDelta(freqs, pickStage(splDbForPipeline), 40, 70),
+    splDbSchroeder: peakDipDelta(freqs, pickStage(splDbSchroeder), 40, 70),
+    splDbRepaired: peakDipDelta(freqs, pickStage(splDbRepaired), 40, 70),
+    plottedDb: peakDipDelta(freqs, pickStage(plottedDb), 40, 70),
+  };
+}
+
+const baseReturn = {
+
     freqs: [...safeFreqs],
     splDb: [...safeDisplayDb], // Display version (with offset applied in REW+Relative)
     engineFinalDb: rewParityMode ? [...safeFinalDb] : null, // Engine truth (no offset)
@@ -1802,6 +1830,8 @@ export function computeRoomModesResponse({
         };
       }) : null,
       parityAudits,
+      audit40_70,
+
       }
       };
 
