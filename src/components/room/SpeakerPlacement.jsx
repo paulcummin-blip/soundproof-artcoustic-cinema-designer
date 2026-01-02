@@ -1212,13 +1212,15 @@ function SpeakerPlacementImpl(props) {
   const roomDims = app?.dimensions || dimensions;
 
   if (globalThis.__B44_DEBUG_PLACEMENT) {
+    if (globalThis.__B44_DEBUG_PLACEMENT) {
     console.log("[B44] DIMENSIONS CHECK", {
-    raw: dimensions,
-    width: dimensions?.width,
-    length: dimensions?.length,
-    height: dimensions?.height,
-    keys: dimensions ? Object.keys(dimensions) : null
-  });
+      raw: dimensions,
+      width: dimensions?.width,
+      length: dimensions?.length,
+      height: dimensions?.height,
+      keys: dimensions ? Object.keys(dimensions) : null
+    });
+  }
 
   const frontSubsCfg = app?.frontSubsCfg || props?.frontSubsCfg || { 
     enabled: false, count: 0, model: null, placement: "front" 
