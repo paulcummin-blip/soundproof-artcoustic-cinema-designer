@@ -1632,8 +1632,8 @@ export function computeRoomModesResponse({
 
   const baseReturn = {
     freqs: [...safeFreqs],
-    splDb: [...safeDisplayDb], // Display version (with offset applied in REW+Relative)
-    engineFinalDb: rewParityMode ? [...safeFinalDb] : null, // Engine truth (no offset)
+    splDb: [...safeDisplayDb],
+    engineFinalDb: rewParityMode ? [...safeFinalDb] : null,
     plottedDb: [...safeDisplayPlottedDb],
     coherentRawDb: rewParityMode ? [...rawCoherentDb] : null,
     debug: {
