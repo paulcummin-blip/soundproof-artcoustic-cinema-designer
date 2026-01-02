@@ -400,6 +400,38 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         sbirDebugSingleFrontWall: sbirDebugSingleFrontWall // DIAGNOSTIC: single reflection mode
       });
 
+      if (globalThis.__B44_BASS_AUDIT && result?.debug && Array.isArray(result.freqs)) {
+        try {
+          result.debug.audit40_70 = {
+            coherentRawDb: Array.isArray(result.coherentRawDb)
+              ? peakDipDelta(result.freqs, result.coherentRawDb, 40, 70)
+              : null,
+
+            splDb: Array.isArray(result.splDb)
+              ? peakDipDelta(result.freqs, result.splDb, 40, 70)
+              : null,
+
+            splDbForPipeline: Array.isArray(result.debug?.splDbForPipeline)
+              ? peakDipDelta(result.freqs, result.debug.splDbForPipeline, 40, 70)
+              : null,
+
+            splDbSchroeder: Array.isArray(result.debug?.splDbSchroeder)
+              ? peakDipDelta(result.freqs, result.debug.splDbSchroeder, 40, 70)
+              : null,
+
+            splDbRepaired: Array.isArray(result.debug?.splDbRepaired)
+              ? peakDipDelta(result.freqs, result.debug.splDbRepaired, 40, 70)
+              : null,
+
+            plottedDb: Array.isArray(result.plottedDb)
+              ? peakDipDelta(result.freqs, result.plottedDb, 40, 70)
+              : null
+          };
+        } catch {
+          // absolute fail-safe: audit must never break rendering
+        }
+      }
+
       // Clear failure cache on success
       lastRewFailSigRef.current = null;
       lastRewFailResultRef.current = null;
