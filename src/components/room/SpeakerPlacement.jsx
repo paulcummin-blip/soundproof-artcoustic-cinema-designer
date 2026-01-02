@@ -1885,22 +1885,19 @@ function SpeakerPlacementImpl(props) {
 
   const handleResetPositions = useCallback(() => {
     if (!mlpPoint || !dimensions || !Number.isFinite(dimensions.width) || !Number.isFinite(dimensions.length) || !Number.isFinite(dimensions.height)) {
-      if (globalThis.__B44_LOGS) console.warn('[SP] resetSurroundPositions ABORT: invalid dimensions', dimensions);
-      return currentSpeakers || [];
-    }
       if (showToast) {
         if (globalThis.__B44_LOGS) console.error('Cannot reset speakers: Room dimensions or MLP not set.');
         showToast('Cannot reset speakers: Room dimensions or MLP not set.', 'error');
       }
       return;
     }
-    
+
     setSpeakers(currentSpeakers => {
       const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, globalSurroundModel);
       // Clear positionSource for all speakers (return to auto mode)
       return reset.map(s => ({ ...s, positionSource: 'auto' }));
     });
-    
+
     if (showToast) {
       const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : effectivePreset.startsWith('9.') ? '9.x' : '7.1';
       showToast(`Speaker positions reset for ${layoutKey} layout with 50cm corner clearance.`, 'success');
