@@ -1628,6 +1628,7 @@ function SpeakerPlacementImpl(props) {
     }
       dims = safeDims;
 
+      if (globalThis.__B44_DEBUG_PLACEMENT) {
       console.log('[SP] resetSurroundPositions START', {
         layoutString, mlp, dims,
         currentSpeakersCount: currentSpeakers?.length,
