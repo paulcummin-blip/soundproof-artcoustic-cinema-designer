@@ -1767,12 +1767,14 @@ function SpeakerPlacementImpl(props) {
         if (!Number.isFinite(p.y)) p.y = dims.length / 2;
         if (!Number.isFinite(p.z)) p.z = 1.1; // Default height
 
-        console.log(
-          '[finalisePos] AFTER wall-hugging & corner guard:',
-          'canon=', canon,
-          'p.x=', Number.isFinite(p.x) ? p.x.toFixed(3) : p.x,
-          'p.y=', Number.isFinite(p.y) ? p.y.toFixed(3) : p.y
-        );
+        if (globalThis.__B44_DEBUG_PLACEMENT) {
+          console.log(
+            '[finalisePos] AFTER wall-hugging & corner guard:',
+            'canon=', canon,
+            'p.x=', Number.isFinite(p.x) ? p.x.toFixed(3) : p.x,
+            'p.y=', Number.isFinite(p.y) ? p.y.toFixed(3) : p.y
+          );
+        }
 
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           console.warn('[SP resetSurroundPositions] dropping surround with invalid position', {
