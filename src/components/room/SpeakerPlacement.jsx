@@ -1634,6 +1634,7 @@ function SpeakerPlacementImpl(props) {
         currentSpeakersCount: currentSpeakers?.length,
         globalSurroundModelParam
       });
+      }
 
       if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
         console.warn('[SP] resetSurroundPositions ABORT: missing data');
