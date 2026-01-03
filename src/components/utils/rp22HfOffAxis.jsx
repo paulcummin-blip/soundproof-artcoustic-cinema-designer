@@ -423,7 +423,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
     }
 
-    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxisDeg, lossDb });
+    if (globalThis.__B44_LOGS) console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxisDeg, lossDb });
 
     return {
       role,
