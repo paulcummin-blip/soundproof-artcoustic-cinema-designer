@@ -61,6 +61,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     typeof globalThis !== 'undefined' && globalThis.__B44_BASS_AUDIT === true
   ); // Bass audit UI visibility
   const [auditEpoch, setAuditEpoch] = useState(0); // Force re-simulation when audit toggled
+  const [rewSbirEnabled, setRewSbirEnabled] = useState(false); // SBIR reflections toggle
 
   // Sensitivity audit refs (track previous run)
   const prevSourceSigRef = useRef(null);
@@ -268,10 +269,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         globalEqHeadroomDb: splConfig?.globalEqHeadroomDb ?? 0,
         radiationMode: splConfig?.radiationMode ?? 'half-space',
         modesEnabled,
-        roomDamping
+        roomDamping,
+        sbirEnabled: rewSbirEnabled
       }
     });
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, modesEnabled, roomDamping, hasNoSeats, hasNoSubs, auditEpoch]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, modesEnabled, roomDamping, rewSbirEnabled, hasNoSeats, hasNoSubs, auditEpoch]);
   
   const bassAudit = simulationResults.audit || null;
 
@@ -4022,10 +4024,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </Alert>
       )}
       
-      {/* Room Modes Controls */}
+      {/* Room Modes & SBIR Controls */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
-        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Modes (Product Simulation)</div>
+        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Acoustics (Product Simulation)</div>
         <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label htmlFor="sbir-toggle" className="text-xs text-[#3E4349]">
+                SBIR (reflections)
+              </Label>
+              <div className="text-[10px] text-[#3E4349] opacity-70 mt-0.5">
+                Adds first-order reflections (image sources). Disables boundary gain when enabled.
+              </div>
+            </div>
+            <Switch
+              id="sbir-toggle"
+              checked={rewSbirEnabled}
+              onCheckedChange={setRewSbirEnabled}
+            />
+          </div>
+
           <div className="flex items-center justify-between">
             <Label htmlFor="modes-toggle" className="text-xs text-[#3E4349]">
               Enable Room Modes

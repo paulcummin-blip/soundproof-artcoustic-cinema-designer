@@ -418,6 +418,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   const radiationMode = splConfig?.radiationMode ?? 'half-space';
   const modesEnabled = splConfig?.modesEnabled ?? false;
   const roomDamping = splConfig?.roomDamping ?? 20; // Q value: 8 (dead) to 35 (lively)
+  const sbirEnabled = splConfig?.sbirEnabled === true; // SBIR reflections toggle
   
   const dbPower = 10 * Math.log10(Math.max(1, powerW));
   const dbEq = -eqHeadroomDb;
@@ -460,8 +461,8 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         // Distance loss
         const dbDist = -20 * Math.log10(d / 1);
 
-        // Boundary gain
-        const dbBoundary = calculateBoundaryGain({ x: sub.x, y: sub.y, z: sub.z }, roomDims, radiationMode);
+        // Boundary gain (disabled when SBIR is enabled to prevent double-counting)
+        const dbBoundary = sbirEnabled ? 0 : calculateBoundaryGain({ x: sub.x, y: sub.y, z: sub.z }, roomDims, radiationMode);
 
         // Apply user gain adjustment
         const dbGain = tuning.gainDb;
@@ -489,13 +490,60 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         // Guard against non-finite phase
         if (!isFinite(phi)) return;
 
-        // Complex contribution from this sub (before modal filtering)
+        // Complex contribution from this sub (direct path)
         const subReal = amplitude * Math.cos(phi);
         const subImag = amplitude * Math.sin(phi);
 
-        // Apply modal filtering if enabled (per sub-seat path)
+        // Start with direct path
+        let totalSubReal = subReal;
+        let totalSubImag = subImag;
+
+        // Add SBIR (first-order image sources) if enabled
+        if (sbirEnabled) {
+          const reflCoeff = 0.90; // Rigid reflection coefficient (minimal absorption)
+          
+          // Image sources: reflect sub position across each boundary
+          const imageSources = [
+            // Left wall (x=0)
+            { x: -sub.x, y: sub.y, z: sub.z, wall: 'left' },
+            // Right wall (x=widthM)
+            { x: 2 * roomDims.widthM - sub.x, y: sub.y, z: sub.z, wall: 'right' },
+            // Front wall (y=0)
+            { x: sub.x, y: -sub.y, z: sub.z, wall: 'front' },
+            // Back wall (y=lengthM)
+            { x: sub.x, y: 2 * roomDims.lengthM - sub.y, z: sub.z, wall: 'back' },
+            // Floor (z=0)
+            { x: sub.x, y: sub.y, z: -sub.z, wall: 'floor' }
+          ];
+          
+          // Add each image source contribution
+          imageSources.forEach(imgSub => {
+            const dx_img = imgSub.x - seatPos.x;
+            const dy_img = imgSub.y - seatPos.y;
+            const dz_img = imgSub.z - seatPos.z;
+            const d_img = Math.max(MIN_DISTANCE, Math.sqrt(dx_img*dx_img + dy_img*dy_img + dz_img*dz_img));
+            
+            // Image path magnitude (no boundary gain for reflected paths)
+            const dbMag_img = db0 + (-20 * Math.log10(d_img / 1)) + dbPower + dbEq + dbGain;
+            const amplitude_img = Math.pow(10, dbMag_img / 20) * reflCoeff;
+            
+            if (!isFinite(amplitude_img)) return;
+            
+            // Image path phase (includes distance, user delay, and polarity)
+            const phiDistance_img = -2 * Math.PI * f * (d_img / SPEED_OF_SOUND);
+            const phi_img = phiDistance_img + phiDelay + phiPolarity;
+            
+            if (!isFinite(phi_img)) return;
+            
+            // Add image source complex contribution
+            totalSubReal += amplitude_img * Math.cos(phi_img);
+            totalSubImag += amplitude_img * Math.sin(phi_img);
+          });
+        }
+
+        // Apply modal filtering to composite (direct + SBIR) pressure
         const { real: filteredReal, imag: filteredImag } = applyModesToComplexPressure(
-          subReal, subImag, f, modes, sub, seatPos, roomDamping, modesEnabled
+          totalSubReal, totalSubImag, f, modes, sub, seatPos, roomDamping, modesEnabled
         );
 
         // Record audit data if enabled for this frequency and seat
