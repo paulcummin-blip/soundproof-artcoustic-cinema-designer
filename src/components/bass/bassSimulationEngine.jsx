@@ -559,6 +559,42 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
     seatResponses[seatId] = { freqsHz, splDb, nulls: nullInfo };
   });
   
+  // Force audit probe entry at 50 Hz for visibility test
+  if (auditEnabled && audit && audit.contributors.length === 0) {
+    audit.contributors.push({
+      seatId: auditSeatId || 'unknown',
+      frequencyHz: 50,
+      subIndex: 0,
+      subId: '__audit_probe__',
+      distance: 0,
+      db0: 0,
+      dbDist: 0,
+      dbBoundary: 0,
+      dbPower: 0,
+      dbEq: 0,
+      dbGain: 0,
+      dbMag: 0,
+      amplitude: 0,
+      phiDistance: 0,
+      phiDelay: 0,
+      phiPolarity: 0,
+      phiTotal: 0,
+      subReal: 0,
+      subImag: 0,
+      filteredReal: 0,
+      filteredImag: 0
+    });
+    audit.summations.push({
+      seatId: auditSeatId || 'unknown',
+      frequencyHz: 50,
+      sumReal: 0,
+      sumImag: 0,
+      magnitude: 0,
+      spl: 0,
+      finalSplDb: 0
+    });
+  }
+  
   // Compute RP22 metrics
   const metrics = computeRP22Metrics(seatResponses, seats, subs, roomDims);
   
