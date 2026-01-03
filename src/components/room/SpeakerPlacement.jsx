@@ -1990,6 +1990,14 @@ function SpeakerPlacementImpl(props) {
       return userVersion || speaker;
     });
 
+    if (globalThis.__B44_LOGS) {
+      console.log('[SP] speakerApply effect OUTPUT:', nextSpeakers.map(s => ({
+        role: s.role,
+        model: s.model,
+        hasPos: !!s.position
+      })));
+    }
+
     // Only set when meaningfully changed - use functional update to prevent loops
     setSpeakers((current) => {
       if (!Array.isArray(nextSpeakers)) return current;
