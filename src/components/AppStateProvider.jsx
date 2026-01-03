@@ -505,7 +505,7 @@ function useDesignerState() {
           : [];
 
         // DEBUG: show exactly what roles we are receiving and storing.
-        if (globalThis.__B44_LOGS) {
+        if (typeof window !== "undefined" && window.console) {
           console.log("[AS] setSpeakerSystem RAW incoming roles:",
             speakers.map(s => s && String(s.role)));
         }
@@ -516,7 +516,7 @@ function useDesignerState() {
           placedSpeakers: speakers,
         };
 
-        if (globalThis.__B44_LOGS) {
+        if (typeof window !== "undefined" && window.console) {
           console.log("[AS] setSpeakerSystem STORED roles:",
             (result.placedSpeakers || []).map(s => s && String(s.role)));
         }

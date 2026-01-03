@@ -1332,19 +1332,6 @@ function SpeakerPlacementImpl(props) {
   const __b44LastApplySigRef = React.useRef(null);
   const __b44LastEffectSigRef = useRef({});
 
-  // Stable signature for the main speaker apply effect dependency list
-  const applySigInputs = useMemo(() => {
-    return __b44SigFor({
-      preset: effectivePreset,
-      globalModel: globalSurroundModel,
-      mlpX: mlpPoint?.x,
-      mlpY: mlpPoint?.y,
-      dimsW: dimensions?.width,
-      dimsL: dimensions?.length,
-      roles: Array.from(allowedRoles).sort().join(',')
-    });
-  }, [effectivePreset, globalSurroundModel, mlpPoint?.x, mlpPoint?.y, dimensions?.width, dimensions?.length, allowedRoles]);
-
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
     
@@ -2031,7 +2018,14 @@ function SpeakerPlacementImpl(props) {
     });
 
     lastPresetRef.current = effectivePreset;
-  }, [applySigInputs, resetSurroundPositions, setSpeakers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    effectivePreset,
+    globalSurroundModel,
+    mlpPoint?.x, mlpPoint?.y,
+    dimensions?.width, dimensions?.length,
+    allowedRoles // Dependency added to re-evaluate on layout change (NOTE: This dependency is okay for general reruns, but was made explicit by the previous change to `allowedRoles` logic.)
+  ]);
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
