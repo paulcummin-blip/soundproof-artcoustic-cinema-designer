@@ -1811,7 +1811,75 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // Optional polarity optimisation (existing behaviour kept)
     if (tryPolarity && count > 1) {
-...
+      const testFreqs = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80];
+
+      const scorePolarity = (polarityConfig) => {
+        const testSubs = subData.map(({ subId, pos }, i) => ({
+          id: subId,
+          modelKey: cfg?.model,
+          x: pos.x,
+          y: pos.y,
+          z: 0.35,
+          tuning: {
+            gainDb: 0,
+            delayMs: newSettings[subId].delayMs,
+            polarity: polarityConfig[i] ? 180 : 0
+          }
+        }));
+
+        let totalSpl = 0;
+        testFreqs.forEach(f => {
+          let sumReal = 0;
+          let sumImag = 0;
+
+          testSubs.forEach(sub => {
+            const dx = sub.x - mlpPoint.x;
+            const dy = sub.y - mlpPoint.y;
+            const dz = sub.z - mlpPoint.z;
+            const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+
+            const amplitude = Math.pow(10, (90 - 20 * Math.log10(d)) / 20);
+
+            let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
+            phi += -2 * Math.PI * f * (sub.tuning.delayMs / 1000);
+            if (sub.tuning.polarity === 180) phi += Math.PI;
+
+            sumReal += amplitude * Math.cos(phi);
+            sumImag += amplitude * Math.sin(phi);
+          });
+
+          const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+          const spl = 20 * Math.log10(magnitude);
+          totalSpl += spl;
+        });
+
+        return totalSpl / testFreqs.length;
+      };
+
+      const bestConfig = [false, false];
+      let bestScore = scorePolarity(bestConfig);
+
+      if (count === 2) {
+        const configs = [
+          [false, false],
+          [false, true],
+          [true, false],
+          [true, true]
+        ];
+
+        configs.forEach(config => {
+          const score = scorePolarity(config);
+          if (score > bestScore + 0.5) {
+            bestScore = score;
+            bestConfig[0] = config[0];
+            bestConfig[1] = config[1];
+          }
+        });
+      }
+
+      subData.forEach(({ subId }, i) => {
+        newSettings[subId].polarity = bestConfig[i] ? "invert" : "normal";
+      });
     }
 
     // --- APPLY GUARD: only set state if settings for active subIds actually changed
