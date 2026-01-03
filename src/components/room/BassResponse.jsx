@@ -3783,6 +3783,70 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </div>
       </div>
 
+      {/* Bass Audit Debug Block (Always Visible) */}
+      {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_AUDIT === true && (
+        <div className="rounded-lg border-4 border-red-600 bg-red-50 p-4 mb-4">
+          <div className="text-sm font-bold text-red-900 mb-3">
+            BASS AUDIT – ENGINE INTERNAL VALUES (DEBUG)
+          </div>
+          {bassAudit && Array.isArray(bassAudit.contributors) && bassAudit.contributors.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs font-mono border-collapse">
+                <thead>
+                  <tr className="border-b-2 border-red-400">
+                    <th className="text-left p-2 text-red-900">Frequency (Hz)</th>
+                    <th className="text-left p-2 text-red-900">Sub ID</th>
+                    <th className="text-right p-2 text-red-900">Distance (m)</th>
+                    <th className="text-right p-2 text-red-900">Amplitude</th>
+                    <th className="text-right p-2 text-red-900">Phase (rad)</th>
+                    <th className="text-right p-2 text-red-900">Final SPL (dB)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(() => {
+                    // Show only 50 Hz entries
+                    const entries50Hz = bassAudit.contributors.filter(c => c.frequencyHz === 50);
+                    
+                    if (entries50Hz.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan="6" className="p-2 text-center text-red-700">
+                            No 50 Hz data in audit
+                          </td>
+                        </tr>
+                      );
+                    }
+                    
+                    return entries50Hz.map((contrib, idx) => {
+                      const summation = bassAudit.summations.find(s => 
+                        s.frequencyHz === 50 && s.seatId === contrib.seatId
+                      );
+                      
+                      return (
+                        <tr key={idx} className="border-b border-red-200 hover:bg-red-100">
+                          <td className="p-2">{contrib.frequencyHz}</td>
+                          <td className="p-2">{contrib.subId}</td>
+                          <td className="text-right p-2">{contrib.distance.toFixed(2)}</td>
+                          <td className="text-right p-2">{contrib.amplitude.toFixed(4)}</td>
+                          <td className="text-right p-2">{contrib.phiTotal.toFixed(4)}</td>
+                          <td className="text-right p-2 font-bold">
+                            {summation ? summation.finalSplDb.toFixed(2) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-sm text-red-700 font-mono">
+              Audit enabled but no data received from engine.
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Bass Audit Table (REW Comparison) */}
       {auditUiEnabled && bassAudit && Array.isArray(bassAudit.contributors) && bassAudit.contributors.length > 0 && (
         <div className="rounded-lg border border-[#213428] bg-[#213428]/5 p-4">
