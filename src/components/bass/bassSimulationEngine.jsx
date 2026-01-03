@@ -378,19 +378,20 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   // Audit instrumentation (diagnostic only, no behavior change)
   const auditEnabled = globalThis.__B44_BASS_AUDIT === true;
   const auditFrequencies = [20, 30, 40, 50, 63, 80, 100, 125, 160];
-  let audit = null;
+  let audit = {
+    enabled: auditEnabled,
+    seatId: null,
+    frequencies: [],
+    contributors: [],
+    summations: []
+  };
   let auditSeatId = null;
   
   if (auditEnabled) {
     // Select primary seat or first seat for audit
     const auditSeat = seats.find(s => s.isPrimary) || seats[0];
     auditSeatId = auditSeat.id || `${auditSeat.x}-${auditSeat.y}`;
-    audit = {
-      seatId: auditSeatId,
-      frequencies: [],
-      contributors: [],
-      summations: []
-    };
+    audit.seatId = auditSeatId;
   }
   
   // Load curves for all unique models
@@ -560,7 +561,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   });
   
   // Force audit probe entry at 50 Hz for visibility test
-  if (auditEnabled && audit && audit.contributors.length === 0) {
+  if (auditEnabled && audit.contributors.length === 0) {
     audit.contributors.push({
       seatId: auditSeatId || 'unknown',
       frequencyHz: 50,

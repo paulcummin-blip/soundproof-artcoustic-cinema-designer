@@ -60,6 +60,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [auditUiEnabled, setAuditUiEnabled] = useState(
     typeof globalThis !== 'undefined' && globalThis.__B44_BASS_AUDIT === true
   ); // Bass audit UI visibility
+  const [auditEpoch, setAuditEpoch] = useState(0); // Force re-simulation when audit toggled
 
   // Sensitivity audit refs (track previous run)
   const prevSourceSigRef = useRef(null);
@@ -148,17 +149,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewStyleMode, rewSmoothing]);
 
-  // Poll global audit flag and update UI state
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const flagValue = typeof globalThis !== 'undefined' && globalThis.__B44_BASS_AUDIT === true;
-      if (flagValue !== auditUiEnabled) {
-        setAuditUiEnabled(flagValue);
-      }
-    }, 250); // 250ms polling
-    
-    return () => clearInterval(interval);
-  }, [auditUiEnabled]);
+  // Bass Audit toggle handler
+  const handleAuditToggle = (enabled) => {
+    if (typeof globalThis !== 'undefined') {
+      globalThis.__B44_BASS_AUDIT = enabled;
+    }
+    setAuditUiEnabled(enabled);
+    setAuditEpoch(v => v + 1); // Force re-simulation
+  };
 
   // Auto-enable Lock Y-axis when REW mode is turned ON
   React.useEffect(() => {
@@ -273,7 +271,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDamping
       }
     });
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, modesEnabled, roomDamping, hasNoSeats, hasNoSubs]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, modesEnabled, roomDamping, hasNoSeats, hasNoSubs, auditEpoch]);
   
   const bassAudit = simulationResults.audit || null;
 
@@ -2114,6 +2112,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            {/* Bass Audit toggle (always visible) */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Label htmlFor="bass-audit" className="text-xs text-[#3E4349] whitespace-nowrap">
+                Bass Audit (REW comparison)
+              </Label>
+              <Switch
+                id="bass-audit"
+                checked={auditUiEnabled}
+                onCheckedChange={handleAuditToggle}
+              />
+            </div>
+
             {rewStyleMode && (
               <>
                 {/* Advanced controls visible only when REW mode is ON */}
@@ -3867,10 +3877,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       )}
 
       {/* Bass Audit Table (REW Comparison) */}
-      {(simulationResults?.audit && simulationResults.audit.contributors && simulationResults.audit.contributors.length > 0) && (
+      {simulationResults?.audit?.enabled === true && simulationResults.audit.contributors && simulationResults.audit.contributors.length > 0 && (
         <div className="rounded-lg border border-[#213428] bg-[#213428]/5 p-4">
           <div className="text-sm font-bold text-[#213428] mb-3">
             Bass Simulation Audit (REW Comparison)
+          </div>
+          <div className="text-xs text-[#3E4349] mb-2">
+            Audit enabled: {String(simulationResults.audit.enabled)} | 
+            contributors: {simulationResults.audit.contributors.length} | 
+            summations: {simulationResults.audit.summations.length}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-[10px] font-mono border-collapse">
