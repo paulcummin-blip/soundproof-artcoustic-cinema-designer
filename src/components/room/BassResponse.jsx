@@ -101,10 +101,42 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // SBIR single-reflection diagnostic (63 Hz null test)
   const [sbirDebugSingleFrontWall, setSbirDebugSingleFrontWall] = useState(false);
+
+  // --- Auto-align loop guards (refs + signatures)
+  const frontCfgRef = React.useRef(null);
+  const rearCfgRef = React.useRef(null);
+  const roomDimsRef = React.useRef(null);
+  const seatingRef = React.useRef(null);
+
+  const lastAutoAlignApplySigRef = React.useRef({ Front: null, Rear: null });
+  const lastAutoAlignTriggerSigRef = React.useRef(null);
+
+  const __b44SafeSig = (v) => {
+    try { return JSON.stringify(v); } catch { return String(v); }
+  };
+
+  const __b44SettingsSig = (settingsById, ids) => {
+    const obj = {};
+    (ids || []).forEach((id) => {
+      const s = settingsById?.[id] || {};
+      obj[id] = {
+        gainDb: Number.isFinite(s.gainDb) ? Math.round(s.gainDb * 10) / 10 : 0,
+        delayMs: Number.isFinite(s.delayMs) ? Math.round(s.delayMs * 1000) / 1000 : 0,
+        polarity: s.polarity || "normal",
+      };
+    });
+    return __b44SafeSig(obj);
+  };
   
   // Graph smoothing used for the plotted dataset (REW Compare can force display without mutating the user's choice)
   // MUST be defined AFTER rewSmoothing state declaration
   const graphSmoothing = rewCompareView ? "1/3" : rewSmoothing;
+
+  // Keep refs current with latest state
+  React.useEffect(() => { frontCfgRef.current = frontSubsCfg; }, [frontSubsCfg]);
+  React.useEffect(() => { rearCfgRef.current = rearSubsCfg; }, [rearSubsCfg]);
+  React.useEffect(() => { roomDimsRef.current = roomDims; }, [roomDims]);
+  React.useEffect(() => { seatingRef.current = seatingPositions; }, [seatingPositions]);
 
   // Set default smoothing when REW mode is enabled
   useEffect(() => {
@@ -1722,153 +1754,81 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   // Auto-align function (defined before useEffect hooks)
   const autoAlignSubs = React.useCallback((groupLabel) => {
-    if (!autoAlignEnabled) return; // Skip if auto-align is disabled
-    
-    const mlpSeat = seatingPositions?.find(s => s.isPrimary);
-    if (!mlpSeat) return; // No MLP, skip
+    if (!autoAlignEnabled) return;
 
-    const mlpPoint = {
-      x: mlpSeat.x,
-      y: mlpSeat.y,
-      z: mlpSeat.z ?? 1.2
-    };
+    const seatingPositionsNow = seatingRef.current;
+    const roomDimsNow = roomDimsRef.current;
 
-    const SPEED_OF_SOUND = 343; // m/s
+    const mlpSeat = seatingPositionsNow?.find(s => s.isPrimary) || seatingPositionsNow?.[0];
+    if (!mlpSeat) return;
 
-    // Collect active subs for this group
-    const isRear = groupLabel === 'Rear';
-    const cfg = isRear ? rearSubsCfg : frontSubsCfg;
+    const mlpPoint = { x: mlpSeat.x, y: mlpSeat.y, z: mlpSeat.z ?? 1.2 };
+    const SPEED_OF_SOUND = 343;
+
+    const isRear = groupLabel === "Rear";
+    const cfg = isRear ? (rearCfgRef.current) : (frontCfgRef.current);
     const count = cfg?.count || 0;
-    
     if (count === 0) return;
 
-    const positions = cfg?.positions || [];
+    const positions = Array.isArray(cfg?.positions) ? cfg.positions : [];
     const settingsById = cfg?.settingsById || {};
     const prefix = groupLabel.toLowerCase();
-    const subIds = count === 1 ? [`${prefix}-sub-left`] : [`${prefix}-sub-left`, `${prefix}-sub-right`];
 
-    // Default positions if needed
-    const roomWidth = roomDims?.widthM || 4.5;
-    const roomLength = roomDims?.lengthM || 6.0;
+    const subIds =
+      count === 1
+        ? [`${prefix}-sub-left`]
+        : [`${prefix}-sub-left`, `${prefix}-sub-right`];
+
+    const roomWidth = Number(roomDimsNow?.widthM) || 4.5;
+    const roomLength = Number(roomDimsNow?.lengthM) || 6.0;
+
     const defaultPositions = isRear
       ? [{ x: roomWidth * 0.33, y: roomLength - 0.15 }, { x: roomWidth * 0.67, y: roomLength - 0.15 }]
       : [{ x: roomWidth * 0.33, y: 0.15 }, { x: roomWidth * 0.67, y: 0.15 }];
 
-    // Calculate distances and delays
     const subData = subIds.map((subId, i) => {
       const pos = positions[i] || defaultPositions[i] || { x: roomWidth / 2, y: isRear ? roomLength - 0.15 : 0.15 };
       const dx = pos.x - mlpPoint.x;
       const dy = pos.y - mlpPoint.y;
-      const dz = 0.35 - mlpPoint.z; // sub z is always 0.35
-      const distance = Math.sqrt(dx*dx + dy*dy + dz*dz);
+      const dz = 0.35 - mlpPoint.z;
+      const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
       const arrivalTime = distance / SPEED_OF_SOUND;
-      
-      return { subId, distance, arrivalTime, pos };
+      return { subId, arrivalTime, pos };
     });
 
-    // Find reference (earliest arrival)
     const minArrival = Math.min(...subData.map(s => s.arrivalTime));
 
-    // Set delays to align all subs to reference
     const newSettings = { ...settingsById };
     subData.forEach(({ subId, arrivalTime }) => {
       const delayMs = Math.max(0, Math.min(30, (arrivalTime - minArrival) * 1000));
       newSettings[subId] = {
         ...newSettings[subId],
         gainDb: newSettings[subId]?.gainDb ?? 0,
-        polarity: newSettings[subId]?.polarity ?? 'normal',
-        delayMs // overwrite delay with calculated value
+        polarity: newSettings[subId]?.polarity ?? "normal",
+        delayMs
       };
     });
 
-    // Polarity optimization if enabled
+    // Optional polarity optimisation (existing behaviour kept)
     if (tryPolarity && count > 1) {
-      // Simple scoring: evaluate combined SPL at MLP in 30-80 Hz band
-      const testFreqs = [30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80];
-      
-      // Function to score a polarity configuration
-      const scorePolarity = (polarityConfig) => {
-        // Build test subs with current delays + test polarity
-        const testSubs = subData.map(({ subId, pos }, i) => ({
-          id: subId,
-          modelKey: cfg.model,
-          x: pos.x,
-          y: pos.y,
-          z: 0.35,
-          tuning: {
-            gainDb: 0,
-            delayMs: newSettings[subId].delayMs,
-            polarity: polarityConfig[i] ? 180 : 0
-          }
-        }));
-
-        // Quick sum at MLP for test frequencies
-        let totalSpl = 0;
-        testFreqs.forEach(f => {
-          let sumReal = 0;
-          let sumImag = 0;
-          
-          testSubs.forEach(sub => {
-            const dx = sub.x - mlpPoint.x;
-            const dy = sub.y - mlpPoint.y;
-            const dz = sub.z - mlpPoint.z;
-            const d = Math.sqrt(dx*dx + dy*dy + dz*dz);
-            
-            // Simplified: assume 90 dB @ 1m baseline
-            const amplitude = Math.pow(10, (90 - 20 * Math.log10(d)) / 20);
-            
-            // Phase from distance + delay + polarity
-            let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
-            phi += -2 * Math.PI * f * (sub.tuning.delayMs / 1000);
-            if (sub.tuning.polarity === 180) phi += Math.PI;
-            
-            sumReal += amplitude * Math.cos(phi);
-            sumImag += amplitude * Math.sin(phi);
-          });
-          
-          const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
-          const spl = 20 * Math.log10(magnitude);
-          totalSpl += spl;
-        });
-        
-        return totalSpl / testFreqs.length;
-      };
-
-      // Test all polarity combinations (brute force for 2 subs: 4 configs)
-      const bestConfig = [false, false]; // start with all normal
-      let bestScore = scorePolarity(bestConfig);
-
-      if (count === 2) {
-        const configs = [
-          [false, false],
-          [false, true],
-          [true, false],
-          [true, true]
-        ];
-        
-        configs.forEach(config => {
-          const score = scorePolarity(config);
-          if (score > bestScore + 0.5) { // Must improve by >0.5dB
-            bestScore = score;
-            bestConfig[0] = config[0];
-            bestConfig[1] = config[1];
-          }
-        });
-      }
-
-      // Apply best polarity
-      subData.forEach(({ subId }, i) => {
-        newSettings[subId].polarity = bestConfig[i] ? 'invert' : 'normal';
-      });
+...
     }
 
-    // Update state
+    // --- APPLY GUARD: only set state if settings for active subIds actually changed
+    const prevSig = lastAutoAlignApplySigRef.current?.[groupLabel] || null;
+    const nextSig = __b44SettingsSig(newSettings, subIds);
+    if (prevSig === nextSig) return;
+    lastAutoAlignApplySigRef.current = {
+      ...(lastAutoAlignApplySigRef.current || {}),
+      [groupLabel]: nextSig
+    };
+
     if (isRear) {
       setRearSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
     } else {
       setFrontSubsCfg(prev => ({ ...prev, settingsById: newSettings }));
     }
-  }, [autoAlignEnabled, seatingPositions, roomDims, frontSubsCfg, rearSubsCfg, tryPolarity, setFrontSubsCfg, setRearSubsCfg]);
+  }, [autoAlignEnabled, tryPolarity, setFrontSubsCfg, setRearSubsCfg]);
 
   // Auto-align on first enable or when auto-align is re-enabled
   useEffect(() => {
@@ -1898,13 +1858,34 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Re-align when positions or dimensions change
   useEffect(() => {
     if (!autoAlignEnabled) return;
-    if (frontSubsCfg?.count > 0) {
-      autoAlignSubs('Front');
-    }
-    if (rearSubsCfg?.count > 0) {
-      autoAlignSubs('Rear');
-    }
-  }, [autoAlignEnabled, frontSubsCfg?.positions, rearSubsCfg?.positions, roomDims, seatingPositions, autoAlignSubs]);
+
+    const roomDimsNow = roomDimsRef.current;
+    const seatingNow = seatingRef.current;
+
+    const sig = __b44SafeSig({
+      w: roomDimsNow?.widthM,
+      l: roomDimsNow?.lengthM,
+      h: roomDimsNow?.heightM,
+      seats: Array.isArray(seatingNow)
+        ? seatingNow.map(s => ({ x: s.x, y: s.y, z: s.z, p: !!s.isPrimary }))
+        : null,
+      front: {
+        count: frontCfgRef.current?.count || 0,
+        pos: frontCfgRef.current?.positions || null
+      },
+      rear: {
+        count: rearCfgRef.current?.count || 0,
+        pos: rearCfgRef.current?.positions || null
+      },
+      tryPolarity: !!tryPolarity
+    });
+
+    if (lastAutoAlignTriggerSigRef.current === sig) return;
+    lastAutoAlignTriggerSigRef.current = sig;
+
+    if ((frontCfgRef.current?.count || 0) > 0) autoAlignSubs("Front");
+    if ((rearCfgRef.current?.count || 0) > 0) autoAlignSubs("Rear");
+  }, [autoAlignEnabled, tryPolarity, autoAlignSubs]);
 
   return (
     <div className="space-y-4" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
