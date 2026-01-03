@@ -1958,14 +1958,26 @@ function SpeakerPlacementImpl(props) {
     if (!mlpPoint || !dimensions) return;
 
     // ---- build a stable input signature for this effect ----
-    const w = dimensions?.width;
-    const l = dimensions?.length;
-    const mlpX = mlpPoint?.x;
-    const mlpY = mlpPoint?.y;
-    const inputSig = `w=${Number(w).toFixed?.(3)}|l=${Number(l).toFixed?.(3)}|mlp=${Number(mlpX).toFixed?.(3)},${Number(mlpY).toFixed?.(3)}|cur=${__b44SigFor(placedSpeakers)}`;
+    const __sig = __b44SigFor({
+      w: dimensions?.width ?? null,
+      l: dimensions?.length ?? null,
+      h: dimensions?.height ?? null,
+      mlpX: mlpPoint?.x ?? null,
+      mlpY: mlpPoint?.y ?? null,
+      preset: effectivePreset ?? null,
+      globalModel: globalSurroundModel ?? null,
+      roles: Array.from(allowedRoles).sort(),
+      speakers: placedSpeakers.map(s => ({
+        role: s?.role ?? null,
+        model: s?.model ?? null,
+        x: s?.position?.x ?? null,
+        y: s?.position?.y ?? null,
+        source: s?.positionSource ?? null
+      }))
+    });
 
-    if (__b44LastApplySigRef.current === inputSig) return;
-    __b44LastApplySigRef.current = inputSig;
+    if (__b44LastEffectSigRef.current.speakerApply === __sig) return;
+    __b44LastEffectSigRef.current.speakerApply = __sig;
 
     // ---- existing logic: compute the next speakers array ----
     const preserveUserPositions = (placedSpeakers || []).filter(s => {
