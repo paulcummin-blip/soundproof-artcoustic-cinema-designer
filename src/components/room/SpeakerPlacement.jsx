@@ -350,6 +350,7 @@ function yawDegToMLP(spkPos, mlpPos) {
   return yawRad * 180 / Math.PI;
 }
 
+const SURROUND_BED_ROLES = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
 const ALL_SURROUND_ROLES = new Set(["SL","SR","SBL","SBR","LW","RW"]);
 const LCR_ROLES = new Set(["FL", "FC", "FR"]);
 const ROLE_TO_KEY = new Map([["FL", "L"], ["FC", "C"], ["FR", "R"]]);
@@ -1267,8 +1268,6 @@ function SpeakerPlacementImpl(props) {
 
   const subWarnings = app?.subWarnings || { front: [], rear: [] };
 
-  const SURROUND_BED_ROLES = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
-
   const effectivePreset = (typeof dolbyPreset === "string" && dolbyPreset) 
     || (typeof app?.dolbyLayout === "string" && app.dolbyLayout) 
     || "5.1";
@@ -1343,7 +1342,7 @@ function SpeakerPlacementImpl(props) {
     }
     
     return null;
-  }, [placedSpeakers, SURROUND_BED_ROLES]);
+  }, [placedSpeakers]);
 
   const overheadCount = useMemo(() => {
     if (!effectivePreset) return 0;
@@ -1610,13 +1609,20 @@ function SpeakerPlacementImpl(props) {
       Number(dimensions?.length) || 0, 
       "front"
     )?.mlp || null;
-  }, [seatingPositions, dimensions]);
+  }, [seatingPositions, dimensions?.width, dimensions?.length]);
 
   const setSpeakers = useCallback((updater) => {
-    setSpeakerSystem(prev => ({
-      ...prev, 
-      placedSpeakers: typeof updater === 'function' ? updater(prev?.placedSpeakers || []) : updater
-    }));
+    setSpeakerSystem(prev => {
+      const current = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
+      const next = (typeof updater === "function") ? updater(current) : updater;
+      const nextArr = Array.isArray(next) ? next : [];
+
+      if (typeof __b44SameSpeakers === "function" && __b44SameSpeakers(nextArr, current)) {
+        return prev;
+      }
+
+      return { ...prev, placedSpeakers: nextArr };
+    });
   }, [setSpeakerSystem]);
 
   const canSides = allowedRoles.has('SL') && allowedRoles.has('SR');
