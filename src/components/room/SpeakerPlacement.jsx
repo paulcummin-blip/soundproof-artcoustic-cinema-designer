@@ -1989,10 +1989,12 @@ function SpeakerPlacementImpl(props) {
       return userVersion || speaker;
     });
 
-    // ---- only set when meaningfully changed ----
-    if (!__b44SameSpeakers(placedSpeakers, nextSpeakers)) {
-      setSpeakers(nextSpeakers);
-    }
+    // Only set when meaningfully changed - use functional update to prevent loops
+    setSpeakers((current) => {
+      if (!Array.isArray(nextSpeakers)) return current;
+      if (__b44SameSpeakers(current, nextSpeakers)) return current;
+      return nextSpeakers;
+    });
 
     lastPresetRef.current = effectivePreset;
   // eslint-disable-next-line react-hooks/exhaustive-deps
