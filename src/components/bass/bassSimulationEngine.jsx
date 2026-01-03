@@ -544,8 +544,8 @@ function computeRP22Metrics(seatResponses, seats, subs = [], roomDims) {
   const p18Result = computeP18InRoomF3({ freqsHz, splDb, targetDb, minHz: 10, maxHz: 200 });
   const p19Result = computeP19DeviationBelowSchroeder({ freqsHz, splDb, targetDb, schroederHz });
   
-  // Temporary debug logging
-  if (typeof window !== 'undefined' && window.console) {
+  // Debug logging (controlled by global flag)
+  if (globalThis.__B44_LOGS) {
     console.log('[RP22 Bass Metrics]', {
       p14_maxSpl: p14Result.maxSplDb,
       p18_f3Hz: p18Result.f3Hz,
