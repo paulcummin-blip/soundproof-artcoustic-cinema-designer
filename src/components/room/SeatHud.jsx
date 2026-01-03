@@ -170,7 +170,7 @@ export default function SeatHud({
           };
 
           return (
-            <React.Fragment key={key}>
+            <div key={key}>
               <div
                 style={{
                   display: 'flex',
@@ -220,7 +220,7 @@ export default function SeatHud({
 
               {/* P17 per-speaker breakdown */}
               {key === 'p17' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
-                <>
+                <div>
                   <div
                     style={{
                       fontSize: 10,
@@ -283,9 +283,9 @@ export default function SeatHud({
                       N/A = &gt;41° off-axis; RP22 Level 2 limit
                     </div>
                   )}
-                </>
+                </div>
               )}
-            </React.Fragment>
+            </div>
           );
         })}
       </div>
@@ -345,7 +345,7 @@ export default function SeatHud({
           )}
 
           {Object.keys(tooltipData.splAtSeat.surrounds).length > 0 && (
-            <>
+            <div>
               <div
                 style={{
                   fontSize: 11,
@@ -360,7 +360,7 @@ export default function SeatHud({
                   {role}: {formatDb(spl.value)}
                 </div>
               ))}
-            </>
+            </div>
           )}
 
           {Object.keys(tooltipData.splAtSeat.overheads).length > 0 && (
