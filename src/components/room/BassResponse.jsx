@@ -2091,6 +2091,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       {/* Bass Response Graph */}
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
+        {/* B44 DEBUG STRIP (temporary) */}
+        <div style={{
+          marginTop: 8,
+          marginBottom: 12,
+          padding: '8px 10px',
+          border: '1px solid #DCDBD6',
+          borderRadius: 8,
+          background: '#FFF6E6',
+          fontSize: 12,
+          color: '#1B1A1A'
+        }}>
+          <div><strong>DEBUG</strong></div>
+          <div>globalThis.__B44_BASS_AUDIT: {String(globalThis?.__B44_BASS_AUDIT)}</div>
+          <div>simulationResults.audit exists: {String(!!simulationResults?.audit)}</div>
+          <div>contributors length: {String(simulationResults?.audit?.contributors?.length ?? 0)}</div>
+          <div>summations length: {String(simulationResults?.audit?.summations?.length ?? 0)}</div>
+          <div>hasNoSeats: {String(!!hasNoSeats)} | hasNoSubs: {String(!!hasNoSubs)}</div>
+        </div>
+
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
 
@@ -3848,7 +3867,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       )}
 
       {/* Bass Audit Table (REW Comparison) */}
-      {auditUiEnabled && bassAudit && Array.isArray(bassAudit.contributors) && bassAudit.contributors.length > 0 && (
+      {(simulationResults?.audit && simulationResults.audit.contributors && simulationResults.audit.contributors.length > 0) && (
         <div className="rounded-lg border border-[#213428] bg-[#213428]/5 p-4">
           <div className="text-sm font-bold text-[#213428] mb-3">
             Bass Simulation Audit (REW Comparison)
