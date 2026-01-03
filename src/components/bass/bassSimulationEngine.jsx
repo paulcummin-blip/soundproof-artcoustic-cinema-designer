@@ -375,6 +375,24 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
     return { seatResponses: {}, metrics: null };
   }
   
+  // Audit instrumentation (diagnostic only, no behavior change)
+  const auditEnabled = globalThis.__B44_BASS_AUDIT === true;
+  const auditFrequencies = [20, 30, 40, 50, 63, 80, 100, 125, 160];
+  let audit = null;
+  let auditSeatId = null;
+  
+  if (auditEnabled) {
+    // Select primary seat or first seat for audit
+    const auditSeat = seats.find(s => s.isPrimary) || seats[0];
+    auditSeatId = auditSeat.id || `${auditSeat.x}-${auditSeat.y}`;
+    audit = {
+      seatId: auditSeatId,
+      frequencies: [],
+      contributors: [],
+      summations: []
+    };
+  }
+  
   // Load curves for all unique models
   const modelCurves = {};
   subs.forEach(sub => {
@@ -416,8 +434,13 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
     const splDb = freqsHz.map(f => {
       let sumReal = 0;
       let sumImag = 0;
+      
+      // Check if this frequency should be audited
+      const shouldAudit = auditEnabled && 
+                         seatId === auditSeatId && 
+                         auditFrequencies.includes(f);
 
-      subs.forEach(sub => {
+      subs.forEach((sub, subIdx) => {
         const curve = modelCurves[sub.modelKey];
         if (!curve) return;
 
@@ -450,17 +473,17 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         if (!isFinite(amplitude)) return;
 
         // Time-of-flight phase
-        let phi = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
+        const phiDistance = -2 * Math.PI * f * (d / SPEED_OF_SOUND);
 
         // Apply user delay (adds phase lag)
         const delaySeconds = tuning.delayMs / 1000;
-        const phaseDelayRadians = -2 * Math.PI * f * delaySeconds;
-        phi += phaseDelayRadians;
-
+        const phiDelay = -2 * Math.PI * f * delaySeconds;
+        
         // Apply polarity (180° phase shift if inverted)
-        if (tuning.polarity === 180) {
-          phi += Math.PI;
-        }
+        const phiPolarity = (tuning.polarity === 180) ? Math.PI : 0;
+        
+        // Total phase
+        let phi = phiDistance + phiDelay + phiPolarity;
 
         // Guard against non-finite phase
         if (!isFinite(phi)) return;
@@ -474,6 +497,36 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
           subReal, subImag, f, modes, sub, seatPos, roomDamping, modesEnabled
         );
 
+        // Record audit data if enabled for this frequency and seat
+        if (shouldAudit) {
+          audit.contributors.push({
+            seatId,
+            frequencyHz: f,
+            subIndex: subIdx,
+            subId: sub.id || `sub-${subIdx}`,
+            distance: d,
+            // Raw dB components
+            db0,
+            dbDist,
+            dbBoundary,
+            dbPower,
+            dbEq,
+            dbGain,
+            dbMag,
+            // Magnitude & phase
+            amplitude,
+            phiDistance,
+            phiDelay,
+            phiPolarity,
+            phiTotal: phi,
+            // Complex values
+            subReal,
+            subImag,
+            filteredReal,
+            filteredImag
+          });
+        }
+
         // Accumulate
         sumReal += filteredReal;
         sumImag += filteredImag;
@@ -482,7 +535,22 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
       // Convert complex sum to SPL (pure pressure summation)
       const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
       const spl = 20 * Math.log10(magnitude);
-      return Math.max(MIN_SPL_FLOOR, spl);
+      const finalSpl = Math.max(MIN_SPL_FLOOR, spl);
+      
+      // Record summation audit data
+      if (shouldAudit) {
+        audit.summations.push({
+          seatId,
+          frequencyHz: f,
+          sumReal,
+          sumImag,
+          magnitude,
+          spl,
+          finalSplDb: finalSpl
+        });
+      }
+      
+      return finalSpl;
     });
     
     // Detect nulls for this seat
@@ -494,7 +562,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   // Compute RP22 metrics
   const metrics = computeRP22Metrics(seatResponses, seats, subs, roomDims);
   
-  return { seatResponses, metrics };
+  return { seatResponses, metrics, audit };
 }
 
 // Check for extreme tuning settings
