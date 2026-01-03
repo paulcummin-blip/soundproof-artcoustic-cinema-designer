@@ -57,6 +57,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [seatNudgeTest, setSeatNudgeTest] = useState(false); // Diagnostic seat nudge
   const [modalOnlyDebugView, setModalOnlyDebugView] = useState(false); // Modal-only debug view (no SBIR, no smoothing)
   const [rewPlotSeries, setRewPlotSeries] = useState('DISPLAY'); // 'RAW' | 'ENGINE' | 'DISPLAY'
+  const [auditUiEnabled, setAuditUiEnabled] = useState(
+    typeof globalThis !== 'undefined' && globalThis.__B44_BASS_AUDIT === true
+  ); // Bass audit UI visibility
 
   // Sensitivity audit refs (track previous run)
   const prevSourceSigRef = useRef(null);
@@ -144,6 +147,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       setRewSmoothing('1/3'); // Default to RP22 standard
     }
   }, [rewStyleMode, rewSmoothing]);
+
+  // Poll global audit flag and update UI state
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const flagValue = typeof globalThis !== 'undefined' && globalThis.__B44_BASS_AUDIT === true;
+      if (flagValue !== auditUiEnabled) {
+        setAuditUiEnabled(flagValue);
+      }
+    }, 250); // 250ms polling
+    
+    return () => clearInterval(interval);
+  }, [auditUiEnabled]);
 
   // Auto-enable Lock Y-axis when REW mode is turned ON
   React.useEffect(() => {
@@ -3769,7 +3784,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       </div>
 
       {/* Bass Audit Table (REW Comparison) */}
-      {globalThis.__B44_BASS_AUDIT === true && bassAudit && bassAudit.contributors && (
+      {auditUiEnabled && bassAudit && Array.isArray(bassAudit.contributors) && bassAudit.contributors.length > 0 && (
         <div className="rounded-lg border border-[#213428] bg-[#213428]/5 p-4">
           <div className="text-sm font-bold text-[#213428] mb-3">
             Bass Simulation Audit (REW Comparison)
