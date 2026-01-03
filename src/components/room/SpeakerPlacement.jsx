@@ -1330,6 +1330,7 @@ function SpeakerPlacementImpl(props) {
   const lastPresetRef = useRef(effectivePreset);
   const lastEffectSigRef = React.useRef(null);
   const __b44LastApplySigRef = React.useRef(null);
+  const __b44LastEffectSigRef = useRef({});
 
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
@@ -2014,17 +2015,22 @@ function SpeakerPlacementImpl(props) {
   // This runs whenever speakers or dimensions change, independent of overlay state.
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!canWides || !dimensions) {
-      if (globalThis.__B44_LOGS) console.log('[SP FW MEDIAN] SKIP: no wides or dimensions', { canWides, dimensions: !!dimensions });
-      return;
-    }
+    if (!canWides || !dimensions) return;
 
-    if (globalThis.__B44_LOGS) console.log('[SP FW MEDIAN] RUNNING (unconditional)', {
+    const __sig = __b44SigFor({
+      w: dimensions?.width ?? null,
+      l: dimensions?.length ?? null,
       canWides,
-      dimensionsW: dimensions?.width,
-      dimensionsL: dimensions?.length,
-      enableFrontWides // This variable is now intentionally unused in deps
+      fl: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position,
+      fr: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position,
+      sl: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position,
+      sr: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position,
+      lw: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW'),
+      rw: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'RW')
     });
+
+    if (__b44LastEffectSigRef.current.fwMedian === __sig) return;
+    __b44LastEffectSigRef.current.fwMedian = __sig;
 
     setSpeakers((prev) => {
       const list = Array.isArray(prev) ? prev : [];
@@ -2138,6 +2144,22 @@ function SpeakerPlacementImpl(props) {
   // wall-pinned by the hugging logic.
   // [B44 POSITION LOCK] Only adjusts auto-positioned speakers
   useEffect(() => {
+    const __sig = __b44SigFor({
+      w: dimensions?.width ?? null,
+      l: dimensions?.length ?? null,
+      flY: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.y,
+      frY: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.y,
+      slY: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.y,
+      srY: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.y,
+      lwY: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW')?.position?.y,
+      rwY: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'RW')?.position?.y,
+      lwSrc: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW')?.positionSource,
+      rwSrc: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'RW')?.positionSource
+    });
+
+    if (__b44LastEffectSigRef.current.fwYCorrect === __sig) return;
+    __b44LastEffectSigRef.current.fwYCorrect = __sig;
+
     setSpeakers(prev => {
       if (!Array.isArray(prev) || prev.length === 0) return prev;
 
@@ -2211,6 +2233,20 @@ function SpeakerPlacementImpl(props) {
   // Update overhead speaker models when overhead selection state changes
   useEffect(() => {
     if (overheadCount === 0) return;
+
+    const __sig = __b44SigFor({
+      count: overheadCount,
+      global: overheadGlobalModel,
+      frontOvr: overheadFrontOverride,
+      midOvr: overheadMidOverride,
+      rearOvr: overheadRearOverride,
+      useFront: useFrontGlobal,
+      useMid: useMidGlobal,
+      useRear: useRearGlobal
+    });
+
+    if (__b44LastEffectSigRef.current.overheadModels === __sig) return;
+    __b44LastEffectSigRef.current.overheadModels = __sig;
     
     const OVERHEAD_ROLES = new Set(['TFL', 'TFR', 'TFC', 'TL', 'TR', 'TML', 'TMR', 'TBL', 'TBR', 'TBC']);
     
