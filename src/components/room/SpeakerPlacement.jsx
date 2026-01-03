@@ -30,6 +30,14 @@ import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/cen
 import SurroundSplStrip from '@/components/speakers/SurroundSplStrip';
 import OverheadSplStrip from '@/components/speakers/OverheadSplStrip';
 
+const __b44SigFor = (v) => {
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
+};
+
 const P12_THRESHOLDS = { L1: 102, L2: 105, L3: 108, L4: 111 };
 const P13_THRESHOLDS = { L1: 99, L2: 102, L3: 105, L4: 108 };
 
