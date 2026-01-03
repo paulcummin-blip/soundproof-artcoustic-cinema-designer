@@ -411,7 +411,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   
   seats.forEach(seat => {
     const seatId = seat.id || `${seat.x}-${seat.y}`;
-    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 0.35 };
+    const seatPos = { x: seat.x, y: seat.y, z: Number.isFinite(seat.z) ? seat.z : 1.2 };
     
     const splDb = freqsHz.map(f => {
       let sumReal = 0;
