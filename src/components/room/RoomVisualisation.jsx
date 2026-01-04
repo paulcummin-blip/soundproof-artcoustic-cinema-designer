@@ -5714,6 +5714,40 @@ return (
     {/* CANVAS WRAPPER (no tailwind) */}
     <div style={canvasStyle}>
 
+      {/* TEMP DEBUG PANEL: Speaker Trace */}
+      {globalThis.__B44_RV_DEBUG === true && (
+        <div
+          style={{
+            position: "absolute",
+            top: 10,
+            right: 10,
+            padding: 10,
+            border: "1px solid #E0E0E0",
+            borderRadius: 8,
+            fontSize: 10,
+            lineHeight: "14px",
+            background: "#FAFAFA",
+            maxWidth: 320,
+            zIndex: 999,
+            whiteSpace: "pre-wrap"
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: 6 }}>Speaker Trace Debug</div>
+          {Object.entries(__speakerTraceDebug || {}).map(([role, d]) => (
+            <div key={role} style={{ marginBottom: 6 }}>
+              <div style={{ fontWeight: 600 }}>{role}</div>
+              <div>Placed: {String(d.existsInPlacedSpeakers)}</div>
+              <div>Has Pos: {String(d.hasPosition)} ({d.rawX}, {d.rawY})</div>
+              <div>In Room: {String(d.inRoomBounds)}</div>
+              <div>To Render: {String(d.inSpeakersToRender)}</div>
+              <div>After Renderable: {String(d.inAfterRenderable)}</div>
+              <div>After Visibility: {String(d.inAfterVisibility)}</div>
+              <div>Canvas: {d.canvasX}, {d.canvasY}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {/* ROOT SVG */}
       <svg
         ref={svgRef}
