@@ -4167,6 +4167,66 @@ useEffect(() => {
     if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
   }
 
+  // DEBUG: Ghost speaker markers (bypass all render filters)
+  // Toggle with: globalThis.__B44_RV_DEBUG = true
+  const __rvGhost = React.useMemo(() => {
+    const enabled = globalThis.__B44_RV_DEBUG === true;
+    if (!enabled) return { enabled: false, rows: [] };
+
+    const target = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
+    const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+
+    const rows = base
+      .map((s) => {
+        const role = getCanonicalRole(s?.role);
+        if (!target.has(role)) return null;
+
+        const x = s?.position?.x;
+        const y = s?.position?.y;
+
+        const hasPos = Number.isFinite(x) && Number.isFinite(y);
+        const inRoom =
+          hasPos &&
+          Number.isFinite(widthM) &&
+          Number.isFinite(lengthM) &&
+          x >= 0 &&
+          x <= widthM &&
+          y >= 0 &&
+          y <= lengthM;
+
+        let cx = null;
+        let cy = null;
+
+        // IMPORTANT: use same converters as icons
+        try {
+          if (hasPos && typeof meterToCanvasX === "function" && typeof meterToCanvasY === "function") {
+            cx = meterToCanvasX(x);
+            cy = meterToCanvasY(y);
+          }
+        } catch (e) {
+          cx = null;
+          cy = null;
+        }
+
+        const canvasOk = Number.isFinite(cx) && Number.isFinite(cy);
+
+        return {
+          role,
+          model: s?.model ?? null,
+          hasPos,
+          x: hasPos ? x : null,
+          y: hasPos ? y : null,
+          inRoom,
+          canvasOk,
+          cx,
+          cy,
+        };
+      })
+      .filter(Boolean);
+
+    return { enabled: true, rows };
+  }, [placedSpeakers, widthM, lengthM, getCanonicalRole, meterToCanvasX, meterToCanvasY]);
+
   // TEMP DEBUG: RV speaker trace (remove later)
   const __rvMissingTrace = React.useMemo(() => {
     if (globalThis.__B44_RV_DEBUG !== true) return null;
@@ -6075,6 +6135,41 @@ return (
         >
           RV LIVE: RoomVisualisation.jsx
         </text>
+
+        {/* DEBUG GHOST MARKERS — remove later */}
+        {__rvGhost?.enabled && (
+          <g data-layer="rv-ghost-debug" style={{ pointerEvents: "none" }}>
+            {/* Mini status block */}
+            <text x="12" y="36" fontSize="11" fill="#B00020">
+              Ghost: {__rvGhost.rows.length} found (SL/SR/SBL/SBR/LW/RW)
+            </text>
+
+            {__rvGhost.rows.slice(0, 6).map((r, idx) => (
+              <text
+                key={`ghost-line-${r.role}-${idx}`}
+                x="12"
+                y={52 + idx * 14}
+                fontSize="11"
+                fill="#B00020"
+              >
+                {r.role} | pos:{r.hasPos ? "Y" : "N"} | inRoom:{r.inRoom ? "Y" : "N"} | canvas:{r.canvasOk ? "Y" : "N"} | model:{String(r.model)}
+              </text>
+            ))}
+
+            {/* Markers */}
+            {__rvGhost.rows.map((r) => {
+              if (!r.canvasOk) return null;
+              return (
+                <g key={`ghost-dot-${r.role}`}>
+                  <circle cx={r.cx} cy={r.cy} r="6" fill="#B00020" opacity="0.6" />
+                  <text x={r.cx + 8} y={r.cy + 4} fontSize="12" fill="#B00020">
+                    {r.role}
+                  </text>
+                </g>
+              );
+            })}
+          </g>
+        )}
 <SvgDefs ids={ids} scale={scale} svgW={svgW} svgH={svgH} />
 
 {/* Removed debug label (zoneKeysLabel) */}
