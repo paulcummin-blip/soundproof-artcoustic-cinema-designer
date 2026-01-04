@@ -1726,6 +1726,8 @@ export function computeRoomModesResponse({
         floor: beta.floor.toFixed(3)
       } : null,
       sbirEnabled,
+      sbirEnabledPassed: includeSBIR, // Actual value passed from UI
+      modesEnabledPassed: includeAxial || includeTangential || includeOblique, // Actual modes toggle from UI
       sbirMaxOrder: sbirMaxOrder,
       sbirBlendStartHz: sbirEnabled ? sbirBlendStartHzActual.toFixed(1) : 'N/A',
       sbirBlendEndHz: sbirEnabled ? sbirBlendEndHzActual.toFixed(1) : 'N/A',
