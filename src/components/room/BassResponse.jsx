@@ -1,3 +1,10 @@
+// BassResponse.jsx - Smoothing control locations audit:
+// - Line 50: rewSmoothing state declaration (now defaults to 'none')
+// - Line 141: graphSmoothing derivation (forced to 1/3 when rewCompareView is ON)
+// - Line 150: useEffect that tracks user smoothing choice when Compare View is OFF
+// - Line 1010: useEffect for REW Compare View (does NOT touch smoothing state)
+// - Lines 4169-4197: Smoothing button UI (3 buttons: None/1:48/1:3, all disabled when Compare View is ON)
+
 import React, { useMemo, useEffect, useState, useRef, useCallback } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
