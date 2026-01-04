@@ -5234,11 +5234,23 @@ return {
       return null;
     }
 
-    // Resolve model & dimensions using your existing helpers
-    const resolvedModel = resolveSurroundModel(model, canon);
+    // [B44 VISIBILITY FIX] Resolve model with safe fallback for LW/RW/SBL/SBR
+    let resolvedModel = resolveSurroundModel(model, canon);
+    
+    // If model is null but this is a surround role, use fallback for icon dimensions
+    if (!resolvedModel && ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+      // Try to get global surround model from AppState
+      const globalSurroundModel = placedSpeakers?.find(s => {
+        const c = getCanonicalRole(s.role);
+        return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(c) && s.model && s.model !== 'off';
+      })?.model;
+      
+      resolvedModel = globalSurroundModel || 'evolve-2-1_s'; // Fallback to small default
+    }
+    
     const dims = getSpeakerDims(resolvedModel);
-    const widthM_spk = dims.widthM || 0;
-    const depthM_spk = dims.depthM || 0;
+    const widthM_spk = dims.widthM || 0.27; // Safe default
+    const depthM_spk = dims.depthM || 0.082; // Safe default
 
     // Compute yaw: prefer explicit speaker.yaw (seeded by SpeakerPlacement)
     // and fall back to the existing helper if it's not set / not finite.
