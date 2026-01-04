@@ -4167,6 +4167,134 @@ useEffect(() => {
     if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
   }
 
+  // TEMP DEBUG: trace LW/RW/SBL/SBR through the render pipeline (remove later)
+  const __rvTargets = ["LW", "RW", "SBL", "SBR"];
+
+  const __rvTrace = React.useMemo(() => {
+    const out = {};
+    const widthM_local = Number(widthM ?? 0);
+    const lengthM_local = Number(lengthM ?? 0);
+
+    const safeFindByRole = (arr, role) => {
+      if (!Array.isArray(arr)) return null;
+      return arr.find(s => getCanonicalRole(s?.role) === role) || null;
+    };
+
+    __rvTargets.forEach((role) => {
+      const inPlaced = safeFindByRole(placedSpeakers, role);
+      const inToRender = safeFindByRole(speakersToRender, role);
+
+      // These two arrays are built inside renderSpeakers
+      const inAfterRenderable = null; // Will be computed below
+      const inAfterVisibility = null; // Will be computed below
+
+      const pos = inPlaced?.position || {};
+      const x = pos?.x;
+      const y = pos?.y;
+      const z = pos?.z;
+
+      const hasX = Number.isFinite(x);
+      const hasY = Number.isFinite(y);
+      const hasPos = hasX && hasY;
+
+      const inRoomBounds = hasPos && Number.isFinite(widthM_local) && Number.isFinite(lengthM_local)
+        ? (x >= 0 && x <= widthM_local && y >= 0 && y <= lengthM_local)
+        : false;
+
+      // Canvas coords (use the same helpers RoomVisualisation uses)
+      let canvasX = null;
+      let canvasY = null;
+      let canvasOk = false;
+      let canvasReason = null;
+
+      if (!hasPos) {
+        canvasReason = "missing position.x/y";
+      } else {
+        try {
+          const cx = meterToCanvasX(x);
+          const cy = meterToCanvasY(y);
+          canvasOk = Number.isFinite(cx) && Number.isFinite(cy);
+          canvasX = canvasOk ? cx : null;
+          canvasY = canvasOk ? cy : null;
+          if (!canvasOk) canvasReason = "non-finite canvas coords";
+        } catch (e) {
+          canvasOk = false;
+          canvasReason = "toCanvasX/toCanvasY threw";
+        }
+      }
+
+      out[role] = {
+        existsInPlacedSpeakers: !!inPlaced,
+        placed: inPlaced ? {
+          id: inPlaced.id,
+          role: inPlaced.role,
+          model: inPlaced.model,
+          position: inPlaced.position
+        } : null,
+
+        hasPosition: hasPos,
+        rawX: hasX ? Number(x).toFixed(3) : "N/A",
+        rawY: hasY ? Number(y).toFixed(3) : "N/A",
+        rawZ: Number.isFinite(z) ? Number(z).toFixed(3) : "N/A",
+        inRoomBounds,
+
+        inSpeakersToRender: !!inToRender,
+        inAfterRenderable: "see renderSpeakers",
+        inAfterVisibility: "see renderSpeakers",
+
+        canvasX: canvasOk ? Number(canvasX).toFixed(2) : "N/A",
+        canvasY: canvasOk ? Number(canvasY).toFixed(2) : "N/A",
+        renderable: !!inToRender && hasPos && canvasOk,
+        renderableReason: (() => {
+          if (!inPlaced) return "missing from placedSpeakers";
+          if (!hasPos) return "missing position";
+          if (!inToRender) return "missing from speakersToRender";
+          if (!canvasOk) return canvasReason || "canvas invalid";
+          return "OK";
+        })()
+      };
+    });
+
+    return out;
+  }, [
+    placedSpeakers,
+    speakersToRender,
+    widthM,
+    lengthM,
+    getCanonicalRole,
+    meterToCanvasX,
+    meterToCanvasY
+  ]);
+
+  const __rvLastTraceRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (globalThis.__B44_RV_DEBUG !== true) return;
+
+    const nextStr = JSON.stringify(__rvTrace);
+    if (__rvLastTraceRef.current === nextStr) return;
+    __rvLastTraceRef.current = nextStr;
+
+    console.groupCollapsed("[RV TRACE] LW/RW/SBL/SBR pipeline");
+    try {
+      console.table(Object.entries(__rvTrace).map(([role, d]) => ({
+        role,
+        existsInPlacedSpeakers: d.existsInPlacedSpeakers,
+        hasPosition: d.hasPosition,
+        rawX: d.rawX,
+        rawY: d.rawY,
+        inRoomBounds: d.inRoomBounds,
+        inSpeakersToRender: d.inSpeakersToRender,
+        canvasX: d.canvasX,
+        canvasY: d.canvasY,
+        renderable: d.renderable,
+        reason: d.renderableReason
+      })));
+    } finally {
+      console.groupEnd();
+    }
+  }, [__rvTrace]);
+
   // Get overhead count from dolbyLayout
   const overheadCount = useMemo(() => {
     if (!dolbyLayout) return 0;
@@ -5800,35 +5928,31 @@ return (
     {/* CANVAS WRAPPER (no tailwind) */}
     <div style={canvasStyle}>
 
-      {/* TEMP DEBUG PANEL: Speaker Trace */}
+      {/* TEMP DEBUG PANEL: RV Trace (LW/RW/SBL/SBR) */}
       {globalThis.__B44_RV_DEBUG === true && (
-        <div
-          style={{
-            position: "absolute",
-            top: 10,
-            right: 10,
-            padding: 10,
-            border: "1px solid #E0E0E0",
-            borderRadius: 8,
-            fontSize: 10,
-            lineHeight: "14px",
-            background: "#FAFAFA",
-            maxWidth: 320,
-            zIndex: 999,
-            whiteSpace: "pre-wrap"
-          }}
-        >
-          <div style={{ fontWeight: 600, marginBottom: 6 }}>Speaker Trace Debug</div>
-          {Object.entries(__speakerTraceDebug || {}).map(([role, d]) => (
-            <div key={role} style={{ marginBottom: 6 }}>
-              <div style={{ fontWeight: 600 }}>{role}</div>
+        <div style={{
+          position: "absolute",
+          top: 10,
+          right: 10,
+          width: 340,
+          padding: 10,
+          background: "#fffbe6",
+          border: "2px solid #ff4d4f",
+          borderRadius: 8,
+          fontSize: 11,
+          lineHeight: "14px",
+          zIndex: 9999
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>RV TRACE (LW/RW/SBL/SBR)</div>
+          {Object.entries(__rvTrace).map(([role, d]) => (
+            <div key={role} style={{ marginBottom: 8 }}>
+              <div style={{ fontWeight: 700 }}>{role} — {d.renderable ? "RENDER" : "NO"}</div>
               <div>Placed: {String(d.existsInPlacedSpeakers)}</div>
-              <div>Has Pos: {String(d.hasPosition)} ({d.rawX}, {d.rawY})</div>
-              <div>In Room: {String(d.inRoomBounds)}</div>
-              <div>To Render: {String(d.inSpeakersToRender)}</div>
-              <div>After Renderable: {String(d.inAfterRenderable)}</div>
-              <div>After Visibility: {String(d.inAfterVisibility)}</div>
+              <div>Pos: {String(d.hasPosition)} (x {d.rawX}, y {d.rawY})</div>
+              <div>In room: {String(d.inRoomBounds)}</div>
+              <div>ToRender / AfterR / AfterV: {String(d.inSpeakersToRender)} / {String(d.inAfterRenderable)} / {String(d.inAfterVisibility)}</div>
               <div>Canvas: {d.canvasX}, {d.canvasY}</div>
+              <div>Reason: {d.renderableReason}</div>
             </div>
           ))}
         </div>

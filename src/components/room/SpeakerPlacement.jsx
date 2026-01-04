@@ -1885,6 +1885,17 @@ function SpeakerPlacementImpl(props) {
             // so the speaker starts flat to the wall.
             rotation: existing?.rotation || { x: 0, y: 0, z: initialYaw },
           });
+
+          // TEMP DEBUG: Log seeded/updated target speakers
+          if (globalThis.__B44_RV_DEBUG === true && (['LW', 'RW', 'SBL', 'SBR'].includes(canon))) {
+            const just = next[next.length - 1];
+            console.log(`[SpeakerPlacement seed] ${canon}`, {
+              id: just?.id,
+              role: just?.role,
+              model: just?.model,
+              position: just?.position
+            });
+          }
         };
 
       if (globalThis.__B44_LOGS) console.table(next.map(s => ({
