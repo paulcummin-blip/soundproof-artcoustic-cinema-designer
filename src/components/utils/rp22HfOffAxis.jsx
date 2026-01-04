@@ -328,6 +328,19 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
   const role = String(speaker.role || "").toUpperCase();
   const pos = speaker.position;
   
+  // [B44 DEBUG] Log filter decisions
+  if (globalThis.__B44_RV_DEBUG === true && ["LW", "RW", "SBL", "SBR"].includes(role)) {
+    console.log(`[P17 FILTER] ${role}:`, {
+      hasRole: !!speaker.role,
+      isLCR: LCR_ROLES.has(role),
+      isSub: role.includes("LFE") || role.includes("SUB"),
+      hasPosition: !!(pos && isNum(pos.x) && isNum(pos.y)),
+      inSurroundRoles: SURROUND_ROLES.has(role),
+      inOverheadRoles: OVERHEAD_ROLES.has(role),
+      willProcess: !LCR_ROLES.has(role) && !role.includes("LFE") && !role.includes("SUB") && pos && isNum(pos.x) && isNum(pos.y)
+    });
+  }
+  
   // Skip LCR and subs
   if (LCR_ROLES.has(role) || role.includes("LFE") || role.includes("SUB")) {
     return null;
@@ -439,6 +452,23 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
   if (!Array.isArray(seats) || !seats.length) return {};
   if (!Array.isArray(speakers) || !speakers.length) return {};
 
+  // [B44 DEBUG] Log speakers entering P17 analysis
+  if (globalThis.__B44_RV_DEBUG === true) {
+    console.groupCollapsed("[P17 DEBUG] Speakers entering analysis");
+    console.log("Total speakers:", speakers.length);
+    console.table(speakers.map(s => ({
+      role: s.role,
+      canonicalRole: String(s.role || "").toUpperCase(),
+      model: s.model || "—",
+      hasPosition: !!(s.position && isNum(s.position.x) && isNum(s.position.y)),
+      posX: s.position?.x?.toFixed(3) || "—",
+      posY: s.position?.y?.toFixed(3) || "—",
+    })));
+    console.log("SURROUND_ROLES allowlist:", Array.from(SURROUND_ROLES));
+    console.log("OVERHEAD_ROLES allowlist:", Array.from(OVERHEAD_ROLES));
+    console.groupEnd();
+  }
+
   const perSeat = {};
 
   for (const seat of seats) {
@@ -458,6 +488,9 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
     const perSpeaker = [];
     let p17HasNaAngles = false;
 
+    // [B44 DEBUG] Track which speakers enter the per-seat loop
+    const speakersProcessed = [];
+
     // Loop over all non-LCR speakers
     for (const spk of speakers) {
       const result = computeSurroundLikeHfLoss({
@@ -467,6 +500,15 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
         modelMeta: spk.model ? modelIndex(spk.model) : null,
         roomHeightM,
       });
+
+      // [B44 DEBUG] Track processing result
+      if (globalThis.__B44_RV_DEBUG === true) {
+        speakersProcessed.push({
+          role: spk.role,
+          processed: !!result,
+          reason: result ? "OK" : "filtered by computeSurroundLikeHfLoss"
+        });
+      }
 
       if (!result) continue;
 
@@ -510,6 +552,14 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
           isBeyondNonLcrLimit: result.isBeyondNonLcrLimit || false,
         };
       }
+    }
+
+    // [B44 DEBUG] Log processing results for this seat
+    if (globalThis.__B44_RV_DEBUG === true && seatId === seats[0]?.id) {
+      console.groupCollapsed(`[P17 DEBUG] Seat ${seatId} processing`);
+      console.table(speakersProcessed);
+      console.log("perSpeaker results:", perSpeaker);
+      console.groupEnd();
     }
 
     if (!isNum(maxAbsLossDb) || maxAbsLossDb === -Infinity) {
