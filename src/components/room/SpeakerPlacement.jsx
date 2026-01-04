@@ -1821,25 +1821,37 @@ function SpeakerPlacementImpl(props) {
             resolvedModel = String(resolvedModel);
           }
 
-          const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
+          // [B44 CRITICAL FIX] If no model is assigned, skip position calculation
+          // but still create the speaker entry with undefined position
+          let pos = undefined;
           
-          // [B44 REAR FIX] Use back-wall projector for SBL/SBR
-          let baseWithWall;
-          if (canon === 'SBL' || canon === 'SBR') {
-            baseWithWall = projectToBackWallFromMLP_xy(mlp, projectAngleDeg, room, resolvedModel, getModelDimsM, WALL_BUFFER_M);
-          } else {
-            baseWithWall = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
-          }
-          
-          const base = { x: baseWithWall.x, y: baseWithWall.y };
-          const hitWall = baseWithWall.wall;
-          
-          if (globalThis.__B44_LOGS) console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
-          
-          let pos  = finalisePos(base, canon, resolvedModel, hitWall);
+          if (resolvedModel) {
+            const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
+            
+            // [B44 REAR FIX] Use back-wall projector for SBL/SBR
+            let baseWithWall;
+            if (canon === 'SBL' || canon === 'SBR') {
+              baseWithWall = projectToBackWallFromMLP_xy(mlp, projectAngleDeg, room, resolvedModel, getModelDimsM, WALL_BUFFER_M);
+            } else {
+              baseWithWall = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
+            }
+            
+            const base = { x: baseWithWall.x, y: baseWithWall.y };
+            const hitWall = baseWithWall.wall;
+            
+            if (globalThis.__B44_LOGS) console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
+            
+            pos = finalisePos(base, canon, resolvedModel, hitWall);
 
-          if (!pos) {
-            return;
+            if (!pos) {
+              // Position calculation failed, but we still want the speaker entry
+              // Use safe room-center fallback
+              pos = {
+                x: dims.width / 2,
+                y: dims.length / 2,
+                z: 1.1
+              };
+            }
           }
 
           // CRITICAL: Final back-wall safety clamp ONLY for rear speakers
