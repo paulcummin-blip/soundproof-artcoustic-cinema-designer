@@ -3859,6 +3859,50 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div className="text-sm font-bold text-red-900 mb-3">
             BASS AUDIT – ENGINE INTERNAL VALUES (DEBUG)
           </div>
+          
+          {/* Graph source + toggles diagnostic */}
+          <div className="text-xs font-mono mb-3 bg-yellow-100 p-2 rounded border border-yellow-400">
+            <div className="font-semibold text-yellow-900 mb-1">Graph source + toggles</div>
+            <div className="space-y-0.5 text-[10px]">
+              <div>
+                <strong>graphSource:</strong> {(() => {
+                  // Determine which engine produced the plotted series
+                  if (rewStyleMode) {
+                    return "roomModesEngine";
+                  }
+                  return "bassSimulationEngine";
+                })()}
+              </div>
+              <div>
+                <strong>sbirEnabledPassed:</strong> {String(rewSbirEnabled)}
+              </div>
+              <div>
+                <strong>modesEnabledPassed:</strong> {String(modesEnabled)}
+              </div>
+              <div>
+                <strong>plottedSeriesName:</strong> {(() => {
+                  if (activeDebug?.componentView) {
+                    return activeDebug.componentView;
+                  }
+                  if (rewStyleMode) {
+                    return `REW-${rewView}-${componentView}`;
+                  }
+                  return "productSim";
+                })()}
+              </div>
+              <div>
+                <strong>sbirPathsUsed:</strong> {(() => {
+                  if (activeDebug?.sbirDebugProbe63Hz?.pathsUsed) {
+                    return activeDebug.sbirDebugProbe63Hz.pathsUsed;
+                  }
+                  if (activeDebug?.sbirDebugProbe40Hz?.pathsUsed) {
+                    return activeDebug.sbirDebugProbe40Hz.pathsUsed;
+                  }
+                  return "N/A";
+                })()}
+              </div>
+            </div>
+          </div>
           {bassAudit && Array.isArray(bassAudit.contributors) && bassAudit.contributors.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs font-mono border-collapse">
