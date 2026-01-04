@@ -44,7 +44,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [roomDamping, setRoomDamping] = useState(20);
   const [showModeMarkers, setShowModeMarkers] = useState(false);
   const [rewStyleMode, setRewStyleMode] = useState(true);
-  const [rewSmoothing, setRewSmoothing] = useState('1/3'); // Default: RP22 standard for normal use
+  const [rewSmoothing, setRewSmoothing] = useState('none'); // Default: no smoothing for raw view
   const [showRewModeLines, setShowRewModeLines] = useState(true);
   const [linearHzAxis, setLinearHzAxis] = useState(false);
   const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
@@ -133,6 +133,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return __b44SafeSig(obj);
   };
   
+  // User's smoothing choice tracking (for restore after Compare View)
+  const lastUserSmoothingRef = useRef(rewSmoothing);
+
   // Graph smoothing used for the plotted dataset (REW Compare can force display without mutating the user's choice)
   // MUST be defined AFTER rewSmoothing state declaration
   const graphSmoothing = rewCompareView ? "1/3" : rewSmoothing;
@@ -143,12 +146,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   React.useEffect(() => { roomDimsRef.current = roomDims; }, [roomDims]);
   React.useEffect(() => { seatingRef.current = seatingPositions; }, [seatingPositions]);
 
-  // Set default smoothing when REW mode is enabled
+  // Track user's smoothing choice when Compare View is OFF
   useEffect(() => {
-    if (rewStyleMode && (!rewSmoothing || rewSmoothing === 'none')) {
-      setRewSmoothing('1/3'); // Default to RP22 standard
+    if (!rewCompareView) {
+      lastUserSmoothingRef.current = rewSmoothing;
     }
-  }, [rewStyleMode, rewSmoothing]);
+  }, [rewCompareView, rewSmoothing]);
 
   // Bass Audit toggle handler
   const handleAuditToggle = (enabled) => {
@@ -1003,13 +1006,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [rewStyleMode, rewView, rewRelativeView, rewModesDataAbs, rewRoomPlusProductDataAbs, componentView]);
 
   // REW Compare View display preset (does NOT mutate user smoothing state)
-  // Compare view forces display to 1/3, but user's saved choice (1/48 or 1/3) remains intact
+  // Compare view forces display to 1/3 via graphSmoothing derivation, user's choice stays intact
   useEffect(() => {
     if (rewCompareView) {
       setRewRelativeView(false);     // absolute SPL for compare
       setYAxisLocked(true);
       setShowRewModeLines(true);
       setLinearHzAxis(false);        // REW-style log axis
+      // NOTE: rewSmoothing is NOT changed here - graphSmoothing handles display override
     }
   }, [rewCompareView]);
 
@@ -2264,7 +2268,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           border: "1px solid #DCDBD6",
           marginBottom: 6
         }}>
-          Modes: {String(modesEnabled)} | Smoothing: {graphSmoothing} | SBIR: {String(rewSbirEnabled)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)}
+          User smoothing: {rewSmoothing} | Graph smoothing: {graphSmoothing} | Compare: {String(rewCompareView)} | Modes: {String(modesEnabled)} | SBIR: {String(rewSbirEnabled)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)}
         </div>
 
         {/* Engine Parameter Verification */}
