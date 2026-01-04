@@ -1810,19 +1810,21 @@ function SpeakerPlacementImpl(props) {
 
           const existing = byRole.get(canon);
           
-          // [B44 CRITICAL FIX] ALWAYS seed speaker roles for layout format
-          // Model can be null (no icon renders), but the role MUST exist for system definition
+          // [B44 FIX] Don't create surround speakers if global model is off/none
+          if (!globalSurroundModelParam || globalSurroundModelParam === 'off' || globalSurroundModelParam === 'none') {
+            return; // User hasn't selected a surround model - don't create this speaker
+          }
+
           let resolvedModel = existing?.model || globalSurroundModelParam;
 
-          // Normalize 'off' / 'none' to null (speaker exists, but no model selected)
+          // Normalize invalid models to use the global model
           if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
-            resolvedModel = null;
+            resolvedModel = globalSurroundModelParam;
           } else {
             resolvedModel = String(resolvedModel);
           }
 
-          // [B44 CRITICAL FIX] If no model is assigned, skip position calculation
-          // but still create the speaker entry with undefined position
+          // resolvedModel is now guaranteed to be a real model string
           let pos = undefined;
           
           if (resolvedModel) {
