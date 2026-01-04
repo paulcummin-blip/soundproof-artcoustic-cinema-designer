@@ -389,110 +389,6 @@ function useDesignerState() {
     return visibleRoles.has(canon);
   }, [visibleRoles, OVERHEAD_CANON_ROLES]);
 
-  // --- Autosave: Restore on mount ---
-  useEffect(() => {
-    const data = loadAutosave();
-    if (!data?.payload) return;
-
-    // Only restore if the current state looks "empty"
-    const hasAlready = Array.isArray(seatingPositions) && seatingPositions.length > 0;
-    const hasSpk = Array.isArray(speakerSystem?.placedSpeakers) && speakerSystem.placedSpeakers.length > 0;
-
-    if (hasAlready || hasSpk) return; // don't stomp a real loaded session
-
-    const p = data.payload;
-    if (!isAutosavePayloadValid(p)) return;
-
-    // Apply (use the existing setters)
-    try {
-      if (p.roomDims) setRoomDims(p.roomDims);
-      if (p.dimensions) setDimensions(p.dimensions);
-      if (p.seatingPositions) setSeatingPositions(p.seatingPositions);
-      if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
-      if (p.frontSubsCfg) setFrontSubsCfg(p.frontSubsCfg);
-      if (p.rearSubsCfg) setRearSubsCfg(p.rearSubsCfg);
-      if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
-      if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
-      if (p.screen) setScreen(p.screen);
-
-      setAutosaveMeta(getAutosaveMeta());
-    } catch {
-      // never crash
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // --- Autosave: Debounced save on change ---
-  const autosaveTimerRef = useRef(null);
-
-  useEffect(() => {
-    // Build payload (ONLY what we need to restore the room session)
-    const payload = {
-      roomDims,
-      dimensions,
-      seatingPositions,
-      speakerSystem,
-      frontSubsCfg,
-      rearSubsCfg,
-      dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
-      dolbyConfig,
-      screen
-    };
-
-    if (!isAutosavePayloadValid(payload)) return;
-
-    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-
-    autosaveTimerRef.current = setTimeout(() => {
-      saveAutosave(payload);
-      setAutosaveMeta(getAutosaveMeta());
-    }, 500);
-
-    return () => {
-      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
-    };
-  }, [
-    roomDims,
-    dimensions,
-    seatingPositions,
-    speakerSystem,
-    frontSubsCfg,
-    rearSubsCfg,
-    dolbyLayout,
-    dolbyConfig,
-    screen
-  ]);
-
-  // --- Autosave: Manual restore/clear functions ---
-  const restoreAutosave = useCallback(() => {
-    const data = loadAutosave();
-    if (!data?.payload) return false;
-    const p = data.payload;
-    if (!isAutosavePayloadValid(p)) return false;
-
-    try {
-      if (p.roomDims) setRoomDims(p.roomDims);
-      if (p.dimensions) setDimensions(p.dimensions);
-      if (p.seatingPositions) setSeatingPositions(p.seatingPositions);
-      if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
-      if (p.frontSubsCfg) setFrontSubsCfg(p.frontSubsCfg);
-      if (p.rearSubsCfg) setRearSubsCfg(p.rearSubsCfg);
-      if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
-      if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
-      if (p.screen) setScreen(p.screen);
-
-      setAutosaveMeta(getAutosaveMeta());
-      return true;
-    } catch {
-      return false;
-    }
-  }, [setRoomDims, setDimensions, setSeatingPositions, setSpeakerSystem, setFrontSubsCfg, setRearSubsCfg, setDolbyLayout, setDolbyConfig, setScreen]);
-
-  const clearAutosaveNow = useCallback(() => {
-    clearAutosaveStorage();
-    setAutosaveMeta(null);
-  }, []);
-
   const isFrozen = useCallback((tab) => !!frozenTabs[tab], [frozenTabs]);
   const freezeTab = useCallback((tab) => {
     setFrozenTabs(prev => ({ ...prev, [tab]: true }));
@@ -633,6 +529,110 @@ function useDesignerState() {
     },
     []
   );
+
+  // --- Autosave: Restore on mount ---
+  useEffect(() => {
+    const data = loadAutosave();
+    if (!data?.payload) return;
+
+    // Only restore if the current state looks "empty"
+    const hasAlready = Array.isArray(seatingPositions) && seatingPositions.length > 0;
+    const hasSpk = Array.isArray(speakerSystem?.placedSpeakers) && speakerSystem.placedSpeakers.length > 0;
+
+    if (hasAlready || hasSpk) return; // don't stomp a real loaded session
+
+    const p = data.payload;
+    if (!isAutosavePayloadValid(p)) return;
+
+    // Apply (use the existing setters)
+    try {
+      if (p.roomDims) setRoomDims(p.roomDims);
+      if (p.dimensions) setDimensions(p.dimensions);
+      if (p.seatingPositions) setSeatingPositions(p.seatingPositions);
+      if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
+      if (p.frontSubsCfg) setFrontSubsCfg(p.frontSubsCfg);
+      if (p.rearSubsCfg) setRearSubsCfg(p.rearSubsCfg);
+      if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
+      if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
+      if (p.screen) setScreen(p.screen);
+
+      setAutosaveMeta(getAutosaveMeta());
+    } catch {
+      // never crash
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // --- Autosave: Debounced save on change ---
+  const autosaveTimerRef = useRef(null);
+
+  useEffect(() => {
+    // Build payload (ONLY what we need to restore the room session)
+    const payload = {
+      roomDims,
+      dimensions,
+      seatingPositions,
+      speakerSystem,
+      frontSubsCfg,
+      rearSubsCfg,
+      dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
+      dolbyConfig,
+      screen
+    };
+
+    if (!isAutosavePayloadValid(payload)) return;
+
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+
+    autosaveTimerRef.current = setTimeout(() => {
+      saveAutosave(payload);
+      setAutosaveMeta(getAutosaveMeta());
+    }, 500);
+
+    return () => {
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    };
+  }, [
+    roomDims,
+    dimensions,
+    seatingPositions,
+    speakerSystem,
+    frontSubsCfg,
+    rearSubsCfg,
+    dolbyLayout,
+    dolbyConfig,
+    screen
+  ]);
+
+  // --- Autosave: Manual restore/clear functions ---
+  const restoreAutosave = useCallback(() => {
+    const data = loadAutosave();
+    if (!data?.payload) return false;
+    const p = data.payload;
+    if (!isAutosavePayloadValid(p)) return false;
+
+    try {
+      if (p.roomDims) setRoomDims(p.roomDims);
+      if (p.dimensions) setDimensions(p.dimensions);
+      if (p.seatingPositions) setSeatingPositions(p.seatingPositions);
+      if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
+      if (p.frontSubsCfg) setFrontSubsCfg(p.frontSubsCfg);
+      if (p.rearSubsCfg) setRearSubsCfg(p.rearSubsCfg);
+      if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
+      if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
+      if (p.screen) setScreen(p.screen);
+
+      setAutosaveMeta(getAutosaveMeta());
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const clearAutosaveNow = useCallback(() => {
+    clearAutosaveStorage();
+    setAutosaveMeta(null);
+  }, []);
 
   const value = useMemo(() => ({
     dimensions, setDimensions, 
