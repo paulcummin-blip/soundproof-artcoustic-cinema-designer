@@ -6264,6 +6264,45 @@ return (
           splPowerW={tooltipData?.splAtSeatMeta?.powerW}
           splRadiationMode={tooltipData?.splAtSeatMeta?.radiationMode}
         />
+
+        {/* TEMP DEBUG PANEL: FW + Rear Surrounds */}
+        {globalThis.__B44_RV_DEBUG === true && (
+          <div style={{
+            marginTop: 10,
+            padding: 10,
+            border: "1px solid #E0E0E0",
+            borderRadius: 8,
+            fontSize: 12,
+            lineHeight: "16px",
+            background: "#FAFAFA",
+            maxWidth: 520
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 6 }}>RV Debug (FW + Rear Surrounds)</div>
+            <div>placedSpeakers: {__rvDebug.placedCount} | speakersToRender: {__rvDebug.renderCount}</div>
+
+            <div style={{ marginTop: 8, fontWeight: 600 }}>In placedSpeakers</div>
+            {__rvDebug.placed.length === 0 ? (
+              <div>None</div>
+            ) : (
+              __rvDebug.placed.map((r) => (
+                <div key={"p-" + r.role + "-" + r.id}>
+                  {r.role} | pos: {r.x}, {r.y}, {r.z} | hasPos: {String(r.hasPos)} | outside: {String(r.outside)}
+                </div>
+              ))
+            )}
+
+            <div style={{ marginTop: 8, fontWeight: 600 }}>In speakersToRender</div>
+            {__rvDebug.render.length === 0 ? (
+              <div>None</div>
+            ) : (
+              __rvDebug.render.map((r) => (
+                <div key={"r-" + r.role + "-" + r.id}>
+                  {r.role} | pos: {r.x}, {r.y}, {r.z} | hasPos: {String(r.hasPos)} | outside: {String(r.outside)}
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
