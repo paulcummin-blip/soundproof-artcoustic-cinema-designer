@@ -4087,6 +4087,80 @@ useEffect(() => {
     return withoutLfe;
   }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
 
+  // TEMP DEBUG: Component-level filters for trace diagnostics
+  const afterRenderableDebug = React.useMemo(() => {
+    const raw = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+    return raw.filter(isRenderableSpeaker);
+  }, [placedSpeakers]);
+
+  const afterVisibilityDebug = React.useMemo(() => {
+    return afterRenderableDebug;
+  }, [afterRenderableDebug]);
+
+  // TEMP DEBUG: Comprehensive trace for LW/RW/SBL/SBR
+  const __speakerTraceDebug = React.useMemo(() => {
+    const targets = ["LW", "RW", "SBL", "SBR"];
+    const out = {};
+
+    const pickByRole = (arr, role) => {
+      if (!Array.isArray(arr)) return null;
+      const canonTarget = String(getCanonicalRole(role) || "").toUpperCase();
+      return arr.find(s => String(getCanonicalRole(s?.role) || "").toUpperCase() === canonTarget) || null;
+    };
+
+    const safeNum = (v) => (typeof v === "number" && Number.isFinite(v)) ? v : null;
+
+    targets.forEach((role) => {
+      const spPlaced = pickByRole(placedSpeakers, role);
+      const spToRender = pickByRole(speakersToRender, role);
+      const spAfterRenderable = pickByRole(afterRenderableDebug, role);
+      const spAfterVisibility = pickByRole(afterVisibilityDebug, role);
+
+      const px = safeNum(spPlaced?.position?.x);
+      const py = safeNum(spPlaced?.position?.y);
+
+      const hasPosition = (px !== null && py !== null);
+      const inRoomBounds = hasPosition
+        ? (px >= 0 && px <= widthM && py >= 0 && py <= lengthM)
+        : false;
+
+      let canvasX = "—", canvasY = "—";
+      if (hasPosition && roomRect && scale) {
+        const tempX = roomRect.x + (px * scale);
+        const tempY = roomRect.y + (py * scale);
+        if (Number.isFinite(tempX) && Number.isFinite(tempY)) {
+          canvasX = tempX.toFixed(1);
+          canvasY = tempY.toFixed(1);
+        }
+      }
+
+      out[role] = {
+        existsInPlacedSpeakers: !!spPlaced,
+        hasPosition,
+        rawX: hasPosition ? px.toFixed(3) : "—",
+        rawY: hasPosition ? py.toFixed(3) : "—",
+        inSpeakersToRender: !!spToRender,
+        inAfterRenderable: !!spAfterRenderable,
+        inAfterVisibility: !!spAfterVisibility,
+        inRoomBounds,
+        canvasX,
+        canvasY
+      };
+    });
+
+    return out;
+  }, [
+    placedSpeakers,
+    speakersToRender,
+    afterRenderableDebug,
+    afterVisibilityDebug,
+    widthM,
+    lengthM,
+    roomRect,
+    scale,
+    getCanonicalRole
+  ]);
+
 
   // Light diagnostics (temporary)
   if (appState_DBG_FW) {
