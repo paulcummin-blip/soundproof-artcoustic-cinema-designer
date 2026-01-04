@@ -4167,11 +4167,11 @@ useEffect(() => {
     if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
   }
 
-  // --- COMPREHENSIVE DEBUG TRACE FOR LW/RW/SBL/SBR ---
+  // TEMP DEBUG: RV speaker trace (remove later)
   const __rvMissingTrace = React.useMemo(() => {
     if (globalThis.__B44_RV_DEBUG !== true) return null;
 
-    const targets = ["LW", "RW", "SBL", "SBR"];
+    const targets = ["SL", "SR", "SBL", "SBR", "LW", "RW"];
     const trace = {};
 
     const safeFindByRole = (arr, role) => {
@@ -4180,16 +4180,26 @@ useEffect(() => {
       return arr.find(s => getCanonicalRole(s?.role) === canon) || null;
     };
 
-    // Build filtered arrays for trace (same as renderSpeakers does)
+    // Build filtered arrays (same as renderSpeakers does)
     const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
     const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
-    const afterVisibility = afterRenderable; // No additional visibility filter for bed speakers
+    const afterVisibility = afterRenderable; // No additional visibility for bed speakers
+    
+    // CRITICAL: Simulate the exact filter used in renderSpeakers before mapping to icons
+    const wouldRenderInRenderSpeakers = afterVisibility.filter(s => {
+      const canon = getCanonicalRole(s.role);
+      // Skip overheads (rendered separately) and LFE
+      if (rvIsOverheadRole(s.role)) return false;
+      if (canon === "LFE") return false;
+      return true;
+    });
 
     targets.forEach(role => {
       const inPlaced = safeFindByRole(placedSpeakers, role);
       const inToRender = safeFindByRole(speakersToRender, role);
       const inAfterRender = safeFindByRole(afterRenderable, role);
       const inAfterVis = safeFindByRole(afterVisibility, role);
+      const inFinalRender = safeFindByRole(wouldRenderInRenderSpeakers, role);
 
       const xM = inPlaced?.position?.x;
       const yM = inPlaced?.position?.y;
@@ -4223,24 +4233,25 @@ useEffect(() => {
         }
       }
 
+      // Test isRenderableSpeaker on this exact speaker
+      const passesRenderable = inPlaced ? isRenderableSpeaker(inPlaced) : false;
+
       trace[role] = {
-        inPlacedSpeakers: !!inPlaced,
-        inSpeakersToRender: !!inToRender,
-        inAfterRenderable: !!inAfterRender,
-        inAfterVisibility: !!inAfterVis,
-        
-        xM: hasFiniteXY ? xM : null,
-        yM: hasFiniteXY ? yM : null,
-        hasFiniteXY,
+        existsInPlaced: !!inPlaced,
+        model: inPlaced?.model || "—",
+        posX: hasFiniteXY ? xM.toFixed(3) : "—",
+        posY: hasFiniteXY ? yM.toFixed(3) : "—",
         inRoomBounds,
+        isRenderableSpeaker: passesRenderable,
+        canvasX: hasFiniteCanvas ? xPx.toFixed(1) : "—",
+        canvasY: hasFiniteCanvas ? yPx.toFixed(1) : "—",
+        wouldRenderInRenderSpeakers: !!inFinalRender,
         
-        xPx: hasFiniteCanvas ? xPx : null,
-        yPx: hasFiniteCanvas ? yPx : null,
-        hasFiniteCanvas,
-        inRoomRectPx,
-        
-        model: inPlaced?.model || null,
-        canonRole: getCanonicalRole(role),
+        // Internal tracking
+        _speaker: inPlaced,
+        _hasFiniteXY: hasFiniteXY,
+        _hasFiniteCanvas: hasFiniteCanvas,
+        _inRoomRectPx: inRoomRectPx,
       };
     });
 
@@ -4255,10 +4266,10 @@ useEffect(() => {
     meterToCanvasX,
     meterToCanvasY,
     getCanonicalRole,
-    isRenderableSpeaker
+    isRenderableSpeaker,
   ]);
 
-  // Console.table snapshot when trace changes
+  // TEMP DEBUG: Console.table snapshot when trace changes (remove later)
   const __rvLastTraceRef = React.useRef(null);
 
   React.useEffect(() => {
@@ -4269,23 +4280,61 @@ useEffect(() => {
     if (__rvLastTraceRef.current === nextStr) return;
     __rvLastTraceRef.current = nextStr;
 
-    console.groupCollapsed("[RV TRACE] LW/RW/SBL/SBR");
+    console.groupCollapsed("[RV TRACE] Surround Speakers Pipeline");
     try {
       const rows = Object.entries(__rvMissingTrace).map(([role, d]) => ({
         role,
-        inPlaced: d.inPlacedSpeakers,
-        inRenderable: d.inAfterRenderable,
-        "xM,yM": d.hasFiniteXY ? `${d.xM.toFixed(3)},${d.yM.toFixed(3)}` : "—",
-        inRoom: d.inRoomBounds,
-        "xPx,yPx": d.hasFiniteCanvas ? `${d.xPx.toFixed(1)},${d.yPx.toFixed(1)}` : "—",
-        inRoomRectPx: d.inRoomRectPx,
-        model: d.model || "—",
+        existsInPlaced: d.existsInPlaced,
+        model: d.model,
+        posX: d.posX,
+        posY: d.posY,
+        inRoomBounds: d.inRoomBounds,
+        isRenderableSpeaker: d.isRenderableSpeaker,
+        canvasX: d.canvasX,
+        canvasY: d.canvasY,
+        wouldRender: d.wouldRenderInRenderSpeakers,
       }));
       console.table(rows);
     } finally {
       console.groupEnd();
     }
-  }, [__rvMissingTrace]);
+
+    // TEMP DEBUG: Off-canvas warnings (remove later)
+    Object.entries(__rvMissingTrace).forEach(([role, d]) => {
+      if (!d.existsInPlaced) {
+        console.warn(`[RV TRACE] ${role} not in placedSpeakers`);
+      } else if (!d._hasFiniteXY) {
+        console.warn(`[RV TRACE] ${role} not drawable - non-finite position`, {
+          model: d.model,
+          position: d._speaker?.position
+        });
+      } else if (!d.inRoomBounds) {
+        console.warn(`[RV TRACE] ${role} not drawable - out of room bounds`, {
+          posX: d.posX,
+          posY: d.posY,
+          roomWidth: widthM,
+          roomLength: lengthM
+        });
+      } else if (!d.isRenderableSpeaker) {
+        console.warn(`[RV TRACE] ${role} not drawable - failed isRenderableSpeaker`, {
+          model: d.model,
+          position: d._speaker?.position
+        });
+      } else if (!d._hasFiniteCanvas) {
+        console.warn(`[RV TRACE] ${role} not drawable - bad canvas coords`, {
+          posX: d.posX,
+          posY: d.posY,
+          canvasX: d.canvasX,
+          canvasY: d.canvasY
+        });
+      } else if (!d.wouldRenderInRenderSpeakers) {
+        console.warn(`[RV TRACE] ${role} exists but won't render - filtered before icon mapping`, {
+          model: d.model,
+          position: { x: d.posX, y: d.posY }
+        });
+      }
+    });
+  }, [__rvMissingTrace, widthM, lengthM]);
 
   // Get overhead count from dolbyLayout
   const overheadCount = useMemo(() => {
@@ -5920,14 +5969,14 @@ return (
     {/* CANVAS WRAPPER (no tailwind) */}
     <div style={canvasStyle}>
 
-      {/* DEBUG PANEL: Missing Speakers Trace (Top-Right) */}
+      {/* TEMP DEBUG: Speaker trace panel (remove later) */}
       {globalThis.__B44_RV_DEBUG === true && __rvMissingTrace && (
         <div style={{
           position: "absolute",
           top: 10,
           right: 10,
-          width: 420,
-          maxHeight: 400,
+          width: 500,
+          maxHeight: 450,
           overflow: "auto",
           padding: 12,
           background: "#fffbe6",
@@ -5939,42 +5988,60 @@ return (
           zIndex: 9999,
           pointerEvents: "auto"
         }}>
-          <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 11 }}>RV TRACE: LW/RW/SBL/SBR</div>
+          <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 11 }}>
+            RV TRACE: Surround Speakers (9.1.4)
+          </div>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
             <thead>
-              <tr style={{ borderBottom: "1px solid #ccc" }}>
-                <th style={{ padding: "4px 2px", textAlign: "left" }}>Role</th>
-                <th style={{ padding: "4px 2px", textAlign: "center" }}>Placed</th>
-                <th style={{ padding: "4px 2px", textAlign: "center" }}>Rend</th>
-                <th style={{ padding: "4px 2px", textAlign: "right" }}>xM,yM</th>
-                <th style={{ padding: "4px 2px", textAlign: "center" }}>InRoom</th>
-                <th style={{ padding: "4px 2px", textAlign: "right" }}>xPx,yPx</th>
-                <th style={{ padding: "4px 2px", textAlign: "center" }}>InRect</th>
-                <th style={{ padding: "4px 2px", textAlign: "left" }}>Model</th>
+              <tr style={{ borderBottom: "1px solid #333", background: "#ffeb3b" }}>
+                <th style={{ padding: "4px 3px", textAlign: "left" }}>Role</th>
+                <th style={{ padding: "4px 3px", textAlign: "center" }}>Exist</th>
+                <th style={{ padding: "4px 3px", textAlign: "left" }}>Model</th>
+                <th style={{ padding: "4px 3px", textAlign: "right" }}>x,y (m)</th>
+                <th style={{ padding: "4px 3px", textAlign: "center" }}>InRoom</th>
+                <th style={{ padding: "4px 3px", textAlign: "center" }}>Rend?</th>
+                <th style={{ padding: "4px 3px", textAlign: "right" }}>Canvas</th>
+                <th style={{ padding: "4px 3px", textAlign: "center" }}>Final</th>
               </tr>
             </thead>
             <tbody>
               {Object.entries(__rvMissingTrace).map(([role, d]) => (
-                <tr key={role} style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: "4px 2px", fontWeight: 700 }}>{role}</td>
-                  <td style={{ padding: "4px 2px", textAlign: "center" }}>{d.inPlacedSpeakers ? "✓" : "✗"}</td>
-                  <td style={{ padding: "4px 2px", textAlign: "center" }}>{d.inAfterRenderable ? "✓" : "✗"}</td>
-                  <td style={{ padding: "4px 2px", textAlign: "right" }}>
-                    {d.hasFiniteXY ? `${d.xM.toFixed(2)},${d.yM.toFixed(2)}` : "—"}
+                <tr key={role} style={{ 
+                  borderBottom: "1px solid #eee",
+                  background: d.wouldRenderInRenderSpeakers ? "#e8f5e9" : "#ffebee"
+                }}>
+                  <td style={{ padding: "4px 3px", fontWeight: 700 }}>{role}</td>
+                  <td style={{ padding: "4px 3px", textAlign: "center" }}>
+                    {d.existsInPlaced ? "✓" : "✗"}
                   </td>
-                  <td style={{ padding: "4px 2px", textAlign: "center" }}>{d.inRoomBounds ? "✓" : "✗"}</td>
-                  <td style={{ padding: "4px 2px", textAlign: "right" }}>
-                    {d.hasFiniteCanvas ? `${Math.round(d.xPx)},${Math.round(d.yPx)}` : "—"}
+                  <td style={{ padding: "4px 3px", fontSize: 9 }}>{d.model}</td>
+                  <td style={{ padding: "4px 3px", textAlign: "right", fontSize: 9 }}>
+                    {d.posX},{d.posY}
                   </td>
-                  <td style={{ padding: "4px 2px", textAlign: "center", 
-                    color: d.inRoomRectPx ? "green" : d.hasFiniteCanvas ? "orange" : "inherit" }}>
-                    {d.hasFiniteCanvas ? (d.inRoomRectPx ? "✓" : "OFF") : "—"}
+                  <td style={{ padding: "4px 3px", textAlign: "center" }}>
+                    {d.inRoomBounds ? "✓" : "✗"}
                   </td>
-                  <td style={{ padding: "4px 2px", fontSize: 9 }}>{d.model || "—"}</td>
+                  <td style={{ padding: "4px 3px", textAlign: "center" }}>
+                    {d.isRenderableSpeaker ? "✓" : "✗"}
+                  </td>
+                  <td style={{ padding: "4px 3px", textAlign: "right", fontSize: 9 }}>
+                    {d.canvasX},{d.canvasY}
+                  </td>
+                  <td style={{ 
+                    padding: "4px 3px", 
+                    textAlign: "center",
+                    fontWeight: 700,
+                    color: d.wouldRenderInRenderSpeakers ? "#2e7d32" : "#c62828"
+                  }}>
+                    {d.wouldRenderInRenderSpeakers ? "YES" : "NO"}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <div style={{ marginTop: 8, fontSize: 9, color: "#666" }}>
+            Green row = renders | Red row = filtered out
+          </div>
         </div>
       )}
 
