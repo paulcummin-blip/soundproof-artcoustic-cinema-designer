@@ -4089,6 +4089,14 @@ useEffect(() => {
       return withoutLfe;
     }
 
+    // SAFETY: If visibleRoles is missing ANY role that we actually have placed,
+    // treat it as "not authoritative" and DO NOT filter anything out.
+    // (This prevents rear surrounds / front wides disappearing until some other toggle runs.)
+    const missingAnyPlacedRole = withoutLfe.some((spk) => !vis.has(getCanonicalRole(spk.role)));
+    if (missingAnyPlacedRole) {
+      return withoutLfe;
+    }
+
     // Only keep speakers whose canonical role is in the visibleRoles set
     return withoutLfe.filter((spk) => vis.has(getCanonicalRole(spk.role)));
   }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
