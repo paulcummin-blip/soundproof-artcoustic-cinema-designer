@@ -5124,44 +5124,10 @@ return {
   // 1) Basic structural filter (existing helper)
   const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
 
-  // 2) Visibility filter (layout + model) – but NEVER drop overhead speakers
-  let afterVisibility = afterRenderable.filter((spk) => {
-    try {
-      const canon = String(spk.role || "").toUpperCase();
-      
-      // CRITICAL: Overhead speakers MUST always pass through visibility filter
-      // The overhead overlay toggle only affects zone bands, NOT icon rendering
-      if (rvIsOverheadRole(spk.role)) {
-        return true;
-      }
-
-      // CRITICAL: These must never be dropped by visibility logic.
-      // Their existence is driven by config + placement, NOT overlay toggles.
-      if (["SBL", "SBR", "LW", "RW"].includes(canon)) {
-        return true;
-      }
-      
-      const result = getSpeakerVisibility(spk.role, spk.model);
-      
-      // TEMP DEBUG: Log each visibility check
-      if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-        if (globalThis.__B44_LOGS) console.log('[RV filter]', {
-          role: canon,
-          model: spk.model,
-          visibilityResult: result
-        });
-      }
-      
-      return result;
-    } catch (err) {
-      if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn("[RV] getSpeakerVisibility error; allowing speaker through", {
-        role: spk.role,
-        model: spk.model,
-        err,
-      });
-      return true;
-    }
-  });
+  // 2) CRITICAL: Visibility is now FULLY decoupled from overlay toggles.
+  //    Overhead speakers are rendered separately via overheadIconElements.
+  //    All other speakers: if they exist in placedSpeakers, they render. Period.
+  let afterVisibility = afterRenderable;
 
   // --- OVERHEAD VISIBILITY REMOVED ---
   // Overhead speakers are now rendered independently via overheadIconElements
