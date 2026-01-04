@@ -30,13 +30,19 @@ export const isRenderableSpeaker = (speaker) => {
     return false;
   }
 
-  if (
-    speaker.model === undefined ||
-    speaker.model === null ||
-    speaker.model === "off" ||
-    speaker.model === "none"
-  ) {
-    return false;
+  // Allow surround roles to render even without a model selected.
+  // RoomVisualisation will use safe fallback dimensions for the icon.
+  const isSurround = ["SL","SR","SBL","SBR","LW","RW"].includes(role);
+
+  if (!isSurround) {
+    if (
+      speaker.model === undefined ||
+      speaker.model === null ||
+      speaker.model === "off" ||
+      speaker.model === "none"
+    ) {
+      return false;
+    }
   }
 
   return true;
