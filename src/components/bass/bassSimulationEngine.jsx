@@ -12,14 +12,14 @@ const SPEED_OF_SOUND = 343; // m/s
 const MIN_DISTANCE = 0.5; // meters (prevent explosion at near-zero)
 const MIN_SPL_FLOOR = 30; // dB (prevent -Infinity)
 
-// Build frequency array from curve points, clamped to 15-200 Hz
+// Build fixed high-resolution frequency array for bass simulation (independent of product curves)
 export function buildBassFrequencyBins(curvePoints) {
-  if (!Array.isArray(curvePoints) || curvePoints.length === 0) {
-    return [];
+  // Generate fixed 1 Hz resolution array from 15-200 Hz
+  const freqs = [];
+  for (let f = 15; f <= 200; f += 1) {
+    freqs.push(f);
   }
-  
-  const frequencies = curvePoints.map(p => p.hz || p.frequency || p[0]).filter(f => f >= 15 && f <= 200);
-  return [...new Set(frequencies)].sort((a, b) => a - b);
+  return freqs;
 }
 
 // Generate target curve for bass (flat through 20-80 Hz, gentle roll-off above)
