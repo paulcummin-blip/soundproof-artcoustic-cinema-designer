@@ -4167,133 +4167,125 @@ useEffect(() => {
     if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
   }
 
-  // TEMP DEBUG: trace LW/RW/SBL/SBR through the render pipeline (remove later)
-  const __rvTargets = ["LW", "RW", "SBL", "SBR"];
+  // --- COMPREHENSIVE DEBUG TRACE FOR LW/RW/SBL/SBR ---
+  const __rvMissingTrace = React.useMemo(() => {
+    if (globalThis.__B44_RV_DEBUG !== true) return null;
 
-  const __rvTrace = React.useMemo(() => {
-    const out = {};
-    const widthM_local = Number(widthM ?? 0);
-    const lengthM_local = Number(lengthM ?? 0);
+    const targets = ["LW", "RW", "SBL", "SBR"];
+    const trace = {};
 
     const safeFindByRole = (arr, role) => {
       if (!Array.isArray(arr)) return null;
-      return arr.find(s => getCanonicalRole(s?.role) === role) || null;
+      const canon = getCanonicalRole(role);
+      return arr.find(s => getCanonicalRole(s?.role) === canon) || null;
     };
 
-    __rvTargets.forEach((role) => {
+    // Build filtered arrays for trace (same as renderSpeakers does)
+    const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+    const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
+    const afterVisibility = afterRenderable; // No additional visibility filter for bed speakers
+
+    targets.forEach(role => {
       const inPlaced = safeFindByRole(placedSpeakers, role);
       const inToRender = safeFindByRole(speakersToRender, role);
+      const inAfterRender = safeFindByRole(afterRenderable, role);
+      const inAfterVis = safeFindByRole(afterVisibility, role);
 
-      // These two arrays are built inside renderSpeakers
-      const inAfterRenderable = null; // Will be computed below
-      const inAfterVisibility = null; // Will be computed below
-
-      const pos = inPlaced?.position || {};
-      const x = pos?.x;
-      const y = pos?.y;
-      const z = pos?.z;
-
-      const hasX = Number.isFinite(x);
-      const hasY = Number.isFinite(y);
-      const hasPos = hasX && hasY;
-
-      const inRoomBounds = hasPos && Number.isFinite(widthM_local) && Number.isFinite(lengthM_local)
-        ? (x >= 0 && x <= widthM_local && y >= 0 && y <= lengthM_local)
+      const xM = inPlaced?.position?.x;
+      const yM = inPlaced?.position?.y;
+      const hasFiniteXY = Number.isFinite(xM) && Number.isFinite(yM);
+      const inRoomBounds = hasFiniteXY 
+        ? (xM >= 0 && xM <= widthM && yM >= 0 && yM <= lengthM)
         : false;
 
-      // Canvas coords (use the same helpers RoomVisualisation uses)
-      let canvasX = null;
-      let canvasY = null;
-      let canvasOk = false;
-      let canvasReason = null;
+      // Canvas coords using same helpers as icons
+      let xPx = null;
+      let yPx = null;
+      let hasFiniteCanvas = false;
+      let inRoomRectPx = false;
 
-      if (!hasPos) {
-        canvasReason = "missing position.x/y";
-      } else {
+      if (hasFiniteXY) {
         try {
-          const cx = meterToCanvasX(x);
-          const cy = meterToCanvasY(y);
-          canvasOk = Number.isFinite(cx) && Number.isFinite(cy);
-          canvasX = canvasOk ? cx : null;
-          canvasY = canvasOk ? cy : null;
-          if (!canvasOk) canvasReason = "non-finite canvas coords";
+          xPx = meterToCanvasX(xM);
+          yPx = meterToCanvasY(yM);
+          hasFiniteCanvas = Number.isFinite(xPx) && Number.isFinite(yPx);
+          
+          if (hasFiniteCanvas && roomRect) {
+            inRoomRectPx = (
+              xPx >= roomRect.x && 
+              xPx <= (roomRect.x + roomRect.width) &&
+              yPx >= roomRect.y && 
+              yPx <= (roomRect.y + roomRect.height)
+            );
+          }
         } catch (e) {
-          canvasOk = false;
-          canvasReason = "toCanvasX/toCanvasY threw";
+          hasFiniteCanvas = false;
         }
       }
 
-      out[role] = {
-        existsInPlacedSpeakers: !!inPlaced,
-        placed: inPlaced ? {
-          id: inPlaced.id,
-          role: inPlaced.role,
-          model: inPlaced.model,
-          position: inPlaced.position
-        } : null,
-
-        hasPosition: hasPos,
-        rawX: hasX ? Number(x).toFixed(3) : "N/A",
-        rawY: hasY ? Number(y).toFixed(3) : "N/A",
-        rawZ: Number.isFinite(z) ? Number(z).toFixed(3) : "N/A",
-        inRoomBounds,
-
+      trace[role] = {
+        inPlacedSpeakers: !!inPlaced,
         inSpeakersToRender: !!inToRender,
-        inAfterRenderable: "see renderSpeakers",
-        inAfterVisibility: "see renderSpeakers",
-
-        canvasX: canvasOk ? Number(canvasX).toFixed(2) : "N/A",
-        canvasY: canvasOk ? Number(canvasY).toFixed(2) : "N/A",
-        renderable: !!inToRender && hasPos && canvasOk,
-        renderableReason: (() => {
-          if (!inPlaced) return "missing from placedSpeakers";
-          if (!hasPos) return "missing position";
-          if (!inToRender) return "missing from speakersToRender";
-          if (!canvasOk) return canvasReason || "canvas invalid";
-          return "OK";
-        })()
+        inAfterRenderable: !!inAfterRender,
+        inAfterVisibility: !!inAfterVis,
+        
+        xM: hasFiniteXY ? xM : null,
+        yM: hasFiniteXY ? yM : null,
+        hasFiniteXY,
+        inRoomBounds,
+        
+        xPx: hasFiniteCanvas ? xPx : null,
+        yPx: hasFiniteCanvas ? yPx : null,
+        hasFiniteCanvas,
+        inRoomRectPx,
+        
+        model: inPlaced?.model || null,
+        canonRole: getCanonicalRole(role),
       };
     });
 
-    return out;
+    return trace;
   }, [
     placedSpeakers,
     speakersToRender,
     widthM,
     lengthM,
-    getCanonicalRole,
+    roomRect,
+    scale,
     meterToCanvasX,
-    meterToCanvasY
+    meterToCanvasY,
+    getCanonicalRole,
+    isRenderableSpeaker
   ]);
 
+  // Console.table snapshot when trace changes
   const __rvLastTraceRef = React.useRef(null);
 
   React.useEffect(() => {
     if (globalThis.__B44_RV_DEBUG !== true) return;
+    if (!__rvMissingTrace) return;
 
-    const nextStr = JSON.stringify(__rvTrace);
+    const nextStr = JSON.stringify(__rvMissingTrace);
     if (__rvLastTraceRef.current === nextStr) return;
     __rvLastTraceRef.current = nextStr;
 
-    console.groupCollapsed("[RV TRACE] LW/RW/SBL/SBR pipeline");
+    console.groupCollapsed("[RV TRACE] LW/RW/SBL/SBR");
     try {
-      console.table(Object.entries(__rvTrace).map(([role, d]) => ({
+      const rows = Object.entries(__rvMissingTrace).map(([role, d]) => ({
         role,
-        existsInPlacedSpeakers: d.existsInPlacedSpeakers,
-        hasPosition: d.hasPosition,
-        rawX: d.rawX,
-        rawY: d.rawY,
-        inRoomBounds: d.inRoomBounds,
-        inSpeakersToRender: d.inSpeakersToRender,
-        canvasX: d.canvasX,
-        canvasY: d.canvasY,
-        renderable: d.renderable,
-        reason: d.renderableReason
-      })));
+        inPlaced: d.inPlacedSpeakers,
+        inRenderable: d.inAfterRenderable,
+        "xM,yM": d.hasFiniteXY ? `${d.xM.toFixed(3)},${d.yM.toFixed(3)}` : "—",
+        inRoom: d.inRoomBounds,
+        "xPx,yPx": d.hasFiniteCanvas ? `${d.xPx.toFixed(1)},${d.yPx.toFixed(1)}` : "—",
+        inRoomRectPx: d.inRoomRectPx,
+        model: d.model || "—",
+      }));
+      console.table(rows);
     } finally {
       console.groupEnd();
     }
-  }, [__rvTrace]);
+  }, [__rvMissingTrace]);
 
   // Get overhead count from dolbyLayout
   const overheadCount = useMemo(() => {
@@ -5928,33 +5920,61 @@ return (
     {/* CANVAS WRAPPER (no tailwind) */}
     <div style={canvasStyle}>
 
-      {/* TEMP DEBUG PANEL: RV Trace (LW/RW/SBL/SBR) */}
-      {globalThis.__B44_RV_DEBUG === true && (
+      {/* DEBUG PANEL: Missing Speakers Trace (Top-Right) */}
+      {globalThis.__B44_RV_DEBUG === true && __rvMissingTrace && (
         <div style={{
           position: "absolute",
           top: 10,
           right: 10,
-          width: 340,
-          padding: 10,
+          width: 420,
+          maxHeight: 400,
+          overflow: "auto",
+          padding: 12,
           background: "#fffbe6",
           border: "2px solid #ff4d4f",
           borderRadius: 8,
-          fontSize: 11,
-          lineHeight: "14px",
-          zIndex: 9999
+          fontSize: 10,
+          lineHeight: "13px",
+          fontFamily: "monospace",
+          zIndex: 9999,
+          pointerEvents: "auto"
         }}>
-          <div style={{ fontWeight: 700, marginBottom: 6 }}>RV TRACE (LW/RW/SBL/SBR)</div>
-          {Object.entries(__rvTrace).map(([role, d]) => (
-            <div key={role} style={{ marginBottom: 8 }}>
-              <div style={{ fontWeight: 700 }}>{role} — {d.renderable ? "RENDER" : "NO"}</div>
-              <div>Placed: {String(d.existsInPlacedSpeakers)}</div>
-              <div>Pos: {String(d.hasPosition)} (x {d.rawX}, y {d.rawY})</div>
-              <div>In room: {String(d.inRoomBounds)}</div>
-              <div>ToRender / AfterR / AfterV: {String(d.inSpeakersToRender)} / {String(d.inAfterRenderable)} / {String(d.inAfterVisibility)}</div>
-              <div>Canvas: {d.canvasX}, {d.canvasY}</div>
-              <div>Reason: {d.renderableReason}</div>
-            </div>
-          ))}
+          <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 11 }}>RV TRACE: LW/RW/SBL/SBR</div>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+            <thead>
+              <tr style={{ borderBottom: "1px solid #ccc" }}>
+                <th style={{ padding: "4px 2px", textAlign: "left" }}>Role</th>
+                <th style={{ padding: "4px 2px", textAlign: "center" }}>Placed</th>
+                <th style={{ padding: "4px 2px", textAlign: "center" }}>Rend</th>
+                <th style={{ padding: "4px 2px", textAlign: "right" }}>xM,yM</th>
+                <th style={{ padding: "4px 2px", textAlign: "center" }}>InRoom</th>
+                <th style={{ padding: "4px 2px", textAlign: "right" }}>xPx,yPx</th>
+                <th style={{ padding: "4px 2px", textAlign: "center" }}>InRect</th>
+                <th style={{ padding: "4px 2px", textAlign: "left" }}>Model</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(__rvMissingTrace).map(([role, d]) => (
+                <tr key={role} style={{ borderBottom: "1px solid #eee" }}>
+                  <td style={{ padding: "4px 2px", fontWeight: 700 }}>{role}</td>
+                  <td style={{ padding: "4px 2px", textAlign: "center" }}>{d.inPlacedSpeakers ? "✓" : "✗"}</td>
+                  <td style={{ padding: "4px 2px", textAlign: "center" }}>{d.inAfterRenderable ? "✓" : "✗"}</td>
+                  <td style={{ padding: "4px 2px", textAlign: "right" }}>
+                    {d.hasFiniteXY ? `${d.xM.toFixed(2)},${d.yM.toFixed(2)}` : "—"}
+                  </td>
+                  <td style={{ padding: "4px 2px", textAlign: "center" }}>{d.inRoomBounds ? "✓" : "✗"}</td>
+                  <td style={{ padding: "4px 2px", textAlign: "right" }}>
+                    {d.hasFiniteCanvas ? `${Math.round(d.xPx)},${Math.round(d.yPx)}` : "—"}
+                  </td>
+                  <td style={{ padding: "4px 2px", textAlign: "center", 
+                    color: d.inRoomRectPx ? "green" : d.hasFiniteCanvas ? "orange" : "inherit" }}>
+                    {d.hasFiniteCanvas ? (d.inRoomRectPx ? "✓" : "OFF") : "—"}
+                  </td>
+                  <td style={{ padding: "4px 2px", fontSize: 9 }}>{d.model || "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -6417,6 +6437,67 @@ return (
 
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
             {renderSpeakers()}
+
+            {/* DEBUG DOTS: LW/RW/SBL/SBR positions (even if not rendering) */}
+            {globalThis.__B44_RV_DEBUG === true && __rvMissingTrace && (() => {
+              const debugDots = [];
+              Object.entries(__rvMissingTrace).forEach(([role, d]) => {
+                if (!d.hasFiniteCanvas) return;
+
+                const xPx = d.xPx;
+                const yPx = d.yPx;
+                
+                // Check if off-canvas (outside roomRect)
+                const isOffView = !d.inRoomRectPx;
+                
+                // Clamp to SVG visible area if off-view
+                let dotX = xPx;
+                let dotY = yPx;
+                let label = `${role}`;
+                
+                if (isOffView) {
+                  // Clamp to roomRect edges for visibility
+                  dotX = Math.max(roomRect.x, Math.min(roomRect.x + roomRect.width, xPx));
+                  dotY = Math.max(roomRect.y, Math.min(roomRect.y + roomRect.height, yPx));
+                  label = `${role} OFFVIEW`;
+                }
+
+                debugDots.push(
+                  <g key={`debug-${role}`}>
+                    <circle
+                      cx={dotX}
+                      cy={dotY}
+                      r={6}
+                      fill={isOffView ? "#ff4d4f" : "#faad14"}
+                      stroke="#fff"
+                      strokeWidth={2}
+                      opacity={0.9}
+                    />
+                    <text
+                      x={dotX + 10}
+                      y={dotY - 10}
+                      fontSize={10}
+                      fill={isOffView ? "#ff4d4f" : "#333"}
+                      fontWeight={700}
+                      fontFamily="monospace"
+                    >
+                      {label}
+                    </text>
+                    <text
+                      x={dotX + 10}
+                      y={dotY + 2}
+                      fontSize={9}
+                      fill="#666"
+                      fontFamily="monospace"
+                    >
+                      ({d.xM?.toFixed(2)}, {d.yM?.toFixed(2)})
+                    </text>
+                  </g>
+                );
+              });
+
+              return <g data-layer="debug-dots" pointerEvents="none">{debugDots}</g>;
+            })()}
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
             {renderSpeakerLabels()}
