@@ -1810,15 +1810,16 @@ function SpeakerPlacementImpl(props) {
 
           const existing = byRole.get(canon);
           
-          // B44 FIX: only create surrounds when a real model is chosen
+          // [B44 CRITICAL FIX] ALWAYS seed speaker roles for layout format
+          // Model can be null (no icon renders), but the role MUST exist for system definition
           let resolvedModel = existing?.model || globalSurroundModelParam;
 
-          // If there is still no model (dropdown "Off"), do not seed this role
+          // Normalize 'off' / 'none' to null (speaker exists, but no model selected)
           if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
-            return;
+            resolvedModel = null;
+          } else {
+            resolvedModel = String(resolvedModel);
           }
-
-          resolvedModel = String(resolvedModel);
 
           const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
           
