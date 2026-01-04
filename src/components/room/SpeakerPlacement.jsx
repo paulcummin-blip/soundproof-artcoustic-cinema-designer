@@ -1869,11 +1869,13 @@ function SpeakerPlacementImpl(props) {
 
           const initialYaw = Number.isFinite(yawDeg) ? yawDeg : 0;
 
+          // [B44 CRITICAL FIX] Always create speaker entry for system role
+          // even if model is null or position is undefined
           next.push({
             id: existing?.id || `${canon}-${timeNowMs()}`,
             role: canon,
-            model: resolvedModel,
-            position: pos,
+            model: resolvedModel, // can be null
+            position: pos, // can be undefined if no model
             draggable: true,
 
             // Keep yaw for labels / analysis
