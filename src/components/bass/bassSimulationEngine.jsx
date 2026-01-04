@@ -87,37 +87,62 @@ function calculateBoundaryGain(subPos, roomDims, radiationMode) {
   return Math.min(wallCount * 3, 6);
 }
 
-// Compute axial room modes (L/W/H) up to fMax
-function computeAxialModes(roomDims, fMax = 200) {
-  const modes = [];
+// Compute room modes up to maxHz (axial + tangential + oblique)
+function computeRoomModes(roomDims, maxHz = 200) {
+  const Lx = Number(roomDims.widthM);
+  const Ly = Number(roomDims.lengthM);
+  const Lz = Number(roomDims.heightM);
+
+  if (!Lx || !Ly || !Lz) return [];
+
   const c = SPEED_OF_SOUND;
-  
-  // Length modes (along Y axis)
-  for (let n = 1; n < 50; n++) {
-    const f = (c / 2) * (n / roomDims.lengthM);
-    if (f > fMax) break;
-    modes.push({ axis: 'Y', n, fHz: f, dim: roomDims.lengthM });
+
+  // Conservative upper bounds for mode indices
+  const nxMax = Math.max(1, Math.ceil((2 * maxHz * Lx) / c));
+  const nyMax = Math.max(1, Math.ceil((2 * maxHz * Ly) / c));
+  const nzMax = Math.max(1, Math.ceil((2 * maxHz * Lz) / c));
+
+  const modes = [];
+
+  for (let nx = 0; nx <= nxMax; nx++) {
+    for (let ny = 0; ny <= nyMax; ny++) {
+      for (let nz = 0; nz <= nzMax; nz++) {
+        // Skip (0,0,0)
+        if (nx === 0 && ny === 0 && nz === 0) continue;
+
+        // Frequency
+        const fx = (nx / Lx);
+        const fy = (ny / Ly);
+        const fz = (nz / Lz);
+
+        const fHz = (c / 2) * Math.sqrt(fx * fx + fy * fy + fz * fz);
+        if (!Number.isFinite(fHz) || fHz <= 0 || fHz > maxHz) continue;
+
+        // Classify type
+        const nonZero = (nx !== 0) + (ny !== 0) + (nz !== 0);
+        let type = "axial";
+        if (nonZero === 2) type = "tangential";
+        if (nonZero === 3) type = "oblique";
+
+        modes.push({
+          type,
+          nx, ny, nz,
+          fHz,
+          dims: { Lx, Ly, Lz }
+        });
+      }
+    }
   }
-  
-  // Width modes (along X axis)
-  for (let n = 1; n < 50; n++) {
-    const f = (c / 2) * (n / roomDims.widthM);
-    if (f > fMax) break;
-    modes.push({ axis: 'X', n, fHz: f, dim: roomDims.widthM });
-  }
-  
-  // Height modes (along Z axis)
-  for (let n = 1; n < 50; n++) {
-    const f = (c / 2) * (n / roomDims.heightM);
-    if (f > fMax) break;
-    modes.push({ axis: 'Z', n, fHz: f, dim: roomDims.heightM });
-  }
-  
-  return modes;
+
+  // Sort by frequency and cap count for performance
+  modes.sort((a, b) => a.fHz - b.fHz);
+
+  // Keep a sensible number (REW-like density but safe)
+  return modes.slice(0, 400);
 }
 
-// Export for UI use
-export { computeAxialModes };
+// Export for UI use (backward compat alias)
+export { computeRoomModes as computeAxialModes };
 
 // Compute REW-style modes-only response (axial modes with source/receiver coupling)
 export function computeModesOnlyResponse({ roomDims, seatPos, freqsHz, damping = 20 }) {
@@ -213,26 +238,22 @@ export function computeModesOnlyResponse({ roomDims, seatPos, freqsHz, damping =
   });
 }
 
-// Calculate mode coupling between source and receiver (pressure-mode shape)
-function axisCoupling(axis, n, sourcePos, seatPos, dim) {
-  let sourceU, seatU;
-  
-  if (axis === 'Y') {
-    sourceU = sourcePos.y;
-    seatU = seatPos.y;
-  } else if (axis === 'X') {
-    sourceU = sourcePos.x;
-    seatU = seatPos.x;
-  } else { // Z
-    sourceU = sourcePos.z;
-    seatU = seatPos.z;
-  }
-  
-  // Standing wave pressure shape: cos(n * π * u / dim)
-  const excite = Math.abs(Math.cos(n * Math.PI * sourceU / dim));
-  const receive = Math.abs(Math.cos(n * Math.PI * seatU / dim));
-  
-  return excite * receive;
+// Signed mode-shape coupling between source and receiver for a 3D mode
+function modeCoupling(mode, sourcePos, seatPos) {
+  const { nx, ny, nz, dims } = mode;
+  const { Lx, Ly, Lz } = dims;
+
+  // Normalised standing-wave pressure shape (signed!)
+  const sx = (nx === 0) ? 1 : Math.cos(nx * Math.PI * (sourcePos.x / Lx));
+  const sy = (ny === 0) ? 1 : Math.cos(ny * Math.PI * (sourcePos.y / Ly));
+  const sz = (nz === 0) ? 1 : Math.cos(nz * Math.PI * (sourcePos.z / Lz));
+
+  const rx = (nx === 0) ? 1 : Math.cos(nx * Math.PI * (seatPos.x / Lx));
+  const ry = (ny === 0) ? 1 : Math.cos(ny * Math.PI * (seatPos.y / Ly));
+  const rz = (nz === 0) ? 1 : Math.cos(nz * Math.PI * (seatPos.z / Lz));
+
+  // Signed coupling (can be negative → enables cancellations)
+  return (sx * sy * sz) * (rx * ry * rz);
 }
 
 // Compute modal resonator response (complex)
@@ -279,13 +300,15 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
     const df = Math.abs(f - mode.fHz);
     if (df > 3 * bw) continue;
     
-    // Calculate coupling for this sub-seat pair
-    const coupling = axisCoupling(mode.axis, mode.n, 
-      { x: sub.x, y: sub.y, z: sub.z }, 
-      seatPos, 
-      mode.dim);
-    
-    if (coupling < 0.01) continue; // Skip negligible couplings
+    // Calculate coupling for this sub-seat pair (signed, full 3D)
+    const coupling = modeCoupling(
+      mode,
+      { x: sub.x, y: sub.y, z: sub.z },
+      seatPos
+    );
+
+    // Skip tiny couplings
+    if (Math.abs(coupling) < 0.01) continue;
     
     // Get complex resonator response
     const resonator = modalResonator(f, mode.fHz, Q, coupling);
@@ -424,7 +447,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   const dbEq = -eqHeadroomDb;
   
   // Precompute room modes (do this once)
-  const modes = modesEnabled ? computeAxialModes(roomDims, 200) : [];
+  const modes = modesEnabled ? computeRoomModes(roomDims, 200) : [];
   
   // Compute response for each seat
   const seatResponses = {};
