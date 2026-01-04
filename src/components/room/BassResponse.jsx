@@ -439,9 +439,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         pointsPerOct: 24,
         modeLimitHz: 200,
         q: roomDamping,
-        includeAxial: true,
-        includeTangential: true,
-        includeOblique: true,
+        includeAxial: modesEnabled,
+        includeTangential: modesEnabled,
+        includeOblique: modesEnabled,
+        includeSBIR: rewSbirEnabled,
         rewParityMode: true,
         smoothing: 'none', // NO SMOOTHING for audit
         subFloorHeight: 0.0,
