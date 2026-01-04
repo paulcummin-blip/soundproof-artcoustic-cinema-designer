@@ -24,7 +24,7 @@ const brand = {
 };
 
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
-  const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg } = useAppState();
+  const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave } = useAppState();
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
   const totalSubCount = (frontSubsCfg?.count || 0) + (rearSubsCfg?.count || 0);
   const hasNoSubs = totalSubCount === 0;
@@ -4024,6 +4024,39 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </Alert>
       )}
       
+      {/* Session Autosave Controls */}
+      <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
+        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Session Auto-Save</div>
+        <div className="space-y-3">
+          <div className="flex gap-2 items-center flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => restoreAutosave?.()}
+              className="text-xs"
+            >
+              Restore last session
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => clearAutosave?.()}
+              className="text-xs"
+            >
+              Clear autosave
+            </Button>
+            <div className="text-xs text-[#3E4349]">
+              {autosaveMeta?.savedAt 
+                ? `Last autosave: ${new Date(autosaveMeta.savedAt).toLocaleTimeString()}` 
+                : "No autosave yet"}
+            </div>
+          </div>
+          <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
+            Auto-saves room state every 500ms (prevents data loss on Preview refresh)
+          </div>
+        </div>
+      </div>
+
       {/* Room Modes & SBIR Controls */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
         <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Acoustics (Product Simulation)</div>
