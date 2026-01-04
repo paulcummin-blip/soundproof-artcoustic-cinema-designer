@@ -2110,7 +2110,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div>hasNoSeats: {String(!!hasNoSeats)} | hasNoSubs: {String(!!hasNoSubs)}</div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -2251,6 +2251,34 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div style={{ fontSize: 12, color: "#3E4349" }}>
             Showing: {selectedSeat?.isPrimary ? "MLP" : `Seat ${selectedSeat?.id ?? ""}`}
           </div>
+        </div>
+
+        {/* Live Control Status Strip */}
+        <div style={{ 
+          fontSize: 10, 
+          color: "#3E4349", 
+          fontFamily: "monospace",
+          background: "#F8F8F7",
+          padding: "4px 8px",
+          borderRadius: 4,
+          border: "1px solid #DCDBD6",
+          marginBottom: 6
+        }}>
+          Modes: {String(modesEnabled)} | Smoothing: {graphSmoothing} | SBIR: {String(rewSbirEnabled)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)}
+        </div>
+
+        {/* Engine Parameter Verification */}
+        <div style={{ 
+          fontSize: 10, 
+          color: "#1B1A1A", 
+          fontFamily: "monospace",
+          background: "#FFF6E6",
+          padding: "4px 8px",
+          borderRadius: 4,
+          border: "1px solid #C1B6AD",
+          marginBottom: 8
+        }}>
+          Engine modesEnabled: {String(modesEnabled)} | seatResponses: {Object.keys(simulationResults.seatResponses || {}).length}
         </div>
 
         {/* REW Parity Test Case (Part E - VALIDATION) */}
@@ -4136,6 +4164,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div className="text-sm font-medium text-[#1B1A1A] mb-3">Smoothing</div>
           <div className="space-y-2">
             <div className="flex gap-2">
+              <Button
+                variant={(rewCompareView ? graphSmoothing === 'none' : rewSmoothing === 'none') ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setRewSmoothing('none')}
+                className="text-xs flex-1"
+                disabled={rewCompareView}
+              >
+                None (Raw)
+              </Button>
               <Button
                 variant={(rewCompareView ? graphSmoothing === '1/48' : rewSmoothing === '1/48') ? 'default' : 'outline'}
                 size="sm"
