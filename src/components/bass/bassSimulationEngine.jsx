@@ -605,10 +605,15 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
       });
 
       // Convert complex sum to SPL (pure pressure summation)
-      const magnitude = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+      const magnitudeRaw = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+
+      // Prevent -Infinity / crazy negatives when magnitude collapses to ~0
+      const floorLinear = Math.pow(10, MIN_SPL_FLOOR / 20);
+      const magnitude = Math.max(magnitudeRaw, floorLinear);
+
       const spl = 20 * Math.log10(magnitude);
-      const finalSpl = Math.max(MIN_SPL_FLOOR, spl);
-      
+      const finalSpl = spl; // already floored in linear domain
+
       // Record summation audit data
       if (shouldAudit) {
         audit.summations.push({
@@ -616,12 +621,13 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
           frequencyHz: f,
           sumReal,
           sumImag,
+          magnitudeRaw,
           magnitude,
           spl,
           finalSplDb: finalSpl
         });
       }
-      
+
       return finalSpl;
     });
     
