@@ -5126,6 +5126,12 @@ return {
       if (rvIsOverheadRole(spk.role)) {
         return true;
       }
+
+      // CRITICAL: These must never be dropped by visibility logic.
+      // Their existence is driven by config + placement, NOT overlay toggles.
+      if (["SBL", "SBR", "LW", "RW"].includes(canon)) {
+        return true;
+      }
       
       const result = getSpeakerVisibility(spk.role, spk.model);
       
