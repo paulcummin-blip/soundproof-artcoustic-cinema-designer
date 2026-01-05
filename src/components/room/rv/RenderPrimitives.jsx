@@ -21,7 +21,7 @@ export const isRenderableSpeaker = (speaker) => {
     return true;
   }
 
-  // Existing position/model rules for non-overheads
+  // Bed-layer speakers: require valid position only, NOT model
   if (
     !speaker.position ||
     typeof speaker.position.x !== "number" ||
@@ -30,15 +30,7 @@ export const isRenderableSpeaker = (speaker) => {
     return false;
   }
 
-  if (
-    speaker.model === undefined ||
-    speaker.model === null ||
-    speaker.model === "off" ||
-    speaker.model === "none"
-  ) {
-    return false;
-  }
-
+  // Bed-layer speakers render even without model assignment
   return true;
 };
 

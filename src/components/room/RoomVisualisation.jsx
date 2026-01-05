@@ -5599,9 +5599,9 @@ return {
     let canvasX, canvasY;
 
     if (canon === "FL" || canon === "FC" || canon === "FR") {
-      // LCR: pinned to front wall using WALL_BUFFER_M
+      // LCR: use speaker.position.y when available, fallback to wall-hugged position
       const half = yHalfExtentM(depthM_spk, widthM_spk, yawDeg);
-      const y_m = WALL_BUFFER_M + half;
+      const y_m = Number.isFinite(pos_y) ? pos_y : (WALL_BUFFER_M + half);
       canvasX = toCanvasX(pos_x);
       canvasY = toCanvasY(y_m);
     } else {
