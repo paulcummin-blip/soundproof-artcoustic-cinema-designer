@@ -291,6 +291,7 @@ function useDesignerState() {
   const [aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP] = useState(false);
 
   const [autosaveMeta, setAutosaveMeta] = useState(null);
+  const [globalSurroundModel, setGlobalSurroundModel] = useState(null);
 
   const [splConfig, setSplConfig] = useState({
         globalPowerW: 100,
@@ -686,6 +687,8 @@ function useDesignerState() {
     autosaveMeta,
     restoreAutosave,
     clearAutosave: clearAutosaveNow,
+    globalSurroundModel,
+    setGlobalSurroundModel,
   }), [
     dimensions, setDimensions,
     roomDims, setRoomDims,
@@ -739,6 +742,8 @@ function useDesignerState() {
     autosaveMeta,
     restoreAutosave,
     clearAutosaveNow,
+    globalSurroundModel,
+    setGlobalSurroundModel,
   ]);
 
   return value;

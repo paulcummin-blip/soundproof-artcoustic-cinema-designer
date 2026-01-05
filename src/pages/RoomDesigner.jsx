@@ -2864,7 +2864,7 @@ function RoomDesignerWithState() {
          if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${seededBed.length} bed + ${seededOverheads.length} overhead (${seededOverheads.map(s => s.role).join(', ')})`);
          
          // Process bed-layer speakers (preserve models from previous)
-         // For surround roles without models, try to inherit from any existing surround speaker
+         // For surround roles without models, try to inherit from any existing surround speaker OR globalSurroundModel
          const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
          const anySurroundModel = prevBedSpeakers
            .filter(s => surroundRoles.has(safeCanon(s.role)))
@@ -2872,6 +2872,9 @@ function RoomDesignerWithState() {
              const m = String(s.model || '').trim().toLowerCase();
              return m && m !== 'off' && m !== 'none';
            })?.model;
+         
+         // Get global surround model from AppState
+         const globalSurroundModel = appState?.globalSurroundModel;
          
          const nextBed = seededBed.map(seed => {
            const canonRole = safeCanon(seed.role);
@@ -2884,7 +2887,16 @@ function RoomDesignerWithState() {
            if (surroundRoles.has(canonRole)) {
              const currentModelStr = String(finalModel || '').trim().toLowerCase();
              if (!currentModelStr || currentModelStr === 'off' || currentModelStr === 'none') {
-               finalModel = anySurroundModel ?? finalModel;
+               // Priority: anySurroundModel (from existing speakers) > globalSurroundModel (from UI) > keep undefined
+               finalModel = anySurroundModel ?? globalSurroundModel ?? finalModel;
+               
+               if (globalThis.__B44_LOGS) console.log(`[RD RECON] Assigning model to ${canonRole}:`, {
+                 prevMatch: prevMatch?.model,
+                 hint,
+                 anySurroundModel,
+                 globalSurroundModel,
+                 finalModel
+               });
              }
            }
            
@@ -3806,6 +3818,9 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         setUseMidGlobal={setUseMidGlobalFromState}
                         useRearGlobal={useRearGlobalFromState}
                         setUseRearGlobal={setUseRearGlobalFromState}
+                        
+                        globalSurroundModel={appState?.globalSurroundModel}
+                        setGlobalSurroundModel={appState?.setGlobalSurroundModel}
                         
                         allSeatSplMetrics={allSeatSplMetrics}
                       />
