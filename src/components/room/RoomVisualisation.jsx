@@ -894,9 +894,9 @@ const byId = useMemo(() => {
   // actualScreenFrontY declaration and calculation
   const actualScreenFrontY = React.useMemo(() => {
     const floatDepthM = Number(screen?.floatDepthM) || 0.0;
-    const speakerClearanceM = Number(screen?.speakerClearanceM) || 0.02;
 
-    const minDepthForSpeakersToClear = calculatedMinScreenDepthM + speakerClearanceM;
+    // calculatedMinScreenDepthM already includes the 1cm gap, don't add it again
+    const minDepthForSpeakersToClear = calculatedMinScreenDepthM;
 
     if (screenPlaneMode === 'autoTight') {
       return minDepthForSpeakersToClear;
@@ -906,7 +906,6 @@ const byId = useMemo(() => {
   }, [
     calculatedMinScreenDepthM,
     screen?.floatDepthM,
-    screen?.speakerClearanceM,
     screenPlaneMode
   ]);
 
