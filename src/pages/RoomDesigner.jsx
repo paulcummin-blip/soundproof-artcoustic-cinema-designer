@@ -24,6 +24,7 @@ import { placeSubsForFrontWall } from "@/components/room/utils/placeSubs";
 import { debug } from "@/components/utils/consolePolyfill";
 import { safeGroup, safeTable } from "@/components/utils/safeLog"; // NEW: Import safe logging
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry"; // NEW: For model metadata
+import { yHalfExtentM } from "@/components/room/rv/RenderPrimitives"; // NEW: For stroke-aware positioning
 import { calculateLcrConstraints } from "@/components/room/constraints/lcrConstraints"; // NEW: For LCR constraints
 import { placeSubwoofers } from '@/components/room/placement/placeSubwoofers'; // NEW import // FIX: Added 'from' keyword
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones"; // NEW import
@@ -2388,7 +2389,7 @@ function RoomDesignerWithState() {
     if (!placedSpeakers || !placedSpeakers.length) return;
     if (stableScreen.mountMode === 'floating') return;
     
-    const WALL_BUFFER_M = 0.02;
+    const gapM = 0.01; // 1cm air gap from wall
     let needsUpdate = false;
     
     const updated = placedSpeakers.map(spk => {
@@ -2403,9 +2404,12 @@ function RoomDesignerWithState() {
       // Get speaker dimensions
       const meta = getSpeakerModelMeta(spk.model) || {};
       const depthM = Number(meta.depthM) || 0.082;
+      const widthM = Number(meta.widthM) || 0.27;
       
-      // Calculate wall-hugged Y (yaw 0 for LCR)
-      const wallY = WALL_BUFFER_M + (depthM / 2);
+      // Calculate wall-hugged Y using stroke-aware half extent (yaw 0 for LCR)
+      const halfExtentM = yHalfExtentM(depthM, widthM, 0);
+      const wallY = gapM + halfExtentM;
+      
       const currentY = spk.position?.y ?? 0;
       const currentZ = spk.position?.z ?? 1.2;
       
