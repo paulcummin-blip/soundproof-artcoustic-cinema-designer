@@ -343,8 +343,8 @@ function computeMinimumScreenDepthM({
         ? lcrAngles.R
         : 0; // FC and subs remain 0 yaw for depth calculation
 
-    // total projected Y depth of the box = 2 * half-extent
-    const half = _yHalfExtentM_physical(depthM, widthM, yawDeg);
+    // CRITICAL: Use stroke-aware calculation to match LCR positioning logic
+    const half = yHalfExtentM(depthM, widthM, yawDeg);
     const projectedY = 2 * half;
 
     // hard planes: wall (y=0) + screen plane
