@@ -2387,6 +2387,7 @@ function RoomDesignerWithState() {
   useEffect(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
     if (!placedSpeakers || !placedSpeakers.length) return;
+    if (!mlpAnchorEffective) return;
     
     const gapM = 0.01; // 1cm air gap from wall
     let needsUpdate = false;
@@ -2405,16 +2406,17 @@ function RoomDesignerWithState() {
       const depthM = Number(meta.depthM) || 0.082;
       const widthM = Number(meta.widthM) || 0.27;
       
-      // Get actual yaw angle for this speaker when aimed
-      let actualYawDeg = 0;
-      if (lcrAimMode === "angled") {
-        if (role === 'FL') actualYawDeg = Math.abs(Number(spk.rotation?.y) || 0);
-        if (role === 'FR') actualYawDeg = Math.abs(Number(spk.rotation?.y) || 0);
-        // FC stays 0
+      // Compute target yaw angle if aiming at MLP (same logic as aiming effect)
+      let targetYawDeg = 0;
+      if (lcrAimMode === "angled" && spk.position) {
+        const dx = mlpAnchorEffective.x - spk.position.x;
+        const dy = mlpAnchorEffective.y - spk.position.y;
+        const yawRad = Math.atan2(dx, dy);
+        targetYawDeg = Math.abs((yawRad * 180) / Math.PI);
       }
       
-      // Calculate wall-hugged Y using stroke-aware half extent with ACTUAL yaw
-      const halfExtentM = yHalfExtentM(depthM, widthM, actualYawDeg);
+      // Calculate wall-hugged Y using stroke-aware half extent with TARGET yaw
+      const halfExtentM = yHalfExtentM(depthM, widthM, targetYawDeg);
       const wallY = gapM + halfExtentM;
       
       const currentY = spk.position?.y ?? 0;
@@ -2439,7 +2441,7 @@ function RoomDesignerWithState() {
     if (needsUpdate) {
       setSpeakers(prev => mergePreserveOverheads(prev, updated));
     }
-  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode]);
+  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective]);
 
   // NEW: Effect to lock FC speaker to room centerline
   useEffect(() => {
