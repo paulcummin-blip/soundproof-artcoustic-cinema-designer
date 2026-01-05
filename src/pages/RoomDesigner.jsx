@@ -1283,9 +1283,29 @@ export function seedSpeakersFromPreset({
       // Sides - DO NOT CLAMP (maintain existing logic)
       case "SL":  return { x: m,     y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY)), z: earZ };
       case "SR":  return { x: w - m, y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY)), z: earZ };
-      // Backs - ONLY rear roles snap to back wall
-      case "SBL": return { x: Math.max(m, Math.min(backLeftX, w - m)),  y: Math.min(yRear, l - m), z: earZ };
-      case "SBR": return { x: Math.max(m, Math.min(backRightX, w - m)), y: Math.min(yRear, l - m), z: earZ };
+      // Backs - STROKE-AWARE rear wall placement with 1cm gap
+      case "SBL": 
+      case "SBR": {
+        const gapM = 0.01; // 1cm air gap from rear wall
+        // Use a default model for sizing if none is set yet (will be overridden when user selects)
+        const modelId = "evolve-2-1_s"; // Safe fallback for initial seeding
+        const meta = getSpeakerModelMeta(modelId) || {};
+        const widthM = Number(meta.widthM) || 0.27;
+        const depthM = Number(meta.depthM) || 0.082;
+        
+        // Calculate stroke-aware half extent (yaw = 0 for rear-wall hug)
+        const halfExtentM = yHalfExtentM(depthM, widthM, 0);
+        const rearWallY = l - (gapM + halfExtentM);
+        
+        // Symmetrical X positions
+        const xPos = role === "SBL" ? x25 : x75;
+        
+        return { 
+          x: Math.max(m, Math.min(xPos, w - m)), 
+          y: rearWallY, 
+          z: earZ 
+        };
+      }
       case "RBL": return { x: Math.max(m, Math.min(backLeftX, w - m)),  y: Math.min(yRear, l - m), z: earZ };
       case "RBR": return { x: Math.max(m, Math.min(backRightX, w - m)), y: Math.min(yRear, l - m), z: earZ };
       // Wides - DO NOT CLAMP (maintain existing logic)
