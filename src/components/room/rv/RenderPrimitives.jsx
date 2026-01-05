@@ -14,11 +14,6 @@ export const hasPos = (s) => (s?.position && Number.isFinite(s.position.x) && Nu
 export const isRenderableSpeaker = (speaker) => {
   if (!speaker) return false;
 
-  const role = String(speaker.role || "").toUpperCase();
-
-  // Overheads ALWAYS render (even if model missing)
-  if (role.startsWith("T")) return true;
-
   // Must have a valid position to draw anything
   if (
     !speaker.position ||
@@ -30,7 +25,7 @@ export const isRenderableSpeaker = (speaker) => {
     return false;
   }
 
-  // Bed speakers require a selected model to render
+  // ALL speakers (bed + overhead) require a selected model to render
   // Block undefined, null, "", "off", "none"
   const m = speaker.model;
   const ms = String(m ?? "").trim().toLowerCase();

@@ -5535,11 +5535,6 @@ return {
       return null;
     }
 
-    // Skip Front Wides if zones not enabled
-    if ((canon === 'LW' || canon === 'RW') && !enableFrontWides) {
-      return null;
-    }
-
     // [B44 VISIBILITY FIX] Resolve model with safe fallback for LW/RW/SBL/SBR
     let resolvedModel = resolveSurroundModel(model, canon);
     
@@ -5600,20 +5595,9 @@ return {
       }
     }
 
-    // Convert to canvas coordinates
-    let canvasX, canvasY;
-
-    if (canon === "FL" || canon === "FC" || canon === "FR") {
-      // LCR: use speaker.position.y when available, fallback to wall-hugged position
-      const half = yHalfExtentM(depthM_spk, widthM_spk, yawDeg);
-      const y_m = Number.isFinite(pos_y) ? pos_y : (WALL_BUFFER_M + half);
-      canvasX = toCanvasX(pos_x);
-      canvasY = toCanvasY(y_m);
-    } else {
-      // Everyone else: use their stored world coords directly
-      canvasX = toCanvasX(pos_x);
-      canvasY = toCanvasY(pos_y);
-    }
+    // Convert to canvas coordinates - use stored position for all speakers
+    const canvasX = toCanvasX(pos_x);
+    const canvasY = toCanvasY(pos_y);
 
     // NaN safety: ensure we never pass invalid coordinates
     const safeCanvasX = Number.isFinite(canvasX) ? canvasX : 0;

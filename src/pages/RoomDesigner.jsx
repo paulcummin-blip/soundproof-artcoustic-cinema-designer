@@ -2385,6 +2385,8 @@ function RoomDesignerWithState() {
   // Effect to lock LCR to front wall + z=1.2
   useEffect(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
+    if (!placedSpeakers || !placedSpeakers.length) return;
+    if (stableScreen.mountMode === 'floating') return;
     
     const WALL_BUFFER_M = 0.02;
     let needsUpdate = false;
@@ -2424,9 +2426,9 @@ function RoomDesignerWithState() {
     });
     
     if (needsUpdate) {
-      setSpeakers(updated);
+      setSpeakers(prev => mergePreserveOverheads(prev, updated));
     }
-  }, [placedSpeakers, _isFrozen, setSpeakers]);
+  }, [placedSpeakers, _isFrozen, setSpeakers, stableScreen.mountMode]);
 
   // NEW: Effect to lock FC speaker to room centerline
   useEffect(() => {
