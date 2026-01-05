@@ -2781,10 +2781,10 @@ function RoomDesignerWithState() {
          const knownOverheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR', 'TL', 'TR', 'TFC', 'TRC', 'TBC', 'TBL', 'TBR']);
          
          // Separate existing speakers into bed layer and overheads
-         const prevBeds = (prev || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
+         const bedSpeakers = (prev || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
          const existingOverheads = (prev || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
          
-         if (globalThis.__B44_LOGS) debug(`[Speakers] Existing: ${prevBeds.length} bed + ${existingOverheads.length} overhead (${existingOverheads.map(s => s.role).join(', ')})`);
+         if (globalThis.__B44_LOGS) debug(`[Speakers] Existing: ${bedSpeakers.length} bed + ${existingOverheads.length} overhead (${existingOverheads.map(s => s.role).join(', ')})`);
          
          // Keep only overheads that are in the target set
          const keptOverheads = existingOverheads.filter(s => targetSet.has(safeCanon(s.role)));
@@ -2792,8 +2792,8 @@ function RoomDesignerWithState() {
          // Create map of existing overheads by canonical role
          const overheadMap = new Map(keptOverheads.map(s => [safeCanon(s.role), s]));
          
-         // Create map from PREVIOUS bed speakers for model preservation only
-         const byCanonPrev = new Map(prevBeds.map(s => [safeCanon(s.role), s]));
+         // Create map from bed speakers only
+         const byCanonPrev = new Map(bedSpeakers.map(s => [safeCanon(s.role), s]));
          
          // Separate seeded speakers into bed-layer and overheads
          const seededBed = (seededSpeakers || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
