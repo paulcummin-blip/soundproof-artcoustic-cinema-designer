@@ -2387,7 +2387,6 @@ function RoomDesignerWithState() {
   useEffect(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
     if (!placedSpeakers || !placedSpeakers.length) return;
-    if (stableScreen.mountMode === 'floating') return;
     
     const gapM = 0.01; // 1cm air gap from wall
     let needsUpdate = false;
@@ -2432,7 +2431,7 @@ function RoomDesignerWithState() {
     if (needsUpdate) {
       setSpeakers(prev => mergePreserveOverheads(prev, updated));
     }
-  }, [placedSpeakers, _isFrozen, setSpeakers, stableScreen.mountMode]);
+  }, [placedSpeakers, _isFrozen, setSpeakers]);
 
   // NEW: Effect to lock FC speaker to room centerline
   useEffect(() => {
