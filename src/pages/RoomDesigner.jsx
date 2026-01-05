@@ -2669,7 +2669,22 @@ function RoomDesignerWithState() {
         listeningArea: null,
       });
       if (globalThis.__B44_LOGS) console.log('[RD] early reseed -> roles', seeded.map(s => safeCanon(s.role)));
-      setSpeakers(seeded);
+      setSpeakers(prev => {
+        const base = (Array.isArray(prev) && prev.length) ? prev : seeded;
+        const withOverheads = ensureAtmosOverheads({
+          placedSpeakers: base,
+          dolbyPreset,
+          roomDimensions: stableDimensions,
+          overheadGlobalModel: _overheadGlobalModel,
+          overheadFrontOverride: _overheadFrontOverride,
+          overheadMidOverride: _overheadMidOverride,
+          overheadRearOverride: _overheadRearOverride,
+          useFrontGlobal: _useFrontGlobal,
+          useMidGlobal: _useMidGlobal,
+          useRearGlobal: _useRearGlobal,
+        });
+        return withOverheads;
+      });
       return;
     }
 
@@ -2685,8 +2700,8 @@ function RoomDesignerWithState() {
       });
     }
 
-    const currentRolesSet = new Set(placedSpeakers.map(s => s.role));
-    const expectedRolesSet = new Set(expectedRoles);
+    const currentRolesSet = new Set((Array.isArray(placedSpeakers) ? placedSpeakers : []).map(s => safeCanon(s?.role)));
+    const expectedRolesSet = new Set((Array.isArray(expectedRoles) ? expectedRoles : []).map(r => safeCanon(r)));
 
     // Check if current roles match expected roles
     const hasCorrectRoles = currentRolesSet.size === expectedRolesSet.size &&
@@ -2702,6 +2717,30 @@ function RoomDesignerWithState() {
     );
 
     if (!hasCorrectRoles || noSpeakers) {
+      // GUARD: For Atmos layouts with existing bed speakers, don't full-reseed
+      const parts = String(normalizedPreset || '').split('.');
+      const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
+
+      if (heights > 0 && Array.isArray(placedSpeakers) && placedSpeakers.length) {
+        setSpeakers(prev => {
+          const withOverheads = ensureAtmosOverheads({
+            placedSpeakers: prev,
+            dolbyPreset,
+            roomDimensions: stableDimensions,
+            overheadGlobalModel: _overheadGlobalModel,
+            overheadFrontOverride: _overheadFrontOverride,
+            overheadMidOverride: _overheadMidOverride,
+            overheadRearOverride: _overheadRearOverride,
+            useFrontGlobal: _useFrontGlobal,
+            useMidGlobal: _useMidGlobal,
+            useRearGlobal: _useRearGlobal,
+          });
+          if (speakersEqual(prev, withOverheads)) return prev;
+          return withOverheads;
+        });
+        return;
+      }
+
       if (globalThis.__B44_LOGS) console.log(
         "[RD RECON] about to reseed using normalizedPreset =",
         normalizedPreset
