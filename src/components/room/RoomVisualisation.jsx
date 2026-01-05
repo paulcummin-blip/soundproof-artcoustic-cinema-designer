@@ -4227,6 +4227,78 @@ useEffect(() => {
     return { enabled: true, rows };
   }, [placedSpeakers, widthM, lengthM, getCanonicalRole, meterToCanvasX, meterToCanvasY]);
 
+  // TEMP DEBUG: Canvas Sanity readout (remove later)
+  const __rvCanvasSanity = React.useMemo(() => {
+    const enabled = globalThis.__B44_RV_DEBUG === true;
+    if (!enabled) return { enabled: false };
+
+    const testRoles = ["SL", "SR", "SBL", "SBR", "LW", "RW"];
+    const speakers = testRoles.map(role => {
+      const spk = (placedSpeakers || []).find(s => getCanonicalRole(s?.role) === role);
+      
+      if (!spk) {
+        return {
+          role,
+          exists: false,
+          roleStored: "—",
+          model: "—",
+          posX: "N/A",
+          posY: "N/A",
+          canvasX: "N/A",
+          canvasY: "N/A",
+          posFinite: false,
+          canvasFinite: false,
+        };
+      }
+
+      const posX = spk?.position?.x;
+      const posY = spk?.position?.y;
+      const posFinite = Number.isFinite(posX) && Number.isFinite(posY);
+
+      let canvasX = null;
+      let canvasY = null;
+      let canvasFinite = false;
+
+      if (posFinite && typeof meterToCanvasX === "function" && typeof meterToCanvasY === "function") {
+        try {
+          canvasX = meterToCanvasX(posX);
+          canvasY = meterToCanvasY(posY);
+          canvasFinite = Number.isFinite(canvasX) && Number.isFinite(canvasY);
+        } catch (e) {
+          canvasFinite = false;
+        }
+      }
+
+      return {
+        role,
+        exists: true,
+        roleStored: String(spk.role),
+        model: String(spk.model || "—"),
+        posX: posFinite ? posX.toFixed(3) : "N/A",
+        posY: posFinite ? posY.toFixed(3) : "N/A",
+        canvasX: canvasFinite ? canvasX.toFixed(1) : "N/A",
+        canvasY: canvasFinite ? canvasY.toFixed(1) : "N/A",
+        posFinite,
+        canvasFinite,
+      };
+    });
+
+    return {
+      enabled: true,
+      widthM: Number.isFinite(widthM) ? widthM.toFixed(2) : "N/A",
+      lengthM: Number.isFinite(lengthM) ? lengthM.toFixed(2) : "N/A",
+      heightM: Number.isFinite(heightM) ? heightM.toFixed(2) : "N/A",
+      scale: Number.isFinite(scale) ? scale.toFixed(2) : "N/A",
+      roomRect: {
+        x: Number.isFinite(roomRect?.x) ? roomRect.x.toFixed(1) : "N/A",
+        y: Number.isFinite(roomRect?.y) ? roomRect.y.toFixed(1) : "N/A",
+        width: Number.isFinite(roomRect?.width) ? roomRect.width.toFixed(1) : "N/A",
+        height: Number.isFinite(roomRect?.height) ? roomRect.height.toFixed(1) : "N/A",
+      },
+      speakers,
+    };
+  }, [placedSpeakers, widthM, lengthM, heightM, scale, roomRect, getCanonicalRole, meterToCanvasX, meterToCanvasY]);
+
   // TEMP DEBUG: RV speaker trace (remove later)
   const __rvMissingTrace = React.useMemo(() => {
     if (globalThis.__B44_RV_DEBUG !== true) return null;
@@ -6136,11 +6208,70 @@ return (
           RV LIVE: RoomVisualisation.jsx
         </text>
 
+        {/* TEMP DEBUG: Canvas Sanity Panel — remove later */}
+        {__rvCanvasSanity?.enabled && (
+          <g data-layer="canvas-sanity-debug" style={{ pointerEvents: "none" }}>
+            <rect x="8" y="32" width="420" height="260" fill="rgba(255,255,255,0.95)" stroke="#B00020" strokeWidth="2" rx="4" />
+            
+            {/* Room Geometry */}
+            <text x="14" y="50" fontSize="11" fill="#1B1A1A" fontWeight="700">
+              CANVAS SANITY
+            </text>
+            <text x="14" y="66" fontSize="10" fill="#333">
+              widthM: {__rvCanvasSanity.widthM} | lengthM: {__rvCanvasSanity.lengthM} | heightM: {__rvCanvasSanity.heightM} | scale: {__rvCanvasSanity.scale}
+            </text>
+            <text x="14" y="80" fontSize="10" fill="#333">
+              roomRect: x={__rvCanvasSanity.roomRect.x} y={__rvCanvasSanity.roomRect.y} w={__rvCanvasSanity.roomRect.width} h={__rvCanvasSanity.roomRect.height}
+            </text>
+
+            {/* Speaker data header */}
+            <text x="14" y="100" fontSize="9" fill="#666" fontWeight="700">
+              Role | Exists | Model | posX, posY (m) | canvasX, canvasY (px) | Flags
+            </text>
+
+            {/* Speaker rows */}
+            {__rvCanvasSanity.speakers.map((spk, idx) => {
+              const y = 114 + idx * 13;
+              const bgColor = spk.exists && spk.posFinite && spk.canvasFinite ? "#e8f5e9" : 
+                              spk.exists && spk.posFinite ? "#fff3e0" : "#ffebee";
+              
+              return (
+                <g key={spk.role}>
+                  <rect x="10" y={y - 10} width="410" height="12" fill={bgColor} opacity="0.4" />
+                  <text x="14" y={y} fontSize="9" fill="#1B1A1A" fontWeight="600">
+                    {spk.role}
+                  </text>
+                  <text x="50" y={y} fontSize="9" fill={spk.exists ? "#2e7d32" : "#c62828"}>
+                    {spk.exists ? "✓" : "✗"}
+                  </text>
+                  <text x="80" y={y} fontSize="8" fill="#333">
+                    {spk.model.slice(0, 12)}
+                  </text>
+                  <text x="160" y={y} fontSize="8" fill="#333">
+                    {spk.posX}, {spk.posY}
+                  </text>
+                  <text x="260" y={y} fontSize="8" fill="#333">
+                    {spk.canvasX}, {spk.canvasY}
+                  </text>
+                  <text x="360" y={y} fontSize="8" fill={spk.posFinite && spk.canvasFinite ? "#2e7d32" : "#c62828"}>
+                    pos:{spk.posFinite ? "✓" : "✗"} cvs:{spk.canvasFinite ? "✓" : "✗"}
+                  </text>
+                </g>
+              );
+            })}
+
+            {/* Legend */}
+            <text x="14" y="280" fontSize="8" fill="#666">
+              Green bg = ready to render | Orange = has pos, bad canvas | Red = missing/invalid
+            </text>
+          </g>
+        )}
+
         {/* DEBUG GHOST MARKERS — remove later */}
         {__rvGhost?.enabled && (
           <g data-layer="rv-ghost-debug" style={{ pointerEvents: "none" }}>
             {/* Mini status block */}
-            <text x="12" y="36" fontSize="11" fill="#B00020">
+            <text x="12" y="310" fontSize="11" fill="#B00020">
               Ghost: {__rvGhost.rows.length} found (SL/SR/SBL/SBR/LW/RW)
             </text>
 
@@ -6148,7 +6279,7 @@ return (
               <text
                 key={`ghost-line-${r.role}-${idx}`}
                 x="12"
-                y={52 + idx * 14}
+                y={326 + idx * 14}
                 fontSize="11"
                 fill="#B00020"
               >
