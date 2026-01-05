@@ -326,7 +326,8 @@ function computeMinimumScreenDepthM({
   lcrAngles = { L: 0, R: 0 },
   aimAtMLP = false,
 }) {
-  if (!frontObjects.length) return WALL_BUFFER_M + SCREEN_BUFFER_M;
+  const SCREEN_GAP_M = 0.01; // 1cm gap between speaker and screen
+  if (!frontObjects.length) return WALL_BUFFER_M + SCREEN_GAP_M;
 
   const neededEach = frontObjects.map((s) => {
     // resolveSurroundModel is called inside getYawForObject. Here, just pass s.model
@@ -347,11 +348,11 @@ function computeMinimumScreenDepthM({
     const projectedY = 2 * half;
 
     // hard planes: wall (y=0) + screen plane
-    return WALL_BUFFER_M + projectedY + SCREEN_BUFFER_M;
+    return WALL_BUFFER_M + projectedY + SCREEN_GAP_M;
   });
 
   // the screen must clear the *deepest* front object
-  return Math.max(...neededEach, WALL_BUFFER_M + SCREEN_BUFFER_M);
+  return Math.max(...neededEach, WALL_BUFFER_M + SCREEN_GAP_M);
 }
 
 export default forwardRef(function RoomVisualisation(props, ref) {
