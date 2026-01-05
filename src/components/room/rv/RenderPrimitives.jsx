@@ -30,9 +30,12 @@ export const isRenderableSpeaker = (speaker) => {
     return false;
   }
 
-  // Only hide if model is explicitly "off"
-  const modelStr = String(speaker.model || "").toLowerCase().trim();
-  if (modelStr === "off") {
+  if (
+    speaker.model === undefined ||
+    speaker.model === null ||
+    speaker.model === "off" ||
+    speaker.model === "none"
+  ) {
     return false;
   }
 
