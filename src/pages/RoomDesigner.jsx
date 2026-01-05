@@ -2405,8 +2405,16 @@ function RoomDesignerWithState() {
       const depthM = Number(meta.depthM) || 0.082;
       const widthM = Number(meta.widthM) || 0.27;
       
-      // Calculate wall-hugged Y using stroke-aware half extent (yaw 0 for LCR)
-      const halfExtentM = yHalfExtentM(depthM, widthM, 0);
+      // Get actual yaw angle for this speaker when aimed
+      let actualYawDeg = 0;
+      if (lcrAimMode === "angled") {
+        if (role === 'FL') actualYawDeg = Math.abs(Number(spk.rotation?.y) || 0);
+        if (role === 'FR') actualYawDeg = Math.abs(Number(spk.rotation?.y) || 0);
+        // FC stays 0
+      }
+      
+      // Calculate wall-hugged Y using stroke-aware half extent with ACTUAL yaw
+      const halfExtentM = yHalfExtentM(depthM, widthM, actualYawDeg);
       const wallY = gapM + halfExtentM;
       
       const currentY = spk.position?.y ?? 0;
@@ -2431,7 +2439,7 @@ function RoomDesignerWithState() {
     if (needsUpdate) {
       setSpeakers(prev => mergePreserveOverheads(prev, updated));
     }
-  }, [placedSpeakers, _isFrozen, setSpeakers]);
+  }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode]);
 
   // NEW: Effect to lock FC speaker to room centerline
   useEffect(() => {
