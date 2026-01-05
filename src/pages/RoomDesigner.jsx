@@ -2313,44 +2313,7 @@ function RoomDesignerWithState() {
       
       if (needsUpdate) {
         if (globalThis.__B44_LOGS) debug('[Resize Re-clamp] Adjusting LCR positions due to model change or constraint violation.');
-        
-        // Lock LCR to front wall when model is selected
-        const WALL_BUFFER_M = 0.02;
-        const updatedWithWallLock = updatedSpeakers.map(spk => {
-          const role = safeCanon(spk.role);
-          if (!['FL', 'FC', 'FR'].includes(role)) return spk;
-          
-          // Only lock if model is actually selected
-          const m = spk.model;
-          const ms = String(m ?? "").trim().toLowerCase();
-          if (!ms || ms === "off" || ms === "none") return spk;
-          
-          // Get speaker dimensions
-          const meta = getSpeakerModelMeta(spk.model) || {};
-          const widthM = Number(meta.widthM) || 0.27;
-          const depthM = Number(meta.depthM) || 0.082;
-          
-          // Calculate wall-hugged Y (yaw 0 for LCR)
-          const wallY = WALL_BUFFER_M + (depthM / 2);
-          const currentY = spk.position?.y ?? 0;
-          const currentZ = spk.position?.z ?? 1.2;
-          
-          // Only update if meaningful change
-          if (Math.abs(currentY - wallY) > 0.001 || Math.abs(currentZ - 1.2) > 0.001) {
-            return {
-              ...spk,
-              position: {
-                ...spk.position,
-                y: wallY,
-                z: 1.2
-              }
-            };
-          }
-          
-          return spk;
-        });
-        
-        setSpeakers(prev => mergePreserveOverheads(prev, updatedWithWallLock));
+        setSpeakers(prev => mergePreserveOverheads(prev, updatedSpeakers));
       }
     } catch (error) {
       if (typeof console !== 'undefined' && typeof console.warn === 'function') {
@@ -2419,28 +2382,51 @@ function RoomDesignerWithState() {
     }
   }, [stableDimensions.width, stableDimensions.length, placedSpeakers, _isFrozen, setSpeakers]);
 
-  // Effect to adjust LCR speaker positions in floating mode
+  // Effect to lock LCR to front wall + z=1.2
   useEffect(() => {
-    if (stableScreen.mountMode !== 'floating' || (_isFrozen && _isFrozen('speakers'))) return;
-    const yLCR = stableScreen.floatDepthM || 0.20;
-    const hasLCRChanges = placedSpeakers.some(spk => {
-      const role = String(spk.role).toUpperCase();
-      if (['FL', 'FC', 'FR'].includes(role)) {
-        return Math.abs((spk.position.y || 0) - yLCR) > 0.01;
+    if (_isFrozen && _isFrozen('speakers')) return;
+    
+    const WALL_BUFFER_M = 0.02;
+    let needsUpdate = false;
+    
+    const updated = placedSpeakers.map(spk => {
+      const role = safeCanon(spk.role);
+      if (!['FL', 'FC', 'FR'].includes(role)) return spk;
+      
+      // Only lock if model is actually selected
+      const m = spk.model;
+      const ms = String(m ?? "").trim().toLowerCase();
+      if (!ms || ms === "off" || ms === "none") return spk;
+      
+      // Get speaker dimensions
+      const meta = getSpeakerModelMeta(spk.model) || {};
+      const depthM = Number(meta.depthM) || 0.082;
+      
+      // Calculate wall-hugged Y (yaw 0 for LCR)
+      const wallY = WALL_BUFFER_M + (depthM / 2);
+      const currentY = spk.position?.y ?? 0;
+      const currentZ = spk.position?.z ?? 1.2;
+      
+      // Only update if meaningful change
+      if (Math.abs(currentY - wallY) > 0.001 || Math.abs(currentZ - 1.2) > 0.001) {
+        needsUpdate = true;
+        return {
+          ...spk,
+          position: {
+            ...spk.position,
+            y: wallY,
+            z: 1.2
+          }
+        };
       }
-      return false;
+      
+      return spk;
     });
-    if (hasLCRChanges) {
-      if (globalThis.__B44_LOGS) debug(`[Speakers] Adjusting LCR Y-position to ${yLCR}m for floating screen.`);
-      setSpeakers(prevSpeakers => prevSpeakers.map(spk => {
-        const role = String(spk.role).toUpperCase();
-        if (['FL', 'FC', 'FR'].includes(role)) {
-          return { ...spk, position: { ...(spk.position || {}), y: yLCR } };
-        }
-        return spk;
-      }));
+    
+    if (needsUpdate) {
+      setSpeakers(updated);
     }
-  }, [stableScreen.mountMode, stableScreen.floatDepthM, placedSpeakers, _isFrozen, setSpeakers]);
+  }, [placedSpeakers, _isFrozen, setSpeakers]);
 
   // NEW: Effect to lock FC speaker to room centerline
   useEffect(() => {
