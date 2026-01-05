@@ -30,11 +30,11 @@ export const isRenderableSpeaker = (speaker) => {
     return false;
   }
 
-  // Allow missing model for bed speakers (draw placeholder dims).
-  // Still block explicit OFF/NONE.
+  // Bed speakers require a selected model to render
+  // Block undefined, null, "", "off", "none"
   const m = speaker.model;
   const ms = String(m ?? "").trim().toLowerCase();
-  if (ms === "off" || ms === "none") return false;
+  if (!ms || ms === "off" || ms === "none") return false;
 
   return true;
 };

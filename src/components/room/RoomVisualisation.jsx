@@ -5535,6 +5535,11 @@ return {
       return null;
     }
 
+    // Skip Front Wides if zones not enabled
+    if ((canon === 'LW' || canon === 'RW') && !enableFrontWides) {
+      return null;
+    }
+
     // [B44 VISIBILITY FIX] Resolve model with safe fallback for LW/RW/SBL/SBR
     let resolvedModel = resolveSurroundModel(model, canon);
     
