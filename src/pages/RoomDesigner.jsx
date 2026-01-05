@@ -2864,9 +2864,30 @@ function RoomDesignerWithState() {
          if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${seededBed.length} bed + ${seededOverheads.length} overhead (${seededOverheads.map(s => s.role).join(', ')})`);
          
          // Process bed-layer speakers (preserve models from previous)
+         // For surround roles without models, try to inherit from any existing surround speaker
+         const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+         const anySurroundModel = prevBedSpeakers
+           .filter(s => surroundRoles.has(safeCanon(s.role)))
+           .find(s => {
+             const m = String(s.model || '').trim().toLowerCase();
+             return m && m !== 'off' && m !== 'none';
+           })?.model;
+         
          const nextBed = seededBed.map(seed => {
-           const prevMatch = byCanonPrev.get(safeCanon(seed.role));
-           const finalModel = prevMatch?.model ?? hint ?? seed.model;
+           const canonRole = safeCanon(seed.role);
+           const prevMatch = byCanonPrev.get(canonRole);
+           
+           // Start with previous model, then hint, then seed default
+           let finalModel = prevMatch?.model ?? hint ?? seed.model;
+           
+           // If this is a surround role and still has no valid model, try to inherit
+           if (surroundRoles.has(canonRole)) {
+             const currentModelStr = String(finalModel || '').trim().toLowerCase();
+             if (!currentModelStr || currentModelStr === 'off' || currentModelStr === 'none') {
+               finalModel = anySurroundModel ?? finalModel;
+             }
+           }
+           
            return { ...seed, model: finalModel, draggable: true };
          });
          
