@@ -16,21 +16,26 @@ export const isRenderableSpeaker = (speaker) => {
 
   const role = String(speaker.role || "").toUpperCase();
 
-  // NEW: Overheads ALWAYS render
-  if (role.startsWith("T")) {
-    return true;
-  }
+  // Overheads ALWAYS render (even if model missing)
+  if (role.startsWith("T")) return true;
 
-  // Bed-layer speakers: require valid position only, NOT model
+  // Must have a valid position to draw anything
   if (
     !speaker.position ||
     typeof speaker.position.x !== "number" ||
-    typeof speaker.position.y !== "number"
+    typeof speaker.position.y !== "number" ||
+    !Number.isFinite(speaker.position.x) ||
+    !Number.isFinite(speaker.position.y)
   ) {
     return false;
   }
 
-  // Bed-layer speakers render even without model assignment
+  // Allow missing model for bed speakers (draw placeholder dims).
+  // Still block explicit OFF/NONE.
+  const m = speaker.model;
+  const ms = String(m ?? "").trim().toLowerCase();
+  if (ms === "off" || ms === "none") return false;
+
   return true;
 };
 

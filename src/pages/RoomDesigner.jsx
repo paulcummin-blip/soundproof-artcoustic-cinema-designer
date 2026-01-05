@@ -2655,22 +2655,24 @@ function RoomDesignerWithState() {
       return;
     }
 
-    // Early reseed for Atmos layouts without existing overheads
+    // Early ensure for Atmos layouts without existing overheads
+    // IMPORTANT: do NOT wipe bed speakers just because overheads are missing.
+    // Only add the missing overhead roles for the active preset.
     const targetOverheadIds = getTargetOverheadIds(dolbyPreset);
     const hasOverheadTargets = targetOverheadIds.length > 0;
+
     const hasAnyExistingOverheads =
       Array.isArray(placedSpeakers) &&
       placedSpeakers.some((spk) => safeCanon(spk.role || "").startsWith("T"));
 
     if (hasOverheadTargets && !hasAnyExistingOverheads) {
-      const seeded = seedSpeakersFromPreset({
-        preset: normalizedPreset,
-        roomDimensions: stableDimensions,
-        listeningArea: null,
-      });
-      if (globalThis.__B44_LOGS) console.log('[RD] early reseed -> roles', seeded.map(s => safeCanon(s.role)));
-      setSpeakers(prev => {
-        const base = (Array.isArray(prev) && prev.length) ? prev : seeded;
+      setSpeakers((prev) => {
+        const base = Array.isArray(prev) && prev.length ? prev : seedSpeakersFromPreset({
+          preset: normalizedPreset,
+          roomDimensions: stableDimensions,
+          listeningArea: null,
+        });
+
         const withOverheads = ensureAtmosOverheads({
           placedSpeakers: base,
           dolbyPreset,
@@ -2683,6 +2685,10 @@ function RoomDesignerWithState() {
           useMidGlobal: _useMidGlobal,
           useRearGlobal: _useRearGlobal,
         });
+
+        if (globalThis.__B44_LOGS) {
+          console.log("[RD] early ensure overheads -> roles", (withOverheads || []).map(s => safeCanon(s.role)));
+        }
         return withOverheads;
       });
       return;
