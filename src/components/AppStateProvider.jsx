@@ -34,7 +34,7 @@ function getTargetOverheadIdsForLayout(layout) {
 
 // --- SINGLE SOURCE OF TRUTH FOR VISIBILITY -----------------------------
 // Simple, explicit visibility rules for bed-layer channels + overhead channels
-export function getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears) {
+export function getSpeakerVisibilityFor(layoutString, sevenBedLayoutType) {
   const layout = String(layoutString || "5.1");
   const parts = layout.split(".");
   const major = parseInt(parts[0], 10) || 5;
@@ -44,8 +44,11 @@ export function getSpeakerVisibilityFor(layoutString, useWidesInsteadOfRears) {
   const roles = new Set(["FL", "FC", "FR"]);
 
   const showSides = major >= 5;
-  const showRears = major >= 7 && !useWidesInsteadOfRears;
-  const showWides = (major >= 7 && !!useWidesInsteadOfRears) || major >= 9;
+  
+  // For 7.x layouts: use sevenBedLayoutType to decide rears vs wides
+  const useWides = sevenBedLayoutType === "wides";
+  const showRears = major >= 7 && !useWides;
+  const showWides = (major >= 7 && useWides) || major >= 9;
 
   if (showSides) {
     roles.add("SL");
@@ -362,10 +365,20 @@ function useDesignerState() {
   }, [splConfig]);
 
   // --- CANONICAL VISIBILITY HELPER (used everywhere) ---------------------
-  const visibleRoles = useMemo(
-    () => getSpeakerVisibilityFor(dolbyLayout || '5.1', useWidesInsteadOfRears),
-    [dolbyLayout, useWidesInsteadOfRears]
-  );
+  const visibleRoles = useMemo(() => {
+    const roles = getSpeakerVisibilityFor(dolbyLayout || '5.1', sevenBedLayoutType);
+    
+    // Debug log for visibility calculation
+    if (globalThis.__B44_LOGS) {
+      console.log('[AppState] visibleRoles computed:', {
+        dolbyLayout,
+        sevenBedLayoutType,
+        visibleRoles: Array.from(roles)
+      });
+    }
+    
+    return roles;
+  }, [dolbyLayout, sevenBedLayoutType]);
 
   const OVERHEAD_CANON_ROLES = useMemo(() => new Set([
     "TFL", "TFR", "TML", "TMR", "TRL", "TRR",

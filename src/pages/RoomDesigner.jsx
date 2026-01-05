@@ -2880,22 +2880,33 @@ function RoomDesignerWithState() {
            const canonRole = safeCanon(seed.role);
            const prevMatch = byCanonPrev.get(canonRole);
            
-           // Start with previous model, then hint, then seed default
-           let finalModel = prevMatch?.model ?? hint ?? seed.model;
+           // Priority for model assignment:
+           // 1. Previous speaker model (persistence)
+           // 2. Global surround model (from UI selection)
+           // 3. Any existing surround model (from other surrounds)
+           // 4. Hint from window
+           // 5. Seed default
+           let finalModel = prevMatch?.model;
            
-           // If this is a surround role and still has no valid model, try to inherit
+           if (!finalModel || String(finalModel).trim().toLowerCase() === 'off' || String(finalModel).trim().toLowerCase() === 'none') {
+             finalModel = globalSurroundModel ?? anySurroundModel ?? hint ?? seed.model;
+           }
+           
+           // For surround roles, ensure we never lose a valid model once set
            if (surroundRoles.has(canonRole)) {
              const currentModelStr = String(finalModel || '').trim().toLowerCase();
              if (!currentModelStr || currentModelStr === 'off' || currentModelStr === 'none') {
-               // Priority: anySurroundModel (from existing speakers) > globalSurroundModel (from UI) > keep undefined
                finalModel = anySurroundModel ?? globalSurroundModel ?? finalModel;
-               
-               if (globalThis.__B44_LOGS) console.log(`[RD RECON] Assigning model to ${canonRole}:`, {
+             }
+             
+             if (globalThis.__B44_LOGS) {
+               console.log(`[RD RECON] Model assignment for ${canonRole}:`, {
                  prevMatch: prevMatch?.model,
-                 hint,
-                 anySurroundModel,
                  globalSurroundModel,
-                 finalModel
+                 anySurroundModel,
+                 hint,
+                 finalModel,
+                 willRender: !!(finalModel && finalModel !== 'off' && finalModel !== 'none')
                });
              }
            }
