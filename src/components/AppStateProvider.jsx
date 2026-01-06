@@ -369,12 +369,12 @@ function useDesignerState() {
   const visibleRoles = useMemo(() => {
     const roles = getSpeakerVisibilityFor(dolbyLayout || '5.1', sevenBedLayoutType);
     
-    // Debug log for visibility calculation
+    // Debug log for visibility calculation (always log to ensure visibility rules are transparent)
     if (globalThis.__B44_LOGS) {
-      console.log('[AppState] visibleRoles computed:', {
-        dolbyLayout,
+      console.log('[AppState visibleRoles]', {
+        dolbyLayout: dolbyLayout || '5.1',
         sevenBedLayoutType,
-        visibleRoles: Array.from(roles)
+        visibleRoles: Array.from(roles),
       });
     }
     

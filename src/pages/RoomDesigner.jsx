@@ -2623,16 +2623,20 @@ function RoomDesignerWithState() {
     const hasRears = currentSpeakers.some(s => s.role === 'SBL' || s.role === 'SBR');
     
     const earZ = 1.1; // Standard ear height for bed speakers
+    
+    // CRITICAL: Model preservation - use globalSurroundModel as primary source
+    const globalSurroundModel = appState?.globalSurroundModel;
     const hint = (typeof window !== "undefined" && window.__SURROUND_MODEL_HINT_) || null;
     const byRole = new Map(currentSpeakers.map(s => [s.role, s]));
 
     if (_sevenBedLayoutType === 'wides' && !hasWides && hasRears) {
       if (globalThis.__B44_LOGS) debug('[Speakers] Switching from Rear Surrounds (SBL/SBR) to Front Wides (LW/RW).');
       
-      const lw = cloneRoleWithModel(byRole, 'SBL', 'LW', hint);
+      // Use globalSurroundModel as primary fallback for new wides
+      const lw = cloneRoleWithModel(byRole, 'SBL', 'LW', globalSurroundModel || hint);
       lw.position = { x: stableDimensions.width * 0.15, y: stableDimensions.length * 0.4, z: earZ };
       
-      const rw = cloneRoleWithModel(byRole, 'SBR', 'RW', hint);
+      const rw = cloneRoleWithModel(byRole, 'SBR', 'RW', globalSurroundModel || hint);
       rw.position = { x: stableDimensions.width * 0.85, y: stableDimensions.length * 0.4, z: earZ };
       
       const nextList = currentSpeakers
@@ -2652,10 +2656,11 @@ function RoomDesignerWithState() {
     } else if (_sevenBedLayoutType === 'rears' && hasWides && !hasRears) {
       if (globalThis.__B44_LOGS) debug('[Speakers] Switching from Front Wides (LW/RW) to Rear Surrounds (SBL/SBR).');
       
-      const sbl = cloneRoleWithModel(byRole, 'LW', 'SBL', hint);
+      // Use globalSurroundModel as primary fallback for new rears
+      const sbl = cloneRoleWithModel(byRole, 'LW', 'SBL', globalSurroundModel || hint);
       sbl.position = { x: stableDimensions.width * 0.25, y: stableDimensions.length - 0.1, z: earZ };
       
-      const sbr = cloneRoleWithModel(byRole, 'RW', 'SBR', hint);
+      const sbr = cloneRoleWithModel(byRole, 'RW', 'SBR', globalSurroundModel || hint);
       sbr.position = { x: stableDimensions.width * 0.75, y: stableDimensions.length - 0.1, z: earZ };
       
       const nextList = currentSpeakers
@@ -2753,14 +2758,29 @@ function RoomDesignerWithState() {
     }
 
     // Determine the expected roles based on the dolbyPreset and current sevenBedLayoutType
+    // CRITICAL: Use _sevenBedLayoutType as single source of truth for 7.x wides vs rears
     const is7ChannelBed = normalizedPreset && (normalizedPreset.startsWith('7.1') || normalizedPreset.startsWith('7.2'));
+    const is9ChannelBed = normalizedPreset && normalizedPreset.startsWith('9.1');
+    
     let expectedRoles = DOLBY_PRESETS[normalizedPreset] || [];
 
+    // For 7.x: swap SBL/SBR with LW/RW based on sevenBedLayoutType
+    // For 9.x: ALWAYS include BOTH (no swapping)
     if (is7ChannelBed && _sevenBedLayoutType === 'wides') {
       expectedRoles = expectedRoles.map(role => {
         if (role === 'SBL') return 'LW';
         if (role === 'SBR') return 'RW';
         return role;
+      });
+    }
+    
+    if (globalThis.__B44_LOGS) {
+      console.log('[RD RECON] Layout decision:', {
+        normalizedPreset,
+        is7ChannelBed,
+        is9ChannelBed,
+        sevenBedLayoutType: _sevenBedLayoutType,
+        expectedRoles,
       });
     }
 
@@ -2866,51 +2886,68 @@ function RoomDesignerWithState() {
          // Process bed-layer speakers (preserve models from previous)
          // For surround roles without models, try to inherit from any existing surround speaker OR globalSurroundModel
          const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+
+         // Get global surround model from AppState as PRIMARY source
+         const globalSurroundModel = appState?.globalSurroundModel;
+
+         // Get any existing surround model as fallback
          const anySurroundModel = prevBedSpeakers
            .filter(s => surroundRoles.has(safeCanon(s.role)))
            .find(s => {
              const m = String(s.model || '').trim().toLowerCase();
              return m && m !== 'off' && m !== 'none';
            })?.model;
-         
-         // Get global surround model from AppState
-         const globalSurroundModel = appState?.globalSurroundModel;
-         
+
          const nextBed = seededBed.map(seed => {
            const canonRole = safeCanon(seed.role);
            const prevMatch = byCanonPrev.get(canonRole);
-           
-           // Priority for model assignment:
-           // 1. Previous speaker model (persistence)
-           // 2. Global surround model (from UI selection)
-           // 3. Any existing surround model (from other surrounds)
-           // 4. Hint from window
-           // 5. Seed default
-           let finalModel = prevMatch?.model;
-           
-           if (!finalModel || String(finalModel).trim().toLowerCase() === 'off' || String(finalModel).trim().toLowerCase() === 'none') {
-             finalModel = globalSurroundModel ?? anySurroundModel ?? hint ?? seed.model;
-           }
-           
-           // For surround roles, ensure we never lose a valid model once set
+
+           // CRITICAL: Model persistence hierarchy for surrounds
+           // 1. Keep existing speaker's model if present and valid
+           // 2. Use globalSurroundModel if set (from UI selection)
+           // 3. Fallback to any existing surround model
+           // 4. Fallback to window hint (legacy)
+           // 5. NEVER use seed.model (keeps it undefined)
+
+           let finalModel = seed.model; // Start with seed default
+
+           // For surround roles: bulletproof model persistence
            if (surroundRoles.has(canonRole)) {
-             const currentModelStr = String(finalModel || '').trim().toLowerCase();
-             if (!currentModelStr || currentModelStr === 'off' || currentModelStr === 'none') {
-               finalModel = anySurroundModel ?? globalSurroundModel ?? finalModel;
+             const prevModelStr = String(prevMatch?.model || '').trim().toLowerCase();
+             const hasValidPrevModel = prevModelStr && prevModelStr !== 'off' && prevModelStr !== 'none';
+
+             if (hasValidPrevModel) {
+               // Keep existing model (persistence wins)
+               finalModel = prevMatch.model;
+             } else if (globalSurroundModel) {
+               // Use global surround model if no previous model
+               const globalModelStr = String(globalSurroundModel).trim().toLowerCase();
+               if (globalModelStr && globalModelStr !== 'off' && globalModelStr !== 'none') {
+                 finalModel = globalSurroundModel;
+               }
+             } else if (anySurroundModel) {
+               // Fallback to any existing surround model
+               finalModel = anySurroundModel;
+             } else if (hint) {
+               // Legacy hint as last resort
+               finalModel = hint;
              }
-             
+
              if (globalThis.__B44_LOGS) {
-               console.log(`[RD RECON] Model assignment for ${canonRole}:`, {
-                 prevMatch: prevMatch?.model,
+               console.log(`[RD RECON] Surround model for ${canonRole}:`, {
+                 prevModel: prevMatch?.model,
                  globalSurroundModel,
                  anySurroundModel,
                  hint,
                  finalModel,
-                 willRender: !!(finalModel && finalModel !== 'off' && finalModel !== 'none')
+                 willRender: !!(finalModel && String(finalModel).trim().toLowerCase() !== 'off' && String(finalModel).trim().toLowerCase() !== 'none')
                });
              }
+           } else {
+             // Non-surround roles: keep previous model or seed default
+             finalModel = prevMatch?.model ?? seed.model;
            }
-           
+
            return { ...seed, model: finalModel, draggable: true };
          });
          
