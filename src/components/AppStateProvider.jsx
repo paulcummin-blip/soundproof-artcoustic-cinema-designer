@@ -32,6 +32,17 @@ function getTargetOverheadIdsForLayout(layout) {
 }
 // --- END ATMOS PROTECTION HELPERS ---
 
+// --- CANONICAL ROLE HELPER (handles aliases like LR→SBL, FWL→LW) -------
+const canonRoleForVisibility = (role) => {
+  const raw = String(role || "").toUpperCase();
+  try {
+    const mapped = getCanonicalRole ? getCanonicalRole(raw) : raw;
+    return String(mapped || raw).toUpperCase();
+  } catch {
+    return raw;
+  }
+};
+
 // --- SINGLE SOURCE OF TRUTH FOR VISIBILITY -----------------------------
 // Simple, explicit visibility rules for bed-layer channels + overhead channels
 export function getSpeakerVisibilityFor(layoutString, sevenBedLayoutType) {
@@ -59,11 +70,17 @@ export function getSpeakerVisibilityFor(layoutString, sevenBedLayoutType) {
   if (showRears) {
     roles.add("SBL");
     roles.add("SBR");
+    // common aliases used elsewhere
+    roles.add("LR");
+    roles.add("RR");
   }
 
   if (showWides) {
     roles.add("LW");
     roles.add("RW");
+    // common aliases used elsewhere
+    roles.add("FWL");
+    roles.add("FWR");
   }
 
   // Add overhead channels based on height count
@@ -387,7 +404,7 @@ function useDesignerState() {
   ]), []);
 
   const getSpeakerVisibility = useCallback((role, model) => {
-    const canon = String(role || "").toUpperCase();
+    const canon = canonRoleForVisibility(role);
 
     // Never show LFE
     if (canon.startsWith("LFE")) return false;
@@ -397,11 +414,31 @@ function useDesignerState() {
       return visibleRoles.has(canon);
     }
 
-    // Non-overheads require a real model
-    const modelStr = String(model || "").toLowerCase().trim();
-    if (!modelStr || modelStr === "off" || modelStr === "none") return false;
+    // For bed channels: if the layout expects this channel, show it even if model is blank
+    // This prevents LW/RW and SBL/SBR from vanishing due to model assignment timing
+    const isExpectedByLayout = visibleRoles.has(canon);
+    
+    if (isExpectedByLayout) {
+      // Debug log if enabled
+      if (globalThis.__B44_LOGS) {
+        console.log("[VIS]", { role, canon, model, expected: true });
+      }
+      return true;
+    }
 
-    return visibleRoles.has(canon);
+    // Otherwise keep strict behaviour for non-expected channels
+    const modelStr = String(model || "").toLowerCase().trim();
+    if (!modelStr || modelStr === "off" || modelStr === "none") {
+      if (globalThis.__B44_LOGS) {
+        console.log("[VIS]", { role, canon, model, expected: false, reason: "no model" });
+      }
+      return false;
+    }
+
+    if (globalThis.__B44_LOGS) {
+      console.log("[VIS]", { role, canon, model, expected: false, reason: "not in layout" });
+    }
+    return false;
   }, [visibleRoles, OVERHEAD_CANON_ROLES]);
 
   const isFrozen = useCallback((tab) => !!frozenTabs[tab], [frozenTabs]);
