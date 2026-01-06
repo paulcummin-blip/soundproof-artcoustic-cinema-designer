@@ -184,8 +184,21 @@ function projectToBackWallFromMLP_xy(mlp, angleDeg, room, speakerModel, getModel
   const dx = Math.cos(rad);
   const dy = Math.sin(rad);
 
-  const dims = getModelDimsM?.(speakerModel) || { depthM: 0.082, widthM: 0.20 };
-  const halfShortEdge = Math.min(dims.widthM, dims.depthM) / 2;
+  // Robust dims: getModelDimsM may return {} or partial values when a model isn't found
+  const rawDims = (() => {
+    try { return getModelDimsM?.(speakerModel); }
+    catch (e) { return null; }
+  })();
+
+  const widthM = Number.isFinite(rawDims?.widthM) ? rawDims.widthM : 0.20;
+  const depthM = Number.isFinite(rawDims?.depthM) ? rawDims.depthM : 0.082;
+
+  const halfShortEdge = Math.min(widthM, depthM) / 2;
+
+  if (globalThis.__B44_LOGS) {
+    console.log('[SP] backWall projector dims', { speakerModel, rawDims, widthM, depthM, halfShortEdge });
+  }
+
   const backWallY = room.back - (WALL_BUFFER_M + halfShortEdge);
 
   const EPS = 1e-6;
