@@ -333,6 +333,42 @@ function buildRoleMap(list) {
 
 const degToRad = (deg) => (deg * Math.PI) / 180;
 
+const isValidModel = (m) => {
+  const s = String(m ?? "").trim().toLowerCase();
+  return !!s && s !== "off" && s !== "none";
+};
+
+// Preserve surround bed models across any position/rotation-only updates
+const preserveSurroundModels = (prevList, nextList, appState) => {
+  const prev = Array.isArray(prevList) ? prevList : [];
+  const next = Array.isArray(nextList) ? nextList : [];
+
+  const surroundCanon = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
+
+  const prevByCanon = new Map();
+  prev.forEach((s) => {
+    prevByCanon.set(getCanonicalRole(s?.role), s);
+  });
+
+  return next.map((s) => {
+    const canon = getCanonicalRole(s?.role);
+    if (!surroundCanon.has(canon)) return s;
+
+    // keep next if already valid
+    if (isValidModel(s?.model)) return s;
+
+    // inherit previous same-role model if valid
+    const pm = prevByCanon.get(canon)?.model;
+    if (isValidModel(pm)) return { ...s, model: pm };
+
+    // inherit global surround model if valid
+    const gm = appState?.globalSurroundModel;
+    if (isValidModel(gm)) return { ...s, model: gm };
+
+    return s;
+  });
+};
+
 function projectToWallFromMLP(mlpX, mlpY, angleDeg, room) {
   const angle = degToRad(angleDeg);
   const dx = Math.cos(angle);
