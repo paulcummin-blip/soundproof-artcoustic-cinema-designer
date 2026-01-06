@@ -1826,11 +1826,13 @@ function SpeakerPlacementImpl(props) {
 
           const existing = byRole.get(canon);
 
-          let resolvedModel = existing?.model || globalSurroundModelParam;
+          // Always provide a usable model so surrounds can be created/positioned
+          // even before the user has selected a surround model.
+          let resolvedModel = existing?.model || globalSurroundModelParam || 'evolve-2-1_s';
 
-          // Normalize invalid models to use the global model
+          // Normalize invalid models to use the fallback
           if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
-            resolvedModel = globalSurroundModelParam;
+            resolvedModel = 'evolve-2-1_s';
           } else {
             resolvedModel = String(resolvedModel);
           }
