@@ -2396,7 +2396,7 @@ function RoomDesignerWithState() {
     
     // Only update if at least one speaker was rescued
     if (anyOutOfBounds) {
-      setSpeakers(rescued);
+      setSpeakers(prev => preserveSurroundModels(prev, rescued, appState));
     }
   }, [stableDimensions.width, stableDimensions.length, placedSpeakers, _isFrozen, setSpeakers]);
 
@@ -2572,7 +2572,7 @@ function RoomDesignerWithState() {
     });
 
     if (changed) {
-      setSpeakers(updated);
+      setSpeakers(prev => preserveSurroundModels(prev, updated, appState));
     }
   }, [
     placedSpeakers,
