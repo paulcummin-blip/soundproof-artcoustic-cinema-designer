@@ -904,7 +904,8 @@ function UnifiedSurroundsConfig({
       }
 
       // If user selected "Off", clear models on surround roles but keep entries
-      if (!modelKey || modelKey.toLowerCase() === "off") {
+      const modelKeyStr = String(modelKey ?? "").trim().toLowerCase();
+      if (!modelKeyStr || modelKeyStr === "off" || modelKeyStr === "none") {
         layoutRoles.forEach(role => {
           if (byRole.has(role)) {
             byRole.set(role, { ...byRole.get(role), model: null });
