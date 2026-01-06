@@ -120,7 +120,8 @@ export function debugRolesForLayout(layout, useWides) {
  */
 export function isRoleVisible(role, { dolbyLayout = "5.1", useWidesInsteadOfRears = false } = {}) {
   const req = rolesForLayout({ dolbyLayout, useWidesInsteadOfRears });
-  return req.includes(String(role).toUpperCase());
+  const canon = getCanonicalRole(role);
+  return req.includes(canon);
 }
 
 /**
@@ -133,11 +134,12 @@ export function isRoleVisible(role, { dolbyLayout = "5.1", useWidesInsteadOfRear
  */
 export function ensureSpeakersForRoles(prev = [], requiredRoles = [], makeDefault) {
   const next = Array.isArray(prev) ? [...prev] : [];
-  const have = new Set(next.map(s => String(s?.role || '').toUpperCase()));
+  const have = new Set(next.map(s => getCanonicalRole(s?.role)));
   
   for (const r of requiredRoles) {
-    if (!have.has(r)) {
-      const sp = makeDefault ? makeDefault(r) : null;
+    const R = getCanonicalRole(r);
+    if (!have.has(R)) {
+      const sp = makeDefault ? makeDefault(R) : null;
       if (sp) next.push(sp);
     }
   }
@@ -168,7 +170,11 @@ export function defaultSpeakerForRole(role, dims, mlp) {
       id: `${R}-${Math.random().toString(36).slice(2, 7)}`,
       role: R,
       label: R,
-      position: null,       // SpeakerPlacement will decide real x/y/z
+      position: {
+        x: Number.isFinite(mlp?.x) ? mlp.x : 0,
+        y: Number.isFinite(mlp?.y) ? mlp.y : 0,
+        z: Number.isFinite(mlp?.z) ? mlp.z : 1.2,
+      },
       model: undefined,     // User / SurroundsSelector chooses model
     };
   }
