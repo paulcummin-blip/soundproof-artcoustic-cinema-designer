@@ -6,7 +6,14 @@ import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getAutosaveMeta, isAutosavePayloadValid } from "@/components/utils/sessionAutosave";
 
 // --- ATMOS PROTECTION HELPERS ---
-const safeCanonRole = (role) => String(role || '').toUpperCase();
+const safeCanonRole = (role) => {
+  try {
+    const mapped = getCanonicalRole(role);
+    return String(mapped || role || "").toUpperCase();
+  } catch {
+    return String(role || "").toUpperCase();
+  }
+};
 
 // CRITICAL: This mapping must stay aligned with RoomDesigner's OVERHEAD_IDS_BY_LAYOUT
 const OVERHEAD_IDS_BY_LAYOUT_APPSTATE = {
@@ -31,16 +38,6 @@ function getTargetOverheadIdsForLayout(layout) {
   return OVERHEAD_IDS_BY_LAYOUT_APPSTATE[normalized] || [];
 }
 // --- END ATMOS PROTECTION HELPERS ---
-
-// --- CANONICAL ROLE HELPER (handles aliases like LR→SBL, FWL→LW) -------
-const safeCanonRole = (role) => {
-  try {
-    const mapped = getCanonicalRole(role);
-    return String(mapped || role || "").toUpperCase();
-  } catch {
-    return String(role || "").toUpperCase();
-  }
-};
 
 // --- SINGLE SOURCE OF TRUTH FOR VISIBILITY -----------------------------
 // Simple, explicit visibility rules for bed-layer channels + overhead channels
