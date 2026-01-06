@@ -102,12 +102,9 @@ function carryModel(prevSpeakers, roleFrom, roleTo, fallbackHint = null) {
 
 // --- ATMOS OVERHEAD PRESERVATION HELPERS ---
 function isOverheadRole(role) {
-  const canon = safeCanon(role);
-  const OVERHEAD_ROLES = new Set([
-    'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR',
-    'TFC', 'TRC', 'TBC', 'TL', 'TR', 'TBL', 'TBR'
-  ]);
-  return OVERHEAD_ROLES.has(canon);
+  const r = safeCanon(role);
+  // STRICT: Overheads are only "T.." or "U.." roles (e.g. TFL, TMR, TBL, UFL, etc.)
+  return r.startsWith('T') || r.startsWith('U');
 }
 
 function mergePreserveOverheads(prevList, draftNextList) {
@@ -115,8 +112,8 @@ function mergePreserveOverheads(prevList, draftNextList) {
   const next = Array.isArray(draftNextList) ? draftNextList : [];
 
   // Collect overhead speakers from both lists
-  const prevOverheads = prev.filter(s => isOverheadRole(s.role));
-  const nextOverheads = next.filter(s => isOverheadRole(s.role));
+  const prevOverheads = prev.filter(s => isOverheadRole(safeCanon(s.role)));
+  const nextOverheads = next.filter(s => isOverheadRole(safeCanon(s.role)));
 
   // If the draft has overheads, use those; otherwise keep previous
   const overheadsToKeep = nextOverheads.length > 0 ? nextOverheads : prevOverheads;
@@ -128,7 +125,7 @@ function mergePreserveOverheads(prevList, draftNextList) {
   });
 
   // Build final list: bed speakers from draft + deduplicated overheads
-  const nextBeds = next.filter(s => !isOverheadRole(s.role));
+  const nextBeds = next.filter(s => !isOverheadRole(safeCanon(s.role)));
   const mergedOverheads = Array.from(overheadMap.values());
   const finalList = [...nextBeds, ...mergedOverheads];
 
