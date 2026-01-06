@@ -16,8 +16,8 @@ const CANONICAL_ROLE_MAP = {
   SR: "SR", RS: "SR",
 
   // Rear surrounds
-  SBL: "SBL", RL: "SBL", RSL: "SBL", LR: "SBL", LRS: "SBL", BL: "SBL", LB: "SBL",
-  SBR: "SBR", RR: "SBR", RSR: "SBR", RRS: "SBR", BR: "SBR", RB: "SBR",
+  SBL: "SBL", RL: "SBL", RSL: "SBL", LR: "SBL", LRS: "SBL", BL: "SBL", LB: "SBL", LBS: "SBL", LBR: "SBL",
+  SBR: "SBR", RR: "SBR", RSR: "SBR", RRS: "SBR", BR: "SBR", RB: "SBR", RBS: "SBR", RBR: "SBR",
 
   // Wides
   LW: "LW", FWL: "LW",
