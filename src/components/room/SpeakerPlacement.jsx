@@ -827,8 +827,14 @@ function UnifiedSurroundsConfig({
     };
 
     setSurroundConfig(safeConfig);
-    
+
     const modelKey = safeConfig.value.master;
+
+    if (globalThis.__B44_LOGS) console.log('[SP handleSurroundModelChange]', {
+      modelKey,
+      effectivePreset,
+      useWides
+    });
     
     setSpeakers(prev => {
       const layout = effectivePreset || "5.1";
