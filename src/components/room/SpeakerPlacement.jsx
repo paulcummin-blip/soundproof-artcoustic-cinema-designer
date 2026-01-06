@@ -2229,7 +2229,6 @@ function SpeakerPlacementImpl(props) {
     canWides,
     dimensions?.width,
     dimensions?.length,
-    // Removed enableFrontWides from deps - now runs unconditionally
     applyCornerClearance,
     applyRoomBoundsClamp,
     getHuggingCenterLines,
@@ -2328,7 +2327,6 @@ function SpeakerPlacementImpl(props) {
   }, [
     dimensions?.width, 
     dimensions?.length, 
-    enableFrontWides,
     setSpeakers,
     // React to FL/FR/SL/SR position changes
     placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.y,
