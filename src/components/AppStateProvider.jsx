@@ -521,8 +521,16 @@ function useDesignerState() {
           ? prev.placedSpeakers.slice()
           : [];
 
+        // IDEMPOTENCE CHECK: if speakers haven't actually changed, don't update state
+        if (speakersShallowEqual(prev.placedSpeakers, speakers)) {
+          if (globalThis.__B44_LOGS) {
+            console.log("[AS] setSpeakerSystem: speakers unchanged, returning prev");
+          }
+          return prev;
+        }
+
         // DEBUG: show exactly what roles we are receiving and storing.
-        if (typeof window !== "undefined" && window.console) {
+        if (globalThis.__B44_LOGS) {
           console.log("[AS] setSpeakerSystem RAW incoming roles:",
             speakers.map(s => s && String(s.role)));
         }
@@ -533,7 +541,7 @@ function useDesignerState() {
           placedSpeakers: speakers,
         };
 
-        if (typeof window !== "undefined" && window.console) {
+        if (globalThis.__B44_LOGS) {
           console.log("[AS] setSpeakerSystem STORED roles:",
             (result.placedSpeakers || []).map(s => s && String(s.role)));
         }
