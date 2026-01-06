@@ -2918,9 +2918,42 @@ function RoomDesignerWithState() {
               if (canon === 'LW'  || canon === 'RW')  return wantsWides;
               return true;
             });
-         
-         if (globalThis.__B44_LOGS) debug(`[Speakers] Existing: ${prevBedSpeakers.length} prev bed + ${existingOverheads.length} overhead (${existingOverheads.map(s => s.role).join(', ')})`);
-         if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${bedSpeakers.length} bed (from new preset)`);
+
+          // [B44 FIX] Ensure required surround roles exist even if seededSpeakers is missing them
+          const have = new Set(bedSpeakers.map(s => safeCanon(s.role)));
+
+          const pushIfMissing = (role) => {
+            if (have.has(role)) return;
+
+            bedSpeakers.push({
+              id: role,
+              role,
+              label: role,
+              model: undefined,
+              position: null, // SpeakerPlacement / resetSurroundPositions will hydrate
+            });
+
+            have.add(role);
+          };
+
+          // Sides always required for 5.x+
+          if (major >= 5) {
+            pushIfMissing('SL');
+            pushIfMissing('SR');
+          }
+
+          // Rears + Wides depending on layout
+          if (wantsRears) {
+            pushIfMissing('SBL');
+            pushIfMissing('SBR');
+          }
+          if (wantsWides) {
+            pushIfMissing('LW');
+            pushIfMissing('RW');
+          }
+
+          if (globalThis.__B44_LOGS) debug(`[Speakers] Existing: ${prevBedSpeakers.length} prev bed + ${existingOverheads.length} overhead (${existingOverheads.map(s => s.role).join(', ')})`);
+          if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${bedSpeakers.length} bed (from new preset)`);
          
          // Keep only overheads that are in the target set
          const keptOverheads = existingOverheads.filter(s => targetSet.has(safeCanon(s.role)));
@@ -2934,9 +2967,9 @@ function RoomDesignerWithState() {
          // Separate seeded speakers into bed-layer and overheads
          const seededBed = (seededSpeakers || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
          const seededOverheads = (seededSpeakers || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
-         
+
          if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${seededBed.length} bed + ${seededOverheads.length} overhead (${seededOverheads.map(s => s.role).join(', ')})`);
-         
+
          // Process bed-layer speakers (preserve models from previous)
          // For surround roles without models, try to inherit from any existing surround speaker OR globalSurroundModel
          const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
@@ -2952,7 +2985,8 @@ function RoomDesignerWithState() {
              return m && m !== 'off' && m !== 'none';
            })?.model;
 
-         const nextBed = seededBed.map(seed => {
+         // [B44 FIX] Use bedSpeakers (already filtered and ensured) instead of seededBed
+         const nextBed = bedSpeakers.map(seed => {
            const canonRole = safeCanon(seed.role);
            const prevMatch = byCanonPrev.get(canonRole);
 
