@@ -5559,8 +5559,11 @@ return {
 
   // 3) Map to icons
   return afterVisibility.map((speaker) => {
-    const { id, role, model, position = {} } = speaker;
-    const canon = getCanonicalRole(role);
+    const { id, role: rawRole, model, position = {} } = speaker;
+
+    // Canonicalise ONCE and use canonical role for ALL rendering decisions
+    const canon = getCanonicalRole(rawRole);
+    const role = canon; // <- critical: render role is canonical
 
     // CRITICAL: Overhead speakers are rendered by overheadIconElements,
     // skip them here to avoid duplicate icons
