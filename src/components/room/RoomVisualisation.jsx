@@ -327,19 +327,13 @@ function computeMinimumScreenDepthM({
   aimAtMLP = false,
 }) {
   const SCREEN_GAP_M = 0.01; // 1cm gap between speaker and screen
-  const DEFAULT_SPEAKER_DEPTH_M = 0.082; // Smallest speaker (EVOLVE 2-1)
-  
-  // If no speakers placed yet, use realistic default for one typical speaker
-  if (!frontObjects.length) {
-    const defaultProjectedDepth = 2 * yHalfExtentM(DEFAULT_SPEAKER_DEPTH_M, 0.27, 0);
-    return WALL_BUFFER_M + defaultProjectedDepth + SCREEN_GAP_M;
-  }
+  if (!frontObjects.length) return WALL_BUFFER_M + SCREEN_GAP_M;
 
   const neededEach = frontObjects.map((s) => {
     // resolveSurroundModel is called inside getYawForObject. Here, just pass s.model
     const dims = getDims(s.model) || {};
-    const widthM = Number(dims.widthM) || 0.27; // Default to typical width
-    const depthM = Number(dims.depthM) || DEFAULT_SPEAKER_DEPTH_M; // Use realistic default
+    const widthM = Number(dims.widthM) || 0;
+    const depthM = Number(dims.depthM) || 0;
 
     // subs are drawn round / not yawed; FC stays 0°
     const canonicalRole = getCanonicalRoleGlobal(s.role);
@@ -358,7 +352,7 @@ function computeMinimumScreenDepthM({
   });
 
   // the screen must clear the *deepest* front object
-  return Math.max(...neededEach, WALL_BUFFER_M + DEFAULT_SPEAKER_DEPTH_M * 2 + SCREEN_GAP_M);
+  return Math.max(...neededEach, WALL_BUFFER_M + SCREEN_GAP_M);
 }
 
 export default forwardRef(function RoomVisualisation(props, ref) {
@@ -899,12 +893,30 @@ const byId = useMemo(() => {
 
   // actualScreenFrontY declaration and calculation
   const actualScreenFrontY = React.useMemo(() => {
-    // CRITICAL: calculatedMinScreenDepthM is the TOTAL distance from front wall (y=0) to screen
-    // It already includes: wall buffer (0.02m) + speaker projected depth + screen gap (0.01m)
-    // This is the true edge-to-edge "Distance from Front Wall to Screen" measurement.
-    // No additional offsets should be added.
-    return calculatedMinScreenDepthM;
-  }, [calculatedMinScreenDepthM]);
+    // CRITICAL: Screen front plane is ALWAYS based on floatDepthM + speakerClearanceM
+    // This is the true "Distance from Front Wall to Screen" metric.
+    const floatDepthM = Number(screen?.floatDepthM) || 0.0;
+    const speakerClearanceM = Number(screen?.speakerClearanceM) || 0.0;
+    
+    // Base screen position = float depth + fixed clearance
+    const baseScreenFrontY = floatDepthM + speakerClearanceM;
+
+    // calculatedMinScreenDepthM is the minimum needed to clear speakers
+    const minDepthForSpeakersToClear = calculatedMinScreenDepthM;
+
+    // In autoTight mode, we push screen forward to clear speakers
+    // Otherwise, we use the configured depth but never less than what's needed
+    if (screenPlaneMode === 'autoTight') {
+      return Math.max(baseScreenFrontY, minDepthForSpeakersToClear);
+    } else {
+      return Math.max(baseScreenFrontY, minDepthForSpeakersToClear);
+    }
+  }, [
+    calculatedMinScreenDepthM,
+    screen?.floatDepthM,
+    screen?.speakerClearanceM,
+    screenPlaneMode
+  ]);
 
   // Publish screen front plane to AppState with guards (rounded to mm)
   useEffect(() => {
