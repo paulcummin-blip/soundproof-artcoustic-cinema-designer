@@ -1983,6 +1983,59 @@ function SpeakerPlacementImpl(props) {
     }
   }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast, globalSurroundModel]);
 
+  // NEW: Auto-hydrate surround positions when layout or 7.x toggle changes
+  // This ensures SBL/SBR and LW/RW appear WITHOUT requiring zone toggles
+  useEffect(() => {
+    if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) return;
+    if (!mlpPoint || !dimensions) return;
+    if (!effectivePreset) return;
+
+    // Only run when layout changes OR when surround model becomes available
+    const __layoutSig = __b44SigFor({
+      preset: effectivePreset,
+      useWides: useWides,
+      globalModel: globalSurroundModel,
+    });
+
+    if (__b44LastEffectSigRef.current.layoutHydrate === __layoutSig) return;
+    __b44LastEffectSigRef.current.layoutHydrate = __layoutSig;
+
+    // If no surround model is selected yet, don't hydrate (wait for user to select)
+    if (!globalSurroundModel || globalSurroundModel === 'off') {
+      if (globalThis.__B44_LOGS) console.log('[SP HYDRATE] Skipping: no global surround model');
+      return;
+    }
+
+    if (globalThis.__B44_LOGS) console.log('[SP HYDRATE] Running for layout change', {
+      preset: effectivePreset,
+      useWides: useWides,
+      globalModel: globalSurroundModel,
+    });
+
+    // Force one hydration pass to ensure speakers exist with positions
+    setSpeakers(current => {
+      const reset = resetSurroundPositions(
+        effectivePreset,
+        mlpPoint,
+        dimensions,
+        current,
+        globalSurroundModel
+      );
+      
+      if (__b44SameSpeakers(current, reset)) return current;
+      return reset;
+    });
+  }, [
+    effectivePreset,
+    useWides,
+    globalSurroundModel,
+    placedSpeakers?.length,
+    mlpPoint,
+    dimensions,
+    resetSurroundPositions,
+    setSpeakers,
+  ]);
+
   useEffect(() => {
     // HARD GUARD: if there are no speakers, SpeakerPlacement must do nothing.
     // Subs can exist independently; we must not “seed” or “reset” surrounds here.
