@@ -33,13 +33,12 @@ function getTargetOverheadIdsForLayout(layout) {
 // --- END ATMOS PROTECTION HELPERS ---
 
 // --- CANONICAL ROLE HELPER (handles aliases like LR→SBL, FWL→LW) -------
-const canonRoleForVisibility = (role) => {
-  const raw = String(role || "").toUpperCase();
+const safeCanonRole = (role) => {
   try {
-    const mapped = getCanonicalRole ? getCanonicalRole(raw) : raw;
-    return String(mapped || raw).toUpperCase();
+    const mapped = getCanonicalRole(role);
+    return String(mapped || role || "").toUpperCase();
   } catch {
-    return raw;
+    return String(role || "").toUpperCase();
   }
 };
 
@@ -118,7 +117,7 @@ function speakersShallowEqual(a = [], b = []) {
 
   const byRole = (arr) => {
     const m = new Map();
-    arr.forEach(s => m.set(String(s.role).toUpperCase(), s));
+    arr.forEach(s => m.set(safeCanonRole(getCanonicalRole(s?.role) || s?.role), s));
     return m;
   };
   const A = byRole(a), B = byRole(b);
@@ -404,7 +403,7 @@ function useDesignerState() {
   ]), []);
 
   const getSpeakerVisibility = useCallback((role, model) => {
-    const canon = canonRoleForVisibility(role);
+    const canon = safeCanonRole(getCanonicalRole(role) || role);
 
     // Never show LFE
     if (canon.startsWith("LFE")) return false;
