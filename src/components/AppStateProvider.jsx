@@ -321,7 +321,12 @@ function useDesignerState() {
   const [aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP] = useState(false);
 
   const [autosaveMeta, setAutosaveMeta] = useState(null);
-  const [globalSurroundModel, setGlobalSurroundModel] = useState(null);
+  const [globalSurroundModel, _setGlobalSurroundModel] = useState(null);
+
+  const setGlobalSurroundModel = useCallback((model) => {
+    if (globalThis.__B44_LOGS) console.log('[AppState] setGlobalSurroundModel', { model });
+    _setGlobalSurroundModel(model);
+  }, []);
 
   const [splConfig, setSplConfig] = useState({
         globalPowerW: 100,
