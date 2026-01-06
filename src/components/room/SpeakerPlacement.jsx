@@ -1674,12 +1674,15 @@ function SpeakerPlacementImpl(props) {
         return currentSpeakers || [];
       }
 
+      // Robust: layoutString may be a string ("9.1.6") OR an object with { layout: "9.1.6" }
       const layoutNormalized =
-        (typeof layoutString === 'string' && layoutString.trim()) ? layoutString.trim() :
-        (typeof dolbyConfig === 'string' && dolbyConfig.trim()) ? dolbyConfig.trim() :
-        (dolbyConfig && typeof dolbyConfig === 'object' && typeof dolbyConfig.layout === 'string')
-          ? dolbyConfig.layout.trim()
-          : '5.1';
+        (typeof layoutString === 'string' && layoutString.trim())
+          ? layoutString.trim()
+          : (layoutString && typeof layoutString === 'object' && typeof layoutString.layout === 'string' && layoutString.layout.trim())
+            ? layoutString.layout.trim()
+            : '5.1';
+
+      if (globalThis.__B44_LOGS) console.log('[SP] layoutNormalized', { layoutString, layoutNormalized });
 
       const major = parseInt(layoutNormalized.split('.')[0], 10) || 5;
 
