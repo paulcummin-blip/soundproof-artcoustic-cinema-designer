@@ -3142,8 +3142,38 @@ function RoomDesignerWithState() {
            });
          }
 
-         if (speakersEqual(prev, withOverheads)) return prev;
-         return withOverheads;
+         // [B44 FINAL FIX] Enforce required surround roles in the FINAL list (prevents later filters wiping rears/wides)
+         const final = Array.isArray(withOverheads) ? [...withOverheads] : [];
+
+         const haveFinal = new Set(final.map(s => safeCanon(s?.role)));
+
+         const ensureFinal = (role) => {
+           if (haveFinal.has(role)) return;
+           final.push({
+             id: role,
+             role,
+             label: role,
+             model: undefined,
+             position: null,
+           });
+           haveFinal.add(role);
+         };
+
+         if (wantsRears) {
+           ensureFinal('SBL');
+           ensureFinal('SBR');
+         }
+         if (wantsWides) {
+           ensureFinal('LW');
+           ensureFinal('RW');
+         }
+
+         if (globalThis.__B44_LOGS) {
+           debug(`[Speakers][FINAL] major=${major} wantsRears=${wantsRears} wantsWides=${wantsWides} roles=${final.map(s => safeCanon(s.role)).join(', ')}`);
+         }
+
+         if (speakersEqual(prev, final)) return prev;
+         return final;
          });
          }
   }, [
