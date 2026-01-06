@@ -893,19 +893,28 @@ const byId = useMemo(() => {
 
   // actualScreenFrontY declaration and calculation
   const actualScreenFrontY = React.useMemo(() => {
+    // CRITICAL: Screen front plane is ALWAYS based on floatDepthM + speakerClearanceM
+    // This is the true "Distance from Front Wall to Screen" metric.
     const floatDepthM = Number(screen?.floatDepthM) || 0.0;
+    const speakerClearanceM = Number(screen?.speakerClearanceM) || 0.0;
+    
+    // Base screen position = float depth + fixed clearance
+    const baseScreenFrontY = floatDepthM + speakerClearanceM;
 
-    // calculatedMinScreenDepthM already includes the 1cm gap, don't add it again
+    // calculatedMinScreenDepthM is the minimum needed to clear speakers
     const minDepthForSpeakersToClear = calculatedMinScreenDepthM;
 
+    // In autoTight mode, we push screen forward to clear speakers
+    // Otherwise, we use the configured depth but never less than what's needed
     if (screenPlaneMode === 'autoTight') {
-      return minDepthForSpeakersToClear;
+      return Math.max(baseScreenFrontY, minDepthForSpeakersToClear);
     } else {
-      return Math.max(floatDepthM, minDepthForSpeakersToClear);
+      return Math.max(baseScreenFrontY, minDepthForSpeakersToClear);
     }
   }, [
     calculatedMinScreenDepthM,
     screen?.floatDepthM,
+    screen?.speakerClearanceM,
     screenPlaneMode
   ]);
 
