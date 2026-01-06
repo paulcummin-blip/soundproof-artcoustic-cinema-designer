@@ -1809,11 +1809,6 @@ function SpeakerPlacementImpl(props) {
           if (!localAllowedRoles.has(canon)) return;
 
           const existing = byRole.get(canon);
-          
-          // [B44 FIX] Don't create surround speakers if global model is off/none
-          if (!globalSurroundModelParam || globalSurroundModelParam === 'off' || globalSurroundModelParam === 'none') {
-            return; // User hasn't selected a surround model - don't create this speaker
-          }
 
           let resolvedModel = existing?.model || globalSurroundModelParam;
 
