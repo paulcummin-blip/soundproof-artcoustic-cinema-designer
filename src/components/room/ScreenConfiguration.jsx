@@ -544,9 +544,26 @@ export default function ScreenConfiguration(props) {
                 <div>
                   <Label className="text-[#625143] text-xs">Distance from Front Wall to Screen</Label>
                   <div className="text-[#1B1A1A] font-medium">
-                    {Number.isFinite(screenFrontPlaneM) && screenFrontPlaneM >= 0
-                      ? `${Math.round(screenFrontPlaneM * 100)} cm`
-                      : '—'}
+                    {(() => {
+                      let frontPlaneM;
+                      
+                      // Priority 1: Floating mode with explicit float depth
+                      if (screenData.mountMode === "floating" && Number.isFinite(screenData.floatDepthM)) {
+                        frontPlaneM = screenData.floatDepthM + (screenData.speakerClearanceM || 0);
+                      }
+                      // Priority 2: Use screen centre depth minus half thickness
+                      else if (Number.isFinite(appState?.screenCentreDepthM)) {
+                        frontPlaneM = Math.max(0, appState.screenCentreDepthM - 0.025);
+                      }
+                      // Priority 3: Fallback to stored front plane
+                      else {
+                        frontPlaneM = screenFrontPlaneM;
+                      }
+                      
+                      return Number.isFinite(frontPlaneM) && frontPlaneM >= 0
+                        ? `${Math.round(frontPlaneM * 100)} cm`
+                        : '—';
+                    })()}
                   </div>
                 </div>
               </div>
