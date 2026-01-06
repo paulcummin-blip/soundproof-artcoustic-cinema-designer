@@ -5485,10 +5485,15 @@ return {
   // 1) Basic structural filter (existing helper)
   const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
 
-  // 2) CRITICAL: Visibility is now FULLY decoupled from overlay toggles.
-  //    Overhead speakers are rendered separately via overheadIconElements.
-  //    All other speakers: if they exist in placedSpeakers, they render. Period.
-  let afterVisibility = afterRenderable;
+  // 2) Apply visibility filter using AppState's getSpeakerVisibility
+  //    This ensures speakers only render when their role is active for the current layout
+  let afterVisibility = afterRenderable.filter(s => {
+    const canon = rvSafeCanonRole(s.role);
+    // Never show LFE
+    if (canon === "LFE") return false;
+    // Use AppState visibility check
+    return getSpeakerVisibility(canon, s.model);
+  });
 
   // --- OVERHEAD VISIBILITY REMOVED ---
   // Overhead speakers are now rendered independently via overheadIconElements
