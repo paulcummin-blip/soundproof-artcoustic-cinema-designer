@@ -5505,8 +5505,36 @@ return {
     window.__LAST_RV__ = { rawSpeakers, afterVisibility };
   }
 
-  // DEBUG: Table of afterVisibility with positions (guarded + one-shot)
+  // DEBUG: Log visibility decisions (guarded)
   if (globalThis.__B44_LOGS && typeof console !== 'undefined') {
+    // Get current layout config
+    const visibleRoles = appState?.visibleRoles || new Set();
+    
+    // Find speakers that were filtered out
+    const filtered = rawSpeakers
+      .filter(s => isRenderableSpeaker(s))
+      .filter(s => !afterVisibility.includes(s))
+      .map(s => {
+        const canon = rvSafeCanonRole(s.role);
+        const hasModel = s.model && String(s.model).trim().toLowerCase() !== 'off' && String(s.model).trim().toLowerCase() !== 'none';
+        const isVisible = visibleRoles.has(canon);
+        return {
+          role: s.role,
+          canon,
+          reason: !isVisible ? 'not-visible-role' : !hasModel ? 'no-model' : 'unknown'
+        };
+      });
+    
+    console.log('[RV Visibility]', {
+      dolbyLayout,
+      sevenBedLayoutType: appState?.sevenBedLayoutType,
+      visibleRoles: Array.from(visibleRoles),
+      totalPlaced: rawSpeakers.length,
+      afterRenderable: afterRenderable.length,
+      afterVisibility: afterVisibility.length,
+      filtered: filtered
+    });
+    
     console.log('After visibility filter:', afterVisibility.map(s => ({
       role: s.role,
       canon: rvSafeCanonRole(s.role),

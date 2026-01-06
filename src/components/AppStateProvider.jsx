@@ -45,10 +45,11 @@ export function getSpeakerVisibilityFor(layoutString, sevenBedLayoutType) {
 
   const showSides = major >= 5;
   
+  // For 9.x layouts: ALWAYS show BOTH wides AND rears
   // For 7.x layouts: use sevenBedLayoutType to decide rears vs wides
   const useWides = sevenBedLayoutType === "wides";
-  const showRears = major >= 7 && !useWides;
-  const showWides = (major >= 7 && useWides) || major >= 9;
+  const showRears = major >= 9 || (major >= 7 && !useWides);
+  const showWides = major >= 9 || (major >= 7 && useWides);
 
   if (showSides) {
     roles.add("SL");
