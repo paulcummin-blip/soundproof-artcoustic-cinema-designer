@@ -1828,7 +1828,26 @@ function SpeakerPlacementImpl(props) {
             // [B44 REAR FIX] Use back-wall projector for SBL/SBR
             let baseWithWall;
             if (canon === 'SBL' || canon === 'SBR') {
-              baseWithWall = projectToBackWallFromMLP_xy(mlp, projectAngleDeg, room, resolvedModel, getModelDimsM, WALL_BUFFER_M);
+              // Rear surrounds: back-wall placement uses model dims.
+              // If the model isn't in the database, fall back to safe generic dims
+              // so we never produce NaN and drop the speaker.
+              const dims = (() => {
+                try {
+                  const d = getModelDimsM?.(resolvedModel);
+                  if (d && Number.isFinite(d.depthM) && Number.isFinite(d.widthM)) return d;
+                } catch (e) {}
+                return { depthM: 0.082, widthM: 0.27 }; // safe fallback
+              })();
+
+              baseWithWall = projectToBackWallFromMLP_xy(
+                mlp,
+                projectAngleDeg,
+                room,
+                resolvedModel,
+                // wrap getModelDimsM so it always returns valid dims for this call
+                () => dims,
+                WALL_BUFFER_M
+              );
             } else {
               baseWithWall = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
             }
