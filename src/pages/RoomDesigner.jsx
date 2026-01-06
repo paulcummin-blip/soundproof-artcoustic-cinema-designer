@@ -2897,11 +2897,27 @@ function RoomDesignerWithState() {
          const knownOverheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR', 'TL', 'TR', 'TFC', 'TRC', 'TBC', 'TBL', 'TBR']);
          
          // Separate existing speakers into bed layer and overheads
-         const prevBedSpeakers = (prev || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
-         const existingOverheads = (prev || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
-         
-         // NEW: bed speakers must come from seededSpeakers (canonical roles for the new preset)
-         const bedSpeakers = (seededSpeakers || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
+          const prevBedSpeakers = (prev || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
+          const existingOverheads = (prev || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
+
+          // [B44 FIX] Remove only the surround roles that are NOT required by the current layout
+          const major = parseInt(String(dolbyPreset || '').split('.')[0], 10) || 5;
+          const useWidesInsteadOfRears = _sevenBedLayoutType === 'wides';
+
+          // 7.x chooses between rears and wides. 9.x must keep BOTH.
+          const wantsRears = (major >= 9) || (major === 7 && !useWidesInsteadOfRears);
+          const wantsWides = (major >= 9) || (major === 7 &&  useWidesInsteadOfRears);
+
+          // NEW: bed speakers must come from seededSpeakers (canonical roles for the new preset)
+          // But filter out only what we DON'T want
+          const bedSpeakers = (seededSpeakers || [])
+            .filter(s => !knownOverheadRoles.has(safeCanon(s.role)))
+            .filter(s => {
+              const canon = safeCanon(s.role);
+              if (canon === 'SBL' || canon === 'SBR') return wantsRears;
+              if (canon === 'LW'  || canon === 'RW')  return wantsWides;
+              return true;
+            });
          
          if (globalThis.__B44_LOGS) debug(`[Speakers] Existing: ${prevBedSpeakers.length} prev bed + ${existingOverheads.length} overhead (${existingOverheads.map(s => s.role).join(', ')})`);
          if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${bedSpeakers.length} bed (from new preset)`);
