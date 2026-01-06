@@ -1674,7 +1674,7 @@ function SpeakerPlacementImpl(props) {
         return currentSpeakers || [];
       }
 
-      // Robust: layoutString may be a string ("9.1.6") OR an object with { layout: "9.1.6" }
+      // Robust: layoutString can be "9.1.6" OR an object like { layout: "9.1.6" }
       const layoutNormalized =
         (typeof layoutString === 'string' && layoutString.trim())
           ? layoutString.trim()
@@ -1838,6 +1838,8 @@ function SpeakerPlacementImpl(props) {
           }
 
           // resolvedModel is now guaranteed to be a real model string
+
+          // resolvedModel is now guaranteed to be a real model string
           let pos = undefined;
           
           if (resolvedModel) {
@@ -1846,26 +1848,18 @@ function SpeakerPlacementImpl(props) {
             // [B44 REAR FIX] Use back-wall projector for SBL/SBR
             let baseWithWall;
             if (canon === 'SBL' || canon === 'SBR') {
-              // Rear surrounds: back-wall placement uses model dims.
-              // If the model isn't in the database, fall back to safe generic dims
-              // so we never produce NaN and drop the speaker.
-              const dims = (() => {
-                try {
-                  const d = getModelDimsM?.(resolvedModel);
-                  if (d && Number.isFinite(d.depthM) && Number.isFinite(d.widthM)) return d;
-                } catch (e) {}
-                return { depthM: 0.082, widthM: 0.27 }; // safe fallback
+              // Rear surrounds: ensure model dims are always finite to avoid NaN → drop
+              const rawDims = (() => {
+                try { return getModelDimsM?.(resolvedModel); }
+                catch (e) { return null; }
               })();
+              const widthM = Number.isFinite(rawDims?.widthM) ? rawDims.widthM : 0.20;
+              const depthM = Number.isFinite(rawDims?.depthM) ? rawDims.depthM : 0.082;
+              const getModelDimsSafe = () => ({ widthM, depthM });
 
-              baseWithWall = projectToBackWallFromMLP_xy(
-                mlp,
-                projectAngleDeg,
-                room,
-                resolvedModel,
-                // wrap getModelDimsM so it always returns valid dims for this call
-                () => dims,
-                WALL_BUFFER_M
-              );
+              baseWithWall = projectToBackWallFromMLP_xy(mlp, projectAngleDeg, room, resolvedModel, getModelDimsSafe, WALL_BUFFER_M);
+
+              if (globalThis.__B44_LOGS) console.log('[SP] rear dims safe', { resolvedModel, rawDims, widthM, depthM });
             } else {
               baseWithWall = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
             }
