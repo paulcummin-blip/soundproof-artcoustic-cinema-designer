@@ -11,21 +11,7 @@ import { WIDTH_PRESETS } from "@/components/data/screenSizes"; // Keep this impo
 import { useAppState } from "@/components/AppStateProvider";
 import RoomVisualisation from "./RoomVisualisation";
 
-// Placeholder for getSpeakerModelMeta if not imported elsewhere.
-// In a real application, this would likely be imported from a separate utility file
-// that manages speaker model data, e.g., from "@/lib/speakerUtils" or "@/data/speakerModels".
-// For the purpose of making the provided code functional, we'll include a basic mock.
-const getSpeakerModelMeta = (modelId) => {
-  // This is a mock function. In a real application, it would
-  // return actual metadata for a given speaker `modelId`,
-  // including its physical depth in meters.
-  // For demonstration, we'll return a default depth.
-  if (modelId) {
-    // Example: A generic speaker might have a depth of 15cm (0.15m)
-    return { depthM: 0.15 };
-  }
-  return { depthM: 0 }; // No model, no depth
-};
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
 export default function ScreenConfiguration(props) {
   const {
@@ -126,6 +112,31 @@ export default function ScreenConfiguration(props) {
       return { widthM, heightM };
     }
   }, [manualSize, screenData.visibleWidthInches, screenData.aspectRatio]);
+
+  // Compute required front wall to screen distance based on actual speaker depths
+  const requiredFrontWallToScreenM = useMemo(() => {
+    const gapWallToSpeakerM = 0.01;
+    const gapSpeakerToScreenM = 0.01;
+    
+    // Get LCR speakers (behind screen)
+    const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+    const lcrSpeakers = (placedSpeakers || []).filter(s => {
+      const role = String(s.role || '').toUpperCase();
+      return lcrRoles.has(role) && s.model;
+    });
+    
+    // Get max depth from LCR speakers
+    let maxDepthM = 0;
+    for (const spk of lcrSpeakers) {
+      const meta = getSpeakerModelMeta(spk.model);
+      const depthM = Number(meta?.depthM) || 0.082;
+      if (depthM > maxDepthM) {
+        maxDepthM = depthM;
+      }
+    }
+    
+    return gapWallToSpeakerM + maxDepthM + gapSpeakerToScreenM;
+  }, [placedSpeakers]);
 
   // Live metrics computation - uses VIEWABLE width only (same as Viewing Angle Analysis)
   const liveMetrics = useMemo(() => {
@@ -544,8 +555,8 @@ export default function ScreenConfiguration(props) {
                 <div>
                   <Label className="text-[#625143] text-xs">Distance from Front Wall to Screen</Label>
                   <div className="text-[#1B1A1A] font-medium">
-                    {Number.isFinite(screenFrontPlaneM) && screenFrontPlaneM >= 0
-                      ? `${Math.round(screenFrontPlaneM * 100)} cm`
+                    {Number.isFinite(requiredFrontWallToScreenM) && requiredFrontWallToScreenM >= 0
+                      ? `${Math.round(requiredFrontWallToScreenM * 100)} cm`
                       : '—'}
                   </div>
                 </div>
