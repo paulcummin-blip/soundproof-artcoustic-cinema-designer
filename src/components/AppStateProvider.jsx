@@ -7,11 +7,23 @@ import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getA
 
 // --- ATMOS PROTECTION HELPERS ---
 const safeCanonRole = (role) => {
+  const raw = String(role || "").trim();
+  const upper = raw.toUpperCase();
+
+  // Local safety net for common aliases (in case getCanonicalRole is incomplete)
+  const aliasMap = {
+    LR: "SBL",
+    RR: "SBR",
+    FWL: "LW",
+    FWR: "RW",
+  };
+
+  const preMapped = aliasMap[upper] || raw;
+
   try {
-    const mapped = getCanonicalRole(role);
-    return String(mapped || role || "").toUpperCase();
-  } catch {
-    return String(role || "").toUpperCase();
+    return String(getCanonicalRole(preMapped) || preMapped || raw).trim().toUpperCase();
+  } catch (e) {
+    return String(preMapped || raw).trim().toUpperCase();
   }
 };
 
@@ -52,9 +64,10 @@ export function getSpeakerVisibilityFor(layoutString, sevenBedLayoutType) {
 
   const showSides = major >= 5;
   
-  // For 9.x layouts: ALWAYS show BOTH wides AND rears
-  // For 7.x layouts: use sevenBedLayoutType to decide rears vs wides
   const useWides = sevenBedLayoutType === "wides";
+
+  // 9.x layouts MUST show BOTH rears and wides.
+  // 7.x layouts choose between them based on sevenBedLayoutType.
   const showRears = major >= 9 || (major >= 7 && !useWides);
   const showWides = major >= 9 || (major >= 7 && useWides);
 
@@ -114,7 +127,7 @@ function speakersShallowEqual(a = [], b = []) {
 
   const byRole = (arr) => {
     const m = new Map();
-    arr.forEach(s => m.set(safeCanonRole(getCanonicalRole(s?.role) || s?.role), s));
+    arr.forEach(s => m.set(safeCanonRole(s?.role), s));
     return m;
   };
   const A = byRole(a), B = byRole(b);
@@ -400,7 +413,7 @@ function useDesignerState() {
   ]), []);
 
   const getSpeakerVisibility = useCallback((role, model) => {
-    const canon = safeCanonRole(getCanonicalRole(role) || role);
+    const canon = safeCanonRole(role);
 
     // Never show LFE
     if (canon.startsWith("LFE")) return false;
