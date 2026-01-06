@@ -2644,13 +2644,32 @@ function RoomDesignerWithState() {
         .concat([lw, rw]);
       
       if (globalThis.__B44_LOGS) safeGroup('[Speakers] swap/reseed merge check (wides)', () => {
-        if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
+       if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
       });
-            if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
+           if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
       setSpeakers(prev => {
-        const merged = mergePreserveOverheads(prev, nextList);
-        if (speakersEqual(prev, merged)) return prev;
-        return merged;
+       let merged = mergePreserveOverheads(prev, nextList);
+
+       // CRITICAL: Ensure wides inherit globalSurroundModel if they have no model
+       const globalSurroundModel = appState?.globalSurroundModel;
+       if (globalSurroundModel) {
+         const modelStr = String(globalSurroundModel).trim().toLowerCase();
+         if (modelStr && modelStr !== 'off' && modelStr !== 'none') {
+           merged = merged.map(spk => {
+             const canon = safeCanon(spk.role);
+             if (canon !== 'LW' && canon !== 'RW') return spk;
+
+             const currentModel = String(spk.model || '').trim().toLowerCase();
+             if (!currentModel || currentModel === 'off' || currentModel === 'none') {
+               return { ...spk, model: globalSurroundModel };
+             }
+             return spk;
+           });
+         }
+       }
+
+       if (speakersEqual(prev, merged)) return prev;
+       return merged;
       });
 
     } else if (_sevenBedLayoutType === 'rears' && hasWides && !hasRears) {
@@ -2672,7 +2691,26 @@ function RoomDesignerWithState() {
       });
             if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
       setSpeakers(prev => {
-        const merged = mergePreserveOverheads(prev, nextList);
+        let merged = mergePreserveOverheads(prev, nextList);
+        
+        // CRITICAL: Ensure rears inherit globalSurroundModel if they have no model
+        const globalSurroundModel = appState?.globalSurroundModel;
+        if (globalSurroundModel) {
+          const modelStr = String(globalSurroundModel).trim().toLowerCase();
+          if (modelStr && modelStr !== 'off' && modelStr !== 'none') {
+            merged = merged.map(spk => {
+              const canon = safeCanon(spk.role);
+              if (canon !== 'SBL' && canon !== 'SBR') return spk;
+              
+              const currentModel = String(spk.model || '').trim().toLowerCase();
+              if (!currentModel || currentModel === 'off' || currentModel === 'none') {
+                return { ...spk, model: globalSurroundModel };
+              }
+              return spk;
+            });
+          }
+        }
+        
         if (speakersEqual(prev, merged)) return prev;
         return merged;
       });
@@ -2984,7 +3022,7 @@ function RoomDesignerWithState() {
            }
          }
          
-         const nextList = [...nextBed, ...nextOverheads];
+         let nextList = [...nextBed, ...nextOverheads];
 
          if (globalThis.__B44_LOGS) debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
          if (globalThis.__B44_LOGS) console.log("[RD] RECONCILE nextList:", nextList.map(s => s.role));
@@ -2992,14 +3030,14 @@ function RoomDesignerWithState() {
            "[RD RECON] OUTPUT roles =",
            nextList.map(s => s.role)
          );
-         
+
          if (globalThis.__B44_LOGS) safeGroup('[Speakers] Reconciliation result', () => {
            if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
          });
 
          // NEW: guarantee Atmos overheads exist & have models,
          // independent of surround model selection.
-         const withOverheads = ensureAtmosOverheads({
+         let withOverheads = ensureAtmosOverheads({
            placedSpeakers: nextList,
            dolbyPreset,
            roomDimensions: stableDimensions,
@@ -3012,8 +3050,49 @@ function RoomDesignerWithState() {
            useRearGlobal: _useRearGlobal,
          });
 
+         // CRITICAL: Final safety pass - ensure surround roles NEVER lose their model
+         // This runs AFTER all merging/swapping/reconciliation to catch any stragglers
+         const surroundRolesToProtect = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+         const globalSurroundModelFinal = appState?.globalSurroundModel;
+
+         if (globalSurroundModelFinal) {
+           const modelStr = String(globalSurroundModelFinal).trim().toLowerCase();
+           const isValidGlobalModel = modelStr && modelStr !== 'off' && modelStr !== 'none';
+
+           if (isValidGlobalModel) {
+             withOverheads = withOverheads.map(spk => {
+               const canonRole = safeCanon(spk.role);
+               if (!surroundRolesToProtect.has(canonRole)) return spk;
+
+               const currentModel = String(spk.model || '').trim().toLowerCase();
+               const hasValidModel = currentModel && currentModel !== 'off' && currentModel !== 'none';
+
+               // If this surround has no valid model, assign globalSurroundModel
+               if (!hasValidModel) {
+                 return { ...spk, model: globalSurroundModelFinal };
+               }
+
+               return spk;
+             });
+           }
+         }
+
+         // DEBUG: Log final state before commit (shows what will actually render)
+         if (globalThis.__B44_LOGS) {
+           const bedOnly = withOverheads.filter(s => surroundRolesToProtect.has(safeCanon(s.role)));
+           console.log('[RD RECON] FINAL COMMIT:', {
+             dolbyLayout: dolbyPreset,
+             sevenBedLayoutType: _sevenBedLayoutType,
+             expectedRoles: expectedRoles,
+             surroundRolesInOutput: bedOnly.map(s => ({
+               role: s.role,
+               canon: safeCanon(s.role),
+               model: s.model || '(none)',
+             })),
+           });
+         }
+
          if (speakersEqual(prev, withOverheads)) return prev;
-         return withOverheads;
          return withOverheads;
          });
          }
