@@ -1039,7 +1039,10 @@ React.useEffect(() => {
   // Initialize rear mode once (safe guard on mount or when speakers appear)
   React.useEffect(() => {
     const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
-    if (!sbl) return;
+    if (!sbl) {
+      // Rear surrounds not yet hydrated; skip rear mode init this pass
+      return;
+    }
     const L = lengthM || 0;
     if (!(L > 0)) return;
 
