@@ -5488,11 +5488,11 @@ return {
   // 2) Apply visibility filter using AppState's getSpeakerVisibility
   //    This ensures speakers only render when their role is active for the current layout
   let afterVisibility = afterRenderable.filter(s => {
-    const canon = rvSafeCanonRole(s.role);
+    const canon = getCanonicalRole(s.role);
     // Never show LFE
     if (canon === "LFE") return false;
-    // Use AppState visibility check
-    return getSpeakerVisibility(canon, s.model);
+    // Use AppState visibility check (it will canonicalize again, but that's safe)
+    return getSpeakerVisibility(s.role, s.model);
   });
 
   // --- OVERHEAD VISIBILITY REMOVED ---
