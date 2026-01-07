@@ -4181,246 +4181,9 @@ useEffect(() => {
     return { enabled: true, rows };
   }, [placedSpeakers, widthM, lengthM, getCanonicalRole, meterToCanvasX, meterToCanvasY]);
 
-  // TEMP DEBUG: Canvas Sanity readout (remove later)
-  const __rvCanvasSanity = React.useMemo(() => {
-    const enabled = globalThis.__B44_RV_DEBUG === true;
-    if (!enabled) return { enabled: false };
 
-    const testRoles = ["SL", "SR", "SBL", "SBR", "LW", "RW"];
-    const speakers = testRoles.map(role => {
-      const spk = (placedSpeakers || []).find(s => getCanonicalRole(s?.role) === role);
-      
-      if (!spk) {
-        return {
-          role,
-          exists: false,
-          roleStored: "—",
-          model: "—",
-          posX: "N/A",
-          posY: "N/A",
-          canvasX: "N/A",
-          canvasY: "N/A",
-          posFinite: false,
-          canvasFinite: false,
-        };
-      }
 
-      const posX = spk?.position?.x;
-      const posY = spk?.position?.y;
-      const posFinite = Number.isFinite(posX) && Number.isFinite(posY);
 
-      let canvasX = null;
-      let canvasY = null;
-      let canvasFinite = false;
-
-      if (posFinite && typeof meterToCanvasX === "function" && typeof meterToCanvasY === "function") {
-        try {
-          canvasX = meterToCanvasX(posX);
-          canvasY = meterToCanvasY(posY);
-          canvasFinite = Number.isFinite(canvasX) && Number.isFinite(canvasY);
-        } catch (e) {
-          canvasFinite = false;
-        }
-      }
-
-      return {
-        role,
-        exists: true,
-        roleStored: String(spk.role),
-        model: String(spk.model || "—"),
-        posX: posFinite ? posX.toFixed(3) : "N/A",
-        posY: posFinite ? posY.toFixed(3) : "N/A",
-        canvasX: canvasFinite ? canvasX.toFixed(1) : "N/A",
-        canvasY: canvasFinite ? canvasY.toFixed(1) : "N/A",
-        posFinite,
-        canvasFinite,
-      };
-    });
-
-    return {
-      enabled: true,
-      widthM: Number.isFinite(widthM) ? widthM.toFixed(2) : "N/A",
-      lengthM: Number.isFinite(lengthM) ? lengthM.toFixed(2) : "N/A",
-      heightM: Number.isFinite(heightM) ? heightM.toFixed(2) : "N/A",
-      scale: Number.isFinite(scale) ? scale.toFixed(2) : "N/A",
-      roomRect: {
-        x: Number.isFinite(roomRect?.x) ? roomRect.x.toFixed(1) : "N/A",
-        y: Number.isFinite(roomRect?.y) ? roomRect.y.toFixed(1) : "N/A",
-        width: Number.isFinite(roomRect?.width) ? roomRect.width.toFixed(1) : "N/A",
-        height: Number.isFinite(roomRect?.height) ? roomRect.height.toFixed(1) : "N/A",
-      },
-      speakers,
-    };
-  }, [placedSpeakers, widthM, lengthM, heightM, scale, roomRect, getCanonicalRole, meterToCanvasX, meterToCanvasY]);
-
-  // TEMP DEBUG: RV speaker trace (remove later)
-  const __rvMissingTrace = React.useMemo(() => {
-    if (globalThis.__B44_RV_DEBUG !== true) return null;
-
-    const targets = ["SL", "SR", "SBL", "SBR", "LW", "RW"];
-    const trace = {};
-
-    const safeFindByRole = (arr, role) => {
-      if (!Array.isArray(arr)) return null;
-      const canon = getCanonicalRole(role);
-      return arr.find(s => getCanonicalRole(s?.role) === canon) || null;
-    };
-
-    // Build filtered arrays (same as renderSpeakers does)
-    const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-    const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
-    const afterVisibility = afterRenderable; // No additional visibility for bed speakers
-    
-    // CRITICAL: Simulate the exact filter used in renderSpeakers before mapping to icons
-    const wouldRenderInRenderSpeakers = afterVisibility.filter(s => {
-      const canon = getCanonicalRole(s.role);
-      // Skip overheads (rendered separately) and LFE
-      if (rvIsOverheadRole(s.role)) return false;
-      if (canon === "LFE") return false;
-      return true;
-    });
-
-    targets.forEach(role => {
-      const inPlaced = safeFindByRole(placedSpeakers, role);
-      const inToRender = safeFindByRole(speakersToRender, role);
-      const inAfterRender = safeFindByRole(afterRenderable, role);
-      const inAfterVis = safeFindByRole(afterVisibility, role);
-      const inFinalRender = safeFindByRole(wouldRenderInRenderSpeakers, role);
-
-      const xM = inPlaced?.position?.x;
-      const yM = inPlaced?.position?.y;
-      const hasFiniteXY = Number.isFinite(xM) && Number.isFinite(yM);
-      const inRoomBounds = hasFiniteXY 
-        ? (xM >= 0 && xM <= widthM && yM >= 0 && yM <= lengthM)
-        : false;
-
-      // Canvas coords using same helpers as icons
-      let xPx = null;
-      let yPx = null;
-      let hasFiniteCanvas = false;
-      let inRoomRectPx = false;
-
-      if (hasFiniteXY) {
-        try {
-          xPx = meterToCanvasX(xM);
-          yPx = meterToCanvasY(yM);
-          hasFiniteCanvas = Number.isFinite(xPx) && Number.isFinite(yPx);
-          
-          if (hasFiniteCanvas && roomRect) {
-            inRoomRectPx = (
-              xPx >= roomRect.x && 
-              xPx <= (roomRect.x + roomRect.width) &&
-              yPx >= roomRect.y && 
-              yPx <= (roomRect.y + roomRect.height)
-            );
-          }
-        } catch (e) {
-          hasFiniteCanvas = false;
-        }
-      }
-
-      // Test isRenderableSpeaker on this exact speaker
-      const passesRenderable = inPlaced ? isRenderableSpeaker(inPlaced) : false;
-
-      trace[role] = {
-        existsInPlaced: !!inPlaced,
-        model: inPlaced?.model || "—",
-        posX: hasFiniteXY ? xM.toFixed(3) : "—",
-        posY: hasFiniteXY ? yM.toFixed(3) : "—",
-        inRoomBounds,
-        isRenderableSpeaker: passesRenderable,
-        canvasX: hasFiniteCanvas ? xPx.toFixed(1) : "—",
-        canvasY: hasFiniteCanvas ? yPx.toFixed(1) : "—",
-        wouldRenderInRenderSpeakers: !!inFinalRender,
-        
-        // Internal tracking
-        _speaker: inPlaced,
-        _hasFiniteXY: hasFiniteXY,
-        _hasFiniteCanvas: hasFiniteCanvas,
-        _inRoomRectPx: inRoomRectPx,
-      };
-    });
-
-    return trace;
-  }, [
-    placedSpeakers,
-    speakersToRender,
-    widthM,
-    lengthM,
-    roomRect,
-    scale,
-    meterToCanvasX,
-    meterToCanvasY,
-    getCanonicalRole,
-    isRenderableSpeaker,
-  ]);
-
-  // TEMP DEBUG: Console.table snapshot when trace changes (remove later)
-  const __rvLastTraceRef = React.useRef(null);
-
-  React.useEffect(() => {
-    if (globalThis.__B44_RV_DEBUG !== true) return;
-    if (!__rvMissingTrace) return;
-
-    const nextStr = JSON.stringify(__rvMissingTrace);
-    if (__rvLastTraceRef.current === nextStr) return;
-    __rvLastTraceRef.current = nextStr;
-
-    console.groupCollapsed("[RV TRACE] Surround Speakers Pipeline");
-    try {
-      const rows = Object.entries(__rvMissingTrace).map(([role, d]) => ({
-        role,
-        existsInPlaced: d.existsInPlaced,
-        model: d.model,
-        posX: d.posX,
-        posY: d.posY,
-        inRoomBounds: d.inRoomBounds,
-        isRenderableSpeaker: d.isRenderableSpeaker,
-        canvasX: d.canvasX,
-        canvasY: d.canvasY,
-        wouldRender: d.wouldRenderInRenderSpeakers,
-      }));
-      console.table(rows);
-    } finally {
-      console.groupEnd();
-    }
-
-    // TEMP DEBUG: Off-canvas warnings (remove later)
-    Object.entries(__rvMissingTrace).forEach(([role, d]) => {
-      if (!d.existsInPlaced) {
-        console.warn(`[RV TRACE] ${role} not in placedSpeakers`);
-      } else if (!d._hasFiniteXY) {
-        console.warn(`[RV TRACE] ${role} not drawable - non-finite position`, {
-          model: d.model,
-          position: d._speaker?.position
-        });
-      } else if (!d.inRoomBounds) {
-        console.warn(`[RV TRACE] ${role} not drawable - out of room bounds`, {
-          posX: d.posX,
-          posY: d.posY,
-          roomWidth: widthM,
-          roomLength: lengthM
-        });
-      } else if (!d.isRenderableSpeaker) {
-        console.warn(`[RV TRACE] ${role} not drawable - failed isRenderableSpeaker`, {
-          model: d.model,
-          position: d._speaker?.position
-        });
-      } else if (!d._hasFiniteCanvas) {
-        console.warn(`[RV TRACE] ${role} not drawable - bad canvas coords`, {
-          posX: d.posX,
-          posY: d.posY,
-          canvasX: d.canvasX,
-          canvasY: d.canvasY
-        });
-      } else if (!d.wouldRenderInRenderSpeakers) {
-        console.warn(`[RV TRACE] ${role} exists but won't render - filtered before icon mapping`, {
-          model: d.model,
-          position: { x: d.posX, y: d.posY }
-        });
-      }
-    });
-  }, [__rvMissingTrace, widthM, lengthM]);
 
   // Get overhead count from dolbyLayout
   const overheadCount = useMemo(() => {
@@ -5439,66 +5202,44 @@ return {
   // 1) Basic structural filter (existing helper)
   const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
 
-  // 2) Apply visibility filter using AppState's getSpeakerVisibility
-  //    This ensures speakers only render when their role is active for the current layout
-  let afterVisibility = afterRenderable.filter(s => {
-    const canon = getCanonicalRole(s.role);
-    // Never show LFE
+  // 2) Bed/overhead visibility must come from the layout roles, not model timing.
+  const speakerSystem = appState?.speakerSystem;
+  const sevenBedLayoutType = appState?.sevenBedLayoutType;
+  
+  const layoutRaw =
+    speakerSystem?.dolbyLayout ??
+    speakerSystem?.dolbyPreset ??
+    dolbyLayout ??
+    "5.1";
+
+  const layoutKey =
+    (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1")
+      .toString()
+      .trim()
+      .split(" ")[0]
+      .split("_")[0];
+
+  const useWidesInsteadOfRears =
+    !!speakerSystem?.useWidesInsteadOfRears ||
+    speakerSystem?.sevenBedLayoutType === "wides" ||
+    sevenBedLayoutType === "wides" ||
+    false;
+
+  // Import rolesForLayout from surroundRoleMap
+  const { rolesForLayout } = await import("@/components/utils/surroundRoleMap");
+  
+  const allowedRoles = new Set(
+    rolesForLayout({
+      dolbyLayout: layoutKey,
+      useWidesInsteadOfRears: !!useWidesInsteadOfRears,
+    })
+  );
+
+  let afterVisibility = afterRenderable.filter((s) => {
+    const canon = getCanonicalRole(s?.role);
     if (canon === "LFE") return false;
-    // Use AppState visibility check (it will canonicalize again, but that's safe)
-    return getSpeakerVisibility(s.role, s.model);
+    return allowedRoles.has(canon);
   });
-
-  // --- OVERHEAD VISIBILITY REMOVED ---
-  // Overhead speakers are now rendered independently via overheadIconElements
-  // This prevents surrounds toggle from showing overheads
-  // --- END OVERHEAD VISIBILITY REMOVED ---
-
-  // DEBUG: Expose to window for manual inspection
-  if (typeof window !== 'undefined') {
-    window.__LAST_RV__ = { rawSpeakers, afterVisibility };
-  }
-
-  // DEBUG: Log visibility decisions (guarded)
-  if (globalThis.__B44_LOGS && typeof console !== 'undefined') {
-    // Get current layout config
-    const visibleRoles = appState?.visibleRoles || new Set();
-    
-    // Find speakers that were filtered out
-    const filtered = rawSpeakers
-      .filter(s => isRenderableSpeaker(s))
-      .filter(s => !afterVisibility.includes(s))
-      .map(s => {
-        const canon = rvSafeCanonRole(s.role);
-        const hasModel = s.model && String(s.model).trim().toLowerCase() !== 'off' && String(s.model).trim().toLowerCase() !== 'none';
-        const isVisible = visibleRoles.has(canon);
-        return {
-          role: s.role,
-          canon,
-          reason: !isVisible ? 'not-visible-role' : !hasModel ? 'no-model' : 'unknown'
-        };
-      });
-    
-    console.log('[RV Visibility]', {
-      dolbyLayout,
-      sevenBedLayoutType: appState?.sevenBedLayoutType,
-      visibleRoles: Array.from(visibleRoles),
-      totalPlaced: rawSpeakers.length,
-      afterRenderable: afterRenderable.length,
-      afterVisibility: afterVisibility.length,
-      filtered: filtered
-    });
-    
-    console.log('After visibility filter:', afterVisibility.map(s => ({
-      role: s.role,
-      canon: rvSafeCanonRole(s.role),
-      isOverhead: rvIsOverheadRole(s.role),
-      hasPos: !!(s.position),
-      posX: s.position?.x?.toFixed?.(3) || '—',
-      posY: s.position?.y?.toFixed?.(3) || '—',
-    })));
-    if (console.groupEnd) console.groupEnd();
-  }
 
   // Local NaN-safe coordinate mappers (must be inside this loop)
   const toCanvasX = (xM) => {
