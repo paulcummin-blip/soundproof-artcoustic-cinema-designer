@@ -966,7 +966,7 @@ function UnifiedSurroundsConfig({
       return Array.isArray(hydrated) ? hydrated : draft;
     });
   }, [
-    app,
+    appState,
     setSurroundConfig,
     setSpeakers,
     effectivePreset,
@@ -1293,6 +1293,7 @@ function SpeakerPlacementImpl(props) {
   } = props;
 
   const app = useAppState();
+  const appState = app;
   
   // NEW: Refs for surround position reset flow
   const needsSurroundResetRef = React.useRef(false);
@@ -1317,7 +1318,7 @@ function SpeakerPlacementImpl(props) {
     useRearGlobal,
     setUseRearGlobal,
     enableFrontWides, // <-- FW overlay state
-  } = app || {};
+  } = appState || {};
 
   if (globalThis.__B44_LOGS) console.log("[B44] DIMENSIONS CHECK", {
     raw: dimensions,
@@ -1327,18 +1328,18 @@ function SpeakerPlacementImpl(props) {
     keys: dimensions ? Object.keys(dimensions) : null
   });
 
-  const frontSubsCfg = app?.frontSubsCfg || props?.frontSubsCfg || { 
+  const frontSubsCfg = appState?.frontSubsCfg || props?.frontSubsCfg || { 
     enabled: false, count: 0, model: null, placement: "front" 
   };
 
-  const rearSubsCfg = app?.rearSubsCfg || props?.rearSubsCfg || { 
+  const rearSubsCfg = appState?.rearSubsCfg || props?.rearSubsCfg || { 
     enabled: false, count: 0, model: null, placement: "rear" 
   };
 
-  const subWarnings = app?.subWarnings || { front: [], rear: [] };
+  const subWarnings = appState?.subWarnings || { front: [], rear: [] };
 
   const effectivePreset = (typeof dolbyPreset === "string" && dolbyPreset) 
-    || (typeof app?.dolbyLayout === "string" && app.dolbyLayout) 
+    || (typeof appState?.dolbyLayout === "string" && appState.dolbyLayout) 
     || "5.1";
 
   // Is the current bed layout a 7.x variant?
@@ -1354,16 +1355,16 @@ function SpeakerPlacementImpl(props) {
     return String(sevenBedLayoutType || "").toLowerCase() === "wides";
   }, [is7xBed, sevenBedLayoutType]);
 
-  // Keep global app.setUseWidesInsteadOfRears in sync with the 7.x layout toggle
+  // Keep global appState.setUseWidesInsteadOfRears in sync with the 7.x layout toggle
   React.useEffect(() => {
-    if (!app || typeof app.setUseWidesInsteadOfRears !== "function") return;
+    if (!appState || typeof appState.setUseWidesInsteadOfRears !== "function") return;
     if (!is7xBed) {
       // For non-7.x layouts, enforce "false" so 5.x and 9.x behave predictably
-      app.setUseWidesInsteadOfRears(false);
+      appState.setUseWidesInsteadOfRears(false);
       return;
     }
-    app.setUseWidesInsteadOfRears(useWides);
-  }, [app, is7xBed, useWides]);
+    appState.setUseWidesInsteadOfRears(useWides);
+  }, [appState, is7xBed, useWides]);
 
   const allowedRoles = React.useMemo(() => {
     const layout = String(effectivePreset || "5.1");
@@ -2784,8 +2785,8 @@ function SpeakerPlacementImpl(props) {
                   <Select
                     value={frontSubsCfg?.model ?? ""}
                     onValueChange={(model) => {
-                      if (app?.setFrontSubsCfg) {
-                        app.setFrontSubsCfg(prev => ({ ...prev, model }))
+                      if (appState?.setFrontSubsCfg) {
+                        appState.setFrontSubsCfg(prev => ({ ...prev, model }))
                       }
                     }}
                   >
@@ -2805,8 +2806,8 @@ function SpeakerPlacementImpl(props) {
                   <Select
                     value={String(frontSubsCfg?.count ?? 0)}
                     onValueChange={(v) => {
-                      if (app?.setFrontSubsCfg) {
-                        app.setFrontSubsCfg(prev => ({ ...prev, count: Number(v) }))
+                      if (appState?.setFrontSubsCfg) {
+                        appState.setFrontSubsCfg(prev => ({ ...prev, count: Number(v) }))
                       }
                     }}
                     disabled={!frontSubsCfg?.model}
@@ -2840,8 +2841,8 @@ function SpeakerPlacementImpl(props) {
                   <Select
                     value={rearSubsCfg?.model ?? ""}
                     onValueChange={(model) => {
-                      if (app?.setRearSubsCfg) {
-                        app.setRearSubsCfg(prev => ({ ...prev, model }))
+                      if (appState?.setRearSubsCfg) {
+                        appState.setRearSubsCfg(prev => ({ ...prev, model }))
                       }
                     }}
                   >
@@ -2861,8 +2862,8 @@ function SpeakerPlacementImpl(props) {
                   <Select
                     value={String(rearSubsCfg?.count ?? 0)}
                     onValueChange={(v) => {
-                      if (app?.setRearSubsCfg) {
-                        app.setRearSubsCfg(prev => ({ ...prev, count: Number(v) }))
+                      if (appState?.setRearSubsCfg) {
+                        appState.setRearSubsCfg(prev => ({ ...prev, count: Number(v) }))
                       }
                     }}
                     disabled={!rearSubsCfg?.model}
