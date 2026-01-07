@@ -927,6 +927,7 @@ function UnifiedSurroundsConfig({
           .filter(s => ALL_SURROUND_ROLES.has(getCanonicalRole(s.role)))
           .map(s => ({ role: s.role, model: s.model || '(null)' }))
         );
+        needsSurroundResetRef.current = false;
         return mergePreserveOverheads(prev || [], result);
       }
 
@@ -961,12 +962,13 @@ function UnifiedSurroundsConfig({
         .map(s => ({ role: s.role, model: s.model || '(null)', hasPosition: !!s.position }))
       );
 
-      // Immediately compute positions so speakers render when model is selected
-      const stableDimensions = dimensions;
-      const positioned = resetSurroundPositions(layout, mlpPoint, stableDimensions, updated, modelKey);
-      return mergePreserveOverheads(prev || [], positioned);
+      // Signal that we need to reposition surrounds in the follow-up effect
+      needsSurroundResetRef.current = true;
+      lastSurroundModelKeyRef.current = modelKey;
+      
+      return mergePreserveOverheads(prev || [], updated);
       });
-      }, [setSurroundConfig, setSpeakers, effectivePreset, useWides, mlpPoint, dimensions, resetSurroundPositions]);
+      }, [setSurroundConfig, setSpeakers, effectivePreset, useWides]);
   
   // [B44 FIX] REMOVED: Removed the backfill effect that was setting master model on null speakers.
   // This effect was redundant and could conflict with user selections.
@@ -1387,6 +1389,8 @@ function SpeakerPlacementImpl(props) {
   const lastEffectSigRef = React.useRef(null);
   const __b44LastApplySigRef = React.useRef(null);
   const __b44LastEffectSigRef = useRef({});
+  const needsSurroundResetRef = React.useRef(false);
+  const lastSurroundModelKeyRef = React.useRef(null);
 
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
@@ -2028,6 +2032,37 @@ function SpeakerPlacementImpl(props) {
     },
     [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, getModelDimsM, dolbyConfig, SURROUND_BED_ROLES, useWides, WALL_BUFFER_M]
   );
+
+  // Effect: Apply surround positions after model selection (where resetSurroundPositions IS in scope)
+  useEffect(() => {
+    if (!needsSurroundResetRef.current) return;
+    
+    const modelKey = lastSurroundModelKeyRef.current;
+    if (!modelKey || modelKey === 'off' || modelKey === 'none') {
+      needsSurroundResetRef.current = false;
+      return;
+    }
+    
+    if (!mlpPoint || !dimensions?.width || !dimensions?.length) {
+      needsSurroundResetRef.current = false;
+      return;
+    }
+    
+    if (globalThis.__B44_LOGS) console.log('[SP] Applying surround positions after model selection', { modelKey });
+    
+    setSpeakers(prev => {
+      const positioned = resetSurroundPositions(
+        effectivePreset,
+        mlpPoint,
+        dimensions,
+        prev,
+        modelKey
+      );
+      return positioned;
+    });
+    
+    needsSurroundResetRef.current = false;
+  }, [placedSpeakers?.length, mlpPoint, dimensions, effectivePreset, resetSurroundPositions, setSpeakers]);
 
   const handleResetPositions = useCallback(() => {
     if (!mlpPoint || !dimensions || !Number.isFinite(dimensions.width) || !Number.isFinite(dimensions.length) || !Number.isFinite(dimensions.height)) {
