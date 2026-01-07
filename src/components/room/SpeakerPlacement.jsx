@@ -779,8 +779,10 @@ function UnifiedSurroundsConfig({
   resetSurroundPositions,
   surroundConfig,
   setSurroundConfig,
+  needsSurroundResetRef,
+  lastSurroundModelKeyRef,
 }) {
-  const appState = useAppState();
+  const app = useAppState();
   const activeRoles = useMemo(() => {
     const roles = [];
     if (allowedRoles.has('SL')) roles.push('SL', 'SR');
@@ -811,8 +813,8 @@ function UnifiedSurroundsConfig({
     const modelKeyLower = modelKey.toLowerCase();
 
     // Keep global model in app state if available (do not crash if missing)
-    if (appState && typeof appState.setGlobalSurroundModel === "function") {
-      appState.setGlobalSurroundModel(modelKeyLower === "off" ? "off" : modelKey);
+    if (app && typeof app.setGlobalSurroundModel === "function") {
+      app.setGlobalSurroundModel(modelKeyLower === "off" ? "off" : modelKey);
     }
 
     if (globalThis.__B44_LOGS) {
@@ -864,6 +866,11 @@ function UnifiedSurroundsConfig({
           if (!s) continue;
           byRole.set(role, { ...s, model: null });
         }
+        
+        // Clear hydration flags
+        if (needsSurroundResetRef) needsSurroundResetRef.current = false;
+        if (lastSurroundModelKeyRef) lastSurroundModelKeyRef.current = null;
+        
         const result = Array.from(byRole.values());
         if (globalThis.__B44_LOGS) {
           console.log("[SP] Surrounds OFF -> kept stubs:", result
@@ -883,34 +890,29 @@ function UnifiedSurroundsConfig({
 
       const draft = Array.from(byRole.values());
 
-      // IMPORTANT: hydrate immediately so SBL/SBR (and LW/RW) actually appear right away
-      const hydrated = resetSurroundPositions(
-        layout,
-        mlpPoint,
-        dimensions,
-        draft,
-        modelKey
-      );
+      // Tell SpeakerPlacementImpl to hydrate surround positions centrally (where resetSurroundPositions exists)
+      if (needsSurroundResetRef) needsSurroundResetRef.current = true;
+      if (lastSurroundModelKeyRef) lastSurroundModelKeyRef.current = modelKey;
 
       if (globalThis.__B44_LOGS) {
-        console.log("[SP] Surrounds ON -> hydrated:", (hydrated || []).map(s => ({
-          role: s.role,
-          model: s.model,
-          hasPos: !!s.position
-        })));
+        console.log("[SP] Surrounds ON -> draft (positions will be hydrated centrally):", draft
+          .filter(s => ["SL","SR","SBL","SBR","LW","RW"].includes(getCanonicalRole(s.role)))
+          .map(s => ({ role: s.role, model: s.model }))
+        );
       }
 
-      return hydrated || draft;
+      return draft;
     });
   }, [
-    appState,
+    app,
     setSurroundConfig,
     setSpeakers,
     effectivePreset,
     useWides,
-    resetSurroundPositions,
     mlpPoint,
     dimensions,
+    needsSurroundResetRef,
+    lastSurroundModelKeyRef,
   ]);
   
   // [B44 FIX] REMOVED: Removed the backfill effect that was setting master model on null speakers.
@@ -1337,6 +1339,10 @@ function SpeakerPlacementImpl(props) {
   const lastEffectSigRef = React.useRef(null);
   const __b44LastApplySigRef = React.useRef(null);
   const __b44LastEffectSigRef = useRef({});
+
+  // [B44] Surround reset flow (model selection -> central hydrate)
+  const needsSurroundResetRef = React.useRef(false);
+  const lastSurroundModelKeyRef = React.useRef(null);
 
   const globalSurroundModel = useMemo(() => {
     if (!Array.isArray(placedSpeakers)) return null;
@@ -1986,7 +1992,28 @@ function SpeakerPlacementImpl(props) {
     [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, getModelDimsM, dolbyConfig, SURROUND_BED_ROLES, useWides, WALL_BUFFER_M]
   );
 
+  // [B44] Central surround hydration (the ONLY place resetSurroundPositions is called)
+  useEffect(() => {
+    if (!needsSurroundResetRef.current) return;
 
+    // Only hydrate if a real model is selected
+    const modelKey = String(lastSurroundModelKeyRef.current || "").trim();
+    const ms = modelKey.toLowerCase();
+    if (!modelKey || ms === "off" || ms === "none") {
+      needsSurroundResetRef.current = false;
+      return;
+    }
+
+    // Hydrate positions now
+    setSpeakers(prev => {
+      const layout = String(effectivePreset || "5.1").split(" ")[0].split("_")[0];
+      const next = resetSurroundPositions(layout, mlpPoint, dimensions, prev, modelKey);
+      return Array.isArray(next) ? next : prev;
+    });
+
+    // Consume the request
+    needsSurroundResetRef.current = false;
+  }, [setSpeakers, resetSurroundPositions, effectivePreset, mlpPoint, dimensions]);
 
   const handleResetPositions = useCallback(() => {
     if (!mlpPoint || !dimensions || !Number.isFinite(dimensions.width) || !Number.isFinite(dimensions.length) || !Number.isFinite(dimensions.height)) {
@@ -2617,6 +2644,8 @@ function SpeakerPlacementImpl(props) {
           resetSurroundPositions={resetSurroundPositions}
           surroundConfig={surroundConfig}
           setSurroundConfig={setSurroundConfig}
+          needsSurroundResetRef={needsSurroundResetRef}
+          lastSurroundModelKeyRef={lastSurroundModelKeyRef}
         />
 
         {/* NEW: Surround SPL @ MLP strip */}
