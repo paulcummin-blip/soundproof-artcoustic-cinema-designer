@@ -134,7 +134,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   const modelMeta = getSpeakerModelMeta(model);
   
   // Log warning if model not found in registry (with better visibility for overhead debugging)
-  if (modelMeta?.notFound && typeof console !== 'undefined') {
+  if (false && modelMeta?.notFound && typeof console !== 'undefined') {
     console.warn(`[RenderPrimitives] Speaker model "${model}" not found in registry, using defaults for role ${role}`);
   }
   

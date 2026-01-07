@@ -973,7 +973,70 @@ function UnifiedSurroundsConfig({
         );
       }
 
-      return draft;
+      // Hydrate positions now (centrally, inside this handler)
+      const hydrated = resetSurroundPositions(
+        effectivePreset,
+        mlpPoint,
+        dimensions,
+        draft,
+        modelKey
+      );
+
+      // — REAR RESCUE: guarantee SBL/SBR exist + have valid positions when layout expects rears —
+      const layoutMajor = parseInt(String(effectivePreset || '5.1').split('.')[0], 10) || 5;
+      const expectsRears = (layoutMajor >= 9) || (layoutMajor === 7 && !useWides);
+
+      const list0 = Array.isArray(hydrated) && hydrated.length ? hydrated : draft;
+      const byCanon0 = new Map(list0.map(s => [getCanonicalRole(s?.role), s]));
+
+      const hasFiniteXY = (p) =>
+        !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+
+      if (expectsRears) {
+        const W = Number(dimensions?.width) || 0;
+        const L = Number(dimensions?.length) || 0;
+        const earZ = 1.1;
+
+        // Only attempt rescue if room dims are valid
+        if (W > 0 && L > 0) {
+          const backY = Math.max(0.01, L - 0.10);
+
+          const ensureRear = (role, xFrac) => {
+            const canon = role;
+            const existing = byCanon0.get(canon);
+
+            if (existing && hasFiniteXY(existing.position)) return;
+
+            const x = Math.max(0.01, Math.min(W - 0.01, W * xFrac));
+            const fixed = {
+              ...(existing || {}),
+              id: existing?.id || `${canon.toLowerCase()}-${timeNowMs()}`,
+              role: canon,
+              label: canon,
+              model: existing?.model || modelKey,
+              position: { x, y: backY, z: earZ },
+              rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
+              draggable: true,
+            };
+
+            byCanon0.set(canon, fixed);
+          };
+
+          ensureRear('SBL', 0.25);
+          ensureRear('SBR', 0.75);
+        }
+      }
+
+      const hydratedWithRears = Array.from(byCanon0.values());
+
+      if (globalThis.__B44_LOGS) {
+        console.log('[SP] Rear rescue check:', hydratedWithRears
+          .filter(s => ['SBL','SBR'].includes(getCanonicalRole(s.role)))
+          .map(s => ({ role: s.role, model: s.model, pos: s.position }))
+        );
+      }
+
+      return hydratedWithRears;
     });
   }, [
     app,
