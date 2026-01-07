@@ -865,34 +865,38 @@ function UnifiedSurroundsConfig({
 
     setSurroundConfig(safeConfig);
 
-    const layout = effectivePreset || "5.1";
     const modelKeyRaw = safeConfig.value.master;
     const modelKey = String(modelKeyRaw || "").trim();
-    const modelKeyLc = modelKey.toLowerCase();
-    const isOff = !modelKey || modelKeyLc === "off" || modelKeyLc === "none";
+    const modelKeyLower = modelKey.toLowerCase();
+
+    // Optional: keep global model in appState if you have it
+    if (appState?.setGlobalSurroundModel) {
+      appState.setGlobalSurroundModel(modelKeyLower === "off" ? "off" : modelKey);
+    }
 
     if (globalThis.__B44_LOGS) {
-      console.log("[SP handleSurroundModelChange]", { layout, useWides, modelKey, isOff });
+      console.log("[SP handleSurroundModelChange]", {
+        modelKey,
+        effectivePreset,
+        useWides,
+      });
     }
 
     setSpeakers((prev) => {
-      const prevList = Array.isArray(prev) ? prev : [];
+      const layout = String(effectivePreset || "5.1").split(" ")[0].split("_")[0];
 
-      // Which surround roles are required by the current layout?
+      // Only bed surround roles
       const layoutRoles = rolesForLayout({
         dolbyLayout: layout,
         useWidesInsteadOfRears: !!useWides,
       }).filter((r) => ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r));
 
-      // Build a canonical map of existing speakers
       const byRole = new Map();
-      for (const s of prevList) {
-        const canon = getCanonicalRole(s?.role);
-        if (!canon) continue;
-        byRole.set(canon, { ...s, role: canon });
+      for (const s of Array.isArray(prev) ? prev : []) {
+        byRole.set(getCanonicalRole(s.role), { ...s });
       }
 
-      // Ensure required surround entries exist (as stubs if needed)
+      // Always ensure the required roles exist as entries (stubs are fine)
       for (const role of layoutRoles) {
         if (!byRole.has(role)) {
           byRole.set(role, {
@@ -907,50 +911,57 @@ function UnifiedSurroundsConfig({
         }
       }
 
-      // Remove surround roles that are NOT required by this layout
+      // Remove surround roles that are not required by this layout
       for (const role of ["SL", "SR", "SBL", "SBR", "LW", "RW"]) {
         if (!layoutRoles.includes(role)) byRole.delete(role);
       }
 
-      // Apply model selection
-      if (isOff) {
-        // Blank slate: keep entries (so UI state stays stable) but clear model + position
+      // OFF = keep stubs but clear model (blank slate, nothing will render)
+      if (!modelKey || modelKeyLower === "off" || modelKeyLower === "none") {
         for (const role of layoutRoles) {
           const s = byRole.get(role);
           if (!s) continue;
-          byRole.set(role, { ...s, model: null, position: null });
+          byRole.set(role, { ...s, model: null });
         }
-
         const result = Array.from(byRole.values());
-        if (globalThis.__B44_LOGS) console.log("[SP] Surrounds OFF -> kept stubs:", result.map(s => ({ role: s.role, model: s.model })));
+        if (globalThis.__B44_LOGS) {
+          console.log("[SP] Surrounds OFF -> kept stubs:", result
+            .filter(s => ["SL","SR","SBL","SBR","LW","RW"].includes(getCanonicalRole(s.role)))
+            .map(s => ({ role: s.role, model: s.model }))
+          );
+        }
         return result;
       }
 
-      // Model ON: write modelKey onto all required surround roles
+      // ON = write modelKey onto all required surround roles
       for (const role of layoutRoles) {
         const s = byRole.get(role);
         if (!s) continue;
         byRole.set(role, { ...s, model: modelKey });
       }
 
-      // Now hydrate coordinates immediately (do NOT rely on a later effect)
+      // Hydrate coordinates immediately (so the strict render gate can pass straight away)
       const draft = Array.from(byRole.values());
 
-      const mlp = (mlpPoint && Number.isFinite(mlpPoint.x) && Number.isFinite(mlpPoint.y))
-        ? mlpPoint
-        : { x: (dimensions?.width || 0) * 0.5, y: (dimensions?.length || 0) * 0.58, z: 1.2 };
+      // Use the current MLP + room dims already available in this component
+      const mlpForReset = mlpPoint || { x: (dimensions?.width || 0) * 0.5, y: (dimensions?.length || 0) * 0.58, z: 1.2 };
+      const dimsForReset = dimensions || { width: 4.5, length: 6.0, height: 2.4 };
 
-      const hydrated = resetSurroundPositions({
-        speakers: draft,
-        layoutString: layout,
-        useWidesInsteadOfRears: !!useWides,
-        roomDims: dimensions,
-        mlpPoint: mlp,
-        getModelDimsM,
-        globalSurroundModelParam: modelKey
-      });
+      const hydrated = resetSurroundPositions(
+        layout,
+        mlpForReset,
+        dimsForReset,
+        draft,
+        modelKey
+      );
 
-      if (globalThis.__B44_LOGS) console.log("[SP] Surrounds ON -> hydrated:", (hydrated || []).map(s => ({ role: s.role, model: s.model, hasPos: !!s.position })));
+      if (globalThis.__B44_LOGS) {
+        console.log("[SP] Surrounds ON -> hydrated:", (hydrated || []).map(s => ({
+          role: s.role,
+          model: s.model,
+          hasPos: !!(s.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y))
+        })));
+      }
 
       return Array.isArray(hydrated) ? hydrated : draft;
     });
@@ -1699,11 +1710,7 @@ function SpeakerPlacementImpl(props) {
 
   // MOVE resetSurroundPositions HERE (before it's used in handlers/effects)
   const resetSurroundPositions = useCallback(
-    ({ speakers, layoutString, useWidesInsteadOfRears, roomDims, mlpPoint, getModelDimsM, globalSurroundModelParam }) => {
-      const currentSpeakers = speakers;
-      const mlp = mlpPoint;
-      const dims = roomDims;
-      
+    (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
       // --- B44 FIX: ensure dims is always valid ---
       if (!dims || !Number.isFinite(dims.width) || !Number.isFinite(dims.length) || !Number.isFinite(dims.height)) {
         if (globalThis.__B44_LOGS) {
@@ -1738,7 +1745,7 @@ function SpeakerPlacementImpl(props) {
       // [B44 FIX] Use rolesForLayout and convert to Set for .has() compatibility
       const localAllowedRolesArray = rolesForLayout({
         dolbyLayout: layoutNormalized,
-        useWidesInsteadOfRears: useWidesInsteadOfRears
+        useWidesInsteadOfRears: useWides
       }).filter(r => ["SL","SR","SBL","SBR","LW","RW"].includes(r));
       
       const localAllowedRoles = new Set(localAllowedRolesArray.map(getCanonicalRole));
@@ -2031,7 +2038,7 @@ function SpeakerPlacementImpl(props) {
 
       return next;
     },
-    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, getModelDimsM, dolbyConfig, SURROUND_BED_ROLES, WALL_BUFFER_M]
+    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, getModelDimsM, dolbyConfig, SURROUND_BED_ROLES, useWides, WALL_BUFFER_M]
   );
 
 
@@ -2049,15 +2056,7 @@ function SpeakerPlacementImpl(props) {
       if (!Array.isArray(currentSpeakers) || currentSpeakers.length === 0) {
         return currentSpeakers;
       }
-      const reset = resetSurroundPositions({
-        speakers: currentSpeakers,
-        layoutString: effectivePreset,
-        useWidesInsteadOfRears: useWides,
-        roomDims: dimensions,
-        mlpPoint,
-        getModelDimsM,
-        globalSurroundModelParam: globalSurroundModel
-      });
+      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, globalSurroundModel);
       // Clear positionSource for all speakers (return to auto mode)
       return reset.map(s => ({ ...s, positionSource: 'auto' }));
     });
@@ -2099,15 +2098,7 @@ function SpeakerPlacementImpl(props) {
 
     // Force one hydration pass to ensure speakers exist with positions
     setSpeakers(current => {
-      const reset = resetSurroundPositions({
-        speakers: current,
-        layoutString: effectivePreset,
-        useWidesInsteadOfRears: useWides,
-        roomDims: dimensions,
-        mlpPoint,
-        getModelDimsM,
-        globalSurroundModelParam: globalSurroundModel
-      });
+      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, current, globalSurroundModel);
       
       if (__b44SameSpeakers(current, reset)) return current;
       return reset;
@@ -2160,15 +2151,7 @@ function SpeakerPlacementImpl(props) {
     });
 
     const resetOut = (Array.isArray(placedSpeakers) && placedSpeakers.length > 0)
-      ? resetSurroundPositions({
-          speakers: placedSpeakers,
-          layoutString: effectivePreset,
-          useWidesInsteadOfRears: useWides,
-          roomDims: dimensions,
-          mlpPoint,
-          getModelDimsM,
-          globalSurroundModelParam: globalSurroundModel
-        })
+      ? resetSurroundPositions(effectivePreset, mlpPoint, dimensions, placedSpeakers, globalSurroundModel)
       : (placedSpeakers || []);
 
     const nextSpeakers = resetOut.map(speaker => {
