@@ -5793,40 +5793,7 @@ return (
 
 
 
-        {/* DEBUG GHOST MARKERS — remove later */}
-        {__rvGhost?.enabled && (
-          <g data-layer="rv-ghost-debug" style={{ pointerEvents: "none" }}>
-            {/* Mini status block */}
-            <text x="12" y="310" fontSize="11" fill="#B00020">
-              Ghost: {__rvGhost.rows.length} found (SL/SR/SBL/SBR/LW/RW)
-            </text>
 
-            {__rvGhost.rows.slice(0, 6).map((r, idx) => (
-              <text
-                key={`ghost-line-${r.role}-${idx}`}
-                x="12"
-                y={326 + idx * 14}
-                fontSize="11"
-                fill="#B00020"
-              >
-                {r.role} | pos:{r.hasPos ? "Y" : "N"} | inRoom:{r.inRoom ? "Y" : "N"} | canvas:{r.canvasOk ? "Y" : "N"} | model:{String(r.model)}
-              </text>
-            ))}
-
-            {/* Markers */}
-            {__rvGhost.rows.map((r) => {
-              if (!r.canvasOk) return null;
-              return (
-                <g key={`ghost-dot-${r.role}`}>
-                  <circle cx={r.cx} cy={r.cy} r="6" fill="#B00020" opacity="0.6" />
-                  <text x={r.cx + 8} y={r.cy + 4} fontSize="12" fill="#B00020">
-                    {r.role}
-                  </text>
-                </g>
-              );
-            })}
-          </g>
-        )}
 <SvgDefs ids={ids} scale={scale} svgW={svgW} svgH={svgH} />
 
 {/* Removed debug label (zoneKeysLabel) */}
