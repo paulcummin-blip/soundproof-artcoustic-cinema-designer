@@ -962,7 +962,8 @@ function UnifiedSurroundsConfig({
       );
 
       // Immediately compute positions so speakers render when model is selected
-      const positioned = resetSurroundPositions(layout, mlpPoint, dimensions, updated, modelKey);
+      const stableDimensions = dimensions;
+      const positioned = resetSurroundPositions(layout, mlpPoint, stableDimensions, updated, modelKey);
       return mergePreserveOverheads(prev || [], positioned);
       });
       }, [setSurroundConfig, setSpeakers, effectivePreset, useWides, mlpPoint, dimensions, resetSurroundPositions]);
