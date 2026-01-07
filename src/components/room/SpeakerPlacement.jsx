@@ -776,6 +776,8 @@ function UnifiedSurroundsConfig({
   safePos,
   effectivePreset, // Added this prop for the new implementation
   useWides,        // Added this prop for the new implementation
+  needsSurroundResetRef, // NEW: Ref for triggering position reset
+  lastSurroundModelKeyRef, // NEW: Ref for storing selected model
 }) {
   const activeRoles = useMemo(() => {
     const roles = [];
@@ -2701,6 +2703,8 @@ function SpeakerPlacementImpl(props) {
           safePos={safePos}
           effectivePreset={effectivePreset} 
           useWides={useWides}
+          needsSurroundResetRef={needsSurroundResetRef}
+          lastSurroundModelKeyRef={lastSurroundModelKeyRef}
         />
 
         {/* NEW: Surround SPL @ MLP strip */}
