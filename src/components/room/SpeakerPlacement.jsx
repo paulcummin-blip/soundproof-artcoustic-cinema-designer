@@ -1,6 +1,78 @@
 "use client";
 
 import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } from 'react';
+
+// ---- B44: local surround hydrator (keeps RV simple + avoids missing import) ----
+// Creates/updates x,y,z for bed surround roles when a real model is selected.
+// If model is OFF/NONE, we intentionally do NOT create positions (blank slate).
+function resetSurroundPositions(layout, mlpPoint, dimensions, speakers, modelKey) {
+  const W = Number(dimensions?.width) || 0;
+  const L = Number(dimensions?.length) || 0;
+
+  // If room is not valid, return unchanged
+  if (!(W > 0 && L > 0)) return Array.isArray(speakers) ? speakers : [];
+
+  const m = String(modelKey || "").trim().toLowerCase();
+  const modelOn = !!m && m !== "off" && m !== "none";
+
+  // If model is off/none, keep speakers as stubs (no positions)
+  if (!modelOn) return Array.isArray(speakers) ? speakers : [];
+
+  const earZ = 1.1;
+  const INSET = 0.02; // 2cm inset to keep inside bounds
+
+  const mlpX = Number.isFinite(mlpPoint?.x) ? mlpPoint.x : W / 2;
+  const mlpY = Number.isFinite(mlpPoint?.y) ? mlpPoint.y : L * 0.58;
+
+  // Reasonable defaults (simple + stable)
+  const ySide = Math.max(INSET, Math.min(L - INSET, mlpY));
+  const yWide = Math.max(INSET, Math.min(L - INSET, L * 0.40));
+  const yRear = Math.max(INSET, Math.min(L - INSET, L - INSET));
+
+  const xSL = INSET;
+  const xSR = W - INSET;
+
+  const xLW = Math.max(INSET, Math.min(W - INSET, W * 0.15));
+  const xRW = Math.max(INSET, Math.min(W - INSET, W * 0.85));
+
+  const xSBL = Math.max(INSET, Math.min(W - INSET, W * 0.25));
+  const xSBR = Math.max(INSET, Math.min(W - INSET, W * 0.75));
+
+  const next = (Array.isArray(speakers) ? speakers : []).map((spk) => {
+    const role = String(spk?.role || "").toUpperCase();
+
+    // Only touch bed surround roles
+    if (!["SL", "SR", "LW", "RW", "SBL", "SBR"].includes(role)) return spk;
+
+    // Only hydrate if model is actually set on this speaker
+    const sm = String(spk?.model || "").trim().toLowerCase();
+    if (!sm || sm === "off" || sm === "none") return spk;
+
+    let x = spk?.position?.x;
+    let y = spk?.position?.y;
+
+    // If missing/invalid, assign defaults
+    if (!Number.isFinite(x) || !Number.isFinite(y)) {
+      if (role === "SL") { x = xSL; y = ySide; }
+      if (role === "SR") { x = xSR; y = ySide; }
+      if (role === "LW") { x = xLW; y = yWide; }
+      if (role === "RW") { x = xRW; y = yWide; }
+      if (role === "SBL") { x = xSBL; y = yRear; }
+      if (role === "SBR") { x = xSBR; y = yRear; }
+    }
+
+    // Clamp just in case
+    x = Math.max(INSET, Math.min(W - INSET, Number(x)));
+    y = Math.max(INSET, Math.min(L - INSET, Number(y)));
+
+    return {
+      ...spk,
+      position: { ...(spk.position || {}), x, y, z: earZ },
+    };
+  });
+
+  return next;
+}
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';

@@ -33,6 +33,17 @@ import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/sea
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 
+// B44 shim: some older logic expects getModelDimsM()
+const getModelDimsM = (model) => {
+  const meta = getSpeakerModelMeta(model) || {};
+  return {
+    widthM: meta.widthM,
+    depthM: meta.depthM,
+    diameterM: meta.diameterM,
+    round: meta.round,
+  };
+};
+
 // NEW: Helper hook for URL query parameters - SSR Safe
 function useUrlQuery() {
   const [projectId, setProjectId] = React.useState(null);
