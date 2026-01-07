@@ -774,10 +774,9 @@ function UnifiedSurroundsConfig({
   canWides,
   is7xOrHigher,
   safePos,
-  effectivePreset, // Added this prop for the new implementation
-  useWides,        // Added this prop for the new implementation
-  needsSurroundResetRef, // NEW: Ref for triggering position reset
-  lastSurroundModelKeyRef, // NEW: Ref for storing selected model
+  effectivePreset,
+  useWides,
+  resetSurroundPositions, // CRITICAL: Pass from parent
 }) {
   const activeRoles = useMemo(() => {
     const roles = [];
@@ -1694,6 +1693,7 @@ function SpeakerPlacementImpl(props) {
     return getMlpSeat(seatingPositions || []);
   }, [seatingPositions]);
 
+  // MOVE resetSurroundPositions HERE (before it's used in handlers/effects)
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
       // --- B44 FIX: ensure dims is always valid ---
@@ -2663,8 +2663,7 @@ function SpeakerPlacementImpl(props) {
           safePos={safePos}
           effectivePreset={effectivePreset} 
           useWides={useWides}
-          needsSurroundResetRef={needsSurroundResetRef}
-          lastSurroundModelKeyRef={lastSurroundModelKeyRef}
+          resetSurroundPositions={resetSurroundPositions}
         />
 
         {/* NEW: Surround SPL @ MLP strip */}
