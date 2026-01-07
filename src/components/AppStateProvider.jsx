@@ -398,19 +398,67 @@ function useDesignerState() {
 
   // --- CANONICAL VISIBILITY HELPER (used everywhere) ---------------------
   const visibleRoles = useMemo(() => {
-    const roles = getSpeakerVisibilityFor(dolbyLayout || '5.1', sevenBedLayoutType);
-    
-    // Debug log for visibility calculation (always log to ensure visibility rules are transparent)
+    // --- B44 VISIBILITY FIX: robust layout + correct rears/wides rules ---
+    const layoutRaw =
+      speakerSystem?.dolbyLayout ??
+      speakerSystem?.dolbyPreset ??
+      dolbyLayout ??
+      "5.1";
+
+    // layoutRaw may be "9.1.6 Dolby Atmos" OR { layout: "9.1.6" }
+    const layoutNorm =
+      (typeof layoutRaw === "string" && layoutRaw.trim())
+        ? layoutRaw.trim()
+        : (layoutRaw && typeof layoutRaw === "object" && typeof layoutRaw.layout === "string" && layoutRaw.layout.trim())
+          ? layoutRaw.layout.trim()
+          : "5.1";
+
+    // keep only "9.1.6" part
+    const layoutKey = layoutNorm.split(" ")[0].split("_")[0];
+    const major = parseInt(layoutKey.split(".")[0], 10) || 5;
+
+    // IMPORTANT: one source of truth for 7.x behaviour
+    const useWidesInsteadOfRears =
+      !!speakerSystem?.useWidesInsteadOfRears ||
+      speakerSystem?.sevenBedLayoutType === "wides" ||
+      sevenBedLayoutType === "wides" ||
+      false;
+
+    // 7.x chooses rears OR wides, 9.x+ MUST include BOTH
+    const showRears = (major >= 9) || (major === 7 && !useWidesInsteadOfRears);
+    const showWides = (major >= 9) || (major === 7 &&  useWidesInsteadOfRears);
+
+    const roles = new Set(["FL", "FC", "FR"]);
+    if (major >= 5) { roles.add("SL"); roles.add("SR"); }
+    if (showRears) { roles.add("SBL"); roles.add("SBR"); }
+    if (showWides) { roles.add("LW"); roles.add("RW"); }
+
+    // Add overhead channels (from original getSpeakerVisibilityFor)
+    const heights = parseInt(layoutKey.split(".")[2], 10) || 0;
+    if (heights === 2) {
+      roles.add("TML");
+      roles.add("TMR");
+    } else if (heights === 4) {
+      roles.add("TFL");
+      roles.add("TFR");
+      roles.add("TRL");
+      roles.add("TRR");
+    } else if (heights === 6) {
+      roles.add("TFL");
+      roles.add("TFR");
+      roles.add("TML");
+      roles.add("TMR");
+      roles.add("TRL");
+      roles.add("TRR");
+    }
+
+    // Optional debug:
     if (globalThis.__B44_LOGS) {
-      console.log('[AppState visibleRoles]', {
-        dolbyLayout: dolbyLayout || '5.1',
-        sevenBedLayoutType,
-        visibleRoles: Array.from(roles),
-      });
+      console.log("[VIS roles]", { layoutRaw, layoutNorm, layoutKey, major, useWidesInsteadOfRears, showRears, showWides, roles: Array.from(roles) });
     }
     
     return roles;
-  }, [dolbyLayout, sevenBedLayoutType]);
+  }, [dolbyLayout, sevenBedLayoutType, speakerSystem?.dolbyLayout, speakerSystem?.dolbyPreset, speakerSystem?.useWidesInsteadOfRears, speakerSystem?.sevenBedLayoutType]);
 
   const OVERHEAD_CANON_ROLES = useMemo(() => new Set([
     "TFL", "TFR", "TML", "TMR", "TRL", "TRR",
