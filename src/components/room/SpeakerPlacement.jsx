@@ -921,9 +921,9 @@ function UnifiedSurroundsConfig({
           byRole.set(role, { ...s, model: null, position: null });
         }
 
-        const out = Array.from(byRole.values());
-        if (globalThis.__B44_LOGS) console.log("[SP] Surrounds OFF -> kept stubs:", out.map(s => ({ role: s.role, model: s.model })));
-        return out;
+        const result = Array.from(byRole.values());
+        if (globalThis.__B44_LOGS) console.log("[SP] Surrounds OFF -> kept stubs:", result.map(s => ({ role: s.role, model: s.model })));
+        return result;
       }
 
       // Model ON: write modelKey onto all required surround roles
@@ -944,9 +944,7 @@ function UnifiedSurroundsConfig({
         modelKey
       );
 
-      if (globalThis.__B44_LOGS) {
-        console.log("[SP] Surrounds ON -> hydrated roles:", (hydrated || []).map(s => ({ role: s.role, model: s.model, pos: s.position })));
-      }
+      if (globalThis.__B44_LOGS) console.log("[SP] Surrounds ON -> hydrated:", (hydrated || []).map(s => ({ role: s.role, model: s.model, hasPos: !!s.position })));
 
       return Array.isArray(hydrated) ? hydrated : draft;
     });
