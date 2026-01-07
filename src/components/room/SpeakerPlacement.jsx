@@ -966,6 +966,7 @@ function UnifiedSurroundsConfig({
       return Array.isArray(hydrated) ? hydrated : draft;
     });
   }, [
+    app,
     setSurroundConfig,
     setSpeakers,
     effectivePreset,
