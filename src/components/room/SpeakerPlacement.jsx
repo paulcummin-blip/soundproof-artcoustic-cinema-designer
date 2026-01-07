@@ -776,7 +776,9 @@ function UnifiedSurroundsConfig({
   safePos,
   effectivePreset,
   useWides,
-  resetSurroundPositions, // CRITICAL: Pass from parent
+  resetSurroundPositions,
+  surroundConfig,
+  setSurroundConfig,
 }) {
   const appState = useAppState();
   const activeRoles = useMemo(() => {
@@ -786,68 +788,6 @@ function UnifiedSurroundsConfig({
     if (allowedRoles.has('LW')) roles.push('LW', 'RW');
     return roles;
   }, [allowedRoles]);
-
-  const indexByCanonicalRole = useCallback((speakers) => {
-    const map = {};
-    (speakers || []).forEach(s => {
-      const canon = getCanonicalRole(s.role);
-      map[canon] = s;
-    });
-    return map;
-  }, []);
-
-  const speakersByRole = useMemo(() => indexByCanonicalRole(placedSpeakers), [placedSpeakers, indexByCanonicalRole]);
-  const modelOf = useCallback((r) => speakersByRole[r]?.model ?? 'off', [speakersByRole]);
-
-  const getCurrentSurroundModels = useCallback(() => {
-    let currentSideModel = 'off';
-    let currentRearModel = 'off';
-    let currentWideModel = 'off';
-
-    if (canSides) {
-      currentSideModel = modelOf('SL');
-    }
-    if (canRears) {
-      currentRearModel = modelOf('SBL');
-    }
-    if (canWides) {
-      currentWideModel = modelOf('LW');
-    }
-
-    const masterModel = currentSideModel !== 'off' ? currentSideModel :
-                        (currentRearModel !== 'off' ? currentRearModel :
-                        (currentWideModel !== 'off' ? currentWideModel : 'off'));
-
-    return {
-      master: masterModel,
-      side: currentSideModel,
-      rear: currentRearModel,
-      wide: currentWideModel,
-    };
-  }, [modelOf, canSides, canRears, canWides]);
-  
-  const [surroundConfig, setSurroundConfig] = useState(() => {
-    const models = getCurrentSurroundModels();
-    return {
-      value: models,
-      override: { side: false, rear: false, wide: false },
-    };
-  });
-  
-  // [B44 FIX] REMOVED: This useEffect was causing dropdown snap-back by immediately
-  // overwriting user selection with old speaker state before update propagated.
-  // useEffect(() => {
-  //   const models = getCurrentSurroundModels();
-  //   if (surroundConfig.value.side !== models.side ||
-  //       surroundConfig.value.rear !== models.rear ||
-  //       surroundConfig.value.wide !== models.wide ||
-  //       surroundConfig.value.master !== models.master) {
-  //       setSurroundConfig(prev => ({
-  //           ...prev,
-  //           value: models
-  //       }));
-  //   }
-  // }, [getCurrentSurroundModels, surroundConfig.value]);
 
   const handleSurroundModelChange = useCallback((config) => {
     const safeConfig = {
@@ -870,8 +810,8 @@ function UnifiedSurroundsConfig({
     const modelKey = String(modelKeyRaw || "").trim();
     const modelKeyLower = modelKey.toLowerCase();
 
-    // Optional: keep global model in appState if you have it
-    if (appState?.setGlobalSurroundModel) {
+    // Keep global model in app state if available (do not crash if missing)
+    if (appState && typeof appState.setGlobalSurroundModel === "function") {
       appState.setGlobalSurroundModel(modelKeyLower === "off" ? "off" : modelKey);
     }
 
@@ -934,24 +874,20 @@ function UnifiedSurroundsConfig({
         return result;
       }
 
-      // ON = write modelKey onto all required surround roles
+      // MODEL ON = write modelKey onto all required surround roles
       for (const role of layoutRoles) {
         const s = byRole.get(role);
         if (!s) continue;
         byRole.set(role, { ...s, model: modelKey });
       }
 
-      // Hydrate coordinates immediately (so the strict render gate can pass straight away)
       const draft = Array.from(byRole.values());
 
-      // Use the current MLP + room dims already available in this component
-      const mlpForReset = mlpPoint || { x: (dimensions?.width || 0) * 0.5, y: (dimensions?.length || 0) * 0.58, z: 1.2 };
-      const dimsForReset = dimensions || { width: 4.5, length: 6.0, height: 2.4 };
-
+      // IMPORTANT: hydrate immediately so SBL/SBR (and LW/RW) actually appear right away
       const hydrated = resetSurroundPositions(
         layout,
-        mlpForReset,
-        dimsForReset,
+        mlpPoint,
+        dimensions,
         draft,
         modelKey
       );
@@ -960,11 +896,11 @@ function UnifiedSurroundsConfig({
         console.log("[SP] Surrounds ON -> hydrated:", (hydrated || []).map(s => ({
           role: s.role,
           model: s.model,
-          hasPos: !!(s.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y))
+          hasPos: !!s.position
         })));
       }
 
-      return Array.isArray(hydrated) ? hydrated : draft;
+      return hydrated || draft;
     });
   }, [
     appState,
@@ -1710,6 +1646,12 @@ function SpeakerPlacementImpl(props) {
   const mlpSeat = useMemo(() => {
     return getMlpSeat(seatingPositions || []);
   }, [seatingPositions]);
+
+  // Surround config state (lifted to parent so effects can access it)
+  const [surroundConfig, setSurroundConfig] = useState({
+    value: { master: "off", side: "off", rear: "off", wide: "off" },
+    override: { side: false, rear: false, wide: false },
+  });
 
   // MOVE resetSurroundPositions HERE (before it's used in handlers/effects)
   const resetSurroundPositions = useCallback(
@@ -2673,6 +2615,8 @@ function SpeakerPlacementImpl(props) {
           effectivePreset={effectivePreset} 
           useWides={useWides}
           resetSurroundPositions={resetSurroundPositions}
+          surroundConfig={surroundConfig}
+          setSurroundConfig={setSurroundConfig}
         />
 
         {/* NEW: Surround SPL @ MLP strip */}
