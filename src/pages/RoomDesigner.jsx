@@ -1283,23 +1283,13 @@ export function seedSpeakersFromPreset({
       // Backs - STROKE-AWARE rear wall placement with 1cm gap
       case "SBL": 
       case "SBR": {
-        const gapM = 0.01; // 1cm air gap from rear wall
-        // Use a default model for sizing if none is set yet (will be overridden when user selects)
-        const modelId = "evolve-2-1_s"; // Safe fallback for initial seeding
-        const meta = getSpeakerModelMeta(modelId) || {};
-        const widthM = Number(meta.widthM) || 0.27;
-        const depthM = Number(meta.depthM) || 0.082;
-        
-        // Calculate stroke-aware half extent (yaw = 0 for rear-wall hug)
-        const halfExtentM = yHalfExtentM(depthM, widthM, 0);
-        const rearWallY = l - (gapM + halfExtentM);
-        
-        // Symmetrical X positions
+        // NOTE: Do not compute speaker geometry in RoomDesigner. SpeakerPlacement handles positioning.
+        // Return a simple stub position - SpeakerPlacement/resetSurroundPositions will compute wall-hugging correctly.
         const xPos = role === "SBL" ? x25 : x75;
         
         return { 
           x: Math.max(m, Math.min(xPos, w - m)), 
-          y: rearWallY, 
+          y: l - 0.10, // Safe 10cm margin from rear wall (SpeakerPlacement will correct)
           z: earZ 
         };
       }
