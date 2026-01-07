@@ -1233,10 +1233,6 @@ function SpeakerPlacementImpl(props) {
 
   const app = useAppState();
   const appState = app;
-  
-  // NEW: Refs for surround position reset flow
-  const needsSurroundResetRef = React.useRef(false);
-  const lastSurroundModelKeyRef = React.useRef(null);
 
   const {
     speakerSystem, setSpeakerSystem, dimensions, seatingPositions, setDolbyConfig, dolbyConfig,
