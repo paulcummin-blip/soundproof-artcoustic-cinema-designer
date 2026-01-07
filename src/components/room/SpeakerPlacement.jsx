@@ -778,6 +778,7 @@ function UnifiedSurroundsConfig({
   useWides,
   resetSurroundPositions, // CRITICAL: Pass from parent
 }) {
+  const appState = useAppState();
   const activeRoles = useMemo(() => {
     const roles = [];
     if (allowedRoles.has('SL')) roles.push('SL', 'SR');
