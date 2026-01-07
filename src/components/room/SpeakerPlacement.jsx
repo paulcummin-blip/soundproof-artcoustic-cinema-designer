@@ -2077,18 +2077,20 @@ function SpeakerPlacementImpl(props) {
     if (!mlpPoint || !dimensions) return;
     if (!effectivePreset) return;
 
+    const masterSurroundModel = String(surroundConfig?.value?.master || 'off');
+
     // Only run when layout changes OR when surround model becomes available
     const __layoutSig = __b44SigFor({
       preset: effectivePreset,
       useWides: useWides,
-      globalModel: globalSurroundModel,
+      globalModel: masterSurroundModel,
     });
 
     if (__b44LastEffectSigRef.current.layoutHydrate === __layoutSig) return;
     __b44LastEffectSigRef.current.layoutHydrate = __layoutSig;
 
     // If no surround model is selected yet, don't hydrate (wait for user to select)
-    if (!globalSurroundModel || globalSurroundModel === 'off') {
+    if (!masterSurroundModel || masterSurroundModel === 'off') {
       if (globalThis.__B44_LOGS) console.log('[SP HYDRATE] Skipping: no global surround model');
       return;
     }
@@ -2096,12 +2098,12 @@ function SpeakerPlacementImpl(props) {
     if (globalThis.__B44_LOGS) console.log('[SP HYDRATE] Running for layout change', {
       preset: effectivePreset,
       useWides: useWides,
-      globalModel: globalSurroundModel,
+      globalModel: masterSurroundModel,
     });
 
     // Force one hydration pass to ensure speakers exist with positions
     setSpeakers(current => {
-      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, current, globalSurroundModel);
+      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, current, masterSurroundModel);
       
       if (__b44SameSpeakers(current, reset)) return current;
       return reset;
@@ -2115,6 +2117,7 @@ function SpeakerPlacementImpl(props) {
     dimensions,
     resetSurroundPositions,
     setSpeakers,
+    surroundConfig?.value?.master,
   ]);
 
   useEffect(() => {
