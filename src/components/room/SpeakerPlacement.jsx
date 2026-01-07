@@ -908,26 +908,26 @@ function UnifiedSurroundsConfig({
       if (!modelKeyStr || modelKeyStr === "off" || modelKeyStr === "none") {
         layoutRoles.forEach(role => {
           if (byRole.has(role)) {
-            byRole.set(role, { ...byRole.get(role), model: null });
+            byRole.set(role, { ...byRole.get(role), model: null, position: null });
           } else {
             // Create entry even for "off" so dropdown doesn't snap back
             byRole.set(role, {
               id: `${role.toLowerCase()}-${timeNowMs()}`,
               role,
               model: null,
-              position: undefined,
+              position: null,
               rotation: { x:0, y:0, z:0 },
               draggable: true
             });
           }
         });
-        
+
         const result = Array.from(byRole.values());
         if (globalThis.__B44_LOGS) console.log('[B44] handleSurroundModelChange OUTPUT (OFF):', result
           .filter(s => ALL_SURROUND_ROLES.has(getCanonicalRole(s.role)))
           .map(s => ({ role: s.role, model: s.model || '(null)' }))
         );
-        return result;
+        return mergePreserveOverheads(prev || [], result);
       }
 
       // Otherwise: force-create / update ALL required surround speakers
@@ -955,17 +955,17 @@ function UnifiedSurroundsConfig({
       }
 
       const updated = Array.from(byRole.values());
-      
+
       if (globalThis.__B44_LOGS) console.log('[B44] handleSurroundModelChange OUTPUT (before reset):', updated
         .filter(s => ALL_SURROUND_ROLES.has(getCanonicalRole(s.role)))
         .map(s => ({ role: s.role, model: s.model || '(null)', hasPosition: !!s.position }))
       );
 
-      // Let resetSurroundPositions compute coordinates
-      // Note: resetSurroundPositions will run via useEffect after this state update
-      return updated;
-    });
-  }, [setSurroundConfig, setSpeakers, effectivePreset, useWides]);
+      // Immediately compute positions so speakers render when model is selected
+      const positioned = resetSurroundPositions(layout, mlpPoint, dimensions, updated, modelKey);
+      return mergePreserveOverheads(prev || [], positioned);
+      });
+      }, [setSurroundConfig, setSpeakers, effectivePreset, useWides, mlpPoint, dimensions, resetSurroundPositions]);
   
   // [B44 FIX] REMOVED: Removed the backfill effect that was setting master model on null speakers.
   // This effect was redundant and could conflict with user selections.
