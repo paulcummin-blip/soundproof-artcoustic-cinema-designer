@@ -2,6 +2,7 @@
 
 import React from "react";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 
 // ---- Roles / misc helpers ----
 export const isSubRole = (role) => {
@@ -27,8 +28,17 @@ export const isRenderableSpeaker = (speaker) => {
 
   // Only render if a real model is selected.
   // Prevents "default" surround icons appearing when Surround Model = off.
+  const canon = getCanonicalRole(speaker.role);
   const ms = String(speaker?.model ?? '').trim().toLowerCase();
-  if (!ms || ms === 'off' || ms === 'none') return false;
+
+  // Allow rear surrounds to render once positioned,
+  // even if model assignment lags one render
+  if (
+    (!ms || ms === 'off' || ms === 'none') &&
+    !['SBL', 'SBR'].includes(canon)
+  ) {
+    return false;
+  }
 
   return true;
 };
