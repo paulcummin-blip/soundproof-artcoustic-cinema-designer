@@ -4032,6 +4032,12 @@ useEffect(() => {
     });
 
     // CRITICAL: Speaker icons render based on system config, not overlay toggles.
+    // Debug log to confirm LW/RW roles are present
+    if (globalThis.__B44_LOGS) {
+      const roles = withoutLfe.map(s => getCanonicalRole(s.role));
+      console.log("[RV] roles present:", roles);
+    }
+
     return withoutLfe;
   }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
 
