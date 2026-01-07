@@ -852,125 +852,114 @@ function UnifiedSurroundsConfig({
   const handleSurroundModelChange = useCallback((config) => {
     const safeConfig = {
       value: {
-        master: String(config?.value?.master || 'off'),
-        side: String(config?.value?.side || 'off'),
-        rear: String(config?.value?.rear || 'off'),
-        wide: String(config?.value?.wide || 'off')
+        master: String(config?.value?.master || "off"),
+        side: String(config?.value?.side || "off"),
+        rear: String(config?.value?.rear || "off"),
+        wide: String(config?.value?.wide || "off"),
       },
       override: {
         side: !!config?.override?.side,
         rear: !!config?.override?.rear,
-        wide: !!config?.override?.wide
-      }
+        wide: !!config?.override?.wide,
+      },
     };
 
     setSurroundConfig(safeConfig);
 
-    const modelKey = safeConfig.value.master;
+    const layout = effectivePreset || "5.1";
+    const modelKeyRaw = safeConfig.value.master;
+    const modelKey = String(modelKeyRaw || "").trim();
+    const modelKeyLc = modelKey.toLowerCase();
+    const isOff = !modelKey || modelKeyLc === "off" || modelKeyLc === "none";
 
-    if (globalThis.__B44_LOGS) console.log('[SP handleSurroundModelChange]', {
-      modelKey,
-      effectivePreset,
-      useWides
-    });
-    
-    setSpeakers(prev => {
-      const layout = effectivePreset || "5.1";
+    if (globalThis.__B44_LOGS) {
+      console.log("[SP handleSurroundModelChange]", { layout, useWides, modelKey, isOff });
+    }
 
-      // Determine which surround roles MUST exist for this layout
+    setSpeakers((prev) => {
+      const prevList = Array.isArray(prev) ? prev : [];
+
+      // Which surround roles are required by the current layout?
       const layoutRoles = rolesForLayout({
         dolbyLayout: layout,
-        useWidesInsteadOfRears: !!useWides
-      }).filter(r => ["SL","SR","SBL","SBR","LW","RW"].includes(r));
+        useWidesInsteadOfRears: !!useWides,
+      }).filter((r) => ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r));
 
-      if (globalThis.__B44_LOGS) console.log('[B44] handleSurroundModelChange', {
-        modelKey,
-        layout,
-        useWides,
-        layoutRoles
-      });
-
-      // [B44 FIX] Guard against empty layoutRoles
-      if (!Array.isArray(layoutRoles) || layoutRoles.length === 0) {
-        if (globalThis.__B44_LOGS) console.warn('[B44] handleSurroundModelChange: no bed surround roles for layout', {
-          layout,
-          useWides
-        });
-        return prev || [];
-      }
-
-      // Build map of existing speakers
+      // Build a canonical map of existing speakers
       const byRole = new Map();
-      for (const s of prev || []) {
-        byRole.set(getCanonicalRole(s.role), { ...s });
+      for (const s of prevList) {
+        const canon = getCanonicalRole(s?.role);
+        if (!canon) continue;
+        byRole.set(canon, { ...s, role: canon });
       }
 
-      // If user selected "Off", clear models on surround roles but keep entries
-      const modelKeyStr = String(modelKey ?? "").trim().toLowerCase();
-      if (!modelKeyStr || modelKeyStr === "off" || modelKeyStr === "none") {
-        layoutRoles.forEach(role => {
-          if (byRole.has(role)) {
-            byRole.set(role, { ...byRole.get(role), model: null, position: null });
-          } else {
-            // Create entry even for "off" so dropdown doesn't snap back
-            byRole.set(role, {
-              id: `${role.toLowerCase()}-${timeNowMs()}`,
-              role,
-              model: null,
-              position: null,
-              rotation: { x:0, y:0, z:0 },
-              draggable: true
-            });
-          }
-        });
-
-        const result = Array.from(byRole.values());
-        if (globalThis.__B44_LOGS) console.log('[B44] handleSurroundModelChange OUTPUT (OFF):', result
-          .filter(s => ALL_SURROUND_ROLES.has(getCanonicalRole(s.role)))
-          .map(s => ({ role: s.role, model: s.model || '(null)' }))
-        );
-        needsSurroundResetRef.current = false;
-        return mergePreserveOverheads(prev || [], result);
-      }
-
-      // Otherwise: force-create / update ALL required surround speakers
-      layoutRoles.forEach(role => {
-        const existing = byRole.get(role);
-        if (existing) {
-          byRole.set(role, { ...existing, model: modelKey });
-        } else {
+      // Ensure required surround entries exist (as stubs if needed)
+      for (const role of layoutRoles) {
+        if (!byRole.has(role)) {
           byRole.set(role, {
             id: `${role.toLowerCase()}-${timeNowMs()}`,
             role,
-            model: modelKey,
-            position: undefined,
-            rotation: { x:0, y:0, z:0 },
-            draggable: true
+            label: role,
+            model: null,
+            position: null,
+            rotation: { x: 0, y: 0, z: 0 },
+            draggable: true,
           });
-        }
-      });
-
-      // Remove surround roles that are NOT in layoutRoles for this layout
-      for (const role of ["SL","SR","SBL","SBR","LW","RW"]) {
-        if (!layoutRoles.includes(role)) {
-          byRole.delete(role);
         }
       }
 
-      const updated = Array.from(byRole.values());
+      // Remove surround roles that are NOT required by this layout
+      for (const role of ["SL", "SR", "SBL", "SBR", "LW", "RW"]) {
+        if (!layoutRoles.includes(role)) byRole.delete(role);
+      }
 
-      if (globalThis.__B44_LOGS) console.log('[B44] handleSurroundModelChange OUTPUT (before reset):', updated
-        .filter(s => ALL_SURROUND_ROLES.has(getCanonicalRole(s.role)))
-        .map(s => ({ role: s.role, model: s.model || '(null)', hasPosition: !!s.position }))
+      // Apply model selection
+      if (isOff) {
+        // Blank slate: keep entries (so UI state stays stable) but clear model + position
+        for (const role of layoutRoles) {
+          const s = byRole.get(role);
+          if (!s) continue;
+          byRole.set(role, { ...s, model: null, position: null });
+        }
+
+        const out = Array.from(byRole.values());
+        if (globalThis.__B44_LOGS) console.log("[SP] Surrounds OFF -> kept stubs:", out.map(s => ({ role: s.role, model: s.model })));
+        return out;
+      }
+
+      // Model ON: write modelKey onto all required surround roles
+      for (const role of layoutRoles) {
+        const s = byRole.get(role);
+        if (!s) continue;
+        byRole.set(role, { ...s, model: modelKey });
+      }
+
+      // Now hydrate coordinates immediately (do NOT rely on a later effect)
+      const draft = Array.from(byRole.values());
+
+      const hydrated = resetSurroundPositions(
+        layout,
+        mlpPoint,
+        dimensions,
+        draft,
+        modelKey
       );
 
-      // Signal that we need to reposition surrounds in the follow-up effect
-      needsSurroundResetRef.current = true;
-      lastSurroundModelKeyRef.current = modelKey;
-      
-      return mergePreserveOverheads(prev || [], updated);
-      });
-      }, [setSurroundConfig, setSpeakers, effectivePreset, useWides]);
+      if (globalThis.__B44_LOGS) {
+        console.log("[SP] Surrounds ON -> hydrated roles:", (hydrated || []).map(s => ({ role: s.role, model: s.model, pos: s.position })));
+      }
+
+      return Array.isArray(hydrated) ? hydrated : draft;
+    });
+  }, [
+    setSurroundConfig,
+    setSpeakers,
+    effectivePreset,
+    useWides,
+    resetSurroundPositions,
+    mlpPoint,
+    dimensions,
+  ]);
   
   // [B44 FIX] REMOVED: Removed the backfill effect that was setting master model on null speakers.
   // This effect was redundant and could conflict with user selections.
@@ -2037,36 +2026,7 @@ function SpeakerPlacementImpl(props) {
     [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, getModelDimsM, dolbyConfig, SURROUND_BED_ROLES, useWides, WALL_BUFFER_M]
   );
 
-  // Effect: Apply surround positions after model selection (where resetSurroundPositions IS in scope)
-  useEffect(() => {
-    if (!needsSurroundResetRef.current) return;
-    
-    const modelKey = lastSurroundModelKeyRef.current;
-    if (!modelKey || modelKey === 'off' || modelKey === 'none') {
-      needsSurroundResetRef.current = false;
-      return;
-    }
-    
-    if (!mlpPoint || !dimensions?.width || !dimensions?.length) {
-      needsSurroundResetRef.current = false;
-      return;
-    }
-    
-    if (globalThis.__B44_LOGS) console.log('[SP] Applying surround positions after model selection', { modelKey });
-    
-    setSpeakers(prev => {
-      const positioned = resetSurroundPositions(
-        effectivePreset,
-        mlpPoint,
-        dimensions,
-        prev,
-        modelKey
-      );
-      return positioned;
-    });
-    
-    needsSurroundResetRef.current = false;
-  }, [placedSpeakers?.length, mlpPoint, dimensions, effectivePreset, resetSurroundPositions, setSpeakers]);
+
 
   const handleResetPositions = useCallback(() => {
     if (!mlpPoint || !dimensions || !Number.isFinite(dimensions.width) || !Number.isFinite(dimensions.length) || !Number.isFinite(dimensions.height)) {
