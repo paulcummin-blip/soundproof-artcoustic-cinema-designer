@@ -4041,79 +4041,9 @@ useEffect(() => {
     return withoutLfe;
   }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
 
-  // TEMP DEBUG: Component-level filters for trace diagnostics
-  const afterRenderableDebug = React.useMemo(() => {
-    const raw = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-    return raw.filter(isRenderableSpeaker);
-  }, [placedSpeakers]);
 
-  const afterVisibilityDebug = React.useMemo(() => {
-    return afterRenderableDebug;
-  }, [afterRenderableDebug]);
 
-  // TEMP DEBUG: Comprehensive trace for LW/RW/SBL/SBR
-  const __speakerTraceDebug = React.useMemo(() => {
-    const targets = ["LW", "RW", "SBL", "SBR"];
-    const out = {};
 
-    const pickByRole = (arr, role) => {
-      if (!Array.isArray(arr)) return null;
-      const canonTarget = String(getCanonicalRole(role) || "").toUpperCase();
-      return arr.find(s => String(getCanonicalRole(s?.role) || "").toUpperCase() === canonTarget) || null;
-    };
-
-    const safeNum = (v) => (typeof v === "number" && Number.isFinite(v)) ? v : null;
-
-    targets.forEach((role) => {
-      const spPlaced = pickByRole(placedSpeakers, role);
-      const spToRender = pickByRole(speakersToRender, role);
-      const spAfterRenderable = pickByRole(afterRenderableDebug, role);
-      const spAfterVisibility = pickByRole(afterVisibilityDebug, role);
-
-      const px = safeNum(spPlaced?.position?.x);
-      const py = safeNum(spPlaced?.position?.y);
-
-      const hasPosition = (px !== null && py !== null);
-      const inRoomBounds = hasPosition
-        ? (px >= 0 && px <= widthM && py >= 0 && py <= lengthM)
-        : false;
-
-      let canvasX = "—", canvasY = "—";
-      if (hasPosition && roomRect && scale) {
-        const tempX = roomRect.x + (px * scale);
-        const tempY = roomRect.y + (py * scale);
-        if (Number.isFinite(tempX) && Number.isFinite(tempY)) {
-          canvasX = tempX.toFixed(1);
-          canvasY = tempY.toFixed(1);
-        }
-      }
-
-      out[role] = {
-        existsInPlacedSpeakers: !!spPlaced,
-        hasPosition,
-        rawX: hasPosition ? px.toFixed(3) : "—",
-        rawY: hasPosition ? py.toFixed(3) : "—",
-        inSpeakersToRender: !!spToRender,
-        inAfterRenderable: !!spAfterRenderable,
-        inAfterVisibility: !!spAfterVisibility,
-        inRoomBounds,
-        canvasX,
-        canvasY
-      };
-    });
-
-    return out;
-  }, [
-    placedSpeakers,
-    speakersToRender,
-    afterRenderableDebug,
-    afterVisibilityDebug,
-    widthM,
-    lengthM,
-    roomRect,
-    scale,
-    getCanonicalRole
-  ]);
 
 
   // Light diagnostics (temporary)
@@ -5803,81 +5733,7 @@ return (
     {/* CANVAS WRAPPER (no tailwind) */}
     <div style={canvasStyle}>
 
-      {/* TEMP DEBUG: Speaker trace panel (remove later) */}
-      {globalThis.__B44_RV_DEBUG === true && __rvMissingTrace && (
-        <div style={{
-          position: "absolute",
-          top: 10,
-          right: 10,
-          width: 500,
-          maxHeight: 450,
-          overflow: "auto",
-          padding: 12,
-          background: "#fffbe6",
-          border: "2px solid #ff4d4f",
-          borderRadius: 8,
-          fontSize: 10,
-          lineHeight: "13px",
-          fontFamily: "monospace",
-          zIndex: 9999,
-          pointerEvents: "auto"
-        }}>
-          <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 11 }}>
-            RV TRACE: Surround Speakers (9.1.4)
-          </div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
-            <thead>
-              <tr style={{ borderBottom: "1px solid #333", background: "#ffeb3b" }}>
-                <th style={{ padding: "4px 3px", textAlign: "left" }}>Role</th>
-                <th style={{ padding: "4px 3px", textAlign: "center" }}>Exist</th>
-                <th style={{ padding: "4px 3px", textAlign: "left" }}>Model</th>
-                <th style={{ padding: "4px 3px", textAlign: "right" }}>x,y (m)</th>
-                <th style={{ padding: "4px 3px", textAlign: "center" }}>InRoom</th>
-                <th style={{ padding: "4px 3px", textAlign: "center" }}>Rend?</th>
-                <th style={{ padding: "4px 3px", textAlign: "right" }}>Canvas</th>
-                <th style={{ padding: "4px 3px", textAlign: "center" }}>Final</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(__rvMissingTrace).map(([role, d]) => (
-                <tr key={role} style={{ 
-                  borderBottom: "1px solid #eee",
-                  background: d.wouldRenderInRenderSpeakers ? "#e8f5e9" : "#ffebee"
-                }}>
-                  <td style={{ padding: "4px 3px", fontWeight: 700 }}>{role}</td>
-                  <td style={{ padding: "4px 3px", textAlign: "center" }}>
-                    {d.existsInPlaced ? "✓" : "✗"}
-                  </td>
-                  <td style={{ padding: "4px 3px", fontSize: 9 }}>{d.model}</td>
-                  <td style={{ padding: "4px 3px", textAlign: "right", fontSize: 9 }}>
-                    {d.posX},{d.posY}
-                  </td>
-                  <td style={{ padding: "4px 3px", textAlign: "center" }}>
-                    {d.inRoomBounds ? "✓" : "✗"}
-                  </td>
-                  <td style={{ padding: "4px 3px", textAlign: "center" }}>
-                    {d.isRenderableSpeaker ? "✓" : "✗"}
-                  </td>
-                  <td style={{ padding: "4px 3px", textAlign: "right", fontSize: 9 }}>
-                    {d.canvasX},{d.canvasY}
-                  </td>
-                  <td style={{ 
-                    padding: "4px 3px", 
-                    textAlign: "center",
-                    fontWeight: 700,
-                    color: d.wouldRenderInRenderSpeakers ? "#2e7d32" : "#c62828"
-                  }}>
-                    {d.wouldRenderInRenderSpeakers ? "YES" : "NO"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={{ marginTop: 8, fontSize: 9, color: "#666" }}>
-            Green row = renders | Red row = filtered out
-          </div>
-        </div>
-      )}
+
 
       {/* ROOT SVG */}
       <svg
@@ -5935,64 +5791,7 @@ return (
           );
         })()}
 
-        {/* TEMP DEBUG: Canvas Sanity Panel — remove later */}
-        {__rvCanvasSanity?.enabled && (
-          <g data-layer="canvas-sanity-debug" style={{ pointerEvents: "none" }}>
-            <rect x="8" y="32" width="420" height="260" fill="rgba(255,255,255,0.95)" stroke="#B00020" strokeWidth="2" rx="4" />
-            
-            {/* Room Geometry */}
-            <text x="14" y="50" fontSize="11" fill="#1B1A1A" fontWeight="700">
-              CANVAS SANITY
-            </text>
-            <text x="14" y="66" fontSize="10" fill="#333">
-              widthM: {__rvCanvasSanity.widthM} | lengthM: {__rvCanvasSanity.lengthM} | heightM: {__rvCanvasSanity.heightM} | scale: {__rvCanvasSanity.scale}
-            </text>
-            <text x="14" y="80" fontSize="10" fill="#333">
-              roomRect: x={__rvCanvasSanity.roomRect.x} y={__rvCanvasSanity.roomRect.y} w={__rvCanvasSanity.roomRect.width} h={__rvCanvasSanity.roomRect.height}
-            </text>
 
-            {/* Speaker data header */}
-            <text x="14" y="100" fontSize="9" fill="#666" fontWeight="700">
-              Role | Exists | Model | posX, posY (m) | canvasX, canvasY (px) | Flags
-            </text>
-
-            {/* Speaker rows */}
-            {__rvCanvasSanity.speakers.map((spk, idx) => {
-              const y = 114 + idx * 13;
-              const bgColor = spk.exists && spk.posFinite && spk.canvasFinite ? "#e8f5e9" : 
-                              spk.exists && spk.posFinite ? "#fff3e0" : "#ffebee";
-              
-              return (
-                <g key={spk.role}>
-                  <rect x="10" y={y - 10} width="410" height="12" fill={bgColor} opacity="0.4" />
-                  <text x="14" y={y} fontSize="9" fill="#1B1A1A" fontWeight="600">
-                    {spk.role}
-                  </text>
-                  <text x="50" y={y} fontSize="9" fill={spk.exists ? "#2e7d32" : "#c62828"}>
-                    {spk.exists ? "✓" : "✗"}
-                  </text>
-                  <text x="80" y={y} fontSize="8" fill="#333">
-                    {spk.model.slice(0, 12)}
-                  </text>
-                  <text x="160" y={y} fontSize="8" fill="#333">
-                    {spk.posX}, {spk.posY}
-                  </text>
-                  <text x="260" y={y} fontSize="8" fill="#333">
-                    {spk.canvasX}, {spk.canvasY}
-                  </text>
-                  <text x="360" y={y} fontSize="8" fill={spk.posFinite && spk.canvasFinite ? "#2e7d32" : "#c62828"}>
-                    pos:{spk.posFinite ? "✓" : "✗"} cvs:{spk.canvasFinite ? "✓" : "✗"}
-                  </text>
-                </g>
-              );
-            })}
-
-            {/* Legend */}
-            <text x="14" y="280" fontSize="8" fill="#666">
-              Green bg = ready to render | Orange = has pos, bad canvas | Red = missing/invalid
-            </text>
-          </g>
-        )}
 
         {/* DEBUG GHOST MARKERS — remove later */}
         {__rvGhost?.enabled && (
@@ -6468,66 +6267,7 @@ return (
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
             {renderSpeakers()}
 
-            {/* DEBUG DOTS: LW/RW/SBL/SBR positions (even if not rendering) */}
-            {globalThis.__B44_RV_DEBUG === true && __rvMissingTrace && (() => {
-              const debugDots = [];
-              Object.entries(__rvMissingTrace).forEach(([role, d]) => {
-                if (!d.hasFiniteCanvas) return;
 
-                const xPx = d.xPx;
-                const yPx = d.yPx;
-                
-                // Check if off-canvas (outside roomRect)
-                const isOffView = !d.inRoomRectPx;
-                
-                // Clamp to SVG visible area if off-view
-                let dotX = xPx;
-                let dotY = yPx;
-                let label = `${role}`;
-                
-                if (isOffView) {
-                  // Clamp to roomRect edges for visibility
-                  dotX = Math.max(roomRect.x, Math.min(roomRect.x + roomRect.width, xPx));
-                  dotY = Math.max(roomRect.y, Math.min(roomRect.y + roomRect.height, yPx));
-                  label = `${role} OFFVIEW`;
-                }
-
-                debugDots.push(
-                  <g key={`debug-${role}`}>
-                    <circle
-                      cx={dotX}
-                      cy={dotY}
-                      r={6}
-                      fill={isOffView ? "#ff4d4f" : "#faad14"}
-                      stroke="#fff"
-                      strokeWidth={2}
-                      opacity={0.9}
-                    />
-                    <text
-                      x={dotX + 10}
-                      y={dotY - 10}
-                      fontSize={10}
-                      fill={isOffView ? "#ff4d4f" : "#333"}
-                      fontWeight={700}
-                      fontFamily="monospace"
-                    >
-                      {label}
-                    </text>
-                    <text
-                      x={dotX + 10}
-                      y={dotY + 2}
-                      fontSize={9}
-                      fill="#666"
-                      fontFamily="monospace"
-                    >
-                      ({d.xM?.toFixed(2)}, {d.yM?.toFixed(2)})
-                    </text>
-                  </g>
-                );
-              });
-
-              return <g data-layer="debug-dots" pointerEvents="none">{debugDots}</g>;
-            })()}
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
             {renderSpeakerLabels()}
@@ -6572,44 +6312,7 @@ return (
           splRadiationMode={tooltipData?.splAtSeatMeta?.radiationMode}
         />
 
-        {/* TEMP DEBUG PANEL: FW + Rear Surrounds */}
-        {globalThis.__B44_RV_DEBUG === true && (
-          <div style={{
-            marginTop: 10,
-            padding: 10,
-            border: "1px solid #E0E0E0",
-            borderRadius: 8,
-            fontSize: 12,
-            lineHeight: "16px",
-            background: "#FAFAFA",
-            maxWidth: 520
-          }}>
-            <div style={{ fontWeight: 600, marginBottom: 6 }}>RV Debug (FW + Rear Surrounds)</div>
-            <div>placedSpeakers: {__rvDebug.placedCount} | speakersToRender: {__rvDebug.renderCount}</div>
 
-            <div style={{ marginTop: 8, fontWeight: 600 }}>In placedSpeakers</div>
-            {__rvDebug.placed.length === 0 ? (
-              <div>None</div>
-            ) : (
-              __rvDebug.placed.map((r) => (
-                <div key={"p-" + r.role + "-" + r.id}>
-                  {r.role} | pos: {r.x}, {r.y}, {r.z} | hasPos: {String(r.hasPos)} | outside: {String(r.outside)}
-                </div>
-              ))
-            )}
-
-            <div style={{ marginTop: 8, fontWeight: 600 }}>In speakersToRender</div>
-            {__rvDebug.render.length === 0 ? (
-              <div>None</div>
-            ) : (
-              __rvDebug.render.map((r) => (
-                <div key={"r-" + r.role + "-" + r.id}>
-                  {r.role} | pos: {r.x}, {r.y}, {r.z} | hasPos: {String(r.hasPos)} | outside: {String(r.outside)}
-                </div>
-              ))
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
