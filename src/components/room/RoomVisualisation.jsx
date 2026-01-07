@@ -10,6 +10,7 @@ import {
 } from '@/components/utils/seatHover';
 import { buildRoleMap, isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils";
 import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
+import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from '../room/constraints/lcrConstraints';
 import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
 import RP22ZonesOverlay from '@/components/room/RP22ZonesOverlay';
@@ -4051,65 +4052,7 @@ useEffect(() => {
     if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
   }
 
-  // DEBUG: Ghost speaker markers (bypass all render filters)
-  // Toggle with: globalThis.__B44_RV_DEBUG = true
-  const __rvGhost = React.useMemo(() => {
-    const enabled = globalThis.__B44_RV_DEBUG === true;
-    if (!enabled) return { enabled: false, rows: [] };
 
-    const target = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
-    const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-
-    const rows = base
-      .map((s) => {
-        const role = getCanonicalRole(s?.role);
-        if (!target.has(role)) return null;
-
-        const x = s?.position?.x;
-        const y = s?.position?.y;
-
-        const hasPos = Number.isFinite(x) && Number.isFinite(y);
-        const inRoom =
-          hasPos &&
-          Number.isFinite(widthM) &&
-          Number.isFinite(lengthM) &&
-          x >= 0 &&
-          x <= widthM &&
-          y >= 0 &&
-          y <= lengthM;
-
-        let cx = null;
-        let cy = null;
-
-        // IMPORTANT: use same converters as icons
-        try {
-          if (hasPos && typeof meterToCanvasX === "function" && typeof meterToCanvasY === "function") {
-            cx = meterToCanvasX(x);
-            cy = meterToCanvasY(y);
-          }
-        } catch (e) {
-          cx = null;
-          cy = null;
-        }
-
-        const canvasOk = Number.isFinite(cx) && Number.isFinite(cy);
-
-        return {
-          role,
-          model: s?.model ?? null,
-          hasPos,
-          x: hasPos ? x : null,
-          y: hasPos ? y : null,
-          inRoom,
-          canvasOk,
-          cx,
-          cy,
-        };
-      })
-      .filter(Boolean);
-
-    return { enabled: true, rows };
-  }, [placedSpeakers, widthM, lengthM, getCanonicalRole, meterToCanvasX, meterToCanvasY]);
 
 
 
