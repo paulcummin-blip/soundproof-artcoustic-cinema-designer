@@ -5092,23 +5092,7 @@ return {
   );
 
   // 2) Apply visibility filter (RV = single source of truth for bed roles)
-  const layoutRaw = String(dolbyLayout || "").trim();
-  const layoutKey = (layoutRaw ? layoutRaw : "5.1").split(" ")[0].split("_")[0];
-
-  const useWidesInsteadOfRears =
-    !!appState?.useWidesInsteadOfRears ||
-    appState?.sevenBedLayoutType === "wides" ||
-    sevenBedLayoutType === "wides" ||
-    false;
-
-  // Roles that MUST exist / be visible for the current layout
-  const requiredRoles = new Set(
-    rolesForLayout({
-      dolbyLayout: layoutKey,
-      useWidesInsteadOfRears,
-    })
-  );
-
+  // Use the allowedRoles already computed above (no redeclaration needed)
   let afterVisibility = afterRenderable.filter((s) => {
     const canon = getCanonicalRole(s.role);
 
@@ -5119,7 +5103,7 @@ return {
     if (rvIsOverheadRole(s.role)) return false;
 
     // Bed speakers: only show if the layout requires the role
-    return requiredRoles.has(canon);
+    return allowedRoles.has(canon);
   });
 
   // Local NaN-safe coordinate mappers (must be inside this loop)
