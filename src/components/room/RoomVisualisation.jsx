@@ -5086,6 +5086,34 @@ return {
     ]);
   }
 
+  // TEMP TRACE (remove after): prove if SBL/SBR exist + have positions before any filters
+  if (globalThis.__B44_LOGS) {
+    const pick = (role) =>
+      rawSpeakers.find(s => getCanonicalRole(s?.role) === role) || null;
+
+    const sbl = pick("SBL");
+    const sbr = pick("SBR");
+
+    console.table([
+      {
+        role: "SBL",
+        exists: !!sbl,
+        model: sbl?.model ?? null,
+        x: Number.isFinite(sbl?.position?.x) ? sbl.position.x : null,
+        y: Number.isFinite(sbl?.position?.y) ? sbl.position.y : null,
+        z: Number.isFinite(sbl?.position?.z) ? sbl.position.z : null,
+      },
+      {
+        role: "SBR",
+        exists: !!sbr,
+        model: sbr?.model ?? null,
+        x: Number.isFinite(sbr?.position?.x) ? sbr.position.x : null,
+        y: Number.isFinite(sbr?.position?.y) ? sbr.position.y : null,
+        z: Number.isFinite(sbr?.position?.z) ? sbr.position.z : null,
+      },
+    ]);
+  }
+
   // 1) Basic structural filter (existing helper)
   const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
 
