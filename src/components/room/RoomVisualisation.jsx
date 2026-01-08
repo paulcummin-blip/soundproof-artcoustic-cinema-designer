@@ -10,7 +10,7 @@ import {
 } from '@/components/utils/seatHover';
 import { buildRoleMap, isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils";
 import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
-import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRoleMap";
+import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from '../room/constraints/lcrConstraints';
 import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
 import RP22ZonesOverlay from '@/components/room/RP22ZonesOverlay';
@@ -432,12 +432,11 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     };
   }, []);
 
-  // [B44] Use imported getCanonicalRole from surroundRoleMap for consistency
-  // const getCanonicalRole = useCallback((role) => {
-  //   const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
-  //   const r = String(role || '').toUpperCase();
-  //   return map[r] || r;
-  // }, []);
+  const getCanonicalRole = useCallback((role) => {
+    const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
+    const r = String(role || '').toUpperCase();
+    return map[r] || r;
+  }, []);
 
   // --- MLP: use RoomDesigner anchor if available; DO NOT stick to seats ---
 
@@ -5058,62 +5057,6 @@ return {
   // Start from the prop (single source of truth)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
-  // TEMP TRACE (remove after): prove if SBL/SBR exist + have positions before any filters
-  if (globalThis.__B44_LOGS) {
-    const pick = (role) =>
-      rawSpeakers.find(s => getCanonicalRole(s?.role) === role) || null;
-
-    const sbl = pick("SBL");
-    const sbr = pick("SBR");
-
-    console.table([
-      {
-        role: "SBL",
-        exists: !!sbl,
-        model: sbl?.model ?? null,
-        x: Number.isFinite(sbl?.position?.x) ? sbl.position.x : null,
-        y: Number.isFinite(sbl?.position?.y) ? sbl.position.y : null,
-        z: Number.isFinite(sbl?.position?.z) ? sbl.position.z : null,
-      },
-      {
-        role: "SBR",
-        exists: !!sbr,
-        model: sbr?.model ?? null,
-        x: Number.isFinite(sbr?.position?.x) ? sbr.position.x : null,
-        y: Number.isFinite(sbr?.position?.y) ? sbr.position.y : null,
-        z: Number.isFinite(sbr?.position?.z) ? sbr.position.z : null,
-      },
-    ]);
-  }
-
-  // TEMP TRACE (remove after): prove if SBL/SBR exist + have positions before any filters
-  if (globalThis.__B44_LOGS) {
-    const pick = (role) =>
-      rawSpeakers.find(s => getCanonicalRole(s?.role) === role) || null;
-
-    const sbl = pick("SBL");
-    const sbr = pick("SBR");
-
-    console.table([
-      {
-        role: "SBL",
-        exists: !!sbl,
-        model: sbl?.model ?? null,
-        x: Number.isFinite(sbl?.position?.x) ? sbl.position.x : null,
-        y: Number.isFinite(sbl?.position?.y) ? sbl.position.y : null,
-        z: Number.isFinite(sbl?.position?.z) ? sbl.position.z : null,
-      },
-      {
-        role: "SBR",
-        exists: !!sbr,
-        model: sbr?.model ?? null,
-        x: Number.isFinite(sbr?.position?.x) ? sbr.position.x : null,
-        y: Number.isFinite(sbr?.position?.y) ? sbr.position.y : null,
-        z: Number.isFinite(sbr?.position?.z) ? sbr.position.z : null,
-      },
-    ]);
-  }
-
   // 1) Basic structural filter (existing helper)
   const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
 
@@ -5147,18 +5090,20 @@ return {
     })
   );
 
-  // 2) Apply visibility filter (RV = single source of truth for bed roles)
   let afterVisibility = afterRenderable.filter((s) => {
-    const canon = getCanonicalRole(s.role);
+    const canon = getCanonicalRole(s?.role);
 
-    // Never show LFE
+    // Always hide LFE
     if (canon === "LFE") return false;
 
-    // Overheads are rendered elsewhere (keep them out of this list)
-    if (rvIsOverheadRole(s.role)) return false;
+    // Bed surrounds are controlled by layout role visibility, not model.
+    // This prevents "rear surrounds vanish" when model is null during hydration.
+    if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
+      return allowedRoles.has(canon);
+    }
 
-    // Bed speakers: only show if the layout requires the role
-    return allowedRoles.has(canon);
+    // Everything else keeps existing behaviour
+    return getSpeakerVisibility(s.role, s.model);
   });
 
   // Local NaN-safe coordinate mappers (must be inside this loop)
