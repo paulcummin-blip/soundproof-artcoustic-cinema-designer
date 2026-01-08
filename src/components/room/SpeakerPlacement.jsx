@@ -2117,6 +2117,50 @@ function SpeakerPlacementImpl(props) {
         yaw: s.rotation?.z
       })));
 
+      // --- HARD GUARANTEE: rear surrounds must exist + have valid XY when required ---
+      const needsRears = localAllowedRoles.has("SBL") || localAllowedRoles.has("SBR");
+
+      if (needsRears) {
+        const W = Number(room?.right) || 0;
+        const L = Number(room?.back) || 0;
+
+        if (W > 0 && L > 0) {
+          const earZ = Number.isFinite(mlp?.z) ? mlp.z : 1.1;
+          const backY = Math.max(0.01, L - 0.10);
+
+          const hasFiniteXY = (p) =>
+            !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+
+          const byCanon = new Map(next.map(s => [getCanonicalRole(s?.role), s]));
+
+          const ensureRear = (canonRole, xFrac) => {
+            const existing = byCanon.get(canonRole);
+            if (existing && hasFiniteXY(existing.position)) return;
+
+            const x = Math.max(0.01, Math.min(W - 0.01, W * xFrac));
+
+            byCanon.set(canonRole, {
+              ...(existing || {}),
+              id: existing?.id || `${canonRole.toLowerCase()}-${timeNowMs()}`,
+              role: canonRole,
+              label: canonRole,
+              model: existing?.model ?? globalSurroundModelParam ?? null,
+              position: { x, y: backY, z: earZ },
+              rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
+              draggable: true,
+            });
+          };
+
+          ensureRear("SBL", 0.25);
+          ensureRear("SBR", 0.75);
+
+          // Replace next with the guaranteed set
+          next.length = 0;
+          next.push(...Array.from(byCanon.values()));
+        }
+      }
+      // --- END HARD GUARANTEE ---
+
       return next;
     },
     [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, getModelDimsM, dolbyConfig, SURROUND_BED_ROLES, useWides, WALL_BUFFER_M]
