@@ -21,7 +21,6 @@ function resetSurroundPositions(layout, mlpPoint, dimensions, speakers, modelKey
   const earZ = 1.1;
   const INSET = 0.02; // 2cm inset to keep inside bounds
 
-  const mlpX = Number.isFinite(mlpPoint?.x) ? mlpPoint.x : W / 2;
   const mlpY = Number.isFinite(mlpPoint?.y) ? mlpPoint.y : L * 0.58;
 
   // Reasonable defaults (simple + stable)
@@ -32,11 +31,15 @@ function resetSurroundPositions(layout, mlpPoint, dimensions, speakers, modelKey
   const xSL = INSET;
   const xSR = W - INSET;
 
-  const xLW = Math.max(INSET, Math.min(W - INSET, W * 0.15));
-  const xRW = Math.max(INSET, Math.min(W - INSET, W * 0.85));
+  // Explicit symmetry: use same distance-from-left for LW, mirror for RW
+  const xWideFromLeft = Math.max(INSET, Math.min(W - INSET, W * 0.15));
+  const xLW = xWideFromLeft;
+  const xRW = W - xWideFromLeft;
 
-  const xSBL = Math.max(INSET, Math.min(W - INSET, W * 0.25));
-  const xSBR = Math.max(INSET, Math.min(W - INSET, W * 0.75));
+  // Explicit symmetry: use same distance-from-left for SBL, mirror for SBR
+  const xRearFromLeft = Math.max(INSET, Math.min(W - INSET, W * 0.25));
+  const xSBL = xRearFromLeft;
+  const xSBR = W - xRearFromLeft;
 
   const next = (Array.isArray(speakers) ? speakers : []).map((spk) => {
     const role = String(spk?.role || "").toUpperCase();
