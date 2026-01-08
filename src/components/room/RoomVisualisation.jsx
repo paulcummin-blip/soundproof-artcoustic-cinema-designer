@@ -5092,8 +5092,18 @@ return {
 
   let afterVisibility = afterRenderable.filter((s) => {
     const canon = getCanonicalRole(s?.role);
+
+    // Always hide LFE
     if (canon === "LFE") return false;
-    return allowedRoles.has(canon);
+
+    // Bed surrounds are controlled by layout role visibility, not model.
+    // This prevents "rear surrounds vanish" when model is null during hydration.
+    if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
+      return allowedRoles.has(canon);
+    }
+
+    // Everything else keeps existing behaviour
+    return getSpeakerVisibility(s.role, s.model);
   });
 
   // Local NaN-safe coordinate mappers (must be inside this loop)
