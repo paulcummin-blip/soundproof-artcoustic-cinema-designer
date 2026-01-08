@@ -60,6 +60,37 @@ function useUrlQuery() {
   return { projectId };
 }
 
+// --- SAFETY: keep any already-selected surround models when rebuilding speaker lists ---
+const preserveSurroundModels = (prevList, nextList) => {
+  const prev = Array.isArray(prevList) ? prevList : [];
+  const next = Array.isArray(nextList) ? nextList : [];
+
+  const canon = (r) => String(r || "").toUpperCase();
+
+  const isValidModel = (m) => {
+    const s = String(m ?? "").trim().toLowerCase();
+    return !!s && s !== "off" && s !== "none" && s !== "null" && s !== "undefined";
+  };
+
+  const surroundRoles = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
+
+  const prevByRole = new Map(prev.map(s => [canon(s?.role), s]));
+
+  return next.map(s => {
+    const role = canon(s?.role);
+    if (!surroundRoles.has(role)) return s;
+
+    const prevMatch = prevByRole.get(role);
+    const nextModelOk = isValidModel(s?.model);
+    const prevModelOk = isValidModel(prevMatch?.model);
+
+    if (!nextModelOk && prevModelOk) {
+      return { ...s, model: prevMatch.model };
+    }
+    return s;
+  });
+};
+
 // Put near your other helpers in RoomDesigner.js
 const CANON_MAP = { 
   LS:'SL', SL:'SL', RS:'SR', SR:'SR', 
