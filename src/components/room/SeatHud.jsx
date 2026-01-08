@@ -1,6 +1,8 @@
 "use client";
-import React from "react";
+import React, { useState } from "react";
 import { formatDb } from '@/components/utils/formatDb';
+import { getRP22Definition } from '@/components/data/rp22Definitions';
+import { getLevelColors } from '@/components/utils/rp22Colors';
 
 export default function SeatHud({
   tooltipData,
@@ -18,6 +20,9 @@ export default function SeatHud({
 }) {
   // Guard: render nothing if no hovered seat or tooltip data
   if (!effectiveHoveredSeat || !tooltipData) return null;
+
+  // Track which parameter is being hovered for tooltip
+  const [hoveredParam, setHoveredParam] = useState(null);
 
   // Safe value formatter
   const fmt = (v) => {
@@ -37,33 +42,88 @@ export default function SeatHud({
     return String(v);
   };
 
+  // RP22 Tooltip Component
+  const RP22Tooltip = ({ paramKey, level }) => {
+    const def = getRP22Definition(paramKey);
+    if (!def) return null;
+
+    const levelColors = getLevelColors(level);
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          right: '100%',
+          top: 0,
+          marginRight: 12,
+          background: 'white',
+          border: `2px solid ${levelColors.border || '#E6E4DD'}`,
+          borderRadius: 8,
+          padding: 12,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          maxWidth: 320,
+          minWidth: 280,
+          fontSize: 11,
+          lineHeight: 1.5,
+          color: levelColors.text || '#625143',
+          zIndex: 1001,
+        }}
+      >
+        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 12 }}>
+          {def.title}
+        </div>
+        <div style={{ marginBottom: 8 }}>
+          {def.description}
+        </div>
+        <div style={{ fontWeight: 600, marginBottom: 4 }}>Thresholds:</div>
+        {def.thresholds.map((t) => (
+          <div key={t.level} style={{ paddingLeft: 8, fontSize: 10 }}>
+            Level {t.level}: {t.criteria}
+          </div>
+        ))}
+        <div style={{ marginTop: 8, fontSize: 10, fontStyle: 'italic', color: '#888' }}>
+          Scope: {def.scope}
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div
-      ref={hudElRef}
-      className="seat-hud"
-      style={{
-        position: 'absolute',
-        left: hudPosition?.x || 20,
-        top: hudPosition?.y || 20,
-        background: 'white',
-        border: '1px solid #DCDBD6',
-        borderRadius: 8,
-        padding: 12,
-        boxShadow: '0 44px 12px rgba(0,0,0,0.15)',
-        pointerEvents: isHudPinned ? 'auto' : 'none',
-        zIndex: 1000,
-        minWidth: 260,
-        maxWidth: 320,
-        fontSize: 11,
-        color: '#625143',
-        maxHeight: '80vh',
-        overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        ...hudDynamicStyle
-      }}
-    >
+    <>
+      {/* RP22 Parameter Tooltip (only shown when pinned and hovering) */}
+      {isHudPinned && hoveredParam && (
+        <RP22Tooltip
+          paramKey={hoveredParam.key}
+          level={hoveredParam.level}
+        />
+      )}
+
+      <div
+        ref={hudElRef}
+        className="seat-hud"
+        style={{
+          position: 'absolute',
+          left: hudPosition?.x || 20,
+          top: hudPosition?.y || 20,
+          background: 'white',
+          border: '1px solid #DCDBD6',
+          borderRadius: 8,
+          padding: 12,
+          boxShadow: '0 44px 12px rgba(0,0,0,0.15)',
+          pointerEvents: isHudPinned ? 'auto' : 'none',
+          zIndex: 1000,
+          minWidth: 260,
+          maxWidth: 320,
+          fontSize: 11,
+          color: '#625143',
+          maxHeight: '80vh',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          ...hudDynamicStyle
+        }}
+      >
       {/* Header with drag handle and eye icon */}
       <div
         onMouseDown={onHudHeaderMouseDown}
@@ -181,10 +241,29 @@ export default function SeatHud({
                 }}
               >
                 <span>
+                  {/* Parameter label with hover to show definition */}
+                  <span
+                    style={{
+                      cursor: isHudPinned ? 'help' : 'default',
+                      borderBottom: isHudPinned ? '1px dotted #625143' : 'none',
+                    }}
+                    onMouseEnter={() => {
+                      if (isHudPinned) {
+                        setHoveredParam({ key: key.toUpperCase(), level: normalizeLevel(metric.level) });
+                      }
+                    }}
+                    onMouseLeave={() => {
+                      if (isHudPinned) {
+                        setHoveredParam(null);
+                      }
+                    }}
+                  >
+                    {key.toUpperCase()}
+                  </span>
                   {key === 'p16' && metric.hudLabel ? (
-                    `P16: ${metric.hudLabel}`
+                    `: ${metric.hudLabel}`
                   ) : (
-                    `${key.toUpperCase()}: ${metric.formatted || '—'}`
+                    `: ${metric.formatted || '—'}`
                   )}
                 </span>
                 {renderLevelBadge(normalizeLevel(metric.level))}
@@ -398,6 +477,6 @@ export default function SeatHud({
           <div>Distance to MLP: {tooltipData.distanceToMLP}</div>
         )}
       </div>
-    </div>
+    </>
   );
 }
