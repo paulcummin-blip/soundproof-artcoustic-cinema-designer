@@ -10,7 +10,7 @@ import {
 } from '@/components/utils/seatHover';
 import { buildRoleMap, isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils";
 import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
-import { rolesForLayout } from "@/components/utils/surroundRoleMap";
+import { getCanonicalRole, rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from '../room/constraints/lcrConstraints';
 import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
 import RP22ZonesOverlay from '@/components/room/RP22ZonesOverlay';
@@ -432,11 +432,12 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     };
   }, []);
 
-  const getCanonicalRole = useCallback((role) => {
-    const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
-    const r = String(role || '').toUpperCase();
-    return map[r] || r;
-  }, []);
+  // [B44] Use imported getCanonicalRole from surroundRoleMap for consistency
+  // const getCanonicalRole = useCallback((role) => {
+  //   const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
+  //   const r = String(role || '').toUpperCase();
+  //   return map[r] || r;
+  // }, []);
 
   // --- MLP: use RoomDesigner anchor if available; DO NOT stick to seats ---
 
@@ -5090,35 +5091,35 @@ return {
     })
   );
 
-  // 2) Apply visibility filter using AppState's getSpeakerVisibility
-  // BUT: force-correct rear surround visibility for 9.x+ (9.x must show BOTH rears + wides)
-  let afterVisibility = afterRenderable.filter(s => {
+  // 2) Apply visibility filter (RV = single source of truth for bed roles)
+  const layoutRaw = String(dolbyLayout || "").trim();
+  const layoutKey = (layoutRaw ? layoutRaw : "5.1").split(" ")[0].split("_")[0];
+
+  const useWidesInsteadOfRears =
+    !!appState?.useWidesInsteadOfRears ||
+    appState?.sevenBedLayoutType === "wides" ||
+    sevenBedLayoutType === "wides" ||
+    false;
+
+  // Roles that MUST exist / be visible for the current layout
+  const requiredRoles = new Set(
+    rolesForLayout({
+      dolbyLayout: layoutKey,
+      useWidesInsteadOfRears,
+    })
+  );
+
+  let afterVisibility = afterRenderable.filter((s) => {
     const canon = getCanonicalRole(s.role);
 
     // Never show LFE
     if (canon === "LFE") return false;
 
-    // Parse layout safely (handles "9.1.4 Dolby Atmos")
-    const layoutRaw = String(dolbyLayout || "").trim();
-    const layoutKey = (layoutRaw ? layoutRaw : "5.1").split(" ")[0].split("_")[0];
-    const major = parseInt(layoutKey.split(".")[0], 10) || 5;
+    // Overheads are rendered elsewhere (keep them out of this list)
+    if (rvIsOverheadRole(s.role)) return false;
 
-    // 7.x chooses rears OR wides, 9.x+ MUST include BOTH
-    const useWidesInsteadOfRears =
-      !!appState?.useWidesInsteadOfRears ||
-      appState?.sevenBedLayoutType === "wides" ||
-      sevenBedLayoutType === "wides" ||
-      false;
-
-    const showRears = (major >= 9) || (major === 7 && !useWidesInsteadOfRears);
-    const showWides = (major >= 9) || (major === 7 && useWidesInsteadOfRears);
-
-    // HARD OVERRIDE: never let getSpeakerVisibility hide these when the layout expects them
-    if ((canon === "SBL" || canon === "SBR") && showRears) return true;
-    if ((canon === "LW" || canon === "RW") && showWides) return true;
-
-    // Default path
-    return getSpeakerVisibility(s.role, s.model);
+    // Bed speakers: only show if the layout requires the role
+    return requiredRoles.has(canon);
   });
 
   // Local NaN-safe coordinate mappers (must be inside this loop)
