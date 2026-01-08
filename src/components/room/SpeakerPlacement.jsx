@@ -1498,7 +1498,14 @@ function SpeakerPlacementImpl(props) {
   const CORNER_CLEARANCE_M = 0.50;
   const WALL_BUFFER_M = 0.01;
 
-
+  // Local model-dim helper (SpeakerPlacement must not depend on RV helpers)
+  const getModelDimsM = React.useCallback((model) => {
+    const meta = getSpeakerModelMeta(model);
+    return {
+      widthM: Number(meta?.widthM) || 0.27,
+      depthM: Number(meta?.depthM) || 0.082,
+    };
+  }, []);
 
   const getHuggingCenterLines = useCallback((speakerModel, roomDimensions) => {
     const { width: W, length: L } = roomDimensions;
@@ -1781,15 +1788,6 @@ function SpeakerPlacementImpl(props) {
     value: { master: "off", side: "off", rear: "off", wide: "off" },
     override: { side: false, rear: false, wide: false },
   });
-
-  // Local model-dim helper (SpeakerPlacement must not depend on RV helpers)
-  const getModelDimsM = React.useCallback((model) => {
-    const meta = getSpeakerModelMeta(model);
-    return {
-      widthM: Number(meta?.widthM) || 0.27,
-      depthM: Number(meta?.depthM) || 0.082,
-    };
-  }, []);
 
   // MOVE resetSurroundPositions HERE (before it's used in handlers/effects)
   const resetSurroundPositions = useCallback(
