@@ -1793,13 +1793,13 @@ function SpeakerPlacementImpl(props) {
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
       // Normalise dims (some callers provide widthM/lengthM/heightM)
-      const W = Number(dims?.width ?? dims?.widthM);
-      const L = Number(dims?.length ?? dims?.lengthM);
+      const W = Number(dims?.width ?? dims?.widthM) || 0;
+      const L = Number(dims?.length ?? dims?.lengthM) || 0;
       const H = Number(dims?.height ?? dims?.heightM);
 
       // Only width/length are required to place bed surrounds.
-      // Height can be missing; default it.
-      if (!Number.isFinite(W) || !Number.isFinite(L)) {
+      // Height can be missing; default it to 2.4m.
+      if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
         if (globalThis.__B44_LOGS) console.warn('[resetSurroundPositions] ABORT: invalid W/L', { dims, W, L });
         return currentSpeakers || [];
       }
@@ -1809,7 +1809,7 @@ function SpeakerPlacementImpl(props) {
         ...(dims || {}),
         width: W,
         length: L,
-        height: Number.isFinite(H) ? H : 2.4,
+        height: Number.isFinite(H) && H > 0 ? H : 2.4,
       };
 
             if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions START', {
