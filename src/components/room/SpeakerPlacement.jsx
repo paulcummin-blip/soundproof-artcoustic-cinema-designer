@@ -6,8 +6,8 @@ import React, { useMemo, useState, Suspense, useEffect, useCallback, useRef } fr
 // Creates/updates x,y,z for bed surround roles when a real model is selected.
 // If model is OFF/NONE, we intentionally do NOT create positions (blank slate).
 function resetSurroundPositions(layout, mlpPoint, dimensions, speakers, modelKey) {
-  const W = Number(dimensions?.width) || 0;
-  const L = Number(dimensions?.length) || 0;
+  const W = Number(dimensions?.width ?? dimensions?.widthM) || 0;
+  const L = Number(dimensions?.length ?? dimensions?.lengthM) || 0;
 
   // If room is not valid, return unchanged
   if (!(W > 0 && L > 0)) return Array.isArray(speakers) ? speakers : [];
