@@ -3034,7 +3034,31 @@ function RoomDesignerWithState() {
              finalModel = prevMatch?.model ?? seed.model;
            }
 
-           return { ...seed, model: finalModel, draggable: true };
+           // CRITICAL: Position preservation - preserve existing position if seed has no usable coords
+           const prevPos = prevMatch?.position;
+           const seedPos = seed?.position;
+
+           const prevHasXY =
+             prevPos && Number.isFinite(prevPos.x) && Number.isFinite(prevPos.y);
+
+           const seedHasXY =
+             seedPos && Number.isFinite(seedPos.x) && Number.isFinite(seedPos.y);
+
+           // Preserve existing position if seed has no usable coords
+           const finalPosition = (!seedHasXY && prevHasXY) ? prevPos : seedPos;
+
+           // Preserve rotation the same way
+           const prevRot = prevMatch?.rotation;
+           const seedRot = seed?.rotation;
+           const finalRotation = seedRot ?? prevRot;
+
+           return { 
+             ...seed, 
+             model: finalModel, 
+             position: finalPosition,
+             rotation: finalRotation,
+             draggable: true 
+           };
          });
          
          // Build final overhead list: reuse existing positions if available, otherwise use seeded defaults
