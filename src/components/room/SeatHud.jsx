@@ -477,6 +477,7 @@ export default function SeatHud({
           <div>Distance to MLP: {tooltipData.distanceToMLP}</div>
         )}
       </div>
+      </div>
     </>
   );
 }
