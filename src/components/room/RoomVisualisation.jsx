@@ -5090,19 +5090,34 @@ return {
     })
   );
 
-  let afterVisibility = afterRenderable.filter((s) => {
-    const canon = getCanonicalRole(s?.role);
+  // 2) Apply visibility filter using AppState's getSpeakerVisibility
+  // BUT: force-correct rear surround visibility for 9.x+ (9.x must show BOTH rears + wides)
+  let afterVisibility = afterRenderable.filter(s => {
+    const canon = getCanonicalRole(s.role);
 
-    // Always hide LFE
+    // Never show LFE
     if (canon === "LFE") return false;
 
-    // Bed surrounds are controlled by layout role visibility, not model.
-    // This prevents "rear surrounds vanish" when model is null during hydration.
-    if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
-      return allowedRoles.has(canon);
-    }
+    // Parse layout safely (handles "9.1.4 Dolby Atmos")
+    const layoutRaw = String(dolbyLayout || "").trim();
+    const layoutKey = (layoutRaw ? layoutRaw : "5.1").split(" ")[0].split("_")[0];
+    const major = parseInt(layoutKey.split(".")[0], 10) || 5;
 
-    // Everything else keeps existing behaviour
+    // 7.x chooses rears OR wides, 9.x+ MUST include BOTH
+    const useWidesInsteadOfRears =
+      !!appState?.useWidesInsteadOfRears ||
+      appState?.sevenBedLayoutType === "wides" ||
+      sevenBedLayoutType === "wides" ||
+      false;
+
+    const showRears = (major >= 9) || (major === 7 && !useWidesInsteadOfRears);
+    const showWides = (major >= 9) || (major === 7 && useWidesInsteadOfRears);
+
+    // HARD OVERRIDE: never let getSpeakerVisibility hide these when the layout expects them
+    if ((canon === "SBL" || canon === "SBR") && showRears) return true;
+    if ((canon === "LW" || canon === "RW") && showWides) return true;
+
+    // Default path
     return getSpeakerVisibility(s.role, s.model);
   });
 
