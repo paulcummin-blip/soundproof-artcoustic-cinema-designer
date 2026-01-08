@@ -89,7 +89,32 @@ export default function SeatHud({
   };
 
   return (
-    <>
+    <div
+      ref={hudElRef}
+      className="seat-hud"
+      style={{
+        position: 'absolute',
+        left: hudPosition?.x || 20,
+        top: hudPosition?.y || 20,
+        background: 'white',
+        border: '1px solid #DCDBD6',
+        borderRadius: 8,
+        padding: 12,
+        boxShadow: '0 44px 12px rgba(0,0,0,0.15)',
+        pointerEvents: isHudPinned ? 'auto' : 'none',
+        zIndex: 1000,
+        minWidth: 260,
+        maxWidth: 320,
+        fontSize: 11,
+        color: '#625143',
+        maxHeight: '80vh',
+        overflowY: 'auto',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+        ...hudDynamicStyle
+      }}
+    >
       {/* RP22 Parameter Tooltip (only shown when pinned and hovering) */}
       {isHudPinned && hoveredParam && (
         <RP22Tooltip
@@ -97,33 +122,6 @@ export default function SeatHud({
           level={hoveredParam.level}
         />
       )}
-
-      <div
-        ref={hudElRef}
-        className="seat-hud"
-        style={{
-          position: 'absolute',
-          left: hudPosition?.x || 20,
-          top: hudPosition?.y || 20,
-          background: 'white',
-          border: '1px solid #DCDBD6',
-          borderRadius: 8,
-          padding: 12,
-          boxShadow: '0 44px 12px rgba(0,0,0,0.15)',
-          pointerEvents: isHudPinned ? 'auto' : 'none',
-          zIndex: 1000,
-          minWidth: 260,
-          maxWidth: 320,
-          fontSize: 11,
-          color: '#625143',
-          maxHeight: '80vh',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 4,
-          ...hudDynamicStyle
-        }}
-      >
       {/* Header with drag handle and eye icon */}
       <div
         onMouseDown={onHudHeaderMouseDown}
@@ -477,7 +475,6 @@ export default function SeatHud({
           <div>Distance to MLP: {tooltipData.distanceToMLP}</div>
         )}
       </div>
-      </div>
-    </>
+    </div>
   );
 }
