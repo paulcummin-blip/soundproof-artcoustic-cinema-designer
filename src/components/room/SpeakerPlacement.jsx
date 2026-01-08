@@ -2288,9 +2288,9 @@ function SpeakerPlacementImpl(props) {
 
     // ---- build a stable input signature for this effect ----
     const __sig = __b44SigFor({
-      w: dimensions?.width ?? null,
-      l: dimensions?.length ?? null,
-      h: dimensions?.height ?? null,
+      w: (dimensions?.width ?? dimensions?.widthM) ?? null,
+      l: (dimensions?.length ?? dimensions?.lengthM) ?? null,
+      h: (dimensions?.height ?? dimensions?.heightM) ?? null,
       mlpX: mlpPoint?.x ?? null,
       mlpY: mlpPoint?.y ?? null,
       preset: effectivePreset ?? null,
@@ -2307,6 +2307,14 @@ function SpeakerPlacementImpl(props) {
 
     if (__b44LastEffectSigRef.current.speakerApply === __sig) return;
     __b44LastEffectSigRef.current.speakerApply = __sig;
+
+    // ---- early exit if room dimensions are not usable ----
+    const W = Number(dimensions?.width ?? dimensions?.widthM);
+    const L = Number(dimensions?.length ?? dimensions?.lengthM);
+    if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
+      if (globalThis.__B44_LOGS) console.warn('[SP speakerApply] ABORT: invalid room dimensions', { W, L });
+      return;
+    }
 
     // ---- existing logic: compute the next speakers array ----
     const preserveUserPositions = (placedSpeakers || []).filter(s => {
@@ -2341,14 +2349,16 @@ function SpeakerPlacementImpl(props) {
     });
 
     lastPresetRef.current = effectivePreset;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [
     effectivePreset,
     globalSurroundModel,
     mlpPoint?.x, mlpPoint?.y,
-    dimensions?.width, dimensions?.length,
-    allowedRoles // Dependency added to re-evaluate on layout change (NOTE: This dependency is okay for general reruns, but was made explicit by the previous change to `allowedRoles` logic.)
-  ]);
+    dimensions?.width, dimensions?.widthM,
+    dimensions?.length, dimensions?.lengthM,
+    dimensions?.height, dimensions?.heightM,
+    allowedRoles
+    ]);
 
   const is7ChannelBed = effectivePreset && (effectivePreset.startsWith('7.1') || effectivePreset.startsWith('7.2'));
 
@@ -2460,27 +2470,29 @@ function SpeakerPlacementImpl(props) {
       });
 
       return changed ? updated : prev;
-    });
-  }, [
-    canWides,
-    dimensions?.width,
-    dimensions?.length,
-    applyCornerClearance,
-    applyRoomBoundsClamp,
-    getHuggingCenterLines,
-    setSpeakers,
-    // React to changes in FL/FR/SL/SR positions
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.x,
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.y,
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.x,
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.y,
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.x,
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.y,
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.x,
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.y,
-  ]);
+      });
+      }, [
+      canWides,
+      dimensions?.width,
+      dimensions?.widthM,
+      dimensions?.length,
+      dimensions?.lengthM,
+      applyCornerClearance,
+      applyRoomBoundsClamp,
+      getHuggingCenterLines,
+      setSpeakers,
+      // React to changes in FL/FR/SL/SR positions
+      placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.x,
+      placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.y,
+      placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.x,
+      placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.y,
+      placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.x,
+      placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.y,
+      placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.x,
+      placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.y,
+      ]);
 
-  // --- FINAL FRONT-WIDE Y CORRECTION -----------------------------------------
+      // --- FINAL FRONT-WIDE Y CORRECTION -----------------------------------------
   // Ensures LW and RW always sit at the true median between front and side
   // surrounds on their own side. We only touch the Y position; X is already
   // wall-pinned by the hugging logic.
@@ -2556,22 +2568,76 @@ function SpeakerPlacementImpl(props) {
         }
 
         return sp;
-      });
-    });
-    // Depend on room geometry / toggles so this runs when things change,
-    // but the EPS guard above prevents unnecessary setState loops.
-  }, [
-    dimensions?.width, 
-    dimensions?.length, 
-    setSpeakers,
-    // React to FL/FR/SL/SR position changes
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.y,
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.y,
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.y,
-    placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.y,
-  ]);
+        });
+        });
+        // Depend on room geometry / toggles so this runs when things change,
+        // but the EPS guard above prevents unnecessary setState loops.
+        }, [
+        dimensions?.width,
+        dimensions?.widthM,
+        dimensions?.length,
+        dimensions?.lengthM,
+        setSpeakers,
+        // React to FL/FR/SL/SR position changes
+        placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.y,
+        placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.y,
+        placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.y,
+        placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR')?.position?.y,
+        ]);
 
-  // Update overhead speaker models when overhead selection state changes
+        // --- FINAL FRONT-WIDE X-AXIS SYMMETRY CORRECTION --------------------------
+        // Ensures LW and RW are perfectly mirrored on the X-axis around the room center.
+        // This runs after all other positioning and clamping, correcting any asymmetries.
+        useEffect(() => {
+        if (!canWides || !dimensions) return;
+
+        const W = Number(dimensions?.width ?? dimensions?.widthM);
+        if (!Number.isFinite(W) || W <= 0) return;
+
+        const lw = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW');
+        const rw = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'RW');
+
+        // Only symmetrize auto-placed speakers with valid positions
+        if (!lw || !rw || lw.positionSource === 'user' || rw.positionSource === 'user') return;
+        if (!Number.isFinite(lw.position?.x) || !Number.isFinite(rw.position?.x)) return;
+
+        const roomCenter = W / 2;
+        const lwDist = roomCenter - lw.position.x;
+        const rwDist = rw.position.x - roomCenter;
+        const avgDist = (lwDist + rwDist) / 2;
+
+        const EPS = 1e-4;
+        if (Math.abs(lwDist - avgDist) > EPS || Math.abs(rwDist - avgDist) > EPS) {
+        if (globalThis.__B44_LOGS) console.log('[SP] Applying FW X-symmetry correction');
+
+        setSpeakers(prev => {
+        let changed = false;
+        const next = prev.map(s => {
+          const canon = getCanonicalRole(s.role);
+          if ((canon === 'LW' || canon === 'RW') && s.positionSource !== 'user' && Number.isFinite(s.position?.x)) {
+            const newX = canon === 'LW' ? (roomCenter - avgDist) : (roomCenter + avgDist);
+            if (Math.abs(s.position.x - newX) > EPS) {
+              changed = true;
+              return { ...s, position: { ...s.position, x: newX } };
+            }
+          }
+          return s;
+        });
+        return changed ? next : prev;
+        });
+        }
+        }, [
+        canWides,
+        dimensions?.width,
+        dimensions?.widthM,
+        placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW')?.position?.x,
+        placedSpeakers?.find(s => getCanonicalRole(s.role) === 'RW')?.position?.x,
+        placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW')?.positionSource,
+        placedSpeakers?.find(s => getCanonicalRole(s.role) === 'RW')?.positionSource,
+        setSpeakers
+        ]);
+
+        // Update overhead speaker models when overhead selection state changes
   useEffect(() => {
     if (overheadCount === 0) return;
 
