@@ -43,18 +43,43 @@ export default function SeatHud({
   };
 
   // RP22 Tooltip Component - positioned as a sibling to the HUD
-  const RP22Tooltip = ({ paramKey, level, hudPosition }) => {
+  const RP22Tooltip = ({ paramKey, level, hudElRef }) => {
     const def = getRP22Definition(paramKey);
     if (!def) return null;
 
     const levelColors = getLevelColors(level);
 
+    // Get the main HUD's actual screen position
+    const r = hudElRef?.current?.getBoundingClientRect?.();
+    if (!r) return null;
+
+    // Constants for positioning
+    const GAP = 12;
+    const W = 320;
+    const PAD = 12;
+
+    // Calculate position - prefer left of HUD, fallback to right
+    const spaceOnLeft = r.left;
+    const spaceOnRight = window.innerWidth - r.right;
+    
+    let left, top;
+    if (spaceOnLeft >= W + GAP) {
+      // Place to the left
+      left = r.left - W - GAP;
+    } else {
+      // Place to the right
+      left = r.right + GAP;
+    }
+
+    // Align top with HUD, but clamp to viewport
+    top = Math.max(PAD, Math.min(r.top, window.innerHeight - 400));
+
     return (
       <div
         style={{
           position: 'fixed',
-          left: Math.max(12, (hudPosition?.x || 20) - 320 - 8),
-          top: (hudPosition?.y || 20),
+          left,
+          top,
           background: 'white',
           border: `2px solid ${levelColors.border || '#E6E4DD'}`,
           borderRadius: 8,
@@ -64,24 +89,24 @@ export default function SeatHud({
           minWidth: 280,
           fontSize: 11,
           lineHeight: 1.5,
-          color: '#625143',
+          color: '#1B1A1A',
           zIndex: 1001,
           pointerEvents: 'none',
         }}
       >
-        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 12, color: levelColors.border || '#625143' }}>
+        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 12, color: '#1B1A1A' }}>
           {def.title}
         </div>
-        <div style={{ marginBottom: 8, color: '#625143' }}>
+        <div style={{ marginBottom: 8, color: '#1B1A1A' }}>
           {def.description}
         </div>
-        <div style={{ fontWeight: 600, marginBottom: 4, color: levelColors.border || '#625143' }}>Thresholds:</div>
+        <div style={{ fontWeight: 600, marginBottom: 4, color: '#1B1A1A' }}>Thresholds:</div>
         {def.thresholds.map((t) => (
-          <div key={t.level} style={{ paddingLeft: 8, fontSize: 10, color: '#625143' }}>
+          <div key={t.level} style={{ paddingLeft: 8, fontSize: 10, color: '#1B1A1A' }}>
             Level {t.level}: {t.criteria}
           </div>
         ))}
-        <div style={{ marginTop: 8, fontSize: 10, fontStyle: 'italic', color: '#625143' }}>
+        <div style={{ marginTop: 8, fontSize: 10, fontStyle: 'italic', color: '#1B1A1A' }}>
           Scope: {def.scope}
         </div>
       </div>
@@ -95,7 +120,7 @@ export default function SeatHud({
         <RP22Tooltip
           paramKey={hoveredParam.key}
           level={hoveredParam.level}
-          hudPosition={hudPosition}
+          hudElRef={hudElRef}
         />
       )}
       
