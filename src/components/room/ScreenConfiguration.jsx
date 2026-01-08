@@ -556,14 +556,22 @@ export default function ScreenConfiguration(props) {
                   <Label className="text-[#625143] text-xs">Distance from Front Wall to Screen</Label>
                   <div className="text-[#1B1A1A] font-medium">
                     {(() => {
-                      const frontWallToScreenM =
-                        Number(screen?.floatDepthM ?? screen?.frontWallToScreenM ?? screen?.screenOffsetM ?? 0);
-
-                      const frontWallToScreenCm = Number.isFinite(frontWallToScreenM)
-                        ? Math.round(frontWallToScreenM * 100)
-                        : 0;
-
-                      return `${frontWallToScreenCm} cm`;
+                      const SCREEN_THICKNESS_M = 0.05;
+                      
+                      // Collect all candidates from screen state
+                      const candidates = [
+                        screen?.floatDepthM,
+                        screen?.frontWallToScreenM,
+                        screen?.screenOffsetM
+                      ].filter(v => Number.isFinite(v) && v >= 0);
+                      
+                      // Choose the minimum candidate (closest to front wall)
+                      const chosenM = candidates.length > 0 ? Math.min(...candidates) : 0;
+                      
+                      // Subtract screen thickness to get nearest edge
+                      const nearestEdgeM = Math.max(0, chosenM - SCREEN_THICKNESS_M);
+                      
+                      return `${Math.round(nearestEdgeM * 100)} cm`;
                     })()}
                   </div>
                 </div>
