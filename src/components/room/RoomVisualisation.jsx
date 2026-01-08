@@ -5057,32 +5057,30 @@ return {
   // Start from the prop (single source of truth)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
-  // TEMP TRACE (remove after): prove if SBL/SBR exist + have positions before any filters
-  if (globalThis.__B44_LOGS) {
-    const pick = (role) =>
-      rawSpeakers.find(s => getCanonicalRole(s?.role) === role) || null;
-
+  // TEMP TRACE (remove after): always log SBL/SBR state
+  try {
+    const pick = (role) => rawSpeakers.find(s => getCanonicalRole(s?.role) === role) || null;
     const sbl = pick("SBL");
     const sbr = pick("SBR");
 
-    console.table([
-      {
-        role: "SBL",
-        exists: !!sbl,
-        model: sbl?.model ?? null,
-        x: Number.isFinite(sbl?.position?.x) ? sbl.position.x : null,
-        y: Number.isFinite(sbl?.position?.y) ? sbl.position.y : null,
-        z: Number.isFinite(sbl?.position?.z) ? sbl.position.z : null,
-      },
-      {
-        role: "SBR",
-        exists: !!sbr,
-        model: sbr?.model ?? null,
-        x: Number.isFinite(sbr?.position?.x) ? sbr.position.x : null,
-        y: Number.isFinite(sbr?.position?.y) ? sbr.position.y : null,
-        z: Number.isFinite(sbr?.position?.z) ? sbr.position.z : null,
-      },
-    ]);
+    const row = (sp, role) => ({
+      role,
+      exists: !!sp,
+      model: sp?.model ?? null,
+      x: Number.isFinite(sp?.position?.x) ? sp.position.x : null,
+      y: Number.isFinite(sp?.position?.y) ? sp.position.y : null,
+      z: Number.isFinite(sp?.position?.z) ? sp.position.z : null,
+    });
+
+    const out = [row(sbl, "SBL"), row(sbr, "SBR")];
+
+    if (typeof window !== "undefined") window.__SBL_SBR_TRACE__ = out;
+
+    // ALWAYS log (not gated by __B44_LOGS)
+    console.log("[SBL/SBR TRACE]", out);
+    if (console.table) console.table(out);
+  } catch (e) {
+    console.warn("[SBL/SBR TRACE] failed", e);
   }
 
   // 1) Basic structural filter (existing helper)
