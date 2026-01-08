@@ -2133,8 +2133,8 @@ function SpeakerPlacementImpl(props) {
       const needsRears = localAllowedRoles.has("SBL") || localAllowedRoles.has("SBR");
 
       if (needsRears) {
-        const W = Number(room?.right) || 0;
-        const L = Number(room?.back) || 0;
+        const W = Number(room?.right ?? dimensions?.width ?? dimensions?.widthM) || 0;
+        const L = Number(room?.back ?? dimensions?.length ?? dimensions?.lengthM) || 0;
 
         if (W > 0 && L > 0) {
           const earZ = Number.isFinite(mlp?.z) ? mlp.z : 1.1;
