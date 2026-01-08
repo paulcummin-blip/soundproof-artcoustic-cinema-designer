@@ -53,7 +53,7 @@ export default function SeatHud({
       <div
         style={{
           position: 'fixed',
-          left: Math.max(12, (hudPosition?.x || 20) - 320 - 12),
+          left: Math.max(12, (hudPosition?.x || 20) - 320 - 4),
           top: (hudPosition?.y || 20),
           background: 'white',
           border: `2px solid ${levelColors.border || '#E6E4DD'}`,
@@ -64,18 +64,18 @@ export default function SeatHud({
           minWidth: 280,
           fontSize: 11,
           lineHeight: 1.5,
-          color: levelColors.text || '#625143',
+          color: '#625143',
           zIndex: 1001,
           pointerEvents: 'none',
         }}
       >
-        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 12 }}>
+        <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 12, color: levelColors.border || '#625143' }}>
           {def.title}
         </div>
         <div style={{ marginBottom: 8 }}>
           {def.description}
         </div>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>Thresholds:</div>
+        <div style={{ fontWeight: 600, marginBottom: 4, color: levelColors.border || '#625143' }}>Thresholds:</div>
         {def.thresholds.map((t) => (
           <div key={t.level} style={{ paddingLeft: 8, fontSize: 10 }}>
             Level {t.level}: {t.criteria}
