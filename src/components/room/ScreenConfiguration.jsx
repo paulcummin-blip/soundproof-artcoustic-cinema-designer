@@ -555,9 +555,16 @@ export default function ScreenConfiguration(props) {
                 <div>
                   <Label className="text-[#625143] text-xs">Distance from Front Wall to Screen</Label>
                   <div className="text-[#1B1A1A] font-medium">
-                    {Number.isFinite(requiredFrontWallToScreenM) && requiredFrontWallToScreenM >= 0
-                      ? `${Math.round(requiredFrontWallToScreenM * 100)} cm`
-                      : '—'}
+                    {(() => {
+                      const frontWallToScreenM =
+                        Number(screen?.floatDepthM ?? screen?.frontWallToScreenM ?? screen?.screenOffsetM ?? 0);
+
+                      const frontWallToScreenCm = Number.isFinite(frontWallToScreenM)
+                        ? Math.round(frontWallToScreenM * 100)
+                        : 0;
+
+                      return `${frontWallToScreenCm} cm`;
+                    })()}
                   </div>
                 </div>
               </div>
