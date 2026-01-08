@@ -2809,6 +2809,165 @@ function SpeakerPlacementImpl(props) {
     };
   }, [resetOnlyFrontWidesToDefaults]);
 
+  // --- FINAL SAFETY PASS ---
+  useEffect(() => {
+    setSpeakers(prevSpeakers => {
+      let speakers = [...prevSpeakers];
+      let changed = false;
+
+      const W = Number(dimensions?.width ?? dimensions?.widthM) || 0;
+      const L = Number(dimensions?.length ?? dimensions?.lengthM) || 0;
+
+      // Skip if room dimensions are invalid (cannot calculate fallbacks)
+      if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
+        return prevSpeakers;
+      }
+
+      const earZ = 1.1; // Standard listening height
+      const EPS = 1e-4; // For float comparison
+
+      // 1. SBL/SBR Invariant Check (each independently)
+      const needsRears = allowedRoles.has("SBL") || allowedRoles.has("SBR");
+      if (needsRears) {
+        const SBL = speakers.find(s => getCanonicalRole(s.role) === 'SBL');
+        const SBR = speakers.find(s => getCanonicalRole(s.role) === 'SBR');
+
+        const hasFiniteXY = (s) => !!s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
+
+        const fixRearSpeaker = (speaker, defaultXFraction) => {
+          if (!speaker || speaker.positionSource === 'user') return speaker; // Don't touch user-placed
+
+          // Only fix if model is valid AND position is missing/invalid
+          if (isValidModel(speaker.model) && !hasFiniteXY(speaker)) {
+            // Generate a safe fallback position
+            if (globalThis.__B44_LOGS) console.warn(`[SAFETY PASS] Fixing SBL/SBR position for ${speaker.role}`);
+            const fixedX = Math.max(0.01, Math.min(W - 0.01, W * defaultXFraction));
+            const fixedY = Math.max(0.01, L - 0.10); // Clamped near back wall
+            changed = true;
+            return {
+              ...speaker,
+              position: { x: fixedX, y: fixedY, z: earZ },
+              rotation: speaker.rotation || { x: 0, y: 0, z: 0 },
+            };
+          }
+          return speaker;
+        };
+
+        const newSBL = fixRearSpeaker(SBL, 0.25);
+        const newSBR = fixRearSpeaker(SBR, 0.75);
+
+        if (newSBL !== SBL) speakers = speakers.map(s => getCanonicalRole(s.role) === 'SBL' ? newSBL : s);
+        if (newSBR !== SBR) speakers = speakers.map(s => getCanonicalRole(s.role) === 'SBR' ? newSBR : s);
+      }
+
+      // 2. LW/RW Symmetry Invariant Check
+      const LW = speakers.find(s => getCanonicalRole(s.role) === 'LW');
+      const RW = speakers.find(s => getCanonicalRole(s.role) === 'RW');
+
+      // Proceed only if both LW and RW exist and have valid position data
+      if (LW && RW && LW.position && RW.position && Number.isFinite(LW.position.x) && Number.isFinite(LW.position.y) && Number.isFinite(RW.position.x) && Number.isFinite(RW.position.y)) {
+        const lwUser = LW.positionSource === 'user';
+        const rwUser = RW.positionSource === 'user';
+
+        // If both are user-positioned, do nothing
+        if (lwUser && rwUser) {
+          return changed ? speakers : prevSpeakers;
+        }
+
+        let sharedY;
+        if (lwUser && !rwUser) { // LW is user-positioned, RW is auto-positioned. LW leads for Y.
+          sharedY = LW.position.y;
+        } else if (!lwUser && rwUser) { // RW is user-positioned, LW is auto-positioned. RW leads for Y.
+          sharedY = RW.position.y;
+        } else { // Both auto - average their current Ys for a calm transition.
+          sharedY = (LW.position.y + RW.position.y) / 2;
+        }
+
+        const roomCenter = W / 2;
+        let targetLwX, targetRwX;
+
+        // Determine X targets based on leader
+        if (lwUser && !rwUser) { // LW leads for X
+          targetLwX = LW.position.x;
+          targetRwX = W - LW.position.x;
+        } else if (!lwUser && rwUser) { // RW leads for X
+          targetRwX = RW.position.x;
+          targetLwX = W - RW.position.x;
+        } else { // Both auto - mirror around center based on current average X distance
+          const lwDistFromCenter = roomCenter - LW.position.x;
+          const rwDistFromCenter = RW.position.x - roomCenter;
+          const avgDistFromCenter = (lwDistFromCenter + rwDistFromCenter) / 2;
+          targetLwX = roomCenter - avgDistFromCenter;
+          targetRwX = roomCenter + avgDistFromCenter;
+        }
+        
+        // Clamp X targets to stay within room bounds
+        const minXClamp = 0.02;
+        const maxXClamp = W - 0.02;
+        targetLwX = Math.max(minXClamp, Math.min(maxXClamp, targetLwX));
+        targetRwX = Math.max(minXClamp, Math.min(maxXClamp, targetRwX));
+
+        let lwChanged = false;
+        let rwChanged = false;
+
+        const updatedSpeakers = speakers.map(s => {
+          const canon = getCanonicalRole(s.role);
+          if (canon === 'LW') {
+            let newPos = { ...s.position };
+            // Always update Y for LW
+            if (Number.isFinite(sharedY) && Math.abs(newPos.y - sharedY) > EPS) {
+              newPos.y = sharedY;
+              lwChanged = true;
+            }
+            // Update X only if LW is not user-positioned
+            if (lwUser && !rwUser) {
+              // LW is leader, its X is fixed
+            } else if (!lwUser && Number.isFinite(targetLwX) && Math.abs(newPos.x - targetLwX) > EPS) {
+              newPos.x = targetLwX;
+              lwChanged = true;
+            }
+            return lwChanged ? { ...s, position: newPos } : s;
+          } else if (canon === 'RW') {
+            let newPos = { ...s.position };
+            // Always update Y for RW
+            if (Number.isFinite(sharedY) && Math.abs(newPos.y - sharedY) > EPS) {
+              newPos.y = sharedY;
+              rwChanged = true;
+            }
+            // Update X only if RW is not user-positioned
+            if (rwUser && !lwUser) {
+              // RW is leader, its X is fixed
+            } else if (!rwUser && Number.isFinite(targetRwX) && Math.abs(newPos.x - targetRwX) > EPS) {
+              newPos.x = targetRwX;
+              rwChanged = true;
+            }
+            return rwChanged ? { ...s, position: newPos } : s;
+          }
+          return s;
+        });
+
+        if (lwChanged || rwChanged) {
+          if (globalThis.__B44_LOGS) console.log('[SAFETY PASS] Enforcing LW/RW symmetry and shared Y with enhanced user-lock logic');
+          changed = true;
+          speakers = updatedSpeakers;
+        }
+      }
+
+      if (changed) {
+        return speakers;
+      }
+      return prevSpeakers;
+    });
+  }, [
+    placedSpeakers,
+    effectivePreset,
+    useWides,
+    dimensions?.width, dimensions?.widthM,
+    dimensions?.length, dimensions?.lengthM,
+    allowedRoles,
+    setSpeakers,
+  ]);
+
   return (
     <div className="space-y-4 font-sans" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
       <div className="space-y-3">
