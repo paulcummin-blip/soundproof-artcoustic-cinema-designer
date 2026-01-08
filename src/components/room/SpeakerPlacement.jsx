@@ -2542,15 +2542,16 @@ function SpeakerPlacementImpl(props) {
       // If any of the anchors are missing, do nothing.
       if (!FL || !FR || !SL || !SR || !LW || !RW) return prev;
       
-      // [B44 POSITION LOCK] Skip if user has manually placed FW speakers
-      if (LW.positionSource === 'user' && RW.positionSource === 'user') return prev;
+      // [B44 POSITION LOCK] Skip if user has manually placed either FW speaker
+      if (LW.positionSource === 'user' || RW.positionSource === 'user') return prev;
 
       const targetYL = (FL.position.y + SL.position.y) / 2;
       const targetYR = (FR.position.y + SR.position.y) / 2;
+      const targetY = (targetYL + targetYR) / 2;
 
       const EPS = 0.001;
-      const needsLeftAdjust  = LW.positionSource !== 'user' && Math.abs(LW.position.y - targetYL) > EPS;
-      const needsRightAdjust = RW.positionSource !== 'user' && Math.abs(RW.position.y - targetYR) > EPS;
+      const needsLeftAdjust  = LW.positionSource !== 'user' && Math.abs(LW.position.y - targetY) > EPS;
+      const needsRightAdjust = RW.positionSource !== 'user' && Math.abs(RW.position.y - targetY) > EPS;
 
       if (!needsLeftAdjust && !needsRightAdjust) {
         return prev; // already correct — avoid infinite loops
@@ -2564,7 +2565,7 @@ function SpeakerPlacementImpl(props) {
             ...sp,
             position: {
               ...sp.position,
-              y: targetYL,   // keep existing x (already wall-pinned)
+              y: targetY,   // keep existing x (already wall-pinned)
             },
           };
         }
@@ -2574,7 +2575,7 @@ function SpeakerPlacementImpl(props) {
             ...sp,
             position: {
               ...sp.position,
-              y: targetYR,
+              y: targetY,
             },
           };
         }
