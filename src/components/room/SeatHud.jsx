@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import { formatDb } from '@/components/utils/formatDb';
 import { getRP22Definition } from '@/components/data/rp22Definitions';
 import { getLevelColors } from '@/components/utils/rp22Colors';
-import { Info } from 'lucide-react';
 
 export default function SeatHud({
   tooltipData,
@@ -43,39 +42,19 @@ export default function SeatHud({
     return String(v);
   };
 
-  // RP22 Tooltip Component
-  const RP22Tooltip = ({ paramKey, level, hudElRef }) => {
+  // RP22 Tooltip Component - positioned as a sibling to the HUD
+  const RP22Tooltip = ({ paramKey, level, hudPosition }) => {
     const def = getRP22Definition(paramKey);
     if (!def) return null;
 
     const levelColors = getLevelColors(level);
 
-    // Calculate positioning - place to the left if there's room, otherwise to the right
-    const [position, setPosition] = React.useState({ right: '100%', left: 'auto' });
-
-    React.useEffect(() => {
-      if (!hudElRef?.current) return;
-      
-      const hudRect = hudElRef.current.getBoundingClientRect();
-      const spaceOnLeft = hudRect.left;
-      const spaceOnRight = window.innerWidth - hudRect.right;
-      
-      // Prefer left side, but use right if not enough space
-      if (spaceOnLeft < 320) {
-        setPosition({ left: '100%', right: 'auto' });
-      } else {
-        setPosition({ right: '100%', left: 'auto' });
-      }
-    }, [hudElRef]);
-
     return (
       <div
         style={{
-          position: 'absolute',
-          ...position,
-          top: 0,
-          marginRight: position.right === '100%' ? 12 : 0,
-          marginLeft: position.left === '100%' ? 12 : 0,
+          position: 'fixed',
+          left: Math.max(12, (hudPosition?.x || 20) - 320 - 12),
+          top: (hudPosition?.y || 20),
           background: 'white',
           border: `2px solid ${levelColors.border || '#E6E4DD'}`,
           borderRadius: 8,
@@ -87,6 +66,7 @@ export default function SeatHud({
           lineHeight: 1.5,
           color: levelColors.text || '#625143',
           zIndex: 1001,
+          pointerEvents: 'none',
         }}
       >
         <div style={{ fontWeight: 600, marginBottom: 8, fontSize: 12 }}>
@@ -109,40 +89,42 @@ export default function SeatHud({
   };
 
   return (
-    <div
-      ref={hudElRef}
-      className="seat-hud"
-      style={{
-        position: 'absolute',
-        left: hudPosition?.x || 20,
-        top: hudPosition?.y || 20,
-        background: 'white',
-        border: '1px solid #DCDBD6',
-        borderRadius: 8,
-        padding: 12,
-        boxShadow: '0 44px 12px rgba(0,0,0,0.15)',
-        pointerEvents: isHudPinned ? 'auto' : 'none',
-        zIndex: 1000,
-        minWidth: 260,
-        maxWidth: 320,
-        fontSize: 11,
-        color: '#625143',
-        maxHeight: '80vh',
-        overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 4,
-        ...hudDynamicStyle
-      }}
-    >
-      {/* RP22 Parameter Tooltip (only shown when pinned and hovering) */}
+    <>
+      {/* RP22 Parameter Tooltip (only shown when pinned and hovering) - rendered outside HUD */}
       {isHudPinned && hoveredParam && (
         <RP22Tooltip
           paramKey={hoveredParam.key}
           level={hoveredParam.level}
-          hudElRef={hudElRef}
+          hudPosition={hudPosition}
         />
       )}
+      
+      <div
+        ref={hudElRef}
+        className="seat-hud"
+        style={{
+          position: 'absolute',
+          left: hudPosition?.x || 20,
+          top: hudPosition?.y || 20,
+          background: 'white',
+          border: '1px solid #DCDBD6',
+          borderRadius: 8,
+          padding: 12,
+          boxShadow: '0 44px 12px rgba(0,0,0,0.15)',
+          pointerEvents: isHudPinned ? 'auto' : 'none',
+          zIndex: 1000,
+          minWidth: 260,
+          maxWidth: 320,
+          fontSize: 11,
+          color: '#625143',
+          maxHeight: '80vh',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          ...hudDynamicStyle
+        }}
+      >
       {/* Header with drag handle and eye icon */}
       <div
         onMouseDown={onHudHeaderMouseDown}
@@ -263,10 +245,7 @@ export default function SeatHud({
                   {/* Parameter label with hover to show definition */}
                   <span
                     style={{
-                      cursor: isHudPinned ? 'pointer' : 'default',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 4,
+                      cursor: isHudPinned ? 'help' : 'default',
                     }}
                     onMouseEnter={() => {
                       if (isHudPinned) {
@@ -280,9 +259,6 @@ export default function SeatHud({
                     }}
                   >
                     {key.toUpperCase()}
-                    {isHudPinned && (
-                      <Info size={12} style={{ color: '#625143', opacity: 0.6 }} />
-                    )}
                   </span>
                   {key === 'p16' && metric.hudLabel ? (
                     `: ${metric.hudLabel}`
@@ -501,6 +477,7 @@ export default function SeatHud({
           <div>Distance to MLP: {tooltipData.distanceToMLP}</div>
         )}
       </div>
-    </div>
+      </div>
+    </>
   );
 }
