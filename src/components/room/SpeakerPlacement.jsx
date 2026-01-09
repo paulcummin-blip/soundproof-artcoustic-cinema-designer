@@ -904,9 +904,16 @@ function UnifiedSurroundsConfig({
       const layout = String(effectivePreset || "5.1").split(" ")[0].split("_")[0];
 
       // Only bed surround roles
+      const layoutMajor = parseInt(String(layout || "5.1").split(".")[0], 10) || 5;
+
+      // IMPORTANT:
+      // - In 7.x, useWides swaps between rears and wides.
+      // - In 9.x+, we must keep BOTH rears and wides, so DO NOT swap rears out.
+      const useWidesInsteadOfRearsForThisLayout = (layoutMajor === 7) ? !!useWides : false;
+
       const layoutRoles = rolesForLayout({
         dolbyLayout: layout,
-        useWidesInsteadOfRears: !!useWides,
+        useWidesInsteadOfRears: useWidesInsteadOfRearsForThisLayout,
       }).filter((r) => ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r));
 
       const byRole = new Map();
@@ -2419,10 +2426,24 @@ function SpeakerPlacementImpl(props) {
 
       let changed = false;
 
+      // Shared Y for LW/RW (keeps them locked as a pair from the start)
+      const FLy = byCanon.get("FL")?.position?.y;
+      const FRy = byCanon.get("FR")?.position?.y;
+      const SLy = byCanon.get("SL")?.position?.y;
+      const SRy = byCanon.get("SR")?.position?.y;
+
+      const hasYAnchors =
+        Number.isFinite(FLy) && Number.isFinite(FRy) &&
+        Number.isFinite(SLy) && Number.isFinite(SRy);
+
+      const sharedMedianY = hasYAnchors
+        ? (((FLy + SLy) / 2) + ((FRy + SRy) / 2)) / 2
+        : null;
+
       const updated = list.map((s) => {
         const canon = getCanonicalRole(s.role);
         if (canon !== "LW" && canon !== "RW") return s;
-        
+
         // [B44 POSITION LOCK] Skip user-positioned speakers
         if (s.positionSource === 'user') return s;
 
@@ -2446,7 +2467,7 @@ function SpeakerPlacementImpl(props) {
         }
 
         // RP22 "median distance" along the listening plane: midpoint of Y
-        const medianY = (fy + sy) / 2;
+        const medianY = (Number.isFinite(sharedMedianY) ? sharedMedianY : (fy + sy) / 2);
 
         // X is pinned to the side wall using the hugging helpers
         const hugging = getHuggingCenterLines(s.model, dimensions);
