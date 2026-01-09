@@ -1864,7 +1864,7 @@ function SpeakerPlacementImpl(props) {
       );
 
       const byRole = buildRoleMap(currentSpeakers);
-      const room = { left: 0, right: dims.width, front: 0, back: dims.length };
+      const room = { left: 0, right: dimsN.width, front: 0, back: dimsN.length };
 
       // [B44 FIX] finalisePos with safety fallbacks
       const finalisePos = (base, canon, model, hitWall) => {
