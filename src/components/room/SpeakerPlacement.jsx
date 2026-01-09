@@ -2827,18 +2827,60 @@ function SpeakerPlacementImpl(props) {
       const EPS = 1e-4; // For float comparison
 
       // 1. SBL/SBR Invariant Check (each independently)
-      const needsRears = allowedRoles.has("SBL") || allowedRoles.has("SBR");
-      if (needsRears) {
-        const SBL = speakers.find(s => getCanonicalRole(s.role) === 'SBL');
-        const SBR = speakers.find(s => getCanonicalRole(s.role) === 'SBR');
+      // Derive rears expectation from layout, not allowedRoles
+      const layoutMajor = parseInt(String(effectivePreset || '5.1').split('.')[0], 10) || 5;
+      const expectsRears = (layoutMajor >= 9) || (layoutMajor === 7 && !useWides);
+      
+      if (expectsRears) {
+        let SBL = speakers.find(s => getCanonicalRole(s.role) === 'SBL');
+        let SBR = speakers.find(s => getCanonicalRole(s.role) === 'SBR');
 
         const hasFiniteXY = (s) => !!s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
+
+        // Get surround master model if available
+        const masterModel = surroundConfig?.value?.master;
+        const masterModelValid = masterModel && String(masterModel).toLowerCase() !== 'off' && String(masterModel).toLowerCase() !== 'none';
+
+        // Create SBL if missing
+        if (!SBL) {
+          const fixedX = Math.max(0.01, Math.min(W - 0.01, W * 0.25));
+          const fixedY = Math.max(0.01, L - 0.10);
+          SBL = {
+            id: `sbl-${timeNowMs()}`,
+            role: 'SBL',
+            model: masterModelValid ? masterModel : null,
+            position: { x: fixedX, y: fixedY, z: earZ },
+            rotation: { x: 0, y: 0, z: 0 },
+            draggable: true,
+          };
+          speakers.push(SBL);
+          changed = true;
+          if (globalThis.__B44_LOGS) console.warn('[SAFETY PASS] Created missing SBL speaker');
+        }
+
+        // Create SBR if missing
+        if (!SBR) {
+          const fixedX = Math.max(0.01, Math.min(W - 0.01, W * 0.75));
+          const fixedY = Math.max(0.01, L - 0.10);
+          SBR = {
+            id: `sbr-${timeNowMs()}`,
+            role: 'SBR',
+            model: masterModelValid ? masterModel : null,
+            position: { x: fixedX, y: fixedY, z: earZ },
+            rotation: { x: 0, y: 0, z: 0 },
+            draggable: true,
+          };
+          speakers.push(SBR);
+          changed = true;
+          if (globalThis.__B44_LOGS) console.warn('[SAFETY PASS] Created missing SBR speaker');
+        }
 
         const fixRearSpeaker = (speaker, defaultXFraction) => {
           if (!speaker || speaker.positionSource === 'user') return speaker; // Don't touch user-placed
 
-          // Only fix if model is valid AND position is missing/invalid
-          if (isValidModel(speaker.model) && !hasFiniteXY(speaker)) {
+          // Only fix if model is not OFF/NONE AND position is missing/invalid
+          const modelNotOff = speaker.model && String(speaker.model).toLowerCase() !== 'off' && String(speaker.model).toLowerCase() !== 'none';
+          if (modelNotOff && !hasFiniteXY(speaker)) {
             // Generate a safe fallback position
             if (globalThis.__B44_LOGS) console.warn(`[SAFETY PASS] Fixing SBL/SBR position for ${speaker.role}`);
             const fixedX = Math.max(0.01, Math.min(W - 0.01, W * defaultXFraction));
