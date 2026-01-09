@@ -993,8 +993,7 @@ function UnifiedSurroundsConfig({
       );
 
       // — REAR RESCUE: guarantee SBL/SBR exist + have valid positions when layout expects rears —
-      const layoutMajor = parseInt(String(effectivePreset || '5.1').split('.')[0], 10) || 5;
-      const expectsRears = (layoutMajor >= 9) || (layoutMajor === 7 && !useWides);
+      // (layoutMajor and expectsRears already declared above)
 
       const list0 = Array.isArray(hydrated) && hydrated.length ? hydrated : draft;
       const byCanon0 = new Map(list0.map(s => [getCanonicalRole(s?.role), s]));
