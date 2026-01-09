@@ -1826,6 +1826,8 @@ function SpeakerPlacementImpl(props) {
       const L = Number(dims?.length ?? dims?.lengthM);
 
       console.log('[SP resetSurroundPositions CALLBACK] HIT', { layoutString, modelKeyParam, W, L, speakerCount: Array.isArray(currentSpeakers) ? currentSpeakers.length : null });
+      alert('[SP] resetSurroundPositions HIT (check console for W/L)');
+      debugger;
 
       // If room dims are not usable, do nothing (do NOT null anything)
       if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
