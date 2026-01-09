@@ -2059,12 +2059,18 @@ function SpeakerPlacementImpl(props) {
       return SURROUND_BED_ROLES.has(canon) && s.positionSource === 'user';
     });
 
-    const uiSelectedModel = String(surroundConfig?.value?.master || 'off');
-    const _m = uiSelectedModel.trim().toLowerCase();
-    const resolvedModel = (!_m || _m === 'off' || _m === 'none') ? null : uiSelectedModel;
+    const uiSelectedModelRaw = String(surroundConfig?.value?.master || 'off').trim();
+    const uiSelectedModelLower = uiSelectedModelRaw.toLowerCase();
+
+    // IMPORTANT: do NOT require isValidModel here.
+    // We only care if the user has selected ON vs OFF/NONE.
+    const modelKeyForPlacement =
+      uiSelectedModelLower && uiSelectedModelLower !== 'off' && uiSelectedModelLower !== 'none'
+        ? uiSelectedModelRaw
+        : null;
 
     const resetOut = (Array.isArray(placedSpeakers) && placedSpeakers.length > 0)
-      ? resetSurroundPositions(effectivePreset, mlpPoint, dimensions, placedSpeakers, resolvedModel)
+      ? resetSurroundPositions(effectivePreset, mlpPoint, dimensions, placedSpeakers, modelKeyForPlacement)
       : (placedSpeakers || []);
 
     const nextSpeakers = resetOut.map(speaker => {
@@ -2622,8 +2628,10 @@ function SpeakerPlacementImpl(props) {
           if (!speaker || speaker.positionSource === 'user') return speaker; // Don't touch user-placed
 
           // Only fix if model is not OFF/NONE AND position is missing/invalid
-          const _sm = String(speaker.model || '').trim().toLowerCase();
-          if (_sm && _sm !== 'off' && _sm !== 'none' && !hasFiniteXY(speaker)) {
+          const mk = String(speaker?.model || '').trim().toLowerCase();
+          const modelOn = !!mk && mk !== 'off' && mk !== 'none';
+
+          if (modelOn && !hasFiniteXY(speaker)) {
             // Generate a safe fallback position
             if (globalThis.__B44_LOGS) console.warn(`[SAFETY PASS] Fixing SBL/SBR position for ${speaker.role}`);
             const fixedX = Math.max(0.01, Math.min(W - 0.01, W * defaultXFraction));
