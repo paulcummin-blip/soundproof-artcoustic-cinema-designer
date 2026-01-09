@@ -1819,385 +1819,94 @@ function SpeakerPlacementImpl(props) {
 
   // MOVE resetSurroundPositions HERE (before it's used in handlers/effects)
   const resetSurroundPositions = useCallback(
-    (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
-      // --- B44 FIX: normalise dimensions (supports width/length/height and widthM/lengthM/heightM) ---
+    (layoutString, mlp, dims, currentSpeakers, modelKeyParam) => {
+      const list = Array.isArray(currentSpeakers) ? currentSpeakers : [];
+
       const W = Number(dims?.width ?? dims?.widthM);
       const L = Number(dims?.length ?? dims?.lengthM);
-      const H = Number(dims?.height ?? dims?.heightM);
 
-      if (globalThis.__B44_LOGS) console.log('[SP resetSurroundPositions CALLBACK] W/L/modelKey', { W, L, modelKey: globalSurroundModelParam });
-
-      const dimsN = dims ? { ...dims, width: W, length: L, height: H } : null;
-
-      if (!dimsN || !Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0 || !Number.isFinite(H) || H <= 0) {
-        if (globalThis.__B44_LOGS) console.warn('[resetSurroundPositions] ABORT: invalid dimensions', { dims, W, L, H });
-        return currentSpeakers || [];
+      // If room dims are not usable, do nothing (do NOT null anything)
+      if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
+        if (globalThis.__B44_LOGS) console.warn('[SP resetSurroundPositions] ABORT: invalid dims', { W, L, dims });
+        return list;
       }
 
-            if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions START', {
-        layoutString, mlp, dims,
-        currentSpeakersCount: currentSpeakers?.length,
-        globalSurroundModelParam
-      });
+      // Normalise / accept model keys like "evolve-2-1_s" before checks
+      const rawKey = String(modelKeyParam || '').trim();
+      const normKey = (typeof normaliseModelKey === 'function') ? normaliseModelKey(rawKey) : rawKey;
+      const keyLower = String(normKey || '').trim().toLowerCase();
+      const modelOn = !!keyLower && keyLower !== 'off' && keyLower !== 'none';
 
-      if (!mlp || !dims || !Array.isArray(currentSpeakers)) {
-        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn('[SP] resetSurroundPositions ABORT: missing data');
-        return currentSpeakers || [];
+      if (!modelOn) {
+        if (globalThis.__B44_LOGS) console.log('[SP resetSurroundPositions] model OFF -> no placement');
+        return list;
       }
 
-      // Robust: layoutString can be "9.1.6" OR an object like { layout: "9.1.6" }
-      const layoutNormalized =
-        (typeof layoutString === 'string' && layoutString.trim())
-          ? layoutString.trim()
-          : (layoutString && typeof layoutString === 'object' && typeof layoutString.layout === 'string' && layoutString.layout.trim())
-            ? layoutString.layout.trim()
-            : '5.1';
+      const earZ = 1.1;
+      const INSET = 0.02;
 
-      if (globalThis.__B44_LOGS) console.log('[SP] layoutNormalized', { layoutString, layoutNormalized });
+      // Layout: do we expect rears?
+      const major = parseInt(String(layoutString || '5.1').split('.')[0], 10) || 5;
+      const useWidesInsteadOfRears = (sevenBedLayoutType === 'wides');
+      const expectsRears = (major >= 9) || (major === 7 && !useWidesInsteadOfRears);
 
-      const major = parseInt(layoutNormalized.split('.')[0], 10) || 5;
+      const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+      const hasXY = (s) => Number.isFinite(s?.position?.x) && Number.isFinite(s?.position?.y);
 
-      // [B44 FIX] Use rolesForLayout and convert to Set for .has() compatibility
-      const localAllowedRolesArray = rolesForLayout({
-        dolbyLayout: layoutNormalized,
-        useWidesInsteadOfRears: useWides
-      }).filter(r => ["SL","SR","SBL","SBR","LW","RW"].includes(r));
-      
-      const localAllowedRoles = new Set(localAllowedRolesArray.map(getCanonicalRole));
+      // Ensure we can look up by canonical role
+      const byCanon = new Map();
+      list.forEach(s => byCanon.set(getCanonicalRole(s?.role), s));
 
-      if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions CONFIG', {
-        layoutNormalized, major,
-        useWidesInsteadOfRear: useWides,
-        localRoles: Array.from(localAllowedRoles),
-        globalSurroundModel: globalSurroundModelParam
-      });
+      const ensure = (canonRole, xFrac, yVal) => {
+        const existing = byCanon.get(canonRole);
+        if (!existing) return;
 
-      const next = currentSpeakers.filter(
-        s => !SURROUND_BED_ROLES.has(getCanonicalRole(s.role))
-      );
+        // If model missing on the speaker, apply the global model key
+        const sm = String(existing?.model || '').trim();
+        const smLower = sm.toLowerCase();
+        const speakerModelOn = !!smLower && smLower !== 'off' && smLower !== 'none';
 
-      const byRole = buildRoleMap(currentSpeakers);
-      const room = { left: 0, right: dimsN.width, front: 0, back: dimsN.length };
+        const finalModel = speakerModelOn ? existing.model : normKey;
 
-      // [B44 FIX] finalisePos with safety fallbacks
-      const finalisePos = (base, canon, model, hitWall) => {
-        if (globalThis.__B44_LOGS) console.log(`[finalisePos] ENTRY: canon=${canon}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}, W=${dims.width}, L=${dims.length}`);
-        
-        const safeModel = model || 'evolve-2-1_s';
-        
-        if (!Number.isFinite(base.x) || !Number.isFinite(base.y)) {
-          console.warn('[finalisePos] Non-finite base coordinates', { base, canon });
-          return null;
-        }
-        
-        let p = { x: base.x, y: base.y, z: 1.1 };
+        if (hasXY(existing) && speakerModelOn) return;
 
-        p = applyCornerClearance(p, canon, safeModel, dimsN, {});
-        if (globalThis.__B44_LOGS) console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
-        
-        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-          if (globalThis.__B44_LOGS) console.warn('[finalisePos] NaN after applyCornerClearance', { p, canon, base });
-          return { x: dimsN.width / 2, y: dimsN.length / 2, z: 1.1 };
-        }
-        
-        p = applyRoomBoundsClamp(p, safeModel, dimsN);
-        if (globalThis.__B44_LOGS) console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
-        
-        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-          if (globalThis.__B44_LOGS) console.warn('[finalisePos] NaN after applyRoomBoundsClamp', { p, canon, base });
-          return { x: dimsN.width / 2, y: dimsN.length / 2, z: 1.1 };
-        }
+        const x = clamp(W * xFrac, INSET, W - INSET);
+        const y = clamp(yVal, INSET, L - INSET);
 
-        // -------- B44 SAFETY WALL-HUGGING -------- //
-        const R = canon; // Canonical role
-
-        // Get safe speaker dimensions for halfDepth and halfWidth calculation.
-        const modelMeta = getSpeakerModelMeta(safeModel);
-        const speakerWidthM = Number.isFinite(modelMeta?.widthM) ? modelMeta.widthM : 0.27; // Fallback
-        const speakerDepthM = Number.isFinite(modelMeta?.depthM) ? modelMeta.depthM : 0.082; // Fallback
-
-        const halfShortEdge = Math.min(speakerWidthM, speakerDepthM) / 2;
-        // const halfLongEdge = Math.max(speakerWidthM, speakerDepthM) / 2; // Not used currently, but kept for context
-
-        // LEFT wall speakers (SL, LW)
-        // Rear surrounds (SBL/SBR) are treated as BACK wall only, not side walls.
-        if (R === 'SL' || R === 'LW') {
-          const leftX = WALL_BUFFER_M + halfShortEdge;
-          p.x = Number.isFinite(leftX) ? leftX : dimsN.width / 2;
-        }
-
-        // RIGHT wall speakers (SR, RW)
-        if (R === 'SR' || R === 'RW') {
-          const rightX = dimsN.width - WALL_BUFFER_M - halfShortEdge;
-          p.x = Number.isFinite(rightX) ? rightX : dimsN.width / 2;
-        }
-
-        // BACK wall speakers (SBL + SBR + RBL + RBR only)
-        const isRearRole = R === 'SBL' || R === 'SBR' || R === 'RBL' || R === 'RBR';
-        if (isRearRole) {
-          const backY = dimsN.length - WALL_BUFFER_M - halfShortEdge;
-          // CRITICAL: Always clamp to actual room back wall, even if projection went beyond
-          p.y = Number.isFinite(backY) ? Math.min(backY, dimsN.length - WALL_BUFFER_M - 0.01) : dimsN.length / 2;
-        }
-
-        // --- Front-Wide Corner Pin Guard ---
-        // Ensure LW/RW are not stuck in the front corners.
-        if ((R === 'LW' || R === 'RW') && Number.isFinite(p.x) && Number.isFinite(p.y)) {
-          const frontWallY = WALL_BUFFER_M + halfShortEdge;
-          const cornerThreshold = 0.30; // Distance in meters to consider it 'near' the corner
-
-          const isNearFrontWall = p.y < (frontWallY + cornerThreshold);
-          const isNearLeftWall = p.x < (WALL_BUFFER_M + cornerThreshold);
-          const isNearRightWall = p.x > (dims.width - WALL_BUFFER_M - cornerThreshold);
-
-          if ((R === 'LW' && isNearLeftWall && isNearFrontWall) ||
-              (R === 'RW' && isNearRightWall && isNearFrontWall)) {
-            if (globalThis.__B44_LOGS) console.warn(`[finalisePos] Front-Wide (${R}) detected near front corner (${p.x.toFixed(2)}, ${p.y.toFixed(2)}). Nudging back.`);
-            // Nudge back along the Y-axis to prevent corner pinning.
-            const defaultNudgeY = Math.max(dimsN.length / 3, mlp?.y + 0.5 || 1.5);
-
-            if (Number.isFinite(defaultNudgeY)) {
-              p.y = defaultNudgeY;
-            } else {
-              p.y = dimsN.length / 2; // Ultimate fallback
-            }
-          }
-        }
-
-        // Final safety clamp for x and y to ensure they are always finite
-        if (!Number.isFinite(p.x)) p.x = dimsN.width / 2;
-        if (!Number.isFinite(p.y)) p.y = dimsN.length / 2;
-        if (!Number.isFinite(p.z)) p.z = 1.1; // Default height
-
-        if (globalThis.__B44_LOGS) console.log(
-          '[finalisePos] AFTER wall-hugging & corner guard:',
-          'canon=', canon,
-          'p.x=', Number.isFinite(p.x) ? p.x.toFixed(3) : p.x,
-          'p.y=', Number.isFinite(p.y) ? p.y.toFixed(3) : p.y
-        );
-
-        if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
-          if (globalThis.__B44_LOGS) console.warn('[SP resetSurroundPositions] invalid position, using room center fallback', {
-            base,
-            canon,
-            safeModel,
-            hitWall,
-            p,
-          });
-          return { x: dimsN.width / 2, y: dimsN.length / 2, z: 1.1 };
-        }
-
-        return p;
+        byCanon.set(canonRole, {
+          ...existing,
+          model: finalModel,
+          position: { ...(existing.position || {}), x, y, z: earZ },
+        });
       };
 
-        const seed = (role, dolbyAngleDeg, yawDeg) => {
-          const canon = getCanonicalRole(role);
-          // Only seed if the role is allowed in the current layout
-          if (!localAllowedRoles.has(canon)) return;
+      // Sides always get sane defaults if present and model is on
+      ensure('SL', 0.02 / W, (Number.isFinite(mlp?.y) ? mlp.y : L * 0.58));
+      ensure('SR', 1 - (0.02 / W), (Number.isFinite(mlp?.y) ? mlp.y : L * 0.58));
 
-          const existing = byRole.get(canon);
+      // Wides (if present) get a stable front-ish default
+      ensure('LW', 0.15, L * 0.40);
+      ensure('RW', 0.85, L * 0.40);
 
-          // Always provide a usable model so surrounds can be created/positioned
-          // even before the user has selected a surround model.
-          let resolvedModel = existing?.model || globalSurroundModelParam || 'evolve-2-1_s';
-
-          // Normalize invalid models to use the fallback
-          if (!resolvedModel || resolvedModel === 'off' || resolvedModel === 'none') {
-            resolvedModel = 'evolve-2-1_s';
-          } else {
-            resolvedModel = String(resolvedModel);
-          }
-
-          // resolvedModel is now guaranteed to be a real model string
-
-          // resolvedModel is now guaranteed to be a real model string
-          let pos = undefined;
-          
-          if (resolvedModel) {
-            const projectAngleDeg = (270 - dolbyAngleDeg + 360) % 360;
-            
-            // [B44 REAR FIX] Use back-wall projector for SBL/SBR
-            let baseWithWall;
-            if (canon === 'SBL' || canon === 'SBR') {
-              // Rear surrounds: ensure model dims are always finite to avoid NaN → drop
-              const rawDims = (() => {
-                try { return getModelDimsM?.(resolvedModel); }
-                catch (e) { return null; }
-              })();
-              const widthM = Number.isFinite(rawDims?.widthM) ? rawDims.widthM : 0.20;
-              const depthM = Number.isFinite(rawDims?.depthM) ? rawDims.depthM : 0.082;
-              const getModelDimsSafe = () => ({ widthM, depthM });
-
-              baseWithWall = projectToBackWallFromMLP_xy(mlp, projectAngleDeg, room, resolvedModel, getModelDimsSafe, WALL_BUFFER_M);
-
-              if (globalThis.__B44_LOGS) console.log('[SP] rear dims safe', { resolvedModel, rawDims, widthM, depthM });
-            } else {
-              baseWithWall = projectToWallFromMLP_xy(mlp, projectAngleDeg, room);
-            }
-            
-            const base = { x: baseWithWall.x, y: baseWithWall.y };
-            const hitWall = baseWithWall.wall;
-            
-            if (globalThis.__B44_LOGS) console.log(`[seed] canon=${canon}, dolbyAngle=${dolbyAngleDeg}, projectAngle=${projectAngleDeg}, base.x=${base.x?.toFixed(3)}, base.y=${base.y?.toFixed(3)}, hitWall=${hitWall}`);
-            
-            pos = finalisePos(base, canon, resolvedModel, hitWall);
-
-            if (!pos) {
-              // Position calculation failed, but we still want the speaker entry
-              // Use safe room-center fallback
-              pos = {
-                x: dims.width / 2,
-                y: dims.length / 2,
-                z: 1.1
-              };
-            }
-          }
-
-          // CRITICAL: Final back-wall safety clamp ONLY for rear speakers
-          // Ensure they NEVER initialize outside the actual room length
-          const isRearRole = canon === 'SBL' || canon === 'SBR' || canon === 'RBL' || canon === 'RBR';
-          if (isRearRole) {
-            const maxAllowedY = dimsN.length - WALL_BUFFER_M - 0.01;
-            if (pos.y > maxAllowedY) {
-              console.warn(`[seed] ${canon} Y clamped from ${pos.y.toFixed(3)} to ${maxAllowedY.toFixed(3)} (room length=${dimsN.length.toFixed(3)})`);
-              pos = { ...pos, y: maxAllowedY };
-            }
-            // Also clamp X to room bounds for rear speakers
-            pos.x = Math.max(WALL_BUFFER_M, Math.min(pos.x, dimsN.width - WALL_BUFFER_M));
-          }
-
-          const initialYaw = Number.isFinite(yawDeg) ? yawDeg : 0;
-
-          // [B44 CRITICAL FIX] Always create speaker entry for system role
-          // even if model is null or position is undefined
-          next.push({
-            id: existing?.id || `${canon}-${timeNowMs()}`,
-            role: canon,
-            model: resolvedModel, // can be null
-            position: pos, // can be undefined if no model
-            draggable: true,
-
-            // Keep yaw for labels / analysis
-            yaw: initialYaw,
-
-            // CRITICAL: drive the icon orientation from rotation.z
-            // so the speaker starts flat to the wall.
-            rotation: existing?.rotation || { x: 0, y: 0, z: initialYaw },
-          });
-
-          // TEMP DEBUG: Log seeded/updated target speakers
-          if (globalThis.__B44_RV_DEBUG === true && (['LW', 'RW', 'SBL', 'SBR'].includes(canon))) {
-            const just = next[next.length - 1];
-            console.log(`[SpeakerPlacement seed] ${canon}`, {
-              id: just?.id,
-              role: just?.role,
-              model: just?.model,
-              position: just?.position
-            });
-          }
-        };
-
-      if (globalThis.__B44_LOGS) console.table(next.map(s => ({
-        role: s.role, model: s.model,
-        x: s.position?.x?.toFixed(3),
-        y: s.position?.y?.toFixed(3),
-        yaw: s.rotation?.z
-      })));
-
-        const sideAngle = (major >= 7) ? 100 : 115;
-
-        // Rear surround centre of Dolby zone: 142.5°
-        const rearCentreAngle = 142.5;
-        const rearRightDolby  = rearCentreAngle;           // SBR  (back-right)
-        const rearLeftDolby   = 360 - rearCentreAngle;     // SBL  (back-left)
-
-        if (localAllowedRoles.has('LW') || localAllowedRoles.has('RW')) { 
-          // 9.x AND 7.x-with-wides: sides, rears AND wides can all exist
-          if (localAllowedRoles.has('SL'))  seed('SL',  360 - sideAngle, +90);
-          if (localAllowedRoles.has('SR'))  seed('SR',  sideAngle,       -90);
-          if (localAllowedRoles.has('SBL')) seed('SBL', rearLeftDolby,   0);
-          if (localAllowedRoles.has('SBR')) seed('SBR', rearRightDolby,  0);
-          if (localAllowedRoles.has('LW'))  seed('LW',  +300,            +90);
-          if (localAllowedRoles.has('RW'))  seed('RW',  -300,            -90);
-        } else if (major === 7) { 
-          // 7.x without wides: sides + rears only
-          seed('SL',  360 - sideAngle, +90);
-          seed('SR',  sideAngle,       -90);
-          seed('SBL', rearLeftDolby,   0);
-          seed('SBR', rearRightDolby,  0);
-        } else { 
-          // 5.1 layout: sides only
-          seed('SL',  360 - sideAngle, +90);
-          seed('SR',  sideAngle,       -90);
-        }
-
-      // [B44 DIAGNOSTIC] Log all surround outputs before return
-      if (globalThis.__B44_LOGS) console.log(
-        "[SP] resetSurroundPositions OUTPUT",
-        next.map((s) => ({
-          role: s.role,
-          model: s.model,
-          x: s.position?.x,
-          y: s.position?.y,
-          z: s.position?.z,
-        }))
-      );
-
-      if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions END. Final Speakers:');
-      if (globalThis.__B44_LOGS) console.table(next.map(s => ({
-        role: s.role, model: s.model,
-        x: s.position?.x?.toFixed(3),
-        y: s.position?.y?.toFixed(3),
-        yaw: s.rotation?.z
-      })));
-
-      // --- HARD GUARANTEE: rear surrounds must exist + have valid XY when required ---
-      const needsRears = localAllowedRoles.has("SBL") || localAllowedRoles.has("SBR");
-
-      if (needsRears) {
-        const W = Number(room?.right ?? dimensions?.width ?? dimensions?.widthM) || 0;
-        const L = Number(room?.back ?? dimensions?.length ?? dimensions?.lengthM) || 0;
-
-        if (W > 0 && L > 0) {
-          const earZ = Number.isFinite(mlp?.z) ? mlp.z : 1.1;
-          const backY = Math.max(0.01, L - 0.10);
-
-          const hasFiniteXY = (p) =>
-            !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
-
-          const byCanon = new Map(next.map(s => [getCanonicalRole(s?.role), s]));
-
-          const ensureRear = (canonRole, xFrac) => {
-            const existing = byCanon.get(canonRole);
-            if (existing && hasFiniteXY(existing.position)) return;
-
-            const x = Math.max(0.01, Math.min(W - 0.01, W * xFrac));
-
-            byCanon.set(canonRole, {
-              ...(existing || {}),
-              id: existing?.id || `${canonRole.toLowerCase()}-${timeNowMs()}`,
-              role: canonRole,
-              label: canonRole,
-              model: existing?.model ?? globalSurroundModelParam ?? null,
-              position: { x, y: backY, z: earZ },
-              rotation: existing?.rotation || { x: 0, y: 0, z: 0 },
-              draggable: true,
-            });
-          };
-
-          ensureRear("SBL", 0.25);
-          ensureRear("SBR", 0.75);
-
-          // Replace next with the guaranteed set
-          next.length = 0;
-          next.push(...Array.from(byCanon.values()));
-        }
+      // Rears MUST be forced when layout expects them
+      if (expectsRears) {
+        const backY = L - 0.10;
+        ensure('SBL', 0.25, backY);
+        ensure('SBR', 0.75, backY);
       }
-      // --- END HARD GUARANTEE ---
 
-      return next;
+      const out = Array.from(byCanon.values());
+
+      if (globalThis.__B44_LOGS) {
+        const trace = out
+          .filter(s => ['SBL','SBR'].includes(getCanonicalRole(s?.role)))
+          .map(s => ({ role: s?.role, model: s?.model, x: s?.position?.x, y: s?.position?.y, z: s?.position?.z }));
+        console.log('[SP resetSurroundPositions] OUTPUT rears:', trace, { W, L, expectsRears, model: normKey });
+      }
+
+      return out;
     },
-    [applyCornerClearance, applyRoomBoundsClamp, getHuggingCenterLines, getModelDimsM, dolbyConfig, SURROUND_BED_ROLES, useWides, WALL_BUFFER_M]
+    [sevenBedLayoutType]
   );
 
   // [B44] Central surround hydration (the ONLY place resetSurroundPositions is called)
