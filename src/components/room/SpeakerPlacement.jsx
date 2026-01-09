@@ -1458,7 +1458,7 @@ function SpeakerPlacementImpl(props) {
     }
 
     // 7.x – either rears OR wides, depending on useWides
-    const showRears = major === 7 && !useWides;
+    const showRears = (major === 7 && !useWides) || major >= 9;
     const showWides7 = major === 7 && !!useWides;
 
     if (showRears || major >= 9) {
