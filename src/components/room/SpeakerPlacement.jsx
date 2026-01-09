@@ -1955,7 +1955,13 @@ function SpeakerPlacementImpl(props) {
       if (!Array.isArray(currentSpeakers) || currentSpeakers.length === 0) {
         return currentSpeakers;
       }
-      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, globalSurroundModel);
+      
+      // Use UI-selected model for reset, same as speakerApply effect
+      const uiModelRaw = String(surroundConfig?.value?.master || "off").trim();
+      const uiModelLower = uiModelRaw.toLowerCase();
+      const modelKeyForPlacement = (uiModelLower === "off" || uiModelLower === "none") ? null : uiModelRaw;
+      
+      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, modelKeyForPlacement);
       // Clear positionSource for all speakers (return to auto mode)
       return reset.map(s => ({ ...s, positionSource: 'auto' }));
     });
@@ -2059,18 +2065,19 @@ function SpeakerPlacementImpl(props) {
       return SURROUND_BED_ROLES.has(canon) && s.positionSource === 'user';
     });
 
-    const uiSelectedModelRaw = String(surroundConfig?.value?.master || 'off').trim();
-    const uiSelectedModelLower = uiSelectedModelRaw.toLowerCase();
-
-    // IMPORTANT: do NOT require isValidModel here.
-    // We only care if the user has selected ON vs OFF/NONE.
-    const modelKeyForPlacement =
-      uiSelectedModelLower && uiSelectedModelLower !== 'off' && uiSelectedModelLower !== 'none'
-        ? uiSelectedModelRaw
-        : null;
+    // Use the UI-selected surround model (NOT globalSurroundModel) to drive placement
+    const uiModelRaw = String(surroundConfig?.value?.master || "off").trim();
+    const uiModelLower = uiModelRaw.toLowerCase();
+    const modelKeyForPlacement = (uiModelLower === "off" || uiModelLower === "none") ? null : uiModelRaw;
 
     const resetOut = (Array.isArray(placedSpeakers) && placedSpeakers.length > 0)
-      ? resetSurroundPositions(effectivePreset, mlpPoint, dimensions, placedSpeakers, modelKeyForPlacement)
+      ? resetSurroundPositions(
+          effectivePreset,
+          mlpPoint,
+          dimensions,
+          placedSpeakers,
+          modelKeyForPlacement
+        )
       : (placedSpeakers || []);
 
     const nextSpeakers = resetOut.map(speaker => {
@@ -2099,7 +2106,7 @@ function SpeakerPlacementImpl(props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
     effectivePreset,
-    globalSurroundModel,
+    surroundConfig?.value?.master,
     mlpPoint?.x, mlpPoint?.y,
     dimensions?.width, dimensions?.widthM,
     dimensions?.length, dimensions?.lengthM,
