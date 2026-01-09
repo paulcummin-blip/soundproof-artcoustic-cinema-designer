@@ -1935,25 +1935,25 @@ function SpeakerPlacementImpl(props) {
 
           const isNearFrontWall = p.y < (frontWallY + cornerThreshold);
           const isNearLeftWall = p.x < (WALL_BUFFER_M + cornerThreshold);
-          const isNearRightWall = p.x > (dims.width - WALL_BUFFER_M - cornerThreshold);
+          const isNearRightWall = p.x > (dimsN.width - WALL_BUFFER_M - cornerThreshold);
 
           if ((R === 'LW' && isNearLeftWall && isNearFrontWall) ||
               (R === 'RW' && isNearRightWall && isNearFrontWall)) {
             if (globalThis.__B44_LOGS) console.warn(`[finalisePos] Front-Wide (${R}) detected near front corner (${p.x.toFixed(2)}, ${p.y.toFixed(2)}). Nudging back.`);
             // Nudge back along the Y-axis to prevent corner pinning.
-            const defaultNudgeY = Math.max(dims.length / 3, mlp?.y + 0.5 || 1.5);
+            const defaultNudgeY = Math.max(dimsN.length / 3, mlp?.y + 0.5 || 1.5);
 
             if (Number.isFinite(defaultNudgeY)) {
               p.y = defaultNudgeY;
             } else {
-              p.y = dims.length / 2; // Ultimate fallback
+              p.y = dimsN.length / 2; // Ultimate fallback
             }
           }
         }
 
         // Final safety clamp for x and y to ensure they are always finite
-        if (!Number.isFinite(p.x)) p.x = dims.width / 2;
-        if (!Number.isFinite(p.y)) p.y = dims.length / 2;
+        if (!Number.isFinite(p.x)) p.x = dimsN.width / 2;
+        if (!Number.isFinite(p.y)) p.y = dimsN.length / 2;
         if (!Number.isFinite(p.z)) p.z = 1.1; // Default height
 
         if (globalThis.__B44_LOGS) console.log(
