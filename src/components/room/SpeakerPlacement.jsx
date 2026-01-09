@@ -2341,7 +2341,8 @@ function SpeakerPlacementImpl(props) {
     });
 
     const uiSelectedModel = String(surroundConfig?.value?.master || 'off');
-    const resolvedModel = isValidModel(uiSelectedModel) ? uiSelectedModel : null;
+    const _m = uiSelectedModel.trim().toLowerCase();
+    const resolvedModel = (!_m || _m === 'off' || _m === 'none') ? null : uiSelectedModel;
 
     const resetOut = (Array.isArray(placedSpeakers) && placedSpeakers.length > 0)
       ? resetSurroundPositions(effectivePreset, mlpPoint, dimensions, placedSpeakers, resolvedModel)
@@ -2902,8 +2903,8 @@ function SpeakerPlacementImpl(props) {
           if (!speaker || speaker.positionSource === 'user') return speaker; // Don't touch user-placed
 
           // Only fix if model is not OFF/NONE AND position is missing/invalid
-          const modelNotOff = speaker.model && String(speaker.model).toLowerCase() !== 'off' && String(speaker.model).toLowerCase() !== 'none';
-          if (modelNotOff && !hasFiniteXY(speaker)) {
+          const _sm = String(speaker.model || '').trim().toLowerCase();
+          if (_sm && _sm !== 'off' && _sm !== 'none' && !hasFiniteXY(speaker)) {
             // Generate a safe fallback position
             if (globalThis.__B44_LOGS) console.warn(`[SAFETY PASS] Fixing SBL/SBR position for ${speaker.role}`);
             const fixedX = Math.max(0.01, Math.min(W - 0.01, W * defaultXFraction));
