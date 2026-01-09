@@ -1809,25 +1809,17 @@ function SpeakerPlacementImpl(props) {
   // MOVE resetSurroundPositions HERE (before it's used in handlers/effects)
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
-      // Normalise dims (some callers provide widthM/lengthM/heightM)
-      const W = Number(dims?.width ?? dims?.widthM) || 0;
-      const L = Number(dims?.length ?? dims?.lengthM) || 0;
+      // --- B44 FIX: normalise dimensions (supports width/length/height and widthM/lengthM/heightM) ---
+      const W = Number(dims?.width ?? dims?.widthM);
+      const L = Number(dims?.length ?? dims?.lengthM);
       const H = Number(dims?.height ?? dims?.heightM);
 
-      // Only width/length are required to place bed surrounds.
-      // Height can be missing; default it to 2.4m.
-      if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
-        if (globalThis.__B44_LOGS) console.warn('[resetSurroundPositions] ABORT: invalid W/L', { dims, W, L });
+      const dimsN = dims ? { ...dims, width: W, length: L, height: H } : null;
+
+      if (!dimsN || !Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0 || !Number.isFinite(H) || H <= 0) {
+        if (globalThis.__B44_LOGS) console.warn('[resetSurroundPositions] ABORT: invalid dimensions', { dims, W, L, H });
         return currentSpeakers || [];
       }
-
-      // Reassign local param so the rest of the function (dims.width/dims.length/dims.height) stays valid
-      dims = {
-        ...(dims || {}),
-        width: W,
-        length: L,
-        height: Number.isFinite(H) && H > 0 ? H : 2.4,
-      };
 
             if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions START', {
         layoutString, mlp, dims,
