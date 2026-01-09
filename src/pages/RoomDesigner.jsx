@@ -1535,6 +1535,22 @@ function RoomDesignerWithState() {
   // (Assumes AppStateProvider has been updated to provide these)
   const _roomDims = appState?.roomDims;
   const _setRoomDims = appState?.setRoomDims;
+  
+  // CRITICAL: Define stableDimensions EARLY (before any hooks that use it)
+  // This is the canonical room dimensions object used throughout RoomDesigner
+  const stableDimensions = useMemo(() => {
+    const dims = {
+      width: Number(_roomDims?.widthM) || 4.5,
+      length: Number(_roomDims?.lengthM) || 6.0,
+      height: Number(_roomDims?.heightM) || 2.8,
+    };
+    
+    if (globalThis.__B44_LOGS) {
+      console.log('[RoomDesigner] stableDimensions', dims);
+    }
+    
+    return dims;
+  }, [_roomDims?.widthM, _roomDims?.lengthM, _roomDims?.heightM]);
   const _selectedSpeakersByRole = appState?.selectedSpeakersByRole;
   const _setSelectedSpeakersByRole = appState?.setSelectedSpeakersByRole;
   const _speakerNodes = appState?.speakerNodes;
