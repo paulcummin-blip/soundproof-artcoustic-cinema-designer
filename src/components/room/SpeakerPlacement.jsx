@@ -1910,21 +1910,21 @@ function SpeakerPlacementImpl(props) {
         // Rear surrounds (SBL/SBR) are treated as BACK wall only, not side walls.
         if (R === 'SL' || R === 'LW') {
           const leftX = WALL_BUFFER_M + halfShortEdge;
-          p.x = Number.isFinite(leftX) ? leftX : dims.width / 2;
+          p.x = Number.isFinite(leftX) ? leftX : dimsN.width / 2;
         }
 
         // RIGHT wall speakers (SR, RW)
         if (R === 'SR' || R === 'RW') {
-          const rightX = dims.width - WALL_BUFFER_M - halfShortEdge;
-          p.x = Number.isFinite(rightX) ? rightX : dims.width / 2;
+          const rightX = dimsN.width - WALL_BUFFER_M - halfShortEdge;
+          p.x = Number.isFinite(rightX) ? rightX : dimsN.width / 2;
         }
 
         // BACK wall speakers (SBL + SBR + RBL + RBR only)
         const isRearRole = R === 'SBL' || R === 'SBR' || R === 'RBL' || R === 'RBR';
         if (isRearRole) {
-          const backY = dims.length - WALL_BUFFER_M - halfShortEdge;
+          const backY = dimsN.length - WALL_BUFFER_M - halfShortEdge;
           // CRITICAL: Always clamp to actual room back wall, even if projection went beyond
-          p.y = Number.isFinite(backY) ? Math.min(backY, dims.length - WALL_BUFFER_M - 0.01) : dims.length / 2;
+          p.y = Number.isFinite(backY) ? Math.min(backY, dimsN.length - WALL_BUFFER_M - 0.01) : dimsN.length / 2;
         }
 
         // --- Front-Wide Corner Pin Guard ---
