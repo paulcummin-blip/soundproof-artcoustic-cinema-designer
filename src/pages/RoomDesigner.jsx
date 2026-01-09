@@ -1617,6 +1617,11 @@ function RoomDesignerWithState() {
   // "controls" gives the right menu more space (useful when showing the bass graph).
   const [viewEmphasis, setViewEmphasis] = React.useState("balanced"); // "plan" | "balanced" | "controls"
 
+  // --- bed rears required? (SBL/SBR) ---
+  const layoutMajor = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) || 5;
+  const useWidesInsteadOfRears = _sevenBedLayoutType === "wides";
+  const expectsRears = (layoutMajor >= 9) || (layoutMajor === 7 && !useWidesInsteadOfRears);
+
   // screen state is now managed directly by AppState, removed local useState here.
 
   // Track preset changes to prevent unnecessary re-seeding
