@@ -91,7 +91,7 @@ import { ceilDb, splAtDistanceFrom1m, safeNum } from '@/components/utils/splMath
 import { artcousticSpeakers } from '@/components/data/speakerData';
 import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 import { safeGroup, safeTable, safeGroupEnd } from "@/components/utils/safeLog";
-import { getSpeakerModelMeta, getModelsByCategoryOrdered } from "@/components/models/speakers/registry";
+import { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
 import { safeComputeLcrSpl } from '@/components/utils/splMathSafe';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import SurroundsSelector from '../speakers/SurroundsSelector';
@@ -884,7 +884,8 @@ function UnifiedSurroundsConfig({
     setSurroundConfig(safeConfig);
 
     const modelKeyRaw = safeConfig.value.master;
-    const modelKey = String(modelKeyRaw || "").trim();
+    let modelKey = String(modelKeyRaw || "").trim();
+    modelKey = normaliseModelKey(modelKey);
     const modelKeyLower = modelKey.toLowerCase();
 
     // Keep global model in app state if available (do not crash if missing)
