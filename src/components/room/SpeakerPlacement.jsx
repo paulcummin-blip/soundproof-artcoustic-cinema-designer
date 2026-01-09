@@ -1879,20 +1879,20 @@ function SpeakerPlacementImpl(props) {
         
         let p = { x: base.x, y: base.y, z: 1.1 };
 
-        p = applyCornerClearance(p, canon, safeModel, dims, {});
+        p = applyCornerClearance(p, canon, safeModel, dimsN, {});
         if (globalThis.__B44_LOGS) console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           if (globalThis.__B44_LOGS) console.warn('[finalisePos] NaN after applyCornerClearance', { p, canon, base });
-          return { x: dims.width / 2, y: dims.length / 2, z: 1.1 };
+          return { x: dimsN.width / 2, y: dimsN.length / 2, z: 1.1 };
         }
         
-        p = applyRoomBoundsClamp(p, safeModel, dims);
+        p = applyRoomBoundsClamp(p, safeModel, dimsN);
         if (globalThis.__B44_LOGS) console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           if (globalThis.__B44_LOGS) console.warn('[finalisePos] NaN after applyRoomBoundsClamp', { p, canon, base });
-          return { x: dims.width / 2, y: dims.length / 2, z: 1.1 };
+          return { x: dimsN.width / 2, y: dimsN.length / 2, z: 1.1 };
         }
 
         // -------- B44 SAFETY WALL-HUGGING -------- //
