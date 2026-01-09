@@ -1809,17 +1809,25 @@ function SpeakerPlacementImpl(props) {
   // MOVE resetSurroundPositions HERE (before it's used in handlers/effects)
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, globalSurroundModelParam) => {
-      // --- B44 FIX: normalise dimensions (supports width/length/height and widthM/lengthM/heightM) ---
-      const W = Number(dims?.width ?? dims?.widthM);
-      const L = Number(dims?.length ?? dims?.lengthM);
+      // Normalise dims (some callers provide widthM/lengthM/heightM)
+      const W = Number(dims?.width ?? dims?.widthM) || 0;
+      const L = Number(dims?.length ?? dims?.lengthM) || 0;
       const H = Number(dims?.height ?? dims?.heightM);
 
-      const dimsN = dims ? { ...dims, width: W, length: L, height: H } : null;
-
-      if (!dimsN || !Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0 || !Number.isFinite(H) || H <= 0) {
-        if (globalThis.__B44_LOGS) console.warn('[resetSurroundPositions] ABORT: invalid dimensions', { dims, W, L, H });
+      // Only width/length are required to place bed surrounds.
+      // Height can be missing; default it to 2.4m.
+      if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
+        if (globalThis.__B44_LOGS) console.warn('[resetSurroundPositions] ABORT: invalid W/L', { dims, W, L });
         return currentSpeakers || [];
       }
+
+      // Reassign local param so the rest of the function (dims.width/dims.length/dims.height) stays valid
+      dims = {
+        ...(dims || {}),
+        width: W,
+        length: L,
+        height: Number.isFinite(H) && H > 0 ? H : 2.4,
+      };
 
             if (globalThis.__B44_LOGS) console.log('[SP] resetSurroundPositions START', {
         layoutString, mlp, dims,
@@ -1864,7 +1872,7 @@ function SpeakerPlacementImpl(props) {
       );
 
       const byRole = buildRoleMap(currentSpeakers);
-      const room = { left: 0, right: dimsN.width, front: 0, back: dimsN.length };
+      const room = { left: 0, right: dims.width, front: 0, back: dims.length };
 
       // [B44 FIX] finalisePos with safety fallbacks
       const finalisePos = (base, canon, model, hitWall) => {
@@ -1879,20 +1887,20 @@ function SpeakerPlacementImpl(props) {
         
         let p = { x: base.x, y: base.y, z: 1.1 };
 
-        p = applyCornerClearance(p, canon, safeModel, dimsN, {});
+        p = applyCornerClearance(p, canon, safeModel, dims, {});
         if (globalThis.__B44_LOGS) console.log(`[finalisePos] AFTER applyCornerClearance: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           if (globalThis.__B44_LOGS) console.warn('[finalisePos] NaN after applyCornerClearance', { p, canon, base });
-          return { x: dimsN.width / 2, y: dimsN.length / 2, z: 1.1 };
+          return { x: dims.width / 2, y: dims.length / 2, z: 1.1 };
         }
         
-        p = applyRoomBoundsClamp(p, safeModel, dimsN);
+        p = applyRoomBoundsClamp(p, safeModel, dims);
         if (globalThis.__B44_LOGS) console.log(`[finalisePos] AFTER applyRoomBoundsClamp: canon=${canon}, p.x=${p.x?.toFixed(3)}, p.y=${p.y?.toFixed(3)}`);
         
         if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
           if (globalThis.__B44_LOGS) console.warn('[finalisePos] NaN after applyRoomBoundsClamp', { p, canon, base });
-          return { x: dimsN.width / 2, y: dimsN.length / 2, z: 1.1 };
+          return { x: dims.width / 2, y: dims.length / 2, z: 1.1 };
         }
 
         // -------- B44 SAFETY WALL-HUGGING -------- //
@@ -1910,21 +1918,21 @@ function SpeakerPlacementImpl(props) {
         // Rear surrounds (SBL/SBR) are treated as BACK wall only, not side walls.
         if (R === 'SL' || R === 'LW') {
           const leftX = WALL_BUFFER_M + halfShortEdge;
-          p.x = Number.isFinite(leftX) ? leftX : dimsN.width / 2;
+          p.x = Number.isFinite(leftX) ? leftX : dims.width / 2;
         }
 
         // RIGHT wall speakers (SR, RW)
         if (R === 'SR' || R === 'RW') {
-          const rightX = dimsN.width - WALL_BUFFER_M - halfShortEdge;
-          p.x = Number.isFinite(rightX) ? rightX : dimsN.width / 2;
+          const rightX = dims.width - WALL_BUFFER_M - halfShortEdge;
+          p.x = Number.isFinite(rightX) ? rightX : dims.width / 2;
         }
 
         // BACK wall speakers (SBL + SBR + RBL + RBR only)
         const isRearRole = R === 'SBL' || R === 'SBR' || R === 'RBL' || R === 'RBR';
         if (isRearRole) {
-          const backY = dimsN.length - WALL_BUFFER_M - halfShortEdge;
+          const backY = dims.length - WALL_BUFFER_M - halfShortEdge;
           // CRITICAL: Always clamp to actual room back wall, even if projection went beyond
-          p.y = Number.isFinite(backY) ? Math.min(backY, dimsN.length - WALL_BUFFER_M - 0.01) : dimsN.length / 2;
+          p.y = Number.isFinite(backY) ? Math.min(backY, dims.length - WALL_BUFFER_M - 0.01) : dims.length / 2;
         }
 
         // --- Front-Wide Corner Pin Guard ---
@@ -1935,25 +1943,25 @@ function SpeakerPlacementImpl(props) {
 
           const isNearFrontWall = p.y < (frontWallY + cornerThreshold);
           const isNearLeftWall = p.x < (WALL_BUFFER_M + cornerThreshold);
-          const isNearRightWall = p.x > (dimsN.width - WALL_BUFFER_M - cornerThreshold);
+          const isNearRightWall = p.x > (dims.width - WALL_BUFFER_M - cornerThreshold);
 
           if ((R === 'LW' && isNearLeftWall && isNearFrontWall) ||
               (R === 'RW' && isNearRightWall && isNearFrontWall)) {
             if (globalThis.__B44_LOGS) console.warn(`[finalisePos] Front-Wide (${R}) detected near front corner (${p.x.toFixed(2)}, ${p.y.toFixed(2)}). Nudging back.`);
             // Nudge back along the Y-axis to prevent corner pinning.
-            const defaultNudgeY = Math.max(dimsN.length / 3, mlp?.y + 0.5 || 1.5);
+            const defaultNudgeY = Math.max(dims.length / 3, mlp?.y + 0.5 || 1.5);
 
             if (Number.isFinite(defaultNudgeY)) {
               p.y = defaultNudgeY;
             } else {
-              p.y = dimsN.length / 2; // Ultimate fallback
+              p.y = dims.length / 2; // Ultimate fallback
             }
           }
         }
 
         // Final safety clamp for x and y to ensure they are always finite
-        if (!Number.isFinite(p.x)) p.x = dimsN.width / 2;
-        if (!Number.isFinite(p.y)) p.y = dimsN.length / 2;
+        if (!Number.isFinite(p.x)) p.x = dims.width / 2;
+        if (!Number.isFinite(p.y)) p.y = dims.length / 2;
         if (!Number.isFinite(p.z)) p.z = 1.1; // Default height
 
         if (globalThis.__B44_LOGS) console.log(
