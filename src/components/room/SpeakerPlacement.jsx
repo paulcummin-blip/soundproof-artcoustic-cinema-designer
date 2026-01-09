@@ -998,7 +998,7 @@ function UnifiedSurroundsConfig({
       const hydrated = resetSurroundPositions(
         effectivePreset,
         mlpPoint,
-        dimensions,
+        effectiveDims,
         draft,
         modelKey
       );
@@ -1378,6 +1378,7 @@ function formatDolbyLabel(key) {
 function SpeakerPlacementImpl(props) {
   const {
     disabled = false,
+    dimensions: dimensionsProp, // NEW: Room dimensions from parent
     sevenBedLayoutType,
     onSevenBedLayoutTypeChange,
     dolbyPreset,
@@ -1392,7 +1393,7 @@ function SpeakerPlacementImpl(props) {
   const appState = app;
 
   const {
-    speakerSystem, setSpeakerSystem, dimensions, seatingPositions, setDolbyConfig, dolbyConfig,
+    speakerSystem, setSpeakerSystem, seatingPositions, setDolbyConfig, dolbyConfig,
     showToast,
     setUseWidesInsteadOfRears, 
     overheadGlobalModel,
@@ -1412,12 +1413,70 @@ function SpeakerPlacementImpl(props) {
     enableFrontWides, // <-- FW overlay state
   } = appState || {};
 
+  // CRITICAL: Effective room dimensions - NEVER empty, always has valid numbers
+  // This ensures resetSurroundPositions always gets usable W/L/H values
+  const effectiveDims = React.useMemo(() => {
+    const propW = Number(dimensionsProp?.width ?? dimensionsProp?.widthM);
+    const propL = Number(dimensionsProp?.length ?? dimensionsProp?.lengthM);
+    const propH = Number(dimensionsProp?.height ?? dimensionsProp?.heightM);
+    
+    const appW = Number(appState?.roomDims?.widthM ?? appState?.roomDims?.width);
+    const appL = Number(appState?.roomDims?.lengthM ?? appState?.roomDims?.length);
+    const appH = Number(appState?.roomDims?.heightM ?? appState?.roomDims?.height);
+    
+    const DEFAULT_WIDTH = 4.5;
+    const DEFAULT_LENGTH = 6.0;
+    const DEFAULT_HEIGHT = 2.4;
+    
+    const finalWidth = (Number.isFinite(propW) && propW > 0) ? propW 
+                     : (Number.isFinite(appW) && appW > 0) ? appW 
+                     : DEFAULT_WIDTH;
+    
+    const finalLength = (Number.isFinite(propL) && propL > 0) ? propL 
+                      : (Number.isFinite(appL) && appL > 0) ? appL 
+                      : DEFAULT_LENGTH;
+    
+    const finalHeight = (Number.isFinite(propH) && propH > 0) ? propH 
+                      : (Number.isFinite(appH) && appH > 0) ? appH 
+                      : DEFAULT_HEIGHT;
+    
+    const result = {
+      width: finalWidth,
+      length: finalLength,
+      height: finalHeight,
+      widthM: finalWidth,
+      lengthM: finalLength,
+      heightM: finalHeight,
+    };
+    
+    // DEBUG: Show dimension sources
+    if (globalThis.__B44_LOGS) {
+      console.log('[SP effectiveDims]', {
+        propDims: dimensionsProp,
+        appDims: appState?.roomDims,
+        effectiveDims: result,
+        W: finalWidth,
+        L: finalLength,
+        H: finalHeight,
+      });
+    }
+    
+    return result;
+  }, [
+    dimensionsProp?.width, dimensionsProp?.widthM,
+    dimensionsProp?.length, dimensionsProp?.lengthM,
+    dimensionsProp?.height, dimensionsProp?.heightM,
+    appState?.roomDims?.widthM, appState?.roomDims?.width,
+    appState?.roomDims?.lengthM, appState?.roomDims?.length,
+    appState?.roomDims?.heightM, appState?.roomDims?.height,
+  ]);
+
   if (globalThis.__B44_LOGS) console.log("[B44] DIMENSIONS CHECK", {
-    raw: dimensions,
-    width: dimensions?.width,
-    length: dimensions?.length,
-    height: dimensions?.height,
-    keys: dimensions ? Object.keys(dimensions) : null
+    propDims: dimensionsProp,
+    effectiveDims: effectiveDims,
+    width: effectiveDims?.width,
+    length: effectiveDims?.length,
+    height: effectiveDims?.height,
   });
 
   const frontSubsCfg = appState?.frontSubsCfg || props?.frontSubsCfg || { 
@@ -1772,15 +1831,15 @@ function SpeakerPlacementImpl(props) {
   }
 
   const mlpPoint = useMemo(() => {
-    const W = Number(dimensions?.width ?? dimensions?.widthM) || 0;
-    const L = Number(dimensions?.length ?? dimensions?.lengthM) || 0;
+    const W = Number(effectiveDims?.width ?? effectiveDims?.widthM) || 0;
+    const L = Number(effectiveDims?.length ?? effectiveDims?.lengthM) || 0;
     return computeMLPAndPrimary(
       seatingPositions || [], 
       W, 
       L, 
       "front"
     )?.mlp || null;
-  }, [seatingPositions, dimensions?.width, dimensions?.widthM, dimensions?.length, dimensions?.lengthM]);
+  }, [seatingPositions, effectiveDims?.width, effectiveDims?.widthM, effectiveDims?.length, effectiveDims?.lengthM]);
 
   const setSpeakers = useCallback((updater) => {
     setSpeakerSystem(prev => {
@@ -1825,9 +1884,7 @@ function SpeakerPlacementImpl(props) {
       const W = Number(dims?.width ?? dims?.widthM);
       const L = Number(dims?.length ?? dims?.lengthM);
 
-      console.log('[SP resetSurroundPositions CALLBACK] HIT', { layoutString, modelKeyParam, W, L, speakerCount: Array.isArray(currentSpeakers) ? currentSpeakers.length : null });
-      alert('[SP] resetSurroundPositions HIT (check console for W/L)');
-      debugger;
+      console.log('[SP resetSurroundPositions CALLBACK] HIT', { layoutString, modelKeyParam, W, L, dims, speakerCount: Array.isArray(currentSpeakers) ? currentSpeakers.length : null });
 
       // If room dims are not usable, do nothing (do NOT null anything)
       if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
@@ -1928,7 +1985,7 @@ function SpeakerPlacementImpl(props) {
     // Hydrate positions now
     setSpeakers(prev => {
       const layout = String(effectivePreset || "5.1").split(" ")[0].split("_")[0];
-      const next = resetSurroundPositions(layout, mlpPoint, dimensions, prev, modelKey);
+      const next = resetSurroundPositions(layout, mlpPoint, effectiveDims, prev, modelKey);
       return Array.isArray(next) ? next : prev;
     });
 
@@ -1937,14 +1994,14 @@ function SpeakerPlacementImpl(props) {
   }, [setSpeakers, resetSurroundPositions, effectivePreset, mlpPoint, dimensions]);
 
   const handleResetPositions = useCallback(() => {
-    const W = Number(dimensions?.width ?? dimensions?.widthM) || 0;
-    const L = Number(dimensions?.length ?? dimensions?.lengthM) || 0;
-    const H = Number(dimensions?.height ?? dimensions?.heightM) || 2.4;
-    
-    if (!mlpPoint || !dimensions ||
-        !Number.isFinite(Number(dimensions?.width ?? dimensions?.widthM)) ||
-        !Number.isFinite(Number(dimensions?.length ?? dimensions?.lengthM)) ||
-        !Number.isFinite(Number(dimensions?.height ?? dimensions?.heightM))
+    const W = Number(effectiveDims?.width ?? effectiveDims?.widthM) || 0;
+    const L = Number(effectiveDims?.length ?? effectiveDims?.lengthM) || 0;
+    const H = Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.4;
+
+    if (!mlpPoint || !effectiveDims ||
+        !Number.isFinite(Number(effectiveDims?.width ?? effectiveDims?.widthM)) ||
+        !Number.isFinite(Number(effectiveDims?.length ?? effectiveDims?.lengthM)) ||
+        !Number.isFinite(Number(effectiveDims?.height ?? effectiveDims?.heightM))
     ) {
       if (showToast) {
         if (globalThis.__B44_LOGS) console.error('Cannot reset speakers: Room dimensions or MLP not set.');
@@ -1957,13 +2014,13 @@ function SpeakerPlacementImpl(props) {
       if (!Array.isArray(currentSpeakers) || currentSpeakers.length === 0) {
         return currentSpeakers;
       }
-      
+
       // Use UI-selected model for reset, same as speakerApply effect
       const uiModelRaw = String(surroundConfig?.value?.master || "off").trim();
       const uiModelLower = uiModelRaw.toLowerCase();
       const modelKeyForPlacement = (uiModelLower === "off" || uiModelLower === "none") ? null : uiModelRaw;
-      
-      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, currentSpeakers, modelKeyForPlacement);
+
+      const reset = resetSurroundPositions(effectivePreset, mlpPoint, effectiveDims, currentSpeakers, modelKeyForPlacement);
       // Clear positionSource for all speakers (return to auto mode)
       return reset.map(s => ({ ...s, positionSource: 'auto' }));
     });
@@ -1972,13 +2029,13 @@ function SpeakerPlacementImpl(props) {
       const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : effectivePreset.startsWith('9.') ? '9.x' : '7.1';
       showToast(`Speaker positions reset for ${layoutKey} layout with 50cm corner clearance.`, 'success');
     }
-  }, [effectivePreset, mlpPoint, dimensions, resetSurroundPositions, setSpeakers, showToast, globalSurroundModel]);
+  }, [effectivePreset, mlpPoint, effectiveDims, resetSurroundPositions, setSpeakers, showToast, globalSurroundModel]);
 
   // NEW: Auto-hydrate surround positions when layout or 7.x toggle changes
   // This ensures SBL/SBR and LW/RW appear WITHOUT requiring zone toggles
   useEffect(() => {
     if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) return;
-    if (!mlpPoint || !dimensions) return;
+    if (!mlpPoint || !effectiveDims) return;
     if (!effectivePreset) return;
 
     const masterSurroundModel = String(surroundConfig?.value?.master || 'off');
@@ -2007,21 +2064,21 @@ function SpeakerPlacementImpl(props) {
 
     // Force one hydration pass to ensure speakers exist with positions
     setSpeakers(current => {
-      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimensions, current, masterSurroundModel);
-      
+      const reset = resetSurroundPositions(effectivePreset, mlpPoint, effectiveDims, current, masterSurroundModel);
+
       if (__b44SameSpeakers(current, reset)) return current;
       return reset;
     });
-  }, [
-  effectivePreset,
-  useWides,
-  surroundConfig?.value?.master,
-  placedSpeakers?.length,
-  mlpPoint,
-  dimensions,
-  resetSurroundPositions,
-  setSpeakers,
-  ]);
+    }, [
+    effectivePreset,
+    useWides,
+    surroundConfig?.value?.master,
+    placedSpeakers?.length,
+    mlpPoint,
+    effectiveDims,
+    resetSurroundPositions,
+    setSpeakers,
+    ]);
 
   useEffect(() => {
     // HARD GUARD: if there are no speakers, SpeakerPlacement must do nothing.
@@ -2033,9 +2090,9 @@ function SpeakerPlacementImpl(props) {
 
     // ---- build a stable input signature for this effect ----
     const __sig = __b44SigFor({
-      w: (dimensions?.width ?? dimensions?.widthM) ?? null,
-      l: (dimensions?.length ?? dimensions?.lengthM) ?? null,
-      h: (dimensions?.height ?? dimensions?.heightM) ?? null,
+      w: (effectiveDims?.width ?? effectiveDims?.widthM) ?? null,
+      l: (effectiveDims?.length ?? effectiveDims?.lengthM) ?? null,
+      h: (effectiveDims?.height ?? effectiveDims?.heightM) ?? null,
       mlpX: mlpPoint?.x ?? null,
       mlpY: mlpPoint?.y ?? null,
       preset: effectivePreset ?? null,
@@ -2054,8 +2111,8 @@ function SpeakerPlacementImpl(props) {
     __b44LastEffectSigRef.current.speakerApply = __sig;
 
     // ---- early exit if room dimensions are not usable ----
-    const W = Number(dimensions?.width ?? dimensions?.widthM);
-    const L = Number(dimensions?.length ?? dimensions?.lengthM);
+    const W = Number(effectiveDims?.width ?? effectiveDims?.widthM);
+    const L = Number(effectiveDims?.length ?? effectiveDims?.lengthM);
     if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
       if (globalThis.__B44_LOGS) console.warn('[SP speakerApply] ABORT: invalid room dimensions', { W, L });
       return;
@@ -2076,7 +2133,7 @@ function SpeakerPlacementImpl(props) {
       ? resetSurroundPositions(
           effectivePreset,
           mlpPoint,
-          dimensions,
+          effectiveDims,
           placedSpeakers,
           modelKeyForPlacement
         )
@@ -2110,9 +2167,9 @@ function SpeakerPlacementImpl(props) {
     effectivePreset,
     surroundConfig?.value?.master,
     mlpPoint?.x, mlpPoint?.y,
-    dimensions?.width, dimensions?.widthM,
-    dimensions?.length, dimensions?.lengthM,
-    dimensions?.height, dimensions?.heightM,
+    effectiveDims?.width, effectiveDims?.widthM,
+    effectiveDims?.length, effectiveDims?.lengthM,
+    effectiveDims?.height, effectiveDims?.heightM,
     allowedRoles
     ]);
 
@@ -2121,10 +2178,10 @@ function SpeakerPlacementImpl(props) {
   // ---------------------------------------------------------------------------
   // FRONT-WIDE AUTO MEDIAN (RP22 - UNCONDITIONAL, but respects user lock)
   // LW / RW sit at the midpoint between FL/SL and FR/SR respectively.
-  // This runs whenever speakers or dimensions change, independent of overlay state.
+  // This runs whenever speakers or effectiveDims change, independent of overlay state.
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!canWides || !dimensions) return;
+    if (!canWides || !effectiveDims) return;
 
     const __sig = __b44SigFor({
       w: dimensions?.width ?? null,
@@ -2152,8 +2209,8 @@ function SpeakerPlacementImpl(props) {
       });
       if (!hasFW) return prev;
 
-      const W = Number(dimensions?.width ?? dimensions?.widthM) || 0;
-      const L = Number(dimensions?.length ?? dimensions?.lengthM) || 0;
+      const W = Number(effectiveDims?.width ?? effectiveDims?.widthM) || 0;
+      const L = Number(effectiveDims?.length ?? effectiveDims?.lengthM) || 0;
       if (!W || !L) return prev;
 
       const byCanon = new Map();
@@ -2207,7 +2264,7 @@ function SpeakerPlacementImpl(props) {
         const medianY = (Number.isFinite(sharedMedianY) ? sharedMedianY : (fy + sy) / 2);
 
         // X is pinned to the side wall using the hugging helpers
-        const hugging = getHuggingCenterLines(s.model, dimensions);
+        const hugging = getHuggingCenterLines(s.model, effectiveDims);
         const wallX =
           canon === "LW"
             ? hugging.leftWallX
@@ -2220,8 +2277,8 @@ function SpeakerPlacementImpl(props) {
         };
 
         // Respect buffer / corners but keep it on the wall
-        pos = applyCornerClearance(pos, canon, s.model, dimensions, {});
-        pos = applyRoomBoundsClamp(pos, s.model, dimensions);
+        pos = applyCornerClearance(pos, canon, s.model, effectiveDims, {});
+        pos = applyRoomBoundsClamp(pos, s.model, effectiveDims);
 
         if (!Number.isFinite(pos.x) || !Number.isFinite(pos.y)) {
           return s;
@@ -2243,10 +2300,10 @@ function SpeakerPlacementImpl(props) {
       });
       }, [
       canWides,
-      dimensions?.width,
-      dimensions?.widthM,
-      dimensions?.length,
-      dimensions?.lengthM,
+      effectiveDims?.width,
+      effectiveDims?.widthM,
+      effectiveDims?.length,
+      effectiveDims?.lengthM,
       applyCornerClearance,
       applyRoomBoundsClamp,
       getHuggingCenterLines,
@@ -2263,14 +2320,14 @@ function SpeakerPlacementImpl(props) {
       ]);
 
       // --- FINAL FRONT-WIDE Y CORRECTION -----------------------------------------
-  // Ensures LW and RW always sit at the true median between front and side
-  // surrounds on their own side. We only touch the Y position; X is already
-  // wall-pinned by the hugging logic.
-  // [B44 POSITION LOCK] Only adjusts auto-positioned speakers
-  useEffect(() => {
-    const __sig = __b44SigFor({
-      w: dimensions?.width ?? null,
-      l: dimensions?.length ?? null,
+      // Ensures LW and RW always sit at the true median between front and side
+      // surrounds on their own side. We only touch the Y position; X is already
+      // wall-pinned by the hugging logic.
+      // [B44 POSITION LOCK] Only adjusts auto-positioned speakers
+      useEffect(() => {
+      const __sig = __b44SigFor({
+      w: effectiveDims?.width ?? null,
+      l: effectiveDims?.length ?? null,
       flY: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.y,
       frY: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position?.y,
       slY: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL')?.position?.y,
@@ -2344,10 +2401,10 @@ function SpeakerPlacementImpl(props) {
         // Depend on room geometry / toggles so this runs when things change,
         // but the EPS guard above prevents unnecessary setState loops.
         }, [
-        dimensions?.width,
-        dimensions?.widthM,
-        dimensions?.length,
-        dimensions?.lengthM,
+        effectiveDims?.width,
+        effectiveDims?.widthM,
+        effectiveDims?.length,
+        effectiveDims?.lengthM,
         setSpeakers,
         // React to FL/FR/SL/SR position changes
         placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position?.y,
@@ -2360,9 +2417,9 @@ function SpeakerPlacementImpl(props) {
         // Ensures LW and RW are perfectly mirrored on the X-axis around the room center.
         // This runs after all other positioning and clamping, correcting any asymmetries.
         useEffect(() => {
-        if (!canWides || !dimensions) return;
+        if (!canWides || !effectiveDims) return;
 
-        const W = Number(dimensions?.width ?? dimensions?.widthM);
+        const W = Number(effectiveDims?.width ?? effectiveDims?.widthM);
         if (!Number.isFinite(W) || W <= 0) return;
 
         const lw = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW');
@@ -2399,8 +2456,8 @@ function SpeakerPlacementImpl(props) {
         }
         }, [
         canWides,
-        dimensions?.width,
-        dimensions?.widthM,
+        effectiveDims?.width,
+        effectiveDims?.widthM,
         placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW')?.position?.x,
         placedSpeakers?.find(s => getCanonicalRole(s.role) === 'RW')?.position?.x,
         placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW')?.positionSource,
@@ -2493,7 +2550,7 @@ function SpeakerPlacementImpl(props) {
   ]);
 
   const resetOnlyFrontWidesToDefaults = useCallback(() => {
-    if (!mlpPoint || !dimensions || !canWides) {
+    if (!mlpPoint || !effectiveDims || !canWides) {
         if (showToast) {
         if (globalThis.__B44_LOGS) console.info('Front-Wide speakers are not enabled or room data missing.');
         showToast('Front-Wide speakers are not enabled or room data missing.', 'info');
@@ -2513,23 +2570,23 @@ function SpeakerPlacementImpl(props) {
         const newFWSpeakers = [];
         const fwRoles = ['LW', 'RW'];
 
-        const W = Number(dimensions?.width ?? dimensions?.widthM) || 4.5;
-        const L = Number(dimensions?.length ?? dimensions?.lengthM) || 6.0;
+        const W = Number(effectiveDims?.width ?? effectiveDims?.widthM) || 4.5;
+        const L = Number(effectiveDims?.length ?? effectiveDims?.lengthM) || 6.0;
 
         fwRoles.forEach(role => {
             const existing = existingSpeakersMap.get(role);
             let model = existing?.model || existingSpeakersMap.get(role === 'LW' ? 'SL' : 'SR')?.model || 'off';
-            
+
             if (model === 'off') return;
 
             let xAtWall;
             const medianY = L / 2;
 
             if (role === 'LW') {
-                const hugging = getHuggingCenterLines(model, dimensions);
+                const hugging = getHuggingCenterLines(model, effectiveDims);
                 xAtWall = hugging.leftWallX;
             } else if (role === 'RW') {
-                const hugging = getHuggingCenterLines(model, dimensions);
+                const hugging = getHuggingCenterLines(model, effectiveDims);
                 xAtWall = hugging.rightWallX;
             } else {
                 return;
@@ -2554,8 +2611,8 @@ function SpeakerPlacementImpl(props) {
     if (showToast) {
         if (globalThis.__B44_LOGS) console.log('Front-Wide speakers reset to median positions.');
         showToast('Front-Wide speakers reset to median positions.', 'success');
-      }
-  }, [mlpPoint, dimensions, canWides, setSpeakers, showToast, getHuggingCenterLines]);
+        }
+        }, [mlpPoint, effectiveDims, canWides, setSpeakers, showToast, getHuggingCenterLines]);
 
   useEffect(() => {
     const handler = () => {
@@ -2573,8 +2630,8 @@ function SpeakerPlacementImpl(props) {
       let speakers = [...prevSpeakers];
       let changed = false;
 
-      const W = Number(dimensions?.width ?? dimensions?.widthM) || 0;
-      const L = Number(dimensions?.length ?? dimensions?.lengthM) || 0;
+      const W = Number(effectiveDims?.width ?? effectiveDims?.widthM) || 0;
+      const L = Number(effectiveDims?.length ?? effectiveDims?.lengthM) || 0;
 
       // Skip if room dimensions are invalid (cannot calculate fallbacks)
       if (!Number.isFinite(W) || W <= 0 || !Number.isFinite(L) || L <= 0) {
@@ -2764,8 +2821,8 @@ function SpeakerPlacementImpl(props) {
     placedSpeakers,
     effectivePreset,
     useWides,
-    dimensions?.width, dimensions?.widthM,
-    dimensions?.length, dimensions?.lengthM,
+    effectiveDims?.width, effectiveDims?.widthM,
+    effectiveDims?.length, effectiveDims?.lengthM,
     allowedRoles,
     setSpeakers,
   ]);

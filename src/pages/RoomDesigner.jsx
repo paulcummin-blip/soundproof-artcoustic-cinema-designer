@@ -4061,6 +4061,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   
                   <Suspense fallback={<div>Loading...</div>}>
                       <SpeakerPlacement disabled={isFrozen('speakers')}
+                        dimensions={stableDimensions}
                         sevenBedLayoutType={_sevenBedLayoutType}
                         onSevenBedLayoutTypeChange={setSevenBedLayoutType}
                         dolbyPreset={dolbyPreset}
