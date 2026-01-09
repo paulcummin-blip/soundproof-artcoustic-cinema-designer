@@ -701,7 +701,7 @@ function useProjectLoader(
         const projectData = serializeProject({
           name: projectNameState,
           roomDims: appState.roomDims,
-          dimensions,
+          dimensions: appState.roomDims, // Use appState.roomDims directly (serializeProject needs legacy fields)
           screen,
           seatingPositions: appState?.seatingPositions || seatingPositions || [],
           seatsPerRowByRow,
@@ -851,7 +851,7 @@ function useProjectLoader(
       const projectData = serializeProject({
         name: projectNameState,
         roomDims: appState.roomDims,
-        dimensions: stableDimensions,
+        dimensions: appState.roomDims, // Use appState.roomDims directly (serializeProject needs legacy fields)
         screen,
         seatingPositions: appState?.seatingPositions || seatingPositions || [],
         seatsPerRowByRow,
