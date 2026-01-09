@@ -993,8 +993,7 @@ function UnifiedSurroundsConfig({
       );
 
       // — REAR RESCUE: guarantee SBL/SBR exist + have valid positions when layout expects rears —
-      // --- bed rears required? (SBL/SBR) ---
-      const layoutMajor = parseInt(String(effectivePreset || "5.1").split(".")[0], 10) || 5;
+      // Use already-declared layoutMajor from line 907
       const useWidesInsteadOfRears = sevenBedLayoutType === "wides";
       const expectsRears = (layoutMajor >= 9) || (layoutMajor === 7 && !useWidesInsteadOfRears);
 
