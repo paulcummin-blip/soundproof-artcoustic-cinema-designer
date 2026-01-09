@@ -1645,13 +1645,6 @@ function RoomDesignerWithState() {
   // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
 
   // ⚠️ Hoisted memos so they’re initialized before any effects that depend on them
-  // `stableDimensions` now directly depends on `appState.roomDims` (the source of truth)
-  const stableDimensions = useMemo(() => ({
-    width: Number(_roomDims?.widthM) || 4.5,
-    length: Number(_roomDims?.lengthM) || 6.0,
-    height: Number(_roomDims?.heightM) || 2.8,
-  }), [_roomDims?.widthM, _roomDims?.lengthM, _roomDims?.heightM]);
-
   // stableScreen now directly depends on _screen from appState
   const stableScreen = useMemo(() => ({
     mountMode: _screen?.mountMode || "floating",
