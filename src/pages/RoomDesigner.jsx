@@ -1642,6 +1642,8 @@ function RoomDesignerWithState() {
   const lastPresetRef = React.useRef(dolbyPreset);
   useEffect(() => { lastPresetRef.current = dolbyPreset; }, [dolbyPreset]);
 
+  // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
+
   // ⚠️ Hoisted memos so they’re initialized before any effects that depend on them
   // `stableDimensions` now directly depends on `appState.roomDims` (the source of truth)
   const stableDimensions = useMemo(() => ({
