@@ -188,11 +188,36 @@ export function useAppState() {
 }
 
 function useDesignerState() {
-  const [roomDims, setRoomDims] = useState({
+  const [roomDims, _setRoomDims] = useState({
     widthM: 4.5,
     lengthM: 6.0,
     heightM: 2.4,
   });
+
+  // CRITICAL: Normalizer - ensure roomDims is NEVER {} and always has finite numbers
+  const setRoomDims = useCallback((updater) => {
+    _setRoomDims(prev => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      
+      // Default fallback values
+      const DEFAULT_WIDTH = 4.5;
+      const DEFAULT_LENGTH = 6.0;
+      const DEFAULT_HEIGHT = 2.4;
+      
+      // Normalize: extract from any key variant, fallback to defaults
+      const normalized = {
+        widthM: Number(next?.widthM ?? next?.width) || DEFAULT_WIDTH,
+        lengthM: Number(next?.lengthM ?? next?.length) || DEFAULT_LENGTH,
+        heightM: Number(next?.heightM ?? next?.height) || DEFAULT_HEIGHT,
+        // Mirror keys for compatibility
+        width: Number(next?.widthM ?? next?.width) || DEFAULT_WIDTH,
+        length: Number(next?.lengthM ?? next?.length) || DEFAULT_LENGTH,
+        height: Number(next?.heightM ?? next?.height) || DEFAULT_HEIGHT,
+      };
+      
+      return normalized;
+    });
+  }, []);
 
   const setRoomWidthM = useCallback((v) => {
     const newVal = Number(v);
