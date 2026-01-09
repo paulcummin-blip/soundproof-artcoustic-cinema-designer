@@ -9,10 +9,18 @@ function resetSurroundPositions(layout, mlpPoint, dimensions, speakers, modelKey
   const W = Number(dimensions?.width ?? dimensions?.widthM) || 0;
   const L = Number(dimensions?.length ?? dimensions?.lengthM) || 0;
 
-  if (globalThis.__B44_LOGS) console.log('[SP resetSurroundPositions TOP] W/L/modelKey', { W, L, modelKey });
+  safeLog("[resetSurroundPositions] INPUT", {
+    modelKey,
+    W, L,
+    dimsKeys: dimensions ? Object.keys(dimensions) : null,
+    dimensions,
+  });
 
   // If room is not valid, return unchanged
-  if (!(W > 0 && L > 0)) return Array.isArray(speakers) ? speakers : [];
+  if (!(W > 0 && L > 0)) {
+    safeLog("[resetSurroundPositions] ABORT (invalid W/L)", { W, L, dimensions });
+    return Array.isArray(speakers) ? speakers : [];
+  }
 
   const m = String(modelKey || "").trim().toLowerCase();
   const modelOn = !!m && m !== "off" && m !== "none";
