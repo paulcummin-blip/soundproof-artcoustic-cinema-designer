@@ -1377,6 +1377,17 @@ function formatDolbyLabel(key) {
 
 function SpeakerPlacementImpl(props) {
   const dimensions = props?.dimensions; // legacy alias to prevent ReferenceError
+  
+  // Define dimsSafe early - always exists, always has valid numbers
+  const dimsSafe = React.useMemo(() => {
+    const src = dimensions || props.roomDimensions || {};
+    return {
+      width: Number(src.width ?? src.widthM) || 4.5,
+      length: Number(src.length ?? src.lengthM) || 6.0,
+      height: Number(src.height ?? src.heightM) || 2.4,
+    };
+  }, [dimensions, props.roomDimensions]);
+  
   const {
     disabled = false,
     dimensions: dimensionsProp, // NEW: Room dimensions from parent
