@@ -5273,12 +5273,36 @@ return {
     }
 
     // FINAL OVERRIDE — Front Wides yaw rules (must win over any other yaw logic)
-    if (canon === "LW" || canon === "RW") {
-      if (aimFrontWidesAtMLP) {
+    // Read all three independent toggles from appState
+    const aimFWAtMLP = !!appState?.aimFrontWidesAtMLP;
+    const aimSSAtMLP = !!appState?.aimSideSurroundsAtMLP;
+    const aimRSAtMLP = !!appState?.aimRearSurroundsAtMLP;
+
+    // Determine which group this speaker belongs to
+    const isFW = canon === "LW" || canon === "RW";
+    const isSS = canon === "SL" || canon === "SR";
+    const isRS = canon === "SBL" || canon === "SBR";
+
+    if (isFW) {
+      if (aimFWAtMLP) {
         yawDeg = safeYawToMLP(speaker.position, mlp);
       } else {
         // Aim OFF: sit flat to side walls (left = -90, right = +90)
         yawDeg = (canon === "LW") ? -90 : +90;
+      }
+    } else if (isSS) {
+      if (aimSSAtMLP) {
+        yawDeg = safeYawToMLP(speaker.position, mlp);
+      } else {
+        // Aim OFF: sides revert to wall-aligned yaw
+        yawDeg = 0;
+      }
+    } else if (isRS) {
+      if (aimRSAtMLP) {
+        yawDeg = safeYawToMLP(speaker.position, mlp);
+      } else {
+        // Aim OFF: rears revert to wall-aligned yaw
+        yawDeg = 0;
       }
     }
 
