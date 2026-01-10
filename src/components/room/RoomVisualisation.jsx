@@ -5277,8 +5277,37 @@ return {
       ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
       : undefined;
 
-    // Visual-only yaw: flip sign so icons match the room coordinate system.
-    const visualYawDeg = Number.isFinite(yawDeg) ? -yawDeg : 0;
+    // Helper: compute yaw from canvas coords (guaranteed correct direction)
+    const yawDegCanvasToTarget = (fromX, fromY, toX, toY) => {
+      const dx = toX - fromX;
+      const dy = toY - fromY;
+      // SVG/canvas: +Y is down. rotate(+) is clockwise in SVG coords.
+      return (Math.atan2(dx, dy) * 180) / Math.PI;
+    };
+
+    const canon = getCanonicalRole(speaker?.role);
+
+    let visualYawDeg;
+
+    // LCR aim override: compute yaw in CANVAS space (guaranteed correct direction)
+    if (aimAtMLP && (canon === "FL" || canon === "FR") && mlp) {
+      const mlpCanvasX = meterToCanvasX(mlp.x);
+      const mlpCanvasY = meterToCanvasY(mlp.y);
+
+      visualYawDeg = yawDegCanvasToTarget(
+        safeCanvasX,
+        safeCanvasY,
+        mlpCanvasX,
+        mlpCanvasY
+      );
+      
+      if (globalThis.__B44_LOGS) {
+        console.log("[LCR yaw canvas]", canon, { visualYawDeg });
+      }
+    } else {
+      // Existing behaviour for everything else (keep as-is)
+      visualYawDeg = Number.isFinite(yawDeg) ? -yawDeg : 0;
+    }
 
     return (
       <SpeakerIcon
