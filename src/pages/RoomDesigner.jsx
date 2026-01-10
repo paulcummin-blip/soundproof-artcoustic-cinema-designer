@@ -4031,7 +4031,7 @@ function RoomDesignerWithState() {
                     </summary>
                     <div className="space-y-2 mt-3">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="aim-lcr" className="text-sm">Left / Right → Aim to MLP</Label>
+                        <Label htmlFor="aim-lcr" className="text-sm">Left / Right</Label>
                         <Switch
                       id="aim-lcr"
                       checked={lcrAimMode === "angled"}
@@ -4040,7 +4040,7 @@ function RoomDesignerWithState() {
 
                       </div>
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="aim-front-wides" className="text-sm">Front Wides → Aim to MLP</Label>
+                        <Label htmlFor="aim-front-wides" className="text-sm">Front Wides</Label>
                         <Switch
                       id="aim-front-wides"
                       checked={appState?.aimFrontWidesAtMLP || false}
@@ -4049,7 +4049,7 @@ function RoomDesignerWithState() {
 
                       </div>
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="aim-side-surrounds" className="text-sm">Side Surrounds → Aim to MLP</Label>
+                        <Label htmlFor="aim-side-surrounds" className="text-sm">Side Surrounds</Label>
                         <Switch
                       id="aim-side-surrounds"
                       checked={appState?.aimSideSurroundsAtMLP || false}
@@ -4058,7 +4058,7 @@ function RoomDesignerWithState() {
 
                       </div>
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="aim-rear-surrounds" className="text-sm">Rear Surrounds → Aim to MLP</Label>
+                        <Label htmlFor="aim-rear-surrounds" className="text-sm">Rear Surrounds</Label>
                         <Switch
                       id="aim-rear-surrounds"
                       checked={appState?.aimRearSurroundsAtMLP || false}
