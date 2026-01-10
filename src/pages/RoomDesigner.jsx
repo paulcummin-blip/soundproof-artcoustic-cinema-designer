@@ -4066,9 +4066,6 @@ function RoomDesignerWithState() {
                       disabled={isFrozen('speakers')} />
 
                       </div>
-                      <div className="text-xs text-gray-500 mt-2">
-                        Turns the speaker to face the MLP. Position does not change (yet).
-                      </div>
                     </div>
                   </details>
                   
