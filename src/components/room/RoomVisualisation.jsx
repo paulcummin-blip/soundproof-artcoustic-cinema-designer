@@ -5285,8 +5285,6 @@ return {
       return (Math.atan2(dx, dy) * 180) / Math.PI;
     };
 
-    const canon = getCanonicalRole(speaker?.role);
-
     let visualYawDeg;
 
     // LCR aim override: compute yaw in CANVAS space (guaranteed correct direction)
