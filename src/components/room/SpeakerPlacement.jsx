@@ -1895,8 +1895,8 @@ function SpeakerPlacementImpl(props) {
     (layoutString, mlp, dims, currentSpeakers, modelKeyParam) => {
       const list = Array.isArray(currentSpeakers) ? currentSpeakers : [];
 
-      const W = Number(dims?.width ?? dims?.widthM);
-      const L = Number(dims?.length ?? dims?.lengthM);
+      const W = Number(dims?.width);
+      const L = Number(dims?.length);
 
       console.log('[SP resetSurroundPositions CALLBACK] HIT', { layoutString, modelKeyParam, W, L, dims, speakerCount: Array.isArray(currentSpeakers) ? currentSpeakers.length : null });
 
