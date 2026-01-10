@@ -1550,7 +1550,8 @@ function RoomDesignerWithState() {
     return dims;
   }, [_roomDims?.widthM, _roomDims?.lengthM, _roomDims?.heightM]);
   
-  const dimensions = stableDimensions; // compatibility alias (prevents "dimensions is not defined" crashes)
+  const dimensions = stableDimensions; // legacy alias to prevent ReferenceError
+  
   const _selectedSpeakersByRole = appState?.selectedSpeakersByRole;
   const _setSelectedSpeakersByRole = appState?.setSelectedSpeakersByRole;
   const _speakerNodes = appState?.speakerNodes;
