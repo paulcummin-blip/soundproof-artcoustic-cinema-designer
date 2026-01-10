@@ -285,8 +285,8 @@ const getYawForObject = (speaker, lcrAngles, aimAtMLP, dimensions, getModelDimsM
   const L = Number(dimensions?.length) || 0;
 
   // 1) LCR: use precomputed angles when aiming at MLP (rotation only, no position move)
-  if (aimAtMLP && (role === 'FL' || role === 'L')) return -(Number(lcrAngles?.L) || 0);
-  if (aimAtMLP && (role === 'FR' || role === 'R')) return -(Number(lcrAngles?.R) || 0);
+  if (aimAtMLP && (role === 'FL' || role === 'L')) return (Number(lcrAngles?.L) || 0);
+  if (aimAtMLP && (role === 'FR' || role === 'R')) return (Number(lcrAngles?.R) || 0);
   if (role === 'FC' || role === 'C') return 0;
 
   // 2) Side/Rear surrounds must sit FLAT to the wall
