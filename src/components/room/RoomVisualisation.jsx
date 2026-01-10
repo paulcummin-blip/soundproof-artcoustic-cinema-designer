@@ -277,39 +277,23 @@ import {
   SpeakerRect,
 } from "@/components/room/rv/RenderPrimitives";
 
+// NEW: Shared MLP aiming function (used by all speaker groups)
+const getAimingYawDeg = (speaker, mlpTarget) => {
+  if (!speaker?.position) return 0;
+  return safeYawToMLP(speaker.position, mlpTarget);
+};
+
 // NEW: Helper function to compute yaw angle for a speaker
-const getYawForObject = (speaker, lcrAngles, aimAtMLP, dimensions, getModelDimsM) => {
+const getYawForObject = (speaker, lcrAngles, aimAtMLP) => {
   if (!speaker) return 0;
   const role = String(speaker.role || '').toUpperCase();
-  const W = Number(dimensions?.width) || 0;
-  const L = Number(dimensions?.length) || 0;
 
-  // 1) LCR: use precomputed angles when aiming at MLP (rotation only, no position move)
+  // LCR: use precomputed angles when aiming at MLP
   if (aimAtMLP && (role === 'FL' || role === 'L')) return (Number(lcrAngles?.L) || 0);
   if (aimAtMLP && (role === 'FR' || role === 'R')) return (Number(lcrAngles?.R) || 0);
   if (role === 'FC' || role === 'C') return 0;
 
-  // 2) Side/Rear surrounds must sit FLAT to the wall
-  // Side wall: long edge vertical (±90). Back wall: long edge horizontal (0).
-  const pos = speaker.position || {};
-  const dims = getModelDimsM?.(speaker.model) || {};
-  const halfDepth = (Number(dims.depthM) || 0.082) / 2;
-  const leftX  = 0.05 + halfDepth;
-  const rightX = (W ? (W - 0.05 - halfDepth) : NaN);
-  const onLeftWall  = Number.isFinite(pos.x) && Math.abs(pos.x - leftX)  <= 0.035;
-  const onRightWall = Number.isFinite(pos.x) && Math.abs(pos.x - rightX) <= 0.035;
-  const onBackWall  = Number.isFinite(pos.y) && Math.abs(pos.y - (L - (0.05 + halfDepth))) <= 0.035;
-
-  if (['SL', 'SR', 'SBL', 'SBR'].includes(role)) {
-    // Side walls: speaker long edge along the wall, facing into room
-    if (onLeftWall)  return +90;
-    if (onRightWall) return -90;
-
-    // Back wall: long edge across the back wall, facing forward
-    if (onBackWall)  return 0;
-  }
-
-  // 3) Overheads/wides and anything else default to 0°
+  // Other speakers default to 0° (wall-hugging logic moved to renderSpeakers)
   return 0;
 };
 
@@ -409,6 +393,9 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const useFrontGlobal = appState?.useFrontGlobal ?? true;
   const useMidGlobal   = appState?.useMidGlobal   ?? true;
   const useRearGlobal  = appState?.useRearGlobal  ?? true;
+  const aimFrontWidesAtMLP = appState?.aimFrontWidesAtMLP ?? false;
+  const aimSideSurroundsAtMLP = appState?.aimSideSurroundsAtMLP ?? false;
+  const aimRearSurroundsAtMLP = appState?.aimRearSurroundsAtMLP ?? false;
 
   const centerX_m = widthM / 2;
   const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
@@ -2286,7 +2273,23 @@ React.useEffect(() => {
       const sideOffsetKey = canonicalRole === 'LW' ? 'L' : 'R';
       fwOffsetRef.current[sideOffsetKey] = offset;
 
-      const nextPos = { x: xAtWall, y: yClamped, z: spk.position?.z ?? 1.1 };
+      // CRITICAL: Lock LW/RW to wall during drag (no wall breaking)
+      const W = widthM || 0;
+      const L = lengthM || 0;
+      const wallBuffer = 0.05;
+      const fwDims = getModelDimsM?.(spk.model) || {};
+      const fwDepthM = Number(fwDims.depthM) || 0.082;
+      const fwHalfDepth = fwDepthM / 2;
+
+      const lockedX = (canonicalRole === "LW") 
+        ? (wallBuffer + fwHalfDepth) 
+        : (W - wallBuffer - fwHalfDepth);
+      
+      const frontY = wallBuffer + fwHalfDepth;
+      const backY = (L - wallBuffer - fwHalfDepth);
+      const clampedY = Math.max(frontY, Math.min(backY, yClamped));
+
+      const nextPos = { x: lockedX, y: clampedY, z: spk.position?.z ?? 1.1 };
 
       // Update both speakers simultaneously, marking both as user-positioned
       if (nextPos && onSetSpeakers) {
@@ -2307,22 +2310,27 @@ React.useEffect(() => {
               const partnerHalfDepth = (Number(partnerDims?.depthM) || 0.082) / 2;
               const partnerHalfWidth = (Number(partnerDims?.widthM) || 0.20) / 2;
 
-              const partnerXAtWall = (canonicalRole === 'LW')
-                ? (W - WALL_BUFFER_FW - partnerHalfDepth)
-                : (WALL_BUFFER_FW + partnerHalfDepth);
+              // CRITICAL: Lock partner to wall (same logic as dragged speaker)
+              const partnerDims = getModelDimsM?.(partner.model) || {};
+              const partnerDepthM = Number(partnerDims.depthM) || 0.082;
+              const partnerHalfDepth = partnerDepthM / 2;
+              
+              const partnerLockedX = (canonicalRole === 'LW')
+                ? (W - wallBuffer - partnerHalfDepth)
+                : (wallBuffer + partnerHalfDepth);
 
               // Fallback for partner zone bounds
-              const partnerFallbackYMin = WALL_BUFFER_FW + partnerHalfWidth;
-              const partnerFallbackYMax = L - WALL_BUFFER_FW - partnerHalfWidth;
+              const partnerFallbackYMin = wallBuffer + partnerHalfDepth;
+              const partnerFallbackYMax = L - wallBuffer - partnerHalfDepth;
               const partnerFallbackMedianY = L / 2;
               
               const partnerMedianY = partnerZone?.medianY || partnerFallbackMedianY;
               const partnerTargetY = partnerMedianY + offset;
-              const partnerYMinClamped = partnerZone ? ((partnerZone.yMin || 0) + (partnerHalfWidth * SIDE_ALLOW_OVERHANG)) : partnerFallbackYMin;
-              const partnerYMaxClamped = partnerZone ? ((partnerZone.yMax || L) - (partnerHalfWidth * SIDE_ALLOW_OVERHANG)) : partnerFallbackYMax;
+              const partnerYMinClamped = partnerZone ? ((partnerZone.yMin || 0) + partnerHalfDepth) : partnerFallbackYMin;
+              const partnerYMaxClamped = partnerZone ? ((partnerZone.yMax || L) - partnerHalfDepth) : partnerFallbackYMax;
               const partnerYClamped = clamp(partnerTargetY, partnerYMinClamped, partnerYMaxClamped);
 
-              const partnerPos = { x: partnerXAtWall, y: partnerYClamped, z: partner.position?.z ?? 1.1 };
+              const partnerPos = { x: partnerLockedX, y: partnerYClamped, z: partner.position?.z ?? 1.1 };
 
               // Store partner offset too (ensure it's based on actual clamped position)
               const partnerSideOffsetKey = partnerRole === 'LW' ? 'L' : 'R';
@@ -5199,56 +5207,83 @@ return {
     const widthM_spk = dims.widthM || 0.27; // Safe default
     const depthM_spk = dims.depthM || 0.082; // Safe default
 
+    // Position coordinates from speaker.position (with safe fallbacks)
+    const pos_x = position.x ?? 0;
+    const pos_y = position.y ?? 0;
+
     // Compute yaw: prefer explicit speaker.yaw (seeded by SpeakerPlacement)
-    // and fall back to the existing helper if it's not set / not finite.
+    // and fall back to centralized logic if not set.
     let yawDeg;
 
     if (Number.isFinite(speaker?.yaw)) {
       yawDeg = Number(speaker.yaw);
     } else {
-      yawDeg = getYawForObject(
-        speaker,
-        { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
-        aimAtMLP,
-        { width: widthM, length: lengthM, height: heightM },
-        getModelDimsM
-      );
+      const isLCR = (canon === "FL" || canon === "FR" || canon === "FC");
+      const isFrontWide = (canon === "LW" || canon === "RW");
+      const isSideSurround = (canon === "SL" || canon === "SR");
+      const isRearSurround = (canon === "SBL" || canon === "SBR");
+
+      const shouldAimAtMLP =
+        (isLCR && aimAtMLP) ||
+        (isFrontWide && aimFrontWidesAtMLP) ||
+        (isSideSurround && aimSideSurroundsAtMLP) ||
+        (isRearSurround && aimRearSurroundsAtMLP);
+
+      if (shouldAimAtMLP) {
+        yawDeg = getAimingYawDeg(speaker, mlp);
+      } else {
+        // Default / not aiming at MLP: flat to wall logic
+        const pos = speaker.position || {};
+        const dims = getModelDimsM?.(resolvedModel) || {};
+        const halfDepth = (Number(dims.depthM) || 0.082) / 2;
+        const W = widthM || 0;
+        const L = lengthM || 0;
+
+        const leftX = 0.05 + halfDepth;
+        const rightX = (W ? (W - 0.05 - halfDepth) : NaN);
+        const backY = (L ? (L - 0.05 - halfDepth) : NaN);
+
+        const onLeftWall = Number.isFinite(pos.x) && Math.abs(pos.x - leftX) <= 0.035;
+        const onRightWall = Number.isFinite(pos.x) && Math.abs(pos.x - rightX) <= 0.035;
+        const onBackWall = Number.isFinite(pos.y) && Math.abs(pos.y - backY) <= 0.035;
+
+        if (isLCR || canon === "FC" || rvIsOverheadRole(canon)) {
+          yawDeg = 0;
+        } else if (isFrontWide) {
+          // CRITICAL: LW/RW default to 0° when aim is OFF (no wall-snap!)
+          yawDeg = 0;
+        } else if (isSideSurround) {
+          // SL/SR: wall-hugged yaw based on position
+          if (onLeftWall) yawDeg = +90;
+          else if (onRightWall) yawDeg = -90;
+          else yawDeg = 0;
+        } else if (isRearSurround) {
+          // SBL/SBR: wall-aware yaw (can be on side or back wall)
+          const distLeft  = Math.abs(pos.x - 0);
+          const distRight = Math.abs(widthM - pos.x);
+          const distBack  = Math.abs(lengthM - pos.y);
+          const minDist = Math.min(distLeft, distRight, distBack);
+
+          if (minDist === distBack) yawDeg = 0;
+          else if (minDist === distLeft) yawDeg = 90;
+          else if (minDist === distRight) yawDeg = -90;
+          else yawDeg = 0;
+        } else {
+          yawDeg = 0;
+        }
+      }
     }
 
-    // --- Front Wides: keep cabinet flat to side wall when NOT aiming to MLP ---
+    // FINAL OVERRIDE — Front Wides yaw rules (must win over any other yaw logic)
     if (canon === "LW" || canon === "RW") {
-      const aimFW = !!appState?.aimFrontWidesAtMLP; // uses existing app state toggle
-      if (!aimFW) {
-        // LW on left wall faces into room (+90), RW on right wall faces into room (-90)
-        yawDeg = (canon === "LW") ? 90 : -90;
-      }
-    }
-
-    // Position coordinates from speaker.position (with safe fallbacks)
-    const pos_x = position.x ?? 0;
-    const pos_y = position.y ?? 0;
-
-    // --- Rear surround wall-aware yaw ---
-    // If SBL/SBR are dragged onto a side wall, rotate them 90° so the
-    // long edge sits flat on that wall (matching SL/SR behaviour).
-    if (canon === "SBL" || canon === "SBR") {
-      const distLeft  = Math.abs(pos_x - 0);
-      const distRight = Math.abs(widthM - pos_x);
-      const distBack  = Math.abs(lengthM - pos_y); // back wall at y = lengthM
-
-      const minDist = Math.min(distLeft, distRight, distBack);
-
-      if (minDist === distBack) {
-        // Closest to back wall: keep standard rear orientation (flat to back)
+      if (aimFrontWidesAtMLP) {
+        yawDeg = safeYawToMLP(speaker.position, mlp);
+      } else {
         yawDeg = 0;
-      } else if (minDist === distLeft) {
-        // Now effectively on left wall
-        yawDeg = 90;
-      } else if (minDist === distRight) {
-        // Now effectively on right wall
-        yawDeg = -90;
       }
     }
+
+    const visualYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
 
     // Convert to canvas coordinates - use stored position for all speakers
     const canvasX = toCanvasX(pos_x);
