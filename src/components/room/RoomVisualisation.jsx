@@ -77,6 +77,21 @@ const rvIsOverheadRole = (role) => {
 };
 // --- END OVERHEAD HELPERS ---
 
+const degToRad = (deg) => (deg * Math.PI) / 180;
+
+const rotatedHalfExtentToWall = (yawDeg, widthM_spk, depthM_spk, wallAxis /* "x" | "y" */) => {
+  const halfW = Math.max(0, (Number(widthM_spk) || 0) / 2);
+  const halfD = Math.max(0, (Number(depthM_spk) || 0) / 2);
+  const a = Math.abs(Math.cos(degToRad(Number(yawDeg) || 0)));
+  const b = Math.abs(Math.sin(degToRad(Number(yawDeg) || 0)));
+
+  // wallAxis = "x" => left/right wall (normal is X)
+  // wallAxis = "y" => front/back wall (normal is Y)
+  return wallAxis === "x"
+    ? (a * halfW + b * halfD)
+    : (b * halfW + a * halfD);
+};
+
 // Legacy aliases for backward compatibility
 const canonRoleRV = rvSafeCanonRole;
 const isOverheadRole = rvIsOverheadRole;
@@ -5231,11 +5246,58 @@ return {
       yawDeg = 0;
     }
 
-    const finalYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
+    let finalYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
+
+    // --- Wall-safe centre clamp (prevents rotated cabinet crossing the wall) ---
+    const W = Number(widthM) || 0;
+    const L = Number(lengthM) || 0;
+
+    if (W > 0 && L > 0 && speaker?.position) {
+      const wall = Number(WALL_BUFFER_M) || 0.01;
+
+      // Determine if this role is intended to live on a wall
+      const canonRole = getCanonicalRole(speaker.role);
+
+      const isLeftWallRole = (canonRole === "LW" || canonRole === "SL");
+      const isRightWallRole = (canonRole === "RW" || canonRole === "SR");
+      const isBackWallRole = (canonRole === "SBL" || canonRole === "SBR");
+
+      // Compute rotated half-extent towards the relevant wall
+      if (isLeftWallRole || isRightWallRole) {
+        const halfToWall = rotatedHalfExtentToWall(finalYawDeg, widthM_spk, depthM_spk, "x");
+        const xMin = wall + halfToWall;
+        const xMax = W - wall - halfToWall;
+
+        // clamp x only (these speakers are on side walls)
+        speaker = {
+          ...speaker,
+          position: {
+            ...speaker.position,
+            x: Math.min(xMax, Math.max(xMin, Number(speaker.position.x) || 0)),
+          }
+        };
+      }
+
+      if (isBackWallRole) {
+        const halfToWall = rotatedHalfExtentToWall(finalYawDeg, widthM_spk, depthM_spk, "y");
+        const yMin = wall + halfToWall;
+        const yMax = L - wall - halfToWall;
+
+        // clamp y only (rear surrounds live on back wall)
+        speaker = {
+          ...speaker,
+          position: {
+            ...speaker.position,
+            y: Math.min(yMax, Math.max(yMin, Number(speaker.position.y) || 0)),
+          }
+        };
+      }
+    }
+    // --- end wall-safe clamp ---
 
     // Convert to canvas coordinates - use stored position for all speakers
-    const canvasX = toCanvasX(pos_x);
-    const canvasY = toCanvasY(pos_y);
+    const canvasX = toCanvasX(speaker.position.x ?? 0);
+    const canvasY = toCanvasY(speaker.position.y ?? 0);
 
     // NaN safety: ensure we never pass invalid coordinates
     const safeCanvasX = Number.isFinite(canvasX) ? canvasX : 0;
