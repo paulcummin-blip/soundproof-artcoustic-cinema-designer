@@ -5299,7 +5299,6 @@ return {
   getCanonicalRole,
   resolveSurroundModel,
   getSpeakerDims,
-  getYawForObject,
   yHalfExtentM,
   WALL_BUFFER_M,
   roomRect,
@@ -5309,11 +5308,17 @@ return {
   heightM,
   lcrAngleInfo,
   aimAtMLP,
+  aimFrontWidesAtMLP,
+  aimSideSurroundsAtMLP,
+  aimRearSurroundsAtMLP,
   isDraggable,
   bedLayerSpeakerMouseDownHandler,
   setHoveredSpeaker,
   SpeakerIcon,
-  placedSpeakers, // Added to ensure reactivity when speakers change
+  placedSpeakers,
+  mlp,
+  getAimingYawDeg, // Added dependency
+  rvIsOverheadRole, // Added dependency
 ]);
 
   // Renders rear subwoofers using SpeakerRect
