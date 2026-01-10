@@ -5787,16 +5787,7 @@ return (
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-        {/* DEBUG WATERMARK — remove later */}
-        <text
-          x="12"
-          y="18"
-          fontSize="12"
-          fill="#B00020"
-          style={{ pointerEvents: "none" }}
-        >
-          RV LIVE: RoomVisualisation.jsx
-        </text>
+
 
         {/* TEMP DEBUG: Surround Hydration State */}
         {globalThis.__B44_DEBUG_UI === true && (() => {
