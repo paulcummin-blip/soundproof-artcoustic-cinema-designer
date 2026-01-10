@@ -555,41 +555,7 @@ export default function ScreenConfiguration(props) {
                 <div>
                   <Label className="text-[#625143] text-xs">Distance from Front Wall to Screen</Label>
                   <div className="text-[#1B1A1A] font-medium">
-                    {(() => {
-                      // Edge-to-edge only. Front wall is y=0.
-                      // We must use the SAME value the plan drawing uses for the screen plane.
-                      console.log('[LiveMetrics] screen keys', Object.keys(screen || {}), screen);
-                      
-                      const candidates = [
-                        // Most likely "plan uses this" fields (seen in your codebase naming)
-                        screen?.screenPlaneY_m,
-                        screen?.screenPlaneY,
-                        screen?.screenPlaneY_meters,
-                        screen?.screenPlaneY_m_Value,
-                        screen?.screenPlaneY_m_value,
-                        screen?.screenPlaneY_m_current,
-                        screen?.screenPlaneY_m_live,
-
-                        // Common alternates
-                        screen?.screenPlaneYM,
-                        screen?.planeY_m,
-                        screen?.planeYM,
-                        screen?.frontFaceY_m,
-                        screen?.frontWallOffsetM,
-                        screen?.wallOffsetM,
-                        screen?.distanceFromFrontWallM,
-
-                        // Legacy fields (what you used before)
-                        screen?.frontWallToScreenM,
-                        screen?.screenOffsetM,
-                        screen?.floatDepthM,
-                      ].filter(v => Number.isFinite(v) && v >= 0);
-
-                      const chosenM = candidates.length ? Number(candidates[0]) : 0;
-
-                      // chosenM should already be the *front face / screen plane* distance.
-                      return `${Math.round(chosenM * 100)} cm`;
-                    })()}
+                    {Math.round((screen?.screenPlaneY_m ?? 0) * 100)} cm
                   </div>
                 </div>
               </div>

@@ -932,6 +932,7 @@ const byId = useMemo(() => {
 
   // Push live plane up to RoomDesigner when it changes (debounced + change guard)
 const screenSendTimerRef = React.useRef(null);
+const lastSentScreenPlaneRef = React.useRef(null);
 
 React.useEffect(() => {
   if (typeof onScreenPlaneChange !== 'function') return;
@@ -951,6 +952,21 @@ React.useEffect(() => {
 
   return () => clearTimeout(screenSendTimerRef.current);
 }, [actualScreenFrontY, onScreenPlaneChange]);
+
+// NEW: Publish live screen plane Y to screen object for Live Metrics (immediate, no debounce)
+React.useEffect(() => {
+  if (typeof props.onScreenPlaneYChange !== 'function') return;
+  if (!Number.isFinite(actualScreenFrontY)) return;
+
+  // Round to mm to prevent jitter
+  const rounded = Math.round(actualScreenFrontY * 1000) / 1000;
+  
+  // Only call if value actually changed
+  if (lastSentScreenPlaneRef.current === rounded) return;
+  lastSentScreenPlaneRef.current = rounded;
+  
+  props.onScreenPlaneYChange(rounded);
+}, [actualScreenFrontY, props.onScreenPlaneYChange]);
 
   const TOP_GUTTER_PX = 150; // reserved space above room for dimension lines
   
