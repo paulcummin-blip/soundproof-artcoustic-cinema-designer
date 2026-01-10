@@ -5214,6 +5214,15 @@ return {
       );
     }
 
+    // --- Front Wides: keep cabinet flat to side wall when NOT aiming to MLP ---
+    if (canon === "LW" || canon === "RW") {
+      const aimFW = !!appState?.aimFrontWidesAtMLP; // uses existing app state toggle
+      if (!aimFW) {
+        // LW on left wall faces into room (+90), RW on right wall faces into room (-90)
+        yawDeg = (canon === "LW") ? 90 : -90;
+      }
+    }
+
     // Position coordinates from speaker.position (with safe fallbacks)
     const pos_x = position.x ?? 0;
     const pos_y = position.y ?? 0;
