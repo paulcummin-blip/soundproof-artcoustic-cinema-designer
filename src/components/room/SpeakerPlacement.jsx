@@ -2147,7 +2147,7 @@ function SpeakerPlacementImpl(props) {
       ? resetSurroundPositions(
           effectivePreset,
           mlpPoint,
-          effectiveDims,
+          dimsSafe,
           placedSpeakers,
           modelKeyForPlacement
         )
