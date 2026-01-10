@@ -3457,36 +3457,7 @@ useEffect(() => {
 
   }, [constraintZones, screenCenterX_m, onSetSpeakers, placedSpeakers, getCanonicalRole]);
 
-  // [NEW] Persist LCR yaw when aimAtMLP or lcrAngleInfo changes
-  useEffect(() => {
-    if (!onSetSpeakers) return;
-
-    const fl = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL');
-    const fc = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FC');
-    const fr = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR');
-
-    if (!fl && !fc && !fr) return;
-
-    // Compute target yaw for each LCR
-    const targetYawL = aimAtMLP ? (Number(lcrAngleInfo.L) || 0) : 0;
-    const targetYawC = 0;
-    const targetYawR = aimAtMLP ? (Number(lcrAngleInfo.R) || 0) : 0;
-
-    // Check if any need updating
-    const needsUpdateL = fl && Math.abs((fl.yaw ?? 0) - targetYawL) > 0.1;
-    const needsUpdateC = fc && Math.abs((fc.yaw ?? 0) - targetYawC) > 0.1;
-    const needsUpdateR = fr && Math.abs((fr.yaw ?? 0) - targetYawR) > 0.1;
-
-    if (!needsUpdateL && !needsUpdateC && !needsUpdateR) return;
-
-    onSetSpeakers(prev => prev.map(spk => {
-      const role = getCanonicalRole(spk.role);
-      if (role === 'FL') return { ...spk, yaw: targetYawL };
-      if (role === 'FC') return { ...spk, yaw: targetYawC };
-      if (role === 'FR') return { ...spk, yaw: targetYawR };
-      return spk;
-    }));
-  }, [aimAtMLP, lcrAngleInfo.L, lcrAngleInfo.R, onSetSpeakers, getCanonicalRole, placedSpeakers]);
+  // [REMOVED] Redundant useEffect for LCR yaw was here.
 
   // [NEW] Auto-hug surrounds to walls when room dimensions change (only auto-positioned speakers)
   useEffect(() => {
@@ -5209,77 +5180,55 @@ return {
     const pos_x = position.x ?? 0;
     const pos_y = position.y ?? 0;
 
-    // Compute yaw: prefer explicit speaker.yaw (seeded by SpeakerPlacement)
-    // and fall back to centralized logic if not set.
+    // --- YAW CALCULATION ---
     let yawDeg;
 
-    if (Number.isFinite(speaker?.yaw)) {
-      yawDeg = Number(speaker.yaw);
-    } else {
-      const isLCR = (canon === "FL" || canon === "FR" || canon === "FC");
-      const isFrontWide = (canon === "LW" || canon === "RW");
-      const isSideSurround = (canon === "SL" || canon === "SR");
-      const isRearSurround = (canon === "SBL" || canon === "SBR");
+    const isLCR = (canon === "FL" || canon === "FR" || canon === "FC");
+    const isFrontWide = (canon === "LW" || canon === "RW");
+    const isSideSurround = (canon === "SL" || canon === "SR");
+    const isRearSurround = (canon === "SBL" || canon === "SBR");
 
-      const shouldAimAtMLP =
-        (isLCR && aimAtMLP) ||
-        (isFrontWide && aimFrontWidesAtMLP) ||
-        (isSideSurround && aimSideSurroundsAtMLP) ||
-        (isRearSurround && aimRearSurroundsAtMLP);
-
-      if (shouldAimAtMLP) {
+    if (isLCR) {
+      if (aimAtMLP) {
+        if (canon === 'FL') yawDeg = lcrAngleInfo.L;
+        else if (canon === 'FR') yawDeg = lcrAngleInfo.R;
+        else yawDeg = 0; // FC is always 0
+      } else {
+        yawDeg = 0;
+      }
+    } else if (isFrontWide) {
+      if (aimFrontWidesAtMLP) {
         yawDeg = getAimingYawDeg(speaker, mlp);
       } else {
-        // Default / not aiming at MLP: flat to wall logic
-        const pos = speaker.position || {};
-        const dims = getModelDimsM?.(resolvedModel) || {};
-        const halfDepth = (Number(dims.depthM) || 0.082) / 2;
-        const W = widthM || 0;
-        const L = lengthM || 0;
-
-        const leftX = 0.05 + halfDepth;
-        const rightX = (W ? (W - 0.05 - halfDepth) : NaN);
-        const backY = (L ? (L - 0.05 - halfDepth) : NaN);
-
-        const onLeftWall = Number.isFinite(pos.x) && Math.abs(pos.x - leftX) <= 0.035;
-        const onRightWall = Number.isFinite(pos.x) && Math.abs(pos.x - rightX) <= 0.035;
-        const onBackWall = Number.isFinite(pos.y) && Math.abs(pos.y - backY) <= 0.035;
-
-        if (isLCR || canon === "FC" || rvIsOverheadRole(canon)) {
-          yawDeg = 0;
-        } else if (isFrontWide) {
-          // CRITICAL: LW/RW default to 0° when aim is OFF (no wall-snap!)
-          yawDeg = 0;
-        } else if (isSideSurround) {
-          // SL/SR: wall-hugged yaw based on position
-          if (onLeftWall) yawDeg = +90;
-          else if (onRightWall) yawDeg = -90;
-          else yawDeg = 0;
-        } else if (isRearSurround) {
-          // SBL/SBR: wall-aware yaw (can be on side or back wall)
-          const distLeft  = Math.abs(pos.x - 0);
-          const distRight = Math.abs(widthM - pos.x);
-          const distBack  = Math.abs(lengthM - pos.y);
-          const minDist = Math.min(distLeft, distRight, distBack);
-
-          if (minDist === distBack) yawDeg = 0;
-          else if (minDist === distLeft) yawDeg = 90;
-          else if (minDist === distRight) yawDeg = -90;
-          else yawDeg = 0;
-        } else {
-          yawDeg = 0;
-        }
-      }
-    }
-
-    // FINAL OVERRIDE — Front Wides yaw rules (must win over any other yaw logic)
-    if (canon === "LW" || canon === "RW") {
-      if (aimFrontWidesAtMLP) {
-        yawDeg = safeYawToMLP(speaker.position, mlp);
-      } else {
-        // Aim OFF: sit flat to side walls (left = -90, right = +90)
+        // Aim OFF: sit flat to side walls
         yawDeg = (canon === "LW") ? -90 : +90;
       }
+    } else if (isSideSurround) {
+      if (aimSideSurroundsAtMLP) {
+        yawDeg = getAimingYawDeg(speaker, mlp);
+      } else {
+        // Aim OFF: sit flat to side walls
+        yawDeg = (canon === "SL") ? 90 : -90;
+      }
+    } else if (isRearSurround) {
+      if (aimRearSurroundsAtMLP) {
+        yawDeg = getAimingYawDeg(speaker, mlp);
+      } else {
+        // Aim OFF: sit flat to back wall (0 deg) or side walls
+        const pos = speaker.position || {};
+        const distLeft  = Math.abs(pos.x - 0);
+        const distRight = Math.abs(widthM - pos.x);
+        const distBack  = Math.abs(lengthM - pos.y);
+        const minDist = Math.min(distLeft, distRight, distBack);
+
+        if (minDist === distBack) yawDeg = 0;
+        else if (minDist === distLeft) yawDeg = 90;
+        else if (minDist === distRight) yawDeg = -90;
+        else yawDeg = 0;
+      }
+    } else {
+      // Fallback for any other speaker type, including overheads
+      yawDeg = 0;
     }
 
     const finalYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
