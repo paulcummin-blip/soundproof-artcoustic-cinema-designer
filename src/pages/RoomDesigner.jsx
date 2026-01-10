@@ -239,7 +239,7 @@ function useSurroundGroupDepths() {
     aimRearSurroundsAtMLP,
   } = useAppState() || {};
 
-  const mlp = useMemo(() => ({ x: roomDims?.widthM / 2, y: mlpY_m, z: 1.2 }), [roomDims?.widthM, mlpY_m]);
+  const mlp = useMemo(() => ({ x: (roomDims?.widthM || 0) / 2, y: mlpY_m, z: 1.2 }), [roomDims?.widthM, mlpY_m]);
 
   const calculateGroupDepth = useCallback((groupName) => {
     let roles, defaultWallAxis;
@@ -260,9 +260,13 @@ function useSurroundGroupDepths() {
     if (groupSpeakers.length === 0) return null;
 
     const depths = groupSpeakers.map(speaker => {
-      if (!speaker.position) return 0;
+      if (!speaker.position || !Number.isFinite(speaker.position.x) || !Number.isFinite(speaker.position.y)) {
+        return null;
+      }
       const canonRole = canon(speaker.role);
       const pos = speaker.position;
+      const W = roomDims?.widthM || 0;
+      const L = roomDims?.lengthM || 0;
       
       let yawDeg = 0;
       let wallAxis = defaultWallAxis;
@@ -272,7 +276,7 @@ function useSurroundGroupDepths() {
         (groupName === 'side-surrounds' && aimSideSurroundsAtMLP) ||
         (groupName === 'rear-surrounds' && aimRearSurroundsAtMLP);
       
-      if (aimThisGroup) {
+      if (aimThisGroup && mlp && Number.isFinite(mlp.x) && Number.isFinite(mlp.y)) {
         yawDeg = yawDegToMLP(pos, mlp);
       } else {
         if (groupName === 'front-wides') {
@@ -281,8 +285,8 @@ function useSurroundGroupDepths() {
             yawDeg = (canonRole === 'SL') ? 90 : -90;
         } else if (groupName === 'rear-surrounds') {
             const distLeft  = Math.abs(pos.x);
-            const distRight = Math.abs((roomDims?.widthM || 0) - pos.x);
-            const distBack  = Math.abs((roomDims?.lengthM || 0) - pos.y);
+            const distRight = Math.abs(W - pos.x);
+            const distBack  = Math.abs(L - pos.y);
             const minDist = Math.min(distLeft, distRight, distBack);
 
             if (minDist === distBack) {
@@ -298,27 +302,30 @@ function useSurroundGroupDepths() {
         }
       }
       
-      const dims = getModelDimsM(speaker.model);
-      const halfNormal = rotatedHalfExtentToWall(yawDeg, dims.widthM, dims.depthM, wallAxis);
+      const dims = getModelDimsM(speaker.model) || {};
+      const widthM = dims.widthM || 0.27;
+      const depthM = dims.depthM || 0.082;
+      const halfNormal = rotatedHalfExtentToWall(yawDeg, widthM, depthM, wallAxis);
 
       let dCentre = 0;
       if (wallAxis === 'x') {
-        const isLeft = canonRole === 'LW' || canonRole === 'SL' || (canonRole === 'SBL' && wallAxis === 'x' && Math.abs(pos.x) < Math.abs((roomDims?.widthM || 0) - pos.x));
-        dCentre = isLeft ? pos.x : (roomDims?.widthM || 0) - pos.x;
+        const isLeft = canonRole === 'LW' || canonRole === 'SL' || (canonRole === 'SBL' && Math.abs(pos.x) < Math.abs(W - pos.x));
+        dCentre = isLeft ? pos.x : W - pos.x;
       } else { // 'y'
-        dCentre = (roomDims?.lengthM || 0) - pos.y;
+        dCentre = L - pos.y;
       }
 
       return dCentre + halfNormal;
     });
 
-    if (depths.length === 0) return null;
-    return Math.max(...depths);
-  }, [placedSpeakers, roomDims, mlp, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP]);
+    const validDepths = depths.filter(d => d !== null && Number.isFinite(d));
+    if (validDepths.length === 0) return null;
+    return Math.max(...validDepths);
+  }, [placedSpeakers, roomDims?.widthM, roomDims?.lengthM, mlp, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP]);
 
-  const frontWideDepth = calculateGroupDepth('front-wides');
-  const sideSurroundDepth = calculateGroupDepth('side-surrounds');
-  const rearSurroundDepth = calculateGroupDepth('rear-surrounds');
+  const frontWideDepth = useMemo(() => calculateGroupDepth('front-wides'), [calculateGroupDepth]);
+  const sideSurroundDepth = useMemo(() => calculateGroupDepth('side-surrounds'), [calculateGroupDepth]);
+  const rearSurroundDepth = useMemo(() => calculateGroupDepth('rear-surrounds'), [calculateGroupDepth]);
 
   return { frontWideDepth, sideSurroundDepth, rearSurroundDepth };
 }
