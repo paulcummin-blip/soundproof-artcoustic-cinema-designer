@@ -2078,7 +2078,7 @@ function SpeakerPlacementImpl(props) {
 
     // Force one hydration pass to ensure speakers exist with positions
     setSpeakers(current => {
-      const reset = resetSurroundPositions(effectivePreset, mlpPoint, effectiveDims, current, masterSurroundModel);
+    const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimsSafe, current, masterSurroundModel);
 
       if (__b44SameSpeakers(current, reset)) return current;
       return reset;
