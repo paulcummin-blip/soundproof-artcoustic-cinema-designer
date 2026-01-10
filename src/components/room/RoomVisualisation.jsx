@@ -5333,7 +5333,7 @@ return {
         speaker={{ ...speaker, model: resolvedModel }}
         canvasX={safeCanvasX}
         canvasY_raw={safeCanvasY}
-        yawDeg={visualYawDeg}
+        yawDeg={finalYawDeg}
         widthM={widthM_spk}
         depthM={depthM_spk}
         scale={scale}
