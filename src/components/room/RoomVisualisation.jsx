@@ -543,6 +543,7 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const isDraggingFW = React.useRef(false);
   const isDraggingRearRef = React.useRef(0);
   const isDraggingSpeakerRef = useRef(false);
+  const isAnyDraggingRef = React.useRef(false);
   const dragOffsetRoomRef = useRef({ x: 0, y: 0 });
   const draggedSubWallRef = useRef(null);
   const draggedSubTypeRef = useRef(null);
@@ -1393,6 +1394,7 @@ React.useEffect(() => {
   // Keeps BOTH FWL+FWR paired when zones change (e.g., when SL/SR move)
   // Skip any speaker marked positionSource='user' to preserve manual placement
   useEffect(() => {
+    if (isAnyDraggingRef.current) return;
     if (!onSetSpeakers) return;
     if (isDraggingFW.current) return;
 
@@ -1617,6 +1619,8 @@ React.useEffect(() => {
         draggedSubWallRef.current = wall;
         draggedSubTypeRef.current = target._subType;
       }
+      
+      isAnyDraggingRef.current = true;
       
       setDragState({
         dragging: true,
@@ -2947,6 +2951,8 @@ React.useEffect(() => {
       }
     }
     
+    isAnyDraggingRef.current = false;
+    
     setDragState({
       dragging: false,
       draggedItemId: null,
@@ -3478,6 +3484,7 @@ useEffect(() => {
 
   // [NEW] Auto-hug surrounds to walls when room dimensions change (only auto-positioned speakers)
   useEffect(() => {
+    if (isAnyDraggingRef.current) return;
     if (!onSetSpeakers || !placedSpeakers?.length) return;
 
     const W = widthM || 0;
