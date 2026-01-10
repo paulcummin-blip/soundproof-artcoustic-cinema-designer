@@ -1376,6 +1376,7 @@ function formatDolbyLabel(key) {
 }
 
 function SpeakerPlacementImpl(props) {
+  const dimensions = props?.dimensions; // legacy alias to prevent ReferenceError
   const {
     disabled = false,
     dimensions: dimensionsProp, // NEW: Room dimensions from parent
