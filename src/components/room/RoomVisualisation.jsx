@@ -5277,34 +5277,27 @@ return {
       ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
       : undefined;
 
-    // Helper: compute yaw from canvas coords (guaranteed correct direction)
-    const yawDegCanvasToTarget = (fromX, fromY, toX, toY) => {
-      const dx = toX - fromX;
-      const dy = toY - fromY;
-      // SVG/canvas: +Y is down. rotate(+) is clockwise in SVG coords.
+    // Yaw for SVG rotate(): compute directly in CANVAS space so signs match what is drawn.
+    // 0° = facing +canvasY (down). Positive = clockwise.
+    const yawCanvasToMLP = (spkCanvasX, spkCanvasY, mlpRoomPoint) => {
+      if (!mlpRoomPoint) return 0;
+
+      // Convert MLP from room metres → canvas pixels (must match the drawing mapping)
+      const mlpCanvasX = roomRect.x + (Number(mlpRoomPoint.x) * scale);
+      const mlpCanvasY = roomRect.y + (Number(mlpRoomPoint.y) * scale);
+
+      const dx = mlpCanvasX - spkCanvasX;
+      const dy = mlpCanvasY - spkCanvasY;
+
+      // Angle from +canvasY axis, clockwise for positive values:
       return (Math.atan2(dx, dy) * 180) / Math.PI;
     };
 
-    let visualYawDeg;
+    let visualYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
 
-    // LCR aim override: compute yaw in CANVAS space (guaranteed correct direction)
-    if (aimAtMLP && (canon === "FL" || canon === "FR") && mlp) {
-      const mlpCanvasX = meterToCanvasX(mlp.x);
-      const mlpCanvasY = meterToCanvasY(mlp.y);
-
-      visualYawDeg = yawDegCanvasToTarget(
-        safeCanvasX,
-        safeCanvasY,
-        mlpCanvasX,
-        mlpCanvasY
-      );
-      
-      if (globalThis.__B44_LOGS) {
-        console.log("[LCR yaw canvas]", canon, { visualYawDeg });
-      }
-    } else {
-      // Existing behaviour for everything else (keep as-is)
-      visualYawDeg = Number.isFinite(yawDeg) ? -yawDeg : 0;
+    // If aiming is enabled, force L/R yaw from canvas-to-MLP so it always points correctly
+    if (aimAtMLP && (canon === "FL" || canon === "FR" || canon === "L" || canon === "R")) {
+      visualYawDeg = yawCanvasToMLP(safeCanvasX, safeCanvasY, mlpPoint);
     }
 
     return (
