@@ -40,7 +40,7 @@ const getModelDimsM = (model) => {
     widthM: meta.widthM,
     depthM: meta.depthM,
     diameterM: meta.diameterM,
-    round: meta.round,
+    round: meta.round
   };
 };
 
@@ -74,9 +74,9 @@ const preserveSurroundModels = (prevList, nextList) => {
 
   const surroundRoles = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
 
-  const prevByRole = new Map(prev.map(s => [canon(s?.role), s]));
+  const prevByRole = new Map(prev.map((s) => [canon(s?.role), s]));
 
-  return next.map(s => {
+  return next.map((s) => {
     const role = canon(s?.role);
     if (!surroundRoles.has(role)) return s;
 
@@ -92,49 +92,49 @@ const preserveSurroundModels = (prevList, nextList) => {
 };
 
 // Put near your other helpers in RoomDesigner.js
-const CANON_MAP = { 
-  LS:'SL', SL:'SL', RS:'SR', SR:'SR', 
-  RL:'SBL', RR:'SBR', RSL:'SBL', RSR:'SBR', LRS:'SBL', RRS:'SBR', 
-  FWL:'LW', FWR:'RW', LW:'LW', RW:'RW', 
-  SBL:'SBL', SBR:'SBR', 
-  FL:"FL", L:"FL", FC:"FC", C:"FC", FR:"FR", R:"FR", 
-  TFL:"TFL", TFR:"TFR", 
-  TML:"TML", TMR:"TMR", TL:"TML", TR:"TMR", // Map legacy TL/TR to TML/TMR
-  TRL:"TRL", TRR:"TRR", TBL:"TRL", TBR:"TRR", // Map legacy TBL/TBR to TRL/TRR
-  TFC:"TFC", TRC:"TRC", TBC:"TRC"
+const CANON_MAP = {
+  LS: 'SL', SL: 'SL', RS: 'SR', SR: 'SR',
+  RL: 'SBL', RR: 'SBR', RSL: 'SBL', RSR: 'SBR', LRS: 'SBL', RRS: 'SBR',
+  FWL: 'LW', FWR: 'RW', LW: 'LW', RW: 'RW',
+  SBL: 'SBL', SBR: 'SBR',
+  FL: "FL", L: "FL", FC: "FC", C: "FC", FR: "FR", R: "FR",
+  TFL: "TFL", TFR: "TFR",
+  TML: "TML", TMR: "TMR", TL: "TML", TR: "TMR", // Map legacy TL/TR to TML/TMR
+  TRL: "TRL", TRR: "TRR", TBL: "TRL", TBR: "TRR", // Map legacy TBL/TBR to TRL/TRR
+  TFC: "TFC", TRC: "TRC", TBC: "TRC"
 };
-const canon = r => CANON_MAP[String(r||'').toUpperCase()] || String(r||'').toUpperCase();
+const canon = (r) => CANON_MAP[String(r || '').toUpperCase()] || String(r || '').toUpperCase();
 
 // Shallow speaker list equality check
 const speakersEqual = (listA, listB) => {
   if (!listA || !listB) return listA === listB;
   if (listA.length !== listB.length) return false;
-  
-  const aMap = new Map(listA.map(s => [s.id, s]));
-  
+
+  const aMap = new Map(listA.map((s) => [s.id, s]));
+
   for (const speakerB of listB) {
     const speakerA = aMap.get(speakerB.id);
     if (!speakerA) return false; // a speaker was added/removed
     if (speakerA.role !== speakerB.role || speakerA.model !== speakerB.model) return false;
-    
+
     const posA = speakerA.position || {};
     const posB = speakerB.position || {};
     if (Math.abs((posA.x ?? 0) - (posB.x ?? 0)) > 0.001) return false;
     if (Math.abs((posA.y ?? 0) - (posB.y ?? 0)) > 0.001) return false;
     if (Math.abs((posA.z ?? 0) - (posB.z ?? 0)) > 0.001) return false;
   }
-  
+
   return true;
 };
 
 // Safe wrapper for role canonicalization
 const safeCanon = (r) => {
-  try { return canon(r); } catch { return String(r || "").toUpperCase(); }
+  try {return canon(r);} catch {return String(r || "").toUpperCase();}
 };
 
 function carryModel(prevSpeakers, roleFrom, roleTo, fallbackHint = null) {
   const byCanon = new Map();
-  (prevSpeakers||[]).forEach(s => byCanon.set(safeCanon(s.role), s));
+  (prevSpeakers || []).forEach((s) => byCanon.set(safeCanon(s.role), s));
 
   const from = byCanon.get(safeCanon(roleFrom));
   const existing = byCanon.get(safeCanon(roleTo));
@@ -154,20 +154,20 @@ function mergePreserveOverheads(prevList, draftNextList) {
   const next = Array.isArray(draftNextList) ? draftNextList : [];
 
   // Collect overhead speakers from both lists
-  const prevOverheads = prev.filter(s => isOverheadRole(safeCanon(s.role)));
-  const nextOverheads = next.filter(s => isOverheadRole(safeCanon(s.role)));
+  const prevOverheads = prev.filter((s) => isOverheadRole(safeCanon(s.role)));
+  const nextOverheads = next.filter((s) => isOverheadRole(safeCanon(s.role)));
 
   // If the draft has overheads, use those; otherwise keep previous
   const overheadsToKeep = nextOverheads.length > 0 ? nextOverheads : prevOverheads;
 
   // Deduplicate overheads by canonical role (last one wins)
   const overheadMap = new Map();
-  overheadsToKeep.forEach(s => {
+  overheadsToKeep.forEach((s) => {
     overheadMap.set(safeCanon(s.role), s);
   });
 
   // Build final list: bed speakers from draft + deduplicated overheads
-  const nextBeds = next.filter(s => !isOverheadRole(safeCanon(s.role)));
+  const nextBeds = next.filter((s) => !isOverheadRole(safeCanon(s.role)));
   const mergedOverheads = Array.from(overheadMap.values());
   const finalList = [...nextBeds, ...mergedOverheads];
 
@@ -175,7 +175,7 @@ function mergePreserveOverheads(prevList, draftNextList) {
     prevCount: prev.length,
     nextCount: next.length,
     finalCount: finalList.length,
-    overheads: mergedOverheads.map(s => safeCanon(s.role))
+    overheads: mergedOverheads.map((s) => safeCanon(s.role))
   });
 
   return finalList;
@@ -187,13 +187,13 @@ function cloneRoleWithModel(byRole, fromRole, toRole, fallbackModel) {
   return {
     id: toRole, role: toRole, label: toRole,
     model: src?.model ?? fallbackModel ?? undefined,
-    position: null, // Will be set by caller
+    position: null // Will be set by caller
   };
 }
 
 // Safe debug logging function
 function logPlacedSpeakers(message, speakers) {
-  const rows = (speakers || []).map(s => ({
+  const rows = (speakers || []).map((s) => ({
     roleRaw: s.role,
     roleCanon: canon(s.role), // Using existing 'canon' function
     model: s.model || "(none)"
@@ -244,8 +244,8 @@ const getMlpPoint = (seatingPositions, mlpBasis, roomDimensions) => {
 
 // Hook to encapsulate project loading, saving, and state management
 function useProjectLoader(
-  appState, // Pass appState directly for setters
-  {
+appState, // Pass appState directly for setters
+{
   projectIdFromUrl,
   dolbyPreset,
   dimensions, // This will now be stableDimensions, derived from appState.roomDims
@@ -293,7 +293,7 @@ function useProjectLoader(
   setRowSpacingM,
   // NEW: Seats Per Row By Row
   seatsPerRowByRow,
-  setSeatsPerRowByRow,
+  setSeatsPerRowByRow
 }) {
   const [projectIdState, setProjectIdState] = useState(projectIdFromUrl);
   const [projectNameState, setProjectNameState] = useState("Untitled Room"); // Internal projectName for loader
@@ -303,7 +303,7 @@ function useProjectLoader(
   const parseMaybe = useCallback((val, fallback) => {
     if (Array.isArray(val)) return val;
     if (typeof val === "string" && val.trim()) {
-      try { return JSON.parse(val); } catch { /* ignore */ }
+      try {return JSON.parse(val);} catch {/* ignore */}
     }
     return fallback;
   }, []);
@@ -321,7 +321,7 @@ function useProjectLoader(
       room_length: p.room_length,
       room_height: p.room_height,
       seating_positions: typeof p.seating_positions === 'string' ? p.seating_positions.slice(0, 200) : p.seating_positions,
-      selected_speakers: typeof p.selected_speakers === 'string' ? p.selected_speakers.slice(0, 200) : p.selected_speakers,
+      selected_speakers: typeof p.selected_speakers === 'string' ? p.selected_speakers.slice(0, 200) : p.selected_speakers
     });
 
     //
@@ -329,7 +329,7 @@ function useProjectLoader(
     //
     if (appState?.setRoomDims && appState?.roomDims) {
       let nextWidthM, nextLengthM, nextHeightM;
-      
+
       if (p.roomDims) {
         try {
           const parsed = JSON.parse(p.roomDims);
@@ -347,18 +347,18 @@ function useProjectLoader(
         nextLengthM = Number(p?.room_length) || 6.0;
         nextHeightM = Number(p?.room_height) || 2.4;
       }
-      
+
       // Only update if any dimension differs by >= 0.001m (1mm)
       const current = appState.roomDims;
       const widthChanged = Math.abs((current?.widthM ?? 0) - nextWidthM) >= 0.001;
       const lengthChanged = Math.abs((current?.lengthM ?? 0) - nextLengthM) >= 0.001;
       const heightChanged = Math.abs((current?.heightM ?? 0) - nextHeightM) >= 0.001;
-      
+
       if (widthChanged || lengthChanged || heightChanged) {
         appState.setRoomDims({
           widthM: nextWidthM,
           lengthM: nextLengthM,
-          heightM: nextHeightM,
+          heightM: nextHeightM
         });
       }
     }
@@ -383,9 +383,9 @@ function useProjectLoader(
         showCavity: !!p?.show_cavity,
         speakerClearanceM: Number(p?.speaker_clearance_m) || 0.02,
         heightFromFloorM:
-          typeof p?.screen_height_from_floor === "number"
-            ? p.screen_height_from_floor
-            : 0.5,
+        typeof p?.screen_height_from_floor === "number" ?
+        p.screen_height_from_floor :
+        0.5
       }));
     }
 
@@ -404,9 +404,9 @@ function useProjectLoader(
 
     const hydratedLcrAimMode = p?.lcr_aim_mode;
     if (
-      (hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") &&
-      typeof setLcrAimMode === "function"
-    ) {
+    (hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") &&
+    typeof setLcrAimMode === "function")
+    {
       setLcrAimMode(hydratedLcrAimMode);
     }
 
@@ -423,10 +423,10 @@ function useProjectLoader(
 
     const seatsPerRowByRowData = parseMaybe(p?.seats_per_row_by_row, []);
     if (
-      Array.isArray(seatsPerRowByRowData) &&
-      seatsPerRowByRowData.length > 0 &&
-      typeof setSeatsPerRowByRow === "function"
-    ) {
+    Array.isArray(seatsPerRowByRowData) &&
+    seatsPerRowByRowData.length > 0 &&
+    typeof setSeatsPerRowByRow === "function")
+    {
       setSeatsPerRowByRow(seatsPerRowByRowData);
     }
 
@@ -484,7 +484,7 @@ function useProjectLoader(
       OVERHEADS_6: false,
       RP22_ANGLES: false,
       enableDolbyZones: false,
-      ROOM_DIMS: false, // NEW – plan dimension overlay
+      ROOM_DIMS: false // NEW – plan dimension overlay
     };
     const overlaysData = parseMaybe(p?.overlays, defaultOverlays);
     if (typeof setOverlays === "function") {
@@ -496,10 +496,10 @@ function useProjectLoader(
     //
     const sp = parseMaybe(p?.seating_positions, []);
     if (
-      Array.isArray(sp) &&
-      sp.length > 0 &&
-      typeof setSeatingPositions === "function"
-    ) {
+    Array.isArray(sp) &&
+    sp.length > 0 &&
+    typeof setSeatingPositions === "function")
+    {
       setSeatingPositions(sp);
     }
 
@@ -567,7 +567,7 @@ function useProjectLoader(
         if (Array.isArray(loadedSpeakers) && loadedSpeakers.length > 0) {
           return {
             ...(prev || {}),
-            placedSpeakers: loadedSpeakers,
+            placedSpeakers: loadedSpeakers
           };
         }
 
@@ -577,33 +577,33 @@ function useProjectLoader(
       });
     }
   }, [
-    appState?.setRoomDims,
-    appState?.setScreenFrontPlaneM,
-    setScreen,
-    setDolbyConfig,
-    setDolbyPreset,
-    setSevenBedLayoutType,
-    setLcrAimMode,
-    setEnableFrontWides,
-    setOverheadGlobalModel,
-    setOverheadFrontOverride,
-    setOverheadMidOverride,
-    setOverheadRearOverride,
-    setUseFrontGlobal,
-    setUseMidGlobal,
-    setUseRearGlobal,
-    setRowSpacingM,
-    setSeatsPerRowByRow,
-    setOverlays,
-    setSeatingPositions,
-    setRoomElements,
-    setFrontSubsCfg,
-    setRearSubsCfg,
-    setSelectedSpeakersByRole,
-    setSpeakerNodes,
-    setSpeakerSystem,
-    parseMaybe,
-  ]);
+  appState?.setRoomDims,
+  appState?.setScreenFrontPlaneM,
+  setScreen,
+  setDolbyConfig,
+  setDolbyPreset,
+  setSevenBedLayoutType,
+  setLcrAimMode,
+  setEnableFrontWides,
+  setOverheadGlobalModel,
+  setOverheadFrontOverride,
+  setOverheadMidOverride,
+  setOverheadRearOverride,
+  setUseFrontGlobal,
+  setUseMidGlobal,
+  setUseRearGlobal,
+  setRowSpacingM,
+  setSeatsPerRowByRow,
+  setOverlays,
+  setSeatingPositions,
+  setRoomElements,
+  setFrontSubsCfg,
+  setRearSubsCfg,
+  setSelectedSpeakersByRole,
+  setSpeakerNodes,
+  setSpeakerSystem,
+  parseMaybe]
+  );
 
 
   const loadProject = useCallback(async (signal, idOverride) => {
@@ -630,7 +630,7 @@ function useProjectLoader(
 
       // Abort is fine – usually navigating away or changing project.
       if (err?.name === "AbortError") {
-        setLoadState(prev => ({ ...prev, phase: "idle" }));
+        setLoadState((prev) => ({ ...prev, phase: "idle" }));
         return;
       }
 
@@ -661,7 +661,7 @@ function useProjectLoader(
       url.searchParams.set("project", id);
       window.history.replaceState({}, "", url.toString());
     } catch (e) {
-        if (globalThis.__B44_LOGS) console.error("Failed to update URL:", e);
+      if (globalThis.__B44_LOGS) console.error("Failed to update URL:", e);
     }
     setProjectIdState(id);
   }, []);
@@ -672,7 +672,7 @@ function useProjectLoader(
 
   useEffect(() => {
     // Update the ref whenever loadState changes
-    const isCurrentlyHydrating = loadState.phase === "loading" || (projectIdFromUrl && loadState.phase !== "loaded" && loadState.phase !== "error");
+    const isCurrentlyHydrating = loadState.phase === "loading" || projectIdFromUrl && loadState.phase !== "loaded" && loadState.phase !== "error";
     isHydratingRef.current = isCurrentlyHydrating;
   }, [loadState.phase, projectIdFromUrl]);
 
@@ -726,7 +726,7 @@ function useProjectLoader(
           useMidGlobal,
           useRearGlobal,
           screenFrontPlaneM: appState.screenFrontPlaneM,
-          splConfig: appState.splConfig,
+          splConfig: appState.splConfig
         });
 
         // IMPORTANT: autosave must never rename a project
@@ -751,36 +751,36 @@ function useProjectLoader(
       }
     };
   }, [
-    projectIdState,
-    projectIdFromUrl,
-    projectNameState,
-    dolbyPreset,
-    screen,
-    seatingPositions,
-    placedSpeakers,
-    roomElements,
-    overlays,
-    frozenTabs,
-    sevenBedLayoutType,
-    frontSubsCfg,
-    rearSubsCfg,
-    lcrAimMode,
-    enableFrontWides,
-    appState.roomDims,
-    appState.selectedSpeakersByRole,
-    appState.speakerNodes,
-    overheadGlobalModel,
-    overheadFrontOverride,
-    overheadMidOverride,
-    overheadRearOverride,
-    useFrontGlobal,
-    useMidGlobal,
-    useRearGlobal,
-    rowSpacingM,
-    appState.screenFrontPlaneM,
-    seatsPerRowByRow,
-    appState.splConfig,
-  ]);
+  projectIdState,
+  projectIdFromUrl,
+  projectNameState,
+  dolbyPreset,
+  screen,
+  seatingPositions,
+  placedSpeakers,
+  roomElements,
+  overlays,
+  frozenTabs,
+  sevenBedLayoutType,
+  frontSubsCfg,
+  rearSubsCfg,
+  lcrAimMode,
+  enableFrontWides,
+  appState.roomDims,
+  appState.selectedSpeakersByRole,
+  appState.speakerNodes,
+  overheadGlobalModel,
+  overheadFrontOverride,
+  overheadMidOverride,
+  overheadRearOverride,
+  useFrontGlobal,
+  useMidGlobal,
+  useRearGlobal,
+  rowSpacingM,
+  appState.screenFrontPlaneM,
+  seatsPerRowByRow,
+  appState.splConfig]
+  );
 
   // Boot logic: run ONCE – either load a project or initialise defaults
   useEffect(() => {
@@ -802,9 +802,9 @@ function useProjectLoader(
         // No project at all – this is a fresh, local-only design.
         // Only initialise defaults if nothing has been laid out yet.
         const hasSpeakers =
-          Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
+        Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
         const hasSeats =
-          Array.isArray(seatingPositions) && seatingPositions.length > 0;
+        Array.isArray(seatingPositions) && seatingPositions.length > 0;
 
         if (!hasSpeakers && !hasSeats && appState?.roomDims) {
           hasBootstrappedRef.current = true;
@@ -819,13 +819,13 @@ function useProjectLoader(
 
     return () => controller.abort();
   }, [
-    projectIdFromUrl,
-    projectIdState,
-    appState?.roomDims,
-    initWithDefaultsAndRules,
-    loadProject,
-    setProjectIdState,
-  ]);
+  projectIdFromUrl,
+  projectIdState,
+  appState?.roomDims,
+  initWithDefaultsAndRules,
+  loadProject,
+  setProjectIdState]
+  );
 
   const manualSaveProject = useCallback(async () => {
     setAutosaveStatus("saving");
@@ -844,7 +844,7 @@ function useProjectLoader(
         projectNameState,
         roomDims: appState.roomDims,
         seatingCount: Array.isArray(seatingPositions) ? seatingPositions.length : null,
-        placedSpeakerCount: Array.isArray(placedSpeakers) ? placedSpeakers.length : null,
+        placedSpeakerCount: Array.isArray(placedSpeakers) ? placedSpeakers.length : null
       };
 
       const projectData = serializeProject({
@@ -875,7 +875,7 @@ function useProjectLoader(
         useMidGlobal,
         useRearGlobal,
         screenFrontPlaneM: appState.screenFrontPlaneM,
-        splConfig: appState.splConfig,
+        splConfig: appState.splConfig
       });
 
       // DEBUG: Log what we're about to save
@@ -884,7 +884,7 @@ function useProjectLoader(
         seating_count: projectData.seating_positions ? JSON.parse(projectData.seating_positions).length : 0,
         speakers_count: projectData.selected_speakers ? JSON.parse(projectData.selected_speakers).length : 0,
         screen_size: projectData.screen_size,
-        dolby: projectData.dolby_config,
+        dolby: projectData.dolby_config
       });
       if (globalThis.__B44_LOGS) console.log('[RD] manualSaveProject payload', {
         debugSnapshot,
@@ -894,13 +894,13 @@ function useProjectLoader(
           room_width: projectData.room_width,
           room_length: projectData.room_length,
           room_height: projectData.room_height,
-          seating_positions: typeof projectData.seating_positions === 'string'
-            ? projectData.seating_positions.slice(0, 200)
-            : projectData.seating_positions,
-          selected_speakers: typeof projectData.selected_speakers === 'string'
-            ? projectData.selected_speakers.slice(0, 200)
-            : projectData.selected_speakers,
-        },
+          seating_positions: typeof projectData.seating_positions === 'string' ?
+          projectData.seating_positions.slice(0, 200) :
+          projectData.seating_positions,
+          selected_speakers: typeof projectData.selected_speakers === 'string' ?
+          projectData.selected_speakers.slice(0, 200) :
+          projectData.selected_speakers
+        }
       });
 
       let savedProject;
@@ -942,7 +942,7 @@ function useProjectLoader(
           effectiveProjectId,
           savedId: savedProject?.id,
           name: savedProject?.name,
-          client_name: savedProject?.client_name,
+          client_name: savedProject?.client_name
         });
 
         // DEBUG: One-shot reload to verify we can read back what we wrote
@@ -968,36 +968,36 @@ function useProjectLoader(
       return { success: false, error: e.message || String(e) };
     }
   }, [
-    projectIdState,
-    projectIdFromUrl,
-    projectNameState,
-    dolbyPreset,
-    screen,
-    seatingPositions,
-    placedSpeakers,
-    roomElements,
-    overlays,
-    frozenTabs,
-    sevenBedLayoutType,
-    frontSubsCfg,
-    rearSubsCfg,
-    lcrAimMode,
-    enableFrontWides,
-    appState.roomDims,
-    appState.selectedSpeakersByRole,
-    appState.speakerNodes,
-    overheadGlobalModel,
-    overheadFrontOverride,
-    overheadMidOverride,
-    overheadRearOverride,
-    useFrontGlobal,
-    useMidGlobal,
-    useRearGlobal,
-    rowSpacingM,
-    appState.screenFrontPlaneM,
-    seatsPerRowByRow,
-    appState.splConfig,
-  ]);
+  projectIdState,
+  projectIdFromUrl,
+  projectNameState,
+  dolbyPreset,
+  screen,
+  seatingPositions,
+  placedSpeakers,
+  roomElements,
+  overlays,
+  frozenTabs,
+  sevenBedLayoutType,
+  frontSubsCfg,
+  rearSubsCfg,
+  lcrAimMode,
+  enableFrontWides,
+  appState.roomDims,
+  appState.selectedSpeakersByRole,
+  appState.speakerNodes,
+  overheadGlobalModel,
+  overheadFrontOverride,
+  overheadMidOverride,
+  overheadRearOverride,
+  useFrontGlobal,
+  useMidGlobal,
+  useRearGlobal,
+  rowSpacingM,
+  appState.screenFrontPlaneM,
+  seatsPerRowByRow,
+  appState.splConfig]
+  );
 
   return {
     projectId: projectIdState,
@@ -1012,40 +1012,40 @@ function useProjectLoader(
 
 // Safe lazy imports that work with both named and default exports
 const RoomDimensions = React.lazy(() =>
-  import("@/components/room/RoomDimensions")
-    .then(m => ({ default: m.default ?? m.RoomDimensions }))
+import("@/components/room/RoomDimensions").
+then((m) => ({ default: m.default ?? m.RoomDimensions }))
 );
 
 const ScreenConfiguration = React.lazy(() =>
-  import("@/components/room/ScreenConfiguration")
-    .then(m => ({ default: m.default ?? m.ScreenConfiguration }))
+import("@/components/room/ScreenConfiguration").
+then((m) => ({ default: m.default ?? m.ScreenConfiguration }))
 );
 
 const SeatingLayout = React.lazy(() =>
-  import("@/components/room/SeatingLayout")
-    .then(m => ({ default: m.default ?? m.SeatingLayout }))
+import("@/components/room/SeatingLayout").
+then((m) => ({ default: m.default ?? m.SeatingLayout }))
 );
 
 const SpeakerPlacement = React.lazy(() =>
-  import("@/components/room/SpeakerPlacement")
-    .then(m => ({ default: m.default ?? m.SpeakerPlacement }))
+import("@/components/room/SpeakerPlacement").
+then((m) => ({ default: m.default ?? m.SpeakerPlacement }))
 );
 
 const RoomElements = React.lazy(() =>
-  import("@/components/room/RoomElements")
-    .then(m => ({ default: m.default ?? m.RoomElements }))
+import("@/components/room/RoomElements").
+then((m) => ({ default: m.default ?? m.RoomElements }))
 );
 
 const BassResponse = React.lazy(() =>
-  import("@/components/room/BassResponse")
-    .then(m => ({ default: m.default ?? m.BassResponse }))
+import("@/components/room/BassResponse").
+then((m) => ({ default: m.default ?? m.BassResponse }))
 );
 
 // Direct imports (these are default exports)
 // Fix: Change RoomVisualisation to be lazy-loaded as it's used within Suspense.
 const RoomVisualisation = React.lazy(() =>
-  import("@/components/room/RoomVisualisation")
-    .then(m => ({ default: m.default ?? m.RoomVisualisation }))
+import("@/components/room/RoomVisualisation").
+then((m) => ({ default: m.default ?? m.RoomVisualisation }))
 );
 import { ErrorBoundary } from "@/components/dev/ErrorBoundary";
 import SubwooferMenu from "@/components/room/SubwooferMenu"; // new
@@ -1057,31 +1057,31 @@ import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 // This must be the single source of truth for all bed + height roles.
 export const DOLBY_PRESETS = {
   // Bed-only layouts
-  "5.1":  ["FL", "FC", "FR", "SL", "SR", "LFE"],
-  "7.1":  ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LFE"],
-  "9.1":  ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LW", "RW", "LFE"],
+  "5.1": ["FL", "FC", "FR", "SL", "SR", "LFE"],
+  "7.1": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LFE"],
+  "9.1": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LW", "RW", "LFE"],
 
   // Atmos 5.x
   "5.1.2": ["FL", "FC", "FR", "SL", "SR", "TML", "TMR", "LFE"],
   "5.1.4": ["FL", "FC", "FR", "SL", "SR", "TFL", "TFR", "TRL", "TRR", "LFE"],
   "5.1.6": ["FL", "FC", "FR", "SL", "SR",
-            "TFL", "TFR", "TML", "TMR", "TRL", "TRR", "LFE"],
+  "TFL", "TFR", "TML", "TMR", "TRL", "TRR", "LFE"],
 
   // Atmos 7.x
   "7.1.2": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR",
-            "TML", "TMR", "LFE"],
+  "TML", "TMR", "LFE"],
   "7.1.4": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR",
-            "TFL", "TFR", "TRL", "TRR", "LFE"],
+  "TFL", "TFR", "TRL", "TRR", "LFE"],
   "7.1.6": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR",
-            "TFL", "TFR", "TML", "TMR", "TRL", "TRR", "LFE"],
+  "TFL", "TFR", "TML", "TMR", "TRL", "TRR", "LFE"],
 
   // Atmos 9.x (future-friendly; LW/RW wides)
   "9.1.2": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LW", "RW",
-            "TML", "TMR", "LFE"],
+  "TML", "TMR", "LFE"],
   "9.1.4": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LW", "RW",
-            "TFL", "TFR", "TRL", "TRR", "LFE"],
+  "TFL", "TFR", "TRL", "TRR", "LFE"],
   "9.1.6": ["FL", "FC", "FR", "SL", "SR", "SBL", "SBR", "LW", "RW",
-            "TFL", "TFR", "TML", "TMR", "TRL", "TRR", "LFE"],
+  "TFL", "TFR", "TML", "TMR", "TRL", "TRR", "LFE"]
 };
 
 // For each Atmos layout, define exactly which overhead roles must exist.
@@ -1097,7 +1097,7 @@ const OVERHEAD_IDS_BY_LAYOUT = {
 
   "9.1.2": ["TML", "TMR"],
   "9.1.4": ["TFL", "TFR", "TRL", "TRR"],
-  "9.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"],
+  "9.1.6": ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"]
 };
 
 // DEBUG: log the available preset keys once at module load
@@ -1107,22 +1107,22 @@ if (typeof window !== "undefined" && window.console) {
 
 function getTargetOverheadIds(preset) {
   if (!preset) return [];
-  
+
   // Normalize: strip " Dolby Atmos" suffixes and other decorations
   // "5.1.4 Dolby Atmos" → "5.1.4"
   // "5.1.4_atmos" → "5.1.4"
-  const normalized = String(preset)
-    .split(" ")[0]      // Remove " Dolby Atmos" suffix
-    .split("_")[0]      // Remove "_atmos" suffix
-    .toLowerCase();
-  
+  const normalized = String(preset).
+  split(" ")[0] // Remove " Dolby Atmos" suffix
+  .split("_")[0] // Remove "_atmos" suffix
+  .toLowerCase();
+
   return OVERHEAD_IDS_BY_LAYOUT[normalized] || [];
 }
 
 // --- ATMOS FAILSAFE: ensure overhead roles match the current layout ---
-function ensureAtmosOverheads({ 
-  placedSpeakers, 
-  dolbyPreset, 
+function ensureAtmosOverheads({
+  placedSpeakers,
+  dolbyPreset,
   roomDimensions,
   overheadGlobalModel = null,
   overheadFrontOverride = null,
@@ -1130,14 +1130,14 @@ function ensureAtmosOverheads({
   overheadRearOverride = null,
   useFrontGlobal = true,
   useMidGlobal = true,
-  useRearGlobal = true,
+  useRearGlobal = true
 }) {
   const current = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
   // Normalise preset string, e.g. "5.1.4 Dolby Atmos" -> "5.1.4"
-  const normalizedPreset = dolbyPreset
-    ? String(dolbyPreset).split(" ")[0].split("_")[0]
-    : "";
+  const normalizedPreset = dolbyPreset ?
+  String(dolbyPreset).split(" ")[0].split("_")[0] :
+  "";
 
   const parts = normalizedPreset.split(".");
   const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
@@ -1166,31 +1166,31 @@ function ensureAtmosOverheads({
   }
 
   const targetSet = new Set(
-    targetOverheadIds.map(id => String(id || "").toUpperCase())
+    targetOverheadIds.map((id) => String(id || "").toUpperCase())
   );
 
   // Map of existing overheads by role (canonical)
   const existingByRole = new Map(
-    currentOverheads.map(spk => [
-      String(spk.role || "").toUpperCase(),
-      spk,
-    ])
+    currentOverheads.map((spk) => [
+    String(spk.role || "").toUpperCase(),
+    spk]
+    )
   );
 
   // Seed full speaker set once so we have default positions for any missing overheads
   const seeded = seedSpeakersFromPreset({
     preset: normalizedPreset,
     roomDimensions,
-    listeningArea: null,
+    listeningArea: null
   }) || [];
 
   const seededOverheadsByRole = new Map(
-    seeded
-      .filter(spk =>
-        typeof spk?.role === "string" &&
-        spk.role.toUpperCase().startsWith("T")
-      )
-      .map(spk => [String(spk.role || "").toUpperCase(), spk])
+    seeded.
+    filter((spk) =>
+    typeof spk?.role === "string" &&
+    spk.role.toUpperCase().startsWith("T")
+    ).
+    map((spk) => [String(spk.role || "").toUpperCase(), spk])
   );
 
   const nextOverheads = [];
@@ -1225,12 +1225,12 @@ function ensureAtmosOverheads({
   // - SPL calculations (Upper Front / Top Middle / Upper Rear)
   if (overheadGlobalModel) {
     const OVERHEAD_CANON_ROLES = new Set([
-      "TFL", "TFR", "TML", "TMR", "TRL", "TRR",
-      // legacy aliases kept for safety
-      "TL", "TR", "TBL", "TBR", "TFC", "TRC", "TBC",
-    ]);
+    "TFL", "TFR", "TML", "TMR", "TRL", "TRR",
+    // legacy aliases kept for safety
+    "TL", "TR", "TBL", "TBR", "TFC", "TRC", "TBC"]
+    );
 
-    merged = merged.map(spk => {
+    merged = merged.map((spk) => {
       const canonRole = String(spk.role || "").toUpperCase();
 
       if (!OVERHEAD_CANON_ROLES.has(canonRole)) {
@@ -1245,16 +1245,16 @@ function ensureAtmosOverheads({
         let modelFromOverrides = overheadGlobalModel;
 
         if (['TFL', 'TFR', 'TFC'].includes(canonRole)) {
-          modelFromOverrides = useFrontGlobal ? overheadGlobalModel : (overheadFrontOverride || overheadGlobalModel);
+          modelFromOverrides = useFrontGlobal ? overheadGlobalModel : overheadFrontOverride || overheadGlobalModel;
         } else if (['TML', 'TMR', 'TL', 'TR'].includes(canonRole)) {
-          modelFromOverrides = useMidGlobal ? overheadGlobalModel : (overheadMidOverride || overheadGlobalModel);
+          modelFromOverrides = useMidGlobal ? overheadGlobalModel : overheadMidOverride || overheadGlobalModel;
         } else if (['TRL', 'TRR', 'TRC', 'TBL', 'TBR'].includes(canonRole)) {
-          modelFromOverrides = useRearGlobal ? overheadGlobalModel : (overheadRearOverride || overheadGlobalModel);
+          modelFromOverrides = useRearGlobal ? overheadGlobalModel : overheadRearOverride || overheadGlobalModel;
         }
 
         return {
           ...spk,
-          model: modelFromOverrides,
+          model: modelFromOverrides
         };
       }
 
@@ -1264,13 +1264,13 @@ function ensureAtmosOverheads({
 
   if (typeof window !== "undefined" && window.console) {
     if (globalThis.__B44_LOGS) console.log("[RD ATMOS FAILSAFE] sync overheads for preset",
-      normalizedPreset,
-      "target=",
-      targetOverheadIds,
-      "final roles=",
-      merged.map(s => s.role),
-      "models=",
-      merged.filter(s => s.role?.toUpperCase().startsWith('T')).map(s => ({ role: s.role, model: s.model }))
+    normalizedPreset,
+    "target=",
+    targetOverheadIds,
+    "final roles=",
+    merged.map((s) => s.role),
+    "models=",
+    merged.filter((s) => s.role?.toUpperCase().startsWith('T')).map((s) => ({ role: s.role, model: s.model }))
     );
   }
 
@@ -1281,7 +1281,7 @@ function ensureAtmosOverheads({
 export function seedSpeakersFromPreset({
   preset,
   roomDimensions,
-  listeningArea = null,
+  listeningArea = null
 }) {
   if (globalThis.__B44_LOGS) console.log(
     "[RD SEED] called with preset =",
@@ -1296,9 +1296,9 @@ export function seedSpeakersFromPreset({
 
   const m = 0.02; // wall margin
   const yFront = m;
-  const yRear  = l - m;
-  const earZ   = 1.1;
-  const topZ   = Math.max(0.3, h - 0.15); // Ceiling height minus 15cm from ceiling
+  const yRear = l - m;
+  const earZ = 1.1;
+  const topZ = Math.max(0.3, h - 0.15); // Ceiling height minus 15cm from ceiling
 
   const x25 = w * 0.25;
   const x50 = w * 0.50;
@@ -1306,73 +1306,73 @@ export function seedSpeakersFromPreset({
 
   const la = listeningArea && typeof listeningArea === "object" ? listeningArea : null;
   const sideY = la ? la.midY : l * 0.60;
-  const backLeftX  = la ? Math.max(m, la.minX) : x25;
+  const backLeftX = la ? Math.max(m, la.minX) : x25;
   const backRightX = la ? Math.min(w - m, la.maxX) : x75;
 
   const posForRole = (role) => {
     switch (role) {
       // Fronts
-      case "FL":  return { x: x25, y: yFront, z: earZ };
-      case "FC":  return { x: x50, y: yFront, z: earZ };
-      case "FR":  return { x: x75, y: yFront, z: earZ };
-      case "FCL": return { x: Math.max(m, x25 - 0.2), y: yFront, z: earZ };
-      case "FCR": return { x: Math.min(w - m, x75 + 0.2), y: yFront, z: earZ };
+      case "FL":return { x: x25, y: yFront, z: earZ };
+      case "FC":return { x: x50, y: yFront, z: earZ };
+      case "FR":return { x: x75, y: yFront, z: earZ };
+      case "FCL":return { x: Math.max(m, x25 - 0.2), y: yFront, z: earZ };
+      case "FCR":return { x: Math.min(w - m, x75 + 0.2), y: yFront, z: earZ };
       // Sides - DO NOT CLAMP (maintain existing logic)
-      case "SL":  return { x: m,     y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY)), z: earZ };
-      case "SR":  return { x: w - m, y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY)), z: earZ };
+      case "SL":return { x: m, y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY)), z: earZ };
+      case "SR":return { x: w - m, y: Math.max(m, Math.min(sideY, la ? la.maxY : sideY)), z: earZ };
       // Backs - STROKE-AWARE rear wall placement with 1cm gap
-      case "SBL": 
-      case "SBR": {
-        // NOTE: Do not compute speaker geometry in RoomDesigner. SpeakerPlacement handles positioning.
-        // Return a simple stub position - SpeakerPlacement/resetSurroundPositions will compute wall-hugging correctly.
-        const xPos = role === "SBL" ? x25 : x75;
-        
-        return { 
-          x: Math.max(m, Math.min(xPos, w - m)), 
-          y: l - 0.10, // Safe 10cm margin from rear wall (SpeakerPlacement will correct)
-          z: earZ 
-        };
-      }
-      case "RBL": return { x: Math.max(m, Math.min(backLeftX, w - m)),  y: Math.min(yRear, l - m), z: earZ };
-      case "RBR": return { x: Math.max(m, Math.min(backRightX, w - m)), y: Math.min(yRear, l - m), z: earZ };
+      case "SBL":
+      case "SBR":{
+          // NOTE: Do not compute speaker geometry in RoomDesigner. SpeakerPlacement handles positioning.
+          // Return a simple stub position - SpeakerPlacement/resetSurroundPositions will compute wall-hugging correctly.
+          const xPos = role === "SBL" ? x25 : x75;
+
+          return {
+            x: Math.max(m, Math.min(xPos, w - m)),
+            y: l - 0.10, // Safe 10cm margin from rear wall (SpeakerPlacement will correct)
+            z: earZ
+          };
+        }
+      case "RBL":return { x: Math.max(m, Math.min(backLeftX, w - m)), y: Math.min(yRear, l - m), z: earZ };
+      case "RBR":return { x: Math.max(m, Math.min(backRightX, w - m)), y: Math.min(yRear, l - m), z: earZ };
       // Wides - DO NOT CLAMP (maintain existing logic)
-      case "LW": return { x: w * 0.15, y: l * 0.4, z: earZ };
-      case "RW": return { x: w * 0.85, y: l * 0.4, z: earZ };
+      case "LW":return { x: w * 0.15, y: l * 0.4, z: earZ };
+      case "RW":return { x: w * 0.85, y: l * 0.4, z: earZ };
 
       // Tops
-      case "TML": return { x: x25, y: l * 0.50, z: topZ }; // Top Mid Left
-      case "TMR": return { x: x75, y: l * 0.50, z: topZ }; // Top Mid Right
-      case "TFL": return { x: x25, y: l * 0.35, z: topZ }; // Top Front Left - 35% from front
-      case "TFR": return { x: x75, y: l * 0.35, z: topZ }; // Top Front Right
-      case "TFC": return { x: x50, y: l * 0.35, z: topZ }; // Top Front Center
-      case "TRL": return { x: x25, y: l * 0.70, z: topZ }; // Top Rear Left - 70% from front
-      case "TRR": return { x: x75, y: l * 0.70, z: topZ }; // Top Rear Right
-      case "TRC": return { x: x50, y: l * 0.70, z: topZ }; // Top Rear Center
+      case "TML":return { x: x25, y: l * 0.50, z: topZ }; // Top Mid Left
+      case "TMR":return { x: x75, y: l * 0.50, z: topZ }; // Top Mid Right
+      case "TFL":return { x: x25, y: l * 0.35, z: topZ }; // Top Front Left - 35% from front
+      case "TFR":return { x: x75, y: l * 0.35, z: topZ }; // Top Front Right
+      case "TFC":return { x: x50, y: l * 0.35, z: topZ }; // Top Front Center
+      case "TRL":return { x: x25, y: l * 0.70, z: topZ }; // Top Rear Left - 70% from front
+      case "TRR":return { x: x75, y: l * 0.70, z: topZ }; // Top Rear Right
+      case "TRC":return { x: x50, y: l * 0.70, z: topZ }; // Top Rear Center
       // Legacy aliases
-      case "TL":  return { x: x25, y: l * 0.50, z: topZ };
-      case "TR":  return { x: x75, y: l * 0.50, z: topZ };
-      case "TBL": return { x: x25, y: l * 0.70, z: topZ };
-      case "TBR": return { x: x75, y: l * 0.70, z: topZ };
-      case "TBC": return { x: x50, y: l * 0.70, z: topZ };
+      case "TL":return { x: x25, y: l * 0.50, z: topZ };
+      case "TR":return { x: x75, y: l * 0.50, z: topZ };
+      case "TBL":return { x: x25, y: l * 0.70, z: topZ };
+      case "TBR":return { x: x75, y: l * 0.70, z: topZ };
+      case "TBC":return { x: x50, y: l * 0.70, z: topZ };
       // LFE
-      case "LFE": return { x: x50, y: yFront + 0.20, z: 0.3 };
-      default:    return { x: x50, y: l * 0.60, z: earZ };
+      case "LFE":return { x: x50, y: yFront + 0.20, z: 0.3 };
+      default:return { x: x50, y: l * 0.60, z: earZ };
     }
   };
 
   const roles = DOLBY_PRESETS[preset] || [];
-  
+
   const seeded = roles.map((role) => ({
     id: role,
     role,
     label: role,
     model: undefined, // Neutralized default model seeding
-    position: posForRole(role),
+    position: posForRole(role)
   }));
 
   if (globalThis.__B44_LOGS) console.log(
     "[RD SEED] result roles =",
-    Array.isArray(seeded) ? seeded.map(s => s.role) : "(not array)"
+    Array.isArray(seeded) ? seeded.map((s) => s.role) : "(not array)"
   );
 
   return seeded;
@@ -1392,11 +1392,11 @@ export function useSpeakerSystemStore() {
     overheadRearOverride,
     useFrontGlobal,
     useMidGlobal,
-    useRearGlobal,
-   } = useAppState() || {};
+    useRearGlobal
+  } = useAppState() || {};
 
   const placedSpeakers = React.useMemo(
-    () => (Array.isArray(speakerSystem?.placedSpeakers) ? speakerSystem.placedSpeakers : []),
+    () => Array.isArray(speakerSystem?.placedSpeakers) ? speakerSystem.placedSpeakers : [],
     [speakerSystem?.placedSpeakers]
   );
 
@@ -1405,9 +1405,9 @@ export function useSpeakerSystemStore() {
       if (typeof setSpeakerSystem !== "function") return;
 
       // Resolve the final list immediately without re-merging with prev
-      let finalList = typeof listOrUpdater === "function"
-        ? listOrUpdater(Array.isArray(placedSpeakers) ? placedSpeakers : [])
-        : (Array.isArray(listOrUpdater) ? listOrUpdater : []);
+      let finalList = typeof listOrUpdater === "function" ?
+      listOrUpdater(Array.isArray(placedSpeakers) ? placedSpeakers : []) :
+      Array.isArray(listOrUpdater) ? listOrUpdater : [];
 
       // NEW: ensure Atmos overheads are present before we hand off to AppState
       finalList = ensureAtmosOverheads({
@@ -1424,7 +1424,7 @@ export function useSpeakerSystemStore() {
         overheadRearOverride,
         useFrontGlobal,
         useMidGlobal,
-        useRearGlobal,
+        useRearGlobal
       });
 
       // DEBUG: log what we're actually sending into AppStateProvider
@@ -1432,12 +1432,12 @@ export function useSpeakerSystemStore() {
       // eslint-disable-next-line no-console
       if (globalThis.__B44_LOGS) console.log("[RD] setSpeakers sending to AppStateProvider:", {
         count: finalList.length,
-        roles: finalList.map(s => s.role),
+        roles: finalList.map((s) => s.role)
       });
 
       // Push the finished list into AppStateProvider in one shot
       setSpeakerSystem({
-        placedSpeakers: finalList,
+        placedSpeakers: finalList
       });
     },
     [setSpeakerSystem, placedSpeakers, dolbyLayout, roomDims, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]
@@ -1446,54 +1446,54 @@ export function useSpeakerSystemStore() {
   const initWithDefaultsAndRules = React.useCallback(() => {
     // This function now relies on `roomDims` from `useAppState`
     const room = {
-      width:  typeof roomDims?.widthM  === "number" ? roomDims.widthM  : 4.5,
+      width: typeof roomDims?.widthM === "number" ? roomDims.widthM : 4.5,
       length: typeof roomDims?.lengthM === "number" ? roomDims.lengthM : 6.0,
-      height: typeof roomDims?.heightM === "number" ? roomDims.heightM : 2.8,
+      height: typeof roomDims?.heightM === "number" ? roomDims.heightM : 2.8
     };
-    if (typeof setRoomDims === "function") { // Update appState.roomDims
+    if (typeof setRoomDims === "function") {// Update appState.roomDims
       setRoomDims(room); // Simplified as roomDims stores {widthM, lengthM, heightM}
     }
 
     if (typeof setScreen === "function") {
-      setScreen(prev => ({
+      setScreen((prev) => ({
         ...prev,
         visibleWidthInches: prev?.visibleWidthInches || 100,
         aspectRatio: prev?.aspectRatio || "16:9",
         mountMode: "floating", // Enforce floating as default on init
-        floatDepthM: (typeof prev?.floatDepthM === "number") ? prev.floatDepthM : 0.2, // Default to 0.2 for floating
-        heightFromFloorM: (typeof prev?.heightFromFloorM === "number") ? prev.heightFromFloorM : 0.5,
+        floatDepthM: typeof prev?.floatDepthM === "number" ? prev.floatDepthM : 0.2, // Default to 0.2 for floating
+        heightFromFloorM: typeof prev?.heightFromFloorM === "number" ? prev.heightFromFloorM : 0.5
       }));
     }
 
     if (typeof setSeatingPositions === "function" && (!Array.isArray(seatingPositions) || seatingPositions.length === 0)) {
       const cx = room.width / 2;
-      const THETA = (57.5 * Math.PI) / 180;
-      const viewWidthM = (100 * 0.0254);
-      const d = (viewWidthM / 2) / Math.tan(THETA / 2);
+      const THETA = 57.5 * Math.PI / 180;
+      const viewWidthM = 100 * 0.0254;
+      const d = viewWidthM / 2 / Math.tan(THETA / 2);
       const y = Math.max(0.10, Math.min(room.length - 1.2, d));
       const spacing = 0.6;
       setSeatingPositions([
-        { id: "seat-left",  x: cx - spacing, y, z: 1.2, rowNumber: 1, seatNumber: 1 },
-        { id: "seat-center",x: cx,           y, z: 1.2, rowNumber: 1, isPrimary: true },
-        { id: "seat-right", x: cx + spacing, y, z: 1.2, rowNumber: 1, seatNumber: 3 },
-      ]);
+      { id: "seat-left", x: cx - spacing, y, z: 1.2, rowNumber: 1, seatNumber: 1 },
+      { id: "seat-center", x: cx, y, z: 1.2, rowNumber: 1, isPrimary: true },
+      { id: "seat-right", x: cx + spacing, y, z: 1.2, rowNumber: 1, seatNumber: 3 }]
+      );
     }
 
     if (typeof setSpeakerSystem === "function") {
       // Determine which preset to seed from based on the current Dolby layout
       const rawPreset = typeof dolbyLayout === "string" ? dolbyLayout : "5.1";
-      const normalizedPreset = String(rawPreset)
-        .split(" ")[0]   // "5.1.2 Dolby Atmos" -> "5.1.2"
-        .split("_")[0];  // "5.1.2_atmos" -> "5.1.2"
+      const normalizedPreset = String(rawPreset).
+      split(" ")[0] // "5.1.2 Dolby Atmos" -> "5.1.2"
+      .split("_")[0]; // "5.1.2_atmos" -> "5.1.2"
 
       const presetKey = DOLBY_PRESETS[normalizedPreset] ? normalizedPreset : "5.1";
 
       const seeded = seedSpeakersFromPreset({
         preset: presetKey,
         roomDimensions: room,
-        listeningArea: null,
+        listeningArea: null
       });
-      if (globalThis.__B44_LOGS) console.log("[RD] SEED RESULT:", seeded.map(s => s.role));
+      if (globalThis.__B44_LOGS) console.log("[RD] SEED RESULT:", seeded.map((s) => s.role));
       setSpeakerSystem((prev) => ({ ...(prev || {}), placedSpeakers: seeded }));
     }
   }, [roomDims, seatingPositions, dolbyLayout, setRoomDims, setScreen, setSeatingPositions, setSpeakerSystem]);
@@ -1521,7 +1521,7 @@ function RoomDesignerWithState() {
   const appState = useAppState();
   const sessionActiveProjectId = useActiveProjectId();
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
-  
+
   // Single source of truth for the project ID
   const resolvedProjectId = sessionActiveProjectId || initialProjectIdFromUrl || null;
 
@@ -1533,25 +1533,25 @@ function RoomDesignerWithState() {
   // (Assumes AppStateProvider has been updated to provide these)
   const _roomDims = appState?.roomDims;
   const _setRoomDims = appState?.setRoomDims;
-  
+
   // CRITICAL: Define stableDimensions EARLY (before any hooks that use it)
   // This is the canonical room dimensions object used throughout RoomDesigner
   const stableDimensions = useMemo(() => {
     const dims = {
       width: Number(_roomDims?.widthM) || 4.5,
       length: Number(_roomDims?.lengthM) || 6.0,
-      height: Number(_roomDims?.heightM) || 2.8,
+      height: Number(_roomDims?.heightM) || 2.8
     };
-    
+
     if (globalThis.__B44_LOGS) {
       console.log('[RoomDesigner] stableDimensions', dims);
     }
-    
+
     return dims;
   }, [_roomDims?.widthM, _roomDims?.lengthM, _roomDims?.heightM]);
-  
+
   const dimensions = stableDimensions; // legacy alias to prevent ReferenceError
-  
+
   const _selectedSpeakersByRole = appState?.selectedSpeakersByRole;
   const _setSelectedSpeakersByRole = appState?.setSelectedSpeakersByRole;
   const _speakerNodes = appState?.speakerNodes;
@@ -1599,7 +1599,7 @@ function RoomDesignerWithState() {
 
 
   const store = useSpeakerSystemStore();
-  
+
   // CRITICAL: Extract placedSpeakers early so it's available for allSeatSplMetrics
   const placedSpeakers = store.placedSpeakers;
 
@@ -1620,7 +1620,7 @@ function RoomDesignerWithState() {
   const [lcrAimMode, setLcrAimMode] = useState("flat"); // "flat" | "angled"
   const [lcrAngleDeg, setLcrAngleDeg] = useState(0); // Live angle readout
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
-  
+
   // NEW: Options panel state
   const [showPrices, setShowPrices] = useState(false);
   const [difficultyMultiplier, setDifficultyMultiplier] = useState(1.0);
@@ -1637,13 +1637,13 @@ function RoomDesignerWithState() {
   // --- bed rears required? (SBL/SBR) ---
   const layoutMajor = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) || 5;
   const useWidesInsteadOfRears = _sevenBedLayoutType === "wides";
-  const expectsRears = (layoutMajor >= 9) || (layoutMajor === 7 && !useWidesInsteadOfRears);
+  const expectsRears = layoutMajor >= 9 || layoutMajor === 7 && !useWidesInsteadOfRears;
 
   // screen state is now managed directly by AppState, removed local useState here.
 
   // Track preset changes to prevent unnecessary re-seeding
   const lastPresetRef = React.useRef(dolbyPreset);
-  useEffect(() => { lastPresetRef.current = dolbyPreset; }, [dolbyPreset]);
+  useEffect(() => {lastPresetRef.current = dolbyPreset;}, [dolbyPreset]);
 
   // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
 
@@ -1657,16 +1657,16 @@ function RoomDesignerWithState() {
     heightFromFloorM: Number(_screen?.heightFromFloorM) || 0.5,
     manualMode: _screen?.manualMode || false,
     manualWidthM: Number(_screen?.manualWidthM) || 0,
-    manualHeightM: Number(_screen?.manualHeightM) || 0,
+    manualHeightM: Number(_screen?.manualHeightM) || 0
   }), [_screen?.visibleWidthInches, _screen?.aspectRatio, _screen?.floatDepthM, _screen?.heightFromFloorM, _screen?.manualMode, _screen?.manualWidthM, _screen?.manualHeightM, _screen?.mountMode]);
 
   // Compute MLP (green dot) and row centers from screen plane
   useEffect(() => {
     // Pull needed values
     const screenFrontPlaneM = appState?.screenFrontPlaneM;
-    const screenVisibleWidthM = stableScreen?.visibleWidthInches 
-      ? stableScreen.visibleWidthInches * 0.0254 
-      : null;
+    const screenVisibleWidthM = stableScreen?.visibleWidthInches ?
+    stableScreen.visibleWidthInches * 0.0254 :
+    null;
     /* Y-only viewing offset (lock X to centre) */
     const viewingOffsetM = Number(_seatingBlockOffset) || 0;
     const rows = Number(_seatingRows) || 1;
@@ -1705,7 +1705,7 @@ function RoomDesignerWithState() {
     const MAX_Y = len - 0.40;
     const _clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
 
-    const centers = centersRaw.map(y => _clampY(y));
+    const centers = centersRaw.map((y) => _clampY(y));
 
     // Store the clamped row centers
     if (typeof appState?.setRowCentersM === 'function') {
@@ -1716,7 +1716,7 @@ function RoomDesignerWithState() {
     const mlpRounded = Math.round(fixedMlpY * 1000) / 1000;
 
     if (typeof appState?.setMlpY_m === 'function') {
-      appState.setMlpY_m(prev => {
+      appState.setMlpY_m((prev) => {
         const prevRounded = prev ? Math.round(prev * 1000) : null;
         const newRounded = Math.round(mlpRounded * 1000);
         return prevRounded === newRounded ? prev : mlpRounded;
@@ -1736,32 +1736,32 @@ function RoomDesignerWithState() {
         count: rows,
         spacing: rowSpacing.toFixed(3),
         frontY: centers[0]?.toFixed(3),
-        backY: centers[centers.length - 1]?.toFixed(3),
+        backY: centers[centers.length - 1]?.toFixed(3)
       });
     }
   }, [
-    appState?.screenFrontPlaneM,
-    stableScreen?.visibleWidthInches,
-    _seatingBlockOffset,
-    _seatingRows,
-    _mlpBasis,
-    _rowSpacingM,
-    appState?.setMlpY_m,
-    appState?.setRowCentersM,
-    stableDimensions?.length,
-    appState?.roomDims?.lengthM,
-  ]);
+  appState?.screenFrontPlaneM,
+  stableScreen?.visibleWidthInches,
+  _seatingBlockOffset,
+  _seatingRows,
+  _mlpBasis,
+  _rowSpacingM,
+  appState?.setMlpY_m,
+  appState?.setRowCentersM,
+  stableDimensions?.length,
+  appState?.roomDims?.lengthM]
+  );
 
   // Use computed MLP as the effective anchor (for backwards compatibility)
   const mlpAnchorEffective = useMemo(() => {
     const mlpY = appState?.mlpY_m;
     if (!Number.isFinite(mlpY)) return null;
-    
+
     const roomWidthM = Number(stableDimensions?.width) || 0;
     return {
       x: roomWidthM > 0 ? roomWidthM / 2 : 0,
       y: mlpY,
-      z: 1.2,
+      z: 1.2
     };
   }, [appState?.mlpY_m, stableDimensions?.width]);
 
@@ -1769,9 +1769,9 @@ function RoomDesignerWithState() {
   // Uses unified SPL logic with max_spl_cont_db_1m cap from speakerData.js
   const allSeatSplMetrics = useMemo(() => {
     const getCanonicalRoleLocal = (role) => {
-      const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', 
-                    FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR',
-                    TFL:'TFL',TFR:'TFR',TL:'TL',TML:'TL',TR:'TR',TMR:'TR',TBL:'TBL',TBR:'TBR' };
+      const map = { SL: 'SL', LS: 'SL', SR: 'SR', RS: 'SR', SBL: 'SBL', SBR: 'SBR', LW: 'LW', RW: 'RW',
+        FL: 'FL', L: 'FL', FC: 'FC', C: 'FC', FR: 'FR', R: 'FR',
+        TFL: 'TFL', TFR: 'TFR', TL: 'TL', TML: 'TL', TR: 'TR', TMR: 'TR', TBL: 'TBL', TBR: 'TBR' };
       const r = String(role || '').toUpperCase();
       return map[r] || r;
     };
@@ -1795,7 +1795,7 @@ function RoomDesignerWithState() {
             // Ensure these critical SPL fields are present
             sensitivity_db_1w_1m: meta.sensitivity_dB_1w1m || meta.sensitivity || 87,
             power_handling_w: meta.max_power || Infinity,
-            max_spl_cont_db_1m: meta.max_spl || null,
+            max_spl_cont_db_1m: meta.max_spl || null
           };
         }
         // Fallback for unknown models
@@ -1804,15 +1804,15 @@ function RoomDesignerWithState() {
       // Pass screen loss and EQ headroom from global splConfig
       screenLoss_dB: screenLoss,
       eqHeadroom_dB: eqHeadroom,
-      mlpPoint: mlpAnchorEffective, // NEW: Pass green dot MLP for synthetic "mlp" seat
+      mlpPoint: mlpAnchorEffective // NEW: Pass green dot MLP for synthetic "mlp" seat
     });
   }, [_seatingPositions, placedSpeakers, appState?.getEffectiveSplInputs, appState?.splConfig, mlpAnchorEffective]);
 
   // Compute diagnostic values
   const widthM =
-    (typeof stableScreen?.widthMeters === 'number' && stableScreen.widthMeters > 0)
-      ? stableScreen.widthMeters
-      : ((Number(stableScreen?.visibleWidthInches) || 0) * 0.0254);
+  typeof stableScreen?.widthMeters === 'number' && stableScreen.widthMeters > 0 ?
+  stableScreen.widthMeters :
+  (Number(stableScreen?.visibleWidthInches) || 0) * 0.0254;
 
   // Derive primarySeatingPosition for backwards compatibility with existing code
   const primarySeatingPosition = useMemo(() => {
@@ -1842,8 +1842,8 @@ function RoomDesignerWithState() {
       rearOverride: _overheadRearOverride,
       useFrontGlobal: _useFrontGlobal,
       useMidGlobal: _useMidGlobal,
-      useRearGlobal: _useRearGlobal,
-    },
+      useRearGlobal: _useRearGlobal
+    }
   });
 
   const frontSubsForRendering = React.useMemo(() => {
@@ -1855,17 +1855,17 @@ function RoomDesignerWithState() {
       const warnings = [];
 
       if (!model || qty < 1) {
-        setSubWarnings(prev => ({ ...prev, front: [] }));
+        setSubWarnings((prev) => ({ ...prev, front: [] }));
         return [];
       }
 
-      const byRole = new Map((placedSpeakers || []).map(s => [String(s.role).toUpperCase(), s]));
+      const byRole = new Map((placedSpeakers || []).map((s) => [String(s.role).toUpperCase(), s]));
       const FL = byRole.get('FL');
       const FC = byRole.get('FC');
       const FR = byRole.get('FR');
 
       if (!FL?.position || !FC?.position || !FR?.position) {
-        setSubWarnings(prev => ({ ...prev, front: ["Place L, C, and R speakers first."] }));
+        setSubWarnings((prev) => ({ ...prev, front: ["Place L, C, and R speakers first."] }));
         return [];
       }
 
@@ -1875,9 +1875,9 @@ function RoomDesignerWithState() {
       const heightM = Number(subDims.heightM);
 
       if (isNaN(widthM) || isNaN(depthM) || isNaN(heightM) || widthM <= 0 || depthM <= 0 || heightM <= 0) {
-          warnings.push("Invalid subwoofer model dimensions.");
-          setSubWarnings(prev => ({ ...prev, front: warnings }));
-          return [];
+        warnings.push("Invalid subwoofer model dimensions.");
+        setSubWarnings((prev) => ({ ...prev, front: warnings }));
+        return [];
       }
 
       const getDims = (m) => getSpeakerModelMeta(m) || {};
@@ -1887,7 +1887,7 @@ function RoomDesignerWithState() {
 
       const neededWidthForOneSub = widthM + 0.10;
       const wallBuffer = 0.02;
-      const centerY = wallBuffer + (depthM / 2);
+      const centerY = wallBuffer + depthM / 2;
       const zBottom = 0.800;
       const zCenter = zBottom + heightM / 2;
 
@@ -1897,7 +1897,7 @@ function RoomDesignerWithState() {
         const fcLeftEdge = FC.position.x - (Number(fcDims.widthM) / 2 || 0);
         const availableSpaceWidth = fcLeftEdge - flRightEdge;
         const defaultXPos = (FL.position.x + FC.position.x) / 2;
-        
+
         const userPos = savedPositions[0];
         const xPosLeftSub = userPos?.x ?? defaultXPos;
 
@@ -1909,7 +1909,7 @@ function RoomDesignerWithState() {
             role: 'SUB', model,
             position: { x: xPosLeftSub, y: centerY, z: zCenter },
             dims_m: { w: widthM, h: heightM, d: depthM },
-            zBottomM: zBottom,
+            zBottomM: zBottom
           });
         }
       }
@@ -1920,7 +1920,7 @@ function RoomDesignerWithState() {
         const frLeftEdge = FR.position.x - (Number(frDims.widthM) / 2 || 0);
         const availableSpaceWidth = frLeftEdge - fcRightEdge;
         const defaultXPos = (FC.position.x + FR.position.x) / 2;
-        
+
         const userPos = savedPositions[1];
         const xPosRightSub = userPos?.x ?? defaultXPos;
 
@@ -1932,27 +1932,27 @@ function RoomDesignerWithState() {
             role: 'SUB', model,
             position: { x: xPosRightSub, y: centerY, z: zCenter },
             dims_m: { w: widthM, h: heightM, d: depthM },
-            zBottomM: zBottom,
+            zBottomM: zBottom
           });
         }
       }
 
-      setSubWarnings(prev => ({ ...prev, front: warnings }));
+      setSubWarnings((prev) => ({ ...prev, front: warnings }));
 
       // Screen depth check
       if (subsToRender.length > 0) {
-          const subFrontY = centerY + (depthM / 2);
-          const requiredScreenDepth = subFrontY + 0.01;
-          if ((_screen?.floatDepthM || 0) < requiredScreenDepth) {
-              _setScreen(prev => ({ ...prev, floatDepthM: requiredScreenDepth }));
-          }
+        const subFrontY = centerY + depthM / 2;
+        const requiredScreenDepth = subFrontY + 0.01;
+        if ((_screen?.floatDepthM || 0) < requiredScreenDepth) {
+          _setScreen((prev) => ({ ...prev, floatDepthM: requiredScreenDepth }));
+        }
       }
-      
+
       return subsToRender;
 
     } catch (e) {
       if (globalThis.__B44_LOGS) console.warn("Error calculating front subs for rendering:", e);
-      setSubWarnings(prev => ({ ...prev, front: ["Error calculating position."] }));
+      setSubWarnings((prev) => ({ ...prev, front: ["Error calculating position."] }));
       return [];
     }
   }, [_frontSubsCfg?.model, _frontSubsCfg?.count, _frontSubsCfg?.positions, placedSpeakers, _screen?.floatDepthM, _setScreen, setSubWarnings]);
@@ -1966,17 +1966,17 @@ function RoomDesignerWithState() {
       const warnings = [];
 
       if (!model || qty < 1) {
-        setSubWarnings(prev => ({ ...prev, rear: [] }));
+        setSubWarnings((prev) => ({ ...prev, rear: [] }));
         return [];
       }
 
-      const byRole = new Map((placedSpeakers || []).map(s => [String(s.role).toUpperCase(), s]));
+      const byRole = new Map((placedSpeakers || []).map((s) => [String(s.role).toUpperCase(), s]));
       const FL = byRole.get('FL');
       const FC = byRole.get('FC');
       const FR = byRole.get('FR');
 
       if (!FL?.position || !FC?.position || !FR?.position) {
-        setSubWarnings(prev => ({ ...prev, rear: ["Place L, C, and R speakers first to determine X-axis positions."] }));
+        setSubWarnings((prev) => ({ ...prev, rear: ["Place L, C, and R speakers first to determine X-axis positions."] }));
         return [];
       }
 
@@ -1995,52 +1995,52 @@ function RoomDesignerWithState() {
       const floorBuffer = 0.05;
       const sideBuffer = 0.05;
 
-      const centerY = rearWallY - wallBuffer - (depthM / 2);
-      const zCenter = floorBuffer + (heightM / 2);
-      
+      const centerY = rearWallY - wallBuffer - depthM / 2;
+      const zCenter = floorBuffer + heightM / 2;
+
       // Compute safe X bounds using half-width + buffer
-      const minX = (widthM / 2) + sideBuffer;
-      const maxX = stableDimensions.width - (widthM / 2) - sideBuffer;
-      
+      const minX = widthM / 2 + sideBuffer;
+      const maxX = stableDimensions.width - widthM / 2 - sideBuffer;
+
       // Only warn if sub physically cannot fit anywhere on this wall
       if (minX >= maxX) {
         warnings.push("Rear subwoofer is too wide for this room width.");
-        setSubWarnings(prev => ({ ...prev, rear: warnings }));
+        setSubWarnings((prev) => ({ ...prev, rear: warnings }));
         return [];
       }
-      
+
       const clamp = (v) => Math.max(minX, Math.min(maxX, v));
 
       if (qty >= 1) {
         const defaultXPos = leftRefX;
         const userPos = savedPositions[0];
         const xPosLeftSub = clamp(userPos?.x ?? defaultXPos);
-        
+
         subsToRender.push({
           id: 'rear-sub-left', role: 'SUB', model,
           position: { x: xPosLeftSub, y: centerY, z: zCenter },
-          dims_m: { w: widthM, h: heightM, d: depthM },
+          dims_m: { w: widthM, h: heightM, d: depthM }
         });
       }
-      
+
       if (qty >= 2) {
         const defaultXPos = rightRefX;
         const userPos = savedPositions[1];
         const xPosRightSub = clamp(userPos?.x ?? defaultXPos);
-        
+
         subsToRender.push({
           id: 'rear-sub-right', role: 'SUB', model,
           position: { x: xPosRightSub, y: centerY, z: zCenter },
-          dims_m: { w: widthM, h: heightM, d: depthM },
+          dims_m: { w: widthM, h: heightM, d: depthM }
         });
       }
 
-      setSubWarnings(prev => ({ ...prev, rear: warnings }));
+      setSubWarnings((prev) => ({ ...prev, rear: warnings }));
       return subsToRender;
 
     } catch (e) {
       if (globalThis.__B44_LOGS) console.warn("Error calculating rear subs for rendering:", e);
-      setSubWarnings(prev => ({ ...prev, rear: ["Error calculating position."] }));
+      setSubWarnings((prev) => ({ ...prev, rear: ["Error calculating position."] }));
       return [];
     }
   }, [_rearSubsCfg?.model, _rearSubsCfg?.count, _rearSubsCfg?.positions, placedSpeakers, stableDimensions.width, stableDimensions.length, setSubWarnings]);
@@ -2050,9 +2050,9 @@ function RoomDesignerWithState() {
     placedSpeakers,
     frontSubsCfg: _frontSubsCfg,
     rearSubsCfg: _rearSubsCfg,
-    difficultyMultiplier,
+    difficultyMultiplier
   });
-  
+
   // Publish price data to window for sidebar consumption
   React.useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -2060,11 +2060,11 @@ function RoomDesignerWithState() {
         showPrices,
         baseTotal: priceData.baseTotal,
         finalTotal: priceData.finalTotal,
-        difficultyMultiplier,
+        difficultyMultiplier
       };
     }
   }, [showPrices, priceData.baseTotal, priceData.finalTotal, difficultyMultiplier]);
-  
+
   const enableFrontWides = _enableFrontWides;
 
   // Safe front-wide zone memo with hard guards
@@ -2078,7 +2078,7 @@ function RoomDesignerWithState() {
       return result;
     }
 
-    if (!mlpAnchorEffective) { // Use mlpAnchorEffective as the fixed reference
+    if (!mlpAnchorEffective) {// Use mlpAnchorEffective as the fixed reference
       const result = { status: 'no-mlp' };
       if (typeof window !== 'undefined') {
         window.FW_DBG = result;
@@ -2099,9 +2099,9 @@ function RoomDesignerWithState() {
     }
 
     // safeCanon is already defined at the top level of the file
-    const sl = placedSpeakers?.find(s => safeCanon(s?.role) === 'SL');
-    const sr = placedSpeakers?.find(s => safeCanon(s?.role) === 'SR');
-    
+    const sl = placedSpeakers?.find((s) => safeCanon(s?.role) === 'SL');
+    const sr = placedSpeakers?.find((s) => safeCanon(s?.role) === 'SR');
+
     if (!sl || !sr) {
       const result = { status: 'no-sides' };
       if (typeof window !== 'undefined') {
@@ -2121,7 +2121,7 @@ function RoomDesignerWithState() {
         dimensions: stableDimensions,
         placedSpeakers,
         getModelDims,
-        rp22BoundDeg: 10,
+        rp22BoundDeg: 10
       }) || { status: 'invalid-geom', reason: 'empty result' };
     } catch (e) {
       result = { status: 'invalid-geom', reason: 'exception', error: e.message };
@@ -2143,23 +2143,23 @@ function RoomDesignerWithState() {
 
     return result;
   }, [
-    enableFrontWides,
-    mlpAnchorEffective, // Depend on mlpAnchorEffective
-    stableDimensions,
-    placedSpeakers,
-  ]);
+  enableFrontWides,
+  mlpAnchorEffective, // Depend on mlpAnchorEffective
+  stableDimensions,
+  placedSpeakers]
+  );
 
 
   // Effect for subwoofer placement
   useEffect(() => {
-    if (!placedSpeakers.length || !_roomDims || !_screen || (_isFrozen && _isFrozen('bass'))) return;
+    if (!placedSpeakers.length || !_roomDims || !_screen || _isFrozen && _isFrozen('bass')) return;
 
     const room = { width_m: _roomDims.widthM, length_m: _roomDims.lengthM, height_m: _roomDims.heightM };
 
-    const byRole = new Map(placedSpeakers.map(s => [s.role, s]));
+    const byRole = new Map(placedSpeakers.map((s) => [s.role, s]));
     const getDims = (model) => {
-        const meta = getSpeakerModelMeta(model);
-        return { w_m: meta?.widthM ?? 0.27, d_m: meta?.depthM ?? 0.082 };
+      const meta = getSpeakerModelMeta(model);
+      return { w_m: meta?.widthM ?? 0.27, d_m: meta?.depthM ?? 0.082 };
     };
 
     const leftSpeaker = byRole.get("FL");
@@ -2167,8 +2167,8 @@ function RoomDesignerWithState() {
     const rightSpeaker = byRole.get("FR");
 
     if (!leftSpeaker || !centreSpeaker || !rightSpeaker) {
-        if (typeof setSubwoofers === 'function') setSubwoofers([]);
-        return;
+      if (typeof setSubwoofers === 'function') setSubwoofers([]);
+      return;
     }
 
     const lcr = {
@@ -2176,7 +2176,7 @@ function RoomDesignerWithState() {
       C: { x_m: centreSpeaker.position.x, dims: getDims(centreSpeaker.model) },
       R: { x_m: rightSpeaker.position.x, dims: getDims(rightSpeaker.model) }
     };
-    
+
     const screenDepth_m = _screen.floatDepthM || 0.2;
 
     const front = placeSubwoofers({
@@ -2185,43 +2185,43 @@ function RoomDesignerWithState() {
       screenPlaneY_m: screenDepth_m,
       lcr,
       group: "front",
-      cfg: { ..._frontSubsCfg, qty: (_frontSubsCfg?.qty ?? _frontSubsCfg?.count ?? 0) }
+      cfg: { ..._frontSubsCfg, qty: _frontSubsCfg?.qty ?? _frontSubsCfg?.count ?? 0 }
     });
 
     const rear = placeSubwoofers({
       room,
-      wallY_m: 0, 
-      screenPlaneY_m: stableDimensions.length, 
+      wallY_m: 0,
+      screenPlaneY_m: stableDimensions.length,
       lcr,
       group: "rear",
-      cfg: { ..._rearSubsCfg, qty: (_rearSubsCfg?.qty ?? _rearSubsCfg?.count ?? 0) }
+      cfg: { ..._rearSubsCfg, qty: _rearSubsCfg?.qty ?? _rearSubsCfg?.count ?? 0 }
     });
-    
-        if (typeof setSubwoofers === 'function') {
+
+    if (typeof setSubwoofers === 'function') {
       const newSubs = [...front.placed, ...rear.placed];
       if (!speakersEqual(appState.subwoofers || [], newSubs)) {
         setSubwoofers(newSubs);
       }
     }
-    
-    setSubWarnings(prev => ({ ...prev, rear: rear.warnings }));
-    
+
+    setSubWarnings((prev) => ({ ...prev, rear: rear.warnings }));
+
     const currentMinFromLcr_m = _screen.floatDepthM || 0;
     const needed_m = Math.max(front.neededScreenDepth_m || 0, currentMinFromLcr_m);
 
     if (needed_m > currentMinFromLcr_m && Math.abs(needed_m - currentMinFromLcr_m) > 0.001) {
-        _setScreen(s => ({ ...s, floatDepthM: needed_m }));
+      _setScreen((s) => ({ ...s, floatDepthM: needed_m }));
     }
 
   }, [_roomDims?.widthM, _roomDims?.lengthM, _roomDims?.heightM, placedSpeakers, _frontSubsCfg, _rearSubsCfg, _screen, stableDimensions.length, _isFrozen, setSubwoofers, setSubWarnings, _setScreen]);
 
 
   const initWithDefaultsAndRules = React.useMemo(
-    () => (typeof store?.initWithDefaultsAndRules === "function" ? store.initWithDefaultsAndRules : () => {}),
+    () => typeof store?.initWithDefaultsAndRules === "function" ? store.initWithDefaultsAndRules : () => {},
     [store?.initWithDefaultsAndRules]
   );
   const setSpeakers = React.useMemo(
-    () => (typeof store?.setSpeakers === "function" ? store?.setSpeakers : () => {}),
+    () => typeof store?.setSpeakers === "function" ? store?.setSpeakers : () => {},
     [store?.setSpeakers]
   );
 
@@ -2240,14 +2240,14 @@ function RoomDesignerWithState() {
     // Check if we already have speakers in the scene that are 5.1 bed speakers
     // This uses canonical roles to be flexible (e.g., Ls maps to SL)
     const existingSpeakers = placedSpeakers || [];
-    const has51BedRoles = ['FL', 'FC', 'FR', 'SL', 'SR'].some(role => 
-      existingSpeakers.some(s => safeCanon(s.role) === role)
+    const has51BedRoles = ['FL', 'FC', 'FR', 'SL', 'SR'].some((role) =>
+    existingSpeakers.some((s) => safeCanon(s.role) === role)
     );
 
     // Only hydrate from handoff if no 5.1 bed speakers exist yet in the current design
     if (!has51BedRoles && setSpeakers) {
       if (globalThis.__B44_LOGS) debug('[Speakers] Hydrating speakers from SPL handoff data (speakerNodes).');
-      const hydratedSpeakers = _speakerNodes.map(node => ({
+      const hydratedSpeakers = _speakerNodes.map((node) => ({
         id: node.id || node.role, // Use ID or role for unique ID
         role: canon(node.role), // Canonicalize roles (e.g., L -> FL, Ls -> SL)
         brand: node.brand,
@@ -2287,59 +2287,59 @@ function RoomDesignerWithState() {
     autosaveStatus,
     handleSaveProject: triggerSaveProject,
     reloadProject
-   } = useProjectLoader(
+  } = useProjectLoader(
     appState, // Pass appState here
     {
-    projectIdFromUrl: resolvedProjectId,
-    dolbyPreset,
-    dimensions: stableDimensions, // Pass stableDimensions for serializeProject's old fields
-    screen: _screen, seatingPositions: _seatingPositions, roomElements: _roomElements,
-    overlays: _overlays, frozenTabs: _frozenTabs,
-    setDimensions: _setRoomDims, // Set appState.roomDims directly
-    setScreen: _setScreen, setSeatingPositions: appState?.setSeatingPositions,
-    setRoomElements: appState?.setRoomElements,
-    setOverlays: _setOverlays, setDolbyConfig: appState?.setDolbyConfig,
-    setDolbyPreset,
-    setSpeakerSystem: store.setSpeakerSystem,
-    initWithDefaultsAndRules: initWithDefaultsAndRules,
-    placedSpeakers: placedSpeakers,
-    sevenBedLayoutType: _sevenBedLayoutType,
-    setSevenBedLayoutType: appState?.setSevenBedLayoutType,
-    frontSubsCfg: _frontSubsCfg,
-    rearSubsCfg: _rearSubsCfg,
-    setFrontSubsCfg: appState?.setFrontSubsCfg,
-    setRearSubsCfg: appState?.setRearSubsCfg,
-    lcrAimMode,
-    setLcrAimMode,
-    enableFrontWides: _enableFrontWides,
-    setEnableFrontWides: _setEnableFrontWides,
-    selectedSpeakersByRole: _selectedSpeakersByRole,
-    setSelectedSpeakersByRole: _setSelectedSpeakersByRole,
-    speakerNodes: _speakerNodes,
-    setSpeakerNodes: _setSpeakerNodes,
-    overheadGlobalModel: _overheadGlobalModel,
-    overheadFrontOverride: _overheadFrontOverride,
-    overheadMidOverride: _overheadMidOverride,
-    overheadRearOverride: _overheadRearOverride,
-    useFrontGlobal: _useFrontGlobal,
-    useMidGlobal: _useMidGlobal,
-    useRearGlobal: _useRearGlobal,
-    setOverheadGlobalModel: _setOverheadGlobalModel,
-    setOverheadFrontOverride: _setOverheadFrontOverride,
-    setOverheadMidOverride: _setOverheadMidOverride,
-    setOverheadRearOverride: _setOverheadRearOverride,
-    setUseFrontGlobal: _setUseFrontGlobal,
-    setUseMidGlobal: _setUseMidGlobal,
-    setUseRearGlobal: _setUseRearGlobal,
-    rowSpacingM: _rowSpacingM,
-    setRowSpacingM: _setRowSpacingM,
-    seatsPerRowByRow: _seatsPerRowByRow,
-    setSeatsPerRowByRow: _setSeatsPerRowByRow,
-  });
+      projectIdFromUrl: resolvedProjectId,
+      dolbyPreset,
+      dimensions: stableDimensions, // Pass stableDimensions for serializeProject's old fields
+      screen: _screen, seatingPositions: _seatingPositions, roomElements: _roomElements,
+      overlays: _overlays, frozenTabs: _frozenTabs,
+      setDimensions: _setRoomDims, // Set appState.roomDims directly
+      setScreen: _setScreen, setSeatingPositions: appState?.setSeatingPositions,
+      setRoomElements: appState?.setRoomElements,
+      setOverlays: _setOverlays, setDolbyConfig: appState?.setDolbyConfig,
+      setDolbyPreset,
+      setSpeakerSystem: store.setSpeakerSystem,
+      initWithDefaultsAndRules: initWithDefaultsAndRules,
+      placedSpeakers: placedSpeakers,
+      sevenBedLayoutType: _sevenBedLayoutType,
+      setSevenBedLayoutType: appState?.setSevenBedLayoutType,
+      frontSubsCfg: _frontSubsCfg,
+      rearSubsCfg: _rearSubsCfg,
+      setFrontSubsCfg: appState?.setFrontSubsCfg,
+      setRearSubsCfg: appState?.setRearSubsCfg,
+      lcrAimMode,
+      setLcrAimMode,
+      enableFrontWides: _enableFrontWides,
+      setEnableFrontWides: _setEnableFrontWides,
+      selectedSpeakersByRole: _selectedSpeakersByRole,
+      setSelectedSpeakersByRole: _setSelectedSpeakersByRole,
+      speakerNodes: _speakerNodes,
+      setSpeakerNodes: _setSpeakerNodes,
+      overheadGlobalModel: _overheadGlobalModel,
+      overheadFrontOverride: _overheadFrontOverride,
+      overheadMidOverride: _overheadMidOverride,
+      overheadRearOverride: _overheadRearOverride,
+      useFrontGlobal: _useFrontGlobal,
+      useMidGlobal: _useMidGlobal,
+      useRearGlobal: _useRearGlobal,
+      setOverheadGlobalModel: _setOverheadGlobalModel,
+      setOverheadFrontOverride: _setOverheadFrontOverride,
+      setOverheadMidOverride: _setOverheadMidOverride,
+      setOverheadRearOverride: _setOverheadRearOverride,
+      setUseFrontGlobal: _setUseFrontGlobal,
+      setUseMidGlobal: _setUseMidGlobal,
+      setUseRearGlobal: _setUseRearGlobal,
+      rowSpacingM: _rowSpacingM,
+      setRowSpacingM: _setRowSpacingM,
+      seatsPerRowByRow: _seatsPerRowByRow,
+      setSeatsPerRowByRow: _setSeatsPerRowByRow
+    });
 
   useEffect(() => {
     if (appState && typeof appState.setSubWarnings === 'function') {
-        appState.setSubWarnings(subWarnings);
+      appState.setSubWarnings(subWarnings);
     }
   }, [subWarnings, appState]);
 
@@ -2350,7 +2350,7 @@ function RoomDesignerWithState() {
     try {
       // Helper to get model dimensions
       const getModelDims = (modelId) => getSpeakerModelMeta(modelId) || {};
-      
+
       const constraints = calculateLcrConstraints({
         placedSpeakers,
         zones: analysisResult.zones,
@@ -2358,15 +2358,15 @@ function RoomDesignerWithState() {
         screen: stableScreen,
         getModelDims
       });
-      
+
       let needsUpdate = false;
-      const updatedSpeakers = placedSpeakers.map(speaker => {
+      const updatedSpeakers = placedSpeakers.map((speaker) => {
         const constraint = constraints[speaker.role];
         if (!constraint) return speaker;
 
         const currentX = speaker.position.x;
         const { minX, maxX } = constraint.clamp;
-        
+
         // If current position is outside the new valid corridor
         if (currentX < minX || currentX > maxX) {
           needsUpdate = true;
@@ -2374,13 +2374,13 @@ function RoomDesignerWithState() {
           if (globalThis.__B44_LOGS) debug(`[Resize Re-clamp] Clamping ${speaker.role} X from ${currentX} to ${newX} (range: [${minX}, ${maxX}]).`);
           return { ...speaker, position: { ...speaker.position, x: newX } };
         }
-        
+
         return speaker;
       });
-      
+
       if (needsUpdate) {
         if (globalThis.__B44_LOGS) debug('[Resize Re-clamp] Adjusting LCR positions due to model change or constraint violation.');
-        setSpeakers(prev => mergePreserveOverheads(prev, updatedSpeakers));
+        setSpeakers((prev) => mergePreserveOverheads(prev, updatedSpeakers));
       }
     } catch (error) {
       if (typeof console !== 'undefined' && typeof console.warn === 'function') {
@@ -2393,59 +2393,59 @@ function RoomDesignerWithState() {
   useEffect(() => {
     // Skip if dragging
     if (isDraggingRef.current) return;
-    
+
     // Skip if frozen
     if (_isFrozen && _isFrozen('speakers')) return;
-    
+
     const W = stableDimensions.width;
     const L = stableDimensions.length;
-    
+
     // Skip if no valid dimensions
     if (!(W > 0 && L > 0)) return;
-    
+
     // Only run if dimensions actually changed
     const prev = prevRoomDimsRef.current;
     if (prev && prev.width === W && prev.length === L) return;
-    
+
     // Update previous dimensions
     prevRoomDimsRef.current = { width: W, length: L };
-    
+
     // If this is the first run, don't rescue (nothing to rescue from)
     if (!prev) return;
-    
+
     // Check if any speakers are out of bounds
     const INSET = 0.01; // 1cm safety margin
     let anyOutOfBounds = false;
-    
-    const rescued = placedSpeakers.map(spk => {
+
+    const rescued = placedSpeakers.map((spk) => {
       if (!spk.position || !Number.isFinite(spk.position.x) || !Number.isFinite(spk.position.y)) {
         return spk;
       }
-      
+
       const x = spk.position.x;
       const y = spk.position.y;
-      
+
       // Test if out of bounds (strict 0...W and 0...L test)
       const outOfBounds = x < 0 || x > W || y < 0 || y > L;
-      
+
       if (!outOfBounds) return spk;
-      
+
       // Clamp to safe inset
       anyOutOfBounds = true;
       const clampedX = Math.max(INSET, Math.min(W - INSET, x));
       const clampedY = Math.max(INSET, Math.min(L - INSET, y));
-      
+
       if (globalThis.__B44_LOGS) debug(`[Rescue] ${spk.role} was outside bounds (${x.toFixed(3)}, ${y.toFixed(3)}), clamped to (${clampedX.toFixed(3)}, ${clampedY.toFixed(3)})`);
-      
+
       return {
         ...spk,
         position: { ...spk.position, x: clampedX, y: clampedY }
       };
     });
-    
+
     // Only update if at least one speaker was rescued
     if (anyOutOfBounds) {
-      setSpeakers(prev => preserveSurroundModels(prev, rescued, appState));
+      setSpeakers((prev) => preserveSurroundModels(prev, rescued, appState));
     }
   }, [stableDimensions.width, stableDimensions.length, placedSpeakers, _isFrozen, setSpeakers]);
 
@@ -2454,40 +2454,40 @@ function RoomDesignerWithState() {
     if (_isFrozen && _isFrozen('speakers')) return;
     if (!placedSpeakers || !placedSpeakers.length) return;
     if (!mlpAnchorEffective) return;
-    
+
     const gapM = 0.01; // 1cm air gap from wall
     let needsUpdate = false;
-    
-    const updated = placedSpeakers.map(spk => {
+
+    const updated = placedSpeakers.map((spk) => {
       const role = safeCanon(spk.role);
       if (!['FL', 'FC', 'FR'].includes(role)) return spk;
-      
+
       // Only lock if model is actually selected
       const m = spk.model;
       const ms = String(m ?? "").trim().toLowerCase();
       if (!ms || ms === "off" || ms === "none") return spk;
-      
+
       // Get speaker dimensions
       const meta = getSpeakerModelMeta(spk.model) || {};
       const depthM = Number(meta.depthM) || 0.082;
       const widthM = Number(meta.widthM) || 0.27;
-      
+
       // Compute target yaw angle if aiming at MLP (same logic as aiming effect)
       let targetYawDeg = 0;
       if (lcrAimMode === "angled" && spk.position) {
         const dx = mlpAnchorEffective.x - spk.position.x;
         const dy = mlpAnchorEffective.y - spk.position.y;
         const yawRad = Math.atan2(dx, dy);
-        targetYawDeg = Math.abs((yawRad * 180) / Math.PI);
+        targetYawDeg = Math.abs(yawRad * 180 / Math.PI);
       }
-      
+
       // Calculate wall-hugged Y using stroke-aware half extent with TARGET yaw
       const halfExtentM = yHalfExtentM(depthM, widthM, targetYawDeg);
       const wallY = gapM + halfExtentM;
-      
+
       const currentY = spk.position?.y ?? 0;
       const currentZ = spk.position?.z ?? 1.2;
-      
+
       // Only update if meaningful change
       if (Math.abs(currentY - wallY) > 0.001 || Math.abs(currentZ - 1.2) > 0.001) {
         needsUpdate = true;
@@ -2500,25 +2500,25 @@ function RoomDesignerWithState() {
           }
         };
       }
-      
+
       return spk;
     });
-    
+
     if (needsUpdate) {
-      setSpeakers(prev => mergePreserveOverheads(prev, updated));
+      setSpeakers((prev) => mergePreserveOverheads(prev, updated));
     }
   }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective]);
 
   // NEW: Effect to lock FC speaker to room centerline
   useEffect(() => {
-    if (!placedSpeakers.length || (_isFrozen && _isFrozen('speakers')) || !stableDimensions.width) return;
+    if (!placedSpeakers.length || _isFrozen && _isFrozen('speakers') || !stableDimensions.width) return;
 
-    const fcSpeaker = placedSpeakers.find(s => safeCanon(s.role) === 'FC');
+    const fcSpeaker = placedSpeakers.find((s) => safeCanon(s.role) === 'FC');
     const centerX = stableDimensions.width / 2;
 
-    if (fcSpeaker && Math.abs(fcSpeaker.position.x - centerX) > 0.001) { // 1mm tolerance
+    if (fcSpeaker && Math.abs(fcSpeaker.position.x - centerX) > 0.001) {// 1mm tolerance
       if (globalThis.__B44_LOGS) debug('[Speakers] Locking FC speaker to room centerline.');
-      setSpeakers(prevSpeakers => prevSpeakers.map(s => {
+      setSpeakers((prevSpeakers) => prevSpeakers.map((s) => {
         if (safeCanon(s.role) === 'FC') {
           return { ...s, position: { ...(s.position || {}), x: centerX } };
         }
@@ -2529,7 +2529,7 @@ function RoomDesignerWithState() {
 
   // NEW: Apply "Aim to MLP" rotation to LCR and Surrounds
   useEffect(() => {
-    if (!placedSpeakers.length || (_isFrozen && _isFrozen('speakers')) || !mlpAnchorEffective) return;
+    if (!placedSpeakers.length || _isFrozen && _isFrozen('speakers') || !mlpAnchorEffective) return;
 
     const aimLCR = lcrAimMode === "angled";
     const aimFW = appState?.aimFrontWidesAtMLP || false;
@@ -2541,7 +2541,7 @@ function RoomDesignerWithState() {
       const dx = mlpPos.x - spkPos.x;
       const dy = mlpPos.y - spkPos.y;
       const yawRad = Math.atan2(dx, dy);
-      return (yawRad * 180) / Math.PI;
+      return yawRad * 180 / Math.PI;
     };
 
     // Helper: check if rotated speaker fits in room with 0.01m buffer
@@ -2549,48 +2549,48 @@ function RoomDesignerWithState() {
       const meta = getSpeakerModelMeta(model);
       const w = meta?.widthM || 0.27;
       const d = meta?.depthM || 0.082;
-      
-      const yawRad = (yawDeg * Math.PI) / 180;
+
+      const yawRad = yawDeg * Math.PI / 180;
       const cosY = Math.cos(yawRad);
       const sinY = Math.sin(yawRad);
-      
+
       // Rotated bounding box half-extents
       const hw = w / 2;
       const hd = d / 2;
       const corners = [
-        { x: hw * cosY - hd * sinY, y: hw * sinY + hd * cosY },
-        { x: -hw * cosY - hd * sinY, y: -hw * sinY + hd * cosY },
-        { x: hw * cosY + hd * sinY, y: hw * sinY - hd * cosY },
-        { x: -hw * cosY + hd * sinY, y: -hw * sinY - hd * cosY },
-      ];
-      
+      { x: hw * cosY - hd * sinY, y: hw * sinY + hd * cosY },
+      { x: -hw * cosY - hd * sinY, y: -hw * sinY + hd * cosY },
+      { x: hw * cosY + hd * sinY, y: hw * sinY - hd * cosY },
+      { x: -hw * cosY + hd * sinY, y: -hw * sinY - hd * cosY }];
+
+
       const buffer = 0.01;
       for (const c of corners) {
         const wx = pos.x + c.x;
         const wy = pos.y + c.y;
         if (wx < buffer || wx > stableDimensions.width - buffer ||
-            wy < buffer || wy > stableDimensions.length - buffer) {
+        wy < buffer || wy > stableDimensions.length - buffer) {
           return false;
         }
       }
       return true;
     };
 
-    const updated = placedSpeakers.map(spk => {
+    const updated = placedSpeakers.map((spk) => {
       const canon = safeCanon(spk.role);
       if (!spk.position) return spk;
 
       // Determine if this speaker should aim
       let shouldAim = false;
-      if (canon === 'FL' || canon === 'FR') shouldAim = aimLCR;
-      else if (canon === 'LW' || canon === 'RW') shouldAim = aimFW;
-      else if (canon === 'SL' || canon === 'SR') shouldAim = aimSide;
-      else if (canon === 'SBL' || canon === 'SBR') shouldAim = aimRear;
-      
+      if (canon === 'FL' || canon === 'FR') shouldAim = aimLCR;else
+      if (canon === 'LW' || canon === 'RW') shouldAim = aimFW;else
+      if (canon === 'SL' || canon === 'SR') shouldAim = aimSide;else
+      if (canon === 'SBL' || canon === 'SBR') shouldAim = aimRear;
+
       if (!shouldAim) {
         // Reset to flat if toggle is off
-        if (canon === 'FL' || canon === 'FR' || canon === 'LW' || canon === 'RW' || 
-            canon === 'SL' || canon === 'SR' || canon === 'SBL' || canon === 'SBR') {
+        if (canon === 'FL' || canon === 'FR' || canon === 'LW' || canon === 'RW' ||
+        canon === 'SL' || canon === 'SR' || canon === 'SBL' || canon === 'SBR') {
           const currentYaw = spk.rotation?.y || 0;
           if (Math.abs(currentYaw) > 0.001) {
             return { ...spk, rotation: { ...(spk.rotation || {}), y: 0 } };
@@ -2601,15 +2601,15 @@ function RoomDesignerWithState() {
 
       // Calculate target yaw to MLP
       const targetYaw = yawToMLP(spk.position, mlpAnchorEffective);
-      
+
       // Check if rotation is safe
       const safe = canRotateSafely(spk.position, targetYaw, spk.model);
-      const finalYaw = safe ? targetYaw : (spk.rotation?.y || 0);
-      
+      const finalYaw = safe ? targetYaw : spk.rotation?.y || 0;
+
       // Only update if changed
       const currentYaw = spk.rotation?.y || 0;
       if (Math.abs(finalYaw - currentYaw) < 0.001) return spk;
-      
+
       return { ...spk, rotation: { ...(spk.rotation || {}), y: finalYaw } };
     });
 
@@ -2621,20 +2621,20 @@ function RoomDesignerWithState() {
     });
 
     if (changed) {
-      setSpeakers(prev => preserveSurroundModels(prev, updated, appState));
+      setSpeakers((prev) => preserveSurroundModels(prev, updated, appState));
     }
   }, [
-    placedSpeakers,
-    mlpAnchorEffective,
-    lcrAimMode,
-    appState?.aimFrontWidesAtMLP,
-    appState?.aimSideSurroundsAtMLP,
-    appState?.aimRearSurroundsAtMLP,
-    stableDimensions.width,
-    stableDimensions.length,
-    _isFrozen,
-    setSpeakers,
-  ]);
+  placedSpeakers,
+  mlpAnchorEffective,
+  lcrAimMode,
+  appState?.aimFrontWidesAtMLP,
+  appState?.aimSideSurroundsAtMLP,
+  appState?.aimRearSurroundsAtMLP,
+  stableDimensions.width,
+  stableDimensions.length,
+  _isFrozen,
+  setSpeakers]
+  );
 
 
   // Effect to swap between Rear Surrounds and Front Wides for 7.x layouts
@@ -2644,7 +2644,7 @@ function RoomDesignerWithState() {
       return;
     }
 
-    if (!dolbyPreset || (_isFrozen && _isFrozen('speakers'))) {
+    if (!dolbyPreset || _isFrozen && _isFrozen('speakers')) {
       return;
     }
 
@@ -2665,89 +2665,46 @@ function RoomDesignerWithState() {
     }
 
     const currentSpeakers = placedSpeakers || [];
-    const hasWides = currentSpeakers.some(s => s.role === 'LW' || s.role === 'RW');
-    const hasRears = currentSpeakers.some(s => s.role === 'SBL' || s.role === 'SBR');
-    
+    const hasWides = currentSpeakers.some((s) => s.role === 'LW' || s.role === 'RW');
+    const hasRears = currentSpeakers.some((s) => s.role === 'SBL' || s.role === 'SBR');
+
     const earZ = 1.1; // Standard ear height for bed speakers
-    
+
     // CRITICAL: Model preservation - use globalSurroundModel as primary source
     const globalSurroundModel = appState?.globalSurroundModel;
-    const hint = (typeof window !== "undefined" && window.__SURROUND_MODEL_HINT_) || null;
-    const byRole = new Map(currentSpeakers.map(s => [s.role, s]));
+    const hint = typeof window !== "undefined" && window.__SURROUND_MODEL_HINT_ || null;
+    const byRole = new Map(currentSpeakers.map((s) => [s.role, s]));
 
     if (_sevenBedLayoutType === 'wides' && !hasWides && hasRears) {
       if (globalThis.__B44_LOGS) debug('[Speakers] Switching from Rear Surrounds (SBL/SBR) to Front Wides (LW/RW).');
-      
+
       // Use globalSurroundModel as primary fallback for new wides
       const lw = cloneRoleWithModel(byRole, 'SBL', 'LW', globalSurroundModel || hint);
       lw.position = { x: stableDimensions.width * 0.15, y: stableDimensions.length * 0.4, z: earZ };
-      
+
       const rw = cloneRoleWithModel(byRole, 'SBR', 'RW', globalSurroundModel || hint);
       rw.position = { x: stableDimensions.width * 0.85, y: stableDimensions.length * 0.4, z: earZ };
-      
-      const nextList = currentSpeakers
-        .filter(s => s.role !== 'SBL' && s.role !== 'SBR')
-        .concat([lw, rw]);
-      
+
+      const nextList = currentSpeakers.
+      filter((s) => s.role !== 'SBL' && s.role !== 'SBR').
+      concat([lw, rw]);
+
       if (globalThis.__B44_LOGS) safeGroup('[Speakers] swap/reseed merge check (wides)', () => {
-       if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
+        if (globalThis.__B44_LOGS) safeTable(nextList.map((s) => ({ role: s.role, model: s.model ?? '(none)' })));
       });
-           if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
-      setSpeakers(prev => {
-       let merged = mergePreserveOverheads(prev, nextList);
-
-       // CRITICAL: Ensure wides inherit globalSurroundModel if they have no model
-       const globalSurroundModel = appState?.globalSurroundModel;
-       if (globalSurroundModel) {
-         const modelStr = String(globalSurroundModel).trim().toLowerCase();
-         if (modelStr && modelStr !== 'off' && modelStr !== 'none') {
-           merged = merged.map(spk => {
-             const canon = safeCanon(spk.role);
-             if (canon !== 'LW' && canon !== 'RW') return spk;
-
-             const currentModel = String(spk.model || '').trim().toLowerCase();
-             if (!currentModel || currentModel === 'off' || currentModel === 'none') {
-               return { ...spk, model: globalSurroundModel };
-             }
-             return spk;
-           });
-         }
-       }
-
-       if (speakersEqual(prev, merged)) return prev;
-       return merged;
-      });
-
-    } else if (_sevenBedLayoutType === 'rears' && hasWides && !hasRears) {
-      if (globalThis.__B44_LOGS) debug('[Speakers] Switching from Front Wides (LW/RW) to Rear Surrounds (SBL/SBR).');
-      
-      // Use globalSurroundModel as primary fallback for new rears
-      const sbl = cloneRoleWithModel(byRole, 'LW', 'SBL', globalSurroundModel || hint);
-      sbl.position = { x: stableDimensions.width * 0.25, y: stableDimensions.length - 0.1, z: earZ };
-      
-      const sbr = cloneRoleWithModel(byRole, 'RW', 'SBR', globalSurroundModel || hint);
-      sbr.position = { x: stableDimensions.width * 0.75, y: stableDimensions.length - 0.1, z: earZ };
-      
-      const nextList = currentSpeakers
-        .filter(s => s.role !== 'LW' && s.role !== 'RW')
-        .concat([sbl, sbr]);
-
-      if (globalThis.__B44_LOGS) safeGroup('[Speakers] swap/reseed merge check (rears)', () => {
-        if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)' })));
-      });
-            if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map(s => safeCanon(s.role)));
-      setSpeakers(prev => {
+      if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map((s) => safeCanon(s.role)));
+      setSpeakers((prev) => {
         let merged = mergePreserveOverheads(prev, nextList);
-        
-        // CRITICAL: Ensure rears inherit globalSurroundModel if they have no model
+
+        // CRITICAL: Ensure wides inherit globalSurroundModel if they have no model
         const globalSurroundModel = appState?.globalSurroundModel;
         if (globalSurroundModel) {
           const modelStr = String(globalSurroundModel).trim().toLowerCase();
           if (modelStr && modelStr !== 'off' && modelStr !== 'none') {
-            merged = merged.map(spk => {
+            merged = merged.map((spk) => {
               const canon = safeCanon(spk.role);
-              if (canon !== 'SBL' && canon !== 'SBR') return spk;
-              
+              if (canon !== 'LW' && canon !== 'RW') return spk;
+
               const currentModel = String(spk.model || '').trim().toLowerCase();
               if (!currentModel || currentModel === 'off' || currentModel === 'none') {
                 return { ...spk, model: globalSurroundModel };
@@ -2756,7 +2713,50 @@ function RoomDesignerWithState() {
             });
           }
         }
-        
+
+        if (speakersEqual(prev, merged)) return prev;
+        return merged;
+      });
+
+    } else if (_sevenBedLayoutType === 'rears' && hasWides && !hasRears) {
+      if (globalThis.__B44_LOGS) debug('[Speakers] Switching from Front Wides (LW/RW) to Rear Surrounds (SBL/SBR).');
+
+      // Use globalSurroundModel as primary fallback for new rears
+      const sbl = cloneRoleWithModel(byRole, 'LW', 'SBL', globalSurroundModel || hint);
+      sbl.position = { x: stableDimensions.width * 0.25, y: stableDimensions.length - 0.1, z: earZ };
+
+      const sbr = cloneRoleWithModel(byRole, 'RW', 'SBR', globalSurroundModel || hint);
+      sbr.position = { x: stableDimensions.width * 0.75, y: stableDimensions.length - 0.1, z: earZ };
+
+      const nextList = currentSpeakers.
+      filter((s) => s.role !== 'LW' && s.role !== 'RW').
+      concat([sbl, sbr]);
+
+      if (globalThis.__B44_LOGS) safeGroup('[Speakers] swap/reseed merge check (rears)', () => {
+        if (globalThis.__B44_LOGS) safeTable(nextList.map((s) => ({ role: s.role, model: s.model ?? '(none)' })));
+      });
+      if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map((s) => safeCanon(s.role)));
+      setSpeakers((prev) => {
+        let merged = mergePreserveOverheads(prev, nextList);
+
+        // CRITICAL: Ensure rears inherit globalSurroundModel if they have no model
+        const globalSurroundModel = appState?.globalSurroundModel;
+        if (globalSurroundModel) {
+          const modelStr = String(globalSurroundModel).trim().toLowerCase();
+          if (modelStr && modelStr !== 'off' && modelStr !== 'none') {
+            merged = merged.map((spk) => {
+              const canon = safeCanon(spk.role);
+              if (canon !== 'SBL' && canon !== 'SBR') return spk;
+
+              const currentModel = String(spk.model || '').trim().toLowerCase();
+              if (!currentModel || currentModel === 'off' || currentModel === 'none') {
+                return { ...spk, model: globalSurroundModel };
+              }
+              return spk;
+            });
+          }
+        }
+
         if (speakersEqual(prev, merged)) return prev;
         return merged;
       });
@@ -2770,12 +2770,12 @@ function RoomDesignerWithState() {
       return;
     }
 
-    if (!dolbyPreset || (_isFrozen && _isFrozen('speakers'))) return;
+    if (!dolbyPreset || _isFrozen && _isFrozen('speakers')) return;
 
     // --- DEBUG: reconciliation entry ---
-    const normalizedPreset = dolbyPreset
-      ? String(dolbyPreset).split(" ")[0].split("_")[0]
-      : "";
+    const normalizedPreset = dolbyPreset ?
+    String(dolbyPreset).split(" ")[0].split("_")[0] :
+    "";
 
     if (globalThis.__B44_LOGS) console.log(
       "[RD RECON] ENTER",
@@ -2788,9 +2788,9 @@ function RoomDesignerWithState() {
 
     if (globalThis.__B44_LOGS) console.log(
       "[RD RECON] placed roles BEFORE =",
-      Array.isArray(placedSpeakers)
-        ? placedSpeakers.map(s => s.role)
-        : "(no speakers)"
+      Array.isArray(placedSpeakers) ?
+      placedSpeakers.map((s) => s.role) :
+      "(no speakers)"
     );
 
     const noSpeakers = (placedSpeakers || []).length === 0;
@@ -2809,15 +2809,15 @@ function RoomDesignerWithState() {
     const hasOverheadTargets = targetOverheadIds.length > 0;
 
     const hasAnyExistingOverheads =
-      Array.isArray(placedSpeakers) &&
-      placedSpeakers.some((spk) => safeCanon(spk.role || "").startsWith("T"));
+    Array.isArray(placedSpeakers) &&
+    placedSpeakers.some((spk) => safeCanon(spk.role || "").startsWith("T"));
 
     if (hasOverheadTargets && !hasAnyExistingOverheads) {
       setSpeakers((prev) => {
         const base = Array.isArray(prev) && prev.length ? prev : seedSpeakersFromPreset({
           preset: normalizedPreset,
           roomDimensions: stableDimensions,
-          listeningArea: null,
+          listeningArea: null
         });
 
         const withOverheads = ensureAtmosOverheads({
@@ -2830,11 +2830,11 @@ function RoomDesignerWithState() {
           overheadRearOverride: _overheadRearOverride,
           useFrontGlobal: _useFrontGlobal,
           useMidGlobal: _useMidGlobal,
-          useRearGlobal: _useRearGlobal,
+          useRearGlobal: _useRearGlobal
         });
 
         if (globalThis.__B44_LOGS) {
-          console.log("[RD] early ensure overheads -> roles", (withOverheads || []).map(s => safeCanon(s.role)));
+          console.log("[RD] early ensure overheads -> roles", (withOverheads || []).map((s) => safeCanon(s.role)));
         }
         return withOverheads;
       });
@@ -2845,35 +2845,35 @@ function RoomDesignerWithState() {
     // CRITICAL: Use _sevenBedLayoutType as single source of truth for 7.x wides vs rears
     const is7ChannelBed = normalizedPreset && (normalizedPreset.startsWith('7.1') || normalizedPreset.startsWith('7.2'));
     const is9ChannelBed = normalizedPreset && normalizedPreset.startsWith('9.1');
-    
+
     let expectedRoles = DOLBY_PRESETS[normalizedPreset] || [];
 
     // For 7.x: swap SBL/SBR with LW/RW based on sevenBedLayoutType
     // For 9.x: ALWAYS include BOTH (no swapping)
     if (is7ChannelBed && _sevenBedLayoutType === 'wides') {
-      expectedRoles = expectedRoles.map(role => {
+      expectedRoles = expectedRoles.map((role) => {
         if (role === 'SBL') return 'LW';
         if (role === 'SBR') return 'RW';
         return role;
       });
     }
-    
+
     if (globalThis.__B44_LOGS) {
       console.log('[RD RECON] Layout decision:', {
         normalizedPreset,
         is7ChannelBed,
         is9ChannelBed,
         sevenBedLayoutType: _sevenBedLayoutType,
-        expectedRoles,
+        expectedRoles
       });
     }
 
-    const currentRolesSet = new Set((Array.isArray(placedSpeakers) ? placedSpeakers : []).map(s => safeCanon(s?.role)));
-    const expectedRolesSet = new Set((Array.isArray(expectedRoles) ? expectedRoles : []).map(r => safeCanon(r)));
+    const currentRolesSet = new Set((Array.isArray(placedSpeakers) ? placedSpeakers : []).map((s) => safeCanon(s?.role)));
+    const expectedRolesSet = new Set((Array.isArray(expectedRoles) ? expectedRoles : []).map((r) => safeCanon(r)));
 
     // Check if current roles match expected roles
     const hasCorrectRoles = currentRolesSet.size === expectedRolesSet.size &&
-      [...expectedRolesSet].every(role => currentRolesSet.has(role));
+    [...expectedRolesSet].every((role) => currentRolesSet.has(role));
 
     if (globalThis.__B44_LOGS) console.log(
       "[RD RECON] expectedRoles =",
@@ -2890,7 +2890,7 @@ function RoomDesignerWithState() {
       const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
 
       if (heights > 0 && Array.isArray(placedSpeakers) && placedSpeakers.length) {
-        setSpeakers(prev => {
+        setSpeakers((prev) => {
           const withOverheads = ensureAtmosOverheads({
             placedSpeakers: prev,
             dolbyPreset,
@@ -2901,7 +2901,7 @@ function RoomDesignerWithState() {
             overheadRearOverride: _overheadRearOverride,
             useFrontGlobal: _useFrontGlobal,
             useMidGlobal: _useMidGlobal,
-            useRearGlobal: _useRearGlobal,
+            useRearGlobal: _useRearGlobal
           });
           if (speakersEqual(prev, withOverheads)) return prev;
           return withOverheads;
@@ -2912,345 +2912,345 @@ function RoomDesignerWithState() {
       if (globalThis.__B44_LOGS) console.log(
         "[RD RECON] about to reseed using normalizedPreset =",
         normalizedPreset
-      ); 
-       if (globalThis.__B44_LOGS) debug(`[Speakers] Reconciling speakers for ${dolbyPreset} (${presetChanged ? 'preset changed' : 'role mismatch'})`);
-       // Seed with the canonical Dolby preset (which means SBL/SBR for 7.x)
-       let seededSpeakers = seedSpeakersFromPreset({
-         preset: normalizedPreset,
-         roomDimensions: stableDimensions,
-         listeningArea: null,
-       });
+      );
+      if (globalThis.__B44_LOGS) debug(`[Speakers] Reconciling speakers for ${dolbyPreset} (${presetChanged ? 'preset changed' : 'role mismatch'})`);
+      // Seed with the canonical Dolby preset (which means SBL/SBR for 7.x)
+      let seededSpeakers = seedSpeakersFromPreset({
+        preset: normalizedPreset,
+        roomDimensions: stableDimensions,
+        listeningArea: null
+      });
 
-       // If it's a 7.x bed and the user wants 'wides', transform the seeded speakers
-       if (is7ChannelBed && _sevenBedLayoutType === 'wides') {
-         seededSpeakers = seededSpeakers
-           .filter(s => s.role !== 'SBL' && s.role !== 'SBR')
-           .concat([
-             { id: 'LW', role: 'LW', label: 'LW', model: undefined, position: { x: stableDimensions.width * 0.15, y: stableDimensions.length * 0.4, z: 1.1 } },
-             { id: 'RW', role: 'RW', label: 'RW', model: undefined, position: { x: stableDimensions.width * 0.85, y: stableDimensions.length * 0.4, z: 1.1 } },
-           ]);
-       }
-       
-       setSpeakers(prev => {
-         const hint = (typeof window !== 'undefined' && window.__SURROUND_MODEL_HINT_) || null;
-         
-         // targetOverheadIds already computed above, reuse it
-         const targetSet = new Set(targetOverheadIds.map(id => id.toUpperCase()));
-         
-         if (globalThis.__B44_LOGS) debug(`[Speakers] Target overheads for ${dolbyPreset}: [${targetOverheadIds.join(', ')}]`);
-         
-         // Known overhead roles (for filtering)
-         const knownOverheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR', 'TL', 'TR', 'TFC', 'TRC', 'TBC', 'TBL', 'TBR']);
-         
-         // Separate existing speakers into bed layer and overheads
-          const prevBedSpeakers = (prev || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
-          const existingOverheads = (prev || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
+      // If it's a 7.x bed and the user wants 'wides', transform the seeded speakers
+      if (is7ChannelBed && _sevenBedLayoutType === 'wides') {
+        seededSpeakers = seededSpeakers.
+        filter((s) => s.role !== 'SBL' && s.role !== 'SBR').
+        concat([
+        { id: 'LW', role: 'LW', label: 'LW', model: undefined, position: { x: stableDimensions.width * 0.15, y: stableDimensions.length * 0.4, z: 1.1 } },
+        { id: 'RW', role: 'RW', label: 'RW', model: undefined, position: { x: stableDimensions.width * 0.85, y: stableDimensions.length * 0.4, z: 1.1 } }]
+        );
+      }
 
-          // [B44 FIX] Remove only the surround roles that are NOT required by the current layout
-          const major = parseInt(String(dolbyPreset || '').split('.')[0], 10) || 5;
-          const useWidesInsteadOfRears = _sevenBedLayoutType === 'wides';
+      setSpeakers((prev) => {
+        const hint = typeof window !== 'undefined' && window.__SURROUND_MODEL_HINT_ || null;
 
-          // 7.x chooses between rears and wides. 9.x must keep BOTH.
-          const wantsRears = (major >= 9) || (major === 7 && !useWidesInsteadOfRears);
-          const wantsWides = (major >= 9) || (major === 7 &&  useWidesInsteadOfRears);
+        // targetOverheadIds already computed above, reuse it
+        const targetSet = new Set(targetOverheadIds.map((id) => id.toUpperCase()));
 
-          // NEW: bed speakers must come from seededSpeakers (canonical roles for the new preset)
-          // But filter out only what we DON'T want
-          const bedSpeakers = (seededSpeakers || [])
-            .filter(s => !knownOverheadRoles.has(safeCanon(s.role)))
-            .filter(s => {
-              const canon = safeCanon(s.role);
-              if (canon === 'SBL' || canon === 'SBR') return wantsRears;
-              if (canon === 'LW'  || canon === 'RW')  return wantsWides;
-              return true;
-            });
+        if (globalThis.__B44_LOGS) debug(`[Speakers] Target overheads for ${dolbyPreset}: [${targetOverheadIds.join(', ')}]`);
 
-          // [B44 FIX] Ensure required surround roles exist even if seededSpeakers is missing them
-          const have = new Set(bedSpeakers.map(s => safeCanon(s.role)));
+        // Known overhead roles (for filtering)
+        const knownOverheadRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR', 'TL', 'TR', 'TFC', 'TRC', 'TBC', 'TBL', 'TBR']);
 
-          const pushIfMissing = (role) => {
-            if (have.has(role)) return;
+        // Separate existing speakers into bed layer and overheads
+        const prevBedSpeakers = (prev || []).filter((s) => !knownOverheadRoles.has(safeCanon(s.role)));
+        const existingOverheads = (prev || []).filter((s) => knownOverheadRoles.has(safeCanon(s.role)));
 
-            bedSpeakers.push({
-              id: role,
-              role,
-              label: role,
-              model: undefined,
-              position: null, // SpeakerPlacement / resetSurroundPositions will hydrate
-            });
+        // [B44 FIX] Remove only the surround roles that are NOT required by the current layout
+        const major = parseInt(String(dolbyPreset || '').split('.')[0], 10) || 5;
+        const useWidesInsteadOfRears = _sevenBedLayoutType === 'wides';
 
-            have.add(role);
+        // 7.x chooses between rears and wides. 9.x must keep BOTH.
+        const wantsRears = major >= 9 || major === 7 && !useWidesInsteadOfRears;
+        const wantsWides = major >= 9 || major === 7 && useWidesInsteadOfRears;
+
+        // NEW: bed speakers must come from seededSpeakers (canonical roles for the new preset)
+        // But filter out only what we DON'T want
+        const bedSpeakers = (seededSpeakers || []).
+        filter((s) => !knownOverheadRoles.has(safeCanon(s.role))).
+        filter((s) => {
+          const canon = safeCanon(s.role);
+          if (canon === 'SBL' || canon === 'SBR') return wantsRears;
+          if (canon === 'LW' || canon === 'RW') return wantsWides;
+          return true;
+        });
+
+        // [B44 FIX] Ensure required surround roles exist even if seededSpeakers is missing them
+        const have = new Set(bedSpeakers.map((s) => safeCanon(s.role)));
+
+        const pushIfMissing = (role) => {
+          if (have.has(role)) return;
+
+          bedSpeakers.push({
+            id: role,
+            role,
+            label: role,
+            model: undefined,
+            position: null // SpeakerPlacement / resetSurroundPositions will hydrate
+          });
+
+          have.add(role);
+        };
+
+        // Sides always required for 5.x+
+        if (major >= 5) {
+          pushIfMissing('SL');
+          pushIfMissing('SR');
+        }
+
+        // Rears + Wides depending on layout
+        if (wantsRears) {
+          pushIfMissing('SBL');
+          pushIfMissing('SBR');
+        }
+        if (wantsWides) {
+          pushIfMissing('LW');
+          pushIfMissing('RW');
+        }
+
+        if (globalThis.__B44_LOGS) debug(`[Speakers] Existing: ${prevBedSpeakers.length} prev bed + ${existingOverheads.length} overhead (${existingOverheads.map((s) => s.role).join(', ')})`);
+        if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${bedSpeakers.length} bed (from new preset)`);
+
+        // Keep only overheads that are in the target set
+        const keptOverheads = existingOverheads.filter((s) => targetSet.has(safeCanon(s.role)));
+
+        // Create map of existing overheads by canonical role
+        const overheadMap = new Map(keptOverheads.map((s) => [safeCanon(s.role), s]));
+
+        // Create map from PREVIOUS bed speakers for model preservation
+        const byCanonPrev = new Map(prevBedSpeakers.map((s) => [safeCanon(s.role), s]));
+
+        // Separate seeded speakers into bed-layer and overheads
+        const seededBed = (seededSpeakers || []).filter((s) => !knownOverheadRoles.has(safeCanon(s.role)));
+        const seededOverheads = (seededSpeakers || []).filter((s) => knownOverheadRoles.has(safeCanon(s.role)));
+
+        if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${seededBed.length} bed + ${seededOverheads.length} overhead (${seededOverheads.map((s) => s.role).join(', ')})`);
+
+        // Process bed-layer speakers (preserve models from previous)
+        // For surround roles without models, try to inherit from any existing surround speaker OR globalSurroundModel
+        const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+
+        // Get global surround model from AppState as PRIMARY source
+        const globalSurroundModel = appState?.globalSurroundModel;
+
+        // Get any existing surround model as fallback
+        const anySurroundModel = prevBedSpeakers.
+        filter((s) => surroundRoles.has(safeCanon(s.role))).
+        find((s) => {
+          const m = String(s.model || '').trim().toLowerCase();
+          return m && m !== 'off' && m !== 'none';
+        })?.model;
+
+        // [B44 FIX] Use bedSpeakers (already filtered and ensured) instead of seededBed
+        const nextBed = bedSpeakers.map((seed) => {
+          const canonRole = safeCanon(seed.role);
+          const prevMatch = byCanonPrev.get(canonRole);
+
+          // CRITICAL: Model persistence hierarchy for surrounds
+          // 1. Keep existing speaker's model if present and valid
+          // 2. Use globalSurroundModel if set (from UI selection)
+          // 3. Fallback to any existing surround model
+          // 4. Fallback to window hint (legacy)
+          // 5. NEVER use seed.model (keeps it undefined)
+
+          let finalModel = seed.model; // Start with seed default
+
+          // For surround roles: bulletproof model persistence
+          if (surroundRoles.has(canonRole)) {
+            const prevModelStr = String(prevMatch?.model || '').trim().toLowerCase();
+            const hasValidPrevModel = prevModelStr && prevModelStr !== 'off' && prevModelStr !== 'none';
+
+            if (hasValidPrevModel) {
+              // Keep existing model (persistence wins)
+              finalModel = prevMatch.model;
+            } else if (globalSurroundModel) {
+              // Use global surround model if no previous model
+              const globalModelStr = String(globalSurroundModel).trim().toLowerCase();
+              if (globalModelStr && globalModelStr !== 'off' && globalModelStr !== 'none') {
+                finalModel = globalSurroundModel;
+              }
+            } else if (anySurroundModel) {
+              // Fallback to any existing surround model
+              finalModel = anySurroundModel;
+            } else if (hint) {
+              // Legacy hint as last resort
+              finalModel = hint;
+            }
+
+            if (globalThis.__B44_LOGS) {
+              console.log(`[RD RECON] Surround model for ${canonRole}:`, {
+                prevModel: prevMatch?.model,
+                globalSurroundModel,
+                anySurroundModel,
+                hint,
+                finalModel,
+                willRender: !!(finalModel && String(finalModel).trim().toLowerCase() !== 'off' && String(finalModel).trim().toLowerCase() !== 'none')
+              });
+            }
+          } else {
+            // Non-surround roles: keep previous model or seed default
+            finalModel = prevMatch?.model ?? seed.model;
+          }
+
+          // CRITICAL: Position preservation - preserve existing position if seed has no usable coords
+          const prevPos = prevMatch?.position;
+          const seedPos = seed?.position;
+
+          const prevHasXY =
+          prevPos && Number.isFinite(prevPos.x) && Number.isFinite(prevPos.y);
+
+          const seedHasXY =
+          seedPos && Number.isFinite(seedPos.x) && Number.isFinite(seedPos.y);
+
+          // Preserve existing position if seed has no usable coords
+          const finalPosition = !seedHasXY && prevHasXY ? prevPos : seedPos;
+
+          // Preserve rotation the same way
+          const prevRot = prevMatch?.rotation;
+          const seedRot = seed?.rotation;
+          const finalRotation = seedRot ?? prevRot;
+
+          return {
+            ...seed,
+            model: finalModel,
+            position: finalPosition,
+            rotation: finalRotation,
+            draggable: true
           };
+        });
 
-          // Sides always required for 5.x+
-          if (major >= 5) {
-            pushIfMissing('SL');
-            pushIfMissing('SR');
+        // Build final overhead list: reuse existing positions if available, otherwise use seeded defaults
+        const nextOverheads = [];
+        for (const targetId of targetOverheadIds) {
+          const canonId = targetId.toUpperCase();
+          const existing = overheadMap.get(canonId);
+
+          if (existing) {
+            // Reuse existing overhead speaker with its position
+            if (globalThis.__B44_LOGS) debug(`[Speakers] Reusing existing overhead: ${canonId}`);
+            nextOverheads.push(existing);
+          } else {
+            // Create new overhead speaker from seed
+            const seeded = seededOverheads.find((s) => safeCanon(s.role) === canonId);
+            if (seeded) {
+              let modelFromOverrides = undefined;
+
+              if (['TFL', 'TFR', 'TFC'].includes(canonId)) {
+                modelFromOverrides = _useFrontGlobal ? _overheadGlobalModel : _overheadFrontOverride || _overheadGlobalModel;
+              } else if (['TML', 'TMR'].includes(canonId)) {
+                modelFromOverrides = _useMidGlobal ? _overheadGlobalModel : _overheadMidOverride || _overheadGlobalModel;
+              } else if (['TRL', 'TRR', 'TRC'].includes(canonId)) {
+                modelFromOverrides = _useRearGlobal ? _overheadGlobalModel : _overheadRearOverride || _overheadGlobalModel;
+              }
+
+              const finalModel = modelFromOverrides || _overheadGlobalModel || seeded.model;
+              if (globalThis.__B44_LOGS) debug(`[Speakers] Creating new overhead: ${canonId} with model ${finalModel}`);
+              nextOverheads.push({ ...seeded, model: finalModel, draggable: true });
+            } else {
+              if (globalThis.__B44_LOGS) debug(`[Speakers] WARNING: Target overhead ${canonId} not found in seeded speakers!`);
+            }
           }
+        }
 
-          // Rears + Wides depending on layout
-          if (wantsRears) {
-            pushIfMissing('SBL');
-            pushIfMissing('SBR');
+        let nextList = [...nextBed, ...nextOverheads];
+
+        if (globalThis.__B44_LOGS) debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
+        if (globalThis.__B44_LOGS) console.log("[RD] RECONCILE nextList:", nextList.map((s) => s.role));
+        if (globalThis.__B44_LOGS) console.log(
+          "[RD RECON] OUTPUT roles =",
+          nextList.map((s) => s.role)
+        );
+
+        if (globalThis.__B44_LOGS) safeGroup('[Speakers] Reconciliation result', () => {
+          if (globalThis.__B44_LOGS) safeTable(nextList.map((s) => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
+        });
+
+        // NEW: guarantee Atmos overheads exist & have models,
+        // independent of surround model selection.
+        let withOverheads = ensureAtmosOverheads({
+          placedSpeakers: nextList,
+          dolbyPreset,
+          roomDimensions: stableDimensions,
+          overheadGlobalModel: _overheadGlobalModel,
+          overheadFrontOverride: _overheadFrontOverride,
+          overheadMidOverride: _overheadMidOverride,
+          overheadRearOverride: _overheadRearOverride,
+          useFrontGlobal: _useFrontGlobal,
+          useMidGlobal: _useMidGlobal,
+          useRearGlobal: _useRearGlobal
+        });
+
+        // CRITICAL: Final safety pass - ensure surround roles NEVER lose their model
+        // This runs AFTER all merging/swapping/reconciliation to catch any stragglers
+        const surroundRolesToProtect = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+        const globalSurroundModelFinal = appState?.globalSurroundModel;
+
+        if (globalSurroundModelFinal) {
+          const modelStr = String(globalSurroundModelFinal).trim().toLowerCase();
+          const isValidGlobalModel = modelStr && modelStr !== 'off' && modelStr !== 'none';
+
+          if (isValidGlobalModel) {
+            withOverheads = withOverheads.map((spk) => {
+              const canonRole = safeCanon(spk.role);
+              if (!surroundRolesToProtect.has(canonRole)) return spk;
+
+              const currentModel = String(spk.model || '').trim().toLowerCase();
+              const hasValidModel = currentModel && currentModel !== 'off' && currentModel !== 'none';
+
+              // If this surround has no valid model, assign globalSurroundModel
+              if (!hasValidModel) {
+                return { ...spk, model: globalSurroundModelFinal };
+              }
+
+              return spk;
+            });
           }
-          if (wantsWides) {
-            pushIfMissing('LW');
-            pushIfMissing('RW');
-          }
+        }
 
-          if (globalThis.__B44_LOGS) debug(`[Speakers] Existing: ${prevBedSpeakers.length} prev bed + ${existingOverheads.length} overhead (${existingOverheads.map(s => s.role).join(', ')})`);
-          if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${bedSpeakers.length} bed (from new preset)`);
-         
-         // Keep only overheads that are in the target set
-         const keptOverheads = existingOverheads.filter(s => targetSet.has(safeCanon(s.role)));
-         
-         // Create map of existing overheads by canonical role
-         const overheadMap = new Map(keptOverheads.map(s => [safeCanon(s.role), s]));
-         
-         // Create map from PREVIOUS bed speakers for model preservation
-         const byCanonPrev = new Map(prevBedSpeakers.map(s => [safeCanon(s.role), s]));
-         
-         // Separate seeded speakers into bed-layer and overheads
-         const seededBed = (seededSpeakers || []).filter(s => !knownOverheadRoles.has(safeCanon(s.role)));
-         const seededOverheads = (seededSpeakers || []).filter(s => knownOverheadRoles.has(safeCanon(s.role)));
+        // DEBUG: Log final state before commit (shows what will actually render)
+        if (globalThis.__B44_LOGS) {
+          const bedOnly = withOverheads.filter((s) => surroundRolesToProtect.has(safeCanon(s.role)));
+          console.log('[RD RECON] FINAL COMMIT:', {
+            dolbyLayout: dolbyPreset,
+            sevenBedLayoutType: _sevenBedLayoutType,
+            expectedRoles: expectedRoles,
+            surroundRolesInOutput: bedOnly.map((s) => ({
+              role: s.role,
+              canon: safeCanon(s.role),
+              model: s.model || '(none)'
+            }))
+          });
+        }
 
-         if (globalThis.__B44_LOGS) debug(`[Speakers] Seeded: ${seededBed.length} bed + ${seededOverheads.length} overhead (${seededOverheads.map(s => s.role).join(', ')})`);
+        // [B44 FINAL FIX] Enforce required surround roles in the FINAL list (prevents later filters wiping rears/wides)
+        const final = Array.isArray(withOverheads) ? [...withOverheads] : [];
 
-         // Process bed-layer speakers (preserve models from previous)
-         // For surround roles without models, try to inherit from any existing surround speaker OR globalSurroundModel
-         const surroundRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+        const haveFinal = new Set(final.map((s) => safeCanon(s?.role)));
 
-         // Get global surround model from AppState as PRIMARY source
-         const globalSurroundModel = appState?.globalSurroundModel;
+        const ensureFinal = (role) => {
+          if (haveFinal.has(role)) return;
+          final.push({
+            id: role,
+            role,
+            label: role,
+            model: undefined,
+            position: null
+          });
+          haveFinal.add(role);
+        };
 
-         // Get any existing surround model as fallback
-         const anySurroundModel = prevBedSpeakers
-           .filter(s => surroundRoles.has(safeCanon(s.role)))
-           .find(s => {
-             const m = String(s.model || '').trim().toLowerCase();
-             return m && m !== 'off' && m !== 'none';
-           })?.model;
+        if (wantsRears) {
+          ensureFinal('SBL');
+          ensureFinal('SBR');
+        }
+        if (wantsWides) {
+          ensureFinal('LW');
+          ensureFinal('RW');
+        }
 
-         // [B44 FIX] Use bedSpeakers (already filtered and ensured) instead of seededBed
-         const nextBed = bedSpeakers.map(seed => {
-           const canonRole = safeCanon(seed.role);
-           const prevMatch = byCanonPrev.get(canonRole);
+        if (globalThis.__B44_LOGS) {
+          debug(`[Speakers][FINAL] major=${major} wantsRears=${wantsRears} wantsWides=${wantsWides} roles=${final.map((s) => safeCanon(s.role)).join(', ')}`);
+        }
 
-           // CRITICAL: Model persistence hierarchy for surrounds
-           // 1. Keep existing speaker's model if present and valid
-           // 2. Use globalSurroundModel if set (from UI selection)
-           // 3. Fallback to any existing surround model
-           // 4. Fallback to window hint (legacy)
-           // 5. NEVER use seed.model (keeps it undefined)
-
-           let finalModel = seed.model; // Start with seed default
-
-           // For surround roles: bulletproof model persistence
-           if (surroundRoles.has(canonRole)) {
-             const prevModelStr = String(prevMatch?.model || '').trim().toLowerCase();
-             const hasValidPrevModel = prevModelStr && prevModelStr !== 'off' && prevModelStr !== 'none';
-
-             if (hasValidPrevModel) {
-               // Keep existing model (persistence wins)
-               finalModel = prevMatch.model;
-             } else if (globalSurroundModel) {
-               // Use global surround model if no previous model
-               const globalModelStr = String(globalSurroundModel).trim().toLowerCase();
-               if (globalModelStr && globalModelStr !== 'off' && globalModelStr !== 'none') {
-                 finalModel = globalSurroundModel;
-               }
-             } else if (anySurroundModel) {
-               // Fallback to any existing surround model
-               finalModel = anySurroundModel;
-             } else if (hint) {
-               // Legacy hint as last resort
-               finalModel = hint;
-             }
-
-             if (globalThis.__B44_LOGS) {
-               console.log(`[RD RECON] Surround model for ${canonRole}:`, {
-                 prevModel: prevMatch?.model,
-                 globalSurroundModel,
-                 anySurroundModel,
-                 hint,
-                 finalModel,
-                 willRender: !!(finalModel && String(finalModel).trim().toLowerCase() !== 'off' && String(finalModel).trim().toLowerCase() !== 'none')
-               });
-             }
-           } else {
-             // Non-surround roles: keep previous model or seed default
-             finalModel = prevMatch?.model ?? seed.model;
-           }
-
-           // CRITICAL: Position preservation - preserve existing position if seed has no usable coords
-           const prevPos = prevMatch?.position;
-           const seedPos = seed?.position;
-
-           const prevHasXY =
-             prevPos && Number.isFinite(prevPos.x) && Number.isFinite(prevPos.y);
-
-           const seedHasXY =
-             seedPos && Number.isFinite(seedPos.x) && Number.isFinite(seedPos.y);
-
-           // Preserve existing position if seed has no usable coords
-           const finalPosition = (!seedHasXY && prevHasXY) ? prevPos : seedPos;
-
-           // Preserve rotation the same way
-           const prevRot = prevMatch?.rotation;
-           const seedRot = seed?.rotation;
-           const finalRotation = seedRot ?? prevRot;
-
-           return { 
-             ...seed, 
-             model: finalModel, 
-             position: finalPosition,
-             rotation: finalRotation,
-             draggable: true 
-           };
-         });
-         
-         // Build final overhead list: reuse existing positions if available, otherwise use seeded defaults
-         const nextOverheads = [];
-         for (const targetId of targetOverheadIds) {
-           const canonId = targetId.toUpperCase();
-           const existing = overheadMap.get(canonId);
-           
-           if (existing) {
-             // Reuse existing overhead speaker with its position
-             if (globalThis.__B44_LOGS) debug(`[Speakers] Reusing existing overhead: ${canonId}`);
-             nextOverheads.push(existing);
-           } else {
-             // Create new overhead speaker from seed
-             const seeded = seededOverheads.find(s => safeCanon(s.role) === canonId);
-             if (seeded) {
-               let modelFromOverrides = undefined;
-
-               if (['TFL', 'TFR', 'TFC'].includes(canonId)) {
-                 modelFromOverrides = _useFrontGlobal ? _overheadGlobalModel : (_overheadFrontOverride || _overheadGlobalModel);
-               } else if (['TML', 'TMR'].includes(canonId)) {
-                 modelFromOverrides = _useMidGlobal ? _overheadGlobalModel : (_overheadMidOverride || _overheadGlobalModel);
-               } else if (['TRL', 'TRR', 'TRC'].includes(canonId)) {
-                 modelFromOverrides = _useRearGlobal ? _overheadGlobalModel : (_overheadRearOverride || _overheadGlobalModel);
-               }
-
-               const finalModel = modelFromOverrides || _overheadGlobalModel || seeded.model;
-               if (globalThis.__B44_LOGS) debug(`[Speakers] Creating new overhead: ${canonId} with model ${finalModel}`);
-               nextOverheads.push({ ...seeded, model: finalModel, draggable: true });
-             } else {
-               if (globalThis.__B44_LOGS) debug(`[Speakers] WARNING: Target overhead ${canonId} not found in seeded speakers!`);
-             }
-           }
-         }
-         
-         let nextList = [...nextBed, ...nextOverheads];
-
-         if (globalThis.__B44_LOGS) debug(`[Speakers] Final: ${nextBed.length} bed + ${nextOverheads.length} overhead = ${nextList.length} total`);
-         if (globalThis.__B44_LOGS) console.log("[RD] RECONCILE nextList:", nextList.map(s => s.role));
-         if (globalThis.__B44_LOGS) console.log(
-           "[RD RECON] OUTPUT roles =",
-           nextList.map(s => s.role)
-         );
-
-         if (globalThis.__B44_LOGS) safeGroup('[Speakers] Reconciliation result', () => {
-           if (globalThis.__B44_LOGS) safeTable(nextList.map(s => ({ role: s.role, model: s.model ?? '(none)', hasPosition: !!s.position })));
-         });
-
-         // NEW: guarantee Atmos overheads exist & have models,
-         // independent of surround model selection.
-         let withOverheads = ensureAtmosOverheads({
-           placedSpeakers: nextList,
-           dolbyPreset,
-           roomDimensions: stableDimensions,
-           overheadGlobalModel: _overheadGlobalModel,
-           overheadFrontOverride: _overheadFrontOverride,
-           overheadMidOverride: _overheadMidOverride,
-           overheadRearOverride: _overheadRearOverride,
-           useFrontGlobal: _useFrontGlobal,
-           useMidGlobal: _useMidGlobal,
-           useRearGlobal: _useRearGlobal,
-         });
-
-         // CRITICAL: Final safety pass - ensure surround roles NEVER lose their model
-         // This runs AFTER all merging/swapping/reconciliation to catch any stragglers
-         const surroundRolesToProtect = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
-         const globalSurroundModelFinal = appState?.globalSurroundModel;
-
-         if (globalSurroundModelFinal) {
-           const modelStr = String(globalSurroundModelFinal).trim().toLowerCase();
-           const isValidGlobalModel = modelStr && modelStr !== 'off' && modelStr !== 'none';
-
-           if (isValidGlobalModel) {
-             withOverheads = withOverheads.map(spk => {
-               const canonRole = safeCanon(spk.role);
-               if (!surroundRolesToProtect.has(canonRole)) return spk;
-
-               const currentModel = String(spk.model || '').trim().toLowerCase();
-               const hasValidModel = currentModel && currentModel !== 'off' && currentModel !== 'none';
-
-               // If this surround has no valid model, assign globalSurroundModel
-               if (!hasValidModel) {
-                 return { ...spk, model: globalSurroundModelFinal };
-               }
-
-               return spk;
-             });
-           }
-         }
-
-         // DEBUG: Log final state before commit (shows what will actually render)
-         if (globalThis.__B44_LOGS) {
-           const bedOnly = withOverheads.filter(s => surroundRolesToProtect.has(safeCanon(s.role)));
-           console.log('[RD RECON] FINAL COMMIT:', {
-             dolbyLayout: dolbyPreset,
-             sevenBedLayoutType: _sevenBedLayoutType,
-             expectedRoles: expectedRoles,
-             surroundRolesInOutput: bedOnly.map(s => ({
-               role: s.role,
-               canon: safeCanon(s.role),
-               model: s.model || '(none)',
-             })),
-           });
-         }
-
-         // [B44 FINAL FIX] Enforce required surround roles in the FINAL list (prevents later filters wiping rears/wides)
-         const final = Array.isArray(withOverheads) ? [...withOverheads] : [];
-
-         const haveFinal = new Set(final.map(s => safeCanon(s?.role)));
-
-         const ensureFinal = (role) => {
-           if (haveFinal.has(role)) return;
-           final.push({
-             id: role,
-             role,
-             label: role,
-             model: undefined,
-             position: null,
-           });
-           haveFinal.add(role);
-         };
-
-         if (wantsRears) {
-           ensureFinal('SBL');
-           ensureFinal('SBR');
-         }
-         if (wantsWides) {
-           ensureFinal('LW');
-           ensureFinal('RW');
-         }
-
-         if (globalThis.__B44_LOGS) {
-           debug(`[Speakers][FINAL] major=${major} wantsRears=${wantsRears} wantsWides=${wantsWides} roles=${final.map(s => safeCanon(s.role)).join(', ')}`);
-         }
-
-         if (speakersEqual(prev, final)) return prev;
-         return final;
-         });
-         }
+        if (speakersEqual(prev, final)) return prev;
+        return final;
+      });
+    }
   }, [
-    dolbyPreset, stableDimensions, setSpeakers, _isFrozen, placedSpeakers, _sevenBedLayoutType, lastPresetRef,
-    _overheadGlobalModel, _overheadFrontOverride, _overheadMidOverride, _overheadRearOverride,
-    _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase
-  ]);
+  dolbyPreset, stableDimensions, setSpeakers, _isFrozen, placedSpeakers, _sevenBedLayoutType, lastPresetRef,
+  _overheadGlobalModel, _overheadFrontOverride, _overheadMidOverride, _overheadRearOverride,
+  _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase]
+  );
 
   // Ensure Atmos overheads exist as soon as an Atmos preset AND a
   // global overhead model are selected – WITHOUT relying on surrounds.
@@ -3268,41 +3268,41 @@ function RoomDesignerWithState() {
 
     // If we already have any T* roles, do nothing
     const hasAnyOverheads =
-      Array.isArray(placedSpeakers) &&
-      placedSpeakers.some((spk) =>
-        safeCanon(spk.role || "").startsWith("T")
-      );
+    Array.isArray(placedSpeakers) &&
+    placedSpeakers.some((spk) =>
+    safeCanon(spk.role || "").startsWith("T")
+    );
 
     if (hasAnyOverheads) return;
 
     // Seed / fix overheads using the existing helper
     setSpeakers((prev) =>
-      ensureAtmosOverheads({
-        placedSpeakers: prev,
-        dolbyPreset,
-        roomDimensions: stableDimensions,
-        overheadGlobalModel: _overheadGlobalModel,
-        overheadFrontOverride: _overheadFrontOverride,
-        overheadMidOverride: _overheadMidOverride,
-        overheadRearOverride: _overheadRearOverride,
-        useFrontGlobal: _useFrontGlobal,
-        useMidGlobal: _useMidGlobal,
-        useRearGlobal: _useRearGlobal,
-      })
+    ensureAtmosOverheads({
+      placedSpeakers: prev,
+      dolbyPreset,
+      roomDimensions: stableDimensions,
+      overheadGlobalModel: _overheadGlobalModel,
+      overheadFrontOverride: _overheadFrontOverride,
+      overheadMidOverride: _overheadMidOverride,
+      overheadRearOverride: _overheadRearOverride,
+      useFrontGlobal: _useFrontGlobal,
+      useMidGlobal: _useMidGlobal,
+      useRearGlobal: _useRearGlobal
+    })
     );
   }, [
-    dolbyPreset,
-    placedSpeakers,
-    _overheadGlobalModel,
-    _overheadFrontOverride,
-    _overheadMidOverride,
-    _overheadRearOverride,
-    _useFrontGlobal,
-    _useMidGlobal,
-    _useRearGlobal,
-    setSpeakers,
-    _isFrozen,
-  ]);
+  dolbyPreset,
+  placedSpeakers,
+  _overheadGlobalModel,
+  _overheadFrontOverride,
+  _overheadMidOverride,
+  _overheadRearOverride,
+  _useFrontGlobal,
+  _useMidGlobal,
+  _useRearGlobal,
+  setSpeakers,
+  _isFrozen]
+  );
 
   // Build or rebuild seating positions whenever seating config changes
   useEffect(() => {
@@ -3315,24 +3315,24 @@ function RoomDesignerWithState() {
     if (typeof setSeats !== 'function') return;
 
     // 1) Decide how many seats in each row
-    const list = Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length
-      ? _seatsPerRowByRow
-      : Array.from(
-          { length: Math.max(1, Number(_seatingRows) || 1) },
-          () => Math.max(1, Number(_seatsPerRow) || 1)
-        );
+    const list = Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length ?
+    _seatsPerRowByRow :
+    Array.from(
+      { length: Math.max(1, Number(_seatingRows) || 1) },
+      () => Math.max(1, Number(_seatsPerRow) || 1)
+    );
 
     // 2) Row centre Y positions - ALWAYS use pre-computed row centers from first effect
     //    Do NOT recalculate from _rowSpacingM here.
-    let centers = Array.isArray(appState?.rowCentersM) && appState.rowCentersM.length
-      ? appState.rowCentersM.slice(0, list.length)
-      : [];
+    let centers = Array.isArray(appState?.rowCentersM) && appState.rowCentersM.length ?
+    appState.rowCentersM.slice(0, list.length) :
+    [];
 
     // If we have no centers yet (e.g. first render before MLP effect runs), use a safe fallback
     // This fallback does NOT depend on _rowSpacingM - it's just a placeholder until the first effect runs.
     const fallbackStartY = 2; // 2m from screen as a safe default
     const fallbackSpacing = 1.8; // fixed fallback, not from state
-    
+
     while (centers.length < list.length) {
       const i = centers.length;
       centers.push(fallbackStartY + i * fallbackSpacing);
@@ -3348,7 +3348,7 @@ function RoomDesignerWithState() {
 
     list.forEach((rawCount, rowIndex) => {
       const count = Math.max(1, Number(rawCount) || 1);
-      const y = Number(centers[rowIndex]) || (fallbackStartY + rowIndex * fallbackSpacing);
+      const y = Number(centers[rowIndex]) || fallbackStartY + rowIndex * fallbackSpacing;
 
       const totalWidth = (count - 1) * spacingX;
       const startX = centerX - totalWidth / 2;
@@ -3359,7 +3359,7 @@ function RoomDesignerWithState() {
           x: startX + i * spacingX,
           y,
           z: 1.2,
-          rowNumber: rowIndex + 1,
+          rowNumber: rowIndex + 1
         });
       }
     });
@@ -3376,82 +3376,82 @@ function RoomDesignerWithState() {
       list
     );
   }, [
-    appState?.setSeatingPositions,
-    _seatsPerRowByRow,
-    _seatingRows,
-    _seatsPerRow,
-    _seatSpacing,
-    // REMOVED: _rowSpacingM (row Y positions come from rowCentersM now)
-    appState?.rowCentersM,
-    stableDimensions?.width,
-  ]);
+  appState?.setSeatingPositions,
+  _seatsPerRowByRow,
+  _seatingRows,
+  _seatsPerRow,
+  _seatSpacing,
+  // REMOVED: _rowSpacingM (row Y positions come from rowCentersM now)
+  appState?.rowCentersM,
+  stableDimensions?.width]
+  );
 
   // Manual seating generation - single source of truth
-const handleGenerateSeating = React.useCallback((overrides = {}) => {
-  // If the seating tab is locked, do nothing
-  if (_isFrozen && _isFrozen('seating')) return;
+  const handleGenerateSeating = React.useCallback((overrides = {}) => {
+    // If the seating tab is locked, do nothing
+    if (_isFrozen && _isFrozen('seating')) return;
 
-  // 1. Spacing (use override if given, otherwise keep current)
-  const seatSpacingVal =
+    // 1. Spacing (use override if given, otherwise keep current)
+    const seatSpacingVal =
     Number(overrides.seatSpacing ?? _seatSpacing ?? 0.8) || 0.8;
 
-  const rowSpacingVal =
+    const rowSpacingVal =
     Number(overrides.rowSpacingM ?? _rowSpacingM ?? 1.8) || 1.8;
 
-  // 2. Build the list of seats per row
+    // 2. Build the list of seats per row
 
-  let list = [];
+    let list = [];
 
-  // Case A: caller sends an explicit list, e.g. [3,3] or [4,3,2]
-  if (Array.isArray(overrides.seatsPerRowByRow) && overrides.seatsPerRowByRow.length) {
-    list = overrides.seatsPerRowByRow.map((n) =>
+    // Case A: caller sends an explicit list, e.g. [3,3] or [4,3,2]
+    if (Array.isArray(overrides.seatsPerRowByRow) && overrides.seatsPerRowByRow.length) {
+      list = overrides.seatsPerRowByRow.map((n) =>
       Math.max(1, parseInt(n || 1, 10))
-    );
-  } else {
-    // Case B: fall back to "numberOfRows" + "seatsPerRow"
-    const rows = Math.max(
-      1,
-      parseInt(overrides.numberOfRows ?? _seatingRows ?? 1, 10)
-    );
-    const seats = Math.max(
-      1,
-      parseInt(overrides.seatsPerRow ?? _seatsPerRow ?? 3, 10)
-    );
-    list = Array.from({ length: rows }, () => seats);
-  }
+      );
+    } else {
+      // Case B: fall back to "numberOfRows" + "seatsPerRow"
+      const rows = Math.max(
+        1,
+        parseInt(overrides.numberOfRows ?? _seatingRows ?? 1, 10)
+      );
+      const seats = Math.max(
+        1,
+        parseInt(overrides.seatsPerRow ?? _seatsPerRow ?? 3, 10)
+      );
+      list = Array.from({ length: rows }, () => seats);
+    }
 
-  // Safety: always at least one row
-  if (!list.length) {
-    list = [Math.max(1, parseInt(_seatsPerRow ?? 3, 10))];
-  }
+    // Safety: always at least one row
+    if (!list.length) {
+      list = [Math.max(1, parseInt(_seatsPerRow ?? 3, 10))];
+    }
 
-  const rowsCount = list.length;
+    const rowsCount = list.length;
 
-  // 3. Update global state (this is what drives the plan view)
+    // 3. Update global state (this is what drives the plan view)
 
-  // how many rows
-  if (typeof setSeatingRowsGuarded === 'function') {
-    setSeatingRowsGuarded(rowsCount);
-  }
+    // how many rows
+    if (typeof setSeatingRowsGuarded === 'function') {
+      setSeatingRowsGuarded(rowsCount);
+    }
 
-  // legacy single "seatsPerRow" — keep roughly in sync (first row)
-  if (typeof setSeatsPerRowGuarded === 'function') {
-    setSeatsPerRowGuarded(list[0] ?? 3);
-  }
+    // legacy single "seatsPerRow" — keep roughly in sync (first row)
+    if (typeof setSeatsPerRowGuarded === 'function') {
+      setSeatsPerRowGuarded(list[0] ?? 3);
+    }
 
-  // spacing
-  if (typeof setSeatSpacingGuarded === 'function') {
-    setSeatSpacingGuarded(seatSpacingVal);
-  }
+    // spacing
+    if (typeof setSeatSpacingGuarded === 'function') {
+      setSeatSpacingGuarded(seatSpacingVal);
+    }
 
-  // REMOVED: Do not write rowSpacingM here. Let the control be the only writer.
-  // The spacing value is already in state and will be used by the seat-builder effect.
+    // REMOVED: Do not write rowSpacingM here. Let the control be the only writer.
+    // The spacing value is already in state and will be used by the seat-builder effect.
 
-  // NEW: per-row list used by the seat-builder effect
-  if (typeof setSeatsPerRowByRowGuarded === 'function') {
-    setSeatsPerRowByRowGuarded([...list]); // spread = new array so React notices
-  }
-}, [
+    // NEW: per-row list used by the seat-builder effect
+    if (typeof setSeatsPerRowByRowGuarded === 'function') {
+      setSeatsPerRowByRowGuarded([...list]); // spread = new array so React notices
+    }
+  }, [
   _isFrozen,
   _seatSpacing,
   _seatingRows,
@@ -3459,8 +3459,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
   setSeatingRowsGuarded,
   setSeatsPerRowGuarded,
   setSeatsPerRowByRowGuarded,
-  setSeatSpacingGuarded,
-]);
+  setSeatSpacingGuarded]
+  );
 
   // Normalise seat flags whenever seating or room size changes
   useEffect(() => {
@@ -3485,10 +3485,10 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
       const spks = Array.isArray(placedSpeakers) ? placedSpeakers : [];
       if (spks.length < 2) return;
 
-      const bedRoles = new Set(["FWL","FWR","LW","RW","SL","SR","LS","RS","LRS","RRS","SBL","SBR","LR","RR"]);
-      const bedSpeakers = spks
-        .filter(s => bedRoles.has(String(s.role).toUpperCase()))
-        .map(s => ({ id: String(s.id || s.role), role: String(s.role).toUpperCase(), position: { x: Number(s.position?.x) || 0, y: Number(s.position?.y) || 0 } }));
+      const bedRoles = new Set(["FWL", "FWR", "LW", "RW", "SL", "SR", "LS", "RS", "LRS", "RRS", "SBL", "SBR", "LR", "RR"]);
+      const bedSpeakers = spks.
+      filter((s) => bedRoles.has(String(s.role).toUpperCase())).
+      map((s) => ({ id: String(s.id || s.role), role: String(s.role).toUpperCase(), position: { x: Number(s.position?.x) || 0, y: Number(s.position?.y) || 0 } }));
 
       if (bedSpeakers.length < 2) return;
 
@@ -3503,24 +3503,24 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
         pads,
         targets: [50, 60, 80],
         weights: { evenness: 1.0, pad: 5.0, target: 0.6 },
-        steps: 250,
+        steps: 250
       });
 
-      const byId = new Map(eq.map(s => [s.id, s]));
-      const surRoles = new Set(["FWL","FWR","LW","RW","SL","SR","LS","RS","LRS","RRS","SBL","SBR","LR","RR"]);
-      const surrogate = spks
-        .filter(s => surRoles.has(String(s.role).toUpperCase()))
-        .map(s => ({
-          position: {
-            x: byId.get(String(s.id || s.role))?.position?.x ?? s.position?.x ?? 0,
-            y: byId.get(String(s.id || s.role))?.position?.y ?? s.position?.y ?? 0
-          }
-        }));
+      const byId = new Map(eq.map((s) => [s.id, s]));
+      const surRoles = new Set(["FWL", "FWR", "LW", "RW", "SL", "SR", "LS", "RS", "LRS", "RRS", "SBL", "SBR", "LR", "RR"]);
+      const surrogate = spks.
+      filter((s) => surRoles.has(String(s.role).toUpperCase())).
+      map((s) => ({
+        position: {
+          x: byId.get(String(s.id || s.role))?.position?.x ?? s.position?.x ?? 0,
+          y: byId.get(String(s.id || s.role))?.position?.y ?? s.position?.y ?? 0
+        }
+      }));
 
-      const gaps = surrogate.length ? (surrogate.length === 2
-        ? [backSweepGap2(mlpForOptimization, surrogate[0].position, surrogate[1].position)]
-        : backSweepGaps(mlpForOptimization, surrogate.map(p => ({ position: p.position })))
-      ) : [];
+      const gaps = surrogate.length ? surrogate.length === 2 ?
+      [backSweepGap2(mlpForOptimization, surrogate[0].position, surrogate[1].position)] :
+      backSweepGaps(mlpForOptimization, surrogate.map((p) => ({ position: p.position }))) :
+      [];
 
       let maxGap = gaps.length ? Math.max(...gaps) : 0;
 
@@ -3541,16 +3541,16 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
         }
       }
 
-      const byIdAfter = new Map(eq.map(s => [s.id, s]));
-      const merged = spks.map(s => {
+      const byIdAfter = new Map(eq.map((s) => [s.id, s]));
+      const merged = spks.map((s) => {
         const k = String(s.id || s.role);
         const u = byIdAfter.get(k);
         if (!u) return s;
         return { ...s, position: { ...(s.position || {}), x: u.position.x, y: u.position.y } };
       });
 
-      if (globalThis.__B44_LOGS) console.log('[RD] optimiseAll -> roles', merged.map(s => safeCanon(s.role)));
-      setSpeakers(prev => mergePreserveOverheads(prev, merged));
+      if (globalThis.__B44_LOGS) console.log('[RD] optimiseAll -> roles', merged.map((s) => safeCanon(s.role)));
+      setSpeakers((prev) => mergePreserveOverheads(prev, merged));
     } catch (e) {
       if (globalThis.__B44_LOGS) console.error("[OptimiseAll] failed:", e);
     }
@@ -3565,8 +3565,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
   const overlayRelevance = React.useMemo(() => {
     const preset = String(dolbyPreset || "5.1");
     const parts = preset.split(".");
-    const major = Number(parts[0] || 5) || 5;     // 5, 7, 9...
-    const heights = Number(parts[2] || 0) || 0;   // 0, 2, 4, 6...
+    const major = Number(parts[0] || 5) || 5; // 5, 7, 9...
+    const heights = Number(parts[2] || 0) || 0; // 0, 2, 4, 6...
     const type = String(_sevenBedLayoutType || "").toLowerCase(); // 'wides' | 'rears' | ''
 
     const is5x = major >= 5;
@@ -3586,7 +3586,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
       // overheads — show only the matching count
       OVERHEADS_2: heights === 2,
       OVERHEADS_4: heights === 4,
-      OVERHEADS_6: heights === 6,
+      OVERHEADS_6: heights === 6
     };
   }, [dolbyPreset, _sevenBedLayoutType]);
 
@@ -3594,18 +3594,18 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
   const overlaysForRendering = useMemo(() => {
     // Start with the existing _overlays from appState (which contains boolean toggles)
     const base = { ...(_overlays || {}) };
-    
+
     // This `FRONT_WIDE` key in `base` will now hold the full `frontWideZones` object
     // (which includes status like 'disabled', 'no-mlp', 'ok', etc.)
     base.FRONT_WIDE = frontWideZones;
-    
+
     // This flag is what RoomVisualisation will use to decide if it should render the zones
     // AND if it should show the HUD for front wides.
     base.enableFrontWides = _enableFrontWides;
-    
+
     // REMOVED: base.OVERHEADS derivation - overhead corridors controlled by individual OVERHEADS_X toggles
     // REMOVED: base.showOverheadZones - overhead zones gated by OVERHEADS_X, not enableDolbyZones
-    
+
     return base;
   }, [_overlays, frontWideZones, _enableFrontWides]);
 
@@ -3613,11 +3613,11 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
   if (!appState) {
     return <div className="p-6 text-sm">Loading Room Designer…</div>;
   }
-  
+
   // Safely destructure appState properties for JSX or non-hook logic after the conditional return
   const {
     seatingPositions, seatingRows, seatsPerRow,
-    seatingBlockOffset, seatSpacing, mlpBasis, roomElements, 
+    seatingBlockOffset, seatSpacing, mlpBasis, roomElements,
     subwoofers,
     setScreenWall, setDolbyConfig, isFrozen, freezeTab, unfreezeTab, frozenTabs,
     overlays, setOverlays, setSevenBedLayoutType,
@@ -3637,7 +3637,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
     useMidGlobal: useMidGlobalFromState,
     setUseMidGlobal: setUseMidGlobalFromState,
     useRearGlobal: useRearGlobalFromState,
-    setUseRearGlobal: setUseRearGlobalFromState,
+    setUseRearGlobal: setUseRearGlobalFromState
   } = appState;
 
   return (
@@ -3663,8 +3663,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
               size="sm"
               className="brand-btn"
               onClick={handleOptimiseAll}
-              disabled={isFrozen('speakers') || placedSpeakers.length < 2}
-            >
+              disabled={isFrozen('speakers') || placedSpeakers.length < 2}>
+
               <RotateCcw className="w-4 h-4 mr-2" />
               Optimise
             </Button>
@@ -3676,21 +3676,21 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
           </div>
         </div>
         <div className="mt-2 text-xs flex items-center gap-4">
-            {showLocalHint && (
-              <div className="text-xs text-amber-600 inline-flex items-center gap-2">
+            {showLocalHint &&
+          <div className="text-xs text-amber-600 inline-flex items-center gap-2">
                 Working locally — select a project to save to cloud
               </div>
-            )}
-            {loadState.phase === "loading" && ( <div className="text-xs text-gray-500 inline-flex items-center gap-2"> Loading project... </div> )}
-            {loadState.phase === "loaded" && ( <div className="text-xs text-gray-600 inline-flex items-center gap-2"> Loaded "{loadState.name}" </div> )}
-            {loadState.phase === "error" && ( <div className="text-xs text-red-600 inline-flex items-center gap-2"> Error: {loadState.error} <Button size="xs" variant="outline" className="ml-2 h-6 px-2" onClick={() => { const ctrl = new AbortController(); reloadProject(ctrl.signal); }}><RotateCcw className="w-3 h-3 mr-1" /> Retry</Button> </div> )}
-            {autosaveStatus === "saving"  && <span className="text-gray-500">Saving…</span>}
-            {autosaveStatus === "saved"   && <span className="text-[#3E4349]">All changes saved</span>}
-            {autosaveStatus === "dirty"   && <span className="text-amber-600">Pending changes…</span>}
+          }
+            {loadState.phase === "loading" && <div className="text-xs text-gray-500 inline-flex items-center gap-2"> Loading project... </div>}
+            {loadState.phase === "loaded" && <div className="text-xs text-gray-600 inline-flex items-center gap-2"> Loaded "{loadState.name}" </div>}
+            {loadState.phase === "error" && <div className="text-xs text-red-600 inline-flex items-center gap-2"> Error: {loadState.error} <Button size="xs" variant="outline" className="ml-2 h-6 px-2" onClick={() => {const ctrl = new AbortController();reloadProject(ctrl.signal);}}><RotateCcw className="w-3 h-3 mr-1" /> Retry</Button> </div>}
+            {autosaveStatus === "saving" && <span className="text-gray-500">Saving…</span>}
+            {autosaveStatus === "saved" && <span className="text-[#3E4349]">All changes saved</span>}
+            {autosaveStatus === "dirty" && <span className="text-amber-600">Pending changes…</span>}
             {autosaveStatus === "hydrating" && <span>Loading project data...</span>}
-            {projectIdState && (
-              <span className="text-xs text-gray-400 ml-auto">ID: {projectIdState.slice(0, 12)}…</span>
-            )}
+            {projectIdState &&
+          <span className="text-xs text-gray-400 ml-auto">ID: {projectIdState.slice(0, 12)}…</span>
+          }
         </div>
       </header>
 
@@ -3698,27 +3698,27 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
         style={{
           display: "grid",
           gridTemplateColumns:
-            viewEmphasis === "plan"
-              ? "minmax(720px, 62vw) 1fr"
-              : viewEmphasis === "controls"
-                ? "minmax(480px, 35vw) 1fr"
-                : "minmax(560px, 48vw) 1fr",
+          viewEmphasis === "plan" ?
+          "minmax(720px, 62vw) 1fr" :
+          viewEmphasis === "controls" ?
+          "minmax(480px, 35vw) 1fr" :
+          "minmax(560px, 48vw) 1fr",
           gap: 16,
           overflow: "hidden",
           padding: 16,
           flex: "1 1 auto",
           minWidth: 0,
-          minHeight: 0,
-        }}
-      >
+          minHeight: 0
+        }}>
+
         <section
           className="relative bg-white border border-[#DCDBD6] rounded-2xl overflow-hidden" // Change from auto to hidden since we're managing scroll inside
           style={{
             minWidth: 0,
             minHeight: 0,
-            height: "calc(100vh - 152px)", // Preserve height constraint
-          }}
-        >
+            height: "calc(100vh - 152px)" // Preserve height constraint
+          }}>
+
           {/* NEW: Static top bar above the drawing (pushes canvas down; no cropping) */}
           <div
             className="plan-toolbar"
@@ -3731,8 +3731,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
               borderBottom: '1px solid #DCDBD6',
               background: '#FFFFFF',
               zIndex: 1
-            }}
-          >
+            }}>
+
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <strong
                 style={{
@@ -3742,9 +3742,9 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   display: "flex",
                   alignItems: "center",
                   height: "100%",
-                  marginLeft: "12px",
-                }}
-              >
+                  marginLeft: "12px"
+                }}>
+
                 {(() => {
                   const base = (dolbyPreset || "").split(" ")[0]; // "5.1.4" or "5.1"
                   const parts = String(base || "5.1").split(".");
@@ -3752,8 +3752,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   const heights = parts[2] || ""; // may be missing for "5.1"
 
                   const frontCount = Number(_frontSubsCfg?.count ?? 0);
-                  const rearCount  = Number(_rearSubsCfg?.count ?? 0);
-                  const totalSubs  = frontCount + rearCount;
+                  const rearCount = Number(_rearSubsCfg?.count ?? 0);
+                  const totalSubs = frontCount + rearCount;
 
                   const subDisplay = totalSubs; // Show actual count (including 0)
 
@@ -3764,94 +3764,94 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
 
               <div style={{ display: "flex", gap: 6, marginLeft: 10 }}>
                 {[
-                  { key: "plan", label: "Plan" },
-                  { key: "balanced", label: "Balanced" },
-                  { key: "controls", label: "Controls" },
-                ].map((b) => (
-                  <button
-                    key={b.key}
-                    type="button"
-                    onClick={() => setViewEmphasis(b.key)}
-                    style={{
-                      fontSize: 12,
-                      padding: "4px 10px",
-                      borderRadius: 999,
-                      border: "1px solid #DCDBD6",
-                      background: viewEmphasis === b.key ? "#213428" : "#FFFFFF",
-                      color: viewEmphasis === b.key ? "#FFFFFF" : "#3E4349",
-                      lineHeight: 1.2,
-                      cursor: "pointer",
-                    }}
-                    aria-pressed={viewEmphasis === b.key}
-                  >
+                { key: "plan", label: "Plan" },
+                { key: "balanced", label: "Balanced" },
+                { key: "controls", label: "Controls" }].
+                map((b) =>
+                <button
+                  key={b.key}
+                  type="button"
+                  onClick={() => setViewEmphasis(b.key)}
+                  style={{
+                    fontSize: 12,
+                    padding: "4px 10px",
+                    borderRadius: 999,
+                    border: "1px solid #DCDBD6",
+                    background: viewEmphasis === b.key ? "#213428" : "#FFFFFF",
+                    color: viewEmphasis === b.key ? "#FFFFFF" : "#3E4349",
+                    lineHeight: 1.2,
+                    cursor: "pointer"
+                  }}
+                  aria-pressed={viewEmphasis === b.key}>
+
                     {b.label}
                   </button>
-                ))}
+                )}
               </div>
             </div>
 
             {/* PLAN TOOLS — dynamic list, only show relevant items */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, auto)', gap: 12, alignItems: 'center' }}>
               {[
-                { key: 'LCR',           label: 'LCR' },
-                { key: 'SIDE_SURROUND', label: 'Side Surrounds' },
-                { key: 'REAR_SURROUND', label: 'Rear Surrounds' },
-                { key: 'OVERHEADS_2',   label: 'Overheads .2' },
-                { key: 'OVERHEADS_4',   label: 'Overheads .4' },
-                { key: 'OVERHEADS_6',   label: 'Overheads .6' },
-                { key: 'enableDolbyZones', label: 'Dolby Zones' },
-              ]
-                .filter(({ key }) => overlayRelevance[key] !== false)
-                .map(({ key, label }) => (
-                  <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              { key: 'LCR', label: 'LCR' },
+              { key: 'SIDE_SURROUND', label: 'Side Surrounds' },
+              { key: 'REAR_SURROUND', label: 'Rear Surrounds' },
+              { key: 'OVERHEADS_2', label: 'Overheads .2' },
+              { key: 'OVERHEADS_4', label: 'Overheads .4' },
+              { key: 'OVERHEADS_6', label: 'Overheads .6' },
+              { key: 'enableDolbyZones', label: 'Dolby Zones' }].
+
+              filter(({ key }) => overlayRelevance[key] !== false).
+              map(({ key, label }) =>
+              <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <label htmlFor={`overlay-top-${key}`} style={{ fontSize: 12, color: '#3E4349' }}>{label}</label>
                     <Switch
-                      id={`overlay-top-${key}`}
-                      checked={!!_overlays?.[key]}
-                      onCheckedChange={() => {
-                        _setOverlays(prev => ({ ...prev, [key]: !prev[key] }));
-                      }}
-                    />
-                  </div>
-                ))}
+                  id={`overlay-top-${key}`}
+                  checked={!!_overlays?.[key]}
+                  onCheckedChange={() => {
+                    _setOverlays((prev) => ({ ...prev, [key]: !prev[key] }));
+                  }} />
 
-              {overlayRelevance.FRONT_WIDES && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  </div>
+              )}
+
+              {overlayRelevance.FRONT_WIDES &&
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                   <label htmlFor="overlay-top-front-wides" style={{ fontSize: 12, color: '#3E4349' }}>Front Wides</label>
                   <Switch
-                    id="overlay-top-front-wides"
-                    checked={!!_enableFrontWides}
-                    onCheckedChange={(checked) => {
-                      _setEnableFrontWides(checked);
-                    }}
-                  />
+                  id="overlay-top-front-wides"
+                  checked={!!_enableFrontWides}
+                  onCheckedChange={(checked) => {
+                    _setEnableFrontWides(checked);
+                  }} />
+
                 </div>
-              )}
+              }
             </div>
             
             {/* NEW: 3-state zoom toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
               <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Zoom</span>
               <div style={{ display: 'flex', gap: 4 }}>
-                {['off', 'in', 'out'].map((mode) => (
-                  <button
-                    key={mode}
-                    type="button"
-                    onClick={() => setZoomMode(mode)}
-                    style={{
-                      fontSize: 11,
-                      padding: '4px 10px',
-                      borderRadius: 4,
-                      border: '1px solid #DCDBD6',
-                      background: zoomMode === mode ? '#213428' : '#FFFFFF',
-                      color: zoomMode === mode ? '#FFFFFF' : '#3E4349',
-                      cursor: 'pointer',
-                      fontWeight: 500,
-                    }}
-                  >
+                {['off', 'in', 'out'].map((mode) =>
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setZoomMode(mode)}
+                  style={{
+                    fontSize: 11,
+                    padding: '4px 10px',
+                    borderRadius: 4,
+                    border: '1px solid #DCDBD6',
+                    background: zoomMode === mode ? '#213428' : '#FFFFFF',
+                    color: zoomMode === mode ? '#FFFFFF' : '#3E4349',
+                    cursor: 'pointer',
+                    fontWeight: 500
+                  }}>
+
                     {mode === 'off' ? 'Off' : mode === 'in' ? '+' : '−'}
                   </button>
-                ))}
+                )}
               </div>
             </div>
           </div>
@@ -3863,8 +3863,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                 {(() => {
                   if (globalThis.__B44_LOGS) console.log('[RD] passing placedSpeakers to RoomVisualisation', {
                     count: Array.isArray(placedSpeakers) ? placedSpeakers.length : 0,
-                    roles: (placedSpeakers || []).map(s => safeCanon(s.role)),
-                    dolbyPreset,
+                    roles: (placedSpeakers || []).map((s) => safeCanon(s.role)),
+                    dolbyPreset
                   });
                   return null;
                 })()}
@@ -3883,7 +3883,7 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   onSetSeatingPositions={appState?.setSeatingPositions}
                   onSetFrontSubs={appState?.setFrontSubsCfg}
                   onSetRearSubs={appState?.setRearSubsCfg}
-                  onScreenPlaneYChange={(y) => _setScreen?.(prev => ({...prev, screenPlaneY_m: y}))}
+                  onScreenPlaneYChange={(y) => _setScreen?.((prev) => ({ ...prev, screenPlaneY_m: y }))}
                   overlays={overlaysForRendering}
                   roomElements={_roomElements}
                   dolbyLayout={dolbyPreset}
@@ -3898,8 +3898,8 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   showMlpRuler={showMlpRuler}
                   zoomMode={zoomMode}
                   onZoomModeChange={setZoomMode}
-                  isDraggingRef={isDraggingRef}
-                />
+                  isDraggingRef={isDraggingRef} />
+
               </Suspense>
             </ErrorBoundary>
           </div>
@@ -3911,120 +3911,120 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
             style={{
               height: "calc(100vh - 152px)",
               overflow: "auto",
-              paddingRight: 8,
+              paddingRight: 8
             }}
-            className="space-y-3"
-          >
+            className="space-y-3">
+
               <CollapsiblePanel
-                title="Room Dimensions"
-                icon={<Ruler className="w-5 h-5" />}
-                defaultOpen={true}
-              >
-                  {isFrozen('dimensions') && (
-                    <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+              title="Room Dimensions"
+              icon={<Ruler className="w-5 h-5" />}
+              defaultOpen={true}>
+
+                  {isFrozen('dimensions') &&
+              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
                       This tab is frozen. Unlock to make changes.
                     </div>
-                  )}
+              }
                   <Suspense fallback={<div>Loading...</div>}>
-                      <RoomDimensions 
-                        width_m={_roomDims?.widthM} 
-                        length_m={_roomDims?.lengthM} 
-                        height_m={_roomDims?.heightM} 
-                        onChange={(partial) => {
-                          if (!isFrozen('dimensions') && _setRoomDims) {
-                            _setRoomDims(prev => ({ ...prev, ...partial }));
-                          }
-                        }} 
-                        disabled={isFrozen('dimensions')} 
-                      />
+                      <RoomDimensions
+                  width_m={_roomDims?.widthM}
+                  length_m={_roomDims?.lengthM}
+                  height_m={_roomDims?.heightM}
+                  onChange={(partial) => {
+                    if (!isFrozen('dimensions') && _setRoomDims) {
+                      _setRoomDims((prev) => ({ ...prev, ...partial }));
+                    }
+                  }}
+                  disabled={isFrozen('dimensions')} />
+
                   </Suspense>
               </CollapsiblePanel>
 
               <CollapsiblePanel
-                title="Screen Size"
-                icon={<Monitor className="w-5 h-5" />}
-                defaultOpen={false}
-              >
-                  {isFrozen('screen') && (
-                    <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+              title="Screen Size"
+              icon={<Monitor className="w-5 h-5" />}
+              defaultOpen={false}>
+
+                  {isFrozen('screen') &&
+              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
                       This tab is frozen. Unlock to make changes.
                     </div>
-                  )}
+              }
                   <Suspense fallback={<div>Loading...</div>}>
-                      <ScreenConfiguration 
-                        dimensions={stableDimensions}
-                        screen={_screen}
-                        onScreenChange={setScreenGuarded}
-                        seatingPositions={seatingPositions} 
-                        dolbyConfig={dolbyPreset} 
-                        disabled={isFrozen('screen')} 
-                      />
+                      <ScreenConfiguration
+                  dimensions={stableDimensions}
+                  screen={_screen}
+                  onScreenChange={setScreenGuarded}
+                  seatingPositions={seatingPositions}
+                  dolbyConfig={dolbyPreset}
+                  disabled={isFrozen('screen')} />
+
                   </Suspense>
               </CollapsiblePanel>
 
               <CollapsiblePanel
-                title="Seating Layout"
-                icon={<Users className="w-5 h-5" />}
-                defaultOpen={false}
-              >
-                  {isFrozen('seating') && (
-                    <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+              title="Seating Layout"
+              icon={<Users className="w-5 h-5" />}
+              defaultOpen={false}>
+
+                  {isFrozen('seating') &&
+              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
                       This tab is frozen. Unlock to make changes.
                     </div>
-                  )}
+              }
                   <Suspense fallback={<div>Loading...</div>}>
-                      <SeatingLayout 
-                        seatingPositions={seatingPositions} 
-                        onGenerateSeating={handleGenerateSeating} 
-                        seatsPerRowByRow={_seatsPerRowByRow}
-                        onSeatsPerRowByRowChange={setSeatsPerRowByRowGuarded}
-                        seatsPerRow={seatsPerRow} 
-                        onSeatsPerRowChange={setSeatsPerRowGuarded} 
-                        seatingRows={seatingRows} 
-                        onSeatingRowsChange={setSeatingRowsGuarded} 
-                        seatSpacing={seatSpacing} 
-                        onSeatSpacingChange={setSeatSpacingGuarded} 
-                        rowSpacingM={_rowSpacingM || 1.8}
-                        onRowSpacingChange={(val) => {
-                          // Hard guard: only accept finite numbers
-                          const next = Number(val);
-                          if (!Number.isFinite(next)) return;
+                      <SeatingLayout
+                  seatingPositions={seatingPositions}
+                  onGenerateSeating={handleGenerateSeating}
+                  seatsPerRowByRow={_seatsPerRowByRow}
+                  onSeatsPerRowByRowChange={setSeatsPerRowByRowGuarded}
+                  seatsPerRow={seatsPerRow}
+                  onSeatsPerRowChange={setSeatsPerRowGuarded}
+                  seatingRows={seatingRows}
+                  onSeatingRowsChange={setSeatingRowsGuarded}
+                  seatSpacing={seatSpacing}
+                  onSeatSpacingChange={setSeatSpacingGuarded}
+                  rowSpacingM={_rowSpacingM || 1.8}
+                  onRowSpacingChange={(val) => {
+                    // Hard guard: only accept finite numbers
+                    const next = Number(val);
+                    if (!Number.isFinite(next)) return;
 
-                          // Use guarded setter (respects frozen state)
-                          if (typeof setRowSpacingGuarded === 'function') {
-                            setRowSpacingGuarded(next);
-                          }
-                        }}
-                        seatingBlockOffset={_seatingBlockOffset} 
-                        onSeatingBlockOffsetChange={setSeatingBlockOffsetGuarded} 
-                        mlpBasis={mlpBasis} 
-                        onMlpBasisChange={setMlpBasisGuarded} 
-                        onSetSeatingPositions={appState?.setSeatingPositions} 
-                        disabled={isFrozen('seating')} 
-                        screen={_screen} 
-                        dimensions={stableDimensions}
-                        shiftSeatsToMaintainAngle={visualisationRef.current?.shiftSeatsToMaintainAngle}
-                        showMlpRuler={showMlpRuler}
-                        onShowMlpRulerChange={setShowMlpRuler}
-                      />
+                    // Use guarded setter (respects frozen state)
+                    if (typeof setRowSpacingGuarded === 'function') {
+                      setRowSpacingGuarded(next);
+                    }
+                  }}
+                  seatingBlockOffset={_seatingBlockOffset}
+                  onSeatingBlockOffsetChange={setSeatingBlockOffsetGuarded}
+                  mlpBasis={mlpBasis}
+                  onMlpBasisChange={setMlpBasisGuarded}
+                  onSetSeatingPositions={appState?.setSeatingPositions}
+                  disabled={isFrozen('seating')}
+                  screen={_screen}
+                  dimensions={stableDimensions}
+                  shiftSeatsToMaintainAngle={visualisationRef.current?.shiftSeatsToMaintainAngle}
+                  showMlpRuler={showMlpRuler}
+                  onShowMlpRulerChange={setShowMlpRuler} />
+
                   </Suspense>
               </CollapsiblePanel>
 
               <CollapsiblePanel
-                title="Speakers"
-                icon={<Speaker className="w-5 h-5" />}
-                defaultOpen={false}
-              >
-                  {isFrozen('speakers') && (
-                    <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+              title="Speakers"
+              icon={<Speaker className="w-5 h-5" />}
+              defaultOpen={false}>
+
+                  {isFrozen('speakers') &&
+              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
                       This tab is frozen. Unlock to make changes.
                     </div>
-                  )}
+              }
                   
                   {/* Aim Loudspeaker - Nested Collapsible */}
                   <details className="px-4 pb-4 border-b border-gray-200">
                     <summary className="cursor-pointer text-sm font-medium text-gray-700 mb-3 list-none flex items-center justify-between">
-                      <span>Aim Loudspeaker</span>
+                      <span className="text-[#625143]">Aim Loudspeaker</span>
                       <svg className="w-4 h-4 transition-transform" style={{ transform: 'rotate(0deg)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
@@ -4033,38 +4033,38 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-lcr" className="text-sm">Left / Right → Aim to MLP</Label>
                         <Switch
-                          id="aim-lcr"
-                          checked={lcrAimMode === "angled"}
-                          onCheckedChange={(checked) => setLcrAimMode(checked ? "angled" : "flat")}
-                          disabled={isFrozen('speakers')}
-                        />
+                      id="aim-lcr"
+                      checked={lcrAimMode === "angled"}
+                      onCheckedChange={(checked) => setLcrAimMode(checked ? "angled" : "flat")}
+                      disabled={isFrozen('speakers')} />
+
                       </div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-front-wides" className="text-sm">Front Wides → Aim to MLP</Label>
                         <Switch
-                          id="aim-front-wides"
-                          checked={appState?.aimFrontWidesAtMLP || false}
-                          onCheckedChange={(checked) => appState?.setAimFrontWidesAtMLP(checked)}
-                          disabled={isFrozen('speakers')}
-                        />
+                      id="aim-front-wides"
+                      checked={appState?.aimFrontWidesAtMLP || false}
+                      onCheckedChange={(checked) => appState?.setAimFrontWidesAtMLP(checked)}
+                      disabled={isFrozen('speakers')} />
+
                       </div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-side-surrounds" className="text-sm">Side Surrounds → Aim to MLP</Label>
                         <Switch
-                          id="aim-side-surrounds"
-                          checked={appState?.aimSideSurroundsAtMLP || false}
-                          onCheckedChange={(checked) => appState?.setAimSideSurroundsAtMLP(checked)}
-                          disabled={isFrozen('speakers')}
-                        />
+                      id="aim-side-surrounds"
+                      checked={appState?.aimSideSurroundsAtMLP || false}
+                      onCheckedChange={(checked) => appState?.setAimSideSurroundsAtMLP(checked)}
+                      disabled={isFrozen('speakers')} />
+
                       </div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-rear-surrounds" className="text-sm">Rear Surrounds → Aim to MLP</Label>
                         <Switch
-                          id="aim-rear-surrounds"
-                          checked={appState?.aimRearSurroundsAtMLP || false}
-                          onCheckedChange={(checked) => appState?.setAimRearSurroundsAtMLP(checked)}
-                          disabled={isFrozen('speakers')}
-                        />
+                      id="aim-rear-surrounds"
+                      checked={appState?.aimRearSurroundsAtMLP || false}
+                      onCheckedChange={(checked) => appState?.setAimRearSurroundsAtMLP(checked)}
+                      disabled={isFrozen('speakers')} />
+
                       </div>
                       <div className="text-xs text-gray-500 mt-2">
                         Turns the speaker to face the MLP. Position does not change (yet).
@@ -4074,45 +4074,45 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   
                   <Suspense fallback={<div>Loading...</div>}>
                       <SpeakerPlacement disabled={isFrozen('speakers')}
-                        dimensions={stableDimensions}
-                        sevenBedLayoutType={_sevenBedLayoutType}
-                        onSevenBedLayoutTypeChange={setSevenBedLayoutType}
-                        dolbyPreset={dolbyPreset}
-                        onDolbyPresetChange={setDolbyPreset}
-                        lcrAimMode={lcrAimMode}
-                        onChangeLcrAimMode={setLcrAimMode}
-                        lcrAngleDeg={lcrAngleDeg}
+                dimensions={stableDimensions}
+                sevenBedLayoutType={_sevenBedLayoutType}
+                onSevenBedLayoutTypeChange={setSevenBedLayoutType}
+                dolbyPreset={dolbyPreset}
+                onDolbyPresetChange={setDolbyPreset}
+                lcrAimMode={lcrAimMode}
+                onChangeLcrAimMode={setLcrAimMode}
+                lcrAngleDeg={lcrAngleDeg}
 
-                        overheadGlobalModel={overheadGlobalModelFromState}
-                        setOverheadGlobalModel={setOverheadGlobalModelFromState}
-                        overheadFrontOverride={overheadFrontOverrideFromState}
-                        setOverheadFrontOverride={setOverheadFrontOverrideFromState}
-                        overheadMidOverride={overheadMidOverrideFromState}
-                        setOverheadMidOverride={setOverheadMidOverrideFromState}
-                        overheadRearOverride={overheadRearOverrideFromState}
-                        setOverheadRearOverride={setOverheadRearOverrideFromState}
-                        useFrontGlobal={useFrontGlobalFromState}
-                        setUseFrontGlobal={setUseFrontGlobalFromState}
-                        useMidGlobal={useMidGlobalFromState}
-                        setUseMidGlobal={setUseMidGlobalFromState}
-                        useRearGlobal={useRearGlobalFromState}
-                        setUseRearGlobal={setUseRearGlobalFromState}
-                        
-                        globalSurroundModel={appState?.globalSurroundModel}
-                        setGlobalSurroundModel={appState?.setGlobalSurroundModel}
-                        
-                        allSeatSplMetrics={allSeatSplMetrics}
-                      />
+                overheadGlobalModel={overheadGlobalModelFromState}
+                setOverheadGlobalModel={setOverheadGlobalModelFromState}
+                overheadFrontOverride={overheadFrontOverrideFromState}
+                setOverheadFrontOverride={setOverheadFrontOverrideFromState}
+                overheadMidOverride={overheadMidOverrideFromState}
+                setOverheadMidOverride={setOverheadMidOverrideFromState}
+                overheadRearOverride={overheadRearOverrideFromState}
+                setOverheadRearOverride={setOverheadRearOverrideFromState}
+                useFrontGlobal={useFrontGlobalFromState}
+                setUseFrontGlobal={setUseFrontGlobalFromState}
+                useMidGlobal={useMidGlobalFromState}
+                setUseMidGlobal={setUseMidGlobalFromState}
+                useRearGlobal={useRearGlobalFromState}
+                setUseRearGlobal={setUseRearGlobalFromState}
+
+                globalSurroundModel={appState?.globalSurroundModel}
+                setGlobalSurroundModel={appState?.setGlobalSurroundModel}
+
+                allSeatSplMetrics={allSeatSplMetrics} />
+
                   </Suspense>
                   
                   <div className="px-4 py-3 border-t border-gray-200">
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-medium text-gray-700">Speaker Positions</div>
                       <select
-                        value={speakerPositionsView}
-                        onChange={(e) => setSpeakerPositionsView(e.target.value)}
-                        className="text-xs px-2 py-1 border border-gray-300 rounded"
-                      >
+                    value={speakerPositionsView}
+                    onChange={(e) => setSpeakerPositionsView(e.target.value)}
+                    className="text-xs px-2 py-1 border border-gray-300 rounded">
+
                         <option value="off">Off</option>
                         <option value="plan">Plan</option>
                         <option value="table">Table</option>
@@ -4122,73 +4122,73 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                   </div>
                   
                   <SpeakerPositionsReadout
-                    placedSpeakers={placedSpeakers}
-                    seatingPositions={_seatingPositions}
-                    roomWidth={stableDimensions.width}
-                    roomLength={stableDimensions.length}
-                    screenFrontPlaneM={appState?.screenFrontPlaneM}
-                    view={speakerPositionsView}
-                  />
+                placedSpeakers={placedSpeakers}
+                seatingPositions={_seatingPositions}
+                roomWidth={stableDimensions.width}
+                roomLength={stableDimensions.length}
+                screenFrontPlaneM={appState?.screenFrontPlaneM}
+                view={speakerPositionsView} />
+
               </CollapsiblePanel>
               
               <CollapsiblePanel
-                title="Bass Simulation"
-                icon={<Waves className="w-5 h-5" />}
-                defaultOpen={false}
-              >
-                  {isFrozen('bass') && (
-                    <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+              title="Bass Simulation"
+              icon={<Waves className="w-5 h-5" />}
+              defaultOpen={false}>
+
+                  {isFrozen('bass') &&
+              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
                       This tab is frozen. Unlock to make changes.
                     </div>
-                  )}
+              }
                   <Suspense fallback={<div>Loading...</div>}>
-                      <BassResponse disabled={isFrozen('bass')} 
-                        frontSubsCfg={frontSubsCfg}
-                        setFrontSubsCfg={setFrontSubsCfg}
-                        rearSubsCfg={rearSubsCfg}
-                        setRearSubsCfg={setRearSubsCfg}
-                        subWarnings={subWarnings}
-                        frontSubsLive={frontSubsForRendering}
-                        rearSubsLive={rearSubsForRendering}
-                      />
+                      <BassResponse disabled={isFrozen('bass')}
+                frontSubsCfg={frontSubsCfg}
+                setFrontSubsCfg={setFrontSubsCfg}
+                rearSubsCfg={rearSubsCfg}
+                setRearSubsCfg={setRearSubsCfg}
+                subWarnings={subWarnings}
+                frontSubsLive={frontSubsForRendering}
+                rearSubsLive={rearSubsForRendering} />
+
                   </Suspense>
               </CollapsiblePanel>
 
               <CollapsiblePanel
-                title="Room Elements"
-                icon={<Box className="w-5 h-5" />}
-                defaultOpen={false}
-              >
-                  {isFrozen('elements') && (
-                    <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+              title="Room Elements"
+              icon={<Box className="w-5 h-5" />}
+              defaultOpen={false}>
+
+                  {isFrozen('elements') &&
+              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
                       This tab is frozen. Unlock to make changes.
                     </div>
-                  )}
+              }
                   <Suspense fallback={<div>Loading...</div>}>
                       <RoomElements elements={roomElements} onChange={setRoomElementsGuarded} disabled={isFrozen('elements')} />
                   </Suspense>
               </CollapsiblePanel>
               
               <CollapsiblePanel
-                title="Compliance Report"
-                icon={<FileText className="w-5 h-5" />}
-                defaultOpen={false}
-              >
-                  {isFrozen('report') && (
-                    <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+              title="Compliance Report"
+              icon={<FileText className="w-5 h-5" />}
+              defaultOpen={false}>
+
+                  {isFrozen('report') &&
+              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
                       This tab is frozen. Unlock to make changes.
                     </div>
-                  )}
+              }
                   <Suspense fallback={<div>Loading...</div>}>
                       <RP22CompliancePanel analysisResult={analysisResult} screen={_screen} />
                   </Suspense>
               </CollapsiblePanel>
               
               <CollapsiblePanel
-                title="Options"
-                icon={<Box className="w-5 h-5" />}
-                defaultOpen={false}
-              >
+              title="Options"
+              icon={<Box className="w-5 h-5" />}
+              defaultOpen={false}>
+
                   <div className="space-y-4 p-4">
                     {/* Show Prices Toggle */}
                     <div className="flex items-center justify-between">
@@ -4196,10 +4196,10 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         Show Prices
                       </Label>
                       <Switch
-                        id="show-prices"
-                        checked={showPrices}
-                        onCheckedChange={setShowPrices}
-                      />
+                    id="show-prices"
+                    checked={showPrices}
+                    onCheckedChange={setShowPrices} />
+
                     </div>
                     
                     {/* Difficulty Rating */}
@@ -4211,32 +4211,32 @@ const handleGenerateSeating = React.useCallback((overrides = {}) => {
                         Multiplies hardware prices to reflect installation difficulty (1.00 = baseline)
                       </div>
                       <input
-                        id="difficulty"
-                        type="number"
-                        step="0.01"
-                        value={difficultyMultiplier.toFixed(2)}
-                        onChange={(e) => {
-                          const val = parseFloat(e.target.value);
-                          if (Number.isFinite(val) && val > 0) {
-                            setDifficultyMultiplier(Math.round(val * 100) / 100);
-                          }
-                        }}
-                        onBlur={(e) => {
-                          const val = parseFloat(e.target.value);
-                          if (!Number.isFinite(val) || val <= 0) {
-                            setDifficultyMultiplier(1.0);
-                          }
-                        }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm"
-                      />
+                    id="difficulty"
+                    type="number"
+                    step="0.01"
+                    value={difficultyMultiplier.toFixed(2)}
+                    onChange={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (Number.isFinite(val) && val > 0) {
+                        setDifficultyMultiplier(Math.round(val * 100) / 100);
+                      }
+                    }}
+                    onBlur={(e) => {
+                      const val = parseFloat(e.target.value);
+                      if (!Number.isFinite(val) || val <= 0) {
+                        setDifficultyMultiplier(1.0);
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm" />
+
                     </div>
                   </div>
               </CollapsiblePanel>
           </div>
         </aside>
       </div>
-    </div>
-  );
+    </div>);
+
 }
 
 export default function RoomDesignerPage() {
@@ -4244,7 +4244,7 @@ export default function RoomDesignerPage() {
   if (disabled) {
     return <div className="p-6 text-sm">Room Designer is temporarily disabled.</div>;
   }
-  
+
   return (
     <SidebarInset>
       <div className="flex flex-col gap-4 px-4 md:px-6">
@@ -4256,6 +4256,6 @@ export default function RoomDesignerPage() {
           </Suspense>
         </AppStateProvider>
       </div>
-    </SidebarInset>
-  );
+    </SidebarInset>);
+
 }
