@@ -5277,7 +5277,8 @@ return {
       if (aimFrontWidesAtMLP) {
         yawDeg = safeYawToMLP(speaker.position, mlp);
       } else {
-        yawDeg = 0;
+        // Aim OFF: sit flat to side walls (left = -90, right = +90)
+        yawDeg = (canon === "LW") ? -90 : +90;
       }
     }
 
