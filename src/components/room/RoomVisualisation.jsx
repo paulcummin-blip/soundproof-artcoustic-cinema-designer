@@ -5309,11 +5309,14 @@ return {
   heightM,
   lcrAngleInfo,
   aimAtMLP,
+  aimFrontWidesAtMLP,
+  aimSideSurroundsAtMLP,
+  aimRearSurroundsAtMLP,
   isDraggable,
   bedLayerSpeakerMouseDownHandler,
   setHoveredSpeaker,
   SpeakerIcon,
-  placedSpeakers, // Added to ensure reactivity when speakers change
+  placedSpeakers,
 ]);
 
   // Renders rear subwoofers using SpeakerRect
