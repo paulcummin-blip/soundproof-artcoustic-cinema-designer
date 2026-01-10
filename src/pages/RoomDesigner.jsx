@@ -2529,6 +2529,7 @@ function RoomDesignerWithState() {
 
   // NEW: Apply "Aim to MLP" rotation to LCR and Surrounds
   useEffect(() => {
+    if (isDraggingRef.current) return;
     if (!placedSpeakers.length || _isFrozen && _isFrozen('speakers') || !mlpAnchorEffective) return;
 
     const aimLCR = lcrAimMode === "angled";
@@ -2639,6 +2640,8 @@ function RoomDesignerWithState() {
 
   // Effect to swap between Rear Surrounds and Front Wides for 7.x layouts
   useEffect(() => {
+    if (isDraggingRef.current) return;
+    
     // If we've just loaded a real project, don't overwrite its speaker layout
     if (loadState?.phase === "loaded") {
       return;
