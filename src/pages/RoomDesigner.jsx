@@ -209,9 +209,18 @@ function logPlacedSpeakers(message, speakers) {
 }
 
 // START IN-ROOM DEPTH HELPERS
+const degToRad = (deg) => (deg * Math.PI) / 180;
 
+const rotatedHalfExtentToWall = (yawDeg, widthM_spk, depthM_spk, wallAxis /* "x" | "y" */) => {
+  const halfW = Math.max(0, (Number(widthM_spk) || 0) / 2);
+  const halfD = Math.max(0, (Number(depthM_spk) || 0) / 2);
+  const a = Math.abs(Math.cos(degToRad(Number(yawDeg) || 0)));
+  const b = Math.abs(Math.sin(degToRad(Number(yawDeg) || 0)));
 
-
+  return wallAxis === "x"
+    ? (a * halfW + b * halfD)
+    : (b * halfW + a * halfD);
+};
 
 const yawDegToMLP = (pos, mlp) => {
   if (!pos || !mlp) return 0;
@@ -221,15 +230,6 @@ const yawDegToMLP = (pos, mlp) => {
 };
 
 function useSurroundGroupDepths() {
-  const degToRad = (deg) => (deg * Math.PI) / 180;
-
-  const rotatedHalfExtentToWall = (yawDeg, widthM_spk, depthM_spk, wallAxis) => {
-    const halfW = Math.max(0, (Number(widthM_spk) || 0) / 2);
-    const halfD = Math.max(0, (Number(depthM_spk) || 0) / 2);
-    const a = Math.abs(Math.cos(degToRad(Number(yawDeg) || 0)));
-    const b = Math.abs(Math.sin(degToRad(Number(yawDeg) || 0)));
-    return wallAxis === 'x' ? (a * halfW + b * halfD) : (b * halfW + a * halfD);
-  };
   const {
     placedSpeakers,
     roomDims,
