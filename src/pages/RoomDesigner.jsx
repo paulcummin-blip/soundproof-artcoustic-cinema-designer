@@ -2541,7 +2541,7 @@ function RoomDesignerWithState() {
       const dx = mlpPos.x - spkPos.x;
       const dy = mlpPos.y - spkPos.y;
       const yawRad = Math.atan2(dx, dy);
-      return -(yawRad * 180) / Math.PI;
+      return (yawRad * 180) / Math.PI;
     };
 
     // Helper: check if rotated speaker fits in room with 0.01m buffer
