@@ -5248,10 +5248,8 @@ return {
         if (isLCR || canon === "FC" || rvIsOverheadRole(canon)) {
           yawDeg = 0;
         } else if (isFrontWide) {
-          // Front Wides: if NOT aiming, they must sit flat to the SIDE walls
-          if (onLeftWall) yawDeg = -90;
-          else if (onRightWall) yawDeg = +90;
-          else yawDeg = 0;
+          // CRITICAL: LW/RW default to 0° when aim is OFF (no wall-snap!)
+          yawDeg = 0;
         } else if (isSideSurround) {
           // SL/SR: wall-hugged yaw based on position
           if (onLeftWall) yawDeg = +90;
@@ -5801,7 +5799,30 @@ return (
       >
 
 
-
+        {/* TEMP DEBUG: Surround Hydration State */}
+        {globalThis.__B44_DEBUG_UI === true && (() => {
+          const targets = ["SBL", "SBR", "LW", "RW"];
+          const status = targets.map(role => {
+            const spk = (placedSpeakers || []).find(s => getCanonicalRole(s?.role) === role);
+            const exists = !!spk;
+            const posValid = spk?.position && Number.isFinite(spk.position.x) && Number.isFinite(spk.position.y);
+            const rawRole = spk?.role || "—";
+            return `${role}: ${exists ? "yes" : "no"} pos:${posValid ? "yes" : "no"}${rawRole !== role ? ` (${rawRole})` : ""}`;
+          }).join(" | ");
+          
+          return (
+            <text
+              x="12"
+              y="36"
+              fontSize="11"
+              fill="#0066CC"
+              fontFamily="monospace"
+              style={{ pointerEvents: "none" }}
+            >
+              {dolbyLayout} → {status}
+            </text>
+          );
+        })()}
 
 
 
