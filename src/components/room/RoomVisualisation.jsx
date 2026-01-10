@@ -3495,9 +3495,10 @@ useEffect(() => {
     const updated = placedSpeakers.map(spk => {
       const canon = getCanonicalRole(spk.role);
       
-      // [B44 REAR FIX] Only process SIDE wall speakers (SL/SR/LW/RW)
+      // [B44 REAR FIX] Only process SIDE wall speakers (SL/SR)
+      // LW/RW are NOT auto-hugged to walls (they use front-wide zones)
       // SBL/SBR are handled by SpeakerPlacement and should NOT be auto-hugged to side walls
-      if (!['SL', 'SR', 'LW', 'RW'].includes(canon)) return spk;
+      if (!['SL', 'SR'].includes(canon)) return spk;
       if (!spk.position || !spk.model) return spk;
       
       // [B44 POSITION LOCK] Skip user-positioned speakers
