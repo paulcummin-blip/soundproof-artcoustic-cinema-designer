@@ -2274,22 +2274,20 @@ React.useEffect(() => {
       fwOffsetRef.current[sideOffsetKey] = offset;
 
       // CRITICAL: Lock LW/RW to wall during drag (no wall breaking)
-      const W = widthM || 0;
-      const L = lengthM || 0;
-      const wallBuffer = 0.05;
+      const fwWallBuffer = 0.05;
       const fwDims = getModelDimsM?.(spk.model) || {};
       const fwDepthM = Number(fwDims.depthM) || 0.082;
       const fwHalfDepth = fwDepthM / 2;
 
       const lockedX = (canonicalRole === "LW") 
-        ? (wallBuffer + fwHalfDepth) 
-        : (W - wallBuffer - fwHalfDepth);
+        ? (fwWallBuffer + fwHalfDepth) 
+        : (W - fwWallBuffer - fwHalfDepth);
       
-      const frontY = wallBuffer + fwHalfDepth;
-      const backY = (L - wallBuffer - fwHalfDepth);
-      const clampedY = Math.max(frontY, Math.min(backY, yClamped));
+      const fwFrontY = fwWallBuffer + fwHalfDepth;
+      const fwBackY = (L - fwWallBuffer - fwHalfDepth);
+      const fwClampedY = Math.max(fwFrontY, Math.min(fwBackY, yClamped));
 
-      const nextPos = { x: lockedX, y: clampedY, z: spk.position?.z ?? 1.1 };
+      const nextPos = { x: lockedX, y: fwClampedY, z: spk.position?.z ?? 1.1 };
 
       // Update both speakers simultaneously, marking both as user-positioned
       if (nextPos && onSetSpeakers) {
@@ -2311,23 +2309,23 @@ React.useEffect(() => {
               const partnerHalfWidth = (Number(partnerDims?.widthM) || 0.20) / 2;
 
               // CRITICAL: Lock partner to wall (same logic as dragged speaker)
-              const partnerDims = getModelDimsM?.(partner.model) || {};
-              const partnerDepthM = Number(partnerDims.depthM) || 0.082;
-              const partnerHalfDepth = partnerDepthM / 2;
+              const fwPartnerDims = getModelDimsM?.(partner.model) || {};
+              const fwPartnerDepthM = Number(fwPartnerDims.depthM) || 0.082;
+              const fwPartnerHalfDepth = fwPartnerDepthM / 2;
               
               const partnerLockedX = (canonicalRole === 'LW')
-                ? (W - wallBuffer - partnerHalfDepth)
-                : (wallBuffer + partnerHalfDepth);
+                ? (W - fwWallBuffer - fwPartnerHalfDepth)
+                : (fwWallBuffer + fwPartnerHalfDepth);
 
               // Fallback for partner zone bounds
-              const partnerFallbackYMin = wallBuffer + partnerHalfDepth;
-              const partnerFallbackYMax = L - wallBuffer - partnerHalfDepth;
+              const partnerFallbackYMin = fwWallBuffer + fwPartnerHalfDepth;
+              const partnerFallbackYMax = L - fwWallBuffer - fwPartnerHalfDepth;
               const partnerFallbackMedianY = L / 2;
               
               const partnerMedianY = partnerZone?.medianY || partnerFallbackMedianY;
               const partnerTargetY = partnerMedianY + offset;
-              const partnerYMinClamped = partnerZone ? ((partnerZone.yMin || 0) + partnerHalfDepth) : partnerFallbackYMin;
-              const partnerYMaxClamped = partnerZone ? ((partnerZone.yMax || L) - partnerHalfDepth) : partnerFallbackYMax;
+              const partnerYMinClamped = partnerZone ? ((partnerZone.yMin || 0) + fwPartnerHalfDepth) : partnerFallbackYMin;
+              const partnerYMaxClamped = partnerZone ? ((partnerZone.yMax || L) - fwPartnerHalfDepth) : partnerFallbackYMax;
               const partnerYClamped = clamp(partnerTargetY, partnerYMinClamped, partnerYMaxClamped);
 
               const partnerPos = { x: partnerLockedX, y: partnerYClamped, z: partner.position?.z ?? 1.1 };
@@ -5283,7 +5281,7 @@ return {
       }
     }
 
-    const visualYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
+    const finalYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
 
     // Convert to canvas coordinates - use stored position for all speakers
     const canvasX = toCanvasX(pos_x);
@@ -5319,7 +5317,7 @@ return {
         pos_y,
         canvasX: safeCanvasX,
         canvasY: safeCanvasY,
-        yawDeg,
+        yawDeg: finalYawDeg,
         widthM_spk,
         depthM_spk,
       });
@@ -5328,29 +5326,6 @@ return {
     const speakerDragHandler = isDraggable(speaker)
       ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
       : undefined;
-
-    // Yaw for SVG rotate(): compute directly in CANVAS space so signs match what is drawn.
-    // 0° = facing +canvasY (down). Positive = clockwise.
-    const yawCanvasToMLP = (spkCanvasX, spkCanvasY, mlpRoomPoint) => {
-      if (!mlpRoomPoint) return 0;
-
-      // Convert MLP from room metres → canvas pixels (must match the drawing mapping)
-      const mlpCanvasX = roomRect.x + (Number(mlpRoomPoint.x) * scale);
-      const mlpCanvasY = roomRect.y + (Number(mlpRoomPoint.y) * scale);
-
-      const dx = mlpCanvasX - spkCanvasX;
-      const dy = mlpCanvasY - spkCanvasY;
-
-      // Angle from +canvasY axis, clockwise for positive values:
-      return -(Math.atan2(dx, dy) * 180) / Math.PI;
-    };
-
-    let visualYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
-
-    // If aiming is enabled, force L/R yaw from canvas-to-MLP so it always points correctly
-    if (aimAtMLP && (canon === "FL" || canon === "FR" || canon === "L" || canon === "R")) {
-      visualYawDeg = yawCanvasToMLP(safeCanvasX, safeCanvasY, mlpPoint);
-    }
 
     return (
       <SpeakerIcon
