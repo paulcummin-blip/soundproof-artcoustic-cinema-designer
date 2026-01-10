@@ -2075,8 +2075,8 @@ function SpeakerPlacementImpl(props) {
     if (__b44LastEffectSigRef.current.layoutHydrate === __layoutSig) return;
     __b44LastEffectSigRef.current.layoutHydrate = __layoutSig;
 
-    // If no surround model is selected yet, don't hydrate (wait for user to select)
-    if (!masterSurroundModel || masterSurroundModel === 'off') {
+    // GATE: If no surround model is selected yet, don't hydrate (wait for user to select)
+    if (!masterSurroundModel || masterSurroundModel === 'off' || masterSurroundModel === 'none') {
       if (globalThis.__B44_LOGS) console.log('[SP HYDRATE] Skipping: no global surround model');
       return;
     }
@@ -2670,16 +2670,17 @@ function SpeakerPlacementImpl(props) {
       // Derive rears expectation from layout, not allowedRoles
       const layoutMajor = parseInt(String(effectivePreset || '5.1').split('.')[0], 10) || 5;
       const expectsRears = (layoutMajor >= 9) || (layoutMajor === 7 && !useWides);
-      
-      if (expectsRears) {
+
+      // Get surround master model if available
+      const masterModel = surroundConfig?.value?.master;
+      const masterModelValid = masterModel && String(masterModel).toLowerCase() !== 'off' && String(masterModel).toLowerCase() !== 'none';
+
+      // GATE: Only position rears when model is selected
+      if (expectsRears && masterModelValid) {
         let SBL = speakers.find(s => getCanonicalRole(s.role) === 'SBL');
         let SBR = speakers.find(s => getCanonicalRole(s.role) === 'SBR');
 
         const hasFiniteXY = (s) => !!s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
-
-        // Get surround master model if available
-        const masterModel = surroundConfig?.value?.master;
-        const masterModelValid = masterModel && String(masterModel).toLowerCase() !== 'off' && String(masterModel).toLowerCase() !== 'none';
 
         // Create SBL if missing
         if (!SBL) {
@@ -2742,7 +2743,19 @@ function SpeakerPlacementImpl(props) {
 
         if (newSBL !== SBL) speakers = speakers.map(s => getCanonicalRole(s.role) === 'SBL' ? newSBL : s);
         if (newSBR !== SBR) speakers = speakers.map(s => getCanonicalRole(s.role) === 'SBR' ? newSBR : s);
-      }
+        } else if (expectsRears && !masterModelValid) {
+        // Layout expects rears but model is OFF - clear positions from any existing stubs
+        speakers = speakers.map(s => {
+          const canon = getCanonicalRole(s.role);
+          if (canon === 'SBL' || canon === 'SBR') {
+            if (s.position) {
+              changed = true;
+              return { ...s, position: null };
+            }
+          }
+          return s;
+        });
+        }
 
       // 2. LW/RW Symmetry Invariant Check
       const LW = speakers.find(s => getCanonicalRole(s.role) === 'LW');
