@@ -1401,19 +1401,7 @@ function SpeakerPlacementImpl(props) {
     allSeatSplMetrics, // NEW: SPL data from parent
   } = props;
 
-  // [B44 FIX] Safe dimensions: try props.dimensions, then props.roomDimensions, then fallback
-  const dimsSafe = React.useMemo(() => {
-    const src = dimensionsProp || props.roomDimensions || {};
-    const result = {
-      width: Number(src.width ?? src.widthM) || 0,
-      length: Number(src.length ?? src.lengthM) || 0,
-      height: Number(src.height ?? src.heightM) || 0,
-    };
-    if (globalThis.__B44_LOGS) {
-      console.log('[SP] dimsSafe', result, 'props.dimensions:', dimensionsProp, 'props.roomDimensions:', props.roomDimensions);
-    }
-    return result;
-  }, [dimensionsProp, props.roomDimensions]);
+
 
   const app = useAppState();
   const appState = app;
@@ -1441,6 +1429,7 @@ function SpeakerPlacementImpl(props) {
 
   // CRITICAL: Effective room dimensions - NEVER empty, always has valid numbers
   // This ensures resetSurroundPositions always gets usable W/L/H values
+  // NOTE: dimsSafe is already defined at top of function - this is effectiveDims
   const effectiveDims = React.useMemo(() => {
     const propW = Number(dimensionsProp?.width ?? dimensionsProp?.widthM);
     const propL = Number(dimensionsProp?.length ?? dimensionsProp?.lengthM);
