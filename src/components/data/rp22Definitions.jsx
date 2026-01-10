@@ -30,10 +30,10 @@ export const RP22_DEFINITIONS = {
     title: "5. Maximum horizontal spacing between adjacent surround speakers",
     description: "This parameter ensures adequate surround field coverage. It measures the maximum horizontal angular gap between adjacent surround speakers as viewed from each listening position.",
     thresholds: [
-      { level: 1, criteria: "≤90°" },
-      { level: 2, criteria: "≤75°" },
+      { level: 1, criteria: "<80.05°" },
+      { level: 2, criteria: "≤80°" },
       { level: 3, criteria: "≤60°" },
-      { level: 4, criteria: "≤45°" }
+      { level: 4, criteria: "≤50°" }
     ],
     scope: "Per seat"
   },
