@@ -556,21 +556,35 @@ export default function ScreenConfiguration(props) {
                   <Label className="text-[#625143] text-xs">Distance from Front Wall to Screen</Label>
                   <div className="text-[#1B1A1A] font-medium">
                     {(() => {
+                      // IMPORTANT: edge-to-edge only (front wall is y=0, screen is a solid object)
                       const SCREEN_THICKNESS_M = 0.05;
-                      
-                      // Collect all candidates from screen state
-                      const candidates = [
-                        screen?.floatDepthM,
+
+                      // 1) Prefer the live position used by the drawing (this must change when you move/adjust the screen)
+                      // Try common shapes without breaking if missing:
+                      const posY =
+                        (Number.isFinite(screen?.position?.y) ? Number(screen.position.y) : null) ??
+                        (Number.isFinite(screen?.y) ? Number(screen.y) : null) ??
+                        (Number.isFinite(screen?.yM) ? Number(screen.yM) : null);
+
+                      // If posY exists, assume it represents the SCREEN FRONT FACE distance from the front wall.
+                      // (We do NOT subtract half-thickness unless your app stores the screen centre.)
+                      if (Number.isFinite(posY) && posY >= 0) {
+                        return `${Math.round(posY * 100)} cm`;
+                      }
+
+                      // 2) Fallback to legacy fields if the drawing position isn't available
+                      const legacy = [
                         screen?.frontWallToScreenM,
-                        screen?.screenOffsetM
+                        screen?.screenOffsetM,
+                        screen?.floatDepthM,
                       ].filter(v => Number.isFinite(v) && v >= 0);
-                      
-                      // Choose the minimum candidate (closest to front wall)
-                      const chosenM = candidates.length > 0 ? Math.min(...candidates) : 0;
-                      
-                      // Subtract screen thickness to get nearest edge
-                      const nearestEdgeM = Math.max(0, chosenM - SCREEN_THICKNESS_M);
-                      
+
+                      const chosenM = legacy.length ? Math.min(...legacy) : 0;
+
+                      // If legacy values represent centre-of-object, convert to nearest edge.
+                      // If they already represent the front face, this will be near-identical (and clamped).
+                      const nearestEdgeM = Math.max(0, chosenM - (SCREEN_THICKNESS_M / 2));
+
                       return `${Math.round(nearestEdgeM * 100)} cm`;
                     })()}
                   </div>
