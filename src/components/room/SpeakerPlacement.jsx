@@ -2034,7 +2034,7 @@ function SpeakerPlacementImpl(props) {
       const uiModelLower = uiModelRaw.toLowerCase();
       const modelKeyForPlacement = (uiModelLower === "off" || uiModelLower === "none") ? null : uiModelRaw;
 
-      const reset = resetSurroundPositions(effectivePreset, mlpPoint, effectiveDims, currentSpeakers, modelKeyForPlacement);
+      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimsSafe, currentSpeakers, modelKeyForPlacement);
       // Clear positionSource for all speakers (return to auto mode)
       return reset.map(s => ({ ...s, positionSource: 'auto' }));
     });
