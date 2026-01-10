@@ -5290,7 +5290,7 @@ return {
       const dy = mlpCanvasY - spkCanvasY;
 
       // Angle from +canvasY axis, clockwise for positive values:
-      return (Math.atan2(dx, dy) * 180) / Math.PI;
+      return -(Math.atan2(dx, dy) * 180) / Math.PI;
     };
 
     let visualYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
