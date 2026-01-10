@@ -5055,270 +5055,266 @@ return {
   const lastRvLogSigRef = React.useRef(null);
 
   const renderSpeakers = useCallback(() => {
-   // Start from the prop (single source of truth)
-   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+  // Start from the prop (single source of truth)
+  const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
-   // TEMP TRACE (remove after): always log SBL/SBR state
-   try {
-     const pick = (role) => rawSpeakers.find(s => getCanonicalRole(s?.role) === role) || null;
-     const sbl = pick("SBL");
-     const sbr = pick("SBR");
+  // TEMP TRACE (remove after): always log SBL/SBR state
+  try {
+    const pick = (role) => rawSpeakers.find(s => getCanonicalRole(s?.role) === role) || null;
+    const sbl = pick("SBL");
+    const sbr = pick("SBR");
 
-     const row = (sp, role) => ({
-       role,
-       exists: !!sp,
-       model: sp?.model ?? null,
-       x: Number.isFinite(sp?.position?.x) ? sp.position.x : null,
-       y: Number.isFinite(sp?.position?.y) ? sp.position.y : null,
-       z: Number.isFinite(sp?.position?.z) ? sp.position.z : null,
-     });
+    const row = (sp, role) => ({
+      role,
+      exists: !!sp,
+      model: sp?.model ?? null,
+      x: Number.isFinite(sp?.position?.x) ? sp.position.x : null,
+      y: Number.isFinite(sp?.position?.y) ? sp.position.y : null,
+      z: Number.isFinite(sp?.position?.z) ? sp.position.z : null,
+    });
 
-     const out = [row(sbl, "SBL"), row(sbr, "SBR")];
+    const out = [row(sbl, "SBL"), row(sbr, "SBR")];
 
-     if (typeof window !== "undefined") window.__SBL_SBR_TRACE__ = out;
+    if (typeof window !== "undefined") window.__SBL_SBR_TRACE__ = out;
 
-     // ALWAYS log (not gated by __B44_LOGS)
-     console.log("[SBL/SBR TRACE]", out);
-     if (console.table) console.table(out);
-   } catch (e) {
-     console.warn("[SBL/SBR TRACE] failed", e);
-   }
+    // ALWAYS log (not gated by __B44_LOGS)
+    console.log("[SBL/SBR TRACE]", out);
+    if (console.table) console.table(out);
+  } catch (e) {
+    console.warn("[SBL/SBR TRACE] failed", e);
+  }
 
-   // 1) Basic structural filter (existing helper)
-   const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
+  // 1) Basic structural filter (existing helper)
+  const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
 
-   // 2) Bed/overhead visibility must come from the layout roles, not model timing.
-   const speakerSystem = appState?.speakerSystem;
-   const sevenBedLayoutType = appState?.sevenBedLayoutType;
+  // 2) Bed/overhead visibility must come from the layout roles, not model timing.
+  const speakerSystem = appState?.speakerSystem;
+  const sevenBedLayoutType = appState?.sevenBedLayoutType;
+  
+  const layoutRaw =
+    speakerSystem?.dolbyLayout ??
+    speakerSystem?.dolbyPreset ??
+    dolbyLayout ??
+    "5.1";
 
-   const layoutRaw =
-     speakerSystem?.dolbyLayout ??
-     speakerSystem?.dolbyPreset ??
-     dolbyLayout ??
-     "5.1";
+  const layoutKey =
+    (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1")
+      .toString()
+      .trim()
+      .split(" ")[0]
+      .split("_")[0];
 
-   const layoutKey =
-     (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1")
-       .toString()
-       .trim()
-       .split(" ")[0]
-       .split("_")[0];
+  const useWidesInsteadOfRears =
+    !!speakerSystem?.useWidesInsteadOfRears ||
+    speakerSystem?.sevenBedLayoutType === "wides" ||
+    sevenBedLayoutType === "wides" ||
+    false;
 
-   const useWidesInsteadOfRears =
-     !!speakerSystem?.useWidesInsteadOfRears ||
-     speakerSystem?.sevenBedLayoutType === "wides" ||
-     sevenBedLayoutType === "wides" ||
-     false;
+  const allowedRoles = new Set(
+    rolesForLayout({
+      dolbyLayout: layoutKey,
+      useWidesInsteadOfRears: !!useWidesInsteadOfRears,
+    })
+  );
 
-   const allowedRoles = new Set(
-     rolesForLayout({
-       dolbyLayout: layoutKey,
-       useWidesInsteadOfRears: !!useWidesInsteadOfRears,
-     })
-   );
+  let afterVisibility = afterRenderable.filter((s) => {
+    const canon = getCanonicalRole(s?.role);
 
-   let afterVisibility = afterRenderable.filter((s) => {
-     const canon = getCanonicalRole(s?.role);
+    // Always hide LFE
+    if (canon === "LFE") return false;
 
-     // Always hide LFE
-     if (canon === "LFE") return false;
+    // Bed surrounds are controlled by layout role visibility, not model.
+    // This prevents "rear surrounds vanish" when model is null during hydration.
+    if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
+      return allowedRoles.has(canon);
+    }
 
-     // Bed surrounds are controlled by layout role visibility, not model.
-     // This prevents "rear surrounds vanish" when model is null during hydration.
-     if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
-       return allowedRoles.has(canon);
-     }
+    // Everything else keeps existing behaviour
+    return getSpeakerVisibility(s.role, s.model);
+  });
 
-     // Everything else keeps existing behaviour
-     return getSpeakerVisibility(s.role, s.model);
-   });
+  // Local NaN-safe coordinate mappers (must be inside this loop)
+  const toCanvasX = (xM) => {
+    const safeX = Number.isFinite(xM) ? xM : 0;
+    return roomRect.x + (safeX * scale);
+  };
 
-   // Local NaN-safe coordinate mappers (must be inside this loop)
-   const toCanvasX = (xM) => {
-     const safeX = Number.isFinite(xM) ? xM : 0;
-     return roomRect.x + (safeX * scale);
-   };
+  const toCanvasY = (yM) => {
+    const safeY = Number.isFinite(yM) ? yM : 0;
+    return roomRect.y + (safeY * scale);
+  };
 
-   const toCanvasY = (yM) => {
-     const safeY = Number.isFinite(yM) ? yM : 0;
-     return roomRect.y + (safeY * scale);
-   };
+  // 3) Map to icons
+  return afterVisibility.map((speaker) => {
+    const { id, role: rawRole, model, position = {} } = speaker;
 
-   // 3) Map to icons
-   return afterVisibility.map((speaker) => {
-     const { id, role: rawRole, model, position = {} } = speaker;
+    // Canonicalise ONCE and use canonical role for ALL rendering decisions
+    const canon = getCanonicalRole(rawRole);
+    const role = canon; // <- critical: render role is canonical
 
-     // Canonicalise ONCE and use canonical role for ALL rendering decisions
-     const canon = getCanonicalRole(rawRole);
-     const role = canon; // <- critical: render role is canonical
+    // CRITICAL: Overhead speakers are rendered by overheadIconElements,
+    // skip them here to avoid duplicate icons
+    if (rvIsOverheadRole(role)) {
+      return null;
+    }
 
-     // CRITICAL: Overhead speakers are rendered by overheadIconElements,
-     // skip them here to avoid duplicate icons
-     if (rvIsOverheadRole(role)) {
-       return null;
-     }
+    // [B44 VISIBILITY FIX] Resolve model with safe fallback for LW/RW/SBL/SBR
+    let resolvedModel = resolveSurroundModel(model, canon);
+    
+    // If model is null but this is a surround role, use fallback for icon dimensions
+    if (!resolvedModel && ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+      // Try to get global surround model from AppState
+      const globalSurroundModel = placedSpeakers?.find(s => {
+        const c = getCanonicalRole(s.role);
+        return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(c) && s.model && s.model !== 'off';
+      })?.model;
+      
+      resolvedModel = globalSurroundModel || 'evolve-2-1_s'; // Fallback to small default
+    }
+    
+    const dims = getSpeakerDims(resolvedModel);
+    const widthM_spk = dims.widthM || 0.27; // Safe default
+    const depthM_spk = dims.depthM || 0.082; // Safe default
 
-     // [B44 VISIBILITY FIX] Resolve model with safe fallback for LW/RW/SBL/SBR
-     let resolvedModel = resolveSurroundModel(model, canon);
+    // Position coordinates from speaker.position (with safe fallbacks)
+    const pos_x = position.x ?? 0;
+    const pos_y = position.y ?? 0;
 
-     // If model is null but this is a surround role, use fallback for icon dimensions
-     if (!resolvedModel && ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-       // Try to get global surround model from AppState
-       const globalSurroundModel = placedSpeakers?.find(s => {
-         const c = getCanonicalRole(s.role);
-         return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(c) && s.model && s.model !== 'off';
-       })?.model;
+    // --- YAW CALCULATION ---
+    let yawDeg;
 
-       resolvedModel = globalSurroundModel || 'evolve-2-1_s'; // Fallback to small default
-     }
+    const isLCR = (canon === "FL" || canon === "FR" || canon === "FC");
+    const isFrontWide = (canon === "LW" || canon === "RW");
+    const isSideSurround = (canon === "SL" || canon === "SR");
+    const isRearSurround = (canon === "SBL" || canon === "SBR");
 
-     const dims = getSpeakerDims(resolvedModel);
-     const widthM_spk = dims.widthM || 0.27; // Safe default
-     const depthM_spk = dims.depthM || 0.082; // Safe default
+    if (isLCR) {
+      if (aimAtMLP) {
+        if (canon === 'FL') yawDeg = lcrAngleInfo.L;
+        else if (canon === 'FR') yawDeg = lcrAngleInfo.R;
+        else yawDeg = 0; // FC is always 0
+      } else {
+        yawDeg = 0;
+      }
+    } else if (isFrontWide) {
+      if (aimFrontWidesAtMLP) {
+        yawDeg = getAimingYawDeg(speaker, mlp);
+      } else {
+        // Aim OFF: sit flat to side walls
+        yawDeg = (canon === "LW") ? -90 : +90;
+      }
+    } else if (isSideSurround) {
+      if (aimSideSurroundsAtMLP) {
+        yawDeg = getAimingYawDeg(speaker, mlp);
+      } else {
+        // Aim OFF: sit flat to side walls
+        yawDeg = (canon === "SL") ? 90 : -90;
+      }
+    } else if (isRearSurround) {
+      if (aimRearSurroundsAtMLP) {
+        yawDeg = getAimingYawDeg(speaker, mlp);
+      } else {
+        // Aim OFF: sit flat to back wall (0 deg) or side walls
+        const pos = speaker.position || {};
+        const distLeft  = Math.abs(pos.x - 0);
+        const distRight = Math.abs(widthM - pos.x);
+        const distBack  = Math.abs(lengthM - pos.y);
+        const minDist = Math.min(distLeft, distRight, distBack);
 
-     // Position coordinates from speaker.position (with safe fallbacks)
-     const pos_x = position.x ?? 0;
-     const pos_y = position.y ?? 0;
+        if (minDist === distBack) yawDeg = 0;
+        else if (minDist === distLeft) yawDeg = 90;
+        else if (minDist === distRight) yawDeg = -90;
+        else yawDeg = 0;
+      }
+    } else {
+      // Fallback for any other speaker type, including overheads
+      yawDeg = 0;
+    }
 
-     // --- YAW CALCULATION ---
-     let yawDeg;
+    const finalYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
 
-     const isLCR = (canon === "FL" || canon === "FR" || canon === "FC");
-     const isFrontWide = (canon === "LW" || canon === "RW");
-     const isSideSurround = (canon === "SL" || canon === "SR");
-     const isRearSurround = (canon === "SBL" || canon === "SBR");
+    // Convert to canvas coordinates - use stored position for all speakers
+    const canvasX = toCanvasX(pos_x);
+    const canvasY = toCanvasY(pos_y);
 
-     if (isLCR) {
-       if (aimAtMLP) {
-         if (canon === 'FL') yawDeg = lcrAngleInfo.L;
-         else if (canon === 'FR') yawDeg = lcrAngleInfo.R;
-         else yawDeg = 0; // FC is always 0
-       } else {
-         yawDeg = 0;
-       }
-     } else if (isFrontWide) {
-       if (aimFrontWidesAtMLP) {
-         yawDeg = getAimingYawDeg(speaker, mlp);
-       } else {
-         // Aim OFF: sit flat to side walls
-         yawDeg = (canon === "LW") ? -90 : +90;
-       }
-     } else if (isSideSurround) {
-       if (aimSideSurroundsAtMLP) {
-         yawDeg = getAimingYawDeg(speaker, mlp);
-       } else {
-         // Aim OFF: sit flat to side walls
-         yawDeg = (canon === "SL") ? 90 : -90;
-       }
-     } else if (isRearSurround) {
-       if (aimRearSurroundsAtMLP) {
-         yawDeg = getAimingYawDeg(speaker, mlp);
-       } else {
-         // Aim OFF: sit flat to back wall (0 deg) or side walls
-         const pos = speaker.position || {};
-         const distLeft  = Math.abs(pos.x - 0);
-         const distRight = Math.abs(widthM - pos.x);
-         const distBack  = Math.abs(lengthM - pos.y);
-         const minDist = Math.min(distLeft, distRight, distBack);
+    // NaN safety: ensure we never pass invalid coordinates
+    const safeCanvasX = Number.isFinite(canvasX) ? canvasX : 0;
+    const safeCanvasY = Number.isFinite(canvasY) ? canvasY : 0;
 
-         if (minDist === distBack) yawDeg = 0;
-         else if (minDist === distLeft) yawDeg = 90;
-         else if (minDist === distRight) yawDeg = -90;
-         else yawDeg = 0;
-       }
-     } else {
-       // Fallback for any other speaker type, including overheads
-       yawDeg = 0;
-     }
+    // Log any invalid coordinates
+    if (!Number.isFinite(canvasX) || !Number.isFinite(canvasY)) {
+      if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn('[RV] INVALID CANVAS COORDS', {
+        id,
+        role,
+        pos: position,
+        pos_x,
+        pos_y,
+        canvasX,
+        canvasY,
+      });
+    }
 
-     const finalYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
+    // DEBUG: Log icon generation for rear/wide speakers
+    if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
+      if (globalThis.__B44_LOGS) console.log('[RV icon]', {
+        id,
+        role,
+        canon,
+        model,
+        resolvedModel,
+        pos: position,
+        pos_x,
+        pos_y,
+        canvasX: safeCanvasX,
+        canvasY: safeCanvasY,
+        yawDeg: finalYawDeg,
+        widthM_spk,
+        depthM_spk,
+      });
+    }
 
-     // Convert to canvas coordinates - use stored position for all speakers
-     const canvasX = toCanvasX(pos_x);
-     const canvasY = toCanvasY(pos_y);
+    const speakerDragHandler = isDraggable(speaker)
+      ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
+      : undefined;
 
-     // NaN safety: ensure we never pass invalid coordinates
-     const safeCanvasX = Number.isFinite(canvasX) ? canvasX : 0;
-     const safeCanvasY = Number.isFinite(canvasY) ? canvasY : 0;
-
-     // Log any invalid coordinates
-     if (!Number.isFinite(canvasX) || !Number.isFinite(canvasY)) {
-       if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn('[RV] INVALID CANVAS COORDS', {
-         id,
-         role,
-         pos: position,
-         pos_x,
-         pos_y,
-         canvasX,
-         canvasY,
-       });
-     }
-
-     // DEBUG: Log icon generation for rear/wide speakers
-     if (['SBL', 'SBR', 'LW', 'RW'].includes(canon)) {
-       if (globalThis.__B44_LOGS) console.log('[RV icon]', {
-         id,
-         role,
-         canon,
-         model,
-         resolvedModel,
-         pos: position,
-         pos_x,
-         pos_y,
-         canvasX: safeCanvasX,
-         canvasY: safeCanvasY,
-         yawDeg: finalYawDeg,
-         widthM_spk,
-         depthM_spk,
-       });
-     }
-
-     const speakerDragHandler = isDraggable(speaker)
-       ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
-       : undefined;
-
-     return (
-       <SpeakerIcon
-         key={id}
-         speaker={{ ...speaker, model: resolvedModel }}
-         canvasX={safeCanvasX}
-         canvasY_raw={safeCanvasY}
-         yawDeg={finalYawDeg}
-         widthM={widthM_spk}
-         depthM={depthM_spk}
-         scale={scale}
-         speakerMouseDownHandler={speakerDragHandler}
-         setHoveredSpeaker={setHoveredSpeaker}
-       />
-     );
-   });
-  }, [
-   speakersToRender,
-   isRenderableSpeaker,
-   getSpeakerVisibility,
-   getCanonicalRole,
-   resolveSurroundModel,
-   getSpeakerDims,
-   getYawForObject,
-   yHalfExtentM,
-   WALL_BUFFER_M,
-   roomRect,
-   scale,
-   widthM,
-   lengthM,
-   heightM,
-   lcrAngleInfo,
-   aimAtMLP,
-   aimFrontWidesAtMLP,
-   aimSideSurroundsAtMLP,
-   aimRearSurroundsAtMLP,
-   isDraggable,
-   bedLayerSpeakerMouseDownHandler,
-   setHoveredSpeaker,
-   SpeakerIcon,
-   placedSpeakers,
-   mlp, // Added mlp as dependency for getAimingYawDeg
-  ]));
+    return (
+      <SpeakerIcon
+        key={id}
+        speaker={{ ...speaker, model: resolvedModel }}
+        canvasX={safeCanvasX}
+        canvasY_raw={safeCanvasY}
+        yawDeg={finalYawDeg}
+        widthM={widthM_spk}
+        depthM={depthM_spk}
+        scale={scale}
+        speakerMouseDownHandler={speakerDragHandler}
+        setHoveredSpeaker={setHoveredSpeaker}
+      />
+    );
+  });
+}, [
+  speakersToRender,
+  isRenderableSpeaker,
+  getSpeakerVisibility,
+  getCanonicalRole,
+  resolveSurroundModel,
+  getSpeakerDims,
+  getYawForObject,
+  yHalfExtentM,
+  WALL_BUFFER_M,
+  roomRect,
+  scale,
+  widthM,
+  lengthM,
+  heightM,
+  lcrAngleInfo,
+  aimAtMLP,
+  isDraggable,
+  bedLayerSpeakerMouseDownHandler,
+  setHoveredSpeaker,
+  SpeakerIcon,
+  placedSpeakers, // Added to ensure reactivity when speakers change
+]);
 
   // Renders rear subwoofers using SpeakerRect
   const renderSubwoofers = React.useCallback(() => {
