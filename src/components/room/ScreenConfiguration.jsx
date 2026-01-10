@@ -556,36 +556,39 @@ export default function ScreenConfiguration(props) {
                   <Label className="text-[#625143] text-xs">Distance from Front Wall to Screen</Label>
                   <div className="text-[#1B1A1A] font-medium">
                     {(() => {
-                      // IMPORTANT: edge-to-edge only (front wall is y=0, screen is a solid object)
-                      const SCREEN_THICKNESS_M = 0.05;
+                      // Edge-to-edge only. Front wall is y=0.
+                      // We must use the SAME value the plan drawing uses for the screen plane.
+                      console.log('[LiveMetrics] screen keys', Object.keys(screen || {}), screen);
+                      
+                      const candidates = [
+                        // Most likely "plan uses this" fields (seen in your codebase naming)
+                        screen?.screenPlaneY_m,
+                        screen?.screenPlaneY,
+                        screen?.screenPlaneY_meters,
+                        screen?.screenPlaneY_m_Value,
+                        screen?.screenPlaneY_m_value,
+                        screen?.screenPlaneY_m_current,
+                        screen?.screenPlaneY_m_live,
 
-                      // 1) Prefer the live position used by the drawing (this must change when you move/adjust the screen)
-                      // Try common shapes without breaking if missing:
-                      const posY =
-                        (Number.isFinite(screen?.position?.y) ? Number(screen.position.y) : null) ??
-                        (Number.isFinite(screen?.y) ? Number(screen.y) : null) ??
-                        (Number.isFinite(screen?.yM) ? Number(screen.yM) : null);
+                        // Common alternates
+                        screen?.screenPlaneYM,
+                        screen?.planeY_m,
+                        screen?.planeYM,
+                        screen?.frontFaceY_m,
+                        screen?.frontWallOffsetM,
+                        screen?.wallOffsetM,
+                        screen?.distanceFromFrontWallM,
 
-                      // If posY exists, assume it represents the SCREEN FRONT FACE distance from the front wall.
-                      // (We do NOT subtract half-thickness unless your app stores the screen centre.)
-                      if (Number.isFinite(posY) && posY >= 0) {
-                        return `${Math.round(posY * 100)} cm`;
-                      }
-
-                      // 2) Fallback to legacy fields if the drawing position isn't available
-                      const legacy = [
+                        // Legacy fields (what you used before)
                         screen?.frontWallToScreenM,
                         screen?.screenOffsetM,
                         screen?.floatDepthM,
                       ].filter(v => Number.isFinite(v) && v >= 0);
 
-                      const chosenM = legacy.length ? Math.min(...legacy) : 0;
+                      const chosenM = candidates.length ? Number(candidates[0]) : 0;
 
-                      // If legacy values represent centre-of-object, convert to nearest edge.
-                      // If they already represent the front face, this will be near-identical (and clamped).
-                      const nearestEdgeM = Math.max(0, chosenM - (SCREEN_THICKNESS_M / 2));
-
-                      return `${Math.round(nearestEdgeM * 100)} cm`;
+                      // chosenM should already be the *front face / screen plane* distance.
+                      return `${Math.round(chosenM * 100)} cm`;
                     })()}
                   </div>
                 </div>
