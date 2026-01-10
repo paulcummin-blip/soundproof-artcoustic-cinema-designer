@@ -867,6 +867,16 @@ function UnifiedSurroundsConfig({
   needsSurroundResetRef,
   lastSurroundModelKeyRef,
 }) {
+  // Local dimsSafe for UnifiedSurroundsConfig scope
+  const dimsSafe = React.useMemo(() => {
+    const src = dimensions || {};
+    return {
+      width: Number(src.width ?? src.widthM) || 4.5,
+      length: Number(src.length ?? src.lengthM) || 6.0,
+      height: Number(src.height ?? src.heightM) || 2.4,
+    };
+  }, [dimensions]);
+  
   const app = useAppState();
   const activeRoles = useMemo(() => {
     const roles = [];
