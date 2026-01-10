@@ -2101,7 +2101,7 @@ function SpeakerPlacementImpl(props) {
     if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) {
       return;
     }
-    if (!mlpPoint || !dimensions) return;
+    if (!mlpPoint || !effectiveDims) return;
 
     // ---- build a stable input signature for this effect ----
     const __sig = __b44SigFor({
@@ -2199,8 +2199,8 @@ function SpeakerPlacementImpl(props) {
     if (!canWides || !effectiveDims) return;
 
     const __sig = __b44SigFor({
-      w: dimensions?.width ?? null,
-      l: dimensions?.length ?? null,
+      w: effectiveDims?.width ?? null,
+      l: effectiveDims?.length ?? null,
       canWides,
       fl: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FL')?.position,
       fr: placedSpeakers?.find(s => getCanonicalRole(s.role) === 'FR')?.position,
@@ -2872,7 +2872,7 @@ function SpeakerPlacementImpl(props) {
           onClick={handleResetPositions}
           variant="outline"
           size="sm"
-          disabled={disabled || !mlpPoint || !dimensions}
+          disabled={disabled || !mlpPoint || !effectiveDims}
           className="flex-1 border-[#DCDBD6] text-[#1B1A1A] hover:bg-[#F8F8F7]"
           title="Re-position surrounds for the current layout. 5.1.x = ±120°. 7.1.x = ±100° sides and ±142.5° rears."
         >
