@@ -208,6 +208,122 @@ function logPlacedSpeakers(message, speakers) {
   }
 }
 
+// START IN-ROOM DEPTH HELPERS
+const degToRad = (deg) => (deg * Math.PI) / 180;
+
+const rotatedHalfExtentToWall = (yawDeg, widthM_spk, depthM_spk, wallAxis /* "x" | "y" */) => {
+  const halfW = Math.max(0, (Number(widthM_spk) || 0) / 2);
+  const halfD = Math.max(0, (Number(depthM_spk) || 0) / 2);
+  const a = Math.abs(Math.cos(degToRad(Number(yawDeg) || 0)));
+  const b = Math.abs(Math.sin(degToRad(Number(yawDeg) || 0)));
+
+  return wallAxis === "x"
+    ? (a * halfW + b * halfD)
+    : (b * halfW + a * halfD);
+};
+
+const yawDegToMLP = (pos, mlp) => {
+  if (!pos || !mlp) return 0;
+  const dx = mlp.x - pos.x;
+  const dy = mlp.y - pos.y;
+  return -Math.atan2(dx, dy) * (180 / Math.PI);
+};
+
+function useSurroundGroupDepths() {
+  const {
+    placedSpeakers,
+    roomDims,
+    mlpY_m,
+    aimFrontWidesAtMLP,
+    aimSideSurroundsAtMLP,
+    aimRearSurroundsAtMLP,
+  } = useAppState() || {};
+
+  const mlp = useMemo(() => ({ x: roomDims?.widthM / 2, y: mlpY_m, z: 1.2 }), [roomDims?.widthM, mlpY_m]);
+
+  const calculateGroupDepth = useCallback((groupName) => {
+    let roles, defaultWallAxis;
+    if (groupName === 'front-wides') {
+      roles = ['LW', 'RW'];
+      defaultWallAxis = 'x';
+    } else if (groupName === 'side-surrounds') {
+      roles = ['SL', 'SR'];
+      defaultWallAxis = 'x';
+    } else if (groupName === 'rear-surrounds') {
+      roles = ['SBL', 'SBR'];
+      defaultWallAxis = 'y';
+    } else {
+      return null;
+    }
+    
+    const groupSpeakers = (placedSpeakers || []).filter(s => s && s.role && roles.includes(canon(s.role)));
+    if (groupSpeakers.length === 0) return null;
+
+    const depths = groupSpeakers.map(speaker => {
+      if (!speaker.position) return 0;
+      const canonRole = canon(speaker.role);
+      const pos = speaker.position;
+      
+      let yawDeg = 0;
+      let wallAxis = defaultWallAxis;
+
+      const aimThisGroup = 
+        (groupName === 'front-wides' && aimFrontWidesAtMLP) ||
+        (groupName === 'side-surrounds' && aimSideSurroundsAtMLP) ||
+        (groupName === 'rear-surrounds' && aimRearSurroundsAtMLP);
+      
+      if (aimThisGroup) {
+        yawDeg = yawDegToMLP(pos, mlp);
+      } else {
+        if (groupName === 'front-wides') {
+            yawDeg = (canonRole === 'LW') ? -90 : 90;
+        } else if (groupName === 'side-surrounds') {
+            yawDeg = (canonRole === 'SL') ? 90 : -90;
+        } else if (groupName === 'rear-surrounds') {
+            const distLeft  = Math.abs(pos.x);
+            const distRight = Math.abs((roomDims?.widthM || 0) - pos.x);
+            const distBack  = Math.abs((roomDims?.lengthM || 0) - pos.y);
+            const minDist = Math.min(distLeft, distRight, distBack);
+
+            if (minDist === distBack) {
+                yawDeg = 0;
+                wallAxis = 'y';
+            } else if (minDist === distLeft) {
+                yawDeg = 90;
+                wallAxis = 'x';
+            } else { // right wall
+                yawDeg = -90;
+                wallAxis = 'x';
+            }
+        }
+      }
+      
+      const dims = getModelDimsM(speaker.model);
+      const halfNormal = rotatedHalfExtentToWall(yawDeg, dims.widthM, dims.depthM, wallAxis);
+
+      let dCentre = 0;
+      if (wallAxis === 'x') {
+        const isLeft = canonRole === 'LW' || canonRole === 'SL' || (canonRole === 'SBL' && wallAxis === 'x' && Math.abs(pos.x) < Math.abs((roomDims?.widthM || 0) - pos.x));
+        dCentre = isLeft ? pos.x : (roomDims?.widthM || 0) - pos.x;
+      } else { // 'y'
+        dCentre = (roomDims?.lengthM || 0) - pos.y;
+      }
+
+      return dCentre + halfNormal;
+    });
+
+    if (depths.length === 0) return null;
+    return Math.max(...depths);
+  }, [placedSpeakers, roomDims, mlp, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP]);
+
+  const frontWideDepth = calculateGroupDepth('front-wides');
+  const sideSurroundDepth = calculateGroupDepth('side-surrounds');
+  const rearSurroundDepth = calculateGroupDepth('rear-surrounds');
+
+  return { frontWideDepth, sideSurroundDepth, rearSurroundDepth };
+}
+// END IN-ROOM DEPTH HELPERS
+
 // NEW: Helper for parsing JSON from project properties
 function parseProjectJson(value, defaultValue = null) {
   if (typeof value === 'string' && value.trim()) {
@@ -1519,6 +1635,7 @@ function useGuardedSetter(setter, tabName) {
 function RoomDesignerWithState() {
   // All hook calls must be unconditional and at the top level
   const appState = useAppState();
+  const { frontWideDepth, sideSurroundDepth, rearSurroundDepth } = useSurroundGroupDepths();
   const sessionActiveProjectId = useActiveProjectId();
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
 
@@ -4049,8 +4166,8 @@ function RoomDesignerWithState() {
                       checked={appState?.aimFrontWidesAtMLP || false}
                       onCheckedChange={(checked) => appState?.setAimFrontWidesAtMLP(checked)}
                       disabled={isFrozen('speakers')} />
-
                       </div>
+                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {frontWideDepth !== null ? `${Math.round(frontWideDepth * 100)} cm` : '—'}</div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-side-surrounds" className="text-sm">Side Surrounds</Label>
                         <Switch
@@ -4058,8 +4175,8 @@ function RoomDesignerWithState() {
                       checked={appState?.aimSideSurroundsAtMLP || false}
                       onCheckedChange={(checked) => appState?.setAimSideSurroundsAtMLP(checked)}
                       disabled={isFrozen('speakers')} />
-
                       </div>
+                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {sideSurroundDepth !== null ? `${Math.round(sideSurroundDepth * 100)} cm` : '—'}</div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-rear-surrounds" className="text-sm">Rear Surrounds</Label>
                         <Switch
@@ -4067,8 +4184,8 @@ function RoomDesignerWithState() {
                       checked={appState?.aimRearSurroundsAtMLP || false}
                       onCheckedChange={(checked) => appState?.setAimRearSurroundsAtMLP(checked)}
                       disabled={isFrozen('speakers')} />
-
                       </div>
+                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {rearSurroundDepth !== null ? `${Math.round(rearSurroundDepth * 100)} cm` : '—'}</div>
                     </div>
                   </details>
                   
