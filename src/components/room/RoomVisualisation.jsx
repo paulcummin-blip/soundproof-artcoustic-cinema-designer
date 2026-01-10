@@ -300,7 +300,7 @@ const getYawForObject = (speaker, lcrAngles, aimAtMLP, dimensions, getModelDimsM
   const onRightWall = Number.isFinite(pos.x) && Math.abs(pos.x - rightX) <= 0.035;
   const onBackWall  = Number.isFinite(pos.y) && Math.abs(pos.y - (L - (0.05 + halfDepth))) <= 0.035;
 
-  if (['SL', 'SR', 'LW', 'RW', 'SBL', 'SBR'].includes(role)) {
+  if (['SL', 'SR', 'SBL', 'SBR'].includes(role)) {
     // Side walls: speaker long edge along the wall, facing into room
     if (onLeftWall)  return +90;
     if (onRightWall) return -90;
