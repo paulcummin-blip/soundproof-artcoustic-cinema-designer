@@ -5306,7 +5306,33 @@ return {
       }
     }
 
-    const finalYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
+    let finalYawDeg;
+
+    const isFW = canon === 'LW' || canon === 'RW';
+    const isSS = canon === 'SL' || canon === 'SR';
+    const isRS = canon === 'SBL' || canon === 'SBR';
+
+    if (isFW) {
+      if (aimFrontWidesAtMLP) {
+        finalYawDeg = safeYawToMLP(speaker.position, mlp);
+      } else {
+        finalYawDeg = (canon === 'LW') ? -90 : +90;
+      }
+    } else if (isSS) {
+      if (aimSideSurroundsAtMLP) {
+        finalYawDeg = safeYawToMLP(speaker.position, mlp);
+      } else {
+        finalYawDeg = 0; // Flat to wall
+      }
+    } else if (isRS) {
+      if (aimRearSurroundsAtMLP) {
+        finalYawDeg = safeYawToMLP(speaker.position, mlp);
+      } else {
+        finalYawDeg = 0; // Flat to wall
+      }
+    } else {
+        finalYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
+    }
 
     // Convert to canvas coordinates - use stored position for all speakers
     const canvasX = toCanvasX(pos_x);
