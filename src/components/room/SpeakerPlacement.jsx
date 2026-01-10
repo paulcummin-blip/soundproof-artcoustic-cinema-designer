@@ -998,7 +998,7 @@ function UnifiedSurroundsConfig({
       const hydrated = resetSurroundPositions(
         effectivePreset,
         mlpPoint,
-        effectiveDims,
+        dimsSafe,
         draft,
         modelKey
       );
