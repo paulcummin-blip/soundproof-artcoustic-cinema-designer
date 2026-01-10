@@ -5230,42 +5230,43 @@ return {
       if (shouldAimAtMLP) {
         yawDeg = getAimingYawDeg(speaker, mlp);
       } else {
-        // Default / not aiming at MLP: flat to wall logic
-        const pos = speaker.position || {};
-        const dims = getModelDimsM?.(resolvedModel) || {};
-        const halfDepth = (Number(dims.depthM) || 0.082) / 2;
-        const W = widthM || 0;
-        const L = lengthM || 0;
-
-        const leftX = 0.05 + halfDepth;
-        const rightX = (W ? (W - 0.05 - halfDepth) : NaN);
-        const backY = (L ? (L - 0.05 - halfDepth) : NaN);
-
-        const onLeftWall = Number.isFinite(pos.x) && Math.abs(pos.x - leftX) <= 0.035;
-        const onRightWall = Number.isFinite(pos.x) && Math.abs(pos.x - rightX) <= 0.035;
-        const onBackWall = Number.isFinite(pos.y) && Math.abs(pos.y - backY) <= 0.035;
-
-        if (isLCR || canon === "FC" || rvIsOverheadRole(canon)) {
+        // Default / not aiming at MLP: flat to wall logic for applicable speakers
+        if (isLCR || canon === "FC" || rvIsOverheadRole(canon) || isFrontWide) {
+          // LCR, FC, overhead, and front-wide (when not aiming) all default to 0°
           yawDeg = 0;
-        } else if (isFrontWide) {
-          // CRITICAL: LW/RW default to 0° when aim is OFF (no wall-snap!)
-          yawDeg = 0;
-        } else if (isSideSurround) {
-          // SL/SR: wall-hugged yaw based on position
-          if (onLeftWall) yawDeg = +90;
-          else if (onRightWall) yawDeg = -90;
-          else yawDeg = 0;
-        } else if (isRearSurround) {
-          // SBL/SBR: wall-aware yaw (can be on side or back wall)
-          const distLeft  = Math.abs(pos.x - 0);
-          const distRight = Math.abs(widthM - pos.x);
-          const distBack  = Math.abs(lengthM - pos.y);
-          const minDist = Math.min(distLeft, distRight, distBack);
+        } else if (isSideSurround || isRearSurround) {
+          // Side and rear surrounds: wall-hugged yaw
+          const pos = speaker.position || {};
+          const dims = getModelDimsM?.(resolvedModel) || {};
+          const halfDepth = (Number(dims.depthM) || 0.082) / 2;
+          const W = widthM || 0;
+          const L = lengthM || 0;
 
-          if (minDist === distBack) yawDeg = 0;
-          else if (minDist === distLeft) yawDeg = 90;
-          else if (minDist === distRight) yawDeg = -90;
-          else yawDeg = 0;
+          const leftX = 0.05 + halfDepth;
+          const rightX = (W ? (W - 0.05 - halfDepth) : NaN);
+          const backY = (L ? (L - 0.05 - halfDepth) : NaN);
+
+          const onLeftWall = Number.isFinite(pos.x) && Math.abs(pos.x - leftX) <= 0.035;
+          const onRightWall = Number.isFinite(pos.x) && Math.abs(pos.x - rightX) <= 0.035;
+          const onBackWall = Number.isFinite(pos.y) && Math.abs(pos.y - backY) <= 0.035;
+
+          if (isSideSurround) {
+            // SL/SR: always wall-hugged
+            if (onLeftWall) yawDeg = +90;
+            else if (onRightWall) yawDeg = -90;
+            else yawDeg = 0;
+          } else {
+            // SBL/SBR: can be on side or back wall
+            const distLeft  = Math.abs(pos.x - 0);
+            const distRight = Math.abs(W - pos.x);
+            const distBack  = Math.abs(L - pos.y);
+            const minDist = Math.min(distLeft, distRight, distBack);
+
+            if (minDist === distBack) yawDeg = 0;
+            else if (minDist === distLeft) yawDeg = 90;
+            else if (minDist === distRight) yawDeg = -90;
+            else yawDeg = 0;
+          }
         } else {
           yawDeg = 0;
         }
@@ -5273,13 +5274,12 @@ return {
     }
 
     // FINAL OVERRIDE — Front Wides yaw rules (must win over any other yaw logic)
+    // When aiming OFF, LW/RW default to 0° (flat to walls without rotation)
     if (canon === "LW" || canon === "RW") {
       if (aimFrontWidesAtMLP) {
         yawDeg = safeYawToMLP(speaker.position, mlp);
-      } else {
-        // Aim OFF: sit flat to side walls (left = -90, right = +90)
-        yawDeg = (canon === "LW") ? -90 : +90;
       }
+      // else: yawDeg stays 0° (set in the wall-flat logic above)
     }
 
     const finalYawDeg = Number.isFinite(yawDeg) ? yawDeg : 0;
