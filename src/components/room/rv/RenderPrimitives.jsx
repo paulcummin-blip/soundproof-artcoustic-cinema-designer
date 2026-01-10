@@ -65,7 +65,7 @@ export function yawDegToMLP(pos, mlp) {
   if (!pos || !mlp) return 0;
   const dx = mlp.x - pos.x;
   const dy = mlp.y - pos.y;
-  return rad2deg(Math.atan2(dx, dy));
+  return -Math.atan2(dx, dy) * (180 / Math.PI);
 }
 
 // Safe wrapper to avoid HUD-breaking exceptions
