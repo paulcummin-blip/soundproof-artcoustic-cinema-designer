@@ -1774,7 +1774,7 @@ function RoomDesignerWithState() {
 
   const visualisationRef = useRef(null);
 
-  // NEW: In-room depth calculation for surround groups
+  // NEW: In-room depth calculation for surround groups (vertex-based, reactive to aim toggles)
   const inRoomDepthsCm = React.useMemo(() => {
     const W = stableDimensions.width;
     const L = stableDimensions.length;
@@ -1783,6 +1783,15 @@ function RoomDesignerWithState() {
       return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
     }
 
+    const mlp = mlpAnchorEffective;
+    if (!mlp || !isFiniteNum(mlp.x) || !isFiniteNum(mlp.y)) {
+      return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
+    }
+
+    const aimFW = appState?.aimFrontWidesAtMLP || false;
+    const aimSide = appState?.aimSideSurroundsAtMLP || false;
+    const aimRear = appState?.aimRearSurroundsAtMLP || false;
+
     const byCanon = (canonRole) =>
       (placedSpeakers || []).filter((s) => safeCanon(s?.role) === canonRole);
 
@@ -1790,37 +1799,96 @@ function RoomDesignerWithState() {
     const dimsFor = (model) => {
       const meta = getSpeakerModelMeta(model) || {};
       return {
-        widthM: meta.widthM ?? 0.12,
-        depthM: meta.depthM ?? 0.08,
+        widthM: meta.widthM ?? 0.27,
+        depthM: meta.depthM ?? 0.082,
       };
     };
 
-    // Get yaw from speaker data (matches what RoomVisualisation uses)
-    const yawFor = (s) => {
-      if (isFiniteNum(s?.yaw)) return Number(s.yaw);
-      if (isFiniteNum(s?.rotation?.y)) return Number(s.rotation.y);
-      if (isFiniteNum(s?.rotationDeg)) return Number(s.rotationDeg);
-      if (isFiniteNum(s?.rotation_deg)) return Number(s.rotation_deg);
+    // CRITICAL: Compute yaw using SAME logic as RoomVisualisation
+    const yawFor = (canonRole, speaker) => {
+      const pos = speaker?.position;
+      if (!pos || !isFiniteNum(pos.x) || !isFiniteNum(pos.y)) return 0;
+
+      // Determine if this group should aim
+      let shouldAim = false;
+      if (canonRole === 'LW' || canonRole === 'RW') shouldAim = aimFW;
+      else if (canonRole === 'SL' || canonRole === 'SR') shouldAim = aimSide;
+      else if (canonRole === 'SBL' || canonRole === 'SBR') shouldAim = aimRear;
+
+      if (shouldAim) {
+        // Aim at MLP
+        const dx = mlp.x - pos.x;
+        const dy = mlp.y - pos.y;
+        return -Math.atan2(dx, dy) * (180 / Math.PI);
+      }
+
+      // Wall-flat yaw
+      if (canonRole === 'LW') return -90;
+      if (canonRole === 'RW') return 90;
+      if (canonRole === 'SL') return 90;
+      if (canonRole === 'SR') return -90;
+      if (canonRole === 'SBL' || canonRole === 'SBR') {
+        // Corner detection logic
+        const distLeft = Math.abs(pos.x);
+        const distRight = Math.abs(W - pos.x);
+        const distBack = Math.abs(L - pos.y);
+        const minDist = Math.min(distLeft, distRight, distBack);
+        
+        if (minDist === distBack) return 0;  // back wall
+        if (minDist === distLeft) return 90; // left wall
+        return -90; // right wall
+      }
+
       return 0;
     };
 
-    const maxDepthCmFor = (roles) => {
+    // Compute rotated vertices and find max depth from wall
+    const depthForSpeaker = (canonRole, speaker, wall) => {
+      const pos = speaker?.position;
+      if (!pos || !isFiniteNum(pos.x) || !isFiniteNum(pos.y)) return null;
+
+      const { widthM, depthM } = dimsFor(speaker.model);
+      const yawDeg = yawFor(canonRole, speaker);
+      const yawRad = degToRad(yawDeg);
+
+      // Rectangle corners in local space (before rotation)
+      const hw = widthM / 2;
+      const hd = depthM / 2;
+      const corners = [
+        { x: -hw, y: -hd },
+        { x:  hw, y: -hd },
+        { x:  hw, y:  hd },
+        { x: -hw, y:  hd }
+      ];
+
+      // Rotate and translate to world space
+      const cosY = Math.cos(yawRad);
+      const sinY = Math.sin(yawRad);
+      const worldCorners = corners.map(c => ({
+        x: pos.x + (c.x * cosY - c.y * sinY),
+        y: pos.y + (c.x * sinY + c.y * cosY)
+      }));
+
+      // Find max distance from wall to furthest vertex
+      if (wall === "left") {
+        return Math.max(...worldCorners.map(c => c.x));
+      } else if (wall === "right") {
+        return W - Math.min(...worldCorners.map(c => c.x));
+      } else if (wall === "back") {
+        return L - Math.min(...worldCorners.map(c => c.y));
+      } else if (wall === "front") {
+        return Math.max(...worldCorners.map(c => c.y));
+      }
+
+      return null;
+    };
+
+    const maxDepthCmFor = (roles, wall) => {
       const vals = [];
       roles.forEach((canonRole) => {
         byCanon(canonRole).forEach((s) => {
-          const { widthM, depthM } = dimsFor(s.model);
-          const yawDeg = yawFor(s);
-
-          // Pick wall based on role
-          let wall = null;
-          if (canonRole === "LW" || canonRole === "SL") wall = "left";
-          if (canonRole === "RW" || canonRole === "SR") wall = "right";
-          if (canonRole === "SBL" || canonRole === "SBR") wall = "back";
-
-          if (!wall) return;
-
-          const m = inRoomDepthM({ speaker: s, wall, roomW: W, roomL: L, widthM, depthM, yawDeg });
-          if (isFiniteNum(m)) vals.push(m);
+          const m = depthForSpeaker(canonRole, s, wall);
+          if (isFiniteNum(m) && m > 0) vals.push(m);
         });
       });
 
@@ -1829,11 +1897,19 @@ function RoomDesignerWithState() {
     };
 
     return {
-      frontWides: maxDepthCmFor(["LW", "RW"]),
-      sideSurrounds: maxDepthCmFor(["SL", "SR"]),
-      rearSurrounds: maxDepthCmFor(["SBL", "SBR"]),
+      frontWides: maxDepthCmFor(["LW", "RW"], "left"), // Both measure from side walls
+      sideSurrounds: maxDepthCmFor(["SL", "SR"], "left"), // Both measure from side walls
+      rearSurrounds: maxDepthCmFor(["SBL", "SBR"], "back"), // Measure from back wall
     };
-  }, [placedSpeakers, stableDimensions.width, stableDimensions.length]);
+  }, [
+    placedSpeakers, 
+    stableDimensions.width, 
+    stableDimensions.length,
+    mlpAnchorEffective,
+    appState?.aimFrontWidesAtMLP,
+    appState?.aimSideSurroundsAtMLP,
+    appState?.aimRearSurroundsAtMLP
+  ]);
 
   // Use session active project ID (from Projects page), fallback to URL param for legacy support
   const activeProjectId = sessionActiveProjectId || initialProjectIdFromUrl;
