@@ -321,8 +321,46 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
   };
 }
 
+// CRITICAL: Get effective yaw using same logic as plan view (matches icon rotation)
+const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
+  const canon = getCanonicalRole ? getCanonicalRole(speaker?.role) : String(speaker?.role || "").toUpperCase();
+
+  // 1) If yaw is explicitly persisted, use it
+  if (isNum(speaker?.yaw)) return Number(speaker.yaw);
+
+  // 2) Use Aim toggles (LIVE - matches plan view behavior)
+  const aimFrontWides = !!appState?.aimFrontWidesAtMLP;
+  const aimSideSur = !!appState?.aimSideSurroundsAtMLP;
+  const aimRearSur = !!appState?.aimRearSurroundsAtMLP;
+
+  const isFW = canon === "LW" || canon === "RW";
+  const isSide = canon === "SL" || canon === "SR";
+  const isRear = canon === "SBL" || canon === "SBR";
+
+  // If aiming is ON, compute yaw to seat (matches visual rotation)
+  if ((isFW && aimFrontWides) || (isSide && aimSideSur) || (isRear && aimRearSur)) {
+    return angleFromTo(speaker?.position, seatPos);
+  }
+
+  // 3) Aiming is OFF: use wall-flat defaults (matches plan view)
+  if (isFW || isSide) {
+    // Left wall speakers face into room: +90
+    // Right wall speakers face into room: -90
+    return (canon === "LW" || canon === "SL") ? 90 : -90;
+  }
+
+  if (isRear) {
+    // Rear speakers on back wall face into room: 0
+    // (Side-wall rear handling omitted for now - add if needed)
+    return 0;
+  }
+
+  // Default: face into room
+  return 0;
+};
+
 // Unified helper: compute HF loss for one non-LCR speaker at one seat
-function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomHeightM }) {
+function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomHeightM, appState, getCanonicalRole }) {
   if (!speaker || !seat) return null;
   
   const role = String(speaker.role || "").toUpperCase();
@@ -373,40 +411,15 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       debug: vert.debug, // Pass through debug data
     };
   } 
-  // Bed-layer surrounds/wides: use horizontal off-axis (same as P16)
+  // Bed-layer surrounds/wides: use horizontal off-axis WITH EFFECTIVE YAW
   else if (SURROUND_ROLES.has(role)) {
     const seatAzDeg = angleFromTo(pos, seat);
     if (!isNum(seatAzDeg)) return null;
 
-    // Aim direction from speaker data
-    // CRITICAL: If yaw is missing, default to "aimed at seat" (zero off-axis)
-    let aimDeg = null;
-    if (isNum(speaker.yaw)) {
-      aimDeg = Number(speaker.yaw);
-    } else if (isNum(speaker.rotationDeg)) {
-      aimDeg = Number(speaker.rotationDeg);
-    } else if (isNum(speaker.rotation_deg)) {
-      aimDeg = Number(speaker.rotation_deg);
-    } else {
-      // Default to aimed at seat, so off-axis becomes 0
-      aimDeg = seatAzDeg;
-    }
+    // CRITICAL: Use effective yaw (matches plan view)
+    const aimDeg = getEffectiveYawDeg(speaker, seat, appState, getCanonicalRole);
 
     offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
-
-    // If yaw is explicitly provided, SBL/SBR can be 180° flipped depending on yaw convention.
-    // Try aimDeg + 180 and keep whichever produces the smaller off-axis angle.
-    const yawWasProvided =
-      isNum(speaker.yaw) || isNum(speaker.rotationDeg) || isNum(speaker.rotation_deg);
-
-    if (yawWasProvided && (role === "SBL" || role === "SBR") && isNum(offAxisDeg) && offAxisDeg > 90) {
-      const aimFlip = norm180((Number(aimDeg) || 0) + 180);
-      const offFlip = Math.abs(norm180(seatAzDeg - aimFlip));
-      if (isNum(offFlip) && offFlip < offAxisDeg) {
-        aimDeg = aimFlip;
-        offAxisDeg = offFlip;
-      }
-    }
 
     if (!isNum(offAxisDeg)) return null;
 
@@ -436,7 +449,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
     }
 
-    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxisDeg, lossDb });
+    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxisDeg, lossDb, appState: !!appState });
 
     return {
       role,
