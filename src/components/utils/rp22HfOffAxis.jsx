@@ -351,10 +351,6 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
 
 // CRITICAL: Get effective yaw using same logic as plan view (matches icon rotation)
 const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
-  const canon = getCanonicalRole
-    ? getCanonicalRole(speaker?.role)
-    : String(speaker?.role || "").toUpperCase();
-
   // 1) If the plan view has already computed a rotation for this icon, use that.
   // This keeps P17 perfectly aligned with what the user is seeing on the plan.
   if (isNum(speaker?.rotationDeg)) return Number(speaker.rotationDeg);
@@ -362,6 +358,8 @@ const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
 
   // 2) If yaw is explicitly persisted, use it
   if (isNum(speaker?.yaw)) return Number(speaker.yaw);
+
+  const canon = canonRole(speaker?.role, getCanonicalRole);
 
   const aimFrontWides = !!appState?.aimFrontWidesAtMLP;
   const aimSideSur = !!appState?.aimSideSurroundsAtMLP;
@@ -401,8 +399,8 @@ const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
 function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomHeightM, appState, getCanonicalRole }) {
   if (!speaker || !seat) return null;
   
-  const role = String(speaker.role || "").toUpperCase();
-  const pos = speaker.position;
+  const role = canonRole(speaker?.role, getCanonicalRole);
+  const pos = speaker?.position;
   
   // [B44 DEBUG] Log filter decisions
   if (globalThis.__B44_RV_DEBUG === true && ["LW", "RW", "SBL", "SBR"].includes(role)) {
