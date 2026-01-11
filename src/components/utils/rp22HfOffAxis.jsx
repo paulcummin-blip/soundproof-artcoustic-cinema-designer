@@ -345,7 +345,8 @@ const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
 
   // If aiming is ON, compute yaw to seat (matches visual rotation)
   if ((isFW && aimFrontWides) || (isSide && aimSideSur) || (isRear && aimRearSur)) {
-    return angleFromTo(speaker?.position, seatPos);
+    const yawToSeat = angleFromTo(speaker?.position, seatPos);
+    return isNum(yawToSeat) ? yawToSeat : 0;
   }
 
   // 3) Aiming is OFF: use wall-flat defaults (matches plan view)
