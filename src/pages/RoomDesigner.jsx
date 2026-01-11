@@ -4369,6 +4369,12 @@ function RoomDesignerWithState() {
                       disabled={isFrozen('speakers')} />
 
                       </div>
+                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
+                        Front wall → screen: {(() => {
+                          const planeM = appState?.screenFrontPlaneM;
+                          return _isNum(planeM) ? `${Math.round(planeM * 100)} cm` : '—';
+                        })()}
+                      </div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-front-wides" className="text-sm">Front Wides</Label>
                         <Switch
