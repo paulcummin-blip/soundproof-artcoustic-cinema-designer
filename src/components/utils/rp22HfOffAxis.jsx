@@ -423,14 +423,14 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
     const seatAzDeg = angleFromTo(pos, seat);
     if (!isNum(seatAzDeg)) return null;
 
-    // CRITICAL: Use effective yaw (matches plan view)
+    // Effective "front axis" yaw (same convention as plan view)
     const aimDeg = getEffectiveYawDeg(speaker, seat, appState, getCanonicalRole);
 
-    offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
+    // True off-axis = smallest angle between seat direction and front axis (0..180)
+    const offAxis = shortestAngleDeg(seatAzDeg, aimDeg);
+    if (!isNum(offAxis)) return null;
 
-    if (!isNum(offAxisDeg)) return null;
-
-    const effectiveAngleDeg = Number(offAxisDeg.toFixed(1));
+    const effectiveAngleDeg = Number(offAxis.toFixed(1));
 
     // Get model metadata for dispersion
     const meta = modelMeta || (speaker.model ? getSpeakerModelMeta(speaker.model) : null);
