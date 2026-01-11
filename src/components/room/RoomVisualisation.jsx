@@ -2921,6 +2921,7 @@ React.useEffect(() => {
       if (spk) {
         const canonicalRole = getCanonicalRole(spk.role);
         const isOverhead = typeof canonicalRole === "string" && canonicalRole.startsWith("T");
+        const isFrontWide = canonicalRole === 'LW' || canonicalRole === 'RW';
         
         if (isOverhead && overheadZones?.status === 'ok') {
           // Determine which zone this overhead belongs to
@@ -2961,6 +2962,23 @@ React.useEffect(() => {
                 : s
             ));
           }
+        } else if (isFrontWide) {
+          // CRITICAL: Lock LW/RW to wall after drag (0.01m buffer)
+          const W = widthM || 0;
+          const FW_WALL_BUFFER_M = 0.01;
+          const dims = getModelDimsM(spk.model);
+          const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
+          
+          const targetX = canonicalRole === 'LW'
+            ? (FW_WALL_BUFFER_M + halfDepth)
+            : (W - FW_WALL_BUFFER_M - halfDepth);
+          
+          // Force X to wall, keep Y from drag
+          onSetSpeakers(prev => prev.map(s => 
+            s.id === draggedItemId 
+              ? { ...s, position: { ...s.position, x: targetX }, positionSource: 'user' }
+              : s
+          ));
         } else {
           // Non-overhead speaker: mark as user-positioned
           onSetSpeakers(prev => prev.map(s => 
