@@ -1769,10 +1769,7 @@ function RoomDesignerWithState() {
 
   const store = useSpeakerSystemStore();
 
-  // CRITICAL: Extract placedSpeakers early so it's available for allSeatSplMetrics
-  const placedSpeakers = store.placedSpeakers;
 
-  const visualisationRef = useRef(null);
 
   // Use session active project ID (from Projects page), fallback to URL param for legacy support
   const activeProjectId = sessionActiveProjectId || initialProjectIdFromUrl;
