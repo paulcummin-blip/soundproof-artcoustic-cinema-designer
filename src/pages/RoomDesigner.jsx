@@ -3936,6 +3936,8 @@ function RoomDesignerWithState() {
     setUseRearGlobal: setUseRearGlobalFromState
   } = appState;
 
+  const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
+
   return (
     <div className="flex flex-col h-full bg-[#F8F8F7]" style={{ minHeight: 0 }}>
       <style>{`
