@@ -3135,6 +3135,126 @@ React.useEffect(() => {
       if (seatMetrics.p20) data.rp22.p20 = seatMetrics.p20;
     }
 
+    // Compute P17 locally if missing from engine (fallback for HUD)
+    if (!data.rp22.p17 || !data.rp22.p17.perSpeaker || data.rp22.p17.perSpeaker.length === 0) {
+      const surroundAndOverheadRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR']);
+      
+      const relevantSpeakers = (placedSpeakers || []).filter(sp => {
+        const canon = getCanonicalRole(sp.role);
+        return surroundAndOverheadRoles.has(canon) && sp.position;
+      });
+
+      if (relevantSpeakers.length > 0) {
+        const perSpeaker = [];
+        let worstLossDb = -Infinity;
+        let worstRole = null;
+        let worstAngleDeg = null;
+
+        for (const sp of relevantSpeakers) {
+          const canon = getCanonicalRole(sp.role);
+          const pos = sp.position;
+          
+          // Calculate direction from speaker to seat
+          const dx = seatX - pos.x;
+          const dy = seatY - pos.y;
+          const dirDeg = Math.atan2(dx, dy) * 180 / Math.PI; // 0° = +Y (into room)
+          
+          // Get speaker's aim angle (front face direction)
+          let aimDeg = 0;
+          const isLW_RW = (canon === 'LW' || canon === 'RW');
+          const isSL_SR = (canon === 'SL' || canon === 'SR');
+          const isSBL_SBR = (canon === 'SBL' || canon === 'SBR');
+          const isOverhead = canon.startsWith('T');
+          
+          if (isOverhead) {
+            // Overheads always aim down (0° in plan = into room)
+            aimDeg = 0;
+          } else if (isLW_RW && aimFrontWidesAtMLP) {
+            aimDeg = getAimingYawDeg(sp, mlp);
+          } else if (isSL_SR && aimSideSurroundsAtMLP) {
+            aimDeg = getAimingYawDeg(sp, mlp);
+          } else if (isSBL_SBR && aimRearSurroundsAtMLP) {
+            aimDeg = getAimingYawDeg(sp, mlp);
+          } else {
+            // Flat to wall defaults
+            if (canon === 'LW' || canon === 'SL') aimDeg = 90;
+            else if (canon === 'RW' || canon === 'SR') aimDeg = -90;
+            else if (canon === 'SBL' || canon === 'SBR') aimDeg = 0;
+          }
+          
+          // Calculate off-axis angle (shortest arc)
+          let offAxisRaw = dirDeg - aimDeg;
+          // Normalize to -180..+180
+          while (offAxisRaw > 180) offAxisRaw -= 360;
+          while (offAxisRaw < -180) offAxisRaw += 360;
+          const offAxisDeg = Math.abs(offAxisRaw);
+          
+          // Clamp to 0..180 for HF falloff lookup
+          const offAxisClamped = Math.min(180, Math.max(0, offAxisDeg));
+          
+          // Calculate loss using same dispersion logic as P16
+          const meta = getSpeakerModelMeta(sp.model);
+          const disp = meta?.dispersion?.horizontal;
+          let lossDb = 0;
+          
+          if (disp && disp.minus1p5dB && disp.minus3dB && disp.minus5dB) {
+            if (offAxisClamped <= disp.minus1p5dB) {
+              lossDb = (offAxisClamped / disp.minus1p5dB) * 1.5;
+            } else if (offAxisClamped <= disp.minus3dB) {
+              const span = disp.minus3dB - disp.minus1p5dB;
+              const t = (offAxisClamped - disp.minus1p5dB) / span;
+              lossDb = 1.5 + t * 1.5;
+            } else if (offAxisClamped <= disp.minus5dB) {
+              const span = disp.minus5dB - disp.minus3dB;
+              const t = (offAxisClamped - disp.minus3dB) / span;
+              lossDb = 3.0 + t * 2.0;
+            } else {
+              lossDb = 5.0 + (offAxisClamped - disp.minus5dB) * 0.05;
+            }
+          } else {
+            // Fallback: simple linear falloff
+            lossDb = offAxisClamped * 0.05;
+          }
+          
+          const isBeyondNonLcrLimit = offAxisClamped > 41;
+          
+          perSpeaker.push({
+            role: canon,
+            angleDeg: offAxisDeg,
+            rawAngleDeg: offAxisDeg,
+            lossDb: Math.round(lossDb * 10) / 10,
+            isBeyondNonLcrLimit,
+          });
+          
+          if (!isBeyondNonLcrLimit && lossDb > worstLossDb) {
+            worstLossDb = lossDb;
+            worstRole = canon;
+            worstAngleDeg = offAxisDeg;
+          }
+        }
+        
+        // Calculate max loss for level
+        let level17 = '—';
+        if (Number.isFinite(worstLossDb)) {
+          if (worstLossDb <= 1.5) level17 = 'L4';
+          else if (worstLossDb <= 3.0) level17 = 'L3';
+          else if (worstLossDb <= 5.0) level17 = 'L2';
+          else level17 = 'L1';
+        }
+        
+        data.rp22.p17 = {
+          value: worstLossDb,
+          formatted: Number.isFinite(worstLossDb) ? `±${worstLossDb.toFixed(1)} dB` : '—',
+          level: level17,
+          perSpeaker,
+          worstRole,
+          worstAngleDeg,
+          worstLossDb,
+          p17HasNaAngles: perSpeaker.some(s => s.isBeyondNonLcrLimit),
+        };
+      }
+    }
+
     // NEW: Use centralized SPL calculation (single source of truth)
     const seatSplData = getSeatSplMetrics(allSeatSplMetrics, effectiveHoveredSeat.id);
     
