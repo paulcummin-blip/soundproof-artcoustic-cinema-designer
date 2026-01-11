@@ -487,11 +487,26 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
 
     console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxis: effectiveAngleDeg, lossDb, appState: !!appState });
 
+    // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs
+    const isLwRw = role === "LW" || role === "RW";
+    const diagnosticDebug = isLwRw ? {
+      seatAzDeg: isNum(seatAzDeg) ? Number(seatAzDeg.toFixed(2)) : null,
+      aimDegUsed: isNum(aimDeg) ? Number(aimDeg.toFixed(2)) : null,
+      offAxisDegComputed: isNum(effectiveAngleDeg) ? Number(effectiveAngleDeg.toFixed(2)) : null,
+      canonRoleUsed: role,
+      aimFlagsSeen: {
+        aimFrontWidesAtMLP: !!appState?.aimFrontWidesAtMLP,
+        aimSideSurroundsAtMLP: !!appState?.aimSideSurroundsAtMLP,
+        aimRearSurroundsAtMLP: !!appState?.aimRearSurroundsAtMLP,
+      }
+    } : undefined;
+
     return {
       role,
       offAxisDeg: effectiveAngleDeg,
       lossDb: Number(lossDb.toFixed(1)),
       isBeyondNonLcrLimit,
+      debug: diagnosticDebug,
     };
   }
 }
