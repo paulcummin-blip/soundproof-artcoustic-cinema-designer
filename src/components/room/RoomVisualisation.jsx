@@ -3489,7 +3489,10 @@ React.useEffect(() => {
     appState,
     heightM,
     getCanonicalRole,
-    allSeatSplMetrics, // NEW: SPL data dependency
+    allSeatSplMetrics,
+    aimFrontWidesAtMLP,
+    aimSideSurroundsAtMLP,
+    aimRearSurroundsAtMLP,
   ]);
 
 // 1) Auto-position HUD near the currently hovered/pinned seat
