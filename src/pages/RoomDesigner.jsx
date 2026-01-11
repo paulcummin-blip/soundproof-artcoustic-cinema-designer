@@ -1993,20 +1993,31 @@ function RoomDesignerWithState() {
 
         const yawDeg = getYawDegForRole?.(sp) ?? 0;
 
-        const isLeftWallRole = role === "LW" || role === "SL" || role === "SBL";
-        const isRightWallRole = role === "RW" || role === "SR" || role === "SBR";
+        // Determine wall based on role
+        let wall = null;
+        if (role === "LW" || role === "SL") wall = "LEFT";
+        else if (role === "RW" || role === "SR") wall = "RIGHT";
+        else if (role === "SBL" || role === "SBR") wall = "BACK";
 
+        if (!wall) continue;
+
+        // Calculate rotated rectangle extents
+        const a = wM / 2;
+        const b = dM / 2;
+        const r = (yawDeg || 0) * Math.PI / 180;
+        const c = Math.abs(Math.cos(r));
+        const s = Math.abs(Math.sin(r));
+        const ex = c * a + s * b; // half-extent along X
+        const ey = s * a + c * b; // half-extent along Y
+
+        // Calculate depth from wall to furthest point
         let depthM_fromWall;
-
-        if (isLeftWallRole) {
-          const proj = _projectHalfExtent(yawDeg, halfW, halfD, "x");
-          depthM_fromWall = pos.x + proj;
-        } else if (isRightWallRole) {
-          const proj = _projectHalfExtent(yawDeg, halfW, halfD, "x");
-          depthM_fromWall = (W - pos.x) + proj;
-        } else {
-          const proj = _projectHalfExtent(yawDeg, halfW, halfD, "y");
-          depthM_fromWall = (L - pos.y) + proj;
+        if (wall === "LEFT") {
+          depthM_fromWall = pos.x + ex;
+        } else if (wall === "RIGHT") {
+          depthM_fromWall = W - (pos.x - ex);
+        } else if (wall === "BACK") {
+          depthM_fromWall = L - (pos.y - ey);
         }
 
         if (!_isNum(depthM_fromWall)) continue;
