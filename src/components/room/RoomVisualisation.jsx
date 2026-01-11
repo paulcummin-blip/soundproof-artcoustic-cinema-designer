@@ -3135,8 +3135,8 @@ React.useEffect(() => {
       if (seatMetrics.p20) data.rp22.p20 = seatMetrics.p20;
     }
 
-    // Compute P17 locally if missing from engine (fallback for HUD)
-    if (!data.rp22.p17 || !data.rp22.p17.perSpeaker || data.rp22.p17.perSpeaker.length === 0) {
+    // ALWAYS compute P17 locally using LIVE plan-view yaw logic (matches icon rotation)
+    {
       const surroundAndOverheadRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR']);
       
       const relevantSpeakers = (placedSpeakers || []).filter(sp => {
@@ -3159,7 +3159,7 @@ React.useEffect(() => {
           const dy = seatY - pos.y;
           const dirDeg = Math.atan2(dx, dy) * 180 / Math.PI; // 0° = +Y (into room)
           
-          // Get speaker's aim angle (front face direction)
+          // CRITICAL: Get speaker's aim using EXACT same logic as renderSpeakers
           let aimDeg = 0;
           const isLW_RW = (canon === 'LW' || canon === 'RW');
           const isSL_SR = (canon === 'SL' || canon === 'SR');
@@ -3169,17 +3169,38 @@ React.useEffect(() => {
           if (isOverhead) {
             // Overheads always aim down (0° in plan = into room)
             aimDeg = 0;
-          } else if (isLW_RW && aimFrontWidesAtMLP) {
-            aimDeg = getAimingYawDeg(sp, mlp);
-          } else if (isSL_SR && aimSideSurroundsAtMLP) {
-            aimDeg = getAimingYawDeg(sp, mlp);
-          } else if (isSBL_SBR && aimRearSurroundsAtMLP) {
-            aimDeg = getAimingYawDeg(sp, mlp);
-          } else {
-            // Flat to wall defaults
-            if (canon === 'LW' || canon === 'SL') aimDeg = 90;
-            else if (canon === 'RW' || canon === 'SR') aimDeg = -90;
-            else if (canon === 'SBL' || canon === 'SBR') aimDeg = 0;
+          } else if (isLW_RW) {
+            // Front Wides: check toggle (LIVE)
+            if (aimFrontWidesAtMLP) {
+              aimDeg = safeYawToMLP(pos, mlp);
+            } else {
+              // Wall-flat: left wall = +90, right wall = -90
+              aimDeg = (canon === 'LW') ? 90 : -90;
+            }
+          } else if (isSL_SR) {
+            // Side Surrounds: check toggle (LIVE)
+            if (aimSideSurroundsAtMLP) {
+              aimDeg = safeYawToMLP(pos, mlp);
+            } else {
+              // Wall-flat: left wall = +90, right wall = -90
+              aimDeg = (canon === 'SL') ? 90 : -90;
+            }
+          } else if (isSBL_SBR) {
+            // Rear Surrounds: check toggle (LIVE)
+            if (aimRearSurroundsAtMLP) {
+              aimDeg = safeYawToMLP(pos, mlp);
+            } else {
+              // Wall-flat: detect which wall (same logic as renderSpeakers)
+              const distLeft  = Math.abs(pos.x - 0);
+              const distRight = Math.abs(widthM - pos.x);
+              const distBack  = Math.abs(lengthM - pos.y);
+              const minDist = Math.min(distLeft, distRight, distBack);
+
+              if (minDist === distBack) aimDeg = 0;
+              else if (minDist === distLeft) aimDeg = 90;
+              else if (minDist === distRight) aimDeg = -90;
+              else aimDeg = 0;
+            }
           }
           
           // Calculate off-axis angle (shortest arc)
