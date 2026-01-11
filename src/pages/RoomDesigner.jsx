@@ -2173,6 +2173,11 @@ function RoomDesignerWithState() {
       aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
+    },
+    aimState: {
+      aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
     }
   });
 
