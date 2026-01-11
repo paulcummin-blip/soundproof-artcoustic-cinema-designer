@@ -350,15 +350,9 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
 }
 
 // CRITICAL: Get effective yaw using same logic as plan view (matches icon rotation)
+// IMPORTANT: When an Aim toggle is ON, it MUST override any persisted yaw/rotation,
+// otherwise P17 will stay "stuck" at the stored wall-flat angle.
 const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
-  // 1) If the plan view has already computed a rotation for this icon, use that.
-  // This keeps P17 perfectly aligned with what the user is seeing on the plan.
-  if (isNum(speaker?.rotationDeg)) return Number(speaker.rotationDeg);
-  if (isNum(speaker?.rotation_deg)) return Number(speaker.rotation_deg);
-
-  // 2) If yaw is explicitly persisted, use it
-  if (isNum(speaker?.yaw)) return Number(speaker.yaw);
-
   const canon = canonRole(speaker?.role, getCanonicalRole);
 
   const aimFrontWides = !!appState?.aimFrontWidesAtMLP;
@@ -369,26 +363,32 @@ const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
   const isSide = canon === "SL" || canon === "SR";
   const isRear = canon === "SBL" || canon === "SBR";
 
-  // IMPORTANT:
-  // If the group's Aim toggle is ON, ALWAYS use yaw-to-seat (live),
-  // even if speaker.yaw exists. This matches the plan-view aiming behaviour
-  // and guarantees 0° off-axis at the aimed seat (e.g. MLP).
   const groupAimOn =
     (isFW && aimFrontWides) ||
     (isSide && aimSideSur) ||
     (isRear && aimRearSur);
 
+  // 1) Aim toggle ON → always use yaw-to-seat (this is what "aimed at MLP" means)
   if (groupAimOn) {
     const yawToSeat = angleFromTo(speaker?.position, seatPos);
     return isNum(yawToSeat) ? yawToSeat : 0;
   }
 
-  // Wall-flat defaults (matches plan view)
+  // 2) Aim toggle OFF → use persisted yaw if present (manual toe-in)
+  if (isNum(speaker?.yaw)) return Number(speaker.yaw);
+  if (isNum(speaker?.rotationDeg)) return Number(speaker.rotationDeg);
+  if (isNum(speaker?.rotation_deg)) return Number(speaker.rotation_deg);
+  if (isNum(speaker?.rotation?.y)) return Number(speaker.rotation.y);
+
+  // 3) No manual yaw → wall-flat defaults (matches plan view)
   if (isFW || isSide) {
-    return (canon === "LW" || canon === "SL") ? 90 : -90;
+    // Left wall speakers face into room: +90
+    // Right wall speakers face into room: -90
+    return canon === "LW" || canon === "SL" ? 90 : -90;
   }
 
   if (isRear) {
+    // Rear speakers on back wall face into room: 0
     return 0;
   }
 
@@ -485,7 +485,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
     }
 
-    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxis: effectiveAngleDeg, lossDb });
+    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxis: effectiveAngleDeg, lossDb, appState: !!appState });
 
     return {
       role,
