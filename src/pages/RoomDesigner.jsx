@@ -209,7 +209,53 @@ function logPlacedSpeakers(message, speakers) {
 }
 
 // START IN-ROOM DEPTH HELPERS
+const isFiniteNum = (v) => typeof v === "number" && Number.isFinite(v);
+
 const degToRad = (deg) => (deg * Math.PI) / 180;
+
+// Returns half-extent into the room along wall normal, for a rotated rectangle.
+const halfNormalExtentM = (widthM, depthM, yawDeg, normalAxis /* "x" | "y" */) => {
+  const halfW = (isFiniteNum(widthM) ? widthM : 0.12) / 2;
+  const halfD = (isFiniteNum(depthM) ? depthM : 0.08) / 2;
+
+  const a = degToRad(isFiniteNum(yawDeg) ? yawDeg : 0);
+
+  if (normalAxis === "x") {
+    return Math.abs(Math.cos(a)) * halfW + Math.abs(Math.sin(a)) * halfD;
+  }
+  return Math.abs(Math.sin(a)) * halfW + Math.abs(Math.cos(a)) * halfD;
+};
+
+// Returns "in-room depth" (metres) for a single speaker relative to its wall.
+const inRoomDepthM = ({ speaker, wall, roomW, roomL, widthM, depthM, yawDeg }) => {
+  if (!speaker?.position) return null;
+  const x = speaker.position.x;
+  const y = speaker.position.y;
+  if (!isFiniteNum(x) || !isFiniteNum(y)) return null;
+  if (!isFiniteNum(roomW) || !isFiniteNum(roomL)) return null;
+
+  let dCentre = null;
+  let normalAxis = "x";
+
+  if (wall === "left") {
+    dCentre = x;
+    normalAxis = "x";
+  } else if (wall === "right") {
+    dCentre = roomW - x;
+    normalAxis = "x";
+  } else if (wall === "back") {
+    dCentre = roomL - y;
+    normalAxis = "y";
+  } else if (wall === "front") {
+    dCentre = y;
+    normalAxis = "y";
+  }
+
+  if (!isFiniteNum(dCentre)) return null;
+
+  const halfN = halfNormalExtentM(widthM, depthM, yawDeg, normalAxis);
+  return dCentre + halfN;
+};
 
 const rotatedHalfExtentToWall = (yawDeg, widthM_spk, depthM_spk, wallAxis /* "x" | "y" */) => {
   const halfW = Math.max(0, (Number(widthM_spk) || 0) / 2);
@@ -1642,7 +1688,6 @@ function useGuardedSetter(setter, tabName) {
 function RoomDesignerWithState() {
   // All hook calls must be unconditional and at the top level
   const appState = useAppState();
-  const { frontWideDepth, sideSurroundDepth, rearSurroundDepth } = useSurroundGroupDepths();
   const sessionActiveProjectId = useActiveProjectId();
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
 
@@ -1728,6 +1773,67 @@ function RoomDesignerWithState() {
   const placedSpeakers = store.placedSpeakers;
 
   const visualisationRef = useRef(null);
+
+  // NEW: In-room depth calculation for surround groups
+  const inRoomDepthsCm = React.useMemo(() => {
+    const W = stableDimensions.width;
+    const L = stableDimensions.length;
+
+    if (!isFiniteNum(W) || !isFiniteNum(L)) {
+      return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
+    }
+
+    const byCanon = (canonRole) =>
+      (placedSpeakers || []).filter((s) => safeCanon(s?.role) === canonRole);
+
+    // Get dims from registry
+    const dimsFor = (model) => {
+      const meta = getSpeakerModelMeta(model) || {};
+      return {
+        widthM: meta.widthM ?? 0.12,
+        depthM: meta.depthM ?? 0.08,
+      };
+    };
+
+    // Get yaw from speaker data (matches what RoomVisualisation uses)
+    const yawFor = (s) => {
+      if (isFiniteNum(s?.yaw)) return Number(s.yaw);
+      if (isFiniteNum(s?.rotation?.y)) return Number(s.rotation.y);
+      if (isFiniteNum(s?.rotationDeg)) return Number(s.rotationDeg);
+      if (isFiniteNum(s?.rotation_deg)) return Number(s.rotation_deg);
+      return 0;
+    };
+
+    const maxDepthCmFor = (roles) => {
+      const vals = [];
+      roles.forEach((canonRole) => {
+        byCanon(canonRole).forEach((s) => {
+          const { widthM, depthM } = dimsFor(s.model);
+          const yawDeg = yawFor(s);
+
+          // Pick wall based on role
+          let wall = null;
+          if (canonRole === "LW" || canonRole === "SL") wall = "left";
+          if (canonRole === "RW" || canonRole === "SR") wall = "right";
+          if (canonRole === "SBL" || canonRole === "SBR") wall = "back";
+
+          if (!wall) return;
+
+          const m = inRoomDepthM({ speaker: s, wall, roomW: W, roomL: L, widthM, depthM, yawDeg });
+          if (isFiniteNum(m)) vals.push(m);
+        });
+      });
+
+      if (!vals.length) return null;
+      return Math.round(Math.max(...vals) * 100);
+    };
+
+    return {
+      frontWides: maxDepthCmFor(["LW", "RW"]),
+      sideSurrounds: maxDepthCmFor(["SL", "SR"]),
+      rearSurrounds: maxDepthCmFor(["SBL", "SBR"]),
+    };
+  }, [placedSpeakers, stableDimensions.width, stableDimensions.length]);
 
   // Use session active project ID (from Projects page), fallback to URL param for legacy support
   const activeProjectId = sessionActiveProjectId || initialProjectIdFromUrl;
@@ -4174,7 +4280,7 @@ function RoomDesignerWithState() {
                       onCheckedChange={(checked) => appState?.setAimFrontWidesAtMLP(checked)}
                       disabled={isFrozen('speakers')} />
                       </div>
-                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {frontWideDepth !== null ? `${Math.round(frontWideDepth * 100)} cm` : '—'}</div>
+                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {inRoomDepthsCm.frontWides !== null ? `${inRoomDepthsCm.frontWides} cm` : '—'}</div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-side-surrounds" className="text-sm">Side Surrounds</Label>
                         <Switch
@@ -4183,7 +4289,7 @@ function RoomDesignerWithState() {
                       onCheckedChange={(checked) => appState?.setAimSideSurroundsAtMLP(checked)}
                       disabled={isFrozen('speakers')} />
                       </div>
-                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {sideSurroundDepth !== null ? `${Math.round(sideSurroundDepth * 100)} cm` : '—'}</div>
+                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {inRoomDepthsCm.sideSurrounds !== null ? `${inRoomDepthsCm.sideSurrounds} cm` : '—'}</div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-rear-surrounds" className="text-sm">Rear Surrounds</Label>
                         <Switch
@@ -4192,7 +4298,7 @@ function RoomDesignerWithState() {
                       onCheckedChange={(checked) => appState?.setAimRearSurroundsAtMLP(checked)}
                       disabled={isFrozen('speakers')} />
                       </div>
-                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {rearSurroundDepth !== null ? `${Math.round(rearSurroundDepth * 100)} cm` : '—'}</div>
+                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {inRoomDepthsCm.rearSurrounds !== null ? `${inRoomDepthsCm.rearSurrounds} cm` : '—'}</div>
                     </div>
                   </details>
                   
