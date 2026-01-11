@@ -1697,6 +1697,7 @@ function RoomDesignerWithState() {
   // NEW: Refs for speaker rescue on room resize
   const prevRoomDimsRef = useRef(null);
   const isDraggingRef = useRef(false);
+  const visualisationRef = React.useRef(null);
 
   // Temporary variables for values that might be undefined if appState is null
   // (Assumes AppStateProvider has been updated to provide these)
