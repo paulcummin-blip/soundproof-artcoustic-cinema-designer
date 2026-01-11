@@ -329,12 +329,10 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
 
 // CRITICAL: Get effective yaw using same logic as plan view (matches icon rotation)
 const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
-  const canon = getCanonicalRole ? getCanonicalRole(speaker?.role) : String(speaker?.role || "").toUpperCase();
+  const canon = getCanonicalRole
+    ? getCanonicalRole(speaker?.role)
+    : String(speaker?.role || "").toUpperCase();
 
-  // 1) If yaw is explicitly persisted, use it
-  if (isNum(speaker?.yaw)) return Number(speaker.yaw);
-
-  // 2) Use Aim toggles (LIVE - matches plan view behavior)
   const aimFrontWides = !!appState?.aimFrontWidesAtMLP;
   const aimSideSur = !!appState?.aimSideSurroundsAtMLP;
   const aimRearSur = !!appState?.aimRearSurroundsAtMLP;
@@ -343,26 +341,32 @@ const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
   const isSide = canon === "SL" || canon === "SR";
   const isRear = canon === "SBL" || canon === "SBR";
 
-  // If aiming is ON, compute yaw to seat (matches visual rotation)
-  if ((isFW && aimFrontWides) || (isSide && aimSideSur) || (isRear && aimRearSur)) {
+  // IMPORTANT:
+  // If the group's Aim toggle is ON, ALWAYS use yaw-to-seat (live),
+  // even if speaker.yaw exists. This matches the plan-view aiming behaviour
+  // and guarantees 0° off-axis at the aimed seat (e.g. MLP).
+  const groupAimOn =
+    (isFW && aimFrontWides) ||
+    (isSide && aimSideSur) ||
+    (isRear && aimRearSur);
+
+  if (groupAimOn) {
     const yawToSeat = angleFromTo(speaker?.position, seatPos);
     return isNum(yawToSeat) ? yawToSeat : 0;
   }
 
-  // 3) Aiming is OFF: use wall-flat defaults (matches plan view)
+  // If aim toggle is OFF, allow persisted yaw (manual rotation etc.)
+  if (isNum(speaker?.yaw)) return Number(speaker.yaw);
+
+  // Wall-flat defaults (matches plan view)
   if (isFW || isSide) {
-    // Left wall speakers face into room: +90
-    // Right wall speakers face into room: -90
     return (canon === "LW" || canon === "SL") ? 90 : -90;
   }
 
   if (isRear) {
-    // Rear speakers on back wall face into room: 0
-    // (Side-wall rear handling omitted for now - add if needed)
     return 0;
   }
 
-  // Default: face into room
   return 0;
 };
 
