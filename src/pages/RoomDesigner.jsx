@@ -1774,143 +1774,6 @@ function RoomDesignerWithState() {
 
   const visualisationRef = useRef(null);
 
-  // NEW: In-room depth calculation for surround groups (vertex-based, reactive to aim toggles)
-  const inRoomDepthsCm = React.useMemo(() => {
-    const W = stableDimensions.width;
-    const L = stableDimensions.length;
-
-    if (!isFiniteNum(W) || !isFiniteNum(L)) {
-      return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
-    }
-
-    const mlp = mlpAnchorEffective;
-    if (!mlp || !isFiniteNum(mlp.x) || !isFiniteNum(mlp.y)) {
-      return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
-    }
-
-    const aimFW = appState?.aimFrontWidesAtMLP || false;
-    const aimSide = appState?.aimSideSurroundsAtMLP || false;
-    const aimRear = appState?.aimRearSurroundsAtMLP || false;
-
-    const byCanon = (canonRole) =>
-      (placedSpeakers || []).filter((s) => safeCanon(s?.role) === canonRole);
-
-    // Get dims from registry
-    const dimsFor = (model) => {
-      const meta = getSpeakerModelMeta(model) || {};
-      return {
-        widthM: meta.widthM ?? 0.27,
-        depthM: meta.depthM ?? 0.082,
-      };
-    };
-
-    // CRITICAL: Compute yaw using SAME logic as RoomVisualisation
-    const yawFor = (canonRole, speaker) => {
-      const pos = speaker?.position;
-      if (!pos || !isFiniteNum(pos.x) || !isFiniteNum(pos.y)) return 0;
-
-      // Determine if this group should aim
-      let shouldAim = false;
-      if (canonRole === 'LW' || canonRole === 'RW') shouldAim = aimFW;
-      else if (canonRole === 'SL' || canonRole === 'SR') shouldAim = aimSide;
-      else if (canonRole === 'SBL' || canonRole === 'SBR') shouldAim = aimRear;
-
-      if (shouldAim) {
-        // Aim at MLP
-        const dx = mlp.x - pos.x;
-        const dy = mlp.y - pos.y;
-        return -Math.atan2(dx, dy) * (180 / Math.PI);
-      }
-
-      // Wall-flat yaw
-      if (canonRole === 'LW') return -90;
-      if (canonRole === 'RW') return 90;
-      if (canonRole === 'SL') return 90;
-      if (canonRole === 'SR') return -90;
-      if (canonRole === 'SBL' || canonRole === 'SBR') {
-        // Corner detection logic
-        const distLeft = Math.abs(pos.x);
-        const distRight = Math.abs(W - pos.x);
-        const distBack = Math.abs(L - pos.y);
-        const minDist = Math.min(distLeft, distRight, distBack);
-        
-        if (minDist === distBack) return 0;  // back wall
-        if (minDist === distLeft) return 90; // left wall
-        return -90; // right wall
-      }
-
-      return 0;
-    };
-
-    // Compute rotated vertices and find max depth from wall
-    const depthForSpeaker = (canonRole, speaker, wall) => {
-      const pos = speaker?.position;
-      if (!pos || !isFiniteNum(pos.x) || !isFiniteNum(pos.y)) return null;
-
-      const { widthM, depthM } = dimsFor(speaker.model);
-      const yawDeg = yawFor(canonRole, speaker);
-      const yawRad = degToRad(yawDeg);
-
-      // Rectangle corners in local space (before rotation)
-      const hw = widthM / 2;
-      const hd = depthM / 2;
-      const corners = [
-        { x: -hw, y: -hd },
-        { x:  hw, y: -hd },
-        { x:  hw, y:  hd },
-        { x: -hw, y:  hd }
-      ];
-
-      // Rotate and translate to world space
-      const cosY = Math.cos(yawRad);
-      const sinY = Math.sin(yawRad);
-      const worldCorners = corners.map(c => ({
-        x: pos.x + (c.x * cosY - c.y * sinY),
-        y: pos.y + (c.x * sinY + c.y * cosY)
-      }));
-
-      // Find max distance from wall to furthest vertex
-      if (wall === "left") {
-        return Math.max(...worldCorners.map(c => c.x));
-      } else if (wall === "right") {
-        return W - Math.min(...worldCorners.map(c => c.x));
-      } else if (wall === "back") {
-        return L - Math.min(...worldCorners.map(c => c.y));
-      } else if (wall === "front") {
-        return Math.max(...worldCorners.map(c => c.y));
-      }
-
-      return null;
-    };
-
-    const maxDepthCmFor = (roles, wall) => {
-      const vals = [];
-      roles.forEach((canonRole) => {
-        byCanon(canonRole).forEach((s) => {
-          const m = depthForSpeaker(canonRole, s, wall);
-          if (isFiniteNum(m) && m > 0) vals.push(m);
-        });
-      });
-
-      if (!vals.length) return null;
-      return Math.round(Math.max(...vals) * 100);
-    };
-
-    return {
-      frontWides: maxDepthCmFor(["LW", "RW"], "left"), // Both measure from side walls
-      sideSurrounds: maxDepthCmFor(["SL", "SR"], "left"), // Both measure from side walls
-      rearSurrounds: maxDepthCmFor(["SBL", "SBR"], "back"), // Measure from back wall
-    };
-  }, [
-    placedSpeakers, 
-    stableDimensions.width, 
-    stableDimensions.length,
-    mlpAnchorEffective,
-    appState?.aimFrontWidesAtMLP,
-    appState?.aimSideSurroundsAtMLP,
-    appState?.aimRearSurroundsAtMLP
-  ]);
-
   // Use session active project ID (from Projects page), fallback to URL param for legacy support
   const activeProjectId = sessionActiveProjectId || initialProjectIdFromUrl;
 
@@ -2058,20 +1921,12 @@ function RoomDesignerWithState() {
   appState?.roomDims?.lengthM]
   );
 
-  // Use computed MLP as the effective anchor (for backwards compatibility)
-  const mlpAnchorEffective = useMemo(() => {
-    const mlpY = appState?.mlpY_m;
-    if (!Number.isFinite(mlpY)) return null;
+  // CRITICAL: Extract placedSpeakers early so it's available for allSeatSplMetrics
+  const placedSpeakers = store.placedSpeakers;
 
-    const roomWidthM = Number(stableDimensions?.width) || 0;
-    return {
-      x: roomWidthM > 0 ? roomWidthM / 2 : 0,
-      y: mlpY,
-      z: 1.2
-    };
-  }, [appState?.mlpY_m, stableDimensions?.width]);
+  const visualisationRef = useRef(null);
 
-  // NEW: Compute centralized SPL data for all seats (powers sidebar SPL cards AND HUD)
+  // Use session active project ID (from Projects page), fallback to URL param for legacy support
   // Uses unified SPL logic with max_spl_cont_db_1m cap from speakerData.js
   const allSeatSplMetrics = useMemo(() => {
     const getCanonicalRoleLocal = (role) => {
