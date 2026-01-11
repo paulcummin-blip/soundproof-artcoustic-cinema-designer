@@ -344,12 +344,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       return speaker;
     });
 
-    // Compute P17 for all seats (non-LCR HF variance)
+    // Compute P17 for all seats (non-LCR HF variance) - PASS appState for aim toggles
     const p17Results = computeP17ForAllSeats({
       seats: seatsWithRoles,
       speakers: speakersWithResolvedOverheads,
       getSpeakerModelMeta,
       roomHeightM,
+      appState: overheadState, // Contains aim toggles (aimFrontWidesAtMLP, etc.)
+      getCanonicalRole,
     });
 
     // Helper to get SPL at seat for a specific role
