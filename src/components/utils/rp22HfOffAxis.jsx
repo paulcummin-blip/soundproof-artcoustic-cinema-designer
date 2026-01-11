@@ -333,6 +333,14 @@ const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
     ? getCanonicalRole(speaker?.role)
     : String(speaker?.role || "").toUpperCase();
 
+  // 1) If the plan view has already computed a rotation for this icon, use that.
+  // This keeps P17 perfectly aligned with what the user is seeing on the plan.
+  if (isNum(speaker?.rotationDeg)) return Number(speaker.rotationDeg);
+  if (isNum(speaker?.rotation_deg)) return Number(speaker.rotation_deg);
+
+  // 2) If yaw is explicitly persisted, use it
+  if (isNum(speaker?.yaw)) return Number(speaker.yaw);
+
   const aimFrontWides = !!appState?.aimFrontWidesAtMLP;
   const aimSideSur = !!appState?.aimSideSurroundsAtMLP;
   const aimRearSur = !!appState?.aimRearSurroundsAtMLP;
@@ -354,9 +362,6 @@ const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
     const yawToSeat = angleFromTo(speaker?.position, seatPos);
     return isNum(yawToSeat) ? yawToSeat : 0;
   }
-
-  // If aim toggle is OFF, allow persisted yaw (manual rotation etc.)
-  if (isNum(speaker?.yaw)) return Number(speaker.yaw);
 
   // Wall-flat defaults (matches plan view)
   if (isFW || isSide) {
@@ -460,7 +465,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
     }
 
-    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, effectiveAngleDeg, lossDb, appState: !!appState });
+    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxisDeg: effectiveAngleDeg, lossDb, appState: !!appState });
 
     return {
       role,
