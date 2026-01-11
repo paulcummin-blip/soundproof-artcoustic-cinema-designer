@@ -1931,6 +1931,8 @@ function RoomDesignerWithState() {
     };
   }, [appState?.mlpY_m, stableDimensions?.width]);
 
+  const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
+
   // NEW: In-room depth calculation (placed AFTER mlpAnchorEffective)
   const inRoomDepthsCm = React.useMemo(() => {
     const W = stableDimensions.width;
@@ -3935,8 +3937,6 @@ function RoomDesignerWithState() {
     useRearGlobal: useRearGlobalFromState,
     setUseRearGlobal: setUseRearGlobalFromState
   } = appState;
-
-  const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
 
   return (
     <div className="flex flex-col h-full bg-[#F8F8F7]" style={{ minHeight: 0 }}>
