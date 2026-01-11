@@ -1934,17 +1934,36 @@ function RoomDesignerWithState() {
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
 
+  // Helper functions for in-room depth calculation
+  const _isNum = (v) => typeof v === "number" && Number.isFinite(v);
+  
+  const _degToRad = (deg) => (deg * Math.PI) / 180;
+  
+  const _projectHalfExtent = (yawDeg, halfW, halfD, normalAxis) => {
+    const a = _degToRad(_isNum(yawDeg) ? yawDeg : 0);
+    const c = Math.abs(Math.cos(a));
+    const s = Math.abs(Math.sin(a));
+    if (normalAxis === "x") return halfW * c + halfD * s;
+    return halfW * s + halfD * c;
+  };
+  
+  const _getDimsM = (modelMeta) => {
+    const d = modelMeta?.dims || modelMeta?.dimensions || {};
+    const widthM = _isNum(d.widthM) ? d.widthM : (_isNum(d.width) ? d.width : 0.18);
+    const depthM = _isNum(d.depthM) ? d.depthM : (_isNum(d.depth) ? d.depth : 0.10);
+    return { widthM, depthM };
+  };
+
   // NEW: In-room depth calculation (placed AFTER mlpAnchorEffective)
   const inRoomDepthsCm = React.useMemo(() => {
-    const W = stableDimensions.width;
-    const L = stableDimensions.length;
-
-    if (!isFiniteNum(W) || !isFiniteNum(L)) {
+    if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) {
       return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
     }
 
-    const mlp = mlpAnchorEffective;
-    if (!mlp || !isFiniteNum(mlp.x) || !isFiniteNum(mlp.y)) {
+    const widthM = stableDimensions.width;
+    const lengthM = stableDimensions.length;
+
+    if (!_isNum(widthM) || !_isNum(lengthM) || widthM <= 0 || lengthM <= 0) {
       return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
     }
 
@@ -1952,105 +1971,106 @@ function RoomDesignerWithState() {
     const aimSide = appState?.aimSideSurroundsAtMLP || false;
     const aimRear = appState?.aimRearSurroundsAtMLP || false;
 
-    const byCanon = (canonRole) =>
-      (placedSpeakers || []).filter((s) => safeCanon(s?.role) === canonRole);
+    const computeGroupDepthCm = ({ roles, getYawDegForRole, placedSpeakers, widthM, lengthM, getModelMeta }) => {
+      if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) return null;
+      const W = widthM;
+      const L = lengthM;
+      if (!(_isNum(W) && W > 0 && _isNum(L) && L > 0)) return null;
 
-    const dimsFor = (model) => {
-      const meta = getSpeakerModelMeta(model) || {};
-      return {
-        widthM: meta.widthM ?? 0.27,
-        depthM: meta.depthM ?? 0.082,
-      };
+      let maxDepthM = null;
+
+      for (const sp of placedSpeakers) {
+        const role = sp?.role;
+        if (!role || !roles.includes(role)) continue;
+
+        const pos = sp?.position || {};
+        if (!_isNum(pos.x) || !_isNum(pos.y)) continue;
+
+        const meta = getModelMeta?.(sp) || null;
+        const { widthM: wM, depthM: dM } = _getDimsM(meta);
+        const halfW = wM / 2;
+        const halfD = dM / 2;
+
+        const yawDeg = getYawDegForRole?.(sp) ?? 0;
+
+        const isLeftWallRole = role === "LW" || role === "SL" || role === "SBL";
+        const isRightWallRole = role === "RW" || role === "SR" || role === "SBR";
+
+        let depthM_fromWall;
+
+        if (isLeftWallRole) {
+          const proj = _projectHalfExtent(yawDeg, halfW, halfD, "x");
+          depthM_fromWall = pos.x + proj;
+        } else if (isRightWallRole) {
+          const proj = _projectHalfExtent(yawDeg, halfW, halfD, "x");
+          depthM_fromWall = (W - pos.x) + proj;
+        } else {
+          const proj = _projectHalfExtent(yawDeg, halfW, halfD, "y");
+          depthM_fromWall = (L - pos.y) + proj;
+        }
+
+        if (!_isNum(depthM_fromWall)) continue;
+        if (maxDepthM === null || depthM_fromWall > maxDepthM) maxDepthM = depthM_fromWall;
+      }
+
+      if (maxDepthM === null) return null;
+      return Math.round(maxDepthM * 100);
     };
 
-    const yawFor = (canonRole, speaker) => {
-      const pos = speaker?.position;
-      if (!pos || !isFiniteNum(pos.x) || !isFiniteNum(pos.y)) return 0;
+    const getModelMeta = (sp) => {
+      const meta = getSpeakerModelMeta(sp?.model);
+      return meta && !meta.notFound ? meta : null;
+    };
 
-      let shouldAim = false;
-      if (canonRole === 'LW' || canonRole === 'RW') shouldAim = aimFW;
-      else if (canonRole === 'SL' || canonRole === 'SR') shouldAim = aimSide;
-      else if (canonRole === 'SBL' || canonRole === 'SBR') shouldAim = aimRear;
+    const getYawDegForRole = (sp) => {
+      const r = sp?.role;
 
-      if (shouldAim) {
-        const dx = mlp.x - pos.x;
-        const dy = mlp.y - pos.y;
+      const aimToMLP = () => {
+        if (!sp?.position || !mlpAnchorEffective) return 0;
+        const dx = mlpAnchorEffective.x - sp.position.x;
+        const dy = mlpAnchorEffective.y - sp.position.y;
         return -Math.atan2(dx, dy) * (180 / Math.PI);
-      }
+      };
 
-      if (canonRole === 'LW') return -90;
-      if (canonRole === 'RW') return 90;
-      if (canonRole === 'SL') return 90;
-      if (canonRole === 'SR') return -90;
-      if (canonRole === 'SBL' || canonRole === 'SBR') {
-        const distLeft = Math.abs(pos.x);
-        const distRight = Math.abs(W - pos.x);
-        const distBack = Math.abs(L - pos.y);
-        const minDist = Math.min(distLeft, distRight, distBack);
-        
-        if (minDist === distBack) return 0;
-        if (minDist === distLeft) return 90;
-        return -90;
-      }
+      if ((r === "LW" || r === "RW") && aimFW) return aimToMLP();
+      if ((r === "SL" || r === "SR") && aimSide) return aimToMLP();
+      if ((r === "SBL" || r === "SBR") && aimRear) return aimToMLP();
+
+      if (r === "LW" || r === "SL") return 90;
+      if (r === "RW" || r === "SR") return -90;
+      if (r === "SBL" || r === "SBR") return 0;
 
       return 0;
     };
 
-    const depthForSpeaker = (canonRole, speaker, wall) => {
-      const pos = speaker?.position;
-      if (!pos || !isFiniteNum(pos.x) || !isFiniteNum(pos.y)) return null;
+    const frontWides = computeGroupDepthCm({
+      roles: ["LW", "RW"],
+      getYawDegForRole,
+      placedSpeakers,
+      widthM,
+      lengthM,
+      getModelMeta,
+    });
 
-      const { widthM, depthM } = dimsFor(speaker.model);
-      const yawDeg = yawFor(canonRole, speaker);
-      const yawRad = degToRad(yawDeg);
+    const sideSurrounds = computeGroupDepthCm({
+      roles: ["SL", "SR"],
+      getYawDegForRole,
+      placedSpeakers,
+      widthM,
+      lengthM,
+      getModelMeta,
+    });
 
-      const hw = widthM / 2;
-      const hd = depthM / 2;
-      const corners = [
-        { x: -hw, y: -hd },
-        { x:  hw, y: -hd },
-        { x:  hw, y:  hd },
-        { x: -hw, y:  hd }
-      ];
+    const rearSurrounds = computeGroupDepthCm({
+      roles: ["SBL", "SBR"],
+      getYawDegForRole,
+      placedSpeakers,
+      widthM,
+      lengthM,
+      getModelMeta,
+    });
 
-      const cosY = Math.cos(yawRad);
-      const sinY = Math.sin(yawRad);
-      const worldCorners = corners.map(c => ({
-        x: pos.x + (c.x * cosY - c.y * sinY),
-        y: pos.y + (c.x * sinY + c.y * cosY)
-      }));
-
-      if (wall === "left") {
-        return Math.max(...worldCorners.map(c => c.x));
-      } else if (wall === "right") {
-        return W - Math.min(...worldCorners.map(c => c.x));
-      } else if (wall === "back") {
-        return L - Math.min(...worldCorners.map(c => c.y));
-      } else if (wall === "front") {
-        return Math.max(...worldCorners.map(c => c.y));
-      }
-
-      return null;
-    };
-
-    const maxDepthCmFor = (roles, wall) => {
-      const vals = [];
-      roles.forEach((canonRole) => {
-        byCanon(canonRole).forEach((s) => {
-          const m = depthForSpeaker(canonRole, s, wall);
-          if (isFiniteNum(m) && m > 0) vals.push(m);
-        });
-      });
-
-      if (!vals.length) return null;
-      return Math.round(Math.max(...vals) * 100);
-    };
-
-    return {
-      frontWides: maxDepthCmFor(["LW", "RW"], "left"),
-      sideSurrounds: maxDepthCmFor(["SL", "SR"], "left"),
-      rearSurrounds: maxDepthCmFor(["SBL", "SBR"], "back"),
-    };
+    return { frontWides, sideSurrounds, rearSurrounds };
   }, [
     placedSpeakers, 
     stableDimensions.width, 
