@@ -2169,7 +2169,10 @@ function RoomDesignerWithState() {
       rearOverride: _overheadRearOverride,
       useFrontGlobal: _useFrontGlobal,
       useMidGlobal: _useMidGlobal,
-      useRearGlobal: _useRearGlobal
+      useRearGlobal: _useRearGlobal,
+      aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
     }
   });
 
