@@ -13,6 +13,28 @@ const SURROUND_ROLES = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
+// Canonical role normaliser (must match AppState aliases)
+const canonRole = (role, getCanonicalRole) => {
+  const raw = String(role || "").trim();
+  const upper = raw.toUpperCase();
+
+  // aliases seen elsewhere in the app
+  const aliasMap = {
+    LR: "SBL",
+    RR: "SBR",
+    FWL: "LW",
+    FWR: "RW",
+  };
+
+  const mapped = aliasMap[upper] || upper;
+
+  try {
+    return String(getCanonicalRole ? getCanonicalRole(mapped) : mapped).trim().toUpperCase();
+  } catch {
+    return String(mapped).trim().toUpperCase();
+  }
+};
+
 // Normalise to -180..+180
 const norm180 = (deg) => {
   if (!isNum(deg)) return null;
@@ -465,7 +487,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
     }
 
-    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxisDeg: effectiveAngleDeg, lossDb, appState: !!appState });
+    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxis: effectiveAngleDeg, lossDb });
 
     return {
       role,
