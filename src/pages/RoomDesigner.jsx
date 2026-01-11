@@ -1921,12 +1921,147 @@ function RoomDesignerWithState() {
   appState?.roomDims?.lengthM]
   );
 
-  // CRITICAL: Extract placedSpeakers early so it's available for allSeatSplMetrics
-  const placedSpeakers = store.placedSpeakers;
+  // Use computed MLP as the effective anchor (for backwards compatibility)
+  const mlpAnchorEffective = useMemo(() => {
+    const mlpY = appState?.mlpY_m;
+    if (!Number.isFinite(mlpY)) return null;
 
-  const visualisationRef = useRef(null);
+    const roomWidthM = Number(stableDimensions?.width) || 0;
+    return {
+      x: roomWidthM > 0 ? roomWidthM / 2 : 0,
+      y: mlpY,
+      z: 1.2
+    };
+  }, [appState?.mlpY_m, stableDimensions?.width]);
 
-  // Use session active project ID (from Projects page), fallback to URL param for legacy support
+  // NEW: In-room depth calculation (placed AFTER mlpAnchorEffective)
+  const inRoomDepthsCm = React.useMemo(() => {
+    const W = stableDimensions.width;
+    const L = stableDimensions.length;
+
+    if (!isFiniteNum(W) || !isFiniteNum(L)) {
+      return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
+    }
+
+    const mlp = mlpAnchorEffective;
+    if (!mlp || !isFiniteNum(mlp.x) || !isFiniteNum(mlp.y)) {
+      return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
+    }
+
+    const aimFW = appState?.aimFrontWidesAtMLP || false;
+    const aimSide = appState?.aimSideSurroundsAtMLP || false;
+    const aimRear = appState?.aimRearSurroundsAtMLP || false;
+
+    const byCanon = (canonRole) =>
+      (placedSpeakers || []).filter((s) => safeCanon(s?.role) === canonRole);
+
+    const dimsFor = (model) => {
+      const meta = getSpeakerModelMeta(model) || {};
+      return {
+        widthM: meta.widthM ?? 0.27,
+        depthM: meta.depthM ?? 0.082,
+      };
+    };
+
+    const yawFor = (canonRole, speaker) => {
+      const pos = speaker?.position;
+      if (!pos || !isFiniteNum(pos.x) || !isFiniteNum(pos.y)) return 0;
+
+      let shouldAim = false;
+      if (canonRole === 'LW' || canonRole === 'RW') shouldAim = aimFW;
+      else if (canonRole === 'SL' || canonRole === 'SR') shouldAim = aimSide;
+      else if (canonRole === 'SBL' || canonRole === 'SBR') shouldAim = aimRear;
+
+      if (shouldAim) {
+        const dx = mlp.x - pos.x;
+        const dy = mlp.y - pos.y;
+        return -Math.atan2(dx, dy) * (180 / Math.PI);
+      }
+
+      if (canonRole === 'LW') return -90;
+      if (canonRole === 'RW') return 90;
+      if (canonRole === 'SL') return 90;
+      if (canonRole === 'SR') return -90;
+      if (canonRole === 'SBL' || canonRole === 'SBR') {
+        const distLeft = Math.abs(pos.x);
+        const distRight = Math.abs(W - pos.x);
+        const distBack = Math.abs(L - pos.y);
+        const minDist = Math.min(distLeft, distRight, distBack);
+        
+        if (minDist === distBack) return 0;
+        if (minDist === distLeft) return 90;
+        return -90;
+      }
+
+      return 0;
+    };
+
+    const depthForSpeaker = (canonRole, speaker, wall) => {
+      const pos = speaker?.position;
+      if (!pos || !isFiniteNum(pos.x) || !isFiniteNum(pos.y)) return null;
+
+      const { widthM, depthM } = dimsFor(speaker.model);
+      const yawDeg = yawFor(canonRole, speaker);
+      const yawRad = degToRad(yawDeg);
+
+      const hw = widthM / 2;
+      const hd = depthM / 2;
+      const corners = [
+        { x: -hw, y: -hd },
+        { x:  hw, y: -hd },
+        { x:  hw, y:  hd },
+        { x: -hw, y:  hd }
+      ];
+
+      const cosY = Math.cos(yawRad);
+      const sinY = Math.sin(yawRad);
+      const worldCorners = corners.map(c => ({
+        x: pos.x + (c.x * cosY - c.y * sinY),
+        y: pos.y + (c.x * sinY + c.y * cosY)
+      }));
+
+      if (wall === "left") {
+        return Math.max(...worldCorners.map(c => c.x));
+      } else if (wall === "right") {
+        return W - Math.min(...worldCorners.map(c => c.x));
+      } else if (wall === "back") {
+        return L - Math.min(...worldCorners.map(c => c.y));
+      } else if (wall === "front") {
+        return Math.max(...worldCorners.map(c => c.y));
+      }
+
+      return null;
+    };
+
+    const maxDepthCmFor = (roles, wall) => {
+      const vals = [];
+      roles.forEach((canonRole) => {
+        byCanon(canonRole).forEach((s) => {
+          const m = depthForSpeaker(canonRole, s, wall);
+          if (isFiniteNum(m) && m > 0) vals.push(m);
+        });
+      });
+
+      if (!vals.length) return null;
+      return Math.round(Math.max(...vals) * 100);
+    };
+
+    return {
+      frontWides: maxDepthCmFor(["LW", "RW"], "left"),
+      sideSurrounds: maxDepthCmFor(["SL", "SR"], "left"),
+      rearSurrounds: maxDepthCmFor(["SBL", "SBR"], "back"),
+    };
+  }, [
+    placedSpeakers, 
+    stableDimensions.width, 
+    stableDimensions.length,
+    mlpAnchorEffective,
+    appState?.aimFrontWidesAtMLP,
+    appState?.aimSideSurroundsAtMLP,
+    appState?.aimRearSurroundsAtMLP
+  ]);
+
+  // NEW: Compute centralized SPL data for all seats (powers sidebar SPL cards AND HUD)
   // Uses unified SPL logic with max_spl_cont_db_1m cap from speakerData.js
   const allSeatSplMetrics = useMemo(() => {
     const getCanonicalRoleLocal = (role) => {
