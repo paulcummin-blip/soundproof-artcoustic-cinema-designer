@@ -22,6 +22,12 @@ const norm180 = (deg) => {
   return a;
 };
 
+// Smallest absolute angle between two headings (0..180)
+const shortestAngleDeg = (aDeg, bDeg) => {
+  const d = norm180((Number(aDeg) || 0) - (Number(bDeg) || 0));
+  return Math.abs(d);
+};
+
 // Centralized angle → HF loss mapping using new RP22 thresholds
 // Uses model-specific dispersion if available, otherwise defaults to generic thresholds
 function mapAngleToHfLossDb(angleDeg, modelMeta = null) {
