@@ -3618,7 +3618,7 @@ useEffect(() => {
 
   // [REMOVED] Redundant useEffect for LCR yaw was here.
 
-  // [NEW] Auto-hug surrounds to walls when room dimensions change (only auto-positioned speakers)
+  // [NEW] Auto-hug surrounds to walls when room dimensions change (INCLUDES LW/RW)
   useEffect(() => {
     if (isAnyDraggingRef.current) return;
     if (!onSetSpeakers || !placedSpeakers?.length) return;
@@ -3631,21 +3631,26 @@ useEffect(() => {
     const updated = placedSpeakers.map(spk => {
       const canon = getCanonicalRole(spk.role);
       
-      // [B44 REAR FIX] Only process SIDE wall speakers (SL/SR)
-      // LW/RW are NOT auto-hugged to walls (they use front-wide zones)
-      // SBL/SBR are handled by SpeakerPlacement and should NOT be auto-hugged to side walls
-      if (!['SL', 'SR'].includes(canon)) return spk;
+      // Process ALL side wall speakers: SL/SR and LW/RW
+      // SBL/SBR are handled by SpeakerPlacement and stay on back wall
+      if (!['SL', 'SR', 'LW', 'RW'].includes(canon)) return spk;
       if (!spk.position || !spk.model) return spk;
       
-      // [B44 POSITION LOCK] Skip user-positioned speakers
-      if (spk.positionSource === 'user') return spk;
+      // [B44 POSITION LOCK] Skip user-positioned speakers (except during wall-hug restore)
+      // Note: Even user-positioned FW speakers must hug the wall
+      if (spk.positionSource === 'user' && !['LW', 'RW'].includes(canon)) return spk;
 
       const dims = getModelDimsM(spk.model);
       const isLeft = ['SL', 'LW'].includes(canon);
       const side = isLeft ? 'L' : 'R';
 
-      // Calculate correct wall-hugged X using same helper as drag code
-      const targetX = fixedSideX(W, dims, side, WALL_BUFFER_M);
+      // Calculate correct wall-hugged X using 0.01m buffer
+      const FW_WALL_BUFFER_M = 0.01;
+      const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
+      const targetX = isLeft 
+        ? (FW_WALL_BUFFER_M + halfDepth)
+        : (W - FW_WALL_BUFFER_M - halfDepth);
+      
       const currentX = Number(spk.position.x) || 0;
 
       // Only update if position has actually changed
