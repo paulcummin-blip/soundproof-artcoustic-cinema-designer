@@ -2170,6 +2170,8 @@ function RoomDesignerWithState() {
       useFrontGlobal: _useFrontGlobal,
       useMidGlobal: _useMidGlobal,
       useRearGlobal: _useRearGlobal,
+    },
+    aimState: {
       aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
