@@ -13,6 +13,9 @@ const SURROUND_ROLES = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
+// Quantise degrees to 0.5° steps (floor, favourable + stable)
+const q05 = (deg) => (typeof deg === "number" && Number.isFinite(deg) ? Math.floor(deg * 2) / 2 : deg);
+
 // Canonical role normaliser (must match AppState aliases)
 const canonRole = (role, getCanonicalRole) => {
   const raw = String(role || "").trim();
@@ -461,19 +464,25 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
   } 
   // Bed-layer surrounds/wides: use horizontal off-axis WITH EFFECTIVE YAW
   else if (SURROUND_ROLES.has(role)) {
-    const seatAzDeg = angleFromTo(pos, seat);
-    if (!isNum(seatAzDeg)) return null;
+    const seatAzDegRaw = angleFromTo(pos, seat);
+    if (!isNum(seatAzDegRaw)) return null;
+
+    // Quantise seat azimuth to 0.5° (prevents input jitter)
+    const seatAzDeg = q05(seatAzDegRaw);
 
     // Effective "front axis" yaw (same convention as plan view)
-    const aimDeg = getEffectiveYawDeg(speaker, seat, appState, getCanonicalRole);
+    const aimDegRaw = getEffectiveYawDeg(speaker, seat, appState, getCanonicalRole);
+    
+    // Quantise aim direction to 0.5° (prevents input jitter)
+    const aimDeg = q05(aimDegRaw);
 
     // True off-axis = smallest angle between seat direction and front axis (0..180)
-    const offAxis = shortestAngleDeg(seatAzDeg, aimDeg);
-    if (!isNum(offAxis)) return null;
+    const offAxisRaw = shortestAngleDeg(seatAzDeg, aimDeg);
+    if (!isNum(offAxisRaw)) return null;
 
-    // Quantise to 0.5° resolution, rounded DOWN (favourable + stable)
-    const offAxisQ = Math.max(0, Math.floor(offAxis * 2) / 2);
-    const effectiveAngleDeg = offAxisQ;
+    // Quantise off-axis result to 0.5° (final stabilisation)
+    const offAxis = q05(offAxisRaw);
+    const effectiveAngleDeg = offAxis;
 
     // Get model metadata for dispersion
     const meta = modelMeta || (speaker.model ? getSpeakerModelMeta(speaker.model) : null);
@@ -503,12 +512,12 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxis: effectiveAngleDeg, lossDb, appState: !!appState });
     }
 
-    // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs
+    // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs (showing quantized values)
     const isLwRw = role === "LW" || role === "RW";
     const diagnosticDebug = isLwRw ? {
-      seatAzDeg: isNum(seatAzDeg) ? Number(seatAzDeg.toFixed(2)) : null,
-      aimDegUsed: isNum(aimDeg) ? Number(aimDeg.toFixed(2)) : null,
-      offAxisDegComputed: isNum(effectiveAngleDeg) ? Number(effectiveAngleDeg.toFixed(2)) : null,
+      seatAzDeg: seatAzDeg,
+      aimDegUsed: aimDeg,
+      offAxisDegComputed: offAxis,
       canonRoleUsed: role,
       aimFlagsSeen: {
         aimFrontWidesAtMLP: !!appState?.aimFrontWidesAtMLP,
@@ -519,7 +528,8 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
 
     return {
       role,
-      offAxisDeg: effectiveAngleDeg,
+      angleDeg: offAxis,
+      offAxisDeg: offAxis,
       lossDb: Number(lossDb.toFixed(1)),
       isBeyondNonLcrLimit,
       debug: diagnosticDebug,
