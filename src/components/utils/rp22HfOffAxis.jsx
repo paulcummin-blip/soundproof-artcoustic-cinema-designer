@@ -105,7 +105,7 @@ const angleFromTo = (from, to) => {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   if (!isNum(dx) || !isNum(dy)) return null;
-  return (Math.atan2(dx, dy) * 180) / Math.PI; // -180..+180
+  return (-Math.atan2(dx, dy) * 180) / Math.PI; // -180..+180 (matches yawDegToMLP)
 };
 
 // P16 level mapping based on loss
@@ -367,7 +367,7 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
 // CRITICAL: Get effective yaw using same logic as plan view (matches icon rotation)
 // IMPORTANT: When an Aim toggle is ON, it MUST override any persisted yaw/rotation,
 // otherwise P17 will stay "stuck" at the stored wall-flat angle.
-const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
+const getEffectiveYawDeg = (speaker, seatPos, mlpPos, appState, getCanonicalRole) => {
   const canon = canonRole(speaker?.role, getCanonicalRole);
 
   const aimFrontWides = !!appState?.aimFrontWidesAtMLP;
@@ -383,10 +383,12 @@ const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
     (isSide && aimSideSur) ||
     (isRear && aimRearSur);
 
-  // 1) Aim toggle ON → always use yaw-to-seat (this is what "aimed at MLP" means)
+  // 1) Aim toggle ON → speaker is physically aimed at the MLP
+  // Off-axis is still measured per-seat elsewhere.
   if (groupAimOn) {
-    const yawToSeat = angleFromTo(speaker?.position, seatPos);
-    return isNum(yawToSeat) ? yawToSeat : 0;
+    const target = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y)) ? mlpPos : seatPos;
+    const yawToTarget = angleFromTo(speaker?.position, target);
+    return isNum(yawToTarget) ? yawToTarget : 0;
   }
 
   // 2) Aim toggle OFF → use persisted yaw if present (manual toe-in)
@@ -411,7 +413,7 @@ const getEffectiveYawDeg = (speaker, seatPos, appState, getCanonicalRole) => {
 };
 
 // Unified helper: compute HF loss for one non-LCR speaker at one seat
-function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomHeightM, appState, getCanonicalRole }) {
+function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMeta, roomHeightM, appState, getCanonicalRole }) {
   if (!speaker || !seat) return null;
   
   const role = canonRole(speaker?.role, getCanonicalRole);
@@ -464,28 +466,28 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
   } 
   // Bed-layer surrounds/wides: use horizontal off-axis WITH EFFECTIVE YAW
   else if (SURROUND_ROLES.has(role)) {
-    // Quantise DOWN to 0.5° steps (more favourable + stable)
-    const q05Down = (deg) => {
-      const n = Number(deg);
-      if (!Number.isFinite(n)) return 0;
-      return Math.floor(n * 2) / 2; // 0.5° steps, floored
+    // Quantise DOWN to integer degrees (no decimals in HUD)
+    const qIntDown = (deg) => {
+      const n = Math.abs(Number(deg) || 0);
+      // epsilon prevents 1.0000000002 from becoming 2
+      return Math.floor(n + 1e-9);
     };
 
     // Raw angles
     const seatAzDeg = angleFromTo(pos, seat);
     if (!isNum(seatAzDeg)) return null;
 
-    const aimDegRaw = getEffectiveYawDeg(speaker, seat, appState, getCanonicalRole);
+    const aimDegRaw = getEffectiveYawDeg(speaker, seat, mlpPos, appState, getCanonicalRole);
 
     // Quantise inputs
-    const seatAzQ = q05Down(seatAzDeg);
-    const aimDegQ = q05Down(aimDegRaw);
+    const seatAzQ = qIntDown(seatAzDeg);
+    const aimDegQ = qIntDown(aimDegRaw);
 
     // Compute + quantise off-axis
     const offAxisRaw = shortestAngleDeg(seatAzQ, aimDegQ);
     if (!isNum(offAxisRaw)) return null;
 
-    const offAxis = Math.max(0, q05Down(offAxisRaw));
+    const offAxis = Math.max(0, qIntDown(offAxisRaw));
     const effectiveAngleDeg = offAxis;
 
     // Get model metadata for dispersion
@@ -549,7 +551,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
 }
 
 // P17: Compute surround/wide/overhead HF variance across all non-LCR speakers for all seats
-export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: modelIndex, roomHeightM, debug, appState, getCanonicalRole }) {
+export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModelMeta: modelIndex, roomHeightM, debug, appState, getCanonicalRole }) {
   if (!Array.isArray(seats) || !seats.length) return {};
   if (!Array.isArray(speakers) || !speakers.length) return {};
 
@@ -597,6 +599,7 @@ export function computeP17ForAllSeats({ seats, speakers, getSpeakerModelMeta: mo
       const result = computeSurroundLikeHfLoss({
         speaker: spk,
         seat: { x: seatPos.x || seat.x, y: seatPos.y || seat.y, z: seatPos.z || seat.z },
+        mlpPos,
         earHeightM,
         modelMeta: spk.model ? modelIndex(spk.model) : null,
         roomHeightM,

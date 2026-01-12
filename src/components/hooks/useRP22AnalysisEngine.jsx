@@ -355,6 +355,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const p17Results = computeP17ForAllSeats({
       seats: seatsWithRoles,
       speakers: speakersWithResolvedOverheads,
+      mlpPos: mlp,
       getSpeakerModelMeta,
       roomHeightM,
       appState: aimState || overheadState,
