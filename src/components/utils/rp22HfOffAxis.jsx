@@ -109,6 +109,9 @@ const yawFromTo = (from, to) => {
   return -(Math.atan2(dx, dy) * 180) / Math.PI; // -180..+180 (matches yawDegToMLP)
 };
 
+// Back-compat: older code paths still call angleFromTo
+const angleFromTo = yawFromTo;
+
 // P16 level mapping based on loss
 const classifyP16 = (lossDb) => {
   if (!isNum(lossDb)) return null;
