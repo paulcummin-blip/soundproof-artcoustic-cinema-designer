@@ -519,7 +519,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
     // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs (showing quantized values)
     const isLwRw = role === "LW" || role === "RW";
     const diagnosticDebug = isLwRw ? {
-      seatAzDeg: seatAz,
+      seatAzDeg: seatAzDeg,
       aimDegUsed: aimDeg,
       offAxisDegComputed: offAxis,
       canonRoleUsed: role,
