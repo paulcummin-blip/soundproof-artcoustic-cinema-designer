@@ -83,6 +83,18 @@ function mapAngleToHfLossDb(angleDeg, modelMeta = null) {
 // Convert radians to degrees
 const rad2deg = (rad) => rad * 180 / Math.PI;
 
+// Quantise angle DOWN to the nearest step (default 0.5°) to prevent jitter.
+// Slightly favourable by design (floors rather than rounds).
+const quantiseAngleDown = (deg, step = 0.5) => {
+  const v = Math.abs(Number(deg) || 0);
+  const s = Number(step) || 0.5;
+  if (!Number.isFinite(v) || !Number.isFinite(s) || s <= 0) return 0;
+  // tiny epsilon so values like 1.0000000002 don't jump up a step
+  const q = Math.floor((v + 1e-9) / s) * s;
+  // Keep one decimal so HUD stays clean (0.5° granularity)
+  return Number(q.toFixed(1));
+};
+
 // 0° = straight into the room (+Y), positive = clockwise.
 // Same convention as yawDegToMLP / safeYawToMLP.
 const angleFromTo = (from, to) => {
@@ -149,7 +161,7 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
     const offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
     if (!isNum(offAxisDeg)) continue;
 
-    const angleDeg = Number(offAxisDeg.toFixed(1));
+    const angleDeg = quantiseAngleDown(offAxisDeg, 0.5);
 
     // Get model metadata for dispersion
     const meta = spk.model ? getSpeakerModelMeta(spk.model) : null;
@@ -441,8 +453,8 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
 
     return {
       role,
-      offAxisDeg: Number(vert.offAxisDeg.toFixed(1)),        // effective angle for scoring
-      rawAngleDeg: Number((vert.rawAngleDeg ?? vert.offAxisDeg).toFixed(1)), // geometric angle for display
+      offAxisDeg: quantiseAngleDown(vert.offAxisDeg, 0.5), // for scoring
+      rawAngleDeg: quantiseAngleDown((vert.rawAngleDeg ?? vert.offAxisDeg), 0.5), // for display
       lossDb: Number(vert.lossDb.toFixed(1)),
       debug: vert.debug, // Pass through debug data
     };
@@ -459,7 +471,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
     const offAxis = shortestAngleDeg(seatAzDeg, aimDeg);
     if (!isNum(offAxis)) return null;
 
-    const effectiveAngleDeg = Number(offAxis.toFixed(1));
+    const effectiveAngleDeg = quantiseAngleDown(offAxis, 0.5);
 
     // Get model metadata for dispersion
     const meta = modelMeta || (speaker.model ? getSpeakerModelMeta(speaker.model) : null);
