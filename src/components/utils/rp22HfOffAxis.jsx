@@ -98,24 +98,15 @@ const quantiseAngleDown = (deg, step = 0.5) => {
   return Number(q.toFixed(1));
 };
 
-// 0° = straight into the room (+Y), positive = clockwise.
-// Used for seat direction (azimuth from speaker to seat).
-const angleFromTo = (from, to) => {
+// Yaw convention MUST match RenderPrimitives.yawDegToMLP:
+// 0° = +Y (into room). Positive yaw = clockwise.
+// NOTE: RenderPrimitives uses a NEGATED atan2.
+const yawFromTo = (from, to) => {
   if (!from || !to) return null;
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   if (!isNum(dx) || !isNum(dy)) return null;
-  return (Math.atan2(dx, dy) * 180) / Math.PI; // -180..+180 (0° = +Y)
-};
-
-// Yaw-to-target using the SAME convention as RenderPrimitives.yawDegToMLP / safeYawToMLP
-// 0° = facing into room (+Y). Positive yaw = clockwise.
-const yawToTargetDeg = (from, to) => {
-  if (!from || !to) return null;
-  const dx = to.x - from.x;
-  const dy = to.y - from.y;
-  if (!isNum(dx) || !isNum(dy)) return null;
-  return (-Math.atan2(dx, dy) * 180) / Math.PI; // NOTE the minus
+  return -(Math.atan2(dx, dy) * 180) / Math.PI; // -180..+180 (matches yawDegToMLP)
 };
 
 // P16 level mapping based on loss
@@ -393,11 +384,10 @@ const getEffectiveYawDeg = (speaker, seatPos, mlpPos, appState, getCanonicalRole
     (isSide && aimSideSur) ||
     (isRear && aimRearSur);
 
-  // 1) Aim toggle ON → speaker is physically aimed at the MLP
-  // Off-axis is still measured per-seat elsewhere.
+  // 1) Aim toggle ON → speaker is physically aimed at the MLP (matches plan-view icon rotation)
   if (groupAimOn) {
     const target = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y)) ? mlpPos : seatPos;
-    const yawToTarget = yawToTargetDeg(speaker?.position, target);
+    const yawToTarget = yawFromTo(speaker?.position, target);
     return isNum(yawToTarget) ? yawToTarget : 0;
   }
 
@@ -407,19 +397,19 @@ const getEffectiveYawDeg = (speaker, seatPos, mlpPos, appState, getCanonicalRole
   if (isNum(speaker?.rotation_deg)) return Number(speaker.rotation_deg);
   if (isNum(speaker?.rotation?.y)) return Number(speaker.rotation.y);
 
-  // 3) No manual yaw → wall-flat defaults (match RoomVisualisation)
+  // 3) No manual yaw → wall-flat defaults (MUST match RoomVisualisation "YAW CALCULATION" block)
   if (isFW) {
-    // LW faces into room from left wall = -90, RW = +90
-    return canon === "LW" ? -90 : 90;
+    // Front Wides: LW = -90, RW = +90
+    return canon === "LW" ? -90 : +90;
   }
 
   if (isSide) {
-    // SL = +90, SR = -90
-    return canon === "SL" ? 90 : -90;
+    // Side Surrounds: SL = +90, SR = -90
+    return canon === "SL" ? +90 : -90;
   }
 
   if (isRear) {
-    // Rear speakers on back wall face into room: 0
+    // Rear Surrounds: back wall = 0 (if you later add wall-detection here, mirror RV logic)
     return 0;
   }
 
@@ -480,24 +470,21 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
   } 
   // Bed-layer surrounds/wides: use horizontal off-axis WITH EFFECTIVE YAW
   else if (SURROUND_ROLES.has(role)) {
-    // Quantise DOWN to integer degrees (no decimals in HUD)
-    const qIntDown = (deg) => {
-      const n = Math.abs(Number(deg) || 0);
-      // epsilon prevents 1.0000000002 from becoming 2
-      return Math.floor(n + 1e-9);
-    };
+    // Compute yaws (SIGNED headings, -180..+180)
+    const seatYawDeg = yawFromTo(pos, seat);
+    if (!isNum(seatYawDeg)) return null;
 
-    // Raw angles
-    const seatAzDeg = angleFromTo(pos, seat);
-    if (!isNum(seatAzDeg)) return null;
+    const aimYawDeg = getEffectiveYawDeg(speaker, seat, mlpPos, appState, getCanonicalRole);
 
-    const aimDegRaw = getEffectiveYawDeg(speaker, seat, mlpPos, appState, getCanonicalRole);
+    // Off-axis magnitude (0..180)
+    const seatYaw = seatYawDeg;
+    const aimYaw = aimYawDeg;
 
-    // Compute + quantise off-axis (integer floor, favourable + stable)
-    const offAxisRaw = shortestAngleDeg(seatAzDeg, aimDegRaw);
+    const offAxisRaw = shortestAngleDeg(seatYaw, aimYaw);
     if (!isNum(offAxisRaw)) return null;
 
-    const offAxis = Math.max(0, qIntDown(offAxisRaw));
+    // Floor DOWN to integer degrees for display + stability
+    const offAxis = Math.max(0, Math.floor(offAxisRaw + 1e-9));
     const effectiveAngleDeg = offAxis;
 
     // Get model metadata for dispersion
@@ -526,8 +513,8 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
 
     if (globalThis.__B44_RV_DEBUG === true) {
       console.log("[P17 SURROUND]", role, {
-        seatAzDeg,
-        aimDegRaw,
+        seatYawDeg,
+        aimYawDeg,
         offAxis,
         lossDb,
       });
@@ -536,8 +523,8 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs
     const isLwRw = role === "LW" || role === "RW";
     const diagnosticDebug = isLwRw ? {
-      seatAzDeg,
-      aimDegUsed: aimDegRaw,
+      seatYawDeg,
+      aimYawDeg,
       offAxisDegComputed: offAxis,
       canonRoleUsed: role,
       aimFlagsSeen: {

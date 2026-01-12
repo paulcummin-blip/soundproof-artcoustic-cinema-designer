@@ -407,12 +407,12 @@ export default function SeatHud({
                       >
                         {lwData?.debug && (
                           <div>
-                            LW dbg: seatAz={formatDbgVal(lwData.debug.seatAzDeg)} aim={formatDbgVal(lwData.debug.aimDegUsed)} offAxis={formatDbgVal(lwData.debug.offAxisDegComputed)} canon={lwData.debug.canonRoleUsed || '—'} flags={formatFlags(lwData.debug.aimFlagsSeen)}
+                            LW dbg: seatYaw={formatDbgVal(lwData.debug.seatYawDeg)} aimYaw={formatDbgVal(lwData.debug.aimYawDeg)} offAxis={formatDbgVal(lwData.debug.offAxisDegComputed)} canon={lwData.debug.canonRoleUsed || '—'} flags={formatFlags(lwData.debug.aimFlagsSeen)}
                           </div>
                         )}
                         {rwData?.debug && (
                           <div>
-                            RW dbg: seatAz={formatDbgVal(rwData.debug.seatAzDeg)} aim={formatDbgVal(rwData.debug.aimDegUsed)} offAxis={formatDbgVal(rwData.debug.offAxisDegComputed)} canon={rwData.debug.canonRoleUsed || '—'} flags={formatFlags(rwData.debug.aimFlagsSeen)}
+                            RW dbg: seatYaw={formatDbgVal(rwData.debug.seatYawDeg)} aimYaw={formatDbgVal(rwData.debug.aimYawDeg)} offAxis={formatDbgVal(rwData.debug.offAxisDegComputed)} canon={rwData.debug.canonRoleUsed || '—'} flags={formatFlags(rwData.debug.aimFlagsSeen)}
                           </div>
                         )}
                       </div>
