@@ -471,7 +471,8 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
     const offAxis = shortestAngleDeg(seatAzDeg, aimDeg);
     if (!isNum(offAxis)) return null;
 
-    const effectiveAngleDeg = quantiseAngleDown(offAxis, 0.5);
+    // Stabilise: round DOWN to nearest 0.5° (favourable + avoids jitter)
+    const effectiveAngleDeg = Math.floor(offAxis * 2) / 2;
 
     // Get model metadata for dispersion
     const meta = modelMeta || (speaker.model ? getSpeakerModelMeta(speaker.model) : null);
@@ -497,7 +498,15 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       lossDb = lossFromAngle != null ? lossFromAngle : 5.0;
     }
 
-    console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxis: effectiveAngleDeg, lossDb, appState: !!appState });
+    if (globalThis.__B44_RV_DEBUG === true) {
+      console.log("[P17 SURROUND]", role, {
+        seatAzDeg,
+        aimDeg,
+        offAxis: effectiveAngleDeg,
+        lossDb,
+        appState: !!appState
+      });
+    }
 
     // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs
     const isLwRw = role === "LW" || role === "RW";
