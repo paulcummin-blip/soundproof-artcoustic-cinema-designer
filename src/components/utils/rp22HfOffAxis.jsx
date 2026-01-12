@@ -464,24 +464,28 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
   } 
   // Bed-layer surrounds/wides: use horizontal off-axis WITH EFFECTIVE YAW
   else if (SURROUND_ROLES.has(role)) {
-    const seatAzDegRaw = angleFromTo(pos, seat);
-    if (!isNum(seatAzDegRaw)) return null;
+    // Quantise DOWN to 0.5° steps (more favourable + stable)
+    const q05Down = (deg) => {
+      const n = Number(deg);
+      if (!Number.isFinite(n)) return 0;
+      return Math.floor(n * 2) / 2; // 0.5° steps, floored
+    };
 
-    // Quantise seat azimuth to 0.5° (prevents input jitter)
-    const seatAzDeg = q05(seatAzDegRaw);
+    const seatAzRaw = angleFromTo(pos, seat);
+    if (!isNum(seatAzRaw)) return null;
 
-    // Effective "front axis" yaw (same convention as plan view)
-    const aimDegRaw = getEffectiveYawDeg(speaker, seat, appState, getCanonicalRole);
-    
-    // Quantise aim direction to 0.5° (prevents input jitter)
-    const aimDeg = q05(aimDegRaw);
+    const aimRaw = getEffectiveYawDeg(speaker, seat, appState, getCanonicalRole);
 
-    // True off-axis = smallest angle between seat direction and front axis (0..180)
-    const offAxisRaw = shortestAngleDeg(seatAzDeg, aimDeg);
+    // Quantise inputs
+    const seatAz = q05Down(seatAzRaw);
+    const aimDeg = q05Down(aimRaw);
+
+    // Compute using quantised inputs
+    const offAxisRaw = shortestAngleDeg(seatAz, aimDeg);
     if (!isNum(offAxisRaw)) return null;
 
-    // Quantise off-axis result to 0.5° (final stabilisation)
-    const offAxis = q05(offAxisRaw);
+    // Quantise output too (belt + braces)
+    const offAxis = Math.max(0, q05Down(offAxisRaw));
     const effectiveAngleDeg = offAxis;
 
     // Get model metadata for dispersion
@@ -509,7 +513,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
     }
 
     if (globalThis.__B44_RV_DEBUG === true) {
-      console.log("[P17 SURROUND]", role, { seatAzDeg, aimDeg, offAxis: effectiveAngleDeg, lossDb, appState: !!appState });
+      console.log("[P17 SURROUND]", role, { seatAzDeg: seatAz, aimDeg, offAxis, lossDb });
     }
 
     // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs (showing quantized values)
@@ -528,7 +532,7 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
 
     return {
       role,
-      angleDeg: offAxis,
+      angleDeg: offAxis, // CRITICAL: must be quantised value for HUD display
       offAxisDeg: offAxis,
       lossDb: Number(lossDb.toFixed(1)),
       isBeyondNonLcrLimit,
