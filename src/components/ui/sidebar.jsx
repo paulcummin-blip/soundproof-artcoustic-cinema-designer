@@ -1,6 +1,14 @@
 import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
 import { cva } from "class-variance-authority";
+
+// Base44: Radix Slot is not available. This is a safe fallback that behaves like a passthrough.
+const Slot = ({ children, ...props }) => {
+  const child = Array.isArray(children) ? children[0] : children;
+  if (child && typeof child === "object" && "type" in child) {
+    return React.cloneElement(child, props);
+  }
+  return <span {...props}>{children}</span>;
+};
 import { PanelLeft } from "lucide-react"
 
 import { useIsMobile } from "@/hooks/use-mobile"
