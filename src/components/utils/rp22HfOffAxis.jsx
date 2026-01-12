@@ -471,20 +471,20 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
       return Math.floor(n * 2) / 2; // 0.5° steps, floored
     };
 
-    const seatAzRaw = angleFromTo(pos, seat);
-    if (!isNum(seatAzRaw)) return null;
+    // Raw angles
+    const seatAzDeg = angleFromTo(pos, seat);
+    if (!isNum(seatAzDeg)) return null;
 
-    const aimRaw = getEffectiveYawDeg(speaker, seat, appState, getCanonicalRole);
+    const aimDegRaw = getEffectiveYawDeg(speaker, seat, appState, getCanonicalRole);
 
     // Quantise inputs
-    const seatAz = q05Down(seatAzRaw);
-    const aimDeg = q05Down(aimRaw);
+    const seatAzQ = q05Down(seatAzDeg);
+    const aimDegQ = q05Down(aimDegRaw);
 
-    // Compute using quantised inputs
-    const offAxisRaw = shortestAngleDeg(seatAz, aimDeg);
+    // Compute + quantise off-axis
+    const offAxisRaw = shortestAngleDeg(seatAzQ, aimDegQ);
     if (!isNum(offAxisRaw)) return null;
 
-    // Quantise output too (belt + braces)
     const offAxis = Math.max(0, q05Down(offAxisRaw));
     const effectiveAngleDeg = offAxis;
 
@@ -513,15 +513,22 @@ function computeSurroundLikeHfLoss({ speaker, seat, earHeightM, modelMeta, roomH
     }
 
     if (globalThis.__B44_RV_DEBUG === true) {
-      console.log("[P17 SURROUND]", role, { seatAzDeg: seatAz, aimDeg, offAxis, lossDb });
+      console.log("[P17 SURROUND]", role, {
+        seatAzDeg,     // raw
+        seatAzQ,       // quantised
+        aimDegQ,
+        offAxis,
+        lossDb,
+      });
     }
 
     // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs (showing quantized values)
     const isLwRw = role === "LW" || role === "RW";
     const diagnosticDebug = isLwRw ? {
-      seatAzDeg: seatAzDeg,
-      aimDegUsed: aimDeg,
-      offAxisDegComputed: offAxis,
+      seatAzDeg,         // raw
+      seatAzQ,           // quantised input
+      aimDegUsed: aimDegQ,  // quantised aim
+      offAxisDegComputed: offAxis,  // quantised result
       canonRoleUsed: role,
       aimFlagsSeen: {
         aimFrontWidesAtMLP: !!appState?.aimFrontWidesAtMLP,
