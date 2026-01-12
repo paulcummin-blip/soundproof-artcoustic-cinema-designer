@@ -3175,7 +3175,7 @@ React.useEffect(() => {
           // Calculate direction from speaker to seat
           const dx = seatX - pos.x;
           const dy = seatY - pos.y;
-          const dirDeg = Math.atan2(dx, dy) * 180 / Math.PI; // 0° = +Y (into room)
+          const dirDeg = safeYawToMLP(pos, { x: seatX, y: seatY });
           
           // CRITICAL: Get speaker's aim using EXACT same logic as renderSpeakers
           let aimDeg = 0;
@@ -3192,16 +3192,16 @@ React.useEffect(() => {
             if (aimFrontWidesAtMLP) {
               aimDeg = safeYawToMLP(pos, mlp);
             } else {
-              // Wall-flat: left wall = +90, right wall = -90
-              aimDeg = (canon === 'LW') ? 90 : -90;
+              // Wall-flat: left wall = -90, right wall = +90 (consistent with safeYawToMLP)
+              aimDeg = (canon === 'LW') ? -90 : 90;
             }
           } else if (isSL_SR) {
             // Side Surrounds: check toggle (LIVE)
             if (aimSideSurroundsAtMLP) {
               aimDeg = safeYawToMLP(pos, mlp);
             } else {
-              // Wall-flat: left wall = +90, right wall = -90
-              aimDeg = (canon === 'SL') ? 90 : -90;
+              // Wall-flat: left wall = -90, right wall = +90 (consistent with safeYawToMLP)
+              aimDeg = (canon === 'SL') ? -90 : 90;
             }
           } else if (isSBL_SBR) {
             // Rear Surrounds: check toggle (LIVE)
@@ -3215,8 +3215,8 @@ React.useEffect(() => {
               const minDist = Math.min(distLeft, distRight, distBack);
 
               if (minDist === distBack) aimDeg = 0;
-              else if (minDist === distLeft) aimDeg = 90;
-              else if (minDist === distRight) aimDeg = -90;
+              else if (minDist === distLeft) aimDeg = -90;
+              else if (minDist === distRight) aimDeg = 90;
               else aimDeg = 0;
             }
           }
@@ -3227,6 +3227,7 @@ React.useEffect(() => {
           while (offAxisRaw > 180) offAxisRaw -= 360;
           while (offAxisRaw < -180) offAxisRaw += 360;
           const offAxisDeg = Math.abs(offAxisRaw);
+          const offAxisDegInt = Math.floor(offAxisDeg + 1e-9);
           
           // Clamp to 0..180 for HF falloff lookup
           const offAxisClamped = Math.min(180, Math.max(0, offAxisDeg));
@@ -3259,8 +3260,8 @@ React.useEffect(() => {
           
           perSpeaker.push({
             role: canon,
-            angleDeg: offAxisDeg,
-            rawAngleDeg: offAxisDeg,
+            angleDeg: offAxisDegInt,
+            rawAngleDeg: offAxisDegInt,
             lossDb: Math.round(lossDb * 10) / 10,
             isBeyondNonLcrLimit,
           });
