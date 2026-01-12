@@ -99,13 +99,23 @@ const quantiseAngleDown = (deg, step = 0.5) => {
 };
 
 // 0° = straight into the room (+Y), positive = clockwise.
-// Same convention as yawDegToMLP / safeYawToMLP.
+// Used for seat direction (azimuth from speaker to seat).
 const angleFromTo = (from, to) => {
   if (!from || !to) return null;
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   if (!isNum(dx) || !isNum(dy)) return null;
   return (Math.atan2(dx, dy) * 180) / Math.PI; // -180..+180 (0° = +Y)
+};
+
+// Yaw-to-target using the SAME convention as RenderPrimitives.yawDegToMLP / safeYawToMLP
+// 0° = facing into room (+Y). Positive yaw = clockwise.
+const yawToTargetDeg = (from, to) => {
+  if (!from || !to) return null;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  if (!isNum(dx) || !isNum(dy)) return null;
+  return (-Math.atan2(dx, dy) * 180) / Math.PI; // NOTE the minus
 };
 
 // P16 level mapping based on loss
@@ -387,7 +397,7 @@ const getEffectiveYawDeg = (speaker, seatPos, mlpPos, appState, getCanonicalRole
   // Off-axis is still measured per-seat elsewhere.
   if (groupAimOn) {
     const target = (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y)) ? mlpPos : seatPos;
-    const yawToTarget = angleFromTo(speaker?.position, target);
+    const yawToTarget = yawToTargetDeg(speaker?.position, target);
     return isNum(yawToTarget) ? yawToTarget : 0;
   }
 
