@@ -7,7 +7,7 @@ import { computeBackArc, param5LevelFromGap } from "@/components/utils/RP22Geome
 import { computeSeatRoles } from "@/components/utils/seatRoles";
 import { getUpperSpeakersForSeat, computeUpperVerticalAnglesForSeat, computeUpperSplSpreadForSeat } from "../utils/rp22UpperSeatMetrics";
 import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, computeBassVarianceMetrics } from "../utils/rp22SeatResponseConsistency";
-import { computeP16ForSeat, computeP17ForAllSeats } from "../utils/rp22HfOffAxis";
+import { computeP16ForSeat, computeP17ForAllSeats } from "../utils/rp22HfOffAxis.js";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
 
