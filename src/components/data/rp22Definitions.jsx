@@ -87,15 +87,16 @@ export const RP22_DEFINITIONS = {
   },
   
   P17: {
-    title: "17. Surround and upper speakers SPL capability at RSP",
-    description: "This parameter measures the maximum continuous SPL that surround and overhead speakers can deliver at the reference listening position, post-calibration EQ, within their assigned bandwidth, without clipping.",
+    title: "17. Seat-to-seat frequency response variance across all wide/surround/upper speakers normalised to measured RSP response between 500 Hz and 16 kHz (1 octave smoothing)",
+    description: "Predicts how similar the experience and performance level will be across multiple seats. Design prediction should consider correct speaker alignment, off-axis frequency response on both the horizontal & vertical axis, and the effect of the room.",
     thresholds: [
-      { level: 1, criteria: "≥99 dB SPL(C)" },
-      { level: 2, criteria: "≥102 dB SPL(C)" },
-      { level: 3, criteria: "≥105 dB SPL(C)" },
-      { level: 4, criteria: "≥108 dB SPL(C)" }
+      { level: 1, criteria: "N/A" },
+      { level: 2, criteria: "N/A" },
+      { level: 3, criteria: "≤ ±3 dB (Max.)" },
+      { level: 4, criteria: "≤ ±1.5 dB (Max.)" }
     ],
-    scope: "At RSP"
+    scope: "Normalised to measured RSP response (500 Hz–16 kHz, 1 octave smoothing)",
+    unit: "± dB"
   },
   
   P20: {
