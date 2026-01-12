@@ -331,7 +331,9 @@ export default function SeatHud({
               .map(s => {
                 // Use rawAngleDeg if available (for overheads), otherwise angleDeg
                 const displayAngle = Number.isFinite(s.rawAngleDeg) ? s.rawAngleDeg : s.angleDeg;
-                const angle = Number.isFinite(displayAngle) ? displayAngle.toFixed(1) : '—';
+                const angle = Number.isFinite(displayAngle)
+                  ? String(Math.floor(Math.abs(displayAngle) + 1e-9))
+                  : '—';
                 const loss = s.isBeyondNonLcrLimit ? 'N/A' : (Number.isFinite(s.lossDb) ? `${s.lossDb.toFixed(1)} dB` : '—');
                 const text = `${s.role} ${angle}° / ${loss}`;
                 const isWorst = metric.worstRole === s.role;
@@ -342,7 +344,7 @@ export default function SeatHud({
                 return [...acc, ', ', item];
               }, [])}
                     {metric.worstRole && Number.isFinite(metric.worstAngleDeg) && Number.isFinite(metric.worstLossDb) && (
-                      <strong> (worst: {metric.worstRole} {metric.worstAngleDeg.toFixed(1)}° / {metric.worstLossDb.toFixed(1)} dB)</strong>
+                      <strong> (worst: {metric.worstRole} {String(Math.floor(Math.abs(metric.worstAngleDeg) + 1e-9))}° / {metric.worstLossDb.toFixed(1)} dB)</strong>
                     )}
                   </div>
                   {/* Debug info for first overhead speaker */}
