@@ -345,13 +345,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     });
 
     // Compute P17 for all seats (non-LCR HF variance) - PASS appState for aim toggles
-    if (globalThis.__B44_RV_DEBUG === true) {
-      console.log("[P17 input aim toggles]", {
-        aimFrontWidesAtMLP: aimState?.aimFrontWidesAtMLP,
-        aimSideSurroundsAtMLP: aimState?.aimSideSurroundsAtMLP,
-        aimRearSurroundsAtMLP: aimState?.aimRearSurroundsAtMLP,
-      });
-    }
+
     const p17Results = computeP17ForAllSeats({
       seats: seatsWithRoles,
       speakers: speakersWithResolvedOverheads,

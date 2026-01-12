@@ -105,7 +105,7 @@ const angleFromTo = (from, to) => {
   const dx = to.x - from.x;
   const dy = to.y - from.y;
   if (!isNum(dx) || !isNum(dy)) return null;
-  return (-Math.atan2(dx, dy) * 180) / Math.PI; // -180..+180 (matches yawDegToMLP)
+  return (Math.atan2(dx, dy) * 180) / Math.PI; // -180..+180 (0° = +Y)
 };
 
 // P16 level mapping based on loss
@@ -397,11 +397,15 @@ const getEffectiveYawDeg = (speaker, seatPos, mlpPos, appState, getCanonicalRole
   if (isNum(speaker?.rotation_deg)) return Number(speaker.rotation_deg);
   if (isNum(speaker?.rotation?.y)) return Number(speaker.rotation.y);
 
-  // 3) No manual yaw → wall-flat defaults (matches plan view)
-  if (isFW || isSide) {
-    // Left wall speakers face into room: +90
-    // Right wall speakers face into room: -90
-    return canon === "LW" || canon === "SL" ? 90 : -90;
+  // 3) No manual yaw → wall-flat defaults (match RoomVisualisation)
+  if (isFW) {
+    // LW faces into room from left wall = -90, RW = +90
+    return canon === "LW" ? -90 : 90;
+  }
+
+  if (isSide) {
+    // SL = +90, SR = -90
+    return canon === "SL" ? 90 : -90;
   }
 
   if (isRear) {
@@ -479,12 +483,8 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
 
     const aimDegRaw = getEffectiveYawDeg(speaker, seat, mlpPos, appState, getCanonicalRole);
 
-    // Quantise inputs
-    const seatAzQ = qIntDown(seatAzDeg);
-    const aimDegQ = qIntDown(aimDegRaw);
-
-    // Compute + quantise off-axis
-    const offAxisRaw = shortestAngleDeg(seatAzQ, aimDegQ);
+    // Compute + quantise off-axis (integer floor, favourable + stable)
+    const offAxisRaw = shortestAngleDeg(seatAzDeg, aimDegRaw);
     if (!isNum(offAxisRaw)) return null;
 
     const offAxis = Math.max(0, qIntDown(offAxisRaw));
@@ -516,21 +516,19 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
 
     if (globalThis.__B44_RV_DEBUG === true) {
       console.log("[P17 SURROUND]", role, {
-        seatAzDeg,     // raw
-        seatAzQ,       // quantised
-        aimDegQ,
+        seatAzDeg,
+        aimDegRaw,
         offAxis,
         lossDb,
       });
     }
 
-    // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs (showing quantized values)
+    // [DIAGNOSTIC] For LW/RW only: expose all calculation inputs
     const isLwRw = role === "LW" || role === "RW";
     const diagnosticDebug = isLwRw ? {
-      seatAzDeg,         // raw
-      seatAzQ,           // quantised input
-      aimDegUsed: aimDegQ,  // quantised aim
-      offAxisDegComputed: offAxis,  // quantised result
+      seatAzDeg,
+      aimDegUsed: aimDegRaw,
+      offAxisDegComputed: offAxis,
       canonRoleUsed: role,
       aimFlagsSeen: {
         aimFrontWidesAtMLP: !!appState?.aimFrontWidesAtMLP,
