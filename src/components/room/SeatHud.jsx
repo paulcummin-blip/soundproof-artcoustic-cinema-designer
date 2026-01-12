@@ -314,6 +314,11 @@ export default function SeatHud({
               )}
 
               {/* P17 per-speaker breakdown */}
+              {key === 'p17' && metric.worstGroup && (
+                <div style={{ fontSize: 10, color: '#999', paddingLeft: 16, paddingBottom: 3 }}>
+                  Worst group: <strong>{metric.worstGroup}</strong>
+                </div>
+              )}
               {key === 'p17' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
                 <div>
                   <div

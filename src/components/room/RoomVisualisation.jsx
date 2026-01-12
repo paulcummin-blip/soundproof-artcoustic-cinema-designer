@@ -3157,6 +3157,14 @@ React.useEffect(() => {
     {
       const surroundAndOverheadRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR']);
       
+      const groupForRole = (role) => {
+        if (role === 'LW' || role === 'RW') return 'Front Wides';
+        if (role === 'SL' || role === 'SR') return 'Side Surrounds';
+        if (role === 'SBL' || role === 'SBR') return 'Rear Surrounds';
+        if (String(role).startsWith('T')) return 'Overheads';
+        return 'Other';
+      };
+      
       const relevantSpeakers = (placedSpeakers || []).filter(sp => {
         const canon = getCanonicalRole(sp.role);
         return surroundAndOverheadRoles.has(canon) && sp.position;
@@ -3167,6 +3175,7 @@ React.useEffect(() => {
         let worstLossDb = -Infinity;
         let worstRole = null;
         let worstAngleDeg = null;
+        let worstGroup = null;
 
         for (const sp of relevantSpeakers) {
           const canon = getCanonicalRole(sp.role);
@@ -3266,10 +3275,22 @@ React.useEffect(() => {
             isBeyondNonLcrLimit,
           });
           
-          if (!isBeyondNonLcrLimit && lossDb > worstLossDb) {
-            worstLossDb = lossDb;
-            worstRole = canon;
-            worstAngleDeg = offAxisDeg;
+          // Worst = highest loss within valid range.
+          // Tie-breakers: higher off-axis angle, then stable role ordering.
+          if (!isBeyondNonLcrLimit) {
+            const angleInt = offAxisDegInt;
+
+            const isBetter =
+              (lossDb > worstLossDb) ||
+              (lossDb === worstLossDb && angleInt > (worstAngleDeg ?? -Infinity)) ||
+              (lossDb === worstLossDb && angleInt === (worstAngleDeg ?? -Infinity) && String(canon).localeCompare(String(worstRole)) < 0);
+
+            if (isBetter) {
+              worstLossDb = lossDb;
+              worstRole = canon;
+              worstAngleDeg = angleInt;
+              worstGroup = groupForRole(canon);
+            }
           }
         }
         
@@ -3290,6 +3311,7 @@ React.useEffect(() => {
           worstRole,
           worstAngleDeg,
           worstLossDb,
+          worstGroup,
           p17HasNaAngles: perSpeaker.some(s => s.isBeyondNonLcrLimit),
         };
       }
