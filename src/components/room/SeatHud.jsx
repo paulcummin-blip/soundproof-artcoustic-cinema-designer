@@ -387,6 +387,44 @@ export default function SeatHud({
                       N/A = &gt;41° off-axis; RP22 Level 2 limit
                     </div>
                   )}
+                  {/* LW/RW Debug Readout */}
+                  {(() => {
+                    const lwData = metric.perSpeaker.find(s => s.role === 'LW');
+                    const rwData = metric.perSpeaker.find(s => s.role === 'RW');
+                    const hasDebug = (lwData?.debug || rwData?.debug);
+                    
+                    if (!hasDebug) return null;
+                    
+                    const formatDbgVal = (v) => Number.isFinite(v) ? v.toFixed(1) : '—';
+                    const formatFlags = (flags) => {
+                      if (!flags) return 'FW:—,SS:—,RS:—';
+                      return `FW:${flags.aimFrontWidesAtMLP ? 'Y' : 'N'},SS:${flags.aimSideSurroundsAtMLP ? 'Y' : 'N'},RS:${flags.aimRearSurroundsAtMLP ? 'Y' : 'N'}`;
+                    };
+                    
+                    return (
+                      <div
+                        style={{
+                          fontSize: 9,
+                          color: '#aaa',
+                          paddingLeft: 16,
+                          paddingTop: 4,
+                          fontFamily: 'monospace',
+                          lineHeight: 1.5,
+                        }}
+                      >
+                        {lwData?.debug && (
+                          <div>
+                            LW dbg: seatAz={formatDbgVal(lwData.debug.seatAzDeg)} aim={formatDbgVal(lwData.debug.aimDegUsed)} offAxis={formatDbgVal(lwData.debug.offAxisDegComputed)} canon={lwData.debug.canonRoleUsed || '—'} flags={formatFlags(lwData.debug.aimFlagsSeen)}
+                          </div>
+                        )}
+                        {rwData?.debug && (
+                          <div>
+                            RW dbg: seatAz={formatDbgVal(rwData.debug.seatAzDeg)} aim={formatDbgVal(rwData.debug.aimDegUsed)} offAxis={formatDbgVal(rwData.debug.offAxisDegComputed)} canon={rwData.debug.canonRoleUsed || '—'} flags={formatFlags(rwData.debug.aimFlagsSeen)}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
