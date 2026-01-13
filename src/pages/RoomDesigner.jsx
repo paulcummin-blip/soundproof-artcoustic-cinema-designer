@@ -1781,6 +1781,7 @@ function RoomDesignerWithState() {
   const sessionActiveProjectId = useActiveProjectId();
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
   const roomStore = useRoomStateStore();
+  const store = useSpeakerSystemStore(); // MOVED UP: needed in hydration effect
 
   // Single source of truth for the project ID
   const resolvedProjectId = sessionActiveProjectId || initialProjectIdFromUrl || null;
@@ -1860,9 +1861,6 @@ function RoomDesignerWithState() {
   const _setUseMidGlobal = appState?.setUseMidGlobal;
   const _useRearGlobal = appState?.useRearGlobal;
   const _setUseRearGlobal = appState?.setUseRearGlobal;
-
-
-  const store = useSpeakerSystemStore();
 
 
 
