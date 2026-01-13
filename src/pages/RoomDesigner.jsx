@@ -988,8 +988,8 @@ appState, // Pass appState directly for setters
       }
 
       // Hydrate speakers
-      if (hasStoredSpeakers && store?.setSpeakerSystem) {
-        store.setSpeakerSystem({ placedSpeakers: activeRoom.speakers });
+      if (hasStoredSpeakers && appState?.setSpeakerSystem) {
+        appState.setSpeakerSystem({ placedSpeakers: activeRoom.speakers });
       }
 
       // Hydrate screen if present
