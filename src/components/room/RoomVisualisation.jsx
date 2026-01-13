@@ -3223,10 +3223,11 @@ React.useEffect(() => {
               const distBack  = Math.abs(lengthM - pos.y);
               const minDist = Math.min(distLeft, distRight, distBack);
 
-              if (minDist === distBack) aimDeg = 0;
+              // Wall-flat (consistent with safeYawToMLP convention)
+              if (minDist === distBack) aimDeg = 180;   // back wall should face INTO the room (towards -Y)
               else if (minDist === distLeft) aimDeg = -90;
               else if (minDist === distRight) aimDeg = 90;
-              else aimDeg = 0;
+              else aimDeg = 180;
             }
           }
           
@@ -3294,9 +3295,8 @@ React.useEffect(() => {
         let level17 = '—';
         if (Number.isFinite(worstLossDb)) {
           if (worstLossDb <= 1.5) level17 = 'L4';
-          else if (worstLossDb <= 3.0) level17 = 'L3';
-          else if (worstLossDb <= 5.0) level17 = 'L2';
-          else level17 = 'L1';
+          else if (worstLossDb < 3.0) level17 = 'L3';
+          else level17 = 'L2';
         }
         
         data.rp22.p17 = {
@@ -5415,17 +5415,18 @@ return {
       if (aimRearSurroundsAtMLP) {
         yawDeg = getAimingYawDeg(speaker, mlp);
       } else {
-        // Aim OFF: sit flat to back wall (0 deg) or side walls
+        // Aim OFF: sit flat to back wall (180 deg) or side walls
         const pos = speaker.position || {};
         const distLeft  = Math.abs(pos.x - 0);
         const distRight = Math.abs(widthM - pos.x);
         const distBack  = Math.abs(lengthM - pos.y);
         const minDist = Math.min(distLeft, distRight, distBack);
 
-        if (minDist === distBack) yawDeg = 0;
+        // Wall-flat (consistent with safeYawToMLP convention)
+        if (minDist === distBack) yawDeg = 180;   // back wall should face INTO the room (towards -Y)
         else if (minDist === distLeft) yawDeg = 90;
         else if (minDist === distRight) yawDeg = -90;
-        else yawDeg = 0;
+        else yawDeg = 180;
       }
     } else {
       // Fallback for any other speaker type, including overheads
