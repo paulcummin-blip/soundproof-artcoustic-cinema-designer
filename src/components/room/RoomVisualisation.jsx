@@ -3170,37 +3170,6 @@ React.useEffect(() => {
         return surroundAndOverheadRoles.has(canon) && sp.position;
       });
 
-      // P17 helpers (product-dependent)
-      const getDispWindows = (model) => {
-        const meta = getSpeakerModelMeta(model);
-        const h = meta?.dispersion?.horizontal;
-        const a15 = Number(h?.minus1p5dB);
-        const a3 = Number(h?.minus3dB);
-        return {
-          a15: Number.isFinite(a15) ? a15 : null,
-          a3: Number.isFinite(a3) ? a3 : null,
-        };
-      };
-
-      const levelForOffAxis = (offAxisDeg, model) => {
-        const { a15, a3 } = getDispWindows(model);
-        // If no windows, be conservative (treat as outside -3 dB)
-        if (!Number.isFinite(offAxisDeg) || !Number.isFinite(a15) || !Number.isFinite(a3)) return "L2";
-        if (offAxisDeg <= a15) return "L4";
-        if (offAxisDeg <= a3) return "L3";
-        return "L2";
-      };
-
-      const lossForDisplay = (offAxisDeg, model) => {
-        const { a15, a3 } = getDispWindows(model);
-        if (!Number.isFinite(offAxisDeg) || !Number.isFinite(a15) || !Number.isFinite(a3)) return 3.0;
-        if (offAxisDeg <= a15) return 0.0;
-        if (offAxisDeg <= a3) return 1.5;
-        return 3.0;
-      };
-
-      const levelRank = (lvl) => (lvl === "L4" ? 4 : lvl === "L3" ? 3 : lvl === "L2" ? 2 : 0);
-
       if (relevantSpeakers.length > 0) {
         const perSpeaker = [];
         let worstLossDb = -Infinity;
@@ -3272,58 +3241,66 @@ React.useEffect(() => {
           // Clamp to 0..180 for HF falloff lookup
           const offAxisClamped = Math.min(180, Math.max(0, offAxisDeg));
           
-          // P17 scoring is PRODUCT-DEPENDENT (uses model dispersion windows)
-          const offAxisForP17 = offAxisClamped; // 0..180
-          const speakerLevel = levelForOffAxis(offAxisForP17, sp.model);
-          const displayLossDb = lossForDisplay(offAxisForP17, sp.model);
-
-          // We do NOT use L1 for P17 in this app
-          const isBeyondNonLcrLimit = false;
+          // Calculate loss using same dispersion logic as P16
+          const meta = getSpeakerModelMeta(sp.model);
+          const disp = meta?.dispersion?.horizontal;
+          let lossDb = 0;
+          
+          if (disp && disp.minus1p5dB && disp.minus3dB && disp.minus5dB) {
+            if (offAxisClamped <= disp.minus1p5dB) {
+              lossDb = (offAxisClamped / disp.minus1p5dB) * 1.5;
+            } else if (offAxisClamped <= disp.minus3dB) {
+              const span = disp.minus3dB - disp.minus1p5dB;
+              const t = (offAxisClamped - disp.minus1p5dB) / span;
+              lossDb = 1.5 + t * 1.5;
+            } else if (offAxisClamped <= disp.minus5dB) {
+              const span = disp.minus5dB - disp.minus3dB;
+              const t = (offAxisClamped - disp.minus3dB) / span;
+              lossDb = 3.0 + t * 2.0;
+            } else {
+              lossDb = 5.0 + (offAxisClamped - disp.minus5dB) * 0.05;
+            }
+          } else {
+            // Fallback: simple linear falloff
+            lossDb = offAxisClamped * 0.05;
+          }
+          
+          const isBeyondNonLcrLimit = offAxisClamped > 41;
           
           perSpeaker.push({
             role: canon,
             angleDeg: offAxisDegInt,
             rawAngleDeg: offAxisDegInt,
-            lossDb: Math.round(displayLossDb * 10) / 10,
-            level: speakerLevel,
+            lossDb: Math.round(lossDb * 10) / 10,
             isBeyondNonLcrLimit,
-            modelKey: sp.model,
           });
           
-          // Worst = LOWEST level. If tied, higher displayed loss wins.
-          const thisRank = levelRank(speakerLevel);
-          const worstRank = levelRank(worstRole ? perSpeaker.find(s => s.role === worstRole)?.level : null);
+          // Worst = highest loss within valid range.
+          // Tie-breakers: higher off-axis angle, then stable role ordering.
+          if (!isBeyondNonLcrLimit) {
+            const angleInt = offAxisDegInt;
 
-          if (!worstRole) {
-            worstRole = canon;
-            worstAngleDeg = offAxisDegInt;
-            worstLossDb = displayLossDb;
-            worstGroup = groupForRole(canon);
-          } else {
-            const currentWorst = perSpeaker.find(s => s.role === worstRole);
-            const currentWorstRank = levelRank(currentWorst?.level);
-            const currentWorstLoss = Number(currentWorst?.lossDb ?? -1);
+            const isBetter =
+              (lossDb > worstLossDb) ||
+              (lossDb === worstLossDb && angleInt > (worstAngleDeg ?? -Infinity)) ||
+              (lossDb === worstLossDb && angleInt === (worstAngleDeg ?? -Infinity) && String(canon).localeCompare(String(worstRole)) < 0);
 
-            if (thisRank < currentWorstRank) {
+            if (isBetter) {
+              worstLossDb = lossDb;
               worstRole = canon;
-              worstAngleDeg = offAxisDegInt;
-              worstLossDb = displayLossDb;
-              worstGroup = groupForRole(canon);
-            } else if (thisRank === currentWorstRank && displayLossDb > currentWorstLoss) {
-              worstRole = canon;
-              worstAngleDeg = offAxisDegInt;
-              worstLossDb = displayLossDb;
+              worstAngleDeg = angleInt;
               worstGroup = groupForRole(canon);
             }
           }
         }
         
-        // P17 only uses L4/L3/L2 (never L1)
-        let level17 = "—";
+        // Calculate max loss for level
+        let level17 = '—';
         if (Number.isFinite(worstLossDb)) {
-          if (worstLossDb <= 0.0) level17 = "L4";
-          else if (worstLossDb <= 1.5) level17 = "L3";
-          else level17 = "L2";
+          if (worstLossDb <= 1.5) level17 = 'L4';
+          else if (worstLossDb <= 3.0) level17 = 'L3';
+          else if (worstLossDb <= 5.0) level17 = 'L2';
+          else level17 = 'L1';
         }
         
         data.rp22.p17 = {
