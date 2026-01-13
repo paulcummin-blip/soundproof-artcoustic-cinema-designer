@@ -415,6 +415,7 @@ const getMlpPoint = (seatingPositions, mlpBasis, roomDimensions) => {
 // Hook to encapsulate project loading, saving, and state management
 function useProjectLoader(
 appState, // Pass appState directly for setters
+roomStore, // Pass roomStore for hydration and state sync
 {
   projectIdFromUrl,
   dolbyPreset,
@@ -2757,6 +2758,7 @@ function RoomDesignerWithState() {
     reloadProject
   } = useProjectLoader(
     appState, // Pass appState here
+    roomStore, // Pass roomStore here
     {
       projectIdFromUrl: resolvedProjectId,
       dolbyPreset,
