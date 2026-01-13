@@ -125,29 +125,6 @@ function RP22ReportInner() {
 
                 <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                     <CardHeader>
-                        <CardTitle className="text-[#1B1A1A] font-header">Room Settings</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                                <Label htmlFor="noise" className="text-sm font-medium text-[#3E4349]">
-                                    Background Noise (NCB)
-                                </Label>
-                                <Input
-                                    id="noise"
-                                    type="number"
-                                    value={backgroundNoiseNCB}
-                                    onChange={(e) => setBackgroundNoiseNCB(Number(e.target.value))}
-                                    className="mt-1"
-                                />
-                                <p className="text-xs text-gray-500 mt-1">Defines compliance for Parameter #{RP22_CATALOG["15"].number}.</p>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-[#FFFFFF] border-[#DCDBD6] mt-6">
-                    <CardHeader>
                         <CardTitle className="text-[#1B1A1A] font-header">
                             RP22 Parameters (Overall Room)
                         </CardTitle>
