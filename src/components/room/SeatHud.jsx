@@ -286,7 +286,7 @@ export default function SeatHud({
               </div>
 
               {/* P16 debug info */}
-              {key === 'p16' && metric.debug && (
+              {key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
                 <div
                   style={{
                     fontSize: 10,
@@ -296,19 +296,22 @@ export default function SeatHud({
                     lineHeight: 1.4,
                   }}
                 >
-                  {['FL', 'FC', 'FR'].map((role) => {
-                    const data = metric.debug.perSpeaker[role];
-                    if (!data) return null;
-                    const angleDisplay = Math.abs(Number(data.angleDeg) || 0);
-                    const text = `${role} ${angleDisplay.toFixed(1)}° / ${data.lossDb ?? '—'} dB`;
-                    const isWorst = metric.debug.worst?.role === role;
-                    return isWorst ? <strong key={role}>{text}</strong> : <span key={role}>{text}</span>;
-                  }).reduce((acc, item, i, arr) => {
-                    if (i === 0) return [item];
-                    return [...acc, ', ', item];
-                  }, [])}
-                  {metric.debug.worst?.role && (
-                    <strong> (worst: {metric.debug.worst.role})</strong>
+                  {metric.perSpeaker
+                    .slice()
+                    .sort((a, b) => a.role.localeCompare(b.role))
+                    .map(s => {
+                      const angle = Math.floor(s.angleDeg || 0);
+                      const loss = s.lossLabel || '—';
+                      const text = `${s.role} ${angle}° / ${loss}`;
+                      const isWorst = metric.worstRole === s.role;
+                      return isWorst ? <strong key={s.role}>{text}</strong> : <span key={s.role}>{text}</span>;
+                    })
+                    .reduce((acc, item, i, arr) => {
+                      if (i === 0) return [item];
+                      return [...acc, ', ', item];
+                    }, [])}
+                  {metric.worstRole && (
+                    <strong> (worst: {metric.worstRole})</strong>
                   )}
                 </div>
               )}
