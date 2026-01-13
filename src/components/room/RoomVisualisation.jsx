@@ -4,6 +4,7 @@ import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, use
 import { Layers3, Compass } from 'lucide-react';
 import SeatHud from "@/components/room/SeatHud";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { getCanonicalRole } from "@/components/utils/speakerRoles";
 import {
   rp23HorizontalAngleForSeat,
   verticalViewingAngleDeg,
