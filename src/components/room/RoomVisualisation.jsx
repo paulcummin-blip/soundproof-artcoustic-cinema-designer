@@ -3148,9 +3148,116 @@ React.useEffect(() => {
     if (seatMetrics) {
       if (seatMetrics.p9)  data.rp22.p9  = seatMetrics.p9;
       if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
-      if (seatMetrics.p16) data.rp22.p16 = seatMetrics.p16;
+      // P16 is computed locally below (skip analysisResult)
       if (seatMetrics.p17) data.rp22.p17 = seatMetrics.p17;
       if (seatMetrics.p20) data.rp22.p20 = seatMetrics.p20;
+    }
+
+    // ALWAYS compute P16 locally using LIVE plan-view yaw logic (matches icon rotation)
+    {
+      const lcrRoles = new Set(['FL', 'FC', 'FR']);
+      const lcrSpeakers = (placedSpeakers || []).filter(sp => {
+        const canon = getCanonicalRole(sp.role);
+        return lcrRoles.has(canon) && sp.position;
+      });
+
+      if (lcrSpeakers.length > 0) {
+        const perSpeaker = {};
+        let worstLossDb = -Infinity;
+        let worstRole = null;
+        let worstAngleDeg = null;
+
+        for (const sp of lcrSpeakers) {
+          const canon = getCanonicalRole(sp.role);
+          const pos = sp.position;
+
+          // Direction from speaker -> seat, using the same yaw convention as plan view
+          const dirDeg = safeYawToMLP(pos, { x: seatX, y: seatY });
+
+          // Aim MUST match what the icon is doing right now (flat vs toed-in)
+          // So we read the aim from the speaker itself (yaw), not from any toggle.
+          const aimDeg = Number.isFinite(sp?.yaw) ? sp.yaw : 0;
+
+          // Off-axis = shortest arc between aim direction and seat direction
+          let offAxisRaw = dirDeg - aimDeg;
+          while (offAxisRaw > 180) offAxisRaw -= 360;
+          while (offAxisRaw < -180) offAxisRaw += 360;
+          const offAxisDeg = Math.abs(offAxisRaw);
+
+          // Get model metadata for dispersion
+          const meta = getSpeakerModelMeta(sp.model);
+          const dispRaw = meta?.dispersion?.horizontal;
+
+          // Convert full-angle dispersion to half-angle (±off-axis), rounded up
+          const w1 = dispRaw?.minus1p5dB ? Math.ceil(dispRaw.minus1p5dB / 2) : null;
+          const w3 = dispRaw?.minus3dB ? Math.ceil(dispRaw.minus3dB / 2) : null;
+          const w5 = dispRaw?.minus5dB ? Math.ceil(dispRaw.minus5dB / 2) : null;
+
+          // Determine loss based on model-specific dispersion
+          let lossDb = 5.0;
+          let isBeyondLcrLimit = false;
+
+          if (w1 != null && w3 != null && w5 != null) {
+            if (offAxisDeg <= w1) lossDb = 1.5;
+            else if (offAxisDeg <= w3) lossDb = 3.0;
+            else if (offAxisDeg <= w5) lossDb = 5.0;
+            else {
+              lossDb = 5.0;
+              isBeyondLcrLimit = true;
+            }
+          } else {
+            // Fallback to generic thresholds
+            if (offAxisDeg <= 28) lossDb = 1.5;
+            else if (offAxisDeg <= 41) lossDb = 3.0;
+            else if (offAxisDeg <= 55) lossDb = 5.0;
+            else isBeyondLcrLimit = true;
+          }
+
+          perSpeaker[canon] = {
+            angleDeg: Math.floor(offAxisDeg),
+            lossDb: Number(lossDb.toFixed(1)),
+            isBeyondLcrLimit,
+          };
+
+          if (lossDb > worstLossDb) {
+            worstLossDb = lossDb;
+            worstRole = canon;
+            worstAngleDeg = offAxisDeg;
+          }
+        }
+
+        // Classify P16 level
+        let level16 = '—';
+        if (Number.isFinite(worstLossDb)) {
+          const hasLcrBeyondLimit = Object.values(perSpeaker).some(s => s.isBeyondLcrLimit);
+          if (hasLcrBeyondLimit) {
+            level16 = 1;
+          } else if (worstLossDb > 5) {
+            level16 = 1;
+          } else if (worstLossDb > 3) {
+            level16 = 2;
+          } else if (worstLossDb > 1.5) {
+            level16 = 3;
+          } else {
+            level16 = 4;
+          }
+        }
+
+        data.rp22.p16 = {
+          value: worstLossDb,
+          formatted: `±${worstLossDb.toFixed(1)} dB`,
+          hudLabel: `${worstRole} ±${worstLossDb.toFixed(1)} dB`,
+          level: level16,
+          debug: {
+            perSpeaker,
+            worst: {
+              role: worstRole,
+              angleDeg: worstAngleDeg,
+              lossDb: worstLossDb,
+            },
+          },
+        };
+      }
     }
 
     // ALWAYS compute P17 locally using LIVE plan-view yaw logic (matches icon rotation)
