@@ -27,8 +27,12 @@ function RP22ReportInner() {
     const analysisResult = useRP22AnalysisEngine(appState);
 
     // Build ordered parameters list (1-21)
+    // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
     const orderedParams = React.useMemo(() => {
-        return [...rp22Parameters].sort((a, b) => a.id - b.id);
+        const perSeatParams = new Set(['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20']);
+        return [...rp22Parameters]
+            .filter(p => !perSeatParams.has(p.id))
+            .sort((a, b) => a.id - b.id);
     }, []);
 
     // Helper: get room-level result for a parameter
@@ -145,7 +149,7 @@ function RP22ReportInner() {
                 <Card className="bg-[#FFFFFF] border-[#DCDBD6] mt-6">
                     <CardHeader>
                         <CardTitle className="text-[#1B1A1A] font-header">
-                            RP22 Parameters (All 21)
+                            RP22 Parameters (Overall Room)
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -158,6 +162,106 @@ function RP22ReportInner() {
                                     seatResults={getSeatResults(param.id)}
                                 />
                             ))}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Seat Reports Section */}
+                <Card className="bg-[#FFFFFF] border-[#DCDBD6] mt-6">
+                    <CardHeader>
+                        <CardTitle className="text-[#1B1A1A] font-header">Seat Reports</CardTitle>
+                        <p className="text-xs text-[#3E4349] mt-1">Per-seat results shown below match the Seat HUD values.</p>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {(() => {
+                                const seatMetrics = analysisResult?.seatMetrics;
+                                if (!seatMetrics || seatMetrics.size === 0) {
+                                    return <p className="text-sm text-[#3E4349]">No seat data available.</p>;
+                                }
+
+                                const seats = Array.from(seatMetrics.entries());
+                                
+                                return seats.map(([seatId, metrics]) => {
+                                    const isPrimary = metrics?.isPrimary || false;
+                                    
+                                    // Helper to render level badge
+                                    const renderBadge = (level) => {
+                                        if (!level || level === 'N/A' || level === '—') {
+                                            return <span className="text-xs text-gray-400">{level || '—'}</span>;
+                                        }
+                                        
+                                        const bgColor = level === 'L4' ? '#213428' :
+                                                        level === 'L3' ? '#3E4349' :
+                                                        level === 'L2' ? '#625143' :
+                                                        '#4A230F';
+                                        
+                                        return (
+                                            <span 
+                                                style={{
+                                                    fontWeight: 600,
+                                                    fontSize: 10,
+                                                    padding: '2px 6px',
+                                                    borderRadius: 4,
+                                                    background: bgColor,
+                                                    color: 'white'
+                                                }}
+                                            >
+                                                {level}
+                                            </span>
+                                        );
+                                    };
+                                    
+                                    return (
+                                        <Card key={seatId} className="border-[#E6E4DD]">
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2">
+                                                    {seatId}
+                                                    {isPrimary && (
+                                                        <span className="text-xs px-2 py-0.5 rounded bg-[#213428] text-white">MLP</span>
+                                                    )}
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-1.5 text-xs">
+                                                {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map(paramKey => {
+                                                    const metric = metrics[paramKey];
+                                                    if (!metric) return null;
+                                                    
+                                                    return (
+                                                        <div key={paramKey}>
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="font-medium text-[#3E4349]">
+                                                                    {paramKey.toUpperCase()}:
+                                                                </span>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-[#1B1A1A]">{metric.formatted || '—'}</span>
+                                                                    {renderBadge(metric.level)}
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            {/* P16 breakdown */}
+                                                            {paramKey === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
+                                                                <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
+                                                                    {metric.perSpeaker.map(s => 
+                                                                        `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`
+                                                                    ).join(', ')}
+                                                                </div>
+                                                            )}
+                                                            
+                                                            {/* P17 breakdown */}
+                                                            {paramKey === 'p17' && metric.worstGroup && (
+                                                                <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
+                                                                    Worst: {metric.worstGroup}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                });
+                            })()}
                         </div>
                     </CardContent>
                 </Card>
