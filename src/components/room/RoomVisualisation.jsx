@@ -3241,31 +3241,27 @@ React.useEffect(() => {
           // Clamp to 0..180 for HF falloff lookup
           const offAxisClamped = Math.min(180, Math.max(0, offAxisDeg));
           
-          // Calculate loss using same dispersion logic as P16
+          // Product-dependent P17 "bucket" using the model's horizontal dispersion windows
           const meta = getSpeakerModelMeta(sp.model);
           const disp = meta?.dispersion?.horizontal;
-          let lossDb = 0;
           
-          if (disp && disp.minus1p5dB && disp.minus3dB && disp.minus5dB) {
+          let lossDb = 3.0; // Default L2 fallback
+          let levelBucket = 2;
+          
+          if (disp && disp.minus1p5dB != null && disp.minus3dB != null) {
             if (offAxisClamped <= disp.minus1p5dB) {
-              lossDb = (offAxisClamped / disp.minus1p5dB) * 1.5;
+              lossDb = 0.0;
+              levelBucket = 4;
             } else if (offAxisClamped <= disp.minus3dB) {
-              const span = disp.minus3dB - disp.minus1p5dB;
-              const t = (offAxisClamped - disp.minus1p5dB) / span;
-              lossDb = 1.5 + t * 1.5;
-            } else if (offAxisClamped <= disp.minus5dB) {
-              const span = disp.minus5dB - disp.minus3dB;
-              const t = (offAxisClamped - disp.minus3dB) / span;
-              lossDb = 3.0 + t * 2.0;
+              lossDb = 1.5;
+              levelBucket = 3;
             } else {
-              lossDb = 5.0 + (offAxisClamped - disp.minus5dB) * 0.05;
+              lossDb = 3.0;
+              levelBucket = 2;
             }
-          } else {
-            // Fallback: simple linear falloff
-            lossDb = offAxisClamped * 0.05;
           }
           
-          const isBeyondNonLcrLimit = offAxisClamped > 41;
+          const isBeyondNonLcrLimit = false; // P17 never uses "beyond limit" logic
           
           perSpeaker.push({
             role: canon,

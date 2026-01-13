@@ -203,6 +203,17 @@ export function getSpeakerModelMeta(modelName) {
     };
   }
 
+  // If this is a SURROUNDS "_s" variant and it lacks dispersion data,
+  // inherit dispersion (and hfOffAxis16k) from the matching non-s model.
+  // This keeps P17 product-dependent for surrounds without duplicating tables.
+  const inherited =
+    (hit?.key && hit.key.endsWith("_s"))
+      ? MODELS.find(m => m.key === hit.key.replace(/_s$/, ""))
+      : null;
+
+  const finalDispersion = hit?.dispersion ?? inherited?.dispersion ?? null;
+  const finalHfOffAxis16k = hit?.hfOffAxis16k ?? inherited?.hfOffAxis16k ?? null;
+
   if (hit.round) {
     return {
       round: true,
@@ -217,9 +228,9 @@ export function getSpeakerModelMeta(modelName) {
       sensitivity_dB_2p83: hit.sensitivity_dB_2p83 ?? null,
       nominalOhms: hit.nominalOhms ?? null,
       max_power: hit.max_power ?? null,
-      hfOffAxis16k: hit.hfOffAxis16k ?? null,
+      hfOffAxis16k: finalHfOffAxis16k,
       builtInTiltDeg: hit.builtInTiltDeg ?? null,
-      dispersion: hit.dispersion ?? null,
+      dispersion: finalDispersion,
       frequency_response_curve: hit.frequency_response_curve ?? null,
       price_gbp_exVat: hit.price_gbp_exVat ?? null,
     };
@@ -237,9 +248,9 @@ export function getSpeakerModelMeta(modelName) {
     sensitivity_dB_2p83: hit.sensitivity_dB_2p83 ?? null,
     nominalOhms: hit.nominalOhms ?? null,
     max_power: hit.max_power ?? null,
-    hfOffAxis16k: hit.hfOffAxis16k ?? null,
+    hfOffAxis16k: finalHfOffAxis16k,
     builtInTiltDeg: hit.builtInTiltDeg ?? null,
-    dispersion: hit.dispersion ?? null,
+    dispersion: finalDispersion,
     frequency_response_curve: hit.frequency_response_curve ?? null,
     price_gbp_exVat: hit.price_gbp_exVat ?? null,
   };
