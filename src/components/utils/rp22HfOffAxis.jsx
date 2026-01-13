@@ -16,6 +16,16 @@ const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 // Quantise degrees to 0.5° steps (floor, favourable + stable)
 const q05 = (deg) => (typeof deg === "number" && Number.isFinite(deg) ? Math.floor(deg * 2) / 2 : deg);
 
+// Plan-view yaw convention (MUST match icon rotation in RoomVisualisation)
+// 0° = +Y (into room), clockwise positive, range -180..+180
+const yawFromToPlan = (from, to) => {
+  if (!from || !to) return null;
+  const dx = (to.x - from.x);
+  const dy = (to.y - from.y);
+  if (!isNum(dx) || !isNum(dy)) return null;
+  return (-(Math.atan2(dx, dy) * 180) / Math.PI);
+};
+
 // Canonical role normaliser (must match AppState aliases)
 const canonRole = (role, getCanonicalRole) => {
   const raw = String(role || "").trim();
@@ -122,7 +132,7 @@ const classifyP16 = (lossDb) => {
   return 4;                      // ≤1.5 dB
 };
 
-export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
+export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta, mlpPos = null) {
   if (!seat || !isNum(seat.x) || !isNum(seat.y)) return null;
   if (!Array.isArray(allSpeakers) || !allSpeakers.length) return null;
 
@@ -149,24 +159,19 @@ export function computeP16ForSeat(seat, allSpeakers, getSpeakerModelMeta) {
     const role = String(spk.role || "").toUpperCase();
     const pos = spk.position;
 
-    // Direction from speaker → seat
-    const seatAzDeg = angleFromTo(pos, seat);
+    // Direction from speaker → seat (PLAN-VIEW CONVENTION)
+    const seatAzDeg = yawFromToPlan(pos, seat);
     if (!isNum(seatAzDeg)) continue;
 
-    // Aim direction: prefer explicit yaw, then rotationDeg, otherwise assume flat (0°)
-    let aimDeg = null;
-    if (isNum(spk.yaw)) {
-      aimDeg = Number(spk.yaw);
-    } else if (isNum(spk.rotationDeg)) {
-      aimDeg = Number(spk.rotationDeg);
-    } else if (isNum(spk.rotation_deg)) {
-      aimDeg = Number(spk.rotation_deg);
-    } else {
-      aimDeg = 0;
-    }
+    // Aim direction: use stored yaw if present, otherwise compute aim to MLP, fallback to 0°
+    const aimDegRaw =
+      (isNum(spk?.yaw) ? spk.yaw : null) ??
+      (mlpPos && isNum(mlpPos.x) && isNum(mlpPos.y) ? yawFromToPlan(pos, mlpPos) : null) ??
+      0;
 
-    // True off-axis angle = |seat direction – aim direction|
-    const offAxisDeg = Math.abs(norm180(seatAzDeg - aimDeg));
+    // True off-axis angle = shortest arc between seat direction and aim direction
+    const offAxisRaw = shortestAngleDeg(seatAzDeg, aimDegRaw);
+    const offAxisDeg = Math.abs(offAxisRaw);
     if (!isNum(offAxisDeg)) continue;
 
     const angleDeg = quantiseAngleDown(offAxisDeg, 0.5);
