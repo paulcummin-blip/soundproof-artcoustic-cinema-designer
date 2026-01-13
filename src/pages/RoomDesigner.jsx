@@ -32,6 +32,7 @@ import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Impor
 import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/seatingUtils';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
+import { useRoomStateStore } from "@/components/state/useRoomStateStore";
 
 // B44 shim: some older logic expects getModelDimsM()
 const getModelDimsM = (model) => {
@@ -1690,6 +1691,7 @@ function RoomDesignerWithState() {
   const appState = useAppState();
   const sessionActiveProjectId = useActiveProjectId();
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
+  const roomStore = useRoomStateStore();
 
   // Single source of truth for the project ID
   const resolvedProjectId = sessionActiveProjectId || initialProjectIdFromUrl || null;
@@ -2180,6 +2182,17 @@ function RoomDesignerWithState() {
       aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
     }
   });
+
+  // Write RP22 results to shared store whenever analysis updates
+  useEffect(() => {
+    if (!analysisResult || !roomStore) return;
+    
+    // Write per-seat RP22 results and overall parameters to shared store
+    const perSeat = analysisResult.perSeatRp22 || {};
+    const overall = analysisResult.gradedParameters?.primary || {};
+    
+    roomStore.updateRP22Results(perSeat, overall);
+  }, [analysisResult, roomStore]);
 
   const frontSubsForRendering = React.useMemo(() => {
     try {

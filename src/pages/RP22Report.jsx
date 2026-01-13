@@ -8,9 +8,11 @@ import { BarChart4 } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import ParameterCard from '../components/report/ParameterCard';
+import { useRoomStateStore } from '@/components/state/useRoomStateStore';
 
 function RP22ReportInner() {
     const app = useAppState();
+    const roomStore = useRoomStateStore();
     
     if (!app) {
         return (
@@ -24,7 +26,24 @@ function RP22ReportInner() {
     }
 
     const { backgroundNoiseNCB, setBackgroundNoiseNCB, ...appState } = app;
-    const analysisResult = useRP22AnalysisEngine(appState);
+    
+    // Read RP22 results from shared store (written by Room Designer)
+    const activeRoom = roomStore?.activeRoom;
+    const perSeatRp22 = activeRoom?.rp22?.perSeat || {};
+    const overallRp22 = activeRoom?.rp22?.overall || {};
+    
+    // Build analysisResult structure compatible with existing code
+    const analysisResult = React.useMemo(() => {
+        return {
+            gradedParameters: {
+                primary: overallRp22
+            },
+            perSeatRp22: perSeatRp22,
+            seatMetrics: new Map(
+                Object.entries(perSeatRp22).map(([seatId, data]) => [seatId, data.rp22 || {}])
+            )
+        };
+    }, [perSeatRp22, overallRp22]);
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
@@ -152,15 +171,16 @@ function RP22ReportInner() {
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {(() => {
-                                const seatMetrics = analysisResult?.seatMetrics;
-                                if (!seatMetrics || seatMetrics.size === 0) {
-                                    return <p className="text-sm text-[#3E4349]">No seat data available.</p>;
+                                // Read directly from perSeatRp22 (already in correct format)
+                                if (!perSeatRp22 || Object.keys(perSeatRp22).length === 0) {
+                                    return <p className="text-sm text-[#3E4349]">No seat data available. Run Room Designer first.</p>;
                                 }
 
-                                const seats = Array.from(seatMetrics.entries());
+                                const seats = Object.entries(perSeatRp22);
                                 
-                                return seats.map(([seatId, metrics]) => {
-                                    const isPrimary = metrics?.isPrimary || false;
+                                return seats.map(([seatId, seatData]) => {
+                                    const isPrimary = seatData?.isPrimary || false;
+                                    const metrics = seatData?.rp22 || {};
                                     
                                     // Helper to render level badge
                                     const renderBadge = (level) => {
@@ -200,24 +220,26 @@ function RP22ReportInner() {
                                                 </CardTitle>
                                             </CardHeader>
                                             <CardContent className="space-y-1.5 text-xs">
-                                                {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map(paramKey => {
-                                                    const metric = metrics[paramKey];
+                                                {[1, 4, 5, 6, 9, 10, 16, 17, 20].map(paramNum => {
+                                                    const metric = metrics[paramNum];
                                                     if (!metric) return null;
                                                     
+                                                    const paramKey = `p${paramNum}`;
+                                                    
                                                     return (
-                                                        <div key={paramKey}>
+                                                        <div key={paramNum}>
                                                             <div className="flex justify-between items-center">
                                                                 <span className="font-medium text-[#3E4349]">
-                                                                    {paramKey.toUpperCase()}:
+                                                                    P{paramNum}:
                                                                 </span>
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-[#1B1A1A]">{metric.formatted || '—'}</span>
+                                                                    <span className="text-[#1B1A1A]">{metric.formatted || metric.hudLabel || '—'}</span>
                                                                     {renderBadge(metric.level)}
                                                                 </div>
                                                             </div>
                                                             
                                                             {/* P16 breakdown */}
-                                                            {paramKey === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
+                                                            {paramNum === 16 && metric.perSpeaker && metric.perSpeaker.length > 0 && (
                                                                 <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
                                                                     {metric.perSpeaker.map(s => 
                                                                         `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`
@@ -226,9 +248,9 @@ function RP22ReportInner() {
                                                             )}
                                                             
                                                             {/* P17 breakdown */}
-                                                            {paramKey === 'p17' && metric.worstGroup && (
+                                                            {paramNum === 17 && metric.worstRole && (
                                                                 <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                                    Worst: {metric.worstGroup}
+                                                                    Worst: {metric.worstRole}
                                                                 </div>
                                                             )}
                                                         </div>
