@@ -3155,14 +3155,15 @@ React.useEffect(() => {
 
     // ALWAYS compute P16 locally using LIVE plan-view yaw logic (matches icon rotation)
     {
-      const lcrRoles = new Set(['FL', 'FC', 'FR']);
+      const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+
       const lcrSpeakers = (placedSpeakers || []).filter(sp => {
         const canon = getCanonicalRole(sp.role);
         return lcrRoles.has(canon) && sp.position;
       });
 
       if (lcrSpeakers.length > 0) {
-        const perSpeaker = {};
+        const perSpeaker = [];
         let worstLossDb = -Infinity;
         let worstRole = null;
         let worstAngleDeg = null;
@@ -3171,53 +3172,72 @@ React.useEffect(() => {
           const canon = getCanonicalRole(sp.role);
           const pos = sp.position;
 
-          // Direction from speaker -> seat, using the same yaw convention as plan view
+          // Direction from speaker to THIS seat (use SAME convention as icon yaw)
           const dirDeg = safeYawToMLP(pos, { x: seatX, y: seatY });
 
-          // Aim MUST match what the icon is doing right now (flat vs toed-in)
-          // So we read the aim from the speaker itself (yaw), not from any toggle.
-          const aimDeg = Number.isFinite(sp?.yaw) ? sp.yaw : 0;
+          // Aim direction (use SAME rule as icon yaw)
+          // If "Left / Right" aiming is ON, FL/FR aim at MLP. FC stays 0°.
+          // If OFF, all LCR are wall-flat (0° into the room).
+          let aimDeg = 0;
+          const isL = (canon === 'FL' || canon === 'L');
+          const isR = (canon === 'FR' || canon === 'R');
+          const isC = (canon === 'FC' || canon === 'C');
 
-          // Off-axis = shortest arc between aim direction and seat direction
+          if (isC) {
+            aimDeg = 0;
+          } else if (isL || isR) {
+            aimDeg = aimAtMLP ? safeYawToMLP(pos, mlp) : 0;
+          } else {
+            aimDeg = 0;
+          }
+
+          // Off-axis (shortest arc)
           let offAxisRaw = dirDeg - aimDeg;
           while (offAxisRaw > 180) offAxisRaw -= 360;
           while (offAxisRaw < -180) offAxisRaw += 360;
           const offAxisDeg = Math.abs(offAxisRaw);
 
-          // Get model metadata for dispersion
+          // Clamp 0..180
+          const offAxisClamped = Math.min(180, Math.max(0, offAxisDeg));
+
+          // Dispersion windows (HALF the stored values, rounded up)
           const meta = getSpeakerModelMeta(sp.model);
-          const dispRaw = meta?.dispersion?.horizontal;
+          const disp = meta?.dispersion?.horizontal;
 
-          // Convert full-angle dispersion to half-angle (±off-axis), rounded up
-          const w1 = dispRaw?.minus1p5dB ? Math.ceil(dispRaw.minus1p5dB / 2) : null;
-          const w3 = dispRaw?.minus3dB ? Math.ceil(dispRaw.minus3dB / 2) : null;
-          const w5 = dispRaw?.minus5dB ? Math.ceil(dispRaw.minus5dB / 2) : null;
+          const w1 = Number.isFinite(disp?.minus1p5dB) ? Math.ceil(disp.minus1p5dB / 2) : null;
+          const w3 = Number.isFinite(disp?.minus3dB) ? Math.ceil(disp.minus3dB / 2) : null;
+          const w5 = Number.isFinite(disp?.minus5dB) ? Math.ceil(disp.minus5dB / 2) : null;
 
-          // Determine loss based on model-specific dispersion
-          let lossDb = 5.0;
-          let isBeyondLcrLimit = false;
+          // Loss calc (same style as you use elsewhere)
+          let lossDb = 0;
 
-          if (w1 != null && w3 != null && w5 != null) {
-            if (offAxisDeg <= w1) lossDb = 1.5;
-            else if (offAxisDeg <= w3) lossDb = 3.0;
-            else if (offAxisDeg <= w5) lossDb = 5.0;
-            else {
-              lossDb = 5.0;
-              isBeyondLcrLimit = true;
+          if (Number.isFinite(w1) && Number.isFinite(w3) && Number.isFinite(w5) && w1 > 0 && w3 >= w1 && w5 >= w3) {
+            if (offAxisClamped <= w1) {
+              lossDb = (offAxisClamped / w1) * 1.5;
+            } else if (offAxisClamped <= w3) {
+              const span = (w3 - w1) || 1;
+              const t = (offAxisClamped - w1) / span;
+              lossDb = 1.5 + t * 1.5;
+            } else if (offAxisClamped <= w5) {
+              const span = (w5 - w3) || 1;
+              const t = (offAxisClamped - w3) / span;
+              lossDb = 3.0 + t * 2.0;
+            } else {
+              lossDb = 5.0 + (offAxisClamped - w5) * 0.05;
             }
           } else {
-            // Fallback to generic thresholds
-            if (offAxisDeg <= 28) lossDb = 1.5;
-            else if (offAxisDeg <= 41) lossDb = 3.0;
-            else if (offAxisDeg <= 55) lossDb = 5.0;
-            else isBeyondLcrLimit = true;
+            // Fallback
+            lossDb = offAxisClamped * 0.05;
           }
 
-          perSpeaker[canon] = {
-            angleDeg: Math.floor(offAxisDeg),
-            lossDb: Number(lossDb.toFixed(1)),
-            isBeyondLcrLimit,
-          };
+          lossDb = Math.round(lossDb * 10) / 10;
+
+          perSpeaker.push({
+            role: canon,
+            angleDeg: offAxisDeg,
+            rawAngleDeg: offAxisDeg,
+            lossDb,
+          });
 
           if (lossDb > worstLossDb) {
             worstLossDb = lossDb;
@@ -3226,36 +3246,23 @@ React.useEffect(() => {
           }
         }
 
-        // Classify P16 level
+        // Level mapping (keep your existing P16 rules)
         let level16 = '—';
         if (Number.isFinite(worstLossDb)) {
-          const hasLcrBeyondLimit = Object.values(perSpeaker).some(s => s.isBeyondLcrLimit);
-          if (hasLcrBeyondLimit) {
-            level16 = 1;
-          } else if (worstLossDb > 5) {
-            level16 = 1;
-          } else if (worstLossDb > 3) {
-            level16 = 2;
-          } else if (worstLossDb > 1.5) {
-            level16 = 3;
-          } else {
-            level16 = 4;
-          }
+          if (worstLossDb <= 1.5) level16 = 'L4';
+          else if (worstLossDb <= 3.0) level16 = 'L3';
+          else if (worstLossDb <= 5.0) level16 = 'L2';
+          else level16 = 'L1';
         }
 
         data.rp22.p16 = {
           value: worstLossDb,
-          formatted: `±${worstLossDb.toFixed(1)} dB`,
-          hudLabel: `${worstRole} ±${worstLossDb.toFixed(1)} dB`,
+          formatted: Number.isFinite(worstLossDb) ? `${worstRole} ±${worstLossDb.toFixed(1)} dB` : '—',
           level: level16,
-          debug: {
-            perSpeaker,
-            worst: {
-              role: worstRole,
-              angleDeg: worstAngleDeg,
-              lossDb: worstLossDb,
-            },
-          },
+          perSpeaker,
+          worstRole,
+          worstAngleDeg,
+          worstLossDb,
         };
       }
     }
