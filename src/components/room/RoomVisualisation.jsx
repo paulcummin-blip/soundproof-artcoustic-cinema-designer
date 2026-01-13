@@ -4,14 +4,13 @@ import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, use
 import { Layers3, Compass } from 'lucide-react';
 import SeatHud from "@/components/room/SeatHud";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
-import { getCanonicalRole } from "@/components/utils/speakerRoles";
 import {
   rp23HorizontalAngleForSeat,
   verticalViewingAngleDeg,
 } from '@/components/utils/seatHover';
 import { buildRoleMap, isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils";
 import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
-import { rolesForLayout } from "@/components/utils/surroundRoleMap";
+import { rolesForLayout, getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from '../room/constraints/lcrConstraints';
 import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
 import RP22ZonesOverlay from '@/components/room/RP22ZonesOverlay';
