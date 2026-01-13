@@ -298,6 +298,62 @@ const getAimingYawDeg = (speaker, mlpTarget) => {
   return safeYawToMLP(speaker.position, mlpTarget);
 };
 
+// NEW: Single source of truth for speaker aim direction (matches icon rotation)
+// CRITICAL: P16 and icon rendering must use this same function to avoid angle mismatches
+const getPlanAimDeg = (speaker, mlp, widthM, lengthM, aimLeftRightAtMLP, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, lcrAngleInfo) => {
+  if (!speaker?.position) return 0;
+  
+  const canon = getCanonicalRole(speaker.role);
+  const pos = speaker.position;
+  
+  // LCR speakers
+  if (canon === 'FL' || canon === 'L') {
+    return aimLeftRightAtMLP ? (lcrAngleInfo?.L ?? 0) : 0;
+  }
+  if (canon === 'FR' || canon === 'R') {
+    return aimLeftRightAtMLP ? (lcrAngleInfo?.R ?? 0) : 0;
+  }
+  if (canon === 'FC' || canon === 'C') {
+    return 0; // Center always aims straight
+  }
+  
+  // Front Wides
+  if (canon === 'LW' || canon === 'RW') {
+    if (aimFrontWidesAtMLP) {
+      return safeYawToMLP(pos, mlp);
+    }
+    return canon === 'LW' ? -90 : 90;
+  }
+  
+  // Side Surrounds
+  if (canon === 'SL' || canon === 'SR') {
+    if (aimSideSurroundsAtMLP) {
+      return safeYawToMLP(pos, mlp);
+    }
+    return canon === 'SL' ? 90 : -90;
+  }
+  
+  // Rear Surrounds
+  if (canon === 'SBL' || canon === 'SBR') {
+    if (aimRearSurroundsAtMLP) {
+      return safeYawToMLP(pos, mlp);
+    }
+    // Wall-flat: detect which wall
+    const distLeft = Math.abs(pos.x - 0);
+    const distRight = Math.abs(widthM - pos.x);
+    const distBack = Math.abs(lengthM - pos.y);
+    const minDist = Math.min(distLeft, distRight, distBack);
+    
+    if (minDist === distBack) return 180;
+    if (minDist === distLeft) return 90;
+    if (minDist === distRight) return -90;
+    return 180;
+  }
+  
+  // Default
+  return 0;
+};
+
 // NEW: Helper function to compute yaw angle for a speaker
 const getYawForObject = (speaker, lcrAngles, aimAtMLP) => {
   if (!speaker) return 0;
@@ -3176,9 +3232,8 @@ React.useEffect(() => {
           // Direction from speaker to THIS seat (use SAME convention as icon yaw)
           const dirDeg = safeYawToMLP(pos, { x: seatX, y: seatY });
 
-          // Aim MUST match what the icon is doing right now (flat vs toed-in)
-          // So we read the aim from the speaker itself (yaw), not from any toggle.
-          const aimDeg = Number.isFinite(sp?.yaw) ? sp.yaw : 0;
+          // Aim MUST match EXACTLY what the icon is using (shared helper)
+          const aimDeg = getPlanAimDeg(sp, mlp, widthM, lengthM, aimAtMLP, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, lcrAngleInfo);
 
           // Off-axis = shortest arc between aim direction and seat direction
           let offAxisRaw = dirDeg - aimDeg;
