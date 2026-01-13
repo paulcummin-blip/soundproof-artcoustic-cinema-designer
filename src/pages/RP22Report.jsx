@@ -29,9 +29,9 @@ function RP22ReportInner() {
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
     const orderedParams = React.useMemo(() => {
-        const perSeatParams = new Set(['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20']);
+        const perSeatParams = new Set([1, 4, 5, 6, 9, 10, 16, 17, 20]);
         return [...rp22Parameters]
-            .filter(p => !perSeatParams.has(p.id))
+            .filter(p => !perSeatParams.has(p.number))
             .sort((a, b) => a.id - b.id);
     }, []);
 
