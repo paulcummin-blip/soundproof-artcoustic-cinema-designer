@@ -53,6 +53,12 @@ const shortestAngleDeg = (aDeg, bDeg) => {
   return Math.abs(d);
 };
 
+// Helper: convert full included angle to half-angle (±off-axis), rounded up
+function halfDispersionDeg(fullDeg) {
+  if (!Number.isFinite(fullDeg)) return null;
+  return Math.ceil(fullDeg / 2);
+}
+
 // Centralized angle → HF loss mapping using new RP22 thresholds
 // Uses model-specific dispersion if available, otherwise defaults to generic thresholds
 function mapAngleToHfLossDb(angleDeg, modelMeta = null) {
@@ -61,9 +67,9 @@ function mapAngleToHfLossDb(angleDeg, modelMeta = null) {
   // Try to use model-specific dispersion data
   if (modelMeta?.dispersion?.horizontal) {
     const disp = modelMeta.dispersion.horizontal;
-    const minus1p5 = disp.minus1p5dB ?? disp.minus1p5 ?? null;
-    const minus3 = disp.minus3dB ?? disp.minus3 ?? null;
-    const minus5 = disp.minus5dB ?? disp.minus5 ?? null;
+    const minus1p5 = halfDispersionDeg(disp.minus1p5dB ?? disp.minus1p5);
+    const minus3 = halfDispersionDeg(disp.minus3dB ?? disp.minus3);
+    const minus5 = halfDispersionDeg(disp.minus5dB ?? disp.minus5);
 
     if (minus1p5 != null && minus3 != null && minus5 != null) {
       if (a <= minus1p5) return 1.5;
@@ -307,9 +313,9 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
   let lossDb;
   if (meta?.dispersion?.horizontal) {
     const disp = meta.dispersion.horizontal;
-    const minus1p5 = disp.minus1p5dB ?? disp.minus1p5 ?? null;
-    const minus3 = disp.minus3dB ?? disp.minus3 ?? null;
-    const minus5 = disp.minus5dB ?? disp.minus5 ?? null;
+    const minus1p5 = halfDispersionDeg(disp.minus1p5dB ?? disp.minus1p5);
+    const minus3 = halfDispersionDeg(disp.minus3dB ?? disp.minus3);
+    const minus5 = halfDispersionDeg(disp.minus5dB ?? disp.minus5);
 
     if (minus1p5 != null && minus3 != null && minus5 != null) {
       // Use model's actual dispersion windows directly on effective angle
@@ -492,9 +498,10 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
     let isBeyondNonLcrLimit = false;
 
     // Determine limit based on model-specific dispersion or fallback to 41°
-    const nonLcrLimit = meta?.dispersion?.horizontal?.minus3dB ?? 
-                       meta?.dispersion?.horizontal?.minus3 ?? 
-                       41;
+    const nonLcrLimit = halfDispersionDeg(
+      meta?.dispersion?.horizontal?.minus3dB ?? 
+      meta?.dispersion?.horizontal?.minus3
+    ) ?? 41;
 
     if (Math.abs(effectiveAngleDeg) > nonLcrLimit) {
       // Beyond the model's −3 dB window

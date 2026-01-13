@@ -3177,6 +3177,12 @@ React.useEffect(() => {
         // Room height for overhead angle maths (metres)
         const roomZ = Number.isFinite(roomHeight) ? roomHeight : Number.isFinite(heightM) ? heightM : null;
 
+        // Helper: convert full included angle to half-angle (±off-axis), rounded up
+        const halfDispersionDeg = (fullDeg) => {
+          if (!Number.isFinite(fullDeg)) return null;
+          return Math.ceil(fullDeg / 2);
+        };
+
         const perSpeaker = [];
         let worstLossDb = -Infinity;
         let worstRole = null;
@@ -3272,7 +3278,14 @@ React.useEffect(() => {
           
           // Product-dependent P17 "bucket" using the model's horizontal dispersion windows
           const meta = getSpeakerModelMeta(sp.model);
-          const disp = meta?.dispersion?.horizontal;
+          const dispRaw = meta?.dispersion?.horizontal;
+          const disp = dispRaw
+            ? {
+                minus1p5dB: halfDispersionDeg(dispRaw.minus1p5dB),
+                minus3dB:   halfDispersionDeg(dispRaw.minus3dB),
+                minus5dB:   halfDispersionDeg(dispRaw.minus5dB),
+              }
+            : null;
           
           let lossDb = 3.0; // Default L2 fallback
           let levelBucket = 2;
