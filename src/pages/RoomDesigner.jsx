@@ -2287,34 +2287,6 @@ function RoomDesignerWithState() {
     roomStore.updateRP22Results(perSeat, overall);
   }, [analysisResult, roomStore]);
 
-  // Sync room state to store whenever relevant data changes (only after hydration)
-  useEffect(() => {
-    if (!hasHydratedFromStoreRef.current) return; // Wait for hydration
-    if (!roomStore) return;
-
-    roomStore.updateRoomState({
-      room: stableDimensions ? {
-        widthM: stableDimensions.width,
-        lengthM: stableDimensions.length,
-        heightM: stableDimensions.height
-      } : undefined,
-      screen: _screen,
-      seats: _seatingPositions || [],
-      speakers: placedSpeakers || [],
-      subs: [...(frontSubsForRendering || []), ...(rearSubsForRendering || [])]
-    });
-  }, [
-    stableDimensions?.width,
-    stableDimensions?.length,
-    stableDimensions?.height,
-    _screen,
-    _seatingPositions,
-    placedSpeakers,
-    frontSubsForRendering,
-    rearSubsForRendering,
-    roomStore
-  ]);
-
   const frontSubsForRendering = React.useMemo(() => {
     try {
       const model = _frontSubsCfg?.model;
@@ -2513,6 +2485,35 @@ function RoomDesignerWithState() {
       return [];
     }
   }, [_rearSubsCfg?.model, _rearSubsCfg?.count, _rearSubsCfg?.positions, placedSpeakers, stableDimensions.width, stableDimensions.length, setSubWarnings]);
+
+  // Sync room state to store whenever relevant data changes (only after hydration)
+  // MOVED HERE: After frontSubsForRendering and rearSubsForRendering are defined
+  useEffect(() => {
+    if (!hasHydratedFromStoreRef.current) return; // Wait for hydration
+    if (!roomStore) return;
+
+    roomStore.updateRoomState({
+      room: stableDimensions ? {
+        widthM: stableDimensions.width,
+        lengthM: stableDimensions.length,
+        heightM: stableDimensions.height
+      } : undefined,
+      screen: _screen,
+      seats: _seatingPositions || [],
+      speakers: placedSpeakers || [],
+      subs: [...(frontSubsForRendering || []), ...(rearSubsForRendering || [])]
+    });
+  }, [
+    stableDimensions?.width,
+    stableDimensions?.length,
+    stableDimensions?.height,
+    _screen,
+    _seatingPositions,
+    placedSpeakers,
+    frontSubsForRendering,
+    rearSubsForRendering,
+    roomStore
+  ]);
 
   // NEW: Calculate live room price total
   const priceData = usePriceCalculation({
