@@ -3183,6 +3183,25 @@ React.useEffect(() => {
           return Math.ceil(fullDeg / 2);
         };
 
+        // 3D vector helpers for overhead aim-at-MLP logic
+        const rad2deg = (r) => (r * 180) / Math.PI;
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        const v3 = (x, y, z) => ({ x, y, z });
+        const v3sub = (a, b) => v3(a.x - b.x, a.y - b.y, a.z - b.z);
+        const v3len = (a) => Math.sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
+        const v3norm = (a) => {
+          const L = v3len(a);
+          return L > 1e-9 ? v3(a.x / L, a.y / L, a.z / L) : v3(0, 0, 0);
+        };
+        const v3dot = (a, b) => a.x*b.x + a.y*b.y + a.z*b.z;
+        // angle between vectors in degrees (0..180)
+        const angleBetweenDeg = (a, b) => {
+          const na = v3norm(a);
+          const nb = v3norm(b);
+          const d = clamp(v3dot(na, nb), -1, 1);
+          return rad2deg(Math.acos(d));
+        };
+
         const perSpeaker = [];
         let worstLossDb = -Infinity;
         let worstRole = null;
@@ -3206,28 +3225,36 @@ React.useEffect(() => {
           const isOverhead = canon.startsWith('T');
           
           if (isOverhead) {
-            // Overheads: compute vertical off-axis angle using ceiling height and seat height,
-            // then subtract built-in tilt (PAS etc.)
+            // --- 3D OFF-AXIS FOR OVERHEADS: AIM = overhead centre → MLP centre-line ---
+            // Speaker position (ceiling)
+            const sp3 = v3(pos.x, pos.y, Number.isFinite(heightM) ? heightM : 2.4);
+
+            // MLP and seat positions (listener height)
+            const mlp3  = v3(mlp.x, mlp.y, 1.2);
+            const seat3 = v3(seatX, seatY, seatZ);
+
+            // Aim vector = speaker → MLP (always)
+            const aimVec = v3sub(mlp3, sp3);
+
+            // Seat vector = speaker → seat (the seat being evaluated)
+            const seatVec = v3sub(seat3, sp3);
+
+            // Raw off-axis = 3D angle between aim axis and seat direction
+            let offAxisDeg = angleBetweenDeg(aimVec, seatVec);
+
+            // Apply built-in tilt: tilt reduces off-axis angle (can't go below 0)
             const meta = getSpeakerModelMeta(sp.model);
+            const builtInTilt = Number(meta?.builtInTiltDeg) || 0;
+            offAxisDeg = Math.max(0, offAxisDeg - builtInTilt);
 
-            const dxO = seatX - pos.x;
-            const dyO = seatY - pos.y;
+            // Store for later use
+            sp.__p17_overheadOffAxisDeg = offAxisDeg;
 
-            // If we don't have a room height, fail safe to "no penalty"
-            const dzO = Number.isFinite(roomZ) ? Math.max(0.001, (roomZ - seatZ)) : null;
+            // Continue using the existing loss logic below.
+            // Set offAxisClamped so downstream code can use it:
+            var offAxisClamped = Math.min(180, Math.max(0, offAxisDeg));
 
-            // Angle away from straight-down (0° = directly under the speaker)
-            const horizDist = Math.sqrt(dxO * dxO + dyO * dyO);
-            const rawVertOffAxisDeg = dzO ? (Math.atan2(horizDist, dzO) * 180 / Math.PI) : 0;
-
-            // Built-in tilt reduces off-axis (PAS should improve)
-            const builtInTiltDeg = Number.isFinite(meta?.builtInTiltDeg) ? meta.builtInTiltDeg : 0;
-
-            // Store per-speaker overhead angle for the later loss calculation
-            sp.__p17_overheadOffAxisDeg = Math.max(0, rawVertOffAxisDeg - builtInTiltDeg);
-
-            // We do NOT use aimDeg/dirDeg for overheads anymore
-            aimDeg = 0;
+            // Skip 2D dirDeg/aimDeg calculation for overheads
           } else if (isLW_RW) {
             // Front Wides: check toggle (LIVE)
             if (aimFrontWidesAtMLP) {
