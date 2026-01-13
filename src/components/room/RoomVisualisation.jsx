@@ -3171,6 +3171,12 @@ React.useEffect(() => {
       });
 
       if (relevantSpeakers.length > 0) {
+        // Seat height for overhead angle maths (metres)
+        const seatZ = Number.isFinite(effectiveHoveredSeat?.z) ? effectiveHoveredSeat.z : 1.2;
+
+        // Room height for overhead angle maths (metres)
+        const roomZ = Number.isFinite(roomHeight) ? roomHeight : Number.isFinite(heightM) ? heightM : null;
+
         const perSpeaker = [];
         let worstLossDb = -Infinity;
         let worstRole = null;
@@ -3194,7 +3200,27 @@ React.useEffect(() => {
           const isOverhead = canon.startsWith('T');
           
           if (isOverhead) {
-            // Overheads always aim down (0° in plan = into room)
+            // Overheads: compute vertical off-axis angle using ceiling height and seat height,
+            // then subtract built-in tilt (PAS etc.)
+            const meta = getSpeakerModelMeta(sp.model);
+
+            const dxO = seatX - pos.x;
+            const dyO = seatY - pos.y;
+
+            // If we don't have a room height, fail safe to "no penalty"
+            const dzO = Number.isFinite(roomZ) ? Math.max(0.001, (roomZ - seatZ)) : null;
+
+            // Angle away from straight-down (0° = directly under the speaker)
+            const horizDist = Math.sqrt(dxO * dxO + dyO * dyO);
+            const rawVertOffAxisDeg = dzO ? (Math.atan2(horizDist, dzO) * 180 / Math.PI) : 0;
+
+            // Built-in tilt reduces off-axis (PAS should improve)
+            const builtInTiltDeg = Number.isFinite(meta?.builtInTiltDeg) ? meta.builtInTiltDeg : 0;
+
+            // Store per-speaker overhead angle for the later loss calculation
+            sp.__p17_overheadOffAxisDeg = Math.max(0, rawVertOffAxisDeg - builtInTiltDeg);
+
+            // We do NOT use aimDeg/dirDeg for overheads anymore
             aimDeg = 0;
           } else if (isLW_RW) {
             // Front Wides: check toggle (LIVE)
@@ -3236,7 +3262,9 @@ React.useEffect(() => {
           // Normalize to -180..+180
           while (offAxisRaw > 180) offAxisRaw -= 360;
           while (offAxisRaw < -180) offAxisRaw += 360;
-          const offAxisDeg = Math.abs(offAxisRaw);
+          const offAxisDeg = isOverhead && Number.isFinite(sp.__p17_overheadOffAxisDeg)
+            ? sp.__p17_overheadOffAxisDeg
+            : Math.abs(offAxisRaw);
           const offAxisDegInt = Math.floor(offAxisDeg + 1e-9);
           
           // Clamp to 0..180 for HF falloff lookup
