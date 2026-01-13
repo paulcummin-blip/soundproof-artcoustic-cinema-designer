@@ -3247,12 +3247,8 @@ React.useEffect(() => {
             const builtInTilt = Number(meta?.builtInTiltDeg) || 0;
             offAxisDeg = Math.max(0, offAxisDeg - builtInTilt);
 
-            // Store for later use
+            // Store for later use (existing code will extract this into offAxisDeg variable)
             sp.__p17_overheadOffAxisDeg = offAxisDeg;
-
-            // Continue using the existing loss logic below.
-            // Set offAxisClamped so downstream code can use it:
-            var offAxisClamped = Math.min(180, Math.max(0, offAxisDeg));
 
             // Skip 2D dirDeg/aimDeg calculation for overheads
           } else if (isLW_RW) {
