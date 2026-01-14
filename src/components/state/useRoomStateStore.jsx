@@ -108,7 +108,7 @@ export function useRoomStateStore() {
     notifySubscribers(newState);
   }, []);
 
-  // Update room state with partial patch (deep merge for nested objects)
+  // Update room state with partial patch
   const updateRoomState = useCallback((patch) => {
     const roomId = state.activeRoomId || 'default';
     const currentRoom = state.rooms[roomId] || getDefaultRoomState().rooms.default;
@@ -116,11 +116,6 @@ export function useRoomStateStore() {
     const updatedRoom = {
       ...currentRoom,
       ...patch,
-      // Deep merge for nested rp22 object
-      rp22: patch.rp22 ? {
-        ...(currentRoom.rp22 || {}),
-        ...patch.rp22,
-      } : currentRoom.rp22,
       updatedAt: new Date().toISOString(),
     };
 
