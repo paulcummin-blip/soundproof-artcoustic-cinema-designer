@@ -297,7 +297,19 @@ function RP22ReportInner() {
                                 
                                 return allSeatMetrics.map((seatMetric) => {
                                     const seatId = seatMetric?.seatId || '—';
-                                    const metrics = seatMetric?.rp22 || {};
+                                    // CRITICAL: metrics are keyed as 'p1', 'p4', etc. (lowercase) not numbers
+                                    const rp22Raw = seatMetric?.rp22 || {};
+                                    const metrics = {
+                                        1: rp22Raw.p1,
+                                        4: rp22Raw.p4,
+                                        5: rp22Raw.p5,
+                                        6: rp22Raw.p6,
+                                        9: rp22Raw.p9,
+                                        10: rp22Raw.p10,
+                                        16: rp22Raw.p16,
+                                        17: rp22Raw.p17,
+                                        20: rp22Raw.p20
+                                    };
                                     const rp23 = seatMetric?.rp23 || {};
                                     const isPrimary = seatMetric?.isPrimary || false;
                                     
