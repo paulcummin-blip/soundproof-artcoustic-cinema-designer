@@ -10,6 +10,7 @@ import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, 
 import { computeP16ForSeat, computeP17ForAllSeats } from "../utils/rp22HfOffAxis";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
+import { computePerSeatRP22Metrics } from '@/components/utils/seatRp22Computation';
 
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
@@ -173,7 +174,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, seatSplMetrics, overheadState, aimState }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, seatSplMetrics, overheadState, aimState, screen, screenFrontPlaneM, lcrAngleInfo }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -328,9 +329,12 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     gradedParameters.secondary = null;
 
-    // Compute per-seat RP22 metrics (P9, P10, P16, P17, P20)
+    // Compute per-seat RP22 metrics using shared computation logic
     const seatMetrics = new Map();
     const roomCenterX = (dimensions?.widthM || 0) / 2;
+    
+    // Extract screen front plane from dimensions or use default
+    const screenFrontPlaneM = dimensions?.screenFrontPlaneM ?? 0;
 
     // Resolve overhead models before passing to P17
     const speakersWithResolvedOverheads = safeSpeakers.map(speaker => {
@@ -373,7 +377,35 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     for (const seat of seatsWithRoles) {
       const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
-      const metrics = { p1: null, p4: null, p5: null, p6: null, p9: null, p10: null, p16: null, p17: null, p20: null };
+      
+      // Use shared computation for P1, P4, P5, P6, P16, P17, RP23
+      const sharedMetrics = computePerSeatRP22Metrics({
+        seat,
+        seatingPositions: safeSeats,
+        placedSpeakers: speakersWithResolvedOverheads,
+        dimensions,
+        mlp,
+        screen: screen || dimensions?.screen || {},
+        screenFrontPlaneM: screenFrontPlaneM ?? dimensions?.screenFrontPlaneM ?? 0,
+        allSeatSplMetrics: seatSplMetrics,
+        aimAtMLP: aimState?.aimAtMLP || false,
+        aimFrontWidesAtMLP: aimState?.aimFrontWidesAtMLP || false,
+        aimSideSurroundsAtMLP: aimState?.aimSideSurroundsAtMLP || false,
+        aimRearSurroundsAtMLP: aimState?.aimRearSurroundsAtMLP || false,
+        lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 },
+      });
+      
+      const metrics = {
+        p1: sharedMetrics?.p1,
+        p4: sharedMetrics?.p4,
+        p5: sharedMetrics?.p5,
+        p6: sharedMetrics?.p6,
+        p9: null,
+        p10: sharedMetrics?.p10,
+        p16: sharedMetrics?.p16,
+        p17: sharedMetrics?.p17,
+        p20: sharedMetrics?.p20,
+      };
 
       // P9 - Maximum vertical angle between adjacent upper speakers
       const upperSpeakers = getUpperSpeakersForSeat(seat, safeSpeakers, getCanonicalRole);
@@ -394,18 +426,15 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
       }
 
-      // P10 – Maximum SPL difference between upper speakers (upper SPL spread)
-      // Uses the same SPL data source as the HUD (getSeatSplMetrics → .uppers)
-      {
+      // P9, P10 already computed by shared logic above (if applicable)
+      // Override P10 with local calculation if not already set
+      if (!metrics.p10 || metrics.p10.level === '—') {
         let upperValues = [];
 
         if (seatSplMetrics) {
-          // Use the same helper + key as RoomVisualisation / HUD:
-          // getSeatSplMetrics(allSeatSplMetrics, effectiveHoveredSeat.id)
           const seatSpl = getSeatSplMetrics(seatSplMetrics, seatId);
 
           if (seatSpl && seatSpl.uppers) {
-            // seatSpl.uppers is an object like { TFL: { value, formatted }, ... }
             upperValues = Object.values(seatSpl.uppers)
               .map((o) => (o && typeof o.value === 'number' ? o.value : null))
               .filter((v) => isNum(v));
@@ -416,12 +445,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           const maxSpl = Math.max(...upperValues);
           const minSpl = Math.min(...upperValues);
           const delta = Math.abs(maxSpl - minSpl);
-
-          // Round to 0.1 dB for display, keep numeric for value
           const deltaRounded = Math.round(delta * 10) / 10;
 
-          // RP22 P10 levels:
-          // L4: ≤ 2 dB, L3: ≤ 5 dB, L2: ≤ 8 dB, L1: > 8 dB
           let level10 = 1;
           if (deltaRounded <= 2) level10 = 4;
           else if (deltaRounded <= 5) level10 = 3;
@@ -432,77 +457,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             value: deltaRounded,
             formatted: `±${deltaRounded.toFixed(1)} dB`,
             level: level10,
-          };
-        } else {
-          // Less than 2 valid upper SPL values – keep HUD honest but neutral
-          metrics.p10 = {
-            value: null,
-            formatted: 'N/A (insufficient data)',
-            level: '—',
-          };
-        }
-      }
-
-      // P16 – LCR horizontal off-axis HF loss (RP22 Param 16)
-      {
-        const p16 = computeP16ForSeat(seat, safeSpeakers, getSpeakerModelMeta, mlp);
-
-        if (p16) {
-          // Add note if any LCR is beyond 55°
-          let hudLabel = p16.hudLabel;
-          if (p16.p16BeyondLcrLimit) {
-            hudLabel = `${p16.hudLabel} (>55° off-axis – fail)`;
-          }
-
-          metrics.p16 = {
-            ...p16,
-            hudLabel,
-          };
-        } else {
-          metrics.p16 = {
-            value: null,
-            formatted: "—",
-            hudLabel: null,
-            level: "—",
-          };
-        }
-      }
-
-      // P17 – Non-LCR (surrounds/wides/overheads) HF off-axis variance
-      {
-        const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
-        const p17Data = p17Results[seatId];
-
-        if (p17Data && isNum(p17Data.p17Db)) {
-          const valueDb = p17Data.p17Db;
-
-          // P17 level mapping
-          let level17 = 2; // Default
-          if (valueDb <= 1.5) level17 = 4;
-          else if (valueDb <= 3.0) level17 = 3;
-
-          // If any speaker is beyond 41°, cap at Level 2
-          if (p17Data.p17HasNaAngles) {
-            level17 = Math.min(level17, 2);
-          }
-
-          metrics.p17 = {
-            value: valueDb,
-            formatted: `±${valueDb.toFixed(1)} dB`,
-            level: level17,
-            worstRole: p17Data.worstRole,
-            worstAngleDeg: p17Data.worstAngleDeg,
-            worstLossDb: p17Data.worstLossDb,
-            perSpeaker: p17Data.perSpeaker || [],
-            p17HasNaAngles: p17Data.p17HasNaAngles || false,
-          };
-        } else {
-          metrics.p17 = {
-            value: null,
-            formatted: "—",
-            level: "—",
-            perSpeaker: [],
-            p17HasNaAngles: false,
           };
         }
       }
@@ -526,7 +480,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         rp22: {}
       };
 
-      // Map p9 -> parameter 9, p10 -> parameter 10, etc.
+      // Map p1..p20 and rp23 to numbered keys
       if (metrics.p1) perSeatRp22[seatId].rp22[1] = metrics.p1;
       if (metrics.p4) perSeatRp22[seatId].rp22[4] = metrics.p4;
       if (metrics.p5) perSeatRp22[seatId].rp22[5] = metrics.p5;
@@ -536,6 +490,11 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       if (metrics.p16) perSeatRp22[seatId].rp22[16] = metrics.p16;
       if (metrics.p17) perSeatRp22[seatId].rp22[17] = metrics.p17;
       if (metrics.p20) perSeatRp22[seatId].rp22[20] = metrics.p20;
+      
+      // Add RP23 viewing angle
+      if (sharedMetrics?.rp23) {
+        perSeatRp22[seatId].rp23 = sharedMetrics.rp23;
+      }
     }
 
     console.log(
