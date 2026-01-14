@@ -278,8 +278,12 @@ function useDesignerState() {
   const setScreenWall = useCallback(() => _setScreenWall("front"), []);
   const screenWall = screenWallState;
 
-  const [dolbyConfig, _setDolbyConfig] = useState("5.1");
-  const [dolbyLayout, setDolbyLayout] = useState("5.1");
+  const [dolbyConfig, _setDolbyConfig] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.dolbyConfig === "string") ? __autosavePayload.dolbyConfig : "5.1"
+  ));
+  const [dolbyLayout, setDolbyLayout] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.dolbyLayout === "string") ? __autosavePayload.dolbyLayout : "5.1"
+  ));
   const setDolbyConfig = useCallback((v) => {
     const p = v || "5.1";
     _setDolbyConfig(p);

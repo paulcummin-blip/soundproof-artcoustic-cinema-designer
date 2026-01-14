@@ -1895,10 +1895,14 @@ function SpeakerPlacementImpl(props) {
     return getMlpSeat(seatingPositions || []);
   }, [seatingPositions]);
 
-  // Surround config state (lifted to parent so effects can access it)
-  const [surroundConfig, setSurroundConfig] = useState({
-    value: { master: "off", side: "off", rear: "off", wide: "off" },
-    override: { side: false, rear: false, wide: false },
+  // Surround config state (initialize from AppState if available)
+  const [surroundConfig, setSurroundConfig] = useState(() => {
+    const savedModel = appState?.globalSurroundModel;
+    const master = savedModel && savedModel !== 'off' && savedModel !== 'none' ? savedModel : "off";
+    return {
+      value: { master, side: "off", rear: "off", wide: "off" },
+      override: { side: false, rear: false, wide: false },
+    };
   });
 
   // MOVE resetSurroundPositions HERE (before it's used in handlers/effects)
