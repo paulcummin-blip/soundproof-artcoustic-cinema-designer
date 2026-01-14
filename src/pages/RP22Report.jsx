@@ -12,30 +12,6 @@ import ParameterCard from '../components/report/ParameterCard';
 function RP22ReportInner() {
     const app = useAppState();
     
-    // Safe metric reader helper - works with Map, object, or array
-    const readSeatMetrics = React.useCallback((allSeatMetrics, seatId) => {
-        if (!allSeatMetrics) return null;
-
-        // Case 1: Map
-        if (typeof allSeatMetrics.get === "function") {
-            return allSeatMetrics.get(seatId) || null;
-        }
-
-        // Case 2: Plain object keyed by seatId
-        if (typeof allSeatMetrics === "object" && !Array.isArray(allSeatMetrics)) {
-            return allSeatMetrics[seatId] || null;
-        }
-
-        // Case 3: Array of per-seat metric objects
-        if (Array.isArray(allSeatMetrics)) {
-            return (
-                allSeatMetrics.find((m) => m?.seatId === seatId || m?.id === seatId) || null
-            );
-        }
-
-        return null;
-    }, []);
-    
     if (!app) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
@@ -47,58 +23,8 @@ function RP22ReportInner() {
         );
     }
 
-    // Build proper dimensions object for analysis engine (same shape as Room Designer uses)
-    const stableDimensions = React.useMemo(() => ({
-        width: Number(app?.roomDims?.widthM) || 4.5,
-        length: Number(app?.roomDims?.lengthM) || 6.0,
-        height: Number(app?.roomDims?.heightM) || 2.8
-    }), [app?.roomDims?.widthM, app?.roomDims?.lengthM, app?.roomDims?.heightM]);
-
-    // Compute primary seat for analysis (same logic as Room Designer)
-    const primarySeatingPosition = React.useMemo(() => {
-        const seats = Array.isArray(app?.seatingPositions) ? app.seatingPositions : [];
-        if (seats.length === 0) return null;
-        
-        // Find primary seat or use first seat
-        const primary = seats.find(s => s?.isPrimary) || seats[0];
-        if (!primary) return null;
-        
-        // Lock MLP X to centerline
-        return { ...primary, x: stableDimensions.width / 2 };
-    }, [app?.seatingPositions, stableDimensions.width]);
-
-    // Get placed speakers
-    const placedSpeakers = React.useMemo(() => 
-        Array.isArray(app?.speakerSystem?.placedSpeakers) ? app.speakerSystem.placedSpeakers : [],
-        [app?.speakerSystem?.placedSpeakers]
-    );
-
-    // Call analysis engine with the exact shape Room Designer uses
-    const analysisResult = useRP22AnalysisEngine({
-        placedSpeakers,
-        seatingPositions: app?.seatingPositions || [],
-        primarySeatingPosition,
-        dimensions: stableDimensions,
-        mlpBasis: app?.mlpBasis || "front",
-        seatSplMetrics: {}, // RP22 Report doesn't need SPL metrics for now
-        overheadState: {
-            globalModel: app?.overheadGlobalModel,
-            frontOverride: app?.overheadFrontOverride,
-            midOverride: app?.overheadMidOverride,
-            rearOverride: app?.overheadRearOverride,
-            useFrontGlobal: app?.useFrontGlobal,
-            useMidGlobal: app?.useMidGlobal,
-            useRearGlobal: app?.useRearGlobal,
-            aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,
-            aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP,
-            aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP,
-        },
-        aimState: {
-            aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,
-            aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP,
-            aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP,
-        }
-    });
+    const { backgroundNoiseNCB, setBackgroundNoiseNCB, ...appState } = app;
+    const analysisResult = useRP22AnalysisEngine(appState);
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
@@ -187,20 +113,6 @@ function RP22ReportInner() {
                                 
                                 return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
                             })()}
-                        </div>
-                        
-                        {/* DEBUG: remove after verification */}
-                        <div style={{ marginTop: 8, fontSize: 12, opacity: 0.75 }}>
-                          Debug:
-                          {" seats="}{Array.isArray(app?.seatingPositions) ? app.seatingPositions.length : "?"}
-                          {" placedSpeakers="}{Array.isArray(app?.speakerSystem?.placedSpeakers) ? app.speakerSystem.placedSpeakers.length : "?"}
-                          {" hasRoomDims="}{app?.roomDims ? "yes" : "no"}
-                        </div>
-                        
-                        <div style={{ marginTop: 4, fontSize: 12, opacity: 0.75 }}>
-                          Debug metrics:
-                          {" perSeatRp22="}{analysisResult?.perSeatRp22 ? `${Object.keys(analysisResult.perSeatRp22).length} seats` : "no"}
-                          {" gradedParameters="}{analysisResult?.gradedParameters ? "yes" : "no"}
                         </div>
                     </div>
                     <div className="text-right">
