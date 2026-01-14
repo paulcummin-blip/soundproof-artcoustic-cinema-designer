@@ -8,6 +8,16 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SidebarInset } from "@/components/ui/sidebar"; // NEW: Import SidebarInset
 import { CollapsiblePanel } from "@/components/ui/CollapsiblePanel";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import AppStateProvider, { useAppState, useScreenFrontPlaneY } from "@/components/AppStateProvider";
 import { useActiveProjectId } from "@/components/state/project-session";
@@ -1801,6 +1811,7 @@ function RoomDesignerWithState() {
   const [speakerPositionsView, setSpeakerPositionsView] = React.useState('off'); // 'off' | 'plan' | 'table' | 'both'
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
 
   // Layout emphasis: controls how wide the left plan vs right menu are.
   // "balanced" keeps your current look.
@@ -3848,6 +3859,9 @@ function RoomDesignerWithState() {
   const handleResetPositions = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
     
+    // Close dialog and execute reset
+    setShowResetConfirm(false);
+    
     // Clear working copy first
     if (typeof appState?.clearWorkingCopy === 'function') {
       appState.clearWorkingCopy();
@@ -4042,18 +4056,36 @@ function RoomDesignerWithState() {
   } = appState;
 
   return (
-    <div className="flex flex-col h-full bg-[#F8F8F7]" style={{ minHeight: 0 }}>
-      <style>{`
-        .brand-btn{
-          background:#213428 !important;
-          color:#fff !important;
-          border-color:transparent !important;
-        }
-        .brand-btn:hover{ background:#3E4349 !important; }
-        details[open] summary svg {
-          transform: rotate(180deg) !important;
-        }
-      `}</style>
+    <>
+      <AlertDialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Reset Room Designer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reset room, seating, screen, speakers and subs back to defaults. This can't be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleResetPositions} className="bg-red-600 hover:bg-red-700">
+              Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <div className="flex flex-col h-full bg-[#F8F8F7]" style={{ minHeight: 0 }}>
+        <style>{`
+          .brand-btn{
+            background:#213428 !important;
+            color:#fff !important;
+            border-color:transparent !important;
+          }
+          .brand-btn:hover{ background:#3E4349 !important; }
+          details[open] summary svg {
+            transform: rotate(180deg) !important;
+          }
+        `}</style>
 
       <header className="p-4 bg-white border-b border-[#DCDBD6] flex-shrink-0">
         <div className="flex items-center justify-between">
@@ -4063,7 +4095,7 @@ function RoomDesignerWithState() {
             <Button
               size="sm"
               variant="outline"
-              onClick={handleResetPositions}
+              onClick={() => setShowResetConfirm(true)}
               disabled={isFrozen('speakers')}>
               <RotateCcw className="w-4 h-4 mr-2" />
               Reset
@@ -4647,7 +4679,8 @@ function RoomDesignerWithState() {
           </div>
         </aside>
       </div>
-    </div>);
+    </div>
+    </>);
 
 }
 

@@ -275,11 +275,15 @@ function useDesignerState() {
 
   const [dimensions, setDimensions] = useState({}); 
 
-  const [screen, setScreen] = useState({
-    visibleWidthInches: 100, aspectRatio: "16:9", mountMode: "baffle",
-    floatDepthM: 0, showScreenPlane: false, showCavity: false, speakerClearanceM: 0.02,
-  });
-  const [screenHeight, setScreenHeight] = useState(0.5);
+  const [screen, setScreen] = useState(() => (
+    (__autosavePayload && __autosavePayload.screen) ? __autosavePayload.screen : {
+      visibleWidthInches: 100, aspectRatio: "16:9", mountMode: "baffle",
+      floatDepthM: 0, showScreenPlane: false, showCavity: false, speakerClearanceM: 0.02,
+    }
+  ));
+  const [screenHeight, setScreenHeight] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.screenHeight === "number") ? __autosavePayload.screenHeight : 0.5
+  ));
   const [screenWallState, _setScreenWall] = useState("front");
   const setScreenWall = useCallback(() => _setScreenWall("front"), []);
   const screenWall = screenWallState;
@@ -302,14 +306,30 @@ function useDesignerState() {
     (__autosavePayload && Array.isArray(__autosavePayload.seatingPositions)) ? __autosavePayload.seatingPositions : []
   ));
   const [baselineSeatingPositions, setBaselineSeatingPositions] = useState([]);
-  const [seatingRows, setSeatingRows] = useState(1);
-  const [seatsPerRow, setSeatsPerRow] = useState(3);
-  const [seatsPerRowByRow, setSeatsPerRowByRow] = useState([]);
-  const [seatingBlockOffset, setSeatingBlockOffset] = useState(0);
-  const [seatSpacing, setSeatSpacing] = useState(0.8);
-  const [rowSpacingM, setRowSpacingM] = useState(1.8);
-  const [mlpBasis, setMlpBasis] = useState("front");
-  const [autoSeatByRP23, setAutoSeatByRP23] = useState(true);
+  const [seatingRows, setSeatingRows] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.seatingRows === "number") ? __autosavePayload.seatingRows : 1
+  ));
+  const [seatsPerRow, setSeatsPerRow] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.seatsPerRow === "number") ? __autosavePayload.seatsPerRow : 3
+  ));
+  const [seatsPerRowByRow, setSeatsPerRowByRow] = useState(() => (
+    (__autosavePayload && Array.isArray(__autosavePayload.seatsPerRowByRow)) ? __autosavePayload.seatsPerRowByRow : []
+  ));
+  const [seatingBlockOffset, setSeatingBlockOffset] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.seatingBlockOffset === "number") ? __autosavePayload.seatingBlockOffset : 0
+  ));
+  const [seatSpacing, setSeatSpacing] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.seatSpacing === "number") ? __autosavePayload.seatSpacing : 0.8
+  ));
+  const [rowSpacingM, setRowSpacingM] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.rowSpacingM === "number") ? __autosavePayload.rowSpacingM : 1.8
+  ));
+  const [mlpBasis, setMlpBasis] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.mlpBasis === "string") ? __autosavePayload.mlpBasis : "front"
+  ));
+  const [autoSeatByRP23, setAutoSeatByRP23] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.autoSeatByRP23 === "boolean") ? __autosavePayload.autoSeatByRP23 : true
+  ));
   const [roomElements, setRoomElements] = useState([]);
   const [subwoofers, setSubwoofers] = useState([]);
   const [frontSubsCfg, setFrontSubsCfg] = useState(() => (
@@ -811,6 +831,15 @@ function useDesignerState() {
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
       screen,
+      screenHeight,
+      seatingRows,
+      seatsPerRow,
+      seatsPerRowByRow,
+      seatSpacing,
+      rowSpacingM,
+      mlpBasis,
+      autoSeatByRP23,
+      seatingBlockOffset,
       aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP,
@@ -836,7 +865,7 @@ function useDesignerState() {
     return () => {
       if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
     };
-  }, [
+    }, [
     roomDims,
     dimensions,
     seatingPositions,
@@ -846,6 +875,15 @@ function useDesignerState() {
     dolbyLayout,
     dolbyConfig,
     screen,
+    screenHeight,
+    seatingRows,
+    seatsPerRow,
+    seatsPerRowByRow,
+    seatSpacing,
+    rowSpacingM,
+    mlpBasis,
+    autoSeatByRP23,
+    seatingBlockOffset,
     aimFrontWidesAtMLP,
     aimSideSurroundsAtMLP,
     aimRearSurroundsAtMLP,
@@ -857,7 +895,7 @@ function useDesignerState() {
     useFrontGlobal,
     useMidGlobal,
     useRearGlobal
-  ]);
+    ]);
 
   // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
   useEffect(() => {
@@ -871,6 +909,15 @@ function useDesignerState() {
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
       screen,
+      screenHeight,
+      seatingRows,
+      seatsPerRow,
+      seatsPerRowByRow,
+      seatSpacing,
+      rowSpacingM,
+      mlpBasis,
+      autoSeatByRP23,
+      seatingBlockOffset,
       aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP,
@@ -889,7 +936,7 @@ function useDesignerState() {
     } catch (e) {
       console.warn("Autosave failed:", e);
     }
-  }, [
+    }, [
     roomDims,
     dimensions,
     seatingPositions,
@@ -899,6 +946,15 @@ function useDesignerState() {
     dolbyLayout,
     dolbyConfig,
     screen,
+    screenHeight,
+    seatingRows,
+    seatsPerRow,
+    seatsPerRowByRow,
+    seatSpacing,
+    rowSpacingM,
+    mlpBasis,
+    autoSeatByRP23,
+    seatingBlockOffset,
     aimFrontWidesAtMLP,
     aimSideSurroundsAtMLP,
     aimRearSurroundsAtMLP,
@@ -910,7 +966,7 @@ function useDesignerState() {
     useFrontGlobal,
     useMidGlobal,
     useRearGlobal
-  ]);
+    ]);
 
   // --- Autosave: Manual restore/clear functions ---
   const restoreAutosave = useCallback(() => {
@@ -929,6 +985,15 @@ function useDesignerState() {
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
       if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
       if (p.screen) setScreen(p.screen);
+      if (typeof p.screenHeight === "number") setScreenHeight(p.screenHeight);
+      if (typeof p.seatingRows === "number") setSeatingRows(p.seatingRows);
+      if (typeof p.seatsPerRow === "number") setSeatsPerRow(p.seatsPerRow);
+      if (Array.isArray(p.seatsPerRowByRow)) setSeatsPerRowByRow(p.seatsPerRowByRow);
+      if (typeof p.seatSpacing === "number") setSeatSpacing(p.seatSpacing);
+      if (typeof p.rowSpacingM === "number") setRowSpacingM(p.rowSpacingM);
+      if (typeof p.mlpBasis === "string") setMlpBasis(p.mlpBasis);
+      if (typeof p.autoSeatByRP23 === "boolean") setAutoSeatByRP23(p.autoSeatByRP23);
+      if (typeof p.seatingBlockOffset === "number") setSeatingBlockOffset(p.seatingBlockOffset);
 
       setAutosaveMeta(getAutosaveMeta());
       return true;
@@ -953,6 +1018,15 @@ function useDesignerState() {
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
       screen,
+      screenHeight,
+      seatingRows,
+      seatsPerRow,
+      seatsPerRowByRow,
+      seatSpacing,
+      rowSpacingM,
+      mlpBasis,
+      autoSeatByRP23,
+      seatingBlockOffset,
       aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP,
@@ -970,7 +1044,7 @@ function useDesignerState() {
     } catch (e) {
       console.warn("Autosave failed:", e);
     }
-  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]);
+  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, screenHeight, seatingRows, seatsPerRow, seatsPerRowByRow, seatSpacing, rowSpacingM, mlpBasis, autoSeatByRP23, seatingBlockOffset, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]);
 
   const clearWorkingCopy = useCallback(() => {
     try {
