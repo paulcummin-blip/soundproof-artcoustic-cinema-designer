@@ -3738,6 +3738,25 @@ React.useEffect(() => {
     // Legacy bridge
     data.p1NearestM = data.rp22.p1.valueM;
 
+    // Push metrics to AppState (single source of truth)
+    if (appState?.setPerSeatMetricsForSeat && effectiveHoveredSeat?.id) {
+      const seatMetricsPayload = {
+        rp23: data.rp23,
+        rp22: {
+          p1: data.rp22.p1,
+          p4: data.rp22.p4,
+          p5: data.rp22.p5,
+          p6: data.rp22.p6,
+          p9: data.rp22.p9,
+          p10: data.rp22.p10,
+          p16: data.rp22.p16,
+          p17: data.rp22.p17,
+          p20: data.rp22.p20,
+        }
+      };
+      appState.setPerSeatMetricsForSeat(effectiveHoveredSeat.id, seatMetricsPayload);
+    }
+
     return data;
   }, [
     effectiveHoveredSeat,
@@ -3757,6 +3776,7 @@ React.useEffect(() => {
     aimFrontWidesAtMLP,
     aimSideSurroundsAtMLP,
     aimRearSurroundsAtMLP,
+    appState?.setPerSeatMetricsForSeat,
   ]);
 
 // 1) Auto-position HUD near the currently hovered/pinned seat

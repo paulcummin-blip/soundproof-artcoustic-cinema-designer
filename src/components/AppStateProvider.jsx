@@ -373,6 +373,7 @@ function useDesignerState() {
   const [autosaveMeta, setAutosaveMeta] = useState(null);
   const [globalSurroundModel, _setGlobalSurroundModel] = useState(null);
   const [isHydrated, setIsHydrated] = useState(true);
+  const [perSeatMetrics, setPerSeatMetrics] = useState({});
 
   const setGlobalSurroundModel = useCallback((model) => {
     if (globalThis.__B44_LOGS) console.log('[AppState] setGlobalSurroundModel', { model });
@@ -892,6 +893,14 @@ function useDesignerState() {
     }
   }, []);
 
+  const setPerSeatMetricsForSeat = useCallback((seatId, data) => {
+    if (!seatId || !data) return;
+    setPerSeatMetrics(prev => ({
+      ...prev,
+      [seatId]: data
+    }));
+  }, []);
+
   const value = useMemo(() => ({
     dimensions, setDimensions, 
     roomDims, setRoomDims,
@@ -949,6 +958,8 @@ function useDesignerState() {
     globalSurroundModel,
     setGlobalSurroundModel,
     isHydrated,
+    perSeatMetrics,
+    setPerSeatMetricsForSeat,
   }), [
     dimensions, setDimensions,
     roomDims, setRoomDims,
@@ -1007,6 +1018,8 @@ function useDesignerState() {
     globalSurroundModel,
     setGlobalSurroundModel,
     isHydrated,
+    perSeatMetrics,
+    setPerSeatMetricsForSeat,
   ]);
 
   return value;

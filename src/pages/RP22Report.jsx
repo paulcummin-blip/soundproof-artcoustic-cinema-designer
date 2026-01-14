@@ -152,17 +152,21 @@ function RP22ReportInner() {
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {(() => {
-                                const seatMetrics = analysisResult?.seatMetrics;
-                                if (!seatMetrics || seatMetrics.size === 0) {
-                                    return <p className="text-sm text-[#3E4349]">No seat data available.</p>;
+                                // Read from AppState perSeatMetrics (single source of truth)
+                                const storedMetrics = app?.perSeatMetrics || {};
+                                const seats = Object.entries(storedMetrics);
+                                
+                                if (seats.length === 0) {
+                                    return (
+                                        <p className="text-sm text-[#3E4349]">
+                                            No seat data available. Visit Room Designer and hover over seats to populate metrics.
+                                        </p>
+                                    );
                                 }
-
-                                const perSeatRp22 = analysisResult?.perSeatRp22 || {};
-                                const seats = Object.entries(perSeatRp22);
                                 
                                 return seats.map(([seatId, seatData]) => {
-                                    const isPrimary = seatData?.isPrimary || false;
                                     const metrics = seatData?.rp22 || {};
+                                    const rp23 = seatData?.rp23 || {};
                                     
                                     // Helper to render level badge
                                     const renderBadge = (level) => {
@@ -196,17 +200,24 @@ function RP22ReportInner() {
                                             <CardHeader className="pb-2">
                                                 <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2">
                                                     {seatId}
-                                                    {isPrimary && (
-                                                        <span className="text-xs px-2 py-0.5 rounded bg-[#213428] text-white">MLP</span>
-                                                    )}
                                                 </CardTitle>
                                             </CardHeader>
                                             <CardContent className="space-y-1.5 text-xs">
+                                                {/* RP23 Horizontal Viewing */}
+                                                {rp23?.formatted && (
+                                                    <div className="flex justify-between items-center pb-1.5 border-b border-gray-100">
+                                                        <span className="font-medium text-[#3E4349]">RP23:</span>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[#1B1A1A]">{rp23.formatted}</span>
+                                                            {renderBadge(rp23.level)}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* RP22 Per-Seat Parameters */}
                                                 {[1, 4, 5, 6, 9, 10, 16, 17, 20].map(paramNum => {
                                                     const metric = metrics[paramNum];
                                                     if (!metric) return null;
-                                                    
-                                                    const paramKey = `p${paramNum}`;
                                                     
                                                     return (
                                                         <div key={paramNum}>
@@ -232,7 +243,7 @@ function RP22ReportInner() {
                                                             {/* P17 breakdown */}
                                                             {paramNum === 17 && metric.worstRole && (
                                                                 <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                                    Worst: {metric.worstRole}
+                                                                    Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
                                                                 </div>
                                                             )}
                                                         </div>
