@@ -23,8 +23,37 @@ function RP22ReportInner() {
         );
     }
 
+    // --- SAFE READERS (do not assume Map / do not crash) ---
+    const safeArray = (v) => (Array.isArray(v) ? v : []);
+    const safeObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
+
+    // Room Designer source-of-truth keys (these must match AppStateProvider)
+    const seats = safeArray(app?.seatingPositions);
+    const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
+
+    // Optional subs (won't break if missing)
+    const frontSubsCfg = safeObj(app?.frontSubsCfg);
+    const rearSubsCfg = safeObj(app?.rearSubsCfg);
+
     const { backgroundNoiseNCB, setBackgroundNoiseNCB, ...appState } = app;
     const analysisResult = useRP22AnalysisEngine(appState);
+
+    // Extract per-seat metrics from analysis engine (no Map assumptions)
+    const allSeatMetrics = safeArray(analysisResult?.perSeatRp22 ? Object.entries(analysisResult.perSeatRp22).map(([seatId, data]) => ({
+        seatId,
+        ...data
+    })) : []);
+    const roomMetrics = safeObj(analysisResult?.gradedParameters?.primary);
+
+    // Helper to find seat metric by ID safely
+    const readSeatMetricById = (list, seatId) => {
+        const arr = safeArray(list);
+        return arr.find((m) => m?.seatId === seatId || m?.id === seatId) || null;
+    };
+
+    // Validation flags
+    const hasSeats = seats.length > 0;
+    const hasSpeakers = placedSpeakers.length > 0;
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
@@ -152,22 +181,36 @@ function RP22ReportInner() {
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {(() => {
-                                // Use automatic per-seat analysis from engine (no hover required)
-                                const perSeatData = analysisResult?.perSeatRp22 || {};
-                                const seats = Object.entries(perSeatData);
-                                
-                                if (seats.length === 0) {
+                                // Check state before rendering
+                                if (!hasSeats) {
                                     return (
                                         <p className="text-sm text-[#3E4349]">
-                                            No seats defined yet. Configure seating in Room Designer first.
+                                            No seats defined yet. Configure seating in Room Designer.
                                         </p>
                                     );
                                 }
                                 
-                                return seats.map(([seatId, seatData]) => {
-                                    const metrics = seatData?.rp22 || {};
-                                    const rp23 = seatData?.rp23 || {};
-                                    const isPrimary = seatData?.isPrimary || false;
+                                if (!hasSpeakers) {
+                                    return (
+                                        <p className="text-sm text-[#3E4349]">
+                                            No speakers placed yet. Place speakers in Room Designer.
+                                        </p>
+                                    );
+                                }
+
+                                if (allSeatMetrics.length === 0) {
+                                    return (
+                                        <p className="text-sm text-[#3E4349]">
+                                            Analysis in progress...
+                                        </p>
+                                    );
+                                }
+                                
+                                return allSeatMetrics.map((seatMetric) => {
+                                    const seatId = seatMetric?.seatId || '—';
+                                    const metrics = seatMetric?.rp22 || {};
+                                    const rp23 = seatMetric?.rp23 || {};
+                                    const isPrimary = seatMetric?.isPrimary || false;
                                     
                                     // Helper to render level badge
                                     const renderBadge = (level) => {
