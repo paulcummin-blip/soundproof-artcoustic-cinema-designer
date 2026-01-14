@@ -953,6 +953,9 @@ appState, // Pass appState directly for setters
 
   // Boot logic: run ONCE – either load a project or initialise defaults
   useEffect(() => {
+    // CRITICAL: Wait for AppStateProvider to finish autosave restore before applying defaults
+    if (!appState?.isHydrated) return;
+
     // Already bootstrapped for this mount? Do nothing.
     if (hasBootstrappedRef.current) return;
 
@@ -988,6 +991,7 @@ appState, // Pass appState directly for setters
 
     return () => controller.abort();
   }, [
+  appState?.isHydrated,
   projectIdFromUrl,
   projectIdState,
   appState?.roomDims,
@@ -3104,6 +3108,9 @@ function RoomDesignerWithState() {
 
   // Effect to reconcile overhead speakers when layout changes
   useEffect(() => {
+    // CRITICAL: Wait for autosave hydration before applying defaults
+    if (!appState?.isHydrated) return;
+
     // Skip on initial project load (let project hydration complete first)
     if (loadState?.phase === "loaded" && !lastPresetRef.current) {
       return;
@@ -3599,6 +3606,7 @@ function RoomDesignerWithState() {
       });
     }
   }, [
+  appState?.isHydrated,
   dolbyPreset, stableDimensions, setSpeakers, _isFrozen, placedSpeakers, _sevenBedLayoutType, lastPresetRef,
   _overheadGlobalModel, _overheadFrontOverride, _overheadMidOverride, _overheadRearOverride,
   _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase]
@@ -3658,6 +3666,9 @@ function RoomDesignerWithState() {
 
   // Build or rebuild seating positions whenever seating config changes
   useEffect(() => {
+    // CRITICAL: Wait for autosave hydration
+    if (!appState?.isHydrated) return;
+
     // If we've just loaded a real project, don't overwrite its seating layout
     if (loadState?.phase === "loaded") {
       return;
@@ -3728,6 +3739,7 @@ function RoomDesignerWithState() {
       list
     );
   }, [
+  appState?.isHydrated,
   appState?.setSeatingPositions,
   _seatsPerRowByRow,
   _seatingRows,
