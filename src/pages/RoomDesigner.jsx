@@ -3834,6 +3834,11 @@ function RoomDesignerWithState() {
   const handleResetPositions = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
     
+    // Clear autosaved state (uses existing clearAutosave from AppStateProvider)
+    if (typeof appState?.clearAutosave === 'function') {
+      appState.clearAutosave();
+    }
+    
     // Set reset flag
     didUserRequestResetRef.current = true;
     
@@ -3846,7 +3851,7 @@ function RoomDesignerWithState() {
     setTimeout(() => {
       didUserRequestResetRef.current = false;
     }, 100);
-  }, [_isFrozen, initWithDefaultsAndRules]);
+  }, [_isFrozen, initWithDefaultsAndRules, appState]);
 
   const handleOptimiseAll = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
