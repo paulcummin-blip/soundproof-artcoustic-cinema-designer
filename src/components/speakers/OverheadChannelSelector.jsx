@@ -40,8 +40,17 @@ export default function OverheadChannelSelector({
   const midHasOverride = !useMidGlobal && midOverride;
   const rearHasOverride = !useRearGlobal && rearOverride;
 
+  // Look up display label from overhead models registry
   const getModelLabel = (modelKey) => {
-    const model = overheadModels.find(m => m.key === modelKey);
+    // Try exact match first
+    let model = overheadModels.find(m => m.key === modelKey);
+    
+    // If not found and key ends with _s, try without suffix
+    if (!model && modelKey && String(modelKey).endsWith('_s')) {
+      const keyWithoutS = String(modelKey).slice(0, -2);
+      model = overheadModels.find(m => m.key === keyWithoutS);
+    }
+    
     return model?.label || 'Off';
   };
 

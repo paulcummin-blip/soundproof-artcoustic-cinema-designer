@@ -34,8 +34,17 @@ export default function SurroundsSelector({
   const rearOverride = !!override?.rear;
   const wideOverride = !!override?.wide;
 
+  // Look up display label from choices (strips any _s suffix for display)
   const getModelLabel = (modelKey) => {
-    const choice = choices.find(c => c.value === modelKey);
+    // Try exact match first
+    let choice = choices.find(c => c.value === modelKey);
+    
+    // If not found and key ends with _s, try without suffix
+    if (!choice && modelKey && String(modelKey).endsWith('_s')) {
+      const keyWithoutS = String(modelKey).slice(0, -2);
+      choice = choices.find(c => c.value === keyWithoutS);
+    }
+    
     return choice?.label || 'Off';
   };
 

@@ -1217,6 +1217,24 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
     return "";
   }, [getByRole, LCR_CANONICAL_ROLES, lcrModelOptions]);
 
+  // Helper to get clean display label for any model
+  const getDisplayLabel = useCallback((modelKey) => {
+    if (!modelKey) return "";
+    
+    // Look up in LCR models first
+    const lcrMatch = lcrModelOptions.find(m => m.key === modelKey || m.label === modelKey);
+    if (lcrMatch) return lcrMatch.label;
+    
+    // If ends with _s, try without suffix
+    if (String(modelKey).endsWith('_s')) {
+      const withoutS = String(modelKey).slice(0, -2);
+      const fallback = lcrModelOptions.find(m => m.key === withoutS);
+      if (fallback) return fallback.label;
+    }
+    
+    return modelKey;
+  }, [lcrModelOptions]);
+
   const [lcrModel, setLcrModel] = useState(initialModel);
   const [powerInputValue, setPowerInputValue] = useState(String(splConfig?.globalPowerW || 100));
 
