@@ -969,18 +969,40 @@ appState, // Pass appState directly for setters
           loadProject(controller.signal);
         }
       } else {
-        // No project at all – this is a fresh, local-only design.
-        // Only initialise defaults if nothing has been laid out yet.
-        const hasSpeakers =
-        Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
-        const hasSeats =
-        Array.isArray(seatingPositions) && seatingPositions.length > 0;
+        // No project at all – check if we have saved room state from previous session
+        const hasSavedRoomState = (() => {
+          // Check roomStore for saved data
+          if (!roomStore?.activeRoom) return false;
+          
+          const room = roomStore.activeRoom;
+          
+          // Valid if has non-default dimensions
+          const hasValidDims = 
+            room.room?.widthM > 0 && 
+            room.room?.lengthM > 0 && 
+            room.room?.heightM > 0;
+          
+          // Valid if has any speakers or seats
+          const hasContent = 
+            (Array.isArray(room.speakers) && room.speakers.length > 0) ||
+            (Array.isArray(room.seats) && room.seats.length > 0);
+          
+          return hasValidDims && hasContent;
+        })();
 
-        if (!hasSpeakers && !hasSeats && appState?.roomDims) {
+        // Also check current state as fallback
+        const hasSpeakers = Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
+        const hasSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0;
+
+        // Only initialise defaults if BOTH saved state AND current state are empty
+        if (!hasSavedRoomState && !hasSpeakers && !hasSeats && appState?.roomDims) {
           hasBootstrappedRef.current = true;
           if (typeof initWithDefaultsAndRules === "function") {
             initWithDefaultsAndRules();
           }
+        } else if (hasSavedRoomState) {
+          // Mark as bootstrapped so we don't reinitialize
+          hasBootstrappedRef.current = true;
         }
       }
     } catch (e) {
@@ -994,7 +1016,8 @@ appState, // Pass appState directly for setters
   appState?.roomDims,
   initWithDefaultsAndRules,
   loadProject,
-  setProjectIdState]
+  setProjectIdState,
+  roomStore?.activeRoom]
   );
 
   const manualSaveProject = useCallback(async () => {
@@ -2575,6 +2598,9 @@ function RoomDesignerWithState() {
 
   // NEW: Hydrate speaker system from handoff nodes (only if no speakers placed yet)
   useEffect(() => {
+    // Skip if already bootstrapped
+    if (hasBootstrappedRef.current && placedSpeakers.length > 0) return;
+    
     // === Manual seeding mode (leave speakers empty until user acts)
     const AUTOSEED_ON_LOAD = false; // set true only if you want auto-hydration again
 
@@ -2990,6 +3016,11 @@ function RoomDesignerWithState() {
   useEffect(() => {
     if (isDraggingRef.current) return;
     
+    // Skip if not yet bootstrapped
+    if (!hasBootstrappedRef.current) {
+      return;
+    }
+    
     // If we've just loaded a real project, don't overwrite its speaker layout
     if (loadState?.phase === "loaded") {
       return;
@@ -3116,6 +3147,11 @@ function RoomDesignerWithState() {
 
   // Effect to reconcile overhead speakers when layout changes
   useEffect(() => {
+    // Skip if not yet bootstrapped (prevents overwriting on first load)
+    if (!hasBootstrappedRef.current) {
+      return;
+    }
+    
     // Skip on initial project load (let project hydration complete first)
     if (loadState?.phase === "loaded" && !lastPresetRef.current) {
       return;
@@ -3659,6 +3695,11 @@ function RoomDesignerWithState() {
   useEffect(() => {
     // If we've just loaded a real project, don't overwrite its seating layout
     if (loadState?.phase === "loaded") {
+      return;
+    }
+    
+    // Skip if we haven't bootstrapped yet (prevents overwriting on first load)
+    if (!hasBootstrappedRef.current) {
       return;
     }
 
