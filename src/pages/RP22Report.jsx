@@ -8,11 +8,9 @@ import { BarChart4 } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import ParameterCard from '../components/report/ParameterCard';
-import { useRoomStateStore } from '@/components/state/useRoomStateStore';
 
 function RP22ReportInner() {
     const app = useAppState();
-    const roomStore = useRoomStateStore();
     
     if (!app) {
         return (
@@ -26,24 +24,7 @@ function RP22ReportInner() {
     }
 
     const { backgroundNoiseNCB, setBackgroundNoiseNCB, ...appState } = app;
-    
-    // Read RP22 results from shared store (written by Room Designer)
-    const activeRoom = roomStore?.activeRoom;
-    const perSeatRp22 = activeRoom?.rp22?.perSeat || {};
-    const overallRp22 = activeRoom?.rp22?.overall || {};
-    
-    // Build analysisResult structure compatible with existing code
-    const analysisResult = React.useMemo(() => {
-        return {
-            gradedParameters: {
-                primary: overallRp22
-            },
-            perSeatRp22: perSeatRp22,
-            seatMetrics: new Map(
-                Object.entries(perSeatRp22).map(([seatId, data]) => [seatId, data.rp22 || {}])
-            )
-        };
-    }, [perSeatRp22, overallRp22]);
+    const analysisResult = useRP22AnalysisEngine(appState);
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
@@ -171,11 +152,12 @@ function RP22ReportInner() {
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {(() => {
-                                // Read directly from perSeatRp22 (already in correct format)
-                                if (!perSeatRp22 || Object.keys(perSeatRp22).length === 0) {
-                                    return <p className="text-sm text-[#3E4349]">No seat data available. Run Room Designer first.</p>;
+                                const seatMetrics = analysisResult?.seatMetrics;
+                                if (!seatMetrics || seatMetrics.size === 0) {
+                                    return <p className="text-sm text-[#3E4349]">No seat data available.</p>;
                                 }
 
+                                const perSeatRp22 = analysisResult?.perSeatRp22 || {};
                                 const seats = Object.entries(perSeatRp22);
                                 
                                 return seats.map(([seatId, seatData]) => {
