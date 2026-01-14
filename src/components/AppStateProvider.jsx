@@ -347,6 +347,7 @@ function useDesignerState() {
 
   const [autosaveMeta, setAutosaveMeta] = useState(null);
   const [globalSurroundModel, _setGlobalSurroundModel] = useState(null);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   const setGlobalSurroundModel = useCallback((model) => {
     if (globalThis.__B44_LOGS) console.log('[AppState] setGlobalSurroundModel', { model });
@@ -680,16 +681,25 @@ function useDesignerState() {
   // --- Autosave: Restore on mount ---
   useEffect(() => {
     const data = loadAutosave();
-    if (!data?.payload) return;
+    if (!data?.payload) {
+      setIsHydrated(true);
+      return;
+    }
 
     // Only restore if the current state looks "empty"
     const hasAlready = Array.isArray(seatingPositions) && seatingPositions.length > 0;
     const hasSpk = Array.isArray(speakerSystem?.placedSpeakers) && speakerSystem.placedSpeakers.length > 0;
 
-    if (hasAlready || hasSpk) return; // don't stomp a real loaded session
+    if (hasAlready || hasSpk) {
+      setIsHydrated(true);
+      return; // don't stomp a real loaded session
+    }
 
     const p = data.payload;
-    if (!isAutosavePayloadValid(p)) return;
+    if (!isAutosavePayloadValid(p)) {
+      setIsHydrated(true);
+      return;
+    }
 
     // Apply (use the existing setters)
     try {
@@ -706,6 +716,8 @@ function useDesignerState() {
       setAutosaveMeta(getAutosaveMeta());
     } catch {
       // never crash
+    } finally {
+      setIsHydrated(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -835,6 +847,7 @@ function useDesignerState() {
     clearAutosave: clearAutosaveNow,
     globalSurroundModel,
     setGlobalSurroundModel,
+    isHydrated,
   }), [
     dimensions, setDimensions,
     roomDims, setRoomDims,
@@ -890,6 +903,7 @@ function useDesignerState() {
     clearAutosaveNow,
     globalSurroundModel,
     setGlobalSurroundModel,
+    isHydrated,
   ]);
 
   return value;
