@@ -347,10 +347,20 @@ function RP22ReportInner() {
                                                     </div>
                                                 )}
                                                 
-                                                {/* RP22 Per-Seat Parameters */}
-                                                {[1, 4, 5, 6, 9, 10, 16, 17, 20].map(paramNum => {
+                                                {/* RP22 Per-Seat Parameters - ALWAYS SHOW ALL */}
+                                                {[
+                                                    { num: 1, label: 'Minimum distance to room boundaries' },
+                                                    { num: 4, label: 'Screen SPL balance' },
+                                                    { num: 5, label: 'Surround angular spacing' },
+                                                    { num: 6, label: 'Surround SPL balance' },
+                                                    { num: 9, label: 'Vertical angle between upper rows' },
+                                                    { num: 10, label: 'Upper speaker SPL balance' },
+                                                    { num: 16, label: 'Screen speaker seat-to-seat response variance' },
+                                                    { num: 17, label: 'Surround/wide/overhead seat-to-seat response variance' },
+                                                    { num: 20, label: 'Reserved / Not implemented' }
+                                                ].map(({ num: paramNum, label: paramLabel }) => {
                                                     const metric = metrics[paramNum];
-                                                    if (!metric) return null;
+                                                    const hasData = !!metric;
                                                     
                                                     return (
                                                         <div key={paramNum}>
@@ -359,13 +369,19 @@ function RP22ReportInner() {
                                                                     P{paramNum}:
                                                                 </span>
                                                                 <div className="flex items-center gap-2">
-                                                                    <span className="text-[#1B1A1A]">{metric.formatted || metric.hudLabel || '—'}</span>
-                                                                    {renderBadge(metric.level)}
+                                                                    {hasData ? (
+                                                                        <>
+                                                                            <span className="text-[#1B1A1A]">{metric.formatted || metric.hudLabel || '—'}</span>
+                                                                            {renderBadge(metric.level)}
+                                                                        </>
+                                                                    ) : (
+                                                                        <span className="text-xs text-gray-400 italic">Insufficient data</span>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                             
                                                             {/* P16 breakdown */}
-                                                            {paramNum === 16 && metric.perSpeaker && metric.perSpeaker.length > 0 && (
+                                                            {hasData && paramNum === 16 && metric.perSpeaker && metric.perSpeaker.length > 0 && (
                                                                 <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
                                                                     {metric.perSpeaker.map(s => 
                                                                         `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`
@@ -374,7 +390,7 @@ function RP22ReportInner() {
                                                             )}
                                                             
                                                             {/* P17 breakdown */}
-                                                            {paramNum === 17 && metric.worstRole && (
+                                                            {hasData && paramNum === 17 && metric.worstRole && (
                                                                 <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
                                                                     Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
                                                                 </div>
