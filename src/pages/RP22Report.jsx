@@ -12,6 +12,30 @@ import ParameterCard from '../components/report/ParameterCard';
 function RP22ReportInner() {
     const app = useAppState();
     
+    // Safe metric reader helper - works with Map, object, or array
+    const readSeatMetrics = React.useCallback((allSeatMetrics, seatId) => {
+        if (!allSeatMetrics) return null;
+
+        // Case 1: Map
+        if (typeof allSeatMetrics.get === "function") {
+            return allSeatMetrics.get(seatId) || null;
+        }
+
+        // Case 2: Plain object keyed by seatId
+        if (typeof allSeatMetrics === "object" && !Array.isArray(allSeatMetrics)) {
+            return allSeatMetrics[seatId] || null;
+        }
+
+        // Case 3: Array of per-seat metric objects
+        if (Array.isArray(allSeatMetrics)) {
+            return (
+                allSeatMetrics.find((m) => m?.seatId === seatId || m?.id === seatId) || null
+            );
+        }
+
+        return null;
+    }, []);
+    
     if (!app) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
