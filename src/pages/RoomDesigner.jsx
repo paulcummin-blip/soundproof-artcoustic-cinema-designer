@@ -3142,7 +3142,6 @@ function RoomDesignerWithState() {
     );
 
     const noSpeakers = (placedSpeakers || []).length === 0;
-    const presetChanged = lastPresetRef.current !== dolbyPreset;
 
     // Skip only if preset is unchanged AND we have speakers AND user didn't request reset
     // CRITICAL: If preset changed, ALWAYS run reconciliation
