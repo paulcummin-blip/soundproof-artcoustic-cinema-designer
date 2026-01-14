@@ -8,6 +8,9 @@ import { BarChart4 } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import ParameterCard from '../components/report/ParameterCard';
+import { computeMLPAndPrimary } from '../components/utils/computeMLPAndPrimary';
+import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
+import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 
 function RP22ReportInner() {
     const app = useAppState();
@@ -30,30 +33,116 @@ function RP22ReportInner() {
     // Room Designer source-of-truth keys (these must match AppStateProvider)
     const seats = safeArray(app?.seatingPositions);
     const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
+    const roomDims = app?.roomDims || {};
+    const screen = app?.screen || {};
+    const dolbyLayout = app?.dolbyLayout || "5.1";
+    const mlpBasis = app?.mlpBasis || "front";
 
     // Optional subs (won't break if missing)
     const frontSubsCfg = safeObj(app?.frontSubsCfg);
     const rearSubsCfg = safeObj(app?.rearSubsCfg);
 
-    const { backgroundNoiseNCB, setBackgroundNoiseNCB, ...appState } = app;
-    const analysisResult = useRP22AnalysisEngine(appState);
-
-    // Extract per-seat metrics from analysis engine (no Map assumptions)
-    const allSeatMetrics = safeArray(analysisResult?.perSeatRp22 ? Object.entries(analysisResult.perSeatRp22).map(([seatId, data]) => ({
-        seatId,
-        ...data
-    })) : []);
-    const roomMetrics = safeObj(analysisResult?.gradedParameters?.primary);
-
-    // Helper to find seat metric by ID safely
-    const readSeatMetricById = (list, seatId) => {
-        const arr = safeArray(list);
-        return arr.find((m) => m?.seatId === seatId || m?.id === seatId) || null;
-    };
-
     // Validation flags
     const hasSeats = seats.length > 0;
     const hasSpeakers = placedSpeakers.length > 0;
+
+    // Compute stable dimensions for analysis
+    const stableDimensions = React.useMemo(() => ({
+        width: Number(roomDims?.widthM) || 4.5,
+        length: Number(roomDims?.lengthM) || 6.0,
+        height: Number(roomDims?.heightM) || 2.4
+    }), [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
+
+    // Compute primary seating position (MLP)
+    const primarySeatingPosition = React.useMemo(() => {
+        if (!hasSeats) return null;
+        const { primary } = computeMLPAndPrimary(
+            seats,
+            stableDimensions.width,
+            stableDimensions.length,
+            mlpBasis
+        );
+        return primary ? { ...primary, x: stableDimensions.width / 2 } : null;
+    }, [seats, stableDimensions.width, stableDimensions.length, mlpBasis, hasSeats]);
+
+    // Compute SPL metrics for all seats (needed by analysis engine)
+    const allSeatSplMetrics = React.useMemo(() => {
+        if (!hasSeats || !hasSpeakers) return [];
+
+        const getCanonicalRole = (role) => {
+            const map = { 
+                SL: 'SL', LS: 'SL', SR: 'SR', RS: 'SR', 
+                SBL: 'SBL', SBR: 'SBR', LW: 'LW', RW: 'RW',
+                FL: 'FL', L: 'FL', FC: 'FC', C: 'FC', FR: 'FR', R: 'FR',
+                TFL: 'TFL', TFR: 'TFR', TML: 'TML', TMR: 'TMR', TRL: 'TRL', TRR: 'TRR'
+            };
+            const r = String(role || '').toUpperCase();
+            return map[r] || r;
+        };
+
+        const splConfig = app?.splConfig || {};
+        const mlpPoint = primarySeatingPosition;
+
+        return computeAllSeatSplMetrics({
+            seats: seats,
+            placedSpeakers: placedSpeakers,
+            getCanonicalRole,
+            getEffectiveSplInputs: app?.getEffectiveSplInputs || (() => ({ powerW: 100, eqHeadroomDb: 0 })),
+            getModelDimsM: (model) => {
+                const meta = getSpeakerModelMeta(model);
+                if (meta && !meta.notFound) {
+                    return {
+                        ...meta,
+                        sensitivity_db_1w_1m: meta.sensitivity_dB_1w1m || 87,
+                        power_handling_w: meta.max_power || Infinity,
+                        max_spl_cont_db_1m: meta.max_spl || null
+                    };
+                }
+                return { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 };
+            },
+            screenLoss_dB: Number(splConfig.screenLossDb) || 0,
+            eqHeadroom_dB: Number(splConfig.globalEqHeadroomDb) || 0,
+            mlpPoint
+        });
+    }, [seats, placedSpeakers, primarySeatingPosition, app?.splConfig, app?.getEffectiveSplInputs, hasSeats, hasSpeakers]);
+
+    // Call analysis engine with proper inputs (same as Room Designer)
+    const analysisResult = useRP22AnalysisEngine({
+        placedSpeakers,
+        seatingPositions: seats,
+        primarySeatingPosition,
+        dimensions: stableDimensions,
+        mlpBasis,
+        seatSplMetrics: allSeatSplMetrics,
+        overheadState: {
+            globalModel: app?.overheadGlobalModel,
+            frontOverride: app?.overheadFrontOverride,
+            midOverride: app?.overheadMidOverride,
+            rearOverride: app?.overheadRearOverride,
+            useFrontGlobal: app?.useFrontGlobal ?? true,
+            useMidGlobal: app?.useMidGlobal ?? true,
+            useRearGlobal: app?.useRearGlobal ?? true,
+            aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,
+            aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP,
+            aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP,
+        },
+        aimState: {
+            aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,
+            aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP,
+            aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP,
+        }
+    });
+
+    // Extract per-seat metrics as plain array (NO Map.get)
+    const allSeatMetrics = React.useMemo(() => {
+        const perSeatData = analysisResult?.perSeatRp22;
+        if (!perSeatData || typeof perSeatData !== 'object') return [];
+        
+        return Object.entries(perSeatData).map(([seatId, data]) => ({
+            seatId,
+            ...data
+        }));
+    }, [analysisResult?.perSeatRp22]);
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
