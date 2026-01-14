@@ -197,6 +197,12 @@ function useDesignerState() {
     __autosavePayload = null;
   }
 
+  // Strip legacy "_s" suffix from surround models (UI hygiene)
+  const stripSurroundSuffix = (v) => {
+    const s = String(v || "");
+    return s.endsWith("_s") ? s.slice(0, -2) : s;
+  };
+
   // Log what we're restoring (debug)
   if (__autosavePayload && globalThis.__B44_LOGS) {
     console.log('[AppState] Autosave payload loaded:', {
@@ -400,7 +406,7 @@ function useDesignerState() {
 
   const [autosaveMeta, setAutosaveMeta] = useState(null);
   const [globalSurroundModel, _setGlobalSurroundModel] = useState(() => (
-    (__autosavePayload && __autosavePayload.globalSurroundModel) ? __autosavePayload.globalSurroundModel : null
+    (__autosavePayload && __autosavePayload.globalSurroundModel) ? stripSurroundSuffix(__autosavePayload.globalSurroundModel) : null
   ));
   const [isHydrated, setIsHydrated] = useState(true);
   const [perSeatMetrics, setPerSeatMetrics] = useState({});
@@ -769,7 +775,7 @@ function useDesignerState() {
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
       if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
       if (p.screen) setScreen(p.screen);
-      if (p.globalSurroundModel) _setGlobalSurroundModel(p.globalSurroundModel);
+      if (p.globalSurroundModel) _setGlobalSurroundModel(stripSurroundSuffix(p.globalSurroundModel));
       if (p.overheadGlobalModel) setOverheadGlobalModel(p.overheadGlobalModel);
       if (p.overheadFrontOverride) setOverheadFrontOverride(p.overheadFrontOverride);
       if (p.overheadMidOverride) setOverheadMidOverride(p.overheadMidOverride);

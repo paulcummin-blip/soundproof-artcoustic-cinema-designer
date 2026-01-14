@@ -909,8 +909,10 @@ function UnifiedSurroundsConfig({
     const modelKeyLower = modelKey.toLowerCase();
 
     // Keep global model in app state if available (do not crash if missing)
+    // Strip _s suffix for UI hygiene (internal registry uses _s, but UI should not)
+    const cleanModelKey = modelKey && modelKey.endsWith("_s") ? modelKey.slice(0, -2) : modelKey;
     if (app && typeof app.setGlobalSurroundModel === "function") {
-      app.setGlobalSurroundModel(modelKeyLower === "off" ? "off" : modelKey);
+      app.setGlobalSurroundModel(modelKeyLower === "off" ? "off" : cleanModelKey);
     }
 
     if (globalThis.__B44_LOGS) {
@@ -1898,7 +1900,11 @@ function SpeakerPlacementImpl(props) {
   // Surround config state (initialize from AppState if available)
   const [surroundConfig, setSurroundConfig] = useState(() => {
     const savedModel = appState?.globalSurroundModel;
-    const master = savedModel && savedModel !== 'off' && savedModel !== 'none' ? savedModel : "off";
+    // Strip _s suffix for UI display
+    const cleanedModel = savedModel && savedModel.endsWith && savedModel.endsWith("_s") 
+      ? savedModel.slice(0, -2) 
+      : savedModel;
+    const master = cleanedModel && cleanedModel !== 'off' && cleanedModel !== 'none' ? cleanedModel : "off";
     return {
       value: { master, side: "off", rear: "off", wide: "off" },
       override: { side: false, rear: false, wide: false },
