@@ -2180,9 +2180,6 @@ function RoomDesignerWithState() {
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
     mlpBasis: _mlpBasis,
     seatSplMetrics: allSeatSplMetrics,
-    screen: _screen,
-    screenFrontPlaneM: appState?.screenFrontPlaneM,
-    lcrAngleInfo: { L: 0, R: 0 }, // Will be computed in RoomVisualisation
     overheadState: {
       globalModel: _overheadGlobalModel,
       frontOverride: _overheadFrontOverride,
@@ -2196,7 +2193,6 @@ function RoomDesignerWithState() {
       aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
     },
     aimState: {
-      aimAtMLP: lcrAimMode === "angled",
       aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
