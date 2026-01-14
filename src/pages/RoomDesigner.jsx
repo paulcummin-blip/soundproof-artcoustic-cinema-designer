@@ -3131,12 +3131,13 @@ function RoomDesignerWithState() {
 
     if (!dolbyPreset || _isFrozen && _isFrozen('speakers')) return;
     
-    // GUARD: Don't auto-reset if room already configured (unless user requested reset)
+    // GUARD: Don't auto-reset if room already configured (unless user requested reset OR reset epoch changed)
     const hasExistingSpeakers = Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
     const hasExistingSeats = Array.isArray(_seatingPositions) && _seatingPositions.length > 0;
     const presetChanged = lastPresetRef.current !== dolbyPreset;
+    const resetEpochChanged = appState?.roomResetEpoch !== undefined && appState.roomResetEpoch > 0;
     
-    if (hasExistingSpeakers && hasExistingSeats && !presetChanged && !didUserRequestResetRef.current) {
+    if (hasExistingSpeakers && hasExistingSeats && !presetChanged && !didUserRequestResetRef.current && !resetEpochChanged) {
       return;
     }
 
@@ -3622,7 +3623,7 @@ function RoomDesignerWithState() {
   appState?.isHydrated,
   dolbyPreset, stableDimensions, setSpeakers, _isFrozen, placedSpeakers, _sevenBedLayoutType, lastPresetRef,
   _overheadGlobalModel, _overheadFrontOverride, _overheadMidOverride, _overheadRearOverride,
-  _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase]
+  _useFrontGlobal, _useMidGlobal, _useRearGlobal, loadState?.phase, appState?.roomResetEpoch]
   );
 
   // Ensure Atmos overheads exist as soon as an Atmos preset AND a
@@ -3682,8 +3683,8 @@ function RoomDesignerWithState() {
     // CRITICAL: Wait for autosave hydration
     if (!appState?.isHydrated) return;
 
-    // If we've just loaded a real project, don't overwrite its seating layout
-    if (loadState?.phase === "loaded") {
+    // If we've just loaded a real project, don't overwrite its seating layout (UNLESS reset was triggered)
+    if (loadState?.phase === "loaded" && !didUserRequestResetRef.current && !(appState?.roomResetEpoch > 0)) {
       return;
     }
 
@@ -3760,7 +3761,9 @@ function RoomDesignerWithState() {
   _seatSpacing,
   // REMOVED: _rowSpacingM (row Y positions come from rowCentersM now)
   appState?.rowCentersM,
-  stableDimensions?.width]
+  stableDimensions?.width,
+  appState?.roomResetEpoch,
+  loadState?.phase]
   );
 
   // Manual seating generation - single source of truth
@@ -3859,27 +3862,22 @@ function RoomDesignerWithState() {
   const handleResetPositions = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
     
-    // Close dialog and execute reset
+    // Close dialog
     setShowResetConfirm(false);
     
-    // Clear working copy first
-    if (typeof appState?.clearWorkingCopy === 'function') {
-      appState.clearWorkingCopy();
+    // Call single reset action from AppStateProvider
+    if (typeof appState?.resetRoomDesignerToDefaults === 'function') {
+      appState.resetRoomDesignerToDefaults();
     }
     
-    // Set reset flag
+    // Set reset flag so reconciliation effects run
     didUserRequestResetRef.current = true;
     
-    // Trigger re-initialization by calling initWithDefaultsAndRules
-    if (typeof initWithDefaultsAndRules === 'function') {
-      initWithDefaultsAndRules();
-    }
-    
-    // Reset flag after a brief delay to allow effects to run
+    // Clear flag after effects complete
     setTimeout(() => {
       didUserRequestResetRef.current = false;
     }, 100);
-  }, [_isFrozen, initWithDefaultsAndRules, appState]);
+  }, [_isFrozen, appState]);
 
   const handleOptimiseAll = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;

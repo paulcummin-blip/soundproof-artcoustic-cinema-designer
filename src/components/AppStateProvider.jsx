@@ -430,6 +430,7 @@ function useDesignerState() {
   ));
   const [isHydrated, setIsHydrated] = useState(true);
   const [perSeatMetrics, setPerSeatMetrics] = useState({});
+  const [roomResetEpoch, setRoomResetEpoch] = useState(0);
 
   const setGlobalSurroundModel = useCallback((model) => {
     if (globalThis.__B44_LOGS) console.log('[AppState] setGlobalSurroundModel', { model });
@@ -1062,6 +1063,128 @@ function useDesignerState() {
     }));
   }, []);
 
+  // RESET TO DEFAULTS - Single source of truth for clean reset
+  const resetRoomDesignerToDefaults = useCallback(() => {
+    // 1. Clear autosave/persistence
+    try {
+      clearAutosaveStorage();
+      setAutosaveMeta(null);
+    } catch (e) {
+      console.warn("Failed to clear autosave:", e);
+    }
+
+    // 2. Reset all state to original defaults
+    // Room dimensions
+    setRoomDims({
+      widthM: 4.5,
+      lengthM: 6.0,
+      heightM: 2.4,
+      width: 4.5,
+      length: 6.0,
+      height: 2.4
+    });
+
+    // Screen
+    setScreen({
+      visibleWidthInches: 100,
+      aspectRatio: "16:9",
+      mountMode: "floating",
+      floatDepthM: 0.2,
+      showScreenPlane: false,
+      showCavity: false,
+      speakerClearanceM: 0.02,
+      heightFromFloorM: 0.5
+    });
+
+    // Seating (will rebuild from these values)
+    setSeatingRows(1);
+    setSeatsPerRow(3);
+    setSeatsPerRowByRow([]);
+    setSeatSpacing(0.8);
+    setRowSpacingM(1.8);
+    setSeatingBlockOffset(0);
+    setMlpBasis("front");
+    setAutoSeatByRP23(true);
+
+    // Clear seating positions (will rebuild from row config)
+    setSeatingPositions([]);
+
+    // Speaker system
+    _setSpeakerSystem({
+      placedSpeakers: [],
+      lastUpdated: timeNowMs()
+    });
+
+    // Subs
+    setFrontSubsCfg({
+      model: "SUB2-12",
+      count: 0,
+      positions: [],
+      tuning: []
+    });
+    setRearSubsCfg({
+      model: "SUB2-12",
+      count: 0,
+      positions: [],
+      tuning: []
+    });
+
+    // Layout/Config
+    setDolbyLayout("5.1");
+    _setDolbyConfig("5.1");
+    setSevenBedLayoutType("rears");
+
+    // Aim toggles
+    setAimFrontWidesAtMLP(false);
+    setAimSideSurroundsAtMLP(false);
+    setAimRearSurroundsAtMLP(false);
+
+    // Overhead config
+    _setGlobalSurroundModel(null);
+    setOverheadGlobalModel(null);
+    setOverheadFrontOverride(null);
+    setOverheadMidOverride(null);
+    setOverheadRearOverride(null);
+    setUseFrontGlobal(true);
+    setUseMidGlobal(true);
+    setUseRearGlobal(true);
+
+    // Overlays
+    setOverlays({
+      LCR: false,
+      FRONT_WIDE: false,
+      SIDE_SURROUND: false,
+      REAR_SURROUND: false,
+      OVERHEADS_2: false,
+      OVERHEADS_4: false,
+      OVERHEADS_6: false,
+      RP22_ANGLES: false,
+      enableDolbyZones: false,
+      ROOM_DIMS: false
+    });
+
+    // Room elements
+    setRoomElements([]);
+
+    // SPL Config
+    setSplConfig({
+      globalPowerW: 100,
+      globalEqHeadroomDb: 0,
+      radiationMode: 'half-space',
+      perRole: {}
+    });
+
+    // Per-seat metrics
+    setPerSeatMetrics({});
+
+    // 3. Increment reset epoch to force rebuild
+    setRoomResetEpoch(prev => prev + 1);
+
+    if (globalThis.__B44_LOGS) {
+      console.log('[AppState] Reset to defaults complete, epoch:', roomResetEpoch + 1);
+    }
+  }, []);
+
   const value = useMemo(() => ({
     dimensions, setDimensions, 
     roomDims, setRoomDims,
@@ -1121,6 +1244,8 @@ function useDesignerState() {
     isHydrated,
     perSeatMetrics,
     setPerSeatMetricsForSeat,
+    roomResetEpoch,
+    resetRoomDesignerToDefaults,
   }), [
     dimensions, setDimensions,
     roomDims, setRoomDims,
@@ -1181,9 +1306,11 @@ function useDesignerState() {
     isHydrated,
     perSeatMetrics,
     setPerSeatMetricsForSeat,
-  ]);
+    roomResetEpoch,
+    resetRoomDesignerToDefaults,
+    ]);
 
-  return value;
+    return value;
 }
 
 export function AppStateProvider({ children }) {
