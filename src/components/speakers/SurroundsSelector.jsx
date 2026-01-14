@@ -2,6 +2,7 @@ import React from 'react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
 
 export default function SurroundsSelector({
   layout,
@@ -34,18 +35,17 @@ export default function SurroundsSelector({
   const rearOverride = !!override?.rear;
   const wideOverride = !!override?.wide;
 
-  // Look up display label from choices (strips any _s suffix for display)
+  // Look up display label from registry (canonical source)
   const getModelLabel = (modelKey) => {
-    // Try exact match first
-    let choice = choices.find(c => c.value === modelKey);
+    if (!modelKey || modelKey === 'off' || modelKey === 'OFF') return 'Off';
     
-    // If not found and key ends with _s, try without suffix
-    if (!choice && modelKey && String(modelKey).endsWith('_s')) {
-      const keyWithoutS = String(modelKey).slice(0, -2);
-      choice = choices.find(c => c.value === keyWithoutS);
-    }
+    // Use speaker registry as source of truth for labels
+    const meta = getSpeakerModelMeta(modelKey);
+    if (meta && meta.label && !meta.notFound) return meta.label;
     
-    return choice?.label || 'Off';
+    // Fallback to choices if registry lookup fails
+    const choice = choices.find(c => c.value === modelKey);
+    return choice?.label || modelKey;
   };
 
   return (
@@ -66,7 +66,9 @@ export default function SurroundsSelector({
           disabled={disabled}
         >
           <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-            <SelectValue placeholder="Select surround model..." className="text-2xl font-semibold" style={{ color: "#213428" }} />
+            <span className="text-2xl font-semibold" style={{ color: "#213428" }}>
+              {getModelLabel(masterModel)}
+            </span>
           </SelectTrigger>
           <SelectContent className="bg-white border-[#DCDBD6]">
             {choices.map((choice) => (

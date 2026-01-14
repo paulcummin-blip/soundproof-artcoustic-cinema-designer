@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getModelsByCategoryOrdered } from '@/components/models/speakers/registry';
+import { getModelsByCategoryOrdered, getSpeakerModelMeta } from '@/components/models/speakers/registry';
 
 export default function OverheadChannelSelector({
   overheadCount,
@@ -40,18 +40,17 @@ export default function OverheadChannelSelector({
   const midHasOverride = !useMidGlobal && midOverride;
   const rearHasOverride = !useRearGlobal && rearOverride;
 
-  // Look up display label from overhead models registry
+  // Look up display label from registry (canonical source)
   const getModelLabel = (modelKey) => {
-    // Try exact match first
-    let model = overheadModels.find(m => m.key === modelKey);
+    if (!modelKey || modelKey === 'OFF') return 'OFF — (no overheads active)';
     
-    // If not found and key ends with _s, try without suffix
-    if (!model && modelKey && String(modelKey).endsWith('_s')) {
-      const keyWithoutS = String(modelKey).slice(0, -2);
-      model = overheadModels.find(m => m.key === keyWithoutS);
-    }
+    // Use speaker registry as source of truth for labels
+    const meta = getSpeakerModelMeta(modelKey);
+    if (meta && meta.label && !meta.notFound) return meta.label;
     
-    return model?.label || 'Off';
+    // Fallback to overhead models array
+    const model = overheadModels.find(m => m.key === modelKey);
+    return model?.label || modelKey;
   };
 
   if (overheadCount === 0) {
@@ -72,7 +71,9 @@ export default function OverheadChannelSelector({
           disabled={disabled}
         >
           <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-            <SelectValue placeholder="Select overhead model..." className="text-2xl font-semibold" style={{ color: "#213428" }} />
+            <span className="text-2xl font-semibold" style={{ color: "#213428" }}>
+              {getModelLabel(globalModel)}
+            </span>
           </SelectTrigger>
           <SelectContent className="bg-white border-[#DCDBD6]">
             <SelectItem value="OFF" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]" style={{ color: "#213428" }}>
