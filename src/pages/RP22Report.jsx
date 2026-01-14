@@ -159,7 +159,7 @@ function RP22ReportInner() {
                                 if (seats.length === 0) {
                                     return (
                                         <p className="text-sm text-[#3E4349]">
-                                            No seat data available. Configure seating in Room Designer first.
+                                            No seats defined yet. Configure seating in Room Designer first.
                                         </p>
                                     );
                                 }
@@ -167,6 +167,7 @@ function RP22ReportInner() {
                                 return seats.map(([seatId, seatData]) => {
                                     const metrics = seatData?.rp22 || {};
                                     const rp23 = seatData?.rp23 || {};
+                                    const isPrimary = seatData?.isPrimary || false;
                                     
                                     // Helper to render level badge
                                     const renderBadge = (level) => {
@@ -199,7 +200,7 @@ function RP22ReportInner() {
                                         <Card key={seatId} className="border-[#E6E4DD]">
                                             <CardHeader className="pb-2">
                                                 <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2">
-                                                    {seatId}
+                                                    {seatId} {isPrimary && <span className="text-xs text-green-700">(MLP)</span>}
                                                 </CardTitle>
                                             </CardHeader>
                                             <CardContent className="space-y-1.5 text-xs">
