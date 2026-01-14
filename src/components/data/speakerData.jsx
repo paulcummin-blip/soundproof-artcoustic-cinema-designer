@@ -69,11 +69,11 @@ export const artcousticSpeakers = [
     "transducers": "Transducers LF – 3\" woofer (x 6) HF – 1.5\" woofer (x 2)",
     "enclosure": "Enclosure Medium density Fiber board. Elite Composite",
     "accessories": "Accessories None",
+    "price": 2090,
     "category": "Spitfire",
     "widthM": 0.27,
     "depthM": 0.08,
     "heightM": 0.40,
-    "price": 2100
   },
   {
     "id": "spitfire-q-4-5",
@@ -102,6 +102,7 @@ export const artcousticSpeakers = [
     "power_draw_w_nominal": 370,
     "power_draw_vrms_nominal": 54,
     "is_artcoustic": true,
+    "price": 3950,
     "description": "LF – 5.5\" woofer (x4); HF – 1.5\" woofer (x4)",
     "transducers": "Transducers LF – 5.5\" woofer (x 4) HF – 1.5\" woofer (x 4)",
     "enclosure": "Enclosure Medium density Fiber board. Elite Composite. Elite Composite",
@@ -138,6 +139,7 @@ export const artcousticSpeakers = [
     "transducers": "Transducers LF – 5.5\" woofer (x 8) HF – 1.5\" woofer (x 6)",
     "enclosure": "Enclosure Medium density Fiber board. Elite Composite. Elite Composite",
     "accessories": "Accessories None",
+    "price": 5810,
     "category": "Spitfire",
     "widthM": 0.27,
     "depthM": 0.135,
