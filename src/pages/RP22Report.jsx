@@ -152,14 +152,14 @@ function RP22ReportInner() {
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {(() => {
-                                // Read from AppState perSeatMetrics (single source of truth)
-                                const storedMetrics = app?.perSeatMetrics || {};
-                                const seats = Object.entries(storedMetrics);
+                                // Use automatic per-seat analysis from engine (no hover required)
+                                const perSeatData = analysisResult?.perSeatRp22 || {};
+                                const seats = Object.entries(perSeatData);
                                 
                                 if (seats.length === 0) {
                                     return (
                                         <p className="text-sm text-[#3E4349]">
-                                            No seat data available. Visit Room Designer and hover over seats to populate metrics.
+                                            No seat data available. Configure seating in Room Designer first.
                                         </p>
                                     );
                                 }
