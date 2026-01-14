@@ -3846,9 +3846,9 @@ function RoomDesignerWithState() {
   const handleResetPositions = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
     
-    // Clear autosaved state (uses existing clearAutosave from AppStateProvider)
-    if (typeof appState?.clearAutosave === 'function') {
-      appState.clearAutosave();
+    // Clear working copy first
+    if (typeof appState?.clearWorkingCopy === 'function') {
+      appState.clearWorkingCopy();
     }
     
     // Set reset flag
@@ -3944,8 +3944,21 @@ function RoomDesignerWithState() {
 
   // Manual Save Project function now just calls the one from useProjectLoader
   const handleSaveProject = React.useCallback(async () => {
+    // If no active project, save locally instead
+    if (!resolvedProjectId) {
+      if (typeof appState?.saveWorkingCopyNow === 'function') {
+        appState.saveWorkingCopyNow();
+        // Simple toast feedback
+        if (typeof window !== 'undefined' && window.alert) {
+          console.log("Saved locally (no active project)");
+        }
+      }
+      return;
+    }
+
+    // Otherwise, save to cloud project
     await triggerSaveProject();
-  }, [triggerSaveProject]);
+  }, [triggerSaveProject, resolvedProjectId, appState]);
 
   // decide which overlay toggles are relevant for the current system configuration
   const overlayRelevance = React.useMemo(() => {

@@ -705,7 +705,6 @@ function useDesignerState() {
 
   // --- Autosave: Restore on mount ---
   useEffect(() => {
-    return;
     // OLD RESTORE LOGIC (disabled - now happens in useState initializers)
     const data = loadAutosave();
     if (!data?.payload) {
@@ -790,7 +789,47 @@ function useDesignerState() {
     rearSubsCfg,
     dolbyLayout,
     dolbyConfig,
-    screen
+    screen,
+    aimFrontWidesAtMLP,
+    aimSideSurroundsAtMLP,
+    aimRearSurroundsAtMLP
+  ]);
+
+  // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
+  useEffect(() => {
+    const payload = {
+      roomDims,
+      dimensions,
+      seatingPositions,
+      speakerSystem,
+      frontSubsCfg,
+      rearSubsCfg,
+      dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
+      dolbyConfig,
+      screen,
+      aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP
+    };
+
+    try {
+      saveAutosave(payload);
+    } catch (e) {
+      console.warn("Autosave failed:", e);
+    }
+  }, [
+    roomDims,
+    dimensions,
+    seatingPositions,
+    speakerSystem,
+    frontSubsCfg,
+    rearSubsCfg,
+    dolbyLayout,
+    dolbyConfig,
+    screen,
+    aimFrontWidesAtMLP,
+    aimSideSurroundsAtMLP,
+    aimRearSurroundsAtMLP
   ]);
 
   // --- Autosave: Manual restore/clear functions ---
@@ -821,6 +860,36 @@ function useDesignerState() {
   const clearAutosaveNow = useCallback(() => {
     clearAutosaveStorage();
     setAutosaveMeta(null);
+  }, []);
+
+  const saveWorkingCopyNow = useCallback(() => {
+    const payload = {
+      roomDims,
+      dimensions,
+      seatingPositions,
+      speakerSystem,
+      frontSubsCfg,
+      rearSubsCfg,
+      dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
+      dolbyConfig,
+      screen,
+      aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP
+    };
+    try {
+      saveAutosave(payload);
+    } catch (e) {
+      console.warn("Autosave failed:", e);
+    }
+  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP]);
+
+  const clearWorkingCopy = useCallback(() => {
+    try {
+      clearAutosaveStorage();
+    } catch (e) {
+      console.warn("Clear autosave failed:", e);
+    }
   }, []);
 
   const value = useMemo(() => ({
@@ -875,6 +944,8 @@ function useDesignerState() {
     autosaveMeta,
     restoreAutosave,
     clearAutosave: clearAutosaveNow,
+    saveWorkingCopyNow,
+    clearWorkingCopy,
     globalSurroundModel,
     setGlobalSurroundModel,
     isHydrated,
@@ -931,6 +1002,8 @@ function useDesignerState() {
     autosaveMeta,
     restoreAutosave,
     clearAutosaveNow,
+    saveWorkingCopyNow,
+    clearWorkingCopy,
     globalSurroundModel,
     setGlobalSurroundModel,
     isHydrated,
