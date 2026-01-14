@@ -188,11 +188,22 @@ export function useAppState() {
 }
 
 function useDesignerState() {
-  const [roomDims, _setRoomDims] = useState({
-    widthM: 4.5,
-    lengthM: 6.0,
-    heightM: 2.4,
-  });
+  // --- AUTOSAVE RESTORE (read once, sync) ---
+  let __autosavePayload = null;
+  try {
+    const d = loadAutosave();
+    __autosavePayload = d?.payload || null;
+  } catch {
+    __autosavePayload = null;
+  }
+
+  const [roomDims, _setRoomDims] = useState(() => (
+    (__autosavePayload && __autosavePayload.roomDims) ? __autosavePayload.roomDims : {
+      widthM: 4.5,
+      lengthM: 6.0,
+      heightM: 2.4,
+    }
+  ));
 
   // CRITICAL: Normalizer - ensure roomDims is NEVER {} and always has finite numbers
   const setRoomDims = useCallback((updater) => {
@@ -267,7 +278,9 @@ function useDesignerState() {
 
   const [seededChannels, setSeededChannels] = useState([]);
   const [sevenBedLayoutType, setSevenBedLayoutType] = useState('rears');
-  const [seatingPositions, setSeatingPositions] = useState([]);
+  const [seatingPositions, setSeatingPositions] = useState(() => (
+    (__autosavePayload && Array.isArray(__autosavePayload.seatingPositions)) ? __autosavePayload.seatingPositions : []
+  ));
   const [baselineSeatingPositions, setBaselineSeatingPositions] = useState([]);
   const [seatingRows, setSeatingRows] = useState(1);
   const [seatsPerRow, setSeatsPerRow] = useState(3);
@@ -279,18 +292,22 @@ function useDesignerState() {
   const [autoSeatByRP23, setAutoSeatByRP23] = useState(true);
   const [roomElements, setRoomElements] = useState([]);
   const [subwoofers, setSubwoofers] = useState([]);
-  const [frontSubsCfg, setFrontSubsCfg] = useState({ 
-    model: "SUB2-12", 
-    count: 0, 
-    positions: [],
-    tuning: []
-  });
-  const [rearSubsCfg, setRearSubsCfg] = useState({ 
-    model: "SUB2-12", 
-    count: 0,
-    positions: [],
-    tuning: []
-  });
+  const [frontSubsCfg, setFrontSubsCfg] = useState(() => (
+    (__autosavePayload && __autosavePayload.frontSubsCfg) ? __autosavePayload.frontSubsCfg : {
+      model: "SUB2-12",
+      count: 0,
+      positions: [],
+      tuning: []
+    }
+  ));
+  const [rearSubsCfg, setRearSubsCfg] = useState(() => (
+    (__autosavePayload && __autosavePayload.rearSubsCfg) ? __autosavePayload.rearSubsCfg : {
+      model: "SUB2-12",
+      count: 0,
+      positions: [],
+      tuning: []
+    }
+  ));
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
   const [aimAtMLP, setAimAtMLP] = useState(true);
   const [overheadOffsetM, setOverheadOffsetM] = useState(0);
@@ -303,7 +320,9 @@ function useDesignerState() {
     enableDolbyZones: false,
   });
 
-  const [speakerSystem, _setSpeakerSystem] = useState({ placedSpeakers: [], lastUpdated: timeNowMs() });
+  const [speakerSystem, _setSpeakerSystem] = useState(() => (
+    (__autosavePayload && __autosavePayload.speakerSystem) ? __autosavePayload.speakerSystem : { placedSpeakers: [], lastUpdated: timeNowMs() }
+  ));
   const [speakersEpoch, setSpeakersEpoch] = useState(0);
   const [enableLayoutSPLWidget, setEnableLayoutSPLWidget] = useState(true);
   
@@ -341,13 +360,19 @@ function useDesignerState() {
   const [useMidGlobal, setUseMidGlobal] = useState(true);
   const [useRearGlobal, setUseRearGlobal] = useState(true);
 
-  const [aimFrontWidesAtMLP, setAimFrontWidesAtMLP] = useState(false);
-  const [aimSideSurroundsAtMLP, setAimSideSurroundsAtMLP] = useState(false);
-  const [aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP] = useState(false);
+  const [aimFrontWidesAtMLP, setAimFrontWidesAtMLP] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.aimFrontWidesAtMLP === "boolean") ? __autosavePayload.aimFrontWidesAtMLP : false
+  ));
+  const [aimSideSurroundsAtMLP, setAimSideSurroundsAtMLP] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.aimSideSurroundsAtMLP === "boolean") ? __autosavePayload.aimSideSurroundsAtMLP : false
+  ));
+  const [aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.aimRearSurroundsAtMLP === "boolean") ? __autosavePayload.aimRearSurroundsAtMLP : false
+  ));
 
   const [autosaveMeta, setAutosaveMeta] = useState(null);
   const [globalSurroundModel, _setGlobalSurroundModel] = useState(null);
-  const [isHydrated, setIsHydrated] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(true);
 
   const setGlobalSurroundModel = useCallback((model) => {
     if (globalThis.__B44_LOGS) console.log('[AppState] setGlobalSurroundModel', { model });
@@ -680,6 +705,8 @@ function useDesignerState() {
 
   // --- Autosave: Restore on mount ---
   useEffect(() => {
+    return;
+    // OLD RESTORE LOGIC (disabled - now happens in useState initializers)
     const data = loadAutosave();
     if (!data?.payload) {
       setIsHydrated(true);
@@ -736,7 +763,10 @@ function useDesignerState() {
       rearSubsCfg,
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
-      screen
+      screen,
+      aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP
     };
 
     if (!isAutosavePayloadValid(payload)) return;
