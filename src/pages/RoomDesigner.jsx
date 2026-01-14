@@ -1698,6 +1698,7 @@ function RoomDesignerWithState() {
   const prevRoomDimsRef = useRef(null);
   const isDraggingRef = useRef(false);
   const visualisationRef = React.useRef(null);
+  const didUserRequestResetRef = useRef(false);
 
   // Temporary variables for values that might be undefined if appState is null
   // (Assumes AppStateProvider has been updated to provide these)
@@ -3109,6 +3110,15 @@ function RoomDesignerWithState() {
     }
 
     if (!dolbyPreset || _isFrozen && _isFrozen('speakers')) return;
+    
+    // GUARD: Don't auto-reset if room already configured (unless user requested reset)
+    const hasExistingSpeakers = Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
+    const hasExistingSeats = Array.isArray(_seatingPositions) && _seatingPositions.length > 0;
+    const presetChanged = lastPresetRef.current !== dolbyPreset;
+    
+    if (hasExistingSpeakers && hasExistingSeats && !presetChanged && !didUserRequestResetRef.current) {
+      return;
+    }
 
     // --- DEBUG: reconciliation entry ---
     const normalizedPreset = dolbyPreset ?
@@ -3134,10 +3144,15 @@ function RoomDesignerWithState() {
     const noSpeakers = (placedSpeakers || []).length === 0;
     const presetChanged = lastPresetRef.current !== dolbyPreset;
 
-    // Skip only if preset is unchanged AND we have speakers
+    // Skip only if preset is unchanged AND we have speakers AND user didn't request reset
     // CRITICAL: If preset changed, ALWAYS run reconciliation
-    if (!presetChanged && !noSpeakers) {
+    if (!presetChanged && !noSpeakers && !didUserRequestResetRef.current) {
       return;
+    }
+    
+    // Clear reset flag after reconciliation runs
+    if (didUserRequestResetRef.current) {
+      didUserRequestResetRef.current = false;
     }
 
     // Early ensure for Atmos layouts without existing overheads
@@ -3817,6 +3832,23 @@ function RoomDesignerWithState() {
     }
   }, [_seatingPositions, _roomDims?.widthM, _roomDims?.lengthM, _mlpBasis, appState?.setSeatingPositions]); // Add _roomDims to dependencies
 
+  const handleResetPositions = React.useCallback(() => {
+    if (_isFrozen && _isFrozen('speakers')) return;
+    
+    // Set reset flag
+    didUserRequestResetRef.current = true;
+    
+    // Trigger re-initialization by calling initWithDefaultsAndRules
+    if (typeof initWithDefaultsAndRules === 'function') {
+      initWithDefaultsAndRules();
+    }
+    
+    // Reset flag after a brief delay to allow effects to run
+    setTimeout(() => {
+      didUserRequestResetRef.current = false;
+    }, 100);
+  }, [_isFrozen, initWithDefaultsAndRules]);
+
   const handleOptimiseAll = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
     try {
@@ -3999,10 +4031,18 @@ function RoomDesignerWithState() {
           <div className="flex items-center" style={{ gap: '12px' }}>
             <Button
               size="sm"
+              variant="outline"
+              onClick={handleResetPositions}
+              disabled={isFrozen('speakers')}>
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Reset
+            </Button>
+            
+            <Button
+              size="sm"
               className="brand-btn"
               onClick={handleOptimiseAll}
               disabled={isFrozen('speakers') || placedSpeakers.length < 2}>
-
               <RotateCcw className="w-4 h-4 mr-2" />
               Optimise
             </Button>
