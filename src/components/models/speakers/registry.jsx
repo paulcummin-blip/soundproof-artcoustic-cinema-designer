@@ -176,6 +176,12 @@ export function normaliseModelKey(name = "") {
   return s;
 }
 
+// DISPLAY HELPER — Remove _s suffix for UI display
+export function displayModelKey(modelKey = "") {
+  const key = String(modelKey || "");
+  return key.endsWith("_s") ? key.slice(0, -2) : key;
+}
+
 // PRIMARY ACCESSOR — RETURNS METRICS IN METRES, WITH PLAN SHAPE HINTS
 export function getSpeakerModelMeta(modelName) {
   const key = normaliseModelKey(modelName);

@@ -101,7 +101,7 @@ import { ceilDb, splAtDistanceFrom1m, safeNum } from '@/components/utils/splMath
 import { artcousticSpeakers } from '@/components/data/speakerData';
 import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
 import { safeGroup, safeTable, safeGroupEnd } from "@/components/utils/safeLog";
-import { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey } from "@/components/models/speakers/registry";
+import { getSpeakerModelMeta, getModelsByCategoryOrdered, normaliseModelKey, displayModelKey } from "@/components/models/speakers/registry";
 import { safeComputeLcrSpl } from '@/components/utils/splMathSafe';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import SurroundsSelector from '../speakers/SurroundsSelector';
@@ -1110,7 +1110,7 @@ function UnifiedSurroundsConfig({
     const surrounds = byCat['SURROUNDS'] || [];
     return [
       { value: 'off', label: 'Off' },
-      ...surrounds.map(s => ({ value: s.key, label: s.label }))
+      ...surrounds.map(s => ({ value: s.key, label: displayModelKey(s.label) }))
     ];
   }, [getModelsByCategoryOrdered]);
 

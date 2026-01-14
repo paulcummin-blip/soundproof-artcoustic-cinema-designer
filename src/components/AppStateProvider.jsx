@@ -777,6 +777,9 @@ function useDesignerState() {
       if (typeof p.useFrontGlobal === "boolean") setUseFrontGlobal(p.useFrontGlobal);
       if (typeof p.useMidGlobal === "boolean") setUseMidGlobal(p.useMidGlobal);
       if (typeof p.useRearGlobal === "boolean") setUseRearGlobal(p.useRearGlobal);
+      if (typeof p.aimFrontWidesAtMLP === "boolean") setAimFrontWidesAtMLP(p.aimFrontWidesAtMLP);
+      if (typeof p.aimSideSurroundsAtMLP === "boolean") setAimSideSurroundsAtMLP(p.aimSideSurroundsAtMLP);
+      if (typeof p.aimRearSurroundsAtMLP === "boolean") setAimRearSurroundsAtMLP(p.aimRearSurroundsAtMLP);
 
       setAutosaveMeta(getAutosaveMeta());
     } catch {
