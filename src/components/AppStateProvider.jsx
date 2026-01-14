@@ -197,6 +197,16 @@ function useDesignerState() {
     __autosavePayload = null;
   }
 
+  // Log what we're restoring (debug)
+  if (__autosavePayload && globalThis.__B44_LOGS) {
+    console.log('[AppState] Autosave payload loaded:', {
+      hasGlobalSurroundModel: !!__autosavePayload.globalSurroundModel,
+      hasOverheadGlobalModel: !!__autosavePayload.overheadGlobalModel,
+      globalSurroundModel: __autosavePayload.globalSurroundModel,
+      overheadGlobalModel: __autosavePayload.overheadGlobalModel,
+    });
+  }
+
   const [roomDims, _setRoomDims] = useState(() => (
     (__autosavePayload && __autosavePayload.roomDims) ? __autosavePayload.roomDims : {
       widthM: 4.5,
@@ -352,13 +362,27 @@ function useDesignerState() {
     []
   );
 
-  const [overheadGlobalModel, setOverheadGlobalModel] = useState(null);
-  const [overheadFrontOverride, setOverheadFrontOverride] = useState(null);
-  const [overheadMidOverride, setOverheadMidOverride] = useState(null);
-  const [overheadRearOverride, setOverheadRearOverride] = useState(null);
-  const [useFrontGlobal, setUseFrontGlobal] = useState(true);
-  const [useMidGlobal, setUseMidGlobal] = useState(true);
-  const [useRearGlobal, setUseRearGlobal] = useState(true);
+  const [overheadGlobalModel, setOverheadGlobalModel] = useState(() => (
+    (__autosavePayload && __autosavePayload.overheadGlobalModel) ? __autosavePayload.overheadGlobalModel : null
+  ));
+  const [overheadFrontOverride, setOverheadFrontOverride] = useState(() => (
+    (__autosavePayload && __autosavePayload.overheadFrontOverride) ? __autosavePayload.overheadFrontOverride : null
+  ));
+  const [overheadMidOverride, setOverheadMidOverride] = useState(() => (
+    (__autosavePayload && __autosavePayload.overheadMidOverride) ? __autosavePayload.overheadMidOverride : null
+  ));
+  const [overheadRearOverride, setOverheadRearOverride] = useState(() => (
+    (__autosavePayload && __autosavePayload.overheadRearOverride) ? __autosavePayload.overheadRearOverride : null
+  ));
+  const [useFrontGlobal, setUseFrontGlobal] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.useFrontGlobal === "boolean") ? __autosavePayload.useFrontGlobal : true
+  ));
+  const [useMidGlobal, setUseMidGlobal] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.useMidGlobal === "boolean") ? __autosavePayload.useMidGlobal : true
+  ));
+  const [useRearGlobal, setUseRearGlobal] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.useRearGlobal === "boolean") ? __autosavePayload.useRearGlobal : true
+  ));
 
   const [aimFrontWidesAtMLP, setAimFrontWidesAtMLP] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.aimFrontWidesAtMLP === "boolean") ? __autosavePayload.aimFrontWidesAtMLP : false
@@ -371,7 +395,9 @@ function useDesignerState() {
   ));
 
   const [autosaveMeta, setAutosaveMeta] = useState(null);
-  const [globalSurroundModel, _setGlobalSurroundModel] = useState(null);
+  const [globalSurroundModel, _setGlobalSurroundModel] = useState(() => (
+    (__autosavePayload && __autosavePayload.globalSurroundModel) ? __autosavePayload.globalSurroundModel : null
+  ));
   const [isHydrated, setIsHydrated] = useState(true);
   const [perSeatMetrics, setPerSeatMetrics] = useState({});
 
@@ -739,6 +765,14 @@ function useDesignerState() {
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
       if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
       if (p.screen) setScreen(p.screen);
+      if (p.globalSurroundModel) _setGlobalSurroundModel(p.globalSurroundModel);
+      if (p.overheadGlobalModel) setOverheadGlobalModel(p.overheadGlobalModel);
+      if (p.overheadFrontOverride) setOverheadFrontOverride(p.overheadFrontOverride);
+      if (p.overheadMidOverride) setOverheadMidOverride(p.overheadMidOverride);
+      if (p.overheadRearOverride) setOverheadRearOverride(p.overheadRearOverride);
+      if (typeof p.useFrontGlobal === "boolean") setUseFrontGlobal(p.useFrontGlobal);
+      if (typeof p.useMidGlobal === "boolean") setUseMidGlobal(p.useMidGlobal);
+      if (typeof p.useRearGlobal === "boolean") setUseRearGlobal(p.useRearGlobal);
 
       setAutosaveMeta(getAutosaveMeta());
     } catch {
@@ -766,7 +800,15 @@ function useDesignerState() {
       screen,
       aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP,
-      aimRearSurroundsAtMLP
+      aimRearSurroundsAtMLP,
+      globalSurroundModel,
+      overheadGlobalModel,
+      overheadFrontOverride,
+      overheadMidOverride,
+      overheadRearOverride,
+      useFrontGlobal,
+      useMidGlobal,
+      useRearGlobal
     };
 
     if (!isAutosavePayloadValid(payload)) return;
@@ -793,7 +835,15 @@ function useDesignerState() {
     screen,
     aimFrontWidesAtMLP,
     aimSideSurroundsAtMLP,
-    aimRearSurroundsAtMLP
+    aimRearSurroundsAtMLP,
+    globalSurroundModel,
+    overheadGlobalModel,
+    overheadFrontOverride,
+    overheadMidOverride,
+    overheadRearOverride,
+    useFrontGlobal,
+    useMidGlobal,
+    useRearGlobal
   ]);
 
   // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
@@ -810,7 +860,15 @@ function useDesignerState() {
       screen,
       aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP,
-      aimRearSurroundsAtMLP
+      aimRearSurroundsAtMLP,
+      globalSurroundModel,
+      overheadGlobalModel,
+      overheadFrontOverride,
+      overheadMidOverride,
+      overheadRearOverride,
+      useFrontGlobal,
+      useMidGlobal,
+      useRearGlobal
     };
 
     try {
@@ -830,7 +888,15 @@ function useDesignerState() {
     screen,
     aimFrontWidesAtMLP,
     aimSideSurroundsAtMLP,
-    aimRearSurroundsAtMLP
+    aimRearSurroundsAtMLP,
+    globalSurroundModel,
+    overheadGlobalModel,
+    overheadFrontOverride,
+    overheadMidOverride,
+    overheadRearOverride,
+    useFrontGlobal,
+    useMidGlobal,
+    useRearGlobal
   ]);
 
   // --- Autosave: Manual restore/clear functions ---
@@ -876,14 +942,22 @@ function useDesignerState() {
       screen,
       aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP,
-      aimRearSurroundsAtMLP
+      aimRearSurroundsAtMLP,
+      globalSurroundModel,
+      overheadGlobalModel,
+      overheadFrontOverride,
+      overheadMidOverride,
+      overheadRearOverride,
+      useFrontGlobal,
+      useMidGlobal,
+      useRearGlobal
     };
     try {
       saveAutosave(payload);
     } catch (e) {
       console.warn("Autosave failed:", e);
     }
-  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP]);
+  }, [roomDims, dimensions, seatingPositions, speakerSystem, frontSubsCfg, rearSubsCfg, dolbyLayout, dolbyConfig, screen, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, globalSurroundModel, overheadGlobalModel, overheadFrontOverride, overheadMidOverride, overheadRearOverride, useFrontGlobal, useMidGlobal, useRearGlobal]);
 
   const clearWorkingCopy = useCallback(() => {
     try {
