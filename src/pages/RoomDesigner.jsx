@@ -415,7 +415,6 @@ const getMlpPoint = (seatingPositions, mlpBasis, roomDimensions) => {
 // Hook to encapsulate project loading, saving, and state management
 function useProjectLoader(
 appState, // Pass appState directly for setters
-roomStore, // Pass roomStore for hydration and state sync
 {
   projectIdFromUrl,
   dolbyPreset,
@@ -953,87 +952,10 @@ roomStore, // Pass roomStore for hydration and state sync
   appState.splConfig]
   );
 
-  // STAGE 1: Hydrate from Room State Store on mount (before project load or defaults)
-  useEffect(() => {
-    if (hasHydratedFromStoreRef.current) return;
-    if (!roomStore || !appState) return;
-
-    const activeRoom = roomStore.activeRoom;
-    
-    // Check if store has meaningful saved data
-    const hasStoredSeats = Array.isArray(activeRoom?.seats) && activeRoom.seats.length > 0;
-    const hasStoredSpeakers = Array.isArray(activeRoom?.speakers) && activeRoom.speakers.length > 0;
-    const hasStoredRoom = activeRoom?.room && 
-      Number.isFinite(activeRoom.room.widthM) && 
-      Number.isFinite(activeRoom.room.lengthM);
-
-    if (hasStoredSeats || hasStoredSpeakers || hasStoredRoom) {
-      if (globalThis.__B44_LOGS) console.log('[RD] Hydrating from Room State Store:', {
-        seats: activeRoom.seats?.length,
-        speakers: activeRoom.speakers?.length,
-        room: activeRoom.room
-      });
-
-      // Hydrate room dimensions
-      if (hasStoredRoom && appState.setRoomDims) {
-        appState.setRoomDims({
-          widthM: activeRoom.room.widthM,
-          lengthM: activeRoom.room.lengthM,
-          heightM: activeRoom.room.heightM
-        });
-      }
-
-      // Hydrate seats
-      if (hasStoredSeats && appState.setSeatingPositions) {
-        appState.setSeatingPositions(activeRoom.seats);
-      }
-
-      // Hydrate speakers
-      if (hasStoredSpeakers && appState?.setSpeakerSystem) {
-        appState.setSpeakerSystem({ placedSpeakers: activeRoom.speakers });
-      }
-
-      // Hydrate screen if present
-      if (activeRoom.screen && appState.setScreen) {
-        appState.setScreen(prev => ({ ...prev, ...activeRoom.screen }));
-      }
-
-      // Hydrate subs if present
-      if (activeRoom.subs && Array.isArray(activeRoom.subs)) {
-        const frontSubs = activeRoom.subs.filter(s => s.group === 'front');
-        const rearSubs = activeRoom.subs.filter(s => s.group === 'rear');
-        
-        if (frontSubs.length && appState.setFrontSubsCfg) {
-          appState.setFrontSubsCfg({
-            count: frontSubs.length,
-            model: frontSubs[0]?.model || 'SUB2-12',
-            positions: frontSubs.map(s => s.position)
-          });
-        }
-        
-        if (rearSubs.length && appState.setRearSubsCfg) {
-          appState.setRearSubsCfg({
-            count: rearSubs.length,
-            model: rearSubs[0]?.model || 'SUB2-12',
-            positions: rearSubs.map(s => s.position)
-          });
-        }
-      }
-
-      hasHydratedFromStoreRef.current = true;
-      return; // Don't run boot logic below
-    }
-
-    hasHydratedFromStoreRef.current = true;
-  }, [roomStore, appState, store]);
-
-  // STAGE 2: Boot logic - only runs if NO saved store data exists
+  // Boot logic: run ONCE – either load a project or initialise defaults
   useEffect(() => {
     // Already bootstrapped for this mount? Do nothing.
     if (hasBootstrappedRef.current) return;
-    
-    // Wait for store hydration to complete first
-    if (!hasHydratedFromStoreRef.current) return;
 
     const controller = new AbortController();
 
@@ -1047,26 +969,17 @@ roomStore, // Pass roomStore for hydration and state sync
           loadProject(controller.signal);
         }
       } else {
-        // No project at all – check if we have saved store data
-        const activeRoom = roomStore?.activeRoom;
-        const hasStoredData = 
-          (Array.isArray(activeRoom?.seats) && activeRoom.seats.length > 0) ||
-          (Array.isArray(activeRoom?.speakers) && activeRoom.speakers.length > 0);
+        // No project at all – this is a fresh, local-only design.
+        // Only initialise defaults if nothing has been laid out yet.
+        const hasSpeakers =
+        Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
+        const hasSeats =
+        Array.isArray(seatingPositions) && seatingPositions.length > 0;
 
-        if (hasStoredData) {
-          // Store has data - already hydrated above, skip defaults
-          if (globalThis.__B44_LOGS) console.log('[RD] Store data exists, skipping default initialization');
+        if (!hasSpeakers && !hasSeats && appState?.roomDims) {
           hasBootstrappedRef.current = true;
-        } else {
-          // No store data, no project – this is truly fresh
-          const hasSpeakers = Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
-          const hasSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0;
-
-          if (!hasSpeakers && !hasSeats && appState?.roomDims) {
-            hasBootstrappedRef.current = true;
-            if (typeof initWithDefaultsAndRules === "function") {
-              initWithDefaultsAndRules();
-            }
+          if (typeof initWithDefaultsAndRules === "function") {
+            initWithDefaultsAndRules();
           }
         }
       }
@@ -1081,10 +994,7 @@ roomStore, // Pass roomStore for hydration and state sync
   appState?.roomDims,
   initWithDefaultsAndRules,
   loadProject,
-  setProjectIdState,
-  roomStore,
-  placedSpeakers,
-  seatingPositions]
+  setProjectIdState]
   );
 
   const manualSaveProject = useCallback(async () => {
@@ -1782,13 +1692,9 @@ function RoomDesignerWithState() {
   const sessionActiveProjectId = useActiveProjectId();
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
   const roomStore = useRoomStateStore();
-  const store = useSpeakerSystemStore(); // MOVED UP: needed in hydration effect
 
   // Single source of truth for the project ID
   const resolvedProjectId = sessionActiveProjectId || initialProjectIdFromUrl || null;
-
-  // NEW: One-time hydration guard (prevents store overwrite on mount)
-  const hasHydratedFromStoreRef = useRef(false);
 
   // NEW: Refs for speaker rescue on room resize
   const prevRoomDimsRef = useRef(null);
@@ -1862,6 +1768,9 @@ function RoomDesignerWithState() {
   const _setUseMidGlobal = appState?.setUseMidGlobal;
   const _useRearGlobal = appState?.useRearGlobal;
   const _setUseRearGlobal = appState?.setUseRearGlobal;
+
+
+  const store = useSpeakerSystemStore();
 
 
 
@@ -2274,9 +2183,8 @@ function RoomDesignerWithState() {
     }
   });
 
-  // Write RP22 results to shared store whenever analysis updates (only after hydration)
+  // Write RP22 results to shared store whenever analysis updates
   useEffect(() => {
-    if (!hasHydratedFromStoreRef.current) return; // Wait for hydration
     if (!analysisResult || !roomStore) return;
     
     // Write per-seat RP22 results and overall parameters to shared store
@@ -2484,35 +2392,6 @@ function RoomDesignerWithState() {
       return [];
     }
   }, [_rearSubsCfg?.model, _rearSubsCfg?.count, _rearSubsCfg?.positions, placedSpeakers, stableDimensions.width, stableDimensions.length, setSubWarnings]);
-
-  // Sync room state to store whenever relevant data changes (only after hydration)
-  // MOVED HERE: After frontSubsForRendering and rearSubsForRendering are defined
-  useEffect(() => {
-    if (!hasHydratedFromStoreRef.current) return; // Wait for hydration
-    if (!roomStore) return;
-
-    roomStore.updateRoomState({
-      room: stableDimensions ? {
-        widthM: stableDimensions.width,
-        lengthM: stableDimensions.length,
-        heightM: stableDimensions.height
-      } : undefined,
-      screen: _screen,
-      seats: _seatingPositions || [],
-      speakers: placedSpeakers || [],
-      subs: [...(frontSubsForRendering || []), ...(rearSubsForRendering || [])]
-    });
-  }, [
-    stableDimensions?.width,
-    stableDimensions?.length,
-    stableDimensions?.height,
-    _screen,
-    _seatingPositions,
-    placedSpeakers,
-    frontSubsForRendering,
-    rearSubsForRendering,
-    roomStore
-  ]);
 
   // NEW: Calculate live room price total
   const priceData = usePriceCalculation({
@@ -2758,7 +2637,6 @@ function RoomDesignerWithState() {
     reloadProject
   } = useProjectLoader(
     appState, // Pass appState here
-    roomStore, // Pass roomStore here
     {
       projectIdFromUrl: resolvedProjectId,
       dolbyPreset,
@@ -3952,28 +3830,6 @@ function RoomDesignerWithState() {
     }
   }, [_seatingPositions, _roomDims?.widthM, _roomDims?.lengthM, _mlpBasis, appState?.setSeatingPositions]); // Add _roomDims to dependencies
 
-  // NEW: Reset function that clears BOTH visual state AND store
-  const handleReset = React.useCallback(() => {
-    if (!roomStore) return;
-    
-    // Clear the store for active room
-    roomStore.updateRoomState({
-      room: { widthM: 4.5, lengthM: 6.0, heightM: 2.8 },
-      screen: {},
-      seats: [],
-      speakers: [],
-      subs: [],
-      rp22: { perSeat: {}, overall: {} }
-    });
-
-    // Reset visual state using existing defaults function
-    if (typeof initWithDefaultsAndRules === 'function') {
-      initWithDefaultsAndRules();
-    }
-
-    if (globalThis.__B44_LOGS) console.log('[RD] Reset: cleared store and reset to defaults');
-  }, [roomStore, initWithDefaultsAndRules]);
-
   const handleOptimiseAll = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;
     try {
@@ -4154,15 +4010,6 @@ function RoomDesignerWithState() {
           <h1 className="text-2xl font-bold text-[#1B1A1A] font-header">Cinema Designer</h1>
           
           <div className="flex items-center" style={{ gap: '12px' }}>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleReset}
-              title="Reset room to defaults and clear saved state">
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Reset
-            </Button>
-
             <Button
               size="sm"
               className="brand-btn"
