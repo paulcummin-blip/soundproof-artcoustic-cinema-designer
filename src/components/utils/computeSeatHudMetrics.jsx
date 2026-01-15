@@ -96,6 +96,10 @@ export function computeSeatHudMetrics({
   const roomHeight = Number(heightM) || 2.4;
   const halfW = roomWidth / 2;
 
+  // Check if we have valid seat position
+  const hasSeatPos = Number.isFinite(seatX) && Number.isFinite(seatY);
+  const hasMlp = hasPoint(mlp);
+
   // Distance to screen
   const distanceToScreen = Math.abs(seatY - screenFrontPlaneM);
 
@@ -263,7 +267,7 @@ export function computeSeatHudMetrics({
   }
 
   // --- P16 (LCR off-axis) ---
-  if (placedLCR.length > 0) {
+  if (placedLCR.length > 0 && hasSeatPos && hasMlp) {
     const perSpeaker = [];
     let worstLossLabel = null;
     let worstLevel = 4;
@@ -337,7 +341,7 @@ export function computeSeatHudMetrics({
     return surroundAndOverheadRoles.has(canon) && sp.position;
   });
 
-  if (relevantSpeakers.length > 0) {
+  if (relevantSpeakers.length > 0 && hasSeatPos && hasMlp) {
     const halfDispersionDeg = (fullDeg) => Number.isFinite(fullDeg) ? Math.ceil(fullDeg / 2) : null;
     const rad2deg = (r) => (r * 180) / Math.PI;
     const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -477,6 +481,6 @@ export function computeSeatHudMetrics({
     splAtSeat: seatSplFormatted,
     position: `(${seatX.toFixed(2)}, ${seatY.toFixed(2)})`,
     distanceToScreen: `${distanceToScreen.toFixed(2)}m`,
-    distanceToMLP: hasPoint(mlp) ? `${Math.hypot(seatX - mlp.x, seatY - mlp.y).toFixed(2)}m` : '—',
+    distanceToMLP: hasMlp ? `${Math.hypot(seatX - mlp.x, seatY - mlp.y).toFixed(2)}m` : '—',
   };
 }
