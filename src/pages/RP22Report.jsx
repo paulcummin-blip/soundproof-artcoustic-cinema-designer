@@ -11,6 +11,7 @@ import ParameterCard from '../components/report/ParameterCard';
 import { computeMLPAndPrimary } from '../components/utils/computeMLPAndPrimary';
 import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
+import { computeSeatHudMetrics } from '../components/utils/computeSeatHudMetrics';
 
 function RP22ReportInner() {
     const app = useAppState();
@@ -133,8 +134,67 @@ function RP22ReportInner() {
         }
     });
 
-    // Read cached seat metrics from AppState (single source of truth)
-    const seatMetricsById = app?.seatMetricsById || {};
+    // Compute LCR angle info for aim calculations
+    const lcrAngleInfo = React.useMemo(() => {
+        if (!primarySeatingPosition || !hasSpeakers) return { L: 0, R: 0 };
+        
+        const mlpTarget = { x: stableDimensions.width / 2, y: primarySeatingPosition.y };
+        const flSpeaker = placedSpeakers.find(s => {
+            const canon = String(s.role || '').toUpperCase();
+            return canon === 'FL' || canon === 'L';
+        });
+        const frSpeaker = placedSpeakers.find(s => {
+            const canon = String(s.role || '').toUpperCase();
+            return canon === 'FR' || canon === 'R';
+        });
+        
+        const safeYawToMLP = (speakerPos, mlpTarget) => {
+            if (!speakerPos || !mlpTarget) return 0;
+            const dx = mlpTarget.x - speakerPos.x;
+            const dy = mlpTarget.y - speakerPos.y;
+            if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) return 0;
+            return Math.atan2(dx, -dy) * (180 / Math.PI);
+        };
+        
+        const angleL = flSpeaker?.position ? safeYawToMLP(flSpeaker.position, mlpTarget) : 0;
+        const angleR = frSpeaker?.position ? safeYawToMLP(frSpeaker.position, mlpTarget) : 0;
+        
+        return { L: angleL, R: angleR };
+    }, [primarySeatingPosition, placedSpeakers, stableDimensions.width, hasSpeakers]);
+
+    // Compute seat metrics for all seats using shared helper
+    const seatMetricsById = React.useMemo(() => {
+        if (!hasSeats) return {};
+        
+        const nextMetrics = {};
+        for (const seat of seats) {
+            if (!seat?.id) continue;
+            try {
+                nextMetrics[seat.id] = computeSeatHudMetrics({
+                    seat,
+                    placedSpeakers,
+                    widthM: stableDimensions.width,
+                    lengthM: stableDimensions.length,
+                    heightM: stableDimensions.height,
+                    screenFrontPlaneM: screen.heightFromFloorM || 0,
+                    screen,
+                    mlp: primarySeatingPosition || { x: stableDimensions.width / 2, y: stableDimensions.length * 0.6, z: 1.2 },
+                    allSeatSplMetrics,
+                    aimAtMLP: false,
+                    aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP || false,
+                    aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP || false,
+                    aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP || false,
+                    lcrAngleInfo,
+                    analysisResult,
+                    seatingPositions: seats,
+                });
+            } catch (err) {
+                console.warn(`[RP22Report] Failed to compute metrics for seat ${seat.id}:`, err);
+                nextMetrics[seat.id] = { error: true };
+            }
+        }
+        return nextMetrics;
+    }, [seats, placedSpeakers, stableDimensions, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, lcrAngleInfo, analysisResult, hasSeats]);
     
     // Build seat metrics array for rendering
     const allSeatMetrics = React.useMemo(() => {
@@ -142,10 +202,7 @@ function RP22ReportInner() {
         
         return seats.map(seat => {
             const metrics = seatMetricsById[seat.id];
-            // Include seats even if metrics failed (they'll show N/A)
             if (!metrics) return null;
-            
-            // Skip error-only entries without rendering them
             if (metrics.error && !metrics.rp23 && !metrics.rp22) return null;
             
             return {
@@ -312,8 +369,8 @@ function RP22ReportInner() {
                                     );
                                 }
 
-                                // Only show "in progress" when seats exist but metrics haven't been computed yet
-                                if (hasSeats && Object.keys(seatMetricsById).length === 0) {
+                                // Only show "in progress" when we have seats but incomplete metrics
+                                if (hasSeats && Object.keys(seatMetricsById).length < seats.length) {
                                     return (
                                         <p className="text-sm text-[#3E4349]">
                                             Analysis in progress...
