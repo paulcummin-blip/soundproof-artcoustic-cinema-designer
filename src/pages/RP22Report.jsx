@@ -274,22 +274,16 @@ function RP22ReportInner() {
 
                                 return seats.map((seat) => {
                                     const seatId = seat?.id || '—';
-                                    const cachedMetrics = seatMetricsById[seatId] || {};
-                                    const rp22Raw = cachedMetrics?.rp22 || {};
-                                    const rp23 = cachedMetrics?.rp23 || {};
-                                    const isPrimary = seat?.isPrimary || false;
-                                    
-                                    const rp22Metrics = {
-                                        1: rp22Raw.p1,
-                                        4: rp22Raw.p4,
-                                        5: rp22Raw.p5,
-                                        6: rp22Raw.p6,
-                                        9: rp22Raw.p9,
-                                        10: rp22Raw.p10,
-                                        16: rp22Raw.p16,
-                                        17: rp22Raw.p17,
-                                        20: rp22Raw.p20
-                                    };
+                                    const tooltipData = seatMetricsById[seatId];
+
+                                    // If no metrics computed yet for this seat, skip
+                                    if (!tooltipData) {
+                                        return null;
+                                    }
+
+                                    const rp22Raw = tooltipData?.rp22 || {};
+                                    const rp23 = tooltipData?.rp23 || {};
+                                    const isPrimary = tooltipData?.isPrimary || false;
                                     
                                     // Helper to render level badge
                                     const renderBadge = (level) => {
@@ -326,7 +320,7 @@ function RP22ReportInner() {
                                                 </CardTitle>
                                             </CardHeader>
                                             <CardContent className="space-y-1.5 text-xs">
-                                                {/* RP23 Horizontal Viewing - ALWAYS SHOW */}
+                                                {/* RP23 Horizontal Viewing */}
                                                 <div className="flex justify-between items-center pb-1.5 border-b border-gray-100">
                                                     <span className="font-medium text-[#3E4349]">RP23 Horizontal:</span>
                                                     <div className="flex items-center gap-2">
@@ -336,67 +330,57 @@ function RP22ReportInner() {
                                                                 {renderBadge(rp23.level)}
                                                             </>
                                                         ) : (
-                                                            <span className="text-xs text-gray-400">N/A (insufficient data)</span>
+                                                            <span className="text-xs text-gray-400">—</span>
                                                         )}
                                                     </div>
                                                 </div>
-                                                
-                                                {/* RP22 Per-Seat Parameters - ALWAYS SHOW ALL */}
-                                                {[
-                                                    { num: 1, label: 'Minimum distance to room boundaries' },
-                                                    { num: 4, label: 'Screen SPL balance' },
-                                                    { num: 5, label: 'Surround angular spacing' },
-                                                    { num: 6, label: 'Surround SPL balance' },
-                                                    { num: 9, label: 'Vertical angle between upper rows' },
-                                                    { num: 10, label: 'Upper speaker SPL balance' },
-                                                    { num: 16, label: 'Screen speaker seat-to-seat response variance' },
-                                                    { num: 17, label: 'Surround/wide/overhead seat-to-seat response variance' },
-                                                    { num: 20, label: 'Reserved / Not implemented' }
-                                                ].map(({ num: paramNum, label: paramLabel }) => {
-                                                    const metric = rp22Metrics[paramNum];
-                                                    const hasData = !!metric;
-                                                    
+
+                                                {/* RP22 Per-Seat Parameters */}
+                                                {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
+                                                    const metric = rp22Raw[key];
+                                                    const paramNum = parseInt(key.substring(1));
+
                                                     return (
-                                                        <div key={paramNum}>
+                                                        <div key={key}>
                                                             <div className="flex justify-between items-center">
                                                                 <span className="font-medium text-[#3E4349]">
                                                                     P{paramNum}:
                                                                 </span>
                                                                 <div className="flex items-center gap-2">
-                                                                    {hasData ? (
+                                                                    {metric ? (
                                                                         <>
                                                                             <span className="text-[#1B1A1A]">{metric.formatted || metric.hudLabel || '—'}</span>
                                                                             {renderBadge(metric.level)}
                                                                         </>
                                                                     ) : (
-                                                                       <span className="text-xs text-gray-400">N/A (insufficient data)</span>
+                                                                       <span className="text-xs text-gray-400">—</span>
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            
+
                                                             {/* P16 breakdown */}
-                                                            {hasData && paramNum === 16 && metric.perSpeaker && metric.perSpeaker.length > 0 && (
+                                                            {metric && key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
                                                                 <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
                                                                     {metric.perSpeaker.map(s => 
                                                                         `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`
                                                                     ).join(', ')}
                                                                 </div>
                                                             )}
-                                                            
+
                                                             {/* P17 breakdown */}
-                                                            {hasData && paramNum === 17 && metric.worstRole && (
+                                                            {metric && key === 'p17' && metric.worstRole && (
                                                                 <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
                                                                     Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
                                                                 </div>
                                                             )}
                                                         </div>
-                                                    );
-                                                })}
-                                            </CardContent>
-                                        </Card>
-                                    );
-                                });
-                            })()}
+                                                        );
+                                                        })}
+                                                        </CardContent>
+                                                        </Card>
+                                                        );
+                                                        }).filter(Boolean); // Remove any null cards
+                                                        })()}
                         </div>
                     </CardContent>
                 </Card>
