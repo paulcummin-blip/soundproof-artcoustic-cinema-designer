@@ -11,7 +11,6 @@ import ParameterCard from '../components/report/ParameterCard';
 import { computeMLPAndPrimary } from '../components/utils/computeMLPAndPrimary';
 import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
-import { computeSeatHudMetrics } from '../components/utils/computeSeatHudMetrics';
 
 
 function RP22ReportInner() {
@@ -126,38 +125,8 @@ function RP22ReportInner() {
         }
     });
 
-    // Compute seat metrics using the same helper as Seat HUD (null-safe)
-    const seatMetricsById = React.useMemo(() => {
-        if (!hasSeats) return {};
-        
-        const result = {};
-        for (const seat of seats) {
-            const metrics = computeSeatHudMetrics({
-                seat,
-                placedSpeakers,
-                widthM: stableDimensions.width,
-                lengthM: stableDimensions.length,
-                heightM: stableDimensions.height,
-                screenFrontPlaneM: app?.screenFrontPlaneM || 0,
-                screen,
-                mlp: primarySeatingPosition,
-                allSeatSplMetrics,
-                aimAtMLP: app?.aimAtMLP ?? true,
-                aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP ?? false,
-                aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP ?? false,
-                aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP ?? false,
-                lcrAngleInfo: null,
-                analysisResult,
-                seatingPositions: seats,
-            });
-            
-            if (metrics) {
-                result[seat.id] = metrics;
-            }
-        }
-        
-        return result;
-    }, [seats, placedSpeakers, stableDimensions, screen, primarySeatingPosition, allSeatSplMetrics, analysisResult, app?.screenFrontPlaneM, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, hasSeats]);
+    // Read pre-computed seat metrics from AppState (same as HUD uses)
+    const seatMetricsById = app?.seatMetricsById || {};
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
@@ -281,10 +250,6 @@ function RP22ReportInner() {
                     <CardHeader>
                         <CardTitle className="text-[#1B1A1A] font-header">Seat Reports</CardTitle>
                         <p className="text-xs text-[#3E4349] mt-1">Per-seat results shown below match the Seat HUD values.</p>
-                        {/* DEBUG: Show pipeline state */}
-                        <p className="text-[10px] text-gray-400 mt-1 font-mono">
-                            Debug: seats={seats.length}, mlp={primarySeatingPosition ? `${primarySeatingPosition.x?.toFixed(2) || '?'},${primarySeatingPosition.y?.toFixed(2) || '?'}` : 'null'}, metricsKeys={Object.keys(seatMetricsById).length}, metricsIds=[{Object.keys(seatMetricsById).slice(0,3).join(',')}]
-                        </p>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -297,15 +262,16 @@ function RP22ReportInner() {
                                         </p>
                                     );
                                 }
-                                
-                                if (!hasSpeakers) {
+
+                                const hasMetrics = Object.keys(seatMetricsById).length > 0;
+                                if (!hasMetrics) {
                                     return (
                                         <p className="text-sm text-[#3E4349]">
-                                            No speakers placed yet. Place speakers in Room Designer.
+                                            Loading seat metrics... (Visit Room Designer to generate)
                                         </p>
                                     );
                                 }
-                                
+
                                 return seats.map((seat) => {
                                     const seatId = seat?.id || '—';
                                     const cachedMetrics = seatMetricsById[seatId] || {};

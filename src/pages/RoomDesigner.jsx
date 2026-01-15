@@ -42,6 +42,7 @@ import { SHOW_DEBUG_LOGS } from '../components/utils/diagnostics'; // NEW: Impor
 import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/seatingUtils';
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
+import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 
 // B44 shim: some older logic expects getModelDimsM()
 const getModelDimsM = (model) => {
@@ -2198,6 +2199,66 @@ function RoomDesignerWithState() {
       aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
     }
   });
+
+  // NEW: Compute ALL seat HUD metrics and store in AppState (powers both HUD and RP22 Report)
+  useEffect(() => {
+    if (!Array.isArray(_seatingPositions) || _seatingPositions.length === 0) {
+      // Clear metrics when no seats
+      if (appState?.setSeatMetricsById) {
+        appState.setSeatMetricsById({});
+      }
+      return;
+    }
+
+    const allMetrics = {};
+    
+    for (const seat of _seatingPositions) {
+      const metrics = computeSeatHudMetrics({
+        seat,
+        placedSpeakers,
+        widthM: stableDimensions.width,
+        lengthM: stableDimensions.length,
+        heightM: stableDimensions.height,
+        screenFrontPlaneM: appState?.screenFrontPlaneM || 0,
+        screen: _screen,
+        mlp: appState?.mlp || mlpAnchorEffective,
+        allSeatSplMetrics,
+        aimAtMLP: lcrAimMode === 'angled',
+        aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP || false,
+        aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP || false,
+        aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP || false,
+        lcrAngleInfo: null,
+        analysisResult,
+        seatingPositions: _seatingPositions,
+      });
+      
+      if (metrics && seat.id) {
+        allMetrics[seat.id] = metrics;
+      }
+    }
+
+    // Store in AppState for RP22 Report to read
+    if (appState?.setSeatMetricsById) {
+      appState.setSeatMetricsById(allMetrics);
+    }
+  }, [
+    _seatingPositions,
+    placedSpeakers,
+    stableDimensions.width,
+    stableDimensions.length,
+    stableDimensions.height,
+    appState?.screenFrontPlaneM,
+    _screen,
+    appState?.mlp,
+    mlpAnchorEffective,
+    allSeatSplMetrics,
+    lcrAimMode,
+    appState?.aimFrontWidesAtMLP,
+    appState?.aimSideSurroundsAtMLP,
+    appState?.aimRearSurroundsAtMLP,
+    analysisResult,
+    appState?.setSeatMetricsById
+  ]);
 
   const frontSubsForRendering = React.useMemo(() => {
     try {
