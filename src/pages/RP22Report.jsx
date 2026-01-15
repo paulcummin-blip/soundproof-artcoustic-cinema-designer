@@ -286,9 +286,9 @@ function RP22ReportInner() {
                                 
                                 return seats.map((seat) => {
                                     const seatId = seat?.id || '—';
-                                    const metrics = seatMetricsById[seatId] || {};
-                                    const rp22Raw = metrics?.rp22 || {};
-                                    const rp23 = metrics?.rp23 || {};
+                                    const cachedMetrics = seatMetricsById[seatId] || {};
+                                    const rp22Raw = cachedMetrics?.rp22 || {};
+                                    const rp23 = cachedMetrics?.rp23 || {};
                                     const isPrimary = seat?.isPrimary || false;
                                     
                                     const rp22Metrics = {
@@ -302,21 +302,6 @@ function RP22ReportInner() {
                                         17: rp22Raw.p17,
                                         20: rp22Raw.p20
                                     };
-                                    const seatId = seatMetric?.seatId || '—';
-                                    const rp22Raw = seatMetric?.rp22 || {};
-                                    const metrics = {
-                                        1: rp22Raw.p1,
-                                        4: rp22Raw.p4,
-                                        5: rp22Raw.p5,
-                                        6: rp22Raw.p6,
-                                        9: rp22Raw.p9,
-                                        10: rp22Raw.p10,
-                                        16: rp22Raw.p16,
-                                        17: rp22Raw.p17,
-                                        20: rp22Raw.p20
-                                    };
-                                    const rp23 = seatMetric?.rp23 || {};
-                                    const isPrimary = seatMetric?.isPrimary || false;
                                     
                                     // Helper to render level badge
                                     const renderBadge = (level) => {
@@ -380,7 +365,7 @@ function RP22ReportInner() {
                                                     { num: 17, label: 'Surround/wide/overhead seat-to-seat response variance' },
                                                     { num: 20, label: 'Reserved / Not implemented' }
                                                 ].map(({ num: paramNum, label: paramLabel }) => {
-                                                    const metric = metrics[paramNum];
+                                                    const metric = rp22Metrics[paramNum];
                                                     const hasData = !!metric;
                                                     
                                                     return (
