@@ -3118,30 +3118,39 @@ React.useEffect(() => {
   const allSeatSplMetrics = allSeatSplMetricsProp || allSeatSplMetricsLocal;
 
 
-  // Build tooltip data with RP22 per-seat metrics using shared helper
+  // Build tooltip data: READ from cache (single source of truth)
   const tooltipData = useMemo(() => {
     if (!effectiveHoveredSeat) return null;
-
-    // Use shared helper (same as RP22 Report uses)
-    return buildSeatHudSnapshot({
-      seat: effectiveHoveredSeat,
-      placedSpeakers,
-      widthM,
-      lengthM,
-      heightM,
-      screenFrontPlaneM,
-      screen,
-      mlp,
-      allSeatSplMetrics,
-      aimAtMLP,
-      aimFrontWidesAtMLP,
-      aimSideSurroundsAtMLP,
-      aimRearSurroundsAtMLP,
-      lcrAngleInfo,
-      analysisResult,
-      seatingPositions,
-      splConfig: appState?.splConfig,
-    });
+    
+    // CRITICAL: Pure reader - get pre-computed snapshot from AppState cache
+    const cached = appState?.seatMetricsById?.[effectiveHoveredSeat.id];
+    
+    if (cached) {
+      return cached; // Use cached snapshot (guarantees HUD === Report)
+    }
+    
+    // Fallback: If cache miss, show "Analysis in progress..." (no in-place computation)
+    return {
+      seatId: effectiveHoveredSeat.id || 'Seat',
+      isPrimary: effectiveHoveredSeat.isPrimary || false,
+      position: '—',
+      distanceToScreen: '—',
+      distanceToMLP: '—',
+      rp23: { formatted: 'Analysis in progress…', level: '—' },
+      rp22: {
+        p1: { formatted: 'Analysis in progress…', level: '—' },
+        p4: { formatted: 'Analysis in progress…', level: '—' },
+        p5: { formatted: 'Analysis in progress…', level: '—' },
+        p6: { formatted: 'Analysis in progress…', level: '—' },
+        p9: { formatted: 'Analysis in progress…', level: '—' },
+        p10: { formatted: 'Analysis in progress…', level: '—' },
+        p16: { formatted: 'Analysis in progress…', level: '—' },
+        p17: { formatted: 'Analysis in progress…', level: '—' },
+        p20: { formatted: 'Analysis in progress…', level: '—' },
+      },
+      splAtSeat: { lcr: {}, surrounds: {}, overheads: {} },
+      splAtSeatMeta: { powerW: 100, radiationMode: 'half-space' },
+    };
 
     /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
 
@@ -3783,18 +3792,18 @@ React.useEffect(() => {
     appState?.splConfig,
   ]);
 
-  // AUTOMATIC SEAT METRICS CACHE - runs for ALL seats, no hover required
+  // AUTOMATIC SEAT METRICS CACHE - SOLE WRITER for seatMetricsById (powers both HUD and Report)
   useEffect(() => {
     if (!appState?.setSeatMetricsById) return;
     
     // Guard: if no seats, clear cache and exit
-    if (!seatingPositions?.length) {
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
       appState.setSeatMetricsById({});
       return;
     }
 
-    // Skip if critical dependencies are missing
-    if (!mlp || !Number.isFinite(widthM) || !Number.isFinite(lengthM)) {
+    // Skip if critical dependencies are missing (but don't crash)
+    if (!Number.isFinite(widthM) || !Number.isFinite(lengthM)) {
       return;
     }
 
@@ -3802,8 +3811,9 @@ React.useEffect(() => {
     const nextMetrics = {};
     for (const seat of seatingPositions) {
       if (!seat?.id) continue;
+      
       try {
-        const result = computeSeatHudMetrics({
+        const snapshot = buildSeatHudSnapshot({
           seat,
           placedSpeakers,
           widthM,
@@ -3811,7 +3821,7 @@ React.useEffect(() => {
           heightM,
           screenFrontPlaneM,
           screen,
-          mlp,
+          mlp: mlp || { x: widthM / 2, y: lengthM * 0.58, z: 1.2 }, // Safe fallback if MLP is null
           allSeatSplMetrics,
           aimAtMLP,
           aimFrontWidesAtMLP,
@@ -3820,18 +3830,56 @@ React.useEffect(() => {
           lcrAngleInfo,
           analysisResult,
           seatingPositions,
+          splConfig: appState?.splConfig || {},
         });
-        nextMetrics[seat.id] = result;
+        
+        if (snapshot) {
+          nextMetrics[seat.id] = snapshot;
+        }
       } catch (err) {
         console.warn(`[SeatMetrics] failed seat ${seat.id}:`, err);
-        nextMetrics[seat.id] = { error: true, errorMessage: err.message };
+        // Store partial result with error flag
+        nextMetrics[seat.id] = { 
+          seatId: seat.id,
+          error: true, 
+          errorMessage: err.message,
+          rp23: { formatted: 'Error', level: '—' },
+          rp22: {
+            p1: { formatted: 'Error', level: '—' },
+            p4: { formatted: 'Error', level: '—' },
+            p5: { formatted: 'Error', level: '—' },
+            p6: { formatted: 'Error', level: '—' },
+            p9: { formatted: 'Error', level: '—' },
+            p10: { formatted: 'Error', level: '—' },
+            p16: { formatted: 'Error', level: '—' },
+            p17: { formatted: 'Error', level: '—' },
+            p20: { formatted: 'Error', level: '—' },
+          }
+        };
       }
     }
 
-    // Only write to state if we computed at least one seat
-    if (Object.keys(nextMetrics).length > 0) {
-      console.log('[SeatMetrics] recompute', seatingPositions.length, 'seats →', Object.keys(nextMetrics).length, 'metrics');
+    // Only write if something actually changed (avoid infinite loops)
+    const prevKeys = Object.keys(appState?.seatMetricsById || {});
+    const nextKeys = Object.keys(nextMetrics);
+    
+    // Quick check: different number of seats = always update
+    if (prevKeys.length !== nextKeys.length) {
+      console.log('[SeatMetrics] count changed', prevKeys.length, '→', nextKeys.length);
       appState.setSeatMetricsById(nextMetrics);
+      return;
+    }
+    
+    // Cheap checksum: compare first seat only (avoid deep equality check)
+    if (nextKeys.length > 0) {
+      const firstKey = nextKeys[0];
+      const prevChecksum = JSON.stringify(appState.seatMetricsById[firstKey]);
+      const nextChecksum = JSON.stringify(nextMetrics[firstKey]);
+      
+      if (prevChecksum !== nextChecksum) {
+        console.log('[SeatMetrics] recompute', seatingPositions.length, 'seats →', nextKeys.length, 'metrics');
+        appState.setSeatMetricsById(nextMetrics);
+      }
     }
   }, [
     seatingPositions,
@@ -3850,12 +3898,8 @@ React.useEffect(() => {
     lcrAngleInfo,
     analysisResult,
     appState?.setSeatMetricsById,
-    getCanonicalRole,
-    dolbyLayout,
-    appState?.frontSubsCfg?.count,
-    appState?.frontSubsCfg?.model,
-    appState?.rearSubsCfg?.count,
-    appState?.rearSubsCfg?.model,
+    appState?.splConfig,
+    appState?.seatMetricsById,
   ]);
 
 // 1) Auto-position HUD near the currently hovered/pinned seat
