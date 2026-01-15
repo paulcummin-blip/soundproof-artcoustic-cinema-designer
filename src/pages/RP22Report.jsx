@@ -133,16 +133,25 @@ function RP22ReportInner() {
         }
     });
 
-    // Extract per-seat metrics as plain array (NO Map.get)
+    // Read cached seat metrics from AppState (single source of truth)
+    const seatMetricsById = app?.seatMetricsById || {};
+    
+    // Build seat metrics array for rendering
     const allSeatMetrics = React.useMemo(() => {
-        const perSeatData = analysisResult?.perSeatRp22;
-        if (!perSeatData || typeof perSeatData !== 'object') return [];
+        if (!hasSeats) return [];
         
-        return Object.entries(perSeatData).map(([seatId, data]) => ({
-            seatId,
-            ...data
-        }));
-    }, [analysisResult?.perSeatRp22]);
+        return seats.map(seat => {
+            const metrics = seatMetricsById[seat.id];
+            if (!metrics) return null;
+            
+            return {
+                seatId: seat.id,
+                isPrimary: seat.isPrimary,
+                rp23: metrics.rp23,
+                rp22: metrics.rp22
+            };
+        }).filter(Boolean);
+    }, [seats, seatMetricsById, hasSeats]);
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
@@ -297,7 +306,6 @@ function RP22ReportInner() {
                                 
                                 return allSeatMetrics.map((seatMetric) => {
                                     const seatId = seatMetric?.seatId || '—';
-                                    // CRITICAL: metrics are keyed as 'p1', 'p4', etc. (lowercase) not numbers
                                     const rp22Raw = seatMetric?.rp22 || {};
                                     const metrics = {
                                         1: rp22Raw.p1,
@@ -348,16 +356,20 @@ function RP22ReportInner() {
                                                 </CardTitle>
                                             </CardHeader>
                                             <CardContent className="space-y-1.5 text-xs">
-                                                {/* RP23 Horizontal Viewing */}
-                                                {rp23?.formatted && (
-                                                    <div className="flex justify-between items-center pb-1.5 border-b border-gray-100">
-                                                        <span className="font-medium text-[#3E4349]">RP23:</span>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-[#1B1A1A]">{rp23.formatted}</span>
-                                                            {renderBadge(rp23.level)}
-                                                        </div>
+                                                {/* RP23 Horizontal Viewing - ALWAYS SHOW */}
+                                                <div className="flex justify-between items-center pb-1.5 border-b border-gray-100">
+                                                    <span className="font-medium text-[#3E4349]">RP23 Horizontal:</span>
+                                                    <div className="flex items-center gap-2">
+                                                        {rp23?.formatted && rp23.formatted !== '—' ? (
+                                                            <>
+                                                                <span className="text-[#1B1A1A]">{rp23.formatted}</span>
+                                                                {renderBadge(rp23.level)}
+                                                            </>
+                                                        ) : (
+                                                            <span className="text-xs text-gray-400">N/A (insufficient data)</span>
+                                                        )}
                                                     </div>
-                                                )}
+                                                </div>
                                                 
                                                 {/* RP22 Per-Seat Parameters - ALWAYS SHOW ALL */}
                                                 {[
@@ -387,7 +399,7 @@ function RP22ReportInner() {
                                                                             {renderBadge(metric.level)}
                                                                         </>
                                                                     ) : (
-                                                                        <span className="text-xs text-gray-400 italic">Insufficient data</span>
+                                                                       <span className="text-xs text-gray-400">N/A (insufficient data)</span>
                                                                     )}
                                                                 </div>
                                                             </div>

@@ -431,6 +431,9 @@ function useDesignerState() {
   const [isHydrated, setIsHydrated] = useState(true);
   const [perSeatMetrics, setPerSeatMetrics] = useState({});
   const [roomResetEpoch, setRoomResetEpoch] = useState(0);
+  const [seatMetricsById, setSeatMetricsById] = useState(() => (
+    (__autosavePayload && __autosavePayload.seatMetricsById) ? __autosavePayload.seatMetricsById : {}
+  ));
 
   const setGlobalSurroundModel = useCallback((model) => {
     if (globalThis.__B44_LOGS) console.log('[AppState] setGlobalSurroundModel', { model });
@@ -851,7 +854,8 @@ function useDesignerState() {
       overheadRearOverride,
       useFrontGlobal,
       useMidGlobal,
-      useRearGlobal
+      useRearGlobal,
+      seatMetricsById
     };
 
     if (!isAutosavePayloadValid(payload)) return;
@@ -895,11 +899,12 @@ function useDesignerState() {
     overheadRearOverride,
     useFrontGlobal,
     useMidGlobal,
-    useRearGlobal
+    useRearGlobal,
+    seatMetricsById
     ]);
 
-  // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
-  useEffect(() => {
+    // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
+    useEffect(() => {
     const payload = {
       roomDims,
       dimensions,
@@ -929,15 +934,16 @@ function useDesignerState() {
       overheadRearOverride,
       useFrontGlobal,
       useMidGlobal,
-      useRearGlobal
-    };
+      useRearGlobal,
+      seatMetricsById
+      };
 
-    try {
+      try {
       saveAutosave(payload);
-    } catch (e) {
+      } catch (e) {
       console.warn("Autosave failed:", e);
-    }
-    }, [
+      }
+      }, [
     roomDims,
     dimensions,
     seatingPositions,
@@ -966,10 +972,11 @@ function useDesignerState() {
     overheadRearOverride,
     useFrontGlobal,
     useMidGlobal,
-    useRearGlobal
+    useRearGlobal,
+    seatMetricsById
     ]);
 
-  // --- Autosave: Manual restore/clear functions ---
+    // --- Autosave: Manual restore/clear functions ---
   const restoreAutosave = useCallback(() => {
     const data = loadAutosave();
     if (!data?.payload) return false;
