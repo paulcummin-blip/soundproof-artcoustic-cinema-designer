@@ -55,17 +55,8 @@ function RP22ReportInner() {
         height: Number(roomDims?.heightM) || 2.4
     }), [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
-    // Compute primary seating position (MLP)
-    const primarySeatingPosition = React.useMemo(() => {
-        if (!hasSeats) return null;
-        const { primary } = computeMLPAndPrimary(
-            seats,
-            stableDimensions.width,
-            stableDimensions.length,
-            mlpBasis
-        );
-        return primary ? { ...primary, x: stableDimensions.width / 2 } : null;
-    }, [seats, stableDimensions.width, stableDimensions.length, mlpBasis, hasSeats]);
+    // Get MLP from AppState context (same as Room Designer uses)
+    const primarySeatingPosition = app?.mlp || null;
 
     // Compute SPL metrics for all seats (needed by analysis engine)
     const allSeatSplMetrics = React.useMemo(() => {
@@ -292,7 +283,7 @@ function RP22ReportInner() {
                         <p className="text-xs text-[#3E4349] mt-1">Per-seat results shown below match the Seat HUD values.</p>
                         {/* DEBUG: Show pipeline state */}
                         <p className="text-[10px] text-gray-400 mt-1 font-mono">
-                            Debug: seats={seats.length}, mlp={primarySeatingPosition ? `${primarySeatingPosition.x?.toFixed(2)},${primarySeatingPosition.y?.toFixed(2)}` : 'null'}, seatMetricsKeys={Object.keys(seatMetricsById).length}
+                            Debug: seats={seats.length}, mlp={primarySeatingPosition ? `${primarySeatingPosition.x?.toFixed(2) || '?'},${primarySeatingPosition.y?.toFixed(2) || '?'}` : 'null'}, metricsKeys={Object.keys(seatMetricsById).length}, metricsIds=[{Object.keys(seatMetricsById).slice(0,3).join(',')}]
                         </p>
                     </CardHeader>
                     <CardContent>

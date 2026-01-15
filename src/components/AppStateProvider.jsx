@@ -4,6 +4,7 @@ import { safeTable } from '@/components/utils/safeLog';
 import { SHOW_DEBUG_LOGS } from '@/components/utils/diagnostics';
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getAutosaveMeta, isAutosavePayloadValid } from "@/components/utils/sessionAutosave";
+import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 
 // --- ATMOS PROTECTION HELPERS ---
 const safeCanonRole = (role) => {
@@ -434,6 +435,34 @@ function useDesignerState() {
   const [seatMetricsById, setSeatMetricsById] = useState(() => (
     (__autosavePayload && __autosavePayload.seatMetricsById) ? __autosavePayload.seatMetricsById : {}
   ));
+
+  // Compute MLP point from seating positions (stable, always available when seats exist)
+  const mlp = useMemo(() => {
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
+    
+    const widthM = Number(roomDims?.widthM) || 4.5;
+    const lengthM = Number(roomDims?.lengthM) || 6.0;
+    
+    try {
+      const { primary } = computeMLPAndPrimary(
+        seatingPositions,
+        widthM,
+        lengthM,
+        mlpBasis
+      );
+      
+      if (!primary || !Number.isFinite(primary.y)) return null;
+      
+      return {
+        x: widthM / 2, // MLP is always centered on room width
+        y: primary.y,
+        z: primary.z || 1.2,
+      };
+    } catch (e) {
+      console.warn('[AppState] MLP computation failed:', e);
+      return null;
+    }
+  }, [seatingPositions, roomDims?.widthM, roomDims?.lengthM, mlpBasis]);
 
   const setGlobalSurroundModel = useCallback((model) => {
     if (globalThis.__B44_LOGS) console.log('[AppState] setGlobalSurroundModel', { model });
@@ -1287,6 +1316,7 @@ function useDesignerState() {
     DBG_FW, frozenTabs, isFrozen, freezeTab, unfreezeTab, showToast,
     screenCentreDepthM,
     screenFrontPlaneM, setScreenFrontPlaneM,
+    mlp,
     mlpY_m, setMlpY_m,
     rowCentersM, setRowCentersM,
     overheadGlobalModel, setOverheadGlobalModel,
