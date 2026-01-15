@@ -11,6 +11,7 @@ import ParameterCard from '../components/report/ParameterCard';
 import { computeMLPAndPrimary } from '../components/utils/computeMLPAndPrimary';
 import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
+import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
 
 
 function RP22ReportInner() {
@@ -125,8 +126,48 @@ function RP22ReportInner() {
         }
     });
 
-    // Read pre-computed seat metrics from AppState (same as HUD uses)
-    const seatMetricsById = app?.seatMetricsById || {};
+    // Compute seat HUD snapshots using the EXACT same helper as the Seat HUD
+    const seatMetricsById = React.useMemo(() => {
+        if (!hasSeats || !hasSpeakers) return {};
+        
+        const result = {};
+        
+        // Compute for all seats
+        for (const seat of seats) {
+            if (!seat?.id) continue;
+            
+            try {
+                // Use shared helper (identical to hover HUD)
+                const snapshot = buildSeatHudSnapshot({
+                    seat,
+                    placedSpeakers,
+                    widthM: stableDimensions.width,
+                    lengthM: stableDimensions.length,
+                    heightM: stableDimensions.height,
+                    screenFrontPlaneM: app?.screenFrontPlaneM || 0,
+                    screen,
+                    mlp: primarySeatingPosition,
+                    allSeatSplMetrics,
+                    aimAtMLP: app?.aimAtMLP ?? true,
+                    aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP ?? false,
+                    aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP ?? false,
+                    aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP ?? false,
+                    lcrAngleInfo: null, // RP22 Report doesn't need live LCR angles
+                    analysisResult,
+                    seatingPositions: seats,
+                    splConfig: app?.splConfig || {},
+                });
+                
+                if (snapshot) {
+                    result[seat.id] = snapshot;
+                }
+            } catch (err) {
+                console.warn(`[RP22Report] Failed to build snapshot for seat ${seat.id}:`, err);
+            }
+        }
+        
+        return result;
+    }, [seats, placedSpeakers, stableDimensions, screen, primarySeatingPosition, allSeatSplMetrics, analysisResult, app?.screenFrontPlaneM, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.splConfig, hasSeats, hasSpeakers]);
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid

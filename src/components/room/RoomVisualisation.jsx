@@ -177,6 +177,7 @@ import { computeAllSeatSplMetrics, getSeatSplMetrics, getMlpSeat } from "@/compo
 
 // NEW: Import shared seat HUD metrics calculator
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
+import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
 
 
 import {
@@ -3117,9 +3118,32 @@ React.useEffect(() => {
   const allSeatSplMetrics = allSeatSplMetricsProp || allSeatSplMetricsLocal;
 
 
-  // Build tooltip data with RP22 per-seat metrics
+  // Build tooltip data with RP22 per-seat metrics using shared helper
   const tooltipData = useMemo(() => {
     if (!effectiveHoveredSeat) return null;
+
+    // Use shared helper (same as RP22 Report uses)
+    return buildSeatHudSnapshot({
+      seat: effectiveHoveredSeat,
+      placedSpeakers,
+      widthM,
+      lengthM,
+      heightM,
+      screenFrontPlaneM,
+      screen,
+      mlp,
+      allSeatSplMetrics,
+      aimAtMLP,
+      aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP,
+      lcrAngleInfo,
+      analysisResult,
+      seatingPositions,
+      splConfig: appState?.splConfig,
+    });
+
+    /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
 
     // Helper for safe number extraction
     const finite = (v, fallback) => {
@@ -3738,28 +3762,25 @@ React.useEffect(() => {
       }
     }
 
-    // Legacy bridge
-    data.p1NearestM = data.rp22.p1.valueM;
-
-    return data;
+    END ORIGINAL INLINE LOGIC */
   }, [
     effectiveHoveredSeat,
     placedSpeakers,
     widthM,
     lengthM,
-    screenFrontPlaneM,
-    mlp,
-    screen?.visibleWidthInches,
-    seatingPositions,
-    getModelDimsM,
-    screen,
-    appState,
     heightM,
-    getCanonicalRole,
+    screenFrontPlaneM,
+    screen,
+    mlp,
     allSeatSplMetrics,
+    aimAtMLP,
     aimFrontWidesAtMLP,
     aimSideSurroundsAtMLP,
     aimRearSurroundsAtMLP,
+    lcrAngleInfo,
+    analysisResult,
+    seatingPositions,
+    appState?.splConfig,
   ]);
 
   // AUTOMATIC SEAT METRICS CACHE - runs for ALL seats, no hover required

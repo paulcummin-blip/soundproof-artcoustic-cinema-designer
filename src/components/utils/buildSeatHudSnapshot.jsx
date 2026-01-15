@@ -1,0 +1,683 @@
+// Shared Seat HUD snapshot builder - single source of truth for per-seat metrics
+// Used by both Seat HUD (hover) and RP22 Report (all seats)
+// 
+// CRITICAL: This file is a PURE COPY of RoomVisualisation's tooltipData builder
+// Any changes to the HUD must be reflected here to keep both in sync
+
+import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
+import { getSpeakerModelMeta } from '@/components/models/speakers/registry';
+import { 
+  metricP1_nearestWallM, 
+  rp22LevelForP1, 
+  rp22LevelForP4,
+  metricP5_maxSurroundGapNoWrap,
+  rp22LevelForP5_NoWrap,
+  azimuthDegFromSeat
+} from '@/components/utils/seatMetrics';
+import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
+
+// Helper for safe number extraction
+const finite = (v, fallback) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
+};
+
+// Safe role canonicalization
+const getCanonicalRole = (role) => {
+  const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
+  const r = String(role || '').toUpperCase();
+  return map[r] || r;
+};
+
+// Helper: max pairwise delta
+const maxPairwiseDelta = (values) => {
+  if (!values || values.length < 2) return null;
+  let maxDelta = 0;
+  for (let i = 0; i < values.length; i++) {
+    for (let j = i + 1; j < values.length; j++) {
+      const delta = Math.abs(values[i] - values[j]);
+      if (delta > maxDelta) maxDelta = delta;
+    }
+  }
+  return maxDelta;
+};
+
+// Helper: convert full included angle to half-angle (±off-axis), rounded up
+const halfDispersionDeg = (fullDeg) => {
+  if (!Number.isFinite(fullDeg)) return null;
+  return Math.ceil(fullDeg / 2);
+};
+
+// 3D vector helpers for overhead aim-at-MLP logic
+const rad2deg = (r) => (r * 180) / Math.PI;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const v3 = (x, y, z) => ({ x, y, z });
+const v3sub = (a, b) => v3(a.x - b.x, a.y - b.y, a.z - b.z);
+const v3len = (a) => Math.sqrt(a.x*a.x + a.y*a.y + a.z*a.z);
+const v3norm = (a) => {
+  const L = v3len(a);
+  return L > 1e-9 ? v3(a.x / L, a.y / L, a.z / L) : v3(0, 0, 0);
+};
+const v3dot = (a, b) => a.x*b.x + a.y*b.y + a.z*b.z;
+// angle between vectors in degrees (0..180)
+const angleBetweenDeg = (a, b) => {
+  const na = v3norm(a);
+  const nb = v3norm(b);
+  const d = clamp(v3dot(na, nb), -1, 1);
+  return rad2deg(Math.acos(d));
+};
+
+/**
+ * Build complete Seat HUD snapshot (matches RoomVisualisation tooltipData exactly)
+ * 
+ * @param {Object} params
+ * @param {Object} params.seat - Seat object { id, x, y, z, isPrimary }
+ * @param {Array} params.placedSpeakers - All speakers in the room
+ * @param {number} params.widthM - Room width in meters
+ * @param {number} params.lengthM - Room length in meters
+ * @param {number} params.heightM - Room height in meters
+ * @param {number} params.screenFrontPlaneM - Screen front plane Y coordinate
+ * @param {Object} params.screen - Screen config { visibleWidthInches, ... }
+ * @param {Object} params.mlp - MLP point { x, y, z }
+ * @param {Map} params.allSeatSplMetrics - Pre-computed SPL metrics for all seats
+ * @param {boolean} params.aimAtMLP - LCR aiming toggle
+ * @param {boolean} params.aimFrontWidesAtMLP - Front wide aiming toggle
+ * @param {boolean} params.aimSideSurroundsAtMLP - Side surround aiming toggle
+ * @param {boolean} params.aimRearSurroundsAtMLP - Rear surround aiming toggle
+ * @param {Object} params.lcrAngleInfo - Pre-computed LCR angles { L, R }
+ * @param {Object} params.analysisResult - Global RP22 analysis result
+ * @param {Array} params.seatingPositions - All seats (for P1 centerline check)
+ * @param {Object} params.splConfig - SPL config { globalPowerW, radiationMode, ... }
+ * @returns {Object} Complete HUD snapshot matching tooltipData structure
+ */
+export function buildSeatHudSnapshot({
+  seat,
+  placedSpeakers = [],
+  widthM,
+  lengthM,
+  heightM,
+  screenFrontPlaneM,
+  screen = {},
+  mlp,
+  allSeatSplMetrics,
+  aimAtMLP = false,
+  aimFrontWidesAtMLP = false,
+  aimSideSurroundsAtMLP = false,
+  aimRearSurroundsAtMLP = false,
+  lcrAngleInfo = { L: 0, R: 0 },
+  analysisResult = {},
+  seatingPositions = [],
+  splConfig = {},
+}) {
+  if (!seat) return null;
+
+  // Extract seat coordinates
+  const seatX = finite(seat?.x ?? seat?.position?.x, 0);
+  const seatY = finite(seat?.y ?? seat?.position?.y, 0);
+  const seatZ = finite(seat?.z, 1.2);
+
+  // Room dimensions with fallbacks
+  const roomWidth = finite(widthM, 4.5);
+  const roomLength = finite(lengthM, 6.0);
+  const roomHeight = finite(heightM, 2.4);
+  const halfW = roomWidth / 2;
+
+  // Distance to screen (from screen plane)
+  const distanceToScreen = Math.abs(seatY - screenFrontPlaneM);
+
+  // Distance to MLP
+  let distanceToMLP = null;
+  if (mlp && Number.isFinite(mlp.x) && Number.isFinite(mlp.y)) {
+    const dx = seatX - mlp.x;
+    const dy = seatY - mlp.y;
+    distanceToMLP = Math.hypot(dx, dy);
+  }
+
+  // RP23 horizontal viewing angle
+  let rp23AngleDeg = null;
+  let rp23Level = null;
+  if (screen?.visibleWidthInches && distanceToScreen > 0.1) {
+    const screenWidthM = (screen.visibleWidthInches * 0.0254) || 0;
+    if (screenWidthM > 0) {
+      rp23AngleDeg = 2 * Math.atan((screenWidthM / 2) / distanceToScreen) * (180 / Math.PI);
+      
+      if (rp23AngleDeg >= 48 && rp23AngleDeg <= 67) rp23Level = 'L4';
+      else if (rp23AngleDeg >= 45 && rp23AngleDeg <= 70) rp23Level = 'L3';
+      else if (rp23AngleDeg >= 40 && rp23AngleDeg <= 75) rp23Level = 'L2';
+      else if (rp23AngleDeg >= 35 && rp23AngleDeg <= 80) rp23Level = 'L1';
+      else rp23Level = 'N/A';
+    }
+  }
+
+  // Compute directional arrows and distance to nearest wall
+  const distLeft = seatX;
+  const distRight = roomWidth - seatX;
+  const xNearest = Math.min(distLeft, distRight);
+  const xArrow = distLeft <= distRight ? '⬅️' : '➡️';
+  const yArrow = '⬆️';
+  
+  // Build base tooltip data
+  const data = {
+    seatId: seat.id || 'Seat',
+    isPrimary: seat.isPrimary || false,
+    position: `(${xArrow} ${xNearest.toFixed(2)}m, ${yArrow} ${seatY.toFixed(2)}m)`,
+    distanceToScreen: Number.isFinite(distanceToScreen) ? `${distanceToScreen.toFixed(2)}m` : '—',
+    distanceToMLP: Number.isFinite(distanceToMLP) ? `${distanceToMLP.toFixed(2)}m` : '—',
+    rp23: {
+      angleDeg: rp23AngleDeg,
+      level: rp23Level,
+      formatted: Number.isFinite(rp23AngleDeg) ? `${rp23AngleDeg.toFixed(1)}°` : '—',
+    }
+  };
+
+  // RP22 per-seat metrics – initialise with defaults
+  data.rp22 = {
+    p1:  { valueM:  null, level: '—', formatted: '—' },
+    p4:  { valueDb: null, level: '—', formatted: '—' },
+    p5:  { valueDeg: null, level: '—', formatted: '—' },
+    p6:  { valueDb: null, level: '—', formatted: '—' },
+    p9:  { valueDeg: null, level: '—', formatted: '—' },
+    p10: { valueDb: null, level: '—', formatted: '—' },
+    p16: { valueDb: null, level: '—', formatted: '—' },
+    p17: { valueDb: null, level: '—', formatted: '—' },
+    p20: { valueDb: null, level: '—', formatted: '—' },
+  };
+
+  // Pull per-seat RP22 metrics from analysisResult (single source of truth)
+  const seatMetrics = analysisResult?.seatMetrics?.get?.(seat.id);
+  if (seatMetrics) {
+    if (seatMetrics.p9)  data.rp22.p9  = seatMetrics.p9;
+    if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
+    // P16 is computed locally below (skip analysisResult)
+    if (seatMetrics.p17) data.rp22.p17 = seatMetrics.p17;
+    if (seatMetrics.p20) data.rp22.p20 = seatMetrics.p20;
+  }
+
+  // ALWAYS compute P16 locally using LIVE plan-view yaw logic (matches icon rotation)
+  {
+    const lcrRoles = new Set(['FL', 'FC', 'FR', 'L', 'C', 'R']);
+
+    const lcrSpeakers = (placedSpeakers || []).filter(sp => {
+      const canon = getCanonicalRole(sp.role);
+      return lcrRoles.has(canon) && sp.position;
+    });
+
+    if (lcrSpeakers.length > 0) {
+      const perSpeaker = [];
+      let worstLossLabel = null;
+      let worstLevel = 4;
+      let worstRole = null;
+      let worstAngleDeg = null;
+
+      for (const sp of lcrSpeakers) {
+        const canon = getCanonicalRole(sp.role);
+        const pos = sp.position;
+
+        // Direction from speaker to THIS seat (use SAME convention as icon yaw)
+        const dirDeg = safeYawToMLP(pos, { x: seatX, y: seatY });
+
+        // Aim calculation (match renderSpeakers exactly)
+        let aimDeg = 0;
+        if (aimAtMLP) {
+          if (canon === 'FL') aimDeg = lcrAngleInfo.L || 0;
+          else if (canon === 'FR') aimDeg = lcrAngleInfo.R || 0;
+          else aimDeg = 0; // FC is always 0
+        } else {
+          aimDeg = 0;
+        }
+
+        // Off-axis = shortest arc between aim direction and seat direction
+        let offAxisRaw = dirDeg - aimDeg;
+        while (offAxisRaw > 180) offAxisRaw -= 360;
+        while (offAxisRaw < -180) offAxisRaw += 360;
+        const offAxisDeg = Math.abs(offAxisRaw);
+
+        // Dispersion windows (HALF the stored values, rounded up)
+        const meta = getSpeakerModelMeta(sp.model);
+        const disp = meta?.dispersion?.horizontal;
+
+        const w1 = Number.isFinite(disp?.minus1p5dB) ? Math.ceil(disp.minus1p5dB / 2) : null;
+        const w3 = Number.isFinite(disp?.minus3dB) ? Math.ceil(disp.minus3dB / 2) : null;
+        const w5 = Number.isFinite(disp?.minus5dB) ? Math.ceil(disp.minus5dB / 2) : null;
+
+        // Threshold-based step classification (NO interpolation)
+        let lossLabel = 'FAIL';
+        let level = 1;
+
+        if (Number.isFinite(w1) && Number.isFinite(w3) && Number.isFinite(w5)) {
+          if (offAxisDeg <= w1) {
+            lossLabel = '≤1.5 dB';
+            level = 4;
+          } else if (offAxisDeg <= w3) {
+            lossLabel = '≤3.0 dB';
+            level = 3;
+          } else if (offAxisDeg <= w5) {
+            lossLabel = '≤5.0 dB';
+            level = 2;
+          } else {
+            lossLabel = 'FAIL';
+            level = 1;
+          }
+        } else {
+          // Fallback to generic thresholds
+          if (offAxisDeg <= 28) {
+            lossLabel = '≤1.5 dB';
+            level = 4;
+          } else if (offAxisDeg <= 41) {
+            lossLabel = '≤3.0 dB';
+            level = 3;
+          } else if (offAxisDeg <= 55) {
+            lossLabel = '≤5.0 dB';
+            level = 2;
+          } else {
+            lossLabel = 'FAIL';
+            level = 1;
+          }
+        }
+
+        perSpeaker.push({
+          role: canon,
+          angleDeg: Math.floor(offAxisDeg),
+          rawAngleDeg: offAxisDeg,
+          lossLabel,
+          level,
+        });
+
+        // Worst = lowest level, then highest angle
+        if (level < worstLevel || (level === worstLevel && offAxisDeg > (worstAngleDeg || 0))) {
+          worstLevel = level;
+          worstLossLabel = lossLabel;
+          worstRole = canon;
+          worstAngleDeg = offAxisDeg;
+        }
+      }
+
+      // Map level to string
+      const levelStr = worstLevel === 4 ? 'L4' : worstLevel === 3 ? 'L3' : worstLevel === 2 ? 'L2' : 'L1';
+
+      data.rp22.p16 = {
+        value: null, // No numeric value, only step labels
+        formatted: worstLossLabel ? `${worstRole} ${worstLossLabel}` : '—',
+        hudLabel: worstLossLabel ? `${worstRole} ${worstLossLabel}` : '—',
+        level: levelStr,
+        perSpeaker,
+        worstRole,
+        worstAngleDeg,
+        worstLossLabel,
+      };
+    }
+  }
+
+  // ALWAYS compute P17 locally using LIVE plan-view yaw logic (matches icon rotation)
+  {
+    const surroundAndOverheadRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR']);
+    
+    const groupForRole = (role) => {
+      if (role === 'LW' || role === 'RW') return 'Front Wides';
+      if (role === 'SL' || role === 'SR') return 'Side Surrounds';
+      if (role === 'SBL' || role === 'SBR') return 'Rear Surrounds';
+      if (String(role).startsWith('T')) return 'Overheads';
+      return 'Other';
+    };
+    
+    const relevantSpeakers = (placedSpeakers || []).filter(sp => {
+      const canon = getCanonicalRole(sp.role);
+      return surroundAndOverheadRoles.has(canon) && sp.position;
+    });
+
+    if (relevantSpeakers.length > 0) {
+      const perSpeaker = [];
+      let worstLossDb = -Infinity;
+      let worstRole = null;
+      let worstAngleDeg = null;
+      let worstGroup = null;
+
+      for (const sp of relevantSpeakers) {
+        const canon = getCanonicalRole(sp.role);
+        const pos = sp.position;
+        
+        // Calculate direction from speaker to seat
+        const dx = seatX - pos.x;
+        const dy = seatY - pos.y;
+        const dirDeg = safeYawToMLP(pos, { x: seatX, y: seatY });
+        
+        // CRITICAL: Get speaker's aim using EXACT same logic as renderSpeakers
+        let aimDeg = 0;
+        const isLW_RW = (canon === 'LW' || canon === 'RW');
+        const isSL_SR = (canon === 'SL' || canon === 'SR');
+        const isSBL_SBR = (canon === 'SBL' || canon === 'SBR');
+        const isOverhead = canon.startsWith('T');
+        
+        if (isOverhead) {
+          // --- 3D OFF-AXIS FOR OVERHEADS: AIM = overhead centre → MLP centre-line ---
+          // Speaker position (ceiling)
+          const sp3 = v3(pos.x, pos.y, Number.isFinite(heightM) ? heightM : 2.4);
+
+          // MLP and seat positions (listener height)
+          const mlp3  = v3(mlp.x, mlp.y, 1.2);
+          const seat3 = v3(seatX, seatY, seatZ);
+
+          // Aim vector = speaker → MLP (always)
+          const aimVec = v3sub(mlp3, sp3);
+
+          // Seat vector = speaker → seat (the seat being evaluated)
+          const seatVec = v3sub(seat3, sp3);
+
+          // Raw off-axis = 3D angle between aim axis and seat direction
+          let offAxisDeg = angleBetweenDeg(aimVec, seatVec);
+
+          // Apply built-in tilt: tilt reduces off-axis angle (can't go below 0)
+          const meta = getSpeakerModelMeta(sp.model);
+          const builtInTilt = Number(meta?.builtInTiltDeg) || 0;
+          offAxisDeg = Math.max(0, offAxisDeg - builtInTilt);
+
+          // Store for later use
+          sp.__p17_overheadOffAxisDeg = offAxisDeg;
+
+          // Skip 2D dirDeg/aimDeg calculation for overheads
+        } else if (isLW_RW) {
+          // Front Wides: check toggle (LIVE)
+          if (aimFrontWidesAtMLP) {
+            aimDeg = safeYawToMLP(pos, mlp);
+          } else {
+            // Wall-flat: left wall = -90, right wall = +90
+            aimDeg = (canon === 'LW') ? -90 : 90;
+          }
+        } else if (isSL_SR) {
+          // Side Surrounds: check toggle (LIVE)
+          if (aimSideSurroundsAtMLP) {
+            aimDeg = safeYawToMLP(pos, mlp);
+          } else {
+            // Wall-flat: left wall = -90, right wall = +90
+            aimDeg = (canon === 'SL') ? -90 : 90;
+          }
+        } else if (isSBL_SBR) {
+          // Rear Surrounds: check toggle (LIVE)
+          if (aimRearSurroundsAtMLP) {
+            aimDeg = safeYawToMLP(pos, mlp);
+          } else {
+            // Wall-flat: detect which wall
+            const distLeft  = Math.abs(pos.x - 0);
+            const distRight = Math.abs(widthM - pos.x);
+            const distBack  = Math.abs(lengthM - pos.y);
+            const minDist = Math.min(distLeft, distRight, distBack);
+
+            // Wall-flat
+            if (minDist === distBack) aimDeg = 180;
+            else if (minDist === distLeft) aimDeg = 90;
+            else if (minDist === distRight) aimDeg = -90;
+            else aimDeg = 180;
+          }
+        }
+        
+        // Calculate off-axis angle (shortest arc)
+        let offAxisRaw = dirDeg - aimDeg;
+        // Normalize to -180..+180
+        while (offAxisRaw > 180) offAxisRaw -= 360;
+        while (offAxisRaw < -180) offAxisRaw += 360;
+        const offAxisDeg = isOverhead && Number.isFinite(sp.__p17_overheadOffAxisDeg)
+          ? sp.__p17_overheadOffAxisDeg
+          : Math.abs(offAxisRaw);
+        const offAxisDegInt = Math.floor(offAxisDeg + 1e-9);
+        
+        // Clamp to 0..180 for HF falloff lookup
+        const offAxisClamped = Math.min(180, Math.max(0, offAxisDeg));
+        
+        // Product-dependent P17 "bucket" using the model's horizontal dispersion windows
+        const meta = getSpeakerModelMeta(sp.model);
+        const dispRaw = meta?.dispersion?.horizontal;
+        const disp = dispRaw
+          ? {
+              minus1p5dB: halfDispersionDeg(dispRaw.minus1p5dB),
+              minus3dB:   halfDispersionDeg(dispRaw.minus3dB),
+              minus5dB:   halfDispersionDeg(dispRaw.minus5dB),
+            }
+          : null;
+        
+        let lossDb = 3.0; // Default L2 fallback
+        let levelBucket = 2;
+        
+        if (disp && disp.minus1p5dB != null && disp.minus3dB != null) {
+          if (offAxisClamped <= disp.minus1p5dB) {
+            lossDb = 0.0;
+            levelBucket = 4;
+          } else if (offAxisClamped <= disp.minus3dB) {
+            lossDb = 1.5;
+            levelBucket = 3;
+          } else {
+            lossDb = 3.0;
+            levelBucket = 2;
+          }
+        }
+        
+        const isBeyondNonLcrLimit = false; // P17 never uses "beyond limit" logic
+        
+        perSpeaker.push({
+          role: canon,
+          angleDeg: offAxisDegInt,
+          rawAngleDeg: offAxisDegInt,
+          lossDb: Math.round(lossDb * 10) / 10,
+          isBeyondNonLcrLimit,
+        });
+        
+        // Worst = highest loss within valid range
+        if (!isBeyondNonLcrLimit) {
+          const angleInt = offAxisDegInt;
+
+          const isBetter =
+            (lossDb > worstLossDb) ||
+            (lossDb === worstLossDb && angleInt > (worstAngleDeg ?? -Infinity)) ||
+            (lossDb === worstLossDb && angleInt === (worstAngleDeg ?? -Infinity) && String(canon).localeCompare(String(worstRole)) < 0);
+
+          if (isBetter) {
+            worstLossDb = lossDb;
+            worstRole = canon;
+            worstAngleDeg = angleInt;
+            worstGroup = groupForRole(canon);
+          }
+        }
+      }
+      
+      // Calculate max loss for level
+      let level17 = '—';
+      if (Number.isFinite(worstLossDb)) {
+        if (worstLossDb <= 1.5) level17 = 'L4';
+        else if (worstLossDb < 3.0) level17 = 'L3';
+        else level17 = 'L2';
+      }
+      
+      data.rp22.p17 = {
+        value: worstLossDb,
+        formatted: Number.isFinite(worstLossDb) ? `±${worstLossDb.toFixed(1)} dB` : '—',
+        level: level17,
+        perSpeaker,
+        worstRole,
+        worstAngleDeg,
+        worstLossDb,
+        worstGroup,
+        p17HasNaAngles: perSpeaker.some(s => s.isBeyondNonLcrLimit),
+      };
+    }
+  }
+
+  // NEW: Use centralized SPL calculation (single source of truth)
+  const seatSplData = getSeatSplMetrics(allSeatSplMetrics, seat.id);
+  
+  data.splAtSeat = {
+    lcr: seatSplData?.screen || {},
+    surrounds: seatSplData?.surrounds || {},
+    overheads: seatSplData?.uppers || {},
+  };
+
+  // HUD-local P10 – Maximum SPL difference between upper speakers
+  {
+    const upperEntries = seatSplData?.uppers
+      ? Object.values(seatSplData.uppers)
+      : [];
+
+    const upperValues = upperEntries
+      .map((o) =>
+        o && typeof o.value === 'number' && Number.isFinite(o.value)
+          ? o.value
+          : null
+      )
+      .filter((v) => typeof v === 'number' && Number.isFinite(v));
+
+    if (upperValues.length >= 2) {
+      const maxSpl = Math.max(...upperValues);
+      const minSpl = Math.min(...upperValues);
+      const delta  = Math.abs(maxSpl - minSpl);
+
+      // Round to 0.1 dB
+      const deltaRounded = Math.round(delta * 10) / 10;
+
+      // RP22 P10 thresholds
+      let level10 = 1;
+      if (deltaRounded <= 2)      level10 = 4;
+      else if (deltaRounded <= 5) level10 = 3;
+      else if (deltaRounded <= 8) level10 = 2;
+      else                        level10 = 1;
+
+      data.rp22.p10 = {
+        value:     deltaRounded,
+        formatted: `±${deltaRounded.toFixed(1)} dB`,
+        level:     level10,
+      };
+    } else {
+      data.rp22.p10 = {
+        value:     null,
+        formatted: 'N/A (insufficient data)',
+        level:     '—',
+      };
+    }
+  }
+
+  // SPL meta: power + radiation mode for HUD caption
+  data.splAtSeatMeta = {
+    powerW: splConfig?.globalPowerW ?? 100,
+    radiationMode: splConfig?.radiationMode ?? 'half-space',
+  };
+
+  // Helper: check if speaker has valid position
+  const hasPos = s => s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
+
+  // Role sets
+  const screenRoles = new Set(['FL','FC','FR']);
+  const surroundRoles = new Set(['SL','SR','SBL','SBR','LW','RW']);
+
+  // Filter placed speakers by category (only those with valid positions)
+  const placed = Array.isArray(placedSpeakers) ? placedSpeakers.filter(hasPos) : [];
+  const placedLCR = placed.filter(s => screenRoles.has(getCanonicalRole(s.role)));
+  const placedSur = placed.filter(s => surroundRoles.has(getCanonicalRole(s.role)));
+
+  const seatPos = { x: seatX, y: seatY, z: seatZ };
+
+  // --- Compute P1: Nearest boundary distance ---
+  if (Number.isFinite(seatX) && Number.isFinite(seatY)) {
+    const isCenterlineX = seatX < 0 || (
+      Array.isArray(seatingPositions) && 
+      seatingPositions.some(s => Number(s?.x) < 0)
+    );
+
+    const xLeftWall = isCenterlineX 
+      ? Math.max(0, Math.min(roomWidth, halfW + seatX))
+      : Math.max(0, Math.min(roomWidth, seatX));
+
+    const yFromScreenPlane = Math.max(0, seatY);
+
+    const p1ValueM = metricP1_nearestWallM({
+      xLeftWall,
+      yFromScreenPlane,
+      widthM: roomWidth,
+      lengthM: roomLength,
+      screenFrontPlaneM,
+    });
+
+    if (Number.isFinite(p1ValueM)) {
+      data.rp22.p1 = {
+        valueM: p1ValueM,
+        level: rp22LevelForP1(p1ValueM),
+        formatted: `${p1ValueM.toFixed(2)}m (nearest)`
+      };
+    }
+  }
+
+  // --- Compute P4: Max SPL difference between screen speakers ---
+  if (placedLCR.length >= 2 && seatSplData?.screen) {
+    const lcrSplValues = Object.values(seatSplData.screen)
+      .map(s => s.value)
+      .filter(Number.isFinite);
+    
+    const valueDb = maxPairwiseDelta(lcrSplValues);
+    
+    if (Number.isFinite(valueDb)) {
+      data.rp22.p4 = {
+        valueDb,
+        level: rp22LevelForP4(valueDb),
+        formatted: `${Math.floor(valueDb)} dB (screen)`
+      };
+    }
+  }
+
+  // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
+  // Build eligible surrounds for P5
+  const allSurrounds = (placedSpeakers || []).filter(s => {
+    const r = getCanonicalRole(s.role);
+    return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
+  });
+
+  const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
+  const hasSR = allSurrounds.some(s => getCanonicalRole(s.role) === 'SR');
+
+  const eligibleSurrounds = allSurrounds.filter(s => {
+    const r = getCanonicalRole(s.role);
+    if (r === 'LW' || r === 'RW') return hasSL && hasSR;
+    return true;
+  });
+
+  let p5Val = null;
+  let p5Level = '—';
+  let p5Formatted = '—';
+
+  if (seat && Array.isArray(eligibleSurrounds) && eligibleSurrounds.length >= 2) {
+    p5Val = metricP5_maxSurroundGapNoWrap({
+      seat: seat,
+      surrounds: eligibleSurrounds,
+      toPoint: sp => sp?.position,
+    });
+    
+    if (Number.isFinite(p5Val)) {
+      p5Level = rp22LevelForP5_NoWrap(p5Val);
+      p5Formatted = `${p5Val.toFixed(1)}° (sur spacing)`;
+    }
+  }
+  // Publish P5 to HUD
+  data.rp22.p5 = { valueDeg: p5Val, level: p5Level, formatted: p5Formatted };
+
+  // --- P6: Surround SPL delta (requires ≥2 surrounds) ---
+  if (placedSur.length >= 2 && seatSplData?.surrounds) {
+    const surSplValues = Object.values(seatSplData.surrounds)
+      .map(s => s.value)
+      .filter(Number.isFinite);
+
+    const p6ValueDb = maxPairwiseDelta(surSplValues);
+    if (Number.isFinite(p6ValueDb)) {
+      let level = '—';
+      if (p6ValueDb <= 2) level = 'L4';
+      else if (p6ValueDb <= 4) level = 'L3';
+      else if (p6ValueDb <= 6) level = 'L2';
+      else if (p6ValueDb <= 10) level = 'L1';
+
+      data.rp22.p6 = {
+        valueDb: p6ValueDb,
+        level,
+        formatted: `${Math.floor(p6ValueDb)} dB (sur)`
+      };
+    }
+  }
+
+  // Legacy bridge
+  data.p1NearestM = data.rp22.p1.valueM;
+
+  return data;
+}
