@@ -279,7 +279,7 @@ function RP22ReportInner() {
                         <p className="text-xs text-[#3E4349] mt-1">Per-seat results shown below match the Seat HUD values.</p>
                         {/* DEBUG: Show pipeline state */}
                         <p className="text-[10px] text-gray-400 mt-1 font-mono">
-                            Debug: seats={seats.length}, seatMetricsKeys={Object.keys(seatMetricsById).length}, firstSeat={seats[0]?.id || 'none'}
+                            Debug: seats={seats.length}, seatMetricsKeys={Object.keys(seatMetricsById).length}, seatIds=[{seats.slice(0,3).map(s => s.id).join(',')}], metricsIds=[{Object.keys(seatMetricsById).slice(0,3).join(',')}]
                         </p>
                     </CardHeader>
                     <CardContent>

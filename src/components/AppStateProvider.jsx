@@ -1251,6 +1251,8 @@ function useDesignerState() {
     isHydrated,
     perSeatMetrics,
     setPerSeatMetricsForSeat,
+    seatMetricsById,
+    setSeatMetricsById,
     roomResetEpoch,
     resetRoomDesignerToDefaults,
   }), [
@@ -1313,6 +1315,7 @@ function useDesignerState() {
     isHydrated,
     perSeatMetrics,
     setPerSeatMetricsForSeat,
+    seatMetricsById,
     roomResetEpoch,
     resetRoomDesignerToDefaults,
     ]);
