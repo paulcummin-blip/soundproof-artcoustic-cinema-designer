@@ -84,39 +84,8 @@ export function computeSeatHudMetrics({
   analysisResult,
   seatingPositions,
 }) {
-  // NULL-SAFE GUARDS: Return valid "N/A" structure if required data is missing
+  // Basic null-safety: seat must exist
   if (!seat) return null;
-  
-  if (!hasPoint(seat) || !hasPoint(mlp) || !Number.isFinite(widthM) || !Number.isFinite(lengthM)) {
-    return {
-      seatId: seat?.id || '—',
-      isPrimary: seat?.isPrimary || false,
-      rp23: {
-        angleDeg: null,
-        level: '—',
-        formatted: '—',
-      },
-      rp22: {
-        p1: null,
-        p4: null,
-        p5: null,
-        p6: null,
-        p9: null,
-        p10: null,
-        p16: null,
-        p17: null,
-        p20: null,
-      },
-      splAtSeat: {
-        lcr: {},
-        surrounds: {},
-        overheads: {},
-      },
-      position: '—',
-      distanceToScreen: '—',
-      distanceToMLP: '—',
-    };
-  }
 
   const seatX = Number(seat?.x ?? seat?.position?.x ?? 0);
   const seatY = Number(seat?.y ?? seat?.position?.y ?? 0);
