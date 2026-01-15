@@ -136,24 +136,6 @@ function RP22ReportInner() {
 
     // Read cached seat metrics from AppState (single source of truth)
     const seatMetricsById = app?.seatMetricsById || {};
-    
-    // Build seat metrics array for rendering
-    const allSeatMetrics = React.useMemo(() => {
-        if (!hasSeats) return [];
-        
-        return seats.map(seat => {
-            const metrics = seatMetricsById[seat.id];
-            if (!metrics) return null;
-            if (metrics.error && !metrics.rp23 && !metrics.rp22) return null;
-            
-            return {
-                seatId: seat.id,
-                isPrimary: seat.isPrimary,
-                rp23: metrics.rp23,
-                rp22: metrics.rp22
-            };
-        }).filter(Boolean);
-    }, [seats, seatMetricsById, hasSeats]);
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
@@ -285,14 +267,6 @@ function RP22ReportInner() {
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {(() => {
-                                // DEBUG: Log pipeline state
-                                console.log('[RP22Report SeatReports]', {
-                                    seats: seats.length,
-                                    seatMetricsKeys: Object.keys(seatMetricsById).length,
-                                    firstSeat: seats[0]?.id || 'none',
-                                    allSeatMetricsLength: allSeatMetrics.length
-                                });
-                                
                                 // Check state before rendering
                                 if (!hasSeats) {
                                     return (
@@ -309,17 +283,25 @@ function RP22ReportInner() {
                                         </p>
                                     );
                                 }
-
-                                // Only show "in progress" when we have seats but incomplete metrics
-                                if (hasSeats && Object.keys(seatMetricsById).length < seats.length) {
-                                    return (
-                                        <p className="text-sm text-[#3E4349]">
-                                            Analysis in progress...
-                                        </p>
-                                    );
-                                }
                                 
-                                return allSeatMetrics.map((seatMetric) => {
+                                return seats.map((seat) => {
+                                    const seatId = seat?.id || '—';
+                                    const metrics = seatMetricsById[seatId] || {};
+                                    const rp22Raw = metrics?.rp22 || {};
+                                    const rp23 = metrics?.rp23 || {};
+                                    const isPrimary = seat?.isPrimary || false;
+                                    
+                                    const rp22Metrics = {
+                                        1: rp22Raw.p1,
+                                        4: rp22Raw.p4,
+                                        5: rp22Raw.p5,
+                                        6: rp22Raw.p6,
+                                        9: rp22Raw.p9,
+                                        10: rp22Raw.p10,
+                                        16: rp22Raw.p16,
+                                        17: rp22Raw.p17,
+                                        20: rp22Raw.p20
+                                    };
                                     const seatId = seatMetric?.seatId || '—';
                                     const rp22Raw = seatMetric?.rp22 || {};
                                     const metrics = {
