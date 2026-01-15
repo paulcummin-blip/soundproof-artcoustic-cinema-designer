@@ -4199,8 +4199,10 @@ React.useEffect(() => {
     appState?.setSeatMetricsById,
     getCanonicalRole,
     dolbyLayout,
-    frontSubsCfg,
-    rearSubsCfg,
+    appState?.frontSubsCfg?.count,
+    appState?.frontSubsCfg?.model,
+    appState?.rearSubsCfg?.count,
+    appState?.rearSubsCfg?.model,
   ]);
 
 // 1) Auto-position HUD near the currently hovered/pinned seat
