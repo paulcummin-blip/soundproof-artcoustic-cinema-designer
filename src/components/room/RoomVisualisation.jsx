@@ -3762,8 +3762,16 @@ React.useEffect(() => {
   // AUTOMATIC SEAT METRICS CACHE - runs for ALL seats, no hover required
   useEffect(() => {
     if (!appState?.setSeatMetricsById) return;
-    if (!seatingPositions?.length || !placedSpeakers?.length) {
+    
+    // Guard: if no seats, clear cache and exit
+    if (!seatingPositions?.length) {
       appState.setSeatMetricsById({});
+      return;
+    }
+
+    // Allow metrics to compute even without speakers (some params like P1 don't need them)
+    // But skip if critical dependencies are missing
+    if (!mlp || !Number.isFinite(widthM) || !Number.isFinite(lengthM)) {
       return;
     }
 
@@ -4154,18 +4162,24 @@ React.useEffect(() => {
       return metrics;
     };
 
-    // Compute for all seats
+    // Compute for all seats with per-seat error isolation
     const nextMetrics = {};
     for (const seat of seatingPositions) {
       if (!seat?.id) continue;
       try {
         nextMetrics[seat.id] = computeMetricsForSeat(seat);
       } catch (err) {
-        console.warn(`Failed to compute metrics for seat ${seat.id}:`, err);
+        console.warn(`[SeatMetrics] failed seat ${seat.id}:`, err);
+        // Mark seat as errored but don't abort the entire loop
+        nextMetrics[seat.id] = { error: true, errorMessage: err.message };
       }
     }
 
-    appState.setSeatMetricsById(nextMetrics);
+    // Only write to state if we computed at least one seat
+    if (Object.keys(nextMetrics).length > 0) {
+      console.log('[SeatMetrics] recompute', seatingPositions.length, 'seats →', Object.keys(nextMetrics).length, 'metrics');
+      appState.setSeatMetricsById(nextMetrics);
+    }
   }, [
     seatingPositions,
     placedSpeakers,
@@ -4184,6 +4198,9 @@ React.useEffect(() => {
     analysisResult,
     appState?.setSeatMetricsById,
     getCanonicalRole,
+    dolbyLayout,
+    frontSubsCfg,
+    rearSubsCfg,
   ]);
 
 // 1) Auto-position HUD near the currently hovered/pinned seat

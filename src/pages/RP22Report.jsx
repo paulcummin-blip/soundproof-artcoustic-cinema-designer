@@ -142,7 +142,11 @@ function RP22ReportInner() {
         
         return seats.map(seat => {
             const metrics = seatMetricsById[seat.id];
+            // Include seats even if metrics failed (they'll show N/A)
             if (!metrics) return null;
+            
+            // Skip error-only entries without rendering them
+            if (metrics.error && !metrics.rp23 && !metrics.rp22) return null;
             
             return {
                 seatId: seat.id,
@@ -275,10 +279,22 @@ function RP22ReportInner() {
                     <CardHeader>
                         <CardTitle className="text-[#1B1A1A] font-header">Seat Reports</CardTitle>
                         <p className="text-xs text-[#3E4349] mt-1">Per-seat results shown below match the Seat HUD values.</p>
+                        {/* DEBUG: Show pipeline state */}
+                        <p className="text-[10px] text-gray-400 mt-1 font-mono">
+                            Debug: seats={seats.length}, seatMetricsKeys={Object.keys(seatMetricsById).length}, firstSeat={seats[0]?.id || 'none'}
+                        </p>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {(() => {
+                                // DEBUG: Log pipeline state
+                                console.log('[RP22Report SeatReports]', {
+                                    seats: seats.length,
+                                    seatMetricsKeys: Object.keys(seatMetricsById).length,
+                                    firstSeat: seats[0]?.id || 'none',
+                                    allSeatMetricsLength: allSeatMetrics.length
+                                });
+                                
                                 // Check state before rendering
                                 if (!hasSeats) {
                                     return (
@@ -296,7 +312,8 @@ function RP22ReportInner() {
                                     );
                                 }
 
-                                if (allSeatMetrics.length === 0) {
+                                // Only show "in progress" when seats exist but metrics haven't been computed yet
+                                if (hasSeats && Object.keys(seatMetricsById).length === 0) {
                                     return (
                                         <p className="text-sm text-[#3E4349]">
                                             Analysis in progress...
