@@ -135,9 +135,9 @@ function RP22ReportInner() {
         }
     });
 
-    // Compute seat metrics using the same helper as Seat HUD
+    // Compute seat metrics using the same helper as Seat HUD (null-safe)
     const seatMetricsById = React.useMemo(() => {
-        if (!hasSeats || !hasSpeakers) return {};
+        if (!hasSeats) return {};
         
         const result = {};
         for (const seat of seats) {
@@ -166,7 +166,7 @@ function RP22ReportInner() {
         }
         
         return result;
-    }, [seats, placedSpeakers, stableDimensions, screen, primarySeatingPosition, allSeatSplMetrics, analysisResult, app?.screenFrontPlaneM, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, hasSeats, hasSpeakers]);
+    }, [seats, placedSpeakers, stableDimensions, screen, primarySeatingPosition, allSeatSplMetrics, analysisResult, app?.screenFrontPlaneM, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, hasSeats]);
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
@@ -292,7 +292,7 @@ function RP22ReportInner() {
                         <p className="text-xs text-[#3E4349] mt-1">Per-seat results shown below match the Seat HUD values.</p>
                         {/* DEBUG: Show pipeline state */}
                         <p className="text-[10px] text-gray-400 mt-1 font-mono">
-                            Debug: seats={seats.length}, seatMetricsKeys={Object.keys(seatMetricsById).length}, seatIds=[{seats.slice(0,3).map(s => s.id).join(',')}], metricsIds=[{Object.keys(seatMetricsById).slice(0,3).join(',')}]
+                            Debug: seats={seats.length}, mlp={primarySeatingPosition ? `${primarySeatingPosition.x?.toFixed(2)},${primarySeatingPosition.y?.toFixed(2)}` : 'null'}, seatMetricsKeys={Object.keys(seatMetricsById).length}
                         </p>
                     </CardHeader>
                     <CardContent>

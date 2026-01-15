@@ -12,6 +12,11 @@ import {
 } from "@/components/utils/seatMetrics";
 import { getSeatSplMetrics } from "@/components/utils/spl/centralSplEngine";
 
+// Helper: check if point has valid coordinates
+const hasPoint = (p) => {
+  return p && Number.isFinite(p.x) && Number.isFinite(p.y);
+};
+
 // Helper: safeYawToMLP (copied from RenderPrimitives to avoid circular deps)
 const safeYawToMLP = (speakerPos, mlpTarget) => {
   if (!speakerPos || !mlpTarget) return 0;
@@ -79,7 +84,39 @@ export function computeSeatHudMetrics({
   analysisResult,
   seatingPositions,
 }) {
+  // NULL-SAFE GUARDS: Return valid "N/A" structure if required data is missing
   if (!seat) return null;
+  
+  if (!hasPoint(seat) || !hasPoint(mlp) || !Number.isFinite(widthM) || !Number.isFinite(lengthM)) {
+    return {
+      seatId: seat?.id || '—',
+      isPrimary: seat?.isPrimary || false,
+      rp23: {
+        angleDeg: null,
+        level: '—',
+        formatted: '—',
+      },
+      rp22: {
+        p1: null,
+        p4: null,
+        p5: null,
+        p6: null,
+        p9: null,
+        p10: null,
+        p16: null,
+        p17: null,
+        p20: null,
+      },
+      splAtSeat: {
+        lcr: {},
+        surrounds: {},
+        overheads: {},
+      },
+      position: '—',
+      distanceToScreen: '—',
+      distanceToMLP: '—',
+    };
+  }
 
   const seatX = Number(seat?.x ?? seat?.position?.x ?? 0);
   const seatY = Number(seat?.y ?? seat?.position?.y ?? 0);
@@ -456,5 +493,21 @@ export function computeSeatHudMetrics({
   if (seatAnalysis?.p9) metrics.rp22.p9 = seatAnalysis.p9;
   if (seatAnalysis?.p20) metrics.rp22.p20 = seatAnalysis.p20;
 
-  return metrics;
+  // Add SPL and position data
+  const seatSplFormatted = seatSplData ? {
+    lcr: seatSplData.screen || {},
+    surrounds: seatSplData.surrounds || {},
+    overheads: seatSplData.uppers || {},
+  } : { lcr: {}, surrounds: {}, overheads: {} };
+
+  return {
+    seatId: seat.id || '—',
+    isPrimary: seat.isPrimary || false,
+    rp23: metrics.rp23,
+    rp22: metrics.rp22,
+    splAtSeat: seatSplFormatted,
+    position: `(${seatX.toFixed(2)}, ${seatY.toFixed(2)})`,
+    distanceToScreen: `${distanceToScreen.toFixed(2)}m`,
+    distanceToMLP: hasPoint(mlp) ? `${Math.hypot(seatX - mlp.x, seatY - mlp.y).toFixed(2)}m` : '—',
+  };
 }
