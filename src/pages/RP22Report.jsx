@@ -292,6 +292,24 @@ function RP22ReportInner() {
                                             return <span className="text-xs text-gray-400">{level || '—'}</span>;
                                         }
                                         
+                                        // FAIL badge: black background, white text
+                                        if (level === 'FAIL') {
+                                            return (
+                                                <span 
+                                                    style={{
+                                                        fontWeight: 600,
+                                                        fontSize: 10,
+                                                        padding: '2px 6px',
+                                                        borderRadius: 4,
+                                                        background: '#000000',
+                                                        color: 'white'
+                                                    }}
+                                                >
+                                                    FAIL
+                                                </span>
+                                            );
+                                        }
+                                        
                                         const bgColor = level === 'L4' ? '#213428' :
                                                         level === 'L3' ? '#3E4349' :
                                                         level === 'L2' ? '#625143' :

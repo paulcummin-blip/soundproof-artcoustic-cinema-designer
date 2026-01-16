@@ -292,14 +292,15 @@ export function buildSeatHudSnapshot({
         }
       }
 
-      // Map level to string
-      const levelStr = worstLevel === 4 ? 'L4' : worstLevel === 3 ? 'L3' : worstLevel === 2 ? 'L2' : 'L1';
+      // Map level to string (or FAIL)
+      const isFail = worstLossLabel === 'FAIL';
+      const levelStr = isFail ? 'FAIL' : (worstLevel === 4 ? 'L4' : worstLevel === 3 ? 'L3' : worstLevel === 2 ? 'L2' : 'L1');
 
       data.rp22.p16 = {
         value: null, // No numeric value, only step labels
-        formatted: worstLossLabel ? `${worstRole} ${worstLossLabel}` : '—',
-        hudLabel: worstLossLabel ? `${worstRole} ${worstLossLabel}` : '—',
-        level: levelStr,
+        formatted: worstRole || '—', // Just the role (e.g., "FR")
+        hudLabel: worstRole || '—',
+        level: levelStr, // "FAIL" or "L1".."L4"
         perSpeaker,
         worstRole,
         worstAngleDeg,
@@ -488,7 +489,7 @@ export function buildSeatHudSnapshot({
       
       data.rp22.p17 = {
         value: worstLossDb,
-        formatted: Number.isFinite(worstLossDb) ? `±${worstLossDb.toFixed(1)} dB` : '—',
+        formatted: worstGroup || '—', // Show worst group name (e.g., "Side Surrounds")
         level: level17,
         perSpeaker,
         worstRole,
