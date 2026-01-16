@@ -8,6 +8,7 @@ import { BarChart4 } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import ParameterCard from '../components/report/ParameterCard';
+import RP22GradingPill from '../components/ui/RP22GradingPill';
 import { computeMLPAndPrimary } from '../components/utils/computeMLPAndPrimary';
 import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
@@ -328,51 +329,6 @@ function RP22ReportInner() {
                                     const rp23 = tooltipData?.rp23 || {};
                                     const isPrimary = tooltipData?.isPrimary || false;
                                     
-                                    // Helper to render level badge
-                                    const renderBadge = (level) => {
-                                        if (!level || level === 'N/A' || level === '—') {
-                                            return <span className="text-xs text-gray-400">{level || '—'}</span>;
-                                        }
-                                        
-                                        // FAIL badge: black background, white text
-                                        if (level === 'FAIL') {
-                                            return (
-                                                <span 
-                                                    style={{
-                                                        fontWeight: 600,
-                                                        fontSize: 10,
-                                                        padding: '2px 6px',
-                                                        borderRadius: 4,
-                                                        background: '#000000',
-                                                        color: 'white'
-                                                    }}
-                                                >
-                                                    FAIL
-                                                </span>
-                                            );
-                                        }
-                                        
-                                        const bgColor = level === 'L4' ? '#213428' :
-                                                        level === 'L3' ? '#3E4349' :
-                                                        level === 'L2' ? '#625143' :
-                                                        '#4A230F';
-                                        
-                                        return (
-                                            <span 
-                                                style={{
-                                                    fontWeight: 600,
-                                                    fontSize: 10,
-                                                    padding: '2px 6px',
-                                                    borderRadius: 4,
-                                                    background: bgColor,
-                                                    color: 'white'
-                                                }}
-                                            >
-                                                {level}
-                                            </span>
-                                        );
-                                    };
-                                    
                                     return (
                                         <Card key={seatId} className="border-[#E6E4DD]">
                                             <CardHeader className="pb-2">
@@ -383,12 +339,12 @@ function RP22ReportInner() {
                                             <CardContent className="space-y-1.5 text-xs">
                                                 {/* RP23 Horizontal Viewing */}
                                                 <div className="flex justify-between items-center pb-1.5 border-b border-gray-100">
-                                                    <span className="font-medium text-[#3E4349]">RP23 Horizontal:</span>
+                                                    <span className="font-semibold text-[#1B1A1A]">RP23 Horizontal:</span>
                                                     <div className="flex items-center gap-2">
                                                         {rp23?.formatted && rp23.formatted !== '—' ? (
                                                             <>
                                                                 <span className="text-[#1B1A1A]">{rp23.formatted}</span>
-                                                                {renderBadge(rp23.level)}
+                                                                <RP22GradingPill level={rp23.level} />
                                                             </>
                                                         ) : (
                                                             <span className="text-xs text-gray-400">—</span>
@@ -404,14 +360,14 @@ function RP22ReportInner() {
                                                    return (
                                                        <div key={key}>
                                                            <div className="flex justify-between items-center">
-                                                               <span className="font-medium text-[#3E4349]">
+                                                               <span className="font-semibold text-[#1B1A1A]">
                                                                    P{paramNum}:
                                                                </span>
                                                                <div className="flex items-center gap-2">
                                                                    {metric ? (
                                                                        <>
                                                                            <span className="text-[#1B1A1A]">{metric.formatted || metric.hudLabel || '—'}</span>
-                                                                           {renderBadge(typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—'))}
+                                                                           <RP22GradingPill level={typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—')} />
                                                                        </>
                                                                    ) : (
                                                                       <span className="text-xs text-gray-400">—</span>
