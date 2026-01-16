@@ -169,7 +169,7 @@ export function buildSeatHudSnapshot({
       angleDeg: rp23AngleDeg,
       displayDeg: rp23DisplayDeg, // Floored integer
       level: rp23Level,
-      formatted: Number.isFinite(rp23DisplayDeg) ? `${rp23DisplayDeg}°` : '—',
+      formatted: formatDegFloor(rp23AngleDeg),
     }
   };
 
@@ -652,7 +652,7 @@ export function buildSeatHudSnapshot({
     
     if (Number.isFinite(p5Val)) {
       p5Level = rp22LevelForP5_NoWrap(p5Val);
-      p5Formatted = `${Math.floor(p5Val)}°`;
+      p5Formatted = formatDegFloor(p5Val);
     }
   }
   // Publish P5 to HUD

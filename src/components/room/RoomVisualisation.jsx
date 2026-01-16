@@ -4,6 +4,7 @@ import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, use
 import { Layers3, Compass } from 'lucide-react';
 import SeatHud from "@/components/room/SeatHud";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { formatDegFloor } from "@/components/utils/angleDisplay";
 import {
   rp23HorizontalAngleForSeat,
   verticalViewingAngleDeg,
@@ -6269,7 +6270,7 @@ const renderRp22AnglesOverlay = useCallback(() => {
       effectiveHoveredSeat.y - R * Math.cos((rawMid * Math.PI) / 180)
     );
 
-    const text = `${deg.toFixed(1)}°`;
+    const text = formatDegFloor(deg);
 
     labelGroup.push(
       <text
