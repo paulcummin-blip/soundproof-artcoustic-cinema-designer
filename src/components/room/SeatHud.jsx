@@ -286,7 +286,7 @@ export default function SeatHud({
               </div>
 
               {/* P16 debug info */}
-              {key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
+              {key === 'p16' && metric?.perSpeaker && metric.perSpeaker.length > 0 && (
                 <div
                   style={{
                     fontSize: 10,
@@ -300,29 +300,24 @@ export default function SeatHud({
                     .slice()
                     .sort((a, b) => a.role.localeCompare(b.role))
                     .map(s => {
-                      const angle = Math.floor(s.angleDeg || 0);
-                      const loss = s.lossLabel || '—';
+                      const angle = Math.floor(s?.angleDeg || 0);
+                      const loss = s?.lossLabel || '—';
                       const text = `${s.role} ${angle}° / ${loss}`;
-                      const isWorst = metric.worstRole === s.role;
+                      const isWorst = metric?.worstRole === s.role;
                       return isWorst ? <strong key={s.role}>{text}</strong> : <span key={s.role}>{text}</span>;
                     })
                     .reduce((acc, item, i, arr) => {
                       if (i === 0) return [item];
                       return [...acc, ', ', item];
                     }, [])}
-                  {metric.worstRole && (
+                  {metric?.worstRole && (
                     <strong> (worst: {metric.worstRole})</strong>
                   )}
                 </div>
               )}
 
-              {/* P17 per-speaker breakdown */}
-              {key === 'p17' && metric.worstGroup && (
-                <div style={{ fontSize: 10, color: '#999', paddingLeft: 16, paddingBottom: 3 }}>
-                  Worst group: <strong>{metric.worstGroup}</strong>
-                </div>
-              )}
-              {key === 'p17' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
+              {/* P17 per-speaker breakdown - no separate "Worst group" line */}
+              {key === 'p17' && metric?.perSpeaker && metric.perSpeaker.length > 0 && (
                 <div>
                   <div
                     style={{
@@ -338,20 +333,20 @@ export default function SeatHud({
               .sort((a, b) => a.role.localeCompare(b.role))
               .map(s => {
                 // Use rawAngleDeg if available (for overheads), otherwise angleDeg
-                const displayAngle = Number.isFinite(s.rawAngleDeg) ? s.rawAngleDeg : s.angleDeg;
+                const displayAngle = Number.isFinite(s?.rawAngleDeg) ? s.rawAngleDeg : s?.angleDeg;
                 const angle = Number.isFinite(displayAngle)
                   ? String(Math.floor(Math.abs(displayAngle) + 1e-9))
                   : '—';
-                const loss = s.isBeyondNonLcrLimit ? 'N/A' : (Number.isFinite(s.lossDb) ? `${s.lossDb.toFixed(1)} dB` : '—');
+                const loss = s?.isBeyondNonLcrLimit ? 'N/A' : (Number.isFinite(s?.lossDb) ? `${s.lossDb.toFixed(1)} dB` : '—');
                 const text = `${s.role} ${angle}° / ${loss}`;
-                const isWorst = metric.worstRole === s.role;
+                const isWorst = metric?.worstRole === s.role;
                 return isWorst ? <strong key={s.role}>{text}</strong> : <span key={s.role}>{text}</span>;
               })
               .reduce((acc, item, i, arr) => {
                 if (i === 0) return [item];
                 return [...acc, ', ', item];
               }, [])}
-                    {metric.worstRole && Number.isFinite(metric.worstAngleDeg) && Number.isFinite(metric.worstLossDb) && (
+                    {metric?.worstRole && Number.isFinite(metric?.worstAngleDeg) && Number.isFinite(metric?.worstLossDb) && (
                       <strong> (worst: {metric.worstRole} {String(Math.floor(Math.abs(metric.worstAngleDeg) + 1e-9))}° / {metric.worstLossDb.toFixed(1)} dB)</strong>
                     )}
                   </div>
