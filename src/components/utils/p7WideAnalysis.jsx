@@ -52,6 +52,7 @@ export function computeP7Wides({ speakers = [], seats = [], mlpOverride = null }
     lwDevDeg: null,
     rwDevDeg: null,
     maxDevDeg: null,
+    foundRoles: spk.map(s => s?.role).filter(Boolean), // Debug: what roles are in the array
   };
 
   if (!mlp) {
@@ -64,7 +65,15 @@ export function computeP7Wides({ speakers = [], seats = [], mlpOverride = null }
     };
   }
 
-  const byRole = new Map(spk.map(s => [String(s?.role || '').toUpperCase(), s]));
+  // Normalize role aliases: FWL → LW, FWR → RW
+  const normalizeRole = (role) => {
+    const r = String(role || '').toUpperCase();
+    if (r === 'FWL') return 'LW';
+    if (r === 'FWR') return 'RW';
+    return r;
+  };
+
+  const byRole = new Map(spk.map(s => [normalizeRole(s?.role), s]));
 
   const posLW = byRole.get('LW')?.position || null;
   const posRW = byRole.get('RW')?.position || null;
