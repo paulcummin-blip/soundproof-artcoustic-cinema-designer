@@ -51,6 +51,13 @@ const OVERHEAD_PAIR_MAP = {
   TRR: 'TRL',
 };
 
+// Angle display helper - whole degrees only (floor), no decimals
+const floorDeg = (deg) => {
+  if (deg === null || deg === undefined) return null;
+  const n = Number(deg);
+  return Number.isFinite(n) ? Math.floor(n + 1e-9) : null;
+};
+
 // --- OVERHEAD HELPERS (RoomVisualisation) ---
 const rvSafeCanonRole = (role) => String(role || '').toUpperCase();
 
@@ -3129,7 +3136,36 @@ React.useEffect(() => {
       return cached; // Use cached snapshot (guarantees HUD === Report)
     }
     
-    // Fallback: If cache miss, show "Analysis in progress..." (no in-place computation)
+    // PINNED HUD: If seat is pinned but cache miss, try to compute immediately (don't show dashes)
+    if (hudPinnedSeatId === effectiveHoveredSeat.id) {
+      try {
+        const snapshot = buildSeatHudSnapshot({
+          seat: effectiveHoveredSeat,
+          placedSpeakers,
+          widthM,
+          lengthM,
+          heightM,
+          screenFrontPlaneM,
+          screen,
+          mlp: mlp || { x: widthM / 2, y: lengthM * 0.58, z: 1.2 },
+          allSeatSplMetrics,
+          aimAtMLP,
+          aimFrontWidesAtMLP,
+          aimSideSurroundsAtMLP,
+          aimRearSurroundsAtMLP,
+          lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 }, // Safe default
+          analysisResult: analysisResult || {},
+          seatingPositions,
+          splConfig: appState?.splConfig || {},
+        });
+        
+        if (snapshot) return snapshot;
+      } catch (err) {
+        console.warn('[HUD] Failed to compute pinned seat snapshot:', err);
+      }
+    }
+    
+    // Fallback: If cache miss and not pinned, show "Analysis in progress..." (no flicker)
     return {
       seatId: effectiveHoveredSeat.id || 'Seat',
       isPrimary: effectiveHoveredSeat.isPrimary || false,
@@ -3269,7 +3305,7 @@ React.useEffect(() => {
           const dirDeg = safeYawToMLP(pos, { x: seatX, y: seatY });
 
           // Aim MUST match EXACTLY what the icon is using (shared helper)
-          const aimDeg = getPlanAimDeg(sp, mlp, widthM, lengthM, aimAtMLP, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, lcrAngleInfo);
+          const aimDeg = getPlanAimDeg(sp, mlp, widthM, lengthM, aimAtMLP, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP, lcrAngleInfo || { L: 0, R: 0 });
 
           // Off-axis = shortest arc between aim direction and seat direction
           let offAxisRaw = dirDeg - aimDeg;
@@ -3793,17 +3829,33 @@ React.useEffect(() => {
   ]);
 
   // AUTOMATIC SEAT METRICS CACHE - SOLE WRITER for seatMetricsById (powers both HUD and Report)
+  const lastCacheSignatureRef = useRef(null);
+  
   useEffect(() => {
     if (!appState?.setSeatMetricsById) return;
     
     // Guard: if no seats, clear cache and exit
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
       appState.setSeatMetricsById({});
+      lastCacheSignatureRef.current = null;
       return;
     }
 
     // Skip if critical dependencies are missing (but don't crash)
     if (!Number.isFinite(widthM) || !Number.isFinite(lengthM)) {
+      return;
+    }
+
+    // Build cheap signature to detect actual changes (prevents spam updates)
+    const seatIds = seatingPositions.map(s => s.id).join(',');
+    const speakerCount = placedSpeakers?.length || 0;
+    const layout = dolbyLayout || '5.1';
+    const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
+    const mlpRp23 = mlp ? Math.floor((mlp.y || 0) * 100) : 0; // Coarse MLP position
+    const signature = `${seatIds}|${speakerCount}|${layout}|${aimFlags}|${mlpRp23}`;
+    
+    // Skip if nothing changed
+    if (lastCacheSignatureRef.current === signature) {
       return;
     }
 
@@ -3821,14 +3873,14 @@ React.useEffect(() => {
           heightM,
           screenFrontPlaneM,
           screen,
-          mlp: mlp || { x: widthM / 2, y: lengthM * 0.58, z: 1.2 }, // Safe fallback if MLP is null
+          mlp: mlp || { x: widthM / 2, y: lengthM * 0.58, z: 1.2 },
           allSeatSplMetrics,
           aimAtMLP,
           aimFrontWidesAtMLP,
           aimSideSurroundsAtMLP,
           aimRearSurroundsAtMLP,
-          lcrAngleInfo,
-          analysisResult,
+          lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 }, // Safe default
+          analysisResult: analysisResult || {},
           seatingPositions,
           splConfig: appState?.splConfig || {},
         });
@@ -3838,49 +3890,18 @@ React.useEffect(() => {
         }
       } catch (err) {
         console.warn(`[SeatMetrics] failed seat ${seat.id}:`, err);
-        // Store partial result with error flag
-        nextMetrics[seat.id] = { 
-          seatId: seat.id,
-          error: true, 
-          errorMessage: err.message,
-          rp23: { formatted: 'Error', level: '—' },
-          rp22: {
-            p1: { formatted: 'Error', level: '—' },
-            p4: { formatted: 'Error', level: '—' },
-            p5: { formatted: 'Error', level: '—' },
-            p6: { formatted: 'Error', level: '—' },
-            p9: { formatted: 'Error', level: '—' },
-            p10: { formatted: 'Error', level: '—' },
-            p16: { formatted: 'Error', level: '—' },
-            p17: { formatted: 'Error', level: '—' },
-            p20: { formatted: 'Error', level: '—' },
-          }
-        };
+        // Keep previous value on error (don't replace with dashes)
+        const prev = appState?.seatMetricsById?.[seat.id];
+        if (prev) {
+          nextMetrics[seat.id] = prev;
+        }
       }
     }
 
-    // Only write if something actually changed (avoid infinite loops)
-    const prevKeys = Object.keys(appState?.seatMetricsById || {});
-    const nextKeys = Object.keys(nextMetrics);
+    // Write once (no clear-then-refill pattern)
+    appState.setSeatMetricsById(nextMetrics);
+    lastCacheSignatureRef.current = signature;
     
-    // Quick check: different number of seats = always update
-    if (prevKeys.length !== nextKeys.length) {
-      console.log('[SeatMetrics] count changed', prevKeys.length, '→', nextKeys.length);
-      appState.setSeatMetricsById(nextMetrics);
-      return;
-    }
-    
-    // Cheap checksum: compare first seat only (avoid deep equality check)
-    if (nextKeys.length > 0) {
-      const firstKey = nextKeys[0];
-      const prevChecksum = JSON.stringify(appState.seatMetricsById[firstKey]);
-      const nextChecksum = JSON.stringify(nextMetrics[firstKey]);
-      
-      if (prevChecksum !== nextChecksum) {
-        console.log('[SeatMetrics] recompute', seatingPositions.length, 'seats →', nextKeys.length, 'metrics');
-        appState.setSeatMetricsById(nextMetrics);
-      }
-    }
   }, [
     seatingPositions,
     placedSpeakers,
@@ -3897,9 +3918,9 @@ React.useEffect(() => {
     aimRearSurroundsAtMLP,
     lcrAngleInfo,
     analysisResult,
+    dolbyLayout,
     appState?.setSeatMetricsById,
     appState?.splConfig,
-    appState?.seatMetricsById,
   ]);
 
 // 1) Auto-position HUD near the currently hovered/pinned seat
@@ -6269,7 +6290,8 @@ const renderRp22AnglesOverlay = useCallback(() => {
       effectiveHoveredSeat.y - R * Math.cos((rawMid * Math.PI) / 180)
     );
 
-    const text = `${Math.floor(deg)}°`;
+    const degFloor = floorDeg(deg);
+    const text = degFloor !== null ? `${degFloor}°` : '—';
 
     labelGroup.push(
       <text
