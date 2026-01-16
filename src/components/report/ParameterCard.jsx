@@ -15,8 +15,8 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
     const hasSeatData = Array.isArray(seatResults) && seatResults.length > 0;
 
     const formatValue = (val) => {
-        if (val === null || val === undefined) return 'N/A';
-        if (typeof val === 'number') {
+        if (val === null || val === undefined) return '—';
+        if (typeof val === 'number' && Number.isFinite(val)) {
             return parameter.unit ? `${val.toFixed(1)} ${parameter.unit}` : val.toFixed(1);
         }
         return String(val);
@@ -118,7 +118,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 </span>
                                 {renderLevelBadge('L4')}
                             </div>
-                        ) : hasRoomResult ? (
+                        ) : hasRoomResult && roomResult.status !== 'no_data' ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-[#213428] font-medium">
                                     {formatted || formatValue(value)}
@@ -126,7 +126,10 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 {renderLevelBadge(level)}
                             </div>
                         ) : (
-                            <span className="text-xs text-gray-400 italic">No data yet</span>
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-400 italic">—</span>
+                                {renderLevelBadge('—')}
+                            </div>
                         )}
                     </div>
                 </div>

@@ -177,8 +177,7 @@ function RP22ReportInner() {
         };
     }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
 
-    // P7 is now computed by the analysis engine - read from analysisResult
-    const p7FromEngine = analysisResult?.gradedParameters?.primary?.[7] || null;
+
 
     // Helper: get room-level result for a parameter
     const getRoomResult = React.useCallback((paramId) => {

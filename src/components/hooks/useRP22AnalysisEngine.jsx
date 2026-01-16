@@ -86,15 +86,44 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
     return { number: 7, title: RP22_CATALOG["7"].title, level: null, value: null, unit: RP22_CATALOG["7"].unit, overlay: null, note: "Front Wide angular deviation from bisector", deviation: null, perSide: null };
   }
 
+  // Helper to get position from any format
+  const getPos = (s) => {
+    if (!s) return null;
+    if (s.position && isNum(s.position.x) && isNum(s.position.y)) return s.position;
+    if (s.pos && isNum(s.pos.x) && isNum(s.pos.y)) return s.pos;
+    if (isNum(s.x) && isNum(s.y)) return { x: s.x, y: s.y };
+    return null;
+  };
+
   // Helper to get azimuth consistent with azimuthFromMLP (0 deg is +Y, 90 deg is +X)
   const getAngle = (vec) => (vec.x === 0 && vec.y === 0) ? 0 : (Math.atan2(vec.x, vec.y) * 180 / Math.PI + 360) % 360;
 
-  const L  = speakers.find(s => s.role === 'L' && s.position);
-  const R  = speakers.find(s => s.role === 'R' && s.position);
-  const LS = speakers.find(s => s.role === 'LS' && s.position);
-  const RS = speakers.find(s => s.role === 'RS' && s.position);
-  const LW = speakers.find(s => s.role === 'LW' && s.position);
-  const RW = speakers.find(s => s.role === 'RW' && s.position);
+  // Normalize role (handle aliases)
+  const normalizeRole = (role) => {
+    const r = String(role || '').toUpperCase();
+    if (r === 'L' || r === 'FL') return 'L';
+    if (r === 'R' || r === 'FR') return 'R';
+    if (r === 'LS' || r === 'SL') return 'LS';
+    if (r === 'RS' || r === 'SR') return 'RS';
+    if (r === 'LW' || r === 'FWL' || r === 'WL' || r === 'LFW') return 'LW';
+    if (r === 'RW' || r === 'FWR' || r === 'WR' || r === 'RFW') return 'RW';
+    return r;
+  };
+
+  // Find speakers by normalized role
+  const findSpeaker = (targetRole) => {
+    const spk = speakers.find(s => normalizeRole(s.role) === targetRole);
+    if (!spk) return null;
+    const pos = getPos(spk);
+    return pos ? { ...spk, position: pos } : null;
+  };
+
+  const L  = findSpeaker('L');
+  const R  = findSpeaker('R');
+  const LS = findSpeaker('LS');
+  const RS = findSpeaker('RS');
+  const LW = findSpeaker('LW');
+  const RW = findSpeaker('RW');
 
   const calcSide = (front, side, wide) => {
     if (!front || !side || !wide) return { deviation: null, targetAngle: null, actualAngle: null };
@@ -140,7 +169,8 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
       overlay: null,
       note: "Front Wide angular deviation from bisector",
       deviation: null,
-      perSide: { LW: detailsL, RW: detailsR }
+      perSide: { LW: detailsL, RW: detailsR },
+      status: "no_data"
     };
   }
 
@@ -166,7 +196,8 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
     perSide: {
       LW: detailsL,
       RW: detailsR
-    }
+    },
+    status: "ok"
   };
 }
 
