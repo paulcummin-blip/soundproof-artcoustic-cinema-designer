@@ -58,7 +58,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                         {parameter.id === 2 && systemConfig ? (
                             // P2: Discrete speaker count
                             <div className="space-y-2">
-                                <div className="text-[10px] text-[#3E4349] leading-relaxed mb-2">
+                                <div className="text-[10px] text-[#3E4349] leading-relaxed mb-2" style={{ minHeight: '180px' }}>
                                     <div className="font-semibold mb-1">2. Decoder/renderer capability and discretely rendered speaker configuration, excl. subwoofers</div>
                                     <div className="mb-1">Number discrete speakers</div>
                                     <div className="text-[9px] space-y-0.5">
@@ -90,7 +90,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                         ) : parameter.id === 3 ? (
                             // P3: Screen wall speakers outside recommended zones (always L4)
                             <div className="space-y-2">
-                                <div className="text-[10px] text-[#3E4349] leading-relaxed mb-2">
+                                <div className="text-[10px] text-[#3E4349] leading-relaxed mb-2" style={{ minHeight: '180px' }}>
                                     <div className="font-semibold mb-1">3. Number of screen wall speakers allowed outside of recommended zonal locations</div>
                                     <div className="mb-1">Number speakers</div>
                                     <div className="text-[9px] space-y-0.5">
@@ -114,14 +114,18 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 </div>
                             </div>
                         ) : hasRoomResult ? (
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm text-[#213428] font-medium">
-                                    {formatted || formatValue(value)}
-                                </span>
-                                {renderLevelBadge(level)}
+                            <div style={{ minHeight: '180px' }} className="flex flex-col justify-end">
+                                <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[#213428] font-medium">
+                                        {formatted || formatValue(value)}
+                                    </span>
+                                    {renderLevelBadge(level)}
+                                </div>
                             </div>
                         ) : (
-                            <span className="text-xs text-gray-400 italic">No data yet</span>
+                            <div style={{ minHeight: '180px' }} className="flex items-end">
+                                <span className="text-xs text-gray-400 italic">No data yet</span>
+                            </div>
                         )}
                     </div>
 
