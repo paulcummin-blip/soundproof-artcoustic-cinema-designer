@@ -142,24 +142,14 @@ function RP22ReportInner() {
     // Compute P2: Discrete speaker count (excluding subwoofers)
     const p2SystemConfig = React.useMemo(() => {
         // Parse current system configuration string
-        const systemConfigStr = (() => {
-            const dolbyPreset = app?.dolbyLayout || "5.1";
-            const base = String(dolbyPreset).split(" ")[0];
-            const parts = base.split(".");
-            const bed = parts[0] || "5";
-            const heights = parts[2] || "";
-            
-            const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
-            const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
-            const totalSubs = frontCount + rearCount;
-            
-            return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-        })();
+        const dolbyPreset = app?.dolbyLayout || "5.1";
+        const base = String(dolbyPreset).split(" ")[0];
+        const parts = base.split(".");
+        const bed = parts[0] || "5";
+        const heights = parts[2] || "";
         
-        // Parse bed.overhead configuration
-        const parts = systemConfigStr.split('.');
-        const bedCount = parseInt(parts[0]) || 5;
-        const overheadCount = parseInt(parts[2]) || 0;
+        const bedCount = parseInt(bed) || 5;
+        const overheadCount = parseInt(heights) || 0;
         
         const discreteCount = bedCount + overheadCount;
         
@@ -169,6 +159,8 @@ function RP22ReportInner() {
             p2Level = 'L4';
         } else if (discreteCount >= 11) {
             p2Level = 'L2';
+        } else if (discreteCount >= 5) {
+            p2Level = 'L1';
         } else {
             p2Level = 'L1';
         }
@@ -176,40 +168,132 @@ function RP22ReportInner() {
         return {
             discreteSpeakerCount: discreteCount,
             p2Level,
+            resultValue: discreteCount,
+            resultLevel: p2Level,
         };
-    }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
+    }, [app?.dolbyLayout]);
 
     // Compute P7: Front wide deviation from median
     const p7Config = React.useMemo(() => {
-        // Check if front wides are enabled in the current layout
-        const enableFrontWides = app?.enableFrontWides ?? false;
+        // Check if LW/RW speakers exist
+        const hasLW = placedSpeakers.some(s => String(s?.role || '').toUpperCase() === 'LW');
+        const hasRW = placedSpeakers.some(s => String(s?.role || '').toUpperCase() === 'RW');
+        const hasWides = hasLW && hasRW;
         
-        if (!enableFrontWides) {
+        if (!hasWides) {
             return { 
                 status: 'disabled', 
-                level: '—', 
+                level: '-', 
                 displayValue: '—',
-                debug: { hasWides: false }
+                resultValue: '—',
+                resultLevel: '-',
             };
         }
 
-        // Use app.mlp if available, otherwise compute from seats
+        // Get MLP
         const mlpPoint = app?.mlp || null;
+        if (!mlpPoint || !Number.isFinite(mlpPoint.x) || !Number.isFinite(mlpPoint.y)) {
+            return {
+                status: 'ok',
+                level: '-',
+                displayValue: '—',
+                resultValue: '—',
+                resultLevel: '-',
+            };
+        }
 
-        const result = computeP7Wides({ 
-            speakers: placedSpeakers, 
-            seats: seats,
-            mlpOverride: mlpPoint
+        // Helper: azimuth from MLP to point
+        const azimuthFromMLP = (p) => {
+            if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+            const dx = p.x - mlpPoint.x;
+            const dy = p.y - mlpPoint.y;
+            const deg = Math.atan2(dx, dy) * 180 / Math.PI;
+            return (deg + 360) % 360;
+        };
+
+        // Get FL and FR positions
+        const flSpeaker = placedSpeakers.find(s => {
+            const r = String(s?.role || '').toUpperCase();
+            return r === 'FL' || r === 'L';
         });
+        const frSpeaker = placedSpeakers.find(s => {
+            const r = String(s?.role || '').toUpperCase();
+            return r === 'FR' || r === 'R';
+        });
+
+        if (!flSpeaker?.position || !frSpeaker?.position) {
+            return {
+                status: 'ok',
+                level: '-',
+                displayValue: '—',
+                resultValue: '—',
+                resultLevel: '-',
+            };
+        }
+
+        // Compute median azimuth (bisector of FL and FR)
+        const flAz = azimuthFromMLP(flSpeaker.position);
+        const frAz = azimuthFromMLP(frSpeaker.position);
+
+        if (!Number.isFinite(flAz) || !Number.isFinite(frAz)) {
+            return {
+                status: 'ok',
+                level: '-',
+                displayValue: '—',
+                resultValue: '—',
+                resultLevel: '-',
+            };
+        }
+
+        const medianAz = (flAz + frAz) / 2;
+
+        // Get LW and RW positions
+        const lwSpeaker = placedSpeakers.find(s => String(s?.role || '').toUpperCase() === 'LW');
+        const rwSpeaker = placedSpeakers.find(s => String(s?.role || '').toUpperCase() === 'RW');
+
+        const lwAz = lwSpeaker?.position ? azimuthFromMLP(lwSpeaker.position) : null;
+        const rwAz = rwSpeaker?.position ? azimuthFromMLP(rwSpeaker.position) : null;
+
+        // Helper: circular delta
+        const circDelta = (a, b) => {
+            const d = Math.abs(a - b) % 360;
+            return d > 180 ? 360 - d : d;
+        };
+
+        // Compute deviations
+        const devLW = (Number.isFinite(lwAz) && Number.isFinite(medianAz)) ? circDelta(lwAz, medianAz) : null;
+        const devRW = (Number.isFinite(rwAz) && Number.isFinite(medianAz)) ? circDelta(rwAz, medianAz) : null;
+
+        if (!Number.isFinite(devLW) && !Number.isFinite(devRW)) {
+            return {
+                status: 'ok',
+                level: '-',
+                displayValue: '—',
+                resultValue: '—',
+                resultLevel: '-',
+            };
+        }
+
+        const maxDev = Math.max(devLW || 0, devRW || 0);
+
+        // Apply P7 level thresholds
+        let level = 'L1';
+        if (maxDev <= 2) level = 'L4';
+        else if (maxDev <= 5) level = 'L3';
+        else if (maxDev <= 7) level = 'L2';
+        else if (maxDev <= 10) level = 'L1';
+        else level = 'L1';
+
+        const displayValue = `±${(Math.round(maxDev * 10) / 10).toFixed(1)}°`;
 
         return {
             status: 'ok',
-            level: result.level || 'FAIL',
-            displayValue: result.displayValue || '—',
-            details: result.details,
-            debug: result.debug
+            level,
+            displayValue,
+            resultValue: displayValue,
+            resultLevel: level,
         };
-    }, [placedSpeakers, seats, app?.enableFrontWides, app?.mlp]);
+    }, [placedSpeakers, app?.mlp]);
 
     // Helper: get room-level result for a parameter
     const getRoomResult = React.useCallback((paramId) => {
@@ -307,15 +391,64 @@ function RP22ReportInner() {
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
-                            {orderedParams.map(param => (
-                                <ParameterCard
-                                    key={param.id}
-                                    parameter={param}
-                                    roomResult={getRoomResult(param.id)}
-                                    seatResults={getSeatResults(param.id)}
-                                    systemConfig={param.id === 2 ? p2SystemConfig : param.id === 7 ? p7Config : null}
-                                />
-                            ))}
+                            {orderedParams.map(param => {
+                                // P2: Discrete speaker count
+                                if (param.id === 2) {
+                                    return (
+                                        <ParameterCard
+                                            key={param.id}
+                                            parameter={param}
+                                            roomResult={{
+                                                value: p2SystemConfig.resultValue,
+                                                level: p2SystemConfig.resultLevel,
+                                                formatted: String(p2SystemConfig.resultValue)
+                                            }}
+                                            systemConfig={p2SystemConfig}
+                                        />
+                                    );
+                                }
+                                
+                                // P3: Screen wall speakers outside zones (hardcoded 0 / L4)
+                                if (param.id === 3) {
+                                    return (
+                                        <ParameterCard
+                                            key={param.id}
+                                            parameter={param}
+                                            roomResult={{
+                                                value: 0,
+                                                level: 'L4',
+                                                formatted: '0'
+                                            }}
+                                        />
+                                    );
+                                }
+                                
+                                // P7: Front wide deviation
+                                if (param.id === 7) {
+                                    return (
+                                        <ParameterCard
+                                            key={param.id}
+                                            parameter={param}
+                                            roomResult={{
+                                                value: p7Config.resultValue,
+                                                level: p7Config.resultLevel,
+                                                formatted: p7Config.displayValue
+                                            }}
+                                            systemConfig={p7Config}
+                                        />
+                                    );
+                                }
+                                
+                                // All other parameters: use engine results
+                                return (
+                                    <ParameterCard
+                                        key={param.id}
+                                        parameter={param}
+                                        roomResult={getRoomResult(param.id)}
+                                        seatResults={getSeatResults(param.id)}
+                                    />
+                                );
+                            })}
                         </div>
                     </CardContent>
                 </Card>
