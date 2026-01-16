@@ -30,32 +30,40 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
 
     return (
         <Card className="border bg-white border-[#DCDBD6] h-full flex flex-col">
-            {/* Section 1: Header (fixed height) */}
-            <CardHeader className="pb-3" style={{ minHeight: '80px' }}>
-                <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                        <CardTitle 
-                            className="text-sm font-semibold text-[#1B1A1A]"
-                            style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
-                        >
-                            P{parameter.id} — {parameter.name}
-                        </CardTitle>
-                        <p className="text-xs mt-1 text-[#3E4349]">
-                            {parameter.scope} • {parameter.unit}
-                        </p>
+            <div className="flex flex-col h-full">
+                {/* SECTION 1: Header (fixed height) */}
+                <div style={{ height: '80px', minHeight: '80px', maxHeight: '80px', overflow: 'hidden' }} className="px-6 pt-6">
+                    <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                            <CardTitle 
+                                className="text-sm font-semibold text-[#1B1A1A]"
+                                style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
+                            >
+                                P{parameter.id} — {parameter.name}
+                            </CardTitle>
+                            <p className="text-xs mt-1 text-[#3E4349]">
+                                {parameter.scope} • {parameter.unit}
+                            </p>
+                        </div>
                     </div>
                 </div>
-            </CardHeader>
-            
-            {/* Section 2: Metric Label (consistent position) */}
-            <CardContent className="flex-1 flex flex-col pt-0">
-                <div className="text-xs font-medium text-[#3E4349] mb-2" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
-                    {isSeatScoped ? 'Overall (Room)' : 'System Metric'}
+                
+                {/* SECTION 2: Metric Label + Divider (fixed height) */}
+                <div style={{ height: '40px', minHeight: '40px', maxHeight: '40px' }} className="px-6">
+                    <div className="text-xs font-medium text-[#3E4349] mb-2" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
+                        {isSeatScoped ? 'Overall (Room)' : 'System Metric'}
+                    </div>
+                    <div className="border-t border-[#E6E4DD]"></div>
                 </div>
                 
-                {/* Section 3: Result (pinned to bottom) */}
-                <div className="mt-auto border-t border-[#E6E4DD] pt-3" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
-                    <div>
+                {/* SECTION 3: Content + Result (flex fill, result pinned to bottom) */}
+                <div className="flex-1 flex flex-col px-6 pb-6 pt-3" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
+                    <div className="flex-1">
+                        {/* Content area */}
+                    </div>
+                    
+                    {/* Result row (pinned to bottom) */}
+                    <div className="mt-auto">
                         {parameter.id === 2 && systemConfig ? (
                             // P2: Discrete speaker count
                             <div className="space-y-2">
@@ -160,7 +168,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                         )}
                     </div>
                 </div>
-            </CardContent>
+            </div>
         </Card>
     );
 }
