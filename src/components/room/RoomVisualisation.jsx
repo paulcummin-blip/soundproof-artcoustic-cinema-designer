@@ -5761,8 +5761,8 @@ return {
 
     if (isLCR) {
       if (aimAtMLP) {
-        if (canon === 'FL') yawDeg = lcrAngleInfo.L;
-        else if (canon === 'FR') yawDeg = lcrAngleInfo.R;
+        if (canon === 'FL') yawDeg = lcrAngleInfo?.L ?? 0;
+        else if (canon === 'FR') yawDeg = lcrAngleInfo?.R ?? 0;
         else yawDeg = 0; // FC is always 0
       } else {
         yawDeg = 0;
@@ -6269,7 +6269,7 @@ const renderRp22AnglesOverlay = useCallback(() => {
       effectiveHoveredSeat.y - R * Math.cos((rawMid * Math.PI) / 180)
     );
 
-    const text = `${deg.toFixed(1)}°`;
+    const text = `${Math.floor(deg)}°`;
 
     labelGroup.push(
       <text
