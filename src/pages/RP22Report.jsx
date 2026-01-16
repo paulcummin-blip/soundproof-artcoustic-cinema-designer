@@ -181,27 +181,15 @@ function RP22ReportInner() {
 
     // Compute P7: Front wide deviation from median
     const p7Config = React.useMemo(() => {
-        // Check if front wides exist in placedSpeakers (actual speakers, not UI toggle)
-        const hasLW = placedSpeakers.some(s => {
-            const role = String(s?.role || '').toUpperCase();
-            return role === 'LW' && s.position;
-        });
-        const hasRW = placedSpeakers.some(s => {
-            const role = String(s?.role || '').toUpperCase();
-            return role === 'RW' && s.position;
-        });
+        // Check if front wides are enabled in the current layout
+        const enableFrontWides = app?.enableFrontWides ?? false;
         
-        if (!hasLW || !hasRW) {
+        if (!enableFrontWides) {
             return { 
                 status: 'disabled', 
                 level: '—', 
                 displayValue: '—',
-                debug: { 
-                    hasWides: false,
-                    hasLW,
-                    hasRW,
-                    allRoles: placedSpeakers.map(s => String(s?.role || '').toUpperCase())
-                }
+                debug: { hasWides: false }
             };
         }
 
@@ -221,7 +209,7 @@ function RP22ReportInner() {
             details: result.details,
             debug: result.debug
         };
-    }, [placedSpeakers, seats, app?.mlp]);
+    }, [placedSpeakers, seats, app?.enableFrontWides, app?.mlp]);
 
     // Helper: get room-level result for a parameter
     const getRoomResult = React.useCallback((paramId) => {
