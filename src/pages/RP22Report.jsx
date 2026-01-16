@@ -12,7 +12,6 @@ import { computeMLPAndPrimary } from '../components/utils/computeMLPAndPrimary';
 import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
-import { formatDegFloor } from '../components/utils/angleDisplay';
 
 
 function RP22ReportInner() {
@@ -380,17 +379,17 @@ function RP22ReportInner() {
 
                                                             {/* P16 breakdown */}
                                                             {metric && key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
-                                                               <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                                   {metric.perSpeaker.map(s => 
-                                                                       `${s.role} ${formatDegFloor(s.angleDeg)} / ${s.lossLabel || '—'}`
-                                                                   ).join(', ')}
-                                                               </div>
+                                                                <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
+                                                                    {metric.perSpeaker.map(s => 
+                                                                        `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`
+                                                                    ).join(', ')}
+                                                                </div>
                                                             )}
 
                                                             {/* P17 breakdown */}
                                                             {metric && key === 'p17' && metric.worstRole && (
                                                                 <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                                    Worst: {metric.worstRole} ({formatDegFloor(metric.worstAngleDeg)} / {metric.worstLossDb?.toFixed(1) || '—'} dB)
+                                                                    Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
                                                                 </div>
                                                             )}
                                                         </div>

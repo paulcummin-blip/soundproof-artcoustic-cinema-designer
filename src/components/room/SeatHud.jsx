@@ -3,7 +3,6 @@ import React, { useState } from "react";
 import { formatDb } from '@/components/utils/formatDb';
 import { getRP22Definition } from '@/components/data/rp22Definitions';
 import { getLevelColors } from '@/components/utils/rp22Colors';
-import { formatDegFloor } from '@/components/utils/angleDisplay';
 
 export default function SeatHud({
   tooltipData,
@@ -301,9 +300,9 @@ export default function SeatHud({
                     .slice()
                     .sort((a, b) => a.role.localeCompare(b.role))
                     .map(s => {
-                      const angle = formatDegFloor(s.angleDeg);
+                      const angle = Math.floor(s.angleDeg || 0);
                       const loss = s.lossLabel || '—';
-                      const text = `${s.role} ${angle} / ${loss}`;
+                      const text = `${s.role} ${angle}° / ${loss}`;
                       const isWorst = metric.worstRole === s.role;
                       return isWorst ? <strong key={s.role}>{text}</strong> : <span key={s.role}>{text}</span>;
                     })
@@ -340,9 +339,11 @@ export default function SeatHud({
               .map(s => {
                 // Use rawAngleDeg if available (for overheads), otherwise angleDeg
                 const displayAngle = Number.isFinite(s.rawAngleDeg) ? s.rawAngleDeg : s.angleDeg;
-                const angle = formatDegFloor(displayAngle);
+                const angle = Number.isFinite(displayAngle)
+                  ? String(Math.floor(Math.abs(displayAngle) + 1e-9))
+                  : '—';
                 const loss = s.isBeyondNonLcrLimit ? 'N/A' : (Number.isFinite(s.lossDb) ? `${s.lossDb.toFixed(1)} dB` : '—');
-                const text = `${s.role} ${angle} / ${loss}`;
+                const text = `${s.role} ${angle}° / ${loss}`;
                 const isWorst = metric.worstRole === s.role;
                 return isWorst ? <strong key={s.role}>{text}</strong> : <span key={s.role}>{text}</span>;
               })
@@ -351,7 +352,7 @@ export default function SeatHud({
                 return [...acc, ', ', item];
               }, [])}
                     {metric.worstRole && Number.isFinite(metric.worstAngleDeg) && Number.isFinite(metric.worstLossDb) && (
-                      <strong> (worst: {metric.worstRole} {formatDegFloor(Math.abs(metric.worstAngleDeg))} / {metric.worstLossDb.toFixed(1)} dB)</strong>
+                      <strong> (worst: {metric.worstRole} {String(Math.floor(Math.abs(metric.worstAngleDeg) + 1e-9))}° / {metric.worstLossDb.toFixed(1)} dB)</strong>
                     )}
                   </div>
                   {/* Debug info for first overhead speaker */}
