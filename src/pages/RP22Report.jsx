@@ -185,21 +185,31 @@ function RP22ReportInner() {
         const enableFrontWides = app?.enableFrontWides ?? false;
         
         if (!enableFrontWides) {
-            return { status: 'disabled', level: '—', displayValue: '—' };
+            return { 
+                status: 'disabled', 
+                level: '—', 
+                displayValue: '—',
+                debug: { hasWides: false }
+            };
         }
+
+        // Use app.mlp if available, otherwise compute from seats
+        const mlpPoint = app?.mlp || null;
 
         const result = computeP7Wides({ 
             speakers: placedSpeakers, 
-            seats: seats 
+            seats: seats,
+            mlpOverride: mlpPoint
         });
 
         return {
             status: 'ok',
             level: result.level || 'FAIL',
             displayValue: result.displayValue || '—',
-            details: result.details
+            details: result.details,
+            debug: result.debug
         };
-    }, [placedSpeakers, seats, app?.enableFrontWides]);
+    }, [placedSpeakers, seats, app?.enableFrontWides, app?.mlp]);
 
     // Helper: get room-level result for a parameter
     const getRoomResult = React.useCallback((paramId) => {

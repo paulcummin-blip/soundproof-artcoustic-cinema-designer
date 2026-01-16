@@ -104,8 +104,22 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 <div className="text-[9px] mt-1">
                                     {systemConfig.status === 'disabled' 
                                         ? 'Front wides not enabled in current layout.'
-                                        : 'Measured as maximum angular deviation of LW/RW from the median angle between FL-SL and FR-SR, as viewed from MLP.'}
+                                        : 'Measured as maximum angular deviation of LW/RW from the median angle between wide speakers, as viewed from MLP.'}
                                 </div>
+                                
+                                {/* Debug output */}
+                                {systemConfig.debug && (
+                                    <div className="text-[9px] mt-2 p-2 bg-gray-50 rounded border border-gray-200 font-mono">
+                                        <div>hasWides: {systemConfig.debug.hasWides ? 'true' : 'false'}</div>
+                                        <div>mlp: {systemConfig.debug.mlp ? `(${systemConfig.debug.mlp.x.toFixed(2)}, ${systemConfig.debug.mlp.y.toFixed(2)})` : '—'}</div>
+                                        <div>medianAz: {systemConfig.debug.medianAzDeg !== null ? `${systemConfig.debug.medianAzDeg}°` : '—'}</div>
+                                        <div>lwAz: {systemConfig.debug.lwAzDeg !== null ? `${systemConfig.debug.lwAzDeg}°` : '—'}</div>
+                                        <div>rwAz: {systemConfig.debug.rwAzDeg !== null ? `${systemConfig.debug.rwAzDeg}°` : '—'}</div>
+                                        <div>lwDev: {systemConfig.debug.lwDevDeg !== null ? `${systemConfig.debug.lwDevDeg}°` : '—'}</div>
+                                        <div>rwDev: {systemConfig.debug.rwDevDeg !== null ? `${systemConfig.debug.rwDevDeg}°` : '—'}</div>
+                                        <div>maxDev: {systemConfig.debug.maxDevDeg !== null ? `${systemConfig.debug.maxDevDeg}°` : '—'}</div>
+                                    </div>
+                                )}
                             </div>
                         ) : null}
                     </div>
