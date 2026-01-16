@@ -140,21 +140,24 @@ export function computeP7Wides({ speakers = [], seats = [], mlpOverride = null }
     y: (posLW.y + posRW.y) / 2
   };
 
+  // Clean helper: ensure number or null (never undefined)
+  const clean = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
   // Compute azimuths
   const medianAz = azimuthFromMLP(mlp, medianPoint);
   const lwAz = azimuthFromMLP(mlp, posLW);
   const rwAz = azimuthFromMLP(mlp, posRW);
 
-  debug.medianAzDeg = N(medianAz) ? Math.floor(medianAz) : null;
-  debug.lwAzDeg = N(lwAz) ? Math.floor(lwAz) : null;
-  debug.rwAzDeg = N(rwAz) ? Math.floor(rwAz) : null;
+  debug.medianAzDeg = clean(medianAz);
+  debug.lwAzDeg = clean(lwAz);
+  debug.rwAzDeg = clean(rwAz);
 
   // Compute deviations (circular delta)
   const devLW = (N(lwAz) && N(medianAz)) ? circDelta(lwAz, medianAz) : null;
   const devRW = (N(rwAz) && N(medianAz)) ? circDelta(rwAz, medianAz) : null;
 
-  debug.lwDevDeg = N(devLW) ? Math.floor(devLW * 10) / 10 : null;
-  debug.rwDevDeg = N(devRW) ? Math.floor(devRW * 10) / 10 : null;
+  debug.lwDevDeg = clean(devLW);
+  debug.rwDevDeg = clean(devRW);
 
   const lvlLW = devLW != null ? levelForP7(devLW) : null;
   const lvlRW = devRW != null ? levelForP7(devRW) : null;
@@ -169,21 +172,21 @@ export function computeP7Wides({ speakers = [], seats = [], mlpOverride = null }
   }
 
   // Max deviation for display
-  const maxDev = Math.max(devLW ?? 0, devRW ?? 0);
-  debug.maxDevDeg = N(maxDev) ? Math.floor(maxDev * 10) / 10 : null;
+  const maxDev = clean(Math.max(devLW ?? 0, devRW ?? 0));
+  debug.maxDevDeg = clean(maxDev);
   
-  const displayValue = Number.isFinite(maxDev) ? `±${Math.floor(maxDev)}°` : '—';
+  const displayValue = N(maxDev) ? `±${Math.floor(maxDev)}°` : '—';
 
   return {
     enabled: true,
     hasWides: true,
-    valueDeg: maxDev,
+    valueDeg: clean(maxDev),
     details: {
-      LW: { targetAngle: medianAz, actualAngle: lwAz, deviation: devLW },
-      RW: { targetAngle: medianAz, actualAngle: rwAz, deviation: devRW },
+      LW: { targetAngle: clean(medianAz), actualAngle: clean(lwAz), deviation: clean(devLW) },
+      RW: { targetAngle: clean(medianAz), actualAngle: clean(rwAz), deviation: clean(devRW) },
     },
     level,
-    maxDeviation: maxDev,
+    maxDeviation: clean(maxDev),
     displayValue,
     debug
   };

@@ -107,14 +107,20 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 {/* Debug output */}
                                 {systemConfig.debug && (
                                     <div className="text-[9px] mt-2 p-2 bg-gray-50 rounded border border-gray-200 font-mono">
+                                        <div>speakerCount: {systemConfig.debug.speakerCount ?? 0}</div>
+                                        <div>rolesFound: {systemConfig.debug.rolesFound || 'none'}</div>
+                                        <div>lwRoleRaw: {systemConfig.debug.lwRoleRaw || '—'}</div>
+                                        <div>rwRoleRaw: {systemConfig.debug.rwRoleRaw || '—'}</div>
+                                        <div>lwHasPos: {systemConfig.debug.lwHasPos ? 'true' : 'false'}</div>
+                                        <div>rwHasPos: {systemConfig.debug.rwHasPos ? 'true' : 'false'}</div>
                                         <div>hasWides: {systemConfig.debug.hasWides ? 'true' : 'false'}</div>
-                                        <div>mlp: {systemConfig.debug.mlp ? `(${systemConfig.debug.mlp.x.toFixed(2)}, ${systemConfig.debug.mlp.y.toFixed(2)})` : '—'}</div>
-                                        <div>medianAz: {systemConfig.debug.medianAzDeg !== null ? `${systemConfig.debug.medianAzDeg}°` : '—'}</div>
-                                        <div>lwAz: {systemConfig.debug.lwAzDeg !== null ? `${systemConfig.debug.lwAzDeg}°` : '—'}</div>
-                                        <div>rwAz: {systemConfig.debug.rwAzDeg !== null ? `${systemConfig.debug.rwAzDeg}°` : '—'}</div>
-                                        <div>lwDev: {systemConfig.debug.lwDevDeg !== null ? `${systemConfig.debug.lwDevDeg}°` : '—'}</div>
-                                        <div>rwDev: {systemConfig.debug.rwDevDeg !== null ? `${systemConfig.debug.rwDevDeg}°` : '—'}</div>
-                                        <div>maxDev: {systemConfig.debug.maxDevDeg !== null ? `${systemConfig.debug.maxDevDeg}°` : '—'}</div>
+                                        <div>mlp: {systemConfig.debug.mlp || '—'}</div>
+                                        <div>medianAz: {systemConfig.debug.medianAzDeg !== null ? `${systemConfig.debug.medianAzDeg.toFixed(1)}°` : '—'}</div>
+                                        <div>lwAz: {systemConfig.debug.lwAzDeg !== null ? `${systemConfig.debug.lwAzDeg.toFixed(1)}°` : '—'}</div>
+                                        <div>rwAz: {systemConfig.debug.rwAzDeg !== null ? `${systemConfig.debug.rwAzDeg.toFixed(1)}°` : '—'}</div>
+                                        <div>lwDev: {systemConfig.debug.lwDevDeg !== null ? `${systemConfig.debug.lwDevDeg.toFixed(1)}°` : '—'}</div>
+                                        <div>rwDev: {systemConfig.debug.rwDevDeg !== null ? `${systemConfig.debug.rwDevDeg.toFixed(1)}°` : '—'}</div>
+                                        <div>maxDev: {systemConfig.debug.maxDevDeg !== null ? `${systemConfig.debug.maxDevDeg.toFixed(1)}°` : '—'}</div>
                                     </div>
                                 )}
                             </div>

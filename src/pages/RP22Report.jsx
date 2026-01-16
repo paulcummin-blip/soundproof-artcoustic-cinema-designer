@@ -14,6 +14,10 @@ import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
 import { computeP7Wides } from '../components/utils/p7WideAnalysis';
 
+// Safe formatters for P7 (and other numeric displays)
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+const fmtDeg = (v, dp = 0) => (isNum(v) ? `${v.toFixed(dp)}°` : "—");
+const fmtNum = (v, dp = 0) => (isNum(v) ? v.toFixed(dp) : "—");
 
 function RP22ReportInner() {
     const app = useAppState();
