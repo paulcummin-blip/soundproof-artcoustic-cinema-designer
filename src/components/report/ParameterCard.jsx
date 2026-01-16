@@ -87,6 +87,32 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     {renderLevelBadge(systemConfig.p2Level)}
                                 </div>
                             </div>
+                        ) : parameter.id === 3 ? (
+                            // P3: Screen wall speakers outside recommended zones (always L4)
+                            <div className="space-y-2">
+                                <div className="text-[10px] text-[#3E4349] leading-relaxed mb-2">
+                                    <div className="font-semibold mb-1">3. Number of screen wall speakers allowed outside of recommended zonal locations</div>
+                                    <div className="mb-1">Number speakers</div>
+                                    <div className="text-[9px] space-y-0.5">
+                                        <div>L1: 0</div>
+                                        <div>L2: 0</div>
+                                        <div>L3: 0</div>
+                                        <div>L4: 0</div>
+                                    </div>
+                                    <div className="text-[9px] mt-1">
+                                        Speaker locations are not strict angle numbers. They are zones/areas resulting from multiple trade-offs and defining acceptable possible locations for a given screen wall speaker. Defined zones are wide enough to allow some flexibility in speaker locations within the recommended zone.
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span 
+                                        className="text-sm font-bold"
+                                        style={{ color: '#213428' }}
+                                    >
+                                        0
+                                    </span>
+                                    {renderLevelBadge('L4')}
+                                </div>
+                            </div>
                         ) : hasRoomResult ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-[#213428] font-medium">
