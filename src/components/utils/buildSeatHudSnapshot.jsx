@@ -597,7 +597,7 @@ export function buildSeatHudSnapshot({
       data.rp22.p1 = {
         valueM: p1ValueM,
         level: rp22LevelForP1(p1ValueM),
-        formatted: `${p1ValueM.toFixed(2)}m (nearest)`
+        formatted: `${p1ValueM.toFixed(2)}m`
       };
     }
   }
@@ -614,7 +614,7 @@ export function buildSeatHudSnapshot({
       data.rp22.p4 = {
         valueDb,
         level: rp22LevelForP4(valueDb),
-        formatted: `${Math.floor(valueDb)} dB (screen)`
+        formatted: `${Math.floor(valueDb)} dB`
       };
     }
   }
@@ -648,7 +648,7 @@ export function buildSeatHudSnapshot({
     
     if (Number.isFinite(p5Val)) {
       p5Level = rp22LevelForP5_NoWrap(p5Val);
-      p5Formatted = `${p5Val.toFixed(1)}° (sur spacing)`;
+      p5Formatted = `${p5Val.toFixed(1)}°`;
     }
   }
   // Publish P5 to HUD
@@ -671,7 +671,7 @@ export function buildSeatHudSnapshot({
       data.rp22.p6 = {
         valueDb: p6ValueDb,
         level,
-        formatted: `${Math.floor(p6ValueDb)} dB (sur)`
+        formatted: `${Math.floor(p6ValueDb)} dB`
       };
     }
   }
