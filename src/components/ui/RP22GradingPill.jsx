@@ -25,8 +25,15 @@ export default function RP22GradingPill({ level = 4, children }) {
     ? { bg: '#F3F4F6', border: '#E5E7EB', text: '#9CA3AF' } 
     : getLevelColors(n);
 
+  // Safety: ensure colors object always has required fields
+  const safeColors = {
+    bg: colors?.bg || '#F3F4F6',
+    border: colors?.border || '#E5E7EB',
+    text: colors?.text || '#9CA3AF'
+  };
+
   const styleBase = {
-    border: `1px solid ${colors.border || '#E6E4DD'}`,
+    border: `1px solid ${safeColors.border}`,
     borderRadius: 10,
     padding: '4px 10px',
     fontSize: 12,
@@ -35,8 +42,8 @@ export default function RP22GradingPill({ level = 4, children }) {
     display: 'inline-flex',
     alignItems: 'center',
     gap: 4,
-    background: colors.bg,
-    color: colors.text,
+    background: safeColors.bg,
+    color: safeColors.text,
   };
 
   return <span style={styleBase}>{label}</span>;

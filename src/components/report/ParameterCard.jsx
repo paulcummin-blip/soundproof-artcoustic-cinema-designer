@@ -89,41 +89,6 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     Speaker locations are not strict angle numbers. They are zones/areas resulting from multiple trade-offs and defining acceptable possible locations for a given screen wall speaker. Defined zones are wide enough to allow some flexibility in speaker locations within the recommended zone.
                                 </div>
                             </div>
-                        ) : parameter.id === 7 && systemConfig ? (
-                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
-                                <div className="mb-1">Maximum deviation</div>
-                                <div className="text-[9px] space-y-0.5">
-                                    <div>L4: ≤ 2°</div>
-                                    <div>L3: ≤ 5°</div>
-                                    <div>L2: ≤ 7°</div>
-                                    <div>L1: ≤ 10°</div>
-                                </div>
-                                <div className="text-[9px] mt-1">
-                                    {systemConfig.status === 'disabled' 
-                                        ? 'Front wides not enabled in current layout.'
-                                        : 'Measured as maximum angular deviation of LW/RW from the median angle between wide speakers, as viewed from MLP.'}
-                                </div>
-                                
-                                {/* Debug output */}
-                                {systemConfig.debug && (
-                                    <div className="text-[9px] mt-2 p-2 bg-gray-50 rounded border border-gray-200 font-mono">
-                                        <div>speakerCount: {systemConfig.debug.speakerCount ?? 0}</div>
-                                        <div>rolesFound: {systemConfig.debug.rolesFound || 'none'}</div>
-                                        <div>lwRoleRaw: {systemConfig.debug.lwRoleRaw || '—'}</div>
-                                        <div>rwRoleRaw: {systemConfig.debug.rwRoleRaw || '—'}</div>
-                                        <div>lwHasPos: {systemConfig.debug.lwHasPos ? 'true' : 'false'}</div>
-                                        <div>rwHasPos: {systemConfig.debug.rwHasPos ? 'true' : 'false'}</div>
-                                        <div>hasWides: {systemConfig.debug.hasWides ? 'true' : 'false'}</div>
-                                        <div>mlp: {systemConfig.debug.mlp || '—'}</div>
-                                        <div>medianAz: {systemConfig.debug.medianAzDeg !== null ? `${systemConfig.debug.medianAzDeg.toFixed(1)}°` : '—'}</div>
-                                        <div>lwAz: {systemConfig.debug.lwAzDeg !== null ? `${systemConfig.debug.lwAzDeg.toFixed(1)}°` : '—'}</div>
-                                        <div>rwAz: {systemConfig.debug.rwAzDeg !== null ? `${systemConfig.debug.rwAzDeg.toFixed(1)}°` : '—'}</div>
-                                        <div>lwDev: {systemConfig.debug.lwDevDeg !== null ? `${systemConfig.debug.lwDevDeg.toFixed(1)}°` : '—'}</div>
-                                        <div>rwDev: {systemConfig.debug.rwDevDeg !== null ? `${systemConfig.debug.rwDevDeg.toFixed(1)}°` : '—'}</div>
-                                        <div>maxDev: {systemConfig.debug.maxDevDeg !== null ? `${systemConfig.debug.maxDevDeg.toFixed(1)}°` : '—'}</div>
-                                    </div>
-                                )}
-                            </div>
                         ) : null}
                     </div>
                     
@@ -152,22 +117,6 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     0
                                 </span>
                                 {renderLevelBadge('L4')}
-                            </div>
-                        ) : parameter.id === 7 && systemConfig ? (
-                            <div className="flex justify-between items-center">
-                                <span 
-                                    className="text-sm font-bold"
-                                    style={{
-                                        color: systemConfig.level === 'L4' ? '#213428' :
-                                               systemConfig.level === 'L3' ? '#3E4349' :
-                                               systemConfig.level === 'L2' ? '#625143' :
-                                               systemConfig.level === 'L1' ? '#4A230F' :
-                                               '#000000'
-                                    }}
-                                >
-                                    {systemConfig.displayValue}
-                                </span>
-                                {renderLevelBadge(systemConfig.level)}
                             </div>
                         ) : hasRoomResult ? (
                             <div className="flex justify-between items-center">

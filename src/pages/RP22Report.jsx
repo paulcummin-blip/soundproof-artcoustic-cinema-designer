@@ -12,12 +12,6 @@ import { computeMLPAndPrimary } from '../components/utils/computeMLPAndPrimary';
 import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
-import { computeP7Wides } from '../components/utils/p7WideAnalysis';
-
-// Safe formatters for P7 (and other numeric displays)
-const isNum = (v) => typeof v === "number" && Number.isFinite(v);
-const fmtDeg = (v, dp = 0) => (isNum(v) ? `${v.toFixed(dp)}°` : "—");
-const fmtNum = (v, dp = 0) => (isNum(v) ? v.toFixed(dp) : "—");
 
 function RP22ReportInner() {
     const app = useAppState();
@@ -183,38 +177,8 @@ function RP22ReportInner() {
         };
     }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
 
-    // Compute P7: Front wide deviation from median (detect by role, not toggle)
-    const p7Config = React.useMemo(() => {
-        // Use RAW speaker list (same as HUD) - NO filtering
-        const rawPlacedSpeakers = app?.speakerSystem?.placedSpeakers || [];
-
-        // Use the same MLP as Seat Reports (app.mlp or fallback to primarySeatingPosition)
-        const mlpPoint = app?.mlpPoint || app?.mlp || primarySeatingPosition || null;
-
-        const result = computeP7Wides({ 
-            speakers: rawPlacedSpeakers, 
-            seats: seats,
-            mlpOverride: mlpPoint
-        });
-
-        // If not enabled or no wides detected, return neutral state
-        if (!result.enabled || !result.hasWides) {
-            return { 
-                status: 'disabled', 
-                level: null,
-                displayValue: '—',
-                debug: result.debug
-            };
-        }
-
-        return {
-            status: 'ok',
-            level: result.level,
-            displayValue: result.displayValue || '—',
-            details: result.details,
-            debug: result.debug
-        };
-    }, [app?.speakerSystem?.placedSpeakers, placedSpeakers, seats, app?.mlp, primarySeatingPosition]);
+    // P7 is now computed by the analysis engine - read from analysisResult
+    const p7FromEngine = analysisResult?.gradedParameters?.primary?.[7] || null;
 
     // Helper: get room-level result for a parameter
     const getRoomResult = React.useCallback((paramId) => {
@@ -318,7 +282,7 @@ function RP22ReportInner() {
                                     parameter={param}
                                     roomResult={getRoomResult(param.id)}
                                     seatResults={getSeatResults(param.id)}
-                                    systemConfig={param.id === 2 ? p2SystemConfig : param.id === 7 ? p7Config : null}
+                                    systemConfig={param.id === 2 ? p2SystemConfig : null}
                                 />
                             ))}
                         </div>
