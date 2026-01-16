@@ -181,26 +181,8 @@ function RP22ReportInner() {
 
     // Compute P7: Front wide deviation from median (detect by role, not toggle)
     const p7Config = React.useMemo(() => {
-        // Use the same speaker source as the plan view (prefer speakerSystem.placedSpeakers)
-        const speakers = Array.isArray(app?.speakerSystem?.placedSpeakers) 
-            ? app.speakerSystem.placedSpeakers 
-            : Array.isArray(placedSpeakers) 
-            ? placedSpeakers 
-            : [];
-
-        // Detect wides by role (LW/RW), not by toggle
-        const hasLW = speakers.some(s => s?.role === 'LW' && s?.position);
-        const hasRW = speakers.some(s => s?.role === 'RW' && s?.position);
-        const hasWides = hasLW || hasRW;
-
-        if (!hasWides) {
-            return { 
-                status: 'disabled', 
-                level: '—', 
-                displayValue: '—',
-                debug: { hasWides: false, mlp: null, medianAzDeg: null, lwAzDeg: null, rwAzDeg: null, lwDevDeg: null, rwDevDeg: null, maxDevDeg: null }
-            };
-        }
+        // Use RAW speaker list (same as HUD) - NO filtering
+        const speakers = app?.speakerSystem?.placedSpeakers ?? placedSpeakers ?? [];
 
         // Use the same MLP as Seat Reports (app.mlp or fallback to primarySeatingPosition)
         const mlpPoint = app?.mlp || primarySeatingPosition || null;
@@ -211,9 +193,19 @@ function RP22ReportInner() {
             mlpOverride: mlpPoint
         });
 
+        // If not enabled or no wides detected, return neutral state
+        if (!result.enabled || !result.hasWides) {
+            return { 
+                status: 'disabled', 
+                level: null,
+                displayValue: '—',
+                debug: result.debug
+            };
+        }
+
         return {
             status: 'ok',
-            level: result.level || 'FAIL',
+            level: result.level,
             displayValue: result.displayValue || '—',
             details: result.details,
             debug: result.debug
