@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RP22GradingPill from '../ui/RP22GradingPill';
 
-export default function ParameterCard({ parameter, roomResult, seatResults = [] }) {
+export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null }) {
     if (!parameter) return null;
 
     const hasRoomResult = roomResult && typeof roomResult === 'object';
@@ -55,7 +55,39 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [] 
                         <div className="text-xs font-medium text-[#3E4349] mb-2">
                             {isSeatScoped ? 'Overall (Room)' : 'System Metric'}
                         </div>
-                        {hasRoomResult ? (
+                        {parameter.id === 2 && systemConfig ? (
+                            // P2: Discrete speaker count
+                            <div className="space-y-2">
+                                <div className="text-[10px] text-[#3E4349] leading-relaxed mb-2">
+                                    <div className="font-semibold mb-1">2. Decoder/renderer capability and discretely rendered speaker configuration, excl. subwoofers</div>
+                                    <div className="mb-1">Number discrete speakers</div>
+                                    <div className="text-[9px] space-y-0.5">
+                                        <div>Min.</div>
+                                        <div>Level 1: 5</div>
+                                        <div>Level 2: 11</div>
+                                        <div>Level 3: 15</div>
+                                        <div>Level 4: 15</div>
+                                        <div>Room</div>
+                                    </div>
+                                    <div className="text-[9px] mt-1">
+                                        Includes all listener-level and upper discrete processor outputs, though there are multiple combinations of speaker locations possible therein, depending on the room design and characteristics.
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span 
+                                        className="text-sm font-bold"
+                                        style={{
+                                            color: systemConfig.p2Level === 'L4' ? '#213428' :
+                                                   systemConfig.p2Level === 'L2' ? '#625143' :
+                                                   '#4A230F'
+                                        }}
+                                    >
+                                        {systemConfig.discreteSpeakerCount}
+                                    </span>
+                                    {renderLevelBadge(systemConfig.p2Level)}
+                                </div>
+                            </div>
+                        ) : hasRoomResult ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-[#213428] font-medium">
                                     {formatted || formatValue(value)}

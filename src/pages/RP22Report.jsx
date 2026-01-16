@@ -138,6 +138,46 @@ function RP22ReportInner() {
             .sort((a, b) => a.id - b.id);
     }, []);
 
+    // Compute P2: Discrete speaker count (excluding subwoofers)
+    const p2SystemConfig = React.useMemo(() => {
+        // Parse current system configuration string
+        const systemConfigStr = (() => {
+            const dolbyPreset = app?.dolbyLayout || "5.1";
+            const base = String(dolbyPreset).split(" ")[0];
+            const parts = base.split(".");
+            const bed = parts[0] || "5";
+            const heights = parts[2] || "";
+            
+            const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
+            const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
+            const totalSubs = frontCount + rearCount;
+            
+            return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+        })();
+        
+        // Parse bed.overhead configuration
+        const parts = systemConfigStr.split('.');
+        const bedCount = parseInt(parts[0]) || 5;
+        const overheadCount = parseInt(parts[2]) || 0;
+        
+        const discreteCount = bedCount + overheadCount;
+        
+        // Apply P2 level mapping (never L3)
+        let p2Level = 'L1';
+        if (discreteCount >= 15) {
+            p2Level = 'L4';
+        } else if (discreteCount >= 11) {
+            p2Level = 'L2';
+        } else {
+            p2Level = 'L1';
+        }
+        
+        return {
+            discreteSpeakerCount: discreteCount,
+            p2Level,
+        };
+    }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
+
     // Helper: get room-level result for a parameter
     const getRoomResult = React.useCallback((paramId) => {
         return analysisResult?.gradedParameters?.primary?.[paramId] ?? null;
@@ -240,6 +280,7 @@ function RP22ReportInner() {
                                     parameter={param}
                                     roomResult={getRoomResult(param.id)}
                                     seatResults={getSeatResults(param.id)}
+                                    systemConfig={param.id === 2 ? p2SystemConfig : null}
                                 />
                             ))}
                         </div>
