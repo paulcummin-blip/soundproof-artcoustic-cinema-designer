@@ -63,6 +63,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                     <div style={{ paddingTop: '12px' }}>
                         {parameter.id === 2 && systemConfig ? (
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="font-semibold mb-1">2. Decoder/renderer capability and discretely rendered speaker configuration, excl. subwoofers</div>
                                 <div className="mb-1">Number discrete speakers</div>
                                 <div className="text-[9px] space-y-0.5">
                                     <div>Min.</div>
@@ -78,6 +79,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             </div>
                         ) : parameter.id === 3 ? (
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="font-semibold mb-1">3. Number of screen wall speakers allowed outside of recommended zonal locations</div>
                                 <div className="mb-1">Number speakers</div>
                                 <div className="text-[9px] space-y-0.5">
                                     <div>L1: 0</div>
@@ -91,6 +93,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             </div>
                         ) : parameter.id === 7 && systemConfig ? (
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="font-semibold mb-1">7. Front wide speaker deviation from median</div>
                                 <div className="mb-1">Maximum deviation</div>
                                 <div className="text-[9px] space-y-0.5">
                                     <div>L4: ≤ 2°</div>
@@ -104,7 +107,19 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                         : 'Measured as maximum angular deviation of LW/RW from the median angle between wide speakers, as viewed from MLP.'}
                                 </div>
                                 
-
+                                {/* Debug output */}
+                                {systemConfig.debug && (
+                                    <div className="text-[9px] mt-2 p-2 bg-gray-50 rounded border border-gray-200 font-mono">
+                                        <div>hasWides: {systemConfig.debug.hasWides ? 'true' : 'false'}</div>
+                                        <div>mlp: {systemConfig.debug.mlp ? `(${systemConfig.debug.mlp.x.toFixed(2)}, ${systemConfig.debug.mlp.y.toFixed(2)})` : '—'}</div>
+                                        <div>medianAz: {systemConfig.debug.medianAzDeg !== null ? `${systemConfig.debug.medianAzDeg}°` : '—'}</div>
+                                        <div>lwAz: {systemConfig.debug.lwAzDeg !== null ? `${systemConfig.debug.lwAzDeg}°` : '—'}</div>
+                                        <div>rwAz: {systemConfig.debug.rwAzDeg !== null ? `${systemConfig.debug.rwAzDeg}°` : '—'}</div>
+                                        <div>lwDev: {systemConfig.debug.lwDevDeg !== null ? `${systemConfig.debug.lwDevDeg}°` : '—'}</div>
+                                        <div>rwDev: {systemConfig.debug.rwDevDeg !== null ? `${systemConfig.debug.rwDevDeg}°` : '—'}</div>
+                                        <div>maxDev: {systemConfig.debug.maxDevDeg !== null ? `${systemConfig.debug.maxDevDeg}°` : '—'}</div>
+                                    </div>
+                                )}
                             </div>
                         ) : null}
                     </div>
