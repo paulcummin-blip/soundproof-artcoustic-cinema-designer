@@ -29,40 +29,41 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
     };
 
     return (
-        <Card className="border bg-white border-[#DCDBD6] h-full flex flex-col">
-            <div className="flex flex-col h-full">
-                {/* SECTION 1: Header (fixed height) */}
-                <div style={{ height: '80px', minHeight: '80px', maxHeight: '80px', overflow: 'hidden' }} className="px-6 pt-6">
-                    <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                            <CardTitle 
-                                className="text-sm font-semibold text-[#1B1A1A]"
-                                style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
-                            >
-                                P{parameter.id} — {parameter.name}
-                            </CardTitle>
-                            <p className="text-xs mt-1 text-[#3E4349]">
-                                {parameter.scope} • {parameter.unit}
-                            </p>
-                        </div>
-                    </div>
+        <Card className="border bg-white border-[#DCDBD6] h-full">
+            <div style={{ 
+                display: 'grid', 
+                gridTemplateRows: '120px 60px 1fr', 
+                height: '100%',
+                fontFamily: 'Didact Gothic, Century Gothic, sans-serif'
+            }}>
+                {/* ROW 1: Header (fixed 120px) */}
+                <div className="px-6 pt-6 overflow-hidden">
+                    <CardTitle 
+                        className="text-sm font-semibold text-[#1B1A1A]"
+                        style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
+                    >
+                        P{parameter.id} — {parameter.name}
+                    </CardTitle>
+                    <p className="text-xs mt-1 text-[#3E4349]">
+                        {parameter.scope} • {parameter.unit}
+                    </p>
                 </div>
                 
-                {/* SECTION 2: Metric Label + Divider (fixed height) */}
-                <div style={{ height: '40px', minHeight: '40px', maxHeight: '40px' }} className="px-6">
-                    <div className="text-xs font-medium text-[#3E4349] mb-2" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
+                {/* ROW 2: Metric Label + Divider (fixed 60px) */}
+                <div className="px-6 flex flex-col justify-center">
+                    <div className="text-xs font-medium text-[#3E4349] mb-2">
                         {isSeatScoped ? 'Overall (Room)' : 'System Metric'}
                     </div>
                     <div className="border-t border-[#E6E4DD]"></div>
                 </div>
                 
-                {/* SECTION 3: Content + Result (flex fill, result pinned to bottom) */}
-                <div className="flex-1 flex flex-col px-6 pb-6 pt-3" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
-                    <div className="flex-1">
-                        {/* Content area */}
+                {/* ROW 3: Content + Result (flexible, result pinned to bottom) */}
+                <div className="px-6 pb-6 flex flex-col" style={{ height: '100%' }}>
+                    <div className="flex-1 pt-3">
+                        {/* Content area expands to fill available space */}
                     </div>
                     
-                    {/* Result row (pinned to bottom) */}
+                    {/* Result row (pinned to bottom with mt-auto) */}
                     <div className="mt-auto">
                         {parameter.id === 2 && systemConfig ? (
                             // P2: Discrete speaker count
