@@ -78,7 +78,7 @@ export const RP22_DEFINITIONS = {
     title: "16. Seat-to-seat frequency response variance across all screen wall speakers normalised to measured RSP response between 500 Hz and 16 kHz (1 octave smoothing)",
     description: "Predicts how similar the experience and performance level will be across multiple seats. Design prediction should consider correct speaker alignment, off-axis frequency response on both the horizontal & vertical axes, and the effect of the room.",
     thresholds: [
-      { level: 1, criteria: "> 5 dB" },
+      { level: 1, criteria: "≤ 5 dB" },
       { level: 2, criteria: "≤ 3 dB" },
       { level: 3, criteria: "≤ 1.5 dB" },
       { level: 4, criteria: "≤ 1.5 dB" }
