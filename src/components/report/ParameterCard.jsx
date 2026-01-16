@@ -89,6 +89,21 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     Speaker locations are not strict angle numbers. They are zones/areas resulting from multiple trade-offs and defining acceptable possible locations for a given screen wall speaker. Defined zones are wide enough to allow some flexibility in speaker locations within the recommended zone.
                                 </div>
                             </div>
+                        ) : parameter.id === 7 ? (
+                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="mb-1">Degrees (°)</div>
+                                <div className="mb-1">±</div>
+                                <div className="text-[9px] space-y-0.5">
+                                    <div>L1: 10°</div>
+                                    <div>L2: 7°</div>
+                                    <div>L3: 5°</div>
+                                    <div>L4: 2°</div>
+                                </div>
+                                <div className="text-[9px] mt-1">Room</div>
+                                <div className="text-[9px] mt-1">
+                                    To ensure localisation accuracy, this metric is the maximum horizontal angular deviation allowed from the ideal median angular location for wide front speakers.
+                                </div>
+                            </div>
                         ) : null}
                     </div>
                     
