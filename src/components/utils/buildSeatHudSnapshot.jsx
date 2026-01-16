@@ -22,6 +22,18 @@ const finite = (v, fallback) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+// Angle display helpers - whole degrees only (floor), no decimals
+const floorDeg = (deg) => {
+  if (deg === null || deg === undefined) return null;
+  const n = Number(deg);
+  return Number.isFinite(n) ? Math.floor(n) : null;
+};
+
+const fmtDeg = (deg) => {
+  const n = floorDeg(deg);
+  return n !== null ? `${n}°` : '—';
+};
+
 // Safe role canonicalization
 const getCanonicalRole = (role) => {
   const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
@@ -280,7 +292,7 @@ export function buildSeatHudSnapshot({
 
         perSpeaker.push({
           role: canon,
-          angleDeg: Math.floor(offAxisDeg), // Already floored
+          angleDeg: floorDeg(offAxisDeg),
           rawAngleDeg: offAxisDeg,
           lossLabel,
           level,
@@ -458,7 +470,7 @@ export function buildSeatHudSnapshot({
         
         perSpeaker.push({
           role: canon,
-          angleDeg: offAxisDegInt, // Already floored integer
+          angleDeg: floorDeg(offAxisDegInt),
           rawAngleDeg: offAxisDegInt,
           lossDb: Math.round(lossDb * 10) / 10,
           isBeyondNonLcrLimit,
@@ -618,7 +630,7 @@ export function buildSeatHudSnapshot({
       data.rp22.p4 = {
         valueDb,
         level: rp22LevelForP4(valueDb),
-        formatted: `${Math.floor(valueDb)} dB`
+        formatted: `${floorDeg(valueDb) || 0} dB`
       };
     }
   }
@@ -675,7 +687,7 @@ export function buildSeatHudSnapshot({
       data.rp22.p6 = {
         valueDb: p6ValueDb,
         level,
-        formatted: `${Math.floor(p6ValueDb)} dB`
+        formatted: `${floorDeg(p6ValueDb) || 0} dB`
       };
     }
   }
