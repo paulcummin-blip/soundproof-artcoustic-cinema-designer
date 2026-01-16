@@ -30,7 +30,8 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
 
     return (
         <Card className="border bg-white border-[#DCDBD6] h-full flex flex-col">
-            <CardHeader className="pb-3">
+            {/* Section 1: Header (fixed height) */}
+            <CardHeader className="pb-3" style={{ minHeight: '80px' }}>
                 <div className="flex items-start justify-between">
                     <div className="flex-1">
                         <CardTitle 
@@ -45,16 +46,16 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col">
-                <div 
-                    className="space-y-3 flex-1 flex flex-col"
-                    style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}
-                >
-                    {/* Room/System Value */}
-                    <div className="border-b border-[#E6E4DD] pb-3 mt-auto">
-                        <div className="text-xs font-medium text-[#3E4349] mb-2">
-                            {isSeatScoped ? 'Overall (Room)' : 'System Metric'}
-                        </div>
+            
+            {/* Section 2: Metric Label (consistent position) */}
+            <CardContent className="flex-1 flex flex-col pt-0">
+                <div className="text-xs font-medium text-[#3E4349] mb-2" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
+                    {isSeatScoped ? 'Overall (Room)' : 'System Metric'}
+                </div>
+                
+                {/* Section 3: Result (pinned to bottom) */}
+                <div className="mt-auto border-t border-[#E6E4DD] pt-3" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
+                    <div>
                         {parameter.id === 2 && systemConfig ? (
                             // P2: Discrete speaker count
                             <div className="space-y-2">
@@ -158,47 +159,6 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             <span className="text-xs text-gray-400 italic">No data yet</span>
                         )}
                     </div>
-
-                    {/* Per-Seat Data (for seat-scoped parameters) */}
-                    {isSeatScoped && (
-                        <div>
-                            <div className="text-xs font-medium text-[#3E4349] mb-2">
-                                Per-Seat Values
-                            </div>
-                            {hasSeatData ? (
-                                <div className="max-h-40 overflow-y-auto border border-[#E6E4DD] rounded">
-                                    <table className="w-full text-xs">
-                                        <thead className="bg-[#F8F8F7] sticky top-0">
-                                            <tr>
-                                                <th className="text-left px-2 py-1 text-[#3E4349]">Seat</th>
-                                                <th className="text-right px-2 py-1 text-[#3E4349]">Value</th>
-                                                <th className="text-right px-2 py-1 text-[#3E4349]">Level</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {seatResults.map(({ seatId, isPrimary, metric }) => (
-                                                <tr key={seatId} className="border-t border-[#E6E4DD]">
-                                                    <td className="px-2 py-1 text-[#1B1A1A]">
-                                                        {seatId} {isPrimary ? '(MLP)' : ''}
-                                                    </td>
-                                                    <td className="px-2 py-1 text-right text-[#213428]">
-                                                        {metric.formatted || formatValue(metric.value)}
-                                                    </td>
-                                                    <td className="px-2 py-1 text-right">
-                                                        {renderLevelBadge(metric.level)}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            ) : (
-                                <span className="text-xs text-gray-400 italic">
-                                    Per-seat metrics not implemented yet
-                                </span>
-                            )}
-                        </div>
-                    )}
                 </div>
             </CardContent>
         </Card>
