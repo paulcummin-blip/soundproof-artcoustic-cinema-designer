@@ -186,13 +186,13 @@ function RP22ReportInner() {
     // Compute P7: Front wide deviation from median (detect by role, not toggle)
     const p7Config = React.useMemo(() => {
         // Use RAW speaker list (same as HUD) - NO filtering
-        const speakers = app?.speakerSystem?.placedSpeakers ?? placedSpeakers ?? [];
+        const rawPlacedSpeakers = app?.speakerSystem?.placedSpeakers || [];
 
         // Use the same MLP as Seat Reports (app.mlp or fallback to primarySeatingPosition)
-        const mlpPoint = app?.mlp || primarySeatingPosition || null;
+        const mlpPoint = app?.mlpPoint || app?.mlp || primarySeatingPosition || null;
 
         const result = computeP7Wides({ 
-            speakers: speakers, 
+            speakers: rawPlacedSpeakers, 
             seats: seats,
             mlpOverride: mlpPoint
         });

@@ -7,6 +7,20 @@ import { pickMLP } from './seatingUtils';
 const A = (x) => (Array.isArray(x) ? x : []);
 const N = (v) => typeof v === 'number' && Number.isFinite(v);
 
+// Extract x,y from speaker (handles multiple shapes: position, pos, or flat)
+const getXY = (s) => {
+  if (!s) return null;
+
+  // common shapes in this app
+  if (s.position && N(s.position.x) && N(s.position.y)) return { x: s.position.x, y: s.position.y };
+  if (s.pos && N(s.pos.x) && N(s.pos.y)) return { x: s.pos.x, y: s.pos.y };
+
+  // sometimes flattened
+  if (N(s.x) && N(s.y)) return { x: s.x, y: s.y };
+
+  return null;
+};
+
 function azimuthFromMLP(mlp, p) {
   if (!mlp || !p || !N(mlp.x) || !N(mlp.y) || !N(p.x) || !N(p.y)) return null;
   const dx = p.x - mlp.x;   // lateral (+ right)
@@ -107,18 +121,18 @@ export function computeP7Wides({ speakers = [], seats = [], mlpOverride = null }
   const lwSpeaker = byRole.get('LW') || null;
   const rwSpeaker = byRole.get('RW') || null;
   
-  const posLW = lwSpeaker?.position || null;
-  const posRW = rwSpeaker?.position || null;
+  const posLW = getXY(lwSpeaker);
+  const posRW = getXY(rwSpeaker);
 
   // Debug role detection
   debug.lwRoleRaw = lwSpeaker?.role || null;
   debug.rwRoleRaw = rwSpeaker?.role || null;
-  debug.lwHasPos = !!(posLW && N(posLW.x) && N(posLW.y));
-  debug.rwHasPos = !!(posRW && N(posRW.x) && N(posRW.y));
+  debug.lwHasPos = !!posLW;
+  debug.rwHasPos = !!posRW;
 
   // Check if wides are present
-  const hasLW = posLW && N(posLW.x) && N(posLW.y);
-  const hasRW = posRW && N(posRW.x) && N(posRW.y);
+  const hasLW = !!posLW;
+  const hasRW = !!posRW;
   debug.hasWides = hasLW && hasRW;
 
   if (!hasLW || !hasRW) {
