@@ -179,25 +179,34 @@ function RP22ReportInner() {
         };
     }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
 
-    // Compute P7: Front wide deviation from median
+    // Compute P7: Front wide deviation from median (detect by role, not toggle)
     const p7Config = React.useMemo(() => {
-        // Check if front wides are enabled in the current layout
-        const enableFrontWides = app?.enableFrontWides ?? false;
-        
-        if (!enableFrontWides) {
+        // Use the same speaker source as the plan view (prefer speakerSystem.placedSpeakers)
+        const speakers = Array.isArray(app?.speakerSystem?.placedSpeakers) 
+            ? app.speakerSystem.placedSpeakers 
+            : Array.isArray(placedSpeakers) 
+            ? placedSpeakers 
+            : [];
+
+        // Detect wides by role (LW/RW), not by toggle
+        const hasLW = speakers.some(s => s?.role === 'LW' && s?.position);
+        const hasRW = speakers.some(s => s?.role === 'RW' && s?.position);
+        const hasWides = hasLW || hasRW;
+
+        if (!hasWides) {
             return { 
                 status: 'disabled', 
                 level: '—', 
                 displayValue: '—',
-                debug: { hasWides: false }
+                debug: { hasWides: false, mlp: null, medianAzDeg: null, lwAzDeg: null, rwAzDeg: null, lwDevDeg: null, rwDevDeg: null, maxDevDeg: null }
             };
         }
 
-        // Use app.mlp if available, otherwise compute from seats
-        const mlpPoint = app?.mlp || null;
+        // Use the same MLP as Seat Reports (app.mlp or fallback to primarySeatingPosition)
+        const mlpPoint = app?.mlp || primarySeatingPosition || null;
 
         const result = computeP7Wides({ 
-            speakers: placedSpeakers, 
+            speakers: speakers, 
             seats: seats,
             mlpOverride: mlpPoint
         });
@@ -209,7 +218,7 @@ function RP22ReportInner() {
             details: result.details,
             debug: result.debug
         };
-    }, [placedSpeakers, seats, app?.enableFrontWides, app?.mlp]);
+    }, [app?.speakerSystem?.placedSpeakers, placedSpeakers, seats, app?.mlp, primarySeatingPosition]);
 
     // Helper: get room-level result for a parameter
     const getRoomResult = React.useCallback((paramId) => {
