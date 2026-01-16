@@ -104,6 +104,21 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     To ensure localisation accuracy, this metric is the maximum horizontal angular deviation allowed from the ideal median angular location for wide front speakers.
                                 </div>
                             </div>
+                        ) : parameter.id === 8 ? (
+                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="mb-1">Yes/No</div>
+                                <div className="mb-1">-</div>
+                                <div className="text-[9px] space-y-0.5">
+                                    <div>L1: Yes</div>
+                                    <div>L2: Yes</div>
+                                    <div>L3: No</div>
+                                    <div>L4: No</div>
+                                </div>
+                                <div className="text-[9px] mt-1">-</div>
+                                <div className="text-[9px] mt-1">
+                                    Absent the ability to install top (overhead) speakers, one solution is to employ upfiring/elevation (e.g., "Atmos Enabled") speakers aimed at a reflective ceiling surface to reproduce immersive content and audio objects. These speakers should have a suitable mechanical and electrical design.
+                                </div>
+                            </div>
                         ) : null}
                     </div>
                     
@@ -130,6 +145,16 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     style={{ color: '#213428' }}
                                 >
                                     0
+                                </span>
+                                {renderLevelBadge('L4')}
+                            </div>
+                        ) : parameter.id === 8 ? (
+                            <div className="flex justify-between items-center">
+                                <span 
+                                    className="text-sm font-bold"
+                                    style={{ color: '#213428' }}
+                                >
+                                    No
                                 </span>
                                 {renderLevelBadge('L4')}
                             </div>
