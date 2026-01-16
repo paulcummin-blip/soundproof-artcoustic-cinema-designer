@@ -59,103 +59,98 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                 
                 {/* ROW 3: Content + Result (flexible, result pinned to bottom) */}
                 <div className="px-6 pb-6 flex flex-col" style={{ height: '100%' }}>
-                    <div className="flex-1 pt-3">
-                        {/* Content area expands to fill available space */}
-                    </div>
-                    
-                    {/* Result row (pinned to bottom with mt-auto) */}
-                    <div className="mt-auto">
+                    {/* BodyTop: Detail content (fixed start point) */}
+                    <div style={{ paddingTop: '12px' }}>
                         {parameter.id === 2 && systemConfig ? (
-                            // P2: Discrete speaker count
-                            <div className="space-y-2">
-                                <div className="text-[10px] text-[#3E4349] leading-relaxed mb-2">
-                                    <div className="font-semibold mb-1">2. Decoder/renderer capability and discretely rendered speaker configuration, excl. subwoofers</div>
-                                    <div className="mb-1">Number discrete speakers</div>
-                                    <div className="text-[9px] space-y-0.5">
-                                        <div>Min.</div>
-                                        <div>Level 1: 5</div>
-                                        <div>Level 2: 11</div>
-                                        <div>Level 3: 15</div>
-                                        <div>Level 4: 15</div>
-                                        <div>Room</div>
-                                    </div>
-                                    <div className="text-[9px] mt-1">
-                                        Includes all listener-level and upper discrete processor outputs, though there are multiple combinations of speaker locations possible therein, depending on the room design and characteristics.
-                                    </div>
+                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="font-semibold mb-1">2. Decoder/renderer capability and discretely rendered speaker configuration, excl. subwoofers</div>
+                                <div className="mb-1">Number discrete speakers</div>
+                                <div className="text-[9px] space-y-0.5">
+                                    <div>Min.</div>
+                                    <div>Level 1: 5</div>
+                                    <div>Level 2: 11</div>
+                                    <div>Level 3: 15</div>
+                                    <div>Level 4: 15</div>
+                                    <div>Room</div>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span 
-                                        className="text-sm font-bold"
-                                        style={{
-                                            color: systemConfig.p2Level === 'L4' ? '#213428' :
-                                                   systemConfig.p2Level === 'L2' ? '#625143' :
-                                                   '#4A230F'
-                                        }}
-                                    >
-                                        {systemConfig.discreteSpeakerCount}
-                                    </span>
-                                    {renderLevelBadge(systemConfig.p2Level)}
+                                <div className="text-[9px] mt-1">
+                                    Includes all listener-level and upper discrete processor outputs, though there are multiple combinations of speaker locations possible therein, depending on the room design and characteristics.
                                 </div>
                             </div>
                         ) : parameter.id === 3 ? (
-                            // P3: Screen wall speakers outside recommended zones (always L4)
-                            <div className="space-y-2">
-                                <div className="text-[10px] text-[#3E4349] leading-relaxed mb-2">
-                                    <div className="font-semibold mb-1">3. Number of screen wall speakers allowed outside of recommended zonal locations</div>
-                                    <div className="mb-1">Number speakers</div>
-                                    <div className="text-[9px] space-y-0.5">
-                                        <div>L1: 0</div>
-                                        <div>L2: 0</div>
-                                        <div>L3: 0</div>
-                                        <div>L4: 0</div>
-                                    </div>
-                                    <div className="text-[9px] mt-1">
-                                        Speaker locations are not strict angle numbers. They are zones/areas resulting from multiple trade-offs and defining acceptable possible locations for a given screen wall speaker. Defined zones are wide enough to allow some flexibility in speaker locations within the recommended zone.
-                                    </div>
+                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="font-semibold mb-1">3. Number of screen wall speakers allowed outside of recommended zonal locations</div>
+                                <div className="mb-1">Number speakers</div>
+                                <div className="text-[9px] space-y-0.5">
+                                    <div>L1: 0</div>
+                                    <div>L2: 0</div>
+                                    <div>L3: 0</div>
+                                    <div>L4: 0</div>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span 
-                                        className="text-sm font-bold"
-                                        style={{ color: '#213428' }}
-                                    >
-                                        0
-                                    </span>
-                                    {renderLevelBadge('L4')}
+                                <div className="text-[9px] mt-1">
+                                    Speaker locations are not strict angle numbers. They are zones/areas resulting from multiple trade-offs and defining acceptable possible locations for a given screen wall speaker. Defined zones are wide enough to allow some flexibility in speaker locations within the recommended zone.
                                 </div>
                             </div>
                         ) : parameter.id === 7 && systemConfig ? (
-                            // P7: Front wide deviation from median
-                            <div className="space-y-2">
-                                <div className="text-[10px] text-[#3E4349] leading-relaxed mb-2">
-                                    <div className="font-semibold mb-1">7. Front wide speaker deviation from median</div>
-                                    <div className="mb-1">Maximum deviation</div>
-                                    <div className="text-[9px] space-y-0.5">
-                                        <div>L4: ≤ 2°</div>
-                                        <div>L3: ≤ 5°</div>
-                                        <div>L2: ≤ 7°</div>
-                                        <div>L1: ≤ 10°</div>
-                                    </div>
-                                    <div className="text-[9px] mt-1">
-                                        {systemConfig.status === 'disabled' 
-                                            ? 'Front wides not enabled in current layout.'
-                                            : 'Measured as maximum angular deviation of LW/RW from the median angle between FL-SL and FR-SR, as viewed from MLP.'}
-                                    </div>
+                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="font-semibold mb-1">7. Front wide speaker deviation from median</div>
+                                <div className="mb-1">Maximum deviation</div>
+                                <div className="text-[9px] space-y-0.5">
+                                    <div>L4: ≤ 2°</div>
+                                    <div>L3: ≤ 5°</div>
+                                    <div>L2: ≤ 7°</div>
+                                    <div>L1: ≤ 10°</div>
                                 </div>
-                                <div className="flex justify-between items-center">
-                                    <span 
-                                        className="text-sm font-bold"
-                                        style={{
-                                            color: systemConfig.level === 'L4' ? '#213428' :
-                                                   systemConfig.level === 'L3' ? '#3E4349' :
-                                                   systemConfig.level === 'L2' ? '#625143' :
-                                                   systemConfig.level === 'L1' ? '#4A230F' :
-                                                   '#000000'
-                                        }}
-                                    >
-                                        {systemConfig.displayValue}
-                                    </span>
-                                    {renderLevelBadge(systemConfig.level)}
+                                <div className="text-[9px] mt-1">
+                                    {systemConfig.status === 'disabled' 
+                                        ? 'Front wides not enabled in current layout.'
+                                        : 'Measured as maximum angular deviation of LW/RW from the median angle between FL-SL and FR-SR, as viewed from MLP.'}
                                 </div>
+                            </div>
+                        ) : null}
+                    </div>
+                    
+                    {/* BodyBottom: Result row (pinned to bottom) */}
+                    <div style={{ marginTop: 'auto', paddingTop: '12px' }}>
+                        {parameter.id === 2 && systemConfig ? (
+                            <div className="flex justify-between items-center">
+                                <span 
+                                    className="text-sm font-bold"
+                                    style={{
+                                        color: systemConfig.p2Level === 'L4' ? '#213428' :
+                                               systemConfig.p2Level === 'L2' ? '#625143' :
+                                               '#4A230F'
+                                    }}
+                                >
+                                    {systemConfig.discreteSpeakerCount}
+                                </span>
+                                {renderLevelBadge(systemConfig.p2Level)}
+                            </div>
+                        ) : parameter.id === 3 ? (
+                            <div className="flex justify-between items-center">
+                                <span 
+                                    className="text-sm font-bold"
+                                    style={{ color: '#213428' }}
+                                >
+                                    0
+                                </span>
+                                {renderLevelBadge('L4')}
+                            </div>
+                        ) : parameter.id === 7 && systemConfig ? (
+                            <div className="flex justify-between items-center">
+                                <span 
+                                    className="text-sm font-bold"
+                                    style={{
+                                        color: systemConfig.level === 'L4' ? '#213428' :
+                                               systemConfig.level === 'L3' ? '#3E4349' :
+                                               systemConfig.level === 'L2' ? '#625143' :
+                                               systemConfig.level === 'L1' ? '#4A230F' :
+                                               '#000000'
+                                    }}
+                                >
+                                    {systemConfig.displayValue}
+                                </span>
+                                {renderLevelBadge(systemConfig.level)}
                             </div>
                         ) : hasRoomResult ? (
                             <div className="flex justify-between items-center">
