@@ -29,7 +29,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
     };
 
     return (
-        <Card className="border bg-white border-[#DCDBD6]">
+        <Card className="border bg-white border-[#DCDBD6] h-full flex flex-col">
             <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -45,13 +45,13 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                     </div>
                 </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex-1 flex flex-col">
                 <div 
-                    className="space-y-3"
+                    className="space-y-3 flex-1 flex flex-col"
                     style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}
                 >
                     {/* Room/System Value */}
-                    <div className="border-b border-[#E6E4DD] pb-3">
+                    <div className="border-b border-[#E6E4DD] pb-3 mt-auto">
                         <div className="text-xs font-medium text-[#3E4349] mb-2">
                             {isSeatScoped ? 'Overall (Room)' : 'System Metric'}
                         </div>
