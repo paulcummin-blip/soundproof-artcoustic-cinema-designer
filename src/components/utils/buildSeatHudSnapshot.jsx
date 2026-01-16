@@ -136,10 +136,12 @@ export function buildSeatHudSnapshot({
   // RP23 horizontal viewing angle
   let rp23AngleDeg = null;
   let rp23Level = null;
+  let rp23DisplayDeg = null; // Floored integer for display
   if (screen?.visibleWidthInches && distanceToScreen > 0.1) {
     const screenWidthM = (screen.visibleWidthInches * 0.0254) || 0;
     if (screenWidthM > 0) {
       rp23AngleDeg = 2 * Math.atan((screenWidthM / 2) / distanceToScreen) * (180 / Math.PI);
+      rp23DisplayDeg = Math.floor(rp23AngleDeg);
       
       if (rp23AngleDeg >= 48 && rp23AngleDeg <= 67) rp23Level = 'L4';
       else if (rp23AngleDeg >= 45 && rp23AngleDeg <= 70) rp23Level = 'L3';
@@ -165,8 +167,9 @@ export function buildSeatHudSnapshot({
     distanceToMLP: Number.isFinite(distanceToMLP) ? `${distanceToMLP.toFixed(2)}m` : '—',
     rp23: {
       angleDeg: rp23AngleDeg,
+      displayDeg: rp23DisplayDeg, // Floored integer
       level: rp23Level,
-      formatted: Number.isFinite(rp23AngleDeg) ? `${rp23AngleDeg.toFixed(1)}°` : '—',
+      formatted: Number.isFinite(rp23DisplayDeg) ? `${rp23DisplayDeg}°` : '—',
     }
   };
 
@@ -277,7 +280,7 @@ export function buildSeatHudSnapshot({
 
         perSpeaker.push({
           role: canon,
-          angleDeg: Math.floor(offAxisDeg),
+          angleDeg: Math.floor(offAxisDeg), // Already floored
           rawAngleDeg: offAxisDeg,
           lossLabel,
           level,
@@ -455,7 +458,7 @@ export function buildSeatHudSnapshot({
         
         perSpeaker.push({
           role: canon,
-          angleDeg: offAxisDegInt,
+          angleDeg: offAxisDegInt, // Already floored integer
           rawAngleDeg: offAxisDegInt,
           lossDb: Math.round(lossDb * 10) / 10,
           isBeyondNonLcrLimit,
@@ -649,7 +652,7 @@ export function buildSeatHudSnapshot({
     
     if (Number.isFinite(p5Val)) {
       p5Level = rp22LevelForP5_NoWrap(p5Val);
-      p5Formatted = `${p5Val.toFixed(1)}°`;
+      p5Formatted = `${Math.floor(p5Val)}°`;
     }
   }
   // Publish P5 to HUD
