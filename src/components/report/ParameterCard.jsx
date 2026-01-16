@@ -24,8 +24,8 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
 
     // Level badge helper
     const renderLevelBadge = (lvl) => {
-        if (!lvl || lvl === '—') return <Badge variant="outline" className="text-xs">—</Badge>;
-        return <RP22GradingPill level={typeof lvl === 'string' ? parseInt(lvl.replace('L', '')) : lvl} />;
+        if (!lvl || lvl === '—') return <RP22GradingPill level="—" />;
+        return <RP22GradingPill level={lvl || '—'} />;
     };
 
     return (
