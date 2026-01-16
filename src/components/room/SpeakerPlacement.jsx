@@ -3008,6 +3008,11 @@ function SpeakerPlacementImpl(props) {
             allSeatSplMetrics={allSeatSplMetrics}
             mlpSeat={mlpSeat}
             dolbyLayout={effectivePreset}
+            placedSpeakers={placedSpeakers}
+            mlpPoint={mlpPoint}
+            roomDims={effectiveDims}
+            setSpeakers={setSpeakers}
+            disabled={disabled}
           />
           
           {(() => {
