@@ -113,6 +113,40 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     {renderLevelBadge('L4')}
                                 </div>
                             </div>
+                        ) : parameter.id === 7 && systemConfig ? (
+                            // P7: Front wide deviation from median
+                            <div className="space-y-2">
+                                <div className="text-[10px] text-[#3E4349] leading-relaxed mb-2">
+                                    <div className="font-semibold mb-1">7. Front wide speaker deviation from median</div>
+                                    <div className="mb-1">Maximum deviation</div>
+                                    <div className="text-[9px] space-y-0.5">
+                                        <div>L4: ≤ 2°</div>
+                                        <div>L3: ≤ 5°</div>
+                                        <div>L2: ≤ 7°</div>
+                                        <div>L1: ≤ 10°</div>
+                                    </div>
+                                    <div className="text-[9px] mt-1">
+                                        {systemConfig.status === 'disabled' 
+                                            ? 'Front wides not enabled in current layout.'
+                                            : 'Measured as maximum angular deviation of LW/RW from the median angle between FL-SL and FR-SR, as viewed from MLP.'}
+                                    </div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span 
+                                        className="text-sm font-bold"
+                                        style={{
+                                            color: systemConfig.level === 'L4' ? '#213428' :
+                                                   systemConfig.level === 'L3' ? '#3E4349' :
+                                                   systemConfig.level === 'L2' ? '#625143' :
+                                                   systemConfig.level === 'L1' ? '#4A230F' :
+                                                   '#000000'
+                                        }}
+                                    >
+                                        {systemConfig.displayValue}
+                                    </span>
+                                    {renderLevelBadge(systemConfig.level)}
+                                </div>
+                            </div>
                         ) : hasRoomResult ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-[#213428] font-medium">

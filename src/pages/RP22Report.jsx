@@ -12,6 +12,7 @@ import { computeMLPAndPrimary } from '../components/utils/computeMLPAndPrimary';
 import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
+import { computeP7Wides } from '../components/utils/p7WideAnalysis';
 
 
 function RP22ReportInner() {
@@ -178,6 +179,28 @@ function RP22ReportInner() {
         };
     }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
 
+    // Compute P7: Front wide deviation from median
+    const p7Config = React.useMemo(() => {
+        // Check if front wides are enabled in the current layout
+        const enableFrontWides = app?.enableFrontWides ?? false;
+        
+        if (!enableFrontWides) {
+            return { status: 'disabled', level: '—', displayValue: '—' };
+        }
+
+        const result = computeP7Wides({ 
+            speakers: placedSpeakers, 
+            seats: seats 
+        });
+
+        return {
+            status: 'ok',
+            level: result.level || 'FAIL',
+            displayValue: result.displayValue || '—',
+            details: result.details
+        };
+    }, [placedSpeakers, seats, app?.enableFrontWides]);
+
     // Helper: get room-level result for a parameter
     const getRoomResult = React.useCallback((paramId) => {
         return analysisResult?.gradedParameters?.primary?.[paramId] ?? null;
@@ -280,7 +303,7 @@ function RP22ReportInner() {
                                     parameter={param}
                                     roomResult={getRoomResult(param.id)}
                                     seatResults={getSeatResults(param.id)}
-                                    systemConfig={param.id === 2 ? p2SystemConfig : null}
+                                    systemConfig={param.id === 2 ? p2SystemConfig : param.id === 7 ? p7Config : null}
                                 />
                             ))}
                         </div>

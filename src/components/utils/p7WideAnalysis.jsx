@@ -20,13 +20,14 @@ function circDelta(a, b) {
   return d > 180 ? 360 - d : d; // minimal angular difference
 }
 
-// RP22 P7 thresholds (degrees)
+// RP22 P7 thresholds (degrees) - updated to match RP22 spec
 export function levelForP7(devDeg) {
-  if (!N(devDeg)) return 1;
-  if (devDeg <= 5)  return 4; // Excellent
-  if (devDeg <= 10) return 3; // Good
-  if (devDeg <= 15) return 2; // Acceptable
-  return 1;                    // Poor
+  if (!N(devDeg)) return 'FAIL';
+  if (devDeg <= 2)  return 'L4';
+  if (devDeg <= 5)  return 'L3';
+  if (devDeg <= 7)  return 'L2';
+  if (devDeg <= 10) return 'L1';
+  return 'FAIL';
 }
 
 /**
@@ -67,28 +68,36 @@ export function computeP7Wides({ speakers = [], seats = [] }) {
   const devLW = (LW != null && targetLeft  != null) ? circDelta(LW, targetLeft)   : null;
   const devRW = (RW != null && targetRight != null) ? circDelta(RW, targetRight)  : null;
 
-  const lvlLW = devLW != null ? levelForP7(devLW) : 1;
-  const lvlRW = devRW != null ? levelForP7(devRW) : 1;
+  const lvlLW = devLW != null ? levelForP7(devLW) : 'FAIL';
+  const lvlRW = devRW != null ? levelForP7(devRW) : 'FAIL';
 
-  const level = Math.min(lvlLW, lvlRW);
+  // Worst level wins (L4 > L3 > L2 > L1 > FAIL)
+  const levelOrder = { 'L4': 4, 'L3': 3, 'L2': 2, 'L1': 1, 'FAIL': 0 };
+  const level = levelOrder[lvlLW] < levelOrder[lvlRW] ? lvlLW : lvlRW;
+
+  // Max deviation for display
+  const maxDev = Math.max(devLW ?? 0, devRW ?? 0);
+  const displayValue = Number.isFinite(maxDev) ? `±${Math.floor(maxDev)}°` : '—';
 
   return {
     details: {
       LW: { targetAngle: targetLeft,  actualAngle: LW, deviation: devLW },
       RW: { targetAngle: targetRight, actualAngle: RW, deviation: devRW },
     },
-    level
+    level,
+    maxDeviation: maxDev,
+    displayValue
   };
 }
 
 /**
  * Attach P7 into an existing engine result shape:
- * - engine.gradedParameters.primary[7] = { level }
+ * - engine.gradedParameters.primary[7] = { level, formatted }
  * - engine.p7Details = { LW:{...}, RW:{...} }
  */
 export function attachP7ToEngine(engine, speakers, seats) {
   const base = engine || {};
-  const { details, level } = computeP7Wides({ speakers, seats });
+  const { details, level, displayValue } = computeP7Wides({ speakers, seats });
   const gp = base.gradedParameters || {};
   const primary = gp.primary || {};
 
@@ -99,7 +108,7 @@ export function attachP7ToEngine(engine, speakers, seats) {
       ...gp,
       primary: {
         ...primary,
-        7: { level }
+        7: { level, formatted: displayValue }
       }
     }
   };
