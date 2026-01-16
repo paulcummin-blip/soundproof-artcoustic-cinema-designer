@@ -1,15 +1,5 @@
-// Safe inputs, no bare mlp usage
-
-const CANONICAL_ROLE_MAP = {
-  'SL': 'SL', 'LS': 'SL',
-  'SR': 'SR', 'RS': 'SR',
-  'FL': 'FL', 'L': 'FL',
-  'FR': 'FR', 'R': 'FR',
-};
-
-function getCanonicalRole(role) {
-  return CANONICAL_ROLE_MAP[String(role || '').toUpperCase()] || String(role || '').toUpperCase();
-}
+// REFACTORED: Now uses canonical frontWideMedian helper
+import { computeFrontWideMedianData } from './frontWideMedian';
 
 export function computeFrontWideZonesStrict({
   mlpPoint,
@@ -23,28 +13,33 @@ export function computeFrontWideZonesStrict({
     return { status: 'disabled' };
   }
 
-  // Guard: no MLP
-  if (!mlpPoint || !Number.isFinite(mlpPoint.x) || !Number.isFinite(mlpPoint.y)) {
-    return { status: 'no-mlp' };
+  // Call canonical median helper
+  const medianData = computeFrontWideMedianData({
+    mlpPoint,
+    placedSpeakers,
+    roomDims: { widthM: dimensions?.width || 0, lengthM: dimensions?.length || 0 },
+    wallInset: 0.05
+  });
+
+  // Pass through any errors
+  if (medianData.status !== 'ok') {
+    return { status: medianData.status, reason: medianData.reason };
   }
 
-  // Guard: invalid room dimensions
-  const W = Number(dimensions?.width) || 0;
-  const L = Number(dimensions?.length) || 0;
-  if (!(W > 0 && L > 0)) {
-    return { status: 'invalid-geom', reason: 'room dims' };
-  }
-
-  const fl = placedSpeakers?.find(s => getCanonicalRole(s?.role) === 'FL');
-  const fr = placedSpeakers?.find(s => getCanonicalRole(s?.role) === 'FR');
-  const sl = placedSpeakers?.find(s => getCanonicalRole(s?.role) === 'SL');
-  const sr = placedSpeakers?.find(s => getCanonicalRole(s?.role) === 'SR');
-
-  if (!fl || !fr || !sl || !sr) {
-    return { status: 'no-sides', reason: 'missing FL/FR/SL/SR' };
-  }
-
+  // Check if side surrounds are on walls (validation)
+  const W = dimensions?.width || 0;
   const WALL_BUFFER_M = 0.01;
+  
+  const normalizeRole = (role) => {
+    const r = String(role || '').toUpperCase();
+    if (r === 'SL' || r === 'LS') return 'SL';
+    if (r === 'SR' || r === 'RS') return 'SR';
+    return null;
+  };
+  
+  const sl = placedSpeakers?.find(s => normalizeRole(s?.role) === 'SL');
+  const sr = placedSpeakers?.find(s => normalizeRole(s?.role) === 'SR');
+  
   const isOnSideWall = (speaker, side) => {
     if (!speaker || !speaker.position) return false;
     const dims = getModelDimsM ? getModelDimsM(speaker.model) : { depthM: 0.082 };
@@ -62,49 +57,49 @@ export function computeFrontWideZonesStrict({
     return { status: 'no-sides', reason: 'SL/SR not on side walls' };
   }
 
+  // Build zone data from canonical median
   const deg2rad = (d) => d * Math.PI / 180;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
-
+  
+  const L = dimensions?.length || 0;
   const xWallL = 0.01;
   const xWallR = W - 0.01;
-
-  const mlpX = Number(mlpPoint.x);
-  const mlpY = Number(mlpPoint.y);
-
-  const computeSide = (F, S, xWall, sideName) => {
-    const midX = (F.position.x + S.position.x) / 2;
-    const midY = (F.position.y + S.position.y) / 2;
-
-    const theta = Math.atan2(midY - mlpY, midX - mlpX);
-    const thetaDeg = theta * 180 / Math.PI;
-
-    const thetaMin = theta - deg2rad(10);
-    const thetaMax = theta + deg2rad(10);
-
-    const dx = xWall - mlpX;
-    const yMed = mlpY + dx * Math.tan(theta);
-    const yLo = mlpY + dx * Math.tan(thetaMin);
-    const yHi = mlpY + dx * Math.tan(thetaMax);
-
-    const yMin = clamp(Math.min(yLo, yHi), 0, L);
-    const yMax = clamp(Math.max(yLo, yHi), 0, L);
-    const medianY = clamp(yMed, 0, L);
-
-    if (typeof console !== 'undefined' && console.log) {
-      console.log(`[FW] ${sideName} yMin=${yMin.toFixed(3)}..yMax=${yMax.toFixed(3)} @ median=${medianY.toFixed(3)}`,
-        `inputs: F.y=${F.position.y.toFixed(3)}, S.y=${S.position.y.toFixed(3)}, MLP.y=${mlpY.toFixed(3)}, θ=${thetaDeg.toFixed(1)}°`);
-    }
-
-    return {
-      status: 'ok',
-      yMin,
-      yMax,
-      medianY
-    };
+  const mlpX = mlpPoint.x;
+  const mlpY = mlpPoint.y;
+  
+  // LEFT zone: ±10° around median azimuth
+  const leftMedianRad = medianData.left.medianAz * Math.PI / 180;
+  const leftMinRad = leftMedianRad - deg2rad(10);
+  const leftMaxRad = leftMedianRad + deg2rad(10);
+  
+  const dx_left = xWallL - mlpX;
+  const leftYMed = mlpY + dx_left * Math.tan(leftMedianRad);
+  const leftYLo = mlpY + dx_left * Math.tan(leftMinRad);
+  const leftYHi = mlpY + dx_left * Math.tan(leftMaxRad);
+  
+  const leftZone = {
+    status: 'ok',
+    yMin: clamp(Math.min(leftYLo, leftYHi), 0, L),
+    yMax: clamp(Math.max(leftYLo, leftYHi), 0, L),
+    medianY: clamp(leftYMed, 0, L)
   };
-
-  const leftZone = computeSide(fl, sl, xWallL, 'L');
-  const rightZone = computeSide(fr, sr, xWallR, 'R');
+  
+  // RIGHT zone: ±10° around median azimuth
+  const rightMedianRad = medianData.right.medianAz * Math.PI / 180;
+  const rightMinRad = rightMedianRad - deg2rad(10);
+  const rightMaxRad = rightMedianRad + deg2rad(10);
+  
+  const dx_right = xWallR - mlpX;
+  const rightYMed = mlpY + dx_right * Math.tan(rightMedianRad);
+  const rightYLo = mlpY + dx_right * Math.tan(rightMinRad);
+  const rightYHi = mlpY + dx_right * Math.tan(rightMaxRad);
+  
+  const rightZone = {
+    status: 'ok',
+    yMin: clamp(Math.min(rightYLo, rightYHi), 0, L),
+    yMax: clamp(Math.max(rightYLo, rightYHi), 0, L),
+    medianY: clamp(rightYMed, 0, L)
+  };
 
   return {
     status: 'ok',
