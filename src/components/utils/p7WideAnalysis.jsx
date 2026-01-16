@@ -31,42 +31,80 @@ export function levelForP7(devDeg) {
 }
 
 /**
- * Compute P7 details:
- * - TargetLeft  = median angle of L and LS
- * - TargetRight = median angle of R and RS
- * - Actual      = LW / RW azimuth
- * - Deviation   = |Actual - Target| (circular)
- * Returns { details: { LW:{targetAngle, actualAngle, deviation}, RW:{...} }, level }
+ * Compute P7 details using MLP → wide speaker midpoint approach
+ * - medianPoint = midpoint of LW and RW positions
+ * - medianAzDeg = azimuth from MLP to medianPoint
+ * - lwAzDeg, rwAzDeg = azimuths from MLP to each wide
+ * - Deviation = |actualAz - medianAz| (circular)
+ * Returns { details, level, maxDeviation, displayValue, debug }
  */
-export function computeP7Wides({ speakers = [], seats = [] }) {
+export function computeP7Wides({ speakers = [], seats = [], mlpOverride = null }) {
   const spk = A(speakers);
-  const mlp = pickMLP(A(seats)) || null;
-  if (!mlp) return { details: null, level: 1 };
+  const mlp = mlpOverride || pickMLP(A(seats)) || null;
+  
+  // Debug object for all intermediate values
+  const debug = {
+    hasWides: false,
+    mlp: mlp ? { x: mlp.x, y: mlp.y } : null,
+    medianAzDeg: null,
+    lwAzDeg: null,
+    rwAzDeg: null,
+    lwDevDeg: null,
+    rwDevDeg: null,
+    maxDevDeg: null,
+  };
+
+  if (!mlp) {
+    return { 
+      details: null, 
+      level: 'FAIL', 
+      maxDeviation: null,
+      displayValue: '—',
+      debug
+    };
+  }
 
   const byRole = new Map(spk.map(s => [String(s?.role || '').toUpperCase(), s]));
 
-  const pos = (role) => byRole.get(role)?.position || null;
-  const az  = (role) => {
-    const p = pos(role);
-    const a = azimuthFromMLP(mlp, p);
-    return N(a) ? a : null;
+  const posLW = byRole.get('LW')?.position || null;
+  const posRW = byRole.get('RW')?.position || null;
+
+  // Check if wides are present
+  const hasLW = posLW && N(posLW.x) && N(posLW.y);
+  const hasRW = posRW && N(posRW.x) && N(posRW.y);
+  debug.hasWides = hasLW && hasRW;
+
+  if (!hasLW || !hasRW) {
+    return {
+      details: null,
+      level: 'FAIL',
+      maxDeviation: null,
+      displayValue: '—',
+      debug
+    };
+  }
+
+  // Compute median point (midpoint of LW and RW)
+  const medianPoint = {
+    x: (posLW.x + posRW.x) / 2,
+    y: (posLW.y + posRW.y) / 2
   };
 
-  // Required anchors (try best-effort fallbacks on each side)
-  const L  = az('L');
-  const R  = az('R');
-  const LS = az('LS') ?? az('LSS') ?? az('LRS') ?? az('LBS'); // any left surround family
-  const RS = az('RS') ?? az('RSS') ?? az('RRS') ?? az('RBS'); // any right surround family
+  // Compute azimuths
+  const medianAz = azimuthFromMLP(mlp, medianPoint);
+  const lwAz = azimuthFromMLP(mlp, posLW);
+  const rwAz = azimuthFromMLP(mlp, posRW);
 
-  // If either side is missing a pair, we can't evaluate that side
-  const targetLeft  = (L  != null && LS != null) ? (L + LS) / 2 : null;
-  const targetRight = (R  != null && RS != null) ? (R + RS) / 2 : null;
+  debug.medianAzDeg = N(medianAz) ? Math.floor(medianAz) : null;
+  debug.lwAzDeg = N(lwAz) ? Math.floor(lwAz) : null;
+  debug.rwAzDeg = N(rwAz) ? Math.floor(rwAz) : null;
 
-  const LW = az('LW');
-  const RW = az('RW');
+  // Compute deviations (circular delta)
+  const devLW = (N(lwAz) && N(medianAz)) ? circDelta(lwAz, medianAz) : null;
+  const devRW = (N(rwAz) && N(medianAz)) ? circDelta(rwAz, medianAz) : null;
 
-  const devLW = (LW != null && targetLeft  != null) ? circDelta(LW, targetLeft)   : null;
-  const devRW = (RW != null && targetRight != null) ? circDelta(RW, targetRight)  : null;
+  debug.lwDevDeg = N(devLW) ? Math.floor(devLW * 10) / 10 : null;
+  debug.rwDevDeg = N(devRW) ? Math.floor(devRW * 10) / 10 : null;
 
   const lvlLW = devLW != null ? levelForP7(devLW) : 'FAIL';
   const lvlRW = devRW != null ? levelForP7(devRW) : 'FAIL';
@@ -77,16 +115,19 @@ export function computeP7Wides({ speakers = [], seats = [] }) {
 
   // Max deviation for display
   const maxDev = Math.max(devLW ?? 0, devRW ?? 0);
+  debug.maxDevDeg = N(maxDev) ? Math.floor(maxDev * 10) / 10 : null;
+  
   const displayValue = Number.isFinite(maxDev) ? `±${Math.floor(maxDev)}°` : '—';
 
   return {
     details: {
-      LW: { targetAngle: targetLeft,  actualAngle: LW, deviation: devLW },
-      RW: { targetAngle: targetRight, actualAngle: RW, deviation: devRW },
+      LW: { targetAngle: medianAz, actualAngle: lwAz, deviation: devLW },
+      RW: { targetAngle: medianAz, actualAngle: rwAz, deviation: devRW },
     },
     level,
     maxDeviation: maxDev,
-    displayValue
+    displayValue,
+    debug
   };
 }
 
