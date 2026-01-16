@@ -338,26 +338,26 @@ function RP22ReportInner() {
 
                                                 {/* RP22 Per-Seat Parameters */}
                                                 {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
-                                                    const metric = rp22Raw[key];
-                                                    const paramNum = parseInt(key.substring(1));
+                                                   const metric = rp22Raw[key];
+                                                   const paramNum = parseInt(key.substring(1));
 
-                                                    return (
-                                                        <div key={key}>
-                                                            <div className="flex justify-between items-center">
-                                                                <span className="font-medium text-[#3E4349]">
-                                                                    P{paramNum}:
-                                                                </span>
-                                                                <div className="flex items-center gap-2">
-                                                                    {metric ? (
-                                                                        <>
-                                                                            <span className="text-[#1B1A1A]">{metric.formatted || metric.hudLabel || '—'}</span>
-                                                                            {renderBadge(metric.level)}
-                                                                        </>
-                                                                    ) : (
-                                                                       <span className="text-xs text-gray-400">—</span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
+                                                   return (
+                                                       <div key={key}>
+                                                           <div className="flex justify-between items-center">
+                                                               <span className="font-medium text-[#3E4349]">
+                                                                   P{paramNum}:
+                                                               </span>
+                                                               <div className="flex items-center gap-2">
+                                                                   {metric ? (
+                                                                       <>
+                                                                           <span className="text-[#1B1A1A]">{metric.formatted || metric.hudLabel || '—'}</span>
+                                                                           {renderBadge(typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—'))}
+                                                                       </>
+                                                                   ) : (
+                                                                      <span className="text-xs text-gray-400">—</span>
+                                                                   )}
+                                                               </div>
+                                                           </div>
 
                                                             {/* P16 breakdown */}
                                                             {metric && key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
