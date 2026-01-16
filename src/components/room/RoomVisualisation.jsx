@@ -3848,11 +3848,27 @@ React.useEffect(() => {
 
     // Build cheap signature to detect actual changes (prevents spam updates)
     const seatIds = seatingPositions.map(s => s.id).join(',');
-    const speakerCount = placedSpeakers?.length || 0;
+    const seatPosFingerprint = seatingPositions
+      .map(s => `${s.id}:${Math.round((s.x || 0) * 100)}:${Math.round((s.y || 0) * 100)}`)
+      .join(',');
+    
+    // P5-relevant speaker positions fingerprint (surrounds/wides that affect P5)
+    const p5Roles = ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'];
+    const speakerPosFingerprint = (placedSpeakers || [])
+      .filter(s => s?.position && p5Roles.includes(getCanonicalRole(s.role)))
+      .map(s => ({
+        role: getCanonicalRole(s.role),
+        x: Math.round((s.position.x || 0) * 100),
+        y: Math.round((s.position.y || 0) * 100),
+      }))
+      .sort((a, b) => a.role.localeCompare(b.role))
+      .map(s => `${s.role}:${s.x}:${s.y}`)
+      .join(',');
+    
     const layout = dolbyLayout || '5.1';
     const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
-    const mlpRp23 = mlp ? Math.floor((mlp.y || 0) * 100) : 0; // Coarse MLP position
-    const signature = `${seatIds}|${speakerCount}|${layout}|${aimFlags}|${mlpRp23}`;
+    const mlpRp23 = mlp ? Math.floor((mlp.y || 0) * 100) : 0;
+    const signature = `${seatIds}|${seatPosFingerprint}|${speakerPosFingerprint}|${layout}|${aimFlags}|${mlpRp23}`;
     
     // Skip if nothing changed
     if (lastCacheSignatureRef.current === signature) {
