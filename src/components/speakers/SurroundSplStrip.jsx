@@ -2,12 +2,22 @@ import React, { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Volume2 } from 'lucide-react';
 import { formatDb } from '@/components/utils/formatDb';
+import MedianAngleReset from './MedianAngleReset';
 
 /**
  * Displays SPL @ MLP for surround speakers.
  * Groups: Side Surrounds, Rear Surrounds (for 7.x+), Front Wides (for 9.x)
  */
-export default function SurroundSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayout }) {
+export default function SurroundSplStrip({ 
+  allSeatSplMetrics, 
+  mlpSeat, 
+  dolbyLayout,
+  placedSpeakers,
+  mlpPoint,
+  roomDims,
+  setSpeakers,
+  disabled = false
+}) {
   const mlpSplData = useMemo(() => {
     if (!allSeatSplMetrics) return null;
     
@@ -87,6 +97,13 @@ export default function SurroundSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayo
 
   return (
     <div className="space-y-2">
+      <MedianAngleReset
+        placedSpeakers={placedSpeakers}
+        mlpPoint={mlpPoint}
+        roomDims={roomDims}
+        setSpeakers={setSpeakers}
+        disabled={disabled}
+      />
       <div className="text-xs font-medium text-[#625143] mb-2">SPL @ MLP</div>
       <div className="grid grid-cols-3 gap-2">
         {groups.map(group => {
