@@ -2254,7 +2254,7 @@ function RoomDesignerWithState() {
     placedSpeakers
   ]);
 
-  // ✅ Move analysisResult AFTER frontWideZones (now has overlay truth available)
+  // ✅ analysisResult uses internal overlay calculation (no props needed)
   const analysisResult = useRP22AnalysisEngine({
     placedSpeakers: placedSpeakers,
     seatingPositions: _seatingPositions,
@@ -2262,9 +2262,6 @@ function RoomDesignerWithState() {
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
     mlpBasis: _mlpBasis,
     mlpPointOverride: mlpAnchorEffective, // Use same MLP as FW overlay (green dot)
-    frontWideMedianYLeft: frontWideZones?.status === "ok" ? frontWideZones?.left?.medianY : null,
-    frontWideMedianYRight: frontWideZones?.status === "ok" ? frontWideZones?.right?.medianY : null,
-    roomWidthM: Number(stableDimensions?.width) || null,
     seatSplMetrics: allSeatSplMetrics,
     overheadState: {
       globalModel: _overheadGlobalModel,

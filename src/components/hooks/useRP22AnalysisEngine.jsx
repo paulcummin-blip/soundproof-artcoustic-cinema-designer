@@ -10,6 +10,7 @@ import { computeScreenVarianceMetrics, computeWideSurroundUpperVarianceMetrics, 
 import { computeP16ForSeat, computeP17ForAllSeats } from "../utils/rp22HfOffAxis";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { getSeatSplMetrics } from '@/components/utils/spl/centralSplEngine';
+import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
@@ -74,18 +75,18 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
   };
 }
 
-function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPointOverride = null, frontWideMedianYLeft = null, frontWideMedianYRight = null, roomWidthM = null) {
+function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPointOverride = null, dimensions = null) {
   const seatsWithRoles = computeSeatRoles(asArr(seating));
   const primarySeats = seatsWithRoles.filter(s => s.isPrimary);
   const src = primarySeats.length ? primarySeats : seatsWithRoles;
   
   // Use passed mlpPoint (green dot) if available, else fall back to seat-based MLP
-  const mlp = mlpPointOverride && Number.isFinite(mlpPointOverride.x) && Number.isFinite(mlpPointOverride.y)
+  const mlpUsed = mlpPointOverride && Number.isFinite(mlpPointOverride.x) && Number.isFinite(mlpPointOverride.y)
     ? mlpPointOverride
     : pickMLP(mlpBasis, src);
   
   // NULL-SAFE GUARD
-  if (!mlp || !Number.isFinite(mlp.x) || !Number.isFinite(mlp.y)) {
+  if (!mlpUsed || !Number.isFinite(mlpUsed.x) || !Number.isFinite(mlpUsed.y)) {
     return { number: 7, title: RP22_CATALOG["7"].title, level: null, value: null, unit: RP22_CATALOG["7"].unit, overlay: null, note: "Front Wide angular deviation", deviation: null, perSide: null, status: "no_data" };
   }
 
@@ -121,13 +122,6 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
   const LW = findSpeaker('LW');
   const RW = findSpeaker('RW');
 
-  // Check if we have overlay truth available
-  const hasOverlayTruth = 
-    isNum(frontWideMedianYLeft) && 
-    isNum(frontWideMedianYRight) && 
-    isNum(roomWidthM) && 
-    roomWidthM > 0;
-
   // Helper for azimuth calculation (0° = +Y, 90° = +X)
   const azimuthDeg = (from, to) => {
     if (!from || !to || !isNum(from.x) || !isNum(from.y) || !isNum(to.x) || !isNum(to.y)) return NaN;
@@ -145,69 +139,93 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
   };
 
   // ═══════════════════════════════════════════════════════════════════════════
-  // NEW PATH: Use overlay median truth when available
+  // NEW PATH: Compute overlay median truth internally (same util as overlay)
   // ═══════════════════════════════════════════════════════════════════════════
-  if (hasOverlayTruth && LW && RW) {
-    const WALL_INSET = 0.01; // Same as reset button and overlay
+  if (LW && RW && dimensions) {
+    const roomWidthM = Number(dimensions.widthM || dimensions.width);
+    const roomLengthM = Number(dimensions.lengthM || dimensions.length);
     
-    const idealLWPoint = { x: WALL_INSET, y: frontWideMedianYLeft };
-    const idealRWPoint = { x: roomWidthM - WALL_INSET, y: frontWideMedianYRight };
-    
-    const azActualLW = azimuthDeg(mlp, LW.position);
-    const azIdealLW = azimuthDeg(mlp, idealLWPoint);
-    const devLW = circDelta(azActualLW, azIdealLW);
-    
-    const azActualRW = azimuthDeg(mlp, RW.position);
-    const azIdealRW = azimuthDeg(mlp, idealRWPoint);
-    const devRW = circDelta(azActualRW, azIdealRW);
-    
-    const validDevs = [devLW, devRW].filter(v => isNum(v));
-    if (validDevs.length === 0) {
-      return {
-        number: 7,
-        title: RP22_CATALOG["7"].title,
-        level: null,
-        value: null,
-        unit: RP22_CATALOG["7"].unit,
-        overlay: null,
-        note: "Front Wide deviation (overlay median)",
-        deviation: null,
-        perSide: null,
-        status: "no_data"
-      };
+    if (isNum(roomWidthM) && roomWidthM > 0 && isNum(roomLengthM) && roomLengthM > 0) {
+      try {
+        // Call the SAME utility the overlay uses
+        const fwZones = computeFrontWideZonesStrict({
+          mlpPoint: mlpUsed,
+          dimensions: { width: roomWidthM, length: roomLengthM },
+          placedSpeakers: speakers,
+          getModelDims: getSpeakerModelMeta,
+          rp22BoundDeg: 10
+        });
+        
+        // If overlay truth is valid, use it
+        if (fwZones?.status === 'ok' && 
+            fwZones?.left?.status === 'ok' && 
+            fwZones?.right?.status === 'ok' &&
+            isNum(fwZones.left.medianY) && 
+            isNum(fwZones.right.medianY)) {
+          
+          // CRITICAL: Use actual speaker X (not hardcoded wall inset)
+          // This eliminates the final 2.2° because ideal X now matches where reset places the speaker
+          const idealLWPoint = { 
+            x: LW.position.x,  // Use actual speaker X
+            y: fwZones.left.medianY 
+          };
+          const idealRWPoint = { 
+            x: RW.position.x,  // Use actual speaker X
+            y: fwZones.right.medianY 
+          };
+          
+          const azActualLW = azimuthDeg(mlpUsed, LW.position);
+          const azIdealLW = azimuthDeg(mlpUsed, idealLWPoint);
+          const devLW = circDelta(azActualLW, azIdealLW);
+          
+          const azActualRW = azimuthDeg(mlpUsed, RW.position);
+          const azIdealRW = azimuthDeg(mlpUsed, idealRWPoint);
+          const devRW = circDelta(azActualRW, azIdealRW);
+          
+          const validDevs = [devLW, devRW].filter(v => isNum(v));
+          if (validDevs.length > 0) {
+            const maxDev = Math.max(...validDevs);
+            
+            // Grade using RP22 thresholds
+            const p7CatalogEntry = RP22_CATALOG["7"];
+            const lvlP7 = p7CatalogEntry.levels;
+            let level7 = 1;
+            if (lvlP7.L4 != null && maxDev <= lvlP7.L4) level7 = 4;
+            else if (lvlP7.L3 != null && maxDev <= lvlP7.L3) level7 = 3;
+            else if (lvlP7.L2 != null && maxDev <= lvlP7.L2) level7 = 2;
+            
+            return {
+              number: 7,
+              title: p7CatalogEntry.title,
+              level: level7,
+              value: Number(maxDev.toFixed(1)),
+              unit: p7CatalogEntry.unit,
+              overlay: null,
+              note: "Deviation from RP22 median (overlay truth)",
+              deviation: maxDev,
+              perSide: {
+                LW: { deviation: devLW, targetAngle: azIdealLW, actualAngle: azActualLW },
+                RW: { deviation: devRW, targetAngle: azIdealRW, actualAngle: azActualRW }
+              },
+              status: "ok",
+              p7MlpUsed: { x: mlpUsed.x, y: mlpUsed.y },
+              p7MlpSource: mlpPointOverride ? "override" : "seat",
+              // Debug verification
+              p7IdealSource: "overlayTruth",
+              p7IdealLW: idealLWPoint,
+              p7IdealRW: idealRWPoint,
+              p7ActualLW: LW.position,
+              p7ActualRW: RW.position
+            };
+          }
+        }
+      } catch (e) {
+        // Silently fall through to bisector method on error
+        if (typeof console !== 'undefined' && console.warn) {
+          console.warn('[P7] Overlay truth calculation failed, using bisector fallback:', e);
+        }
+      }
     }
-    
-    const maxDev = Math.max(...validDevs);
-    
-    // Grade using RP22 thresholds
-    const p7CatalogEntry = RP22_CATALOG["7"];
-    const lvlP7 = p7CatalogEntry.levels;
-    let level7 = 1;
-    if (lvlP7.L4 != null && maxDev <= lvlP7.L4) level7 = 4;
-    else if (lvlP7.L3 != null && maxDev <= lvlP7.L3) level7 = 3;
-    else if (lvlP7.L2 != null && maxDev <= lvlP7.L2) level7 = 2;
-    
-    return {
-      number: 7,
-      title: p7CatalogEntry.title,
-      level: level7,
-      value: isNum(maxDev) ? Number(maxDev.toFixed(1)) : null,
-      unit: p7CatalogEntry.unit,
-      overlay: null,
-      note: "Deviation from RP22 median (overlay truth)",
-      deviation: maxDev,
-      perSide: {
-        LW: { deviation: devLW, targetAngle: azIdealLW, actualAngle: azActualLW },
-        RW: { deviation: devRW, targetAngle: azIdealRW, actualAngle: azActualRW }
-      },
-      status: "ok",
-      p7MlpUsed: { x: mlp.x, y: mlp.y },
-      p7MlpSource: mlpPointOverride ? "override" : "seat",
-      // Debug verification
-      p7UsedOverlayMedian: true,
-      p7IdealLW: idealLWPoint,
-      p7IdealRW: idealRWPoint
-    };
   }
 
   // ═══════════════════════════════════════════════════════════════════════════
@@ -221,7 +239,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
   const calcSide = (front, side, wide) => {
     if (!front || !side || !wide) return { deviation: null, targetAngle: null, actualAngle: null };
     
-    const mlpPos = mlp;
+    const mlpPos = mlpUsed;
     const frontVec = { x: front.position.x - mlpPos.x, y: front.position.y - mlpPos.y };
     const sideVec  = { x: side.position.x  - mlpPos.x, y: side.position.y  - mlpPos.y };
     const wideVec  = { x: wide.position.x  - mlpPos.x, y: wide.position.y  - mlpPos.y };
@@ -292,16 +310,16 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
       RW: detailsR
     },
     status: "ok",
-    p7MlpUsed: { x: mlp.x, y: mlp.y },
+    p7MlpUsed: { x: mlpUsed.x, y: mlpUsed.y },
     p7MlpSource: mlpPointOverride ? "override" : "seat",
-    p7UsedOverlayMedian: false
+    p7IdealSource: "bisectorFallback"
   };
 }
 
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, frontWideMedianYLeft, frontWideMedianYRight, roomWidthM, seatSplMetrics, overheadState, aimState }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -439,15 +457,13 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       };
     }
 
-    // RP22 Parameter 7 — Front Wides (use overlay median truth)
+    // RP22 Parameter 7 — Front Wides (use overlay median truth computed internally)
     const p7Result = evaluateFrontWideDeviation(
       safeSpeakers, 
       safeSeats, 
       mlpBasis, 
       mlpPointOverride,
-      frontWideMedianYLeft,
-      frontWideMedianYRight,
-      roomWidthM
+      dimensions
     );
     if (p7Result.level !== null) {
       gradedParameters.primary[p7Result.number] = {
@@ -706,9 +722,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     mlpBasis,
     mlpPointOverride?.x,
     mlpPointOverride?.y,
-    frontWideMedianYLeft,
-    frontWideMedianYRight,
-    roomWidthM,
     dimensions?.heightM,
     dimensions?.height,
     dimensions?.lengthM,
