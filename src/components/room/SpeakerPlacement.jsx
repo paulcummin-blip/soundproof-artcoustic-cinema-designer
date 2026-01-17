@@ -3013,9 +3013,6 @@ function SpeakerPlacementImpl(props) {
             roomDims={effectiveDims}
             setSpeakers={setSpeakers}
             disabled={disabled}
-            frontWideZones={null}
-            roomWidthM={Number(effectiveDims?.width ?? effectiveDims?.widthM) || 0}
-            wallInsetM={0.01}
           />
           
           {(() => {

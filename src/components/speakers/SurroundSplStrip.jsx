@@ -103,9 +103,6 @@ export default function SurroundSplStrip({
         roomDims={roomDims}
         setSpeakers={setSpeakers}
         disabled={disabled}
-        frontWideZones={null}
-        roomWidthM={null}
-        wallInsetM={0.01}
       />
       <div className="text-xs font-medium text-[#625143] mb-2">SPL @ MLP</div>
       <div className="grid grid-cols-3 gap-2">
