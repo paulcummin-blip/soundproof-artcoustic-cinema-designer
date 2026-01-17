@@ -74,10 +74,7 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
   };
 }
 
-// REFACTORED: P7 now uses canonical median angle calculation
-import { computeFrontWideMedianData } from '../utils/frontWideMedian';
-
-function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", dimensions = null) {
+function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
   const seatsWithRoles = computeSeatRoles(asArr(seating));
   const primarySeats = seatsWithRoles.filter(s => s.isPrimary);
   const src = primarySeats.length ? primarySeats : seatsWithRoles;
@@ -86,30 +83,83 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", dimen
   
   // NULL-SAFE GUARD
   if (!mlp || !Number.isFinite(mlp.x) || !Number.isFinite(mlp.y)) {
-    return { 
-      number: 7, 
-      title: RP22_CATALOG["7"].title, 
-      level: null, 
-      value: null, 
-      unit: RP22_CATALOG["7"].unit, 
-      overlay: null, 
-      note: "Front Wide RP22 median angle deviation", 
-      deviation: null, 
-      perSide: null,
-      status: "no_data"
-    };
+    return { number: 7, title: RP22_CATALOG["7"].title, level: null, value: null, unit: RP22_CATALOG["7"].unit, overlay: null, note: "Front Wide angular deviation from bisector", deviation: null, perSide: null };
   }
 
-  // Use canonical median calculation
-  const medianData = computeFrontWideMedianData({
-    mlpPoint: mlp,
-    placedSpeakers: speakers,
-    roomDims: dimensions || { widthM: 6, lengthM: 8 }, // fallback dims
-    wallInset: 0.05
-  });
+  // Helper to get position from any format
+  const getPos = (s) => {
+    if (!s) return null;
+    if (s.position && isNum(s.position.x) && isNum(s.position.y)) return s.position;
+    if (s.pos && isNum(s.pos.x) && isNum(s.pos.y)) return s.pos;
+    if (isNum(s.x) && isNum(s.y)) return { x: s.x, y: s.y };
+    return null;
+  };
 
-  // If median calculation failed, return no_data
-  if (medianData.status !== 'ok') {
+  // Helper to get azimuth consistent with azimuthFromMLP (0 deg is +Y, 90 deg is +X)
+  const getAngle = (vec) => (vec.x === 0 && vec.y === 0) ? 0 : (Math.atan2(vec.x, vec.y) * 180 / Math.PI + 360) % 360;
+
+  // Normalize role (handle aliases)
+  const normalizeRole = (role) => {
+    const r = String(role || '').toUpperCase();
+    if (r === 'L' || r === 'FL') return 'L';
+    if (r === 'R' || r === 'FR') return 'R';
+    if (r === 'LS' || r === 'SL') return 'LS';
+    if (r === 'RS' || r === 'SR') return 'RS';
+    if (r === 'LW' || r === 'FWL' || r === 'WL' || r === 'LFW') return 'LW';
+    if (r === 'RW' || r === 'FWR' || r === 'WR' || r === 'RFW') return 'RW';
+    return r;
+  };
+
+  // Find speakers by normalized role
+  const findSpeaker = (targetRole) => {
+    const spk = speakers.find(s => normalizeRole(s.role) === targetRole);
+    if (!spk) return null;
+    const pos = getPos(spk);
+    return pos ? { ...spk, position: pos } : null;
+  };
+
+  const L  = findSpeaker('L');
+  const R  = findSpeaker('R');
+  const LS = findSpeaker('LS');
+  const RS = findSpeaker('RS');
+  const LW = findSpeaker('LW');
+  const RW = findSpeaker('RW');
+
+  const calcSide = (front, side, wide) => {
+    if (!front || !side || !wide) return { deviation: null, targetAngle: null, actualAngle: null };
+    
+    const mlpPos = mlp;
+    const frontVec = { x: front.position.x - mlpPos.x, y: front.position.y - mlpPos.y };
+    const sideVec  = { x: side.position.x  - mlpPos.x, y: side.position.y  - mlpPos.y };
+    const wideVec  = { x: wide.position.x  - mlpPos.x, y: wide.position.y  - mlpPos.y };
+
+    const magFront = Math.hypot(frontVec.x, frontVec.y) || 1;
+    const magSide = Math.hypot(sideVec.x, sideVec.y) || 1;
+    const magWide = Math.hypot(wideVec.x, wideVec.y) || 1;
+
+    const bisector = {
+      x: (frontVec.x / magFront) + (sideVec.x / magSide),
+      y: (frontVec.y / magFront) + (sideVec.y / magSide)
+    };
+    const bisectorNorm = Math.hypot(bisector.x, bisector.y) || 1;
+    const bisectorUnit = { x: bisector.x / bisectorNorm, y: bisector.y / bisectorNorm };
+    
+    const wideUnit = { x: wideVec.x / magWide, y: wideVec.y / magWide };
+
+    const deviation = degreesBetweenVectors(bisectorUnit, wideUnit);
+
+    return {
+      deviation,
+      targetAngle: getAngle(bisectorUnit),
+      actualAngle: getAngle(wideUnit),
+    };
+  };
+
+  const detailsL = calcSide(L, LS, LW);
+  const detailsR = calcSide(R, RS, RW);
+
+  const deviations = [detailsL.deviation, detailsR.deviation].filter(v => v !== null && isNum(v));
+  if (!deviations.length) {
     return {
       number: 7,
       title: RP22_CATALOG["7"].title,
@@ -117,36 +167,35 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", dimen
       value: null,
       unit: RP22_CATALOG["7"].unit,
       overlay: null,
-      note: "Front Wide RP22 median angle deviation",
+      note: "Front Wide angular deviation from bisector",
       deviation: null,
-      perSide: null,
-      status: medianData.status
+      perSide: { LW: detailsL, RW: detailsR },
+      status: "no_data"
     };
   }
 
-  // Extract P7 data from canonical calculation
+  const avgDev = deviations.reduce((a,b)=>a+b,0) / deviations.length;
+
+  // After computing avgDev (average absolute deviation from bisector for wides):
   const p7CatalogEntry = RP22_CATALOG["7"];
-  
+  const lvlP7 = p7CatalogEntry.levels;
+  let level7 = 1; // Default to L1
+  if (lvlP7.L4 != null && avgDev <= lvlP7.L4) level7 = 4;
+  else if (lvlP7.L3 != null && avgDev <= lvlP7.L3) level7 = 3;
+  else if (lvlP7.L2 != null && avgDev <= lvlP7.L2) level7 = 2;
+
   return {
     number: 7,
     title: p7CatalogEntry.title,
-    level: medianData.level === 'FAIL' ? 1 : (medianData.level ? parseInt(medianData.level.substring(1)) : null),
-    value: Number.isFinite(medianData.maxDeviation) ? Number(medianData.maxDeviation.toFixed(1)) : null,
+    level: level7,
+    value: Number(avgDev.toFixed(1)),
     unit: p7CatalogEntry.unit,
     overlay: null,
-    note: "Front Wide RP22 median angle deviation",
-    deviation: medianData.maxDeviation,
+    note: "Front Wide angular deviation from bisector",
+    deviation: avgDev, // Keep for p7Details access
     perSide: {
-      LW: {
-        deviation: medianData.left?.deviation,
-        targetAngle: medianData.left?.medianAz,
-        actualAngle: medianData.left?.actualAz
-      },
-      RW: {
-        deviation: medianData.right?.deviation,
-        targetAngle: medianData.right?.medianAz,
-        actualAngle: medianData.right?.actualAz
-      }
+      LW: detailsL,
+      RW: detailsR
     },
     status: "ok"
   };
@@ -293,8 +342,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       };
     }
 
-    // RP22 Parameter 7 — Front Wides (uses canonical median)
-    const p7Result = evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis, dimensions);
+    // RP22 Parameter 7 — Front Wides (kept)
+    const p7Result = evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis);
     if (p7Result.level !== null) {
       gradedParameters.primary[p7Result.number] = {
         title: p7Result.title,
@@ -533,7 +582,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     return {
       gradedParameters,
-      p7Details: (evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis, dimensions) || {}).perSide,
+      p7Details: (evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis) || {}).perSide,
       param5,
       surroundGaps,
       seatMetrics,
