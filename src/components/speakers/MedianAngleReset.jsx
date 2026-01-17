@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
-import { computeRp22FrontWideMedianData } from '@/components/utils/rp22FrontWides';
 
 /**
  * Median Angle Reset for Front Wides
@@ -64,28 +63,97 @@ export default function MedianAngleReset({
   const handleReset = () => {
     if (!canReset) return;
 
-    // Use canonical RP22 median angle calculation
-    const medianData = computeRp22FrontWideMedianData({
-      mlpPoint,
-      placedSpeakers: placedSpeakers || [],
-      roomDims: roomDims,
-      wallInsetM: 0.05
-    });
+    // Compute median azimuth (same logic as P7)
+    const getAngle = (vec) => {
+      if (!vec || vec.x === 0 && vec.y === 0) return 0;
+      return (Math.atan2(vec.x, vec.y) * 180 / Math.PI + 360) % 360;
+    };
 
-    // Guard: cannot compute median
-    if (medianData.status !== 'ok' || !medianData.targetLW || !medianData.targetRW) {
-      console.warn('[MedianAngleReset] Cannot compute median position:', medianData.debug);
-      return;
-    }
+    // Compute median point (midpoint of L-SL and R-SR bisectors)
+    const lwAz = getAngle({ x: L.position.x - mlpPoint.x, y: L.position.y - mlpPoint.y });
+    const slAz = getAngle({ x: SL.position.x - mlpPoint.x, y: SL.position.y - mlpPoint.y });
+    const rwAz = getAngle({ x: R.position.x - mlpPoint.x, y: R.position.y - mlpPoint.y });
+    const srAz = getAngle({ x: SR.position.x - mlpPoint.x, y: SR.position.y - mlpPoint.y });
 
-    // Update speakers: snap LW/RW to target positions
+    // Median angle for LW (between L and SL)
+    const lwMedianAz = (lwAz + slAz) / 2;
+    
+    // Median angle for RW (between R and SR)
+    const rwMedianAz = (rwAz + srAz) / 2;
+
+    // Helper: intersect ray with room bounds
+    const rayIntersect = (azDeg) => {
+      const azRad = azDeg * Math.PI / 180;
+      const dx = Math.sin(azRad);
+      const dy = Math.cos(azRad);
+
+      const W = roomDims.widthM;
+      const L = roomDims.lengthM;
+      const inset = 0.05; // 5cm from walls
+
+      let tMin = Infinity;
+
+      // Intersect with x = inset
+      if (dx < 0) {
+        const t = (inset - mlpPoint.x) / dx;
+        if (t > 0) {
+          const y = mlpPoint.y + t * dy;
+          if (y >= inset && y <= L - inset) tMin = Math.min(tMin, t);
+        }
+      }
+
+      // Intersect with x = W - inset
+      if (dx > 0) {
+        const t = (W - inset - mlpPoint.x) / dx;
+        if (t > 0) {
+          const y = mlpPoint.y + t * dy;
+          if (y >= inset && y <= L - inset) tMin = Math.min(tMin, t);
+        }
+      }
+
+      // Intersect with y = inset
+      if (dy < 0) {
+        const t = (inset - mlpPoint.y) / dy;
+        if (t > 0) {
+          const x = mlpPoint.x + t * dx;
+          if (x >= inset && x <= W - inset) tMin = Math.min(tMin, t);
+        }
+      }
+
+      // Intersect with y = L - inset
+      if (dy > 0) {
+        const t = (L - inset - mlpPoint.y) / dy;
+        if (t > 0) {
+          const x = mlpPoint.x + t * dx;
+          if (x >= inset && x <= W - inset) tMin = Math.min(tMin, t);
+        }
+      }
+
+      if (tMin === Infinity) {
+        // Fallback: place near MLP
+        return { x: mlpPoint.x + dx * 0.5, y: mlpPoint.y + dy * 0.5 };
+      }
+
+      // Place slightly inside the boundary
+      const safeT = tMin * 0.95;
+      return {
+        x: mlpPoint.x + safeT * dx,
+        y: mlpPoint.y + safeT * dy
+      };
+    };
+
+    // Compute new positions
+    const newLwPos = rayIntersect(lwMedianAz);
+    const newRwPos = rayIntersect(rwMedianAz);
+
+    // Update speakers
     const updated = (placedSpeakers || []).map(s => {
       const canon = normalizeRole(s.role);
       if (canon === 'LW') {
-        return { ...s, position: { ...s.position, x: medianData.targetLW.x, y: medianData.targetLW.y } };
+        return { ...s, position: { ...s.position, x: newLwPos.x, y: newLwPos.y } };
       }
       if (canon === 'RW') {
-        return { ...s, position: { ...s.position, x: medianData.targetRW.x, y: medianData.targetRW.y } };
+        return { ...s, position: { ...s.position, x: newRwPos.x, y: newRwPos.y } };
       }
       return s;
     });
