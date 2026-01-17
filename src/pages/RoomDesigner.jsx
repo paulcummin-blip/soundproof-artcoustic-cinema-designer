@@ -2181,6 +2181,7 @@ function RoomDesignerWithState() {
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
     mlpBasis: _mlpBasis,
     seatSplMetrics: allSeatSplMetrics,
+    frontWideZones: frontWideZones, // NEW: Pass overlay truth for P7
     overheadState: {
       globalModel: _overheadGlobalModel,
       frontOverride: _overheadFrontOverride,

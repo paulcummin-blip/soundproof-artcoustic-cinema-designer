@@ -74,7 +74,42 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
   };
 }
 
-function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
+function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", frontWideZones = null, dimensions = null) {
+  // Guard: if overlay truth is not available or invalid, return no_data
+  if (!frontWideZones || frontWideZones.status !== 'ok') {
+    return {
+      number: 7,
+      title: RP22_CATALOG["7"].title,
+      level: null,
+      value: null,
+      unit: RP22_CATALOG["7"].unit,
+      overlay: null,
+      note: "Front Wide angular deviation from overlay median",
+      deviation: null,
+      perSide: null,
+      status: "no_data"
+    };
+  }
+
+  // Guard: must have at least one valid side zone
+  const hasLeftZone = frontWideZones.left?.status === 'ok' && isNum(frontWideZones.left.medianY);
+  const hasRightZone = frontWideZones.right?.status === 'ok' && isNum(frontWideZones.right.medianY);
+  
+  if (!hasLeftZone && !hasRightZone) {
+    return {
+      number: 7,
+      title: RP22_CATALOG["7"].title,
+      level: null,
+      value: null,
+      unit: RP22_CATALOG["7"].unit,
+      overlay: null,
+      note: "Front Wide angular deviation from overlay median",
+      deviation: null,
+      perSide: null,
+      status: "no_data"
+    };
+  }
+
   const seatsWithRoles = computeSeatRoles(asArr(seating));
   const primarySeats = seatsWithRoles.filter(s => s.isPrimary);
   const src = primarySeats.length ? primarySeats : seatsWithRoles;
@@ -83,8 +118,38 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
   
   // NULL-SAFE GUARD
   if (!mlp || !Number.isFinite(mlp.x) || !Number.isFinite(mlp.y)) {
-    return { number: 7, title: RP22_CATALOG["7"].title, level: null, value: null, unit: RP22_CATALOG["7"].unit, overlay: null, note: "Front Wide angular deviation from bisector", deviation: null, perSide: null };
+    return { 
+      number: 7, 
+      title: RP22_CATALOG["7"].title, 
+      level: null, 
+      value: null, 
+      unit: RP22_CATALOG["7"].unit, 
+      overlay: null, 
+      note: "Front Wide angular deviation from overlay median", 
+      deviation: null, 
+      perSide: null,
+      status: "no_data"
+    };
   }
+
+  // Get room width for wall targets
+  const W = Number(dimensions?.widthM || dimensions?.width) || 0;
+  if (!(W > 0)) {
+    return {
+      number: 7,
+      title: RP22_CATALOG["7"].title,
+      level: null,
+      value: null,
+      unit: RP22_CATALOG["7"].unit,
+      overlay: null,
+      note: "Front Wide angular deviation from overlay median",
+      deviation: null,
+      perSide: null,
+      status: "no_data"
+    };
+  }
+
+  const WALL_INSET_M = 0.01; // Match overlay computation
 
   // Helper to get position from any format
   const getPos = (s) => {
@@ -94,9 +159,6 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
     if (isNum(s.x) && isNum(s.y)) return { x: s.x, y: s.y };
     return null;
   };
-
-  // Helper to get azimuth consistent with azimuthFromMLP (0 deg is +Y, 90 deg is +X)
-  const getAngle = (vec) => (vec.x === 0 && vec.y === 0) ? 0 : (Math.atan2(vec.x, vec.y) * 180 / Math.PI + 360) % 360;
 
   // Normalize role (handle aliases)
   const normalizeRole = (role) => {
@@ -118,47 +180,52 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
     return pos ? { ...spk, position: pos } : null;
   };
 
-  const L  = findSpeaker('L');
-  const R  = findSpeaker('R');
-  const LS = findSpeaker('LS');
-  const RS = findSpeaker('RS');
   const LW = findSpeaker('LW');
   const RW = findSpeaker('RW');
 
-  const calcSide = (front, side, wide) => {
-    if (!front || !side || !wide) return { deviation: null, targetAngle: null, actualAngle: null };
-    
-    const mlpPos = mlp;
-    const frontVec = { x: front.position.x - mlpPos.x, y: front.position.y - mlpPos.y };
-    const sideVec  = { x: side.position.x  - mlpPos.x, y: side.position.y  - mlpPos.y };
-    const wideVec  = { x: wide.position.x  - mlpPos.x, y: wide.position.y  - mlpPos.y };
-
-    const magFront = Math.hypot(frontVec.x, frontVec.y) || 1;
-    const magSide = Math.hypot(sideVec.x, sideVec.y) || 1;
-    const magWide = Math.hypot(wideVec.x, wideVec.y) || 1;
-
-    const bisector = {
-      x: (frontVec.x / magFront) + (sideVec.x / magSide),
-      y: (frontVec.y / magFront) + (sideVec.y / magSide)
-    };
-    const bisectorNorm = Math.hypot(bisector.x, bisector.y) || 1;
-    const bisectorUnit = { x: bisector.x / bisectorNorm, y: bisector.y / bisectorNorm };
-    
-    const wideUnit = { x: wideVec.x / magWide, y: wideVec.y / magWide };
-
-    const deviation = degreesBetweenVectors(bisectorUnit, wideUnit);
-
-    return {
-      deviation,
-      targetAngle: getAngle(bisectorUnit),
-      actualAngle: getAngle(wideUnit),
-    };
+  // Helper: circular angular difference (shortest path)
+  const circDelta = (a1, a2) => {
+    const raw = Math.abs(a1 - a2);
+    return Math.min(raw, 360 - raw);
   };
 
-  const detailsL = calcSide(L, LS, LW);
-  const detailsR = calcSide(R, RS, RW);
+  // Compute deviations using overlay median as truth
+  const deviations = [];
+  let detailsL = { deviation: null, targetAngle: null, actualAngle: null };
+  let detailsR = { deviation: null, targetAngle: null, actualAngle: null };
 
-  const deviations = [detailsL.deviation, detailsR.deviation].filter(v => v !== null && isNum(v));
+  if (hasLeftZone && LW) {
+    const idealLW = { x: WALL_INSET_M, y: frontWideZones.left.medianY };
+    const actualLWAz = azimuthFromMLP(mlp, LW.position);
+    const idealLWAz = azimuthFromMLP(mlp, idealLW);
+    const lwDev = circDelta(actualLWAz, idealLWAz);
+    
+    if (isNum(lwDev)) {
+      deviations.push(lwDev);
+      detailsL = {
+        deviation: lwDev,
+        targetAngle: idealLWAz,
+        actualAngle: actualLWAz
+      };
+    }
+  }
+
+  if (hasRightZone && RW) {
+    const idealRW = { x: W - WALL_INSET_M, y: frontWideZones.right.medianY };
+    const actualRWAz = azimuthFromMLP(mlp, RW.position);
+    const idealRWAz = azimuthFromMLP(mlp, idealRW);
+    const rwDev = circDelta(actualRWAz, idealRWAz);
+    
+    if (isNum(rwDev)) {
+      deviations.push(rwDev);
+      detailsR = {
+        deviation: rwDev,
+        targetAngle: idealRWAz,
+        actualAngle: actualRWAz
+      };
+    }
+  }
+
   if (!deviations.length) {
     return {
       number: 7,
@@ -167,32 +234,47 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
       value: null,
       unit: RP22_CATALOG["7"].unit,
       overlay: null,
-      note: "Front Wide angular deviation from bisector",
+      note: "Front Wide angular deviation from overlay median",
       deviation: null,
       perSide: { LW: detailsL, RW: detailsR },
       status: "no_data"
     };
   }
 
-  const avgDev = deviations.reduce((a,b)=>a+b,0) / deviations.length;
+  const maxDev = Math.max(...deviations);
 
-  // After computing avgDev (average absolute deviation from bisector for wides):
+  if (!Number.isFinite(maxDev)) {
+    return {
+      number: 7,
+      title: RP22_CATALOG["7"].title,
+      level: null,
+      value: null,
+      unit: RP22_CATALOG["7"].unit,
+      overlay: null,
+      note: "Front Wide angular deviation from overlay median",
+      deviation: null,
+      perSide: { LW: detailsL, RW: detailsR },
+      status: "no_data"
+    };
+  }
+
+  // RP22 P7 grading thresholds
   const p7CatalogEntry = RP22_CATALOG["7"];
   const lvlP7 = p7CatalogEntry.levels;
   let level7 = 1; // Default to L1
-  if (lvlP7.L4 != null && avgDev <= lvlP7.L4) level7 = 4;
-  else if (lvlP7.L3 != null && avgDev <= lvlP7.L3) level7 = 3;
-  else if (lvlP7.L2 != null && avgDev <= lvlP7.L2) level7 = 2;
+  if (lvlP7.L4 != null && maxDev <= lvlP7.L4) level7 = 4;
+  else if (lvlP7.L3 != null && maxDev <= lvlP7.L3) level7 = 3;
+  else if (lvlP7.L2 != null && maxDev <= lvlP7.L2) level7 = 2;
 
   return {
     number: 7,
     title: p7CatalogEntry.title,
     level: level7,
-    value: Number(avgDev.toFixed(1)),
+    value: Number(maxDev.toFixed(1)),
     unit: p7CatalogEntry.unit,
     overlay: null,
-    note: "Front Wide angular deviation from bisector",
-    deviation: avgDev, // Keep for p7Details access
+    note: "Front Wide angular deviation from overlay median",
+    deviation: maxDev,
     perSide: {
       LW: detailsL,
       RW: detailsR
@@ -204,7 +286,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, seatSplMetrics, overheadState, aimState }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, seatSplMetrics, frontWideZones, overheadState, aimState }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -342,8 +424,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       };
     }
 
-    // RP22 Parameter 7 — Front Wides (kept)
-    const p7Result = evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis);
+    // RP22 Parameter 7 — Front Wides (using overlay truth)
+    const p7Result = evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis, frontWideZones, dimensions);
     if (p7Result.level !== null) {
       gradedParameters.primary[p7Result.number] = {
         title: p7Result.title,
@@ -582,7 +664,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     return {
       gradedParameters,
-      p7Details: (evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis) || {}).perSide,
+      p7Details: (evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis, frontWideZones, dimensions) || {}).perSide,
       param5,
       surroundGaps,
       seatMetrics,
@@ -617,6 +699,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     aimState?.aimFrontWidesAtMLP,
     aimState?.aimSideSurroundsAtMLP,
     aimState?.aimRearSurroundsAtMLP,
+    frontWideZones?.status,
+    frontWideZones?.left?.medianY,
+    frontWideZones?.right?.medianY,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };
