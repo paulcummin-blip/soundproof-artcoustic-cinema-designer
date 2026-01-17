@@ -154,8 +154,10 @@ function __b44SameSpeakers(a, b) {
   return true;
 }
 
-const P12_THRESHOLDS = { L1: 102, L2: 105, L3: 108, L4: 111 };
-const P13_THRESHOLDS = { L1: 99, L2: 102, L3: 105, L4: 108 };
+const P12_THRESHOLDS_REC = { L1: 102, L2: 105, L3: 108, L4: 111 };
+const P12_THRESHOLDS_MIN = { L1: 99, L2: 102, L3: 105, L4: 108 };
+const P13_THRESHOLDS_REC = { L1: 99, L2: 102, L3: 105, L4: 108 };
+const P13_THRESHOLDS_MIN = { L1: 96, L2: 99, L3: 102, L4: 105 };
 
 // Helper: compute RP22 level from SPL thresholds
 function computeRP22Level(splDb, thresholds) {
@@ -1391,11 +1393,9 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
 
         const pillBasisDb = Math.min(...lcrTileSplDb);
         
-        // Use different thresholds based on radiation mode (state values kept for backwards compat)
+        // Use different thresholds based on mode (state values kept for backwards compat)
         const isMinimumMode = splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode;
-        const thresholds = isMinimumMode 
-          ? { L1: 99, L2: 102, L3: 105, L4: 108 }  // Minimum thresholds
-          : { L1: 102, L2: 105, L3: 108, L4: 111 }; // Recommended thresholds
+        const thresholds = isMinimumMode ? P12_THRESHOLDS_MIN : P12_THRESHOLDS_REC;
         
         const level = computeRP22Level(pillBasisDb, thresholds);
 
@@ -3045,7 +3045,13 @@ function SpeakerPlacementImpl(props) {
             if (surroundTileSplDb.length === 0) return null;
 
             const pillBasisDb = Math.min(...surroundTileSplDb);
-            const level = computeRP22Level(pillBasisDb, P13_THRESHOLDS);
+            
+            // Use different thresholds based on mode (same as P12)
+            const { splConfig } = useAppState() || {};
+            const isMinimumMode = splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode;
+            const thresholds = isMinimumMode ? P13_THRESHOLDS_MIN : P13_THRESHOLDS_REC;
+            
+            const level = computeRP22Level(pillBasisDb, thresholds);
 
             return (
               <RP22LevelPill 
@@ -3105,7 +3111,13 @@ function SpeakerPlacementImpl(props) {
               if (overheadTileSplDb.length === 0) return null;
 
               const pillBasisDb = Math.min(...overheadTileSplDb);
-              const level = computeRP22Level(pillBasisDb, P13_THRESHOLDS);
+              
+              // Use different thresholds based on mode (same as P12)
+              const { splConfig } = useAppState() || {};
+              const isMinimumMode = splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode;
+              const thresholds = isMinimumMode ? P13_THRESHOLDS_MIN : P13_THRESHOLDS_REC;
+              
+              const level = computeRP22Level(pillBasisDb, thresholds);
 
               return (
                 <RP22LevelPill 
