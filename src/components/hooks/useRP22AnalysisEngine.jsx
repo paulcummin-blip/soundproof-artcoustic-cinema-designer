@@ -521,7 +521,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
               title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
               level: `L${level12}`,
               value: minSpl,
-              formatted: `${minSpl.toFixed(1)} dB SPL (C)`,
+              formatted: `${minSpl.toFixed(1)} dB`,
               unit: p12CatalogEntry?.unit || "dB SPL (C)",
               status: "ok"
             };
