@@ -74,7 +74,7 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
   };
 }
 
-function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPointOverride = null) {
+function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPointOverride = null, frontWideMedianYLeft = null, frontWideMedianYRight = null, roomWidthM = null) {
   const seatsWithRoles = computeSeatRoles(asArr(seating));
   const primarySeats = seatsWithRoles.filter(s => s.isPrimary);
   const src = primarySeats.length ? primarySeats : seatsWithRoles;
@@ -86,7 +86,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
   
   // NULL-SAFE GUARD
   if (!mlp || !Number.isFinite(mlp.x) || !Number.isFinite(mlp.y)) {
-    return { number: 7, title: RP22_CATALOG["7"].title, level: null, value: null, unit: RP22_CATALOG["7"].unit, overlay: null, note: "Front Wide angular deviation from bisector", deviation: null, perSide: null };
+    return { number: 7, title: RP22_CATALOG["7"].title, level: null, value: null, unit: RP22_CATALOG["7"].unit, overlay: null, note: "Front Wide angular deviation", deviation: null, perSide: null, status: "no_data" };
   }
 
   // Helper to get position from any format
@@ -97,9 +97,6 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
     if (isNum(s.x) && isNum(s.y)) return { x: s.x, y: s.y };
     return null;
   };
-
-  // Helper to get azimuth consistent with azimuthFromMLP (0 deg is +Y, 90 deg is +X)
-  const getAngle = (vec) => (vec.x === 0 && vec.y === 0) ? 0 : (Math.atan2(vec.x, vec.y) * 180 / Math.PI + 360) % 360;
 
   // Normalize role (handle aliases)
   const normalizeRole = (role) => {
@@ -121,12 +118,105 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
     return pos ? { ...spk, position: pos } : null;
   };
 
+  const LW = findSpeaker('LW');
+  const RW = findSpeaker('RW');
+
+  // Check if we have overlay truth available
+  const hasOverlayTruth = 
+    isNum(frontWideMedianYLeft) && 
+    isNum(frontWideMedianYRight) && 
+    isNum(roomWidthM) && 
+    roomWidthM > 0;
+
+  // Helper for azimuth calculation (0° = +Y, 90° = +X)
+  const azimuthDeg = (from, to) => {
+    if (!from || !to || !isNum(from.x) || !isNum(from.y) || !isNum(to.x) || !isNum(to.y)) return NaN;
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+  };
+
+  // Helper for circular delta (0..180)
+  const circDelta = (a, b) => {
+    if (!isNum(a) || !isNum(b)) return NaN;
+    let diff = Math.abs(a - b);
+    if (diff > 180) diff = 360 - diff;
+    return diff;
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // NEW PATH: Use overlay median truth when available
+  // ═══════════════════════════════════════════════════════════════════════════
+  if (hasOverlayTruth && LW && RW) {
+    const WALL_INSET = 0.01; // Same as reset button and overlay
+    
+    const idealLWPoint = { x: WALL_INSET, y: frontWideMedianYLeft };
+    const idealRWPoint = { x: roomWidthM - WALL_INSET, y: frontWideMedianYRight };
+    
+    const azActualLW = azimuthDeg(mlp, LW.position);
+    const azIdealLW = azimuthDeg(mlp, idealLWPoint);
+    const devLW = circDelta(azActualLW, azIdealLW);
+    
+    const azActualRW = azimuthDeg(mlp, RW.position);
+    const azIdealRW = azimuthDeg(mlp, idealRWPoint);
+    const devRW = circDelta(azActualRW, azIdealRW);
+    
+    const validDevs = [devLW, devRW].filter(v => isNum(v));
+    if (validDevs.length === 0) {
+      return {
+        number: 7,
+        title: RP22_CATALOG["7"].title,
+        level: null,
+        value: null,
+        unit: RP22_CATALOG["7"].unit,
+        overlay: null,
+        note: "Front Wide deviation (overlay median)",
+        deviation: null,
+        perSide: null,
+        status: "no_data"
+      };
+    }
+    
+    const maxDev = Math.max(...validDevs);
+    
+    // Grade using RP22 thresholds
+    const p7CatalogEntry = RP22_CATALOG["7"];
+    const lvlP7 = p7CatalogEntry.levels;
+    let level7 = 1;
+    if (lvlP7.L4 != null && maxDev <= lvlP7.L4) level7 = 4;
+    else if (lvlP7.L3 != null && maxDev <= lvlP7.L3) level7 = 3;
+    else if (lvlP7.L2 != null && maxDev <= lvlP7.L2) level7 = 2;
+    
+    return {
+      number: 7,
+      title: p7CatalogEntry.title,
+      level: level7,
+      value: isNum(maxDev) ? Number(maxDev.toFixed(1)) : null,
+      unit: p7CatalogEntry.unit,
+      overlay: null,
+      note: "Deviation from RP22 median (overlay truth)",
+      deviation: maxDev,
+      perSide: {
+        LW: { deviation: devLW, targetAngle: azIdealLW, actualAngle: azActualLW },
+        RW: { deviation: devRW, targetAngle: azIdealRW, actualAngle: azActualRW }
+      },
+      status: "ok",
+      p7MlpUsed: { x: mlp.x, y: mlp.y },
+      p7MlpSource: mlpPointOverride ? "override" : "seat",
+      // Debug verification
+      p7UsedOverlayMedian: true,
+      p7IdealLW: idealLWPoint,
+      p7IdealRW: idealRWPoint
+    };
+  }
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  // FALLBACK PATH: Use bisector method (legacy)
+  // ═══════════════════════════════════════════════════════════════════════════
   const L  = findSpeaker('L');
   const R  = findSpeaker('R');
   const LS = findSpeaker('LS');
   const RS = findSpeaker('RS');
-  const LW = findSpeaker('LW');
-  const RW = findSpeaker('RW');
 
   const calcSide = (front, side, wide) => {
     if (!front || !side || !wide) return { deviation: null, targetAngle: null, actualAngle: null };
@@ -150,6 +240,8 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
     const wideUnit = { x: wideVec.x / magWide, y: wideVec.y / magWide };
 
     const deviation = degreesBetweenVectors(bisectorUnit, wideUnit);
+    
+    const getAngle = (vec) => (vec.x === 0 && vec.y === 0) ? 0 : (Math.atan2(vec.x, vec.y) * 180 / Math.PI + 360) % 360;
 
     return {
       deviation,
@@ -179,10 +271,9 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 
   const avgDev = deviations.reduce((a,b)=>a+b,0) / deviations.length;
 
-  // After computing avgDev (average absolute deviation from bisector for wides):
   const p7CatalogEntry = RP22_CATALOG["7"];
   const lvlP7 = p7CatalogEntry.levels;
-  let level7 = 1; // Default to L1
+  let level7 = 1;
   if (lvlP7.L4 != null && avgDev <= lvlP7.L4) level7 = 4;
   else if (lvlP7.L3 != null && avgDev <= lvlP7.L3) level7 = 3;
   else if (lvlP7.L2 != null && avgDev <= lvlP7.L2) level7 = 2;
@@ -191,26 +282,26 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
     number: 7,
     title: p7CatalogEntry.title,
     level: level7,
-    value: Number(avgDev.toFixed(1)),
+    value: isNum(avgDev) ? Number(avgDev.toFixed(1)) : null,
     unit: p7CatalogEntry.unit,
     overlay: null,
-    note: "Front Wide angular deviation from bisector",
+    note: "Front Wide angular deviation from bisector (fallback)",
     deviation: avgDev,
     perSide: {
       LW: detailsL,
       RW: detailsR
     },
     status: "ok",
-    // Debug: confirm which MLP was used
     p7MlpUsed: { x: mlp.x, y: mlp.y },
-    p7MlpSource: mlpPointOverride ? "override" : "seat"
+    p7MlpSource: mlpPointOverride ? "override" : "seat",
+    p7UsedOverlayMedian: false
   };
 }
 
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, frontWideMedianYLeft, frontWideMedianYRight, roomWidthM, seatSplMetrics, overheadState, aimState }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -348,8 +439,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       };
     }
 
-    // RP22 Parameter 7 — Front Wides (kept)
-    const p7Result = evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis, mlpPointOverride);
+    // RP22 Parameter 7 — Front Wides (use overlay median truth)
+    const p7Result = evaluateFrontWideDeviation(
+      safeSpeakers, 
+      safeSeats, 
+      mlpBasis, 
+      mlpPointOverride,
+      frontWideMedianYLeft,
+      frontWideMedianYRight,
+      roomWidthM
+    );
     if (p7Result.level !== null) {
       gradedParameters.primary[p7Result.number] = {
         title: p7Result.title,
@@ -607,6 +706,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     mlpBasis,
     mlpPointOverride?.x,
     mlpPointOverride?.y,
+    frontWideMedianYLeft,
+    frontWideMedianYRight,
+    roomWidthM,
     dimensions?.heightM,
     dimensions?.height,
     dimensions?.lengthM,
