@@ -1,286 +1,166 @@
-// components/utils/frontWideMedian.js
-// CANONICAL RP22 P7 FRONT WIDE MEDIAN ANGLE LOGIC
-// This is the ONLY place where Front Wide median angle math is allowed.
+// src/components/utils/frontWideMedian.js
+// RP22 Front Wide "median angle" (spatial midpoint) helper
+// Used by: frontWideZones overlay + P7 calculation + Median Angle Reset
+//
+// Median angle definition (RP22):
+// - Find spatial midpoint between FL and SL (left) and FR and SR (right)
+// - Compute azimuth from MLP to that midpoint
+// - Front wide target lies on that azimuth ray at the side wall (with inset)
 
-const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 
-// Canonical role normalization (single source of truth)
-const normalizeRole = (role) => {
-  const r = String(role || '').toUpperCase().trim();
-  
-  // Front Left
-  if (r === 'FL' || r === 'L') return 'FL';
-  // Front Right
-  if (r === 'FR' || r === 'R') return 'FR';
-  // Side Left
-  if (r === 'SL' || r === 'LS') return 'SL';
-  // Side Right
-  if (r === 'SR' || r === 'RS') return 'SR';
-  // Front Wide Left
-  if (r === 'LW' || r === 'FWL') return 'LW';
-  // Front Wide Right
-  if (r === 'RW' || r === 'FWR') return 'RW';
-  
-  return null;
-};
+const norm360 = (deg) => ((deg % 360) + 360) % 360;
 
-// Extract position from speaker (handles multiple shapes)
-const getPos = (s) => {
-  if (!s) return null;
-  if (s.position && isNum(s.position.x) && isNum(s.position.y)) return s.position;
-  if (s.pos && isNum(s.pos.x) && isNum(s.pos.y)) return s.pos;
-  if (isNum(s.x) && isNum(s.y)) return { x: s.x, y: s.y };
-  return null;
-};
-
-// Minimal circular angular difference
-const circDelta = (a, b) => {
-  if (!isNum(a) || !isNum(b)) return null;
-  const d = Math.abs(a - b) % 360;
+const circDeltaDeg = (a, b) => {
+  const d = Math.abs(norm360(a) - norm360(b)) % 360;
   return d > 180 ? 360 - d : d;
 };
 
-// RP22 P7 grading thresholds
-const levelForP7 = (devDeg) => {
-  if (!isNum(devDeg)) return null;
-  if (devDeg <= 2) return 'L4';
-  if (devDeg <= 5) return 'L3';
-  if (devDeg <= 7) return 'L2';
-  if (devDeg <= 10) return 'L1';
-  return 'FAIL';
+// Our app convention used elsewhere: atan2(dx, dy) where dx is X (left/right), dy is Y (front/back)
+const azFromToDeg = (from, to) => {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  return norm360((Math.atan2(dx, dy) * 180) / Math.PI);
 };
 
-// Ray intersection with room boundary
-const rayIntersect = (mlpPoint, azimuthDeg, roomDims, targetWall, wallInset) => {
-  const azRad = azimuthDeg * Math.PI / 180;
-  const dx = Math.sin(azRad);
-  const dy = Math.cos(azRad);
-  
-  const W = roomDims.widthM;
-  const L = roomDims.lengthM;
-  const inset = wallInset;
-  
-  let tMin = Infinity;
-  
-  // Left wall (x = inset)
-  if (targetWall === 'left' && dx < 0) {
-    const t = (inset - mlpPoint.x) / dx;
-    if (t > 0) {
-      const y = mlpPoint.y + t * dy;
-      if (y >= inset && y <= L - inset) tMin = Math.min(tMin, t);
-    }
-  }
-  
-  // Right wall (x = W - inset)
-  if (targetWall === 'right' && dx > 0) {
-    const t = (W - inset - mlpPoint.x) / dx;
-    if (t > 0) {
-      const y = mlpPoint.y + t * dy;
-      if (y >= inset && y <= L - inset) tMin = Math.min(tMin, t);
-    }
-  }
-  
-  // Check front/back walls as fallback
-  if (tMin === Infinity) {
-    // Front wall (y = inset)
-    if (dy < 0) {
-      const t = (inset - mlpPoint.y) / dy;
-      if (t > 0) {
-        const x = mlpPoint.x + t * dx;
-        if (x >= inset && x <= W - inset) tMin = Math.min(tMin, t);
-      }
-    }
-    
-    // Back wall (y = L - inset)
-    if (dy > 0) {
-      const t = (L - inset - mlpPoint.y) / dy;
-      if (t > 0) {
-        const x = mlpPoint.x + t * dx;
-        if (x >= inset && x <= W - inset) tMin = Math.min(tMin, t);
-      }
-    }
-  }
-  
-  if (tMin === Infinity) {
-    // Fallback: place near MLP
-    return { x: mlpPoint.x + dx * 0.5, y: mlpPoint.y + dy * 0.5 };
-  }
-  
-  // Place slightly inside boundary (95% of distance)
-  const safeT = tMin * 0.95;
-  return {
-    x: mlpPoint.x + safeT * dx,
-    y: mlpPoint.y + safeT * dy
-  };
+const getXY = (s) => {
+  if (!s) return null;
+  const p = s.position || s.pos || s;
+  const x = p?.x;
+  const y = p?.y;
+  if (!isNum(x) || !isNum(y)) return null;
+  return { x, y };
 };
 
-/**
- * Compute canonical RP22 Front Wide median angle data
- * This is the ONLY function that calculates median angles for Front Wides.
- * 
- * RP22 Definition:
- * - Median point = spatial midpoint between FL and SL (and FR-SR)
- * - Median azimuth = angle from MLP to that spatial midpoint
- * - Target position = where that ray hits the side wall
- * - Deviation = circular difference between actual LW/RW angle and median angle
- * 
- * @param {Object} params
- * @param {Object} params.mlpPoint - { x, y } MLP position
- * @param {Array} params.placedSpeakers - Array of speaker objects
- * @param {Object} params.roomDims - { widthM, lengthM }
- * @param {number} [params.wallInset=0.05] - Safety inset from walls (meters)
- * @returns {Object} Canonical median angle data
- */
-export function computeFrontWideMedianData({ 
-  mlpPoint, 
-  placedSpeakers = [], 
-  roomDims, 
-  wallInset = 0.05 
+const normaliseRole = (r) => {
+  const x = String(r || "").trim().toUpperCase();
+  // map common aliases
+  if (x === "L") return "FL";
+  if (x === "R") return "FR";
+  if (x === "LS") return "SL";
+  if (x === "RS") return "SR";
+  if (x === "FWL") return "LW";
+  if (x === "FWR") return "RW";
+  return x;
+};
+
+const pickByRole = (speakers) => {
+  const map = new Map();
+  for (const s of speakers || []) {
+    const role = normaliseRole(s?.role);
+    if (!role) continue;
+    // prefer first with a valid position
+    if (!map.has(role)) map.set(role, s);
+    else {
+      const a = map.get(role);
+      if (!getXY(a) && getXY(s)) map.set(role, s);
+    }
+  }
+  return map;
+};
+
+const intersectRayWithWall = ({ mlp, azDeg, wallX, wallInset, lengthM }) => {
+  // Ray: mlp + t * dir, dir from az
+  const az = (norm360(azDeg) * Math.PI) / 180;
+  const dx = Math.sin(az);
+  const dy = Math.cos(az);
+
+  if (!isNum(dx) || !isNum(dy) || Math.abs(dx) < 1e-9) return null;
+
+  const xTarget = wallX;
+  const t = (xTarget - mlp.x) / dx;
+  if (!isNum(t) || t <= 0) return null;
+
+  const y = mlp.y + t * dy;
+  if (!isNum(y)) return null;
+
+  // clamp inside room (with inset)
+  const yClamped = Math.max(wallInset, Math.min(lengthM - wallInset, y));
+  return { x: xTarget, y: yClamped };
+};
+
+export function computeFrontWideMedianData({
+  placedSpeakers,
+  mlpPoint,
+  widthM,
+  lengthM,
+  wallInset = 0.05,
 }) {
-  // Validate MLP
-  if (!mlpPoint || !isNum(mlpPoint.x) || !isNum(mlpPoint.y)) {
-    return {
-      status: 'no_data',
-      reason: 'missing MLP',
-      left: null,
-      right: null,
-      maxDeviation: null,
-      level: null
-    };
+  const mlp = getXY(mlpPoint);
+  if (!mlp || !isNum(widthM) || !isNum(lengthM) || widthM <= 0 || lengthM <= 0) {
+    return { status: "no_data" };
   }
-  
-  // Validate room dimensions
-  if (!roomDims || !isNum(roomDims.widthM) || !isNum(roomDims.lengthM)) {
-    return {
-      status: 'no_data',
-      reason: 'missing room dimensions',
-      left: null,
-      right: null,
-      maxDeviation: null,
-      level: null
-    };
+
+  const byRole = pickByRole(placedSpeakers);
+
+  const FL = getXY(byRole.get("FL"));
+  const FR = getXY(byRole.get("FR"));
+  const SL = getXY(byRole.get("SL"));
+  const SR = getXY(byRole.get("SR"));
+  const LW = getXY(byRole.get("LW"));
+  const RW = getXY(byRole.get("RW"));
+
+  const haveLeftAnchors = !!(FL && SL);
+  const haveRightAnchors = !!(FR && SR);
+
+  if (!haveLeftAnchors && !haveRightAnchors) {
+    return { status: "missing_anchors" };
   }
-  
-  // Build normalized speaker map
-  const byRole = new Map();
-  for (const s of placedSpeakers) {
-    const normalized = normalizeRole(s?.role);
-    if (normalized && !byRole.has(normalized)) {
-      const pos = getPos(s);
-      if (pos) {
-        byRole.set(normalized, { ...s, position: pos });
-      }
-    }
-  }
-  
-  // Find required speakers
-  const FL = byRole.get('FL');
-  const FR = byRole.get('FR');
-  const SL = byRole.get('SL');
-  const SR = byRole.get('SR');
-  const LW = byRole.get('LW');
-  const RW = byRole.get('RW');
-  
-  // Check for Front Wides presence
+
+  const left = (() => {
+    if (!haveLeftAnchors) return null;
+    const mid = { x: (FL.x + SL.x) / 2, y: (FL.y + SL.y) / 2 };
+    const medianAz = azFromToDeg(mlp, mid);
+    const wallX = wallInset; // left wall
+    const target = intersectRayWithWall({
+      mlp,
+      azDeg: medianAz,
+      wallX,
+      wallInset,
+      lengthM,
+    });
+    const actualAz = LW ? azFromToDeg(mlp, LW) : null;
+    const dev = LW && isNum(actualAz) ? circDeltaDeg(actualAz, medianAz) : null;
+    return { mid, medianAz, target, actualAz, dev };
+  })();
+
+  const right = (() => {
+    if (!haveRightAnchors) return null;
+    const mid = { x: (FR.x + SR.x) / 2, y: (FR.y + SR.y) / 2 };
+    const medianAz = azFromToDeg(mlp, mid);
+    const wallX = widthM - wallInset; // right wall
+    const target = intersectRayWithWall({
+      mlp,
+      azDeg: medianAz,
+      wallX,
+      wallInset,
+      lengthM,
+    });
+    const actualAz = RW ? azFromToDeg(mlp, RW) : null;
+    const dev = RW && isNum(actualAz) ? circDeltaDeg(actualAz, medianAz) : null;
+    return { mid, medianAz, target, actualAz, dev };
+  })();
+
   const hasWides = !!(LW && RW);
-  
-  // Check for anchor speakers
-  if (!FL || !FR || !SL || !SR) {
-    return {
-      status: 'missing_anchors',
-      reason: 'missing FL/FR/SL/SR',
-      hasWides,
-      left: null,
-      right: null,
-      maxDeviation: null,
-      level: null
-    };
-  }
-  
-  // If no wides, return no_data (not an error, just not applicable)
-  if (!hasWides) {
-    return {
-      status: 'no_data',
-      reason: 'no Front Wides present',
-      hasWides: false,
-      left: null,
-      right: null,
-      maxDeviation: null,
-      level: null
-    };
-  }
-  
-  // ========================================================================
-  // LEFT SIDE: RP22 Spatial Median Calculation
-  // ========================================================================
-  
-  // 1. Spatial midpoint between FL and SL
-  const leftMidX = (FL.position.x + SL.position.x) / 2;
-  const leftMidY = (FL.position.y + SL.position.y) / 2;
-  
-  // 2. Median azimuth from MLP to spatial midpoint
-  const leftDx = leftMidX - mlpPoint.x;
-  const leftDy = leftMidY - mlpPoint.y;
-  const leftMedianAz = (Math.atan2(leftDx, leftDy) * 180 / Math.PI + 360) % 360;
-  
-  // 3. Target position on left wall
-  const leftTargetPos = rayIntersect(mlpPoint, leftMedianAz, roomDims, 'left', wallInset);
-  
-  // 4. Actual LW azimuth
-  const lwDx = LW.position.x - mlpPoint.x;
-  const lwDy = LW.position.y - mlpPoint.y;
-  const lwActualAz = (Math.atan2(lwDx, lwDy) * 180 / Math.PI + 360) % 360;
-  
-  // 5. Deviation
-  const leftDeviation = circDelta(lwActualAz, leftMedianAz);
-  
-  // ========================================================================
-  // RIGHT SIDE: RP22 Spatial Median Calculation
-  // ========================================================================
-  
-  // 1. Spatial midpoint between FR and SR
-  const rightMidX = (FR.position.x + SR.position.x) / 2;
-  const rightMidY = (FR.position.y + SR.position.y) / 2;
-  
-  // 2. Median azimuth from MLP to spatial midpoint
-  const rightDx = rightMidX - mlpPoint.x;
-  const rightDy = rightMidY - mlpPoint.y;
-  const rightMedianAz = (Math.atan2(rightDx, rightDy) * 180 / Math.PI + 360) % 360;
-  
-  // 3. Target position on right wall
-  const rightTargetPos = rayIntersect(mlpPoint, rightMedianAz, roomDims, 'right', wallInset);
-  
-  // 4. Actual RW azimuth
-  const rwDx = RW.position.x - mlpPoint.x;
-  const rwDy = RW.position.y - mlpPoint.y;
-  const rwActualAz = (Math.atan2(rwDx, rwDy) * 180 / Math.PI + 360) % 360;
-  
-  // 5. Deviation
-  const rightDeviation = circDelta(rwActualAz, rightMedianAz);
-  
-  // ========================================================================
-  // P7 Grading
-  // ========================================================================
-  
-  const maxDeviation = Math.max(leftDeviation ?? 0, rightDeviation ?? 0);
-  const level = levelForP7(maxDeviation);
-  
+  const devs = [left?.dev, right?.dev].filter((v) => isNum(v));
+  const maxDev = devs.length ? Math.max(...devs) : null;
+
   return {
-    status: 'ok',
-    hasWides: true,
-    left: {
-      medianAz: leftMedianAz,
-      targetPosition: leftTargetPos,
-      actualAz: lwActualAz,
-      deviation: leftDeviation
-    },
-    right: {
-      medianAz: rightMedianAz,
-      targetPosition: rightTargetPos,
-      actualAz: rwActualAz,
-      deviation: rightDeviation
-    },
-    maxDeviation,
-    level
+    status: "ok",
+    mlp,
+    hasWides,
+    left,
+    right,
+    maxDev,
   };
+}
+
+export function gradeP7FromMaxDev(maxDev) {
+  if (!isNum(maxDev)) return { level: null, label: "—" };
+  // thresholds: L4 <=2, L3 <=5, L2 <=7, L1 <=10, else FAIL
+  if (maxDev <= 2) return { level: 4, label: "L4" };
+  if (maxDev <= 5) return { level: 3, label: "L3" };
+  if (maxDev <= 7) return { level: 2, label: "L2" };
+  if (maxDev <= 10) return { level: 1, label: "L1" };
+  return { level: 0, label: "FAIL" };
 }
