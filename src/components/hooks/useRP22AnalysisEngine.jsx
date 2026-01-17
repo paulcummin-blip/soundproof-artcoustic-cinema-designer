@@ -207,7 +207,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, seatSplMetrics, overheadState, aimState }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPoint, seatSplMetrics, overheadState, aimState }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -602,6 +602,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     placedSpeakers,
     seatingPositions,
     mlpBasis,
+    mlpPoint?.x,
+    mlpPoint?.y,
+    mlpPoint?.z,
     dimensions?.heightM,
     dimensions?.height,
     dimensions?.lengthM,
