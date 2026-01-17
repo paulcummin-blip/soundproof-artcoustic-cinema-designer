@@ -41,11 +41,9 @@ function resolveEffectiveSensitivity(speakerMeta, effectiveSplInputs) {
                  safeNum(speakerMeta?.sensitivity) || 
                  87; // default fallback
   
-  // Apply radiation mode adjustment
-  const radiationMode = effectiveSplInputs?.radiationMode || 'half-space';
-  if (radiationMode === 'anechoic') {
-    baseSens -= 6; // Anechoic reduces effective sensitivity by 6 dB
-  }
+  // ALWAYS use anechoic calculation (no radiation mode adjustment to SPL maths)
+  // Radiation mode now only affects P12 level grading thresholds
+  baseSens -= 6; // Always apply anechoic reduction
   
   return baseSens;
 }
@@ -413,10 +411,10 @@ export function computeSingleSeatSplAtDistance({
   const { spl1m_capability: spl1m_cont } = getSPL1mCapability(effectiveMeta, powerW, effectiveSensitivity);
 
   // 4. Peak SPL @ 1m (CF6) - direct from spec, not amp-limited
-  // Peak SPL also needs radiation mode adjustment (same as sensitivity)
+  // ALWAYS use anechoic calculation (no radiation mode adjustment)
   let spl1m_peak = effectiveMeta.max_spl_peak_db_cf6_1m;
-  if (spl1m_peak !== null && radiationMode === 'anechoic') {
-    spl1m_peak -= 6; // Apply same radiation mode adjustment to peak
+  if (spl1m_peak !== null) {
+    spl1m_peak -= 6; // Always apply anechoic reduction
   }
 
   // 5. Distance loss (simple 1D for calculator context)
