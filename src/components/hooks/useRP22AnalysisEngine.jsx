@@ -478,6 +478,17 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       gradedParameters.primary[7] = null;
     }
 
+    // RP22 Parameter 11 — Speaker Zone Compliance (always L4, app enforces zones)
+    const p11CatalogEntry = RP22_CATALOG["11"];
+    gradedParameters.primary[11] = {
+      title: p11CatalogEntry?.title || "Speaker zone compliance",
+      level: "L4",
+      value: 0,
+      unit: p11CatalogEntry?.unit || "",
+      status: "ok",
+      note: "App enforces zone compliance"
+    };
+
     gradedParameters.secondary = null;
 
     // Compute per-seat RP22 metrics (P9, P10, P16, P17, P20)
