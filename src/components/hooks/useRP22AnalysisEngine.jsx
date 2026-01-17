@@ -489,17 +489,6 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       note: "App enforces zone compliance"
     };
 
-    // RP22 Parameter 12 — SPL at Reference Seat (fixed L4 until AES75 model implemented)
-    const p12CatalogEntry = RP22_CATALOG["12"];
-    gradedParameters.primary[12] = {
-      title: p12CatalogEntry?.title || "SPL at Reference Seat",
-      level: "L4",
-      value: 111,
-      unit: p12CatalogEntry?.unit || "dB SPL (C)",
-      status: "ok",
-      note: "Fixed reference (AES75 model pending)"
-    };
-
     gradedParameters.secondary = null;
 
     // Compute per-seat RP22 metrics (P9, P10, P16, P17, P20)

@@ -173,16 +173,6 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 </span>
                                 {renderLevelBadge('L4')}
                             </div>
-                        ) : parameter.id === 11 ? (
-                            <div className="flex justify-between items-center">
-                                <span 
-                                    className="text-sm font-bold"
-                                    style={{ color: '#213428' }}
-                                >
-                                    0
-                                </span>
-                                {renderLevelBadge('L4')}
-                            </div>
                         ) : hasRoomResult && roomResult.status !== 'no_data' ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm text-[#213428] font-medium">
