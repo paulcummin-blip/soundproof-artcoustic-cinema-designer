@@ -74,12 +74,15 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
   };
 }
 
-function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front") {
+function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPointOverride = null) {
   const seatsWithRoles = computeSeatRoles(asArr(seating));
   const primarySeats = seatsWithRoles.filter(s => s.isPrimary);
   const src = primarySeats.length ? primarySeats : seatsWithRoles;
   
-  const mlp = pickMLP(mlpBasis, src);
+  // Use passed mlpPoint (green dot) if available, else fall back to seat-based MLP
+  const mlp = mlpPointOverride && Number.isFinite(mlpPointOverride.x) && Number.isFinite(mlpPointOverride.y)
+    ? mlpPointOverride
+    : pickMLP(mlpBasis, src);
   
   // NULL-SAFE GUARD
   if (!mlp || !Number.isFinite(mlp.x) || !Number.isFinite(mlp.y)) {
@@ -343,7 +346,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     }
 
     // RP22 Parameter 7 — Front Wides (kept)
-    const p7Result = evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis);
+    const p7Result = evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis, mlpPoint);
     if (p7Result.level !== null) {
       gradedParameters.primary[p7Result.number] = {
         title: p7Result.title,
