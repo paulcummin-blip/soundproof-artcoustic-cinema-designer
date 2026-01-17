@@ -134,6 +134,21 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     Speaker locations are not strict angle numbers; they are designated zones/areas for speaker groups resulting from multiple trade-offs. Zones are broad enough to allow some flexibility in speaker locations.
                                 </div>
                             </div>
+                        ) : parameter.id === 12 ? (
+                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="mb-1">dB SPL (C)</div>
+                                <div className="mb-1">-</div>
+                                <div className="text-[9px] space-y-0.5">
+                                    <div>L1: 102</div>
+                                    <div>L2: 105</div>
+                                    <div>L3: 108</div>
+                                    <div>L4: 111</div>
+                                </div>
+                                <div className="text-[9px] mt-1">Room</div>
+                                <div className="text-[9px] mt-1">
+                                    Sound Pressure Level at the Reference Seating Position is the recommended minimum long term SPL according to AES75-2022 or ANSI-CTA-2034-A, Section 8. Consideration should be given to the following: 1. Additional speaker SPL capability at bass frequencies to allow for bass contours 2. Additional speaker SPL capability to allow for +EQ
+                                </div>
+                            </div>
                         ) : null}
                     </div>
                     
