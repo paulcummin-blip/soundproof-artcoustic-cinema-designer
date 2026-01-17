@@ -1,7 +1,7 @@
 // p7WideAnalysis.js
 // RP22 P7 for front wides: deviation from the median between LW & RW
 
-import { isP5SurroundRole } from './roles'; // we already added this
+import { computeFrontWideMedianData, gradeP7FromMaxDev } from './frontWideMedian';
 import { pickMLP } from './seatingUtils';
 
 const A = (x) => (Array.isArray(x) ? x : []);
@@ -63,146 +63,54 @@ function normalizeFrontWideRole(role) {
 }
 
 /**
- * Compute P7 details using MLP → wide speaker midpoint approach
- * - medianPoint = midpoint of LW and RW positions
- * - medianAzDeg = azimuth from MLP to medianPoint
- * - lwAzDeg, rwAzDeg = azimuths from MLP to each wide
- * - Deviation = |actualAz - medianAz| (circular)
+ * Compute P7 details using canonical RP22 spatial median helper
  * Returns { enabled, details, level, maxDeviation, displayValue, debug }
  */
-export function computeP7Wides({ speakers = [], seats = [], mlpOverride = null }) {
+export function computeP7Wides({ speakers = [], seats = [], mlpOverride = null, widthM = 0, lengthM = 0 }) {
   const spk = A(speakers);
   const mlp = mlpOverride || pickMLP(A(seats)) || null;
   
-  // Build role inventory for debug
-  const rawRoles = spk.map(s => s?.role).filter(Boolean);
-  const uniqueRoles = [...new Set(rawRoles)];
-  
-  // Debug object for all intermediate values
-  const debug = {
-    speakerCount: spk.length,
-    rolesFound: uniqueRoles.join(', ') || 'none',
-    lwRoleRaw: null,
-    rwRoleRaw: null,
-    lwHasPos: false,
-    rwHasPos: false,
-    hasWides: false,
-    mlp: mlp ? `(${mlp.x.toFixed(2)}, ${mlp.y.toFixed(2)})` : '—',
-    medianAzDeg: null,
-    lwAzDeg: null,
-    rwAzDeg: null,
-    lwDevDeg: null,
-    rwDevDeg: null,
-    maxDevDeg: null,
-  };
+  // Call canonical median helper
+  const median = computeFrontWideMedianData({
+    placedSpeakers: spk,
+    mlpPoint: mlp,
+    widthM,
+    lengthM,
+    wallInset: 0.05,
+  });
 
-  if (!mlp) {
-    return { 
-      enabled: false,
-      hasWides: false,
-      valueDeg: null,
-      details: null, 
-      level: null,
-      maxDeviation: null,
-      displayValue: '—',
-      debug
-    };
-  }
+  const maxDev = median?.status === 'ok' ? median.maxDev : null;
+  const grade = gradeP7FromMaxDev(maxDev);
 
-  // Build normalized role map
-  const byRole = new Map();
-  for (const s of spk) {
-    const normalized = normalizeFrontWideRole(s?.role);
-    if (normalized && !byRole.has(normalized)) {
-      byRole.set(normalized, s);
-    }
-  }
-
-  const lwSpeaker = byRole.get('LW') || null;
-  const rwSpeaker = byRole.get('RW') || null;
-  
-  const posLW = getXY(lwSpeaker);
-  const posRW = getXY(rwSpeaker);
-
-  // Debug role detection
-  debug.lwRoleRaw = lwSpeaker?.role || null;
-  debug.rwRoleRaw = rwSpeaker?.role || null;
-  debug.lwHasPos = !!posLW;
-  debug.rwHasPos = !!posRW;
-
-  // Check if wides are present
-  const hasLW = !!posLW;
-  const hasRW = !!posRW;
-  debug.hasWides = hasLW && hasRW;
-
-  if (!hasLW || !hasRW) {
-    return {
-      enabled: false,
-      hasWides: false,
-      valueDeg: null,
-      details: null,
-      level: null,
-      maxDeviation: null,
-      displayValue: '—',
-      debug
-    };
-  }
-
-  // Compute median point (midpoint of LW and RW)
-  const medianPoint = {
-    x: (posLW.x + posRW.x) / 2,
-    y: (posLW.y + posRW.y) / 2
-  };
-
-  // Clean helper: ensure number or null (never undefined)
   const clean = (v) => (typeof v === "number" && Number.isFinite(v) ? v : null);
-
-  // Compute azimuths
-  const medianAz = azimuthFromMLP(mlp, medianPoint);
-  const lwAz = azimuthFromMLP(mlp, posLW);
-  const rwAz = azimuthFromMLP(mlp, posRW);
-
-  debug.medianAzDeg = clean(medianAz);
-  debug.lwAzDeg = clean(lwAz);
-  debug.rwAzDeg = clean(rwAz);
-
-  // Compute deviations (circular delta)
-  const devLW = (N(lwAz) && N(medianAz)) ? circDelta(lwAz, medianAz) : null;
-  const devRW = (N(rwAz) && N(medianAz)) ? circDelta(rwAz, medianAz) : null;
-
-  debug.lwDevDeg = clean(devLW);
-  debug.rwDevDeg = clean(devRW);
-
-  const lvlLW = devLW != null ? levelForP7(devLW) : null;
-  const lvlRW = devRW != null ? levelForP7(devRW) : null;
-
-  // Worst level wins (L4 > L3 > L2 > L1 > FAIL > null)
-  const levelOrder = { 'L4': 4, 'L3': 3, 'L2': 2, 'L1': 1, 'FAIL': 0 };
-  let level = null;
-  if (lvlLW !== null && lvlRW !== null) {
-    const lwVal = levelOrder[lvlLW] ?? -1;
-    const rwVal = levelOrder[lvlRW] ?? -1;
-    level = lwVal < rwVal ? lvlLW : lvlRW;
-  }
-
-  // Max deviation for display
-  const maxDev = clean(Math.max(devLW ?? 0, devRW ?? 0));
-  debug.maxDevDeg = clean(maxDev);
-  
   const displayValue = N(maxDev) ? `±${Math.floor(maxDev)}°` : '—';
 
   return {
-    enabled: true,
-    hasWides: true,
+    enabled: median?.status === 'ok' && median?.hasWides,
+    hasWides: !!median?.hasWides,
     valueDeg: clean(maxDev),
-    details: {
-      LW: { targetAngle: clean(medianAz), actualAngle: clean(lwAz), deviation: clean(devLW) },
-      RW: { targetAngle: clean(medianAz), actualAngle: clean(rwAz), deviation: clean(devRW) },
-    },
-    level,
+    details: median?.status === 'ok' ? {
+      LW: { 
+        targetAngle: clean(median.left?.medianAz), 
+        actualAngle: clean(median.left?.actualAz), 
+        deviation: clean(median.left?.dev) 
+      },
+      RW: { 
+        targetAngle: clean(median.right?.medianAz), 
+        actualAngle: clean(median.right?.actualAz), 
+        deviation: clean(median.right?.dev) 
+      },
+    } : null,
+    level: grade.label,
     maxDeviation: clean(maxDev),
     displayValue,
-    debug
+    debug: {
+      status: median?.status || 'no_data',
+      hasWides: !!median?.hasWides,
+      maxDev: clean(maxDev),
+      leftDev: clean(median?.left?.dev),
+      rightDev: clean(median?.right?.dev),
+    }
   };
 }
 
