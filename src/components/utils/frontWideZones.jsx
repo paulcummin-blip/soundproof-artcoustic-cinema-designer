@@ -1,4 +1,5 @@
 // Safe inputs, no bare mlp usage
+import { computeRp22FrontWideMedianData } from './rp22FrontWides';
 
 const CANONICAL_ROLE_MAP = {
   'SL': 'SL', 'LS': 'SL',
@@ -62,37 +63,43 @@ export function computeFrontWideZonesStrict({
     return { status: 'no-sides', reason: 'SL/SR not on side walls' };
   }
 
+  // Use canonical RP22 median angle calculation
+  const medianData = computeRp22FrontWideMedianData({
+    mlpPoint,
+    placedSpeakers,
+    roomDims: { widthM: W, lengthM: L },
+    wallInsetM: 0.01
+  });
+
+  // If helper cannot compute, return existing "no data" shape
+  if (medianData.status !== 'ok' || !medianData.targetLW || !medianData.targetRW) {
+    return { status: 'no-sides', reason: 'cannot compute median' };
+  }
+
+  // Convert helper output to overlay-expected format (preserve return shape)
   const deg2rad = (d) => d * Math.PI / 180;
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
   const xWallL = 0.01;
   const xWallR = W - 0.01;
 
-  const mlpX = Number(mlpPoint.x);
-  const mlpY = Number(mlpPoint.y);
+  const computeSide = (medianAzDeg, targetPos, xWall, sideName) => {
+    const medianY = clamp(targetPos.y, 0, L);
+    
+    // ±10° zone around median
+    const thetaMin = deg2rad(medianAzDeg - 10);
+    const thetaMax = deg2rad(medianAzDeg + 10);
 
-  const computeSide = (F, S, xWall, sideName) => {
-    const midX = (F.position.x + S.position.x) / 2;
-    const midY = (F.position.y + S.position.y) / 2;
-
-    const theta = Math.atan2(midY - mlpY, midX - mlpX);
-    const thetaDeg = theta * 180 / Math.PI;
-
-    const thetaMin = theta - deg2rad(10);
-    const thetaMax = theta + deg2rad(10);
-
-    const dx = xWall - mlpX;
-    const yMed = mlpY + dx * Math.tan(theta);
-    const yLo = mlpY + dx * Math.tan(thetaMin);
-    const yHi = mlpY + dx * Math.tan(thetaMax);
+    const dx = xWall - mlpPoint.x;
+    const yLo = mlpPoint.y + dx * Math.tan(thetaMin);
+    const yHi = mlpPoint.y + dx * Math.tan(thetaMax);
 
     const yMin = clamp(Math.min(yLo, yHi), 0, L);
     const yMax = clamp(Math.max(yLo, yHi), 0, L);
-    const medianY = clamp(yMed, 0, L);
 
     if (typeof console !== 'undefined' && console.log) {
       console.log(`[FW] ${sideName} yMin=${yMin.toFixed(3)}..yMax=${yMax.toFixed(3)} @ median=${medianY.toFixed(3)}`,
-        `inputs: F.y=${F.position.y.toFixed(3)}, S.y=${S.position.y.toFixed(3)}, MLP.y=${mlpY.toFixed(3)}, θ=${thetaDeg.toFixed(1)}°`);
+        `medianAz=${medianAzDeg.toFixed(1)}°`);
     }
 
     return {
@@ -103,8 +110,8 @@ export function computeFrontWideZonesStrict({
     };
   };
 
-  const leftZone = computeSide(fl, sl, xWallL, 'L');
-  const rightZone = computeSide(fr, sr, xWallR, 'R');
+  const leftZone = computeSide(medianData.medianAzLeftDeg, medianData.targetLW, xWallL, 'L');
+  const rightZone = computeSide(medianData.medianAzRightDeg, medianData.targetRW, xWallR, 'R');
 
   return {
     status: 'ok',
