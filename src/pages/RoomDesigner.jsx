@@ -4546,7 +4546,8 @@ function RoomDesignerWithState() {
                 globalSurroundModel={appState?.globalSurroundModel}
                 setGlobalSurroundModel={appState?.setGlobalSurroundModel}
 
-                allSeatSplMetrics={allSeatSplMetrics} />
+                allSeatSplMetrics={allSeatSplMetrics}
+                frontWideOverlay={frontWideZones} />
 
                   </Suspense>
                   

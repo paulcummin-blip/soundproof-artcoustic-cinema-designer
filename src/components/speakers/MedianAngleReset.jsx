@@ -12,7 +12,8 @@ export default function MedianAngleReset({
   mlpPoint, 
   roomDims, 
   setSpeakers,
-  disabled = false
+  disabled = false,
+  frontWideOverlay = null
 }) {
   const [justReset, setJustReset] = useState(false);
 
@@ -167,6 +168,11 @@ export default function MedianAngleReset({
 
   if (!hasWides) return null;
 
+  // Debug: Check if overlay truth is usable
+  const overlayUsable = frontWideOverlay?.status === 'ok' && 
+                        frontWideOverlay?.left?.status === 'ok' && 
+                        frontWideOverlay?.right?.status === 'ok';
+
   return (
     <div className="px-4 py-3 border-t border-gray-200">
       <div className="flex items-center justify-between">
@@ -193,6 +199,26 @@ export default function MedianAngleReset({
           Front Wides not available (missing L, R, SL, SR, or MLP)
         </div>
       )}
+      
+      {/* DEBUG: Overlay Truth Check */}
+      <div className="mt-3 p-2 rounded bg-gray-50 border border-gray-200 text-[10px] font-mono space-y-1">
+        <div className="font-semibold text-gray-700 mb-1">Overlay Truth Debug</div>
+        <div>Status: <span className="font-semibold">{frontWideOverlay?.status || 'null'}</span></div>
+        <div>Left Status: <span className="font-semibold">{frontWideOverlay?.left?.status || '—'}</span></div>
+        <div>Left MedianY: <span className="font-semibold">
+          {Number.isFinite(frontWideOverlay?.left?.medianY) 
+            ? `${frontWideOverlay.left.medianY.toFixed(3)}m` 
+            : '—'}
+        </span></div>
+        <div>Right MedianY: <span className="font-semibold">
+          {Number.isFinite(frontWideOverlay?.right?.medianY) 
+            ? `${frontWideOverlay.right.medianY.toFixed(3)}m` 
+            : '—'}
+        </span></div>
+        <div>Usable: <span className={`font-semibold ${overlayUsable ? 'text-green-700' : 'text-red-700'}`}>
+          {overlayUsable ? 'YES' : 'NO'}
+        </span></div>
+      </div>
     </div>
   );
 }

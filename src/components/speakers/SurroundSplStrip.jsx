@@ -16,7 +16,8 @@ export default function SurroundSplStrip({
   mlpPoint,
   roomDims,
   setSpeakers,
-  disabled = false
+  disabled = false,
+  frontWideOverlay = null
 }) {
   const mlpSplData = useMemo(() => {
     if (!allSeatSplMetrics) return null;
@@ -103,6 +104,7 @@ export default function SurroundSplStrip({
         roomDims={roomDims}
         setSpeakers={setSpeakers}
         disabled={disabled}
+        frontWideOverlay={frontWideOverlay}
       />
       <div className="text-xs font-medium text-[#625143] mb-2">SPL @ MLP</div>
       <div className="grid grid-cols-3 gap-2">

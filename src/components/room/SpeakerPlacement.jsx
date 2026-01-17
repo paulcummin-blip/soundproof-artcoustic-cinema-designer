@@ -3013,6 +3013,7 @@ function SpeakerPlacementImpl(props) {
             roomDims={effectiveDims}
             setSpeakers={setSpeakers}
             disabled={disabled}
+            frontWideOverlay={props.frontWideOverlay}
           />
           
           {(() => {
