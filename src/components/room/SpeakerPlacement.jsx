@@ -1302,7 +1302,10 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         </div>
 
         <div className="space-y-2">
-          <Label className="text-xs text-[#625143]">Radiation Mode</Label>
+          <Label className="text-xs text-[#625143]">P12 Mode</Label>
+          <div className="text-[10px] text-[#8a8e93] -mt-1 mb-2">
+            Recommended = RP22 recommended SPL thresholds • Minimum = RP22 minimum SPL thresholds
+          </div>
           <div className="flex gap-2">
             <Button
               type="button"
@@ -1316,7 +1319,7 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
               onClick={() => updateGlobalSpl?.({ radiationMode: 'half-space' })}
               disabled={disabled}
             >
-              Half-Space
+              Minimum
             </Button>
             <Button
               type="button"
@@ -1330,7 +1333,7 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
               onClick={() => updateGlobalSpl?.({ radiationMode: 'anechoic' })}
               disabled={disabled}
             >
-              Anechoic
+              Recommended
             </Button>
           </div>
         </div>
@@ -1387,7 +1390,14 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         if (lcrTileSplDb.length === 0) return null;
 
         const pillBasisDb = Math.min(...lcrTileSplDb);
-        const level = computeRP22Level(pillBasisDb, P12_THRESHOLDS);
+        
+        // Use different thresholds based on radiation mode (state values kept for backwards compat)
+        const isMinimumMode = splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode;
+        const thresholds = isMinimumMode 
+          ? { L1: 99, L2: 102, L3: 105, L4: 108 }  // Minimum thresholds
+          : { L1: 102, L2: 105, L3: 108, L4: 111 }; // Recommended thresholds
+        
+        const level = computeRP22Level(pillBasisDb, thresholds);
 
         return (
           <RP22LevelPill 
