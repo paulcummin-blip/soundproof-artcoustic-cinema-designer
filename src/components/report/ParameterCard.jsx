@@ -119,6 +119,21 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     Absent the ability to install top (overhead) speakers, one solution is to employ upfiring/elevation (e.g., "Atmos Enabled") speakers aimed at a reflective ceiling surface to reproduce immersive content and audio objects. These speakers should have a suitable mechanical and electrical design.
                                 </div>
                             </div>
+                        ) : parameter.id === 11 ? (
+                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="mb-1">Number speakers</div>
+                                <div className="mb-1">-</div>
+                                <div className="text-[9px] space-y-0.5">
+                                    <div>L1: N/A</div>
+                                    <div>L2: 0</div>
+                                    <div>L3: 0</div>
+                                    <div>L4: 0</div>
+                                </div>
+                                <div className="text-[9px] mt-1">Room</div>
+                                <div className="text-[9px] mt-1">
+                                    Speaker locations are not strict angle numbers; they are designated zones/areas for speaker groups resulting from multiple trade-offs. Zones are broad enough to allow some flexibility in speaker locations.
+                                </div>
+                            </div>
                         ) : null}
                     </div>
                     
