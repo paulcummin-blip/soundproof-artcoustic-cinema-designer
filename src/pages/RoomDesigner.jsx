@@ -2173,6 +2173,89 @@ function RoomDesignerWithState() {
     return primary ? { ...primary, x: roomWidth / 2 } : null;
   }, [_seatingPositions, stableDimensions.width, stableDimensions.length, _mlpBasis]);
 
+  // ✅ CRITICAL: Declare frontWideZones BEFORE analysisResult (to prevent "before initialization" error)
+  // Safe front-wide zone memo with hard guards
+  const frontWideZones = useMemo(() => {
+    if (!_enableFrontWides) {
+      const result = { status: 'disabled' };
+      if (typeof window !== 'undefined') {
+        window.FW_DBG = result;
+        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
+      }
+      return result;
+    }
+
+    if (!mlpAnchorEffective) {// Use mlpAnchorEffective as the fixed reference
+      const result = { status: 'no-mlp' };
+      if (typeof window !== 'undefined') {
+        window.FW_DBG = result;
+        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
+      }
+      return result;
+    }
+
+    const W = stableDimensions.width || 0;
+    const L = stableDimensions.length || 0;
+    if (!(W > 0 && L > 0)) {
+      const result = { status: 'invalid-geom', reason: 'room dims' };
+      if (typeof window !== 'undefined') {
+        window.FW_DBG = result;
+        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
+      }
+      return result;
+    }
+
+    // safeCanon is already defined at the top level of the file
+    const sl = placedSpeakers?.find((s) => safeCanon(s?.role) === 'SL');
+    const sr = placedSpeakers?.find((s) => safeCanon(s?.role) === 'SR');
+
+    if (!sl || !sr) {
+      const result = { status: 'no-sides' };
+      if (typeof window !== 'undefined') {
+        window.FW_DBG = result;
+        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
+      }
+      return result;
+    }
+
+    let result;
+    try {
+      const getModelDims = (modelId) => getSpeakerModelMeta(modelId) || {};
+
+      // Direct call to named export: computeFrontWideZonesStrict
+      result = computeFrontWideZonesStrict({
+        mlpPoint: mlpAnchorEffective, // Use mlpAnchorEffective (now derived from screen AND offset)
+        dimensions: stableDimensions,
+        placedSpeakers,
+        getModelDims,
+        rp22BoundDeg: 10
+      }) || { status: 'invalid-geom', reason: 'empty result' };
+    } catch (e) {
+      result = { status: 'invalid-geom', reason: 'exception', error: e.message };
+      if (typeof window !== 'undefined' && window.DBG_FW && SHOW_DEBUG_LOGS) {
+        if (globalThis.__B44_LOGS) console.warn('[FW zones] compute failed', e);
+      }
+    }
+
+    // Debug hook: expose computed zones
+    if (typeof window !== 'undefined') {
+      window.FW_DBG = result;
+      if (SHOW_DEBUG_LOGS && window.DBG_FW) {
+        if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
+        if (result.status === 'ok') {
+          if (globalThis.__B44_LOGS) console.log('[FW] L =', result.left, 'R =', result.right);
+        }
+      }
+    }
+
+    return result;
+  }, [
+  _enableFrontWides,
+  mlpAnchorEffective, // Depend on mlpAnchorEffective
+  stableDimensions,
+  placedSpeakers]
+  );
+
   // ✅ Move analysisResult BEFORE any effects that depend on it
   const analysisResult = useRP22AnalysisEngine({
     placedSpeakers: placedSpeakers,
@@ -2424,87 +2507,7 @@ function RoomDesignerWithState() {
 
   const enableFrontWides = _enableFrontWides;
 
-  // Safe front-wide zone memo with hard guards
-  const frontWideZones = useMemo(() => {
-    if (!enableFrontWides) {
-      const result = { status: 'disabled' };
-      if (typeof window !== 'undefined') {
-        window.FW_DBG = result;
-        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
-      }
-      return result;
-    }
-
-    if (!mlpAnchorEffective) {// Use mlpAnchorEffective as the fixed reference
-      const result = { status: 'no-mlp' };
-      if (typeof window !== 'undefined') {
-        window.FW_DBG = result;
-        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
-      }
-      return result;
-    }
-
-    const W = stableDimensions.width || 0;
-    const L = stableDimensions.length || 0;
-    if (!(W > 0 && L > 0)) {
-      const result = { status: 'invalid-geom', reason: 'room dims' };
-      if (typeof window !== 'undefined') {
-        window.FW_DBG = result;
-        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
-      }
-      return result;
-    }
-
-    // safeCanon is already defined at the top level of the file
-    const sl = placedSpeakers?.find((s) => safeCanon(s?.role) === 'SL');
-    const sr = placedSpeakers?.find((s) => safeCanon(s?.role) === 'SR');
-
-    if (!sl || !sr) {
-      const result = { status: 'no-sides' };
-      if (typeof window !== 'undefined') {
-        window.FW_DBG = result;
-        if (SHOW_DEBUG_LOGS && window.DBG_FW) if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
-      }
-      return result;
-    }
-
-    let result;
-    try {
-      const getModelDims = (modelId) => getSpeakerModelMeta(modelId) || {};
-
-      // Direct call to named export: computeFrontWideZonesStrict
-      result = computeFrontWideZonesStrict({
-        mlpPoint: mlpAnchorEffective, // Use mlpAnchorEffective (now derived from screen AND offset)
-        dimensions: stableDimensions,
-        placedSpeakers,
-        getModelDims,
-        rp22BoundDeg: 10
-      }) || { status: 'invalid-geom', reason: 'empty result' };
-    } catch (e) {
-      result = { status: 'invalid-geom', reason: 'exception', error: e.message };
-      if (typeof window !== 'undefined' && window.DBG_FW && SHOW_DEBUG_LOGS) {
-        if (globalThis.__B44_LOGS) console.warn('[FW zones] compute failed', e);
-      }
-    }
-
-    // Debug hook: expose computed zones
-    if (typeof window !== 'undefined') {
-      window.FW_DBG = result;
-      if (SHOW_DEBUG_LOGS && window.DBG_FW) {
-        if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
-        if (result.status === 'ok') {
-          if (globalThis.__B44_LOGS) console.log('[FW] L =', result.left, 'R =', result.right);
-        }
-      }
-    }
-
-    return result;
-  }, [
-  enableFrontWides,
-  mlpAnchorEffective, // Depend on mlpAnchorEffective
-  stableDimensions,
-  placedSpeakers]
-  );
+  // ✅ REMOVED: frontWideZones declaration moved earlier (before analysisResult)
 
 
   // Effect for subwoofer placement
