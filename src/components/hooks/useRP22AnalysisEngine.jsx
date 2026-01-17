@@ -195,19 +195,22 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
     unit: p7CatalogEntry.unit,
     overlay: null,
     note: "Front Wide angular deviation from bisector",
-    deviation: avgDev, // Keep for p7Details access
+    deviation: avgDev,
     perSide: {
       LW: detailsL,
       RW: detailsR
     },
-    status: "ok"
+    status: "ok",
+    // Debug: confirm which MLP was used
+    p7MlpUsed: { x: mlp.x, y: mlp.y },
+    p7MlpSource: mlpPointOverride ? "override" : "seat"
   };
 }
 
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPoint, seatSplMetrics, overheadState, aimState }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -346,7 +349,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     }
 
     // RP22 Parameter 7 — Front Wides (kept)
-    const p7Result = evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis, mlpPoint);
+    const p7Result = evaluateFrontWideDeviation(safeSpeakers, safeSeats, mlpBasis, mlpPointOverride);
     if (p7Result.level !== null) {
       gradedParameters.primary[p7Result.number] = {
         title: p7Result.title,
@@ -602,9 +605,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     placedSpeakers,
     seatingPositions,
     mlpBasis,
-    mlpPoint?.x,
-    mlpPoint?.y,
-    mlpPoint?.z,
+    mlpPointOverride?.x,
+    mlpPointOverride?.y,
     dimensions?.heightM,
     dimensions?.height,
     dimensions?.lengthM,

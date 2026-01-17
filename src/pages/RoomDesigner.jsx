@@ -2180,7 +2180,7 @@ function RoomDesignerWithState() {
     primarySeatingPosition: primarySeatingPosition,
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
     mlpBasis: _mlpBasis,
-    mlpPoint: mlpAnchorEffective, // NEW: Use same MLP as FW overlay (green dot)
+    mlpPointOverride: mlpAnchorEffective, // Use same MLP as FW overlay (green dot)
     seatSplMetrics: allSeatSplMetrics,
     overheadState: {
       globalModel: _overheadGlobalModel,
