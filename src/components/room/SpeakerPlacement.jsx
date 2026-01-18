@@ -1303,42 +1303,6 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
           </div>
         </div>
 
-        <div className="space-y-2">
-          <Label className="text-xs text-[#625143]">P12 Mode</Label>
-          <div className="text-[10px] text-[#8a8e93] -mt-1 mb-2">
-            Recommended = RP22 recommended SPL thresholds • Minimum = RP22 minimum SPL thresholds
-          </div>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              size="sm"
-              variant={splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode ? 'default' : 'outline'}
-              className={
-                splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode
-                  ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
-                  : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
-              }
-              onClick={() => updateGlobalSpl?.({ radiationMode: 'half-space' })}
-              disabled={disabled}
-            >
-              Minimum
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={splConfig?.radiationMode === 'anechoic' ? 'default' : 'outline'}
-              className={
-                splConfig?.radiationMode === 'anechoic'
-                  ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
-                  : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
-              }
-              onClick={() => updateGlobalSpl?.({ radiationMode: 'anechoic' })}
-              disabled={disabled}
-            >
-              Recommended
-            </Button>
-          </div>
-        </div>
       </div>
 
       <Label htmlFor="lcr-model" className="text-[#3E4349] font-medium">LCR Model</Label>
@@ -1368,6 +1332,43 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
             allSeatSplMetrics={allSeatSplMetrics}
           />
         ))}
+      </div>
+
+      <div className="space-y-2 mt-4">
+        <Label className="text-xs text-[#625143]">P12 Mode</Label>
+        <div className="text-[10px] text-[#8a8e93] -mt-1 mb-2">
+          Recommended = RP22 recommended SPL thresholds • Minimum = RP22 minimum SPL thresholds
+        </div>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode ? 'default' : 'outline'}
+            className={
+              splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode
+                ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+            }
+            onClick={() => updateGlobalSpl?.({ radiationMode: 'half-space' })}
+            disabled={disabled}
+          >
+            Minimum
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={splConfig?.radiationMode === 'anechoic' ? 'default' : 'outline'}
+            className={
+              splConfig?.radiationMode === 'anechoic'
+                ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+            }
+            onClick={() => updateGlobalSpl?.({ radiationMode: 'anechoic' })}
+            disabled={disabled}
+          >
+            Recommended
+          </Button>
+        </div>
       </div>
 
       {(() => {
