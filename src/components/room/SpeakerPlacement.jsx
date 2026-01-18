@@ -1249,6 +1249,35 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
     setLcrPowerInputValue(String(splConfig?.lcrW || 100));
   }, [splConfig?.lcrW]);
 
+  const handleLcrPowerChange = useCallback((e) => {
+    const newValue = e.target.value;
+    // Allow only digits while typing
+    if (newValue !== '' && !/^\d+$/.test(newValue)) return;
+    
+    setLcrPowerInputValue(newValue);
+    
+    if (newValue === '') return;
+    
+    const val = parseInt(newValue, 10);
+    if (Number.isFinite(val) && val >= 1 && val <= 5000) {
+      updateGlobalSpl?.({ lcrW: val });
+    }
+  }, [updateGlobalSpl]);
+
+  const handleLcrPowerBlur = useCallback((e) => {
+    const val = parseInt(e.target.value, 10);
+    if (!Number.isFinite(val) || val < 1 || val > 5000) {
+      const lastValid = splConfig?.lcrW || 100;
+      setLcrPowerInputValue(String(lastValid));
+    } else {
+      const clamped = Math.max(1, Math.min(5000, val));
+      setLcrPowerInputValue(String(clamped));
+      if (clamped !== (splConfig?.lcrW || 100)) {
+        updateGlobalSpl?.({ lcrW: clamped });
+      }
+    }
+  }, [splConfig?.lcrW, updateGlobalSpl]);
+
   const onChooseModel = useCallback((modelLabel) => {
     if (!lcrModelOptions.some(opt => opt.label === modelLabel)) return;
     setLcrModel(modelLabel);
@@ -1292,35 +1321,12 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         <Label className="text-xs text-[#625143]">Amplifier Power (LCR)</Label>
         <div className="relative">
           <Input
-            type="number"
-            min="1"
-            max="5000"
-            step="1"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
             value={lcrPowerInputValue}
-            onChange={(e) => {
-              const newValue = e.target.value;
-              setLcrPowerInputValue(newValue);
-              
-              if (newValue === '') return;
-              
-              const val = parseInt(newValue, 10);
-              if (Number.isFinite(val) && val >= 1 && val <= 5000) {
-                updateGlobalSpl?.({ lcrW: val });
-              }
-            }}
-            onBlur={(e) => {
-              const val = parseInt(e.target.value, 10);
-              if (!Number.isFinite(val) || val < 1 || val > 5000) {
-                const lastValid = splConfig?.lcrW || 100;
-                setLcrPowerInputValue(String(lastValid));
-              } else {
-                const clamped = Math.max(1, Math.min(5000, val));
-                setLcrPowerInputValue(String(clamped));
-                if (clamped !== (splConfig?.lcrW || 100)) {
-                  updateGlobalSpl?.({ lcrW: clamped });
-                }
-              }
-            }}
+            onChange={handleLcrPowerChange}
+            onBlur={handleLcrPowerBlur}
             disabled={disabled}
             className="pr-8"
           />
@@ -1417,6 +1423,18 @@ function SpeakerPlacementImpl(props) {
   // Get app state with splConfig early (before any usage)
   const appStateContext = useAppState();
   const { splConfig = {}, updateGlobalSpl } = appStateContext || {};
+  
+  // Local state for Surrounds and Overheads power inputs
+  const [surroundsPowerInputValue, setSurroundsPowerInputValue] = useState(String(splConfig?.surroundsW || 100));
+  const [overheadsPowerInputValue, setOverheadsPowerInputValue] = useState(String(splConfig?.overheadsW || 100));
+
+  useEffect(() => {
+    setSurroundsPowerInputValue(String(splConfig?.surroundsW || 100));
+  }, [splConfig?.surroundsW]);
+
+  useEffect(() => {
+    setOverheadsPowerInputValue(String(splConfig?.overheadsW || 100));
+  }, [splConfig?.overheadsW]);
   
   // Define dimsSafe early - always exists, always has valid numbers
   const dimsSafe = React.useMemo(() => {
@@ -3029,16 +3047,17 @@ function SpeakerPlacementImpl(props) {
             <Label className="text-xs text-[#625143]">Amplifier Power (Surrounds)</Label>
             <div className="relative">
               <Input
-                type="number"
-                min="1"
-                max="5000"
-                step="1"
-                value={(() => {
-                  const { splConfig } = useAppState() || {};
-                  return String(splConfig?.surroundsW || 100);
-                })()}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={surroundsPowerInputValue}
                 onChange={(e) => {
                   const newValue = e.target.value;
+                  // Allow only digits while typing
+                  if (newValue !== '' && !/^\d+$/.test(newValue)) return;
+                  
+                  setSurroundsPowerInputValue(newValue);
+                  
                   if (newValue === '') return;
                   
                   const val = parseInt(newValue, 10);
@@ -3047,13 +3066,13 @@ function SpeakerPlacementImpl(props) {
                   }
                 }}
                 onBlur={(e) => {
-                  const { splConfig } = useAppState() || {};
                   const val = parseInt(e.target.value, 10);
                   if (!Number.isFinite(val) || val < 1 || val > 5000) {
-                    e.target.value = String(splConfig?.surroundsW || 100);
+                    const lastValid = splConfig?.surroundsW || 100;
+                    setSurroundsPowerInputValue(String(lastValid));
                   } else {
                     const clamped = Math.max(1, Math.min(5000, val));
-                    e.target.value = String(clamped);
+                    setSurroundsPowerInputValue(String(clamped));
                     if (clamped !== (splConfig?.surroundsW || 100)) {
                       updateGlobalSpl?.({ surroundsW: clamped });
                     }
@@ -3176,17 +3195,17 @@ function SpeakerPlacementImpl(props) {
               <Label className="text-xs text-[#625143]">Amplifier Power (Overheads)</Label>
               <div className="relative">
                 <Input
-                  type="number"
-                  min="1"
-                  max="5000"
-                  step="1"
-                  value={(() => {
-                    const { splConfig } = useAppState() || {};
-                    return String(splConfig?.overheadsW || 100);
-                  })()}
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={overheadsPowerInputValue}
                   onChange={(e) => {
-                    const { updateGlobalSpl } = useAppState() || {};
                     const newValue = e.target.value;
+                    // Allow only digits while typing
+                    if (newValue !== '' && !/^\d+$/.test(newValue)) return;
+                    
+                    setOverheadsPowerInputValue(newValue);
+                    
                     if (newValue === '') return;
                     
                     const val = parseInt(newValue, 10);
@@ -3195,13 +3214,13 @@ function SpeakerPlacementImpl(props) {
                     }
                   }}
                   onBlur={(e) => {
-                    const { splConfig, updateGlobalSpl } = useAppState() || {};
                     const val = parseInt(e.target.value, 10);
                     if (!Number.isFinite(val) || val < 1 || val > 5000) {
-                      e.target.value = String(splConfig?.overheadsW || 100);
+                      const lastValid = splConfig?.overheadsW || 100;
+                      setOverheadsPowerInputValue(String(lastValid));
                     } else {
                       const clamped = Math.max(1, Math.min(5000, val));
-                      e.target.value = String(clamped);
+                      setOverheadsPowerInputValue(String(clamped));
                       if (clamped !== (splConfig?.overheadsW || 100)) {
                         updateGlobalSpl?.({ overheadsW: clamped });
                       }
