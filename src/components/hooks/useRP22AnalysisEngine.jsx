@@ -621,7 +621,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     // RP22 Parameter 15 — Background noise floor (design estimate)
     const p15CatalogEntry = RP22_CATALOG["15"];
-    const p15Level = (aimState && aimState.p15ConstructionLevel) || 'standard';
+    const p15LevelKey = (aimState?.p15ConstructionLevel ?? overheadState?.p15ConstructionLevel) || 'standard';
     
     // Map construction level to NCB value and RP22 level
     const p15Mapping = {
@@ -631,7 +631,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       'studio': { value: 15, level: 4 }
     };
     
-    const p15Data = p15Mapping[p15Level] || p15Mapping['standard'];
+    const p15Data = p15Mapping[p15LevelKey] || p15Mapping['standard'];
     
     gradedParameters.primary[15] = {
       title: p15CatalogEntry?.title || "Background noise floor",

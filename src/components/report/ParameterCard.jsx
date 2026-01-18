@@ -197,18 +197,15 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     </label>
                                     <select 
                                         className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
-                                        value={p15ConstructionLevel || 'standard'}
-                                        onChange={(e) => {
-                                            if (onP15ConstructionLevelChange) {
-                                                onP15ConstructionLevelChange(e.target.value);
-                                            }
-                                        }}
+                                        value={p15ConstructionLevel ?? 'standard'}
+                                        onChange={(e) => onP15ConstructionLevelChange?.(e.target.value)}
                                     >
                                         <option value="standard">Standard domestic room</option>
                                         <option value="purpose-built">Purpose-built home cinema</option>
                                         <option value="reference">Reference-grade isolated room</option>
                                         <option value="studio">Studio / screening-room grade</option>
                                     </select>
+                                    <div className="text-[9px] text-gray-400 mt-1">Selected: {p15ConstructionLevel ?? "standard"}</div>
                                 </div>
                                 <div className="mb-1 pt-2 border-t border-gray-100">Max. NCB rating</div>
                                 <div className="mb-1">Rec.</div>
