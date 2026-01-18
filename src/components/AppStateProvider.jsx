@@ -469,12 +469,13 @@ function useDesignerState() {
     _setGlobalSurroundModel(model);
   }, []);
 
-  const [splConfig, setSplConfig] = useState({
-        globalPowerW: 100,
-        globalEqHeadroomDb: 0,
-        radiationMode: 'half-space', // 'half-space' | 'anechoic'
-        perRole: {}
-      });
+  const [splConfig, setSplConfig] = useState(() => ({
+        globalPowerW: (__autosavePayload && __autosavePayload.splConfig?.globalPowerW) || 100,
+        globalEqHeadroomDb: (__autosavePayload && __autosavePayload.splConfig?.globalEqHeadroomDb) || 0,
+        radiationMode: (__autosavePayload && __autosavePayload.splConfig?.radiationMode) || 'half-space',
+        p13Mode: (__autosavePayload && __autosavePayload.splConfig?.p13Mode) || 'minimum',
+        perRole: (__autosavePayload && __autosavePayload.splConfig?.perRole) || {}
+      }));
 
   const getEffectiveSplInputs = useCallback((role) => {
     const roleConfig = splConfig.perRole[role];
@@ -1207,6 +1208,7 @@ function useDesignerState() {
       globalPowerW: 100,
       globalEqHeadroomDb: 0,
       radiationMode: 'half-space',
+      p13Mode: 'minimum',
       perRole: {}
     });
 
