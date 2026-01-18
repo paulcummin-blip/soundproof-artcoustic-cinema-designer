@@ -3164,7 +3164,7 @@ function SpeakerPlacementImpl(props) {
       </CollapsiblePanel>
 
       {overheadCount > 0 && (
-        <CollapsiblePanel title="Overhead Channels" defaultOpen={true}>
+        <CollapsiblePanel title="Overhead Channels" defaultOpen={false}>
           <div className="space-y-3 p-2">
             <OverheadChannelSelector
               overheadCount={overheadCount}
