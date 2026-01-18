@@ -19,7 +19,7 @@ export function CollapsiblePanel({
       >
         <div className="flex items-center gap-2">
           {icon}
-          <span className="font-medium text-[#1B1A1A]">{title}</span>
+          <span className="font-bold text-[#1B1A1A]">{title}</span>
         </div>
         <ChevronDown 
           className={cn(

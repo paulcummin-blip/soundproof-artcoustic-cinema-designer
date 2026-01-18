@@ -1306,7 +1306,9 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
         Angle to MLP: <span className="font-semibold text-[#1B1A1A]">{Math.round(lcrAngleDeg)}°</span>
       </p>
 
-      <div className="grid grid-cols-3 gap-3 mt-4">
+      <div className="mt-4">
+        <Label className="text-xs text-[#625143] mb-2 block">SPL @ RSP</Label>
+        <div className="grid grid-cols-3 gap-3">
         {lcrRoles.map((role) => (
           <LcrSplCard
             key={role}
@@ -1315,6 +1317,7 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
             allSeatSplMetrics={allSeatSplMetrics}
           />
         ))}
+        </div>
       </div>
 
       <div className="space-y-2 mt-4">
