@@ -335,7 +335,7 @@ function RP22ReportInner() {
                                     const isPrimary = tooltipData?.isPrimary || false;
                                     
                                     return (
-                                        <div key={seatId}>
+                                        <div key={seatId} className="flex flex-col h-full">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
@@ -404,7 +404,7 @@ function RP22ReportInner() {
                                                     </CardContent>
                                                 </Card>
                                                 {/* Summary Box */}
-                                                <div className="mt-2">
+                                                <div className="mt-2 flex-1">
                                                     <SeatComplianceSummary position={idx === 0 ? 'left' : idx === 1 ? 'middle' : 'right'} />
                                                 </div>
                                             </div>
