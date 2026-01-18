@@ -197,14 +197,10 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     </label>
                                     <select 
                                         className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
-                                        value={(() => {
-                                            const appState = typeof window !== 'undefined' && window.__APPSTATE__;
-                                            return appState?.p15ConstructionLevel || 'standard';
-                                        })()}
+                                        value={p15ConstructionLevel || 'standard'}
                                         onChange={(e) => {
-                                            const appState = typeof window !== 'undefined' && window.__APPSTATE__;
-                                            if (appState?.setP15ConstructionLevel) {
-                                                appState.setP15ConstructionLevel(e.target.value);
+                                            if (onP15ConstructionLevelChange) {
+                                                onP15ConstructionLevelChange(e.target.value);
                                             }
                                         }}
                                     >

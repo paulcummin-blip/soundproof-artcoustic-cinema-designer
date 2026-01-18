@@ -284,6 +284,8 @@ function RP22ReportInner() {
                                     roomResult={getRoomResult(param.id)}
                                     seatResults={getSeatResults(param.id)}
                                     systemConfig={param.id === 2 ? p2SystemConfig : null}
+                                    p15ConstructionLevel={param.id === 15 ? app?.p15ConstructionLevel : undefined}
+                                    onP15ConstructionLevelChange={param.id === 15 ? app?.setP15ConstructionLevel : undefined}
                                 />
                             ))}
                         </div>
