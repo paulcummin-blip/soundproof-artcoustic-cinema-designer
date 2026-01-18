@@ -38,15 +38,36 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
             }}>
                 {/* ROW 1: Header (fixed 120px) */}
                 <div className="px-6 pt-6 overflow-hidden">
-                    <CardTitle 
-                        className="text-sm font-semibold text-[#1B1A1A]"
-                        style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
-                    >
-                        P{parameter.id} — {parameter.name}
-                    </CardTitle>
-                    <p className="text-xs mt-1 text-[#3E4349]">
-                        {parameter.scope} • {parameter.unit}
-                    </p>
+                    {parameter.id === 15 ? (
+                        <>
+                            <CardTitle 
+                                className="text-sm font-semibold text-[#1B1A1A] leading-snug"
+                                style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
+                            >
+                                P{parameter.id} — Background noise floor
+                                <div className="text-xs font-normal mt-1 leading-tight">
+                                    with all AV equipment and mechanical systems<br />
+                                    and building services switched on, at nominal<br />
+                                    operating temperatures
+                                </div>
+                            </CardTitle>
+                            <p className="text-xs mt-1 text-[#3E4349]">
+                                {parameter.scope} • {parameter.unit}
+                            </p>
+                        </>
+                    ) : (
+                        <>
+                            <CardTitle 
+                                className="text-sm font-semibold text-[#1B1A1A]"
+                                style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
+                            >
+                                P{parameter.id} — {parameter.name}
+                            </CardTitle>
+                            <p className="text-xs mt-1 text-[#3E4349]">
+                                {parameter.scope} • {parameter.unit}
+                            </p>
+                        </>
+                    )}
                 </div>
                 
                 {/* ROW 2: Metric Label + Divider (fixed 60px) */}
