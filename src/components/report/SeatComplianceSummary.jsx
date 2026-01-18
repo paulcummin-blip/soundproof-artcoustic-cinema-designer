@@ -34,7 +34,7 @@ export default function SeatComplianceSummary({ position = 'left' }) {
 
   return (
     <Card className="border bg-white border-[#DCDBD6] h-full">
-      <div className="p-4" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
+      <div className="p-4 h-full flex flex-col" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
         {/* Title */}
         <div className="mb-3">
           <h4 
@@ -47,7 +47,7 @@ export default function SeatComplianceSummary({ position = 'left' }) {
         </div>
 
         {/* Parameters */}
-        <div className="space-y-2.5">
+        <div className="space-y-2.5 flex-1">
           {box.params.map(param => (
             <div key={param.id} className="text-[10px] text-[#3E4349] leading-snug">
               <span className="font-normal">
