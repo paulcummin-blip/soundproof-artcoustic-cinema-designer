@@ -197,14 +197,23 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     </label>
                                     <select 
                                         className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
-                                        value={p15ConstructionLevel ?? 'standard'}
-                                        onChange={(e) => onP15ConstructionLevelChange?.(e.target.value)}
+                                        value={String(p15ConstructionLevel ?? "standard")}
+                                        onChange={(e) => {
+                                            const next = String(e.target.value);
+                                            // hard clamp to valid keys (prevents "label string" or unexpected values breaking the controlled select)
+                                            const allowed = new Set(["standard", "purpose-built", "reference", "studio"]);
+                                            const safeNext = allowed.has(next) ? next : "standard";
+                                            onP15ConstructionLevelChange?.(safeNext);
+                                        }}
                                     >
                                         <option value="standard">Standard domestic room</option>
                                         <option value="purpose-built">Purpose-built home cinema</option>
                                         <option value="reference">Reference-grade isolated room</option>
                                         <option value="studio">Studio / screening-room grade</option>
                                     </select>
+                                    <div style={{ fontSize: 11, marginTop: 8, opacity: 0.7 }}>
+                                        debug: value="{String(p15ConstructionLevel)}" • setter={onP15ConstructionLevelChange ? "YES" : "NO"}
+                                    </div>
                                     <div className="text-[9px] text-gray-400 mt-1">Selected: {p15ConstructionLevel ?? "standard"}</div>
                                 </div>
                                 <div className="mb-1 pt-2 border-t border-gray-100">Max. NCB rating</div>
