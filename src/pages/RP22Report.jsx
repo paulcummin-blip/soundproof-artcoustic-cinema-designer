@@ -396,41 +396,11 @@ function RP22ReportInner() {
                                                                     Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
                                                                 </div>
                                                             )}
-                                                            </div>
-                                                            );
-                                                            })}
-                                                            </CardContent>
-
-                                                            {/* Summary Boxes Below Seat Card (once per seat, outside parameter map) */}
-                                                            <div className="px-6 pb-6 pt-2 grid grid-cols-1 md:grid-cols-3 gap-3">
-                                                            {/* Left Box: Position & Angles */}
-                                                            <div className="bg-[#F9F8F6] border border-[#E6E4DD] rounded px-3 py-2.5">
-                                                                <div className="text-[10px] text-[#3E4349] space-y-1">
-                                                                    <div><span className="font-normal">P1:</span> Minimum distance between the listening area and the room walls (dsw, dbw)</div>
-                                                                    <div><span className="font-normal">P4:</span> Maximum SPL difference between screen wall speakers</div>
-                                                                    <div><span className="font-normal">P5:</span> Maximum allowable horizontal angle between adjacent surround speakers</div>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Middle Box: Level Balance */}
-                                                            <div className="bg-[#F9F8F6] border border-[#E6E4DD] rounded px-3 py-2.5">
-                                                                <div className="text-[10px] text-[#3E4349] space-y-1">
-                                                                    <div><span className="font-normal">P6:</span> Maximum SPL difference between surround speakers</div>
-                                                                    <div><span className="font-normal">P9:</span> Maximum allowable vertical angle between adjacent (L/R rows of) upper speakers</div>
-                                                                    <div><span className="font-normal">P10:</span> Maximum SPL difference between upper speakers</div>
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Right Box: The Consistency */}
-                                                            <div className="bg-[#F9F8F6] border border-[#E6E4DD] rounded px-3 py-2.5">
-                                                                <div className="text-[10px] text-[#3E4349] space-y-1">
-                                                                    <div><span className="font-normal">P16:</span> Seat-to-seat frequency response variance across all screen wall speakers, normalised to measured RSP response between 500 Hz and 16 kHz (1-octave smoothing)</div>
-                                                                    <div><span className="font-normal">P17:</span> Seat-to-seat frequency response variance across all wide / surround / upper speakers, normalised to measured RSP response between 500 Hz and 16 kHz (1-octave smoothing)</div>
-                                                                    <div><span className="font-normal">P20:</span> Seat-to-seat frequency response relative to measured RSP response below the room's transition frequency per seat (1/3-octave smoothing)</div>
-                                                                </div>
-                                                            </div>
-                                                            </div>
-                                                            </Card>
+                                                        </div>
+                                                        );
+                                                        })}
+                                                        </CardContent>
+                                                        </Card>
                                                         );
                                                         }).filter(Boolean); // Remove any null cards
                                                         })()}
