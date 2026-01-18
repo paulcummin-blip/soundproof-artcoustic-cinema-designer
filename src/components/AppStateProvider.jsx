@@ -436,6 +436,16 @@ function useDesignerState() {
     (__autosavePayload && __autosavePayload.seatMetricsById) ? __autosavePayload.seatMetricsById : {}
   ));
 
+  const [p15ConstructionLevel, setP15ConstructionLevel] = useState(() => (
+    (__autosavePayload && __autosavePayload.p15ConstructionLevel) ? __autosavePayload.p15ConstructionLevel : 'standard'
+  ));
+
+  const setP15ConstructionLevelSafe = useCallback((next) => {
+    const allowed = new Set(["standard", "purpose-built", "reference", "studio"]);
+    const v = allowed.has(next) ? next : "standard";
+    setP15ConstructionLevel(v);
+  }, []);
+
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
@@ -705,8 +715,10 @@ function useDesignerState() {
         setEnableFrontWides(!!v);
         showToast(v ? 'Front-wide overlay on' : 'Front-wide overlay off', 'info');
       };
+      window.__APPSTATE__.p15ConstructionLevel = p15ConstructionLevel;
+      window.__APPSTATE__.setP15ConstructionLevel = setP15ConstructionLevel;
     }
-  }, [enableFrontWides, showToast]);
+  }, [enableFrontWides, showToast, p15ConstructionLevel]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -914,7 +926,8 @@ function useDesignerState() {
       useFrontGlobal,
       useMidGlobal,
       useRearGlobal,
-      seatMetricsById
+      seatMetricsById,
+      p15ConstructionLevel
     };
 
     if (!isAutosavePayloadValid(payload)) return;
@@ -995,7 +1008,8 @@ function useDesignerState() {
       useFrontGlobal,
       useMidGlobal,
       useRearGlobal,
-      seatMetricsById
+      seatMetricsById,
+      p15ConstructionLevel
       };
 
       try {
@@ -1380,7 +1394,9 @@ function useDesignerState() {
     setPerSeatMetricsForSeat,
     seatMetricsById,
     roomResetEpoch,
-    resetRoomDesignerToDefaults
+    resetRoomDesignerToDefaults,
+    p15ConstructionLevel,
+    setP15ConstructionLevelSafe,
     ]);
 
     return value;

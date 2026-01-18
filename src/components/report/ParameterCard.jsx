@@ -3,9 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RP22GradingPill from '../ui/RP22GradingPill';
 
-export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null }) {
-    const [localP15, setLocalP15] = React.useState("standard");
-    
+export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, p15ConstructionLevel, onP15ConstructionLevelChange }) {
     if (!parameter) return null;
 
     const hasRoomResult = roomResult && typeof roomResult === 'object';
@@ -199,8 +197,8 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     </label>
                                     <select 
                                         className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
-                                        value={localP15}
-                                        onChange={(e) => setLocalP15(e.target.value)}
+                                        value={p15ConstructionLevel || 'standard'}
+                                        onChange={(e) => onP15ConstructionLevelChange?.(e.target.value)}
                                     >
                                         <option value="standard">Standard domestic room</option>
                                         <option value="purpose-built">Purpose-built home cinema</option>
@@ -270,35 +268,12 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 </span>
                                 {renderLevelBadge('L4')}
                             </div>
-                        ) : parameter.id === 12 || parameter.id === 13 ? (
+                        ) : parameter.id === 12 || parameter.id === 13 || parameter.id === 15 ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-[#1B1A1A]">
                                     {formatted || formatValue(value)}
                                 </span>
                                 {renderLevelBadge(level)}
-                            </div>
-                        ) : parameter.id === 15 ? (
-                            <div className="flex justify-between items-center">
-                                <span className="text-sm font-bold text-[#1B1A1A]">
-                                    NCB {(() => {
-                                        const p15Map = {
-                                            standard: { value: 26, level: "L1" },
-                                            "purpose-built": { value: 22, level: "L2" },
-                                            reference: { value: 18, level: "L3" },
-                                            studio: { value: 15, level: "L4" }
-                                        };
-                                        return p15Map[localP15]?.value || 26;
-                                    })()} (estimate)
-                                </span>
-                                {renderLevelBadge((() => {
-                                    const p15Map = {
-                                        standard: { value: 26, level: "L1" },
-                                        "purpose-built": { value: 22, level: "L2" },
-                                        reference: { value: 18, level: "L3" },
-                                        studio: { value: 15, level: "L4" }
-                                    };
-                                    return p15Map[localP15]?.level || "L1";
-                                })())}
                             </div>
                         ) : hasRoomResult && roomResult.status !== 'no_data' ? (
                             <div className="flex justify-between items-center">

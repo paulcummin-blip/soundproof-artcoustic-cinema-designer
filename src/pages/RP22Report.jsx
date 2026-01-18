@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAppState } from '../components/AppStateProvider';
+import { AppStateProvider, useAppState } from '../components/AppStateProvider';
 import { useRP22AnalysisEngine } from '../components/hooks/useRP22AnalysisEngine';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -123,7 +123,8 @@ function RP22ReportInner() {
             aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,
             aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP,
             aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP,
-        }
+        },
+        p15ConstructionLevel: app?.p15ConstructionLevel
     });
 
     // READ seat metrics from AppState cache (single source of truth shared with HUD)
@@ -283,6 +284,8 @@ function RP22ReportInner() {
                                     roomResult={getRoomResult(param.id)}
                                     seatResults={getSeatResults(param.id)}
                                     systemConfig={param.id === 2 ? p2SystemConfig : null}
+                                    p15ConstructionLevel={app?.p15ConstructionLevel}
+                                    onP15ConstructionLevelChange={app?.setP15ConstructionLevel}
                                 />
                             ))}
                         </div>
@@ -406,4 +409,10 @@ function RP22ReportInner() {
     );
 }
 
-export default RP22ReportInner;
+export default function RP22Report() {
+    return (
+        <AppStateProvider>
+            <RP22ReportInner />
+        </AppStateProvider>
+    );
+}
