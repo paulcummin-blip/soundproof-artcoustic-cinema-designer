@@ -362,20 +362,26 @@ function RP22ReportInner() {
 
                                                    return (
                                                        <div key={key}>
-                                                           <div className="flex justify-between items-center">
-                                                               <span className="font-semibold text-[#1B1A1A]">
-                                                                   P{paramNum}:
-                                                               </span>
-                                                               <div className="flex items-center gap-2">
-                                                                   {metric ? (
-                                                                       <>
-                                                                           <span className="text-[#1B1A1A]">{metric.formatted || metric.hudLabel || '—'}</span>
-                                                                           <RP22GradingPill level={typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—')} />
-                                                                       </>
-                                                                   ) : (
-                                                                      <span className="text-xs text-gray-400">—</span>
-                                                                   )}
+                                                           <div className="flex items-center justify-between">
+                                                               {/* Left: P#: value (Room-result typography) */}
+                                                               <div className="flex items-baseline gap-2">
+                                                                   <span className="font-semibold text-[#1B1A1A]">
+                                                                       P{paramNum}:
+                                                                   </span>
+
+                                                                   <span className="text-sm font-bold text-[#1B1A1A]">
+                                                                       {metric ? (metric.formatted || metric.hudLabel || '—') : '—'}
+                                                                   </span>
                                                                </div>
+
+                                                               {/* Right: Level pill */}
+                                                               <RP22GradingPill
+                                                                   level={
+                                                                       metric
+                                                                           ? (typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—'))
+                                                                           : '—'
+                                                                   }
+                                                               />
                                                            </div>
 
                                                             {/* P16 breakdown */}
