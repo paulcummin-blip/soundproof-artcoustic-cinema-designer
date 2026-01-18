@@ -199,8 +199,8 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     </label>
                                     <select 
                                         className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
-                                        value={p15ConstructionLevel || 'standard'}
-                                        onChange={(e) => onP15ConstructionLevelChange?.(e.target.value)}
+                                        value={localP15}
+                                        onChange={(e) => setLocalP15(e.target.value)}
                                     >
                                         <option value="standard">Standard domestic room</option>
                                         <option value="purpose-built">Purpose-built home cinema</option>
