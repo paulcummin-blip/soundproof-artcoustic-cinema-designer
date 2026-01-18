@@ -1396,7 +1396,7 @@ function useDesignerState() {
     roomResetEpoch,
     resetRoomDesignerToDefaults,
     p15ConstructionLevel,
-    setP15ConstructionLevel: setP15ConstructionLevelSafe,
+    setP15ConstructionLevelSafe,
     ]);
 
     return value;
