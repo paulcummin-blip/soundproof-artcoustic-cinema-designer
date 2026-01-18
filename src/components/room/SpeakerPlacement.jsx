@@ -1335,7 +1335,7 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
       </div>
 
       <div className="space-y-2 mt-4">
-        <Label className="text-xs text-[#625143]">P12 Mode</Label>
+        <Label className="text-xs text-[#625143]">Parameter 12. Screen speakers SPL capability at RSP</Label>
         <div className="text-[10px] text-[#8a8e93] -mt-1 mb-2">
           Recommended = RP22 recommended SPL thresholds • Minimum = RP22 minimum SPL thresholds
         </div>
