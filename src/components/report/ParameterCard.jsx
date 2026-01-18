@@ -6,6 +6,8 @@ import RP22GradingPill from '../ui/RP22GradingPill';
 export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, p15ConstructionLevel, onP15ConstructionLevelChange }) {
     if (!parameter) return null;
 
+    const [p15Local, setP15Local] = React.useState("standard");
+
     const hasRoomResult = roomResult && typeof roomResult === 'object';
     const level = hasRoomResult ? (roomResult.level || null) : null;
     const value = hasRoomResult ? roomResult.value : null;
@@ -27,6 +29,15 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
         if (!lvl || lvl === '—') return <RP22GradingPill level="—" />;
         return <RP22GradingPill level={lvl || '—'} />;
     };
+
+    // P15 local result computation
+    const P15_MAP = {
+        standard: { value: 26, level: "L1" },
+        "purpose-built": { value: 22, level: "L2" },
+        reference: { value: 18, level: "L3" },
+        studio: { value: 15, level: "L4" },
+    };
+    const p15Result = P15_MAP[p15Local];
 
     return (
         <Card className="border bg-white border-[#DCDBD6] h-full">
@@ -195,10 +206,10 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     <label className="block text-[11px] font-semibold text-[#1B1A1A] mb-1.5">
                                         Expected room noise control (design estimate)
                                     </label>
-                                    <select 
+                                    <select
                                         className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
-                                        value={p15ConstructionLevel || 'standard'}
-                                        onChange={(e) => onP15ConstructionLevelChange?.(e.target.value)}
+                                        value={p15Local}
+                                        onChange={(e) => setP15Local(e.target.value)}
                                     >
                                         <option value="standard">Standard domestic room</option>
                                         <option value="purpose-built">Purpose-built home cinema</option>
@@ -268,12 +279,19 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 </span>
                                 {renderLevelBadge('L4')}
                             </div>
-                        ) : parameter.id === 12 || parameter.id === 13 || parameter.id === 15 ? (
+                        ) : parameter.id === 12 || parameter.id === 13 ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-[#1B1A1A]">
                                     {formatted || formatValue(value)}
                                 </span>
                                 {renderLevelBadge(level)}
+                            </div>
+                        ) : parameter.id === 15 ? (
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm font-bold text-[#1B1A1A]">
+                                    NCB {p15Result.value} (estimate)
+                                </span>
+                                <RP22GradingPill level={p15Result.level} />
                             </div>
                         ) : hasRoomResult && roomResult.status !== 'no_data' ? (
                             <div className="flex justify-between items-center">
