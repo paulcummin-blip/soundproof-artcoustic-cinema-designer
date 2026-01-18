@@ -7,6 +7,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
     if (!parameter) return null;
 
     const [p15Local, setP15Local] = React.useState("standard");
+    const [p21Local, setP21Local] = React.useState("l2");
 
     const hasRoomResult = roomResult && typeof roomResult === 'object';
     const level = hasRoomResult ? (roomResult.level || null) : null;
@@ -38,6 +39,15 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
         studio: { value: 15, level: "L4" },
     };
     const p15Result = P15_MAP[p15Local];
+
+    // P21 local result computation
+    const P21_MAP = {
+        l1: { value: "N/A", level: "L1", label: "No estimate / untreated room" },
+        l2: { value: "-8 dB", level: "L2", label: "Moderately live room" },
+        l3: { value: "-10 dB", level: "L3", label: "Well-balanced treated room" },
+        l4: { value: "-12 dB", level: "L4", label: "Heavily optimised room" },
+    };
+    const p21Result = P21_MAP[p21Local];
 
     return (
         <Card className="border bg-white border-[#DCDBD6] h-full">
@@ -230,6 +240,34 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     Noise floor indicates the level of general noise in the background — that which is discernible with all systems running (including HVAC) during regular operation of the entertainment space but while no multimedia content is being played (for instance, on pause or menu).
                                 </div>
                             </div>
+                        ) : parameter.id === 21 ? (
+                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="mb-2">
+                                    <label className="block text-[11px] font-semibold text-[#1B1A1A] mb-1.5">
+                                        Expected early reflection control (design estimate)
+                                    </label>
+                                    <select
+                                        className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
+                                        value={p21Local}
+                                        onChange={(e) => setP21Local(e.target.value)}
+                                    >
+                                        <option value="l1">L1 — No estimate / untreated room</option>
+                                        <option value="l2">L2 — Moderately live room (≈ −8 dB)</option>
+                                        <option value="l3">L3 — Well-balanced treated room (≈ −10 dB)</option>
+                                        <option value="l4">L4 — Heavily optimised room (≈ −12 dB)</option>
+                                    </select>
+                                </div>
+                                <div className="mb-1 pt-2 border-t border-gray-100">Early reflection level (0–15 ms)</div>
+                                <div className="text-[13px] space-y-0.5">
+                                    <div>L1: N/A</div>
+                                    <div>L2: −8 dB</div>
+                                    <div>L3: −10 dB</div>
+                                    <div>L4: −12 dB</div>
+                                </div>
+                                <div className="text-[9px] mt-1">
+                                    Early reflections in the 1–8 kHz band should be sufficiently attenuated relative to direct sound to preserve clarity and localisation without over-deadening the room.
+                                </div>
+                            </div>
                         ) : null}
                     </div>
                     
@@ -292,6 +330,13 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     NCB {p15Result.value} (estimate)
                                 </span>
                                 <RP22GradingPill level={p15Result.level} />
+                            </div>
+                        ) : parameter.id === 21 ? (
+                            <div className="flex justify-between items-center">
+                                <span className="text-sm font-bold text-[#1B1A1A]">
+                                    {p21Result.value} (estimate)
+                                </span>
+                                <RP22GradingPill level={p21Result.level} />
                             </div>
                         ) : hasRoomResult && roomResult.status !== 'no_data' ? (
                             <div className="flex justify-between items-center">
