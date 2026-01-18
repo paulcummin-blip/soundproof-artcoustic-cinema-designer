@@ -3023,6 +3023,41 @@ function SpeakerPlacementImpl(props) {
             disabled={disabled}
             frontWideOverlay={props.frontWideOverlay}
           />
+
+          {/* P13 Mode toggle (independent from P12) */}
+          <div className="space-y-2 mt-4">
+            <Label className="text-xs text-[#625143]">Parameter 13. Non-screen speakers SPL capability at RSP</Label>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={splConfig?.p13Mode === 'minimum' || !splConfig?.p13Mode ? 'default' : 'outline'}
+                className={
+                  splConfig?.p13Mode === 'minimum' || !splConfig?.p13Mode
+                    ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                    : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+                }
+                onClick={() => updateGlobalSpl?.({ p13Mode: 'minimum' })}
+                disabled={disabled}
+              >
+                Minimum
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={splConfig?.p13Mode === 'recommended' ? 'default' : 'outline'}
+                className={
+                  splConfig?.p13Mode === 'recommended'
+                    ? 'flex-1 bg-[#213428] text-white hover:bg-[#213428]/90'
+                    : 'flex-1 border-[#DCDBD6] text-[#3E4349] hover:bg-[#F8F8F7]'
+                }
+                onClick={() => updateGlobalSpl?.({ p13Mode: 'recommended' })}
+                disabled={disabled}
+              >
+                Recommended
+              </Button>
+            </div>
+          </div>
           
           {(() => {
             // Compute worst-case Surround SPL for P13 using the exact tile values
@@ -3044,9 +3079,9 @@ function SpeakerPlacementImpl(props) {
 
             const pillBasisDb = Math.min(...surroundTileSplDb);
             
-            // Use different thresholds based on mode (same as P12)
+            // Use P13-specific mode (independent from P12)
             const { splConfig } = useAppState() || {};
-            const isMinimumMode = splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode;
+            const isMinimumMode = splConfig?.p13Mode === 'minimum' || !splConfig?.p13Mode;
             const thresholds = isMinimumMode ? P13_THRESHOLDS_MIN : P13_THRESHOLDS_REC;
             
             const level = computeRP22Level(pillBasisDb, thresholds);
@@ -3110,9 +3145,9 @@ function SpeakerPlacementImpl(props) {
 
               const pillBasisDb = Math.min(...overheadTileSplDb);
               
-              // Use different thresholds based on mode (same as P12)
+              // Use P13-specific mode (independent from P12)
               const { splConfig } = useAppState() || {};
-              const isMinimumMode = splConfig?.radiationMode === 'half-space' || !splConfig?.radiationMode;
+              const isMinimumMode = splConfig?.p13Mode === 'minimum' || !splConfig?.p13Mode;
               const thresholds = isMinimumMode ? P13_THRESHOLDS_MIN : P13_THRESHOLDS_REC;
               
               const level = computeRP22Level(pillBasisDb, thresholds);
