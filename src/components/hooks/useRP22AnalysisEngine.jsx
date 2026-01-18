@@ -319,7 +319,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -619,28 +619,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       status: "no_data"
     };
 
-    // RP22 Parameter 15 — Background noise floor (design estimate)
-    const p15CatalogEntry = RP22_CATALOG["15"];
-    const p15LevelKey = p15ConstructionLevel || 'standard';
-    
-    // Map construction level to NCB value and RP22 level
-    const p15Mapping = {
-      'standard': { value: 26, level: 1 },
-      'purpose-built': { value: 22, level: 2 },
-      'reference': { value: 18, level: 3 },
-      'studio': { value: 15, level: 4 }
-    };
-    
-    const p15Data = p15Mapping[p15LevelKey] || p15Mapping['standard'];
-    
-    gradedParameters.primary[15] = {
-      title: p15CatalogEntry?.title || "Background noise floor",
-      level: `L${p15Data.level}`,
-      value: p15Data.value,
-      formatted: `NCB ${p15Data.value} (estimate)`,
-      unit: p15CatalogEntry?.unit || "NCB",
-      status: "ok"
-    };
+    // RP22 Parameter 15 — Background noise floor (placeholder - set by UI)
+    gradedParameters.primary[15] = null;
 
     gradedParameters.secondary = null;
 
@@ -903,8 +883,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     overheadState?.aimRearSurroundsAtMLP,
     aimState?.aimFrontWidesAtMLP,
     aimState?.aimSideSurroundsAtMLP,
-    aimState?.aimRearSurroundsAtMLP,
-    p15ConstructionLevel
+    aimState?.aimRearSurroundsAtMLP
   ]);
 
   return { ...memoizedResult, evaluateOverheads };
