@@ -271,7 +271,7 @@ function RP22ReportInner() {
                 <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
                     <CardHeader>
                         <CardTitle className="text-[#1B1A1A] font-header">
-                            RP22 Parameters (Overall Room)
+                            RP22 Parameters (Room)
                         </CardTitle>
                     </CardHeader>
                     <CardContent>

@@ -64,12 +64,12 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                         {parameter.id === 2 && systemConfig ? (
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
                                 <div className="mb-1">Number discrete speakers</div>
-                                <div className="text-[9px] space-y-0.5">
+                                <div className="text-[13px] space-y-0.5">
                                     <div>Min.</div>
-                                    <div>Level 1: 5</div>
-                                    <div>Level 2: 11</div>
-                                    <div>Level 3: 15</div>
-                                    <div>Level 4: 15</div>
+                                    <div>L1: 5</div>
+                                    <div>L2: 11</div>
+                                    <div>L3: 15</div>
+                                    <div>L4: 15</div>
                                     <div>Room</div>
                                 </div>
                                 <div className="text-[9px] mt-1">
@@ -79,7 +79,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                         ) : parameter.id === 3 ? (
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
                                 <div className="mb-1">Number speakers</div>
-                                <div className="text-[9px] space-y-0.5">
+                                <div className="text-[13px] space-y-0.5">
                                     <div>L1: 0</div>
                                     <div>L2: 0</div>
                                     <div>L3: 0</div>
@@ -91,9 +91,9 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             </div>
                         ) : parameter.id === 7 ? (
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
-                                <div className="mb-1">Degrees (°)</div>
+                                <div className="mb-1">Degrees</div>
                                 <div className="mb-1">±</div>
-                                <div className="text-[9px] space-y-0.5">
+                                <div className="text-[13px] space-y-0.5">
                                     <div>L1: 10°</div>
                                     <div>L2: 7°</div>
                                     <div>L3: 5°</div>
@@ -108,7 +108,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
                                 <div className="mb-1">Yes/No</div>
                                 <div className="mb-1">-</div>
-                                <div className="text-[9px] space-y-0.5">
+                                <div className="text-[13px] space-y-0.5">
                                     <div>L1: Yes</div>
                                     <div>L2: Yes</div>
                                     <div>L3: No</div>
@@ -123,7 +123,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
                                 <div className="mb-1">Number speakers</div>
                                 <div className="mb-1">-</div>
-                                <div className="text-[9px] space-y-0.5">
+                                <div className="text-[13px] space-y-0.5">
                                     <div>L1: N/A</div>
                                     <div>L2: 0</div>
                                     <div>L3: 0</div>
@@ -138,7 +138,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
                                 <div className="mb-1">dB SPL (C)</div>
                                 <div className="mb-1">-</div>
-                                <div className="text-[9px] space-y-0.5">
+                                <div className="text-[13px] space-y-0.5">
                                     <div>L1: 102</div>
                                     <div>L2: 105</div>
                                     <div>L3: 108</div>
@@ -215,7 +215,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             </div>
                         ) : hasRoomResult && roomResult.status !== 'no_data' ? (
                             <div className="flex justify-between items-center">
-                                <span className="text-sm text-[#213428] font-medium">
+                                <span className="text-sm text-[#1B1A1A] font-bold">
                                     {formatted || formatValue(value)}
                                 </span>
                                 {renderLevelBadge(level)}
