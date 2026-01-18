@@ -1201,7 +1201,7 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
 
 function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics }) {
   const appState = useAppState();
-  const { speakerSystem, setScreen, splConfig, updateGlobalSpl, seatingPositions } = appState || {};
+  const { speakerSystem, setScreen, splConfig = {}, updateGlobalSpl, seatingPositions } = appState || {};
   const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
 
   const LCR_CANONICAL_ROLES = useMemo(() => new Set(["FL", "FC", "FR"]), []);
@@ -1239,15 +1239,15 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
   }, [lcrModelOptions]);
 
   const [lcrModel, setLcrModel] = useState(initialModel);
-  const [powerInputValue, setPowerInputValue] = useState(String(splConfig?.globalPowerW || 100));
+  const [lcrPowerInputValue, setLcrPowerInputValue] = useState(String(splConfig?.lcrW || 100));
 
   useEffect(() => {
     if (initialModel && initialModel !== lcrModel) setLcrModel(initialModel);
   }, [initialModel, lcrModel]);
 
   useEffect(() => {
-    setPowerInputValue(String(splConfig?.globalPowerW || 100));
-  }, [splConfig?.globalPowerW]);
+    setLcrPowerInputValue(String(splConfig?.lcrW || 100));
+  }, [splConfig?.lcrW]);
 
   const onChooseModel = useCallback((modelLabel) => {
     if (!lcrModelOptions.some(opt => opt.label === modelLabel)) return;
@@ -1259,53 +1259,6 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
 
   return (
     <div className="space-y-2 p-2">
-      <div className="space-y-3 p-3 rounded-lg border border-[#E6E4DD] bg-[#F8F8F7]">
-        <h4 className="text-sm font-medium text-[#1B1A1A]">Global Settings</h4>
-        
-        <div className="space-y-2">
-          <Label className="text-xs text-[#625143]">Amplifier Power (All)</Label>
-          <div className="relative">
-            <Input
-              type="number"
-              min="1"
-              max="5000"
-              step="1"
-              value={powerInputValue}
-              onChange={(e) => {
-                const newValue = e.target.value;
-                setPowerInputValue(newValue);
-                
-                if (newValue === '') return;
-                
-                const val = parseInt(newValue, 10);
-                if (Number.isFinite(val) && val >= 1 && val <= 5000) {
-                  updateGlobalSpl?.({ globalPowerW: val });
-                }
-              }}
-              onBlur={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (!Number.isFinite(val) || val < 1 || val > 5000) {
-                  const lastValid = splConfig?.globalPowerW || 100;
-                  setPowerInputValue(String(lastValid));
-                } else {
-                  const clamped = Math.max(1, Math.min(5000, val));
-                  setPowerInputValue(String(clamped));
-                  if (clamped !== (splConfig?.globalPowerW || 100)) {
-                    updateGlobalSpl?.({ globalPowerW: clamped });
-                  }
-                }
-              }}
-              disabled={disabled}
-              className="pr-8"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
-              W
-            </span>
-          </div>
-        </div>
-
-      </div>
-
       <Label htmlFor="lcr-model" className="text-[#3E4349] font-medium">LCR Model</Label>
       <Select value={lcrModel || undefined} onValueChange={onChooseModel} disabled={disabled}>
         <SelectTrigger id="lcr-model" className="w-full h-10 px-3 py-2 mt-1 bg-white border border-[#DCDBD6] rounded-md hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428] focus:outline-none">
@@ -1333,6 +1286,48 @@ function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcr
             allSeatSplMetrics={allSeatSplMetrics}
           />
         ))}
+      </div>
+
+      <div className="space-y-2 mt-4">
+        <Label className="text-xs text-[#625143]">Amplifier Power (LCR)</Label>
+        <div className="relative">
+          <Input
+            type="number"
+            min="1"
+            max="5000"
+            step="1"
+            value={lcrPowerInputValue}
+            onChange={(e) => {
+              const newValue = e.target.value;
+              setLcrPowerInputValue(newValue);
+              
+              if (newValue === '') return;
+              
+              const val = parseInt(newValue, 10);
+              if (Number.isFinite(val) && val >= 1 && val <= 5000) {
+                updateGlobalSpl?.({ lcrW: val });
+              }
+            }}
+            onBlur={(e) => {
+              const val = parseInt(e.target.value, 10);
+              if (!Number.isFinite(val) || val < 1 || val > 5000) {
+                const lastValid = splConfig?.lcrW || 100;
+                setLcrPowerInputValue(String(lastValid));
+              } else {
+                const clamped = Math.max(1, Math.min(5000, val));
+                setLcrPowerInputValue(String(clamped));
+                if (clamped !== (splConfig?.lcrW || 100)) {
+                  updateGlobalSpl?.({ lcrW: clamped });
+                }
+              }
+            }}
+            disabled={disabled}
+            className="pr-8"
+          />
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
+            W
+          </span>
+        </div>
       </div>
 
       <div className="space-y-2 mt-4">
@@ -1421,7 +1416,7 @@ function SpeakerPlacementImpl(props) {
   
   // Get app state with splConfig early (before any usage)
   const appStateContext = useAppState();
-  const { splConfig, updateGlobalSpl } = appStateContext || {};
+  const { splConfig = {}, updateGlobalSpl } = appStateContext || {};
   
   // Define dimsSafe early - always exists, always has valid numbers
   const dimsSafe = React.useMemo(() => {
@@ -3029,6 +3024,50 @@ function SpeakerPlacementImpl(props) {
             frontWideOverlay={props.frontWideOverlay}
           />
 
+          {/* Amplifier Power (Surrounds) */}
+          <div className="space-y-2 mt-4">
+            <Label className="text-xs text-[#625143]">Amplifier Power (Surrounds)</Label>
+            <div className="relative">
+              <Input
+                type="number"
+                min="1"
+                max="5000"
+                step="1"
+                value={(() => {
+                  const { splConfig } = useAppState() || {};
+                  return String(splConfig?.surroundsW || 100);
+                })()}
+                onChange={(e) => {
+                  const newValue = e.target.value;
+                  if (newValue === '') return;
+                  
+                  const val = parseInt(newValue, 10);
+                  if (Number.isFinite(val) && val >= 1 && val <= 5000) {
+                    updateGlobalSpl?.({ surroundsW: val });
+                  }
+                }}
+                onBlur={(e) => {
+                  const { splConfig } = useAppState() || {};
+                  const val = parseInt(e.target.value, 10);
+                  if (!Number.isFinite(val) || val < 1 || val > 5000) {
+                    e.target.value = String(splConfig?.surroundsW || 100);
+                  } else {
+                    const clamped = Math.max(1, Math.min(5000, val));
+                    e.target.value = String(clamped);
+                    if (clamped !== (splConfig?.surroundsW || 100)) {
+                      updateGlobalSpl?.({ surroundsW: clamped });
+                    }
+                  }
+                }}
+                disabled={disabled}
+                className="pr-8"
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
+                W
+              </span>
+            </div>
+          </div>
+
           {/* P13 Mode toggle (independent from P12) */}
           <div className="space-y-2 mt-4">
             <Label className="text-xs text-[#625143]">Parameter 13. Non-screen speakers SPL capability at RSP</Label>
@@ -3131,6 +3170,51 @@ function SpeakerPlacementImpl(props) {
               allSeatSplMetrics={allSeatSplMetrics}
               mlpSeat={mlpSeat}
             />
+
+            {/* Amplifier Power (Overheads) */}
+            <div className="space-y-2 mt-4">
+              <Label className="text-xs text-[#625143]">Amplifier Power (Overheads)</Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  min="1"
+                  max="5000"
+                  step="1"
+                  value={(() => {
+                    const { splConfig } = useAppState() || {};
+                    return String(splConfig?.overheadsW || 100);
+                  })()}
+                  onChange={(e) => {
+                    const { updateGlobalSpl } = useAppState() || {};
+                    const newValue = e.target.value;
+                    if (newValue === '') return;
+                    
+                    const val = parseInt(newValue, 10);
+                    if (Number.isFinite(val) && val >= 1 && val <= 5000) {
+                      updateGlobalSpl?.({ overheadsW: val });
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const { splConfig, updateGlobalSpl } = useAppState() || {};
+                    const val = parseInt(e.target.value, 10);
+                    if (!Number.isFinite(val) || val < 1 || val > 5000) {
+                      e.target.value = String(splConfig?.overheadsW || 100);
+                    } else {
+                      const clamped = Math.max(1, Math.min(5000, val));
+                      e.target.value = String(clamped);
+                      if (clamped !== (splConfig?.overheadsW || 100)) {
+                        updateGlobalSpl?.({ overheadsW: clamped });
+                      }
+                    }
+                  }}
+                  disabled={disabled}
+                  className="pr-8"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-[#625143] pointer-events-none">
+                  W
+                </span>
+              </div>
+            </div>
 
             {(() => {
               if (!allSeatSplMetrics) return null;

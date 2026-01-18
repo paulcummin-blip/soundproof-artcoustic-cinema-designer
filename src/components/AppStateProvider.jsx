@@ -469,27 +469,56 @@ function useDesignerState() {
     _setGlobalSurroundModel(model);
   }, []);
 
-  const [splConfig, setSplConfig] = useState(() => ({
-        globalPowerW: (__autosavePayload && __autosavePayload.splConfig?.globalPowerW) || 100,
-        globalEqHeadroomDb: (__autosavePayload && __autosavePayload.splConfig?.globalEqHeadroomDb) || 0,
-        radiationMode: (__autosavePayload && __autosavePayload.splConfig?.radiationMode) || 'half-space',
-        p13Mode: (__autosavePayload && __autosavePayload.splConfig?.p13Mode) || 'minimum',
-        perRole: (__autosavePayload && __autosavePayload.splConfig?.perRole) || {}
-      }));
+  const [splConfig, setSplConfig] = useState(() => {
+      const autosaveConfig = __autosavePayload?.splConfig || {};
+
+      // Migration: if old globalPowerW exists but new split powers don't, migrate
+      const oldGlobalPower = autosaveConfig.globalPowerW;
+      const hasNewPowers = autosaveConfig.lcrW || autosaveConfig.surroundsW || autosaveConfig.overheadsW;
+
+      return {
+        // NEW: Independent power controls (migrate from old global if present)
+        lcrW: autosaveConfig.lcrW || oldGlobalPower || 100,
+        surroundsW: autosaveConfig.surroundsW || oldGlobalPower || 100,
+        overheadsW: autosaveConfig.overheadsW || oldGlobalPower || 100,
+        // Keep old globalPowerW for backwards compatibility (not used in calculations)
+        globalPowerW: oldGlobalPower || 100,
+        globalEqHeadroomDb: autosaveConfig.globalEqHeadroomDb || 0,
+        radiationMode: autosaveConfig.radiationMode || 'half-space',
+        p13Mode: autosaveConfig.p13Mode || 'minimum',
+        perRole: autosaveConfig.perRole || {}
+      };
+    });
 
   const getEffectiveSplInputs = useCallback((role) => {
     const roleConfig = splConfig.perRole[role];
     
+    // Determine which group power to use based on role
+    const canon = String(role || '').toUpperCase();
+    let groupPowerW;
+    
+    if (['FL', 'FC', 'FR', 'L', 'C', 'R'].includes(canon)) {
+      groupPowerW = splConfig.lcrW || 100;
+    } else if (['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'LS', 'RS', 'LR', 'RR', 'FWL', 'FWR'].includes(canon)) {
+      groupPowerW = splConfig.surroundsW || 100;
+    } else if (canon.startsWith('T') || canon.startsWith('U')) {
+      // Overheads: any role starting with T (TFL, TFR, TML, TMR, etc.) or U (up-firing)
+      groupPowerW = splConfig.overheadsW || 100;
+    } else {
+      // Fallback to LCR power for unknown roles
+      groupPowerW = splConfig.lcrW || 100;
+    }
+    
     if (roleConfig && !roleConfig.useGlobal) {
             return {
-              powerW: roleConfig.powerW ?? splConfig.globalPowerW,
+              powerW: roleConfig.powerW ?? groupPowerW,
               eqHeadroomDb: roleConfig.eqHeadroomDb ?? splConfig.globalEqHeadroomDb,
               radiationMode: splConfig.radiationMode || 'half-space',
             };
           }
 
           return {
-            powerW: splConfig.globalPowerW,
+            powerW: groupPowerW,
             eqHeadroomDb: splConfig.globalEqHeadroomDb,
             radiationMode: splConfig.radiationMode || 'half-space',
           };
