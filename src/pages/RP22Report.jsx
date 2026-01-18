@@ -336,24 +336,20 @@ function RP22ReportInner() {
                                     return (
                                         <Card key={seatId} className="border-[#E6E4DD]">
                                             <CardHeader className="pb-2">
-                                                <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2">
+                                                <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                                     {seatId} {isPrimary && <span className="text-xs text-green-700">(MLP)</span>}
                                                 </CardTitle>
                                             </CardHeader>
                                             <CardContent className="space-y-1.5 text-xs">
                                                 {/* RP23 Horizontal Viewing */}
                                                 <div className="flex justify-between items-center pb-1.5 border-b border-gray-100">
-                                                    <span className="font-semibold text-[#1B1A1A]">RP23 Horizontal:</span>
-                                                    <div className="flex items-center gap-2">
-                                                        {rp23?.formatted && rp23.formatted !== '—' ? (
-                                                            <>
-                                                                <span className="text-[#1B1A1A]">{rp23.formatted}</span>
-                                                                <RP22GradingPill level={rp23.level} />
-                                                            </>
-                                                        ) : (
-                                                            <span className="text-xs text-gray-400">—</span>
-                                                        )}
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className="font-semibold text-[#1B1A1A]">RP23 Horizontal:</span>
+                                                        <span className="text-sm font-bold text-[#1B1A1A]">
+                                                            {rp23?.formatted && rp23.formatted !== '—' ? rp23.formatted : '—'}
+                                                        </span>
                                                     </div>
+                                                    <RP22GradingPill level={rp23?.level || '—'} />
                                                 </div>
 
                                                 {/* RP22 Per-Seat Parameters */}
