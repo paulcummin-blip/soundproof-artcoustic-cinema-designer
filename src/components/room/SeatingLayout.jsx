@@ -324,7 +324,7 @@ export default function SeatingLayout({
         <div className="p-3 rounded-lg" style={{border: '1px solid #C1B6AD', backgroundColor: '#F8F8F7'}}>
           <div className="flex items-center gap-2 mb-2">
             <Award className="w-4 h-4" style={{color: '#213428'}} />
-            <span className="text-sm font-medium" style={{color: '#1B1A1A'}}>Main Listening Position (MLP)</span>
+            <span className="text-sm font-medium" style={{color: '#1B1A1A'}}>Reference Seating Position (RSP)</span>
           </div>
           <div className="text-xs space-y-1" style={{color: '#625143'}}>
             <p>Position: ({primarySeat.x.toFixed(2)}m, {primarySeat.y.toFixed(2)}m)</p>
@@ -749,13 +749,13 @@ export default function SeatingLayout({
         </div>
       </div>
 
-      {/* MLP Reference */}
+      {/* RSP Reference */}
       <div className="space-y-2">
         <Label
           className="text-sm font-medium"
           style={{ color: '#3E4349' }}
         >
-          MLP Reference
+          RSP Reference
         </Label>
         <Select
           value={validMlpBasis}
