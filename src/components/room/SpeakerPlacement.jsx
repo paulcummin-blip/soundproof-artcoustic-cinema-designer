@@ -785,7 +785,7 @@ export function SplBoxP13({ title, rawDbFull }) {
     <div style={splCardStyles.card}>
       <div style={splCardStyles.title}>{title}</div>
       <div style={splCardStyles.value}>{displayDb > 0 ? `${displayDb} dB` : '—'}</div>
-      <div style={splCardStyles.foot}>Maximum SPL @ MLP: {fullDb > 0 ? `${fullDb} dB` : '—'}</div>
+      <div style={splCardStyles.foot}>Maximum SPL @ RSP: {fullDb > 0 ? `${fullDb} dB` : '—'}</div>
       <div style={splCardStyles.boldFoot}>RP22 P13 Level {level > 0 ? level : "—"}</div>
     </div>
   );
@@ -3015,7 +3015,7 @@ function SpeakerPlacementImpl(props) {
           lastSurroundModelKeyRef={lastSurroundModelKeyRef}
         />
 
-        {/* NEW: Surround SPL @ MLP strip */}
+        {/* NEW: Surround SPL @ RSP strip */}
         <div className="mt-4">
           <SurroundSplStrip
             allSeatSplMetrics={allSeatSplMetrics}

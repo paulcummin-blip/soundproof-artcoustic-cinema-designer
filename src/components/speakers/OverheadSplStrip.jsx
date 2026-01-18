@@ -4,7 +4,7 @@ import { Volume2 } from 'lucide-react';
 import { formatDb } from '@/components/utils/formatDb';
 
 /**
- * Displays SPL @ MLP for overhead speakers.
+ * Displays SPL @ RSP for overhead speakers.
  * Groups: Upper Front (TFL/TFR), Top Middle (TL/TR), Upper Rear (TBL/TBR)
  */
 export default function OverheadSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayout }) {
@@ -104,7 +104,7 @@ export default function OverheadSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayo
 
   return (
     <div className="space-y-2">
-      <div className="text-xs font-medium text-[#625143] mb-2">SPL @ MLP</div>
+      <div className="text-xs font-medium text-[#625143] mb-2">SPL @ RSP</div>
       <div className="grid grid-cols-3 gap-2">
         {groups.map(group => {
           const splValue = groupSplValues[group.key];

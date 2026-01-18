@@ -167,7 +167,7 @@ export default function SeatHud({
         }}
       >
         <div>
-          {tooltipData.seatId} {tooltipData.isPrimary ? '(MLP)' : ''}
+          {tooltipData.seatId} {tooltipData.isPrimary ? '(RSP)' : ''}
           {isHudPinned && (
             <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 500, color: '#999' }}>(Pinned)</span>
           )}
@@ -533,7 +533,7 @@ export default function SeatHud({
         <div>Position: {tooltipData.position}</div>
         <div>Distance to Screen: {tooltipData.distanceToScreen}</div>
         {tooltipData.distanceToMLP !== '—' && (
-          <div>Distance to MLP: {tooltipData.distanceToMLP}</div>
+          <div>Distance to RSP: {tooltipData.distanceToMLP}</div>
         )}
       </div>
       </div>

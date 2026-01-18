@@ -5,7 +5,7 @@ import { formatDb } from '@/components/utils/formatDb';
 import MedianAngleReset from './MedianAngleReset';
 
 /**
- * Displays SPL @ MLP for surround speakers.
+ * Displays SPL @ RSP for surround speakers.
  * Groups: Side Surrounds, Rear Surrounds (for 7.x+), Front Wides (for 9.x)
  */
 export default function SurroundSplStrip({ 
@@ -106,7 +106,7 @@ export default function SurroundSplStrip({
         disabled={disabled}
         frontWideOverlay={frontWideOverlay}
       />
-      <div className="text-xs font-medium text-[#625143] mb-2">SPL @ MLP</div>
+      <div className="text-xs font-medium text-[#625143] mb-2">SPL @ RSP</div>
       <div className="grid grid-cols-3 gap-2">
         {groups.map(group => {
           const splValue = groupSplValues[group.key];

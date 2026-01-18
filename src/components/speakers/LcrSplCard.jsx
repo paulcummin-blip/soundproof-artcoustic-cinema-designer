@@ -84,7 +84,7 @@ export default function LcrSplCard({ role, label, allSeatSplMetrics }) {
       <CardHeader className="pb-2 pt-3 px-3">
         <CardTitle className="text-xs font-medium flex items-center gap-1">
           <Volume2 className="w-3 h-3" style={{ color: '#625143' }} />
-          {label} SPL @ MLP
+          {label} SPL @ RSP
         </CardTitle>
       </CardHeader>
       <CardContent className="px-3 pb-3">
