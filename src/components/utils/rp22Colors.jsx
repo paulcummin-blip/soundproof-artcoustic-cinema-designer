@@ -10,10 +10,10 @@ export const BRAND_RP22 = {
  * Used for all level indicators: HUD pills, menu bars, tooltips, reports
  */
 export const RP22_LEVEL_COLORS = {
-  4: { bg: "#213428", text: "#FFFFFF" },  // Level 4 - brand green, light text
-  3: { bg: "#625143", text: "#FFFFFF" },  // Level 3 - warm brown, light text
-  2: { bg: "#C1B6AD", text: "#1B1A1A" },  // Level 2 - light warm grey, dark text
-  1: { bg: "#4A230F", text: "#FFFFFF" },  // Level 1 - dark chocolate, light text
+  4: { bg: "#213428", text: "#FFFFFF", border: "#213428" },  // Level 4 - brand green, light text
+  3: { bg: "#625143", text: "#FFFFFF", border: "#625143" },  // Level 3 - warm brown, light text
+  2: { bg: "#C1B6AD", text: "#1B1A1A", border: "#C1B6AD" },  // Level 2 - light warm grey, dark text
+  1: { bg: "#4A230F", text: "#FFFFFF", border: "#4A230F" },  // Level 1 - dark chocolate, light text
   fail: { bg: "#F8F8F7", text: "#DC2626", border: "#E6E4DD" },  // Fail - neutral background, red text
 };
 
