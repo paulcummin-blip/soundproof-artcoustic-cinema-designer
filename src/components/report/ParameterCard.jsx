@@ -251,10 +251,10 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                         value={p21Local}
                                         onChange={(e) => setP21Local(e.target.value)}
                                     >
-                                        <option value="l1">L1 — No estimate / untreated room</option>
-                                        <option value="l2">L2 — Moderately live room</option>
-                                        <option value="l3">L3 — Well-balanced treated room</option>
-                                        <option value="l4">L4 — Heavily optimised room</option>
+                                        <option value="l1">No estimate / untreated room</option>
+                                        <option value="l2">Moderately live room</option>
+                                        <option value="l3">Well-balanced treated room</option>
+                                        <option value="l4">Heavily optimised room</option>
                                     </select>
                                 </div>
                                 <div className="mb-1 pt-2 border-t border-gray-100">Early reflection level (0–15 ms)</div>
