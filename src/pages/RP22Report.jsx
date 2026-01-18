@@ -118,13 +118,13 @@ function RP22ReportInner() {
             aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,
             aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP,
             aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP,
-            p15ConstructionLevel: app?.p15ConstructionLevel,
         },
         aimState: {
             aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,
             aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP,
             aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP,
-        }
+        },
+        p15ConstructionLevel: app?.p15ConstructionLevel
     });
 
     // READ seat metrics from AppState cache (single source of truth shared with HUD)

@@ -319,7 +319,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -621,7 +621,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     // RP22 Parameter 15 — Background noise floor (design estimate)
     const p15CatalogEntry = RP22_CATALOG["15"];
-    const p15LevelKey = (aimState?.p15ConstructionLevel ?? overheadState?.p15ConstructionLevel) || 'standard';
+    const p15LevelKey = p15ConstructionLevel || 'standard';
     
     // Map construction level to NCB value and RP22 level
     const p15Mapping = {
