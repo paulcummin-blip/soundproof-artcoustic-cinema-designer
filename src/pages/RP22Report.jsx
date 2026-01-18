@@ -410,9 +410,5 @@ function RP22ReportInner() {
 }
 
 export default function RP22Report() {
-    return (
-        <AppStateProvider>
-            <RP22ReportInner />
-        </AppStateProvider>
-    );
+    return <RP22ReportInner />;
 }
