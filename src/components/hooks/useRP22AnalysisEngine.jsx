@@ -621,7 +621,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     // RP22 Parameter 15 — Background noise floor (design estimate)
     const p15CatalogEntry = RP22_CATALOG["15"];
-    const p15Level = (overheadState && overheadState.p15ConstructionLevel) || 'standard';
+    const p15Level = (aimState && aimState.p15ConstructionLevel) || 'standard';
     
     // Map construction level to NCB value and RP22 level
     const p15Mapping = {
@@ -901,10 +901,10 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     overheadState?.aimFrontWidesAtMLP,
     overheadState?.aimSideSurroundsAtMLP,
     overheadState?.aimRearSurroundsAtMLP,
-    overheadState?.p15ConstructionLevel,
     aimState?.aimFrontWidesAtMLP,
     aimState?.aimSideSurroundsAtMLP,
     aimState?.aimRearSurroundsAtMLP,
+    aimState?.p15ConstructionLevel,
   ]);
 
   return { ...memoizedResult, evaluateOverheads };
