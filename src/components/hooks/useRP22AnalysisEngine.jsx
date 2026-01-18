@@ -534,7 +534,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       status: "no_data"
     };
 
-    // RP22 Parameter 13 — Non-screen speakers SPL at RSP
+    // RP22 Parameter 13 — Non-screen speakers SPL at RSP (with limiter attribution)
     const p13CatalogEntry = RP22_CATALOG["13"];
     let p13Result = null;
     
@@ -546,20 +546,50 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         : null);
       
       if (seatMetrics) {
-        // Collect all non-screen speaker SPL values
-        const surroundValues = seatMetrics.surrounds ? 
-          Object.values(seatMetrics.surrounds).map(s => s?.value).filter(isNum) : [];
-        const upperValues = seatMetrics.uppers ? 
-          Object.values(seatMetrics.uppers).map(s => s?.value).filter(isNum) : [];
+        // Collect SPL values by group with canonical role mapping
+        const groups = [];
         
-        const allNonScreenValues = [...surroundValues, ...upperValues];
+        // Helper to find min SPL for specific roles in surrounds/uppers
+        const getSplForRoles = (category, roles) => {
+          if (!seatMetrics[category]) return null;
+          const values = roles
+            .map(role => seatMetrics[category][role]?.value)
+            .filter(isNum);
+          return values.length > 0 ? Math.min(...values) : null;
+        };
         
-        if (allNonScreenValues.length > 0) {
-          // P13 uses worst-case (minimum) SPL across all non-screen channels
-          const minSpl = Math.min(...allNonScreenValues);
+        // Front Wides (FW) - Priority 1
+        const fwSpl = getSplForRoles('surrounds', ['LW', 'RW', 'FWL', 'FWR']);
+        if (fwSpl !== null) groups.push({ spl: fwSpl, label: 'FW', priority: 1 });
+        
+        // Side Surrounds (SS) - Priority 2
+        const ssSpl = getSplForRoles('surrounds', ['SL', 'SR', 'LS', 'RS']);
+        if (ssSpl !== null) groups.push({ spl: ssSpl, label: 'SS', priority: 2 });
+        
+        // Rear Surrounds (RS) - Priority 3
+        const rsSpl = getSplForRoles('surrounds', ['SBL', 'SBR', 'LR', 'RR']);
+        if (rsSpl !== null) groups.push({ spl: rsSpl, label: 'RS', priority: 3 });
+        
+        // Overheads (OH) - Priority 4 (all T-prefixed roles)
+        const ohValues = seatMetrics.uppers ? 
+          Object.entries(seatMetrics.uppers)
+            .filter(([role]) => role.startsWith('T'))
+            .map(([_, data]) => data?.value)
+            .filter(isNum) : [];
+        if (ohValues.length > 0) {
+          groups.push({ spl: Math.min(...ohValues), label: 'OH', priority: 4 });
+        }
+        
+        if (groups.length > 0) {
+          // Find minimum SPL across all groups
+          const minSpl = Math.min(...groups.map(g => g.spl));
           
-          // P13 thresholds (same as Room Designer)
-          // Use Recommended thresholds (99/102/105/108) as default
+          // Find limiting group (with tie-breaking by priority)
+          const limitingGroup = groups
+            .filter(g => Math.abs(g.spl - minSpl) < 0.001) // Match within 0.001 dB
+            .sort((a, b) => a.priority - b.priority)[0]; // Lowest priority wins
+          
+          // P13 thresholds (Recommended: 99/102/105/108)
           let level13 = 1;
           if (minSpl >= 108) level13 = 4;
           else if (minSpl >= 105) level13 = 3;
@@ -570,8 +600,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             title: p13CatalogEntry?.title || "Non-screen speakers SPL capability at RSP",
             level: `L${level13}`,
             value: minSpl,
-            formatted: `${minSpl.toFixed(1)} dB`,
+            formatted: `${minSpl.toFixed(1)} dB (${limitingGroup.label})`,
             unit: p13CatalogEntry?.unit || "dB SPL (C)",
+            limitingGroup: limitingGroup.label,
             status: "ok"
           };
         }
