@@ -1200,7 +1200,8 @@ function ensureLcrWhenSelectingModel(modelLabel, dimensions, setSpeakers) {
 }
 
 function LCRPanel({ setSpeakers, dimensions, lcrAimMode, onChangeLcrAimMode, lcrAngleDeg, mlpPoint, disabled, allSeatSplMetrics }) {
-  const { speakerSystem, setScreen, splConfig, updateGlobalSpl, seatingPositions } = useAppState();
+  const appState = useAppState();
+  const { speakerSystem, setScreen, splConfig, updateGlobalSpl, seatingPositions } = appState || {};
   const { LCR: lcrModelOptions = [] } = getModelsByCategoryOrdered() || {};
 
   const LCR_CANONICAL_ROLES = useMemo(() => new Set(["FL", "FC", "FR"]), []);
@@ -1417,6 +1418,10 @@ function formatDolbyLabel(key) {
 
 function SpeakerPlacementImpl(props) {
   const dimensions = props?.dimensions; // legacy alias to prevent ReferenceError
+  
+  // Get app state with splConfig early (before any usage)
+  const appStateContext = useAppState();
+  const { splConfig, updateGlobalSpl } = appStateContext || {};
   
   // Define dimsSafe early - always exists, always has valid numbers
   const dimsSafe = React.useMemo(() => {
