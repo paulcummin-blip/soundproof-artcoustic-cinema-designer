@@ -489,7 +489,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       note: "App enforces zone compliance"
     };
 
-    // RP22 Parameter 12 — Screen speakers SPL at RSP
+    // RP22 Parameter 12 — Screen speakers SPL at RSP (rounded UP to whole dB)
     const p12CatalogEntry = RP22_CATALOG["12"];
     let p12Result = null;
     
@@ -506,7 +506,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         const rSpl = seatMetrics.screen.FR?.value || seatMetrics.screen.R?.value;
         
         if (isNum(lSpl) && isNum(cSpl) && isNum(rSpl)) {
-          const minSpl = Math.min(lSpl, cSpl, rSpl);
+          const minSplRaw = Math.min(lSpl, cSpl, rSpl);
+          const minSpl = Math.ceil(minSplRaw); // Round UP to whole dB
           
           let level12 = 1;
           if (minSpl >= 111) level12 = 4;
@@ -518,7 +519,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             title: p12CatalogEntry?.title || "Screen speakers SPL capability at RSP",
             level: `L${level12}`,
             value: minSpl,
-            formatted: `${minSpl.toFixed(1)} dB`,
+            formatted: `${minSpl} dB`,
             unit: p12CatalogEntry?.unit || "dB SPL (C)",
             status: "ok"
           };
@@ -581,15 +582,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
         }
         
         if (groups.length > 0) {
-          // Find minimum SPL across all groups
-          const minSpl = Math.min(...groups.map(g => g.spl));
+          // Find minimum SPL across all groups (raw)
+          const minSplRaw = Math.min(...groups.map(g => g.spl));
+          const minSpl = Math.ceil(minSplRaw); // Round UP to whole dB
           
-          // Find limiting group (with tie-breaking by priority)
+          // Find limiting group (with tie-breaking by priority) - use raw for detection
           const limitingGroup = groups
-            .filter(g => Math.abs(g.spl - minSpl) < 0.001) // Match within 0.001 dB
+            .filter(g => Math.abs(g.spl - minSplRaw) < 0.001) // Match within 0.001 dB
             .sort((a, b) => a.priority - b.priority)[0]; // Lowest priority wins
           
-          // P13 thresholds (Recommended: 99/102/105/108)
+          // P13 thresholds (Recommended: 99/102/105/108) - use rounded value
           let level13 = 1;
           if (minSpl >= 108) level13 = 4;
           else if (minSpl >= 105) level13 = 3;
@@ -600,7 +602,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             title: p13CatalogEntry?.title || "Non-screen speakers SPL capability at RSP",
             level: `L${level13}`,
             value: minSpl,
-            formatted: `${minSpl.toFixed(1)} dB (${limitingGroup.label})`,
+            formatted: `${minSpl} dB (${limitingGroup.label})`,
             unit: p13CatalogEntry?.unit || "dB SPL (C)",
             limitingGroup: limitingGroup.label,
             status: "ok"
