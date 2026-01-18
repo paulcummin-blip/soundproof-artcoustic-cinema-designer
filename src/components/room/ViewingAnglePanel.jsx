@@ -72,10 +72,10 @@ export default function ViewingAnglePanel({
 
   return (
     <div className="space-y-4">
-      {/* MLP Position Ruler Toggle */}
+      {/* RSP Position Ruler Toggle */}
       <div className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ border: '1px solid #E6E4DD', backgroundColor: '#F8F8F7' }}>
         <Label htmlFor="mlp-ruler-toggle" className="text-sm" style={{ color: '#3E4349', cursor: 'pointer' }}>
-          MLP Position Ruler
+          RSP Position Ruler
         </Label>
         <Switch
           id="mlp-ruler-toggle"
