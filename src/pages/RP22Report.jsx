@@ -334,94 +334,74 @@ function RP22ReportInner() {
                                     const isPrimary = tooltipData?.isPrimary || false;
                                     
                                     return (
-                                        <div key={seatId}>
-                                            <Card className="border-[#E6E4DD]">
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                        {seatId} {isPrimary && <span className="text-xs text-green-700">(MLP)</span>}
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-2.5 text-xs">
-                                                    {/* RP23 Horizontal Viewing */}
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="flex items-baseline gap-2">
-                                                            <span className="font-normal text-[#3E4349]">RP23 Horizontal:</span>
-                                                            <span className="text-sm font-bold text-[#1B1A1A]">
-                                                                {rp23?.formatted && rp23.formatted !== '—' ? rp23.formatted : '—'}
-                                                            </span>
-                                                        </div>
-                                                        <RP22GradingPill level={rp23?.level || '—'} />
+                                        <Card key={seatId} className="border-[#E6E4DD]">
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                                    {seatId} {isPrimary && <span className="text-xs text-green-700">(MLP)</span>}
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-2.5 text-xs">
+                                                {/* RP23 Horizontal Viewing */}
+                                                <div className="flex justify-between items-center">
+                                                    <div className="flex items-baseline gap-2">
+                                                        <span className="font-normal text-[#3E4349]">RP23 Horizontal:</span>
+                                                        <span className="text-sm font-bold text-[#1B1A1A]">
+                                                            {rp23?.formatted && rp23.formatted !== '—' ? rp23.formatted : '—'}
+                                                        </span>
                                                     </div>
+                                                    <RP22GradingPill level={rp23?.level || '—'} />
+                                                </div>
 
-                                                    {/* RP22 Per-Seat Parameters */}
-                                                    {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
-                                                       const metric = rp22Raw[key];
-                                                       const paramNum = parseInt(key.substring(1));
+                                                {/* RP22 Per-Seat Parameters */}
+                                                {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
+                                                   const metric = rp22Raw[key];
+                                                   const paramNum = parseInt(key.substring(1));
 
-                                                        return (
-                                                            <div key={key}>
-                                                                <div className="flex items-baseline justify-between">
-                                                                    {/* Left: P#: value (Room-result typography) */}
-                                                                    <div className="flex items-baseline gap-2">
-                                                                        <span className="font-normal text-[#3E4349]">
-                                                                            P{paramNum}:
-                                                                        </span>
+                                                    return (
+                                                        <div key={key}>
+                                                            <div className="flex items-baseline justify-between">
+                                                                {/* Left: P#: value (Room-result typography) */}
+                                                                <div className="flex items-baseline gap-2">
+                                                                    <span className="font-normal text-[#3E4349]">
+                                                                        P{paramNum}:
+                                                                    </span>
 
-                                                                        <span className="text-sm font-bold text-[#1B1A1A]">
-                                                                            {metric ? (metric.formatted || metric.hudLabel || '—') : '—'}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    {/* Right: Level pill */}
-                                                                    <RP22GradingPill
-                                                                        level={
-                                                                            metric
-                                                                                ? (typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—'))
-                                                                                : '—'
-                                                                        }
-                                                                    />
+                                                                    <span className="text-sm font-bold text-[#1B1A1A]">
+                                                                        {metric ? (metric.formatted || metric.hudLabel || '—') : '—'}
+                                                                    </span>
                                                                 </div>
 
-                                                                {/* P16 breakdown */}
-                                                                {metric && key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
-                                                                    <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                                        {metric.perSpeaker.map(s => 
-                                                                            `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`
-                                                                        ).join(', ')}
-                                                                    </div>
-                                                                )}
-
-                                                                {/* P17 breakdown */}
-                                                                {metric && key === 'p17' && metric.worstRole && (
-                                                                    <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                                        Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
-                                                                    </div>
-                                                                )}
+                                                                {/* Right: Level pill */}
+                                                                <RP22GradingPill
+                                                                    level={
+                                                                        metric
+                                                                            ? (typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—'))
+                                                                            : '—'
+                                                                    }
+                                                                />
                                                             </div>
-                                                            );
-                                                            })}
-                                                            </CardContent>
-                                                            </Card>
 
-                                            {/* Seat Compliance Summary Box */}
-                                            <Card className="border-[#E6E4DD] mt-2">
-                                                <CardContent className="px-6 py-4 text-xs space-y-1.5">
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className="font-normal text-[#3E4349]">P1:</span>
-                                                        <span className="text-[13px] text-[#1B1A1A]">Minimum distance between listening area and room walls (dsw, dbw)</span>
-                                                    </div>
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className="font-normal text-[#3E4349]">P4:</span>
-                                                        <span className="text-[13px] text-[#1B1A1A]">Maximum SPL difference between screen wall speakers</span>
-                                                    </div>
-                                                    <div className="flex items-baseline gap-2">
-                                                        <span className="font-normal text-[#3E4349]">P5:</span>
-                                                        <span className="text-[13px] text-[#1B1A1A]">Maximum allowable horizontal angle between adjacent surrounds</span>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-                                        </div>
-                                        );
+                                                            {/* P16 breakdown */}
+                                                            {metric && key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
+                                                                <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
+                                                                    {metric.perSpeaker.map(s => 
+                                                                        `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`
+                                                                    ).join(', ')}
+                                                                </div>
+                                                            )}
+
+                                                            {/* P17 breakdown */}
+                                                            {metric && key === 'p17' && metric.worstRole && (
+                                                                <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
+                                                                    Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        );
+                                                        })}
+                                                        </CardContent>
+                                                        </Card>
+                                                        );
                                                         }).filter(Boolean); // Remove any null cards
                                                         })()}
                         </div>
