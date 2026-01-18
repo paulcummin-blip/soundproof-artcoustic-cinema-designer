@@ -770,7 +770,7 @@ export function SplBox({ channel, rawDb }) {
       <div style={splCardStyles.foot}>Maximum SPL @ MLP: {fullDb > 0 ? `${fullDb} dB` : '—'}</div>
       <div style={splCardStyles.boldFoot}>RP22 P12 Level {level > 0 ? level : "—"}</div>
       <div style={splCardStyles.foot}>
-        12. Screen speakers SPL capability at RSP (<span style={{ fontWeight: 700 }}>post calibration EQ</span>, within assigned bandwidth)
+        12. Screen speakers SPL capability at Reference Seating Position (RSP) (<span style={{ fontWeight: 700 }}>post calibration EQ</span>, within assigned bandwidth)
         without clipping — dB SPL (C). Thresholds: L1 102, L2 105, L3 108, L4 111
       </div>
     </div>
