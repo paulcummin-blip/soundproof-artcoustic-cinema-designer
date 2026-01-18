@@ -534,6 +534,58 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       status: "no_data"
     };
 
+    // RP22 Parameter 13 — Non-screen speakers SPL at RSP
+    const p13CatalogEntry = RP22_CATALOG["13"];
+    let p13Result = null;
+    
+    if (seatSplMetrics) {
+      // Use synthetic "mlp" entry (green dot) preferentially, fallback to first primary seat
+      const mlpMetrics = getSeatSplMetrics(seatSplMetrics, "mlp");
+      const seatMetrics = mlpMetrics || (primarySeats.length > 0 
+        ? getSeatSplMetrics(seatSplMetrics, primarySeats[0].id || `seat-${primarySeats[0].x}-${primarySeats[0].y}`)
+        : null);
+      
+      if (seatMetrics) {
+        // Collect all non-screen speaker SPL values
+        const surroundValues = seatMetrics.surrounds ? 
+          Object.values(seatMetrics.surrounds).map(s => s?.value).filter(isNum) : [];
+        const upperValues = seatMetrics.uppers ? 
+          Object.values(seatMetrics.uppers).map(s => s?.value).filter(isNum) : [];
+        
+        const allNonScreenValues = [...surroundValues, ...upperValues];
+        
+        if (allNonScreenValues.length > 0) {
+          // P13 uses worst-case (minimum) SPL across all non-screen channels
+          const minSpl = Math.min(...allNonScreenValues);
+          
+          // P13 thresholds (same as Room Designer)
+          // Use Recommended thresholds (99/102/105/108) as default
+          let level13 = 1;
+          if (minSpl >= 108) level13 = 4;
+          else if (minSpl >= 105) level13 = 3;
+          else if (minSpl >= 102) level13 = 2;
+          else if (minSpl >= 99) level13 = 1;
+          
+          p13Result = {
+            title: p13CatalogEntry?.title || "Non-screen speakers SPL capability at RSP",
+            level: `L${level13}`,
+            value: minSpl,
+            formatted: `${minSpl.toFixed(1)} dB`,
+            unit: p13CatalogEntry?.unit || "dB SPL (C)",
+            status: "ok"
+          };
+        }
+      }
+    }
+    
+    gradedParameters.primary[13] = p13Result || {
+      title: p13CatalogEntry?.title || "Non-screen speakers SPL capability at RSP",
+      level: null,
+      value: null,
+      unit: p13CatalogEntry?.unit || "dB SPL (C)",
+      status: "no_data"
+    };
+
     gradedParameters.secondary = null;
 
     // Compute per-seat RP22 metrics (P9, P10, P16, P17, P20)

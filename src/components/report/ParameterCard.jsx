@@ -149,6 +149,27 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     Sound Pressure Level at the Reference Seating Position is the recommended minimum long term SPL according to AES75-2022 or ANSI-CTA-2034-A, Section 8. Consideration should be given to the following: 1. Additional speaker SPL capability at bass frequencies to allow for bass contours 2. Additional speaker SPL capability to allow for +EQ
                                 </div>
                             </div>
+                        ) : parameter.id === 13 ? (
+                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="mb-1">dB SPL (C)</div>
+                                <div className="mb-1">-</div>
+                                <div className="text-[13px] space-y-0.5">
+                                    <div>L1: 99</div>
+                                    <div>L2: 102</div>
+                                    <div>L3: 105</div>
+                                    <div>L4: 108</div>
+                                </div>
+                                <div className="text-[9px] mt-1">Room</div>
+                                <div className="text-[9px] mt-1">
+                                    Sound Pressure Level at the Reference Seating Position is the recommended minimum long term SPL according to AES75-2022 or ANSI-CTA-2034-A, Section 8. Consideration should be given to the following:
+                                </div>
+                                <div className="text-[9px] mt-0.5">
+                                    1. Additional speaker SPL capability at bass frequencies to allow for bass contours
+                                </div>
+                                <div className="text-[9px]">
+                                    2. Additional speaker SPL capability to allow for +EQ
+                                </div>
+                            </div>
                         ) : null}
                     </div>
                     
@@ -198,17 +219,9 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 </span>
                                 {renderLevelBadge('L4')}
                             </div>
-                        ) : parameter.id === 12 ? (
+                        ) : parameter.id === 12 || parameter.id === 13 ? (
                             <div className="flex justify-between items-center">
-                                <span 
-                                    className="text-sm font-bold"
-                                    style={{
-                                        color: level === 'L4' ? '#213428' :
-                                               level === 'L3' ? '#213428' :
-                                               level === 'L2' ? '#625143' :
-                                               '#4A230F'
-                                    }}
-                                >
+                                <span className="text-sm font-bold text-[#1B1A1A]">
                                     {formatted || formatValue(value)}
                                 </span>
                                 {renderLevelBadge(level)}
