@@ -118,6 +118,7 @@ function RP22ReportInner() {
             aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,
             aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP,
             aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP,
+            p15ConstructionLevel: app?.p15ConstructionLevel,
         },
         aimState: {
             aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,

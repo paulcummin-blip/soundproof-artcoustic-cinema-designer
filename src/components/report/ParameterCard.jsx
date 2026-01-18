@@ -191,7 +191,30 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                             </div>
                         ) : parameter.id === 15 ? (
                             <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
-                                <div className="mb-1">Max. NCB rating</div>
+                                <div className="mb-2">
+                                    <label className="block text-[11px] font-semibold text-[#1B1A1A] mb-1.5">
+                                        Expected room noise control (design estimate)
+                                    </label>
+                                    <select 
+                                        className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
+                                        value={(() => {
+                                            const appState = typeof window !== 'undefined' && window.__APPSTATE__;
+                                            return appState?.p15ConstructionLevel || 'standard';
+                                        })()}
+                                        onChange={(e) => {
+                                            const appState = typeof window !== 'undefined' && window.__APPSTATE__;
+                                            if (appState?.setP15ConstructionLevel) {
+                                                appState.setP15ConstructionLevel(e.target.value);
+                                            }
+                                        }}
+                                    >
+                                        <option value="standard">Standard domestic room</option>
+                                        <option value="purpose-built">Purpose-built home cinema</option>
+                                        <option value="reference">Reference-grade isolated room</option>
+                                        <option value="studio">Studio / screening-room grade</option>
+                                    </select>
+                                </div>
+                                <div className="mb-1 pt-2 border-t border-gray-100">Max. NCB rating</div>
                                 <div className="mb-1">Rec.</div>
                                 <div className="text-[13px] space-y-0.5">
                                     <div>L1: 26</div>
