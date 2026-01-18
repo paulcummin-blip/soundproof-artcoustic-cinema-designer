@@ -170,6 +170,21 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     2. Additional speaker SPL capability to allow for +EQ
                                 </div>
                             </div>
+                        ) : parameter.id === 15 ? (
+                            <div className="text-[10px] text-[#3E4349] leading-relaxed" style={{ marginTop: 0 }}>
+                                <div className="mb-1">Max. NCB rating</div>
+                                <div className="mb-1">Rec.</div>
+                                <div className="text-[13px] space-y-0.5">
+                                    <div>L1: 26</div>
+                                    <div>L2: 22</div>
+                                    <div>L3: 18</div>
+                                    <div>L4: 15</div>
+                                </div>
+                                <div className="text-[9px] mt-1">Room</div>
+                                <div className="text-[9px] mt-1">
+                                    Noise floor indicates the level of general noise in the background — that which is discernible with all systems running (including HVAC) during regular operation of the entertainment space but while no multimedia content is being played (for instance, on pause or menu).
+                                </div>
+                            </div>
                         ) : null}
                     </div>
                     
@@ -219,7 +234,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 </span>
                                 {renderLevelBadge('L4')}
                             </div>
-                        ) : parameter.id === 12 || parameter.id === 13 ? (
+                        ) : parameter.id === 12 || parameter.id === 13 || parameter.id === 15 ? (
                             <div className="flex justify-between items-center">
                                 <span className="text-sm font-bold text-[#1B1A1A]">
                                     {formatted || formatValue(value)}
