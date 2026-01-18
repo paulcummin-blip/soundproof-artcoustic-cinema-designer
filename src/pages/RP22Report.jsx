@@ -340,11 +340,11 @@ function RP22ReportInner() {
                                                     {seatId} {isPrimary && <span className="text-xs text-green-700">(MLP)</span>}
                                                 </CardTitle>
                                             </CardHeader>
-                                            <CardContent className="space-y-1.5 text-xs">
+                                            <CardContent className="space-y-2.5 text-xs">
                                                 {/* RP23 Horizontal Viewing */}
-                                                <div className="flex justify-between items-center pb-1.5 border-b border-gray-100">
+                                                <div className="flex justify-between items-center">
                                                     <div className="flex items-baseline gap-2">
-                                                        <span className="font-semibold text-[#1B1A1A]">RP23 Horizontal:</span>
+                                                        <span className="font-normal text-[#3E4349]">RP23 Horizontal:</span>
                                                         <span className="text-sm font-bold text-[#1B1A1A]">
                                                             {rp23?.formatted && rp23.formatted !== '—' ? rp23.formatted : '—'}
                                                         </span>
@@ -357,29 +357,29 @@ function RP22ReportInner() {
                                                    const metric = rp22Raw[key];
                                                    const paramNum = parseInt(key.substring(1));
 
-                                                   return (
-                                                       <div key={key}>
-                                                           <div className="flex items-center justify-between">
-                                                               {/* Left: P#: value (Room-result typography) */}
-                                                               <div className="flex items-baseline gap-2">
-                                                                   <span className="font-semibold text-[#1B1A1A]">
-                                                                       P{paramNum}:
-                                                                   </span>
+                                                    return (
+                                                        <div key={key}>
+                                                            <div className="flex items-baseline justify-between">
+                                                                {/* Left: P#: value (Room-result typography) */}
+                                                                <div className="flex items-baseline gap-2">
+                                                                    <span className="font-normal text-[#3E4349]">
+                                                                        P{paramNum}:
+                                                                    </span>
 
-                                                                   <span className="text-sm font-bold text-[#1B1A1A]">
-                                                                       {metric ? (metric.formatted || metric.hudLabel || '—') : '—'}
-                                                                   </span>
-                                                               </div>
+                                                                    <span className="text-sm font-bold text-[#1B1A1A]">
+                                                                        {metric ? (metric.formatted || metric.hudLabel || '—') : '—'}
+                                                                    </span>
+                                                                </div>
 
-                                                               {/* Right: Level pill */}
-                                                               <RP22GradingPill
-                                                                   level={
-                                                                       metric
-                                                                           ? (typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—'))
-                                                                           : '—'
-                                                                   }
-                                                               />
-                                                           </div>
+                                                                {/* Right: Level pill */}
+                                                                <RP22GradingPill
+                                                                    level={
+                                                                        metric
+                                                                            ? (typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—'))
+                                                                            : '—'
+                                                                    }
+                                                                />
+                                                            </div>
 
                                                             {/* P16 breakdown */}
                                                             {metric && key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
