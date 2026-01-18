@@ -295,8 +295,9 @@ function RP22ReportInner() {
                 {/* Seat Reports Section */}
                 <Card className="bg-[#FFFFFF] border-[#DCDBD6] mt-6">
                     <CardHeader>
-                        <CardTitle className="text-[#1B1A1A] font-header">Seat Reports</CardTitle>
-                        <p className="text-xs text-[#3E4349] mt-1">Per-seat results shown below match the Seat HUD values.</p>
+                        <CardTitle className="text-[#1B1A1A] font-header">
+                            RP22 Parameters (Seat)
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
