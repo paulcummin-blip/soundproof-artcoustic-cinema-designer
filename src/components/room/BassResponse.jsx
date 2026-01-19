@@ -267,11 +267,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return { seatResponses: {}, metrics: null, audit: null };
     }
     
-    // Prepare debugProbe options
+    // Prepare debugProbe options (use first primary seat, not selectedSeat to avoid circular dep)
+    const probeSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+    const probeSeatId = probeSeat ? (probeSeat.id || `${probeSeat.x}-${probeSeat.y}`) : "MLP";
+    
     const debugProbeOptions = modalProbeEnabled ? {
       enabled: true,
-      seatId: selectedSeat?.id || "MLP",
-      freqsHz: [24, 28.6, 38.1, 42.9, 57.2, 60, 80, 100],
+      seatId: probeSeatId,
+      freqsHz: [20, 30, 40, 50, 63, 80, 100],
       topModes: 8
     } : null;
     
@@ -295,7 +298,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         debugProbe: debugProbeOptions
       }
     });
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, modesEnabled, roomDamping, rewSbirEnabled, hasNoSeats, hasNoSubs, auditEpoch, modalProbeEnabled, selectedSeat?.id]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, modesEnabled, roomDamping, rewSbirEnabled, hasNoSeats, hasNoSubs, auditEpoch, modalProbeEnabled]);
   
   const bassAudit = simulationResults.audit || null;
   const modeProbe = bassAudit?.modeProbe || null;
@@ -3286,6 +3289,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="mb-2 space-y-1">
                 <div>
                   <strong>Engine:</strong> bassSimulationEngine.js (product-based, applyModesToComplexPressure)
+                </div>
+                <div>
+                  <strong>NOT using:</strong> computeModesOnlyResponse (legacy, unused)
                 </div>
                 <div>
                   <strong>Seat:</strong> {modeProbe.seatIdUsed || 'N/A'} | 
