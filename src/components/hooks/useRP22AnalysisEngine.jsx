@@ -691,6 +691,147 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
       const metrics = { p1: null, p4: null, p5: null, p6: null, p9: null, p10: null, p16: null, p17: null, p20: null };
 
+      // P1 - Nearest boundary distance (minimum of side/back wall distance)
+      if (isNum(seat.x) && isNum(seat.y)) {
+        const distLeft = seat.x;
+        const distRight = (dimensions?.widthM || 0) - seat.x;
+        const distBack = (dimensions?.lengthM || 0) - seat.y;
+        
+        const xNearest = Math.min(distLeft, distRight);
+        const yNearest = distBack;
+        const p1ValueM = Math.min(xNearest, yNearest);
+        
+        if (isNum(p1ValueM) && p1ValueM >= 0) {
+          let level1 = 1;
+          if (p1ValueM >= 1.2) level1 = 4;
+          else if (p1ValueM >= 0.9) level1 = 3;
+          else if (p1ValueM >= 0.6) level1 = 2;
+          
+          metrics.p1 = {
+            valueM: p1ValueM,
+            level: level1,
+            formatted: `${p1ValueM.toFixed(2)}m`
+          };
+        }
+      }
+
+      // P4 - Max SPL difference between screen speakers
+      if (seatSplMetrics) {
+        const seatSpl = getSeatSplMetrics(seatSplMetrics, seatId);
+        if (seatSpl?.screen) {
+          const lcrSplValues = Object.values(seatSpl.screen)
+            .map(s => s.value)
+            .filter(isNum);
+          
+          if (lcrSplValues.length >= 2) {
+            let maxDelta = 0;
+            for (let i = 0; i < lcrSplValues.length; i++) {
+              for (let j = i + 1; j < lcrSplValues.length; j++) {
+                const delta = Math.abs(lcrSplValues[i] - lcrSplValues[j]);
+                if (delta > maxDelta) maxDelta = delta;
+              }
+            }
+            
+            if (isNum(maxDelta)) {
+              let level4 = 1;
+              if (maxDelta <= 2) level4 = 4;
+              else if (maxDelta <= 4) level4 = 3;
+              else if (maxDelta <= 6) level4 = 2;
+              
+              metrics.p4 = {
+                valueDb: maxDelta,
+                level: level4,
+                formatted: `${Math.floor(maxDelta)} dB`
+              };
+            }
+          }
+        }
+      }
+
+      // P5 - Max horizontal gap between adjacent surrounds (no wrap)
+      {
+        const surroundRoles = ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'];
+        const allSurrounds = speakersWithResolvedOverheads.filter(s => {
+          const r = getCanonicalRole(s.role);
+          return surroundRoles.includes(r) && s.position;
+        });
+
+        const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
+        const hasSR = allSurrounds.some(s => getCanonicalRole(s.role) === 'SR');
+
+        const eligibleSurrounds = allSurrounds.filter(s => {
+          const r = getCanonicalRole(s.role);
+          if (r === 'LW' || r === 'RW') return hasSL && hasSR;
+          return true;
+        });
+
+        if (eligibleSurrounds.length >= 2 && mlp && isNum(mlp.x) && isNum(mlp.y)) {
+          const azimuthDeg = (p) => {
+            const dx = p.x - seat.x;
+            const dy = p.y - seat.y;
+            return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+          };
+
+          const azimuths = eligibleSurrounds
+            .map(s => ({ role: getCanonicalRole(s.role), az: azimuthDeg(s.position) }))
+            .sort((a, b) => a.az - b.az);
+
+          const gaps = [];
+          for (let i = 0; i < azimuths.length - 1; i++) {
+            gaps.push(azimuths[i + 1].az - azimuths[i].az);
+          }
+
+          if (gaps.length > 0) {
+            const maxGap = Math.max(...gaps);
+            
+            let level5 = 1;
+            if (maxGap <= 80) level5 = 4;
+            else if (maxGap <= 100) level5 = 3;
+            else if (maxGap <= 120) level5 = 2;
+            
+            metrics.p5 = {
+              valueDeg: maxGap,
+              level: level5,
+              formatted: `${Math.floor(maxGap)}°`
+            };
+          }
+        }
+      }
+
+      // P6 - Surround SPL delta
+      if (seatSplMetrics) {
+        const seatSpl = getSeatSplMetrics(seatSplMetrics, seatId);
+        if (seatSpl?.surrounds) {
+          const surSplValues = Object.values(seatSpl.surrounds)
+            .map(s => s.value)
+            .filter(isNum);
+
+          if (surSplValues.length >= 2) {
+            let maxDelta = 0;
+            for (let i = 0; i < surSplValues.length; i++) {
+              for (let j = i + 1; j < surSplValues.length; j++) {
+                const delta = Math.abs(surSplValues[i] - surSplValues[j]);
+                if (delta > maxDelta) maxDelta = delta;
+              }
+            }
+
+            if (isNum(maxDelta)) {
+              let level6 = 1;
+              if (maxDelta <= 2) level6 = 4;
+              else if (maxDelta <= 4) level6 = 3;
+              else if (maxDelta <= 6) level6 = 2;
+              else if (maxDelta <= 10) level6 = 1;
+
+              metrics.p6 = {
+                valueDb: maxDelta,
+                level: level6,
+                formatted: `${Math.floor(maxDelta)} dB`
+              };
+            }
+          }
+        }
+      }
+
       // P9 - Maximum vertical angle between adjacent upper speakers
       const upperSpeakers = getUpperSpeakersForSeat(seat, safeSpeakers, getCanonicalRole);
       if (upperSpeakers.length >= 2) {
