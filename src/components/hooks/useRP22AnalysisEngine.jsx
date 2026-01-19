@@ -995,6 +995,43 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       if (metrics.p20) perSeatRp22[seatId].rp22[20] = metrics.p20;
     }
 
+    // Build perSeatRp23 - RP23 horizontal viewing angle for each seat
+    const perSeatRp23 = {};
+    const screenWidthM = ((dimensions?.widthM || 4.5) * 0.0254 * 100) || 2.54; // Fallback to 100 inches
+    
+    for (const seat of seatsWithRoles) {
+      const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
+      const seatY = seat.y || 0;
+      
+      // Calculate distance to screen (assume screen at Y=0)
+      const distanceToScreen = Math.abs(seatY);
+      
+      if (distanceToScreen > 0.1 && screenWidthM > 0) {
+        const rp23AngleDeg = 2 * Math.atan((screenWidthM / 2) / distanceToScreen) * (180 / Math.PI);
+        const rp23DisplayDeg = Math.floor(rp23AngleDeg);
+        
+        let rp23Level = '—';
+        if (rp23AngleDeg >= 48 && rp23AngleDeg <= 67) rp23Level = 'L4';
+        else if (rp23AngleDeg >= 45 && rp23AngleDeg <= 70) rp23Level = 'L3';
+        else if (rp23AngleDeg >= 40 && rp23AngleDeg <= 75) rp23Level = 'L2';
+        else if (rp23AngleDeg >= 35 && rp23AngleDeg <= 80) rp23Level = 'L1';
+        
+        perSeatRp23[seatId] = {
+          angleDeg: rp23AngleDeg,
+          displayDeg: rp23DisplayDeg,
+          level: rp23Level,
+          formatted: `${rp23DisplayDeg}°`
+        };
+      } else {
+        perSeatRp23[seatId] = {
+          angleDeg: null,
+          displayDeg: null,
+          level: '—',
+          formatted: '—'
+        };
+      }
+    }
+
     console.log(
       "[ENGINE P16]",
       {
@@ -1013,6 +1050,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       surroundGaps,
       seatMetrics,
       perSeatRp22, // New: structured per-seat RP22 data
+      perSeatRp23, // New: structured per-seat RP23 data
       analysisDetails: {
         hasSecondarySeating: hasSecondarySeating,
         totalSpeakers: safeSpeakers.length,
