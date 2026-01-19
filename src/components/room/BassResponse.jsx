@@ -3840,7 +3840,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                             {offsetFromPeak !== null && (
                               <div className="text-[9px] text-blue-600 mt-1 pt-1 border-t border-teal-300">
                                 Display offset: {offsetFromPeak >= 0 ? '+' : ''}{offsetFromPeak.toFixed(2)} dB
+                                <div className="text-[8px] opacity-70">(expected: {(allowDisplayRefOffset ? (Number(rewDisplayRefDb) || 0) : 0) >= 0 ? '+' : ''}{(allowDisplayRefOffset ? (Number(rewDisplayRefDb) || 0) : 0).toFixed(2)} dB, mode: {isRelative ? 'RELATIVE' : 'ABSOLUTE'})</div>
                                 {offsetIsConstant && <div className="text-green-600">✓ Constant (reference shift only)</div>}
+                                {isRelative && Math.abs(offsetFromPeak) > 1 && (
+                                  <div className="text-red-600 font-bold">⚠️ RELATIVE mode should have ~0 dB offset (found {offsetFromPeak.toFixed(2)} dB)</div>
+                                )}
                               </div>
                             )}
                           </>
@@ -4317,8 +4321,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 : "No autosave yet"}
             </div>
           </div>
-          <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded">
-            Auto-saves room state every 500ms (prevents data loss on Preview refresh)
+          <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded space-y-1">
+            <div>Auto-saves room state every 500ms (prevents data loss on Preview refresh)</div>
+            <div className="text-[10px] font-mono text-blue-700 pt-1 border-t border-[#DCDBD6]">
+              <strong>Display offset in Relative view:</strong> {allowDisplayRefOffset ? `${(Number(rewDisplayRefDb) || 0).toFixed(2)} dB` : '0.00 dB (forced)'}
+            </div>
           </div>
         </div>
       </div>
