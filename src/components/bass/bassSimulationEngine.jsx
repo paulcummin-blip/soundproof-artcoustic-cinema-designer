@@ -10,7 +10,7 @@ import {
 
 const SPEED_OF_SOUND = 343; // m/s
 const MIN_DISTANCE = 0.5; // meters (prevent explosion at near-zero)
-const MIN_SPL_FLOOR = 30; // dB (prevent -Infinity)
+const MIN_SPL_FLOOR_DB = -200; // dB (very low floor to prevent -Infinity without killing nulls)
 
 // Build fixed high-resolution frequency array for bass simulation (independent of product curves)
 export function buildBassFrequencyBins(curvePoints) {
@@ -608,7 +608,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
       const magnitudeRaw = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
 
       // Prevent -Infinity / crazy negatives when magnitude collapses to ~0
-      const floorLinear = Math.pow(10, MIN_SPL_FLOOR / 20);
+      const floorLinear = Math.pow(10, MIN_SPL_FLOOR_DB / 20);
       const magnitude = Math.max(magnitudeRaw, floorLinear);
 
       const spl = 20 * Math.log10(magnitude);

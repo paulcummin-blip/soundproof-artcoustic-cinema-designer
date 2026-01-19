@@ -1103,7 +1103,53 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   };
 
-  // Convert to chart format (product-based curve)
+  // Canonical analysis series: ABS + optionally smoothed, no display-only transforms
+  const analysisSeriesAbs = useMemo(() => {
+    if (!selectedSeat || !selectedSeat.freqsHz || !selectedSeat.splDb) {
+      return [];
+    }
+    
+    // Convert engine output to points
+    const points = selectedSeat.freqsHz.map((frequency, i) => ({
+      frequency,
+      spl: selectedSeat.splDb[i]
+    }));
+    
+    // Apply smoothing if enabled (same logic as display smoothing)
+    const shouldSmooth = graphSmoothing && graphSmoothing !== 'none';
+    if (shouldSmooth) {
+      return applyRewStyleDisplaySmoothing(points, graphSmoothing);
+    }
+    
+    return points;
+  }, [selectedSeat, graphSmoothing]);
+  
+  // Analysis SPL array for metrics (same smoothing as plot base, absolute only)
+  const analysisSplDbAbs = useMemo(() => {
+    return analysisSeriesAbs.map(p => p.spl);
+  }, [analysisSeriesAbs]);
+  
+  // Dev sanity check (parity verification)
+  useEffect(() => {
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_LOGS) {
+      if (analysisSeriesAbs.length !== (selectedSeat?.freqsHz?.length || 0)) {
+        console.warn('[BASS PARITY CHECK] analysisSeriesAbs length mismatch', {
+          analysis: analysisSeriesAbs.length,
+          engine: selectedSeat?.freqsHz?.length
+        });
+      }
+      
+      const freqMismatch = analysisSeriesAbs.some((p, i) => 
+        selectedSeat?.freqsHz?.[i] && Math.abs(p.frequency - selectedSeat.freqsHz[i]) > 0.01
+      );
+      
+      if (freqMismatch) {
+        console.warn('[BASS PARITY CHECK] Frequency array mismatch detected');
+      }
+    }
+  }, [analysisSeriesAbs, selectedSeat]);
+  
+  // Convert to chart format (product-based curve) - legacy, now replaced by analysisSeriesAbs
   const responseData = useMemo(() => {
     if (!selectedSeat || !selectedSeat.freqsHz || !selectedSeat.splDb) {
       return [];
@@ -1229,20 +1275,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Choose which curve to display based on view
   const displayData = useMemo(() => {
     if (rewStyleMode) {
-      const base =
-        (rewPlotSeries === 'RAW') ? rewRawSeries
-        : (rewPlotSeries === 'ENGINE') ? rewEngineFinalSeries
-        : rewDisplayFinalSeries;
-
-      // In REW mode, smoothing tabs should be DISPLAY-ONLY smoothing.
-      // Apply to ENGINE/DISPLAY only (never RAW).
-      const shouldSmooth = (rewPlotSeries === 'DISPLAY') && (rewSmoothing && rewSmoothing !== 'none');
-
-      if (!shouldSmooth) return base;
-
-      // If a smoothing helper already exists in this file, use it.
-      // Otherwise, call the existing smoothing utility used by the main graph.
-      return applyDisplaySmoothing(base, rewSmoothing);
+      // NEW PATH: Use analysisSeriesAbs as base (already smoothed)
+      let base = analysisSeriesAbs;
+      
+      // Apply display-only transforms
+      if (rewRelativeView) {
+        // Apply relative normalization (30-80 Hz median -> 0 dB)
+        base = normalizeDatasetToRelative({ data: base }).data || base;
+      } else {
+        // Apply display ref offset (e.g., 85/90/95/100 dB)
+        base = base.map(p => ({
+          frequency: p.frequency,
+          spl: Number.isFinite(p.spl) ? p.spl + rewDisplayRefDb : p.spl
+        }));
+      }
+      
+      return base;
     }
     
     // Non-REW mode: use old logic
@@ -1251,7 +1299,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       : rewModesDataAbs?.data?.length ? rewModesDataAbs.data : (rewRoomPlusProductData?.data || []);
     
     return baseData;
-  }, [rewStyleMode, rewPlotSeries, rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries, rewView, rewModesDataAbs, rewRoomPlusProductData, rewSmoothing]);
+  }, [rewStyleMode, analysisSeriesAbs, rewRelativeView, rewDisplayRefDb, normalizeDatasetToRelative, rewView, rewModesDataAbs, rewRoomPlusProductData]);
 
   // TEMP DEBUG (can remove later)
   // if (globalThis.__B44_LOGS) console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
@@ -1605,21 +1653,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return { clampedData: clipped, outBelow: below, outAbove: above };
   }, [rewStyleMode, finalYDomain, displayData, yAxisLocked, rewCompareView, rewView, rewRelativeView]);
 
-  // Bass Metrics (20-80 Hz) for P14 reporting
+  // Bass Metrics (20-80 Hz) - NOW USES ANALYSIS SERIES (same as plot base)
   const bassMetrics2080Hz = useMemo(() => {
-    const seatResponses = simulationResults.seatResponses;
-    if (!seatResponses || Object.keys(seatResponses).length === 0) {
+    if (!selectedSeat || !selectedSeat.freqsHz || !analysisSplDbAbs || analysisSplDbAbs.length === 0) {
       return null;
     }
 
-    const seatIds = Object.keys(seatResponses);
-    const firstSeat = seatResponses[seatIds[0]];
-    if (!firstSeat || !firstSeat.freqsHz || !firstSeat.splDb) {
-      return null;
-    }
+    const freqsHz = selectedSeat.freqsHz;
+    const splDb = analysisSplDbAbs; // Use canonical analysis series
 
     // Filter to 20-80 Hz range
-    const freqIndices = firstSeat.freqsHz
+    const freqIndices = freqsHz
       .map((f, i) => ({ f, i }))
       .filter(({ f }) => f >= 20 && f <= 80);
     
@@ -1627,46 +1671,29 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return null;
     }
 
-    // 1. Seat-to-seat variance (std dev across seats per freq, then average)
-    let sumStdDevs = 0;
-    freqIndices.forEach(({ i }) => {
-      const splValues = seatIds.map(sid => seatResponses[sid].splDb[i]);
-      const mean = splValues.reduce((a, b) => a + b, 0) / splValues.length;
-      const variance = splValues.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / splValues.length;
-      const stdDev = Math.sqrt(variance);
-      sumStdDevs += stdDev;
-    });
-    const avgVariance = sumStdDevs / freqIndices.length;
+    // 1. Seat-to-seat variance (simplified to single-seat for now)
+    // Full multi-seat variance requires access to all seat analysis series
+    const bandSpl = freqIndices.map(({ i }) => splDb[i]).filter(v => Number.isFinite(v));
+    const mean = bandSpl.length > 0 ? bandSpl.reduce((a, b) => a + b, 0) / bandSpl.length : 0;
+    const variance = bandSpl.length > 0 
+      ? Math.sqrt(bandSpl.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / bandSpl.length)
+      : 0;
 
-    // 2. Best vs worst seat (avg level per seat over 20-80 Hz, then max-min)
-    const seatAverages = seatIds.map(sid => {
-      const seat = seatResponses[sid];
-      const sum = freqIndices.reduce((acc, { i }) => acc + seat.splDb[i], 0);
-      return sum / freqIndices.length;
-    });
-    const bestSeatAvg = Math.max(...seatAverages);
-    const worstSeatAvg = Math.min(...seatAverages);
-    const bestWorstDelta = bestSeatAvg - worstSeatAvg;
+    // 2. Best vs worst seat (use engine-computed value from simulationResults.metrics)
+    const bestWorstDelta = simulationResults.metrics?.fairness?.spreadBestWorstDb || 0;
 
-    // 3. Null count (simple: dips >= 6dB below seat's own avg)
-    let totalNulls = 0;
-    seatIds.forEach(sid => {
-      const seat = seatResponses[sid];
-      const seatAvg = freqIndices.reduce((acc, { i }) => acc + seat.splDb[i], 0) / freqIndices.length;
-      freqIndices.forEach(({ i }) => {
-        const dip = seatAvg - seat.splDb[i];
-        if (dip >= 6) {
-          totalNulls++;
-        }
-      });
-    });
+    // 3. Null count (use engine-computed value)
+    const totalNulls = simulationResults.metrics?.fairness?.nulls?.perSeat 
+      ? Object.values(simulationResults.metrics.fairness.nulls.perSeat)
+          .reduce((sum, seat) => sum + (seat.count || 0), 0)
+      : 0;
 
     return {
-      variance: avgVariance,
+      variance,
       bestWorstDelta,
       nullCount: totalNulls
     };
-  }, [simulationResults.seatResponses]);
+  }, [selectedSeat, analysisSplDbAbs, simulationResults.metrics]);
 
   // Schroeder frequency (display only)
   const schroederFrequency = React.useMemo(() => {
@@ -2030,36 +2057,99 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </div>
       )}
 
-      {/* RP22 Bass Metrics */}
-      {simulationResults.metrics && (
-        <div className="grid grid-cols-4 gap-3">
-          <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-            <div className="text-xs text-[#3E4349] mb-1">P14 Max SPL</div>
-            <div className="text-lg font-bold text-[#1B1A1A]">
-              {simulationResults.metrics.p14.maxSplDb.toFixed(1)} dB
+      {/* RP22 Bass Metrics - NOW USES ANALYSIS SERIES */}
+      {(() => {
+        // Compute metrics from analysisSeriesAbs (same base as plot)
+        if (!analysisSeriesAbs || analysisSeriesAbs.length === 0 || !selectedSeat) {
+          return null;
+        }
+        
+        const freqsHz = selectedSeat.freqsHz;
+        const splDb = analysisSplDbAbs;
+        
+        // Generate target curve
+        const targetDb = freqsHz.map(f => f <= 80 ? 0 : (-6 / (200 - 80)) * (f - 80));
+        
+        // Calculate Schroeder frequency
+        const w = roomDims?.widthM ?? 0;
+        const l = roomDims?.lengthM ?? 0;
+        const h = roomDims?.heightM ?? 0;
+        const volume = w * l * h;
+        const rt60 = 0.4;
+        const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
+        
+        // Compute P14 (20-80 Hz max SPL)
+        const band20_80 = splDb
+          .map((spl, i) => ({ freq: freqsHz[i], spl }))
+          .filter(p => p.freq >= 20 && p.freq <= 80 && Number.isFinite(p.spl));
+        const p14MaxSpl = band20_80.length > 0 
+          ? Math.max(...band20_80.map(p => p.spl))
+          : 0;
+        
+        // Compute P18 (in-room -3dB extension)
+        const deviation = splDb.map((spl, i) => spl - targetDb[i]);
+        const refBand = deviation
+          .map((dev, i) => ({ freq: freqsHz[i], dev }))
+          .filter(p => p.freq >= 50 && p.freq <= 80);
+        const refLevel = refBand.length > 0
+          ? refBand.reduce((sum, p) => sum + p.dev, 0) / refBand.length
+          : 0;
+        const targetLevel = refLevel - 3;
+        
+        let p18F3Hz = 15;
+        for (let i = 0; i < freqsHz.length; i++) {
+          if (freqsHz[i] >= 10 && deviation[i] >= targetLevel) {
+            p18F3Hz = freqsHz[i];
+            break;
+          }
+        }
+        
+        // Compute P19 (max deviation below Schroeder, with 1/3 smoothing)
+        const smoothedForP19 = applyRewStyleDisplaySmoothing(
+          analysisSeriesAbs,
+          '1/3'
+        ).map(p => p.spl);
+        
+        const belowSchroeder = smoothedForP19
+          .map((spl, i) => ({ freq: freqsHz[i], dev: Math.abs(spl - targetDb[i]) }))
+          .filter(p => p.freq <= schroederHz && Number.isFinite(p.dev));
+        const p19MaxDev = belowSchroeder.length > 0
+          ? Math.max(...belowSchroeder.map(p => p.dev))
+          : 0;
+        
+        // Bass uniformity (from engine metrics)
+        const uniformitySd = simulationResults.metrics?.uniformity?.sdDb_20_80 || 0;
+        
+        return (
+          <div className="grid grid-cols-4 gap-3">
+            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
+              <div className="text-xs text-[#3E4349] mb-1">P14 Max SPL</div>
+              <div className="text-lg font-bold text-[#1B1A1A]">
+                {p14MaxSpl.toFixed(1)} dB
+              </div>
+            </div>
+            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
+              <div className="text-xs text-[#3E4349] mb-1">P18 Extension</div>
+              <div className="text-lg font-bold text-[#1B1A1A]">
+                {p18F3Hz.toFixed(0)} Hz
+              </div>
+            </div>
+            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
+              <div className="text-xs text-[#3E4349] mb-1">P19 Deviation</div>
+              <div className="text-lg font-bold text-[#1B1A1A]">
+                ±{p19MaxDev.toFixed(1)} dB
+              </div>
+            </div>
+            <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
+              <div className="text-xs text-[#3E4349] mb-1">Bass Uniformity</div>
+              <div className="text-lg font-bold text-[#1B1A1A]">
+                ±{uniformitySd.toFixed(1)} dB
+              </div>
+              <div className="text-xs text-[#3E4349] mt-1">20–80 Hz</div>
             </div>
           </div>
-          <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-            <div className="text-xs text-[#3E4349] mb-1">P18 Extension</div>
-            <div className="text-lg font-bold text-[#1B1A1A]">
-              {simulationResults.metrics.p18.f3Hz.toFixed(0)} Hz
-            </div>
-          </div>
-          <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-            <div className="text-xs text-[#3E4349] mb-1">P19 Deviation</div>
-            <div className="text-lg font-bold text-[#1B1A1A]">
-              ±{simulationResults.metrics.p19.maxDeviationDb.toFixed(1)} dB
-            </div>
-          </div>
-          <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
-            <div className="text-xs text-[#3E4349] mb-1">Bass Uniformity</div>
-            <div className="text-lg font-bold text-[#1B1A1A]">
-              ±{simulationResults.metrics.uniformity.sdDb_20_80.toFixed(1)} dB
-            </div>
-            <div className="text-xs text-[#3E4349] mt-1">20–80 Hz</div>
-          </div>
-        </div>
-      )}
+        );
+      })()}
       
       {/* Designer Warnings */}
       {simulationResults.metrics?.designerWarnings && simulationResults.metrics.designerWarnings.length > 0 && (
