@@ -354,8 +354,9 @@ function RP22ReportInner() {
                                         return null;
                                     }
 
-                                    const rp22Raw = tooltipData?.rp22 || {};
-                                    const rp23 = tooltipData?.rp23 || {};
+                                    // Use fresh analysis data from engine (not stale autosave)
+                                    const rp22Raw = analysisResult?.perSeatRp22?.[seatId]?.rp22 || {};
+                                    const rp23 = analysisResult?.perSeatRp23?.[seatId] || {};
                                     const isPrimary = tooltipData?.isPrimary || false;
                                     
                                     return (
