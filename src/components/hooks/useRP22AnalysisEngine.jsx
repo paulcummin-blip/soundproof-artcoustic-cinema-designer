@@ -996,21 +996,32 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     }
 
     // Build perSeatRp23 - RP23 horizontal viewing angle for each seat
+    // Use the SAME calculation as buildSeatHudSnapshot to ensure consistency
     const perSeatRp23 = {};
-    const screenWidthM = ((dimensions?.widthM || 4.5) * 0.0254 * 100) || 2.54; // Fallback to 100 inches
     
     for (const seat of seatsWithRoles) {
       const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
+      
+      // Import the HUD calculation for RP23 from buildSeatHudSnapshot
+      // Screen width in meters (from screen.visibleWidthInches)
+      const screenWidthInches = screen?.visibleWidthInches || 100;
+      const screenWidthM = screenWidthInches * 0.0254;
+      
+      // Distance from seat to screen (screen is at Y coordinate near front of room)
+      const screenFrontY = screenFrontPlaneM || 0;
       const seatY = seat.y || 0;
+      const distanceToScreenM = Math.abs(seatY - screenFrontY);
       
-      // Calculate distance to screen (assume screen at Y=0)
-      const distanceToScreen = Math.abs(seatY);
-      
-      if (distanceToScreen > 0.1 && screenWidthM > 0) {
-        const rp23AngleDeg = 2 * Math.atan((screenWidthM / 2) / distanceToScreen) * (180 / Math.PI);
-        const rp23DisplayDeg = Math.floor(rp23AngleDeg);
+      if (distanceToScreenM > 0.1 && screenWidthM > 0) {
+        // Calculate horizontal viewing angle (RP23)
+        const rp23AngleRad = 2 * Math.atan((screenWidthM / 2) / distanceToScreenM);
         
-        let rp23Level = '—';
+        // Convert radians to degrees (handle both cases)
+        const rp23AngleDeg = rp23AngleRad < 6.5 ? (rp23AngleRad * 180 / Math.PI) : rp23AngleRad;
+        const rp23DisplayDeg = Math.round(rp23AngleDeg);
+        
+        // RP23 Level thresholds (CEDIA standard)
+        let rp23Level = 'L1';
         if (rp23AngleDeg >= 48 && rp23AngleDeg <= 67) rp23Level = 'L4';
         else if (rp23AngleDeg >= 45 && rp23AngleDeg <= 70) rp23Level = 'L3';
         else if (rp23AngleDeg >= 40 && rp23AngleDeg <= 75) rp23Level = 'L2';
