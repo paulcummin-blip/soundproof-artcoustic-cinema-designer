@@ -69,6 +69,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   ); // Bass audit UI visibility
   const [auditEpoch, setAuditEpoch] = useState(0); // Force re-simulation when audit toggled
   const [rewSbirEnabled, setRewSbirEnabled] = useState(false); // SBIR reflections toggle
+  const [modalProbeEnabled, setModalProbeEnabled] = useState(false); // Modal Probe toggle
 
   // Sensitivity audit refs (track previous run)
   const prevSourceSigRef = useRef(null);
@@ -266,6 +267,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return { seatResponses: {}, metrics: null, audit: null };
     }
     
+    // Prepare debugProbe options
+    const debugProbeOptions = modalProbeEnabled ? {
+      enabled: true,
+      seatId: selectedSeat?.id || "MLP",
+      freqsHz: [24, 28.6, 38.1, 42.9, 57.2, 60, 80, 100],
+      topModes: 8
+    } : null;
+    
     return simulateBassAtSeats({
       roomDims: {
         widthM: roomDims.widthM,
@@ -281,11 +290,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         modesEnabled,
         roomDamping,
         sbirEnabled: rewSbirEnabled
+      },
+      options: {
+        debugProbe: debugProbeOptions
       }
     });
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, modesEnabled, roomDamping, rewSbirEnabled, hasNoSeats, hasNoSubs, auditEpoch]);
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, modesEnabled, roomDamping, rewSbirEnabled, hasNoSeats, hasNoSubs, auditEpoch, modalProbeEnabled, selectedSeat?.id]);
   
   const bassAudit = simulationResults.audit || null;
+  const modeProbe = bassAudit?.modeProbe || null;
 
   // Find MLP seat for display
   const selectedSeat = useMemo(() => {
@@ -2692,6 +2705,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </Label>
             </div>
             
+            {/* Modal Probe toggle */}
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="modal-probe" 
+                checked={modalProbeEnabled}
+                onCheckedChange={setModalProbeEnabled}
+              />
+              <Label htmlFor="modal-probe" className="text-xs font-semibold" style={{ color: modalProbeEnabled ? '#dc2626' : '#3E4349' }}>
+                🔬 Modal Probe (runtime dump)
+              </Label>
+            </div>
+            
             {/* Coupling Phase Probe (Part HB - verify complex eigenfunctions) */}
             {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
               <div className="space-y-2 mt-2 pt-2 border-t border-gray-300">
@@ -3250,6 +3275,44 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 Stack: {rewModesData.debug.stack.split('\n')[0]}
               </div>
             )}
+          </div>
+        )}
+
+        {/* Modal Probe Output */}
+        {modalProbeEnabled && modeProbe && modeProbe.rows && modeProbe.rows.length > 0 && (
+          <div className="text-xs mb-2 bg-red-50 p-2 rounded border border-red-400">
+            <div className="font-semibold mb-1 text-red-700">🔬 Modal Probe (engine internal)</div>
+            <div className="text-[10px] space-y-1">
+              <div className="mb-2">
+                <strong>Seat:</strong> {modeProbe.seatIdUsed || 'N/A'} | 
+                <strong className="ml-2">Requested freqs:</strong> {modeProbe.freqsRequested.join(', ')} Hz
+              </div>
+              <div className="max-h-96 overflow-y-auto space-y-3 font-mono">
+                {modeProbe.rows.map((row, i) => {
+                  const topModes = (row.topModes || []).slice(0, 3);
+                  const topModesStr = topModes.map(m => 
+                    `(${m.nx},${m.ny},${m.nz})@${m.f0Hz.toFixed(0)}Hz:cpl=${m.coupling.toFixed(3)},res=${m.resonMagDb.toFixed(1)}dB`
+                  ).join(', ');
+                  
+                  return (
+                    <div key={i} className="border-t border-red-200 pt-1 first:border-t-0 first:pt-0">
+                      <div className="font-semibold text-red-800">{row.frequencyHz.toFixed(1)} Hz (sub {row.subId}):</div>
+                      <div className="grid grid-cols-4 gap-2 pl-2">
+                        <div>pre: {row.pre.db.toFixed(1)} dB</div>
+                        <div className="font-bold text-blue-600">modeMult: {row.modeMult.db.toFixed(1)} dB</div>
+                        <div>post: {row.post.db.toFixed(1)} dB</div>
+                        <div>Δ: {(row.post.db - row.pre.db).toFixed(1)} dB</div>
+                      </div>
+                      {topModesStr && (
+                        <div className="text-[9px] opacity-80 mt-1 pl-2">
+                          Top modes: {topModesStr}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
 
