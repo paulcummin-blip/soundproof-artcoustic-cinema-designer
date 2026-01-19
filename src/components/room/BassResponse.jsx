@@ -3283,9 +3283,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           <div className="text-xs mb-2 bg-red-50 p-2 rounded border border-red-400">
             <div className="font-semibold mb-1 text-red-700">🔬 Modal Probe (engine internal)</div>
             <div className="text-[10px] space-y-1">
-              <div className="mb-2">
-                <strong>Seat:</strong> {modeProbe.seatIdUsed || 'N/A'} | 
-                <strong className="ml-2">Requested freqs:</strong> {modeProbe.freqsRequested.join(', ')} Hz
+              <div className="mb-2 space-y-1">
+                <div>
+                  <strong>Engine:</strong> bassSimulationEngine.js (product-based, applyModesToComplexPressure)
+                </div>
+                <div>
+                  <strong>Seat:</strong> {modeProbe.seatIdUsed || 'N/A'} | 
+                  <strong className="ml-2">Requested freqs:</strong> {modeProbe.freqsRequested.join(', ')} Hz
+                </div>
+                <div className="text-red-700 font-semibold">
+                  ⚠️ If modesPassedBandwidth is near-zero at most frequencies, modes aren't contributing
+                </div>
               </div>
               <div className="max-h-96 overflow-y-auto space-y-3 font-mono">
                 {modeProbe.rows.map((row, i) => {
@@ -3294,9 +3302,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     `(${m.nx},${m.ny},${m.nz})@${m.f0Hz.toFixed(0)}Hz:cpl=${m.coupling.toFixed(3)},res=${m.resonMagDb.toFixed(1)}dB`
                   ).join(', ');
                   
+                  const modesCount = row.modesPassedBandwidth ?? 0;
+                  const totalModes = row.totalModesAvailable ?? 0;
+                  
                   return (
                     <div key={i} className="border-t border-red-200 pt-1 first:border-t-0 first:pt-0">
-                      <div className="font-semibold text-red-800">{row.frequencyHz.toFixed(1)} Hz (sub {row.subId}):</div>
+                      <div className="font-semibold text-red-800">
+                        {row.frequencyHz.toFixed(1)} Hz (sub {row.subId}) — {modesCount} modes within 3×BW (of {totalModes} total)
+                      </div>
                       <div className="grid grid-cols-4 gap-2 pl-2">
                         <div>pre: {row.pre.db.toFixed(1)} dB</div>
                         <div className="font-bold text-blue-600">modeMult: {row.modeMult.db.toFixed(1)} dB</div>

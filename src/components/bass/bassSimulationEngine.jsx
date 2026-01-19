@@ -295,6 +295,7 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
   
   // Track top modes for debugging
   const modeContributions = [];
+  let modesPassedBandwidth = 0;
   
   // Accumulate modal contributions
   for (const mode of modes) {
@@ -302,6 +303,8 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
     const bw = mode.fHz / Q;
     const df = Math.abs(f - mode.fHz);
     if (df > 3 * bw) continue;
+    
+    modesPassedBandwidth++;
     
     // Calculate coupling for this sub-seat pair (signed, full 3D)
     const coupling = modeCoupling(
@@ -368,7 +371,9 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
         pre: { real: sumReal, imag: sumImag, mag: preMag, db: preDb },
         modeMult: { real: modeMultReal, imag: modeMultImag, mag: multMag, db: multDb },
         post: { real: finalReal, imag: finalImag, mag: postMag, db: postDb },
-        top: topModes
+        top: topModes,
+        modesPassedBandwidth: modesPassedBandwidth,
+        totalModesAvailable: modes.length
       }
     };
   }
