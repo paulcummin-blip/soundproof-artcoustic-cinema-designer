@@ -129,7 +129,31 @@ function RP22ReportInner() {
     });
 
     // READ seat metrics from analysis engine (fresh per-seat RP22 data)
-    const seatMetricsById = analysisResult?.perSeatRp22 || {};
+    const seatMetricsById = React.useMemo(() => {
+        const rp22BySeat = analysisResult?.perSeatRp22 || {};
+        const rp23BySeat = analysisResult?.perSeatRp23 || {};
+
+        const out = {};
+        (seats || []).forEach((seat) => {
+            const seatId = seat?.id;
+            if (!seatId) return;
+
+            // Transform numeric keys (1, 4, 5) to string keys (p1, p4, p5)
+            const engineData = rp22BySeat[seatId]?.rp22 || {};
+            const transformedRp22 = {};
+            Object.keys(engineData).forEach(numKey => {
+                transformedRp22[`p${numKey}`] = engineData[numKey];
+            });
+
+            out[seatId] = {
+                rp22: transformedRp22,
+                rp23: rp23BySeat[seatId] || {},
+                isPrimary: !!seat?.isPrimary,
+            };
+        });
+
+        return out;
+    }, [analysisResult?.perSeatRp22, analysisResult?.perSeatRp23, seats]);
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
