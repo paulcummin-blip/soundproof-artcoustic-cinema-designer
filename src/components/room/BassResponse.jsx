@@ -1231,6 +1231,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
 
+  // Display mode gates (CRITICAL: Relative view and Display ref are mutually exclusive)
+  const isRewStyle = !!rewStyleMode;
+  const isRelative = isRewStyle && !!rewRelativeView;
+  const isCompare = isRewStyle && !!rewCompareView;
+  
+  // IMPORTANT: Relative view must NEVER apply absolute display reference offsets
+  const allowDisplayRefOffset = isRewStyle && !isRelative;
+
   // REW mode: Three distinct series for plotting (RAW, ENGINE, DISPLAY)
   const { rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries } = useMemo(() => {
     // Select active dataset (Room-only or Room+Product)
@@ -1257,7 +1265,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // DISPLAY FINAL:
     // - Absolute view: ENGINE FINAL + display ref (e.g. 85/90/95/100 dB)
     // - Relative view: DISPLAY-ONLY reference shift so median(30–80 Hz) becomes 0 dB (REW-style overlay alignment)
-    let displayOffset = (!rewRelativeView && rewStyleMode) ? rewDisplayRefDb : 0;
+    // CRITICAL: allowDisplayRefOffset prevents stacking of relative + absolute offsets
+    const displayOffsetDb = allowDisplayRefOffset ? (Number(rewDisplayRefDb) || 0) : 0;
 
     // Relative shift (median 30–80 Hz -> 0 dB)
     let relShiftDb = 0;
@@ -1278,7 +1287,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     const displaySeries = (engineFinalSeries || []).map(d => ({
       frequency: d.frequency,
-      spl: Number.isFinite(d.spl) ? (d.spl + displayOffset + relShiftDb) : d.spl
+      spl: Number.isFinite(d.spl) ? (d.spl + displayOffsetDb + relShiftDb) : d.spl
     }));
     
     return {
@@ -1286,27 +1295,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       rewEngineFinalSeries: engineFinalSeries,
       rewDisplayFinalSeries: displaySeries
     };
-  }, [rewView, rewModesDataAbs, rewRoomPlusProductData, rewRelativeView, rewStyleMode, rewDisplayRefDb]);
+  }, [rewView, rewModesDataAbs, rewRoomPlusProductData, rewRelativeView, rewStyleMode, rewDisplayRefDb, allowDisplayRefOffset]);
+
+  // REW final plotted series (gated to prevent stacking of relative + absolute offsets)
+  const rewFinalPlottedSeries = useMemo(() => {
+    if (isRelative) {
+      // Relative view: use relative-normalized dataset ONLY (no additional offsets)
+      return rewRelativeView && rewModesDataRel?.data?.length 
+        ? rewModesDataRel.data 
+        : rewDisplayFinalSeries;
+    } else {
+      // Absolute view: use display dataset (which may include display ref offset)
+      return rewDisplayFinalSeries;
+    }
+  }, [isRelative, rewRelativeView, rewModesDataRel, rewDisplayFinalSeries]);
 
   // Choose which curve to display based on view
   const displayData = useMemo(() => {
     if (rewStyleMode) {
-      // NEW PATH: Use analysisSeriesAbs as base (already smoothed)
-      let base = analysisSeriesAbs;
-      
-      // Apply display-only transforms
-      if (rewRelativeView) {
-        // Apply relative normalization (30-80 Hz median -> 0 dB)
-        base = normalizeDatasetToRelative({ data: base }).data || base;
-      } else {
-        // Apply display ref offset (e.g., 85/90/95/100 dB)
-        base = base.map(p => ({
-          frequency: p.frequency,
-          spl: Number.isFinite(p.spl) ? p.spl + rewDisplayRefDb : p.spl
-        }));
-      }
-      
-      return base;
+      // REW mode: Use gated final plotted series (no stacking)
+      return rewFinalPlottedSeries;
     }
     
     // Non-REW mode: use old logic
@@ -1315,7 +1323,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       : rewModesDataAbs?.data?.length ? rewModesDataAbs.data : (rewRoomPlusProductData?.data || []);
     
     return baseData;
-  }, [rewStyleMode, analysisSeriesAbs, rewRelativeView, rewDisplayRefDb, normalizeDatasetToRelative, rewView, rewModesDataAbs, rewRoomPlusProductData]);
+  }, [rewStyleMode, rewFinalPlottedSeries, rewView, rewModesDataAbs, rewRoomPlusProductData]);
 
   // TEMP DEBUG (can remove later)
   // if (globalThis.__B44_LOGS) console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
@@ -1624,9 +1632,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   // REW mode: no clamping, pass data through unchanged
   const { clampedData, outBelow, outAbove } = React.useMemo(() => {
-    // REW mode: no clamping at all
-    if (rewStyleMode) {
-      return { clampedData: displayData, outBelow: 0, outAbove: 0 };
+    // REW mode: bypass clamping and use final plotted series directly
+    if (isRewStyle) {
+      return { clampedData: rewFinalPlottedSeries, outBelow: 0, outAbove: 0 };
     }
 
     // Non-REW mode: apply old windowing logic if needed
@@ -1667,7 +1675,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     });
 
     return { clampedData: clipped, outBelow: below, outAbove: above };
-  }, [rewStyleMode, finalYDomain, displayData, yAxisLocked, rewCompareView, rewView, rewRelativeView]);
+  }, [isRewStyle, rewFinalPlottedSeries, finalYDomain, displayData, yAxisLocked, rewCompareView, rewView, rewRelativeView]);
 
   // Bass Metrics (20-80 Hz) - NOW USES ANALYSIS SERIES (same as plot base)
   const bassMetrics2080Hz = useMemo(() => {
@@ -3961,8 +3969,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           
           {/* Graph or placeholder */}
           {displayData.length > 0 ? (() => {
-            // [PLOT AUDIT] - Verify what's actually being plotted
-            const dataToPlot = rewStyleMode ? displayData : clampedData;
+            // [PLOT AUDIT] - Verify what's actually being plotted (use gated series for REW)
+            const dataToPlot = isRewStyle ? rewFinalPlottedSeries : clampedData;
             const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
             const audit40_70 =
               (activeDebug?.audit40_70) ||
@@ -3994,7 +4002,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   </div>
                 )}
                 <BassGraph
-                  responseData={rewStyleMode ? displayData : clampedData}
+                  responseData={isRewStyle ? rewFinalPlottedSeries : clampedData}
                   schroederFrequency={schroederFrequency}
                   rp22Levels={rp22Levels}
                   toggles={toggles}
