@@ -284,7 +284,7 @@ function modalResonator(f, f0, Q, coupling, gain = 0.25) {
 }
 
 // Apply modal filtering to complex pressure (per sub contribution)
-function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q, modesEnabled) {
+function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q, modesEnabled, debugProbe = null) {
   if (!modesEnabled || !modes || modes.length === 0) {
     return { real: sumReal, imag: sumImag };
   }
@@ -292,6 +292,9 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
   // Start with unity multiplier
   let modeMultReal = 1;
   let modeMultImag = 0;
+  
+  // Track top modes for debugging
+  const modeContributions = [];
   
   // Accumulate modal contributions
   for (const mode of modes) {
@@ -313,6 +316,23 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
     // Get complex resonator response
     const resonator = modalResonator(f, mode.fHz, Q, coupling);
     
+    // Track for debug probe
+    if (debugProbe) {
+      const resonMag = Math.sqrt(resonator.real * resonator.real + resonator.imag * resonator.imag);
+      const resonMagDb = 20 * Math.log10(Math.max(1e-10, resonMag));
+      
+      modeContributions.push({
+        nx: mode.nx,
+        ny: mode.ny,
+        nz: mode.nz,
+        f0Hz: mode.fHz,
+        coupling,
+        resonMagDb,
+        resonReal: resonator.real,
+        resonImag: resonator.imag
+      });
+    }
+    
     // Multiply complex numbers: (a + jb) * (c + jd) = (ac - bd) + j(ad + bc)
     const newReal = modeMultReal * resonator.real - modeMultImag * resonator.imag;
     const newImag = modeMultReal * resonator.imag + modeMultImag * resonator.real;
@@ -324,6 +344,34 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
   // Apply modal multiplier to pressure
   const finalReal = sumReal * modeMultReal - sumImag * modeMultImag;
   const finalImag = sumReal * modeMultImag + sumImag * modeMultReal;
+  
+  // Return debug data if requested
+  if (debugProbe) {
+    const preMag = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
+    const preDb = 20 * Math.log10(Math.max(1e-10, preMag));
+    
+    const multMag = Math.sqrt(modeMultReal * modeMultReal + modeMultImag * modeMultImag);
+    const multDb = 20 * Math.log10(Math.max(1e-10, multMag));
+    
+    const postMag = Math.sqrt(finalReal * finalReal + finalImag * finalImag);
+    const postDb = 20 * Math.log10(Math.max(1e-10, postMag));
+    
+    // Sort by absolute contribution effect and take top N
+    const topModes = modeContributions
+      .sort((a, b) => Math.abs(b.coupling * b.resonMagDb) - Math.abs(a.coupling * a.resonMagDb))
+      .slice(0, debugProbe.topModes || 8);
+    
+    return {
+      real: finalReal,
+      imag: finalImag,
+      debug: {
+        pre: { real: sumReal, imag: sumImag, mag: preMag, db: preDb },
+        modeMult: { real: modeMultReal, imag: modeMultImag, mag: multMag, db: multDb },
+        post: { real: finalReal, imag: finalImag, mag: postMag, db: postDb },
+        top: topModes
+      }
+    };
+  }
   
   return { real: finalReal, imag: finalImag };
 }
@@ -384,7 +432,7 @@ function normalizeSubTuning(tuning) {
 }
 
 // Main simulation engine
-export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
+export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options = {} }) {
   // Guards
   if (!roomDims || !roomDims.widthM || !roomDims.lengthM || !roomDims.heightM) {
     return { seatResponses: {}, metrics: null };
@@ -397,6 +445,17 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   if (!Array.isArray(subs) || subs.length === 0) {
     return { seatResponses: {}, metrics: null };
   }
+  
+  // Modal Probe setup
+  const debugProbe = options.debugProbe || null;
+  const probeEnabled = debugProbe?.enabled === true;
+  const probeFreqs = probeEnabled ? (debugProbe.freqsHz || []) : [];
+  const probeSeatId = probeEnabled ? debugProbe.seatId : null;
+  const modeProbe = {
+    seatIdUsed: null,
+    freqsRequested: probeFreqs,
+    rows: []
+  };
   
   // Audit instrumentation (diagnostic only, no behavior change)
   const auditEnabled = globalThis.__B44_BASS_AUDIT === true;
@@ -456,6 +515,16 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
     const seatId = seat.id || `${seat.x}-${seat.y}`;
     const seatPos = { x: seat.x, y: seat.y, z: Number.isFinite(seat.z) ? seat.z : 1.2 };
     
+    // Check if this seat should be probed
+    const isProbeTarget = probeEnabled && (
+      probeSeatId === seatId || 
+      probeSeatId === "MLP" && seat.isPrimary
+    );
+    
+    if (isProbeTarget) {
+      modeProbe.seatIdUsed = seatId;
+    }
+    
     const splDb = freqsHz.map(f => {
       let sumReal = 0;
       let sumImag = 0;
@@ -464,6 +533,9 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
       const shouldAudit = auditEnabled && 
                          seatId === auditSeatId && 
                          auditFrequencies.includes(f);
+      
+      // Check if this frequency should be probed
+      const shouldProbe = isProbeTarget && probeFreqs.some(pf => Math.abs(f - pf) < 0.5);
 
       subs.forEach((sub, subIdx) => {
         const curve = modelCurves[sub.modelKey];
@@ -565,9 +637,26 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
         }
 
         // Apply modal filtering to composite (direct + SBIR) pressure
-        const { real: filteredReal, imag: filteredImag } = applyModesToComplexPressure(
-          totalSubReal, totalSubImag, f, modes, sub, seatPos, roomDamping, modesEnabled
+        const modeResult = applyModesToComplexPressure(
+          totalSubReal, totalSubImag, f, modes, sub, seatPos, roomDamping, modesEnabled,
+          shouldProbe ? debugProbe : null
         );
+        
+        const filteredReal = modeResult.real;
+        const filteredImag = modeResult.imag;
+        
+        // Capture probe data if requested
+        if (shouldProbe && modeResult.debug) {
+          modeProbe.rows.push({
+            frequencyHz: f,
+            seatId,
+            subId: sub.id || `sub-${subIdx}`,
+            pre: modeResult.debug.pre,
+            modeMult: modeResult.debug.modeMult,
+            post: modeResult.debug.post,
+            topModes: modeResult.debug.top
+          });
+        }
 
         // Record audit data if enabled for this frequency and seat
         if (shouldAudit) {
@@ -676,7 +765,7 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig }) {
   // Compute RP22 metrics
   const metrics = computeRP22Metrics(seatResponses, seats, subs, roomDims);
   
-  return { seatResponses, metrics, audit };
+  return { seatResponses, metrics, audit: { ...audit, modeProbe } };
 }
 
 // Check for extreme tuning settings
