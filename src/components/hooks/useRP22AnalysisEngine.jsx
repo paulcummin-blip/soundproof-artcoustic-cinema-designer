@@ -1008,7 +1008,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const screenWidthM = screenWidthInches * 0.0254;
       
       // Distance from seat to screen (screen is at Y coordinate near front of room)
-      const screenFrontY = screenFrontPlaneM || 0;
+      const screenFrontY = screen?.frontPlaneM || 0;
       const seatY = seat.y || 0;
       const distanceToScreenM = Math.abs(seatY - screenFrontY);
       
