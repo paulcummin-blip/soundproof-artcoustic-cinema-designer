@@ -128,8 +128,8 @@ function RP22ReportInner() {
         p15ConstructionLevel: app?.p15ConstructionLevel
     });
 
-    // READ seat metrics from AppState cache (single source of truth shared with HUD)
-    const seatMetricsById = app?.seatMetricsById || {};
+    // READ seat metrics from analysis engine (fresh per-seat RP22 data)
+    const seatMetricsById = analysisResult?.perSeatRp22 || {};
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
