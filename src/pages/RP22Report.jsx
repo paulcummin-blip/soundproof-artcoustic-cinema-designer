@@ -128,32 +128,7 @@ function RP22ReportInner() {
         p15ConstructionLevel: app?.p15ConstructionLevel
     });
 
-    // READ seat metrics from analysis engine (fresh per-seat RP22 data)
-    const seatMetricsById = React.useMemo(() => {
-        const rp22BySeat = analysisResult?.perSeatRp22 || {};
-        const rp23BySeat = analysisResult?.perSeatRp23 || {};
 
-        const out = {};
-        (seats || []).forEach((seat) => {
-            const seatId = seat?.id;
-            if (!seatId) return;
-
-            // Transform numeric keys (1, 4, 5) to string keys (p1, p4, p5)
-            const engineData = rp22BySeat[seatId]?.rp22 || {};
-            const transformedRp22 = {};
-            Object.keys(engineData).forEach(numKey => {
-                transformedRp22[`p${numKey}`] = engineData[numKey];
-            });
-
-            out[seatId] = {
-                rp22: transformedRp22,
-                rp23: rp23BySeat[seatId] || {},
-                isPrimary: !!seat?.isPrimary,
-            };
-        });
-
-        return out;
-    }, [analysisResult?.perSeatRp22, analysisResult?.perSeatRp23, seats]);
 
     // Build ordered parameters list (1-21)
     // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
@@ -336,28 +311,21 @@ function RP22ReportInner() {
                                     );
                                 }
 
-                                const hasMetrics = Object.keys(seatMetricsById).length > 0;
-                                if (!hasMetrics) {
-                                    return (
-                                        <p className="text-sm text-[#3E4349]">
-                                            Analysis in progress…
-                                        </p>
-                                    );
-                                }
+
 
                                 return seats.map((seat, idx) => {
                                     const seatId = seat?.id || '—';
-                                    const tooltipData = seatMetricsById[seatId];
+                                    
+                                    // CRITICAL: Read from HUD cache (same source as Seat HUD tooltip)
+                                    const tooltipData = app?.seatMetricsById?.[seatId];
+                                    const rp22Raw = tooltipData?.rp22 || {};
+                                    const rp23 = tooltipData?.rp23 || {};
+                                    const isPrimary = tooltipData?.isPrimary || false;
 
-                                    // If no metrics computed yet for this seat, skip
+                                    // If no metrics computed yet for this seat, show placeholders
                                     if (!tooltipData) {
                                         return null;
                                     }
-
-                                    // Use fresh analysis data from engine (not stale autosave)
-                                    const rp22Raw = analysisResult?.perSeatRp22?.[seatId]?.rp22 || {};
-                                    const rp23 = analysisResult?.perSeatRp23?.[seatId] || {};
-                                    const isPrimary = tooltipData?.isPrimary || false;
                                     
                                     return (
                                         <div key={seatId} className="flex flex-col h-full">
