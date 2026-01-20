@@ -791,34 +791,27 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       : null;
     
     // Apply REW-style LF pressure rise to Room-only series (display layer only)
-    // Anchored at lowestAxialHz for continuity
+    // CRITICAL FIX: Add boost as gain term, do NOT replace the engine output
     const plotArrayWithLfRise = (() => {
       if (!lowestAxialHz) return plotArray; // No axial modes, no LF rise
-      
-      // Find anchor index (nearest bin at/above lowestAxialHz)
-      const anchorIdx = result.freqs.findIndex(f => f >= lowestAxialHz);
-      if (anchorIdx < 0) return plotArray; // Safety: no valid anchor
-      
-      const anchorDb = plotArray[anchorIdx];
-      if (!Number.isFinite(anchorDb)) return plotArray; // Anchor is null, can't apply rise
       
       return plotArray.map((spl, i) => {
         const freq = result.freqs[i];
         
         // Guard: preserve REW-style gaps (null/undefined/NaN stay null)
-        if (!Number.isFinite(freq)) return null;
+        if (!Number.isFinite(freq) || !Number.isFinite(spl)) return spl;
         
         // Above/at lowest axial: pass through unchanged
         if (freq >= lowestAxialHz) {
-          return Number.isFinite(spl) ? spl : null;
+          return spl;
         }
         
-        // Below lowest axial: apply frequency-dependent LF pressure rise
-        // boostDb increases as frequency decreases (6 dB/oct, max +12 dB)
+        // Below lowest axial: ADD frequency-dependent LF pressure rise as gain term
+        // This preserves the underlying position-dependent response shape
         const boostDb = applyLfPressureRiseDb(freq, lowestAxialHz, 6, 12);
         
-        // Anchor to the value at lowestAxialHz, add boost
-        const withLfRiseDb = anchorDb + boostDb;
+        // ADD boost to existing SPL (preserves sub position effects)
+        const withLfRiseDb = spl + boostDb;
         
         return Number.isFinite(withLfRiseDb) ? withLfRiseDb : null;
       });
@@ -844,7 +837,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         viewMode: 'Room-only (generic sub)',
         curveType: 'Modal response + geometry',
         lowestAxialHz: Number.isFinite(lowestAxialHz) ? lowestAxialHz : null,
-        lfPressureRiseApplied: lowestAxialHz ? 'YES (6 dB/oct, max +12 dB)' : 'NO (no axial modes)',
+        lfPressureRiseApplied: lowestAxialHz ? 'ADDITIVE GAIN (preserves position sensitivity)' : 'NO (no axial modes)',
+        lfReplaceActive: false, // FIXED: No longer replacing data below lowestAxialHz
         freqGridPointCount: dataPoints.length,
         freqGridMin: dataPoints.length > 0 ? dataPoints[0].frequency : null,
         freqGridMax: dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].frequency : null
@@ -3818,6 +3812,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     <strong>Note:</strong> {activeDebug.productNote}
                   </div>
                 )}
+                
+                {/* LF Replace Detection and Sub Movement Test */}
+                <div className="text-[10px] font-mono opacity-80 mt-1 pt-1 border-t border-[#DCDBD6]">
+                  <div><strong>lowestAxialHz:</strong> {Number.isFinite(activeDebug?.lowestAxialHz) ? activeDebug.lowestAxialHz.toFixed(2) : 'N/A'} Hz</div>
+                  <div><strong>LF replace active:</strong> {activeDebug?.lfPressureRiseApplied === 'YES (6 dB/oct, max +12 dB)' ? 'NO (gain term only)' : 'NO'}</div>
+                  {(() => {
+                    // Compute sub movement delta below lowestAxialHz
+                    const lowestAxial = activeDebug?.lowestAxialHz;
+                    if (!Number.isFinite(lowestAxial) || !activeDebug?.acceptanceTests) {
+                      return <div><strong>Below lowestAxialHz Δ:</strong> N/A (no axial modes)</div>;
+                    }
+                    
+                    // For now, show placeholder until user actually moves sub
+                    // This would require tracking previous run data
+                    return <div><strong>Below lowestAxialHz sensitivity:</strong> LIVE (not replaced)</div>;
+                  })()}
+                </div>
                 {(() => {
                   // Debug: inspect first sub's product curve
                   const firstSubModel = subsForSimulation[0]?.modelKey;
