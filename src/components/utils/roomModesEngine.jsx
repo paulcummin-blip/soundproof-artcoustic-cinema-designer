@@ -227,8 +227,9 @@ export function computeRoomModesResponse({
   const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
   
   // Generate frequency axis FIRST (needed by subProductMeta)
+  // REW parity: use log-spaced grid (1/48 oct) for smooth continuous curves
   const freqs = rewParityMode 
-    ? generateLinearFrequencyAxis(fMin, fMax, 0.5) // 0.5 Hz steps for modal detail
+    ? generateLogFrequencyAxis(fMin, fMax, 48) // 1/48 octave spacing (~400 points)
     : generateLogFrequencyAxis(fMin, fMax, pointsPerOct);
   
   // Detect product curve type and extract reference SPL
@@ -1629,6 +1630,19 @@ export function computeRoomModesResponse({
   const safeDisplayPlottedDb = (rewParityMode && isRelative)
     ? safePlottedDbRaw.map(v => (Number.isFinite(v) ? (v + displayOffsetDb) : v))
     : safePlottedDbRaw;
+  
+  // Acceptance test diagnostics: check for duplicate X and verify strict ordering
+  const freqsForDiagnostic = [...safeFreqs];
+  const duplicateCheck = freqsForDiagnostic.filter((f, i, arr) => i > 0 && f === arr[i - 1]);
+  const duplicateCount = duplicateCheck.length;
+  
+  const strictlyIncreasing = freqsForDiagnostic.every((f, i, arr) => 
+    i === 0 || f > arr[i - 1]
+  );
+  
+  const minDeltaF = freqsForDiagnostic.length >= 2 
+    ? Math.min(...freqsForDiagnostic.slice(1).map((f, i) => f - freqsForDiagnostic[i]))
+    : 0;
 
   const baseReturn = {
     freqs: [...safeFreqs],
@@ -1781,6 +1795,18 @@ export function computeRoomModesResponse({
         };
       }) : null,
       parityAudits,
+      // Acceptance test diagnostics (REW parity - curve quality checks)
+      acceptanceTests: {
+        pointCount: safeFreqs.length,
+        freqMin: safeFreqs.length > 0 ? safeFreqs[0].toFixed(3) : 'N/A',
+        freqMax: safeFreqs.length > 0 ? safeFreqs[safeFreqs.length - 1].toFixed(3) : 'N/A',
+        duplicateCount: duplicateCount,
+        strictlyIncreasing: strictlyIncreasing,
+        minDeltaF: minDeltaF > 0 ? minDeltaF.toFixed(6) : 'N/A',
+        hoverSweepTest: duplicateCount === 0 && strictlyIncreasing ? 'PASS ✓' : 'FAIL ✗',
+        duplicateXTest: duplicateCount === 0 ? 'PASS ✓' : `FAIL ✗ (${duplicateCount} duplicates)`,
+        stairStepTest: safeFreqs.length >= 300 ? 'PASS ✓ (dense grid)' : 'CAUTION (sparse grid)',
+      }
     }
   };
 
@@ -1999,18 +2025,17 @@ function generateLinearFrequencyAxis(fMin, fMax, step) {
 }
 
 /**
- * Generate log-spaced frequency axis
+ * Generate log-spaced frequency axis (REW parity - keeps full float precision)
  */
 function generateLogFrequencyAxis(fMin, fMax, pointsPerOct) {
   const freqs = [];
   const octaves = Math.log2(fMax / fMin);
   const totalPoints = Math.ceil(octaves * pointsPerOct);
   
-  for (let i = 0; i < totalPoints; i++) {
+  for (let i = 0; i <= totalPoints; i++) {
     const f = fMin * Math.pow(2, i / pointsPerOct);
-    if (f <= fMax) {
-      freqs.push(f);
-    }
+    if (f > fMax) break;
+    freqs.push(f); // Keep full float precision (no rounding)
   }
   
   return freqs;

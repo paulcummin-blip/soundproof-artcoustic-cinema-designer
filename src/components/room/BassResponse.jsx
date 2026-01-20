@@ -3620,7 +3620,31 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div className={isStrictlyIncreasing ? 'text-green-600' : 'text-red-600'}>
                   Strictly increasing: {isStrictlyIncreasing ? '✓ PASS' : '✗ FAIL'}
                 </div>
+                {(() => {
+                  // Compute min delta between adjacent points
+                  const deltas = freqs.slice(1).map((f, i) => f - freqs[i]);
+                  const minDelta = deltas.length > 0 ? Math.min(...deltas) : 0;
+                  return (
+                    <div>
+                      Min Δf: {minDelta > 0 ? minDelta.toFixed(6) : 'N/A'} Hz
+                    </div>
+                  );
+                })()}
               </div>
+              
+              {/* Acceptance Tests Display */}
+              {activeDebug?.acceptanceTests && (
+                <div className="mt-2 pt-2 border-t border-[#C1B6AD] space-y-0.5 text-[10px] font-mono bg-green-50 p-2 rounded">
+                  <div className="font-semibold text-green-700 mb-1">REW Parity Acceptance Tests:</div>
+                  <div>1. Hover sweep test: {activeDebug.acceptanceTests.hoverSweepTest}</div>
+                  <div>2. No duplicate X test: {activeDebug.acceptanceTests.duplicateXTest}</div>
+                  <div>3. Stair/step test: {activeDebug.acceptanceTests.stairStepTest}</div>
+                  <div className="text-[9px] opacity-70 mt-1">
+                    Point count: {activeDebug.acceptanceTests.pointCount} | 
+                    Min Δf: {activeDebug.acceptanceTests.minDeltaF} Hz
+                  </div>
+                </div>
+              )}
               <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
                 <div className="text-[10px] font-mono opacity-80 font-semibold text-blue-700">
                   REW Inputs (Live Tracking):
