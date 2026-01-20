@@ -3530,7 +3530,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <strong>SeatSig:</strong> {activeDebug?.seatSigUsed || 'N/A'}
                 </div>
                 <div className="text-[10px] font-mono opacity-80">
-                  <strong>Lowest axial:</strong> {activeDebug?.lowestAxialHz?.toFixed(1) || 'N/A'} Hz
+                  <strong>Lowest axial:</strong> {Number.isFinite(activeDebug?.lowestAxialHz) ? activeDebug.lowestAxialHz.toFixed(1) : '—'} Hz
                 </div>
                 {activeDebug?.modeCouplingSanity && (
                   <div className="text-[10px] font-mono opacity-80 bg-yellow-100 px-1 rounded">
