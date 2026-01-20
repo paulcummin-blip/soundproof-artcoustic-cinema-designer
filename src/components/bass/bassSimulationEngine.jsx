@@ -271,16 +271,16 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
     return { real: sumReal, imag: sumImag };
   }
   
-  // REW-like: modal effect as an additive complex contribution
-  // Start at 0 and build up, then add to the direct+SBIR pressure
-  let modeAddReal = 0;
-  let modeAddImag = 0;
+  // REW-like: sum modal deltas from unity, then apply transfer function H = 1 + sum(...)
+  // This allows deep cancellations (multiplicative approach smooths/shapes instead)
+  let modeSumReal = 0;
+  let modeSumImag = 0;
   
   // Track top modes for debugging
   const modeContributions = [];
   let modesPassedBandwidth = 0;
   
-  // Accumulate modal contributions
+  // Accumulate modal contributions (sum of deltas from unity)
   for (const mode of modes) {
     // Only evaluate modes near this frequency (within 3*BW)
     const bw = mode.fHz / Q;
@@ -299,7 +299,7 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
     // Skip tiny couplings
     if (Math.abs(coupling) < 0.01) continue;
     
-    // Get complex resonator response
+    // Get complex resonator response (returns 1 + contribution)
     const resonator = modalResonator(f, mode.fHz, Q, coupling);
     
     // Track for debug probe
@@ -319,28 +319,29 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
       });
     }
     
-    // Convert resonator multiplier into a modal *addition* around unity
-    // resonator = 1 + delta, so delta = resonator - 1
-    const deltaReal = (resonator.real - 1);
-    const deltaImag = resonator.imag;
-
-    // Add modal contribution scaled by the current (direct+SBIR) pressure
-    // This preserves phase interaction and allows deep cancellations
-    modeAddReal += (sumReal * deltaReal - sumImag * deltaImag);
-    modeAddImag += (sumReal * deltaImag + sumImag * deltaReal);
+    // Sum the delta from unity (resonator = 1 + delta, so delta = resonator - 1)
+    modeSumReal += (resonator.real - 1);
+    modeSumImag += resonator.imag;
   }
   
-  // Apply modal addition to pressure (1 + sum of modal contributions, not product)
-  const finalReal = sumReal + modeAddReal;
-  const finalImag = sumImag + modeAddImag;
+  // Build transfer function H = 1 + sum(modal deltas)
+  const Hreal = 1 + modeSumReal;
+  const Himag = modeSumImag;
+  
+  // Apply transfer function to pressure once: P_out = P_in * H
+  const finalReal = sumReal * Hreal - sumImag * Himag;
+  const finalImag = sumReal * Himag + sumImag * Hreal;
   
   // Return debug data if requested
   if (debugProbe) {
     const preMag = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
     const preDb = 20 * Math.log10(Math.max(1e-10, preMag));
     
-    const addMag = Math.sqrt(modeAddReal * modeAddReal + modeAddImag * modeAddImag);
-    const addDb = 20 * Math.log10(Math.max(1e-10, addMag));
+    const sumMag = Math.sqrt(modeSumReal * modeSumReal + modeSumImag * modeSumImag);
+    const sumDb = 20 * Math.log10(Math.max(1e-10, sumMag));
+    
+    const Hmag = Math.sqrt(Hreal * Hreal + Himag * Himag);
+    const Hdb = 20 * Math.log10(Math.max(1e-10, Hmag));
     
     const postMag = Math.sqrt(finalReal * finalReal + finalImag * finalImag);
     const postDb = 20 * Math.log10(Math.max(1e-10, postMag));
@@ -355,7 +356,8 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
       imag: finalImag,
       debug: {
         pre: { real: sumReal, imag: sumImag, mag: preMag, db: preDb },
-        modeAdd: { real: modeAddReal, imag: modeAddImag, mag: addMag, db: addDb },
+        modeSum: { real: modeSumReal, imag: modeSumImag, mag: sumMag, db: sumDb },
+        H: { real: Hreal, imag: Himag, mag: Hmag, db: Hdb },
         post: { real: finalReal, imag: finalImag, mag: postMag, db: postDb },
         top: topModes,
         modesPassedBandwidth: modesPassedBandwidth,
