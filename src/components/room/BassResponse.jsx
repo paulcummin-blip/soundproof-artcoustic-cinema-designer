@@ -3345,10 +3345,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                         {row.frequencyHz.toFixed(1)} Hz (sub {row.subId}) — {modesCount} modes within 3×BW (of {totalModes} total)
                       </div>
                       <div className="grid grid-cols-4 gap-2 pl-2">
-                        <div>pre: {row.pre.db.toFixed(1)} dB</div>
-                        <div className="font-bold text-blue-600">modeMult: {row.modeMult.db.toFixed(1)} dB</div>
-                        <div>post: {row.post.db.toFixed(1)} dB</div>
-                        <div>Δ: {(row.post.db - row.pre.db).toFixed(1)} dB</div>
+                       <div>pre: {row.pre.db.toFixed(1)} dB</div>
+                       <div className="font-bold text-blue-600">modeAdd: {row.modeAdd.db.toFixed(1)} dB</div>
+                       <div>post: {row.post.db.toFixed(1)} dB</div>
+                       <div>Δ: {(row.post.db - row.pre.db).toFixed(1)} dB</div>
                       </div>
                       {topModesStr && (
                         <div className="text-[9px] opacity-80 mt-1 pl-2">

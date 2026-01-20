@@ -289,9 +289,10 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
     return { real: sumReal, imag: sumImag };
   }
   
-  // Start with unity multiplier
-  let modeMultReal = 1;
-  let modeMultImag = 0;
+  // REW-like: modal effect as an additive complex contribution
+  // Start at 0 and build up, then add to the direct+SBIR pressure
+  let modeAddReal = 0;
+  let modeAddImag = 0;
   
   // Track top modes for debugging
   const modeContributions = [];
@@ -336,25 +337,28 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
       });
     }
     
-    // Multiply complex numbers: (a + jb) * (c + jd) = (ac - bd) + j(ad + bc)
-    const newReal = modeMultReal * resonator.real - modeMultImag * resonator.imag;
-    const newImag = modeMultReal * resonator.imag + modeMultImag * resonator.real;
-    
-    modeMultReal = newReal;
-    modeMultImag = newImag;
+    // Convert resonator multiplier into a modal *addition* around unity
+    // resonator = 1 + delta, so delta = resonator - 1
+    const deltaReal = (resonator.real - 1);
+    const deltaImag = resonator.imag;
+
+    // Add modal contribution scaled by the current (direct+SBIR) pressure
+    // This preserves phase interaction and allows deep cancellations
+    modeAddReal += (sumReal * deltaReal - sumImag * deltaImag);
+    modeAddImag += (sumReal * deltaImag + sumImag * deltaReal);
   }
   
-  // Apply modal multiplier to pressure
-  const finalReal = sumReal * modeMultReal - sumImag * modeMultImag;
-  const finalImag = sumReal * modeMultImag + sumImag * modeMultReal;
+  // Apply modal addition to pressure (1 + sum of modal contributions, not product)
+  const finalReal = sumReal + modeAddReal;
+  const finalImag = sumImag + modeAddImag;
   
   // Return debug data if requested
   if (debugProbe) {
     const preMag = Math.sqrt(sumReal * sumReal + sumImag * sumImag);
     const preDb = 20 * Math.log10(Math.max(1e-10, preMag));
     
-    const multMag = Math.sqrt(modeMultReal * modeMultReal + modeMultImag * modeMultImag);
-    const multDb = 20 * Math.log10(Math.max(1e-10, multMag));
+    const addMag = Math.sqrt(modeAddReal * modeAddReal + modeAddImag * modeAddImag);
+    const addDb = 20 * Math.log10(Math.max(1e-10, addMag));
     
     const postMag = Math.sqrt(finalReal * finalReal + finalImag * finalImag);
     const postDb = 20 * Math.log10(Math.max(1e-10, postMag));
@@ -369,7 +373,7 @@ function applyModesToComplexPressure(sumReal, sumImag, f, modes, sub, seatPos, Q
       imag: finalImag,
       debug: {
         pre: { real: sumReal, imag: sumImag, mag: preMag, db: preDb },
-        modeMult: { real: modeMultReal, imag: modeMultImag, mag: multMag, db: multDb },
+        modeAdd: { real: modeAddReal, imag: modeAddImag, mag: addMag, db: addDb },
         post: { real: finalReal, imag: finalImag, mag: postMag, db: postDb },
         top: topModes,
         modesPassedBandwidth: modesPassedBandwidth,
@@ -600,7 +604,12 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
 
         // Add SBIR (first-order image sources) if enabled
         if (sbirEnabled) {
-          const reflCoeff = 0.90; // Rigid reflection coefficient (minimal absorption)
+          // REW-style: reflection coefficient derived from absorption (amplitude)
+          // If absorption α=0.30, amplitude reflection ≈ sqrt(1-α)=0.836
+          const defaultAbs = 0.30;
+          const abs = Number.isFinite(splConfig?.surfaceAbsorption) ? splConfig.surfaceAbsorption : defaultAbs;
+          const alpha = Math.max(0, Math.min(0.95, abs));
+          const reflCoeff = Math.sqrt(1 - alpha);
           
           // Image sources: reflect sub position across each boundary
           const imageSources = [
@@ -613,7 +622,9 @@ export function simulateBassAtSeats({ roomDims, seats, subs, splConfig, options 
             // Back wall (y=lengthM)
             { x: sub.x, y: 2 * roomDims.lengthM - sub.y, z: sub.z, wall: 'back' },
             // Floor (z=0)
-            { x: sub.x, y: sub.y, z: -sub.z, wall: 'floor' }
+            { x: sub.x, y: sub.y, z: -sub.z, wall: 'floor' },
+            // Ceiling (z=heightM)
+            { x: sub.x, y: sub.y, z: 2 * roomDims.heightM - sub.z, wall: 'ceiling' }
           ];
           
           // Add each image source contribution
