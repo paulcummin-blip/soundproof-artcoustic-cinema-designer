@@ -3,9 +3,9 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-        const freqDisplay = Number.isFinite(label) ? `${label.toFixed(1)} Hz` : String(label);
+        const freqDisplay = Number.isFinite(Number(label)) ? `${Number(label).toFixed(1)} Hz` : String(label);
         const splValue = payload[0]?.value;
-        const splDisplay = Number.isFinite(splValue) ? `${splValue.toFixed(1)} dB` : 'N/A';
+        const splDisplay = Number.isFinite(Number(splValue)) ? `${Number(splValue).toFixed(1)} dB` : 'N/A';
         
         return (
             <div className="bg-white/80 backdrop-blur-sm p-3 border border-[#DCDBD6] rounded-lg shadow-lg font-body">
@@ -19,7 +19,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 // REW mode plot range debug (proof we're plotting the right numbers)
 const RewPlotRangeDebug = ({ chartData }) => {
-  const finite = chartData.map(p => p?.spl).filter(v => Number.isFinite(v));
+  const finite = chartData.map(p => p?.spl).filter(v => Number.isFinite(Number(v)));
   if (finite.length === 0) return null;
   
   const min = Math.min(...finite);
@@ -27,7 +27,7 @@ const RewPlotRangeDebug = ({ chartData }) => {
   
   return (
     <div className="text-[9px] text-gray-500 mb-1">
-      Plot min/max: {min.toFixed(2)} / {max.toFixed(2)} dB
+      Plot min/max: {Number.isFinite(min) ? min.toFixed(2) : 'N/A'} / {Number.isFinite(max) ? max.toFixed(2) : 'N/A'} dB
     </div>
   );
 };
@@ -264,18 +264,20 @@ export default function BassGraph({
         const hasMarkers = normalizedMarkers.axial.length > 0 || 
                           normalizedMarkers.tangential.length > 0 || 
                           normalizedMarkers.oblique.length > 0;
-        
+
         if (!hasMarkers) return null;
 
         return (
             <>
                 {/* Axial modes (stronger style) */}
                 {normalizedMarkers.axial.map((marker, i) => {
+                    if (!Number.isFinite(marker.fHz)) return null;
+
                     const modeStr = `(${marker.n[0]},${marker.n[1]},${marker.n[2]})`;
                     const label = marker.axisLabel 
                         ? `axial [${marker.axisLabel}] ${modeStr} ${marker.fHz.toFixed(1)} Hz`
                         : `axial ${modeStr} ${marker.fHz.toFixed(1)} Hz`;
-                    
+
                     return (
                         <ReferenceLine 
                             key={`mode-axial-${i}`}
@@ -289,12 +291,14 @@ export default function BassGraph({
                         </ReferenceLine>
                     );
                 })}
-                
+
                 {/* Tangential modes (lighter style) */}
                 {normalizedMarkers.tangential.map((marker, i) => {
+                    if (!Number.isFinite(marker.fHz)) return null;
+
                     const modeStr = `(${marker.n[0]},${marker.n[1]},${marker.n[2]})`;
                     const label = `tangential ${modeStr} ${marker.fHz.toFixed(1)} Hz`;
-                    
+
                     return (
                         <ReferenceLine 
                             key={`mode-tangential-${i}`}
@@ -308,12 +312,14 @@ export default function BassGraph({
                         </ReferenceLine>
                     );
                 })}
-                
+
                 {/* Oblique modes (lightest style) */}
                 {normalizedMarkers.oblique.map((marker, i) => {
+                    if (!Number.isFinite(marker.fHz)) return null;
+
                     const modeStr = `(${marker.n[0]},${marker.n[1]},${marker.n[2]})`;
                     const label = `oblique ${modeStr} ${marker.fHz.toFixed(1)} Hz`;
-                    
+
                     return (
                         <ReferenceLine 
                             key={`mode-oblique-${i}`}
@@ -353,7 +359,7 @@ export default function BassGraph({
                           ? [20, 30, 40, 50, 60, 80, 100, 120, 160, 200] 
                           : [20, 30, 40, 50, 60, 70, 80, 100, 120, 150, 200]
                         }
-                        tickFormatter={(tick) => Number(tick).toFixed(0)}
+                        tickFormatter={(tick) => Number.isFinite(Number(tick)) ? Number(tick).toFixed(0) : ''}
                         label={{ value: "Frequency (Hz)", position: 'insideBottom', offset: -10, className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
@@ -361,7 +367,7 @@ export default function BassGraph({
                     <YAxis
                         domain={[snappedYMin, snappedYMax]}
                         ticks={yTicks}
-                        tickFormatter={(tick) => Number(tick).toFixed(0)}
+                        tickFormatter={(tick) => Number.isFinite(Number(tick)) ? Number(tick).toFixed(0) : ''}
                         label={{ value: 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
                         tick={{ fill: '#3E4349' }}
@@ -370,23 +376,25 @@ export default function BassGraph({
                     <Tooltip content={<CustomTooltip />} shared={false} cursor={false} />
 
                     {rewStyleMode && rp22Levels && rp22Levels.map(level => (
-                        <ReferenceLine 
-                            key={level.level} 
-                            y={level.spl} 
-                            label={{ 
-                                value: level.level, 
-                                position: 'right', 
-                                fill: level.color, 
-                                className: 'font-body text-xs',
-                                offset: 5
-                            }} 
-                            stroke={level.color} 
-                            strokeDasharray="2 2" 
-                        />
+                        Number.isFinite(level.spl) && (
+                            <ReferenceLine 
+                                key={level.level} 
+                                y={level.spl} 
+                                label={{ 
+                                    value: level.level, 
+                                    position: 'right', 
+                                    fill: level.color, 
+                                    className: 'font-body text-xs',
+                                    offset: 5
+                                }} 
+                                stroke={level.color} 
+                                strokeDasharray="2 2" 
+                            />
+                        )
                     ))}
                     
                     {/* Schroeder frequency line (on-scale only) */}
-                    {schroederFrequency > 0 && schroederFrequency <= 200 && (
+                    {Number.isFinite(schroederFrequency) && schroederFrequency > 0 && schroederFrequency <= 200 && (
                         <ReferenceLine 
                             x={schroederFrequency} 
                             stroke="#4A230F" 
@@ -453,19 +461,21 @@ export default function BassGraph({
                     )}
 
                     {/* Reference Line (Always Visible) */}
-                    <ReferenceLine 
-                        y={refDb} 
-                        stroke="#2563eb" 
-                        strokeWidth={1.5}
-                        strokeDasharray="4 4"
-                        label={{ 
-                          value: refDb === 0 ? `${refDb} dB (Relative)` : `${refDb} dB Reference`, 
-                          position: 'right', 
-                          fill: '#2563eb', 
-                          className: 'font-body text-xs',
-                          offset: 5
-                        }} 
-                      />
+                    {Number.isFinite(refDb) && (
+                        <ReferenceLine 
+                            y={refDb} 
+                            stroke="#2563eb" 
+                            strokeWidth={1.5}
+                            strokeDasharray="4 4"
+                            label={{ 
+                              value: refDb === 0 ? `${refDb} dB (Relative)` : `${refDb} dB Reference`, 
+                              position: 'right', 
+                              fill: '#2563eb', 
+                              className: 'font-body text-xs',
+                              offset: 5
+                            }} 
+                          />
+                    )}
                     
                     {/* Mode line legend (REW style) */}
                     {showModeMarkers && (normalizedMarkers.axial.length > 0 || normalizedMarkers.tangential.length > 0 || normalizedMarkers.oblique.length > 0) && (
@@ -475,7 +485,7 @@ export default function BassGraph({
                     )}
 
                     {/* Schroeder frequency header label (top-right) */}
-                    {schroederFrequency > 0 && (
+                    {schroederFrequency > 0 && Number.isFinite(schroederFrequency) && (
                         <text
                             x="98%"
                             y={20}

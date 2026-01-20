@@ -778,11 +778,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Apply REW-style LF pressure rise to Room-only series (display layer only)
     const plotArrayWithLfRise = plotArray.map((spl, i) => {
       const freq = result.freqs[i];
-      if (!Number.isFinite(spl) || !Number.isFinite(freq)) return spl;
+      
+      // Guard: preserve REW-style gaps (null/undefined/NaN stay null)
+      if (!Number.isFinite(spl) || !Number.isFinite(freq)) return null;
       
       // Apply LF rise only if we have a valid lowest axial
       const lfRiseDb = lowestAxialHz ? applyLfPressureRiseDb(freq, lowestAxialHz, 6, 12) : 0;
-      return spl + lfRiseDb;
+      
+      // Guard: ensure both values are finite before adding
+      const withLfRiseDb = Number.isFinite(lfRiseDb) ? spl + lfRiseDb : spl;
+      
+      return Number.isFinite(withLfRiseDb) ? withLfRiseDb : null;
     });
     
     return {
