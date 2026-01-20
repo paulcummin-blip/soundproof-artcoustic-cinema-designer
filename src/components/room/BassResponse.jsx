@@ -776,20 +776,38 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       : null;
     
     // Apply REW-style LF pressure rise to Room-only series (display layer only)
-    const plotArrayWithLfRise = plotArray.map((spl, i) => {
-      const freq = result.freqs[i];
+    // Anchored at lowestAxialHz for continuity
+    const plotArrayWithLfRise = (() => {
+      if (!lowestAxialHz) return plotArray; // No axial modes, no LF rise
       
-      // Guard: preserve REW-style gaps (null/undefined/NaN stay null)
-      if (!Number.isFinite(spl) || !Number.isFinite(freq)) return null;
+      // Find anchor index (nearest bin at/above lowestAxialHz)
+      const anchorIdx = result.freqs.findIndex(f => f >= lowestAxialHz);
+      if (anchorIdx < 0) return plotArray; // Safety: no valid anchor
       
-      // Apply LF rise only if we have a valid lowest axial
-      const lfRiseDb = lowestAxialHz ? applyLfPressureRiseDb(freq, lowestAxialHz, 6, 12) : 0;
+      const anchorDb = plotArray[anchorIdx];
+      if (!Number.isFinite(anchorDb)) return plotArray; // Anchor is null, can't apply rise
       
-      // Guard: ensure both values are finite before adding
-      const withLfRiseDb = Number.isFinite(lfRiseDb) ? spl + lfRiseDb : spl;
-      
-      return Number.isFinite(withLfRiseDb) ? withLfRiseDb : null;
-    });
+      return plotArray.map((spl, i) => {
+        const freq = result.freqs[i];
+        
+        // Guard: preserve REW-style gaps (null/undefined/NaN stay null)
+        if (!Number.isFinite(freq)) return null;
+        
+        // Above/at lowest axial: pass through unchanged
+        if (freq >= lowestAxialHz) {
+          return Number.isFinite(spl) ? spl : null;
+        }
+        
+        // Below lowest axial: apply frequency-dependent LF pressure rise
+        // boostDb increases as frequency decreases (6 dB/oct, max +12 dB)
+        const boostDb = applyLfPressureRiseDb(freq, lowestAxialHz, 6, 12);
+        
+        // Anchor to the value at lowestAxialHz, add boost
+        const withLfRiseDb = anchorDb + boostDb;
+        
+        return Number.isFinite(withLfRiseDb) ? withLfRiseDb : null;
+      });
+    })();
     
     return {
       data: result.freqs.map((frequency, i) => ({
