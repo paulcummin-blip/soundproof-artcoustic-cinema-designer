@@ -161,8 +161,8 @@ export function computeModesOnlyResponse({ roomDims, seatPos, freqsHz, damping =
     z: 0.1
   };
   
-  // Compute axial modes up to 200 Hz
-  const modes = computeAxialModes(roomDims, 200);
+  // Compute room modes up to 200 Hz (uses nx/ny/nz structure)
+  const modes = computeRoomModes(roomDims, 200);
   
   // Baseline (flat response reference)
   const baselineDb = 90;
@@ -184,34 +184,11 @@ export function computeModesOnlyResponse({ roomDims, seatPos, freqsHz, damping =
       // Skip modes too far away (optimization)
       if (df > 5 * bw) continue;
       
-      // Calculate source-receiver coupling for this mode
-      let coupling = 0;
-      const n = mode.n;
-      
-      if (mode.axis === 'Y') {
-        // Length mode
-        const L = roomDims.lengthM;
-        const excite = Math.abs(Math.cos(n * Math.PI * sourcePos.y / L));
-        const receive = Math.abs(Math.cos(n * Math.PI * seatPos.y / L));
-        coupling = excite * receive;
-      } else if (mode.axis === 'X') {
-        // Width mode
-        const W = roomDims.widthM;
-        const excite = Math.abs(Math.cos(n * Math.PI * sourcePos.x / W));
-        const receive = Math.abs(Math.cos(n * Math.PI * seatPos.x / W));
-        coupling = excite * receive;
-      } else if (mode.axis === 'Z') {
-        // Height mode
-        const H = roomDims.heightM;
-        const zS = sourcePos.z;
-        const zR = seatPos.z ?? 1.2;
-        const excite = Math.abs(Math.cos(n * Math.PI * zS / H));
-        const receive = Math.abs(Math.cos(n * Math.PI * zR / H));
-        coupling = excite * receive;
-      }
+      // Use the existing modeCoupling helper (handles signed 3D coupling)
+      const coupling = modeCoupling(mode, sourcePos, seatPos);
       
       // Skip if coupling is negligible
-      if (coupling < 0.01) continue;
+      if (Math.abs(coupling) < 0.01) continue;
       
       // Compute smooth resonator response (2nd-order peaking)
       // Normalized frequency deviation
@@ -234,7 +211,12 @@ export function computeModesOnlyResponse({ roomDims, seatPos, freqsHz, damping =
     // Final SPL = baseline + modal contributions
     const finalDb = baselineDb + totalDb;
     
-    return Math.max(MIN_SPL_FLOOR, Math.min(130, finalDb));
+    // Use correct constant name
+    const floorLinear = Math.pow(10, MIN_SPL_FLOOR_DB / 20);
+    const clampedLinear = Math.max(floorLinear, Math.pow(10, finalDb / 20));
+    const clampedDb = 20 * Math.log10(clampedLinear);
+    
+    return Math.min(130, clampedDb);
   });
 }
 

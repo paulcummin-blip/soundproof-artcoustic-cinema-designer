@@ -175,12 +175,12 @@ export default function BassGraph({
     let calculatedYMin, calculatedYMax;
     let calculatedXMax = 200;
 
-    // If explicit yMin/yMax provided (REW locked mode), use them directly
+    // CRITICAL: If explicit yMin/yMax provided (REW locked mode), use them directly — DO NOT auto-scale from data
     if (Number.isFinite(yMin) && Number.isFinite(yMax)) {
       calculatedYMin = yMin;
       calculatedYMax = yMax;
     }
-    // REW mode: compute Y domain from actual data (only finite values)
+    // REW mode unlocked: compute Y domain from actual plotted data (only finite values)
     else if (rewStyleMode) {
       const splValues = chartData
         .map(d => d.spl)
