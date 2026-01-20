@@ -44,6 +44,8 @@ export default function BassGraph({
   linearHzAxis = false,
   rewStyleMode = false,
   yDomain,
+  yMin,
+  yMax,
   showAxialOnly = false,
   refDb = 85,
   disableHighlight = false
@@ -173,8 +175,13 @@ export default function BassGraph({
     let calculatedYMin, calculatedYMax;
     let calculatedXMax = 200;
 
-    // REW mode: compute Y domain from actual data
-    if (rewStyleMode) {
+    // If explicit yMin/yMax provided (REW locked mode), use them directly
+    if (Number.isFinite(yMin) && Number.isFinite(yMax)) {
+      calculatedYMin = yMin;
+      calculatedYMax = yMax;
+    }
+    // REW mode: compute Y domain from actual data (only finite values)
+    else if (rewStyleMode) {
       const splValues = chartData
         .map(d => d.spl)
         .filter(v => Number.isFinite(v));

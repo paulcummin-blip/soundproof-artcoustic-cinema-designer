@@ -3989,7 +3989,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div className="text-[10px] text-gray-500 mb-2 italic">
               {belowFloor > 0 && `${belowFloor} below display floor (${DISPLAY_SPL_FLOOR_DB} dB)`}
               {belowFloor > 0 && yAxisLocked && (outBelow > 0 || outAbove > 0) && ' | '}
-              {yAxisLocked && (outBelow > 0 || outAbove > 0) && `${outBelow + outAbove} outside Y window`}
+              {yAxisLocked && (outBelow > 0 || outAbove > 0) && `${outBelow + outAbove} outside window`}
+              {isRewStyle && yAxisLocked && ` (${rewLockedMin?.toFixed(0)} to ${rewLockedMax?.toFixed(0)} dB)`}
               {' → null (line breaks, REW-style)'}
             </div>
           )}
