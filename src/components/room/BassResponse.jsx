@@ -30,6 +30,9 @@ const brand = {
   sand:  "#C1B6AD",
 };
 
+// Display floor: REW-style visibility threshold (values below this are nulled, not plotted)
+const DISPLAY_SPL_FLOOR_DB = -60;
+
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
   const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave } = useAppState();
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
@@ -1043,20 +1046,31 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewCompareView]);
 
-  // Helper: apply "null outside window" for locked Y-axis
-  const applyLockedWindowNulls = (data, finalYDomain, yAxisLocked) => {
+  // Helper: apply display floor + locked window nulls (REW-style line breaking)
+  const applyDisplayConditioningNulls = (data, finalYDomain, yAxisLocked) => {
     const points = Array.isArray(data) ? data : [];
-    if (!yAxisLocked) return points;
-
-    // Support either {min,max} or [min,max]
-    const yMin = Number(finalYDomain?.min ?? finalYDomain?.[0]);
-    const yMax = Number(finalYDomain?.max ?? finalYDomain?.[1]);
-    if (!Number.isFinite(yMin) || !Number.isFinite(yMax)) return points;
 
     return points.map(p => {
-      const spl = typeof p?.spl === "number" ? p.spl : null;
+      const spl = typeof p?.spl === "number" && Number.isFinite(p.spl) ? p.spl : null;
       if (spl === null) return p;
-      if (spl < yMin || spl > yMax) return { ...p, spl: null };
+
+      // ALWAYS null below display floor (REW never renders ultra-low values)
+      if (spl < DISPLAY_SPL_FLOOR_DB) {
+        return { ...p, spl: null };
+      }
+
+      // When Y-axis locked, also null values outside the window
+      if (yAxisLocked && finalYDomain) {
+        const yMin = Number(finalYDomain?.min ?? finalYDomain?.[0]);
+        const yMax = Number(finalYDomain?.max ?? finalYDomain?.[1]);
+        
+        if (Number.isFinite(yMin) && Number.isFinite(yMax)) {
+          if (spl < yMin || spl > yMax) {
+            return { ...p, spl: null };
+          }
+        }
+      }
+
       return p;
     });
   };
@@ -1648,35 +1662,45 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return null;
   }, [rewStyleMode, yAxisDomain]);
 
-  // Final plotted series (apply locked window nulling to prevent axis stretching)
+  // Final plotted series (apply display floor + locked window nulling to prevent axis stretching)
   const plottedSeries = React.useMemo(() => {
     // Select base series
     const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
     
-    // Apply locked window nulling if enabled
-    return applyLockedWindowNulls(baseSeries, finalYDomain, yAxisLocked);
+    // Apply display conditioning (floor + locked window)
+    return applyDisplayConditioningNulls(baseSeries, finalYDomain, yAxisLocked);
   }, [isRewStyle, rewFinalPlottedSeries, displayData, finalYDomain, yAxisLocked]);
   
-  // Count out-of-window points (for user feedback)
-  const { outBelow, outAbove } = React.useMemo(() => {
-    if (!yAxisLocked || !finalYDomain) return { outBelow: 0, outAbove: 0 };
-    
+  // Count out-of-window and below-floor points (for user feedback)
+  const { outBelow, outAbove, belowFloor } = React.useMemo(() => {
     const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
-    const yMin = Number(finalYDomain?.min);
-    const yMax = Number(finalYDomain?.max);
     
     let below = 0;
     let above = 0;
+    let floor = 0;
     
     baseSeries.forEach(p => {
       const spl = typeof p?.spl === "number" && Number.isFinite(p.spl) ? p.spl : null;
       if (spl !== null) {
-        if (spl < yMin) below++;
-        else if (spl > yMax) above++;
+        // Count below display floor (always nulled)
+        if (spl < DISPLAY_SPL_FLOOR_DB) {
+          floor++;
+        }
+        
+        // Count outside locked window (only when locked)
+        if (yAxisLocked && finalYDomain) {
+          const yMin = Number(finalYDomain?.min);
+          const yMax = Number(finalYDomain?.max);
+          
+          if (Number.isFinite(yMin) && Number.isFinite(yMax)) {
+            if (spl >= DISPLAY_SPL_FLOOR_DB && spl < yMin) below++;
+            else if (spl > yMax) above++;
+          }
+        }
       }
     });
     
-    return { outBelow: below, outAbove: above };
+    return { outBelow: below, outAbove: above, belowFloor: floor };
   }, [isRewStyle, rewFinalPlottedSeries, displayData, finalYDomain, yAxisLocked]);
 
   // Bass Metrics (20-80 Hz) - NOW USES ANALYSIS SERIES (same as plot base)
@@ -3967,9 +3991,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Graph area */}
         <div className="mt-6">
-          {yAxisLocked && (outBelow > 0 || outAbove > 0) && (
+          {(belowFloor > 0 || (yAxisLocked && (outBelow > 0 || outAbove > 0))) && (
             <div className="text-[10px] text-gray-500 mb-2 italic">
-              {outBelow + outAbove} points outside Y window (off-scale → null, prevents axis stretching)
+              {belowFloor > 0 && `${belowFloor} below display floor (${DISPLAY_SPL_FLOOR_DB} dB)`}
+              {belowFloor > 0 && yAxisLocked && (outBelow > 0 || outAbove > 0) && ' | '}
+              {yAxisLocked && (outBelow > 0 || outAbove > 0) && `${outBelow + outAbove} outside Y window`}
+              {' → null (line breaks, REW-style)'}
             </div>
           )}
           
