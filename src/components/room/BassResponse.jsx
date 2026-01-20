@@ -1630,52 +1630,42 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return null;
   }, [rewStyleMode, yAxisDomain]);
 
-  // REW mode: no clamping, pass data through unchanged
+  // Windowed data for locked Y-axis (use NULL outside window to prevent scale stretching)
   const { clampedData, outBelow, outAbove } = React.useMemo(() => {
-    // REW mode: bypass clamping and use final plotted series directly
-    if (isRewStyle) {
-      return { clampedData: rewFinalPlottedSeries, outBelow: 0, outAbove: 0 };
+    // Select source data (REW uses gated series, non-REW uses displayData)
+    const sourceData = isRewStyle ? rewFinalPlottedSeries : displayData;
+    
+    // If Y-axis is unlocked or no domain set, pass through unchanged
+    if (!yAxisLocked || !finalYDomain) {
+      return { clampedData: sourceData, outBelow: 0, outAbove: 0 };
     }
 
-    // Non-REW mode: apply old windowing logic if needed
-    if (!finalYDomain) {
-      return { clampedData: displayData, outBelow: 0, outAbove: 0 };
-    }
+    const yMin = Number(finalYDomain.min);
+    const yMax = Number(finalYDomain.max);
 
     let below = 0;
     let above = 0;
 
-    // Count violations using RAW spl values
-    displayData.forEach(p => {
-      const v = p.spl;
-      if (Number.isFinite(v)) {
-        if (v < finalYDomain.min) below++;
-        else if (v > finalYDomain.max) above++;
-      }
-    });
+    // Count violations and NULL values outside window
+    const windowed = sourceData.map(p => {
+      const spl = typeof p?.spl === "number" && Number.isFinite(p.spl) ? p.spl : null;
+      
+      if (spl === null) return p;
 
-    // IMPORTANT:
-    // When Y-axis is locked: clamp to window edges (no line breaks, continuous curve)
-    // When Y-axis is unlocked: pass data through unchanged
-    const clipped = displayData.map(p => {
-      const v = p.spl;
-      if (!Number.isFinite(v)) return { ...p, spl: null };
-
-      if (v < finalYDomain.min || v > finalYDomain.max) {
-        if (yAxisLocked) {
-          // Locked: clamp to window edges (no gaps)
-          return { ...p, spl: Math.min(finalYDomain.max, Math.max(finalYDomain.min, v)) };
-        } else {
-          // Unlocked: pass through unchanged
-          return { ...p, spl: v };
-        }
+      // Count out-of-window points
+      if (spl < yMin) {
+        below++;
+        return { ...p, spl: null }; // NULL below window
+      } else if (spl > yMax) {
+        above++;
+        return { ...p, spl: null }; // NULL above window
       }
 
-      return { ...p, spl: v };
+      return p;
     });
 
-    return { clampedData: clipped, outBelow: below, outAbove: above };
-  }, [isRewStyle, rewFinalPlottedSeries, finalYDomain, displayData, yAxisLocked, rewCompareView, rewView, rewRelativeView]);
+    return { clampedData: windowed, outBelow: below, outAbove: above };
+  }, [isRewStyle, rewFinalPlottedSeries, displayData, finalYDomain, yAxisLocked]);
 
   // Bass Metrics (20-80 Hz) - NOW USES ANALYSIS SERIES (same as plot base)
   const bassMetrics2080Hz = useMemo(() => {
@@ -3965,9 +3955,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Graph area */}
         <div className="mt-6">
-          {rewStyleMode && yAxisLocked && (
+          {yAxisLocked && (outBelow > 0 || outAbove > 0) && (
             <div className="text-[10px] text-gray-500 mb-2 italic">
-              Gaps are expected when values fall outside the locked Y window (line breaks use null).
+              {outBelow + outAbove} points outside Y window (off-scale → null, prevents axis stretching)
             </div>
           )}
           
@@ -4006,7 +3996,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   </div>
                 )}
                 <BassGraph
-                  responseData={isRewStyle ? rewFinalPlottedSeries : clampedData}
+                  responseData={yAxisLocked ? clampedData : (isRewStyle ? rewFinalPlottedSeries : displayData)}
                   schroederFrequency={schroederFrequency}
                   rp22Levels={rp22Levels}
                   toggles={toggles}
