@@ -306,7 +306,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const bassAudit = simulationResults.audit || null;
   const modeProbe = bassAudit?.modeProbe || null;
 
-  // Find MLP seat for display
+  // Find MLP seat for display (MUST BE DEFINED BEFORE ANY CODE THAT USES IT)
   const selectedSeat = useMemo(() => {
     const mlpSeat = seatingPositions?.find(s => s.isPrimary);
     const mlpId = mlpSeat ? (mlpSeat.id || `${mlpSeat.x}-${mlpSeat.y}`) : null;
@@ -331,6 +331,52 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     
     return null;
   }, [seatingPositions, simulationResults.seatResponses]);
+
+  // Canonical analysis series: ABS + optionally smoothed, no display-only transforms
+  const analysisSeriesAbs = useMemo(() => {
+    if (!selectedSeat || !selectedSeat.freqsHz || !selectedSeat.splDb) {
+      return [];
+    }
+    
+    // Convert engine output to points
+    const points = selectedSeat.freqsHz.map((frequency, i) => ({
+      frequency,
+      spl: selectedSeat.splDb[i]
+    }));
+    
+    // Apply smoothing if enabled (same logic as display smoothing)
+    const shouldSmooth = graphSmoothing && graphSmoothing !== 'none';
+    if (shouldSmooth) {
+      return applyRewStyleDisplaySmoothing(points, graphSmoothing);
+    }
+    
+    return points;
+  }, [selectedSeat, graphSmoothing]);
+  
+  // Analysis SPL array for metrics (same smoothing as plot base, absolute only)
+  const analysisSplDbAbs = useMemo(() => {
+    return analysisSeriesAbs.map(p => p.spl);
+  }, [analysisSeriesAbs]);
+  
+  // Dev sanity check (parity verification)
+  useEffect(() => {
+    if (typeof globalThis !== 'undefined' && globalThis.__B44_LOGS) {
+      if (analysisSeriesAbs.length !== (selectedSeat?.freqsHz?.length || 0)) {
+        console.warn('[BASS PARITY CHECK] analysisSeriesAbs length mismatch', {
+          analysis: analysisSeriesAbs.length,
+          engine: selectedSeat?.freqsHz?.length
+        });
+      }
+      
+      const freqMismatch = analysisSeriesAbs.some((p, i) => 
+        selectedSeat?.freqsHz?.[i] && Math.abs(p.frequency - selectedSeat.freqsHz[i]) > 0.01
+      );
+      
+      if (freqMismatch) {
+        console.warn('[BASS PARITY CHECK] Frequency array mismatch detected');
+      }
+    }
+  }, [analysisSeriesAbs, selectedSeat]);
 
   // Helper: compute axial coupling for sensitivity audit (mode 1,0,0)
   const computeAxialCoupling = useCallback((source, seat, roomDims) => {
@@ -1146,52 +1192,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   };
 
-  // Canonical analysis series: ABS + optionally smoothed, no display-only transforms
-  const analysisSeriesAbs = useMemo(() => {
-    if (!selectedSeat || !selectedSeat.freqsHz || !selectedSeat.splDb) {
-      return [];
-    }
-    
-    // Convert engine output to points
-    const points = selectedSeat.freqsHz.map((frequency, i) => ({
-      frequency,
-      spl: selectedSeat.splDb[i]
-    }));
-    
-    // Apply smoothing if enabled (same logic as display smoothing)
-    const shouldSmooth = graphSmoothing && graphSmoothing !== 'none';
-    if (shouldSmooth) {
-      return applyRewStyleDisplaySmoothing(points, graphSmoothing);
-    }
-    
-    return points;
-  }, [selectedSeat, graphSmoothing]);
-  
-  // Analysis SPL array for metrics (same smoothing as plot base, absolute only)
-  const analysisSplDbAbs = useMemo(() => {
-    return analysisSeriesAbs.map(p => p.spl);
-  }, [analysisSeriesAbs]);
-  
-  // Dev sanity check (parity verification)
-  useEffect(() => {
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_LOGS) {
-      if (analysisSeriesAbs.length !== (selectedSeat?.freqsHz?.length || 0)) {
-        console.warn('[BASS PARITY CHECK] analysisSeriesAbs length mismatch', {
-          analysis: analysisSeriesAbs.length,
-          engine: selectedSeat?.freqsHz?.length
-        });
-      }
-      
-      const freqMismatch = analysisSeriesAbs.some((p, i) => 
-        selectedSeat?.freqsHz?.[i] && Math.abs(p.frequency - selectedSeat.freqsHz[i]) > 0.01
-      );
-      
-      if (freqMismatch) {
-        console.warn('[BASS PARITY CHECK] Frequency array mismatch detected');
-      }
-    }
-  }, [analysisSeriesAbs, selectedSeat]);
-  
   // Convert to chart format (product-based curve) - legacy, now replaced by analysisSeriesAbs
   const responseData = useMemo(() => {
     if (!selectedSeat || !selectedSeat.freqsHz || !selectedSeat.splDb) {
