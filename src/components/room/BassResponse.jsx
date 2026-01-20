@@ -1043,6 +1043,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewCompareView]);
 
+  // Helper: apply "null outside window" for locked Y-axis
+  const applyLockedWindowNulls = (data, finalYDomain, yAxisLocked) => {
+    const points = Array.isArray(data) ? data : [];
+    if (!yAxisLocked) return points;
+
+    // Support either {min,max} or [min,max]
+    const yMin = Number(finalYDomain?.min ?? finalYDomain?.[0]);
+    const yMax = Number(finalYDomain?.max ?? finalYDomain?.[1]);
+    if (!Number.isFinite(yMin) || !Number.isFinite(yMax)) return points;
+
+    return points.map(p => {
+      const spl = typeof p?.spl === "number" ? p.spl : null;
+      if (spl === null) return p;
+      if (spl < yMin || spl > yMax) return { ...p, spl: null };
+      return p;
+    });
+  };
+
   // Helper: apply REW-style smoothing
   // REW-style display smoothing (fractional octave) in LINEAR PRESSURE domain.
   // This is display-only. Do not feed this back into the engine.
@@ -1630,41 +1648,35 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return null;
   }, [rewStyleMode, yAxisDomain]);
 
-  // Windowed data for locked Y-axis (use NULL outside window to prevent scale stretching)
-  const { clampedData, outBelow, outAbove } = React.useMemo(() => {
-    // Select source data (REW uses gated series, non-REW uses displayData)
-    const sourceData = isRewStyle ? rewFinalPlottedSeries : displayData;
+  // Final plotted series (apply locked window nulling to prevent axis stretching)
+  const plottedSeries = React.useMemo(() => {
+    // Select base series
+    const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
     
-    // If Y-axis is unlocked or no domain set, pass through unchanged
-    if (!yAxisLocked || !finalYDomain) {
-      return { clampedData: sourceData, outBelow: 0, outAbove: 0 };
-    }
-
-    const yMin = Number(finalYDomain.min);
-    const yMax = Number(finalYDomain.max);
-
+    // Apply locked window nulling if enabled
+    return applyLockedWindowNulls(baseSeries, finalYDomain, yAxisLocked);
+  }, [isRewStyle, rewFinalPlottedSeries, displayData, finalYDomain, yAxisLocked]);
+  
+  // Count out-of-window points (for user feedback)
+  const { outBelow, outAbove } = React.useMemo(() => {
+    if (!yAxisLocked || !finalYDomain) return { outBelow: 0, outAbove: 0 };
+    
+    const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
+    const yMin = Number(finalYDomain?.min);
+    const yMax = Number(finalYDomain?.max);
+    
     let below = 0;
     let above = 0;
-
-    // Count violations and NULL values outside window
-    const windowed = sourceData.map(p => {
+    
+    baseSeries.forEach(p => {
       const spl = typeof p?.spl === "number" && Number.isFinite(p.spl) ? p.spl : null;
-      
-      if (spl === null) return p;
-
-      // Count out-of-window points
-      if (spl < yMin) {
-        below++;
-        return { ...p, spl: null }; // NULL below window
-      } else if (spl > yMax) {
-        above++;
-        return { ...p, spl: null }; // NULL above window
+      if (spl !== null) {
+        if (spl < yMin) below++;
+        else if (spl > yMax) above++;
       }
-
-      return p;
     });
-
-    return { clampedData: windowed, outBelow: below, outAbove: above };
+    
+    return { outBelow: below, outAbove: above };
   }, [isRewStyle, rewFinalPlottedSeries, displayData, finalYDomain, yAxisLocked]);
 
   // Bass Metrics (20-80 Hz) - NOW USES ANALYSIS SERIES (same as plot base)
@@ -3963,8 +3975,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           
           {/* Graph or placeholder */}
           {displayData.length > 0 ? (() => {
-            // [PLOT AUDIT] - Verify what's actually being plotted (use gated series for REW)
-            const dataToPlot = isRewStyle ? rewFinalPlottedSeries : clampedData;
+            // [PLOT AUDIT] - Verify what's actually being plotted
+            const dataToPlot = plottedSeries;
             const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
             const audit40_70 =
               (activeDebug?.audit40_70) ||
@@ -3991,12 +4003,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <>
                 {rewStyleMode && (
                   <div className="text-[10px] text-gray-500 mb-1">
-                    Plot source: {Array.isArray(displayData) ? `displayData (${displayData.length})` : 'displayData missing'} | 
-                    clampedData ({Array.isArray(clampedData) ? clampedData.length : 0})
+                    Plot source: plottedSeries ({Array.isArray(plottedSeries) ? plottedSeries.length : 0}) | 
+                    Locked: {yAxisLocked ? 'YES (nulls applied)' : 'NO'}
                   </div>
                 )}
                 <BassGraph
-                  responseData={yAxisLocked ? clampedData : (isRewStyle ? rewFinalPlottedSeries : displayData)}
+                  responseData={plottedSeries}
                   schroederFrequency={schroederFrequency}
                   rp22Levels={rp22Levels}
                   toggles={toggles}
