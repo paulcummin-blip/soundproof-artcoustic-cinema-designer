@@ -308,7 +308,8 @@ export function computeRoomModesResponse({
   // Sealed room LF boost (REW-style: enabled by default, can be disabled for leaky rooms)
   const sealedBoostEnabled = sealedRoom;
   const sealedBoostKDbPerOct = sealedRoom ? 6.0 : 0.0;
-  const sealedBoostMaxGainDb = sealedRoom ? 12.0 : 0.0;
+  // REW parity: disable sealed-room gain (can mask spatial variance below lowestAxialHz)
+  const sealedBoostMaxGainDb = rewParityMode ? 0.0 : (sealedRoom ? 12.0 : 0.0);
 
   // Leaky room LF roll-off (if not sealed, reduce LF below ~35 Hz)
   const leakyRolloffEnabled = !sealedRoom;
@@ -1081,6 +1082,11 @@ export function computeRoomModesResponse({
     for (let i = 0; i < splDbSchroeder.length; i++) {
     const v = splDbSchroeder[i];
     if (!isFinite(v)) {
+      if (rewParityMode) {
+        repaired.push(null);  // preserve deep null behaviour for REW parity
+        nonFiniteRepaired += 1;
+        continue;
+      }
       repaired.push(lastGoodValue);
       nonFiniteRepaired += 1;
     } else {
