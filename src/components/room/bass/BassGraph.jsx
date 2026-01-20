@@ -3,7 +3,12 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 const CustomTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
-        const freqDisplay = Number.isFinite(Number(label)) ? `${Number(label).toFixed(1)} Hz` : String(label);
+        // Use actual hovered point frequency (full precision), only round for display
+        const actualFreq = payload[0]?.payload?.frequency;
+        const freqDisplay = Number.isFinite(Number(actualFreq)) 
+            ? `${Number(actualFreq).toFixed(2)} Hz` 
+            : (Number.isFinite(Number(label)) ? `${Number(label).toFixed(2)} Hz` : String(label));
+        
         const splValue = payload[0]?.value;
         const splDisplay = Number.isFinite(Number(splValue)) ? `${Number(splValue).toFixed(1)} dB` : 'N/A';
         

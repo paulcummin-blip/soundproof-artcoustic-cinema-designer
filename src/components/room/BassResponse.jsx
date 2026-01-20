@@ -36,6 +36,21 @@ const DISPLAY_SPL_FLOOR_DB = -60;
 // Plot floor: REW-style minimum for visual display (prevents LF crushing)
 const PLOT_FLOOR_DB = 60;
 
+// Log-spaced frequency grid generator (REW parity - smooth continuous curves)
+function buildLogSpacedFreqs(fMin, fMax, pointsPerOct) {
+  const freqs = [];
+  const octaves = Math.log2(fMax / fMin);
+  const totalPoints = Math.ceil(octaves * pointsPerOct);
+  
+  for (let i = 0; i <= totalPoints; i++) {
+    const f = fMin * Math.pow(2, i / pointsPerOct);
+    if (f > fMax) break;
+    freqs.push(f); // Keep full precision (no rounding)
+  }
+  
+  return freqs;
+}
+
 // REW-style LF pressure rise so Room-only doesn't collapse below the lowest axial.
 // 6 dB/oct below lowest axial, capped at +12 dB (matches your debug label).
 function applyLfPressureRiseDb(freqHz, lowestAxialHz, kDbPerOct = 6, maxDb = 12) {
@@ -809,17 +824,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       });
     })();
     
-    return {
-      data: result.freqs.map((frequency, i) => ({
-        frequency,
+    // Build data points (ensure strictly increasing X, no rounding, no duplicates)
+    const dataPoints = result.freqs
+      .map((frequency, i) => ({
+        frequency, // Keep full float precision (no toFixed)
         spl: plotArrayWithLfRise[i]
-      })),
+      }))
+      .filter((p, i, arr) => {
+        // Remove duplicate frequencies (keep first occurrence)
+        if (i === 0) return true;
+        return p.frequency !== arr[i - 1].frequency;
+      })
+      .sort((a, b) => a.frequency - b.frequency); // Ensure strictly increasing
+    
+    return {
+      data: dataPoints,
       debug: {
         ...result.debug,
         viewMode: 'Room-only (generic sub)',
         curveType: 'Modal response + geometry',
         lowestAxialHz: Number.isFinite(lowestAxialHz) ? lowestAxialHz : null,
-        lfPressureRiseApplied: lowestAxialHz ? 'YES (6 dB/oct, max +12 dB)' : 'NO (no axial modes)'
+        lfPressureRiseApplied: lowestAxialHz ? 'YES (6 dB/oct, max +12 dB)' : 'NO (no axial modes)',
+        freqGridPointCount: dataPoints.length,
+        freqGridMin: dataPoints.length > 0 ? dataPoints[0].frequency : null,
+        freqGridMax: dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].frequency : null
       },
       freqs: result.freqs,
       splDb: plotArrayWithLfRise,
@@ -827,7 +855,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       subSig,
       seatSig
     };
-  }, [rewStyleMode, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, graphSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView, rewSmoothing]);
+  }, [
+    rewStyleMode, 
+    roomDims?.widthM, 
+    roomDims?.lengthM, 
+    roomDims?.heightM, 
+    stableSeatSig, 
+    stableSubSig, 
+    subPositionEpoch, 
+    roomDamping, 
+    graphSmoothing, 
+    rewRelativeView, 
+    modeIsolation, 
+    complexEigenfunctions, 
+    componentView, 
+    rewSmoothing,
+    modesEnabled, // Include modes toggle
+    rewSbirEnabled // Include SBIR toggle
+  ]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
   const getSubAnechoicResponseDb = (modelKey, freqs) => {
@@ -942,11 +987,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return lastRewFailResultRef.current || { data: [], debug: { error: "computeRoomModesResponse failed (cached)" } };
     }
 
-    // Generate frequency axis once (must match engine's axis)
-    const freqs = [];
-    for (let f = 15; f <= 200; f += 0.5) {
-      freqs.push(f);
-    }
+    // Generate log-spaced frequency axis (REW parity - smooth curves)
+    // 1/48 octave spacing gives ~400 points from 10-200 Hz
+    const freqs = buildLogSpacedFreqs(10, 200, 48);
 
     // Get product curves for each sub and normalize to relative gain
     const subProductCurves = [];
@@ -1103,11 +1146,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Use plottedDb for display (smoothed if requested), coherentRawDb for audit
     const plotArray = result.plottedDb || result.splDb;
 
-    return {
-      data: result.freqs.map((frequency, i) => ({
-        frequency,
+    // Build data points (ensure strictly increasing X, no rounding, no duplicates)
+    const dataPoints = result.freqs
+      .map((frequency, i) => ({
+        frequency, // Keep full float precision (no toFixed)
         spl: plotArray[i]
-      })),
+      }))
+      .filter((p, i, arr) => {
+        // Remove duplicate frequencies (keep first occurrence)
+        if (i === 0) return true;
+        return p.frequency !== arr[i - 1].frequency;
+      })
+      .sort((a, b) => a.frequency - b.frequency); // Ensure strictly increasing
+
+    return {
+      data: dataPoints,
       debug: {
         ...result.debug,
         viewMode: 'Room + Product',
@@ -1119,13 +1172,34 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         productCurveAt50HzDb: firstCurve?.originalAt50Hz || 'N/A',
         productCurveMinMaxDb: firstCurve ? `${firstCurve.relativeMinDb} to ${firstCurve.relativeMaxDb}` : 'N/A',
         productCurveIsRelative: firstCurve?.isRelative || false,
-        productCurveDebug
+        productCurveDebug,
+        freqGridPointCount: dataPoints.length,
+        freqGridMin: dataPoints.length > 0 ? dataPoints[0].frequency : null,
+        freqGridMax: dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].frequency : null
       },
       freqs: result.freqs,
       splDb: plotArray,
       coherentRawDb: result.coherentRawDb
     };
-  }, [rewStyleMode, rewView, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, stableSeatSig, stableSubSig, subPositionEpoch, roomDamping, graphSmoothing, rewRelativeView, modeIsolation, complexEigenfunctions, componentView, rewSmoothing]);
+  }, [
+    rewStyleMode, 
+    rewView, 
+    roomDims?.widthM, 
+    roomDims?.lengthM, 
+    roomDims?.heightM, 
+    stableSeatSig, 
+    stableSubSig, 
+    subPositionEpoch, 
+    roomDamping, 
+    graphSmoothing, 
+    rewRelativeView, 
+    modeIsolation, 
+    complexEigenfunctions, 
+    componentView, 
+    rewSmoothing,
+    modesEnabled, // Include modes toggle
+    rewSbirEnabled // Include SBIR toggle
+  ]);
 
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
   const activeDebug = useMemo(() => {
@@ -3503,6 +3577,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             ? (schroederHz > 200 ? `${schroederHz.toFixed(1)} Hz (off-scale)` : `${schroederHz.toFixed(1)} Hz`)
             : 'N/A';
           
+          // Frequency grid diagnostics
+          const gridPointCount = activeDebug?.freqGridPointCount || 0;
+          const gridMin = activeDebug?.freqGridMin;
+          const gridMax = activeDebug?.freqGridMax;
+          
+          // Check for duplicate frequencies in plotted series
+          const freqs = plottedSeries.map(p => p.frequency).filter(f => Number.isFinite(f));
+          const uniqueFreqs = new Set(freqs);
+          const duplicateCount = freqs.length - uniqueFreqs.size;
+          
+          // Check if strictly increasing
+          const isStrictlyIncreasing = freqs.every((f, i) => i === 0 || f > freqs[i - 1]);
+          
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
               <div className="font-semibold mb-1">
@@ -3516,6 +3603,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 {rewView === 'roomPlusProduct' && (
                   <div>• Product curves: {(activeDebug?.productModels || []).join(', ') || 'None'}</div>
                 )}
+              </div>
+              
+              {/* Frequency grid diagnostics */}
+              <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5 text-[10px] font-mono">
+                <div className="font-semibold text-blue-700">Frequency Grid Quality Check:</div>
+                <div className={gridPointCount >= 300 ? 'text-green-600' : 'text-red-600'}>
+                  Point count: {gridPointCount} {gridPointCount >= 300 ? '✓ (smooth)' : '✗ (too sparse)'}
+                </div>
+                <div>
+                  Range: {Number.isFinite(gridMin) ? gridMin.toFixed(2) : 'N/A'} - {Number.isFinite(gridMax) ? gridMax.toFixed(2) : 'N/A'} Hz
+                </div>
+                <div className={duplicateCount === 0 ? 'text-green-600' : 'text-red-600'}>
+                  Duplicate X: {duplicateCount} {duplicateCount === 0 ? '✓ PASS' : '✗ FAIL'}
+                </div>
+                <div className={isStrictlyIncreasing ? 'text-green-600' : 'text-red-600'}>
+                  Strictly increasing: {isStrictlyIncreasing ? '✓ PASS' : '✗ FAIL'}
+                </div>
               </div>
               <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
                 <div className="text-[10px] font-mono opacity-80 font-semibold text-blue-700">
