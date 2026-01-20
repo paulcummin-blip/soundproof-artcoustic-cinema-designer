@@ -36,6 +36,17 @@ const DISPLAY_SPL_FLOOR_DB = -60;
 // Plot floor: REW-style minimum for visual display (prevents LF crushing)
 const PLOT_FLOOR_DB = 60;
 
+// REW-style LF pressure rise so Room-only doesn't collapse below the lowest axial.
+// 6 dB/oct below lowest axial, capped at +12 dB (matches your debug label).
+function applyLfPressureRiseDb(freqHz, lowestAxialHz, kDbPerOct = 6, maxDb = 12) {
+  if (!Number.isFinite(freqHz) || !Number.isFinite(lowestAxialHz) || lowestAxialHz <= 0) return 0;
+  if (freqHz >= lowestAxialHz) return 0;
+  // octaves below lowest axial: log2(lowestAxial/f)
+  const oct = Math.log2(lowestAxialHz / Math.max(1e-6, freqHz));
+  const db = kDbPerOct * oct;
+  return Math.min(maxDb, Math.max(0, db));
+}
+
 export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, frontSubsLive, rearSubsLive }) {
   const { seatingPositions, roomDims, splConfig, setFrontSubsCfg, setRearSubsCfg, autosaveMeta, restoreAutosave, clearAutosave } = useAppState();
   const hasNoSeats = !Array.isArray(seatingPositions) || seatingPositions.length === 0;
@@ -757,18 +768,37 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Use plottedDb for display (smoothed if requested), coherentRawDb for audit
     const plotArray = result.plottedDb || result.splDb;
     
+    // Compute lowest axial frequency for LF pressure rise
+    const allModes = result.debug?.modeMarkers || [];
+    const axialModes = allModes.filter(m => m.family === 'axial' && Number.isFinite(m.fHz));
+    const lowestAxialHz = axialModes.length > 0 
+      ? Math.min(...axialModes.map(m => m.fHz)) 
+      : null;
+    
+    // Apply REW-style LF pressure rise to Room-only series (display layer only)
+    const plotArrayWithLfRise = plotArray.map((spl, i) => {
+      const freq = result.freqs[i];
+      if (!Number.isFinite(spl) || !Number.isFinite(freq)) return spl;
+      
+      // Apply LF rise only if we have a valid lowest axial
+      const lfRiseDb = lowestAxialHz ? applyLfPressureRiseDb(freq, lowestAxialHz, 6, 12) : 0;
+      return spl + lfRiseDb;
+    });
+    
     return {
       data: result.freqs.map((frequency, i) => ({
         frequency,
-        spl: plotArray[i]
+        spl: plotArrayWithLfRise[i]
       })),
       debug: {
         ...result.debug,
         viewMode: 'Room-only (generic sub)',
         curveType: 'Modal response + geometry',
+        lowestAxialHz: lowestAxialHz?.toFixed(1) || 'N/A',
+        lfPressureRiseApplied: lowestAxialHz ? 'YES (6 dB/oct, max +12 dB)' : 'NO (no axial modes)'
       },
       freqs: result.freqs,
-      splDb: plotArray,
+      splDb: plotArrayWithLfRise,
       coherentRawDb: result.coherentRawDb,
       subSig,
       seatSig
