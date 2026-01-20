@@ -102,6 +102,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [auditEpoch, setAuditEpoch] = useState(0); // Force re-simulation when audit toggled
   const [rewSbirEnabled, setRewSbirEnabled] = useState(false); // SBIR reflections toggle
   const [modalProbeEnabled, setModalProbeEnabled] = useState(false); // Modal Probe toggle
+  const [debugDisableSealedGain, setDebugDisableSealedGain] = useState(false); // Debug: disable sealed-room LF gain
+  const [debugDisableNullRepair, setDebugDisableNullRepair] = useState(false); // Debug: disable null repair/fill
 
   // Sensitivity audit refs (track previous run)
   const prevSourceSigRef = useRef(null);
@@ -759,7 +761,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
         modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
         complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
-        componentView: componentView // Part 3 - component isolation
+        componentView: componentView, // Part 3 - component isolation
+        disableSealedRoomGain: debugDisableSealedGain,
+        disableNullRepair: debugDisableNullRepair
       });
     } catch (e) {
       return {
@@ -2544,7 +2548,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           border: "1px solid #DCDBD6",
           marginBottom: 6
         }}>
-          User smoothing: {rewSmoothing} | Graph smoothing: {graphSmoothing} | Compare: {String(rewCompareView)} | Modes: {String(modesEnabled)} | SBIR: {String(rewSbirEnabled)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)}
+          User smoothing: {rewSmoothing} | Graph smoothing: {graphSmoothing} | Compare: {String(rewCompareView)} | Modes: {String(modesEnabled)} | SBIR: {String(rewSbirEnabled)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)} | DisableSealed: {String(debugDisableSealedGain)} | DisableRepair: {String(debugDisableNullRepair)}
         </div>
 
         {/* Engine Parameter Verification */}
@@ -2877,6 +2881,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               />
               <Label htmlFor="modal-probe" className="text-xs font-semibold" style={{ color: modalProbeEnabled ? '#dc2626' : '#3E4349' }}>
                 🔬 Modal Probe (runtime dump)
+              </Label>
+            </div>
+            
+            {/* Debug: Disable sealed-room LF gain */}
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="debug-disable-sealed-gain" 
+                checked={debugDisableSealedGain}
+                onCheckedChange={setDebugDisableSealedGain}
+              />
+              <Label htmlFor="debug-disable-sealed-gain" className="text-xs font-semibold" style={{ color: debugDisableSealedGain ? '#dc2626' : '#3E4349' }}>
+                🔬 Debug: Disable sealed-room LF gain
+              </Label>
+            </div>
+            
+            {/* Debug: Disable null repair/fill */}
+            <div className="flex items-center gap-2">
+              <Checkbox 
+                id="debug-disable-null-repair" 
+                checked={debugDisableNullRepair}
+                onCheckedChange={setDebugDisableNullRepair}
+              />
+              <Label htmlFor="debug-disable-null-repair" className="text-xs font-semibold" style={{ color: debugDisableNullRepair ? '#dc2626' : '#3E4349' }}>
+                🔬 Debug: Disable null repair/fill
               </Label>
             </div>
             
@@ -3413,6 +3441,47 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     {mode.axisLabel && ` [${mode.axisLabel}]`}
                   </div>
                 ))}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* LF Lock Diagnostic (key frequency values) */}
+        {rewStyleMode && (() => {
+          const probeFreqs = [20, 30, 40, 50, 63];
+          const lowestAxial = activeDebug?.lowestAxialHz || 0;
+          
+          const probeData = probeFreqs.map(fProbe => {
+            const idx = selectedSeat?.freqsHz?.findIndex(f => Math.abs(f - fProbe) < 1) ?? -1;
+            if (idx < 0) return null;
+            
+            return {
+              freq: fProbe,
+              engineFinal: selectedSeat?.splDb?.[idx],
+              plotted: displayData?.[idx]?.spl
+            };
+          }).filter(Boolean);
+          
+          if (probeData.length === 0) return null;
+          
+          return (
+            <div className="text-xs mb-2 bg-orange-50 p-2 rounded border border-orange-400">
+              <div className="font-semibold mb-1 text-orange-700">🔬 LF Lock Diagnostic</div>
+              <div className="text-[10px] font-mono space-y-0.5">
+                <div><strong>Lowest axial:</strong> {Number.isFinite(lowestAxial) ? lowestAxial.toFixed(1) : 'N/A'} Hz (pivot point)</div>
+                <div><strong>Debug flags:</strong> DisableSealedGain={String(debugDisableSealedGain)}, DisableNullRepair={String(debugDisableNullRepair)}</div>
+                <div className="mt-1 pt-1 border-t border-orange-300">
+                  <strong>Key frequencies (move sub to test):</strong>
+                </div>
+                {probeData.map((p, i) => (
+                  <div key={i} className={p.freq < lowestAxial ? 'text-red-700 font-semibold' : ''}>
+                    {p.freq} Hz: engine={Number.isFinite(p.engineFinal) ? p.engineFinal.toFixed(1) : 'null'}, plot={Number.isFinite(p.plotted) ? p.plotted.toFixed(1) : 'null'}
+                    {p.freq < lowestAxial && ' (below axial)'}
+                  </div>
+                ))}
+                <div className="mt-1 pt-1 border-t border-orange-300 text-red-700 font-semibold text-[9px]">
+                  Expected: If LF is NOT locked, values below {lowestAxial.toFixed(0)} Hz must change when sub moves.
+                </div>
               </div>
             </div>
           );

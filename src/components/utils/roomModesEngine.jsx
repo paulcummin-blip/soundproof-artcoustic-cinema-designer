@@ -80,6 +80,8 @@ export function computeRoomModesResponse({
   sealedRoom = true, // REW-style: cinemas are sealed by default
   mlpPosition = null, // MLP position for distance debug
   sbirDebugSingleFrontWall = false, // DIAGNOSTIC: Only use direct + front wall reflection
+  disableSealedRoomGain = false, // Debug: bypass sealed-room LF gain
+  disableNullRepair = false, // Debug: bypass null repair/fill
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -306,10 +308,10 @@ export function computeRoomModesResponse({
   const lowestAxial = modes.find(m => m.type === "axial")?.freq || null;
   
   // Sealed room LF boost (REW-style: enabled by default, can be disabled for leaky rooms)
-  const sealedBoostEnabled = sealedRoom;
-  const sealedBoostKDbPerOct = sealedRoom ? 6.0 : 0.0;
-  // REW parity: disable sealed-room gain (can mask spatial variance below lowestAxialHz)
-  const sealedBoostMaxGainDb = rewParityMode ? 0.0 : (sealedRoom ? 12.0 : 0.0);
+  // Debug bypass: can be disabled to isolate LF locking behavior
+  const sealedBoostEnabled = sealedRoom && !disableSealedRoomGain;
+  const sealedBoostKDbPerOct = sealedBoostEnabled ? 6.0 : 0.0;
+  const sealedBoostMaxGainDb = sealedBoostEnabled ? 12.0 : 0.0;
 
   // Leaky room LF roll-off (if not sealed, reduce LF below ~35 Hz)
   const leakyRolloffEnabled = !sealedRoom;
@@ -1082,8 +1084,8 @@ export function computeRoomModesResponse({
     for (let i = 0; i < splDbSchroeder.length; i++) {
     const v = splDbSchroeder[i];
     if (!isFinite(v)) {
-      if (rewParityMode) {
-        repaired.push(null);  // preserve deep null behaviour for REW parity
+      if (disableNullRepair) {
+        repaired.push(null);  // preserve deep null/cancellation for diagnostic
         nonFiniteRepaired += 1;
         continue;
       }
