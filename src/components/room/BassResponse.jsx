@@ -1149,7 +1149,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewCompareView]);
 
-  // Helper: apply display conditioning (REW-style clamping and nulling)
+  // Helper: apply display conditioning (REW-style nulling only, NO clamping)
   const applyDisplayConditioningNulls = (data, rewLockedMin, rewLockedMax, yAxisLocked, isRewStyle) => {
     const points = Array.isArray(data) ? data : [];
     const ABS_FLOOR_DB = -60; // Absolute display floor for true "no data"
@@ -1165,16 +1165,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         return { ...p, spl: null };
       }
 
-      // When Y-axis locked in REW mode, CLAMP to window (NOT null)
-      if (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax)) {
-        if (spl < rewLockedMin) {
-          return { ...p, spl: rewLockedMin }; // Clamp to bottom
-        }
-        if (spl > rewLockedMax) {
-          return { ...p, spl: rewLockedMax }; // Clamp to top
-        }
-      }
-
+      // Y-axis lock does NOT mutate data (viewport constraint only)
       return p;
     });
   };
@@ -1724,14 +1715,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return null;
   }, [rewStyleMode, yAxisDomain]);
 
-  // Final plotted series (apply display floor + locked window nulling to prevent axis stretching)
+  // Final plotted series (apply display floor only, NO clamping)
   const plottedSeries = React.useMemo(() => {
     // Select base series
     const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
     
-    // Apply display conditioning (floor + locked window)
+    // Apply display conditioning (floor only, no clamping)
     return applyDisplayConditioningNulls(baseSeries, rewLockedMin, rewLockedMax, yAxisLocked, isRewStyle);
   }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked]);
+  
+  // Compute yDomain for viewport constraint (when Y-axis is locked)
+  const yDomain = React.useMemo(() => {
+    if (!isRewStyle || !yAxisLocked) return undefined;
+    if (!Number.isFinite(rewLockedMin) || !Number.isFinite(rewLockedMax)) return undefined;
+    
+    return [rewLockedMin, rewLockedMax];
+  }, [isRewStyle, yAxisLocked, rewLockedMin, rewLockedMax]);
   
   // Count nulled points (for user feedback)
   const { belowFloor, clampedToMin, clampedToMax } = React.useMemo(() => {
@@ -4114,9 +4113,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   modeMarkers={modeMarkersForGraph}
                   linearHzAxis={rewStyleMode && linearHzAxis}
                   rewStyleMode={rewStyleMode}
-                  yDomain={rewStyleMode ? undefined : finalYDomain}
-                  yMin={isRewStyle && yAxisLocked ? rewLockedMin : undefined}
-                  yMax={isRewStyle && yAxisLocked ? rewLockedMax : undefined}
+                  yDomain={yDomain}
                   showAxialOnly={false}
                   refDb={rewStyleMode ? (rewRelativeView ? 0 : rewDisplayRefDb) : (rewRelativeView ? 0 : 85)}
                   disableHighlight={rewRelativeView}

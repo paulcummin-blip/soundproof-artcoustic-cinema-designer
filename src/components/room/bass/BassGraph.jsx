@@ -175,12 +175,12 @@ export default function BassGraph({
     let calculatedYMin, calculatedYMax;
     let calculatedXMax = 200;
 
-    // CRITICAL: If explicit yMin/yMax provided (REW locked mode), use them directly — DO NOT auto-scale from data
-    if (Number.isFinite(yMin) && Number.isFinite(yMax)) {
-      calculatedYMin = yMin;
-      calculatedYMax = yMax;
+    // CRITICAL: If yDomain provided (viewport constraint), use it directly
+    if (yDomain && Array.isArray(yDomain) && yDomain.length === 2 && Number.isFinite(yDomain[0]) && Number.isFinite(yDomain[1])) {
+      calculatedYMin = yDomain[0];
+      calculatedYMax = yDomain[1];
     }
-    // REW mode unlocked: compute Y domain from actual plotted data (only finite values)
+    // REW mode: compute Y domain from actual plotted data (only finite values)
     else if (rewStyleMode) {
       const splValues = chartData
         .map(d => d.spl)
@@ -197,10 +197,6 @@ export default function BassGraph({
         calculatedYMin = 60;
         calculatedYMax = 110;
       }
-    } else if (yDomain && Number.isFinite(yDomain.min) && Number.isFinite(yDomain.max)) {
-      // Non-REW mode: use provided fixed domain
-      calculatedYMin = yDomain.min;
-      calculatedYMax = yDomain.max;
     } else {
       // Default Y range
       calculatedYMin = 90;
