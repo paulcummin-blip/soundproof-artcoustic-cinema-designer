@@ -1047,7 +1047,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [rewCompareView]);
 
   // Helper: apply display floor + locked window nulls (REW-style line breaking)
-  const applyDisplayConditioningNulls = (data, finalYDomain, yAxisLocked) => {
+  const applyDisplayConditioningNulls = (data, rewLockedMin, rewLockedMax, yAxisLocked) => {
     const points = Array.isArray(data) ? data : [];
 
     return points.map(p => {
@@ -1059,15 +1059,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         return { ...p, spl: null };
       }
 
-      // When Y-axis locked, also null values outside the window
-      if (yAxisLocked && finalYDomain) {
-        const yMin = Number(finalYDomain?.min ?? finalYDomain?.[0]);
-        const yMax = Number(finalYDomain?.max ?? finalYDomain?.[1]);
-        
-        if (Number.isFinite(yMin) && Number.isFinite(yMax)) {
-          if (spl < yMin || spl > yMax) {
-            return { ...p, spl: null };
-          }
+      // When Y-axis locked in REW mode, null values outside the fixed window
+      if (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax)) {
+        if (spl < rewLockedMin || spl > rewLockedMax) {
+          return { ...p, spl: null };
         }
       }
 
@@ -1270,6 +1265,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // IMPORTANT: Relative view must NEVER apply absolute display reference offsets
   const allowDisplayRefOffset = isRewStyle && !isRelative;
+  
+  // REW locked window bounds (fixed ±30 dB window around display ref, like REW's 60-120 dB)
+  const rewLockedMin = isRewStyle && yAxisLocked ? (Number(rewDisplayRefDb) || 90) - 30 : null;
+  const rewLockedMax = isRewStyle && yAxisLocked ? (Number(rewDisplayRefDb) || 90) + 30 : null;
 
   // REW mode: Three distinct series for plotting (RAW, ENGINE, DISPLAY)
   const { rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries } = useMemo(() => {
@@ -1668,8 +1667,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
     
     // Apply display conditioning (floor + locked window)
-    return applyDisplayConditioningNulls(baseSeries, finalYDomain, yAxisLocked);
-  }, [isRewStyle, rewFinalPlottedSeries, displayData, finalYDomain, yAxisLocked]);
+    return applyDisplayConditioningNulls(baseSeries, rewLockedMin, rewLockedMax, yAxisLocked);
+  }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked]);
   
   // Count out-of-window and below-floor points (for user feedback)
   const { outBelow, outAbove, belowFloor } = React.useMemo(() => {
@@ -1687,21 +1686,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           floor++;
         }
         
-        // Count outside locked window (only when locked)
-        if (yAxisLocked && finalYDomain) {
-          const yMin = Number(finalYDomain?.min);
-          const yMax = Number(finalYDomain?.max);
-          
-          if (Number.isFinite(yMin) && Number.isFinite(yMax)) {
-            if (spl >= DISPLAY_SPL_FLOOR_DB && spl < yMin) below++;
-            else if (spl > yMax) above++;
-          }
+        // Count outside REW locked window
+        if (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax)) {
+          if (spl >= DISPLAY_SPL_FLOOR_DB && spl < rewLockedMin) below++;
+          else if (spl > rewLockedMax) above++;
         }
       }
     });
     
     return { outBelow: below, outAbove: above, belowFloor: floor };
-  }, [isRewStyle, rewFinalPlottedSeries, displayData, finalYDomain, yAxisLocked]);
+  }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked]);
 
   // Bass Metrics (20-80 Hz) - NOW USES ANALYSIS SERIES (same as plot base)
   const bassMetrics2080Hz = useMemo(() => {
@@ -4013,7 +4007,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               null;
 
             const __plotAudit = {
-              using: rewStyleMode ? "displayData" : "clampedData",
+              using: "plottedSeries",
               len: dataToPlot.length,
               min: finiteSpl.length > 0 ? Math.min(...finiteSpl).toFixed(2) : 'N/A',
               max: finiteSpl.length > 0 ? Math.max(...finiteSpl).toFixed(2) : 'N/A',
@@ -4021,6 +4015,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               rewCompareView,
               userSmoothingChoice: rewSmoothing,
               audit40_70,
+              rewLockedWindow: (isRewStyle && yAxisLocked) ? `${rewLockedMin?.toFixed(0)} to ${rewLockedMax?.toFixed(0)} dB` : 'N/A'
             };
             if (globalThis.__B44_LOGS) {
               globalThis.__B44_LAST_PLOT_AUDIT = __plotAudit;
@@ -4046,6 +4041,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   linearHzAxis={rewStyleMode && linearHzAxis}
                   rewStyleMode={rewStyleMode}
                   yDomain={rewStyleMode ? undefined : finalYDomain}
+                  yMin={isRewStyle && yAxisLocked ? rewLockedMin : undefined}
+                  yMax={isRewStyle && yAxisLocked ? rewLockedMax : undefined}
                   showAxialOnly={false}
                   refDb={rewStyleMode ? (rewRelativeView ? 0 : rewDisplayRefDb) : (rewRelativeView ? 0 : 85)}
                   disableHighlight={rewRelativeView}
