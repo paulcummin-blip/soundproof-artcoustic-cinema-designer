@@ -818,7 +818,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         ...result.debug,
         viewMode: 'Room-only (generic sub)',
         curveType: 'Modal response + geometry',
-        lowestAxialHz: lowestAxialHz?.toFixed(1) || 'N/A',
+        lowestAxialHz: Number.isFinite(lowestAxialHz) ? lowestAxialHz : null,
         lfPressureRiseApplied: lowestAxialHz ? 'YES (6 dB/oct, max +12 dB)' : 'NO (no axial modes)'
       },
       freqs: result.freqs,
@@ -1149,28 +1149,29 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewCompareView]);
 
-  // Helper: apply display floor + locked window nulls (REW-style line breaking)
+  // Helper: apply display conditioning (REW-style clamping and nulling)
   const applyDisplayConditioningNulls = (data, rewLockedMin, rewLockedMax, yAxisLocked, isRewStyle) => {
     const points = Array.isArray(data) ? data : [];
+    const ABS_FLOOR_DB = -60; // Absolute display floor for true "no data"
 
     return points.map(p => {
       const spl = typeof p?.spl === "number" && Number.isFinite(p.spl) ? p.spl : null;
-      if (spl === null) return p;
+      
+      // Non-finite always becomes null
+      if (spl === null) return { ...p, spl: null };
 
-      // REW-style plot floor (prevents LF crushing when locked)
-      if (isRewStyle && yAxisLocked && spl < PLOT_FLOOR_DB) {
+      // Below absolute floor (-60 dB): TRUE floor, break line (REW-style gap)
+      if (spl < ABS_FLOOR_DB) {
         return { ...p, spl: null };
       }
 
-      // ALWAYS null below display floor (extreme values)
-      if (spl < DISPLAY_SPL_FLOOR_DB) {
-        return { ...p, spl: null };
-      }
-
-      // When Y-axis locked in REW mode, null values outside the fixed window
+      // When Y-axis locked in REW mode, CLAMP to window (NOT null)
       if (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax)) {
-        if (spl < rewLockedMin || spl > rewLockedMax) {
-          return { ...p, spl: null };
+        if (spl < rewLockedMin) {
+          return { ...p, spl: rewLockedMin }; // Clamp to bottom
+        }
+        if (spl > rewLockedMax) {
+          return { ...p, spl: rewLockedMax }; // Clamp to top
         }
       }
 
@@ -1732,37 +1733,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return applyDisplayConditioningNulls(baseSeries, rewLockedMin, rewLockedMax, yAxisLocked, isRewStyle);
   }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked]);
   
-  // Count out-of-window and below-floor points (for user feedback)
-  const { outBelow, outAbove, belowFloor, belowPlotFloor } = React.useMemo(() => {
+  // Count nulled points (for user feedback)
+  const { belowFloor, clampedToMin, clampedToMax } = React.useMemo(() => {
     const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
+    const ABS_FLOOR_DB = -60;
     
-    let below = 0;
-    let above = 0;
     let floor = 0;
-    let plotFloor = 0;
+    let clampMin = 0;
+    let clampMax = 0;
     
     baseSeries.forEach(p => {
-      const spl = typeof p?.spl === "number" && Number.isFinite(p.spl) ? p.spl : null;
-      if (spl !== null) {
-        // Count below plot floor (REW locked mode only)
-        if (isRewStyle && yAxisLocked && spl < PLOT_FLOOR_DB) {
-          plotFloor++;
-        }
-        
-        // Count below display floor (always nulled)
-        if (spl < DISPLAY_SPL_FLOOR_DB) {
-          floor++;
-        }
-        
-        // Count outside REW locked window
-        if (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax)) {
-          if (spl >= PLOT_FLOOR_DB && spl < rewLockedMin) below++;
-          else if (spl > rewLockedMax) above++;
-        }
+      const origSpl = typeof p?.spl === "number" && Number.isFinite(p.spl) ? p.spl : null;
+      if (origSpl === null) return;
+      
+      // Count below absolute floor (nulled)
+      if (origSpl < ABS_FLOOR_DB) {
+        floor++;
+        return;
+      }
+      
+      // Count clamped to window (when locked)
+      if (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax)) {
+        if (origSpl < rewLockedMin) clampMin++;
+        else if (origSpl > rewLockedMax) clampMax++;
       }
     });
     
-    return { outBelow: below, outAbove: above, belowFloor: floor, belowPlotFloor: plotFloor };
+    return { belowFloor: floor, clampedToMin: clampMin, clampedToMax: clampMax };
   }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked]);
 
   // Bass Metrics (20-80 Hz) - NOW USES ANALYSIS SERIES (same as plot base)
@@ -3859,10 +3856,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Out of window warning (non-REW mode only) */}
-        {!rewStyleMode && yAxisLocked && (outBelow + outAbove) > 0 && (
+        {/* Clamp feedback (REW mode only) */}
+        {rewStyleMode && yAxisLocked && (clampedToMin + clampedToMax) > 0 && (
           <div style={{ marginTop: 6, marginBottom: 8, fontSize: 12, color: "#8a2b2b", background: "#fff3cd", padding: "6px 10px", borderRadius: 6, border: "1px solid #ffc107" }}>
-            ⚠️ Out of view window: {outBelow} below, {outAbove} above. This is expected with a locked Y-axis; unlock or reset scale to view the full curve.
+            ⚠️ Clamped: {clampedToMin} to min, {clampedToMax} to max. Curve rides window edge (REW-style). Unlock Y-axis to view full range.
           </div>
         )}
 
@@ -4054,15 +4051,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Graph area */}
         <div className="mt-6">
-          {(belowPlotFloor > 0 || belowFloor > 0 || (yAxisLocked && (outBelow > 0 || outAbove > 0))) && (
+          {(belowFloor > 0 || (yAxisLocked && (clampedToMin > 0 || clampedToMax > 0))) && (
             <div className="text-[10px] text-gray-500 mb-2 italic">
-              {belowPlotFloor > 0 && isRewStyle && `${belowPlotFloor} below plot floor (${PLOT_FLOOR_DB} dB)`}
-              {belowPlotFloor > 0 && belowFloor > 0 && ' | '}
-              {belowFloor > 0 && `${belowFloor} below display floor (${DISPLAY_SPL_FLOOR_DB} dB)`}
-              {(belowFloor > 0 || belowPlotFloor > 0) && yAxisLocked && (outBelow > 0 || outAbove > 0) && ' | '}
-              {yAxisLocked && (outBelow > 0 || outAbove > 0) && `${outBelow + outAbove} outside window`}
-              {isRewStyle && yAxisLocked && ` (${rewLockedMin?.toFixed(0)} to ${rewLockedMax?.toFixed(0)} dB)`}
-              {' → null (line breaks, REW-style)'}
+              {belowFloor > 0 && `${belowFloor} below floor (-60 dB) → null`}
+              {belowFloor > 0 && yAxisLocked && (clampedToMin > 0 || clampedToMax > 0) && ' | '}
+              {yAxisLocked && clampedToMin > 0 && `${clampedToMin} clamped to min`}
+              {yAxisLocked && clampedToMin > 0 && clampedToMax > 0 && ', '}
+              {yAxisLocked && clampedToMax > 0 && `${clampedToMax} clamped to max`}
+              {isRewStyle && yAxisLocked && ` (window: ${Number.isFinite(rewLockedMin) ? rewLockedMin.toFixed(0) : '—'} to ${Number.isFinite(rewLockedMax) ? rewLockedMax.toFixed(0) : '—'} dB)`}
             </div>
           )}
           

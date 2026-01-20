@@ -417,16 +417,16 @@ export default function BassGraph({
                       />
                     ))}
 
-                    {/* REW mode: single true-value curve with monotone interpolation (ZERO processing) */}
+                    {/* REW mode: single true-value curve with linear interpolation */}
                     {rewStyleMode && (
                       <Line 
-                          type="monotone" 
+                          type="linear" 
                           dataKey="spl"
                           stroke="#213428" 
                           strokeWidth={2} 
                           dot={false}
                           activeDot={false}
-                          connectNulls={true}
+                          connectNulls={false}
                           isAnimationActive={false}
                       />
                     )}
