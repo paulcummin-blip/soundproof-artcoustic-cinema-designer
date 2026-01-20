@@ -1238,10 +1238,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     });
   };
 
-  // Helper: apply REW-style smoothing
+  // Helper: apply REW-style smoothing (HOISTED for early access in useMemo)
   // REW-style display smoothing (fractional octave) in LINEAR PRESSURE domain.
   // This is display-only. Do not feed this back into the engine.
-  const applyRewStyleDisplaySmoothing = (points, smoothingSetting) => {
+  function applyRewStyleDisplaySmoothing(points, smoothingSetting) {
     if (!points || points.length === 0) return points || [];
 
     // Treat these as "no smoothing"
@@ -1302,7 +1302,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       ...p,
       spl: outDb[i]
     }));
-  };
+  }
 
   // Display-only smoothing for REW mode series (ENGINE/DISPLAY only; never RAW)
   const applyDisplaySmoothing = (series, smoothingSetting) => {
