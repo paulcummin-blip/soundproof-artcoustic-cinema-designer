@@ -415,7 +415,7 @@ export function computeRoomModesResponse({
           
           const bandwidth = f0 / qMode;
           const df = Math.abs(f - f0);
-          if (df > 5 * bandwidth && df > 20) continue;
+          if (f > lowestAxial && df > 5 * bandwidth && df > 20) continue;
           
           const source = soloSource[0];
           const coupling = computeSpatialCoupling(mode, source, seat, room);
@@ -437,8 +437,6 @@ export function computeRoomModesResponse({
           const denom = (re * re + im * im);
           let hRe = re / denom;
           let hIm = -im / denom;
-          hRe /= Math.max(1e-6, qMode);
-          hIm /= Math.max(1e-6, qMode);
           
           // No delay, no polarity for calibration
           const weightMag = productMagScale;
@@ -530,7 +528,7 @@ export function computeRoomModesResponse({
 
       const bandwidth = f0 / qMode;
       const df = Math.abs(f - f0);
-      if (df > 5 * bandwidth && df > 20) continue;
+      if (f > lowestAxial && df > 5 * bandwidth && df > 20) continue;
 
       // Complex pressure contribution per sub
       for (let subIdx = 0; subIdx < sourcesUsed.length; subIdx++) {
@@ -589,11 +587,6 @@ export function computeRoomModesResponse({
         // Complex H
         let hRe = re / denom;
         let hIm = -im / denom;
-
-        // Normalise peak so modes don't "lock" the first axial family unrealistically.
-        // At resonance, |H| ~= Q, so divide by Q to keep peak ~ 1.
-        hRe /= Math.max(1e-6, qMode);
-        hIm /= Math.max(1e-6, qMode);
 
         // Weighted modal contribution: weight * H * coupling
         let cRe, cIm;
@@ -991,16 +984,34 @@ export function computeRoomModesResponse({
   const splDbForPipeline = coherenceLossApplied ? splDbRew : splDb;
   
   
-  // Compute RMS for component magnitudes (20-200 Hz band) - DO THIS 5
-  const computeRmsDb = (dbArray, freqsArr) => {
-    const band = dbArray
-      .map((db, i) => freqsArr[i] >= 20 && freqsArr[i] <= 200 ? db : null)
-      .filter(v => v !== null && Number.isFinite(v));
+  // Compute RMS for component magnitudes (20-200 Hz band) - CORRECTED: linear domain
+  const computeRmsDb = (magLinearArray, freqsArr) => {
+    // Extract linear magnitudes in band (20-200 Hz)
+    const bandLinear = [];
+    for (let i = 0; i < freqsArr.length; i++) {
+      const f = freqsArr[i];
+      if (f < 20 || f > 200) continue;
+      
+      // Convert dB back to linear magnitude
+      const dbVal = magLinearArray[i];
+      if (!Number.isFinite(dbVal)) continue;
+      
+      const linearMag = Math.pow(10, dbVal / 20);
+      
+      // Treat floored values as zero (no acoustic energy)
+      if (linearMag < 1e-10) continue;
+      
+      bandLinear.push(linearMag);
+    }
     
-    if (band.length === 0) return 0;
+    if (bandLinear.length === 0) return 0;
     
-    const sumSq = band.reduce((acc, db) => acc + db * db, 0);
-    return Math.sqrt(sumSq / band.length);
+    // RMS in linear domain
+    const sumSq = bandLinear.reduce((acc, mag) => acc + mag * mag, 0);
+    const rmsLinear = Math.sqrt(sumSq / bandLinear.length);
+    
+    // Convert final RMS to dB
+    return 20 * Math.log10(Math.max(1e-12, rmsLinear));
   };
 
   const modalRmsDb_20_200 = computeRmsDb(modalMagDb_all, freqs);
