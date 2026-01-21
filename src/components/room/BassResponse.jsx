@@ -1925,6 +1925,61 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       }
     }
     
+    // STEP DETECTION: Find flat runs and vertical jumps
+    const splValues = series.map(p => p.spl).filter(v => Number.isFinite(v));
+    
+    let flatRunsCount = 0;
+    let currentFlatRunLength = 0;
+    const jumps = [];
+    
+    for (let i = 1; i < series.length; i++) {
+      const prevSpl = series[i - 1].spl;
+      const currSpl = series[i].spl;
+      
+      if (!Number.isFinite(prevSpl) || !Number.isFinite(currSpl)) {
+        currentFlatRunLength = 0;
+        continue;
+      }
+      
+      const deltaSpl = Math.abs(currSpl - prevSpl);
+      const deltaF = series[i].frequency - series[i - 1].frequency;
+      
+      // Detect flat runs (≥4 consecutive points with <0.001 dB change)
+      if (deltaSpl < 0.001) {
+        currentFlatRunLength++;
+        if (currentFlatRunLength >= 3) { // 4th point in run
+          flatRunsCount++;
+        }
+      } else {
+        currentFlatRunLength = 0;
+      }
+      
+      // Collect all jumps
+      jumps.push({
+        idx: i,
+        hzPrev: series[i - 1].frequency,
+        hzNow: series[i].frequency,
+        dbPrev: prevSpl,
+        dbNow: currSpl,
+        jumpDb: currSpl - prevSpl,
+        absJumpDb: deltaSpl,
+        deltaF: deltaF
+      });
+    }
+    
+    // Find max jump
+    const maxJumpEntry = jumps.length > 0 
+      ? jumps.reduce((max, curr) => curr.absJumpDb > max.absJumpDb ? curr : max, jumps[0])
+      : null;
+    
+    const maxJumpDb = maxJumpEntry ? maxJumpEntry.absJumpDb : 0;
+    const maxJumpAtHz = maxJumpEntry ? maxJumpEntry.hzNow : null;
+    
+    // Top 5 jumps
+    const top5Jumps = [...jumps]
+      .sort((a, b) => b.absJumpDb - a.absJumpDb)
+      .slice(0, 5);
+    
     return {
       status: 'VALID',
       pointCount,
@@ -1933,7 +1988,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       minDf,
       maxDf,
       largestGapBand,
-      hasNaNOrInf
+      hasNaNOrInf,
+      flatRunsCount,
+      maxJumpDb,
+      maxJumpAtHz,
+      top5Jumps
     };
   }, [plottedSeries]);
   
@@ -4548,6 +4607,35 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </div>
                 <div className="text-gray-700">
                   Largest gap: {plotIntegrityCheck.largestGapBand}
+                </div>
+                
+                {/* Step Detection */}
+                <div className="mt-2 pt-2 border-t border-blue-300">
+                  <div className="font-semibold text-red-700 mb-1">Step Detection (SPL quantization):</div>
+                  <div className={plotIntegrityCheck.flatRunsCount === 0 ? 'text-green-600' : 'text-red-600'}>
+                    Flat runs (≥4 pts, Δ&lt;0.001 dB): {plotIntegrityCheck.flatRunsCount} 
+                    {plotIntegrityCheck.flatRunsCount === 0 ? ' ✓ (continuous)' : ' ✗ (binned/cached)'}
+                  </div>
+                  <div className={plotIntegrityCheck.maxJumpDb < 2.0 ? 'text-green-600' : 'text-yellow-600'}>
+                    Max jump: {plotIntegrityCheck.maxJumpDb.toFixed(3)} dB
+                    {plotIntegrityCheck.maxJumpAtHz && ` @ ${plotIntegrityCheck.maxJumpAtHz.toFixed(2)} Hz`}
+                  </div>
+                  
+                  {plotIntegrityCheck.top5Jumps && plotIntegrityCheck.top5Jumps.length > 0 && (
+                    <div className="mt-1 pt-1 border-t border-blue-200">
+                      <div className="font-semibold text-xs mb-1">Top 5 SPL jumps:</div>
+                      <div className="space-y-0.5 text-[9px]">
+                        {plotIntegrityCheck.top5Jumps.map((jump, i) => (
+                          <div key={i} className={jump.absJumpDb > 1.0 ? 'text-red-600 font-semibold' : ''}>
+                            {jump.hzPrev.toFixed(2)} → {jump.hzNow.toFixed(2)} Hz 
+                            (Δf={jump.deltaF.toFixed(4)} Hz): 
+                            {jump.dbPrev.toFixed(2)} → {jump.dbNow.toFixed(2)} dB 
+                            (jump: {jump.jumpDb >= 0 ? '+' : ''}{jump.jumpDb.toFixed(3)} dB)
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
