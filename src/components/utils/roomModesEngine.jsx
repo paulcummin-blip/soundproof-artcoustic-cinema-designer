@@ -861,7 +861,14 @@ export function computeRoomModesResponse({
     // COHERENT PRESSURE RAW: Pure complex magnitude (no processing)
     // This is the REFERENCE PHYSICS - position-dependent nulls come from here
     const coherentMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
-    const coherentPressureRaw = 20 * Math.log10(Math.max(Number.EPSILON, coherentMag));
+    
+    // --- LF debug: avoid Number.EPSILON quantising tiny magnitudes to ~-313 dB ---
+    // Use a deterministic, human-scale dB floor instead, and expose the linear magnitude.
+    // This does NOT change the underlying physics; it only changes how we convert near-zero
+    // pressure magnitudes into dB for inspection and plotting.
+    const COHERENT_MAG_FLOOR = 1e-12; // ~ -240 dB floor (20*log10(1e-12) = -240)
+    const coherentMagFloored = Math.max(COHERENT_MAG_FLOOR, coherentMag);
+    const coherentPressureRaw = 20 * Math.log10(coherentMagFloored);
     
     // Store component magnitudes for RMS calculation and debug visibility
     const modalMag = Math.sqrt(modalTerm_re * modalTerm_re + modalTerm_im * modalTerm_im);
