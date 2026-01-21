@@ -796,8 +796,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     
     // Apply REW-style LF pressure rise to Room-only series (display layer only)
     // CRITICAL FIX: Add boost as gain term, do NOT replace the engine output
+    // DEBUG: When debugDisableSealedGain is ON, bypass this display-side LF rise
+    // to allow true engine LF behaviour (below lowestAxialHz) to be observed.
     const plotArrayWithLfRise = (() => {
-      if (!lowestAxialHz) return plotArray; // No axial modes, no LF rise
+      // If debugDisableSealedGain is true, bypass this display-side LF boost.
+      // This allows the engine's internal LF handling to be observed directly.
+      if (debugDisableSealedGain || !lowestAxialHz) {
+        return plotArray;
+      }
       
       return plotArray.map((spl, i) => {
         const freq = result.freqs[i];
@@ -869,7 +875,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     componentView, 
     rewSmoothing,
     modesEnabled, // Include modes toggle
-    rewSbirEnabled // Include SBIR toggle
+    rewSbirEnabled, // Include SBIR toggle
+    debugDisableSealedGain // Include debug toggle to gate display-side LF rise
   ]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
