@@ -229,10 +229,10 @@ export function computeRoomModesResponse({
   const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
   
   // Generate frequency axis FIRST (needed by subProductMeta)
-  // REW parity: use high-resolution log-spaced grid for smooth continuous curves
-  // Target: 800-1200 points for REW-equivalent smoothness (no stair-stepping)
+  // REW parity: use hybrid linear grid for smooth analytic evaluation
+  // 15-80 Hz: 0.25 Hz steps, 80-200 Hz: 0.5 Hz steps (~700-750 points)
   const freqs = rewParityMode 
-    ? generateLogFrequencyAxis(fMin, fMax, 96) // 1/96 octave spacing (~800 points, 15-200 Hz)
+    ? generateHybridLinearFrequencyAxis(fMin, fMax)
     : generateLogFrequencyAxis(fMin, fMax, pointsPerOct);
   
   // Detect product curve type and extract reference SPL
@@ -2061,7 +2061,29 @@ function generateLinearFrequencyAxis(fMin, fMax, step) {
 }
 
 /**
- * Generate log-spaced frequency axis (REW parity - keeps full float precision)
+ * Generate hybrid linear frequency axis (REW parity - high analytic resolution)
+ * 15-80 Hz: 0.25 Hz steps (dense modal region)
+ * 80-200 Hz: 0.5 Hz steps (upper bass)
+ * Target: ~700-750 points for smooth curves without smoothing
+ */
+function generateHybridLinearFrequencyAxis(fMin, fMax) {
+  const freqs = [];
+  
+  // Part 1: 15-80 Hz at 0.25 Hz steps
+  for (let f = fMin; f <= 80; f += 0.25) {
+    freqs.push(f);
+  }
+  
+  // Part 2: 80-200 Hz at 0.5 Hz steps (start from 80.5 to avoid duplicate)
+  for (let f = 80.5; f <= fMax; f += 0.5) {
+    freqs.push(f);
+  }
+  
+  return freqs;
+}
+
+/**
+ * Generate log-spaced frequency axis (legacy - kept for non-REW mode)
  */
 function generateLogFrequencyAxis(fMin, fMax, pointsPerOct) {
   const freqs = [];
