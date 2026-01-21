@@ -652,14 +652,15 @@ export function computeRoomModesResponse({
         .slice(0, 3);
       
       // Only store for probe frequencies to avoid bloat
+      // Use index-based key to avoid frequency rounding
       if (__isProbeFreq(f)) {
-        modeContributions[f.toFixed(1)] = top3;
+        modeContributions[`idx_${i}`] = { freq: f, modes: top3 };
       }
     }
     
     // LF Movement Probe: capture coupling terms at key frequencies
     const probeFreqs = [25, 35, 45];
-    if (probeFreqs.includes(Math.round(f))) {
+    if (probeFreqs.some(pf => Math.abs(f - pf) < 0.3)) {
       // Find dominant mode near this frequency
       const nearestMode = modes
         .filter(m => Math.abs(m.freq - f) < 5)
@@ -673,7 +674,9 @@ export function computeRoomModesResponse({
         const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
         const modalDbVal = 20 * Math.log10(Math.max(Number.EPSILON, modalMag));
         
-        lfMovementProbe[f.toFixed(0)] = {
+        // Use index-based key to preserve exact frequency
+        lfMovementProbe[`idx_${i}_${f.toFixed(2)}Hz`] = {
+          exactFreqHz: f,
           nearestModeHz: nearestMode.freq.toFixed(1),
           modeIndices: [nearestMode.nx, nearestMode.ny, nearestMode.nz],
           sourceTerm: srcCouplingTerm.toFixed(4),
@@ -773,8 +776,8 @@ export function computeRoomModesResponse({
 
       __probeRows.push({
         fProbe: f,
+        exactFreqHz: f, // Keep exact frequency (no rounding)
         idx: i,
-        binHz: Number(freqs[i].toFixed(2)),
         modalMagDb_pre: Number(toDb(modalMag).toFixed(2)),
         splDb_postSmooth: null,
         finalDb: null,
