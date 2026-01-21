@@ -1659,6 +1659,15 @@ export function computeRoomModesResponse({
     plottedDb: [...safeDisplayPlottedDb],
     coherentRawDb: rewParityMode ? [...rawCoherentDb] : null,
     debug: {
+      roomDimsUsedM: {
+        widthM: Number(widthM),
+        lengthM: Number(lengthM),
+        heightM: Number(heightM),
+      },
+      lowestAxialHz: Number.isFinite(lowestAxial) ? lowestAxial : null,
+      modesEnabled: includeAxialLocal || includeTangentialLocal || includeObliqueLocal,
+      rawEngineOutput: !!rawEngineOutput,
+      sealedBoostEnabled: !!sealedBoostEnabled,
       schroederHz,
       modeMarkersHz: [...modeMarkersHz],
       modeMarkersAllHz: [...modeMarkersAllHz],
