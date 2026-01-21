@@ -452,6 +452,26 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }).join('|');
   }, [subsForSimulation]);
 
+  // --- FORCE-RECOMPUTE KEY (sub movement) ---
+  // We need a stable string that changes when ANY source position/tuning changes.
+  // This prevents useMemo from reusing an old engine result (the "LF locked" symptom).
+  const b44Round = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : v);
+
+  const sourcesSig = React.useMemo(() => {
+    const src = Array.isArray(subsForSimulation) ? subsForSimulation : [];
+    return JSON.stringify(
+      src.map((s) => ({
+        id: s?.id ?? "src",
+        x: b44Round(s?.x),
+        y: b44Round(s?.y),
+        z: b44Round(s?.z),
+        gain: b44Round(s?.tuning?.gainDb),
+        delay: b44Round(s?.tuning?.delayMs),
+        polarity: s?.tuning?.polarity ?? "normal",
+      }))
+    );
+  }, [subsForSimulation]);
+
   // Compute REW-style time alignment delays (when enabled)
   const rewAlignmentDelays = useMemo(() => {
     if (!rewStyleMode || !rewTimeAlign) return {};
@@ -876,7 +896,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     rewSmoothing,
     modesEnabled, // Include modes toggle
     rewSbirEnabled, // Include SBIR toggle
-    debugDisableSealedGain // Include debug toggle to gate display-side LF rise
+    debugDisableSealedGain, // Include debug toggle to gate display-side LF rise
+    sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
   ]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
@@ -1203,7 +1224,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     componentView, 
     rewSmoothing,
     modesEnabled, // Include modes toggle
-    rewSbirEnabled // Include SBIR toggle
+    rewSbirEnabled, // Include SBIR toggle
+    sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
   ]);
 
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
@@ -3503,6 +3525,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="text-[10px] font-mono space-y-0.5">
                 <div><strong>Lowest axial:</strong> {Number.isFinite(lowestAxial) ? lowestAxial.toFixed(1) : 'N/A'} Hz (pivot point)</div>
                 <div><strong>Debug flags:</strong> DisableSealedGain={String(debugDisableSealedGain)}, DisableNullRepair={String(debugDisableNullRepair)}</div>
+                <div style={{ marginTop: 6, opacity: 0.85 }}>
+                  <strong>sourcesSig:</strong> {String(sourcesSig).slice(0, 140)}{String(sourcesSig).length > 140 ? "…" : ""}
+                </div>
                 <div className="mt-1 pt-1 border-t border-orange-300">
                   <strong>Key frequencies (move sub to test):</strong>
                 </div>
