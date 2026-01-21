@@ -3458,15 +3458,40 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           const probeFreqs = [20, 30, 40, 50, 63];
           const lowestAxial = activeDebug?.lowestAxialHz || 0;
           
+          // Nearest frequency-bin lookup for debug readouts (prevents wrong-index "locked" illusions)
+          const nearestFreqIndex = (freqs, targetHz) => {
+            if (!Array.isArray(freqs) || freqs.length === 0) return -1;
+            let bestI = 0;
+            let bestErr = Math.abs((freqs[0] ?? 0) - targetHz);
+            for (let i = 1; i < freqs.length; i++) {
+              const f = freqs[i];
+              if (!Number.isFinite(f)) continue;
+              const err = Math.abs(f - targetHz);
+              if (err < bestErr) {
+                bestErr = err;
+                bestI = i;
+              }
+            }
+            return bestI;
+          };
+          
+          const engineFreqs = activeDebug?.freqs || rewModesDataAbs?.freqs || [];
+          
           const probeData = probeFreqs.map(fProbe => {
-            const idx = selectedSeat?.freqsHz?.findIndex(f => Math.abs(f - fProbe) < 1) ?? -1;
-            if (idx < 0) return null;
+            const binI = nearestFreqIndex(engineFreqs, fProbe);
+            if (binI < 0) return null;
+            
+            const actualFreqHz = engineFreqs[binI];
+            const plotIdx = displayData?.findIndex(d => Math.abs(d.frequency - fProbe) < 1) ?? -1;
             
             return {
               freq: fProbe,
-              idx: idx, // Store index for accessing intermediate arrays
-              engineFinal: selectedSeat?.splDb?.[idx],
-              plotted: displayData?.[idx]?.spl
+              binI: binI,
+              actualFreqHz: actualFreqHz,
+              engineFinal: rewModesDataAbs?.splDb?.[binI],
+              schroeder: activeDebug?.splDbSchroeder?.[binI],
+              repaired: activeDebug?.splDbRepaired?.[binI],
+              plotted: plotIdx >= 0 ? displayData[plotIdx]?.spl : null
             };
           }).filter(Boolean);
           
@@ -3483,9 +3508,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </div>
                 {probeData.map((p, i) => (
                   <div key={i} className={p.freq < lowestAxial ? 'text-red-700 font-semibold' : ''}>
-                    {p.freq} Hz: engine={Number.isFinite(p.engineFinal) ? p.engineFinal.toFixed(1) : 'null'},
-                    schroeder={Number.isFinite(activeDebug?.splDbSchroeder?.[p.idx]) ? activeDebug.splDbSchroeder[p.idx].toFixed(1) : 'null'},
-                    repaired={Number.isFinite(activeDebug?.splDbRepaired?.[p.idx]) ? activeDebug.splDbRepaired[p.idx].toFixed(1) : 'null'},
+                    {p.freq} Hz (bin {p.binI} @ {Number.isFinite(p.actualFreqHz) ? p.actualFreqHz.toFixed(2) : 'null'}):
+                    engine={Number.isFinite(p.engineFinal) ? p.engineFinal.toFixed(1) : 'null'},
+                    schroeder={Number.isFinite(p.schroeder) ? p.schroeder.toFixed(1) : 'null'},
+                    repaired={Number.isFinite(p.repaired) ? p.repaired.toFixed(1) : 'null'},
                     plot={Number.isFinite(p.plotted) ? p.plotted.toFixed(1) : 'null'}
                     {p.freq < lowestAxial && ' (below axial)'}
                   </div>
