@@ -3480,6 +3480,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           const probeFreqs = [20, 30, 40, 50, 63];
           const lowestAxial = activeDebug?.lowestAxialHz || 0;
           
+          // --- Degenerate lowest-axial detection (square-room friendly) ---
+          const LOWEST_AXIAL_EPS_HZ = 0.25; // tolerance for "same" frequency in degenerate rooms
+          
+          const modes = activeDebug?.modeListFirst60 || [];
+          const lowestAxialModes = Array.isArray(modes)
+            ? modes.filter((m) => {
+                if (!m || m.type !== "axial") return false;
+                if (!Number.isFinite(m.fHz) || !Number.isFinite(lowestAxial)) return false;
+                return Math.abs(m.fHz - lowestAxial) <= LOWEST_AXIAL_EPS_HZ;
+              })
+            : [];
+          
           // Nearest frequency-bin lookup for debug readouts (prevents wrong-index "locked" illusions)
           const nearestFreqIndex = (freqs, targetHz) => {
             if (!Array.isArray(freqs) || freqs.length === 0) return -1;
@@ -3524,6 +3536,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="font-semibold mb-1 text-orange-700">🔬 LF Lock Diagnostic</div>
               <div className="text-[10px] font-mono space-y-0.5">
                 <div><strong>Lowest axial:</strong> {Number.isFinite(lowestAxial) ? lowestAxial.toFixed(1) : 'N/A'} Hz (pivot point)</div>
+                <div style={{ marginTop: 6 }}>
+                  <strong>Degenerate lowest-axial modes (±{LOWEST_AXIAL_EPS_HZ.toFixed(2)} Hz):</strong>{" "}
+                  {lowestAxialModes.length
+                    ? lowestAxialModes
+                        .map((m) => `${m.fHz.toFixed(1)}Hz axial (${m.nx},${m.ny},${m.nz})${m.axisLabel ? ` [${m.axisLabel}]` : ''}`)
+                        .join(" | ")
+                    : "none"}
+                </div>
                 <div><strong>Debug flags:</strong> DisableSealedGain={String(debugDisableSealedGain)}, DisableNullRepair={String(debugDisableNullRepair)}</div>
                 <div style={{ marginTop: 6, opacity: 0.85 }}>
                   <strong>sourcesSig:</strong> {String(sourcesSig).slice(0, 140)}{String(sourcesSig).length > 140 ? "…" : ""}
@@ -3629,14 +3649,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Coupling trace diagnostic (Part E1) */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
-          // Show coupling for key modes: (0,1,0), (0,2,0), (1,1,0)
+          // Degenerate lowest-axial detection (same as LF Lock Diagnostic)
+          const LOWEST_AXIAL_EPS_HZ = 0.25;
+          const lowestAxial = activeDebug?.lowestAxialHz || 0;
+          const modeListFirst60 = activeDebug?.modeListFirst60 || [];
+          
+          const lowestAxialModes = Array.isArray(modeListFirst60)
+            ? modeListFirst60.filter((m) => {
+                if (!m || m.type !== "axial") return false;
+                if (!Number.isFinite(m.fHz) || !Number.isFinite(lowestAxial)) return false;
+                return Math.abs(m.fHz - lowestAxial) <= LOWEST_AXIAL_EPS_HZ;
+              })
+            : [];
+          
+          // Show coupling for key modes: all lowest axials (degenerate-safe), plus (0,2,0) and (1,1,0)
           const targetModes = [
-            { n: [0, 1, 0], label: 'axial L (0,1,0)' },
+            ...lowestAxialModes.map(m => ({
+              n: [m.nx, m.ny, m.nz],
+              label: `lowest axial (${m.nx},${m.ny},${m.nz})${m.axisLabel ? ` [${m.axisLabel}]` : ''}`,
+              fHz: m.fHz
+            })),
             { n: [0, 2, 0], label: 'axial L (0,2,0)' },
             { n: [1, 1, 0], label: 'tangential (1,1,0)' }
           ];
           
-          const modeListFirst60 = activeDebug?.modeListFirst60;
           if (!modeListFirst60 || subsForSimulation.length === 0) return null;
           
           const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
