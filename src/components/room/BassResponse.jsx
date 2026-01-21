@@ -14,6 +14,7 @@ import BassGraph from "@/components/room/bass/BassGraph";
 import { simulateBassAtSeats, computeAxialModes, computeModesOnlyResponse } from "@/components/bass/bassSimulationEngine";
 import { computeRoomModesResponse } from "@/components/utils/roomModesEngine";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
+import RewParityValidator from "@/components/room/bass/RewParityValidator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -2700,6 +2701,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
           );
         })()}
+
+        {/* REW Parity Validator (only when REW Compare is ON) */}
+        {rewCompareView && rewStyleMode && (
+          <div className="mb-4">
+            <RewParityValidator
+              b44Series={plottedSeries}
+              rewSeries={null}
+            />
+          </div>
+        )}
 
         {/* REW Compare View readout (only when REW Compare is ON) */}
         {rewCompareView && rewStyleMode && (() => {
