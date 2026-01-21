@@ -418,7 +418,7 @@ export default function BassGraph({
                       />
                     ))}
 
-                    {/* REW mode: smooth curve with monotone interpolation (breaks on null) */}
+                    {/* REW mode: smooth curve with natural monotone interpolation (breaks on null) */}
                     {rewStyleMode && (
                       <Line 
                           type="monotone" 

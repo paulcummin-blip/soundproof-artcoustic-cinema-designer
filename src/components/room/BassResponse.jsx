@@ -1818,14 +1818,124 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return null;
   }, [rewStyleMode, yAxisDomain]);
 
-  // Final plotted series (apply display floor only, NO clamping)
+  // PLOT INTEGRITY CHECK: Ensure clean, sorted, deduplicated data
+  const cleanPlottedSeries = React.useCallback((rawSeries) => {
+    if (!Array.isArray(rawSeries) || rawSeries.length === 0) return [];
+    
+    // Filter out invalid points
+    const valid = rawSeries.filter(p => {
+      const f = p?.frequency;
+      const s = p?.spl;
+      // Keep point if frequency is finite and positive (log axis safety)
+      // SPL can be null/NaN (breaks line), but frequency must be valid
+      return Number.isFinite(f) && f > 0;
+    });
+    
+    if (valid.length === 0) return [];
+    
+    // Sort by frequency ascending
+    const sorted = [...valid].sort((a, b) => a.frequency - b.frequency);
+    
+    // Remove duplicate frequencies (keep last occurrence for each unique Hz)
+    const deduplicated = [];
+    for (let i = 0; i < sorted.length; i++) {
+      const curr = sorted[i];
+      const next = sorted[i + 1];
+      
+      // If next point has same frequency, skip current (keep last)
+      if (next && Math.abs(curr.frequency - next.frequency) < 1e-9) {
+        continue;
+      }
+      
+      deduplicated.push(curr);
+    }
+    
+    return deduplicated;
+  }, []);
+  
+  // Final plotted series (apply display floor + integrity cleanup)
   const plottedSeries = React.useMemo(() => {
     // Select base series
     const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
     
     // Apply display conditioning (floor only, no clamping)
-    return applyDisplayConditioningNulls(baseSeries, rewLockedMin, rewLockedMax, yAxisLocked, isRewStyle);
-  }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked]);
+    const conditioned = applyDisplayConditioningNulls(baseSeries, rewLockedMin, rewLockedMax, yAxisLocked, isRewStyle);
+    
+    // Clean for plotting (sort, deduplicate, ensure strictly increasing)
+    return cleanPlottedSeries(conditioned);
+  }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked, cleanPlottedSeries]);
+  
+  // Plot Integrity Check (runs before graph renders)
+  const plotIntegrityCheck = React.useMemo(() => {
+    const series = plottedSeries;
+    if (!Array.isArray(series) || series.length === 0) {
+      return {
+        status: 'NO_DATA',
+        pointCount: 0
+      };
+    }
+    
+    const pointCount = series.length;
+    
+    // Check for duplicates
+    let duplicateXCount = 0;
+    for (let i = 1; i < series.length; i++) {
+      if (Math.abs(series[i].frequency - series[i - 1].frequency) < 1e-9) {
+        duplicateXCount++;
+      }
+    }
+    
+    // Check for non-increasing
+    let nonIncreasingCount = 0;
+    for (let i = 1; i < series.length; i++) {
+      if (series[i].frequency <= series[i - 1].frequency) {
+        nonIncreasingCount++;
+      }
+    }
+    
+    // Compute spacing stats
+    const deltas = [];
+    for (let i = 1; i < series.length; i++) {
+      deltas.push(series[i].frequency - series[i - 1].frequency);
+    }
+    
+    const minDf = deltas.length > 0 ? Math.min(...deltas) : 0;
+    const maxDf = deltas.length > 0 ? Math.max(...deltas) : 0;
+    
+    // Find largest gap region
+    let largestGapIdx = 0;
+    if (deltas.length > 0) {
+      for (let i = 0; i < deltas.length; i++) {
+        if (deltas[i] === maxDf) {
+          largestGapIdx = i;
+          break;
+        }
+      }
+    }
+    const largestGapBand = largestGapIdx < series.length - 1
+      ? `${series[largestGapIdx].frequency.toFixed(1)}–${series[largestGapIdx + 1].frequency.toFixed(1)} Hz`
+      : 'N/A';
+    
+    // Check for NaN/Inf
+    let hasNaNOrInf = false;
+    for (const p of series) {
+      if (!Number.isFinite(p.frequency) || (p.spl !== null && !Number.isFinite(p.spl))) {
+        hasNaNOrInf = true;
+        break;
+      }
+    }
+    
+    return {
+      status: 'VALID',
+      pointCount,
+      duplicateXCount,
+      nonIncreasingCount,
+      minDf,
+      maxDf,
+      largestGapBand,
+      hasNaNOrInf
+    };
+  }, [plottedSeries]);
   
   // Compute yDomain for viewport constraint (when Y-axis is locked)
   const yDomain = React.useMemo(() => {
@@ -4410,6 +4520,39 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
           )}
           
+          {/* Plot Integrity Check (before graph renders) */}
+          {plotIntegrityCheck.status === 'VALID' && (
+            <div className="text-xs mb-2 bg-blue-50 p-2 rounded border border-blue-400">
+              <div className="font-semibold mb-1 text-blue-700">📊 Plot Integrity Check</div>
+              <div className="text-[10px] font-mono space-y-0.5">
+                <div className={plotIntegrityCheck.pointCount >= 2000 ? 'text-green-600' : plotIntegrityCheck.pointCount >= 1000 ? 'text-yellow-600' : 'text-red-600'}>
+                  Point count: {plotIntegrityCheck.pointCount} 
+                  {plotIntegrityCheck.pointCount >= 2000 ? ' ✓ (smooth)' : plotIntegrityCheck.pointCount >= 1000 ? ' ⚠ (moderate)' : ' ✗ (may show steps)'}
+                </div>
+                <div className={plotIntegrityCheck.duplicateXCount === 0 ? 'text-green-600' : 'text-red-600'}>
+                  Duplicate X: {plotIntegrityCheck.duplicateXCount} 
+                  {plotIntegrityCheck.duplicateXCount === 0 ? ' ✓ PASS' : ' ✗ FAIL (causes hover jumps)'}
+                </div>
+                <div className={plotIntegrityCheck.nonIncreasingCount === 0 ? 'text-green-600' : 'text-red-600'}>
+                  Non-increasing: {plotIntegrityCheck.nonIncreasingCount} 
+                  {plotIntegrityCheck.nonIncreasingCount === 0 ? ' ✓ PASS' : ' ✗ FAIL (breaks chart)'}
+                </div>
+                <div className={!plotIntegrityCheck.hasNaNOrInf ? 'text-green-600' : 'text-red-600'}>
+                  NaN/Inf present: {plotIntegrityCheck.hasNaNOrInf ? 'YES ✗' : 'NO ✓'}
+                </div>
+                <div className="text-gray-700">
+                  Min Δf: {plotIntegrityCheck.minDf.toFixed(6)} Hz
+                </div>
+                <div className="text-gray-700">
+                  Max Δf: {plotIntegrityCheck.maxDf.toFixed(6)} Hz
+                </div>
+                <div className="text-gray-700">
+                  Largest gap: {plotIntegrityCheck.largestGapBand}
+                </div>
+              </div>
+            </div>
+          )}
+          
           {/* Graph or placeholder */}
           {displayData.length > 0 ? (() => {
             // [PLOT AUDIT] - Verify what's actually being plotted
@@ -4437,7 +4580,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               userSmoothingChoice: rewSmoothing,
               audit40_70,
               rewLockedWindow: (isRewStyle && yAxisLocked) ? `${rewLockedMin?.toFixed(0)} to ${rewLockedMax?.toFixed(0)} dB` : 'N/A',
-              yAxisUsesLockedBounds: (isRewStyle && yAxisLocked) ? 'YES' : 'NO'
+              yAxisUsesLockedBounds: (isRewStyle && yAxisLocked) ? 'YES' : 'NO',
+              integrityCheck: plotIntegrityCheck
             };
             if (globalThis.__B44_LOGS) {
               globalThis.__B44_LAST_PLOT_AUDIT = __plotAudit;
@@ -4448,7 +4592,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 {rewStyleMode && (
                   <div className="text-[10px] text-gray-500 mb-1">
                     Plot source: plottedSeries ({Array.isArray(plottedSeries) ? plottedSeries.length : 0}) | 
-                    Locked: {yAxisLocked ? 'YES (nulls applied)' : 'NO'}
+                    Locked: {yAxisLocked ? 'YES (nulls applied)' : 'NO'} | 
+                    Integrity: {plotIntegrityCheck.status === 'VALID' && plotIntegrityCheck.duplicateXCount === 0 && plotIntegrityCheck.nonIncreasingCount === 0 ? '✓' : '✗'}
                   </div>
                 )}
                 <BassGraph
