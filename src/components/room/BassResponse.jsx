@@ -4493,7 +4493,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </div>
             </div>
           </div>
-          {bassAudit && Array.isArray(bassAudit.contributors) && bassAudit.contributors.length > 0 ? (
+          {bassAudit && Array.isArray(bassAudit.contributors) && bassAudit.contributors.length > 0 && Array.isArray(bassAudit.summations) ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs font-mono border-collapse">
                 <thead>
@@ -4509,7 +4509,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <tbody>
                   {(() => {
                     // Show only 50 Hz entries
-                    const entries50Hz = bassAudit.contributors.filter(c => c.frequencyHz === 50);
+                    const entries50Hz = (bassAudit.contributors || []).filter(c => c?.frequencyHz === 50);
                     
                     if (entries50Hz.length === 0) {
                       return (
@@ -4522,8 +4522,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     }
                     
                     return entries50Hz.map((contrib, idx) => {
-                      const summation = bassAudit.summations.find(s => 
-                        s.frequencyHz === 50 && s.seatId === contrib.seatId
+                      const summation = (bassAudit?.summations || []).find(s => 
+                        s?.frequencyHz === 50 && s?.seatId === contrib?.seatId
                       );
                       
                       return (
@@ -4552,15 +4552,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       )}
 
       {/* Bass Audit Table (REW Comparison) */}
-      {simulationResults?.audit?.enabled === true && simulationResults.audit.contributors && simulationResults.audit.contributors.length > 0 && (
+      {simulationResults?.audit?.enabled === true && Array.isArray(simulationResults.audit.contributors) && simulationResults.audit.contributors.length > 0 && Array.isArray(simulationResults.audit.summations) && (
         <div className="rounded-lg border border-[#213428] bg-[#213428]/5 p-4">
           <div className="text-sm font-bold text-[#213428] mb-3">
             Bass Simulation Audit (REW Comparison)
           </div>
           <div className="text-xs text-[#3E4349] mb-2">
             Audit enabled: {String(simulationResults.audit.enabled)} | 
-            contributors: {simulationResults.audit.contributors.length} | 
-            summations: {simulationResults.audit.summations.length}
+            contributors: {(simulationResults.audit.contributors || []).length} | 
+            summations: {(simulationResults.audit.summations || []).length}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-[10px] font-mono border-collapse">
@@ -4597,39 +4597,40 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   
                   auditFreqs.forEach(freq => {
                     // Get contributors for this frequency
-                    const contributors = bassAudit.contributors.filter(c => c.frequencyHz === freq);
+                    const contributors = (bassAudit.contributors || []).filter(c => c?.frequencyHz === freq);
                     
                     // Get summation for this frequency
-                    const summation = bassAudit.summations.find(s => s.frequencyHz === freq);
+                    const summation = (bassAudit.summations || []).find(s => s?.frequencyHz === freq);
                     
                     if (contributors.length === 0) return;
                     
                     contributors.forEach((contrib, idx) => {
+                      if (!contrib) return;
                       const isLastSub = idx === contributors.length - 1;
                       
                       rows.push(
                         <tr key={`${freq}-${contrib.subIndex}`} className="border-b border-[#E6E4DD] hover:bg-[#F8F8F7]">
                           <td className="p-1">{freq}</td>
-                          <td className="p-1">{contrib.subId}</td>
-                          <td className="text-right p-1">{contrib.db0.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.dbDist.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.dbBoundary.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.dbPower.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.dbEq.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.dbGain.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.dbMag.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.amplitude.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.phiDistance.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.phiDelay.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.phiPolarity.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.phiTotal.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.subReal.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.subImag.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.filteredReal.toFixed(2)}</td>
-                          <td className="text-right p-1">{contrib.filteredImag.toFixed(2)}</td>
-                          <td className="text-right p-1">{isLastSub && summation ? summation.sumReal.toFixed(2) : ''}</td>
-                          <td className="text-right p-1">{isLastSub && summation ? summation.sumImag.toFixed(2) : ''}</td>
-                          <td className="text-right p-1">{isLastSub && summation ? summation.finalSplDb.toFixed(2) : ''}</td>
+                          <td className="p-1">{contrib.subId || '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.db0) ? contrib.db0.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.dbDist) ? contrib.dbDist.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.dbBoundary) ? contrib.dbBoundary.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.dbPower) ? contrib.dbPower.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.dbEq) ? contrib.dbEq.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.dbGain) ? contrib.dbGain.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.dbMag) ? contrib.dbMag.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.amplitude) ? contrib.amplitude.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.phiDistance) ? contrib.phiDistance.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.phiDelay) ? contrib.phiDelay.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.phiPolarity) ? contrib.phiPolarity.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.phiTotal) ? contrib.phiTotal.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.subReal) ? contrib.subReal.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.subImag) ? contrib.subImag.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.filteredReal) ? contrib.filteredReal.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{Number.isFinite(contrib.filteredImag) ? contrib.filteredImag.toFixed(2) : '—'}</td>
+                          <td className="text-right p-1">{isLastSub && summation && Number.isFinite(summation.sumReal) ? summation.sumReal.toFixed(2) : ''}</td>
+                          <td className="text-right p-1">{isLastSub && summation && Number.isFinite(summation.sumImag) ? summation.sumImag.toFixed(2) : ''}</td>
+                          <td className="text-right p-1">{isLastSub && summation && Number.isFinite(summation.finalSplDb) ? summation.finalSplDb.toFixed(2) : ''}</td>
                         </tr>
                       );
                     });
@@ -4641,7 +4642,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </table>
           </div>
           <div className="text-xs text-[#3E4349] mt-2">
-            Audit seat: {bassAudit.seatId}
+            Audit seat: {bassAudit?.seatId || 'N/A'}
           </div>
         </div>
       )}
