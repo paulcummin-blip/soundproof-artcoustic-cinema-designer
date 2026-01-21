@@ -3464,6 +3464,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             
             return {
               freq: fProbe,
+              idx: idx, // Store index for accessing intermediate arrays
               engineFinal: selectedSeat?.splDb?.[idx],
               plotted: displayData?.[idx]?.spl
             };
@@ -3482,7 +3483,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </div>
                 {probeData.map((p, i) => (
                   <div key={i} className={p.freq < lowestAxial ? 'text-red-700 font-semibold' : ''}>
-                    {p.freq} Hz: engine={Number.isFinite(p.engineFinal) ? p.engineFinal.toFixed(1) : 'null'}, plot={Number.isFinite(p.plotted) ? p.plotted.toFixed(1) : 'null'}
+                    {p.freq} Hz: engine={Number.isFinite(p.engineFinal) ? p.engineFinal.toFixed(1) : 'null'},
+                    schroeder={Number.isFinite(activeDebug?.splDbSchroeder?.[p.idx]) ? activeDebug.splDbSchroeder[p.idx].toFixed(1) : 'null'},
+                    repaired={Number.isFinite(activeDebug?.splDbRepaired?.[p.idx]) ? activeDebug.splDbRepaired[p.idx].toFixed(1) : 'null'},
+                    plot={Number.isFinite(p.plotted) ? p.plotted.toFixed(1) : 'null'}
                     {p.freq < lowestAxial && ' (below axial)'}
                   </div>
                 ))}
