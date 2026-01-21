@@ -1705,15 +1705,15 @@ export function computeRoomModesResponse({
   const freqsForDiagnostic = [...safeFreqs];
   const duplicateCheck = freqsForDiagnostic.filter((f, i, arr) => i > 0 && f === arr[i - 1]);
   const duplicateCount = duplicateCheck.length;
-
+  
   const strictlyIncreasing = freqsForDiagnostic.every((f, i, arr) => 
     i === 0 || f > arr[i - 1]
   );
-
+  
   const minDeltaF = freqsForDiagnostic.length >= 2 
     ? Math.min(...freqsForDiagnostic.slice(1).map((f, i) => f - freqsForDiagnostic[i]))
     : 0;
-
+  
   // Continuity diagnostic: check for step artifacts (large jumps between adjacent points)
   // Target band: 60-90 Hz (above pivot, where steps were reported)
   const continuityBand60_90 = [];
@@ -1725,100 +1725,14 @@ export function computeRoomModesResponse({
       continuityBand60_90.push({ freq: f, deltaDb, deltaF });
     }
   }
-
+  
   const maxDeltaDb60_90 = continuityBand60_90.length > 0 
     ? Math.max(...continuityBand60_90.map(d => d.deltaDb))
     : 0;
-
+  
   const avgDeltaDb60_90 = continuityBand60_90.length > 0
     ? continuityBand60_90.reduce((sum, d) => sum + d.deltaDb, 0) / continuityBand60_90.length
     : 0;
-
-  // Step Pair Debug: map detected jumps to term count data
-  let stepPairDebug55_80Hz = null;
-  if (termCountDebug.length > 0 && safeFreqs.length > 0 && safeFinalDb.length > 0) {
-    // Find top 3 jumps in 55-80 Hz range
-    const jumps55_80 = [];
-    for (let i = 1; i < safeFreqs.length; i++) {
-      const f = safeFreqs[i];
-      if (f >= 55 && f <= 80 && Number.isFinite(safeFinalDb[i]) && Number.isFinite(safeFinalDb[i-1])) {
-        const jumpDb = safeFinalDb[i] - safeFinalDb[i-1];
-        jumps55_80.push({ i, jumpDb: Math.abs(jumpDb), jumpDbSigned: jumpDb });
-      }
-    }
-
-    // Sort by absolute jump size, take top 3
-    jumps55_80.sort((a, b) => b.jumpDb - a.jumpDb);
-    const top3Jumps = jumps55_80.slice(0, 3);
-
-    // Helper: find nearest termCountDebug row by frequency
-    const findNearestTermRow = (targetFreq) => {
-      let bestRow = null;
-      let bestDist = Infinity;
-      for (const row of termCountDebug) {
-        const dist = Math.abs(row.exactFreqHz - targetFreq);
-        if (dist < bestDist) {
-          bestDist = dist;
-          bestRow = row;
-        }
-      }
-      return bestRow;
-    };
-
-    // Build step pair debug data
-    const stepPairs = [];
-    for (const jump of top3Jumps) {
-      const jumpIdx = jump.i;
-
-      // Window: [i-2, i-1, i, i+1, i+2]
-      const windowStart = Math.max(0, jumpIdx - 2);
-      const windowEnd = Math.min(safeFreqs.length - 1, jumpIdx + 2);
-
-      const windowData = [];
-      for (let wi = windowStart; wi <= windowEnd; wi++) {
-        const freq = safeFreqs[wi];
-        const plotSPL = safeFinalDb[wi];
-        const termRow = findNearestTermRow(freq);
-
-        if (termRow && Number.isFinite(freq) && Number.isFinite(plotSPL)) {
-          windowData.push({
-            idx: wi,
-            exactFreqHz: freq,
-            plotSPLdB: plotSPL,
-            modesUsed: termRow.modesUsed,
-            sbirReflectionsUsed: termRow.sbirReflectionsUsed,
-            activeTermsTotal: termRow.activeTermsTotal,
-            modalDb: termRow.modalDb,
-            modesConsidered: termRow.modesConsidered,
-            modesSkippedBandwidth: termRow.modesSkippedBandwidth,
-            modesSkippedCoupling: termRow.modesSkippedCoupling,
-            isJumpStart: wi === jumpIdx - 1,
-            isJumpEnd: wi === jumpIdx
-          });
-        }
-      }
-
-      // Compute deltas
-      for (let j = 1; j < windowData.length; j++) {
-        const curr = windowData[j];
-        const prev = windowData[j-1];
-        curr.deltaPlotdB = curr.plotSPLdB - prev.plotSPLdB;
-        curr.deltaModesUsed = curr.modesUsed - prev.modesUsed;
-        curr.deltaSbirReflectionsUsed = curr.sbirReflectionsUsed - prev.sbirReflectionsUsed;
-        curr.deltaActiveTermsTotal = curr.activeTermsTotal - prev.activeTermsTotal;
-      }
-
-      stepPairs.push({
-        jumpDbSigned: jump.jumpDbSigned,
-        jumpDbAbs: jump.jumpDb,
-        jumpFreqStart: safeFreqs[jumpIdx - 1],
-        jumpFreqEnd: safeFreqs[jumpIdx],
-        window: windowData
-      });
-    }
-
-    stepPairDebug55_80Hz = stepPairs;
-  }
 
   const baseReturn = {
     freqs: [...safeFreqs],
@@ -1997,8 +1911,7 @@ export function computeRoomModesResponse({
           pointsInBand: continuityBand60_90.length,
           status: maxDeltaDb60_90 < 2.0 ? 'SMOOTH ✓ (continuous)' : 'STEPPED ✗ (binning or undersampling)'
         }
-      },
-      stepPairDebug55_80Hz
+      }
     }
   };
 
