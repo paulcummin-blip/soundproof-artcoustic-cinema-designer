@@ -1670,6 +1670,26 @@ export function computeRoomModesResponse({
   const minDeltaF = freqsForDiagnostic.length >= 2 
     ? Math.min(...freqsForDiagnostic.slice(1).map((f, i) => f - freqsForDiagnostic[i]))
     : 0;
+  
+  // Continuity diagnostic: check for step artifacts (large jumps between adjacent points)
+  // Target band: 60-90 Hz (above pivot, where steps were reported)
+  const continuityBand60_90 = [];
+  for (let i = 1; i < safeFreqs.length; i++) {
+    const f = safeFreqs[i];
+    if (f >= 60 && f <= 90 && Number.isFinite(safeFinalDb[i]) && Number.isFinite(safeFinalDb[i-1])) {
+      const deltaDb = Math.abs(safeFinalDb[i] - safeFinalDb[i-1]);
+      const deltaF = safeFreqs[i] - safeFreqs[i-1];
+      continuityBand60_90.push({ freq: f, deltaDb, deltaF });
+    }
+  }
+  
+  const maxDeltaDb60_90 = continuityBand60_90.length > 0 
+    ? Math.max(...continuityBand60_90.map(d => d.deltaDb))
+    : 0;
+  
+  const avgDeltaDb60_90 = continuityBand60_90.length > 0
+    ? continuityBand60_90.reduce((sum, d) => sum + d.deltaDb, 0) / continuityBand60_90.length
+    : 0;
 
   const baseReturn = {
     freqs: [...safeFreqs],
@@ -1841,7 +1861,13 @@ export function computeRoomModesResponse({
         minDeltaF: minDeltaF > 0 ? minDeltaF.toFixed(6) : 'N/A',
         hoverSweepTest: duplicateCount === 0 && strictlyIncreasing ? 'PASS ✓' : 'FAIL ✗',
         duplicateXTest: duplicateCount === 0 ? 'PASS ✓' : `FAIL ✗ (${duplicateCount} duplicates)`,
-        stairStepTest: safeFreqs.length >= 300 ? 'PASS ✓ (dense grid)' : 'CAUTION (sparse grid)',
+        stairStepTest: safeFreqs.length >= 600 ? 'PASS ✓ (dense grid)' : 'CAUTION (sparse grid)',
+        continuityCheck60_90Hz: {
+          maxDeltaDbBetweenPoints: maxDeltaDb60_90.toFixed(3),
+          avgDeltaDbBetweenPoints: avgDeltaDb60_90.toFixed(3),
+          pointsInBand: continuityBand60_90.length,
+          status: maxDeltaDb60_90 < 2.0 ? 'SMOOTH ✓ (continuous)' : 'STEPPED ✗ (binning or undersampling)'
+        }
       }
     }
   };
