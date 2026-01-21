@@ -229,10 +229,10 @@ export function computeRoomModesResponse({
   const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
   
   // Generate frequency axis FIRST (needed by subProductMeta)
-  // REW parity: use hybrid linear grid for smooth analytic evaluation
-  // 15-80 Hz: 0.25 Hz steps, 80-200 Hz: 0.5 Hz steps (~700-750 points)
+  // REW parity: use DENSE log-spaced grid for continuous, smooth curves
+  // Target: 2000 points across 15-200 Hz (eliminates all step artifacts)
   const freqs = rewParityMode 
-    ? generateHybridLinearFrequencyAxis(fMin, fMax)
+    ? generateLogFrequencyAxis(fMin, fMax, 200) // ~2000 points (1/200 octave spacing)
     : generateLogFrequencyAxis(fMin, fMax, pointsPerOct);
   
   // Detect product curve type and extract reference SPL

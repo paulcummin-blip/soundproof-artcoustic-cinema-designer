@@ -3784,15 +3784,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               
               {/* Frequency grid diagnostics */}
               <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5 text-[10px] font-mono">
-                <div className="font-semibold text-blue-700">Frequency Grid Quality Check:</div>
-                <div className={gridPointCount >= 600 ? 'text-green-600' : 'text-red-600'}>
-                  Point count: {gridPointCount} {gridPointCount >= 600 ? '✓ (smooth)' : '✗ (too sparse)'}
+                <div className="font-semibold text-blue-700">Frequency Grid Stats:</div>
+                <div className={gridPointCount >= 2000 ? 'text-green-600' : gridPointCount >= 1000 ? 'text-yellow-600' : 'text-red-600'}>
+                  Point count: {gridPointCount} {gridPointCount >= 2000 ? '✓ (dense)' : gridPointCount >= 1000 ? '⚠ (moderate)' : '✗ (sparse)'}
                 </div>
                 <div>
                   Range: {Number.isFinite(gridMin) ? gridMin.toFixed(2) : 'N/A'} - {Number.isFinite(gridMax) ? gridMax.toFixed(2) : 'N/A'} Hz
                 </div>
                 <div className="text-blue-600">
-                  Grid type: Hybrid linear (0.25 Hz ≤80 Hz, 0.5 Hz &gt;80 Hz)
+                  Grid type: Dense log-spaced (continuous evaluation)
                 </div>
                 <div className={duplicateCount === 0 ? 'text-green-600' : 'text-red-600'}>
                   Duplicate X: {duplicateCount} {duplicateCount === 0 ? '✓ PASS' : '✗ FAIL'}
@@ -3801,13 +3801,37 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   Strictly increasing: {isStrictlyIncreasing ? '✓ PASS' : '✗ FAIL'}
                 </div>
                 {(() => {
-                  // Compute min delta between adjacent points
+                  // Compute spacing stats
                   const deltas = freqs.slice(1).map((f, i) => f - freqs[i]);
-                  const minDelta = deltas.length > 0 ? Math.min(...deltas) : 0;
+                  if (deltas.length === 0) return null;
+                  
+                  const minDelta = Math.min(...deltas);
+                  const maxDelta = Math.max(...deltas);
+                  
+                  // Find where largest spacing occurs
+                  let maxDeltaIdx = 0;
+                  for (let i = 0; i < deltas.length; i++) {
+                    if (deltas[i] === maxDelta) {
+                      maxDeltaIdx = i;
+                      break;
+                    }
+                  }
+                  const maxDeltaRegion = maxDeltaIdx < freqs.length 
+                    ? `${freqs[maxDeltaIdx].toFixed(1)}–${freqs[maxDeltaIdx + 1].toFixed(1)} Hz`
+                    : 'N/A';
+                  
                   return (
-                    <div className={minDelta >= 0.24 && minDelta <= 0.51 ? 'text-green-600' : 'text-yellow-600'}>
-                      Min Δf: {minDelta > 0 ? minDelta.toFixed(3) : 'N/A'} Hz {minDelta >= 0.24 && minDelta <= 0.51 ? '✓ (0.25/0.5 Hz)' : ''}
-                    </div>
+                    <>
+                      <div className={maxDelta < 0.1 ? 'text-green-600' : 'text-yellow-600'}>
+                        Min Δf: {minDelta.toFixed(6)} Hz
+                      </div>
+                      <div className={maxDelta < 0.5 ? 'text-green-600' : 'text-yellow-600'}>
+                        Max Δf: {maxDelta.toFixed(6)} Hz
+                      </div>
+                      <div className="text-gray-600">
+                        Largest spacing region: {maxDeltaRegion}
+                      </div>
+                    </>
                   );
                 })()}
               </div>
