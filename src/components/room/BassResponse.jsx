@@ -3780,11 +3780,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               {/* Frequency grid diagnostics */}
               <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5 text-[10px] font-mono">
                 <div className="font-semibold text-blue-700">Frequency Grid Quality Check:</div>
-                <div className={gridPointCount >= 300 ? 'text-green-600' : 'text-red-600'}>
-                  Point count: {gridPointCount} {gridPointCount >= 300 ? '✓ (smooth)' : '✗ (too sparse)'}
+                <div className={gridPointCount >= 600 ? 'text-green-600' : 'text-red-600'}>
+                  Point count: {gridPointCount} {gridPointCount >= 600 ? '✓ (smooth)' : '✗ (too sparse)'}
                 </div>
                 <div>
                   Range: {Number.isFinite(gridMin) ? gridMin.toFixed(2) : 'N/A'} - {Number.isFinite(gridMax) ? gridMax.toFixed(2) : 'N/A'} Hz
+                </div>
+                <div className="text-blue-600">
+                  Grid type: Hybrid linear (0.25 Hz ≤80 Hz, 0.5 Hz &gt;80 Hz)
                 </div>
                 <div className={duplicateCount === 0 ? 'text-green-600' : 'text-red-600'}>
                   Duplicate X: {duplicateCount} {duplicateCount === 0 ? '✓ PASS' : '✗ FAIL'}
@@ -3797,8 +3800,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   const deltas = freqs.slice(1).map((f, i) => f - freqs[i]);
                   const minDelta = deltas.length > 0 ? Math.min(...deltas) : 0;
                   return (
-                    <div>
-                      Min Δf: {minDelta > 0 ? minDelta.toFixed(6) : 'N/A'} Hz
+                    <div className={minDelta >= 0.24 && minDelta <= 0.51 ? 'text-green-600' : 'text-yellow-600'}>
+                      Min Δf: {minDelta > 0 ? minDelta.toFixed(3) : 'N/A'} Hz {minDelta >= 0.24 && minDelta <= 0.51 ? '✓ (0.25/0.5 Hz)' : ''}
                     </div>
                   );
                 })()}
