@@ -4638,10 +4638,55 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   )}
                 </div>
                 
-                {/* Term Count Debug (55-80 Hz band) */}
+                {/* Step Pair Debug (55-80 Hz) - Automatic jump diagnosis */}
+                {activeDebug?.stepPairDebug55_80Hz && activeDebug.stepPairDebug55_80Hz.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-purple-300 bg-purple-50">
+                    <div className="font-semibold text-purple-800 mb-2">Step Pair Debug (55–80 Hz):</div>
+                    <div className="text-[9px] font-mono space-y-3">
+                      {activeDebug.stepPairDebug55_80Hz.map((pair, pairIdx) => (
+                        <div key={pairIdx} className="border border-purple-200 rounded p-1.5 bg-white">
+                          <div className="font-bold text-purple-700 mb-1">
+                            Jump #{pairIdx + 1}: {pair.jumpFreqStart.toFixed(2)} → {pair.jumpFreqEnd.toFixed(2)} Hz 
+                            ({pair.jumpDbSigned >= 0 ? '+' : ''}{pair.jumpDbSigned.toFixed(3)} dB)
+                          </div>
+                          <div className="space-y-0.5">
+                            {pair.window.map((pt, i) => (
+                              <div key={i} className={`pl-2 ${
+                                pt.isJumpStart ? 'bg-yellow-100 font-bold border-l-2 border-yellow-500' :
+                                pt.isJumpEnd ? 'bg-red-100 font-bold border-l-2 border-red-500' :
+                                'text-gray-600'
+                              }`}>
+                                {pt.isJumpStart && <span className="text-yellow-700">&gt;&gt;&gt; JUMP START: </span>}
+                                {pt.isJumpEnd && <span className="text-red-700">&gt;&gt;&gt; JUMP END: </span>}
+                                {pt.exactFreqHz.toFixed(3)} Hz: 
+                                SPL={pt.plotSPLdB.toFixed(2)} dB, 
+                                modes={pt.modesUsed}/{pt.modesConsidered}, 
+                                sbir={pt.sbirReflectionsUsed}, 
+                                total={pt.activeTermsTotal}
+                                {i > 0 && (
+                                  <span className={
+                                    Math.abs(pt.deltaModesUsed) > 0 || Math.abs(pt.deltaSbirReflectionsUsed) > 0
+                                      ? 'text-red-600 font-bold'
+                                      : 'text-gray-500'
+                                  }>
+                                    {' '}(Δ: SPL{pt.deltaPlotdB >= 0 ? '+' : ''}{pt.deltaPlotdB.toFixed(3)}, 
+                                    modes{pt.deltaModesUsed >= 0 ? '+' : ''}{pt.deltaModesUsed}, 
+                                    sbir{pt.deltaSbirReflectionsUsed >= 0 ? '+' : ''}{pt.deltaSbirReflectionsUsed})
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Term Count Debug (55-80 Hz band) - Full raw data */}
                 {activeDebug?.termCountDebug55_80Hz && activeDebug.termCountDebug55_80Hz.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-blue-300">
-                    <div className="font-semibold text-purple-700 mb-1">Term Count Debug (55–80 Hz):</div>
+                    <div className="font-semibold text-purple-700 mb-1">Term Count Debug (55–80 Hz) - Full:</div>
                     <div className="text-[9px] font-mono space-y-0.5 max-h-48 overflow-y-auto">
                       {activeDebug.termCountDebug55_80Hz.slice(0, 20).map((entry, i) => (
                         <div key={i} className={
