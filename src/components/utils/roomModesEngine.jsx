@@ -501,6 +501,10 @@ export function computeRoomModesResponse({
   // Store BOTH coherent raw AND processed curves
   // CRITICAL: coherentRawDb is the REFERENCE TRUTH - if nulls don't move with sub position, coupling is broken
   const coherentRawDb = [];
+
+  // DEBUG: Track term counts for 55-80 Hz band (step detection)
+  const termCountDebug = [];
+
   let splDb = freqs.map((f, i) => {
     let sumRe_modal = 0;
     let sumIm_modal = 0;
@@ -508,14 +512,22 @@ export function computeRoomModesResponse({
     
     // Per-mode contribution tracking (top 3 contributors per bin)
     const modeContribsThisBin = [];
-    
+
     // SBIR (image source) complex pressure sum
     let sumRe_sbir = 0;
     let sumIm_sbir = 0;
 
+    // DEBUG: Track terms used for this frequency
+    let modesConsidered = 0;
+    let modesUsed = 0;
+    let modesSkippedBandwidth = 0;
+    let modesSkippedCoupling = 0;
+
     for (const mode of modes) {
       const f0 = mode.freq;
       if (!(f0 > 0)) continue;
+
+      modesConsidered++;
 
       // Compute modal Q
       const qMode = estimateModeQ({
@@ -529,7 +541,10 @@ export function computeRoomModesResponse({
 
       const bandwidth = f0 / qMode;
       const df = Math.abs(f - f0);
-      if (f > lowestAxial && df > 5 * bandwidth && df > 20) continue;
+      if (f > lowestAxial && df > 5 * bandwidth && df > 20) {
+        modesSkippedBandwidth++;
+        continue;
+      }
 
       // Complex pressure contribution per sub
       for (let subIdx = 0; subIdx < sourcesUsed.length; subIdx++) {
@@ -544,9 +559,14 @@ export function computeRoomModesResponse({
           if (Math.abs(coupling) < 1e-6) continue;
         } else {
           coupling = computeSpatialCoupling(mode, source, seat, room);
-          if (Math.abs(coupling) < 1e-6) continue;
+          if (Math.abs(coupling) < 1e-6) {
+            modesSkippedCoupling++;
+            continue;
+          }
           couplingComplex = null; // Not used in real mode
-        }
+          }
+
+          modesUsed++;
 
         // Get product metadata for this sub
         const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
@@ -690,6 +710,7 @@ export function computeRoomModesResponse({
     
     // SBIR (image source) calculation - integrated into modal summation
     let sbirPathsUsed = 0;
+    let sbirReflectionsUsed = 0;
     let sbirStrongestReflection = null;
     
     // Compute SBIR frequency blend weight (REW-style transition)
@@ -751,7 +772,10 @@ export function computeRoomModesResponse({
         // Apply weight to SBIR contribution
         sumRe_sbir += weightRe * sbirResult.re - weightIm * sbirResult.im;
         sumIm_sbir += weightRe * sbirResult.im + weightIm * sbirResult.re;
-        
+
+        // Track SBIR paths used
+        sbirReflectionsUsed += sbirResult.pathsUsed || 0;
+
         // Track debug info (only at 40 Hz probe)
         if (Math.abs(f - 40) < 0.6) {
           sbirPathsUsed = sbirResult.pathsUsed;
@@ -923,9 +947,25 @@ export function computeRoomModesResponse({
     
     // Store coherent raw for RAW mode output
     coherentRawDb.push(coherentPressureRaw);
-    
+
+    // DEBUG: Track term counts for 55-80 Hz band (step detection)
+    if (f >= 55 && f <= 80) {
+      termCountDebug.push({
+        freqHz: f,
+        exactFreqHz: f,
+        idx: i,
+        modesConsidered,
+        modesUsed,
+        modesSkippedBandwidth,
+        modesSkippedCoupling,
+        sbirReflectionsUsed,
+        activeTermsTotal: activeTerms,
+        modalDb: coherentPressureRaw
+      });
+    }
+
     return modalDb;
-  });
+    });
   
   return { splDb, modalBandDb, sbirBandDb, coherentRawDb };
   }; // End of runOnce

@@ -4637,6 +4637,34 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     </div>
                   )}
                 </div>
+                
+                {/* Term Count Debug (55-80 Hz band) */}
+                {activeDebug?.termCountDebug55_80Hz && activeDebug.termCountDebug55_80Hz.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-blue-300">
+                    <div className="font-semibold text-purple-700 mb-1">Term Count Debug (55–80 Hz):</div>
+                    <div className="text-[9px] font-mono space-y-0.5 max-h-48 overflow-y-auto">
+                      {activeDebug.termCountDebug55_80Hz.slice(0, 20).map((entry, i) => (
+                        <div key={i} className={
+                          i > 0 && (
+                            entry.modesUsed !== activeDebug.termCountDebug55_80Hz[i-1].modesUsed ||
+                            entry.sbirReflectionsUsed !== activeDebug.termCountDebug55_80Hz[i-1].sbirReflectionsUsed
+                          ) ? 'text-red-600 font-bold' : 'text-gray-700'
+                        }>
+                          {entry.exactFreqHz.toFixed(3)} Hz: 
+                          modes={entry.modesUsed}/{entry.modesConsidered} 
+                          (skip: bw={entry.modesSkippedBandwidth}, coup={entry.modesSkippedCoupling}), 
+                          sbir={entry.sbirReflectionsUsed}, 
+                          total={entry.activeTermsTotal}
+                        </div>
+                      ))}
+                      {activeDebug.termCountDebug55_80Hz.length > 20 && (
+                        <div className="text-gray-500 italic">
+                          ... ({activeDebug.termCountDebug55_80Hz.length - 20} more)
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
