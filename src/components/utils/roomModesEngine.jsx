@@ -229,9 +229,10 @@ export function computeRoomModesResponse({
   const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
   
   // Generate frequency axis FIRST (needed by subProductMeta)
-  // REW parity: use log-spaced grid (1/48 oct) for smooth continuous curves
+  // REW parity: use high-resolution log-spaced grid for smooth continuous curves
+  // Target: 800-1200 points for REW-equivalent smoothness (no stair-stepping)
   const freqs = rewParityMode 
-    ? generateLogFrequencyAxis(fMin, fMax, 48) // 1/48 octave spacing (~400 points)
+    ? generateLogFrequencyAxis(fMin, fMax, 96) // 1/96 octave spacing (~800 points, 15-200 Hz)
     : generateLogFrequencyAxis(fMin, fMax, pointsPerOct);
   
   // Detect product curve type and extract reference SPL
