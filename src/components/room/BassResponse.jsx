@@ -548,12 +548,35 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return delays;
   }, [rewStyleMode, rewTimeAlign, seatingPositions, subsForSimulation]);
 
-  // Initialize committed positions from props (on mount and when not dragging)
+  // Initialize committed positions from props ONLY on first mount
+  const isInitializedRef = useRef(false);
   useEffect(() => {
-    if (!isDraggingSub) {
+    if (!isInitializedRef.current) {
+      setCommittedFrontSubs(frontSubsLive);
+      setCommittedRearSubs(rearSubsLive);
+      isInitializedRef.current = true;
+    }
+  }, []);
+  
+  // Update committed positions ONLY when props change while NOT dragging
+  const prevIsDraggingRef = useRef(false);
+  useEffect(() => {
+    const wasDragging = prevIsDraggingRef.current;
+    const isNowDragging = isDraggingSub;
+    
+    // On drag end: commit live positions
+    if (wasDragging && !isNowDragging) {
       setCommittedFrontSubs(frontSubsLive);
       setCommittedRearSubs(rearSubsLive);
     }
+    
+    // While not dragging: track prop changes
+    if (!isNowDragging && !wasDragging) {
+      setCommittedFrontSubs(frontSubsLive);
+      setCommittedRearSubs(rearSubsLive);
+    }
+    
+    prevIsDraggingRef.current = isNowDragging;
   }, [frontSubsLive, rearSubsLive, isDraggingSub]);
   
   // Expose drag state controls to parent (if needed)
@@ -567,16 +590,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           clearTimeout(dragIdleTimerRef.current);
           dragIdleTimerRef.current = null;
         }
-        
-        // If drag ended, commit live positions and trigger full simulation
-        if (!dragging) {
-          setCommittedFrontSubs(frontSubsLive);
-          setCommittedRearSubs(rearSubsLive);
-          
-          dragIdleTimerRef.current = setTimeout(() => {
-            calcEpochRef.current += 1; // Force full-quality recalc
-          }, 100);
-        }
       };
     }
     
@@ -585,7 +598,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         clearTimeout(dragIdleTimerRef.current);
       }
     };
-  }, [frontSubsLive, rearSubsLive]);
+  }, []);
   
   // Audit curve (no smoothing, no normalization) for sensitivity testing
   const rewModesDataAudit = useMemo(() => {
