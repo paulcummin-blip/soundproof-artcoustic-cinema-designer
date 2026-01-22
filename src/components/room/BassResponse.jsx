@@ -2321,15 +2321,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Compute yDomain for viewport constraint (when Y-axis is locked)
   // During drag: freeze at captured domain
   const yDomain = React.useMemo(() => {
-    if (isDraggingSub && yDomainBeforeDragRef.current) {
+    // During drag: ALWAYS freeze to the captured domain
+    if (isDraggingSub && Array.isArray(yDomainBeforeDragRef.current)) {
       return yDomainBeforeDragRef.current;
     }
-    
-    if (!isRewStyle || !yAxisLocked) return undefined;
-    if (!Number.isFinite(rewLockedMin) || !Number.isFinite(rewLockedMax)) return undefined;
-    
-    return [rewLockedMin, rewLockedMax];
-  }, [isRewStyle, yAxisLocked, rewLockedMin, rewLockedMax, isDraggingSub]);
+
+    // REW mode + locked: ALWAYS use the fixed ref window
+    if (isRewStyle && yAxisLocked) {
+      const lockedMin = (Number(rewDisplayRefDb) || 90) - 30;
+      const lockedMax = (Number(rewDisplayRefDb) || 90) + 30;
+      return [lockedMin, lockedMax];
+    }
+
+    return undefined;
+  }, [isDraggingSub, isRewStyle, yAxisLocked, rewDisplayRefDb]);
   
   // Count nulled points (for user feedback)
   const { belowFloor, clampedToMin, clampedToMax } = React.useMemo(() => {
