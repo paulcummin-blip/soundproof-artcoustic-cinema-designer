@@ -1757,56 +1757,112 @@ export function computeRoomModesResponse({
     ? continuityBand60_90.reduce((sum, d) => sum + d.deltaDb, 0) / continuityBand60_90.length
     : 0;
 
+  // --- Build baseReturn FIRST (no conditionals inside object literals) ---
   const baseReturn = {
-  if (globalThis.__B44_BASS_AUDIT === true) {
-    const audit = {
-      coherentRawDb: Array.isArray(rawCoherentDb) ? peakDipDelta(freqs, rawCoherentDb, 40, 70) : null,
-      splDb: Array.isArray(splDb) ? peakDipDelta(freqs, splDb, 40, 70) : null,
-      splDbForPipeline: Array.isArray(splDbForPipeline) ? peakDipDelta(freqs, splDbForPipeline, 40, 70) : null,
-      splDbSchroeder: Array.isArray(splDbSchroeder) ? peakDipDelta(freqs, splDbSchroeder, 40, 70) : null,
-      splDbRepaired: Array.isArray(splDbRepaired) ? peakDipDelta(freqs, splDbRepaired, 40, 70) : null,
-      plottedDb: Array.isArray(plottedDb) ? peakDipDelta(freqs, plottedDb, 40, 70) : null,
-    };
-    baseReturn.debug.audit40_70 = audit;
-  }
-
-  // Attach 40–70 Hz stage audit when enabled
-  if (globalThis.__B44_BASS_AUDIT === true) {
-    baseReturn.debug.audit40_70 = {
-      coherentRawDb: Array.isArray(rawCoherentDb) ? peakDipDelta(freqs, rawCoherentDb, 40, 70) : null,
-      splDb: Array.isArray(splDb) ? peakDipDelta(freqs, splDb, 40, 70) : null,
-      splDbForPipeline: Array.isArray(splDbForPipeline) ? peakDipDelta(freqs, splDbForPipeline, 40, 70) : null,
-      splDbSchroeder: Array.isArray(splDbSchroeder) ? peakDipDelta(freqs, splDbSchroeder, 40, 70) : null,
-      splDbRepaired: Array.isArray(splDbRepaired) ? peakDipDelta(freqs, splDbRepaired, 40, 70) : null,
-      plottedDb: Array.isArray(plottedDb) ? peakDipDelta(freqs, plottedDb, 40, 70) : null,
-    };
-  }
-
-  // Attach 40–70 Hz stage audit when enabled
-  if (globalThis.__B44_BASS_AUDIT === true) {
-    baseReturn.debug.audit40_70 = {
-      coherentRawDb: Array.isArray(rawCoherentDb) ? peakDipDelta(freqs, rawCoherentDb, 40, 70) : null,
-      splDb: Array.isArray(splDb) ? peakDipDelta(freqs, splDb, 40, 70) : null,
-      splDbForPipeline: Array.isArray(splDbForPipeline) ? peakDipDelta(freqs, splDbForPipeline, 40, 70) : null,
-      splDbSchroeder: Array.isArray(splDbSchroeder) ? peakDipDelta(freqs, splDbSchroeder, 40, 70) : null,
-      splDbRepaired: Array.isArray(splDbRepaired) ? peakDipDelta(freqs, splDbRepaired, 40, 70) : null,
-      plottedDb: Array.isArray(plottedDb) ? peakDipDelta(freqs, plottedDb, 40, 70) : null,
-    };
-  }
-
-  // Attach 40–70 Hz stage audit when enabled (no UI, no console)
-  if (globalThis.__B44_BASS_AUDIT === true) {
-    const audit = {
-      coherentRawDb: Array.isArray(rawCoherentDb) ? peakDipDelta(freqs, rawCoherentDb, 40, 70) : null,
-      splDb: Array.isArray(splDb) ? peakDipDelta(freqs, splDb, 40, 70) : null,
-      splDbForPipeline: Array.isArray(splDbForPipeline) ? peakDipDelta(freqs, splDbForPipeline, 40, 70) : null,
-      splDbSchroeder: Array.isArray(splDbSchroeder) ? peakDipDelta(freqs, splDbSchroeder, 40, 70) : null,
-      splDbRepaired: Array.isArray(splDbRepaired) ? peakDipDelta(freqs, splDbRepaired, 40, 70) : null,
-      plottedDb: Array.isArray(plottedDb) ? peakDipDelta(freqs, plottedDb, 40, 70) : null,
-    };
-    if (baseReturn && baseReturn.debug) {
-      baseReturn.debug.audit40_70 = audit;
+    freqs: safeFreqs,
+    splDb: safeDisplayDb,
+    plottedDb: safeDisplayPlottedDb,
+    coherentRawDb: rawCoherentDb,
+    engineTrace: engineTraceFinal,
+    debug: {
+      schroederHz: Number.isFinite(schroederHz) ? schroederHz : 0,
+      modeMarkersHz,
+      modeMarkersAllHz,
+      modeMarkers,
+      modeCount: modes.length,
+      axialCount,
+      tangentialCount,
+      obliqueCount,
+      firstTenModeHz,
+      modeListFirst60,
+      qMappingText,
+      rewParityDamping,
+      inputSig,
+      sourceSigUsed,
+      seatSigUsed,
+      sourceSigRounded,
+      seatSigRounded,
+      sourceCountUsed,
+      sourcePositionsUsed,
+      mlpAutoLevelGainsDb,
+      autoLevelEnabled,
+      sbirMatchingApplied,
+      modalMedianDb: Number.isFinite(modalMedianDb) ? modalMedianDb.toFixed(2) : 'N/A',
+      sbirMedianDb: Number.isFinite(sbirMedianDb) ? sbirMedianDb.toFixed(2) : 'N/A',
+      sbirTrimDb: Number.isFinite(sbirTrimDb) ? sbirTrimDb.toFixed(2) : 'N/A',
+      sbirTrimLinear: Number.isFinite(sbirTrimLinear) ? sbirTrimLinear.toFixed(4) : 'N/A',
+      modalRmsDb_20_200: Number.isFinite(modalRmsDb_20_200) ? modalRmsDb_20_200.toFixed(2) : 'N/A',
+      sbirRmsDb_20_200: Number.isFinite(sbirRmsDb_20_200) ? sbirRmsDb_20_200.toFixed(2) : 'N/A',
+      totalRmsDb_20_200: Number.isFinite(totalRmsDb_20_200) ? totalRmsDb_20_200.toFixed(2) : 'N/A',
+      splMinDb: Number.isFinite(splMinDb) ? splMinDb.toFixed(1) : 'N/A',
+      splMaxDb: Number.isFinite(splMaxDb) ? splMaxDb.toFixed(1) : 'N/A',
+      splRangeDb: Number.isFinite(splRangeDb) ? splRangeDb.toFixed(1) : 'N/A',
+      preNormMin: Number.isFinite(preNormMin) ? preNormMin.toFixed(1) : 'N/A',
+      preNormMax: Number.isFinite(preNormMax) ? preNormMax.toFixed(1) : 'N/A',
+      preNormRange: Number.isFinite(preNormRange) ? preNormRange.toFixed(1) : 'N/A',
+      postNormMin: Number.isFinite(postNormMin) ? postNormMin.toFixed(1) : 'N/A',
+      postNormMax: Number.isFinite(postNormMax) ? postNormMax.toFixed(1) : 'N/A',
+      postNormRange: Number.isFinite(postNormRange) ? postNormRange.toFixed(1) : 'N/A',
+      rawMin: Number.isFinite(rawMin) ? rawMin.toFixed(1) : 'N/A',
+      rawMax: Number.isFinite(rawMax) ? rawMax.toFixed(1) : 'N/A',
+      rawRange: Number.isFinite(rawRange) ? rawRange.toFixed(1) : 'N/A',
+      nonFiniteRepaired,
+      smoothingApplied,
+      normRefDb,
+      normApplied: normAppliedActual,
+      calRefMedianDbBefore,
+      calRefMedianDbAfter,
+      calibrationOffsetDb,
+      displayOffsetDb,
+      rewParityMode,
+      isRelative,
+      coherenceLossApplied,
+      productCurveStats,
+      sbirEnabled,
+      sbirBlendEnabled,
+      sbirBlendStartHz: Number.isFinite(sbirBlendStartHzActual) ? sbirBlendStartHzActual.toFixed(1) : 'N/A',
+      sbirBlendEndHz: Number.isFinite(sbirBlendEndHzActual) ? sbirBlendEndHzActual.toFixed(1) : 'N/A',
+      sealedBoostEnabled,
+      sealedBoostKDbPerOct,
+      sealedBoostMaxGainDb,
+      lowestAxialHz: Number.isFinite(lowestAxial) ? lowestAxial.toFixed(1) : 'N/A',
+      lfDeltaDb_20_30: Number.isFinite(lfDeltaDb_20_30) ? lfDeltaDb_20_30.toFixed(2) : 'N/A',
+      lfDelta_25_69,
+      upperBassDelta_69_120,
+      lfSanityCheck,
+      modalMagMin,
+      modalMagMax,
+      lfProbe,
+      lfProbeRaw,
+      lfMovementProbe,
+      modeContributions,
+      seatNodeCheck,
+      warnings,
+      parityAudits,
+      sbirDebugProbe40Hz,
+      sbirDebugProbe63Hz: sbirDebugProbe63Hz_captured,
+      duplicateCount,
+      strictlyIncreasing,
+      minDeltaF: Number.isFinite(minDeltaF) ? minDeltaF.toFixed(6) : 'N/A',
+      continuityBand60_90_maxDeltaDb: Number.isFinite(maxDeltaDb60_90) ? maxDeltaDb60_90.toFixed(3) : 'N/A',
+      continuityBand60_90_avgDeltaDb: Number.isFinite(avgDeltaDb60_90) ? avgDeltaDb60_90.toFixed(3) : 'N/A',
     }
+  };
+
+  // --- Attach 40–70 Hz stage audit when enabled (ONE time only) ---
+  if (globalThis.__B44_BASS_AUDIT === true) {
+    const audit40_70 = {
+      coherentRawDb: Array.isArray(rawCoherentDb) ? peakDipDelta(freqs, rawCoherentDb, 40, 70) : null,
+      splDb: Array.isArray(splDb) ? peakDipDelta(freqs, splDb, 40, 70) : null,
+      splDbForPipeline: Array.isArray(splDbForPipeline) ? peakDipDelta(freqs, splDbForPipeline, 40, 70) : null,
+      splDbSchroeder: Array.isArray(splDbSchroeder) ? peakDipDelta(freqs, splDbSchroeder, 40, 70) : null,
+      splDbRepaired: Array.isArray(splDbRepaired) ? peakDipDelta(freqs, splDbRepaired, 40, 70) : null,
+      plottedDb: Array.isArray(plottedDb) ? peakDipDelta(freqs, plottedDb, 40, 70) : null,
+    };
+
+    // Guard: ensure debug container exists
+    if (!baseReturn.debug) baseReturn.debug = {};
+    baseReturn.debug.audit40_70 = audit40_70;
   }
 
   // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)
