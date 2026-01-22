@@ -258,7 +258,7 @@ export function computeRoomModesResponse({
   // REW parity: use DENSE log-spaced grid for continuous, smooth curves
   // Target: 2000 points across 15-200 Hz (eliminates all step artifacts)
   const freqs = rewParityMode 
-    ? generateLogFrequencyAxis(fMin, fMax, 200) // ~2000 points (1/200 octave spacing)
+    ? generateLogFrequencyAxis(fMin, fMax, 540) // ~2000 points (1/540 octave spacing)
     : generateLogFrequencyAxis(fMin, fMax, pointsPerOct);
   
   // Detect product curve type and extract reference SPL
@@ -573,9 +573,15 @@ export function computeRoomModesResponse({
 
       const bandwidth = f0 / qMode;
       const df = Math.abs(f - f0);
-      if (f > lowestAxial && df > 5 * bandwidth && df > 20) {
+
+      // Smooth distance taper (replaces hard skip gate)
+      const bw = Math.max(1e-6, bandwidth);
+      const x = df / (3.0 * bw);
+      const taper = 1 / (1 + Math.pow(x, 4));
+
+      // Count as "effectively skipped" if taper is negligible
+      if (taper < 0.001) {
         modesSkippedBandwidth++;
-        continue;
       }
 
       // Complex pressure contribution per sub
@@ -640,6 +646,10 @@ export function computeRoomModesResponse({
         // Complex H
         let hRe = re / denom;
         let hIm = -im / denom;
+
+        // Apply smooth distance taper
+        hRe *= taper;
+        hIm *= taper;
 
         // Weighted modal contribution: weight * H * coupling
         let cRe, cIm;
@@ -1983,8 +1993,13 @@ export function computeRoomModesResponse({
           
           const modeKey = `${mode.nx},${mode.ny},${mode.nz}`;
           
-          // Check bandwidth skip
-          if (f > lowestAxial && df > 5 * bandwidth && df > 20) {
+          // Smooth distance taper (replaces hard skip gate)
+          const bw = Math.max(1e-6, bandwidth);
+          const x = df / (3.0 * bw);
+          const taper = 1 / (1 + Math.pow(x, 4));
+          
+          // Count as "effectively skipped" if taper is negligible
+          if (taper < 0.001) {
             modesSkippedBandwidth++;
             modeTrace.push({
               modeKey,
@@ -2040,8 +2055,12 @@ export function computeRoomModesResponse({
             const re = (1 - r * r);
             const im = (r / Math.max(1e-6, qMode));
             const denom = (re * re + im * im);
-            const hRe = re / denom;
-            const hIm = -im / denom;
+            let hRe = re / denom;
+            let hIm = -im / denom;
+            
+            // Apply smooth distance taper
+            hRe *= taper;
+            hIm *= taper;
             
             const cRe = coupling * (weightRe * hRe - weightIm * hIm);
             const cIm = coupling * (weightRe * hIm + weightIm * hRe);
@@ -2068,8 +2087,11 @@ export function computeRoomModesResponse({
             continue;
           }
           
-          modesUsed++;
-          activeTermsTotal++;
+          // Only count as "used" if taper is significant
+          if (taper >= 0.001) {
+            modesUsed++;
+            activeTermsTotal++;
+          }
           
           const contribMag = Math.sqrt(totalContribRe * totalContribRe + totalContribIm * totalContribIm);
           const contribDb = 20 * Math.log10(Math.max(Number.EPSILON, contribMag));
