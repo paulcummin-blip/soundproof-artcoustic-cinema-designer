@@ -638,6 +638,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           }
           
           lastDragUpdateRef.current = now;
+          
+          // Capture the Y domain at drag start so it stays stable for the full drag
+          if (yAxisLocked) {
+            // REW locked mode: fixed +/-30 dB window around display reference
+            if (rewStyleMode && Number.isFinite(rewDisplayRefDb)) {
+              yDomainBeforeDragRef.current = [rewDisplayRefDb - 30, rewDisplayRefDb + 30];
+            }
+          }
+
+          // Also seed lastStablePlotRef at drag start if it's empty (prevents the "first drag frame" from recomputing)
+          if ((!lastStablePlotRef.current || lastStablePlotRef.current.length === 0) && plottedSeries && plottedSeries.length > 0) {
+            lastStablePlotRef.current = plottedSeries;
+          }
+          
           setIsDraggingSub(true);
           
           // Capture latest live positions for preview (no heavy sim yet)
@@ -2029,12 +2043,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewStyleMode, rewCompareView, rewRelativeView]);
 
-  // Determine final Y-axis domain to pass to graph
+  // Determine final Y-axis domain to pass to graph.
+  // Goal: while dragging + axis locked => always pass a stable [min,max] so BassGraph cannot auto-rescale.
   const finalYDomain = React.useMemo(() => {
+    // If we're not in REW style mode, keep current behaviour (no forced domain)
     if (!rewStyleMode) return undefined;
-    // REW mode: pass null so BassGraph computes from data
-    return null;
-  }, [rewStyleMode, yAxisDomain]);
+
+    // If locked + dragging: use the captured domain from drag-start
+    if (yAxisLocked && isDraggingSub) {
+      const d = yDomainBeforeDragRef.current;
+      if (Array.isArray(d) && d.length === 2 && Number.isFinite(d[0]) && Number.isFinite(d[1])) {
+        return d;
+      }
+    }
+
+    // If locked (not dragging): use the fixed window around the REW display ref
+    if (yAxisLocked && Number.isFinite(rewDisplayRefDb)) {
+      return [rewDisplayRefDb - 30, rewDisplayRefDb + 30];
+    }
+
+    // Not locked: let BassGraph auto-compute
+    return undefined;
+  }, [rewStyleMode, yAxisLocked, isDraggingSub, rewDisplayRefDb]);
 
   // PLOT INTEGRITY CHECK: Ensure clean, sorted, deduplicated data
   const cleanPlottedSeries = React.useCallback((rawSeries) => {
@@ -2073,22 +2103,50 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // Final plotted series (apply display floor + integrity cleanup)
   const plottedSeries = React.useMemo(() => {
+    // During drag: freeze the curve using the last stable plot (if we have one)
+    if (isDraggingSub && lastStablePlotRef.current && lastStablePlotRef.current.length > 0) {
+      return lastStablePlotRef.current;
+    }
+
     // Select base series
     const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
-    
+
+    // IMPORTANT: avoid referencing rewLockedMin/rewLockedMax here (it can be declared later).
+    // Derive the locked window directly from rewDisplayRefDb when needed.
+    const localLockedMin =
+      (isRewStyle && yAxisLocked && Number.isFinite(rewDisplayRefDb)) ? (rewDisplayRefDb - 30) : undefined;
+    const localLockedMax =
+      (isRewStyle && yAxisLocked && Number.isFinite(rewDisplayRefDb)) ? (rewDisplayRefDb + 30) : undefined;
+
     // Apply display conditioning (floor only, no clamping)
-    const conditioned = applyDisplayConditioningNulls(baseSeries, rewLockedMin, rewLockedMax, yAxisLocked, isRewStyle);
-    
+    const conditioned = applyDisplayConditioningNulls(
+      baseSeries,
+      localLockedMin,
+      localLockedMax,
+      yAxisLocked,
+      isRewStyle
+    );
+
     // Clean for plotting (sort, deduplicate, ensure strictly increasing)
     const cleaned = cleanPlottedSeries(conditioned);
-    
-    // Store stable plot when not dragging
+
+    // Store stable plot whenever we're NOT dragging (and also seed it the first time)
     if (!isDraggingSub && cleaned && cleaned.length > 0) {
       lastStablePlotRef.current = cleaned;
+    } else if (!lastStablePlotRef.current && cleaned && cleaned.length > 0) {
+      lastStablePlotRef.current = cleaned;
     }
-    
+
     return cleaned;
-  }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked, cleanPlottedSeries, isDraggingSub]);
+  }, [
+    isDraggingSub,
+    isRewStyle,
+    yAxisLocked,
+    rewDisplayRefDb,
+    rewFinalPlottedSeries,
+    displayData,
+    cleanPlottedSeries
+  ]);
   
   // Plot Integrity Check (runs before graph renders)
   const plotIntegrityCheck = React.useMemo(() => {

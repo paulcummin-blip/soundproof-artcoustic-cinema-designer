@@ -187,8 +187,16 @@ export default function BassGraph({
     // Determine Y-axis domain
     let finalYMin, finalYMax, finalYTicks;
 
+    // Check if yDomain is explicitly forced (valid [min, max] pair)
+    const hasForcedYDomain =
+      Array.isArray(yDomain) &&
+      yDomain.length === 2 &&
+      Number.isFinite(yDomain[0]) &&
+      Number.isFinite(yDomain[1]) &&
+      yDomain[1] > yDomain[0];
+
     // CRITICAL: If yDomain explicitly provided, use it directly, bypassing auto-calculation and snapping.
-    if (yDomain && Array.isArray(yDomain) && yDomain.length === 2 && Number.isFinite(yDomain[0]) && Number.isFinite(yDomain[1])) {
+    if (hasForcedYDomain) {
       finalYMin = yDomain[0];
       finalYMax = yDomain[1];
 
