@@ -228,22 +228,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     setAuditEpoch(v => v + 1); // Force re-simulation
   };
 
-  // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
-  const activeDebug = useMemo(() => {
-    // Skip heavy debug computation during drag (smooth performance)
-    if (isDraggingSub) return null;
-    
-    if (!rewStyleMode) return null;
-    const useRel = rewRelativeView;
-    const dbg = rewView === 'roomPlusProduct'
-      ? (useRel ? rewRoomPlusProductDataAbs?.debug : rewRoomPlusProductDataAbs?.debug)
-      : (useRel ? rewModesDataAbs?.debug : rewModesDataAbs?.debug);
-    return dbg || null;
-  }, [rewStyleMode, rewView, rewRelativeView, rewModesDataAbs, rewRoomPlusProductDataAbs, componentView, isDraggingSub]);
-  
-  // Safe default for JSX (never undefined)
-  const safeDebug = activeDebug ?? {};
-  
   // Persist SBIR and Room Modes to localStorage
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -1518,6 +1502,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Aliases switch Abs/Rel based on UI toggle
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
+
+  // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
+  const activeDebug = useMemo(() => {
+    // Skip heavy debug computation during drag (smooth performance)
+    if (isDraggingSub) return null;
+    
+    if (!rewStyleMode) return null;
+    const useRel = rewRelativeView;
+    const dbg = rewView === 'roomPlusProduct'
+      ? (useRel ? rewRoomPlusProductDataAbs?.debug : rewRoomPlusProductDataAbs?.debug)
+      : (useRel ? rewModesDataAbs?.debug : rewModesDataAbs?.debug);
+    return dbg || null;
+  }, [rewStyleMode, rewView, rewRelativeView, rewModesDataAbs, rewRoomPlusProductDataAbs, componentView, isDraggingSub]);
+  
+  // Safe default for JSX (never undefined)
+  const safeDebug = activeDebug ?? {};
 
   // Display mode gates (CRITICAL: Relative view and Display ref are mutually exclusive)
   const isRewStyle = !!rewStyleMode;
