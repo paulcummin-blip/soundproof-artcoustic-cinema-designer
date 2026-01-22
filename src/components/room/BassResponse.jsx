@@ -228,6 +228,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     setAuditEpoch(v => v + 1); // Force re-simulation
   };
 
+  // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
+  const activeDebug = useMemo(() => {
+    // Skip heavy debug computation during drag (smooth performance)
+    if (isDraggingSub) return null;
+    
+    if (!rewStyleMode) return null;
+    const useRel = rewRelativeView;
+    const dbg = rewView === 'roomPlusProduct'
+      ? (useRel ? rewRoomPlusProductDataAbs?.debug : rewRoomPlusProductDataAbs?.debug)
+      : (useRel ? rewModesDataAbs?.debug : rewModesDataAbs?.debug);
+    return dbg || null;
+  }, [rewStyleMode, rewView, rewRelativeView, rewModesDataAbs, rewRoomPlusProductDataAbs, componentView, isDraggingSub]);
+  
+  // Safe default for JSX (never undefined)
+  const safeDebug = activeDebug ?? {};
+  
   // Persist SBIR and Room Modes to localStorage
   useEffect(() => {
     if (typeof localStorage !== 'undefined') {
@@ -2070,7 +2086,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     
     // Build step pair debug (correlate jumps with term count data)
     const stepPairDebug = (() => {
-      const termCountData = activeDebug?.termCountDebug55_80Hz;
+      const termCountData = safeDebug?.termCountDebug55_80Hz;
       if (!termCountData || termCountData.length === 0 || top5Jumps.length === 0) return [];
       
       return top5Jumps.map((jump, jumpIndex) => {
@@ -2283,7 +2299,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     if (rewStyleMode) {
       // Use mode markers from the active debug payload (prevents drift)
-      return activeDebug?.modeMarkersHz || [];
+      return safeDebug?.modeMarkersHz || [];
     }
 
     // Fallback to basic axial modes for product simulation
@@ -2293,25 +2309,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       heightM: roomDims.heightM
     }, 200);
     return modes.map(m => m.fHz);
-  }, [rewStyleMode, rewModesData]);
+  }, [rewStyleMode, rewModesData, safeDebug]);
 
   // Mode markers for graph overlay (REW parity)
   const modeMarkersForGraph = useMemo(() => {
     if (!rewStyleMode) return { axial: [], tangential: [], oblique: [] };
     
-    const activeDebug = rewView === 'roomPlusProduct' && rewRoomPlusProductData?.debug
-      ? rewRoomPlusProductData.debug
-      : rewModesData?.debug;
+    if (!safeDebug?.modeMarkers) return { axial: [], tangential: [], oblique: [] };
     
-    if (!activeDebug?.modeMarkers) return { axial: [], tangential: [], oblique: [] };
-    
-    const allMarkers = activeDebug.modeMarkers || [];
+    const allMarkers = safeDebug.modeMarkers || [];
     return {
       axial: allMarkers.filter(m => m.family === 'axial'),
       tangential: allMarkers.filter(m => m.family === 'tangential'),
       oblique: allMarkers.filter(m => m.family === 'oblique')
     };
-  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData]);
+  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, safeDebug]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
@@ -3066,8 +3078,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
 
-        {/* REW Parity Validator (only when REW Compare is ON) */}
-        {rewCompareView && rewStyleMode && (
+        {/* REW Parity Validator (only when REW Compare is ON and NOT dragging) */}
+        {rewCompareView && rewStyleMode && !isDraggingSub && (
           <div className="mb-4 space-y-3">
             <RewParityValidator
               b44Series={plottedSeries}
@@ -3097,15 +3109,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div>• Absolute SPL mode (30–80 Hz → 85 dB reference)</div>
                 <div>• RefDb (median 30–80): {refDbDisplay} dB</div>
                 <div>• Y window: 65–105 dB (fixed for comparison)</div>
-                <div className="text-[9px] opacity-70 mt-1">Engine SPL range (raw): {activeDebug?.splMinDb || '—'} to {activeDebug?.splMaxDb || '—'} dB</div>
+                <div className="text-[9px] opacity-70 mt-1">Engine SPL range (raw): {safeDebug?.splMinDb || '—'} to {safeDebug?.splMaxDb || '—'} dB</div>
                 <div className="text-[9px] opacity-70">Display SPL range: {(() => {
                   const finite = displayData.filter(d => Number.isFinite(d.spl)).map(d => d.spl);
                   if (finite.length === 0) return 'N/A';
                   return `${Math.min(...finite).toFixed(1)} to ${Math.max(...finite).toFixed(1)} dB`;
                 })()}</div>
                 <div className="text-[9px] opacity-70 text-purple-700 font-semibold mt-1">
-                  LF delta (25→69 Hz): {activeDebug?.lfProbe?.lfDelta_25_69 || 'N/A'} dB | 
-                  Upper-bass delta (69→120 Hz): {activeDebug?.lfProbe?.upperBassDelta_69_120 || 'N/A'} dB
+                  LF delta (25→69 Hz): {safeDebug?.lfProbe?.lfDelta_25_69 || 'N/A'} dB | 
+                  Upper-bass delta (69→120 Hz): {safeDebug?.lfProbe?.upperBassDelta_69_120 || 'N/A'} dB
                 </div>
                 {rewCompareBaselineRef.current && (
                   <div className="text-[9px] opacity-70 mt-1 pt-1 border-t border-blue-200">
@@ -3139,13 +3151,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* LF Probe Raw (only when debug enabled) */}
         {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
-          if (!activeDebug?.lfProbeRaw) return null;
+          if (!safeDebug?.lfProbeRaw) return null;
 
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-orange-50 p-2 rounded border border-orange-300">
               <div className="font-semibold mb-1 text-orange-700">LF Probe Raw (Pre-smoothing)</div>
               <div className="text-[9px] space-y-0.5 font-mono">
-                {activeDebug.lfProbeRaw.map((probe, i) => (
+                {safeDebug.lfProbeRaw.map((probe, i) => (
                   <div key={i}>
                     {probe.freq} Hz: blended={probe.blendedMagDb_pre} (w={probe.w}, direct={probe.directMagDb_pre}, modal={probe.scaledModalMagDb_pre})
                   </div>
@@ -3390,15 +3402,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* SBIR debug info */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
-          if (!activeDebug?.sbirEnabled) return null;
+        if (!safeDebug?.sbirEnabled) return null;
 
-          const probe40 = activeDebug?.sbirDebugProbe40Hz;
-          const probe63 = (activeDebug && activeDebug.sbirDebugProbe63Hz) ? activeDebug.sbirDebugProbe63Hz : null;
+        const probe40 = safeDebug?.sbirDebugProbe40Hz;
+        const probe63 = (safeDebug && safeDebug.sbirDebugProbe63Hz) ? safeDebug.sbirDebugProbe63Hz : null;
 
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
               <div className="font-semibold mb-1 text-blue-700">
-                SBIR: {activeDebug.sbirEnabled ? 'ON' : 'OFF'}, order={activeDebug.sbirMaxOrder || 2}
+                SBIR: {safeDebug.sbirEnabled ? 'ON' : 'OFF'}, order={safeDebug.sbirMaxOrder || 2}
                 {sbirDebugSingleFrontWall && <span className="ml-2 text-red-600 font-bold">— DIAGNOSTIC: FRONT WALL ONLY</span>}
               </div>
               {probe40 && (
@@ -3461,7 +3473,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* LF Movement Probe (spatial coupling verification) */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
-          const movementProbe = activeDebug?.lfMovementProbe;
+          const movementProbe = safeDebug?.lfMovementProbe;
           if (!movementProbe || Object.keys(movementProbe).length === 0) return null;
 
           return (
@@ -3485,7 +3497,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Per-mode contributions (phase debug) */}
         {rewStyleMode && !modalOnlyDebugView && (() => {
-          const modeContribs = activeDebug?.modeContributions;
+          const modeContribs = safeDebug?.modeContributions;
           if (!modeContribs || Object.keys(modeContribs).length === 0) return null;
 
           // Get seat and source for eigenfunction debug
@@ -3566,7 +3578,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   </div>
                 ))}
               </div>
-              {activeDebug?.phaseCheckAvailable && (
+              {safeDebug?.phaseCheckAvailable && (
                 <div className="text-[9px] mt-1 pt-1 border-t border-purple-200">
                   Phase check at 34 Hz available in console: <code>globalThis.__B44_PHASE_CHECK</code>
                 </div>
@@ -3577,7 +3589,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Coupling Phase Probe (Part HB - verify complex eigenfunctions) */}
         {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (() => {
-          const modeList = activeDebug?.modeListFirst60;
+          const modeList = safeDebug?.modeListFirst60;
           if (!modeList || modeList.length === 0 || subsForSimulation.length === 0) return null;
           
           const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
@@ -3735,7 +3747,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Per-Mode Excitation Diagnostic (Part G - DIAGNOSTIC OVERLAY) */}
         {rewStyleMode && showModeExcitationDiag && (() => {
-          const modeList = activeDebug?.modeListFirst60;
+          const modeList = safeDebug?.modeListFirst60;
           if (!modeList || modeList.length === 0 || subsForSimulation.length === 0) return null;
           
           const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
@@ -3837,7 +3849,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         {/* Mode list (first 30) - REW parity check */}
         {rewStyleMode && (() => {
-          const modeList = activeDebug?.modeListFirst60;
+          const modeList = safeDebug?.modeListFirst60;
           if (!modeList || modeList.length === 0) return null;
 
           const first30 = modeList.slice(0, 30);
@@ -3856,7 +3868,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 )}
               </div>
               <div className="text-[9px] font-mono opacity-80 mb-1">
-                <strong>Modes:</strong> {activeDebug.modeCount || 0} total
+                <strong>Modes:</strong> {safeDebug.modeCount || 0} total
               </div>
               <div className="text-[9px] font-mono space-y-0.5 max-h-32 overflow-y-auto">
                 {first30.map((mode, i) => (
@@ -3873,12 +3885,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         {/* LF Lock Diagnostic (key frequency values) */}
         {rewStyleMode && (() => {
           const probeFreqs = [20, 30, 40, 50, 63];
-          const lowestAxial = activeDebug?.lowestAxialHz || 0;
+          const lowestAxial = safeDebug?.lowestAxialHz || 0;
           
           // --- Degenerate lowest-axial detection (square-room friendly) ---
           const LOWEST_AXIAL_EPS_HZ = 0.25; // tolerance for "same" frequency in degenerate rooms
           
-          const modes = activeDebug?.modeListFirst60 || [];
+          const modes = safeDebug?.modeListFirst60 || [];
           const lowestAxialModes = Array.isArray(modes)
             ? modes.filter((m) => {
                 if (!m || m.type !== "axial") return false;
@@ -3904,7 +3916,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             return bestI;
           };
           
-          const engineFreqs = activeDebug?.freqs || rewModesDataAbs?.freqs || [];
+          const engineFreqs = safeDebug?.freqs || rewModesDataAbs?.freqs || [];
           
           const probeData = probeFreqs.map(fProbe => {
             const binI = nearestFreqIndex(engineFreqs, fProbe);
@@ -3918,8 +3930,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               binI: binI,
               actualFreqHz: actualFreqHz,
               engineFinal: rewModesDataAbs?.splDb?.[binI],
-              schroeder: activeDebug?.splDbSchroeder?.[binI],
-              repaired: activeDebug?.splDbRepaired?.[binI],
+              schroeder: safeDebug?.splDbSchroeder?.[binI],
+              repaired: safeDebug?.splDbRepaired?.[binI],
               plotted: plotIdx >= 0 ? displayData[plotIdx]?.spl : null
             };
           }).filter(Boolean);
@@ -4046,8 +4058,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         {rewStyleMode && !modalOnlyDebugView && (() => {
           // Degenerate lowest-axial detection (same as LF Lock Diagnostic)
           const LOWEST_AXIAL_EPS_HZ = 0.25;
-          const lowestAxial = activeDebug?.lowestAxialHz || 0;
-          const modeListFirst60 = activeDebug?.modeListFirst60 || [];
+          const lowestAxial = safeDebug?.lowestAxialHz || 0;
+          const modeListFirst60 = safeDebug?.modeListFirst60 || [];
           
           const lowestAxialModes = Array.isArray(modeListFirst60)
             ? modeListFirst60.filter((m) => {
@@ -4134,9 +4146,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             : 'N/A';
           
           // Frequency grid diagnostics
-          const gridPointCount = activeDebug?.freqGridPointCount || 0;
-          const gridMin = activeDebug?.freqGridMin;
-          const gridMax = activeDebug?.freqGridMax;
+          const gridPointCount = safeDebug?.freqGridPointCount || 0;
+          const gridMin = safeDebug?.freqGridMin;
+          const gridMax = safeDebug?.freqGridMax;
           
           // Check for duplicate frequencies in plotted series
           const freqs = plottedSeries.map(p => p.frequency).filter(f => Number.isFinite(f));
@@ -4148,17 +4160,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
-              <div className="font-semibold mb-1">
-                {rewView === 'roomPlusProduct' ? 'Room + Product' : 'Room-only (generic sub)'}
-              </div>
-              <div className="text-[11px] space-y-1">
-                <div>• Complex modal summation with spatial coupling</div>
-                <div>• {activeDebug?.qMappingText || 'Q-based damping'}</div>
-                <div>• Schroeder: <strong>{schroederDisplay}</strong></div>
-                <div>• {rewRelativeView ? 'Relative (normalized to 0 dB @ 30–80 Hz)' : 'Absolute SPL'} scale</div>
-                {rewView === 'roomPlusProduct' && (
-                  <div>• Product curves: {(activeDebug?.productModels || []).join(', ') || 'None'}</div>
-                )}
+            <div className="font-semibold mb-1">
+            {rewView === 'roomPlusProduct' ? 'Room + Product' : 'Room-only (generic sub)'}
+            </div>
+            <div className="text-[11px] space-y-1">
+            <div>• Complex modal summation with spatial coupling</div>
+            <div>• {safeDebug?.qMappingText || 'Q-based damping'}</div>
+            <div>• Schroeder: <strong>{schroederDisplay}</strong></div>
+            <div>• {rewRelativeView ? 'Relative (normalized to 0 dB @ 30–80 Hz)' : 'Absolute SPL'} scale</div>
+            {rewView === 'roomPlusProduct' && (
+            <div>• Product curves: {(safeDebug?.productModels || []).join(', ') || 'None'}</div>
+            )}
               </div>
               
               {/* Frequency grid diagnostics */}
@@ -4216,15 +4228,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </div>
               
               {/* Acceptance Tests Display */}
-              {activeDebug?.acceptanceTests && (
+              {safeDebug?.acceptanceTests && (
                 <div className="mt-2 pt-2 border-t border-[#C1B6AD] space-y-0.5 text-[10px] font-mono bg-green-50 p-2 rounded">
                   <div className="font-semibold text-green-700 mb-1">REW Parity Acceptance Tests:</div>
-                  <div>1. Hover sweep test: {activeDebug.acceptanceTests.hoverSweepTest}</div>
-                  <div>2. No duplicate X test: {activeDebug.acceptanceTests.duplicateXTest}</div>
-                  <div>3. Stair/step test: {activeDebug.acceptanceTests.stairStepTest}</div>
+                  <div>1. Hover sweep test: {safeDebug.acceptanceTests.hoverSweepTest}</div>
+                  <div>2. No duplicate X test: {safeDebug.acceptanceTests.duplicateXTest}</div>
+                  <div>3. Stair/step test: {safeDebug.acceptanceTests.stairStepTest}</div>
                   <div className="text-[9px] opacity-70 mt-1">
-                    Point count: {activeDebug.acceptanceTests.pointCount} | 
-                    Min Δf: {activeDebug.acceptanceTests.minDeltaF} Hz
+                    Point count: {safeDebug.acceptanceTests.pointCount} | 
+                    Min Δf: {safeDebug.acceptanceTests.minDeltaF} Hz
                   </div>
                 </div>
               )}
@@ -4255,16 +4267,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <strong>SeatSig:</strong> {activeDebug?.seatSigUsed || 'N/A'}
                 </div>
                 <div className="text-[10px] font-mono opacity-80">
-                  <strong>Lowest axial:</strong> {Number.isFinite(activeDebug?.lowestAxialHz) ? activeDebug.lowestAxialHz.toFixed(1) : '—'} Hz
+                  <strong>Lowest axial:</strong> {Number.isFinite(safeDebug?.lowestAxialHz) ? safeDebug.lowestAxialHz.toFixed(1) : '—'} Hz
                 </div>
-                {activeDebug?.modeCouplingSanity && (
+                {safeDebug?.modeCouplingSanity && (
                   <div className="text-[10px] font-mono opacity-80 bg-yellow-100 px-1 rounded">
-                    <strong>ModeCoupling (1,0,0):</strong> seat={fmtFixed(activeDebug.modeCouplingSanity.seatShape_100, 3)} src={fmtFixed(activeDebug.modeCouplingSanity.srcShape_100, 3)} cpl={fmtFixed(activeDebug.modeCouplingSanity.coupling_100, 3)}
+                    <strong>ModeCoupling (1,0,0):</strong> seat={fmtFixed(safeDebug.modeCouplingSanity.seatShape_100, 3)} src={fmtFixed(safeDebug.modeCouplingSanity.srcShape_100, 3)} cpl={fmtFixed(safeDebug.modeCouplingSanity.coupling_100, 3)}
                   </div>
                 )}
-                {activeDebug?.lfProbe?.lfSanityCheck && (
-                  <div className={`text-[10px] font-mono opacity-80 ${activeDebug.lfProbe.lfSanityCheck.startsWith('FAIL') ? 'text-red-600 font-bold' : 'text-green-600'}`}>
-                    <strong>LF Sanity:</strong> {activeDebug.lfProbe.lfSanityCheck}
+                {safeDebug?.lfProbe?.lfSanityCheck && (
+                  <div className={`text-[10px] font-mono opacity-80 ${safeDebug.lfProbe.lfSanityCheck.startsWith('FAIL') ? 'text-red-600 font-bold' : 'text-green-600'}`}>
+                    <strong>LF Sanity:</strong> {safeDebug.lfProbe.lfSanityCheck}
                   </div>
                 )}
                 {(() => {
@@ -4351,10 +4363,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       <strong>Schroeder blend:</strong> {activeDebug.blendStartHz} Hz → {activeDebug.blendEndHz} Hz (null-preserving)
                     </div>
                   )}
-                  {activeDebug?.lfProbe?.measurements && (
+                  {safeDebug?.lfProbe?.measurements && (
                     <div className="text-[10px] font-mono opacity-80 text-purple-700 mt-1 pt-1 border-t border-purple-200">
                       <strong>LF Probe (Hz → SPL + Pressure Gain):</strong><br/>
-                      {activeDebug.lfProbe.measurements.map((m, i) => (
+                      {safeDebug.lfProbe.measurements.map((m, i) => (
                         <div key={i}>
                           {m.freq} Hz: {m.finalDbAfterCal || m.rawDbBeforeCal || 'N/A'} dB
                           {m.pressureGainDb && Number(m.pressureGainDb) > 0 && (
@@ -4366,50 +4378,50 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       {activeDebug.lfProbe.pressureGainSettings && (
                         <div className="text-[9px] opacity-70 mt-1">
                           Pressure: {activeDebug.lfProbe.pressureGainSettings.enabled ? 'ON' : 'OFF'} 
-                          (k={activeDebug.lfProbe.pressureGainSettings.kDbPerOct} dB/oct, 
-                          max={activeDebug.lfProbe.pressureGainSettings.maxGainDb} dB)
+                          (k={safeDebug.lfProbe.pressureGainSettings.kDbPerOct} dB/oct, 
+                          max={safeDebug.lfProbe.pressureGainSettings.maxGainDb} dB)
                         </div>
                       )}
                     </div>
                   )}
-                  {activeDebug.lfDebug15_45Hz && (
+                  {safeDebug.lfDebug15_45Hz && (
                     <div className="text-[10px] font-mono opacity-80 text-green-700 mt-1 pt-1 border-t border-green-200">
                       <strong>LF Debug (15-45 Hz):</strong><br/>
-                      Direct: {activeDebug.lfDebug15_45Hz.directMagDb} dB<br/>
-                      Modal: {activeDebug.lfDebug15_45Hz.modalMagDb} dB<br/>
-                      Blended: {activeDebug.lfDebug15_45Hz.blendedMagDb} dB<br/>
-                      <span className="text-[9px] opacity-70">{activeDebug.lfDebug15_45Hz.note}</span>
+                      Direct: {safeDebug.lfDebug15_45Hz.directMagDb} dB<br/>
+                      Modal: {safeDebug.lfDebug15_45Hz.modalMagDb} dB<br/>
+                      Blended: {safeDebug.lfDebug15_45Hz.blendedMagDb} dB<br/>
+                      <span className="text-[9px] opacity-70">{safeDebug.lfDebug15_45Hz.note}</span>
                     </div>
                   )}
-                  {activeDebug.productCurveStats && activeDebug.productCurveStats.length > 0 && (
+                  {safeDebug.productCurveStats && safeDebug.productCurveStats.length > 0 && (
                     <div className="text-[10px] font-mono opacity-80 text-blue-700">
                       <strong>Product curve stats:</strong><br/>
-                      {activeDebug.productCurveStats.map((stat, i) => (
+                      {safeDebug.productCurveStats.map((stat, i) => (
                         <div key={i}>
                           Sub {stat.subIndex}: min={stat.productMinDb} dB, max={stat.productMaxDb} dB, @50Hz={stat.productAt50HzDb} dB
                         </div>
                       ))}
-                    </div>
-                  )}
-                {activeDebug?.scaleWarning && (
-                  <div className="text-[10px] font-mono opacity-80 text-yellow-700">
-                    <strong>Warning:</strong> {activeDebug.scaleWarning}
-                  </div>
-                )}
-                {activeDebug?.productNote && (
-                  <div className="text-[10px] font-mono opacity-80 text-yellow-700">
-                    <strong>Note:</strong> {activeDebug.productNote}
-                  </div>
-                )}
+                      </div>
+                      )}
+                      {safeDebug?.scaleWarning && (
+                      <div className="text-[10px] font-mono opacity-80 text-yellow-700">
+                      <strong>Warning:</strong> {safeDebug.scaleWarning}
+                      </div>
+                      )}
+                      {safeDebug?.productNote && (
+                      <div className="text-[10px] font-mono opacity-80 text-yellow-700">
+                      <strong>Note:</strong> {safeDebug.productNote}
+                      </div>
+                      )}
                 
                 {/* LF Replace Detection and Sub Movement Test */}
                 <div className="text-[10px] font-mono opacity-80 mt-1 pt-1 border-t border-[#DCDBD6]">
-                  <div><strong>lowestAxialHz:</strong> {Number.isFinite(activeDebug?.lowestAxialHz) ? activeDebug.lowestAxialHz.toFixed(2) : 'N/A'} Hz</div>
-                  <div><strong>LF replace active:</strong> {activeDebug?.lfPressureRiseApplied === 'YES (6 dB/oct, max +12 dB)' ? 'NO (gain term only)' : 'NO'}</div>
+                  <div><strong>lowestAxialHz:</strong> {Number.isFinite(safeDebug?.lowestAxialHz) ? safeDebug.lowestAxialHz.toFixed(2) : 'N/A'} Hz</div>
+                  <div><strong>LF replace active:</strong> {safeDebug?.lfPressureRiseApplied === 'YES (6 dB/oct, max +12 dB)' ? 'NO (gain term only)' : 'NO'}</div>
                   {(() => {
                     // Compute sub movement delta below lowestAxialHz
-                    const lowestAxial = activeDebug?.lowestAxialHz;
-                    if (!Number.isFinite(lowestAxial) || !activeDebug?.acceptanceTests) {
+                    const lowestAxial = safeDebug?.lowestAxialHz;
+                    if (!Number.isFinite(lowestAxial) || !safeDebug?.acceptanceTests) {
                       return <div><strong>Below lowestAxialHz Δ:</strong> N/A (no axial modes)</div>;
                     }
                     
@@ -4591,8 +4603,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         )}
 
         {/* Parity Audit Readout (raw coherent vs final plotted) */}
-        {rewStyleMode && activeDebug?.parityAudits?.modalPlusSbir && (() => {
-          const audit = activeDebug.parityAudits.modalPlusSbir;
+        {rewStyleMode && safeDebug?.parityAudits?.modalPlusSbir && (() => {
+          const audit = safeDebug.parityAudits.modalPlusSbir;
           const raw = audit.raw;
           const final = audit.final;
           const deltaShrink = audit.deltaShrinkDb_40_70;
@@ -4732,7 +4744,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         {/* Mode isolation plot source debug (Part C2 - prove isolation drives plot) */}
         {rewStyleMode && (() => {
           const isolationActive = modeIsolation !== 'off';
-          const modeCountUsed = activeDebug?.modalModeCountUsed || activeDebug?.modeCount || 0;
+          const modeCountUsed = safeDebug?.modalModeCountUsed || safeDebug?.modeCount || 0;
 
           // Determine exact data array being plotted
           const plotDataSource = rewView === 'roomPlusProduct' 
@@ -4753,19 +4765,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="mt-1 pt-1 border-t border-purple-300 font-semibold">
                 Component RMS 20–200 Hz:
               </div>
-              <div>Modal RMS: <strong>{activeDebug?.modalRmsDb_20_200 || '—'} dB</strong></div>
-              <div>SBIR RMS: <strong>{activeDebug?.sbirRmsDb_20_200 || '—'} dB</strong></div>
-              <div>Total RMS: <strong>{activeDebug?.totalRmsDb_20_200 || '—'} dB</strong></div>
+              <div>Modal RMS: <strong>{safeDebug?.modalRmsDb_20_200 || '—'} dB</strong></div>
+              <div>SBIR RMS: <strong>{safeDebug?.sbirRmsDb_20_200 || '—'} dB</strong></div>
+              <div>Total RMS: <strong>{safeDebug?.totalRmsDb_20_200 || '—'} dB</strong></div>
               <div className="text-[9px] opacity-70 mt-1 border-t border-purple-300 pt-1">
                 <strong>UI componentView:</strong> {componentView}
               </div>
               <div className="text-[9px] opacity-70">
-                <strong>Engine componentView:</strong> {activeDebug?.componentView || 'N/A'}
+                <strong>Engine componentView:</strong> {safeDebug?.componentView || 'N/A'}
               </div>
-              {activeDebug?.subDistancesToMLP && (
+              {safeDebug?.subDistancesToMLP && (
                 <div className="text-[9px] opacity-70 mt-1 border-t border-purple-300 pt-1">
                   <strong>Sub distances + effective delays:</strong><br/>
-                  {activeDebug.subDistancesToMLP.map((sub, i) => (
+                  {safeDebug.subDistancesToMLP.map((sub, i) => (
                     <div key={i}>
                       {sub.subId}: {sub.distanceM}m, delay={sub.effectiveDelayMs}ms
                     </div>
@@ -4796,25 +4808,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               
               {/* Visibility guarantee */}
               <div className="text-[10px] font-mono text-gray-600">
-                StepJump present: {String(!!activeDebug?.stepJumpInspector55_90)}
+                StepJump present: {String(!!safeDebug?.stepJumpInspector55_90)}
               </div>
               
               {/* Step Jump Inspector (55–90 Hz) */}
-              {activeDebug?.stepJumpInspector55_90 && (
+              {safeDebug?.stepJumpInspector55_90 && (
                 <div style={{ marginTop: 10, padding: 12, border: "1px solid #cfe3ff", borderRadius: 8, background: "#f0f9ff" }}>
                   <div style={{ fontWeight: 700, marginBottom: 8, color: "#1e40af" }}>Step Jump Inspector (55–90 Hz)</div>
 
-                  {activeDebug.stepJumpInspector55_90.summary ? (
+                  {safeDebug.stepJumpInspector55_90.summary ? (
                     <>
                       <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap", fontSize: 11, marginBottom: 8 }}>
-                        {`Max jump: ${activeDebug.stepJumpInspector55_90.summary.jumpDb.toFixed(3)} dB
-${activeDebug.stepJumpInspector55_90.summary.f0.toFixed(2)} Hz → ${activeDebug.stepJumpInspector55_90.summary.f1.toFixed(2)} Hz
-${activeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${activeDebug.stepJumpInspector55_90.summary.y1.toFixed(2)} dB`}
+                        {`Max jump: ${safeDebug.stepJumpInspector55_90.summary.jumpDb.toFixed(3)} dB
+${safeDebug.stepJumpInspector55_90.summary.f0.toFixed(2)} Hz → ${safeDebug.stepJumpInspector55_90.summary.f1.toFixed(2)} Hz
+${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.stepJumpInspector55_90.summary.y1.toFixed(2)} dB`}
                       </div>
 
                       {/* Mode-level trace (when available) */}
-                      {activeDebug.stepJumpInspector55_90.trace && (() => {
-                        const trace = activeDebug.stepJumpInspector55_90.trace;
+                      {safeDebug.stepJumpInspector55_90.trace && (() => {
+                        const trace = safeDebug.stepJumpInspector55_90.trace;
                         const diff = trace.diff;
                         
                         if (!diff) return null;
@@ -4917,7 +4929,7 @@ ${activeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${activeDebug
                       <div style={{ height: 8 }} />
 
                       <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap", fontSize: 9 }}>
-                        {JSON.stringify(activeDebug.stepJumpInspector55_90.rows, null, 2)}
+                        {JSON.stringify(safeDebug.stepJumpInspector55_90.rows, null, 2)}
                       </div>
                     </>
                   ) : (
@@ -4982,8 +4994,8 @@ ${activeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${activeDebug
                 </div>
                 
                 {/* Step Drilldown (Top jumps) - uses engineTrace from room modes engine */}
-                {activeDebug?.engineTrace && plotIntegrityCheck.top5Jumps && plotIntegrityCheck.top5Jumps.length > 0 && (() => {
-                  const engineTrace = activeDebug.engineTrace;
+                {safeDebug?.engineTrace && plotIntegrityCheck.top5Jumps && plotIntegrityCheck.top5Jumps.length > 0 && (() => {
+                  const engineTrace = safeDebug.engineTrace;
                   const jumps = plotIntegrityCheck.top5Jumps.slice(0, 5);
                   
                   // Helper: find nearest engineTrace row by frequency
@@ -5172,15 +5184,15 @@ ${activeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${activeDebug
                 })()}
                 
                 {/* Term Count Debug (55-80 Hz band) */}
-                {activeDebug?.termCountDebug55_80Hz && activeDebug.termCountDebug55_80Hz.length > 0 && (
+                {safeDebug?.termCountDebug55_80Hz && safeDebug.termCountDebug55_80Hz.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-blue-300">
                     <div className="font-semibold text-purple-700 mb-1">Term Count Debug (55–80 Hz):</div>
                     <div className="text-[9px] font-mono space-y-0.5 max-h-48 overflow-y-auto">
-                      {activeDebug.termCountDebug55_80Hz.slice(0, 20).map((entry, i) => (
+                      {safeDebug.termCountDebug55_80Hz.slice(0, 20).map((entry, i) => (
                         <div key={i} className={
                           i > 0 && (
-                            entry.modesUsed !== activeDebug.termCountDebug55_80Hz[i-1].modesUsed ||
-                            entry.sbirReflectionsUsed !== activeDebug.termCountDebug55_80Hz[i-1].sbirReflectionsUsed
+                            entry.modesUsed !== safeDebug.termCountDebug55_80Hz[i-1].modesUsed ||
+                            entry.sbirReflectionsUsed !== safeDebug.termCountDebug55_80Hz[i-1].sbirReflectionsUsed
                           ) ? 'text-red-600 font-bold' : 'text-gray-700'
                         }>
                           {entry.exactFreqHz.toFixed(3)} Hz: 
@@ -5190,9 +5202,9 @@ ${activeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${activeDebug
                           total={entry.activeTermsTotal}
                         </div>
                       ))}
-                      {activeDebug.termCountDebug55_80Hz.length > 20 && (
+                      {safeDebug.termCountDebug55_80Hz.length > 20 && (
                         <div className="text-gray-500 italic">
-                          ... ({activeDebug.termCountDebug55_80Hz.length - 20} more)
+                          ... ({safeDebug.termCountDebug55_80Hz.length - 20} more)
                         </div>
                       )}
                     </div>
@@ -5308,8 +5320,8 @@ ${activeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${activeDebug
               </div>
               <div>
                 <strong>plottedSeriesName:</strong> {(() => {
-                  if (activeDebug?.componentView) {
-                    return activeDebug.componentView;
+                  if (safeDebug?.componentView) {
+                    return safeDebug.componentView;
                   }
                   if (rewStyleMode) {
                     return `REW-${rewView}-${componentView}`;
@@ -5319,11 +5331,11 @@ ${activeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${activeDebug
               </div>
               <div>
                 <strong>sbirPathsUsed:</strong> {(() => {
-                  if (activeDebug?.sbirDebugProbe63Hz?.pathsUsed) {
-                    return activeDebug.sbirDebugProbe63Hz.pathsUsed;
+                  if (safeDebug?.sbirDebugProbe63Hz?.pathsUsed) {
+                    return safeDebug.sbirDebugProbe63Hz.pathsUsed;
                   }
-                  if (activeDebug?.sbirDebugProbe40Hz?.pathsUsed) {
-                    return activeDebug.sbirDebugProbe40Hz.pathsUsed;
+                  if (safeDebug?.sbirDebugProbe40Hz?.pathsUsed) {
+                    return safeDebug.sbirDebugProbe40Hz.pathsUsed;
                   }
                   return "N/A";
                 })()}
