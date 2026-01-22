@@ -609,12 +609,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         if (dragging) {
           // Drag start: capture Y-axis state (must capture the REAL locked domain, not yAxisDomain)
           if (!isDraggingSub) {
-            // Capture the *actual* locked Y window used by the graph (REW display ref ±30)
-            // IMPORTANT: yAxisDomain is always null in REW mode, so do NOT capture it.
-            yDomainBeforeDragRef.current =
-              (Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax))
-                ? [rewLockedMin, rewLockedMax]
-                : null;
+            // Capture the locked REW window from the current display ref (±30 dB).
+            // We must NOT reference rewLockedMin/rewLockedMax here because they are declared later in the file.
+            const refDb = Number(rewDisplayRefDb) || 90;
+            yDomainBeforeDragRef.current = [refDb - 30, refDb + 30];
 
             yAxisLockedBeforeDragRef.current = yAxisLocked;
             setYAxisLocked(true);
@@ -686,7 +684,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       if (dragThrottleTimerRef.current) clearTimeout(dragThrottleTimerRef.current);
       if (dragSettleTimerRef.current) clearTimeout(dragSettleTimerRef.current);
     };
-  }, [isDraggingSub, yAxisLocked, rewLockedMin, rewLockedMax, frontSubsLive, rearSubsLive]);
+  }, [isDraggingSub, yAxisLocked, rewDisplayRefDb, frontSubsLive, rearSubsLive]);
   
   // Audit curve (no smoothing, no normalization) for sensitivity testing
   const rewModesDataAudit = useMemo(() => {
