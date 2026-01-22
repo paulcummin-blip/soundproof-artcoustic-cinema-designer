@@ -442,7 +442,14 @@ export function computeRoomModesResponse({
           
           const bandwidth = f0 / qMode;
           const df = Math.abs(f - f0);
-          if (f > lowestAxial && df > 5 * bandwidth && df > 20) continue;
+          
+          // Smooth distance taper (replaces hard skip gate)
+          const bw = Math.max(1e-6, bandwidth);
+          const x = df / (3.0 * bw);
+          const taper = 1 / (1 + Math.pow(x, 4));
+          
+          // Skip if taper is negligible
+          if (taper < 0.001) continue;
           
           const source = soloSource[0];
           const coupling = computeSpatialCoupling(mode, source, seat, room);
@@ -464,6 +471,10 @@ export function computeRoomModesResponse({
           const denom = (re * re + im * im);
           let hRe = re / denom;
           let hIm = -im / denom;
+          
+          // Apply smooth distance taper
+          hRe *= taper;
+          hIm *= taper;
           
           // No delay, no polarity for calibration
           const weightMag = productMagScale;
