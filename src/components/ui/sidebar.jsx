@@ -11,7 +11,7 @@ const Slot = ({ children, ...props }) => {
 };
 import { PanelLeft } from "lucide-react"
 
-import { useIsMobile } from "@/hooks/use-mobile"
+import { useMobile } from "@/components/hooks/use-mobile"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -55,7 +55,7 @@ const SidebarProvider = React.forwardRef((
   },
   ref
 ) => {
-  const isMobile = useIsMobile()
+  const isMobile = useMobile()
   const [openMobile, setOpenMobile] = React.useState(false)
 
   // This is the internal state of the sidebar.
