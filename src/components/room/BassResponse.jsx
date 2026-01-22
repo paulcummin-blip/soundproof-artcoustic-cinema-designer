@@ -2073,13 +2073,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [rewStyleMode, rewCompareView, rewRelativeView]);
 
   const finalYDomain = React.useMemo(() => {
-    // During drag: ALWAYS use dragYDomain (state), never fall back to ref
     if (isDraggingSub) {
-      if (Array.isArray(dragYDomain) && dragYDomain.length === 2 && Number.isFinite(dragYDomain[0]) && Number.isFinite(dragYDomain[1])) {
-        return dragYDomain;
-      }
-      // No fallback jump: stay undefined and let BassGraph keep last domain (see BassGraph change)
-      return undefined;
+      const d = dragYDomain;
+      if (Array.isArray(d) && d.length === 2 && Number.isFinite(d[0]) && Number.isFinite(d[1])) return d;
+      return undefined; // IMPORTANT: do not force a random fallback window
     }
 
     // Not dragging: normal behaviour (locked REW window)

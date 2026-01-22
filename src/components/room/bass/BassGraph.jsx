@@ -59,7 +59,7 @@ export default function BassGraph({
   refDb = 85,
   disableHighlight = false
 }) {
-    const lastYDomainRef = React.useRef(null);
+    const lastValidYDomainRef = React.useRef(null);
     let data = responseData;
     
     // Build chart data: REW mode = one true series (ZERO processing), non-REW = good/bad split
@@ -194,44 +194,29 @@ export default function BassGraph({
       Number.isFinite(yDomain[0]) &&
       Number.isFinite(yDomain[1]);
 
-    // External domain wins
+    // Cache last valid domain so the axis cannot jump if parent misses one frame
     if (hasExternalYDomain) {
-      finalYMin = yDomain[0];
-      finalYMax = yDomain[1];
-      lastYDomainRef.current = [finalYMin, finalYMax];
+      lastValidYDomainRef.current = [yDomain[0], yDomain[1]];
+    }
+
+    const cached = lastValidYDomainRef.current;
+    const hasCached =
+      Array.isArray(cached) &&
+      cached.length === 2 &&
+      Number.isFinite(cached[0]) &&
+      Number.isFinite(cached[1]);
+
+    if (hasExternalYDomain || hasCached) {
+      const d = hasExternalYDomain ? yDomain : cached;
+      finalYMin = d[0];
+      finalYMax = d[1];
 
       // Generate simple ticks based on the provided yDomain
       const domainSpan = finalYMax - finalYMin;
-      let step = 10; 
-      if (domainSpan <= 30) {
-        step = 5;
-      } else if (domainSpan <= 60) {
-        step = 10;
-      } else {
-        step = 20;
-      }
-
-      const ticks = [];
-      for (let i = Math.floor(finalYMin / step) * step; i <= Math.ceil(finalYMax / step) * step; i += step) {
-        ticks.push(i);
-      }
-      finalYTicks = ticks;
-
-    } else if (lastYDomainRef.current) {
-      // Hold last domain (prevents jump on first drag frame when parent passes undefined)
-      finalYMin = lastYDomainRef.current[0];
-      finalYMax = lastYDomainRef.current[1];
-
-      // Generate ticks based on held domain
-      const domainSpan = finalYMax - finalYMin;
       let step = 10;
-      if (domainSpan <= 30) {
-        step = 5;
-      } else if (domainSpan <= 60) {
-        step = 10;
-      } else {
-        step = 20;
-      }
+      if (domainSpan <= 30) step = 5;
+      else if (domainSpan <= 60) step = 10;
+      else step = 20;
 
       const ticks = [];
       for (let i = Math.floor(finalYMin / step) * step; i <= Math.ceil(finalYMax / step) * step; i += step) {
