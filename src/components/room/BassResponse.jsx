@@ -1980,6 +1980,73 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       .sort((a, b) => b.absJumpDb - a.absJumpDb)
       .slice(0, 5);
     
+    // Build step pair debug (correlate jumps with term count data)
+    const stepPairDebug = (() => {
+      const termCountData = activeDebug?.termCountDebug55_80Hz;
+      if (!termCountData || termCountData.length === 0 || top5Jumps.length === 0) return [];
+      
+      return top5Jumps.map((jump, jumpIndex) => {
+        const f1Hz = jump.hzPrev;
+        const f2Hz = jump.hzNow;
+        const spl1 = jump.dbPrev;
+        const spl2 = jump.dbNow;
+        
+        // Find nearest term count rows
+        const findNearest = (targetFreq) => {
+          let best = null;
+          let minErr = Infinity;
+          
+          for (const row of termCountData) {
+            const err = Math.abs(row.exactFreqHz - targetFreq);
+            if (err < minErr) {
+              minErr = err;
+              best = row;
+            }
+          }
+          
+          return best;
+        };
+        
+        const row1 = findNearest(f1Hz);
+        const row2 = findNearest(f2Hz);
+        
+        if (!row1 || !row2) return null;
+        
+        return {
+          jumpIndex: jumpIndex + 1,
+          f1Hz,
+          f2Hz,
+          spl1,
+          spl2,
+          jumpDb: jump.jumpDb,
+          row1: {
+            exactFreqHz: row1.exactFreqHz,
+            modesUsed: row1.modesUsed,
+            sbirReflectionsUsed: row1.sbirReflectionsUsed,
+            activeTermsTotal: row1.activeTermsTotal,
+            modalDb: row1.modalDb,
+            modesSkippedBandwidth: row1.modesSkippedBandwidth,
+            modesSkippedCoupling: row1.modesSkippedCoupling
+          },
+          row2: {
+            exactFreqHz: row2.exactFreqHz,
+            modesUsed: row2.modesUsed,
+            sbirReflectionsUsed: row2.sbirReflectionsUsed,
+            activeTermsTotal: row2.activeTermsTotal,
+            modalDb: row2.modalDb,
+            modesSkippedBandwidth: row2.modesSkippedBandwidth,
+            modesSkippedCoupling: row2.modesSkippedCoupling
+          },
+          deltas: {
+            deltaModesUsed: row2.modesUsed - row1.modesUsed,
+            deltaSbirReflectionsUsed: row2.sbirReflectionsUsed - row1.sbirReflectionsUsed,
+            deltaActiveTermsTotal: row2.activeTermsTotal - row1.activeTermsTotal,
+            deltaModalDb: row2.modalDb - row1.modalDb
+          }
+        };
+      }).filter(Boolean);
+    })();
+    
     return {
       status: 'VALID',
       pointCount,
@@ -1992,9 +2059,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       flatRunsCount,
       maxJumpDb,
       maxJumpAtHz,
-      top5Jumps
+      top5Jumps,
+      stepPairDebug
     };
-  }, [plottedSeries]);
+  }, [plottedSeries, activeDebug]);
   
   // Compute yDomain for viewport constraint (when Y-axis is locked)
   const yDomain = React.useMemo(() => {
@@ -4637,6 +4705,50 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                     </div>
                   )}
                 </div>
+                
+                {/* Step Pair Debug (correlate jumps with term counts) */}
+                {plotIntegrityCheck.stepPairDebug && plotIntegrityCheck.stepPairDebug.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-red-400">
+                    <div className="font-semibold text-red-700 mb-1">Step Pair Debug (55–80 Hz):</div>
+                    <div className="space-y-2 text-[9px] font-mono max-h-64 overflow-y-auto">
+                      {plotIntegrityCheck.stepPairDebug.map((pair, i) => (
+                        <div key={i} className="border-l-4 border-red-400 pl-2 bg-red-50 rounded py-1">
+                          <div className="font-semibold text-red-800">
+                            #{pair.jumpIndex} {pair.f1Hz.toFixed(2)}→{pair.f2Hz.toFixed(2)} Hz | 
+                            {pair.spl1.toFixed(2)}→{pair.spl2.toFixed(2)} dB | 
+                            {pair.jumpDb >= 0 ? '+' : ''}{pair.jumpDb.toFixed(2)} dB
+                          </div>
+                          <div className="text-[8px] mt-1 space-y-0.5 text-gray-700">
+                            <div>
+                              row1 @ {pair.row1.exactFreqHz.toFixed(3)} Hz: 
+                              modes={pair.row1.modesUsed}, 
+                              sbir={pair.row1.sbirReflectionsUsed}, 
+                              total={pair.row1.activeTermsTotal}, 
+                              modalDb={pair.row1.modalDb.toFixed(2)}
+                            </div>
+                            <div>
+                              row2 @ {pair.row2.exactFreqHz.toFixed(3)} Hz: 
+                              modes={pair.row2.modesUsed}, 
+                              sbir={pair.row2.sbirReflectionsUsed}, 
+                              total={pair.row2.activeTermsTotal}, 
+                              modalDb={pair.row2.modalDb.toFixed(2)}
+                            </div>
+                            <div className={
+                              Math.abs(pair.deltas.deltaModesUsed) > 0 || Math.abs(pair.deltas.deltaSbirReflectionsUsed) > 0 
+                                ? 'text-red-700 font-bold bg-red-200 px-1 rounded' 
+                                : 'text-green-700'
+                            }>
+                              deltas: Δmodes={pair.deltas.deltaModesUsed}, 
+                              Δsbir={pair.deltas.deltaSbirReflectionsUsed}, 
+                              Δterms={pair.deltas.deltaActiveTermsTotal}, 
+                              ΔmodalDb={pair.deltas.deltaModalDb.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 
                 {/* Term Count Debug (55-80 Hz band) */}
                 {activeDebug?.termCountDebug55_80Hz && activeDebug.termCountDebug55_80Hz.length > 0 && (
