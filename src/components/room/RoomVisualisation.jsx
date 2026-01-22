@@ -594,6 +594,12 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
   const [hudHiddenWhenPinned, setHudHiddenWhenPinned] = useState(false);
   const [hudPinnedOffsetPx, setHudPinnedOffsetPx] = useState(null);
+  
+  // Draft positions for smooth dragging (only update real positions on drag end)
+  const draftFrontSubsRef = useRef(null);
+  const draftRearSubsRef = useRef(null);
+  const isDraggingSubRef = useRef(false);
+  const idleCommitTimerRef = useRef(null);
   // Absolute HUD position in canvas pixels (top-left of the HUD card)
 const [hudBasePosPx, setHudBasePosPx] = useState(null);
   const hudPosition = hudBasePosPx;
@@ -1687,6 +1693,22 @@ React.useEffect(() => {
         
         draggedSubWallRef.current = wall;
         draggedSubTypeRef.current = target._subType;
+        
+        // Initialize draft positions from current real positions
+        isDraggingSubRef.current = true;
+        draftFrontSubsRef.current = frontSubs ? [...frontSubs.map(s => ({ ...s, position: { ...s.position } }))] : [];
+        draftRearSubsRef.current = rearSubs ? [...rearSubs.map(s => ({ ...s, position: { ...s.position } }))] : [];
+        
+        // Signal BassResponse that dragging started
+        if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {
+          window.__B44_setIsDraggingSub(true);
+        }
+        
+        // Clear any pending idle timer
+        if (idleCommitTimerRef.current) {
+          clearTimeout(idleCommitTimerRef.current);
+          idleCommitTimerRef.current = null;
+        }
       }
       
       isAnyDraggingRef.current = true;
@@ -2775,9 +2797,8 @@ React.useEffect(() => {
     if (!sub) return;
     
     const subType = draggedSubTypeRef.current || sub._subType;
-    const setter = subType === 'front' ? onSetFrontSubs : onSetRearSubs;
-    const subsList = subType === 'front' ? frontSubs : rearSubs;
-    if (!setter || !subsList) return;
+    const draftArray = subType === 'front' ? draftFrontSubsRef.current : draftRearSubsRef.current;
+    if (!draftArray) return;
     
     const wall = draggedSubWallRef.current;
     if (!wall) return;
@@ -2826,48 +2847,40 @@ React.useEffect(() => {
       return;
     }
     
-    const currentX = sub.position?.x ?? 0;
-    const currentY = sub.position?.y ?? 0;
+    // Update ONLY draft positions (no state setter during drag)
+    const subIndex = subId === 'front-sub-left' || subId === 'rear-sub-left' ? 0 : 1;
+    const subInDraft = draftArray[subIndex];
     
-    // Only update if meaningful movement
-    if (Math.abs(finalX - currentX) > 0.001 || Math.abs(finalY - currentY) > 0.001) {
-      const pairMode = subsList.length === 2;
+    if (subInDraft) {
+      subInDraft.position.x = finalX;
+      subInDraft.position.y = finalY;
       
-      setter(prev => {
-        const positions = prev?.positions || [];
-        const subIndex = subId === 'front-sub-left' || subId === 'rear-sub-left' ? 0 : 1;
+      // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
+      if (draftArray.length === 2) {
+        const otherIndex = subIndex === 0 ? 1 : 0;
+        const mirrorX = widthM - finalX;
+        const clampedMirrorX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, mirrorX));
         
-        // Initialize array with correct length if needed
-        const updatedPositions = positions.length >= 2 ? [...positions] : [null, null];
-        
-        // Always use the wall-locked Y value
-        const wallLockedY = finalY;
-        
-        // Update dragged sub (with validation)
-        updatedPositions[subIndex] = { x: finalX, y: wallLockedY };
-        
-        // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
-        if (pairMode) {
-          const otherIndex = subIndex === 0 ? 1 : 0;
-          const mirrorX = widthM - finalX;
-          const clampedMirrorX = Math.max(halfW + EPS, Math.min(widthM - halfW - EPS, mirrorX));
-          
-          // Validate mirrored position before writing
-          if (Number.isFinite(clampedMirrorX)) {
-            updatedPositions[otherIndex] = { x: clampedMirrorX, y: wallLockedY };
-          } else {
-            // Keep previous position for mirrored sub if calculation failed
-            const prevPos = positions[otherIndex];
-            if (prevPos) {
-              updatedPositions[otherIndex] = prevPos;
-            }
-          }
+        if (Number.isFinite(clampedMirrorX) && draftArray[otherIndex]) {
+          draftArray[otherIndex].position.x = clampedMirrorX;
+          draftArray[otherIndex].position.y = finalY;
         }
-        
-        return { ...prev, positions: updatedPositions };
-      });
+      }
+      
+      // Force re-render by updating a dummy epoch (or use a state trigger if needed)
+      // For now, the rendering will use draft refs directly
     }
-  }, [byId, canvasToRoom, onSetFrontSubs, onSetRearSubs, frontSubs, rearSubs, widthM, lengthM, getModelDimsM]);
+    
+    // Reset 200ms idle timer (semi-live commit)
+    if (idleCommitTimerRef.current) {
+      clearTimeout(idleCommitTimerRef.current);
+    }
+    
+    idleCommitTimerRef.current = setTimeout(() => {
+      // Commit draft positions after 200ms idle
+      commitDraftSubPositions();
+    }, 200);
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM]);
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
@@ -2963,10 +2976,52 @@ React.useEffect(() => {
     }
   }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, handleSubDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, roomToCanvas, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, dragOffsetRoomRef]);
 
+  // Helper to commit draft sub positions to real state
+  const commitDraftSubPositions = useCallback(() => {
+    // Commit front subs
+    if (draftFrontSubsRef.current && onSetFrontSubs) {
+      const positions = draftFrontSubsRef.current.map(s => ({ x: s.position.x, y: s.position.y }));
+      onSetFrontSubs(prev => ({
+        ...prev,
+        positions
+      }));
+    }
+    
+    // Commit rear subs
+    if (draftRearSubsRef.current && onSetRearSubs) {
+      const positions = draftRearSubsRef.current.map(s => ({ x: s.position.x, y: s.position.y }));
+      onSetRearSubs(prev => ({
+        ...prev,
+        positions
+      }));
+    }
+  }, [onSetFrontSubs, onSetRearSubs]);
+  
   const handleMouseUp = useCallback((e) => {
     // Signal to RoomDesigner that dragging ended
     if (props.isDraggingRef) {
       props.isDraggingRef.current = false;
+    }
+    
+    // Commit draft sub positions if sub was being dragged
+    if (isDraggingSubRef.current) {
+      // Cancel idle timer
+      if (idleCommitTimerRef.current) {
+        clearTimeout(idleCommitTimerRef.current);
+        idleCommitTimerRef.current = null;
+      }
+      
+      // Commit final positions
+      commitDraftSubPositions();
+      
+      // Signal BassResponse that dragging ended
+      if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {
+        window.__B44_setIsDraggingSub(false);
+      }
+      
+      isDraggingSubRef.current = false;
+      draftFrontSubsRef.current = null;
+      draftRearSubsRef.current = null;
     }
     
     // Release pointer capture
@@ -3074,7 +3129,7 @@ React.useEffect(() => {
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, props.isDraggingRef, widthM, getModelDimsM]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, props.isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions]);
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
@@ -6855,7 +6910,7 @@ return (
             {/* Layer 8: Subwoofers */}
             {Array.isArray(frontSubs) && frontSubs.length > 0 && (
               <FrontSubsLayer
-                frontSubs={frontSubs}
+                frontSubs={isDraggingSubRef.current && draftFrontSubsRef.current ? draftFrontSubsRef.current : frontSubs}
                 toPx={toPx}
                 getModelDimsM={getModelDimsM}
                 scale={scale}
@@ -6866,7 +6921,76 @@ return (
                 draggedItemId={draggedItemId}
               />
             )}
-            {renderSubwoofers()}
+            {(() => {
+              const subsToRender = isDraggingSubRef.current && draftRearSubsRef.current ? draftRearSubsRef.current : rearSubs;
+              return Array.isArray(subsToRender) && subsToRender.length > 0 ? (
+                <g data-layer="rear-subwoofers">
+                  {subsToRender.map((sub, i) => {
+                    if (!hasPos(sub)) return null;
+                    const { widthM, depthM } = getModelDimsM(sub.model);
+                    const subId = sub.id || `rear-sub-${i}`;
+                    
+                    const [cx, cy] = toPx(sub.position.x, sub.position.y);
+                    const w = widthM * scale;
+                    const d = depthM * scale;
+                    
+                    const handlePointerDown = (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      try {
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                      } catch (err) {}
+                      handleMouseDown(e, subId, 'sub');
+                    };
+                    
+                    const handlePointerMove = (e) => {
+                      if (!dragging || draggedItemId !== subId) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleMouseMove(e);
+                    };
+                    
+                    const handlePointerUp = (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      try {
+                        e.currentTarget.releasePointerCapture(e.pointerId);
+                      } catch (err) {}
+                      handleMouseUp(e);
+                    };
+                    
+                    return (
+                      <g
+                        key={subId}
+                        style={{ cursor: dragging && draggedItemId === subId ? 'grabbing' : 'grab', pointerEvents: 'all' }}
+                        onPointerDown={handlePointerDown}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onPointerCancel={handlePointerUp}
+                      >
+                        <rect
+                          x={cx - w / 2}
+                          y={cy - d / 2}
+                          width={w}
+                          height={d}
+                          fill="transparent"
+                          pointerEvents="all"
+                        />
+                        <SpeakerRect
+                          speaker={sub}
+                          widthM={widthM}
+                          depthM={depthM}
+                          opacity={0.8}
+                          scale={scale}
+                          toPx={toPx}
+                          pointerEvents="none"
+                        />
+                      </g>
+                    );
+                  })}
+                </g>
+              ) : null;
+            })()}
 
             {/* Layer 9: Draggable Seating Positions */}
             {renderSeatingPositions()}

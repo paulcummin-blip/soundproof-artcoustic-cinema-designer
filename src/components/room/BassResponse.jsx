@@ -1326,15 +1326,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
   ]);
 
-  // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
-  const activeDebug = useMemo(() => {
-    if (!rewStyleMode) return null;
-    const useRel = rewRelativeView;
-    const dbg = rewView === 'roomPlusProduct'
-      ? (useRel ? rewRoomPlusProductDataAbs?.debug : rewRoomPlusProductDataAbs?.debug)
-      : (useRel ? rewModesDataAbs?.debug : rewModesDataAbs?.debug);
-    return dbg || null;
-  }, [rewStyleMode, rewView, rewRelativeView, rewModesDataAbs, rewRoomPlusProductDataAbs, componentView]);
+
 
   // REW Compare View display preset (does NOT mutate user smoothing state)
   // Compare view forces display to 1/3 via graphSmoothing derivation, user's choice stays intact
