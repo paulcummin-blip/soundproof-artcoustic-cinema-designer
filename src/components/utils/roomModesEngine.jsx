@@ -967,22 +967,18 @@ export function computeRoomModesResponse({
       });
     }
 
-    // ENGINE TRACE: Capture calculation breakdown for ALL frequencies
-    const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
-    const modalDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, modalMag));
-
-    const sbirMag = Math.sqrt(sumRe_sbir * sumRe_sbir + sumIm_sbir * sumIm_sbir);
-    const sbirDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, sbirMag));
-
-    const totalMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
-    const totalDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, totalMag));
+    // ENGINE TRACE: Reuse existing magnitude calculations (already computed above for RMS tracking)
+    // modalMag, sbirMag, totalMag are already available from the component magnitude tracking code
+    const modalDbForTrace = modalMagDb_all[modalMagDb_all.length - 1]; // Just pushed above
+    const sbirDbForTrace = sbirMagDb_all[sbirMagDb_all.length - 1];
+    const totalDbForTrace = totalMagDb_all[totalMagDb_all.length - 1];
 
     engineTrace.push({
       idx: i,
       exactFreqHz: f,
-      modalDb: modalDbRaw,
-      sbirDb: sbirDbRaw,
-      totalDb: totalDbRaw,
+      modalDb: modalDbForTrace,
+      sbirDb: sbirDbForTrace,
+      totalDb: totalDbForTrace,
       modesConsidered,
       modesUsed,
       modesSkippedBandwidth,
