@@ -643,7 +643,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
         seatPosition: seatPos,
-        fMin: 15,
+        fMin: 20,
         fMax: 200,
         pointsPerOct: 24,
         modeLimitHz: 200,
@@ -848,7 +848,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
         seatPosition: seatPos,
-        fMin: 15,
+        fMin: 20,
         fMax: 200,
         pointsPerOct: usePreviewProfile ? 60 : 24, // Preview: ~500 pts, Final: ~2000 pts
         modeLimitHz: usePreviewProfile ? 120 : 200, // Preview: 120 Hz, Final: 200 Hz
@@ -1214,7 +1214,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
         seatPosition: seatPos,
-        fMin: 15,
+        fMin: 20,
         fMax: 200,
         pointsPerOct: usePreviewProfile ? 60 : 24, // Preview: ~500 pts, Final: ~2000 pts
         modeLimitHz: usePreviewProfile ? 120 : 200, // Preview: 120 Hz, Final: 200 Hz
