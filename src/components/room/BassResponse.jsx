@@ -106,10 +106,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [modalProbeEnabled, setModalProbeEnabled] = useState(false); // Modal Probe toggle
   const [debugDisableSealedGain, setDebugDisableSealedGain] = useState(false); // Debug: disable sealed-room LF gain
   const [debugDisableNullRepair, setDebugDisableNullRepair] = useState(false); // Debug: disable null repair/fill
-  const [rewStrictParity, setRewStrictParity] = useState(false); // REW Strict (disable presentation shapers)
-  const [isDraggingSub, setIsDraggingSub] = useState(false); // Drag state for quality switching
-  const calcEpochRef = useRef(0); // Request cancellation ID
-  const idleTimerRef = useRef(null); // Idle delay for full quality
 
   // Sensitivity audit refs (track previous run)
   const prevSourceSigRef = useRef(null);
@@ -753,23 +749,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     let result;
     try {
       
-      // Calculation quality profiles (preview while dragging, full after idle)
-      const calcProfile = isDraggingSub ? 'preview' : 'final';
-      const auditEnabled = !isDraggingSub && (globalThis.__B44_BASS_AUDIT === true);
-      
       result = computeRoomModesResponse({
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
         seatPosition: seatPos,
         fMin: 15,
         fMax: 200,
-        pointsPerOct: calcProfile === 'preview' ? 60 : 540, // Preview: ~500pts, Final: ~2000pts
-        modeLimitHz: calcProfile === 'preview' ? 140 : 200, // Preview: reduce upper limit
+        pointsPerOct: 24,
+        modeLimitHz: 200,
         q: roomDamping,
         includeAxial: true,
         includeTangential: true,
         includeOblique: true,
-        includeSBIR: calcProfile === 'preview' ? false : rewSbirEnabled, // SBIR off while dragging
+        includeSBIR: rewSbirEnabled,
         rewParityMode: true,
         smoothing: rewStyleMode ? 'none' : rewSmoothing,
         subFloorHeight: 0.0,
@@ -793,10 +785,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
         componentView: componentView, // Part 3 - component isolation
         disableSealedRoomGain: debugDisableSealedGain,
-        disableNullRepair: debugDisableNullRepair,
-        isDragging: isDraggingSub, // Pass drag state to engine
-        rewStrictParity: rewStrictParity, // Disable presentation shapers for strict parity
-        enableDebugTrace: auditEnabled // Only build debug/audit when needed
+        disableNullRepair: debugDisableNullRepair
       });
     } catch (e) {
       return {
@@ -1110,23 +1099,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     let result;
     try {
       
-      // Calculation quality profiles (preview while dragging, full after idle)
-      const calcProfile = isDraggingSub ? 'preview' : 'final';
-      const auditEnabled = !isDraggingSub && (globalThis.__B44_BASS_AUDIT === true);
-      
       result = computeRoomModesResponse({
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
         seatPosition: seatPos,
         fMin: 15,
         fMax: 200,
-        pointsPerOct: calcProfile === 'preview' ? 60 : 540, // Preview: ~500pts, Final: ~2000pts
-        modeLimitHz: calcProfile === 'preview' ? 140 : 200, // Preview: reduce upper limit
+        pointsPerOct: 24,
+        modeLimitHz: 200,
         q: roomDamping,
         includeAxial: modesEnabled,
         includeTangential: modesEnabled,
         includeOblique: modesEnabled,
-        includeSBIR: calcProfile === 'preview' ? false : rewSbirEnabled, // SBIR off while dragging
+        includeSBIR: rewSbirEnabled,
         rewParityMode: true,
         smoothing: rewStyleMode ? 'none' : rewSmoothing,
         subFloorHeight: 0.0,
@@ -1149,10 +1134,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
         complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
         componentView: componentView, // Part 3 - component isolation
-        sbirDebugSingleFrontWall: sbirDebugSingleFrontWall, // DIAGNOSTIC: single reflection mode
-        isDragging: isDraggingSub, // Pass drag state to engine
-        rewStrictParity: rewStrictParity, // Disable presentation shapers for strict parity
-        enableDebugTrace: auditEnabled // Only build debug/audit when needed
+        sbirDebugSingleFrontWall: sbirDebugSingleFrontWall // DIAGNOSTIC: single reflection mode
       });
     } catch (e) {
       return {
@@ -2722,20 +2704,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               />
             </div>
 
-            {/* REW Strict Parity toggle (only when REW mode is ON) */}
-            {rewStyleMode && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <Label htmlFor="rew-strict" className="text-xs text-[#3E4349] whitespace-nowrap">
-                  REW Strict (Parity)
-                </Label>
-                <Switch
-                  id="rew-strict"
-                  checked={rewStrictParity}
-                  onCheckedChange={setRewStrictParity}
-                />
-              </div>
-            )}
-
             {rewStyleMode && (
               <>
                 {/* Advanced controls visible only when REW mode is ON */}
@@ -2874,7 +2842,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           border: "1px solid #DCDBD6",
           marginBottom: 6
         }}>
-          User smoothing: {rewSmoothing} | Graph smoothing: {graphSmoothing} | Compare: {String(rewCompareView)} | Modes: {String(modesEnabled)} | SBIR: {String(rewSbirEnabled)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)} | DisableSealed: {String(debugDisableSealedGain)} | DisableRepair: {String(debugDisableNullRepair)} | REW Strict: {String(rewStrictParity)} | Dragging: {String(isDraggingSub)}
+          User smoothing: {rewSmoothing} | Graph smoothing: {graphSmoothing} | Compare: {String(rewCompareView)} | Modes: {String(modesEnabled)} | SBIR: {String(rewSbirEnabled)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)} | DisableSealed: {String(debugDisableSealedGain)} | DisableRepair: {String(debugDisableNullRepair)}
         </div>
 
         {/* Engine Parameter Verification */}

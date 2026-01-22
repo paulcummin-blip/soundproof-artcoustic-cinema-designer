@@ -108,8 +108,6 @@ export function computeRoomModesResponse({
   sbirDebugSingleFrontWall = false, // DIAGNOSTIC: Only use direct + front wall reflection
   disableSealedRoomGain = false, // Debug: bypass sealed-room LF gain
   disableNullRepair = false, // Debug: bypass null repair/fill
-  rewStrictParity = false, // REW Strict: disable presentation shapers (coherence loss, mode density, Schroeder blend)
-  enableDebugTrace = true // Only build debug/audit when needed (false while dragging)
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -969,8 +967,7 @@ export function computeRoomModesResponse({
     let modalDb = coherentPressureRaw;
     
     // Mode density compensation (REW-ish) — MUST ramp in smoothly to avoid a cliff at Schroeder.
-    // DISABLED when REW Strict Parity is ON
-    const mdCompEnabled = (!rawEngineOutput && rewParityMode && activeTerms > 1 && !rewStrictParity);
+    const mdCompEnabled = (!rawEngineOutput && rewParityMode && activeTerms > 1);
 
     // Use a smooth transition window around Schroeder (starts a bit before, fully in a bit after).
     const mdCompStartHz = Math.max(70, schroederHz * 0.85);
@@ -1094,13 +1091,12 @@ export function computeRoomModesResponse({
   
   // REW-style coherence loss: transition from coherent pressure sum to energy-like behaviour above ~100-140 Hz
   // This makes the curve "come back down" at HF like REW does
-  // DISABLED when REW Strict Parity is ON
-  const shouldApplyCoherenceLoss = rewParityMode && componentView === 'modalPlusSbir' && !rewStrictParity;
+  const shouldApplyCoherenceLoss = rewParityMode && componentView === 'modalPlusSbir';
   let splDbRew = splDb;
   let coherenceLossApplied = false;
   const cohStartHz = 90;
   const cohEndHz = 140;
-
+  
   if (shouldApplyCoherenceLoss) {
     splDbRew = splDb.map((coherentDb, i) => {
       const f = freqs[i];
@@ -1207,9 +1203,8 @@ export function computeRoomModesResponse({
 
     // Schroeder blend: FIXED RULES to preserve modal nulls
     // NEW: Start at 1.0 × Schroeder (not 0.7), never fill nulls, only tame peaks
-    // DISABLED when REW Strict Parity is ON
     let splDbSchroeder = splDbForPipeline;
-    if (!rawEngineOutput && rewParityMode && schroederHz > 0 && !rewStrictParity) {
+    if (!rawEngineOutput && rewParityMode && schroederHz > 0) {
       splDbSchroeder = splDbForPipeline.map((db, i) => {
         const f = freqs[i];
         const blendStart = schroederHz * 1.0;
@@ -1234,7 +1229,6 @@ export function computeRoomModesResponse({
     const rawRange = rawMax - rawMin;
 
     // Clamp non-finite values before smoothing (IMMUTABLE - do not mutate in place)
-    // DISABLED when REW Strict Parity is ON (preserve deep nulls)
     let nonFiniteRepaired = 0;
     let lastGoodValue = 0;
 
@@ -1242,7 +1236,7 @@ export function computeRoomModesResponse({
     for (let i = 0; i < splDbSchroeder.length; i++) {
     const v = splDbSchroeder[i];
     if (!isFinite(v)) {
-      if (disableNullRepair || rewStrictParity) {
+      if (disableNullRepair) {
         repaired.push(null);  // preserve deep null/cancellation for diagnostic
         nonFiniteRepaired += 1;
         continue;
@@ -1974,7 +1968,7 @@ export function computeRoomModesResponse({
     baseReturn.debug.termCountDebug55_90Hz = enrichedDebug;
     
     // --- BIN-TO-BIN MODE TRACE (only when audit enabled and step exists) ---
-    if (enableDebugTrace && globalThis.__B44_BASS_AUDIT === true) {
+    if (globalThis.__B44_BASS_AUDIT === true) {
       // Helper: trace a single bin's modal calculation
       const traceSingleBin = (iTarget) => {
         const f = freqs[iTarget];
