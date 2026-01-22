@@ -134,6 +134,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const yDomainBeforeDragRef = useRef(null);
   const yAxisLockedBeforeDragRef = useRef(false);
   
+  // Force re-sim key that ACTUALLY triggers re-render (ref.current does not)
+  const [calcEpoch, setCalcEpoch] = useState(0);
+  
+  // Preview positions captured during drag (throttled)
+  const previewFrontSubsRef = useRef(null);
+  const previewRearSubsRef = useRef(null);
+  
   // Draft vs committed positions (freeze simulation during drag)
   const [committedFrontSubs, setCommittedFrontSubs] = useState(null);
   const [committedRearSubs, setCommittedRearSubs] = useState(null);
@@ -283,11 +290,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const engineCallCountRef = useRef(0);
   const [engineCallsUi, setEngineCallsUi] = useState(0);
 
-  // Build subs array from COMMITTED positions (freeze simulation during drag)
+  // Build subs array from preview positions while dragging, otherwise committed/live
   const subsForSimulation = useMemo(() => {
-    // Use committed positions (frozen during drag) not live props
-    const liveFront = Array.isArray(committedFrontSubs || frontSubsLive) ? (committedFrontSubs || frontSubsLive) : [];
-    const liveRear = Array.isArray(committedRearSubs || rearSubsLive) ? (committedRearSubs || rearSubsLive) : [];
+    const frontInput =
+      isDraggingSub && Array.isArray(previewFrontSubsRef.current)
+        ? previewFrontSubsRef.current
+        : (committedFrontSubs || frontSubsLive);
+
+    const rearInput =
+      isDraggingSub && Array.isArray(previewRearSubsRef.current)
+        ? previewRearSubsRef.current
+        : (committedRearSubs || rearSubsLive);
+
+    const liveFront = Array.isArray(frontInput) ? frontInput : [];
+    const liveRear = Array.isArray(rearInput) ? rearInput : [];
 
     // Helper to get tuning settings from config
     const getTuning = (subId, cfg) => {
@@ -329,13 +345,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     return sources;
   }, [
-    // Use committed positions (frozen during drag)
+    isDraggingSub,
     committedFrontSubs,
     committedRearSubs,
-    // also watch config for tuning settings
     frontSubsCfg?.settingsById,
     rearSubsCfg?.settingsById,
-    // plus room dims if you need them elsewhere in the pipeline
     roomDims?.widthM,
     roomDims?.lengthM,
     roomDims?.heightM,
@@ -602,12 +616,32 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           
           // Throttle drag updates
           if (timeSinceLastUpdate < 50) {
-            // Too soon, ignore this update
+            // Too soon — schedule one trailing update if not already scheduled
+            if (!dragThrottleTimerRef.current) {
+              const wait = Math.max(0, 50 - timeSinceLastUpdate);
+              dragThrottleTimerRef.current = setTimeout(() => {
+                dragThrottleTimerRef.current = null;
+                lastDragUpdateRef.current = Date.now();
+
+                previewFrontSubsRef.current = frontSubsLive;
+                previewRearSubsRef.current = rearSubsLive;
+
+                // preview recompute tick
+                setCalcEpoch(v => v + 1);
+              }, wait);
+            }
             return;
           }
           
           lastDragUpdateRef.current = now;
           setIsDraggingSub(true);
+          
+          // Capture latest live positions for preview (no heavy sim yet)
+          previewFrontSubsRef.current = frontSubsLive;
+          previewRearSubsRef.current = rearSubsLive;
+          
+          // Trigger a preview recompute (cheap profile because isDraggingSub = true)
+          setCalcEpoch(v => v + 1);
           
           // Clear settle timer if user starts dragging again
           if (dragSettleTimerRef.current) {
@@ -626,7 +660,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           
           // Wait 250ms for positions to settle, then run full sim
           dragSettleTimerRef.current = setTimeout(() => {
-            calcEpochRef.current += 1; // Force full-quality recalc
+            previewFrontSubsRef.current = null;
+            previewRearSubsRef.current = null;
+            
+            setCalcEpoch(v => v + 1); // Force full-quality recalc (real render)
             
             // Restore Y-axis state after full sim completes
             setTimeout(() => {
@@ -645,7 +682,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       if (dragThrottleTimerRef.current) clearTimeout(dragThrottleTimerRef.current);
       if (dragSettleTimerRef.current) clearTimeout(dragSettleTimerRef.current);
     };
-  }, [isDraggingSub, yAxisDomain, yAxisLocked]);
+  }, [isDraggingSub, yAxisDomain, yAxisLocked, frontSubsLive, rearSubsLive]);
   
   // Audit curve (no smoothing, no normalization) for sensitivity testing
   const rewModesDataAudit = useMemo(() => {
@@ -1051,7 +1088,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     debugDisableSealedGain, // Include debug toggle to gate display-side LF rise
     rewStrictParity, // Include REW strict toggle
     isDraggingSub, // Include drag state
-    calcEpochRef.current, // Include calc epoch for request cancellation
+    calcEpoch, // Include calc epoch for request cancellation
     sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
   ]);
 
@@ -1397,7 +1434,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     rewSbirEnabled, // Include SBIR toggle
     rewStrictParity, // Include REW strict toggle
     isDraggingSub, // Include drag state
-    calcEpochRef.current, // Include calc epoch for request cancellation
+    calcEpoch, // Include calc epoch for request cancellation
     sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
   ]);
 
@@ -2046,11 +2083,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Store stable plot when not dragging
     if (!isDraggingSub && cleaned && cleaned.length > 0) {
       lastStablePlotRef.current = cleaned;
-    }
-    
-    // During drag: freeze at last stable plot
-    if (isDraggingSub && lastStablePlotRef.current) {
-      return lastStablePlotRef.current;
     }
     
     return cleaned;
