@@ -967,11 +967,10 @@ export function computeRoomModesResponse({
       });
     }
 
-    // ENGINE TRACE: Reuse existing magnitude calculations (already computed above for RMS tracking)
-    // modalMag, sbirMag, totalMag are already available from the component magnitude tracking code
-    const modalDbForTrace = modalMagDb_all[modalMagDb_all.length - 1]; // Just pushed above
-    const sbirDbForTrace = sbirMagDb_all[sbirMagDb_all.length - 1];
-    const totalDbForTrace = totalMagDb_all[totalMagDb_all.length - 1];
+    // ENGINE TRACE: Reuse magnitude values already computed for RMS tracking
+    const modalDbForTrace = modalMagDb_all.length > 0 ? modalMagDb_all[modalMagDb_all.length - 1] : 0;
+    const sbirDbForTrace = sbirMagDb_all.length > 0 ? sbirMagDb_all[sbirMagDb_all.length - 1] : 0;
+    const totalDbForTrace = totalMagDb_all.length > 0 ? totalMagDb_all[totalMagDb_all.length - 1] : 0;
 
     engineTrace.push({
       idx: i,
