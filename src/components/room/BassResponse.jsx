@@ -609,16 +609,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         if (dragging) {
           // Drag start: capture Y-axis state (must capture the REAL locked domain, not yAxisDomain)
           if (!isDraggingSub) {
-            // Save current lock flag
+            // Capture the *actual* locked Y window used by the graph (REW display ref ±30)
+            // IMPORTANT: yAxisDomain is always null in REW mode, so do NOT capture it.
+            yDomainBeforeDragRef.current =
+              (Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax))
+                ? [rewLockedMin, rewLockedMax]
+                : null;
+
             yAxisLockedBeforeDragRef.current = yAxisLocked;
-
-            // Force lock immediately
             setYAxisLocked(true);
-
-            // Capture the actual domain we intend to lock to (REW-style fixed window)
-            const lockedMin = (Number(rewDisplayRefDb) || 90) - 30;
-            const lockedMax = (Number(rewDisplayRefDb) || 90) + 30;
-            yDomainBeforeDragRef.current = [lockedMin, lockedMax];
           }
           
           // Throttle drag updates
@@ -687,7 +686,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       if (dragThrottleTimerRef.current) clearTimeout(dragThrottleTimerRef.current);
       if (dragSettleTimerRef.current) clearTimeout(dragSettleTimerRef.current);
     };
-  }, [isDraggingSub, yAxisDomain, yAxisLocked, frontSubsLive, rearSubsLive]);
+  }, [isDraggingSub, yAxisLocked, rewLockedMin, rewLockedMax, frontSubsLive, rearSubsLive]);
   
   // Audit curve (no smoothing, no normalization) for sensitivity testing
   const rewModesDataAudit = useMemo(() => {
@@ -2322,8 +2321,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // During drag: freeze at captured domain
   const yDomain = React.useMemo(() => {
     // During drag: ALWAYS freeze to the captured domain
-    if (isDraggingSub && Array.isArray(yDomainBeforeDragRef.current)) {
-      return yDomainBeforeDragRef.current;
+    if (isDraggingSub) {
+      const d = yDomainBeforeDragRef.current;
+      return (Array.isArray(d) && d.length === 2) ? d : undefined;
     }
 
     // REW mode + locked: ALWAYS use the fixed ref window

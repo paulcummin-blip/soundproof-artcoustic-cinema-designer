@@ -23,7 +23,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 };
 
 // REW mode plot range debug (proof we're plotting the right numbers)
-const RewPlotRangeDebug = ({ chartData }) => {
+const RewPlotRangeDebug = ({ chartData, yDomain }) => {
   const finite = chartData.map(p => p?.spl).filter(v => Number.isFinite(Number(v)));
   if (finite.length === 0) return null;
   
@@ -33,6 +33,9 @@ const RewPlotRangeDebug = ({ chartData }) => {
   return (
     <div className="text-[9px] text-gray-500 mb-1">
       Plot min/max: {Number.isFinite(min) ? min.toFixed(2) : 'N/A'} / {Number.isFinite(max) ? max.toFixed(2) : 'N/A'} dB
+      {yDomain && yDomain[0] !== undefined && (
+        <span className="ml-1 text-blue-500">(Y-axis locked to {yDomain[0].toFixed(0)} / {yDomain[1].toFixed(0)} dB)</span>
+      )}
     </div>
   );
 };
@@ -181,81 +184,106 @@ export default function BassGraph({
     const xMin = xDomain?.[0] ?? 20;
     const xMax = xDomain?.[1] ?? 200;
     
-    // Determine Y-axis domain (only use data within X range)
-    let calculatedYMin, calculatedYMax;
+    // Determine Y-axis domain
+    let finalYMin, finalYMax, finalYTicks;
 
-    // CRITICAL: If yDomain provided (viewport constraint), use it directly
+    // CRITICAL: If yDomain explicitly provided, use it directly, bypassing auto-calculation and snapping.
     if (yDomain && Array.isArray(yDomain) && yDomain.length === 2 && Number.isFinite(yDomain[0]) && Number.isFinite(yDomain[1])) {
-      calculatedYMin = yDomain[0];
-      calculatedYMax = yDomain[1];
-    }
-    // REW mode: compute Y domain from actual plotted data (only finite values within X range)
-    else if (rewStyleMode) {
-      const splValues = chartData
-        .filter(d => d.frequency >= xMin && d.frequency <= xMax)
-        .map(d => d.spl)
-        .filter(v => Number.isFinite(v));
+      finalYMin = yDomain[0];
+      finalYMax = yDomain[1];
 
-      if (splValues.length > 0) {
-        const dataMin = Math.min(...splValues);
-        const dataMax = Math.max(...splValues);
-        const padding = 5; // 5 dB padding top and bottom
-        calculatedYMin = dataMin - padding;
-        calculatedYMax = dataMax + padding;
-      } else {
-        // Fallback if no data
-        calculatedYMin = 60;
-        calculatedYMax = 110;
-      }
-    } else {
-      // Default Y range
-      calculatedYMin = 90;
-      calculatedYMax = 130;
-    }
-
-    // Nice ticks policy: snap Y domain to clean numbers for designer readability
-    let snappedYMin = calculatedYMin;
-    let snappedYMax = calculatedYMax;
-    let yTicks = undefined;
-
-    if (Number.isFinite(calculatedYMin) && Number.isFinite(calculatedYMax) && calculatedYMax > calculatedYMin) {
-      const rawMin = calculatedYMin;
-      const rawMax = calculatedYMax;
-      const span = rawMax - rawMin;
-
-      // Determine tick step based on span
-      let step;
-      if (span <= 30) {
+      // Generate simple ticks based on the provided yDomain
+      const domainSpan = finalYMax - finalYMin;
+      let step = 10; 
+      if (domainSpan <= 30) {
         step = 5;
-      } else if (span <= 60) {
+      } else if (domainSpan <= 60) {
         step = 10;
       } else {
         step = 20;
       }
 
-      // Snap min/max to tick boundaries
-      snappedYMin = Math.floor(rawMin / step) * step;
-      snappedYMax = Math.ceil(rawMax / step) * step;
-
-      // Generate ticks array
       const ticks = [];
-      for (let i = snappedYMin; i <= snappedYMax; i += step) {
+      for (let i = Math.floor(finalYMin / step) * step; i <= Math.ceil(finalYMax / step) * step; i += step) {
         ticks.push(i);
       }
+      finalYTicks = ticks;
 
-      // Guard: if too many ticks, fall back to step=20
-      if (ticks.length > 50) {
-        step = 20;
+    } else {
+      // Auto-calculation logic if no yDomain is provided
+      let calculatedYMin, calculatedYMax;
+
+      // REW mode: compute Y domain from actual plotted data (only finite values within X range)
+      if (rewStyleMode) {
+        const splValues = chartData
+          .filter(d => d.frequency >= xMin && d.frequency <= xMax)
+          .map(d => d.spl)
+          .filter(v => Number.isFinite(v));
+
+        if (splValues.length > 0) {
+          const dataMin = Math.min(...splValues);
+          const dataMax = Math.max(...splValues);
+          const padding = 5; // 5 dB padding top and bottom
+          calculatedYMin = dataMin - padding;
+          calculatedYMax = dataMax + padding;
+        } else {
+          // Fallback if no data
+          calculatedYMin = 60;
+          calculatedYMax = 110;
+        }
+      } else {
+        // Default Y range
+        calculatedYMin = 90;
+        calculatedYMax = 130;
+      }
+
+      // Nice ticks policy: snap Y domain to clean numbers for designer readability
+      let snappedYMin = calculatedYMin;
+      let snappedYMax = calculatedYMax;
+      let yTicks = undefined;
+
+      if (Number.isFinite(calculatedYMin) && Number.isFinite(calculatedYMax) && calculatedYMax > calculatedYMin) {
+        const rawMin = calculatedYMin;
+        const rawMax = calculatedYMax;
+        const span = rawMax - rawMin;
+
+        // Determine tick step based on span
+        let step;
+        if (span <= 30) {
+          step = 5;
+        } else if (span <= 60) {
+          step = 10;
+        } else {
+          step = 20;
+        }
+
+        // Snap min/max to tick boundaries
         snappedYMin = Math.floor(rawMin / step) * step;
         snappedYMax = Math.ceil(rawMax / step) * step;
-        const safeTicks = [];
+
+        // Generate ticks array
+        const ticks = [];
         for (let i = snappedYMin; i <= snappedYMax; i += step) {
-          safeTicks.push(i);
+          ticks.push(i);
         }
-        yTicks = safeTicks;
-      } else {
-        yTicks = ticks;
+
+        // Guard: if too many ticks, fall back to step=20
+        if (ticks.length > 50) {
+          step = 20;
+          snappedYMin = Math.floor(rawMin / step) * step;
+          snappedYMax = Math.ceil(rawMax / step) * step;
+          const safeTicks = [];
+          for (let i = snappedYMin; i <= snappedYMax; i += step) {
+            safeTicks.push(i);
+          }
+          yTicks = safeTicks;
+        } else {
+          yTicks = ticks;
+        }
       }
+      finalYMin = snappedYMin;
+      finalYMax = snappedYMax;
+      finalYTicks = yTicks;
     }
 
     // Render mode markers with hover tooltips (REW parity overlay)
@@ -345,7 +373,7 @@ export default function BassGraph({
                     <div className="text-[10px] text-gray-500 mb-1">
                         X-axis scale: {linearHzAxis ? 'LINEAR' : 'LOG'}
                     </div>
-                    <RewPlotRangeDebug chartData={chartData} />
+                    <RewPlotRangeDebug chartData={chartData} yDomain={yDomain} />
                 </>
             )}
             <ResponsiveContainer>
@@ -366,8 +394,8 @@ export default function BassGraph({
                         tick={{ fill: '#3E4349' }}
                     />
                     <YAxis
-                        domain={[snappedYMin, snappedYMax]}
-                        ticks={yTicks}
+                        domain={[finalYMin, finalYMax]}
+                        ticks={finalYTicks}
                         tickFormatter={(tick) => Number.isFinite(Number(tick)) ? Number(tick).toFixed(0) : ''}
                         label={{ value: 'SPL (dB)', angle: -90, position: 'insideLeft', className: 'font-body text-[#3E4349]' }}
                         className="font-body text-xs"
