@@ -2103,26 +2103,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // Final plotted series (apply display floor + integrity cleanup)
   const plottedSeries = React.useMemo(() => {
-    // During drag: freeze the curve using the last stable plot (if we have one)
-    if (isDraggingSub && lastStablePlotRef.current && lastStablePlotRef.current.length > 0) {
-      return lastStablePlotRef.current;
-    }
-
     // Select base series
     const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
-
-    // IMPORTANT: avoid referencing rewLockedMin/rewLockedMax here (it can be declared later).
-    // Derive the locked window directly from rewDisplayRefDb when needed.
-    const localLockedMin =
-      (isRewStyle && yAxisLocked && Number.isFinite(rewDisplayRefDb)) ? (rewDisplayRefDb - 30) : undefined;
-    const localLockedMax =
-      (isRewStyle && yAxisLocked && Number.isFinite(rewDisplayRefDb)) ? (rewDisplayRefDb + 30) : undefined;
 
     // Apply display conditioning (floor only, no clamping)
     const conditioned = applyDisplayConditioningNulls(
       baseSeries,
-      localLockedMin,
-      localLockedMax,
+      rewLockedMin,
+      rewLockedMax,
       yAxisLocked,
       isRewStyle
     );
@@ -2130,22 +2118,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Clean for plotting (sort, deduplicate, ensure strictly increasing)
     const cleaned = cleanPlottedSeries(conditioned);
 
-    // Store stable plot whenever we're NOT dragging (and also seed it the first time)
+    // Cache stable plot ONLY when not dragging
     if (!isDraggingSub && cleaned && cleaned.length > 0) {
       lastStablePlotRef.current = cleaned;
     } else if (!lastStablePlotRef.current && cleaned && cleaned.length > 0) {
+      // allow initial fill if ref is empty
       lastStablePlotRef.current = cleaned;
     }
 
     return cleaned;
   }, [
-    isDraggingSub,
     isRewStyle,
-    yAxisLocked,
-    rewDisplayRefDb,
     rewFinalPlottedSeries,
     displayData,
-    cleanPlottedSeries
+    rewLockedMin,
+    rewLockedMax,
+    yAxisLocked,
+    cleanPlottedSeries,
+    isDraggingSub,
   ]);
   
   // Plot Integrity Check (runs before graph renders)

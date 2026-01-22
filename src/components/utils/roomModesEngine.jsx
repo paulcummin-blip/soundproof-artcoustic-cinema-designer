@@ -259,9 +259,13 @@ export function computeRoomModesResponse({
   // Generate frequency axis FIRST (needed by subProductMeta)
   // REW parity: use DENSE log-spaced grid for continuous, smooth curves
   // Target: 2000 points across 15-200 Hz (eliminates all step artifacts)
-  const freqs = rewParityMode 
-    ? generateLogFrequencyAxis(fMin, fMax, 540) // ~2000 points (1/540 octave spacing)
-    : generateLogFrequencyAxis(fMin, fMax, pointsPerOct);
+  // During drag: use lower resolution for fast preview
+  const effectivePPO = Number.isFinite(pointsPerOct) ? pointsPerOct : 24;
+
+  const freqs =
+    (rewParityMode && !isDragging)
+      ? generateLogFrequencyAxis(fMin, fMax, 540) // High-res for stable view
+      : generateLogFrequencyAxis(fMin, fMax, isDragging ? Math.max(20, effectivePPO) : effectivePPO); // Lower res for drag or default
   
   // Detect product curve type and extract reference SPL
   const subProductMeta = productCurves ? productCurves.map((curve, idx) => {
