@@ -4677,6 +4677,32 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           {plotIntegrityCheck.status === 'VALID' && (
             <div className="text-xs mb-2 bg-blue-50 p-2 rounded border border-blue-400">
               <div className="font-semibold mb-1 text-blue-700">📊 Plot Integrity Check</div>
+              
+              {/* Step Jump Inspector (55–90 Hz) */}
+              {activeDebug?.stepJumpInspector55_90 && (
+                <div style={{ marginTop: 10, padding: 12, border: "1px solid #cfe3ff", borderRadius: 8 }}>
+                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Step Jump Inspector (55–90 Hz)</div>
+
+                  {activeDebug.stepJumpInspector55_90.summary ? (
+                    <>
+                      <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
+                        {`Max jump: ${activeDebug.stepJumpInspector55_90.summary.jumpDb.toFixed(3)} dB
+${activeDebug.stepJumpInspector55_90.summary.f0.toFixed(2)} Hz → ${activeDebug.stepJumpInspector55_90.summary.f1.toFixed(2)} Hz
+${activeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${activeDebug.stepJumpInspector55_90.summary.y1.toFixed(2)} dB`}
+                      </div>
+
+                      <div style={{ height: 8 }} />
+
+                      <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
+                        {JSON.stringify(activeDebug.stepJumpInspector55_90.rows, null, 2)}
+                      </div>
+                    </>
+                  ) : (
+                    <div style={{ fontFamily: "monospace" }}>No jump found in 55–90 Hz.</div>
+                  )}
+                </div>
+              )}
+              
               <div className="text-[10px] font-mono space-y-0.5">
                 <div className={plotIntegrityCheck.pointCount >= 2000 ? 'text-green-600' : plotIntegrityCheck.pointCount >= 1000 ? 'text-yellow-600' : 'text-red-600'}>
                   Point count: {plotIntegrityCheck.pointCount} 
