@@ -127,7 +127,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Drag performance tracking
   const [isDraggingSub, setIsDraggingSub] = useState(false);
   const dragIdleTimerRef = useRef(null);
+  const dragThrottleTimerRef = useRef(null);
+  const dragSettleTimerRef = useRef(null);
+  const lastDragUpdateRef = useRef(0);
   const calcEpochRef = useRef(0); // Request cancellation
+  const yDomainBeforeDragRef = useRef(null);
+  const yAxisLockedBeforeDragRef = useRef(false);
   
   // Draft vs committed positions (freeze simulation during drag)
   const [committedFrontSubs, setCommittedFrontSubs] = useState(null);
@@ -583,22 +588,64 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.__B44_setIsDraggingSub = (dragging) => {
-        setIsDraggingSub(dragging);
+        // Throttle drag updates to 50ms (20 fps max)
+        const now = Date.now();
+        const timeSinceLastUpdate = now - lastDragUpdateRef.current;
         
-        // Clear existing idle timer
-        if (dragIdleTimerRef.current) {
-          clearTimeout(dragIdleTimerRef.current);
-          dragIdleTimerRef.current = null;
+        if (dragging) {
+          // Drag start: capture Y-axis state
+          if (!isDraggingSub) {
+            yDomainBeforeDragRef.current = yAxisDomain;
+            yAxisLockedBeforeDragRef.current = yAxisLocked;
+            setYAxisLocked(true); // Force lock during drag
+          }
+          
+          // Throttle drag updates
+          if (timeSinceLastUpdate < 50) {
+            // Too soon, ignore this update
+            return;
+          }
+          
+          lastDragUpdateRef.current = now;
+          setIsDraggingSub(true);
+          
+          // Clear settle timer if user starts dragging again
+          if (dragSettleTimerRef.current) {
+            clearTimeout(dragSettleTimerRef.current);
+            dragSettleTimerRef.current = null;
+          }
+        } else {
+          // Drag end: start settle timer for full simulation
+          setIsDraggingSub(false);
+          
+          // Clear any pending throttle timers
+          if (dragThrottleTimerRef.current) {
+            clearTimeout(dragThrottleTimerRef.current);
+            dragThrottleTimerRef.current = null;
+          }
+          
+          // Wait 250ms for positions to settle, then run full sim
+          dragSettleTimerRef.current = setTimeout(() => {
+            calcEpochRef.current += 1; // Force full-quality recalc
+            
+            // Restore Y-axis state after full sim completes
+            setTimeout(() => {
+              if (yAxisLockedBeforeDragRef.current !== null) {
+                setYAxisLocked(yAxisLockedBeforeDragRef.current);
+              }
+              yDomainBeforeDragRef.current = null;
+            }, 100);
+          }, 250);
         }
       };
     }
     
     return () => {
-      if (dragIdleTimerRef.current) {
-        clearTimeout(dragIdleTimerRef.current);
-      }
+      if (dragIdleTimerRef.current) clearTimeout(dragIdleTimerRef.current);
+      if (dragThrottleTimerRef.current) clearTimeout(dragThrottleTimerRef.current);
+      if (dragSettleTimerRef.current) clearTimeout(dragSettleTimerRef.current);
     };
-  }, []);
+  }, [isDraggingSub, yAxisDomain, yAxisLocked]);
   
   // Audit curve (no smoothing, no normalization) for sensitivity testing
   const rewModesDataAudit = useMemo(() => {
@@ -850,13 +897,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         seatPosition: seatPos,
         fMin: 20,
         fMax: 200,
-        pointsPerOct: usePreviewProfile ? 60 : 24, // Preview: ~500 pts, Final: ~2000 pts
+        pointsPerOct: usePreviewProfile ? 30 : 24, // Preview: ~250 pts (REW-live), Final: ~2000 pts
         modeLimitHz: usePreviewProfile ? 120 : 200, // Preview: 120 Hz, Final: 200 Hz
         q: roomDamping,
         includeAxial: true,
         includeTangential: true,
         includeOblique: true,
-        includeSBIR: usePreviewProfile ? false : rewSbirEnabled, // Preview: SBIR OFF, Final: user setting
+        includeSBIR: false, // Always OFF for Room-only (no SBIR needed)
         rewParityMode: true,
         smoothing: rewStyleMode ? 'none' : rewSmoothing,
         subFloorHeight: 0.0,
@@ -1216,7 +1263,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         seatPosition: seatPos,
         fMin: 20,
         fMax: 200,
-        pointsPerOct: usePreviewProfile ? 60 : 24, // Preview: ~500 pts, Final: ~2000 pts
+        pointsPerOct: usePreviewProfile ? 30 : 24, // Preview: ~250 pts (REW-live), Final: ~2000 pts
         modeLimitHz: usePreviewProfile ? 120 : 200, // Preview: 120 Hz, Final: 200 Hz
         q: roomDamping,
         includeAxial: modesEnabled,
@@ -2235,12 +2282,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [plottedSeries, activeDebug]);
   
   // Compute yDomain for viewport constraint (when Y-axis is locked)
+  // During drag: freeze at captured domain
   const yDomain = React.useMemo(() => {
+    if (isDraggingSub && yDomainBeforeDragRef.current) {
+      return yDomainBeforeDragRef.current;
+    }
+    
     if (!isRewStyle || !yAxisLocked) return undefined;
     if (!Number.isFinite(rewLockedMin) || !Number.isFinite(rewLockedMax)) return undefined;
     
     return [rewLockedMin, rewLockedMax];
-  }, [isRewStyle, yAxisLocked, rewLockedMin, rewLockedMax]);
+  }, [isRewStyle, yAxisLocked, rewLockedMin, rewLockedMax, isDraggingSub]);
   
   // Count nulled points (for user feedback)
   const { belowFloor, clampedToMin, clampedToMax } = React.useMemo(() => {
@@ -5311,8 +5363,8 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                   toggles={toggles}
                   crossoverFrequency={80}
                   modeFrequencies={modeFrequencies}
-                  showModeMarkers={rewStyleMode ? showRewModeLines : showModeMarkers}
-                  modeMarkers={modeMarkersForGraph}
+                  showModeMarkers={isDraggingSub ? false : (rewStyleMode ? showRewModeLines : showModeMarkers)}
+                  modeMarkers={isDraggingSub ? { axial: [], tangential: [], oblique: [] } : modeMarkersForGraph}
                   linearHzAxis={rewStyleMode && linearHzAxis}
                   rewStyleMode={rewStyleMode}
                   yDomain={yDomain}
