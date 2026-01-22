@@ -132,7 +132,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const lastDragUpdateRef = useRef(0);
   const calcEpochRef = useRef(0); // Request cancellation
   const yDomainBeforeDragRef = useRef(null);
-  const yAxisLockedBeforeDragRef = useRef(false);
+  const yDomainDuringDragRef = React.useRef(null);
   const [dragYDomain, setDragYDomain] = React.useState(null);
   
   // Force re-sim key that ACTUALLY triggers re-render (ref.current does not)
@@ -612,7 +612,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           if (!isDraggingSub) {
             // If axis is locked in REW mode, use the locked ±30 dB window (REW-like)
             if (rewStyleMode && yAxisLocked && Number.isFinite(rewDisplayRefDb)) {
-              setDragYDomain([rewDisplayRefDb - 30, rewDisplayRefDb + 30]);
+              const domain = [rewDisplayRefDb - 30, rewDisplayRefDb + 30];
+              yDomainDuringDragRef.current = domain;
+              setDragYDomain(domain);
             } else {
               // Otherwise capture from last stable plotted series (most stable visual result)
               const series = lastStablePlotRef.current;
@@ -633,17 +635,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   const snappedMin = Math.floor(rawMin / step) * step;
                   const snappedMax = Math.ceil(rawMax / step) * step;
 
-                  setDragYDomain([snappedMin, snappedMax]);
+                  const domain = [snappedMin, snappedMax];
+                  yDomainDuringDragRef.current = domain;
+                  setDragYDomain(domain);
                 } else {
-                  setDragYDomain([60, 120]);
+                  const domain = [60, 120];
+                  yDomainDuringDragRef.current = domain;
+                  setDragYDomain(domain);
                 }
               } else {
-                setDragYDomain([60, 120]);
+                const domain = [60, 120];
+                yDomainDuringDragRef.current = domain;
+                setDragYDomain(domain);
               }
             }
-
-            yAxisLockedBeforeDragRef.current = yAxisLocked;
-            setYAxisLocked(true);
           }
           
           // Throttle drag updates
@@ -697,6 +702,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         } else {
           // Drag end: start settle timer for full simulation
           setIsDraggingSub(false);
+          yDomainDuringDragRef.current = null;
           setDragYDomain(null);
           
           // Clear any pending throttle timers
@@ -711,12 +717,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             previewRearSubsRef.current = null;
             
             setCalcEpoch(v => v + 1); // Force full-quality recalc (real render)
-            
-            // Restore Y-axis state after full sim completes
-            setTimeout(() => {
-              setYAxisLocked(!!yAxisLockedBeforeDragRef.current);
-              yDomainBeforeDragRef.current = null;
-            }, 50);
           }, 250);
         }
       };
@@ -1346,7 +1346,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         fMin: 20,
         fMax: 200,
         pointsPerOct: usePreviewProfile ? 30 : 24, // Preview: ~250 pts (REW-live), Final: ~2000 pts
-        modeLimitHz: usePreviewProfile ? 120 : 200, // Preview: 120 Hz, Final: 200 Hz
+        modeLimitHz: 200,
         q: roomDamping,
         includeAxial: modesEnabled,
         includeTangential: modesEnabled,
@@ -2074,7 +2074,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   const finalYDomain = React.useMemo(() => {
     if (isDraggingSub) {
-      const d = dragYDomain;
+      const d = yDomainDuringDragRef.current;
       if (Array.isArray(d) && d.length === 2 && Number.isFinite(d[0]) && Number.isFinite(d[1])) return d;
       return undefined; // IMPORTANT: do not force a random fallback window
     }
@@ -2085,7 +2085,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
 
     return undefined;
-  }, [isDraggingSub, dragYDomain, rewStyleMode, yAxisLocked, isRewStyle, rewLockedMin, rewLockedMax]);
+  }, [isDraggingSub, rewStyleMode, yAxisLocked, isRewStyle, rewLockedMin, rewLockedMax]);
 
   // PLOT INTEGRITY CHECK: Ensure clean, sorted, deduplicated data
   const cleanPlottedSeries = React.useCallback((rawSeries) => {
