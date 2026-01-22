@@ -165,10 +165,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Complex eigenfunctions toggle (Part H3 - REW parity phase behaviour)
   const [complexEigenfunctions, setComplexEigenfunctions] = useState(false);
   
-  // X-axis range control (default 20-200 Hz for bass focus)
-  const [xAxisMinHz, setXAxisMinHz] = useState(20);
-  const [xAxisMaxHz, setXAxisMaxHz] = useState(200);
-  
   // Coupling phase probe (Part HB - verify complex eigenfunctions are active)
   const [couplingProbeMode, setCouplingProbeMode] = useState('auto'); // 'auto' or '1,0,0' etc
   const [couplingProbeUseComplex, setCouplingProbeUseComplex] = useState(false);
@@ -4580,50 +4576,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 Time align subs (MLP) — REW-style
               </Label>
             </div>
-            
-            {/* X-axis range controls */}
-            <div className="flex items-center gap-2 mt-2">
-              <Label className="text-xs text-[#3E4349]">
-                Graph Range:
-              </Label>
-              <input
-                type="number"
-                value={xAxisMinHz}
-                onChange={(e) => {
-                  const val = Math.max(10, Math.min(250, parseInt(e.target.value) || 20));
-                  setXAxisMinHz(val);
-                  if (val >= xAxisMaxHz) {
-                    setXAxisMaxHz(val + 10);
-                  }
-                }}
-                className="w-16 text-xs border border-[#DCDBD6] rounded px-2 py-1"
-              />
-              <span className="text-xs text-[#3E4349]">–</span>
-              <input
-                type="number"
-                value={xAxisMaxHz}
-                onChange={(e) => {
-                  const val = Math.max(10, Math.min(300, parseInt(e.target.value) || 200));
-                  setXAxisMaxHz(val);
-                  if (val <= xAxisMinHz) {
-                    setXAxisMinHz(val - 10);
-                  }
-                }}
-                className="w-16 text-xs border border-[#DCDBD6] rounded px-2 py-1"
-              />
-              <span className="text-xs text-[#3E4349]">Hz</span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setXAxisMinHz(20);
-                  setXAxisMaxHz(200);
-                }}
-                className="text-xs h-6 px-2"
-              >
-                Reset
-              </Button>
-            </div>
 
             {/* Live state readout (audit) */}
             <div className="text-[9px] font-mono bg-yellow-50 p-1 rounded border border-yellow-300 mt-2">
@@ -5364,7 +5316,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                   linearHzAxis={rewStyleMode && linearHzAxis}
                   rewStyleMode={rewStyleMode}
                   yDomain={yDomain}
-                  xDomain={[xAxisMinHz, xAxisMaxHz]}
+                  xDomain={[20, 200]}
                   showAxialOnly={false}
                   refDb={rewStyleMode ? (rewRelativeView ? 0 : rewDisplayRefDb) : (rewRelativeView ? 0 : 85)}
                   disableHighlight={rewRelativeView}
