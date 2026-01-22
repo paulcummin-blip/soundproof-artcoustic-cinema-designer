@@ -49,6 +49,7 @@ export default function BassGraph({
   linearHzAxis = false,
   rewStyleMode = false,
   yDomain,
+  xDomain = null,
   yMin,
   yMax,
   showAxialOnly = false,
@@ -176,18 +177,22 @@ export default function BassGraph({
         return { axial: [], tangential: [], oblique: [] };
     }, [modeMarkers]);
 
-    // Determine Y-axis domain
+    // Determine X-axis domain
+    const xMin = xDomain?.[0] ?? 20;
+    const xMax = xDomain?.[1] ?? 200;
+    
+    // Determine Y-axis domain (only use data within X range)
     let calculatedYMin, calculatedYMax;
-    let calculatedXMax = 200;
 
     // CRITICAL: If yDomain provided (viewport constraint), use it directly
     if (yDomain && Array.isArray(yDomain) && yDomain.length === 2 && Number.isFinite(yDomain[0]) && Number.isFinite(yDomain[1])) {
       calculatedYMin = yDomain[0];
       calculatedYMax = yDomain[1];
     }
-    // REW mode: compute Y domain from actual plotted data (only finite values)
+    // REW mode: compute Y domain from actual plotted data (only finite values within X range)
     else if (rewStyleMode) {
       const splValues = chartData
+        .filter(d => d.frequency >= xMin && d.frequency <= xMax)
         .map(d => d.spl)
         .filter(v => Number.isFinite(v));
 
@@ -251,11 +256,6 @@ export default function BassGraph({
       } else {
         yTicks = ticks;
       }
-    }
-
-    // Smart X-axis for REW mode
-    if (rewStyleMode && schroederFrequency > 0) {
-      calculatedXMax = Math.max(120, Math.min(200, schroederFrequency * 1.2));
     }
 
     // Render mode markers with hover tooltips (REW parity overlay)
@@ -354,7 +354,7 @@ export default function BassGraph({
                     <XAxis
                         dataKey="frequency"
                         type="number"
-                        domain={rewStyleMode ? [20, calculatedXMax] : ['dataMin', 'dataMax']}
+                        domain={[xMin, xMax]}
                         scale={linearHzAxis ? "linear" : "log"}
                         ticks={linearHzAxis 
                           ? [20, 30, 40, 50, 60, 80, 100, 120, 160, 200] 
