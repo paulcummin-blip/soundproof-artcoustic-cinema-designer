@@ -1988,8 +1988,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return top5Jumps.map((jump, jumpIndex) => {
         const f1Hz = jump.hzPrev;
         const f2Hz = jump.hzNow;
-        const spl1 = jump.dbPrev;
-        const spl2 = jump.dbNow;
+        const idx1 = jump.idx - 1; // Previous point index
+        const idx2 = jump.idx;      // Current point index
         
         // Find nearest term count rows
         const findNearest = (targetFreq) => {
@@ -2012,36 +2012,62 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         
         if (!row1 || !row2) return null;
         
+        // Extract SBIR contribution from modal total (rough approximation for display)
+        // modalDb in termCountDebug is the total coherent pressure (modal+SBIR)
+        const sbirDb1 = null; // Not separated in current debug data
+        const sbirDb2 = null;
+        
+        // Check if clamped (based on locked Y-axis window)
+        const isClamped1 = (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax))
+          ? (jump.dbPrev < rewLockedMin || jump.dbPrev > rewLockedMax)
+          : false;
+        const isClamped2 = (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax))
+          ? (jump.dbNow < rewLockedMin || jump.dbNow > rewLockedMax)
+          : false;
+        
         return {
           jumpIndex: jumpIndex + 1,
-          f1Hz,
-          f2Hz,
-          spl1,
-          spl2,
+          fromHz: f1Hz,
+          toHz: f2Hz,
+          deltaHz: f2Hz - f1Hz,
+          fromDb: jump.dbPrev,
+          toDb: jump.dbNow,
           jumpDb: jump.jumpDb,
-          row1: {
+          fromIndex: idx1,
+          toIndex: idx2,
+          fromRow: {
             exactFreqHz: row1.exactFreqHz,
+            finalDb: jump.dbPrev, // Actual plotted value
+            modalDb: row1.modalDb,
+            sbirDb: sbirDb1,
+            modesConsidered: row1.modesConsidered,
             modesUsed: row1.modesUsed,
             sbirReflectionsUsed: row1.sbirReflectionsUsed,
             activeTermsTotal: row1.activeTermsTotal,
-            modalDb: row1.modalDb,
             modesSkippedBandwidth: row1.modesSkippedBandwidth,
-            modesSkippedCoupling: row1.modesSkippedCoupling
+            modesSkippedCoupling: row1.modesSkippedCoupling,
+            isClamped: isClamped1
           },
-          row2: {
+          toRow: {
             exactFreqHz: row2.exactFreqHz,
+            finalDb: jump.dbNow,
+            modalDb: row2.modalDb,
+            sbirDb: sbirDb2,
+            modesConsidered: row2.modesConsidered,
             modesUsed: row2.modesUsed,
             sbirReflectionsUsed: row2.sbirReflectionsUsed,
             activeTermsTotal: row2.activeTermsTotal,
-            modalDb: row2.modalDb,
             modesSkippedBandwidth: row2.modesSkippedBandwidth,
-            modesSkippedCoupling: row2.modesSkippedCoupling
+            modesSkippedCoupling: row2.modesSkippedCoupling,
+            isClamped: isClamped2
           },
           deltas: {
             deltaModesUsed: row2.modesUsed - row1.modesUsed,
             deltaSbirReflectionsUsed: row2.sbirReflectionsUsed - row1.sbirReflectionsUsed,
             deltaActiveTermsTotal: row2.activeTermsTotal - row1.activeTermsTotal,
-            deltaModalDb: row2.modalDb - row1.modalDb
+            deltaModalDb: row2.modalDb - row1.modalDb,
+            deltaModesSkippedBw: row2.modesSkippedBandwidth - row1.modesSkippedBandwidth,
+            deltaModesSkippedCoup: row2.modesSkippedCoupling - row1.modesSkippedCoupling
           }
         };
       }).filter(Boolean);
@@ -4706,43 +4732,108 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   )}
                 </div>
                 
-                {/* Step Pair Debug (correlate jumps with term counts) */}
+                {/* Jump Inspector (Top SPL steps) */}
                 {plotIntegrityCheck.stepPairDebug && plotIntegrityCheck.stepPairDebug.length > 0 && (
                   <div className="mt-2 pt-2 border-t border-red-400">
-                    <div className="font-semibold text-red-700 mb-1">Step Pair Debug (55–80 Hz):</div>
-                    <div className="space-y-2 text-[9px] font-mono max-h-64 overflow-y-auto">
+                    <div className="font-semibold text-red-700 mb-2">Jump Inspector (Top SPL steps):</div>
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
                       {plotIntegrityCheck.stepPairDebug.map((pair, i) => (
-                        <div key={i} className="border-l-4 border-red-400 pl-2 bg-red-50 rounded py-1">
-                          <div className="font-semibold text-red-800">
-                            #{pair.jumpIndex} {pair.f1Hz.toFixed(2)}→{pair.f2Hz.toFixed(2)} Hz | 
-                            {pair.spl1.toFixed(2)}→{pair.spl2.toFixed(2)} dB | 
-                            {pair.jumpDb >= 0 ? '+' : ''}{pair.jumpDb.toFixed(2)} dB
+                        <div key={i} className="bg-red-50 rounded border border-red-300 p-2">
+                          <div className="font-semibold text-red-800 mb-2 text-[10px]">
+                            Jump {pair.jumpIndex}: {pair.fromHz.toFixed(2)} → {pair.toHz.toFixed(2)} Hz 
+                            (Δf={pair.deltaHz.toFixed(4)} Hz), 
+                            {pair.fromDb.toFixed(2)} → {pair.toDb.toFixed(2)} dB 
+                            (Δ={pair.jumpDb >= 0 ? '+' : ''}{pair.jumpDb.toFixed(2)} dB)
                           </div>
-                          <div className="text-[8px] mt-1 space-y-0.5 text-gray-700">
-                            <div>
-                              row1 @ {pair.row1.exactFreqHz.toFixed(3)} Hz: 
-                              modes={pair.row1.modesUsed}, 
-                              sbir={pair.row1.sbirReflectionsUsed}, 
-                              total={pair.row1.activeTermsTotal}, 
-                              modalDb={pair.row1.modalDb.toFixed(2)}
-                            </div>
-                            <div>
-                              row2 @ {pair.row2.exactFreqHz.toFixed(3)} Hz: 
-                              modes={pair.row2.modesUsed}, 
-                              sbir={pair.row2.sbirReflectionsUsed}, 
-                              total={pair.row2.activeTermsTotal}, 
-                              modalDb={pair.row2.modalDb.toFixed(2)}
-                            </div>
-                            <div className={
-                              Math.abs(pair.deltas.deltaModesUsed) > 0 || Math.abs(pair.deltas.deltaSbirReflectionsUsed) > 0 
-                                ? 'text-red-700 font-bold bg-red-200 px-1 rounded' 
-                                : 'text-green-700'
-                            }>
-                              deltas: Δmodes={pair.deltas.deltaModesUsed}, 
-                              Δsbir={pair.deltas.deltaSbirReflectionsUsed}, 
-                              Δterms={pair.deltas.deltaActiveTermsTotal}, 
-                              ΔmodalDb={pair.deltas.deltaModalDb.toFixed(2)}
-                            </div>
+                          
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-[8px] font-mono border-collapse">
+                              <thead>
+                                <tr className="border-b-2 border-red-400 bg-red-100">
+                                  <th className="text-left p-1">Point</th>
+                                  <th className="text-right p-1">exactFreqHz</th>
+                                  <th className="text-right p-1">finalDb</th>
+                                  <th className="text-right p-1">modalDb</th>
+                                  <th className="text-right p-1">sbirDb</th>
+                                  <th className="text-right p-1">modesUsed</th>
+                                  <th className="text-right p-1">sbir</th>
+                                  <th className="text-right p-1">total</th>
+                                  <th className="text-right p-1">skip:bw</th>
+                                  <th className="text-right p-1">skip:coup</th>
+                                  <th className="text-right p-1">clamp</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                <tr className="border-b border-red-200">
+                                  <td className="p-1 font-semibold">From</td>
+                                  <td className="text-right p-1">{pair.fromRow.exactFreqHz.toFixed(3)}</td>
+                                  <td className={`text-right p-1 ${Math.abs(pair.jumpDb) > 2.0 ? 'bg-yellow-200' : ''}`}>
+                                    {pair.fromRow.finalDb.toFixed(2)}
+                                  </td>
+                                  <td className={`text-right p-1 ${Math.abs(pair.deltas.deltaModalDb) > 2.0 ? 'bg-yellow-200' : ''}`}>
+                                    {pair.fromRow.modalDb.toFixed(2)}
+                                  </td>
+                                  <td className="text-right p-1">{pair.fromRow.sbirDb !== null ? pair.fromRow.sbirDb.toFixed(2) : '—'}</td>
+                                  <td className={`text-right p-1 ${pair.deltas.deltaModesUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                    {pair.fromRow.modesUsed}
+                                  </td>
+                                  <td className={`text-right p-1 ${pair.deltas.deltaSbirReflectionsUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                    {pair.fromRow.sbirReflectionsUsed}
+                                  </td>
+                                  <td className={`text-right p-1 ${pair.deltas.deltaActiveTermsTotal !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                    {pair.fromRow.activeTermsTotal}
+                                  </td>
+                                  <td className={`text-right p-1 ${pair.deltas.deltaModesSkippedBw !== 0 ? 'bg-orange-200' : ''}`}>
+                                    {pair.fromRow.modesSkippedBandwidth}
+                                  </td>
+                                  <td className={`text-right p-1 ${pair.deltas.deltaModesSkippedCoup !== 0 ? 'bg-orange-200' : ''}`}>
+                                    {pair.fromRow.modesSkippedCoupling}
+                                  </td>
+                                  <td className="text-right p-1">{pair.fromRow.isClamped ? 'YES' : 'no'}</td>
+                                </tr>
+                                <tr className="border-b border-red-200">
+                                  <td className="p-1 font-semibold">To</td>
+                                  <td className="text-right p-1">{pair.toRow.exactFreqHz.toFixed(3)}</td>
+                                  <td className={`text-right p-1 ${Math.abs(pair.jumpDb) > 2.0 ? 'bg-yellow-200' : ''}`}>
+                                    {pair.toRow.finalDb.toFixed(2)}
+                                  </td>
+                                  <td className={`text-right p-1 ${Math.abs(pair.deltas.deltaModalDb) > 2.0 ? 'bg-yellow-200' : ''}`}>
+                                    {pair.toRow.modalDb.toFixed(2)}
+                                  </td>
+                                  <td className="text-right p-1">{pair.toRow.sbirDb !== null ? pair.toRow.sbirDb.toFixed(2) : '—'}</td>
+                                  <td className={`text-right p-1 ${pair.deltas.deltaModesUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                    {pair.toRow.modesUsed}
+                                  </td>
+                                  <td className={`text-right p-1 ${pair.deltas.deltaSbirReflectionsUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                    {pair.toRow.sbirReflectionsUsed}
+                                  </td>
+                                  <td className={`text-right p-1 ${pair.deltas.deltaActiveTermsTotal !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                    {pair.toRow.activeTermsTotal}
+                                  </td>
+                                  <td className={`text-right p-1 ${pair.deltas.deltaModesSkippedBw !== 0 ? 'bg-orange-200' : ''}`}>
+                                    {pair.toRow.modesSkippedBandwidth}
+                                  </td>
+                                  <td className={`text-right p-1 ${pair.deltas.deltaModesSkippedCoup !== 0 ? 'bg-orange-200' : ''}`}>
+                                    {pair.toRow.modesSkippedCoupling}
+                                  </td>
+                                  <td className="text-right p-1">{pair.toRow.isClamped ? 'YES' : 'no'}</td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                          
+                          {/* Diagnosis */}
+                          <div className="mt-2 pt-2 border-t border-red-300 text-[9px]">
+                            {pair.deltas.deltaModesUsed !== 0 || pair.deltas.deltaSbirReflectionsUsed !== 0 ? (
+                              <div className="text-red-700 font-bold">
+                                🚨 CAUSE: Term count changed (Δmodes={pair.deltas.deltaModesUsed}, Δsbir={pair.deltas.deltaSbirReflectionsUsed})
+                                → Check bandwidth/coupling thresholds
+                              </div>
+                            ) : (
+                              <div className="text-green-700">
+                                ✓ Counts stable (Δmodes=0, Δsbir=0) → Check summation/phase logic
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
