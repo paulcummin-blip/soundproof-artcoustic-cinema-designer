@@ -26,6 +26,32 @@ function peakDipDelta(freqs, dbArray, loHz, hiHz) {
   return { peakDb: peak, dipDb: dip, peakHz, dipHz, deltaDb: peak - dip };
 }
 
+// Helper to find the largest adjacent jump in a frequency band
+const findLargestAdjacentJump = (freqs, dbArr, fMin = 55, fMax = 90) => {
+  if (!Array.isArray(freqs) || !Array.isArray(dbArr)) return null;
+
+  let best = null;
+
+  for (let i = 1; i < freqs.length; i++) {
+    const f0 = freqs[i - 1];
+    const f1 = freqs[i];
+    if (!(f0 >= fMin && f0 <= fMax && f1 >= fMin && f1 <= fMax)) continue;
+
+    const y0 = dbArr[i - 1];
+    const y1 = dbArr[i];
+    if (!Number.isFinite(y0) || !Number.isFinite(y1)) continue;
+
+    const jumpDb = Math.abs(y1 - y0);
+    const df = f1 - f0;
+
+    if (!best || jumpDb > best.jumpDb) {
+      best = { i0: i - 1, i1: i, f0, f1, y0, y1, jumpDb, df };
+    }
+  }
+
+  return best;
+};
+
 /**
  * Compute room modes response (axial, tangential, oblique)
  * Returns frequency response based on room geometry and positions
@@ -508,6 +534,9 @@ export function computeRoomModesResponse({
   // ENGINE TRACE: Per-frequency calculation breakdown (for step drilldown)
   const engineTrace = [];
 
+  // STEP JUMP DEBUG: Track term counts for 55-90 Hz (extended range for step detection)
+  const termCountDebug55_90Hz = [];
+
   let splDb = freqs.map((f, i) => {
     let sumRe_modal = 0;
     let sumIm_modal = 0;
@@ -967,6 +996,22 @@ export function computeRoomModesResponse({
       });
     }
 
+    // STEP JUMP DEBUG: Track term counts for 55-90 Hz (extended range)
+    if (f >= 55 && f <= 90) {
+      termCountDebug55_90Hz.push({
+        exactFreqHz: f,
+        idx: i,
+        modesConsidered: Number.isFinite(modesConsidered) ? modesConsidered : 0,
+        modesUsed: Number.isFinite(modesUsed) ? modesUsed : 0,
+        modesSkippedBandwidth: Number.isFinite(modesSkippedBandwidth) ? modesSkippedBandwidth : 0,
+        modesSkippedCoupling: Number.isFinite(modesSkippedCoupling) ? modesSkippedCoupling : 0,
+        sbirReflectionsUsed: Number.isFinite(sbirReflectionsUsed) ? sbirReflectionsUsed : 0,
+        activeTermsTotal: Number.isFinite(activeTerms) ? activeTerms : 0,
+        coherentRawDb: Number.isFinite(coherentPressureRaw) ? coherentPressureRaw : null,
+        modalDb: Number.isFinite(modalDb) ? modalDb : null,
+      });
+    }
+
     // ENGINE TRACE: Reuse magnitude values already computed for RMS tracking
     const modalDbForTrace = modalMagDb_all.length > 0 ? modalMagDb_all[modalMagDb_all.length - 1] : 0;
     const sbirDbForTrace = sbirMagDb_all.length > 0 ? sbirMagDb_all[sbirMagDb_all.length - 1] : 0;
@@ -989,7 +1034,7 @@ export function computeRoomModesResponse({
     return modalDb;
     });
   
-  return { splDb, modalBandDb, sbirBandDb, coherentRawDb };
+  return { splDb, modalBandDb, sbirBandDb, coherentRawDb, termCountDebug55_90Hz };
   }; // End of runOnce
 
   // Run engine with normal sources - FIRST PASS to collect statistics
@@ -1019,6 +1064,7 @@ export function computeRoomModesResponse({
   const splDb = secondPass.splDb;
   const rawCoherentDb = secondPass.coherentRawDb;
   const engineTraceFinal = secondPass.engineTrace;
+  const termCountDebug55_90HzPass2 = secondPass.termCountDebug55_90Hz || [];
 
   
   
@@ -1863,6 +1909,45 @@ export function computeRoomModesResponse({
     // Guard: ensure debug container exists
     if (!baseReturn.debug) baseReturn.debug = {};
     baseReturn.debug.audit40_70 = audit40_70;
+
+    // Step Jump Inspector (55–90 Hz): find the single biggest adjacent jump,
+    // then show the two rows that caused it.
+    const step = findLargestAdjacentJump(freqs, plottedDb, 55, 90);
+
+    if (step && Array.isArray(termCountDebug55_90HzPass2)) {
+      // Enrich term counts with all pipeline stage values
+      const enrichedDebug = termCountDebug55_90HzPass2.map((row, idx) => {
+        const i = row.idx;
+        return {
+          ...row,
+          splDbForPipeline: Number.isFinite(splDbForPipeline?.[i]) ? splDbForPipeline[i] : null,
+          splDbSchroeder: Number.isFinite(splDbSchroeder?.[i]) ? splDbSchroeder[i] : null,
+          splDbRepaired: Number.isFinite(splDbRepaired?.[i]) ? splDbRepaired[i] : null,
+          plottedDb: Number.isFinite(plottedDb?.[i]) ? plottedDb[i] : null,
+        };
+      });
+
+      const row0 = enrichedDebug.find(r => Math.abs(r.exactFreqHz - step.f0) < 1e-6) || null;
+      const row1 = enrichedDebug.find(r => Math.abs(r.exactFreqHz - step.f1) < 1e-6) || null;
+
+      baseReturn.debug.stepJumpInspector55_90 = {
+        summary: {
+          f0: step.f0,
+          f1: step.f1,
+          y0: step.y0,
+          y1: step.y1,
+          jumpDb: step.jumpDb,
+          df: step.df,
+        },
+        rows: [row0, row1],
+      };
+
+      // Always attach the term count list too (so we can scroll it if needed)
+      baseReturn.debug.termCountDebug55_90Hz = enrichedDebug;
+    } else {
+      baseReturn.debug.stepJumpInspector55_90 = { summary: null, rows: [] };
+      baseReturn.debug.termCountDebug55_90Hz = [];
+    }
   }
 
   // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)
