@@ -505,6 +505,9 @@ export function computeRoomModesResponse({
   // DEBUG: Track term counts for 55-80 Hz band (step detection)
   const termCountDebug = [];
 
+  // ENGINE TRACE: Per-frequency calculation breakdown (for step drilldown)
+  const engineTrace = [];
+
   let splDb = freqs.map((f, i) => {
     let sumRe_modal = 0;
     let sumIm_modal = 0;
@@ -964,6 +967,30 @@ export function computeRoomModesResponse({
       });
     }
 
+    // ENGINE TRACE: Capture calculation breakdown for ALL frequencies
+    const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
+    const modalDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, modalMag));
+
+    const sbirMag = Math.sqrt(sumRe_sbir * sumRe_sbir + sumIm_sbir * sumIm_sbir);
+    const sbirDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, sbirMag));
+
+    const totalMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
+    const totalDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, totalMag));
+
+    engineTrace.push({
+      idx: i,
+      exactFreqHz: f,
+      modalDb: modalDbRaw,
+      sbirDb: sbirDbRaw,
+      totalDb: totalDbRaw,
+      modesConsidered,
+      modesUsed,
+      modesSkippedBandwidth,
+      modesSkippedCoupling,
+      sbirReflectionsUsed,
+      activeTermsTotal: activeTerms
+    });
+
     return modalDb;
     });
   
@@ -996,6 +1023,7 @@ export function computeRoomModesResponse({
   const secondPass = runOnce(null, sbirTrimLinear);
   const splDb = secondPass.splDb;
   const rawCoherentDb = secondPass.coherentRawDb;
+  const engineTraceFinal = secondPass.engineTrace;
 
   
   
@@ -1734,186 +1762,57 @@ export function computeRoomModesResponse({
     ? continuityBand60_90.reduce((sum, d) => sum + d.deltaDb, 0) / continuityBand60_90.length
     : 0;
 
-  const baseReturn = {
-    freqs: [...safeFreqs],
-    splDb: [...safeDisplayDb],
-    engineFinalDb: rewParityMode ? [...safeFinalDb] : null,
-    plottedDb: [...safeDisplayPlottedDb],
-    coherentRawDb: rewParityMode ? [...rawCoherentDb] : null,
-    debug: {
-      roomDimsUsedM: {
-        widthM: Number(widthM),
-        lengthM: Number(lengthM),
-        heightM: Number(heightM),
-      },
-      lowestAxialHz: Number.isFinite(lowestAxial) ? lowestAxial : null,
-      modesEnabled: includeAxialLocal || includeTangentialLocal || includeObliqueLocal,
-      rawEngineOutput: !!rawEngineOutput,
-      sealedBoostEnabled: !!sealedBoostEnabled,
-      schroederHz,
-      modeMarkersHz: [...modeMarkersHz],
-      modeMarkersAllHz: [...modeMarkersAllHz],
-      modeMarkers: modeMarkers.map(m => ({ ...m, n: [...m.n] })),
-      modeListFirst60: [...modeListFirst60],
-      modeCount: modes.length,
-      modalModeCountUsed: modes.length, // Tracks actual mode count used in plot (Part C)
-      modeIsolationActive: modeIsolation && modeIsolation !== 'off',
-      axialCount,
-      tangentialCount,
-      obliqueCount,
-      firstTenModeHz: [...firstTenModeHz],
-      lowestAxialHz: lowestAxial,
-      blendStartHz: lowestAxial * 0.7,
-      blendEndHz: lowestAxial,
-      qBase: qBase.toFixed(1),
-      qMappingText,
-      rewParityDamping,
-      absoluteSplMode: isAbsolute,
-      relativeViewEnabled: isRelative,
-      normBandHz: actualNormBand,
-      normApplied: normAppliedActual,
-      normRefDb: Number.isFinite(normRefDb) ? normRefDb.toFixed(2) : (isRelative ? "0.0" : "85.0"),
-      smoothingApplied,
-      inputSig,
-      nonFiniteRepaired,
-      rawRange: rawRange.toFixed(2),
-      preNormRange: preNormRange.toFixed(2),
-      postNormRange: postNormRange.toFixed(2),
-      productCurvesApplied: !!subProductCurves,
-      normalizeBandHz: actualNormBand,
-      pressureEnabled: false,
-      pressureThresholdHz: null,
-      pressureRegion: null,
-      lfDeltaDb_20_30: lfDeltaDb_20_30 !== null ? lfDeltaDb_20_30.toFixed(2) : 'N/A',
-      splMinDb: splMinDb.toFixed(1),
-      splMaxDb: splMaxDb.toFixed(1),
-      splRangeDb: splRangeDb.toFixed(1),
-      normalizeToDb: normalizeToDb !== undefined ? normalizeToDb : null,
-      productCurveStats,
-      calibrationMode: isAbsolute ? "Absolute SPL" : "Relative (normalized)",
-      sourceCountUsed,
-      sourcePositionsUsed: [...sourcePositionsUsed],
-      sourceSigUsed,
-      seatSigUsed,
-      sourceSigRounded,
-      seatSigRounded,
-      splDbRepaired: rewParityMode ? [...splDbRepaired] : null,
-      lfDebug15_45Hz: {
-        modalMagDb: `${modalMagMin} to ${modalMagMax}`,
-        note: "Pure modal pressure magnitudes before calibration offset"
-      },
-      lfProbe: {
-        probeFrequencies: probeFreqs,
-        measurements: lfProbe,
-        pressureRegionActive: sealedBoostEnabled,
-        pressureGainSettings: {
-          kDbPerOct: sealedBoostKDbPerOct.toFixed(1),
-          maxGainDb: sealedBoostMaxGainDb.toFixed(1),
-          enabled: sealedBoostEnabled
-        },
-        minModalWeight: 0.15,
-        lowestAxialHz: lowestAxial,
-        blendStartHz: lowestAxial ? (lowestAxial * 0.7).toFixed(1) : 'N/A',
-        blendEndHz: lowestAxial ? lowestAxial.toFixed(1) : 'N/A',
-        absoluteSplMode: isAbsolute,
-        relativeViewEnabled: isRelative,
-        subProductCurvesPresent: !!(subProductCurves && Array.isArray(subProductCurves) && subProductCurves.length > 0),
-        lfSanityCheck,
-        lfDelta_25_69,
-        upperBassDelta_69_120
-      },
-      lfProbeRaw: Array.isArray(lfProbeRaw) ? lfProbeRaw.map(r => ({ ...r })) : lfProbeRaw,
-      seatNodeCheck: seatNodeCheck ? { ...seatNodeCheck } : null,
-      autoLevelToMLP: autoLevelEnabled,
-      mlpAutoLevelGainsDb: Array.isArray(mlpAutoLevelGainsDb) ? mlpAutoLevelGainsDb.map(g => (Number.isFinite(g) ? g.toFixed(2) : "0.00")) : [],
-      mlpBand: [30, 80],
-      rewParityMode: rewParityMode,
-      modalOnly: rewParityMode,
-      imageFieldEnabled: imageFieldEnabledActual,
-      reflectionBeta: beta ? {
-        front: beta.front.toFixed(3),
-        back: beta.back.toFixed(3),
-        left: beta.left.toFixed(3),
-        right: beta.right.toFixed(3),
-        ceiling: beta.ceiling.toFixed(3),
-        floor: beta.floor.toFixed(3)
-      } : null,
-      sbirEnabled,
-      sbirEnabledPassed: includeSBIR, // Actual value passed from UI
-      modesEnabledPassed: includeAxial || includeTangential || includeOblique, // Actual modes toggle from UI
-      sbirMaxOrder: sbirMaxOrder,
-      sbirBlendStartHz: sbirEnabled ? sbirBlendStartHzActual.toFixed(1) : 'N/A',
-      sbirBlendEndHz: sbirEnabled ? sbirBlendEndHzActual.toFixed(1) : 'N/A',
-      sbirDebugProbe40Hz: !isDragging ? sbirDebugProbe40Hz : null,
-      sbirDebugProbe63Hz: !isDragging && sbirDebugProbe63Hz_captured ? sbirDebugProbe63Hz_captured : null,
-      modeContributions: !isDragging ? modeContributions : null,
-      phaseCheckAvailable: typeof globalThis !== 'undefined' && globalThis.__B44_PHASE_CHECK ? true : false,
-      calRefBandHz: calRefBandHz,
-      calRefMedianDbBefore: Number.isFinite(calRefMedianDbBefore) ? calRefMedianDbBefore.toFixed(2) : 'N/A',
-      displayOffsetDb: (rewParityMode && isRelative) ? displayOffsetDb.toFixed(2) : "0.00",
-      displayShiftMode: (rewParityMode && isRelative) ? "REW relative (median 30–80 Hz -> 0 dB)" : "none",
-      calRefMedianDbAfter: Number.isFinite(calRefMedianDbAfter) ? calRefMedianDbAfter.toFixed(2) : 'N/A',
-      rawEngineOutputMode: rawEngineOutput,
-      blendStartHz: !rawEngineOutput && schroederHz > 0 ? (schroederHz * 1.0).toFixed(1) : 'N/A',
-      blendEndHz: !rawEngineOutput && schroederHz > 0 ? (schroederHz * 1.8).toFixed(1) : 'N/A',
-      modeDensityCompActive: !rawEngineOutput && rewParityMode,
-      modeCouplingSanity: __b44ModeCouplingSanity ? { 
-        seatM: { ...__b44ModeCouplingSanity.seatM },
-        srcM: { ...__b44ModeCouplingSanity.srcM },
-        normSeat: { ...__b44ModeCouplingSanity.normSeat },
-        normSrc: { ...__b44ModeCouplingSanity.normSrc },
-        seatShape_100: __b44ModeCouplingSanity.seatShape_100,
-        srcShape_100: __b44ModeCouplingSanity.srcShape_100,
-        coupling_100: __b44ModeCouplingSanity.coupling_100,
-      } : null,
-      warnings: warnings.length > 0 ? warnings : null,
-      lfMovementProbe: Object.keys(lfMovementProbe).length > 0 ? lfMovementProbe : null,
-      componentView: componentView, // Debug lens: which term is being plotted
-      componentViewNote: "Modal/SBIR/Total are debug views of the same simulation - calibration never changes",
-      coherenceLossApplied: coherenceLossApplied,
-      coherenceLossParams: coherenceLossApplied ? { cohStartHz, cohEndHz, maxPenaltyDb: 10.0 } : null,
-      modalRmsDb_20_200: modalRmsDb_20_200.toFixed(1), // Modal term RMS (20-200 Hz)
-      sbirRmsDb_20_200: sbirRmsDb_20_200.toFixed(1), // SBIR term RMS (includes direct)
-      totalRmsDb_20_200: totalRmsDb_20_200.toFixed(1), // Total term RMS (modal + sbir)
-      sbirLevelMatching: sbirMatchingApplied ? {
-        modalMedianDb: modalMedianDb.toFixed(2),
-        sbirMedianDb: sbirMedianDb.toFixed(2),
-        trimAppliedDb: sbirTrimDb.toFixed(2),
-        trimLinear: sbirTrimLinear.toFixed(4)
-      } : null,
-      sealedRoom: sealedRoom,
-      subDistancesToMLP: mlpPosition ? sourcePositions.map(s => {
-        const dx = s.x - mlpPosition.x;
-        const dy = s.y - mlpPosition.y;
-        const dz = (s.z ?? 0) - (mlpPosition.z ?? 1.2);
-        const dist = Math.sqrt(dx*dx + dy*dy + dz*dz);
-        return {
-          subId: s.id || 'unknown',
-          distanceM: dist.toFixed(3),
-          effectiveDelayMs: (s.tuning?.delayMs ?? 0).toFixed(2)
-        };
-      }) : null,
-      parityAudits,
-      // Acceptance test diagnostics (REW parity - curve quality checks)
-      acceptanceTests: {
-        pointCount: safeFreqs.length,
-        freqMin: safeFreqs.length > 0 ? safeFreqs[0].toFixed(3) : 'N/A',
-        freqMax: safeFreqs.length > 0 ? safeFreqs[safeFreqs.length - 1].toFixed(3) : 'N/A',
-        duplicateCount: duplicateCount,
-        strictlyIncreasing: strictlyIncreasing,
-        minDeltaF: minDeltaF > 0 ? minDeltaF.toFixed(6) : 'N/A',
-        hoverSweepTest: duplicateCount === 0 && strictlyIncreasing ? 'PASS ✓' : 'FAIL ✗',
-        duplicateXTest: duplicateCount === 0 ? 'PASS ✓' : `FAIL ✗ (${duplicateCount} duplicates)`,
-        stairStepTest: safeFreqs.length >= 600 ? 'PASS ✓ (dense grid)' : 'CAUTION (sparse grid)',
-        continuityCheck60_90Hz: {
-          maxDeltaDbBetweenPoints: maxDeltaDb60_90.toFixed(3),
-          avgDeltaDbBetweenPoints: avgDeltaDb60_90.toFixed(3),
-          pointsInBand: continuityBand60_90.length,
-          status: maxDeltaDb60_90 < 2.0 ? 'SMOOTH ✓ (continuous)' : 'STEPPED ✗ (binning or undersampling)'
-        }
-      }
-    }
-  };
+  // DEBUG: Track term counts for 55-80 Hz band (step detection)
+  if (f >= 55 && f <= 80) {
+    termCountDebug.push({
+      freqHz: f,
+      exactFreqHz: f,
+      idx: i,
+      modesConsidered,
+      modesUsed,
+      modesSkippedBandwidth,
+      modesSkippedCoupling,
+      sbirReflectionsUsed,
+      activeTermsTotal: activeTerms,
+      modalDb: coherentPressureRaw
+    });
+  }
+
+  // ENGINE TRACE: Capture calculation breakdown for ALL frequencies
+  const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
+  const modalDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, modalMag));
+
+  const sbirMag = Math.sqrt(sumRe_sbir * sumRe_sbir + sumIm_sbir * sumIm_sbir);
+  const sbirDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, sbirMag));
+
+  const totalMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
+  const totalDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, totalMag));
+
+  engineTrace.push({
+    idx: i,
+    exactFreqHz: f,
+    modalDb: modalDbRaw,
+    sbirDb: sbirDbRaw,
+    totalDb: totalDbRaw,
+    modesConsidered,
+    modesUsed,
+    modesSkippedBandwidth,
+    modesSkippedCoupling,
+    sbirReflectionsUsed,
+    activeTermsTotal: activeTerms
+  });
+
+  return modalDb;
+  });
+
+  return { splDb, modalBandDb, sbirBandDb, coherentRawDb, engineTrace };
+  }; // End of runOnce
+
+  // Run engine with normal sources - FIRST PASS to collect statistics
+  const firstPass = runOnce(null, 1.0);
+  const modalBandDbPass1 = firstPass.modalBandDb;
+  const sbirBandDbPass1 = firstPass.sbirBandDb;
+  const engineTracePass1 = firstPass.engineTrace;
 
   // Attach 40–70 Hz stage audit when enabled
   if (globalThis.__B44_BASS_AUDIT === true) {

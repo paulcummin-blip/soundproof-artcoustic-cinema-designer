@@ -4732,114 +4732,195 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   )}
                 </div>
                 
-                {/* Jump Inspector (Top SPL steps) */}
-                {plotIntegrityCheck.stepPairDebug && plotIntegrityCheck.stepPairDebug.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-red-400">
-                    <div className="font-semibold text-red-700 mb-2">Jump Inspector (Top SPL steps):</div>
-                    <div className="space-y-3 max-h-96 overflow-y-auto">
-                      {plotIntegrityCheck.stepPairDebug.map((pair, i) => (
-                        <div key={i} className="bg-red-50 rounded border border-red-300 p-2">
-                          <div className="font-semibold text-red-800 mb-2 text-[10px]">
-                            Jump {pair.jumpIndex}: {pair.fromHz.toFixed(2)} → {pair.toHz.toFixed(2)} Hz 
-                            (Δf={pair.deltaHz.toFixed(4)} Hz), 
-                            {pair.fromDb.toFixed(2)} → {pair.toDb.toFixed(2)} dB 
-                            (Δ={pair.jumpDb >= 0 ? '+' : ''}{pair.jumpDb.toFixed(2)} dB)
-                          </div>
+                {/* Step Drilldown (Top jumps) - uses engineTrace from room modes engine */}
+                {activeDebug?.engineTrace && plotIntegrityCheck.top5Jumps && plotIntegrityCheck.top5Jumps.length > 0 && (() => {
+                  const engineTrace = activeDebug.engineTrace;
+                  const jumps = plotIntegrityCheck.top5Jumps.slice(0, 5);
+                  
+                  // Helper: find nearest engineTrace row by frequency
+                  const findTraceRow = (targetFreq) => {
+                    let best = null;
+                    let minErr = Infinity;
+                    
+                    for (const row of engineTrace) {
+                      const err = Math.abs(row.exactFreqHz - targetFreq);
+                      if (err < minErr) {
+                        minErr = err;
+                        best = row;
+                      }
+                    }
+                    
+                    return best;
+                  };
+                  
+                  // Build drilldown data
+                  const drilldownData = jumps.map((jump, jumpIndex) => {
+                    const fromRow = findTraceRow(jump.hzPrev);
+                    const toRow = findTraceRow(jump.hzNow);
+                    
+                    if (!fromRow || !toRow) return null;
+                    
+                    return {
+                      jumpIndex: jumpIndex + 1,
+                      fromHz: jump.hzPrev,
+                      toHz: jump.hzNow,
+                      deltaHz: jump.hzNow - jump.hzPrev,
+                      fromDb: jump.dbPrev,
+                      toDb: jump.dbNow,
+                      jumpDb: jump.jumpDb,
+                      fromRow,
+                      toRow,
+                      deltas: {
+                        totalDb: toRow.totalDb - fromRow.totalDb,
+                        modalDb: toRow.modalDb - fromRow.modalDb,
+                        sbirDb: toRow.sbirDb - fromRow.sbirDb,
+                        modesUsed: toRow.modesUsed - fromRow.modesUsed,
+                        sbirReflectionsUsed: toRow.sbirReflectionsUsed - fromRow.sbirReflectionsUsed,
+                        activeTermsTotal: toRow.activeTermsTotal - fromRow.activeTermsTotal,
+                        modesSkippedBw: toRow.modesSkippedBandwidth - fromRow.modesSkippedBandwidth,
+                        modesSkippedCoup: toRow.modesSkippedCoupling - fromRow.modesSkippedCoupling
+                      }
+                    };
+                  }).filter(Boolean);
+                  
+                  if (drilldownData.length === 0) return null;
+                  
+                  return (
+                    <div className="mt-2 pt-2 border-t border-red-400">
+                      <div className="font-semibold text-red-700 mb-2">Step Drilldown (Top jumps):</div>
+                      <div className="space-y-3 max-h-96 overflow-y-auto">
+                        {drilldownData.map((item, i) => {
+                          const countsChanged = item.deltas.modesUsed !== 0 || item.deltas.sbirReflectionsUsed !== 0;
                           
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-[8px] font-mono border-collapse">
-                              <thead>
-                                <tr className="border-b-2 border-red-400 bg-red-100">
-                                  <th className="text-left p-1">Point</th>
-                                  <th className="text-right p-1">exactFreqHz</th>
-                                  <th className="text-right p-1">finalDb</th>
-                                  <th className="text-right p-1">modalDb</th>
-                                  <th className="text-right p-1">sbirDb</th>
-                                  <th className="text-right p-1">modesUsed</th>
-                                  <th className="text-right p-1">sbir</th>
-                                  <th className="text-right p-1">total</th>
-                                  <th className="text-right p-1">skip:bw</th>
-                                  <th className="text-right p-1">skip:coup</th>
-                                  <th className="text-right p-1">clamp</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                <tr className="border-b border-red-200">
-                                  <td className="p-1 font-semibold">From</td>
-                                  <td className="text-right p-1">{pair.fromRow.exactFreqHz.toFixed(3)}</td>
-                                  <td className={`text-right p-1 ${Math.abs(pair.jumpDb) > 2.0 ? 'bg-yellow-200' : ''}`}>
-                                    {pair.fromRow.finalDb.toFixed(2)}
-                                  </td>
-                                  <td className={`text-right p-1 ${Math.abs(pair.deltas.deltaModalDb) > 2.0 ? 'bg-yellow-200' : ''}`}>
-                                    {pair.fromRow.modalDb.toFixed(2)}
-                                  </td>
-                                  <td className="text-right p-1">{pair.fromRow.sbirDb !== null ? pair.fromRow.sbirDb.toFixed(2) : '—'}</td>
-                                  <td className={`text-right p-1 ${pair.deltas.deltaModesUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
-                                    {pair.fromRow.modesUsed}
-                                  </td>
-                                  <td className={`text-right p-1 ${pair.deltas.deltaSbirReflectionsUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
-                                    {pair.fromRow.sbirReflectionsUsed}
-                                  </td>
-                                  <td className={`text-right p-1 ${pair.deltas.deltaActiveTermsTotal !== 0 ? 'bg-red-300 font-bold' : ''}`}>
-                                    {pair.fromRow.activeTermsTotal}
-                                  </td>
-                                  <td className={`text-right p-1 ${pair.deltas.deltaModesSkippedBw !== 0 ? 'bg-orange-200' : ''}`}>
-                                    {pair.fromRow.modesSkippedBandwidth}
-                                  </td>
-                                  <td className={`text-right p-1 ${pair.deltas.deltaModesSkippedCoup !== 0 ? 'bg-orange-200' : ''}`}>
-                                    {pair.fromRow.modesSkippedCoupling}
-                                  </td>
-                                  <td className="text-right p-1">{pair.fromRow.isClamped ? 'YES' : 'no'}</td>
-                                </tr>
-                                <tr className="border-b border-red-200">
-                                  <td className="p-1 font-semibold">To</td>
-                                  <td className="text-right p-1">{pair.toRow.exactFreqHz.toFixed(3)}</td>
-                                  <td className={`text-right p-1 ${Math.abs(pair.jumpDb) > 2.0 ? 'bg-yellow-200' : ''}`}>
-                                    {pair.toRow.finalDb.toFixed(2)}
-                                  </td>
-                                  <td className={`text-right p-1 ${Math.abs(pair.deltas.deltaModalDb) > 2.0 ? 'bg-yellow-200' : ''}`}>
-                                    {pair.toRow.modalDb.toFixed(2)}
-                                  </td>
-                                  <td className="text-right p-1">{pair.toRow.sbirDb !== null ? pair.toRow.sbirDb.toFixed(2) : '—'}</td>
-                                  <td className={`text-right p-1 ${pair.deltas.deltaModesUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
-                                    {pair.toRow.modesUsed}
-                                  </td>
-                                  <td className={`text-right p-1 ${pair.deltas.deltaSbirReflectionsUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
-                                    {pair.toRow.sbirReflectionsUsed}
-                                  </td>
-                                  <td className={`text-right p-1 ${pair.deltas.deltaActiveTermsTotal !== 0 ? 'bg-red-300 font-bold' : ''}`}>
-                                    {pair.toRow.activeTermsTotal}
-                                  </td>
-                                  <td className={`text-right p-1 ${pair.deltas.deltaModesSkippedBw !== 0 ? 'bg-orange-200' : ''}`}>
-                                    {pair.toRow.modesSkippedBandwidth}
-                                  </td>
-                                  <td className={`text-right p-1 ${pair.deltas.deltaModesSkippedCoup !== 0 ? 'bg-orange-200' : ''}`}>
-                                    {pair.toRow.modesSkippedCoupling}
-                                  </td>
-                                  <td className="text-right p-1">{pair.toRow.isClamped ? 'YES' : 'no'}</td>
-                                </tr>
-                              </tbody>
-                            </table>
-                          </div>
-                          
-                          {/* Diagnosis */}
-                          <div className="mt-2 pt-2 border-t border-red-300 text-[9px]">
-                            {pair.deltas.deltaModesUsed !== 0 || pair.deltas.deltaSbirReflectionsUsed !== 0 ? (
-                              <div className="text-red-700 font-bold">
-                                🚨 CAUSE: Term count changed (Δmodes={pair.deltas.deltaModesUsed}, Δsbir={pair.deltas.deltaSbirReflectionsUsed})
-                                → Check bandwidth/coupling thresholds
+                          return (
+                            <div key={i} className="bg-red-50 rounded border border-red-300 p-2">
+                              <div className="font-semibold text-red-800 mb-1 text-[10px]">
+                                Jump {item.jumpIndex}: {item.fromHz.toFixed(2)} → {item.toHz.toFixed(2)} Hz 
+                                (Δf={item.deltaHz.toFixed(4)} Hz), 
+                                {item.fromDb.toFixed(2)} → {item.toDb.toFixed(2)} dB 
+                                (Δ={item.jumpDb >= 0 ? '+' : ''}{item.jumpDb.toFixed(2)} dB)
                               </div>
-                            ) : (
-                              <div className="text-green-700">
-                                ✓ Counts stable (Δmodes=0, Δsbir=0) → Check summation/phase logic
+                              
+                              {/* Diagnosis first */}
+                              <div className="mb-2 text-[9px] font-semibold">
+                                {countsChanged ? (
+                                  <div className="text-red-700 bg-red-200 px-2 py-1 rounded">
+                                    🚨 Counts changed: modesUsed Δ{item.deltas.modesUsed}, sbirReflectionsUsed Δ{item.deltas.sbirReflectionsUsed}
+                                  </div>
+                                ) : (
+                                  <div className="text-green-700 bg-green-100 px-2 py-1 rounded">
+                                    ✓ Counts unchanged — jump is coming from maths/phase, not term inclusion
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+                              
+                              <div className="overflow-x-auto">
+                                <table className="w-full text-[8px] font-mono border-collapse">
+                                  <thead>
+                                    <tr className="border-b-2 border-red-400 bg-red-100">
+                                      <th className="text-left p-1"></th>
+                                      <th className="text-right p-1">exactFreqHz</th>
+                                      <th className="text-right p-1">totalDb</th>
+                                      <th className="text-right p-1">modalDb</th>
+                                      <th className="text-right p-1">sbirDb</th>
+                                      <th className="text-right p-1">modesUsed</th>
+                                      <th className="text-right p-1">sbirRefl</th>
+                                      <th className="text-right p-1">activeTotal</th>
+                                      <th className="text-right p-1">skip:bw</th>
+                                      <th className="text-right p-1">skip:coup</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    <tr className="border-b border-red-200">
+                                      <td className="p-1 font-semibold text-red-700">From</td>
+                                      <td className="text-right p-1">{item.fromRow.exactFreqHz.toFixed(3)}</td>
+                                      <td className={`text-right p-1 ${Math.abs(item.deltas.totalDb) > 2 ? 'bg-yellow-200 font-bold' : ''}`}>
+                                        {item.fromRow.totalDb.toFixed(2)}
+                                      </td>
+                                      <td className={`text-right p-1 ${Math.abs(item.deltas.modalDb) > 2 ? 'bg-yellow-200' : ''}`}>
+                                        {item.fromRow.modalDb.toFixed(2)}
+                                      </td>
+                                      <td className={`text-right p-1 ${Math.abs(item.deltas.sbirDb) > 2 ? 'bg-yellow-200' : ''}`}>
+                                        {item.fromRow.sbirDb.toFixed(2)}
+                                      </td>
+                                      <td className={`text-right p-1 ${item.deltas.modesUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                        {item.fromRow.modesUsed}
+                                      </td>
+                                      <td className={`text-right p-1 ${item.deltas.sbirReflectionsUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                        {item.fromRow.sbirReflectionsUsed}
+                                      </td>
+                                      <td className={`text-right p-1 ${item.deltas.activeTermsTotal !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                        {item.fromRow.activeTermsTotal}
+                                      </td>
+                                      <td className={`text-right p-1 ${item.deltas.modesSkippedBw !== 0 ? 'bg-orange-200' : ''}`}>
+                                        {item.fromRow.modesSkippedBandwidth}
+                                      </td>
+                                      <td className={`text-right p-1 ${item.deltas.modesSkippedCoup !== 0 ? 'bg-orange-200' : ''}`}>
+                                        {item.fromRow.modesSkippedCoupling}
+                                      </td>
+                                    </tr>
+                                    <tr className="border-b border-red-200">
+                                      <td className="p-1 font-semibold text-red-700">To</td>
+                                      <td className="text-right p-1">{item.toRow.exactFreqHz.toFixed(3)}</td>
+                                      <td className={`text-right p-1 ${Math.abs(item.deltas.totalDb) > 2 ? 'bg-yellow-200 font-bold' : ''}`}>
+                                        {item.toRow.totalDb.toFixed(2)}
+                                      </td>
+                                      <td className={`text-right p-1 ${Math.abs(item.deltas.modalDb) > 2 ? 'bg-yellow-200' : ''}`}>
+                                        {item.toRow.modalDb.toFixed(2)}
+                                      </td>
+                                      <td className={`text-right p-1 ${Math.abs(item.deltas.sbirDb) > 2 ? 'bg-yellow-200' : ''}`}>
+                                        {item.toRow.sbirDb.toFixed(2)}
+                                      </td>
+                                      <td className={`text-right p-1 ${item.deltas.modesUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                        {item.toRow.modesUsed}
+                                      </td>
+                                      <td className={`text-right p-1 ${item.deltas.sbirReflectionsUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                        {item.toRow.sbirReflectionsUsed}
+                                      </td>
+                                      <td className={`text-right p-1 ${item.deltas.activeTermsTotal !== 0 ? 'bg-red-300 font-bold' : ''}`}>
+                                        {item.toRow.activeTermsTotal}
+                                      </td>
+                                      <td className={`text-right p-1 ${item.deltas.modesSkippedBw !== 0 ? 'bg-orange-200' : ''}`}>
+                                        {item.toRow.modesSkippedBandwidth}
+                                      </td>
+                                      <td className={`text-right p-1 ${item.deltas.modesSkippedCoup !== 0 ? 'bg-orange-200' : ''}`}>
+                                        {item.toRow.modesSkippedCoupling}
+                                      </td>
+                                    </tr>
+                                    <tr className="bg-red-100 font-bold">
+                                      <td className="p-1 text-red-900">Δ</td>
+                                      <td className="text-right p-1">—</td>
+                                      <td className="text-right p-1 text-red-900">
+                                        {item.deltas.totalDb >= 0 ? '+' : ''}{item.deltas.totalDb.toFixed(2)}
+                                      </td>
+                                      <td className="text-right p-1 text-red-900">
+                                        {item.deltas.modalDb >= 0 ? '+' : ''}{item.deltas.modalDb.toFixed(2)}
+                                      </td>
+                                      <td className="text-right p-1 text-red-900">
+                                        {item.deltas.sbirDb >= 0 ? '+' : ''}{item.deltas.sbirDb.toFixed(2)}
+                                      </td>
+                                      <td className="text-right p-1 text-red-900">
+                                        {item.deltas.modesUsed >= 0 ? '+' : ''}{item.deltas.modesUsed}
+                                      </td>
+                                      <td className="text-right p-1 text-red-900">
+                                        {item.deltas.sbirReflectionsUsed >= 0 ? '+' : ''}{item.deltas.sbirReflectionsUsed}
+                                      </td>
+                                      <td className="text-right p-1 text-red-900">
+                                        {item.deltas.activeTermsTotal >= 0 ? '+' : ''}{item.deltas.activeTermsTotal}
+                                      </td>
+                                      <td className="text-right p-1">—</td>
+                                      <td className="text-right p-1">—</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
                 
                 {/* Term Count Debug (55-80 Hz band) */}
                 {activeDebug?.termCountDebug55_80Hz && activeDebug.termCountDebug55_80Hz.length > 0 && (
