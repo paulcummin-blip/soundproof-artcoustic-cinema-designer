@@ -81,7 +81,24 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [tryPolarity, setTryPolarity] = useState(false);
   const [hasAutoAlignedFront, setHasAutoAlignedFront] = useState(false);
   const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
-  const [modesEnabled, setModesEnabled] = useState(false);
+  
+  // Load SBIR and Room Modes from localStorage (default ON)
+  const [modesEnabled, setModesEnabled] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('b44_bass_modesEnabled');
+      if (saved !== null) return saved === 'true';
+    }
+    return true; // Default ON
+  });
+  
+  const [rewSbirEnabled, setRewSbirEnabled] = useState(() => {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('b44_bass_sbirEnabled');
+      if (saved !== null) return saved === 'true';
+    }
+    return true; // Default ON
+  });
+  
   const [roomDamping, setRoomDamping] = useState(20);
   const [showModeMarkers, setShowModeMarkers] = useState(false);
   const [rewStyleMode, setRewStyleMode] = useState(true);
@@ -102,7 +119,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     typeof globalThis !== 'undefined' && globalThis.__B44_BASS_AUDIT === true
   ); // Bass audit UI visibility
   const [auditEpoch, setAuditEpoch] = useState(0); // Force re-simulation when audit toggled
-  const [rewSbirEnabled, setRewSbirEnabled] = useState(false); // SBIR reflections toggle
   const [modalProbeEnabled, setModalProbeEnabled] = useState(false); // Modal Probe toggle
   const [debugDisableSealedGain, setDebugDisableSealedGain] = useState(false); // Debug: disable sealed-room LF gain
   const [debugDisableNullRepair, setDebugDisableNullRepair] = useState(false); // Debug: disable null repair/fill
@@ -212,6 +228,19 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     setAuditEpoch(v => v + 1); // Force re-simulation
   };
 
+  // Persist SBIR and Room Modes to localStorage
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('b44_bass_sbirEnabled', String(rewSbirEnabled));
+    }
+  }, [rewSbirEnabled]);
+  
+  useEffect(() => {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('b44_bass_modesEnabled', String(modesEnabled));
+    }
+  }, [modesEnabled]);
+  
   // Auto-enable Lock Y-axis when REW mode is turned ON
   React.useEffect(() => {
     if (rewStyleMode) {
