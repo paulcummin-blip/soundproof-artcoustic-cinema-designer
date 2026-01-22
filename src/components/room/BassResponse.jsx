@@ -293,15 +293,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   // Build subs array from preview positions while dragging, otherwise committed/live
   const subsForSimulation = useMemo(() => {
-    const frontInput =
-      isDraggingSub && Array.isArray(previewFrontSubsRef.current)
-        ? previewFrontSubsRef.current
-        : (committedFrontSubs || frontSubsLive);
-
-    const rearInput =
-      isDraggingSub && Array.isArray(previewRearSubsRef.current)
-        ? previewRearSubsRef.current
-        : (committedRearSubs || rearSubsLive);
+    // During drag: use live positions directly (refs are updated by drag handler)
+    const frontInput = isDraggingSub ? frontSubsLive : (committedFrontSubs || frontSubsLive);
+    const rearInput = isDraggingSub ? rearSubsLive : (committedRearSubs || rearSubsLive);
 
     const liveFront = Array.isArray(frontInput) ? frontInput : [];
     const liveRear = Array.isArray(rearInput) ? rearInput : [];
@@ -347,6 +341,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return sources;
   }, [
     isDraggingSub,
+    frontSubsLive,
+    rearSubsLive,
     committedFrontSubs,
     committedRearSubs,
     frontSubsCfg?.settingsById,
@@ -671,20 +667,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           }
           
           lastDragUpdateRef.current = now;
-          
-          // Capture the Y domain at drag start so it stays stable for the full drag
-          if (yAxisLocked) {
-            // REW locked mode: fixed +/-30 dB window around display reference
-            if (rewStyleMode && Number.isFinite(rewDisplayRefDb)) {
-              yDomainBeforeDragRef.current = [rewDisplayRefDb - 30, rewDisplayRefDb + 30];
-            }
-          }
-
-          // Also seed lastStablePlotRef at drag start if it's empty (prevents the "first drag frame" from recomputing)
-          if ((!lastStablePlotRef.current || lastStablePlotRef.current.length === 0) && plottedSeries && plottedSeries.length > 0) {
-            lastStablePlotRef.current = plottedSeries;
-          }
-          
           setIsDraggingSub(true);
           
           // Capture latest live positions for preview (no heavy sim yet)
@@ -979,8 +961,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         seatPosition: seatPos,
         fMin: 20,
         fMax: 200,
-        pointsPerOct: usePreviewProfile ? 30 : 24, // Preview: ~250 pts (REW-live), Final: ~2000 pts
-        modeLimitHz: usePreviewProfile ? 120 : 200, // Preview: 120 Hz, Final: 200 Hz
+        pointsPerOct: usePreviewProfile ? 30 : 24, // Preview: lower grid density for speed
+        modeLimitHz: 200,
         q: roomDamping,
         includeAxial: true,
         includeTangential: true,
