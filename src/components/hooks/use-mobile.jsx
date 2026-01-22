@@ -1,27 +1,35 @@
 import * as React from "react";
 
-// Simple, dependency-free mobile detection hook.
-// Matches the common shadcn pattern used by sidebar components.
-export function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = React.useState(false);
+// Simple, safe mobile media query hook
+// - No external deps
+// - Works in SSR-safe environments (guards window)
+// - Returns true when viewport matches "(max-width: 768px)"
+export function useMobile(breakpointPx = 768) {
+  const getMatch = () => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia(`(max-width: ${breakpointPx}px)`).matches;
+  };
+
+  const [isMobile, setIsMobile] = React.useState(getMatch);
 
   React.useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined" || !window.matchMedia) return;
 
-    const mq = window.matchMedia(`(max-width: ${breakpoint - 1}px)`);
+    const mql = window.matchMedia(`(max-width: ${breakpointPx}px)`);
+    const onChange = () => setIsMobile(mql.matches);
 
-    const update = () => setIsMobile(Boolean(mq.matches));
-    update();
+    // Initial sync
+    setIsMobile(mql.matches);
 
-    // Safari support
-    if (mq.addEventListener) mq.addEventListener("change", update);
-    else mq.addListener(update);
+    // Modern + legacy listeners
+    if (mql.addEventListener) mql.addEventListener("change", onChange);
+    else mql.addListener(onChange);
 
     return () => {
-      if (mq.removeEventListener) mq.removeEventListener("change", update);
-      else mq.removeListener(update);
+      if (mql.removeEventListener) mql.removeEventListener("change", onChange);
+      else mql.removeListener(onChange);
     };
-  }, [breakpoint]);
+  }, [breakpointPx]);
 
   return isMobile;
 }
