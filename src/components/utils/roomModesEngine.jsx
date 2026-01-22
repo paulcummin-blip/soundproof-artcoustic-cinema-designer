@@ -1909,45 +1909,45 @@ export function computeRoomModesResponse({
     // Guard: ensure debug container exists
     if (!baseReturn.debug) baseReturn.debug = {};
     baseReturn.debug.audit40_70 = audit40_70;
+  }
 
-    // Step Jump Inspector (55–90 Hz): find the single biggest adjacent jump,
-    // then show the two rows that caused it.
-    const step = findLargestAdjacentJump(freqs, plottedDb, 55, 90);
+  // ---- Step Jump Inspector ALWAYS ON (55–90 Hz) ----
+  if (!baseReturn.debug) baseReturn.debug = {};
 
-    if (step && Array.isArray(termCountDebug55_90HzPass2)) {
-      // Enrich term counts with all pipeline stage values
-      const enrichedDebug = termCountDebug55_90HzPass2.map((row, idx) => {
-        const i = row.idx;
-        return {
-          ...row,
-          splDbForPipeline: Number.isFinite(splDbForPipeline?.[i]) ? splDbForPipeline[i] : null,
-          splDbSchroeder: Number.isFinite(splDbSchroeder?.[i]) ? splDbSchroeder[i] : null,
-          splDbRepaired: Number.isFinite(splDbRepaired?.[i]) ? splDbRepaired[i] : null,
-          plottedDb: Number.isFinite(plottedDb?.[i]) ? plottedDb[i] : null,
-        };
-      });
+  const step = findLargestAdjacentJump(freqs, plottedDb, 55, 90);
 
-      const row0 = enrichedDebug.find(r => Math.abs(r.exactFreqHz - step.f0) < 1e-6) || null;
-      const row1 = enrichedDebug.find(r => Math.abs(r.exactFreqHz - step.f1) < 1e-6) || null;
-
-      baseReturn.debug.stepJumpInspector55_90 = {
-        summary: {
-          f0: step.f0,
-          f1: step.f1,
-          y0: step.y0,
-          y1: step.y1,
-          jumpDb: step.jumpDb,
-          df: step.df,
-        },
-        rows: [row0, row1],
+  if (step && Array.isArray(termCountDebug55_90HzPass2)) {
+    // Enrich term counts with all pipeline stage values
+    const enrichedDebug = termCountDebug55_90HzPass2.map((row) => {
+      const i = row.idx;
+      return {
+        ...row,
+        splDbForPipeline: Number.isFinite(splDbForPipeline?.[i]) ? splDbForPipeline[i] : null,
+        splDbSchroeder: Number.isFinite(splDbSchroeder?.[i]) ? splDbSchroeder[i] : null,
+        splDbRepaired: Number.isFinite(splDbRepaired?.[i]) ? splDbRepaired[i] : null,
+        plottedDb: Number.isFinite(plottedDb?.[i]) ? plottedDb[i] : null,
       };
+    });
 
-      // Always attach the term count list too (so we can scroll it if needed)
-      baseReturn.debug.termCountDebug55_90Hz = enrichedDebug;
-    } else {
-      baseReturn.debug.stepJumpInspector55_90 = { summary: null, rows: [] };
-      baseReturn.debug.termCountDebug55_90Hz = [];
-    }
+    const row0 = enrichedDebug.find(r => Math.abs(r.exactFreqHz - step.f0) < 1e-6) || null;
+    const row1 = enrichedDebug.find(r => Math.abs(r.exactFreqHz - step.f1) < 1e-6) || null;
+
+    baseReturn.debug.stepJumpInspector55_90 = {
+      summary: {
+        f0: step.f0,
+        f1: step.f1,
+        y0: step.y0,
+        y1: step.y1,
+        jumpDb: step.jumpDb,
+        df: step.df,
+      },
+      rows: [row0, row1],
+    };
+
+    baseReturn.debug.termCountDebug55_90Hz = enrichedDebug;
+  } else {
+    baseReturn.debug.stepJumpInspector55_90 = { summary: null, rows: [] };
+    baseReturn.debug.termCountDebug55_90Hz = [];
   }
 
   // DIAGNOSTIC: Position sensitivity test (run engine twice with mirrored sources)

@@ -4678,6 +4678,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div className="text-xs mb-2 bg-blue-50 p-2 rounded border border-blue-400">
               <div className="font-semibold mb-1 text-blue-700">📊 Plot Integrity Check</div>
               
+              {/* Visibility guarantee */}
+              <div className="text-[10px] font-mono text-gray-600">
+                StepJump present: {String(!!activeDebug?.stepJumpInspector55_90)}
+              </div>
+              
               {/* Step Jump Inspector (55–90 Hz) */}
               {activeDebug?.stepJumpInspector55_90 && (
                 <div style={{ marginTop: 10, padding: 12, border: "1px solid #cfe3ff", borderRadius: 8 }}>
