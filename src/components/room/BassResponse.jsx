@@ -607,11 +607,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         const timeSinceLastUpdate = now - lastDragUpdateRef.current;
         
         if (dragging) {
-          // Drag start: capture Y-axis state
+          // Drag start: capture Y-axis state (must capture the REAL locked domain, not yAxisDomain)
           if (!isDraggingSub) {
-            yDomainBeforeDragRef.current = yAxisDomain;
+            // Save current lock flag
             yAxisLockedBeforeDragRef.current = yAxisLocked;
-            setYAxisLocked(true); // Force lock during drag
+
+            // Force lock immediately
+            setYAxisLocked(true);
+
+            // Capture the actual domain we intend to lock to (REW-style fixed window)
+            const lockedMin = (Number(rewDisplayRefDb) || 90) - 30;
+            const lockedMax = (Number(rewDisplayRefDb) || 90) + 30;
+            yDomainBeforeDragRef.current = [lockedMin, lockedMax];
           }
           
           // Throttle drag updates
@@ -667,11 +674,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             
             // Restore Y-axis state after full sim completes
             setTimeout(() => {
-              if (yAxisLockedBeforeDragRef.current !== null) {
-                setYAxisLocked(yAxisLockedBeforeDragRef.current);
-              }
+              setYAxisLocked(!!yAxisLockedBeforeDragRef.current);
               yDomainBeforeDragRef.current = null;
-            }, 100);
+            }, 50);
           }, 250);
         }
       };
