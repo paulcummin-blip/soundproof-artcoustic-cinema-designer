@@ -1757,59 +1757,7 @@ export function computeRoomModesResponse({
     ? continuityBand60_90.reduce((sum, d) => sum + d.deltaDb, 0) / continuityBand60_90.length
     : 0;
 
-  // DEBUG: Track term counts for 55-80 Hz band (step detection)
-  if (f >= 55 && f <= 80) {
-    termCountDebug.push({
-      freqHz: f,
-      exactFreqHz: f,
-      idx: i,
-      modesConsidered,
-      modesUsed,
-      modesSkippedBandwidth,
-      modesSkippedCoupling,
-      sbirReflectionsUsed,
-      activeTermsTotal: activeTerms,
-      modalDb: coherentPressureRaw
-    });
-  }
-
-  // ENGINE TRACE: Capture calculation breakdown for ALL frequencies
-  const modalMag = Math.sqrt(sumRe_modal * sumRe_modal + sumIm_modal * sumIm_modal);
-  const modalDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, modalMag));
-
-  const sbirMag = Math.sqrt(sumRe_sbir * sumRe_sbir + sumIm_sbir * sumIm_sbir);
-  const sbirDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, sbirMag));
-
-  const totalMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
-  const totalDbRaw = 20 * Math.log10(Math.max(Number.EPSILON, totalMag));
-
-  engineTrace.push({
-    idx: i,
-    exactFreqHz: f,
-    modalDb: modalDbRaw,
-    sbirDb: sbirDbRaw,
-    totalDb: totalDbRaw,
-    modesConsidered,
-    modesUsed,
-    modesSkippedBandwidth,
-    modesSkippedCoupling,
-    sbirReflectionsUsed,
-    activeTermsTotal: activeTerms
-  });
-
-  return modalDb;
-  });
-
-  return { splDb, modalBandDb, sbirBandDb, coherentRawDb, engineTrace };
-  }; // End of runOnce
-
-  // Run engine with normal sources - FIRST PASS to collect statistics
-  const firstPass = runOnce(null, 1.0);
-  const modalBandDbPass1 = firstPass.modalBandDb;
-  const sbirBandDbPass1 = firstPass.sbirBandDb;
-  const engineTracePass1 = firstPass.engineTrace;
-
-  // Attach 40–70 Hz stage audit when enabled
+  const baseReturn = {
   if (globalThis.__B44_BASS_AUDIT === true) {
     const audit = {
       coherentRawDb: Array.isArray(rawCoherentDb) ? peakDipDelta(freqs, rawCoherentDb, 40, 70) : null,
