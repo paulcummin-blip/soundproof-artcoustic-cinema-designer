@@ -129,6 +129,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const dragIdleTimerRef = useRef(null);
   const calcEpochRef = useRef(0); // Request cancellation
   
+  // Draft vs committed positions (freeze simulation during drag)
+  const [committedFrontSubs, setCommittedFrontSubs] = useState(null);
+  const [committedRearSubs, setCommittedRearSubs] = useState(null);
+  const lastStablePlotRef = useRef(null);
+  
   // Sensitivity audit refs (track previous run)
   const prevSourceSigRef = useRef(null);
   const prevFinalDbRef = useRef(null);
@@ -273,10 +278,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const engineCallCountRef = useRef(0);
   const [engineCallsUi, setEngineCallsUi] = useState(0);
 
-  // Build subs array from LIVE dragged positions (frontSubsLive + rearSubsLive)
+  // Build subs array from COMMITTED positions (freeze simulation during drag)
   const subsForSimulation = useMemo(() => {
-    const liveFront = Array.isArray(frontSubsLive) ? frontSubsLive : [];
-    const liveRear = Array.isArray(rearSubsLive) ? rearSubsLive : [];
+    // Use committed positions (frozen during drag) not live props
+    const liveFront = Array.isArray(committedFrontSubs || frontSubsLive) ? (committedFrontSubs || frontSubsLive) : [];
+    const liveRear = Array.isArray(committedRearSubs || rearSubsLive) ? (committedRearSubs || rearSubsLive) : [];
 
     // Helper to get tuning settings from config
     const getTuning = (subId, cfg) => {
@@ -318,11 +324,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     return sources;
   }, [
-    // ensure re-run when the live arrays or any positions change
-    frontLiveSig,
-    rearLiveSig,
-    frontSubsLive,
-    rearSubsLive,
+    // Use committed positions (frozen during drag)
+    committedFrontSubs,
+    committedRearSubs,
     // also watch config for tuning settings
     frontSubsCfg?.settingsById,
     rearSubsCfg?.settingsById,
@@ -544,6 +548,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return delays;
   }, [rewStyleMode, rewTimeAlign, seatingPositions, subsForSimulation]);
 
+  // Initialize committed positions from props (on mount and when not dragging)
+  useEffect(() => {
+    if (!isDraggingSub) {
+      setCommittedFrontSubs(frontSubsLive);
+      setCommittedRearSubs(rearSubsLive);
+    }
+  }, [frontSubsLive, rearSubsLive, isDraggingSub]);
+  
   // Expose drag state controls to parent (if needed)
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -556,11 +568,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           dragIdleTimerRef.current = null;
         }
         
-        // If drag ended, schedule full-quality recalc after 200ms idle
+        // If drag ended, commit live positions and trigger full simulation
         if (!dragging) {
+          setCommittedFrontSubs(frontSubsLive);
+          setCommittedRearSubs(rearSubsLive);
+          
           dragIdleTimerRef.current = setTimeout(() => {
             calcEpochRef.current += 1; // Force full-quality recalc
-          }, 200);
+          }, 100);
         }
       };
     }
@@ -570,7 +585,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         clearTimeout(dragIdleTimerRef.current);
       }
     };
-  }, []);
+  }, [frontSubsLive, rearSubsLive]);
   
   // Audit curve (no smoothing, no normalization) for sensitivity testing
   const rewModesDataAudit = useMemo(() => {
@@ -1966,8 +1981,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const conditioned = applyDisplayConditioningNulls(baseSeries, rewLockedMin, rewLockedMax, yAxisLocked, isRewStyle);
     
     // Clean for plotting (sort, deduplicate, ensure strictly increasing)
-    return cleanPlottedSeries(conditioned);
-  }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked, cleanPlottedSeries]);
+    const cleaned = cleanPlottedSeries(conditioned);
+    
+    // Store stable plot when not dragging
+    if (!isDraggingSub && cleaned && cleaned.length > 0) {
+      lastStablePlotRef.current = cleaned;
+    }
+    
+    // During drag: freeze at last stable plot
+    if (isDraggingSub && lastStablePlotRef.current) {
+      return lastStablePlotRef.current;
+    }
+    
+    return cleaned;
+  }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked, cleanPlottedSeries, isDraggingSub]);
   
   // Plot Integrity Check (runs before graph renders)
   const plotIntegrityCheck = React.useMemo(() => {
@@ -2789,7 +2816,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>Bass Response</div>
+          <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
+            Bass Response
+            {isDraggingSub && (
+              <span style={{ marginLeft: 12, fontSize: 11, color: "#f59e0b", fontWeight: 600 }}>
+                ⏸ Dragging… (updates on release)
+              </span>
+            )}
+          </div>
 
           <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             {/* Bass Audit toggle (always visible) */}
