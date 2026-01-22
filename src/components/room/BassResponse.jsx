@@ -133,6 +133,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const calcEpochRef = useRef(0); // Request cancellation
   const yDomainBeforeDragRef = useRef(null);
   const yAxisLockedBeforeDragRef = useRef(false);
+  const yDomainDuringDragRef = React.useRef(null);
+  const wasDraggingRef = React.useRef(false);
   
   // Force re-sim key that ACTUALLY triggers re-render (ref.current does not)
   const [calcEpoch, setCalcEpoch] = useState(0);
@@ -598,6 +600,48 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     prevIsDraggingRef.current = isNowDragging;
   }, [frontSubsLive, rearSubsLive, isDraggingSub]);
   
+  // Detect drag start / end transitions
+  React.useEffect(() => {
+    // Drag START
+    if (isDraggingSub && !wasDraggingRef.current) {
+      // Prefer the last stable plotted data to compute a sane domain
+      const series = lastStablePlotRef.current;
+
+      if (Array.isArray(series) && series.length > 0) {
+        const vals = series
+          .map(p => p?.spl)
+          .filter(v => typeof v === "number" && Number.isFinite(v));
+
+        if (vals.length > 0) {
+          const min = Math.min(...vals);
+          const max = Math.max(...vals);
+
+          // Add padding and snap to clean numbers (keeps it readable + stable)
+          const rawMin = min - 5;
+          const rawMax = max + 5;
+          const step = (rawMax - rawMin) <= 30 ? 5 : ((rawMax - rawMin) <= 60 ? 10 : 20);
+
+          const snappedMin = Math.floor(rawMin / step) * step;
+          const snappedMax = Math.ceil(rawMax / step) * step;
+
+          yDomainDuringDragRef.current = [snappedMin, snappedMax];
+        }
+      }
+
+      // If we failed to compute it, fall back to a safe window
+      if (!yDomainDuringDragRef.current) {
+        yDomainDuringDragRef.current = [60, 120];
+      }
+    }
+
+    // Drag END
+    if (!isDraggingSub && wasDraggingRef.current) {
+      yDomainDuringDragRef.current = null;
+    }
+
+    wasDraggingRef.current = isDraggingSub;
+  }, [isDraggingSub]);
+
   // Expose drag state controls to parent (if needed)
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -2043,28 +2087,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [rewStyleMode, rewCompareView, rewRelativeView]);
 
-  // Determine final Y-axis domain to pass to graph.
-  // Goal: while dragging + axis locked => always pass a stable [min,max] so BassGraph cannot auto-rescale.
   const finalYDomain = React.useMemo(() => {
-    // If we're not in REW style mode, keep current behaviour (no forced domain)
-    if (!rewStyleMode) return undefined;
-
-    // If locked + dragging: use the captured domain from drag-start
-    if (yAxisLocked && isDraggingSub) {
-      const d = yDomainBeforeDragRef.current;
-      if (Array.isArray(d) && d.length === 2 && Number.isFinite(d[0]) && Number.isFinite(d[1])) {
-        return d;
-      }
+    // While dragging: ALWAYS force the captured domain
+    if (isDraggingSub) {
+      const d = yDomainDuringDragRef.current;
+      if (Array.isArray(d) && d.length === 2 && Number.isFinite(d[0]) && Number.isFinite(d[1])) return d;
+      return [60, 120];
     }
 
-    // If locked (not dragging): use the fixed window around the REW display ref
-    if (yAxisLocked && Number.isFinite(rewDisplayRefDb)) {
-      return [rewDisplayRefDb - 30, rewDisplayRefDb + 30];
+    // Not dragging: keep existing logic (locked REW window / auto / etc.)
+    if (rewStyleMode && yAxisLocked && isRewStyle && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax)) {
+      return [rewLockedMin, rewLockedMax];
     }
 
-    // Not locked: let BassGraph auto-compute
     return undefined;
-  }, [rewStyleMode, yAxisLocked, isDraggingSub, rewDisplayRefDb]);
+  }, [isDraggingSub, rewStyleMode, yAxisLocked, isRewStyle, rewLockedMin, rewLockedMax]);
 
   // PLOT INTEGRITY CHECK: Ensure clean, sorted, deduplicated data
   const cleanPlottedSeries = React.useCallback((rawSeries) => {
