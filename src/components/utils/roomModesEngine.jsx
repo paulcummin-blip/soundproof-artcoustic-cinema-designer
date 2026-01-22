@@ -1945,6 +1945,253 @@ export function computeRoomModesResponse({
     };
 
     baseReturn.debug.termCountDebug55_90Hz = enrichedDebug;
+    
+    // --- BIN-TO-BIN MODE TRACE (only when audit enabled and step exists) ---
+    if (globalThis.__B44_BASS_AUDIT === true) {
+      // Helper: trace a single bin's modal calculation
+      const traceSingleBin = (iTarget) => {
+        const f = freqs[iTarget];
+        if (!Number.isFinite(f)) return null;
+        
+        const modeTrace = [];
+        let activeTermsTotal = 0;
+        let modesConsidered = 0;
+        let modesUsed = 0;
+        let modesSkippedBandwidth = 0;
+        let modesSkippedCoupling = 0;
+        
+        // Per-mode contribution buckets (sum across subs)
+        const modeContribMap = {};
+        
+        for (const mode of modes) {
+          const f0 = mode.freq;
+          if (!(f0 > 0)) continue;
+          
+          modesConsidered++;
+          
+          const qMode = estimateModeQ({
+            mode,
+            roomDims: room,
+            surfaceAbsorption: absorption,
+            dampingScalar,
+            leakage,
+            f0,
+          });
+          
+          const bandwidth = f0 / qMode;
+          const df = Math.abs(f - f0);
+          
+          const modeKey = `${mode.nx},${mode.ny},${mode.nz}`;
+          
+          // Check bandwidth skip
+          if (f > lowestAxial && df > 5 * bandwidth && df > 20) {
+            modesSkippedBandwidth++;
+            modeTrace.push({
+              modeKey,
+              modeHz: f0,
+              type: mode.type,
+              n: [mode.nx, mode.ny, mode.nz],
+              qMode,
+              bandwidthHz: bandwidth,
+              dfHz: df,
+              skipped: true,
+              skipReason: 'bandwidth',
+              contribMag: 0,
+              contribDb: -Infinity
+            });
+            continue;
+          }
+          
+          // Compute coupling for each sub and accumulate
+          let totalContribRe = 0;
+          let totalContribIm = 0;
+          let hadNonZeroCoupling = false;
+          
+          for (let subIdx = 0; subIdx < sourcesLocal.length; subIdx++) {
+            const source = sourcesLocal[subIdx];
+            
+            const coupling = computeSpatialCoupling(mode, source, seat, room);
+            if (Math.abs(coupling) < 1e-6) continue;
+            
+            hadNonZeroCoupling = true;
+            
+            const meta = subProductMeta && subProductMeta[subIdx] ? subProductMeta[subIdx] : null;
+            let productRelativeDb = 0;
+            if (meta && meta.relativeCurve && meta.relativeCurve[iTarget] !== undefined) {
+              productRelativeDb = meta.relativeCurve[iTarget];
+            }
+            const productMagScale = Math.pow(10, productRelativeDb / 20);
+            
+            const subTuning = source.tuning || { gainDb: 0, delayMs: 0, polarity: 0 };
+            const userGainLinear = Math.pow(10, subTuning.gainDb / 20);
+            const autoLevelGainDb = mlpAutoLevelGainsDb[subIdx] || 0;
+            const autoLevelGainLinear = Math.pow(10, autoLevelGainDb / 20);
+            const gainLinear = userGainLinear * autoLevelGainLinear;
+            
+            const delayPhase = -2 * Math.PI * f * (subTuning.delayMs / 1000);
+            const polarityPhase = (subTuning.polarity === 180 || subTuning.polarity === 'invert') ? Math.PI : 0;
+            const totalPhase = delayPhase + polarityPhase;
+            
+            const weightMag = productMagScale * gainLinear;
+            const weightRe = weightMag * Math.cos(totalPhase);
+            const weightIm = weightMag * Math.sin(totalPhase);
+            
+            const r = f / Math.max(1e-6, f0);
+            const re = (1 - r * r);
+            const im = (r / Math.max(1e-6, qMode));
+            const denom = (re * re + im * im);
+            const hRe = re / denom;
+            const hIm = -im / denom;
+            
+            const cRe = coupling * (weightRe * hRe - weightIm * hIm);
+            const cIm = coupling * (weightRe * hIm + weightIm * hRe);
+            
+            totalContribRe += cRe;
+            totalContribIm += cIm;
+          }
+          
+          if (!hadNonZeroCoupling) {
+            modesSkippedCoupling++;
+            modeTrace.push({
+              modeKey,
+              modeHz: f0,
+              type: mode.type,
+              n: [mode.nx, mode.ny, mode.nz],
+              qMode,
+              bandwidthHz: bandwidth,
+              dfHz: df,
+              skipped: true,
+              skipReason: 'coupling',
+              contribMag: 0,
+              contribDb: -Infinity
+            });
+            continue;
+          }
+          
+          modesUsed++;
+          activeTermsTotal++;
+          
+          const contribMag = Math.sqrt(totalContribRe * totalContribRe + totalContribIm * totalContribIm);
+          const contribDb = 20 * Math.log10(Math.max(Number.EPSILON, contribMag));
+          
+          modeTrace.push({
+            modeKey,
+            modeHz: f0,
+            type: mode.type,
+            n: [mode.nx, mode.ny, mode.nz],
+            qMode,
+            bandwidthHz: bandwidth,
+            dfHz: df,
+            skipped: false,
+            skipReason: null,
+            contribMag,
+            contribDb
+          });
+        }
+        
+        const topContribModes = modeTrace
+          .filter(m => !m.skipped)
+          .sort((a, b) => b.contribDb - a.contribDb)
+          .slice(0, 10);
+        
+        return {
+          idx: iTarget,
+          exactFreqHz: f,
+          activeTermsTotal,
+          modesConsidered,
+          modesUsed,
+          modesSkippedBandwidth,
+          modesSkippedCoupling,
+          modeTrace,
+          topContribModes
+        };
+      };
+      
+      // Helper: diff two bin traces
+      const diffTraces = (trace0, trace1) => {
+        if (!trace0 || !trace1) return null;
+        
+        // Build mode key sets
+        const used0 = new Set(trace0.modeTrace.filter(m => !m.skipped).map(m => m.modeKey));
+        const used1 = new Set(trace1.modeTrace.filter(m => !m.skipped).map(m => m.modeKey));
+        
+        // Modes added (in f1 but not f0)
+        const modesAdded = trace1.modeTrace
+          .filter(m => !m.skipped && !used0.has(m.modeKey))
+          .map(m => ({ modeKey: m.modeKey, type: m.type, modeHz: m.modeHz, n: m.n, contribDb: m.contribDb }))
+          .sort((a, b) => b.contribDb - a.contribDb)
+          .slice(0, 15);
+        
+        // Modes removed (in f0 but not f1)
+        const modesRemoved = trace0.modeTrace
+          .filter(m => !m.skipped && !used1.has(m.modeKey))
+          .map(m => ({ modeKey: m.modeKey, type: m.type, modeHz: m.modeHz, n: m.n, contribDb: m.contribDb }))
+          .sort((a, b) => b.contribDb - a.contribDb)
+          .slice(0, 15);
+        
+        // Modes that changed skip status
+        const modesSkipChanged = [];
+        for (const m0 of trace0.modeTrace) {
+          const m1 = trace1.modeTrace.find(m => m.modeKey === m0.modeKey);
+          if (!m1) continue;
+          
+          if (m0.skipped !== m1.skipped || m0.skipReason !== m1.skipReason) {
+            modesSkipChanged.push({
+              modeKey: m0.modeKey,
+              type: m0.type,
+              modeHz: m0.modeHz,
+              n: m0.n,
+              atF0: { skipped: m0.skipped, reason: m0.skipReason, df: m0.dfHz, bw: m0.bandwidthHz },
+              atF1: { skipped: m1.skipped, reason: m1.skipReason, df: m1.dfHz, bw: m1.bandwidthHz }
+            });
+          }
+        }
+        
+        // Top contribution deltas (modes present in both bins)
+        const sharedModes = trace0.modeTrace
+          .filter(m => !m.skipped && used1.has(m.modeKey))
+          .map(m0 => {
+            const m1 = trace1.modeTrace.find(m => m.modeKey === m0.modeKey);
+            if (!m1 || m1.skipped) return null;
+            
+            const deltaDb = m1.contribDb - m0.contribDb;
+            return {
+              modeKey: m0.modeKey,
+              type: m0.type,
+              modeHz: m0.modeHz,
+              n: m0.n,
+              contribDb0: m0.contribDb,
+              contribDb1: m1.contribDb,
+              deltaDb
+            };
+          })
+          .filter(Boolean)
+          .sort((a, b) => Math.abs(b.deltaDb) - Math.abs(a.deltaDb))
+          .slice(0, 15);
+        
+        return {
+          f0: trace0.exactFreqHz,
+          f1: trace1.exactFreqHz,
+          modesAdded,
+          modesRemoved,
+          modesSkipChanged,
+          topDeltaContrib: sharedModes
+        };
+      };
+      
+      // Trace the two bins and compute diff
+      const trace0 = traceSingleBin(step.i0);
+      const trace1 = traceSingleBin(step.i1);
+      const diff = diffTraces(trace0, trace1);
+      
+      if (trace0 && trace1 && diff) {
+        baseReturn.debug.stepJumpInspector55_90.trace = {
+          bin0: trace0,
+          bin1: trace1,
+          diff
+        };
+      }
+    }
   } else {
     baseReturn.debug.stepJumpInspector55_90 = { summary: null, rows: [] };
     baseReturn.debug.termCountDebug55_90Hz = [];

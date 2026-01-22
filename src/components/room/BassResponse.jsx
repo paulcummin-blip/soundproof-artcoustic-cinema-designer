@@ -4685,20 +4685,122 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               
               {/* Step Jump Inspector (55–90 Hz) */}
               {activeDebug?.stepJumpInspector55_90 && (
-                <div style={{ marginTop: 10, padding: 12, border: "1px solid #cfe3ff", borderRadius: 8 }}>
-                  <div style={{ fontWeight: 700, marginBottom: 8 }}>Step Jump Inspector (55–90 Hz)</div>
+                <div style={{ marginTop: 10, padding: 12, border: "1px solid #cfe3ff", borderRadius: 8, background: "#f0f9ff" }}>
+                  <div style={{ fontWeight: 700, marginBottom: 8, color: "#1e40af" }}>Step Jump Inspector (55–90 Hz)</div>
 
                   {activeDebug.stepJumpInspector55_90.summary ? (
                     <>
-                      <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
+                      <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap", fontSize: 11, marginBottom: 8 }}>
                         {`Max jump: ${activeDebug.stepJumpInspector55_90.summary.jumpDb.toFixed(3)} dB
 ${activeDebug.stepJumpInspector55_90.summary.f0.toFixed(2)} Hz → ${activeDebug.stepJumpInspector55_90.summary.f1.toFixed(2)} Hz
 ${activeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${activeDebug.stepJumpInspector55_90.summary.y1.toFixed(2)} dB`}
                       </div>
 
+                      {/* Mode-level trace (when available) */}
+                      {activeDebug.stepJumpInspector55_90.trace && (() => {
+                        const trace = activeDebug.stepJumpInspector55_90.trace;
+                        const diff = trace.diff;
+                        
+                        if (!diff) return null;
+                        
+                        return (
+                          <div style={{ marginTop: 12, padding: 10, background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 6 }}>
+                            <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 11, color: "#92400e" }}>
+                              Mode-Level Trace (what changed?)
+                            </div>
+                            
+                            {/* Summary counts */}
+                            <div style={{ fontFamily: "monospace", fontSize: 10, marginBottom: 8 }}>
+                              <div>modesUsed: {trace.bin0.modesUsed} → {trace.bin1.modesUsed}</div>
+                              <div>skippedBandwidth: {trace.bin0.modesSkippedBandwidth} → {trace.bin1.modesSkippedBandwidth}</div>
+                              <div>skippedCoupling: {trace.bin0.modesSkippedCoupling} → {trace.bin1.modesSkippedCoupling}</div>
+                            </div>
+                            
+                            {/* Modes Added */}
+                            {diff.modesAdded && diff.modesAdded.length > 0 && (
+                              <details style={{ marginTop: 8 }}>
+                                <summary style={{ fontWeight: 700, fontSize: 10, cursor: "pointer", color: "#15803d" }}>
+                                  ✅ Modes Added at f1 ({diff.modesAdded.length})
+                                </summary>
+                                <div style={{ fontFamily: "monospace", fontSize: 9, marginTop: 4, paddingLeft: 12 }}>
+                                  {diff.modesAdded.map((m, i) => (
+                                    <div key={i}>
+                                      {m.modeHz.toFixed(1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}): {m.contribDb.toFixed(1)} dB
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+                            
+                            {/* Modes Removed */}
+                            {diff.modesRemoved && diff.modesRemoved.length > 0 && (
+                              <details style={{ marginTop: 8 }}>
+                                <summary style={{ fontWeight: 700, fontSize: 10, cursor: "pointer", color: "#dc2626" }}>
+                                  ❌ Modes Removed at f1 ({diff.modesRemoved.length})
+                                </summary>
+                                <div style={{ fontFamily: "monospace", fontSize: 9, marginTop: 4, paddingLeft: 12 }}>
+                                  {diff.modesRemoved.map((m, i) => (
+                                    <div key={i}>
+                                      {m.modeHz.toFixed(1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}): {m.contribDb.toFixed(1)} dB
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+                            
+                            {/* Modes with skip status changed */}
+                            {diff.modesSkipChanged && diff.modesSkipChanged.length > 0 && (
+                              <details style={{ marginTop: 8 }}>
+                                <summary style={{ fontWeight: 700, fontSize: 10, cursor: "pointer", color: "#ea580c" }}>
+                                  🔄 Modes Skip Status Changed ({diff.modesSkipChanged.length})
+                                </summary>
+                                <div style={{ fontFamily: "monospace", fontSize: 9, marginTop: 4, paddingLeft: 12 }}>
+                                  {diff.modesSkipChanged.map((m, i) => (
+                                    <div key={i}>
+                                      {m.modeHz.toFixed(1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}):
+                                      f0={m.atF0.skipped ? `SKIP(${m.atF0.reason})` : 'USED'}
+                                      → f1={m.atF1.skipped ? `SKIP(${m.atF1.reason})` : 'USED'}
+                                      (df: {m.atF0.df.toFixed(1)}→{m.atF1.df.toFixed(1)} Hz, bw: {m.atF0.bw.toFixed(1)}→{m.atF1.bw.toFixed(1)} Hz)
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+                            
+                            {/* Top Contribution Deltas */}
+                            {diff.topDeltaContrib && diff.topDeltaContrib.length > 0 && (
+                              <details style={{ marginTop: 8 }}>
+                                <summary style={{ fontWeight: 700, fontSize: 10, cursor: "pointer", color: "#7c2d12" }}>
+                                  📊 Top Contribution Deltas ({diff.topDeltaContrib.length})
+                                </summary>
+                                <div style={{ fontFamily: "monospace", fontSize: 9, marginTop: 4, paddingLeft: 12 }}>
+                                  {diff.topDeltaContrib.map((m, i) => (
+                                    <div key={i}>
+                                      {m.modeHz.toFixed(1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}):
+                                      {m.contribDb0.toFixed(1)} → {m.contribDb1.toFixed(1)} dB
+                                      ({m.deltaDb >= 0 ? '+' : ''}{m.deltaDb.toFixed(1)} dB)
+                                    </div>
+                                  ))}
+                                </div>
+                              </details>
+                            )}
+                            
+                            {/* Raw JSON (optional) */}
+                            <details style={{ marginTop: 8 }}>
+                              <summary style={{ fontWeight: 600, fontSize: 9, cursor: "pointer", color: "#6b7280" }}>
+                                Raw JSON (full trace)
+                              </summary>
+                              <div style={{ fontFamily: "monospace", fontSize: 8, marginTop: 4, whiteSpace: "pre-wrap", maxHeight: 200, overflow: "auto" }}>
+                                {JSON.stringify(trace, null, 2)}
+                              </div>
+                            </details>
+                          </div>
+                        );
+                      })()}
+
                       <div style={{ height: 8 }} />
 
-                      <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap" }}>
+                      <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap", fontSize: 9 }}>
                         {JSON.stringify(activeDebug.stepJumpInspector55_90.rows, null, 2)}
                       </div>
                     </>
