@@ -108,6 +108,8 @@ export function computeRoomModesResponse({
   sbirDebugSingleFrontWall = false, // DIAGNOSTIC: Only use direct + front wall reflection
   disableSealedRoomGain = false, // Debug: bypass sealed-room LF gain
   disableNullRepair = false, // Debug: bypass null repair/fill
+  rewStrictParity = false, // REW Strict: disable all presentation shapers (coherence loss, mode density comp, Schroeder blend)
+  calcEpoch = 0, // Request cancellation epoch
 }) {
   try {
   // IMMUTABILITY GUARD: Create safe local copies of ALL inputs to prevent readonly errors
@@ -967,7 +969,8 @@ export function computeRoomModesResponse({
     let modalDb = coherentPressureRaw;
     
     // Mode density compensation (REW-ish) — MUST ramp in smoothly to avoid a cliff at Schroeder.
-    const mdCompEnabled = (!rawEngineOutput && rewParityMode && activeTerms > 1);
+    // REW Strict: disable when parity mode is active
+    const mdCompEnabled = (!rawEngineOutput && rewParityMode && activeTerms > 1 && !rewStrictParity);
 
     // Use a smooth transition window around Schroeder (starts a bit before, fully in a bit after).
     const mdCompStartHz = Math.max(70, schroederHz * 0.85);
@@ -1091,7 +1094,8 @@ export function computeRoomModesResponse({
   
   // REW-style coherence loss: transition from coherent pressure sum to energy-like behaviour above ~100-140 Hz
   // This makes the curve "come back down" at HF like REW does
-  const shouldApplyCoherenceLoss = rewParityMode && componentView === 'modalPlusSbir';
+  // REW Strict: disable when parity mode is active
+  const shouldApplyCoherenceLoss = rewParityMode && componentView === 'modalPlusSbir' && !rewStrictParity;
   let splDbRew = splDb;
   let coherenceLossApplied = false;
   const cohStartHz = 90;
@@ -1116,6 +1120,11 @@ export function computeRoomModesResponse({
   
   // Use REW-processed array for rest of pipeline when coherence loss is active
   const splDbForPipeline = coherenceLossApplied ? splDbRew : splDb;
+
+  // REW Strict: bypass Schroeder blend (set to same as input)
+  if (rewStrictParity) {
+    splDbSchroeder = splDbForPipeline;
+  }
   
   
   // Compute RMS for component magnitudes (20-200 Hz band) - CORRECTED: linear domain
@@ -1203,8 +1212,9 @@ export function computeRoomModesResponse({
 
     // Schroeder blend: FIXED RULES to preserve modal nulls
     // NEW: Start at 1.0 × Schroeder (not 0.7), never fill nulls, only tame peaks
+    // REW Strict: disable when parity mode is active
     let splDbSchroeder = splDbForPipeline;
-    if (!rawEngineOutput && rewParityMode && schroederHz > 0) {
+    if (!rawEngineOutput && rewParityMode && schroederHz > 0 && !rewStrictParity) {
       splDbSchroeder = splDbForPipeline.map((db, i) => {
         const f = freqs[i];
         const blendStart = schroederHz * 1.0;
@@ -1236,8 +1246,8 @@ export function computeRoomModesResponse({
     for (let i = 0; i < splDbSchroeder.length; i++) {
     const v = splDbSchroeder[i];
     if (!isFinite(v)) {
-      if (disableNullRepair) {
-        repaired.push(null);  // preserve deep null/cancellation for diagnostic
+      if (disableNullRepair || rewStrictParity) {
+        repaired.push(null);  // preserve deep null/cancellation for diagnostic or strict parity
         nonFiniteRepaired += 1;
         continue;
       }

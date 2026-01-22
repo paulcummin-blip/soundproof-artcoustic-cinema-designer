@@ -106,7 +106,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [modalProbeEnabled, setModalProbeEnabled] = useState(false); // Modal Probe toggle
   const [debugDisableSealedGain, setDebugDisableSealedGain] = useState(false); // Debug: disable sealed-room LF gain
   const [debugDisableNullRepair, setDebugDisableNullRepair] = useState(false); // Debug: disable null repair/fill
+  const [rewStrictParity, setRewStrictParity] = useState(false); // REW Strict: disable all presentation shapers
 
+  // Drag performance tracking
+  const [isDraggingSub, setIsDraggingSub] = useState(false);
+  const dragIdleTimerRef = useRef(null);
+  const calcEpochRef = useRef(0); // Request cancellation
+  
   // Sensitivity audit refs (track previous run)
   const prevSourceSigRef = useRef(null);
   const prevFinalDbRef = useRef(null);
@@ -509,6 +515,34 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return delays;
   }, [rewStyleMode, rewTimeAlign, seatingPositions, subsForSimulation]);
 
+  // Expose drag state controls to parent (if needed)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__B44_setIsDraggingSub = (dragging) => {
+        setIsDraggingSub(dragging);
+        
+        // Clear existing idle timer
+        if (dragIdleTimerRef.current) {
+          clearTimeout(dragIdleTimerRef.current);
+          dragIdleTimerRef.current = null;
+        }
+        
+        // If drag ended, schedule full-quality recalc after 200ms idle
+        if (!dragging) {
+          dragIdleTimerRef.current = setTimeout(() => {
+            calcEpochRef.current += 1; // Force full-quality recalc
+          }, 200);
+        }
+      };
+    }
+    
+    return () => {
+      if (dragIdleTimerRef.current) {
+        clearTimeout(dragIdleTimerRef.current);
+      }
+    };
+  }, []);
+  
   // Audit curve (no smoothing, no normalization) for sensitivity testing
   const rewModesDataAudit = useMemo(() => {
     if (!rewStyleMode || !rewCompareView) return null;
@@ -747,7 +781,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Room-only = flat/generic sub response (no product curves)
     // Default to absolute SPL, optional normalize via checkbox
     let result;
+    // Drag performance: use fast preview profile while dragging
+    const usePreviewProfile = isDraggingSub;
+    
     try {
+      const currentEpoch = calcEpochRef.current;
       
       result = computeRoomModesResponse({
         roomDims: { widthM: w, lengthM: l, heightM: h },
@@ -755,13 +793,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         seatPosition: seatPos,
         fMin: 15,
         fMax: 200,
-        pointsPerOct: 24,
-        modeLimitHz: 200,
+        pointsPerOct: usePreviewProfile ? 60 : 24, // Preview: ~500 pts, Final: ~2000 pts
+        modeLimitHz: usePreviewProfile ? 120 : 200, // Preview: 120 Hz, Final: 200 Hz
         q: roomDamping,
         includeAxial: true,
         includeTangential: true,
         includeOblique: true,
-        includeSBIR: rewSbirEnabled,
+        includeSBIR: usePreviewProfile ? false : rewSbirEnabled, // Preview: SBIR OFF, Final: user setting
         rewParityMode: true,
         smoothing: rewStyleMode ? 'none' : rewSmoothing,
         subFloorHeight: 0.0,
@@ -784,9 +822,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
         complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
         componentView: componentView, // Part 3 - component isolation
-        disableSealedRoomGain: debugDisableSealedGain,
-        disableNullRepair: debugDisableNullRepair
+        disableSealedRoomGain: debugDisableSealedGain || rewStrictParity,
+        disableNullRepair: debugDisableNullRepair || rewStrictParity,
+        rewStrictParity: rewStrictParity, // Disable presentation shapers
+        isDragging: usePreviewProfile, // Pass drag state to engine
+        calcEpoch: currentEpoch // For cancellation check
       });
+      
+      // Request cancellation: discard if stale
+      if (currentEpoch !== calcEpochRef.current) {
+        return null;
+      }
     } catch (e) {
       return {
         data: [],
@@ -899,6 +945,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     modesEnabled, // Include modes toggle
     rewSbirEnabled, // Include SBIR toggle
     debugDisableSealedGain, // Include debug toggle to gate display-side LF rise
+    rewStrictParity, // Include REW strict toggle
+    isDraggingSub, // Include drag state
+    calcEpochRef.current, // Include calc epoch for request cancellation
     sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
   ]);
 
@@ -1096,8 +1145,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // Run engine with product curves applied per-sub
     // Default to absolute SPL, optional normalize via checkbox
+    
+    // Drag performance: use fast preview profile while dragging
+    const usePreviewProfile = isDraggingSub;
+    
     let result;
     try {
+      const currentEpoch = calcEpochRef.current;
       
       result = computeRoomModesResponse({
         roomDims: { widthM: w, lengthM: l, heightM: h },
@@ -1105,13 +1159,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         seatPosition: seatPos,
         fMin: 15,
         fMax: 200,
-        pointsPerOct: 24,
-        modeLimitHz: 200,
+        pointsPerOct: usePreviewProfile ? 60 : 24, // Preview: ~500 pts, Final: ~2000 pts
+        modeLimitHz: usePreviewProfile ? 120 : 200, // Preview: 120 Hz, Final: 200 Hz
         q: roomDamping,
         includeAxial: modesEnabled,
         includeTangential: modesEnabled,
         includeOblique: modesEnabled,
-        includeSBIR: rewSbirEnabled,
+        includeSBIR: usePreviewProfile ? false : rewSbirEnabled, // Preview: SBIR OFF, Final: user setting
         rewParityMode: true,
         smoothing: rewStyleMode ? 'none' : rewSmoothing,
         subFloorHeight: 0.0,
@@ -1134,8 +1188,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
         complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
         componentView: componentView, // Part 3 - component isolation
-        sbirDebugSingleFrontWall: sbirDebugSingleFrontWall // DIAGNOSTIC: single reflection mode
+        sbirDebugSingleFrontWall: sbirDebugSingleFrontWall, // DIAGNOSTIC: single reflection mode
+        disableSealedRoomGain: debugDisableSealedGain || rewStrictParity,
+        disableNullRepair: debugDisableNullRepair || rewStrictParity,
+        rewStrictParity: rewStrictParity, // Disable presentation shapers
+        isDragging: usePreviewProfile, // Pass drag state to engine
+        calcEpoch: currentEpoch // For cancellation check
       });
+      
+      // Request cancellation: discard if stale
+      if (currentEpoch !== calcEpochRef.current) {
+        return null;
+      }
     } catch (e) {
       return {
         data: [],
@@ -1227,6 +1291,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     rewSmoothing,
     modesEnabled, // Include modes toggle
     rewSbirEnabled, // Include SBIR toggle
+    rewStrictParity, // Include REW strict toggle
+    isDraggingSub, // Include drag state
+    calcEpochRef.current, // Include calc epoch for request cancellation
     sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
   ]);
 
@@ -2702,9 +2769,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 checked={auditUiEnabled}
                 onCheckedChange={handleAuditToggle}
               />
-            </div>
+              </div>
 
-            {rewStyleMode && (
+              {/* REW Strict Parity toggle */}
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <Label htmlFor="rew-strict" className="text-xs text-[#3E4349] whitespace-nowrap">
+                REW Strict (Parity)
+              </Label>
+              <Switch
+                id="rew-strict"
+                checked={rewStrictParity}
+                onCheckedChange={setRewStrictParity}
+              />
+              </div>
+
+              {rewStyleMode && (
               <>
                 {/* Advanced controls visible only when REW mode is ON */}
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -2842,7 +2921,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           border: "1px solid #DCDBD6",
           marginBottom: 6
         }}>
-          User smoothing: {rewSmoothing} | Graph smoothing: {graphSmoothing} | Compare: {String(rewCompareView)} | Modes: {String(modesEnabled)} | SBIR: {String(rewSbirEnabled)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)} | DisableSealed: {String(debugDisableSealedGain)} | DisableRepair: {String(debugDisableNullRepair)}
+          User smoothing: {rewSmoothing} | Graph smoothing: {graphSmoothing} | Compare: {String(rewCompareView)} | Modes: {String(modesEnabled)} | SBIR: {String(rewSbirEnabled)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)} | REWStrict: {String(rewStrictParity)} | Dragging: {String(isDraggingSub)} | DisableSealed: {String(debugDisableSealedGain)} | DisableRepair: {String(debugDisableNullRepair)}
         </div>
 
         {/* Engine Parameter Verification */}
@@ -3215,6 +3294,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 🔬 Debug: Disable null repair/fill
               </Label>
             </div>
+            
+            {/* REW Strict Parity info banner */}
+            {rewStrictParity && (
+              <div className="text-xs bg-purple-50 p-2 rounded border border-purple-400">
+                <div className="font-semibold mb-1 text-purple-700">🎯 REW Strict (Parity) ACTIVE</div>
+                <div className="text-[10px] space-y-0.5">
+                  <div>• Coherence loss penalty: <strong>DISABLED</strong></div>
+                  <div>• Mode density compensation: <strong>DISABLED</strong></div>
+                  <div>• Schroeder blend / peak taming: <strong>DISABLED</strong></div>
+                  <div>• Null repair/fill: <strong>DISABLED</strong></div>
+                  <div className="mt-1 pt-1 border-t border-purple-300 font-semibold">
+                    This mode outputs pure modal/SBIR physics for side-by-side REW comparison.
+                  </div>
+                </div>
+              </div>
+            )}
             
             {/* Coupling Phase Probe (Part HB - verify complex eigenfunctions) */}
             {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
