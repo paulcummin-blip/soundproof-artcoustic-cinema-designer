@@ -1078,7 +1078,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       {/* Keep only the metrics cards and warnings that were before the graph */}
 
       {/* Auto Align Controls - KEEP THIS SECTION UNCHANGED */}
-      {/* START OF REMOVED SECTION - REMOVE EVERYTHING FROM "REW Parity Test Case" UNTIL HERE */}
+      {(() => {
           // Test room: 5.0 × 5.0 × 3.0 m
           const testRoomOk = Math.abs((roomDims?.widthM || 0) - 5.0) < 0.1 &&
                              Math.abs((roomDims?.lengthM || 0) - 5.0) < 0.1 &&
