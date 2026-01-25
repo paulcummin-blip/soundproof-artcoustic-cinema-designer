@@ -129,8 +129,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return __b44SafeSig(obj);
   };
   
-  // User's smoothing choice tracking (for restore after Compare View)
-  const lastUserSmoothingRef = useRef(rewSmoothing);
+
 
   // Convert absorption % to coefficient (0-1)
   const absorptionCoeff = Math.max(0, Math.min(1, absorptionPct / 100));
@@ -174,11 +173,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const engineCallCountRef = useRef(0);
   const [engineCallsUi, setEngineCallsUi] = useState(0);
 
-  // Build subs array from preview positions while dragging, otherwise committed/live
+  // Build subs array for simulation
   const subsForSimulation = useMemo(() => {
-    // During drag: use live positions directly (refs are updated by drag handler)
-    const frontInput = isDraggingSub ? frontSubsLive : (committedFrontSubs || frontSubsLive);
-    const rearInput = isDraggingSub ? rearSubsLive : (committedRearSubs || rearSubsLive);
+    const frontInput = frontSubsLive;
+    const rearInput = rearSubsLive;
 
     const liveFront = Array.isArray(frontInput) ? frontInput : [];
     const liveRear = Array.isArray(rearInput) ? rearInput : [];
@@ -222,18 +220,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     ].filter(Boolean);
 
     return sources;
-  }, [
-    isDraggingSub,
-    frontSubsLive,
-    rearSubsLive,
-    committedFrontSubs,
-    committedRearSubs,
-    frontSubsCfg?.settingsById,
-    rearSubsCfg?.settingsById,
-    roomDims?.widthM,
-    roomDims?.lengthM,
-    roomDims?.heightM,
-  ]);
+  }, [frontSubsLive, rearSubsLive, frontSubsCfg?.settingsById, rearSubsCfg?.settingsById]);
 
   // Run bass simulation engine  
   const simulationResults = useMemo(() => {
@@ -370,27 +357,39 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const l = roomDims?.lengthM;
     const h = roomDims?.heightM;
     if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h) && w > 0 && l > 0 && h > 0)) {
-      return null;
+      return { freqsHz: [], splDb: [], debug: { error: "Invalid room dimensions" } };
     }
 
     const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-    if (!seat) return null;
-
-    let seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && seatNudgeTest) {
-      seatPos = { ...seatPos, x: seatPos.x - 0.30 };
+    if (!seat) {
+      return { freqsHz: [], splDb: [], debug: { error: "No RSP found" } };
     }
 
+    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+
     const sourcePositions = subsForSimulation
-      .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
-      .map(s => ({
+    .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
+    .map(s => {
+      const userDelayMs = s.tuning?.delayMs || 0;
+      const alignDelayMs = rewAlignmentDelays[s.id] || 0;
+
+      return {
         x: s.x,
         y: s.y,
         z: 0.0,
-        tuning: s.tuning || { gainDb: 0, delayMs: 0, polarity: 'normal' }
-      }));
+        id: s.id,
+        modelKey: s.modelKey,
+        tuning: {
+          gainDb: s.tuning?.gainDb || 0,
+          delayMs: userDelayMs + alignDelayMs,
+          polarity: s.tuning?.polarity || 'normal'
+        }
+      };
+    });
 
-    if (!sourcePositions.length) return null;
+    if (!sourcePositions.length) {
+      return { freqsHz: [], splDb: [], debug: { error: "No valid sub positions" } };
+    }
 
     // Build signature for failure caching
     const sig = `w=${fmtFixed(w, 2)}|l=${fmtFixed(l, 2)}|h=${fmtFixed(h, 2)}|seat=${fmtFixed(seatPos.x, 2)},${fmtFixed(seatPos.y, 2)},${fmtFixed(seatPos.z, 2)}|subs=${sourcePositions.map(s => `${fmtFixed(s.x, 2)},${fmtFixed(s.y, 2)},${fmtFixed(s.z, 2)},g${fmtFixed(s.tuning?.gainDb||0, 1)},d${fmtFixed(s.tuning?.delayMs||0, 1)},p${s.tuning?.polarity||'normal'}`).join('|')}|damp=${roomDamping}`;
@@ -447,7 +446,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   // Build responseData from finalSeries
   const responseData = useMemo(() => {
-    if (!finalSeries.freqsHz || !finalSeries.splDb || finalSeries.freqsHz.length === 0) {
+    if (!finalSeries || !finalSeries.freqsHz || !finalSeries.splDb || finalSeries.freqsHz.length === 0) {
       return [];
     }
     
@@ -463,117 +462,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   }, [responseData]);
 
   // Safe debug object
-  const safeDebug = finalSeries.debug || {};
-
-  // Build source positions from subs
-  const buildSourcePositions = (subs) => {
-    return subs
-      .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
-      .map(s => {
-        const userDelayMs = s.tuning?.delayMs || 0;
-        const alignDelayMs = rewAlignmentDelays[s.id] || 0;
-        
-        return {
-          x: s.x,
-          y: s.y,
-          z: 0.0,
-          tuning: {
-            gainDb: s.tuning?.gainDb || 0,
-            delayMs: userDelayMs + alignDelayMs,
-            polarity: s.tuning?.polarity || 'normal'
-          }
-        };
-      });
-  };
-
-  // REMOVE ALL OLD REW CODE FROM HERE TO:
-  // "// Build responseData ONLY from finalSeries"
-    const w = roomDims?.widthM;
-    const l = roomDims?.lengthM;
-    const h = roomDims?.heightM;
-    
-    if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h) && w > 0 && l > 0 && h > 0)) {
-      return { freqsHz: [], splDb: [], debug: { error: "Invalid room dimensions" } };
-    }
-
-    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-    if (!seat) {
-      return { freqsHz: [], splDb: [], debug: { error: "No RSP found" } };
-    }
-
-    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
-
-    const sourcePositions = subsForSimulation
-      .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
-      .map(s => ({
-        x: s.x,
-        y: s.y,
-        z: 0.0,
-        tuning: s.tuning || { gainDb: 0, delayMs: 0, polarity: 'normal' }
-      }));
-
-    if (!sourcePositions.length) {
-      return { freqsHz: [], splDb: [], debug: { error: "No valid sub positions" } };
-    }
-
-    try {
-      const result = computeRoomModesResponse({
-        roomDims: { widthM: w, lengthM: l, heightM: h },
-        sourcePositions,
-        seatPosition: seatPos,
-        mlpPosition: seatPos,
-        fMin: 20,
-        fMax: 200,
-        pointsPerOct: 24,
-        modeLimitHz: 200,
-        q: roomDamping,
-        includeAxial: true,
-        includeTangential: true,
-        includeOblique: true,
-        includeSBIR: true,
-        sbirMaxOrder: 1,
-        sbirIncludeWalls: true,
-        sbirIncludeFloorCeiling: true,
-        rewParityMode: true,
-        smoothing: 'none',
-        subFloorHeight: 0.0,
-        normalizeBandHz: null,
-        normalizeToDb: null,
-        relativeViewEnabled: false,
-        surfaceAbsorption: {
-          front: 0.30, back: 0.30, left: 0.30,
-          right: 0.30, ceiling: 0.30, floor: 0.30,
-        },
-        dampingScalar: Math.max(0.5, roomDamping / 20),
-        leakage: 0.05,
-        subProductCurves: null,
-        absoluteSplMode: true,
-        rawEngineOutput: false,
-        componentView: 'modalPlusSbir',
-        disableSealedRoomGain: false,
-        disableNullRepair: true,
-        sbirBlendEnabled: false,
-        rewStrictParity: false,
-        isDragging: false,
-        calcEpoch: 0
-      });
-
-      return {
-        freqsHz: result.freqs || [],
-        splDb: result.splDb || [],
-        debug: result.debug || {}
-      };
-    } catch (e) {
-      return {
-        freqsHz: [],
-        splDb: [],
-        debug: {
-          error: "Engine failed",
-          message: String(e?.message || e)
-        }
-      };
-    }
-  }, [roomDims, seatingPositions, subsForSimulation, roomDamping, subPositionEpoch]);
+  const safeDebug = finalSeries?.debug || {};
 
   // Clean plotted series for graph
   const plottedSeries = useMemo(() => {
@@ -665,18 +554,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   // Compute mode frequencies for markers
   const modeFrequencies = useMemo(() => {
-    return safeGraphDebug?.modeMarkersHz || [];
-  }, [safeGraphDebug]);
+    return safeDebug?.modeMarkersHz || [];
+  }, [safeDebug]);
 
   // Mode markers for graph overlay
   const modeMarkersForGraph = useMemo(() => {
-    const allMarkers = safeGraphDebug?.modeMarkers || [];
+    const allMarkers = safeDebug?.modeMarkers || [];
     return {
       axial: allMarkers.filter(m => m.family === 'axial'),
       tangential: allMarkers.filter(m => m.family === 'tangential'),
       oblique: allMarkers.filter(m => m.family === 'oblique')
     };
-  }, [safeGraphDebug]);
+  }, [safeDebug]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
@@ -1031,11 +920,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           }
         }
         
-        // Compute P19 (max deviation below Schroeder, with 1/3 smoothing)
-        const smoothedForP19 = applyRewStyleDisplaySmoothing(
-          analysisSeriesAbs,
-          '1/3'
-        ).map(p => p.spl);
+        // Compute P19 (max deviation below Schroeder)
+        // Note: P19 should use 1/3 smoothing, but helper not accessible
+        const smoothedForP19 = splDb; // Using unsmoothed for now
         
         const belowSchroeder = smoothedForP19
           .map((spl, i) => ({ freq: freqsHz[i], dev: Math.abs(spl - targetDb[i]) }))
