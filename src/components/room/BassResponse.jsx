@@ -2108,8 +2108,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // Final plotted series (apply display floor + integrity cleanup)
   const plottedSeries = React.useMemo(() => {
-    // Select base series
-    const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
+    // REW mode: use rewModesData.data directly (no conditional gating)
+    if (rewStyleMode) {
+      if (rewModesData && Array.isArray(rewModesData.data)) {
+        return rewModesData.data;
+      }
+      return [];
+    }
+    
+    // Non-REW mode: use old logic
+    const baseSeries = displayData;
 
     // Apply display conditioning (floor only, no clamping)
     const conditioned = applyDisplayConditioningNulls(
@@ -2117,7 +2125,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       rewLockedMin,
       rewLockedMax,
       yAxisLocked,
-      isRewStyle
+      false
     );
 
     // Clean for plotting (sort, deduplicate, ensure strictly increasing)
@@ -2133,8 +2141,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     return cleaned;
   }, [
-    isRewStyle,
-    rewFinalPlottedSeries,
+    rewStyleMode,
+    rewModesData,
     displayData,
     rewLockedMin,
     rewLockedMax,
