@@ -135,6 +135,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const yDomainDuringDragRef = React.useRef(null);
   const [dragYDomain, setDragYDomain] = React.useState(null);
   
+  // UI safety: never let REW datasets become null (prevents "No graph data yet")
+  const lastGoodRewModesAbsRef = React.useRef({ data: [], debug: { note: "init" } });
+  const lastGoodRewRoomPlusAbsRef = React.useRef({ data: [], debug: { note: "init" } });
+  
   // Force re-sim key that ACTUALLY triggers re-render (ref.current does not)
   const [calcEpoch, setCalcEpoch] = useState(0);
   
@@ -997,9 +1001,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         calcEpoch: currentEpoch // For cancellation check
       });
       
-      // Request cancellation: discard if stale
+      // Request cancellation: NEVER return null (keeps graph alive)
       if (currentEpoch !== calcEpochRef.current) {
-        return null;
+        return lastGoodRewModesAbsRef.current || { data: [], debug: { note: "stale-cancelled" } };
       }
     } catch (e) {
       return {
@@ -1076,7 +1080,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       })
       .sort((a, b) => a.frequency - b.frequency); // Ensure strictly increasing
     
-    return {
+    const finalResult = {
       data: dataPoints,
       debug: {
         ...result.debug,
@@ -1095,6 +1099,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       subSig,
       seatSig
     };
+    
+    // Cache last good dataset for UI safety (non-empty only)
+    if (Array.isArray(dataPoints) && dataPoints.length > 0) {
+      lastGoodRewModesAbsRef.current = finalResult;
+    }
+    
+    return finalResult;
   }, [
     rewStyleMode, 
     roomDims?.widthM, 
@@ -1364,9 +1375,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         calcEpoch: currentEpoch // For cancellation check
       });
       
-      // Request cancellation: discard if stale
+      // Request cancellation: NEVER return null (keeps graph alive)
       if (currentEpoch !== calcEpochRef.current) {
-        return null;
+        return lastGoodRewRoomPlusAbsRef.current || { data: [], debug: { note: "stale-cancelled" } };
       }
     } catch (e) {
       return {
@@ -1419,7 +1430,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       })
       .sort((a, b) => a.frequency - b.frequency); // Ensure strictly increasing
 
-    return {
+    const finalResult = {
       data: dataPoints,
       debug: {
         ...result.debug,
@@ -1441,6 +1452,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       splDb: plotArray,
       coherentRawDb: result.coherentRawDb
     };
+    
+    // Cache last good dataset for UI safety (non-empty only)
+    if (Array.isArray(dataPoints) && dataPoints.length > 0) {
+      lastGoodRewRoomPlusAbsRef.current = finalResult;
+    }
+    
+    return finalResult;
   }, [
     rewStyleMode, 
     rewView, 
@@ -1630,17 +1648,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   const rewModesDataRel = useMemo(() => {
     if (!rewStyleMode) return null;
-    return normalizeDatasetToRelative(rewModesDataAbs || { data: [] });
-  }, [rewStyleMode, rewModesDataAbs, normalizeDatasetToRelative]);
+    return normalizeDatasetToRelative(safeRewModesData || { data: [] });
+  }, [rewStyleMode, safeRewModesData, normalizeDatasetToRelative]);
 
   const rewRoomPlusProductDataRel = useMemo(() => {
     if (!rewStyleMode) return null;
-    return normalizeDatasetToRelative(rewRoomPlusProductDataAbs || { data: [] });
-  }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDatasetToRelative]);
+    return normalizeDatasetToRelative(safeRewRoomPlusProductData || { data: [] });
+  }, [rewStyleMode, safeRewRoomPlusProductData, normalizeDatasetToRelative]);
 
   // Aliases switch Abs/Rel based on UI toggle
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
+  
+  // UI safety: REW datasets must never be null/undefined
+  const safeRewModesData = rewModesData || lastGoodRewModesAbsRef.current || { data: [] };
+  const safeRewRoomPlusProductData = rewRoomPlusProductData || lastGoodRewRoomPlusAbsRef.current || { data: [] };
 
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
   const activeDebug = useMemo(() => {
@@ -1650,10 +1672,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (!rewStyleMode) return null;
     const useRel = rewRelativeView;
     const dbg = rewView === 'roomPlusProduct'
-      ? (useRel ? rewRoomPlusProductDataAbs?.debug : rewRoomPlusProductDataAbs?.debug)
-      : (useRel ? rewModesDataAbs?.debug : rewModesDataAbs?.debug);
+      ? (useRel ? safeRewRoomPlusProductData?.debug : safeRewRoomPlusProductData?.debug)
+      : (useRel ? safeRewModesData?.debug : safeRewModesData?.debug);
     return dbg || null;
-  }, [rewStyleMode, rewView, rewRelativeView, rewModesDataAbs, rewRoomPlusProductDataAbs, componentView, isDraggingSub]);
+  }, [rewStyleMode, rewView, rewRelativeView, safeRewModesData, safeRewRoomPlusProductData, componentView, isDraggingSub]);
   
   // Safe default for JSX (never undefined)
   const safeDebug = activeDebug ?? {};
@@ -1672,10 +1694,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   // REW mode: Three distinct series for plotting (RAW, ENGINE, DISPLAY)
   const { rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries } = useMemo(() => {
-    // Select active dataset (Room-only or Room+Product)
+    // Select active dataset (Room-only or Room+Product) - USE SAFE VERSIONS
     const activeDataset = rewView === 'roomPlusProduct' 
-      ? rewRoomPlusProductData 
-      : rewModesDataAbs;
+      ? safeRewRoomPlusProductData 
+      : safeRewModesData;
     
     if (!activeDataset || !activeDataset.data || activeDataset.data.length === 0) {
       return { rewRawSeries: [], rewEngineFinalSeries: [], rewDisplayFinalSeries: [] };
@@ -1726,7 +1748,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       rewEngineFinalSeries: engineFinalSeries,
       rewDisplayFinalSeries: displaySeries
     };
-  }, [rewView, rewModesDataAbs, rewRoomPlusProductData, rewRelativeView, rewStyleMode, rewDisplayRefDb, allowDisplayRefOffset]);
+  }, [rewView, safeRewModesData, safeRewRoomPlusProductData, rewRelativeView, rewStyleMode, rewDisplayRefDb, allowDisplayRefOffset]);
 
   // REW final plotted series (gated to prevent stacking of relative + absolute offsets)
   const rewFinalPlottedSeries = useMemo(() => {
@@ -1748,13 +1770,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       return rewFinalPlottedSeries;
     }
     
-    // Non-REW mode: use old logic
+    // Non-REW mode: use old logic - USE SAFE VERSIONS
     const baseData = rewView === 'roomPlusProduct'
-      ? rewRoomPlusProductData?.data?.length ? rewRoomPlusProductData.data : (rewModesDataAbs?.data || [])
-      : rewModesDataAbs?.data?.length ? rewModesDataAbs.data : (rewRoomPlusProductData?.data || []);
+      ? safeRewRoomPlusProductData?.data?.length ? safeRewRoomPlusProductData.data : (safeRewModesData?.data || [])
+      : safeRewModesData?.data?.length ? safeRewModesData.data : (safeRewRoomPlusProductData?.data || []);
     
     return baseData;
-  }, [rewStyleMode, rewFinalPlottedSeries, rewView, rewModesDataAbs, rewRoomPlusProductData]);
+  }, [rewStyleMode, rewFinalPlottedSeries, rewView, safeRewModesData, safeRewRoomPlusProductData]);
 
   // TEMP DEBUG (can remove later)
   // if (globalThis.__B44_LOGS) console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
@@ -2492,7 +2514,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       heightM: roomDims.heightM
     }, 200);
     return modes.map(m => m.fHz);
-  }, [rewStyleMode, rewModesData, safeDebug]);
+  }, [rewStyleMode, safeRewModesData, safeDebug]);
 
   // Mode markers for graph overlay (REW parity)
   const modeMarkersForGraph = useMemo(() => {
@@ -2506,7 +2528,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       tangential: allMarkers.filter(m => m.family === 'tangential'),
       oblique: allMarkers.filter(m => m.family === 'oblique')
     };
-  }, [rewStyleMode, rewView, rewModesData, rewRoomPlusProductData, safeDebug]);
+  }, [rewStyleMode, rewView, safeRewModesData, safeRewRoomPlusProductData, safeDebug]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
@@ -3316,12 +3338,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       variant="ghost"
                       size="sm"
                       onClick={() => {
-                        if (rewModesData?.splDb && rewModesData.debug?.splDbRepaired) {
+                        if (safeRewModesData?.splDb && safeRewModesData.debug?.splDbRepaired) {
                           rewCompareBaselineRef.current = {
-                            splDbRepaired: [...rewModesData.debug.splDbRepaired],
-                            freqs: [...rewModesData.freqs],
-                            sourceSigRounded: rewModesData.debug?.sourceSigRounded,
-                            seatSigRounded: rewModesData.debug?.seatSigRounded,
+                            splDbRepaired: [...safeRewModesData.debug.splDbRepaired],
+                            freqs: [...safeRewModesData.freqs],
+                            sourceSigRounded: safeRewModesData.debug?.sourceSigRounded,
+                            seatSigRounded: safeRewModesData.debug?.seatSigRounded,
                             timestamp: Date.now()
                           };
                         }
