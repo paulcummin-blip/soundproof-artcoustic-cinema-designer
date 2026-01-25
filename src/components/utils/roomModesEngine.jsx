@@ -771,6 +771,9 @@ export function computeRoomModesResponse({
     let sbirPathsUsed = 0;
     let sbirReflectionsUsed = 0;
     let sbirStrongestReflection = null;
+
+    // SBIR null predictor (debug only) - compute predicted null frequency
+    let sbirNullPrediction = null;
     
     // Compute SBIR frequency blend weight (REW-style transition)
     let sbirWeight = 1.0; // Default: full strength
@@ -845,12 +848,36 @@ export function computeRoomModesResponse({
         if (sbirResult.debugAt63Hz && !sbirDebugProbe63Hz_captured) {
           sbirDebugProbe63Hz_captured = sbirResult.debugAt63Hz;
         }
-      }
-      
-      // Apply frequency-dependent SBIR blend weight (REW-style transition)
-      sumRe_sbir *= sbirWeight;
-      sumIm_sbir *= sbirWeight;
-    }
+
+        // SBIR null predictor (debug only - once per frequency sweep)
+        if (sbirDebugSingleFrontWall && !sbirNullPrediction && subIdx === 0) {
+          const directDx = source.x - seat.x;
+          const directDy = source.y - seat.y;
+          const directDz = (source.z ?? 0.0) - (seat.z ?? 1.2);
+          const directM = Math.sqrt(directDx*directDx + directDy*directDy + directDz*directDz);
+
+          // Front wall image source (mirror across Y=0)
+          const imageDx = source.x - seat.x;
+          const imageDy = -source.y - seat.y;
+          const imageDz = (source.z ?? 0.0) - (seat.z ?? 1.2);
+          const reflectedM = Math.sqrt(imageDx*imageDx + imageDy*imageDy + imageDz*imageDz);
+
+          const deltaM = reflectedM - directM;
+          const nullHz = deltaM > 0 ? c / (2 * deltaM) : null;
+
+          sbirNullPrediction = {
+            directM: directM,
+            reflectedM: reflectedM,
+            deltaM: deltaM,
+            nullHz: nullHz
+          };
+        }
+        }
+
+        // Apply frequency-dependent SBIR blend weight (REW-style transition)
+        sumRe_sbir *= sbirWeight;
+        sumIm_sbir *= sbirWeight;
+        }
 
     // DEBUG: capture pre-smoothing magnitudes for probe bins only
     if (__debugBass && __isProbeFreq(f)) {
@@ -936,6 +963,31 @@ export function computeRoomModesResponse({
       // Default REW view: total coherent sum (modal + sbir)
       sumRe_total = totalTerm_re;
       sumIm_total = totalTerm_im;
+    }
+
+    // REW coherence blend (tames extremes without smoothing)
+    // Blends coherent complex sum with incoherent RMS to reduce over-aggressive peaks/nulls
+    const rewCoherenceBlendValue = typeof rewCoherenceBlend === 'number' ? Math.max(0, Math.min(1, rewCoherenceBlend)) : 0;
+
+    if (rewParityMode && rewCoherenceBlendValue > 0) {
+      // Coherent pressure (what we already have)
+      const pCoherent = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
+
+      // Incoherent pressure (RMS of component magnitudes)
+      const modalMag = Math.sqrt(modalTerm_re * modalTerm_re + modalTerm_im * modalTerm_im);
+      const sbirMag = Math.sqrt(sbirTerm_re * sbirTerm_re + sbirTerm_im * sbirTerm_im);
+      const pIncoherent = Math.sqrt(modalMag * modalMag + sbirMag * sbirMag);
+
+      // Blend: sqrt((1-blend)*pCoherent^2 + blend*pIncoherent^2)
+      const pMixed = Math.sqrt(
+        (1 - rewCoherenceBlendValue) * pCoherent * pCoherent + 
+        rewCoherenceBlendValue * pIncoherent * pIncoherent
+      );
+
+      // Scale complex sum to match mixed magnitude (preserves phase relationships)
+      const scale = pCoherent > 1e-12 ? (pMixed / pCoherent) : 1.0;
+      sumRe_total *= scale;
+      sumIm_total *= scale;
     }
 
     // COHERENT PRESSURE RAW: Pure complex magnitude (no processing)
@@ -1922,13 +1974,14 @@ export function computeRoomModesResponse({
       parityAudits,
       sbirDebugProbe40Hz,
       sbirDebugProbe63Hz: sbirDebugProbe63Hz_captured,
+      sbirNullPrediction: sbirNullPrediction,
       duplicateCount,
       strictlyIncreasing,
       minDeltaF: Number.isFinite(minDeltaF) ? minDeltaF.toFixed(6) : 'N/A',
       continuityBand60_90_maxDeltaDb: Number.isFinite(maxDeltaDb60_90) ? maxDeltaDb60_90.toFixed(3) : 'N/A',
       continuityBand60_90_avgDeltaDb: Number.isFinite(avgDeltaDb60_90) ? avgDeltaDb60_90.toFixed(3) : 'N/A',
-    }
-  };
+      }
+      };
 
   // --- Attach 40–70 Hz stage audit when enabled (ONE time only) ---
   if (globalThis.__B44_BASS_AUDIT === true) {
