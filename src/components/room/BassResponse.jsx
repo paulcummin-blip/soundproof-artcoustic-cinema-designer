@@ -199,9 +199,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [couplingProbeMode, setCouplingProbeMode] = useState('auto'); // 'auto' or '1,0,0' etc
   const [couplingProbeUseComplex, setCouplingProbeUseComplex] = useState(false);
   
-  // Component view mode (Part 3 - SBIR isolation)
-  const [componentView, setComponentView] = useState('modalPlusSbir'); // 'modalOnly' | 'sbirOnly' | 'modalPlusSbir'
-  
   // REW-style time alignment (align all subs to MLP arrival time)
   const [rewTimeAlign, setRewTimeAlign] = useState(false);
   
@@ -776,14 +773,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         pointsPerOct: 24,
         modeLimitHz: 200,
         q: roomDamping,
-        includeAxial: modesEnabled,
-        includeTangential: modesEnabled,
-        includeOblique: modesEnabled,
-        includeSBIR: rewSbirEnabled,
+        includeAxial: true,
+        includeTangential: true,
+        includeOblique: true,
+        includeSBIR: true,
+        sbirMaxOrder: 1,
+        sbirIncludeWalls: true,
+        sbirIncludeFloorCeiling: true,
         rewParityMode: true,
-        smoothing: 'none', // NO SMOOTHING for audit
+        smoothing: 'none',
         subFloorHeight: 0.0,
-        normalizeBandHz: null, // NO NORMALIZATION for audit
+        normalizeBandHz: null,
         normalizeToDb: null,
         relativeViewEnabled: false,
         surfaceAbsorption: {
@@ -794,7 +794,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         leakage: 0.05,
         subProductCurves: null,
         absoluteSplMode: false,
-        sbirDebugSingleFrontWall: sbirDebugSingleFrontWall // DIAGNOSTIC: single reflection mode
+        componentView: 'modalPlusSbir',
+        disableSealedRoomGain: false,
+        disableNullRepair: true,
+        sbirBlendEnabled: false,
+        rewStrictParity: false,
+        sbirDebugSingleFrontWall: sbirDebugSingleFrontWall
       });
 
       if (globalThis.__B44_BASS_AUDIT && result?.debug && Array.isArray(result.freqs)) {
@@ -916,10 +921,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const seatSig = stableSeatSig;
 
     // Build signature for failure caching
-    const sig = `w=${fmtFixed(w, 2)}|l=${fmtFixed(l, 2)}|h=${fmtFixed(h, 2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}|cv:${componentView}`;
+    const sig = `w=${fmtFixed(w, 2)}|l=${fmtFixed(l, 2)}|h=${fmtFixed(h, 2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}`;
     
     // Build run key for bounce detection
-    const runKey = `${fmtFixed(w, 2)}x${fmtFixed(l, 2)}x${fmtFixed(h, 2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}`;
+    const runKey = `${fmtFixed(w, 2)}x${fmtFixed(l, 2)}x${fmtFixed(h, 2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}`;
     
     // Bounce detector: only log when deps actually change
     if (runKey !== lastRewRunKeyRef.current) {
@@ -969,10 +974,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Drag performance: use fast preview profile while dragging
     const usePreviewProfile = isDraggingSub;
     
-    // Component view gating: control which physics terms are included
-    const wantModal = modesEnabled && componentView !== 'sbirOnly';
-    const wantSBIR = rewSbirEnabled && componentView !== 'modalOnly';
-    
     try {
       const currentEpoch = calcEpochRef.current;
       
@@ -980,17 +981,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
         seatPosition: seatPos,
+        mlpPosition: seatPos,
         fMin: 20,
         fMax: 200,
         pointsPerOct: usePreviewProfile ? 30 : 24, // Preview: lower grid density for speed
         modeLimitHz: 200,
         q: roomDamping,
-        includeAxial: wantModal,
-        includeTangential: wantModal,
-        includeOblique: wantModal,
-        includeSBIR: wantSBIR && !usePreviewProfile,
+        includeAxial: true,
+        includeTangential: true,
+        includeOblique: true,
+        includeSBIR: true,
+        sbirMaxOrder: 1,
+        sbirIncludeWalls: true,
+        sbirIncludeFloorCeiling: true,
         rewParityMode: true,
-        smoothing: rewStyleMode ? 'none' : rewSmoothing,
+        smoothing: 'none',
         subFloorHeight: 0.0,
         normalizeBandHz: null,
         normalizeToDb: null,
@@ -1005,17 +1010,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         },
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
-        subProductCurves: null, // Room-only: no product curves
+        subProductCurves: null,
         absoluteSplMode: true,
-        rawEngineOutput: modalOnlyDebugView ? true : false,
-        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
-        complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
-        componentView: componentView, // Part 3 - component isolation
-        disableSealedRoomGain: debugDisableSealedGain || rewStrictParity,
-        disableNullRepair: debugDisableNullRepair || rewStrictParity,
-        rewStrictParity: rewStrictParity, // Disable presentation shapers
-        isDragging: usePreviewProfile, // Pass drag state to engine
-        calcEpoch: currentEpoch // For cancellation check
+        rawEngineOutput: false,
+        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null,
+        complexEigenfunctions: complexEigenfunctions,
+        componentView: 'modalPlusSbir',
+        disableSealedRoomGain: false,
+        disableNullRepair: true,
+        sbirBlendEnabled: false,
+        rewStrictParity: false,
+        isDragging: usePreviewProfile,
+        calcEpoch: currentEpoch
       });
       
       // Request cancellation: NEVER return null (keeps graph alive)
@@ -1147,10 +1153,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     complexEigenfunctions, 
     componentView, 
     rewSmoothing,
-    modesEnabled, // Include modes toggle
-    rewSbirEnabled, // Include SBIR toggle
     debugDisableSealedGain, // Include debug toggle to gate display-side LF rise
-    rewStrictParity, // Include REW strict toggle
     isDraggingSub, // Include drag state
     calcEpoch, // Include calc epoch for request cancellation
     sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
@@ -1253,10 +1256,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const seatSig = stableSeatSig;
 
     // Build signature for failure caching
-    const sig = `w=${fmtFixed(w, 2)}|l=${fmtFixed(l, 2)}|h=${fmtFixed(h, 2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView ? 1 : 0}|damp=${roomDamping}|view=product|cv:${componentView}`;
+    const sig = `w=${fmtFixed(w, 2)}|l=${fmtFixed(l, 2)}|h=${fmtFixed(h, 2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView ? 1 : 0}|damp=${roomDamping}|view=product`;
     
     // Build run key for bounce detection
-    const runKey = `${fmtFixed(w, 2)}x${fmtFixed(l, 2)}x${fmtFixed(h, 2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}|view:product`;
+    const runKey = `${fmtFixed(w, 2)}x${fmtFixed(l, 2)}x${fmtFixed(h, 2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|view:product`;
     
     // Bounce detector: only log when deps actually change
     if (runKey !== lastRewRunKeyRef.current) {
@@ -1354,10 +1357,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Drag performance: use fast preview profile while dragging
     const usePreviewProfile = isDraggingSub;
     
-    // Component view gating: control which physics terms are included
-    const wantModal = modesEnabled && componentView !== 'sbirOnly';
-    const wantSBIR = rewSbirEnabled && componentView !== 'modalOnly';
-    
     let result;
     try {
       const currentEpoch = calcEpochRef.current;
@@ -1366,17 +1365,21 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
         seatPosition: seatPos,
+        mlpPosition: seatPos,
         fMin: 20,
         fMax: 200,
-        pointsPerOct: usePreviewProfile ? 30 : 24, // Preview: ~250 pts (REW-live), Final: ~2000 pts
+        pointsPerOct: usePreviewProfile ? 30 : 24,
         modeLimitHz: 200,
         q: roomDamping,
-        includeAxial: wantModal,
-        includeTangential: wantModal,
-        includeOblique: wantModal,
-        includeSBIR: wantSBIR && !usePreviewProfile,
+        includeAxial: true,
+        includeTangential: true,
+        includeOblique: true,
+        includeSBIR: true,
+        sbirMaxOrder: 1,
+        sbirIncludeWalls: true,
+        sbirIncludeFloorCeiling: true,
         rewParityMode: true,
-        smoothing: rewStyleMode ? 'none' : rewSmoothing,
+        smoothing: 'none',
         subFloorHeight: 0.0,
         normalizeBandHz: null,
         normalizeToDb: null,
@@ -1391,18 +1394,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         },
         dampingScalar: Math.max(0.5, roomDamping / 20),
         leakage: 0.05,
-        subProductCurves, // Apply per-sub product curves
+        subProductCurves,
         absoluteSplMode: true,
-        rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
-        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
-        complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
-        componentView: componentView, // Part 3 - component isolation
-        sbirDebugSingleFrontWall: sbirDebugSingleFrontWall, // DIAGNOSTIC: single reflection mode
-        disableSealedRoomGain: debugDisableSealedGain || rewStrictParity,
-        disableNullRepair: debugDisableNullRepair || rewStrictParity,
-        rewStrictParity: rewStrictParity, // Disable presentation shapers
-        isDragging: usePreviewProfile, // Pass drag state to engine
-        calcEpoch: currentEpoch // For cancellation check
+        rawEngineOutput: false,
+        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null,
+        complexEigenfunctions: complexEigenfunctions,
+        componentView: 'modalPlusSbir',
+        disableSealedRoomGain: false,
+        disableNullRepair: true,
+        sbirBlendEnabled: false,
+        rewStrictParity: false,
+        isDragging: usePreviewProfile,
+        calcEpoch: currentEpoch
       });
       
       // Request cancellation: NEVER return null (keeps graph alive)
@@ -1515,9 +1518,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     complexEigenfunctions, 
     componentView, 
     rewSmoothing,
-    modesEnabled, // Include modes toggle
-    rewSbirEnabled, // Include SBIR toggle
-    rewStrictParity, // Include REW strict toggle
     isDraggingSub, // Include drag state
     calcEpoch, // Include calc epoch for request cancellation
     sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
@@ -1744,6 +1744,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
         seatPosition: seatPos,
+        mlpPosition: seatPos,
         fMin: 20,
         fMax: 200,
         pointsPerOct: 24,
@@ -1753,6 +1754,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         includeTangential: true,
         includeOblique: true,
         includeSBIR: true,
+        sbirMaxOrder: 1,
+        sbirIncludeWalls: true,
+        sbirIncludeFloorCeiling: true,
         rewParityMode: true,
         smoothing: 'none',
         subFloorHeight: 0.0,
@@ -1768,7 +1772,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         subProductCurves: null,
         absoluteSplMode: true,
         rawEngineOutput: false,
-        componentView: 'modalPlusSbir', // Always combined
+        componentView: 'modalPlusSbir',
+        disableSealedRoomGain: false,
+        disableNullRepair: true,
+        sbirBlendEnabled: false,
+        rewStrictParity: false,
         isDragging: false,
         calcEpoch: 0
       });
@@ -3150,7 +3158,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           border: "1px solid #DCDBD6",
           marginBottom: 6
         }}>
-          User smoothing: {rewSmoothing} | Graph smoothing: {graphSmoothing} | Compare: {String(rewCompareView)} | Modes: {String(modesEnabled)} | SBIR: {String(rewSbirEnabled)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)} | REWStrict: {String(rewStrictParity)} | Dragging: {String(isDraggingSub)} | DisableSealed: {String(debugDisableSealedGain)} | DisableRepair: {String(debugDisableNullRepair)}
+          User smoothing: {rewSmoothing} | Graph smoothing: {graphSmoothing} | Compare: {String(rewCompareView)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)} | Dragging: {String(isDraggingSub)} | DisableSealed: {String(debugDisableSealedGain)}
         </div>
 
         {/* Engine Parameter Verification */}
@@ -3164,7 +3172,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           border: "1px solid #C1B6AD",
           marginBottom: 8
         }}>
-          Engine modesEnabled: {String(modesEnabled)} | seatResponses: {Object.keys(simulationResults.seatResponses || {}).length}
+          seatResponses: {Object.keys(simulationResults.seatResponses || {}).length}
         </div>
 
         {/* REW Parity Test Case (Part E - VALIDATION) */}
@@ -4967,15 +4975,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <strong>modesEnabledPassed:</strong> {String(modesEnabled)}
               </div>
               <div>
-                <strong>plottedSeriesName:</strong> {(() => {
-                  if (safeDebug?.componentView) {
-                    return safeDebug.componentView;
-                  }
-                  if (rewStyleMode) {
-                    return `REW-${rewView}-${componentView}`;
-                  }
-                  return "productSim";
-                })()}
+                <strong>plottedSeriesName:</strong> modalPlusSbir (REW parity, always)
               </div>
               <div>
                 <strong>sbirPathsUsed:</strong> {(() => {
@@ -5231,65 +5231,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         </div>
       </div>
 
-      {/* Room Modes & SBIR Controls */}
+      {/* Room Damping Control */}
       <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
-        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Acoustics (Product Simulation)</div>
+        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Acoustics</div>
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <Label htmlFor="sbir-toggle" className="text-xs text-[#3E4349]">
-                SBIR (reflections)
-              </Label>
-              <div className="text-[10px] text-[#3E4349] opacity-70 mt-0.5">
-                Adds first-order reflections (image sources). Disables boundary gain when enabled.
-              </div>
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs text-[#3E4349]">Room Damping</Label>
+              <span className="text-xs font-mono text-[#1B1A1A]">
+                {fmtFixed(roomDamping, 0)}
+              </span>
             </div>
-            <Switch
-              id="sbir-toggle"
-              checked={rewSbirEnabled}
-              onCheckedChange={setRewSbirEnabled}
+            <input
+              type="range"
+              value={roomDamping}
+              onChange={(e) => setRoomDamping(Number(e.target.value))}
+              min="8"
+              max="35"
+              step="1"
+              className="w-full"
             />
+            <div className="flex justify-between text-xs text-[#3E4349] mt-1">
+              <span>Dead (8)</span>
+              <span>Lively (35)</span>
+            </div>
           </div>
-
-          <div className="flex items-center justify-between">
-            <Label htmlFor="modes-toggle" className="text-xs text-[#3E4349]">
-              Enable Room Modes
-            </Label>
-            <Switch
-              id="modes-toggle"
-              checked={modesEnabled}
-              onCheckedChange={setModesEnabled}
-            />
-          </div>
-
-          {modesEnabled && (
-           <div>
-             <div className="flex items-center justify-between mb-2">
-               <Label className="text-xs text-[#3E4349]">Room Damping</Label>
-               <span className="text-xs font-mono text-[#1B1A1A]">
-                 {fmtFixed(roomDamping, 0)}
-               </span>
-             </div>
-             <input
-               type="range"
-               value={roomDamping}
-               onChange={(e) => setRoomDamping(Number(e.target.value))}
-               min="8"
-               max="35"
-               step="1"
-               className="w-full"
-             />
-             <div className="flex justify-between text-xs text-[#3E4349] mt-1">
-               <span>Dead (8)</span>
-               <span>Lively (35)</span>
-             </div>
-           </div>
-          )}
-
-
-
           <div className="text-xs text-[#3E4349]">
-            Applies modal filtering to product-based simulation
+            Modal + SBIR simulation (REW parity, always on)
           </div>
         </div>
       </div>

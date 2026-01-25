@@ -1082,10 +1082,8 @@ export function computeRoomModesResponse({
   const splDbForPipeline = splDb;
   const coherenceLossApplied = false;
 
-  // REW Strict: bypass Schroeder blend (set to same as input)
-  if (rewStrictParity) {
-    splDbSchroeder = splDbForPipeline;
-  }
+  // NO Schroeder blend (REW parity: always bypass)
+  const splDbSchroeder = splDbForPipeline;
   
   
   // Compute RMS for component magnitudes (20-200 Hz band) - CORRECTED: linear domain
@@ -1180,7 +1178,7 @@ export function computeRoomModesResponse({
     const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;
     const rawRange = rawMax - rawMin;
 
-    // Preserve nulls (REW-style: no null repair, deep cancellations stay as-is)
+    // NO null repair (REW parity: always preserve deep nulls)
     const splDbRepaired = splDbSchroeder.map(v => isFinite(v) ? v : null);
     const nonFiniteRepaired = splDbSchroeder.filter(v => !isFinite(v)).length;
   
