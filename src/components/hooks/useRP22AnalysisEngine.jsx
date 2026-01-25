@@ -319,7 +319,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -687,19 +687,23 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     // Find MLP seat for P16 reference
     const mlpSeat = mlp && isNum(mlp.x) && isNum(mlp.y) ? mlp : null;
 
+    // Compute screenPlaneOffsetM once for all seats (same as seating generation)
+    const screenPlaneOffsetM = screen?.mountMode === "floating" ? (Number(screen?.floatDepthM) || 0) : 0;
+
     for (const seat of seatsWithRoles) {
       const seatId = seat.id || `seat-${seat.x}-${seat.y}`;
       const metrics = { p1: null, p4: null, p5: null, p6: null, p9: null, p10: null, p16: null, p17: null, p20: null };
 
-      // P1 - Nearest boundary distance (minimum of side/back wall distance)
+      // P1 - Nearest boundary distance (physical walls, not screen plane)
       if (isNum(seat.x) && isNum(seat.y)) {
+        const yPhysical = seat.y + screenPlaneOffsetM;
+        
         const distLeft = seat.x;
         const distRight = (dimensions?.widthM || 0) - seat.x;
-        const distBack = (dimensions?.lengthM || 0) - seat.y;
+        const distFront = yPhysical;
+        const distBack = (dimensions?.lengthM || 0) - yPhysical;
         
-        const xNearest = Math.min(distLeft, distRight);
-        const yNearest = distBack;
-        const p1ValueM = Math.min(xNearest, yNearest);
+        const p1ValueM = Math.min(distLeft, distRight, distFront, distBack);
         
         if (isNum(p1ValueM) && p1ValueM >= 0) {
           let level1 = 1;

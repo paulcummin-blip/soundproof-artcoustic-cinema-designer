@@ -5,19 +5,24 @@
 const isFiniteNum = (v) => Number.isFinite(v);
 
 /** ---------------- P1: nearest wall distance ---------------- */
-export function metricP1_nearestWallM({ seat, room }) {
+export function metricP1_nearestWallM({ seat, room, screenPlaneOffsetM = 0 }) {
   const widthM  = Number(room?.widthM)  || 0;
   const lengthM = Number(room?.lengthM) || 0;
   if (!seat || !isFiniteNum(widthM) || !isFiniteNum(lengthM)) return null;
 
-  const x = Number(seat.x) || 0;
-  const y = Number(seat.y) || 0;
+  const x = Number(seat.x);
+  const yFromScreenPlane = Number(seat.y);
 
-  const halfW = widthM / 2;
-  const side  = Math.max(0, halfW - Math.abs(x));
-  const front = Math.max(0, y);               // screen plane at y=0
-  const back  = Math.max(0, lengthM - y);     // back wall
-  return Math.min(side, front, back);
+  if (!isFiniteNum(x) || !isFiniteNum(yFromScreenPlane)) return null;
+
+  const yPhysical = yFromScreenPlane + (Number(screenPlaneOffsetM) || 0);
+
+  const left  = Math.max(0, x);
+  const right = Math.max(0, widthM - x);
+  const front = Math.max(0, yPhysical);
+  const back  = Math.max(0, lengthM - yPhysical);
+
+  return Math.min(left, right, front, back);
 }
 
 export function levelP1_forNearestM(m) {
