@@ -950,17 +950,9 @@ export function computeRoomModesResponse({
       sumIm_total = totalTerm_im;
     }
 
-    // COHERENT PRESSURE RAW: Pure complex magnitude (no processing)
-    // This is the REFERENCE PHYSICS - position-dependent nulls come from here
+    // COHERENT PRESSURE RAW: Pure complex magnitude (REW-style, no measurement floor)
     const coherentMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
-    
-    // --- LF debug: avoid Number.EPSILON quantising tiny magnitudes to ~-313 dB ---
-    // Use a deterministic, human-scale dB floor instead, and expose the linear magnitude.
-    // This does NOT change the underlying physics; it only changes how we convert near-zero
-    // pressure magnitudes into dB for inspection and plotting.
-    const COHERENT_MAG_FLOOR = 1e-12; // ~ -240 dB floor (20*log10(1e-12) = -240)
-    const coherentMagFloored = Math.max(COHERENT_MAG_FLOOR, coherentMag);
-    const coherentPressureRaw = 20 * Math.log10(coherentMagFloored);
+    const coherentPressureRaw = 20 * Math.log10(Math.max(Number.EPSILON, coherentMag));
     
     // Store component magnitudes for RMS calculation and debug visibility
     const modalMag = Math.sqrt(modalTerm_re * modalTerm_re + modalTerm_im * modalTerm_im);
@@ -984,30 +976,8 @@ export function computeRoomModesResponse({
     // Start with coherent pressure, then apply processing layers (ONLY if not raw mode)
     let modalDb = coherentPressureRaw;
     
-    // Mode density compensation (REW-ish) — MUST ramp in smoothly to avoid a cliff at Schroeder.
-    // REW Strict: disable when parity mode is active
-    const mdCompEnabled = (!rawEngineOutput && rewParityMode && activeTerms > 1 && !rewStrictParity);
-
-    // Use a smooth transition window around Schroeder (starts a bit before, fully in a bit after).
-    const mdCompStartHz = Math.max(70, schroederHz * 0.85);
-    const mdCompEndHz   = Math.max(mdCompStartHz + 1, schroederHz * 1.15);
-
-    let mdCompWeight = 0.0;
-    if (mdCompEnabled) {
-      if (f <= mdCompStartHz) mdCompWeight = 0.0;
-      else if (f >= mdCompEndHz) mdCompWeight = 1.0;
-      else {
-        const t = (f - mdCompStartHz) / (mdCompEndHz - mdCompStartHz);
-        // cosine ease-in (0 → 1) with no kink
-        mdCompWeight = 0.5 * (1 - Math.cos(Math.PI * t));
-      }
-
-      const n = Math.max(1, activeTerms);
-      const compDb = 10 * Math.log10(n) * 0.85;
-
-      // Apply gradually (this prevents the sudden 150 Hz step)
-      modalDb -= compDb * mdCompWeight;
-    }
+    // REW parity: NO mode density compensation (keep raw modal overlap)
+    const mdCompEnabled = false;
 
     // Apply leaky room LF roll-off (if room is not sealed)
     // Reduce LF below ~35 Hz with gentle shelving (REW-like behaviour)
@@ -1108,34 +1078,9 @@ export function computeRoomModesResponse({
 
   
   
-  // REW-style coherence loss: transition from coherent pressure sum to energy-like behaviour above ~100-140 Hz
-  // This makes the curve "come back down" at HF like REW does
-  // REW Strict: disable when parity mode is active
-  const shouldApplyCoherenceLoss = rewParityMode && componentView === 'modalPlusSbir' && !rewStrictParity;
-  let splDbRew = splDb;
-  let coherenceLossApplied = false;
-  const cohStartHz = 90;
-  const cohEndHz = 140;
-  
-  if (shouldApplyCoherenceLoss) {
-    splDbRew = splDb.map((coherentDb, i) => {
-      const f = freqs[i];
-      if (!Number.isFinite(f) || !Number.isFinite(coherentDb)) return coherentDb;
-      
-      // Smooth transition from coherent (LF) to energy-like (HF)
-      const t = Math.max(0, Math.min(1, (f - cohStartHz) / Math.max(1e-6, (cohEndHz - cohStartHz))));
-      const smoothT = t * t * (3 - 2 * t); // Smoothstep
-      
-      // Progressive penalty: by 140 Hz, reduce by ~10 dB
-      const penaltyDb = smoothT * 10.0;
-      
-      return coherentDb - penaltyDb;
-    });
-    coherenceLossApplied = true;
-  }
-  
-  // Use REW-processed array for rest of pipeline when coherence loss is active
-  const splDbForPipeline = coherenceLossApplied ? splDbRew : splDb;
+  // REW parity: NO coherence loss (keep pure modal/SBIR summation at all frequencies)
+  const splDbForPipeline = splDb;
+  const coherenceLossApplied = false;
 
   // REW Strict: bypass Schroeder blend (set to same as input)
   if (rewStrictParity) {
@@ -1223,27 +1168,8 @@ export function computeRoomModesResponse({
   // REW's Room Simulator does not apply artificial pressure-zone boost
   // Kept for future reference only - all gain values set to zero
 
-    // Pressure region is now handled inline during modal summation
-    // (No post-processing needed - losses already bypassed below lowest axial)
-
-    // Schroeder blend: FIXED RULES to preserve modal nulls
-    // NEW: Start at 1.0 × Schroeder (not 0.7), never fill nulls, only tame peaks
-    // REW Strict: disable when parity mode is active
-    let splDbSchroeder = splDbForPipeline;
-    if (!rawEngineOutput && rewParityMode && schroederHz > 0 && !rewStrictParity) {
-      splDbSchroeder = splDbForPipeline.map((db, i) => {
-        const f = freqs[i];
-        const blendStart = schroederHz * 1.0;
-        const blendEnd = schroederHz * 1.8;
-        if (f < blendStart) return db;
-        const t = Math.max(0, Math.min(1, (f - blendStart) / Math.max(1e-6, (blendEnd - blendStart))));
-        const octavesAbove = Math.log2(f / blendStart);
-        const rolloffDb = -1.0 * octavesAbove;
-        const target = dbAt(blendStart, freqs, splDbForPipeline) - 3 * Math.log2(f / blendStart) + rolloffDb;
-        const blendedDb = (1 - t) * db + t * target;
-        return Math.min(blendedDb, db + 2.0);
-      });
-    }
+    // REW parity: NO Schroeder blend (keep raw modal response at all frequencies)
+    const splDbSchroeder = splDbForPipeline;
 
     // AUDIT CHECKPOINT: Schroeder blend should preserve nulls below 1.0×Schroeder
         // If you're seeing nulls get filled in, the blend logic above is broken
@@ -1254,27 +1180,9 @@ export function computeRoomModesResponse({
     const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;
     const rawRange = rawMax - rawMin;
 
-    // Clamp non-finite values before smoothing (IMMUTABLE - do not mutate in place)
-    let nonFiniteRepaired = 0;
-    let lastGoodValue = 0;
-
-    const repaired = [];
-    for (let i = 0; i < splDbSchroeder.length; i++) {
-    const v = splDbSchroeder[i];
-    if (!isFinite(v)) {
-      if (disableNullRepair || rewStrictParity) {
-        repaired.push(null);  // preserve deep null/cancellation for diagnostic or strict parity
-        nonFiniteRepaired += 1;
-        continue;
-      }
-      repaired.push(lastGoodValue);
-      nonFiniteRepaired += 1;
-    } else {
-      repaired.push(v);
-      lastGoodValue = v;
-    }
-    }
-    const splDbRepaired = repaired;
+    // Preserve nulls (REW-style: no null repair, deep cancellations stay as-is)
+    const splDbRepaired = splDbSchroeder.map(v => isFinite(v) ? v : null);
+    const nonFiniteRepaired = splDbSchroeder.filter(v => !isFinite(v)).length;
   
 
   // Capture pre-normalization stats (after repair, before smoothing/norm)
