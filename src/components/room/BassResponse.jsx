@@ -941,7 +941,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // [REW ENGINE RUN][ROOM-ONLY] - Audit log
     if (globalThis.__B44_LOGS) console.log('[REW ENGINE RUN][ROOM-ONLY]', {
-      componentView,
       rewView,
       sig,
       engineCallCount: engineCallCountRef.current
@@ -1151,12 +1150,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     rewRelativeView, 
     modeIsolation, 
     complexEigenfunctions, 
-    componentView, 
     rewSmoothing,
-    debugDisableSealedGain, // Include debug toggle to gate display-side LF rise
-    isDraggingSub, // Include drag state
-    calcEpoch, // Include calc epoch for request cancellation
-    sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
+    debugDisableSealedGain,
+    isDraggingSub,
+    calcEpoch,
+    sourcesSig
   ]);
 
   // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
@@ -1516,11 +1514,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     rewRelativeView, 
     modeIsolation, 
     complexEigenfunctions, 
-    componentView, 
     rewSmoothing,
-    isDraggingSub, // Include drag state
-    calcEpoch, // Include calc epoch for request cancellation
-    sourcesSig // FORCE-RECOMPUTE: changes when sub position/tuning changes
+    isDraggingSub,
+    calcEpoch,
+    sourcesSig
   ]);
 
 
