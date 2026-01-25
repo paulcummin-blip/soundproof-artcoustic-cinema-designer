@@ -1621,47 +1621,59 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   };
 
-  // Convert to chart format (product-based curve) - legacy, now replaced by analysisSeriesAbs
-  const responseData = useMemo(() => {
-    if (!selectedSeat || !selectedSeat.freqsHz || !selectedSeat.splDb) {
+  // ------------------------------
+  // GRAPH SOURCE SELECTION (SAFE)
+  // ------------------------------
+
+  // Non-REW graph source: selectedSeat (product simulation engine)
+  const responseDataNonRew = useMemo(() => {
+    const freqs = selectedSeat?.freqsHz;
+    const spls = selectedSeat?.splDb;
+
+    if (!Array.isArray(freqs) || !Array.isArray(spls) || freqs.length === 0 || spls.length === 0) {
       return [];
     }
-    
-    return selectedSeat.freqsHz.map((frequency, i) => ({
-      frequency,
-      spl: selectedSeat.splDb[i]
-    }));
+
+    const n = Math.min(freqs.length, spls.length);
+
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      const f = freqs[i];
+      const s = spls[i];
+      if (!Number.isFinite(f)) continue;
+      out.push({ frequency: f, spl: Number.isFinite(s) ? s : null });
+    }
+    return out;
   }, [selectedSeat]);
-  
+
   // Derived REW relative datasets: normalise 30–80 Hz to 0 dB baseline
   // Uses mean in linear PRESSURE domain (REW-like visual balance point)
   const normalizeDatasetToRelative = React.useCallback((dataset) => {
     if (!dataset || !Array.isArray(dataset.data) || dataset.data.length === 0) {
       return { data: [], debug: dataset?.debug };
     }
-    
+
     // Extract 30–80 Hz band SPL values
     const band = dataset.data
       .filter(d => d.frequency >= 30 && d.frequency <= 80)
       .map(d => d.spl)
       .filter(v => Number.isFinite(v));
-    
+
     if (band.length < 3) {
       return { data: dataset.data, debug: dataset.debug };
     }
-    
+
     // Use MEAN in LINEAR PRESSURE domain for visual balance point (REW-style)
-    // Convert dB → linear pressure, average, convert back to dB
     const pressures = band.map(db => Math.pow(10, db / 20));
     const meanPressure = pressures.reduce((a, b) => a + b, 0) / pressures.length;
     const baselineDb = 20 * Math.log10(meanPressure);
-    
+
     // Subtract baseline from entire curve (30-80 Hz band centers at 0 dB)
     const shifted = dataset.data.map(p => ({
       frequency: p.frequency,
       spl: Number.isFinite(p.spl) ? p.spl - baselineDb : p.spl
     }));
-    
+
     return {
       data: shifted,
       debug: {
@@ -1686,17 +1698,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // Aliases switch Abs/Rel based on UI toggle
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
-  
-  // Safe series wrapper: ensure graph always gets valid arrays (prevents blank graph + TDZ errors)
-  const safeSeries = (s) => ({
-    freqs: Array.isArray(s?.freqs) ? s.freqs : [],
-    splDb: Array.isArray(s?.splDb) ? s.splDb : [],
-    plottedDb: Array.isArray(s?.plottedDb) ? s.plottedDb : null,
-    debug: s?.debug && typeof s.debug === "object" ? s.debug : {},
-  });
 
-  const safeRewModesData = safeSeries(rewModesData);
-  const safeRoomModesData = safeSeries(roomModesData);
+  // REW graph source → dataset.data (already in chart format)
+  const responseDataRew = useMemo(() => {
+    const d = rewModesData?.data;
+    if (!Array.isArray(d) || d.length === 0) return [];
+    return d
+      .filter(p => Number.isFinite(p?.frequency))
+      .map(p => ({ frequency: p.frequency, spl: Number.isFinite(p.spl) ? p.spl : null }));
+  }, [rewModesData]);
+
+  // Final responseData for BassGraph
+  // REW mode uses REW dataset; non-REW uses selectedSeat series
+  const responseData = rewStyleMode ? responseDataRew : responseDataNonRew;
+
+  // Safe debug object for downstream panels (never crashes)
+  const safeGraphDebug = (rewStyleMode ? rewModesData?.debug : null) || {};
 
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
   const activeDebug = useMemo(() => {
