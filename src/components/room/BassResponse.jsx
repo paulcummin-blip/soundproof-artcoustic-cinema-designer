@@ -1408,7 +1408,17 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     const finiteValues = result.splDb.filter(v => isFinite(v));
     if (finiteValues.length === 0) {
-      return { data: [], debug: { ...result.debug, error: "No finite values" } };
+      // SBIR-only safeguard: always return valid data (even if SBIR disabled)
+      if (componentView === 'sbirOnly') {
+        // Return flat quiet line so graph never blanks
+        return { 
+          freqs: result.freqs, 
+          splDb: result.freqs.map(() => -240),
+          plottedDb: result.freqs.map(() => -240),
+          debug: { ...result.debug, note: wantSBIR ? "SBIR-only: no finite values (SBIR might be very quiet)" : "SBIR disabled" } 
+        };
+      }
+      return { freqs: [], splDb: [], plottedDb: [], debug: { ...result.debug, error: "No finite values" } };
     }
 
     // Clear failure cache on success
