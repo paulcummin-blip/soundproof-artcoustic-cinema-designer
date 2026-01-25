@@ -76,11 +76,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const totalSubCount = (frontSubsCfg?.count || 0) + (rearSubsCfg?.count || 0);
   const hasNoSubs = totalSubCount === 0;
 
-  const dimsTxt = `${(roomDims?.widthM ?? 0).toFixed(1)}×${(roomDims?.lengthM ?? 0).toFixed(1)}×${(roomDims?.heightM ?? 0).toFixed(1)} m`;
+  // Safe number conversion and formatting (MUST BE EARLY for widespread use)
+  const toNum = (v) => {
+    const n = typeof v === "number" ? v : Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
 
-  // Safe formatter for numbers that might be undefined/null
-  const fmtFixed = (v, dp = 1, fallback = "—") =>
-    (typeof v === "number" && Number.isFinite(v)) ? v.toFixed(dp) : fallback;
+  const fmtFixed = (v, digits = 1, fallback = "—") => {
+    const n = toNum(v);
+    return n === null ? fallback : n.toFixed(digits);
+  };
+
+  const dimsTxt = `${fmtFixed(roomDims?.widthM, 1)}×${fmtFixed(roomDims?.lengthM, 1)}×${fmtFixed(roomDims?.heightM, 1)} m`;
 
   // State declarations (must be before useMemo/useCallback that use them)
   const [autoAlignEnabled, setAutoAlignEnabled] = useState(true);
@@ -281,7 +288,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const a = Array.isArray(frontSubsLive) ? frontSubsLive : [];
     return a.map((s) => {
       const p = s?.position ?? s;
-      return `${Number(p?.x).toFixed(4)},${Number(p?.y).toFixed(4)},${Number(p?.z ?? 0).toFixed(4)}`;
+      return `${fmtFixed(p?.x, 4, '0')},${fmtFixed(p?.y, 4, '0')},${fmtFixed(p?.z ?? 0, 4, '0')}`;
     }).join("|");
   }, [frontSubsLive]);
 
@@ -289,7 +296,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const a = Array.isArray(rearSubsLive) ? rearSubsLive : [];
     return a.map((s) => {
       const p = s?.position ?? s;
-      return `${Number(p?.x).toFixed(4)},${Number(p?.y).toFixed(4)},${Number(p?.z ?? 0).toFixed(4)}`;
+      return `${fmtFixed(p?.x, 4, '0')},${fmtFixed(p?.y, 4, '0')},${fmtFixed(p?.z ?? 0, 4, '0')}`;
     }).join("|");
   }, [rearSubsLive]);
 
@@ -497,9 +504,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
     if (!seat) return "";
     
-    const x = Number(seat.x).toFixed(2);
-    const y = Number(seat.y).toFixed(2);
-    const z = Number(seat.z ?? 1.2).toFixed(2);
+    const x = fmtFixed(seat.x, 2, '0');
+    const y = fmtFixed(seat.y, 2, '0');
+    const z = fmtFixed(seat.z ?? 1.2, 2, '1.2');
     
     return `${x}_${y}_${z}`;
   }, [seatingPositions]);
@@ -508,11 +515,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (!subsForSimulation || subsForSimulation.length === 0) return "";
     
     return subsForSimulation.map(s => {
-      const x = Number(s.x).toFixed(2);
-      const y = Number(s.y).toFixed(2);
-      const z = Number(s.z ?? 0).toFixed(2);
-      const gainDb = Number(s.tuning?.gainDb ?? 0).toFixed(1);
-      const delayMs = Number(s.tuning?.delayMs ?? 0).toFixed(1);
+      const x = fmtFixed(s.x, 2, '0');
+      const y = fmtFixed(s.y, 2, '0');
+      const z = fmtFixed(s.z ?? 0, 2, '0');
+      const gainDb = fmtFixed(s.tuning?.gainDb ?? 0, 1, '0');
+      const delayMs = fmtFixed(s.tuning?.delayMs ?? 0, 1, '0');
       const polarity = s.tuning?.polarity || 'normal';
       
       return `${x}_${y}_${z}_g${gainDb}_d${delayMs}_p${polarity}`;
@@ -752,7 +759,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     if (!sourcePositions.length) return null;
 
     // Build signature for failure caching
-    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatPos.x.toFixed(2)},${seatPos.y.toFixed(2)},${seatPos.z.toFixed(2)}|subs=${sourcePositions.map(s => `${s.x.toFixed(2)},${s.y.toFixed(2)},${s.z.toFixed(2)},g${(s.tuning?.gainDb||0).toFixed(1)},d${(s.tuning?.delayMs||0).toFixed(1)},p${s.tuning?.polarity||'normal'}`).join('|')}|damp=${roomDamping}`;
+    const sig = `w=${fmtFixed(w, 2)}|l=${fmtFixed(l, 2)}|h=${fmtFixed(h, 2)}|seat=${fmtFixed(seatPos.x, 2)},${fmtFixed(seatPos.y, 2)},${fmtFixed(seatPos.z, 2)}|subs=${sourcePositions.map(s => `${fmtFixed(s.x, 2)},${fmtFixed(s.y, 2)},${fmtFixed(s.z, 2)},g${fmtFixed(s.tuning?.gainDb||0, 1)},d${fmtFixed(s.tuning?.delayMs||0, 1)},p${s.tuning?.polarity||'normal'}`).join('|')}|damp=${roomDamping}`;
 
     // Check failure cache
     if (lastRewFailSigRef.current === sig) {
@@ -909,10 +916,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const seatSig = stableSeatSig;
 
     // Build signature for failure caching
-    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}|cv:${componentView}`;
+    const sig = `w=${fmtFixed(w, 2)}|l=${fmtFixed(l, 2)}|h=${fmtFixed(h, 2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}|cv:${componentView}`;
     
     // Build run key for bounce detection
-    const runKey = `${w.toFixed(2)}x${l.toFixed(2)}x${h.toFixed(2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}`;
+    const runKey = `${fmtFixed(w, 2)}x${fmtFixed(l, 2)}x${fmtFixed(h, 2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}`;
     
     // Bounce detector: only log when deps actually change
     if (runKey !== lastRewRunKeyRef.current) {
@@ -1246,10 +1253,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const seatSig = stableSeatSig;
 
     // Build signature for failure caching
-    const sig = `w=${w.toFixed(2)}|l=${l.toFixed(2)}|h=${h.toFixed(2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView ? 1 : 0}|damp=${roomDamping}|view=product|cv:${componentView}`;
+    const sig = `w=${fmtFixed(w, 2)}|l=${fmtFixed(l, 2)}|h=${fmtFixed(h, 2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView ? 1 : 0}|damp=${roomDamping}|view=product|cv:${componentView}`;
     
     // Build run key for bounce detection
-    const runKey = `${w.toFixed(2)}x${l.toFixed(2)}x${h.toFixed(2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}|view:product`;
+    const runKey = `${fmtFixed(w, 2)}x${fmtFixed(l, 2)}x${fmtFixed(h, 2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|cv:${componentView}|view:product`;
     
     // Bounce detector: only log when deps actually change
     if (runKey !== lastRewRunKeyRef.current) {
@@ -1294,9 +1301,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
         productCurveDebug.push({
           modelKey: sub.modelKey,
-          originalAt50Hz: valueAt50Hz?.toFixed(1) || 'N/A',
-          relativeMinDb: minDb.toFixed(1),
-          relativeMaxDb: maxDb.toFixed(1),
+          originalAt50Hz: fmtFixed(valueAt50Hz, 1, 'N/A'),
+          relativeMinDb: fmtFixed(minDb, 1),
+          relativeMaxDb: fmtFixed(maxDb, 1),
           isRelative
         });
 
@@ -1440,7 +1447,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     let scaleWarning = null;
 
     if (Math.abs(productSplRange - roomOnlySplRange) > 20) {
-      scaleWarning = `Room-only range: ${roomOnlySplRange.toFixed(1)} dB, Room+Product range: ${productSplRange.toFixed(1)} dB — scale mismatch detected`;
+      scaleWarning = `Room-only range: ${fmtFixed(roomOnlySplRange, 1)} dB, Room+Product range: ${fmtFixed(productSplRange, 1)} dB — scale mismatch detected`;
     }
 
     // Product curve application summary
@@ -1685,8 +1692,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       debug: {
         ...(dataset.debug || {}),
         normRefDb: 0,
-        normOffsetAppliedDb: (-baselineDb).toFixed(2),
-        normBandPressureMeanDb: baselineDb.toFixed(2)
+        normOffsetAppliedDb: fmtFixed(-baselineDb, 2),
+        normBandPressureMeanDb: fmtFixed(baselineDb, 2)
       }
     };
   }, []);
@@ -1891,7 +1898,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     // Use ROUNDED signatures (1cm resolution) to prevent float noise
     const currentSourceSigRounded = subsForSimulation.map(s => 
-      `${s.x.toFixed(2)}_${s.y.toFixed(2)}_${(s.z ?? 0).toFixed(2)}`
+      `${fmtFixed(s.x, 2)}_${fmtFixed(s.y, 2)}_${fmtFixed(s.z ?? 0, 2)}`
     ).join('|');
 
     // Use splDbRepaired for consistent comparison (pre-smoothing, pre-normalization)
@@ -1916,9 +1923,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     
     // Round coupling to 3 decimals for display stability
     const currentCoupling = {
-      src: Number(coupling.src.toFixed(3)),
-      rcv: Number(coupling.rcv.toFixed(3)),
-      total: Number(coupling.total.toFixed(3))
+      src: toNum(coupling.src) ?? 0,
+      rcv: toNum(coupling.rcv) ?? 0,
+      total: toNum(coupling.total) ?? 0
     };
 
     // Check if source changed significantly (>1cm)
@@ -2229,8 +2236,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       }
     }
     const largestGapBand = largestGapIdx < series.length - 1
-      ? `${series[largestGapIdx].frequency.toFixed(1)}–${series[largestGapIdx + 1].frequency.toFixed(1)} Hz`
-      : 'N/A';
+    ? `${fmtFixed(series[largestGapIdx].frequency, 1)}–${fmtFixed(series[largestGapIdx + 1].frequency, 1)} Hz`
+    : 'N/A';
     
     // Check for NaN/Inf
     let hasNaNOrInf = false;
@@ -2404,7 +2411,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       top5Jumps,
       stepPairDebug
     };
-  }, [plottedSeries, activeDebug]);
+  }, [plottedSeries]);
   
   // Compute yDomain for viewport constraint (when Y-axis is locked)
   // During drag: freeze at captured domain
@@ -2795,13 +2802,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div>
               <span className="text-[#3E4349]">Best↔Worst:</span>
               <span className="ml-1 font-medium text-[#1B1A1A]">
-                {simulationResults.metrics.fairness.spreadBestWorstDb.toFixed(1)} dB
+                {fmtFixed(simulationResults.metrics.fairness.spreadBestWorstDb, 1)} dB
               </span>
             </div>
             <div>
               <span className="text-[#3E4349]">Worst Null:</span>
               <span className="ml-1 font-medium text-[#1B1A1A]">
-                {simulationResults.metrics.fairness.nulls.worstNullDb.toFixed(1)} dB
+                {fmtFixed(simulationResults.metrics.fairness.nulls.worstNullDb, 1)} dB
               </span>
             </div>
           </div>
@@ -2881,25 +2888,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
               <div className="text-xs text-[#3E4349] mb-1">P14 Max SPL</div>
               <div className="text-lg font-bold text-[#1B1A1A]">
-                {p14MaxSpl.toFixed(1)} dB
+                {fmtFixed(p14MaxSpl, 1)} dB
               </div>
             </div>
             <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
               <div className="text-xs text-[#3E4349] mb-1">P18 Extension</div>
               <div className="text-lg font-bold text-[#1B1A1A]">
-                {p18F3Hz.toFixed(0)} Hz
+                {fmtFixed(p18F3Hz, 0)} Hz
               </div>
             </div>
             <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
               <div className="text-xs text-[#3E4349] mb-1">P19 Deviation</div>
               <div className="text-lg font-bold text-[#1B1A1A]">
-                ±{p19MaxDev.toFixed(1)} dB
+                ±{fmtFixed(p19MaxDev, 1)} dB
               </div>
             </div>
             <div className="rounded-lg border border-[#DCDBD6] bg-white p-3">
               <div className="text-xs text-[#3E4349] mb-1">Bass Uniformity</div>
               <div className="text-lg font-bold text-[#1B1A1A]">
-                ±{uniformitySd.toFixed(1)} dB
+                ±{fmtFixed(uniformitySd, 1)} dB
               </div>
               <div className="text-xs text-[#3E4349] mt-1">20–80 Hz</div>
             </div>
@@ -3220,8 +3227,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div className="text-xs mb-2 bg-purple-50 p-2 rounded border border-purple-400">
               <div className="font-semibold mb-1 text-purple-700">🧪 REW Parity Test (Part E - VALIDATION)</div>
               <div className="text-[10px] space-y-0.5">
-                <div><strong>Test room:</strong> {testRoomOk ? '✅' : '❌'} 5.0×5.0×3.0 m (current: {(roomDims?.widthM || 0).toFixed(1)}×{(roomDims?.lengthM || 0).toFixed(1)}×{(roomDims?.heightM || 0).toFixed(1)})</div>
-                <div><strong>Test seat:</strong> {testSeatOk ? '✅' : '❌'} Centre (2.5, 2.5, 1.2) (current: {seat?.x.toFixed(1)}, {seat?.y.toFixed(1)}, {(seat?.z || 1.2).toFixed(1)})</div>
+                <div><strong>Test room:</strong> {testRoomOk ? '✅' : '❌'} 5.0×5.0×3.0 m (current: {fmtFixed(roomDims?.widthM, 1)}×{fmtFixed(roomDims?.lengthM, 1)}×{fmtFixed(roomDims?.heightM, 1)})</div>
+                <div><strong>Test seat:</strong> {testSeatOk ? '✅' : '❌'} Centre (2.5, 2.5, 1.2) (current: {fmtFixed(seat?.x, 1)}, {fmtFixed(seat?.y, 1)}, {fmtFixed(seat?.z || 1.2, 1)})</div>
                 <div><strong>Test sub:</strong> {testSubOk ? '✅' : '❌'} At least one sub (current: {subsForSimulation.length})</div>
                 <div><strong>RAW mode:</strong> {rawModeOk ? '✅ ENABLED' : '❌ DISABLED (toggle above)'}</div>
                 <div className="mt-1 pt-1 border-t border-purple-300">
@@ -3230,14 +3237,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 {allReady && currentSubPos && (
                   <>
                     <div className="mt-1 pt-1 border-t border-purple-300 font-semibold text-purple-800">
-                      Current sub position: ({currentSubPos.x.toFixed(2)}, {currentSubPos.y.toFixed(2)})
-                      {closestTest && ` ≈ ${closestTest.label}`}
+                     Current sub position: ({fmtFixed(currentSubPos.x, 2)}, {fmtFixed(currentSubPos.y, 2)})
+                     {closestTest && ` ≈ ${closestTest.label}`}
                     </div>
                     <div className="mt-1 pt-1 border-t border-purple-300">
                       <strong>Probe frequencies (1st/2nd length axial):</strong>
                       <div className="pl-2 space-y-0.5 mt-1">
-                        <div>34 Hz: {probeValues[0] !== null ? probeValues[0].toFixed(1) + ' dB' : 'N/A'}</div>
-                        <div>68 Hz: {probeValues[1] !== null ? probeValues[1].toFixed(1) + ' dB' : 'N/A'}</div>
+                        <div>34 Hz: {fmtFixed(probeValues[0], 1, 'N/A')} dB</div>
+                        <div>68 Hz: {fmtFixed(probeValues[1], 1, 'N/A')} dB</div>
                       </div>
                     </div>
                     <div className="mt-1 pt-1 border-t border-purple-300 font-semibold text-purple-800">
@@ -3284,25 +3291,25 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         {/* REW Compare View readout (only when REW Compare is ON) */}
         {rewCompareView && rewStyleMode && (() => {
           // Safe refDb: use debug.normRefDb or fallback to display mode target
-          const refDbDisplay = activeDebug?.normRefDb 
-            ? (typeof activeDebug.normRefDb === 'string' ? activeDebug.normRefDb : activeDebug.normRefDb.toFixed(1))
+          const refDbDisplay = false?.normRefDb 
+            ? (typeof false.normRefDb === 'string' ? false.normRefDb : fmtFixed(false.normRefDb, 1))
             : (rewRelativeView ? "0.0" : "85.0");
           
           return (
             <div className="text-xs text-[#1B1A1A] mb-2 bg-blue-50 p-2 rounded border border-blue-300">
               <div className="font-semibold mb-1">REW Compare View (Display Preset)</div>
               <div className="text-[10px] space-y-0.5">
-                <div>• Room: {(roomDims?.widthM || 0).toFixed(1)}×{(roomDims?.lengthM || 0).toFixed(1)}×{(roomDims?.heightM || 0).toFixed(1)} m</div>
+                <div>• Room: {fmtFixed(roomDims?.widthM, 1)}×{fmtFixed(roomDims?.lengthM, 1)}×{fmtFixed(roomDims?.heightM, 1)} m</div>
                 <div>• Smoothing: 1/3 octave (fixed)</div>
                 <div>• Sealed room: ALWAYS (cinemas are sealed)</div>
                 <div>• Absolute SPL mode (30–80 Hz → 85 dB reference)</div>
-                <div>• RefDb (median 30–80): {refDbDisplay} dB</div>
+                <div>• RefDb (median 30–80): {typeof refDbDisplay === 'string' ? refDbDisplay : fmtFixed(refDbDisplay, 1)} dB
                 <div>• Y window: 65–105 dB (fixed for comparison)</div>
                 <div className="text-[9px] opacity-70 mt-1">Engine SPL range (raw): {safeDebug?.splMinDb || '—'} to {safeDebug?.splMaxDb || '—'} dB</div>
                 <div className="text-[9px] opacity-70">Display SPL range: {(() => {
                   const finite = displayData.filter(d => Number.isFinite(d.spl)).map(d => d.spl);
                   if (finite.length === 0) return 'N/A';
-                  return `${Math.min(...finite).toFixed(1)} to ${Math.max(...finite).toFixed(1)} dB`;
+                  return `${fmtFixed(Math.min(...finite), 1)} to ${fmtFixed(Math.max(...finite), 1)} dB`;
                 })()}</div>
                 <div className="text-[9px] opacity-70 text-purple-700 font-semibold mt-1">
                   LF delta (25→69 Hz): {safeDebug?.lfProbe?.lfDelta_25_69 || 'N/A'} dB | 
@@ -3369,7 +3376,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   <div className="mt-2 font-semibold">Probe ΔdB (current - previous):</div>
                   {sensitivityAudit.probeDeltas.map((p, i) => (
                     <div key={i}>
-                      {p.freq} Hz: {p.delta >= 0 ? '+' : ''}{p.delta.toFixed(2)} dB
+                      {p.freq} Hz: {p.delta >= 0 ? '+' : ''}{fmtFixed(p.delta, 2)} dB
                     </div>
                   ))}
                   <div className="mt-1">
@@ -3582,30 +3589,30 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       return (
                         <div key={j} className="pl-2 border-l-2 border-purple-200 mb-1">
                           <div>
-                            {mode.type} ({mode.n[0]},{mode.n[1]},{mode.n[2]}): {mode.magDb.toFixed(1)} dB @ {mode.phaseDeg.toFixed(0)}°
+                           {mode.type} ({mode.n[0]},{mode.n[1]},{mode.n[2]}): {fmtFixed(mode.magDb, 1)} dB @ {fmtFixed(mode.phaseDeg, 0)}°
                           </div>
                           <div className="pl-2 text-[8px] opacity-80 space-y-0.5 mt-0.5">
-                            <div>src: X={srcEigenX.toFixed(4)} Y={srcEigenY.toFixed(4)} Z={srcEigenZ.toFixed(4)}</div>
-                            <div>rcv: X={rcvEigenX.toFixed(4)} Y={rcvEigenY.toFixed(4)} Z={rcvEigenZ.toFixed(4)}</div>
-                            <div>coupling (real) = {computedCoupling.toFixed(4)} (engine: {mode.coupling?.toFixed(4) || 'N/A'})</div>
+                            <div>src: X={fmtFixed(srcEigenX, 4)} Y={fmtFixed(srcEigenY, 4)} Z={fmtFixed(srcEigenZ, 4)}</div>
+                            <div>rcv: X={fmtFixed(rcvEigenX, 4)} Y={fmtFixed(rcvEigenY, 4)} Z={fmtFixed(rcvEigenZ, 4)}</div>
+                            <div>coupling (real) = {fmtFixed(computedCoupling, 4)} (engine: {fmtFixed(mode.coupling, 4, 'N/A')})</div>
                             {mode.couplingInfo?.amp !== undefined && (
                               <div className="text-green-600 font-semibold">
-                                amplitude (cosine): {mode.couplingInfo.amp.toFixed(4)}
+                                amplitude (cosine): {fmtFixed(mode.couplingInfo.amp, 4)}
                               </div>
                             )}
                             {mode.couplingInfo?.phaseDeg !== undefined && (
                               <div className="text-purple-600 font-semibold">
-                                phase: {mode.couplingInfo.phaseDeg.toFixed(1)}°
+                                phase: {fmtFixed(mode.couplingInfo.phaseDeg, 1)}°
                               </div>
                             )}
                             {mode.couplingInfo?.complexMag !== undefined && (
                               <div className="text-blue-600 font-semibold">
-                                coupling (complex): mag={mode.couplingInfo.complexMag.toFixed(4)} @ {mode.couplingInfo.complexPhase.toFixed(1)}°
+                                coupling (complex): mag={fmtFixed(mode.couplingInfo.complexMag, 4)} @ {fmtFixed(mode.couplingInfo.complexPhase, 1)}°
                               </div>
                             )}
                             {mode.couplingInfo?.complexRe !== undefined && (
                               <div className="text-blue-600">
-                                (re={mode.couplingInfo.complexRe.toFixed(4)}, im={mode.couplingInfo.complexIm.toFixed(4)})
+                                (re={fmtFixed(mode.couplingInfo.complexRe, 4)}, im={fmtFixed(mode.couplingInfo.complexIm, 4)})
                               </div>
                             )}
                           </div>
@@ -3752,23 +3759,23 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div className="mt-2 space-y-2 font-mono text-[8px]">
                   {probeResults.map((result, i) => (
                     <div key={i} className="border-t border-cyan-200 pt-1 first:border-t-0 first:pt-0">
-                      <div className="font-semibold">{result.freq.toFixed(1)} Hz:</div>
+                      <div className="font-semibold">{fmtFixed(result.freq, 1)} Hz:</div>
                       <div className="pl-2 space-y-0.5">
                         {couplingProbeUseComplex ? (
                           <>
-                            <div className="text-green-600">amp (cosine): {result.amp.toFixed(4)}</div>
-                            <div className="text-purple-600">phi: {result.phi.toFixed(1)}°</div>
-                            <div>src cosines: X={result.src.cosX.toFixed(4)} Y={result.src.cosY.toFixed(4)} Z={result.src.cosZ.toFixed(4)} → amp={result.src.amp.toFixed(4)}</div>
-                            <div>rcv cosines: X={result.rcv.cosX.toFixed(4)} Y={result.rcv.cosY.toFixed(4)} Z={result.rcv.cosZ.toFixed(4)} → amp={result.rcv.amp.toFixed(4)}</div>
+                            <div className="text-green-600">amp (cosine): {fmtFixed(result.amp, 4)}</div>
+                            <div className="text-purple-600">phi: {fmtFixed(result.phi, 1)}°</div>
+                            <div>src cosines: X={fmtFixed(result.src.cosX, 4)} Y={fmtFixed(result.src.cosY, 4)} Z={fmtFixed(result.src.cosZ, 4)} → amp={fmtFixed(result.src.amp, 4)}</div>
+                            <div>rcv cosines: X={fmtFixed(result.rcv.cosX, 4)} Y={fmtFixed(result.rcv.cosY, 4)} Z={fmtFixed(result.rcv.cosZ, 4)} → amp={fmtFixed(result.rcv.amp, 4)}</div>
                           </>
                         ) : (
                           <>
-                            <div>srcEigen: {result.src.re.toFixed(4)} | {result.src.phase.toFixed(1)}°</div>
-                            <div>rcvEigen: {result.rcv.re.toFixed(4)} | {result.rcv.phase.toFixed(1)}°</div>
+                            <div>srcEigen: {fmtFixed(result.src.re, 4)} | {fmtFixed(result.src.phase, 1)}°</div>
+                            <div>rcvEigen: {fmtFixed(result.rcv.re, 4)} | {fmtFixed(result.rcv.phase, 1)}°</div>
                           </>
                         )}
                         <div className="font-semibold text-cyan-800">
-                          coupling: (Re={result.coupling.re.toFixed(4)}, Im={result.coupling.im.toFixed(4)}) | mag={result.coupling.mag.toFixed(4)} @ {result.coupling.phase.toFixed(1)}°
+                          coupling: (Re={fmtFixed(result.coupling.re, 4)}, Im={fmtFixed(result.coupling.im, 4)}) | mag={fmtFixed(result.coupling.mag, 4)} @ {fmtFixed(result.coupling.phase, 1)}°
                         </div>
                       </div>
                     </div>
@@ -3863,13 +3870,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                       className={`pl-2 ${mode.changed ? 'bg-yellow-200 font-semibold' : 'opacity-70'}`}
                     >
                       <span className={mode.type === 'axial' ? 'font-bold' : ''}>
-                        {mode.fHz.toFixed(1)} Hz {mode.type} ({mode.n[0]},{mode.n[1]},{mode.n[2]})
+                        {fmtFixed(mode.fHz, 1)} Hz {mode.type} ({mode.n[0]},{mode.n[1]},{mode.n[2]})
                         {mode.axisLabel && ` [${mode.axisLabel}]`}
                       </span>
-                      : {mode.excitationDb.toFixed(1)} dB
+                      : {fmtFixed(mode.excitationDb, 1)} dB
                       {mode.deltaDb !== 0 && (
                         <span className={mode.changed ? 'text-red-700 font-semibold' : ''}>
-                          {' '}({mode.deltaDb >= 0 ? '+' : ''}{mode.deltaDb.toFixed(1)} dB)
+                          {' '}({mode.deltaDb >= 0 ? '+' : ''}{fmtFixed(mode.deltaDb, 1)} dB)
                         </span>
                       )}
                     </div>
@@ -3910,7 +3917,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="text-[9px] font-mono space-y-0.5 max-h-32 overflow-y-auto">
                 {first30.map((mode, i) => (
                   <div key={i} className={mode.type === 'axial' ? 'font-semibold' : 'opacity-70'}>
-                    {mode.fHz.toFixed(1)} Hz: {mode.type} ({mode.nx},{mode.ny},{mode.nz})
+                    {fmtFixed(mode.fHz, 1)} Hz: {mode.type} ({mode.nx},{mode.ny},{mode.nz})
                     {mode.axisLabel && ` [${mode.axisLabel}]`}
                   </div>
                 ))}
@@ -3979,12 +3986,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             <div className="text-xs mb-2 bg-orange-50 p-2 rounded border border-orange-400">
               <div className="font-semibold mb-1 text-orange-700">🔬 LF Lock Diagnostic</div>
               <div className="text-[10px] font-mono space-y-0.5">
-                <div><strong>Lowest axial:</strong> {Number.isFinite(lowestAxial) ? lowestAxial.toFixed(1) : 'N/A'} Hz (pivot point)</div>
+                <div><strong>Lowest axial:</strong> {fmtFixed(lowestAxial, 1, 'N/A')} Hz (pivot point)</div>
                 <div style={{ marginTop: 6 }}>
-                  <strong>Degenerate lowest-axial modes (±{LOWEST_AXIAL_EPS_HZ.toFixed(2)} Hz):</strong>{" "}
+                  <strong>Degenerate lowest-axial modes (±{fmtFixed(LOWEST_AXIAL_EPS_HZ, 2)} Hz):</strong>{" "}
                   {lowestAxialModes.length
                     ? lowestAxialModes
-                        .map((m) => `${m.fHz.toFixed(1)}Hz axial (${m.nx},${m.ny},${m.nz})${m.axisLabel ? ` [${m.axisLabel}]` : ''}`)
+                        .map((m) => `${fmtFixed(m.fHz, 1)}Hz axial (${m.nx},${m.ny},${m.nz})${m.axisLabel ? ` [${m.axisLabel}]` : ''}`)
                         .join(" | ")
                     : "none"}
                 </div>
@@ -3997,16 +4004,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 </div>
                 {probeData.map((p, i) => (
                   <div key={i} className={p.freq < lowestAxial ? 'text-red-700 font-semibold' : ''}>
-                    {p.freq} Hz (bin {p.binI} @ {Number.isFinite(p.actualFreqHz) ? p.actualFreqHz.toFixed(2) : 'null'}):
-                    engine={Number.isFinite(p.engineFinal) ? p.engineFinal.toFixed(1) : 'null'},
-                    schroeder={Number.isFinite(p.schroeder) ? p.schroeder.toFixed(1) : 'null'},
-                    repaired={Number.isFinite(p.repaired) ? p.repaired.toFixed(1) : 'null'},
-                    plot={Number.isFinite(p.plotted) ? p.plotted.toFixed(1) : 'null'}
+                    {p.freq} Hz (bin {p.binI} @ {fmtFixed(p.actualFreqHz, 2, 'null')}):
+                    engine={fmtFixed(p.engineFinal, 1, 'null')},
+                    schroeder={fmtFixed(p.schroeder, 1, 'null')},
+                    repaired={fmtFixed(p.repaired, 1, 'null')},
+                    plot={fmtFixed(p.plotted, 1, 'null')}
                     {p.freq < lowestAxial && ' (below axial)'}
                   </div>
                 ))}
                 <div className="mt-1 pt-1 border-t border-orange-300 text-red-700 font-semibold text-[9px]">
-                  Expected: If LF is NOT locked, values below {lowestAxial.toFixed(0)} Hz must change when sub moves.
+                  Expected: If LF is NOT locked, values below {fmtFixed(lowestAxial, 0)} Hz must change when sub moves.
                 </div>
               </div>
             </div>
@@ -4048,7 +4055,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 {modeProbe.rows.map((row, i) => {
                   const topModes = (row.topModes || []).slice(0, 3);
                   const topModesStr = topModes.map(m => 
-                    `(${m.nx},${m.ny},${m.nz})@${m.f0Hz.toFixed(0)}Hz:cpl=${m.coupling.toFixed(3)},res=${m.resonMagDb.toFixed(1)}dB`
+                    `(${m.nx},${m.ny},${m.nz})@${fmtFixed(m.f0Hz, 0)}Hz:cpl=${fmtFixed(m.coupling, 3)},res=${fmtFixed(m.resonMagDb, 1)}dB`
                   ).join(', ');
                   
                   const modesCount = row.modesPassedBandwidth ?? 0;
@@ -4057,18 +4064,18 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   return (
                     <div key={i} className="border-t border-red-200 pt-1 first:border-t-0 first:pt-0">
                       <div className="font-semibold text-red-800">
-                        {row.frequencyHz.toFixed(1)} Hz (sub {row.subId}) — {modesCount} modes within 3×BW (of {totalModes} total)
+                        {fmtFixed(row.frequencyHz, 1)} Hz (sub {row.subId}) — {modesCount} modes within 3×BW (of {totalModes} total)
                       </div>
                       <div className="grid grid-cols-5 gap-2 pl-2 text-[9px]">
-                       <div>pre: {row.pre.db.toFixed(1)} dB</div>
-                       <div className="text-purple-600">sum: {row.modeSum.db.toFixed(1)} dB</div>
-                       <div className="font-bold text-blue-600">H: {row.H.db.toFixed(1)} dB</div>
-                       <div>post: {row.post.db.toFixed(1)} dB</div>
-                       <div>Δ: {(row.post.db - row.pre.db).toFixed(1)} dB</div>
+                       <div>pre: {fmtFixed(row.pre.db, 1)} dB</div>
+                       <div className="text-purple-600">sum: {fmtFixed(row.modeSum.db, 1)} dB</div>
+                       <div className="font-bold text-blue-600">H: {fmtFixed(row.H.db, 1)} dB</div>
+                       <div>post: {fmtFixed(row.post.db, 1)} dB</div>
+                       <div>Δ: {fmtFixed(row.post.db - row.pre.db, 1)} dB</div>
                       </div>
                       {topModesStr && (
                         <div className="text-[9px] opacity-80 mt-1 pl-2">
-                          Top modes: {topModesStr}
+                          Top modes: {topModesStr.replace(/toFixed/g, 'fmtFixed')}
                         </div>
                       )}
                     </div>
@@ -4153,7 +4160,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="text-[9px] font-mono space-y-1">
                 {couplingData.map((data, i) => (
                   <div key={i} className="border-t border-cyan-200 pt-1 first:border-t-0 first:pt-0">
-                    <div className="font-semibold">{data.label} @ {data.fHz} Hz:</div>
+                    <div className="font-semibold">{data.label} @ {fmtFixed(data.fHz, 1)} Hz:</div>
                     <div className="pl-2">src={data.srcCoupling}, rcv={data.rcvCoupling}, total={data.totalCoupling}</div>
                   </div>
                 ))}
@@ -4166,7 +4173,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         {devMode && !safeGraphDebug?.error && (() => {
           const schroederHz = safeGraphDebug?.schroederHz || 0;
           const schroederDisplay = schroederHz > 0
-            ? (schroederHz > 200 ? `${schroederHz.toFixed(1)} Hz (off-scale)` : `${schroederHz.toFixed(1)} Hz`)
+            ? (schroederHz > 200 ? `${fmtFixed(schroederHz, 1)} Hz (off-scale)` : `${fmtFixed(schroederHz, 1)} Hz`)
             : 'N/A';
           
           return (
@@ -4235,33 +4242,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div className="text-xs mb-2 bg-cyan-50 p-2 rounded border border-cyan-400">
                   <div className="font-semibold mb-1 text-cyan-700">🔬 Modal Alignment Debug</div>
                   <div className="text-[10px] font-mono space-y-0.5">
-                    <div><strong>Room dims:</strong> {w.toFixed(2)}×{l.toFixed(2)}×{h.toFixed(2)} m</div>
-                    <div><strong>Speed of sound (c):</strong> {c.toFixed(1)} m/s</div>
+                    <div><strong>Room dims:</strong> {fmtFixed(w, 2)}×{fmtFixed(l, 2)}×{fmtFixed(h, 2)} m</div>
+                    <div><strong>Speed of sound (c):</strong> {fmtFixed(c, 1)} m/s</div>
 
                     <div className="mt-1 pt-1 border-t border-cyan-300 font-semibold">Expected axial fundamentals:</div>
                     <div className="pl-2">
-                      <div>fL (length): {fL_expected.toFixed(2)} Hz</div>
-                      <div>fW (width): {fW_expected.toFixed(2)} Hz</div>
-                      <div>fH (height): {fH_expected.toFixed(2)} Hz</div>
-                      <div className="font-bold text-cyan-800">Lowest: {expectedLowest.toFixed(2)} Hz</div>
+                      <div>fL (length): {fmtFixed(fL_expected, 2)} Hz</div>
+                      <div>fW (width): {fmtFixed(fW_expected, 2)} Hz</div>
+                      <div>fH (height): {fmtFixed(fH_expected, 2)} Hz</div>
+                      <div className="font-bold text-cyan-800">Lowest: {fmtFixed(expectedLowest, 2)} Hz</div>
                     </div>
 
                     <div className="mt-1 pt-1 border-t border-cyan-300">
-                      <strong>Engine lowest axial:</strong> {Number.isFinite(engineLowestAxial) ? engineLowestAxial.toFixed(2) : "N/A"} Hz
+                      <strong>Engine lowest axial:</strong> {fmtFixed(engineLowestAxial, 2, "N/A")} Hz
                     </div>
 
                     {engineAxialFundamentals && (
                       <div className="pl-2 text-[9px] opacity-70">
-                        Engine fundamentals: fL={Number(engineAxialFundamentals.fL)?.toFixed?.(2) ?? "N/A"},
-                        fW={Number(engineAxialFundamentals.fW)?.toFixed?.(2) ?? "N/A"},
-                        fH={Number(engineAxialFundamentals.fH)?.toFixed?.(2) ?? "N/A"}
+                        Engine fundamentals: fL={fmtFixed(engineAxialFundamentals.fL, 2, "N/A")},
+                        fW={fmtFixed(engineAxialFundamentals.fW, 2, "N/A")},
+                        fH={fmtFixed(engineAxialFundamentals.fH, 2, "N/A")}
                       </div>
                     )}
 
                     <div className={`mt-1 pt-1 border-t border-cyan-300 font-semibold ${aligned ? "text-green-600" : "text-red-600"}`}>
                       {aligned
                         ? "✓ OK: within ±0.5 Hz"
-                        : `✗ MISMATCH: expected ${expectedLowest.toFixed(1)}, engine says ${Number.isFinite(engineLowestAxial) ? engineLowestAxial.toFixed(1) : "N/A"} → check c/dims/units`}
+                        : `✗ MISMATCH: expected ${fmtFixed(expectedLowest, 1)}, engine says ${fmtFixed(engineLowestAxial, 1, "N/A")} → check c/dims/units`}
                     </div>
                   </div>
                 </div>
@@ -4339,16 +4346,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                         return (
                           <>
                             <div className="font-semibold text-teal-700">DISPLAY FINAL (graph):</div>
-                            <div>Peak: {peak.spl.toFixed(2)} dB @ {peak.frequency.toFixed(1)} Hz</div>
-                            <div>Dip:  {dip.spl.toFixed(2)} dB @ {dip.frequency.toFixed(1)} Hz</div>
-                            <div className="font-bold">Delta: {delta.toFixed(2)} dB</div>
+                            <div>Peak: {fmtFixed(peak.spl, 2)} dB @ {fmtFixed(peak.frequency, 1)} Hz</div>
+                            <div>Dip:  {fmtFixed(dip.spl, 2)} dB @ {fmtFixed(dip.frequency, 1)} Hz</div>
+                            <div className="font-bold">Delta: {fmtFixed(delta, 2)} dB</div>
                             {offsetFromPeak !== null && (
                               <div className="text-[9px] text-blue-600 mt-1 pt-1 border-t border-teal-300">
-                                Display offset: {offsetFromPeak >= 0 ? '+' : ''}{offsetFromPeak.toFixed(2)} dB
-                                <div className="text-[8px] opacity-70">(expected: {(allowDisplayRefOffset ? (Number(rewDisplayRefDb) || 0) : 0) >= 0 ? '+' : ''}{(allowDisplayRefOffset ? (Number(rewDisplayRefDb) || 0) : 0).toFixed(2)} dB, mode: {isRelative ? 'RELATIVE' : 'ABSOLUTE'})</div>
+                                Display offset: {offsetFromPeak >= 0 ? '+' : ''}{fmtFixed(offsetFromPeak, 2)} dB
+                                <div className="text-[8px] opacity-70">(expected: {(allowDisplayRefOffset ? (toNum(rewDisplayRefDb) || 0) : 0) >= 0 ? '+' : ''}{fmtFixed(allowDisplayRefOffset ? (toNum(rewDisplayRefDb) || 0) : 0, 2)} dB, mode: {isRelative ? 'RELATIVE' : 'ABSOLUTE'})</div>
                                 {offsetIsConstant && <div className="text-green-600">✓ Constant (reference shift only)</div>}
                                 {isRelative && Math.abs(offsetFromPeak) > 1 && (
-                                  <div className="text-red-600 font-bold">⚠️ RELATIVE mode should have ~0 dB offset (found {offsetFromPeak.toFixed(2)} dB)</div>
+                                  <div className="text-red-600 font-bold">⚠️ RELATIVE mode should have ~0 dB offset (found {fmtFixed(offsetFromPeak, 2)} dB)</div>
                                 )}
                               </div>
                             )}
@@ -4391,9 +4398,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
                       return (
                         <div className="mt-1 text-[9px] font-mono space-y-0.5">
-                          <div>Peak: {peak.spl.toFixed(2)} dB @ {peak.frequency.toFixed(1)} Hz</div>
-                          <div>Dip:  {dip.spl.toFixed(2)} dB @ {dip.frequency.toFixed(1)} Hz</div>
-                          <div>Delta: {delta.toFixed(2)} dB</div>
+                          <div>Peak: {fmtFixed(peak.spl, 2)} dB @ {fmtFixed(peak.frequency, 1)} Hz</div>
+                          <div>Dip:  {fmtFixed(dip.spl, 2)} dB @ {fmtFixed(dip.frequency, 1)} Hz</div>
+                          <div>Delta: {fmtFixed(delta, 2)} dB</div>
                           <div className="text-green-600 font-semibold mt-1">
                             ✓ These values should match tooltips exactly
                           </div>
@@ -4549,9 +4556,9 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                                 <div style={{ fontFamily: "monospace", fontSize: 9, marginTop: 4, paddingLeft: 12 }}>
                                   {diff.topDeltaContrib.map((m, i) => (
                                     <div key={i}>
-                                      {m.modeHz.toFixed(1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}):
-                                      {m.contribDb0.toFixed(1)} → {m.contribDb1.toFixed(1)} dB
-                                      ({m.deltaDb >= 0 ? '+' : ''}{m.deltaDb.toFixed(1)} dB)
+                                      {fmtFixed(m.modeHz, 1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}):
+                                      {fmtFixed(m.contribDb0, 1)} → {fmtFixed(m.contribDb1, 1)} dB
+                                      ({m.deltaDb >= 0 ? '+' : ''}{fmtFixed(m.deltaDb, 1)} dB)
                                     </div>
                                   ))}
                                 </div>
@@ -4600,10 +4607,10 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                   NaN/Inf present: {plotIntegrityCheck.hasNaNOrInf ? 'YES ✗' : 'NO ✓'}
                 </div>
                 <div className="text-gray-700">
-                  Min Δf: {plotIntegrityCheck.minDf.toFixed(6)} Hz
+                  Min Δf: {fmtFixed(plotIntegrityCheck.minDf, 6)} Hz
                 </div>
                 <div className="text-gray-700">
-                  Max Δf: {plotIntegrityCheck.maxDf.toFixed(6)} Hz
+                  Max Δf: {fmtFixed(plotIntegrityCheck.maxDf, 6)} Hz
                 </div>
                 <div className="text-gray-700">
                   Largest gap: {plotIntegrityCheck.largestGapBand}
@@ -4617,8 +4624,8 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                     {plotIntegrityCheck.flatRunsCount === 0 ? ' ✓ (continuous)' : ' ✗ (binned/cached)'}
                   </div>
                   <div className={plotIntegrityCheck.maxJumpDb < 2.0 ? 'text-green-600' : 'text-yellow-600'}>
-                    Max jump: {plotIntegrityCheck.maxJumpDb.toFixed(3)} dB
-                    {plotIntegrityCheck.maxJumpAtHz && ` @ ${plotIntegrityCheck.maxJumpAtHz.toFixed(2)} Hz`}
+                    Max jump: {fmtFixed(plotIntegrityCheck.maxJumpDb, 3)} dB
+                    {plotIntegrityCheck.maxJumpAtHz && ` @ ${fmtFixed(plotIntegrityCheck.maxJumpAtHz, 2)} Hz`}
                   </div>
                   
                   {plotIntegrityCheck.top5Jumps && plotIntegrityCheck.top5Jumps.length > 0 && (
@@ -4627,10 +4634,10 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                       <div className="space-y-0.5 text-[9px]">
                         {plotIntegrityCheck.top5Jumps.map((jump, i) => (
                           <div key={i} className={jump.absJumpDb > 1.0 ? 'text-red-600 font-semibold' : ''}>
-                            {jump.hzPrev.toFixed(2)} → {jump.hzNow.toFixed(2)} Hz 
-                            (Δf={jump.deltaF.toFixed(4)} Hz): 
-                            {jump.dbPrev.toFixed(2)} → {jump.dbNow.toFixed(2)} dB 
-                            (jump: {jump.jumpDb >= 0 ? '+' : ''}{jump.jumpDb.toFixed(3)} dB)
+                            {fmtFixed(jump.hzPrev, 2)} → {fmtFixed(jump.hzNow, 2)} Hz 
+                            (Δf={fmtFixed(jump.deltaF, 4)} Hz): 
+                            {fmtFixed(jump.dbPrev, 2)} → {fmtFixed(jump.dbNow, 2)} dB 
+                            (jump: {jump.jumpDb >= 0 ? '+' : ''}{fmtFixed(jump.jumpDb, 3)} dB)
                           </div>
                         ))}
                       </div>
@@ -4739,15 +4746,15 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                                   <tbody>
                                     <tr className="border-b border-red-200">
                                       <td className="p-1 font-semibold text-red-700">From</td>
-                                      <td className="text-right p-1">{item.fromRow.exactFreqHz.toFixed(3)}</td>
+                                      <td className="text-right p-1">{fmtFixed(item.fromRow.exactFreqHz, 3)}</td>
                                       <td className={`text-right p-1 ${Math.abs(item.deltas.totalDb) > 2 ? 'bg-yellow-200 font-bold' : ''}`}>
-                                        {item.fromRow.totalDb.toFixed(2)}
+                                        {fmtFixed(item.fromRow.totalDb, 2)}
                                       </td>
                                       <td className={`text-right p-1 ${Math.abs(item.deltas.modalDb) > 2 ? 'bg-yellow-200' : ''}`}>
-                                        {item.fromRow.modalDb.toFixed(2)}
+                                        {fmtFixed(item.fromRow.modalDb, 2)}
                                       </td>
                                       <td className={`text-right p-1 ${Math.abs(item.deltas.sbirDb) > 2 ? 'bg-yellow-200' : ''}`}>
-                                        {item.fromRow.sbirDb.toFixed(2)}
+                                        {fmtFixed(item.fromRow.sbirDb, 2)}
                                       </td>
                                       <td className={`text-right p-1 ${item.deltas.modesUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
                                         {item.fromRow.modesUsed}
@@ -4767,15 +4774,15 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                                     </tr>
                                     <tr className="border-b border-red-200">
                                       <td className="p-1 font-semibold text-red-700">To</td>
-                                      <td className="text-right p-1">{item.toRow.exactFreqHz.toFixed(3)}</td>
+                                      <td className="text-right p-1">{fmtFixed(item.toRow.exactFreqHz, 3)}</td>
                                       <td className={`text-right p-1 ${Math.abs(item.deltas.totalDb) > 2 ? 'bg-yellow-200 font-bold' : ''}`}>
-                                        {item.toRow.totalDb.toFixed(2)}
+                                        {fmtFixed(item.toRow.totalDb, 2)}
                                       </td>
                                       <td className={`text-right p-1 ${Math.abs(item.deltas.modalDb) > 2 ? 'bg-yellow-200' : ''}`}>
-                                        {item.toRow.modalDb.toFixed(2)}
+                                        {fmtFixed(item.toRow.modalDb, 2)}
                                       </td>
                                       <td className={`text-right p-1 ${Math.abs(item.deltas.sbirDb) > 2 ? 'bg-yellow-200' : ''}`}>
-                                        {item.toRow.sbirDb.toFixed(2)}
+                                        {fmtFixed(item.toRow.sbirDb, 2)}
                                       </td>
                                       <td className={`text-right p-1 ${item.deltas.modesUsed !== 0 ? 'bg-red-300 font-bold' : ''}`}>
                                         {item.toRow.modesUsed}
@@ -4797,13 +4804,13 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                                       <td className="p-1 text-red-900">Δ</td>
                                       <td className="text-right p-1">—</td>
                                       <td className="text-right p-1 text-red-900">
-                                        {item.deltas.totalDb >= 0 ? '+' : ''}{item.deltas.totalDb.toFixed(2)}
+                                        {item.deltas.totalDb >= 0 ? '+' : ''}{fmtFixed(item.deltas.totalDb, 2)}
                                       </td>
                                       <td className="text-right p-1 text-red-900">
-                                        {item.deltas.modalDb >= 0 ? '+' : ''}{item.deltas.modalDb.toFixed(2)}
+                                        {item.deltas.modalDb >= 0 ? '+' : ''}{fmtFixed(item.deltas.modalDb, 2)}
                                       </td>
                                       <td className="text-right p-1 text-red-900">
-                                        {item.deltas.sbirDb >= 0 ? '+' : ''}{item.deltas.sbirDb.toFixed(2)}
+                                        {item.deltas.sbirDb >= 0 ? '+' : ''}{fmtFixed(item.deltas.sbirDb, 2)}
                                       </td>
                                       <td className="text-right p-1 text-red-900">
                                         {item.deltas.modesUsed >= 0 ? '+' : ''}{item.deltas.modesUsed}
@@ -4840,7 +4847,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                             entry.sbirReflectionsUsed !== safeDebug.termCountDebug55_80Hz[i-1].sbirReflectionsUsed
                           ) ? 'text-red-600 font-bold' : 'text-gray-700'
                         }>
-                          {entry.exactFreqHz.toFixed(3)} Hz: 
+                          {fmtFixed(entry.exactFreqHz, 3)} Hz: 
                           modes={entry.modesUsed}/{entry.modesConsidered} 
                           (skip: bw={entry.modesSkippedBandwidth}, coup={entry.modesSkippedCoupling}), 
                           sbir={entry.sbirReflectionsUsed}, 
@@ -4880,7 +4887,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
               rewCompareView,
               userSmoothingChoice: rewSmoothing,
               audit40_70,
-              rewLockedWindow: (isRewStyle && yAxisLocked) ? `${rewLockedMin?.toFixed(0)} to ${rewLockedMax?.toFixed(0)} dB` : 'N/A',
+              rewLockedWindow: (isRewStyle && yAxisLocked) ? `${fmtFixed(rewLockedMin, 0)} to ${fmtFixed(rewLockedMax, 0)} dB` : 'N/A',
               yAxisUsesLockedBounds: (isRewStyle && yAxisLocked) ? 'YES' : 'NO',
               integrityCheck: plotIntegrityCheck
             };
@@ -5024,7 +5031,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                           <td className="text-right p-2">{contrib.amplitude.toFixed(4)}</td>
                           <td className="text-right p-2">{contrib.phiTotal.toFixed(4)}</td>
                           <td className="text-right p-2 font-bold">
-                            {summation ? summation.finalSplDb.toFixed(2) : '—'}
+                            {fmtFixed(summation?.finalSplDb, 2, '—')}
                           </td>
                         </tr>
                       );
@@ -5102,25 +5109,25 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                         <tr key={`${freq}-${contrib.subIndex}`} className="border-b border-[#E6E4DD] hover:bg-[#F8F8F7]">
                           <td className="p-1">{freq}</td>
                           <td className="p-1">{contrib.subId || '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.db0) ? contrib.db0.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.dbDist) ? contrib.dbDist.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.dbBoundary) ? contrib.dbBoundary.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.dbPower) ? contrib.dbPower.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.dbEq) ? contrib.dbEq.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.dbGain) ? contrib.dbGain.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.dbMag) ? contrib.dbMag.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.amplitude) ? contrib.amplitude.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.phiDistance) ? contrib.phiDistance.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.phiDelay) ? contrib.phiDelay.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.phiPolarity) ? contrib.phiPolarity.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.phiTotal) ? contrib.phiTotal.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.subReal) ? contrib.subReal.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.subImag) ? contrib.subImag.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.filteredReal) ? contrib.filteredReal.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{Number.isFinite(contrib.filteredImag) ? contrib.filteredImag.toFixed(2) : '—'}</td>
-                          <td className="text-right p-1">{isLastSub && summation && Number.isFinite(summation.sumReal) ? summation.sumReal.toFixed(2) : ''}</td>
-                          <td className="text-right p-1">{isLastSub && summation && Number.isFinite(summation.sumImag) ? summation.sumImag.toFixed(2) : ''}</td>
-                          <td className="text-right p-1">{isLastSub && summation && Number.isFinite(summation.finalSplDb) ? summation.finalSplDb.toFixed(2) : ''}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.db0, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.dbDist, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.dbBoundary, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.dbPower, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.dbEq, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.dbGain, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.dbMag, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.amplitude, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.phiDistance, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.phiDelay, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.phiPolarity, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.phiTotal, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.subReal, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.subImag, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.filteredReal, 2)}</td>
+                          <td className="text-right p-1">{fmtFixed(contrib.filteredImag, 2)}</td>
+                          <td className="text-right p-1">{isLastSub && summation ? fmtFixed(summation.sumReal, 2) : ''}</td>
+                          <td className="text-right p-1">{isLastSub && summation ? fmtFixed(summation.sumImag, 2) : ''}</td>
+                          <td className="text-right p-1">{isLastSub && summation ? fmtFixed(summation.finalSplDb, 2) : ''}</td>
                         </tr>
                       );
                     });
@@ -5152,7 +5159,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                 </Badge>
               </div>
               <span className="font-medium text-[#1B1A1A]">
-                {bassMetrics2080Hz.variance.toFixed(2)} dB
+                {fmtFixed(bassMetrics2080Hz.variance, 2)} dB
               </span>
             </div>
             <div className="text-xs text-[#3E4349] pl-4">
@@ -5162,7 +5169,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
             <div className="flex justify-between items-center">
               <span className="text-[#3E4349]">Best ↔ Worst seat:</span>
               <span className="font-medium text-[#1B1A1A]">
-                {bassMetrics2080Hz.bestWorstDelta.toFixed(1)} dB
+                {fmtFixed(bassMetrics2080Hz.bestWorstDelta, 1)} dB
               </span>
             </div>
             
@@ -5415,7 +5422,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                         <span className="font-medium">Nulls:</span> {nullInfo.count}
                       </div>
                       <div className="text-[#3E4349]">
-                        <span className="font-medium">Worst:</span> {nullInfo.worstDb.toFixed(1)} dB
+                        <span className="font-medium">Worst:</span> {fmtFixed(nullInfo.worstDb, 1)} dB
                       </div>
                     </>
                   )}
