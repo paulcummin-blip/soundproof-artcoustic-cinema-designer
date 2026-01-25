@@ -3478,186 +3478,37 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Advanced debug controls (only visible when REW mode is ON) */}
-        {rewStyleMode && (
-          <div className="space-y-2">
+        {/* Advanced debug controls (dev only) */}
+        {devMode && (
+          <div className="space-y-2 p-2 bg-yellow-50 rounded border border-yellow-400">
+            <div className="text-xs font-semibold text-yellow-900">Dev Controls</div>
             <div className="flex items-center gap-2">
-              <Checkbox 
-                id="raw-engine-output" 
+              <Switch 
+                id="modal-only-debug" 
                 checked={modalOnlyDebugView}
                 onCheckedChange={setModalOnlyDebugView}
               />
-              <Label htmlFor="raw-engine-output" className="text-xs font-semibold" style={{ color: modalOnlyDebugView ? '#dc2626' : '#3E4349' }}>
-                RAW ENGINE OUTPUT — Pure coherent pressure (modal+SBIR), zero processing
-              </Label>
+              <Label htmlFor="modal-only-debug" className="text-xs">RAW mode</Label>
             </div>
-            
-            {/* Mode excitation diagnostic toggle (Part G) */}
-            {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
-              <div className="flex items-center gap-2">
-                <Checkbox 
-                  id="mode-excitation-diag" 
-                  checked={showModeExcitationDiag}
-                  onCheckedChange={setShowModeExcitationDiag}
-                />
-                <Label htmlFor="mode-excitation-diag" className="text-xs text-[#3E4349]">
-                  Show per-mode excitation diagnostic (dev only)
-                </Label>
-              </div>
-            )}
-            
-            {/* Mode isolation selector (Part H - single mode test harness) */}
-            {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
-              <div className="flex items-center gap-2">
-                <Label htmlFor="mode-isolation" className="text-xs text-[#3E4349]">
-                  Mode Isolation (debug):
-                </Label>
-                <select
-                  id="mode-isolation"
-                  value={modeIsolation}
-                  onChange={(e) => setModeIsolation(e.target.value)}
-                  className="text-xs border border-[#DCDBD6] rounded px-2 py-1 bg-white"
-                >
-                  <option value="off">Off (all modes)</option>
-                  <option value="1,0,0">Axial (1,0,0) - Width</option>
-                  <option value="2,0,0">Width even: Axial (2,0,0)</option>
-                  <option value="0,1,0">Axial (0,1,0) - Length</option>
-                  <option value="0,0,1">Axial (0,0,1) - Height</option>
-                  <option value="1,0,0|0,1,0">Axial pair: (1,0,0) + (0,1,0)</option>
-                  <option value="1,0,0|2,0,0">Axial pair: (1,0,0) + (2,0,0)</option>
-                </select>
-              </div>
-            )}
-            
-            {/* Complex eigenfunctions toggle (Part H3 - REW parity phase) */}
-            {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
-              <div className="flex items-center gap-2">
-                <Checkbox 
-                  id="complex-eigenfunctions" 
-                  checked={complexEigenfunctions}
-                  onCheckedChange={setComplexEigenfunctions}
-                />
-                <Label htmlFor="complex-eigenfunctions" className="text-xs font-semibold" style={{ color: complexEigenfunctions ? '#2563eb' : '#3E4349' }}>
-                  Complex eigenfunctions (REW parity)
-                </Label>
-              </div>
-            )}
-            
-            {/* SBIR single-reflection diagnostic (63 Hz null test) */}
             <div className="flex items-center gap-2">
-              <Checkbox 
-                id="sbir-debug-single-front-wall" 
-                checked={sbirDebugSingleFrontWall}
-                onCheckedChange={setSbirDebugSingleFrontWall}
-              />
-              <Label htmlFor="sbir-debug-single-front-wall" className="text-xs font-semibold" style={{ color: sbirDebugSingleFrontWall ? '#dc2626' : '#3E4349' }}>
-                🔬 SBIR: Single front wall reflection only (63 Hz null test)
-              </Label>
-            </div>
-            
-            {/* Modal Probe toggle */}
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="modal-probe" 
-                checked={modalProbeEnabled}
-                onCheckedChange={setModalProbeEnabled}
-              />
-              <Label htmlFor="modal-probe" className="text-xs font-semibold" style={{ color: modalProbeEnabled ? '#dc2626' : '#3E4349' }}>
-                🔬 Modal Probe (runtime dump)
-              </Label>
-            </div>
-            
-            {/* Debug: Disable sealed-room LF gain */}
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="debug-disable-sealed-gain" 
+              <Switch 
+                id="disable-sealed" 
                 checked={debugDisableSealedGain}
                 onCheckedChange={setDebugDisableSealedGain}
               />
-              <Label htmlFor="debug-disable-sealed-gain" className="text-xs font-semibold" style={{ color: debugDisableSealedGain ? '#dc2626' : '#3E4349' }}>
-                🔬 Debug: Disable sealed-room LF gain
-              </Label>
+              <Label htmlFor="disable-sealed" className="text-xs">Disable sealed gain</Label>
             </div>
+          </div>
+        )}
             
-            {/* Debug: Disable null repair/fill */}
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="debug-disable-null-repair" 
-                checked={debugDisableNullRepair}
-                onCheckedChange={setDebugDisableNullRepair}
-              />
-              <Label htmlFor="debug-disable-null-repair" className="text-xs font-semibold" style={{ color: debugDisableNullRepair ? '#dc2626' : '#3E4349' }}>
-                🔬 Debug: Disable null repair/fill
-              </Label>
-            </div>
-            
-            {/* REW Strict Parity info banner */}
-            {rewStrictParity && (
-              <div className="text-xs bg-purple-50 p-2 rounded border border-purple-400">
-                <div className="font-semibold mb-1 text-purple-700">🎯 REW Strict (Parity) ACTIVE</div>
-                <div className="text-[10px] space-y-0.5">
-                  <div>• Coherence loss penalty: <strong>DISABLED</strong></div>
-                  <div>• Mode density compensation: <strong>DISABLED</strong></div>
-                  <div>• Schroeder blend / peak taming: <strong>DISABLED</strong></div>
-                  <div>• Null repair/fill: <strong>DISABLED</strong></div>
-                  <div className="mt-1 pt-1 border-t border-purple-300 font-semibold">
-                    This mode outputs pure modal/SBIR physics for side-by-side REW comparison.
-                  </div>
-                </div>
-              </div>
-            )}
-            
-            {/* Coupling Phase Probe (Part HB - verify complex eigenfunctions) */}
-            {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
-              <div className="space-y-2 mt-2 pt-2 border-t border-gray-300">
-                <div className="font-semibold text-xs text-[#1B1A1A]">Coupling Phase Probe</div>
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="probe-mode" className="text-xs text-[#3E4349]">
-                    Probe mode:
-                  </Label>
-                  <select
-                    id="probe-mode"
-                    value={couplingProbeMode}
-                    onChange={(e) => setCouplingProbeMode(e.target.value)}
-                    className="text-xs border border-[#DCDBD6] rounded px-2 py-1 bg-white"
-                  >
-                    <option value="auto">Auto (first isolated mode)</option>
-                    <option value="1,0,0">(1,0,0)</option>
-                    <option value="2,0,0">(2,0,0)</option>
-                    <option value="0,1,0">(0,1,0)</option>
-                    <option value="0,0,1">(0,0,1)</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox 
-                    id="probe-use-complex" 
-                    checked={couplingProbeUseComplex}
-                    onCheckedChange={setCouplingProbeUseComplex}
-                  />
-                  <Label htmlFor="probe-use-complex" className="text-xs text-[#3E4349]">
-                    Use Complex eigenfunctions
-                  </Label>
-                </div>
-              </div>
-            )}
           </div>
         )}
         
-        {/* RAW mode active banner */}
-        {rewStyleMode && modalOnlyDebugView && (
+        {/* RAW mode banner (dev only) */}
+        {devMode && modalOnlyDebugView && (
           <div className="text-xs mb-2 bg-red-50 p-2 rounded border border-red-400">
             <div className="font-semibold mb-1 text-red-700">🔴 RAW MODE ACTIVE</div>
-            <div className="text-[10px] space-y-0.5">
-              <div>• No Schroeder blending</div>
-              <div>• No mode density compensation</div>
-              <div>• No sealed room boost</div>
-              <div>• No smoothing (even if UI slider is set)</div>
-              <div>• No calibration offsets</div>
-              <div>• No normalization</div>
-              <div className="mt-1 pt-1 border-t border-red-300 font-semibold">
-                This is the PURE physics output. If nulls don't move when sub moves, the modal coupling is broken.
-              </div>
-            </div>
+            <div className="text-[10px]">Pure physics output, no processing</div>
           </div>
         )}
 
@@ -4431,46 +4282,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </Button>
             </div>
 
-            {/* Component view selector (debug lens only - does NOT change calibration) */}
-            <div className="flex items-center gap-3">
-              <div className="text-xs text-[#3E4349]">Component (debug):</div>
-              <Button
-                variant={componentView === 'modalOnly' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setComponentView('modalOnly')}
-                className="text-xs"
-              >
-                Modal only
-              </Button>
-              <Button
-                variant={componentView === 'sbirOnly' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setComponentView('sbirOnly')}
-                className="text-xs"
-              >
-                SBIR only
-              </Button>
-              <Button
-                variant={componentView === 'modalPlusSbir' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setComponentView('modalPlusSbir')}
-                className="text-xs"
-              >
-                Total (REW)
-              </Button>
-            </div>
 
-            {/* REW-style time alignment toggle */}
-            <div className="flex items-center gap-2 mt-2">
-              <Checkbox 
-                id="rew-time-align" 
-                checked={rewTimeAlign}
-                onCheckedChange={setRewTimeAlign}
-              />
-              <Label htmlFor="rew-time-align" className="text-xs text-[#3E4349]">
-                Time align subs (MLP) — REW-style
-              </Label>
-            </div>
 
             {/* Modal Alignment Debug */}
             {devMode && (() => {
@@ -4543,70 +4355,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Dev controls */}
-        {devMode && (
-          <div className="flex items-center gap-4 mb-2">
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="show-mode-lines" 
-                checked={showRewModeLines}
-                onCheckedChange={setShowRewModeLines}
-              />
-              <Label htmlFor="show-mode-lines" className="text-xs text-[#3E4349]">
-                Show mode lines (REW)
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="linear-hz-axis" 
-                checked={linearHzAxis}
-                onCheckedChange={(v) => setLinearHzAxis(!!v)}
-              />
-              <Label htmlFor="linear-hz-axis" className="text-xs text-[#3E4349]">
-                Linear Hz axis (debug)
-              </Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Checkbox 
-                id="rew-relative-view" 
-                checked={rewRelativeView}
-                onCheckedChange={setRewRelativeView}
-              />
-              <Label htmlFor="rew-relative-view" className="text-xs text-[#3E4349]">
-                Relative view (normalise 30–80 Hz)
-              </Label>
-            </div>
-            
-            {/* REW Display Reference Level (only when absolute mode) */}
-            {!rewRelativeView && (
-              <div className="flex items-center gap-2">
-                <Label className="text-xs text-[#3E4349] whitespace-nowrap">
-                  Display ref:
-                </Label>
-                <div className="flex gap-1">
-                  {[85, 90, 95, 100].map(val => (
-                    <Button
-                      key={val}
-                      variant={rewDisplayRefDb === val ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setRewDisplayRefDb(val)}
-                      className="text-xs h-6 px-2"
-                    >
-                      {val} dB
-                    </Button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* Clamp feedback (dev only) */}
-        {devMode && (
-          <div style={{ marginTop: 6, marginBottom: 8, fontSize: 12, color: "#8a2b2b", background: "#fff3cd", padding: "6px 10px", borderRadius: 6, border: "1px solid #ffc107" }}>
-            ⚠️ Clamped: {clampedToMin} to min, {clampedToMax} to max. Curve rides window edge (REW-style). Unlock Y-axis to view full range.
-          </div>
-        )}
+
+
 
         {/* Parity Audit Readout (raw coherent vs final plotted) */}
         {rewStyleMode && safeDebug?.parityAudits?.modalPlusSbir && (() => {
@@ -5628,46 +5379,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
         </div>
       </div>
 
-      {/* Smoothing controls (dev only) */}
-      {devMode && (
-        <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
-          <div className="text-sm font-medium text-[#1B1A1A] mb-3">Smoothing</div>
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <Button
-                variant={(rewCompareView ? graphSmoothing === 'none' : rewSmoothing === 'none') ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setRewSmoothing('none')}
-                className="text-xs flex-1"
-                disabled={rewCompareView}
-              >
-                None (Raw)
-              </Button>
-              <Button
-                variant={(rewCompareView ? graphSmoothing === '1/48' : rewSmoothing === '1/48') ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setRewSmoothing('1/48')}
-                className="text-xs flex-1"
-                disabled={rewCompareView}
-              >
-                1/48 oct (Simulation)
-              </Button>
-              <Button
-                variant={(rewCompareView ? graphSmoothing === '1/3' : rewSmoothing === '1/3') ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setRewSmoothing('1/3')}
-                className="text-xs flex-1"
-                disabled={rewCompareView}
-              >
-                1/3 oct (RP22)
-              </Button>
-            </div>
-            <div className="text-xs text-[#3E4349]">
-              Use 1/48 for diagnostic detail, 1/3 for RP22 reporting
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Auto Align Controls */}
       {totalSubCount > 0 && (
@@ -5696,13 +5408,13 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
             )}
             {totalSubCount > 1 && (
               <div className="flex items-center gap-2">
-                <Checkbox 
+                <Switch 
                   id="try-polarity" 
                   checked={tryPolarity}
                   onCheckedChange={setTryPolarity}
                 />
                 <Label htmlFor="try-polarity" className="text-xs text-[#3E4349]">
-                  Try polarity inversion for best sum
+                  Try polarity inversion
                 </Label>
               </div>
             )}
