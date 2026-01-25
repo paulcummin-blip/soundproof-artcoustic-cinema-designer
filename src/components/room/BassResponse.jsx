@@ -3303,9 +3303,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div>• Smoothing: 1/3 octave (fixed)</div>
                 <div>• Sealed room: ALWAYS (cinemas are sealed)</div>
                 <div>• Absolute SPL mode (30–80 Hz → 85 dB reference)</div>
-                <div>• RefDb (median 30–80): {typeof refDbDisplay === 'string' ? refDbDisplay : fmtFixed(refDbDisplay, 1)} dB
+                <div>• RefDb (median 30–80): {typeof refDbDisplay === 'string' ? refDbDisplay : fmtFixed(refDbDisplay, 1)} dB</div>
                 <div>• Y window: 65–105 dB (fixed for comparison)</div>
-                <div className="text-[9px] opacity-70 mt-1">Engine SPL range (raw): {safeDebug?.splMinDb || '—'} to {safeDebug?.splMaxDb || '—'} dB</div>
+                <div className="text-[9px] opacity-70 mt-1">Engine SPL range (raw): {typeof safeDebug?.splMinDb === 'string' ? safeDebug.splMinDb : fmtFixed(safeDebug?.splMinDb, 1)} to {typeof safeDebug?.splMaxDb === 'string' ? safeDebug.splMaxDb : fmtFixed(safeDebug?.splMaxDb, 1)} dB</div>
                 <div className="text-[9px] opacity-70">Display SPL range: {(() => {
                   const finite = displayData.filter(d => Number.isFinite(d.spl)).map(d => d.spl);
                   if (finite.length === 0) return 'N/A';
@@ -3355,7 +3355,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="text-[9px] space-y-0.5 font-mono">
                 {safeDebug.lfProbeRaw.map((probe, i) => (
                   <div key={i}>
-                    {probe.freq} Hz: blended={probe.blendedMagDb_pre} (w={probe.w}, direct={probe.directMagDb_pre}, modal={probe.scaledModalMagDb_pre})
+                    {probe.freq} Hz: blended={fmtFixed(probe.blendedMagDb_pre, 2)} (w={fmtFixed(probe.w, 2)}, direct={fmtFixed(probe.directMagDb_pre, 2)}, modal={fmtFixed(probe.scaledModalMagDb_pre, 2)})
                   </div>
                 ))}
               </div>
@@ -3396,9 +3396,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               {sensitivityAudit.sourceChanged && sensitivityAudit.couplingDeltas && (
                 <>
                   <div className="mt-1 font-semibold">Coupling Δ:</div>
-                  <div>Source Δ: {fmtFixed(sensitivityAudit?.couplingDeltas?.src, 3, '0.000') >= 0 ? '+' : ''}{fmtFixed(sensitivityAudit?.couplingDeltas?.src, 3)}</div>
-                  <div>Receiver Δ: {fmtFixed(sensitivityAudit?.couplingDeltas?.rcv, 3, '0.000') >= 0 ? '+' : ''}{fmtFixed(sensitivityAudit?.couplingDeltas?.rcv, 3)}</div>
-                  <div>Total Δ: {fmtFixed(sensitivityAudit?.couplingDeltas?.total, 3, '0.000') >= 0 ? '+' : ''}{fmtFixed(sensitivityAudit?.couplingDeltas?.total, 3)}</div>
+                  <div>Source Δ: {(toNum(sensitivityAudit?.couplingDeltas?.src) ?? 0) >= 0 ? '+' : ''}{fmtFixed(sensitivityAudit?.couplingDeltas?.src, 3)}</div>
+                  <div>Receiver Δ: {(toNum(sensitivityAudit?.couplingDeltas?.rcv) ?? 0) >= 0 ? '+' : ''}{fmtFixed(sensitivityAudit?.couplingDeltas?.rcv, 3)}</div>
+                  <div>Total Δ: {(toNum(sensitivityAudit?.couplingDeltas?.total) ?? 0) >= 0 ? '+' : ''}{fmtFixed(sensitivityAudit?.couplingDeltas?.total, 3)}</div>
                 </>
               )}
 
@@ -3464,12 +3464,12 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   </div>
                   {probe40.strongestReflection && (
                     <div className="text-[9px] font-mono">
-                      Strongest reflection at 40 Hz: {probe40.strongestReflection.surface} ({probe40.strongestReflection.magDb.toFixed(1)} dB)
+                      Strongest reflection at 40 Hz: {probe40.strongestReflection.surface} ({fmtFixed(probe40.strongestReflection.magDb, 1)} dB)
                     </div>
                   )}
                   <div className="text-[9px] font-mono mt-1 pt-1 border-t border-blue-200 space-y-0.5">
-                    <div>Direct only: {probe40.directOnlyDb.toFixed(1)} dB</div>
-                    <div>SBIR total: {probe40.sbirTotalDb.toFixed(1)} dB</div>
+                    <div>Direct only: {fmtFixed(probe40.directOnlyDb, 1)} dB</div>
+                    <div>SBIR total: {fmtFixed(probe40.sbirTotalDb, 1)} dB</div>
                     <div>Combined result: {probe40.combinedResultDb} dB</div>
                   </div>
                 </>
@@ -3750,7 +3750,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </div>
               <div className="text-[10px] space-y-1">
                 <div className="font-semibold">
-                  Probing mode: ({nx},{ny},{nz}) @ {fHz.toFixed(1)} Hz
+                  Probing mode: ({nx},{ny},{nz}) @ {fmtFixed(fHz, 1)} Hz
                   {probeModeDef.axisLabel && ` [${probeModeDef.axisLabel}]`}
                 </div>
                 <div className="text-[9px] opacity-70">
@@ -4054,9 +4054,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               <div className="max-h-96 overflow-y-auto space-y-3 font-mono">
                 {modeProbe.rows.map((row, i) => {
                   const topModes = (row.topModes || []).slice(0, 3);
-                  const topModesStr = topModes.map(m => 
+                  const topModesStr = topModes.length > 0 ? topModes.map(m => 
                     `(${m.nx},${m.ny},${m.nz})@${fmtFixed(m.f0Hz, 0)}Hz:cpl=${fmtFixed(m.coupling, 3)},res=${fmtFixed(m.resonMagDb, 1)}dB`
-                  ).join(', ');
+                  ).join(', ') : '';
                   
                   const modesCount = row.modesPassedBandwidth ?? 0;
                   const totalModes = row.totalModesAvailable ?? 0;
@@ -4074,9 +4074,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                        <div>Δ: {fmtFixed(row.post.db - row.pre.db, 1)} dB</div>
                       </div>
                       {topModesStr && (
-                        <div className="text-[9px] opacity-80 mt-1 pl-2">
-                          Top modes: {topModesStr.replace(/toFixed/g, 'fmtFixed')}
-                        </div>
+                       <div className="text-[9px] opacity-80 mt-1 pl-2">
+                         Top modes: {topModesStr}
+                       </div>
                       )}
                     </div>
                   );
@@ -4146,9 +4146,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             return {
               label,
               fHz: mode.fHz,
-              srcCoupling: srcCoupling.toFixed(4),
-              rcvCoupling: rcvCoupling.toFixed(4),
-              totalCoupling: totalCoupling.toFixed(4)
+              srcCoupling: fmtFixed(srcCoupling, 4),
+              rcvCoupling: fmtFixed(rcvCoupling, 4),
+              totalCoupling: fmtFixed(totalCoupling, 4)
             };
           }).filter(Boolean);
           
@@ -4471,9 +4471,9 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                   {safeDebug.stepJumpInspector55_90.summary ? (
                     <>
                       <div style={{ fontFamily: "monospace", whiteSpace: "pre-wrap", fontSize: 11, marginBottom: 8 }}>
-                        {`Max jump: ${safeDebug.stepJumpInspector55_90.summary.jumpDb.toFixed(3)} dB
-${safeDebug.stepJumpInspector55_90.summary.f0.toFixed(2)} Hz → ${safeDebug.stepJumpInspector55_90.summary.f1.toFixed(2)} Hz
-${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.stepJumpInspector55_90.summary.y1.toFixed(2)} dB`}
+                        {`Max jump: ${fmtFixed(safeDebug.stepJumpInspector55_90.summary.jumpDb, 3)} dB
+                        ${fmtFixed(safeDebug.stepJumpInspector55_90.summary.f0, 2)} Hz → ${fmtFixed(safeDebug.stepJumpInspector55_90.summary.f1, 2)} Hz
+                        ${fmtFixed(safeDebug.stepJumpInspector55_90.summary.y0, 2)} dB → ${fmtFixed(safeDebug.stepJumpInspector55_90.summary.y1, 2)} dB`}
                       </div>
 
                       {/* Mode-level trace (when available) */}
@@ -4505,7 +4505,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                                 <div style={{ fontFamily: "monospace", fontSize: 9, marginTop: 4, paddingLeft: 12 }}>
                                   {diff.modesAdded.map((m, i) => (
                                     <div key={i}>
-                                      {m.modeHz.toFixed(1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}): {m.contribDb.toFixed(1)} dB
+                                      {fmtFixed(m.modeHz, 1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}): {fmtFixed(m.contribDb, 1)} dB
                                     </div>
                                   ))}
                                 </div>
@@ -4521,7 +4521,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                                 <div style={{ fontFamily: "monospace", fontSize: 9, marginTop: 4, paddingLeft: 12 }}>
                                   {diff.modesRemoved.map((m, i) => (
                                     <div key={i}>
-                                      {m.modeHz.toFixed(1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}): {m.contribDb.toFixed(1)} dB
+                                      {fmtFixed(m.modeHz, 1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}): {fmtFixed(m.contribDb, 1)} dB
                                     </div>
                                   ))}
                                 </div>
@@ -4537,10 +4537,10 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                                 <div style={{ fontFamily: "monospace", fontSize: 9, marginTop: 4, paddingLeft: 12 }}>
                                   {diff.modesSkipChanged.map((m, i) => (
                                     <div key={i}>
-                                      {m.modeHz.toFixed(1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}):
+                                      {fmtFixed(m.modeHz, 1)} Hz {m.type} ({m.n[0]},{m.n[1]},{m.n[2]}):
                                       f0={m.atF0.skipped ? `SKIP(${m.atF0.reason})` : 'USED'}
                                       → f1={m.atF1.skipped ? `SKIP(${m.atF1.reason})` : 'USED'}
-                                      (df: {m.atF0.df.toFixed(1)}→{m.atF1.df.toFixed(1)} Hz, bw: {m.atF0.bw.toFixed(1)}→{m.atF1.bw.toFixed(1)} Hz)
+                                      (df: {fmtFixed(m.atF0.df, 1)}→{fmtFixed(m.atF1.df, 1)} Hz, bw: {fmtFixed(m.atF0.bw, 1)}→{fmtFixed(m.atF1.bw, 1)} Hz)
                                     </div>
                                   ))}
                                 </div>
@@ -4708,10 +4708,10 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                           return (
                             <div key={i} className="bg-red-50 rounded border border-red-300 p-2">
                               <div className="font-semibold text-red-800 mb-1 text-[10px]">
-                                Jump {item.jumpIndex}: {item.fromHz.toFixed(2)} → {item.toHz.toFixed(2)} Hz 
-                                (Δf={item.deltaHz.toFixed(4)} Hz), 
-                                {item.fromDb.toFixed(2)} → {item.toDb.toFixed(2)} dB 
-                                (Δ={item.jumpDb >= 0 ? '+' : ''}{item.jumpDb.toFixed(2)} dB)
+                                Jump {item.jumpIndex}: {fmtFixed(item.fromHz, 2)} → {fmtFixed(item.toHz, 2)} Hz 
+                                (Δf={fmtFixed(item.deltaHz, 4)} Hz), 
+                                {fmtFixed(item.fromDb, 2)} → {fmtFixed(item.toDb, 2)} dB 
+                                (Δ={item.jumpDb >= 0 ? '+' : ''}{fmtFixed(item.jumpDb, 2)} dB)
                               </div>
                               
                               {/* Diagnosis first */}
@@ -4881,8 +4881,8 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
               using: "plottedSeries",
               len: dataToPlot.length,
               finiteCount: finiteSpl.length,
-              min: Number.isFinite(visualMin) ? visualMin.toFixed(2) : 'N/A',
-              max: Number.isFinite(visualMax) ? visualMax.toFixed(2) : 'N/A',
+              min: fmtFixed(visualMin, 2, 'N/A'),
+              max: fmtFixed(visualMax, 2, 'N/A'),
               smoothing: rewStyleMode ? 'none' : rewSmoothing,
               rewCompareView,
               userSmoothingChoice: rewSmoothing,
@@ -5027,9 +5027,9 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
                         <tr key={idx} className="border-b border-red-200 hover:bg-red-100">
                           <td className="p-2">{contrib.frequencyHz}</td>
                           <td className="p-2">{contrib.subId}</td>
-                          <td className="text-right p-2">{contrib.distance.toFixed(2)}</td>
-                          <td className="text-right p-2">{contrib.amplitude.toFixed(4)}</td>
-                          <td className="text-right p-2">{contrib.phiTotal.toFixed(4)}</td>
+                          <td className="text-right p-2">{fmtFixed(contrib.distance, 2)}</td>
+                          <td className="text-right p-2">{fmtFixed(contrib.amplitude, 4)}</td>
+                          <td className="text-right p-2">{fmtFixed(contrib.phiTotal, 4)}</td>
                           <td className="text-right p-2 font-bold">
                             {fmtFixed(summation?.finalSplDb, 2, '—')}
                           </td>
@@ -5225,7 +5225,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
           <div className="text-xs text-[#3E4349] bg-[#F8F8F7] p-2 rounded space-y-1">
             <div>Auto-saves room state every 500ms (prevents data loss on Preview refresh)</div>
             <div className="text-[10px] font-mono text-blue-700 pt-1 border-t border-[#DCDBD6]">
-              <strong>Display offset in Relative view:</strong> {allowDisplayRefOffset ? `${(Number(rewDisplayRefDb) || 0).toFixed(2)} dB` : '0.00 dB (forced)'}
+              <strong>Display offset in Relative view:</strong> {allowDisplayRefOffset ? `${fmtFixed(toNum(rewDisplayRefDb) || 0, 2)} dB` : '0.00 dB (forced)'}
             </div>
           </div>
         </div>
@@ -5267,7 +5267,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
              <div className="flex items-center justify-between mb-2">
                <Label className="text-xs text-[#3E4349]">Room Damping</Label>
                <span className="text-xs font-mono text-[#1B1A1A]">
-                 {roomDamping.toFixed(0)}
+                 {fmtFixed(roomDamping, 0)}
                </span>
              </div>
              <input
