@@ -1648,21 +1648,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   const rewModesDataRel = useMemo(() => {
     if (!rewStyleMode) return null;
-    return normalizeDatasetToRelative(safeRewModesData || { data: [] });
-  }, [rewStyleMode, safeRewModesData, normalizeDatasetToRelative]);
+    return normalizeDatasetToRelative(rewModesDataAbs || { data: [] });
+  }, [rewStyleMode, rewModesDataAbs, normalizeDatasetToRelative]);
 
   const rewRoomPlusProductDataRel = useMemo(() => {
     if (!rewStyleMode) return null;
-    return normalizeDatasetToRelative(safeRewRoomPlusProductData || { data: [] });
-  }, [rewStyleMode, safeRewRoomPlusProductData, normalizeDatasetToRelative]);
+    return normalizeDatasetToRelative(rewRoomPlusProductDataAbs || { data: [] });
+  }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDatasetToRelative]);
 
   // Aliases switch Abs/Rel based on UI toggle
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
   
-  // UI safety: REW datasets must never be null/undefined
-  const safeRewModesData = rewModesData || lastGoodRewModesAbsRef.current || { data: [] };
-  const safeRewRoomPlusProductData = rewRoomPlusProductData || lastGoodRewRoomPlusAbsRef.current || { data: [] };
+  // UI safety: REW datasets must never be null/undefined (prevents graph blanking)
+  const safeRewModesData =
+    rewModesData && Array.isArray(rewModesData.data)
+      ? rewModesData
+      : (lastGoodRewModesAbsRef.current || { data: [], debug: { note: "safe-fallback-room-only" } });
+
+  const safeRewRoomPlusProductData =
+    rewRoomPlusProductData && Array.isArray(rewRoomPlusProductData.data)
+      ? rewRoomPlusProductData
+      : (lastGoodRewRoomPlusAbsRef.current || { data: [], debug: { note: "safe-fallback-room+product" } });
 
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
   const activeDebug = useMemo(() => {
