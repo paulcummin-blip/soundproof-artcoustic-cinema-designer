@@ -32,6 +32,11 @@ const brand = {
   sand:  "#C1B6AD",
 };
 
+// Safe dev flag (prevents crash if devMode isn't defined)
+const devMode =
+  (typeof globalThis !== "undefined" && !!globalThis.__B44_DEV_MODE) ||
+  (typeof process !== "undefined" && process?.env?.NODE_ENV === "development");
+
 // Display floor: REW-style visibility threshold (values below this are nulled, not plotted)
 const DISPLAY_SPL_FLOOR_DB = -60;
 
