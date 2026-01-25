@@ -956,6 +956,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Drag performance: use fast preview profile while dragging
     const usePreviewProfile = isDraggingSub;
     
+    // Component view gating: control which physics terms are included
+    const wantModal = modesEnabled && componentView !== 'sbirOnly';
+    const wantSBIR = rewSbirEnabled && componentView !== 'modalOnly';
+    
     try {
       const currentEpoch = calcEpochRef.current;
       
@@ -968,10 +972,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         pointsPerOct: usePreviewProfile ? 30 : 24, // Preview: lower grid density for speed
         modeLimitHz: 200,
         q: roomDamping,
-        includeAxial: true,
-        includeTangential: true,
-        includeOblique: true,
-        includeSBIR: false, // Always OFF for Room-only (no SBIR needed)
+        includeAxial: wantModal,
+        includeTangential: wantModal,
+        includeOblique: wantModal,
+        includeSBIR: wantSBIR && !usePreviewProfile,
         rewParityMode: true,
         smoothing: rewStyleMode ? 'none' : rewSmoothing,
         subFloorHeight: 0.0,
@@ -990,7 +994,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         leakage: 0.05,
         subProductCurves: null, // Room-only: no product curves
         absoluteSplMode: true,
-        rawEngineOutput: modalOnlyDebugView, // Pass raw mode flag
+        rawEngineOutput: modalOnlyDebugView ? true : false,
         modeIsolation: modeIsolation !== 'off' ? modeIsolation : null, // Part H - mode isolation
         complexEigenfunctions: complexEigenfunctions, // Part H3 - complex eigenfunctions
         componentView: componentView, // Part 3 - component isolation
@@ -1328,6 +1332,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     // Drag performance: use fast preview profile while dragging
     const usePreviewProfile = isDraggingSub;
     
+    // Component view gating: control which physics terms are included
+    const wantModal = modesEnabled && componentView !== 'sbirOnly';
+    const wantSBIR = rewSbirEnabled && componentView !== 'modalOnly';
+    
     let result;
     try {
       const currentEpoch = calcEpochRef.current;
@@ -1341,10 +1349,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         pointsPerOct: usePreviewProfile ? 30 : 24, // Preview: ~250 pts (REW-live), Final: ~2000 pts
         modeLimitHz: 200,
         q: roomDamping,
-        includeAxial: modesEnabled,
-        includeTangential: modesEnabled,
-        includeOblique: modesEnabled,
-        includeSBIR: usePreviewProfile ? false : rewSbirEnabled, // Preview: SBIR OFF, Final: user setting
+        includeAxial: wantModal,
+        includeTangential: wantModal,
+        includeOblique: wantModal,
+        includeSBIR: wantSBIR && !usePreviewProfile,
         rewParityMode: true,
         smoothing: rewStyleMode ? 'none' : rewSmoothing,
         subFloorHeight: 0.0,
@@ -4752,6 +4760,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             {/* Live state readout (audit) */}
             <div className="text-[9px] font-mono bg-yellow-50 p-1 rounded border border-yellow-300 mt-2">
               <strong>Live State:</strong> componentView={componentView} | rewView={rewView} | engineCalls={engineCallCountRef.current} | dataset={rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'} | timeAlign={rewTimeAlign ? 'ON' : 'OFF'} | smoothingSelected={rewSmoothing} | smoothingPassedToEngine={graphSmoothing}
+              <div className="mt-1 pt-1 border-t border-yellow-400">
+                <strong>Maths:</strong> modal={(() => {
+                  const wantModal = modesEnabled && componentView !== 'sbirOnly';
+                  return wantModal ? 'ON' : 'OFF';
+                })()} | sbir={(() => {
+                  const wantSBIR = rewSbirEnabled && componentView !== 'modalOnly';
+                  return wantSBIR ? 'ON' : 'OFF';
+                })()} | dragging={isDraggingSub ? 'YES' : 'NO'} | sbirPathsUsed={safeDebug?.sbirDebugProbe40Hz?.pathsUsed || safeDebug?.sbirDebugProbe63Hz?.pathsUsed || 0}
+              </div>
             </div>
           </div>
         )}
