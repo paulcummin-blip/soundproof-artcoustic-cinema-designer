@@ -16,9 +16,9 @@ import { computeRoomModesResponse } from "@/components/utils/roomModesEngine";
 import SubTuningControls from "@/components/room/bass/SubTuningControls";
 import RewParityValidator from "@/components/room/bass/RewParityValidator";
 import RewParityValidatorStrict from "@/components/room/bass/RewParityValidatorStrict";
-import { Checkbox } from "@/components/ui/checkbox";
+
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
+
 import { Switch } from "@/components/ui/switch";
 import { getSubwooferCurve, normaliseModelKey } from "@/components/models/speakers/registry";
 
@@ -3500,9 +3500,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
           </div>
         )}
-            
-          </div>
-        )}
         
         {/* RAW mode banner (dev only) */}
         {devMode && modalOnlyDebugView && (
@@ -5338,40 +5335,30 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
           </div>
 
           {modesEnabled && (
-            <>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <Label className="text-xs text-[#3E4349]">Room Damping (Q)</Label>
-                  <span className="text-xs font-mono text-[#1B1A1A]">
-                    {roomDamping.toFixed(0)}
-                  </span>
-                </div>
-                <Slider
-                  value={[roomDamping]}
-                  onValueChange={([v]) => setRoomDamping(v)}
-                  min={8}
-                  max={35}
-                  step={1}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-[#3E4349] mt-1">
-                  <span>Dead (8)</span>
-                  <span>Lively (35)</span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Checkbox 
-                  id="mode-markers" 
-                  checked={showModeMarkers}
-                  onCheckedChange={setShowModeMarkers}
-                />
-                <Label htmlFor="mode-markers" className="text-xs text-[#3E4349]">
-                  Show mode frequency markers
-                </Label>
-              </div>
-            </>
+           <div>
+             <div className="flex items-center justify-between mb-2">
+               <Label className="text-xs text-[#3E4349]">Room Damping</Label>
+               <span className="text-xs font-mono text-[#1B1A1A]">
+                 {roomDamping.toFixed(0)}
+               </span>
+             </div>
+             <input
+               type="range"
+               value={roomDamping}
+               onChange={(e) => setRoomDamping(Number(e.target.value))}
+               min="8"
+               max="35"
+               step="1"
+               className="w-full"
+             />
+             <div className="flex justify-between text-xs text-[#3E4349] mt-1">
+               <span>Dead (8)</span>
+               <span>Lively (35)</span>
+             </div>
+           </div>
           )}
+
+
 
           <div className="text-xs text-[#3E4349]">
             Applies modal filtering to product-based simulation
