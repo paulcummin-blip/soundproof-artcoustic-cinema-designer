@@ -1021,6 +1021,15 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     const finiteValues = result.splDb.filter(v => isFinite(v));
     if (finiteValues.length === 0) {
+      // SBIR-only fallback: if SBIR is enabled but modal is off, curve might be very quiet
+      // Return minimal safe data so graph doesn't blank
+      if (componentView === 'sbirOnly') {
+        const fallbackData = result.freqs.map(frequency => ({ frequency, spl: null }));
+        return { 
+          data: fallbackData, 
+          debug: { ...result.debug, note: "SBIR-only: no finite values (SBIR might be very quiet or off)" } 
+        };
+      }
       return { data: [], debug: { ...result.debug, error: "No finite values" } };
     }
 
