@@ -1700,45 +1700,105 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return normalizeDatasetToRelative(rewRoomPlusProductDataAbs || { data: [] });
   }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDatasetToRelative]);
 
-  // Aliases switch Abs/Rel based on UI toggle
-  const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
-  const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
-
-  // Safe versions with fallback to prevent crashes
-  const safeRewModesData = rewModesData || lastGoodRewModesAbsRef.current || { data: [], debug: {} };
-  const safeRewRoomPlusProductData = rewRoomPlusProductData || lastGoodRewRoomPlusAbsRef.current || { data: [], debug: {} };
-
-  // REW graph source → dataset.data (already in chart format)
-  const responseDataRew = useMemo(() => {
-    const d = rewModesData?.data;
-    if (!Array.isArray(d) || d.length === 0) return [];
-    return d
-      .filter(p => Number.isFinite(p?.frequency))
-      .map(p => ({ frequency: p.frequency, spl: Number.isFinite(p.spl) ? p.spl : null }));
-  }, [rewModesData]);
-
-  // Final responseData for BassGraph
-  // REW mode uses REW dataset; non-REW uses selectedSeat series
-  const responseData = rewStyleMode ? responseDataRew : responseDataNonRew;
-
-  // Safe debug object for downstream panels (never crashes)
-  const safeGraphDebug = (rewStyleMode ? safeRewModesData?.debug : null) || {};
-
-  // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
-  const activeDebug = useMemo(() => {
-    // Skip heavy debug computation during drag (smooth performance)
-    if (isDraggingSub) return null;
+  // CANONICAL DATASET: Single source of truth for graph (prevents blank/undefined errors)
+  const finalSeries = useMemo(() => {
+    // Always use REW-style simulation at RSP
+    const w = roomDims?.widthM;
+    const l = roomDims?.lengthM;
+    const h = roomDims?.heightM;
     
-    if (!rewStyleMode) return null;
-    const useRel = rewRelativeView;
-    const dbg = rewView === 'roomPlusProduct'
-      ? (useRel ? safeRewRoomPlusProductData?.debug : safeRewRoomPlusProductData?.debug)
-      : (useRel ? safeRewModesData?.debug : safeRewModesData?.debug);
-    return dbg || null;
-  }, [rewStyleMode, rewView, rewRelativeView, safeRewModesData, safeRewRoomPlusProductData, componentView, isDraggingSub]);
-  
-  // Safe default for JSX (never undefined)
-  const safeDebug = activeDebug ?? {};
+    if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h) && w > 0 && l > 0 && h > 0)) {
+      return { freqsHz: [], splDb: [], debug: { error: "Invalid room dimensions" } };
+    }
+
+    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
+    if (!seat) {
+      return { freqsHz: [], splDb: [], debug: { error: "No RSP found" } };
+    }
+
+    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
+
+    const sourcePositions = subsForSimulation
+      .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
+      .map(s => ({
+        x: s.x,
+        y: s.y,
+        z: 0.0,
+        tuning: s.tuning || { gainDb: 0, delayMs: 0, polarity: 'normal' }
+      }));
+
+    if (!sourcePositions.length) {
+      return { freqsHz: [], splDb: [], debug: { error: "No valid sub positions" } };
+    }
+
+    try {
+      const result = computeRoomModesResponse({
+        roomDims: { widthM: w, lengthM: l, heightM: h },
+        sourcePositions,
+        seatPosition: seatPos,
+        fMin: 20,
+        fMax: 200,
+        pointsPerOct: 24,
+        modeLimitHz: 200,
+        q: roomDamping,
+        includeAxial: true,
+        includeTangential: true,
+        includeOblique: true,
+        includeSBIR: true,
+        rewParityMode: true,
+        smoothing: 'none',
+        subFloorHeight: 0.0,
+        normalizeBandHz: null,
+        normalizeToDb: null,
+        relativeViewEnabled: false,
+        surfaceAbsorption: {
+          front: 0.30, back: 0.30, left: 0.30,
+          right: 0.30, ceiling: 0.30, floor: 0.30,
+        },
+        dampingScalar: Math.max(0.5, roomDamping / 20),
+        leakage: 0.05,
+        subProductCurves: null,
+        absoluteSplMode: true,
+        rawEngineOutput: false,
+        componentView: 'modalPlusSbir', // Always combined
+        isDragging: false,
+        calcEpoch: 0
+      });
+
+      return {
+        freqsHz: result.freqs || [],
+        splDb: result.splDb || [],
+        debug: result.debug || {}
+      };
+    } catch (e) {
+      return {
+        freqsHz: [],
+        splDb: [],
+        debug: {
+          error: "Engine failed",
+          message: String(e?.message || e)
+        }
+      };
+    }
+  }, [roomDims, seatingPositions, subsForSimulation, roomDamping, subPositionEpoch]);
+
+  // Build responseData ONLY from finalSeries
+  const responseData = useMemo(() => {
+    if (!finalSeries.freqsHz || !finalSeries.splDb || finalSeries.freqsHz.length === 0) {
+      return [];
+    }
+    
+    return finalSeries.freqsHz.map((frequency, i) => ({
+      frequency,
+      spl: Number.isFinite(finalSeries.splDb[i]) ? finalSeries.splDb[i] : null
+    }));
+  }, [finalSeries]);
+
+  // Safe debug object
+  const safeGraphDebug = finalSeries.debug || {};
+
+  // Safe debug alias
+  const safeDebug = safeGraphDebug || {};
 
   // Display mode gates (CRITICAL: Relative view and Display ref are mutually exclusive)
   const isRewStyle = !!rewStyleMode;
@@ -1752,91 +1812,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const rewLockedMin = isRewStyle && yAxisLocked ? (Number(rewDisplayRefDb) || 90) - 30 : null;
   const rewLockedMax = isRewStyle && yAxisLocked ? (Number(rewDisplayRefDb) || 90) + 30 : null;
 
-  // REW mode: Three distinct series for plotting (RAW, ENGINE, DISPLAY)
-  const { rewRawSeries, rewEngineFinalSeries, rewDisplayFinalSeries } = useMemo(() => {
-    // Select active dataset (Room-only or Room+Product) - USE SAFE VERSIONS
-    const activeDataset = rewView === 'roomPlusProduct' 
-      ? safeRewRoomPlusProductData 
-      : safeRewModesData;
-    
-    if (!activeDataset || !activeDataset.data || activeDataset.data.length === 0) {
-      return { rewRawSeries: [], rewEngineFinalSeries: [], rewDisplayFinalSeries: [] };
-    }
-    
-    // RAW: coherent pressure before any processing (from engine debug)
-    const rawDb = activeDataset.coherentRawDb;
-    const rawSeries = rawDb && Array.isArray(rawDb) && rawDb.length > 0
-      ? activeDataset.freqs.map((frequency, i) => ({
-          frequency,
-          spl: rawDb[i]
-        }))
-      : [];
-    
-    // ENGINE FINAL: smoothed/processed output from engine (plottedDb or splDb)
-    const engineFinalSeries = activeDataset.data || [];
-    
-    // DISPLAY FINAL:
-    // - Absolute view: ENGINE FINAL + display ref (e.g. 85/90/95/100 dB)
-    // - Relative view: DISPLAY-ONLY reference shift so median(30–80 Hz) becomes 0 dB (REW-style overlay alignment)
-    // CRITICAL: allowDisplayRefOffset prevents stacking of relative + absolute offsets
-    const displayOffsetDb = allowDisplayRefOffset ? (Number(rewDisplayRefDb) || 0) : 0;
-
-    // Relative shift (median 30–80 Hz -> 0 dB)
-    let relShiftDb = 0;
-
-    if (rewRelativeView) {
-      const band = (engineFinalSeries || [])
-        .filter(p => p && p.frequency >= 30 && p.frequency <= 80 && Number.isFinite(p.spl))
-        .map(p => p.spl);
-
-      if (band.length >= 3) {
-        const sorted = [...band].sort((a, b) => a - b);
-        const median = sorted[Math.floor(sorted.length / 2)];
-        relShiftDb = -median;
-      } else {
-        relShiftDb = 0; // safe fallback
-      }
-    }
-
-    const displaySeries = (engineFinalSeries || []).map(d => ({
-      frequency: d.frequency,
-      spl: Number.isFinite(d.spl) ? (d.spl + displayOffsetDb + relShiftDb) : d.spl
-    }));
-    
-    return {
-      rewRawSeries: rawSeries,
-      rewEngineFinalSeries: engineFinalSeries,
-      rewDisplayFinalSeries: displaySeries
-    };
-  }, [rewView, safeRewModesData, safeRewRoomPlusProductData, rewRelativeView, rewStyleMode, rewDisplayRefDb, allowDisplayRefOffset]);
-
-  // REW final plotted series (gated to prevent stacking of relative + absolute offsets)
-  const rewFinalPlottedSeries = useMemo(() => {
-    if (isRelative) {
-      // Relative view: use relative-normalized dataset ONLY (no additional offsets)
-      return rewRelativeView && rewModesDataRel?.data?.length 
-        ? rewModesDataRel.data 
-        : rewDisplayFinalSeries;
-    } else {
-      // Absolute view: use display dataset (which may include display ref offset)
-      return rewDisplayFinalSeries;
-    }
-  }, [isRelative, rewRelativeView, rewModesDataRel, rewDisplayFinalSeries]);
-
-  // Choose which curve to display based on view
+  // Build displayData directly from finalSeries
   const displayData = useMemo(() => {
-    if (rewStyleMode) {
-      // REW mode: Use gated final plotted series (no stacking)
-      return rewFinalPlottedSeries;
-    }
-    
-    // Non-REW mode: use old logic - USE SAFE VERSIONS
-    const baseData = rewView === 'roomPlusProduct'
-      ? safeRewRoomPlusProductData?.data?.length ? safeRewRoomPlusProductData.data : (safeRewModesData?.data || [])
-      : safeRewModesData?.data?.length ? safeRewModesData.data : (safeRewRoomPlusProductData?.data || []);
-    
-    return baseData;
-  }, [rewStyleMode, rewFinalPlottedSeries, rewView, safeRewModesData, safeRewRoomPlusProductData]);
+    return responseData;
+  }, [responseData]);
 
   // TEMP DEBUG (can remove later)
   // if (globalThis.__B44_LOGS) console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
@@ -2186,42 +2165,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return deduplicated;
   }, []);
   
-  // Final plotted series (apply display floor + integrity cleanup)
+  // Final plotted series (clean for graph, no processing)
   const plottedSeries = React.useMemo(() => {
-    // Select base series
-    const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
-
-    // Apply display conditioning (floor only, no clamping)
-    const conditioned = applyDisplayConditioningNulls(
-      baseSeries,
-      rewLockedMin,
-      rewLockedMax,
-      yAxisLocked,
-      isRewStyle
-    );
-
     // Clean for plotting (sort, deduplicate, ensure strictly increasing)
-    const cleaned = cleanPlottedSeries(conditioned);
+    const cleaned = cleanPlottedSeries(displayData);
 
     // Cache stable plot ONLY when not dragging
     if (!isDraggingSub && cleaned && cleaned.length > 0) {
       lastStablePlotRef.current = cleaned;
     } else if (!lastStablePlotRef.current && cleaned && cleaned.length > 0) {
-      // allow initial fill if ref is empty
       lastStablePlotRef.current = cleaned;
     }
 
     return cleaned;
-  }, [
-    isRewStyle,
-    rewFinalPlottedSeries,
-    displayData,
-    rewLockedMin,
-    rewLockedMax,
-    yAxisLocked,
-    cleanPlottedSeries,
-    isDraggingSub,
-  ]);
+  }, [displayData, cleanPlottedSeries, isDraggingSub]);
   
   // Plot Integrity Check (runs before graph renders)
   const plotIntegrityCheck = React.useMemo(() => {
@@ -2467,34 +2424,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return undefined;
   }, [isDraggingSub, isRewStyle, yAxisLocked, rewDisplayRefDb]);
   
-  // Count nulled points (for user feedback)
-  const { belowFloor, clampedToMin, clampedToMax } = React.useMemo(() => {
-    const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
-    const ABS_FLOOR_DB = -60;
-    
-    let floor = 0;
-    let clampMin = 0;
-    let clampMax = 0;
-    
-    baseSeries.forEach(p => {
-      const origSpl = typeof p?.spl === "number" && Number.isFinite(p.spl) ? p.spl : null;
-      if (origSpl === null) return;
-      
-      // Count below absolute floor (nulled)
-      if (origSpl < ABS_FLOOR_DB) {
-        floor++;
-        return;
-      }
-      
-      // Count clamped to window (when locked)
-      if (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax)) {
-        if (origSpl < rewLockedMin) clampMin++;
-        else if (origSpl > rewLockedMax) clampMax++;
-      }
-    });
-    
-    return { belowFloor: floor, clampedToMin: clampMin, clampedToMax: clampMax };
-  }, [isRewStyle, rewFinalPlottedSeries, displayData, rewLockedMin, rewLockedMax, yAxisLocked]);
+  // Stub for removed display conditioning
+  const belowFloor = 0;
+  const clampedToMin = 0;
+  const clampedToMax = 0;
 
   // Bass Metrics (20-80 Hz) - NOW USES ANALYSIS SERIES (same as plot base)
   const bassMetrics2080Hz = useMemo(() => {
@@ -2558,37 +2491,20 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
   const toggles = React.useMemo(() => ({ smoothing: false }), []);
 
-  // Compute mode frequencies for markers (use SAME parity run to avoid drift)
+  // Compute mode frequencies for markers
   const modeFrequencies = useMemo(() => {
-    if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) return [];
+    return safeGraphDebug?.modeMarkersHz || [];
+  }, [safeGraphDebug]);
 
-    if (rewStyleMode) {
-      // Use mode markers from the active debug payload (prevents drift)
-      return safeDebug?.modeMarkersHz || [];
-    }
-
-    // Fallback to basic axial modes for product simulation
-    const modes = computeAxialModes({
-      widthM: roomDims.widthM,
-      lengthM: roomDims.lengthM,
-      heightM: roomDims.heightM
-    }, 200);
-    return modes.map(m => m.fHz);
-  }, [rewStyleMode, safeRewModesData, safeDebug]);
-
-  // Mode markers for graph overlay (REW parity)
+  // Mode markers for graph overlay
   const modeMarkersForGraph = useMemo(() => {
-    if (!rewStyleMode) return { axial: [], tangential: [], oblique: [] };
-    
-    if (!safeDebug?.modeMarkers) return { axial: [], tangential: [], oblique: [] };
-    
-    const allMarkers = safeDebug.modeMarkers || [];
+    const allMarkers = safeGraphDebug?.modeMarkers || [];
     return {
       axial: allMarkers.filter(m => m.family === 'axial'),
       tangential: allMarkers.filter(m => m.family === 'tangential'),
       oblique: allMarkers.filter(m => m.family === 'oblique')
     };
-  }, [rewStyleMode, rewView, safeRewModesData, safeRewRoomPlusProductData, safeDebug]);
+  }, [safeGraphDebug]);
 
   // Compute geometric distances for readouts
   const subDistances = useMemo(() => {
@@ -4947,12 +4863,7 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
             // [PLOT AUDIT] - Verify what's actually being plotted
             const dataToPlot = plottedSeries;
             const finiteSpl = dataToPlot.map(d => d.spl).filter(v => Number.isFinite(v));
-            const audit40_70 =
-              (activeDebug?.audit40_70) ||
-              (rewModesDataAudit?.debug?.audit40_70) ||
-              (rewModesDataAbs?.debug?.audit40_70) ||
-              (rewRoomPlusProductDataAbs?.debug?.audit40_70) ||
-              null;
+            const audit40_70 = safeGraphDebug?.audit40_70 || null;
 
             // Calculate min/max from ONLY the finite, in-window values (what's actually plotted)
             const visualMin = finiteSpl.length > 0 ? Math.min(...finiteSpl) : null;
