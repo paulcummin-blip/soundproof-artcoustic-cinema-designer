@@ -993,7 +993,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         disableSealedRoomGain: debugDisableSealedGain || rewStrictParity,
         disableNullRepair: debugDisableNullRepair || rewStrictParity,
         rewStrictParity: rewStrictParity, // Disable presentation shapers
-        rewCoherenceBlend: rewStrictParity ? 0.25 : 0.0, // REW coherence blend (tames extremes)
         isDragging: usePreviewProfile, // Pass drag state to engine
         calcEpoch: currentEpoch // For cancellation check
       });
@@ -1361,7 +1360,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         disableSealedRoomGain: debugDisableSealedGain || rewStrictParity,
         disableNullRepair: debugDisableNullRepair || rewStrictParity,
         rewStrictParity: rewStrictParity, // Disable presentation shapers
-        rewCoherenceBlend: rewStrictParity ? 0.25 : 0.0, // REW coherence blend (tames extremes)
         isDragging: usePreviewProfile, // Pass drag state to engine
         calcEpoch: currentEpoch // For cancellation check
       });
@@ -2108,16 +2106,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   
   // Final plotted series (apply display floor + integrity cleanup)
   const plottedSeries = React.useMemo(() => {
-    // REW mode: use rewModesData.data directly (no conditional gating)
-    if (rewStyleMode) {
-      if (rewModesData && Array.isArray(rewModesData.data)) {
-        return rewModesData.data;
-      }
-      return [];
-    }
-    
-    // Non-REW mode: use old logic
-    const baseSeries = displayData;
+    // Select base series
+    const baseSeries = isRewStyle ? rewFinalPlottedSeries : displayData;
 
     // Apply display conditioning (floor only, no clamping)
     const conditioned = applyDisplayConditioningNulls(
@@ -2125,7 +2115,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       rewLockedMin,
       rewLockedMax,
       yAxisLocked,
-      false
+      isRewStyle
     );
 
     // Clean for plotting (sort, deduplicate, ensure strictly increasing)
@@ -2141,8 +2131,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
     return cleaned;
   }, [
-    rewStyleMode,
-    rewModesData,
+    isRewStyle,
+    rewFinalPlottedSeries,
     displayData,
     rewLockedMin,
     rewLockedMax,
@@ -4469,12 +4459,6 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 <div className="text-[10px] font-mono opacity-80">
                   <strong>Lowest axial:</strong> {Number.isFinite(safeDebug?.lowestAxialHz) ? safeDebug.lowestAxialHz.toFixed(1) : '—'} Hz
                 </div>
-                {safeDebug?.sbirNullPrediction && (
-                  <div className="text-[10px] font-mono opacity-80 bg-red-100 px-1 rounded">
-                    <strong>SBIR null predicted:</strong> {Number.isFinite(safeDebug.sbirNullPrediction.nullHz) ? safeDebug.sbirNullPrediction.nullHz.toFixed(1) : '—'} Hz
-                    (direct={safeDebug.sbirNullPrediction.directM.toFixed(3)}m, reflected={safeDebug.sbirNullPrediction.reflectedM.toFixed(3)}m, Δ={safeDebug.sbirNullPrediction.deltaM.toFixed(3)}m)
-                  </div>
-                )}
                 {safeDebug?.modeCouplingSanity && (
                   <div className="text-[10px] font-mono opacity-80 bg-yellow-100 px-1 rounded">
                     <strong>ModeCoupling (1,0,0):</strong> seat={fmtFixed(safeDebug.modeCouplingSanity.seatShape_100, 3)} src={fmtFixed(safeDebug.modeCouplingSanity.srcShape_100, 3)} cpl={fmtFixed(safeDebug.modeCouplingSanity.coupling_100, 3)}
