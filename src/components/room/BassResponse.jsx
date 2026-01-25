@@ -1699,6 +1699,10 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
 
+  // Safe versions with fallback to prevent crashes
+  const safeRewModesData = rewModesData || lastGoodRewModesAbsRef.current || { data: [], debug: {} };
+  const safeRewRoomPlusProductData = rewRoomPlusProductData || lastGoodRewRoomPlusAbsRef.current || { data: [], debug: {} };
+
   // REW graph source → dataset.data (already in chart format)
   const responseDataRew = useMemo(() => {
     const d = rewModesData?.data;
@@ -1713,7 +1717,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const responseData = rewStyleMode ? responseDataRew : responseDataNonRew;
 
   // Safe debug object for downstream panels (never crashes)
-  const safeGraphDebug = (rewStyleMode ? rewModesData?.debug : null) || {};
+  const safeGraphDebug = (rewStyleMode ? safeRewModesData?.debug : null) || {};
 
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
   const activeDebug = useMemo(() => {
