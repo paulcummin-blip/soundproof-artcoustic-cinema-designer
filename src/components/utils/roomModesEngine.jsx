@@ -3,6 +3,7 @@
 // Uses rectangular room normal modes with source/receiver spatial coupling
 
 const SPEED_OF_SOUND = 343; // m/s
+const C_MPS = 343; // Reference speed of sound
 const SPATIAL_AVG_RADIUS_M = 0.10; // REW-style mic/source spatial averaging (10cm)
 
 // Helper to compute peak/dip/delta for a given frequency band
@@ -236,7 +237,7 @@ export function computeRoomModesResponse({
   const autoLevelEnabled = rewParityMode ? (autoLevelToMLP ?? true) : false;
   
   const { widthM, lengthM, heightM } = room;
-  
+
   // Safe guard: ensure dimensions are valid
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM) || 
       widthM <= 0 || lengthM <= 0 || heightM <= 0) {
@@ -249,8 +250,19 @@ export function computeRoomModesResponse({
       } 
     };
   }
-  
+
   const volume = widthM * lengthM * heightM;
+
+  // Speed of sound used in calculations
+  const cActual = Number(c) || C_MPS;
+
+  // Compute axial fundamentals for debug alignment
+  const axialFundamentals = {
+    fL: cActual / (2 * lengthM),
+    fW: cActual / (2 * widthM),
+    fH: cActual / (2 * heightM),
+  };
+  const lowestAxialHz = Math.min(axialFundamentals.fL, axialFundamentals.fW, axialFundamentals.fH);
   
   // Compute Schroeder frequency
   const rt60 = 0.4;
@@ -1846,6 +1858,10 @@ export function computeRoomModesResponse({
     coherentRawDb: rawCoherentDb,
     engineTrace: engineTraceFinal,
     debug: {
+      cMpsUsed: cActual,
+      roomDimsUsed: { widthM, lengthM, heightM },
+      axialFundamentals,
+      lowestAxialHz,
       schroederHz: Number.isFinite(schroederHz) ? schroederHz : 0,
       modeMarkersHz,
       modeMarkersAllHz,

@@ -1677,16 +1677,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const rewModesData = rewRelativeView ? rewModesDataRel : rewModesDataAbs;
   const rewRoomPlusProductData = rewRelativeView ? rewRoomPlusProductDataRel : rewRoomPlusProductDataAbs;
   
-  // UI safety: REW datasets must never be null/undefined (prevents graph blanking)
-  const safeRewModesData =
-    rewModesData && Array.isArray(rewModesData.data)
-      ? rewModesData
-      : (lastGoodRewModesAbsRef.current || { data: [], debug: { note: "safe-fallback-room-only" } });
+  // Safe series wrapper: ensure graph always gets valid arrays (prevents blank graph + TDZ errors)
+  const safeSeries = (s) => ({
+    freqs: Array.isArray(s?.freqs) ? s.freqs : [],
+    splDb: Array.isArray(s?.splDb) ? s.splDb : [],
+    plottedDb: Array.isArray(s?.plottedDb) ? s.plottedDb : null,
+    debug: s?.debug && typeof s.debug === "object" ? s.debug : {},
+  });
 
-  const safeRewRoomPlusProductData =
-    rewRoomPlusProductData && Array.isArray(rewRoomPlusProductData.data)
-      ? rewRoomPlusProductData
-      : (lastGoodRewRoomPlusAbsRef.current || { data: [], debug: { note: "safe-fallback-room+product" } });
+  const safeRewModesData = safeSeries(rewModesData);
+  const safeRoomModesData = safeSeries(roomModesData);
 
   // Single activeDebug definition (prevents duplicate logic and ensures correct engine state visibility)
   const activeDebug = useMemo(() => {
@@ -4766,6 +4766,71 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
               </Label>
             </div>
 
+            {/* Modal Alignment Debug */}
+            {rewStyleMode && (() => {
+              const w = Number(roomDims?.widthM);
+              const l = Number(roomDims?.lengthM);
+              const h = Number(roomDims?.heightM);
+
+              if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h))) return null;
+
+              const seriesForGraph = rewStyleMode ? safeRewModesData : safeRoomModesData;
+              const dbg = seriesForGraph?.debug && typeof seriesForGraph.debug === "object"
+                ? seriesForGraph.debug
+                : {};
+
+              const c = Number(dbg.cMpsUsed) || 343;
+
+              const fL_expected = c / (2 * l);
+              const fW_expected = c / (2 * w);
+              const fH_expected = c / (2 * h);
+
+              const expectedLowest = Math.min(fL_expected, fW_expected, fH_expected);
+
+              const engineLowestAxial = Number(dbg.lowestAxialHz);
+              const aligned = Number.isFinite(engineLowestAxial) && Math.abs(engineLowestAxial - expectedLowest) < 0.5;
+
+              const engineAxialFundamentals = dbg.axialFundamentals && typeof dbg.axialFundamentals === "object"
+                ? dbg.axialFundamentals
+                : null;
+
+              return (
+                <div className="text-xs mb-2 bg-cyan-50 p-2 rounded border border-cyan-400">
+                  <div className="font-semibold mb-1 text-cyan-700">🔬 Modal Alignment Debug</div>
+                  <div className="text-[10px] font-mono space-y-0.5">
+                    <div><strong>Room dims:</strong> {w.toFixed(2)}×{l.toFixed(2)}×{h.toFixed(2)} m</div>
+                    <div><strong>Speed of sound (c):</strong> {c.toFixed(1)} m/s</div>
+
+                    <div className="mt-1 pt-1 border-t border-cyan-300 font-semibold">Expected axial fundamentals:</div>
+                    <div className="pl-2">
+                      <div>fL (length): {fL_expected.toFixed(2)} Hz</div>
+                      <div>fW (width): {fW_expected.toFixed(2)} Hz</div>
+                      <div>fH (height): {fH_expected.toFixed(2)} Hz</div>
+                      <div className="font-bold text-cyan-800">Lowest: {expectedLowest.toFixed(2)} Hz</div>
+                    </div>
+
+                    <div className="mt-1 pt-1 border-t border-cyan-300">
+                      <strong>Engine lowest axial:</strong> {Number.isFinite(engineLowestAxial) ? engineLowestAxial.toFixed(2) : "N/A"} Hz
+                    </div>
+
+                    {engineAxialFundamentals && (
+                      <div className="pl-2 text-[9px] opacity-70">
+                        Engine fundamentals: fL={Number(engineAxialFundamentals.fL)?.toFixed?.(2) ?? "N/A"},
+                        fW={Number(engineAxialFundamentals.fW)?.toFixed?.(2) ?? "N/A"},
+                        fH={Number(engineAxialFundamentals.fH)?.toFixed?.(2) ?? "N/A"}
+                      </div>
+                    )}
+
+                    <div className={`mt-1 pt-1 border-t border-cyan-300 font-semibold ${aligned ? "text-green-600" : "text-red-600"}`}>
+                      {aligned
+                        ? "✓ OK: within ±0.5 Hz"
+                        : `✗ MISMATCH: expected ${expectedLowest.toFixed(1)}, engine says ${Number.isFinite(engineLowestAxial) ? engineLowestAxial.toFixed(1) : "N/A"} → check c/dims/units`}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Live state readout (audit) */}
             <div className="text-[9px] font-mono bg-yellow-50 p-1 rounded border border-yellow-300 mt-2">
               <strong>Live State:</strong> componentView={componentView} | rewView={rewView} | engineCalls={engineCallCountRef.current} | dataset={rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'} | timeAlign={rewTimeAlign ? 'ON' : 'OFF'} | smoothingSelected={rewSmoothing} | smoothingPassedToEngine={graphSmoothing}
@@ -4776,7 +4841,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
                 })()} | sbir={(() => {
                   const wantSBIR = rewSbirEnabled && componentView !== 'modalOnly';
                   return wantSBIR ? 'ON' : 'OFF';
-                })()} | dragging={isDraggingSub ? 'YES' : 'NO'} | sbirPathsUsed={safeDebug?.sbirDebugProbe40Hz?.pathsUsed || safeDebug?.sbirDebugProbe63Hz?.pathsUsed || 0}
+                })()} | dragging={isDraggingSub ? 'YES' : 'NO'} | sbirPathsUsed={(rewStyleMode ? safeRewModesData.debug : safeRoomModesData.debug)?.sbirDebugProbe40Hz?.pathsUsed || (rewStyleMode ? safeRewModesData.debug : safeRoomModesData.debug)?.sbirDebugProbe63Hz?.pathsUsed || 0}
               </div>
             </div>
           </div>
