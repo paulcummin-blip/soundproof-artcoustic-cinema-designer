@@ -41,13 +41,13 @@ export function alignSubsToRSP(sources, rspPosition) {
     };
   });
 
-  // Find earliest arrival (shortest distance)
-  const minArrivalTime = Math.min(...subDistances.map(s => s.arrivalTime));
+  // Find furthest sub (latest arrival) - REW-standard alignment
+  const maxArrivalTime = Math.max(...subDistances.map(s => s.arrivalTime));
 
-  // Apply alignment delays
+  // Apply alignment delays (delay closer subs to match the furthest)
   return subDistances.map(({ sub, arrivalTime }) => {
     const userDelayMs = sub.tuning?.delayMs || 0;
-    const alignmentDelayMs = (arrivalTime - minArrivalTime) * 1000;
+    const alignmentDelayMs = (maxArrivalTime - arrivalTime) * 1000;
     
     return {
       ...sub,
