@@ -4847,6 +4847,63 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
+        {/* Modal Alignment Debug (frequency accuracy check) */}
+        {rewStyleMode && (() => {
+          const w = roomDims?.widthM;
+          const l = roomDims?.lengthM;
+          const h = roomDims?.heightM;
+          
+          if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h))) {
+            return null;
+          }
+          
+          const c = safeDebug?.cMpsUsed || 343;
+          const fL_expected = c / (2 * l);
+          const fW_expected = c / (2 * w);
+          const fH_expected = c / (2 * h);
+          
+          const engineLowestAxial = safeDebug?.lowestAxialHz;
+          const engineAxialFundamentals = safeDebug?.axialFundamentals;
+          
+          // Find which fundamental should be lowest
+          const expectedLowest = Math.min(fL_expected, fW_expected, fH_expected);
+          
+          // Check alignment
+          const aligned = engineLowestAxial && Math.abs(engineLowestAxial - expectedLowest) < 0.5;
+          
+          return (
+            <div className="text-xs mb-2 bg-cyan-50 p-2 rounded border border-cyan-400">
+              <div className="font-semibold mb-1 text-cyan-700">🔬 Modal Alignment Debug</div>
+              <div className="text-[10px] font-mono space-y-0.5">
+                <div><strong>Room dims (engine):</strong> {w.toFixed(2)}×{l.toFixed(2)}×{h.toFixed(2)} m</div>
+                <div><strong>Speed of sound (c):</strong> {c.toFixed(1)} m/s</div>
+                <div className="mt-1 pt-1 border-t border-cyan-300 font-semibold">Expected axial fundamentals:</div>
+                <div className="pl-2">
+                  <div>fL (length): {fL_expected.toFixed(2)} Hz</div>
+                  <div>fW (width): {fW_expected.toFixed(2)} Hz</div>
+                  <div>fH (height): {fH_expected.toFixed(2)} Hz</div>
+                  <div className="font-bold text-cyan-800">Lowest: {expectedLowest.toFixed(2)} Hz</div>
+                </div>
+                <div className="mt-1 pt-1 border-t border-cyan-300">
+                  <strong>Engine lowest axial:</strong> {Number.isFinite(engineLowestAxial) ? engineLowestAxial.toFixed(2) : 'N/A'} Hz
+                </div>
+                {engineAxialFundamentals && (
+                  <div className="pl-2 text-[9px] opacity-70">
+                    Engine fundamentals: fL={engineAxialFundamentals.fL?.toFixed(2) || 'N/A'}, 
+                    fW={engineAxialFundamentals.fW?.toFixed(2) || 'N/A'}, 
+                    fH={engineAxialFundamentals.fH?.toFixed(2) || 'N/A'}
+                  </div>
+                )}
+                <div className={`mt-1 pt-1 border-t border-cyan-300 font-semibold ${aligned ? 'text-green-600' : 'text-red-600'}`}>
+                  {aligned 
+                    ? `✓ OK: within ±0.5 Hz` 
+                    : `✗ MISMATCH: expected ${expectedLowest.toFixed(1)}, engine says ${(engineLowestAxial || 0).toFixed(1)} → check units/speed-of-sound/dims`}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Parity Audit Readout (raw coherent vs final plotted) */}
         {rewStyleMode && safeDebug?.parityAudits?.modalPlusSbir && (() => {
           const audit = safeDebug.parityAudits.modalPlusSbir;
