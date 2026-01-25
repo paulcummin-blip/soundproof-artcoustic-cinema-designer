@@ -2,8 +2,7 @@
 // REW-parity room modes calculator for bass response
 // Uses rectangular room normal modes with source/receiver spatial coupling
 
-const C_MPS = 343; // m/s - canonical speed of sound (all calculations must use this)
-const SPEED_OF_SOUND = C_MPS; // Legacy alias for compatibility
+const SPEED_OF_SOUND = 343; // m/s
 const SPATIAL_AVG_RADIUS_M = 0.10; // REW-style mic/source spatial averaging (10cm)
 
 // Helper to compute peak/dip/delta for a given frequency band
@@ -119,9 +118,6 @@ export function computeRoomModesResponse({
     lengthM: roomDims.lengthM, 
     heightM: roomDims.heightM 
   } : null;
-
-  // Canonical speed of sound (must match mode calculations)
-  const cActual = c || C_MPS;
   
   const seat = seatPosition ? { 
     x: seatPosition.x, 
@@ -240,7 +236,7 @@ export function computeRoomModesResponse({
   const autoLevelEnabled = rewParityMode ? (autoLevelToMLP ?? true) : false;
   
   const { widthM, lengthM, heightM } = room;
-
+  
   // Safe guard: ensure dimensions are valid
   if (!Number.isFinite(widthM) || !Number.isFinite(lengthM) || !Number.isFinite(heightM) || 
       widthM <= 0 || lengthM <= 0 || heightM <= 0) {
@@ -249,19 +245,13 @@ export function computeRoomModesResponse({
       splDb: [], 
       debug: { 
         error: "Invalid room dimensions",
-        roomDims: { widthM, lengthM, heightM },
-        cMpsUsed: cActual
+        roomDims: { widthM, lengthM, heightM }
       } 
     };
   }
-
+  
   const volume = widthM * lengthM * heightM;
-
-  // Compute axial fundamentals for debug (must match mode calculations exactly)
-  const fL_axial = cActual / (2 * lengthM);
-  const fW_axial = cActual / (2 * widthM);
-  const fH_axial = cActual / (2 * heightM);
-
+  
   // Compute Schroeder frequency
   const rt60 = 0.4;
   const schroederHz = volume > 0 ? 2000 * Math.sqrt(rt60 / volume) : 80;
@@ -272,22 +262,10 @@ export function computeRoomModesResponse({
   // During drag: use lower resolution for fast preview
   const effectivePPO = Number.isFinite(pointsPerOct) ? pointsPerOct : 24;
 
-  let freqs =
+  const freqs =
     (rewParityMode && !isDragging)
       ? generateLogFrequencyAxis(fMin, fMax, 540) // High-res for stable view
       : generateLogFrequencyAxis(fMin, fMax, isDragging ? Math.max(20, effectivePPO) : effectivePPO); // Lower res for drag or default
-
-  // REW parity: merge exact mode frequencies into grid (prevents feature drift)
-  if ((rewParityMode || rewStrictParity) && modes.length > 0) {
-    const modeFreqs = modes
-      .map(m => m.freq)
-      .filter(f => Number.isFinite(f) && f >= fMin && f <= fMax);
-
-    // Merge with existing grid
-    const combined = [...freqs, ...modeFreqs];
-    const unique = Array.from(new Set(combined));
-    freqs = unique.sort((a, b) => a - b);
-  }
   
   // Detect product curve type and extract reference SPL
   const subProductMeta = productCurves ? productCurves.map((curve, idx) => {
@@ -334,13 +312,13 @@ export function computeRoomModesResponse({
   }) : null;
 
   
-  // Compute room modes (use canonical speed of sound)
+  // Compute room modes
   let modes = computeRoomModes({
     widthM,
     lengthM,
     heightM,
     fMax: modeLimitHz,
-    c: cActual,
+    c,
     includeAxial: includeAxialLocal,
     includeTangential: includeTangentialLocal,
     includeOblique: includeObliqueLocal
@@ -962,12 +940,8 @@ export function computeRoomModesResponse({
 
     // COHERENT PRESSURE RAW: Pure complex magnitude (no processing)
     // This is the REFERENCE PHYSICS - position-dependent nulls come from here
-
-    // REW Strict Parity: add measurement realism floor (prevents infinitely deep nulls)
-    // Real measurements have noise/leakage - perfect coherent cancellation is theoretical only
-    const measurementFloorLinear = rewStrictParity ? 1e-6 : 0; // -120 dB equivalent
-    const coherentMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total + measurementFloorLinear * measurementFloorLinear);
-
+    const coherentMag = Math.sqrt(sumRe_total * sumRe_total + sumIm_total * sumIm_total);
+    
     // --- LF debug: avoid Number.EPSILON quantising tiny magnitudes to ~-313 dB ---
     // Use a deterministic, human-scale dB floor instead, and expose the linear magnitude.
     // This does NOT change the underlying physics; it only changes how we convert near-zero
@@ -1822,13 +1796,6 @@ export function computeRoomModesResponse({
   const safeFinalDb = Array.isArray(finalDb) && finalDb.length > 0 ? finalDb : (Array.isArray(splDb) ? splDb : []);
   const safePlottedDbRaw = Array.isArray(plottedDb) && plottedDb.length > 0 ? plottedDb : safeFinalDb;
 
-  // Modal alignment debug payload
-  const axialFundamentals = {
-    fL: fL_axial,
-    fW: fW_axial,
-    fH: fH_axial
-  };
-
   // Apply display-only offset ONLY for REW parity + Relative view
   const safeDisplayDb = (rewParityMode && isRelative)
     ? safeFinalDb.map(v => (Number.isFinite(v) ? (v + displayOffsetDb) : v))
@@ -1879,9 +1846,6 @@ export function computeRoomModesResponse({
     coherentRawDb: rawCoherentDb,
     engineTrace: engineTraceFinal,
     debug: {
-      cMpsUsed: cActual,
-      roomDimsUsed: { widthM, lengthM, heightM },
-      axialFundamentals,
       schroederHz: Number.isFinite(schroederHz) ? schroederHz : 0,
       modeMarkersHz,
       modeMarkersAllHz,
@@ -2495,12 +2459,9 @@ function computeRoomModes({
   includeOblique
 }) {
   const modes = [];
-
-  // Use canonical speed of sound if not provided
-  const cUsed = c || C_MPS;
-
+  
   // Maximum mode indices
-  const nMax = Math.ceil((fMax / cUsed) * 2 * Math.max(widthM, lengthM, heightM)) + 5;
+  const nMax = Math.ceil((fMax / c) * 2 * Math.max(widthM, lengthM, heightM)) + 5;
   
   for (let nx = 0; nx <= nMax; nx++) {
     for (let ny = 0; ny <= nMax; ny++) {
@@ -2509,7 +2470,7 @@ function computeRoomModes({
         if (nx === 0 && ny === 0 && nz === 0) continue;
         
         // Modal frequency: f = (c/2) * sqrt( (nx/Lx)^2 + (ny/Ly)^2 + (nz/Lz)^2 )
-        const freq = (cUsed / 2) * Math.sqrt(
+        const freq = (c / 2) * Math.sqrt(
           Math.pow(nx / widthM, 2) +
           Math.pow(ny / lengthM, 2) +
           Math.pow(nz / heightM, 2)
