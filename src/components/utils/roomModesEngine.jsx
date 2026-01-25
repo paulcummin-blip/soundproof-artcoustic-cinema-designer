@@ -1081,10 +1081,6 @@ export function computeRoomModesResponse({
   // REW parity: NO coherence loss (keep pure modal/SBIR summation at all frequencies)
   const splDbForPipeline = splDb;
   const coherenceLossApplied = false;
-
-  // NO Schroeder blend (REW parity: always bypass)
-  const splDbSchroeder = splDbForPipeline;
-  
   
   // Compute RMS for component magnitudes (20-200 Hz band) - CORRECTED: linear domain
   const computeRmsDb = (magLinearArray, freqsArr) => {
@@ -1162,25 +1158,18 @@ export function computeRoomModesResponse({
     }
   }
 
-  // PRESSURE REGION SUPPORT: FULLY DISABLED (REW parity)
-  // REW's Room Simulator does not apply artificial pressure-zone boost
-  // Kept for future reference only - all gain values set to zero
+  // NO Schroeder blend (REW parity: always bypass)
+  const splDbSchroeder = splDbForPipeline;
 
-    // REW parity: NO Schroeder blend (keep raw modal response at all frequencies)
-    const splDbSchroeder = splDbForPipeline;
+  // Capture RAW stats BEFORE any processing (critical for debugging)
+  const rawFinite = splDbSchroeder.filter(v => isFinite(v));
+  const rawMin = rawFinite.length > 0 ? Math.min(...rawFinite) : 0;
+  const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;
+  const rawRange = rawMax - rawMin;
 
-    // AUDIT CHECKPOINT: Schroeder blend should preserve nulls below 1.0×Schroeder
-        // If you're seeing nulls get filled in, the blend logic above is broken
-
-        // Capture RAW stats BEFORE any processing (critical for debugging)
-    const rawFinite = splDbSchroeder.filter(v => isFinite(v));
-    const rawMin = rawFinite.length > 0 ? Math.min(...rawFinite) : 0;
-    const rawMax = rawFinite.length > 0 ? Math.max(...rawFinite) : 0;
-    const rawRange = rawMax - rawMin;
-
-    // NO null repair (REW parity: always preserve deep nulls)
-    const splDbRepaired = splDbSchroeder.map(v => isFinite(v) ? v : null);
-    const nonFiniteRepaired = splDbSchroeder.filter(v => !isFinite(v)).length;
+  // NO null repair (REW parity: always preserve deep nulls)
+  const splDbRepaired = splDbSchroeder.map(v => isFinite(v) ? v : null);
+  const nonFiniteRepaired = splDbSchroeder.filter(v => !isFinite(v)).length;
   
 
   // Capture pre-normalization stats (after repair, before smoothing/norm)
