@@ -95,115 +95,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   const [hasAutoAlignedFront, setHasAutoAlignedFront] = useState(false);
   const [hasAutoAlignedRear, setHasAutoAlignedRear] = useState(false);
   
-  // Load SBIR and Room Modes from localStorage (default ON)
-  const [modesEnabled, setModesEnabled] = useState(() => {
-    if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem('b44_bass_modesEnabled');
-      if (saved !== null) return saved === 'true';
-    }
-    return true; // Default ON
-  });
-  
-  const [rewSbirEnabled, setRewSbirEnabled] = useState(() => {
-    if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem('b44_bass_sbirEnabled');
-      if (saved !== null) return saved === 'true';
-    }
-    return true; // Default ON
-  });
-  
+  // Simplified state: only absorption control
+  const [absorptionPct, setAbsorptionPct] = useState(30); // 0-100%
   const [roomDamping, setRoomDamping] = useState(20);
-  const [showModeMarkers, setShowModeMarkers] = useState(false);
-  const [rewStyleMode, setRewStyleMode] = useState(true);
-  const [rewSmoothing, setRewSmoothing] = useState('none'); // Default: no smoothing for raw view
-  const [showRewModeLines, setShowRewModeLines] = useState(true);
-  const [linearHzAxis, setLinearHzAxis] = useState(false);
-  const [rewView, setRewView] = useState('roomOnly'); // 'roomOnly' | 'roomPlusProduct'
-  const [rewRelativeView, setRewRelativeView] = useState(false); // Normalize toggle
-  const [yAxisLocked, setYAxisLocked] = useState(true);
-  const [yAxisDomain, setYAxisDomain] = useState(null);
-  const [scaleEpoch, setScaleEpoch] = useState(0);
-  const [rewCompareView, setRewCompareView] = useState(false); // REW Compare View toggle
-  const [rewDisplayRefDb, setRewDisplayRefDb] = useState(90); // REW display reference level (dB)
-  const [seatNudgeTest, setSeatNudgeTest] = useState(false); // Diagnostic seat nudge
-  const [modalOnlyDebugView, setModalOnlyDebugView] = useState(false); // Modal-only debug view (no SBIR, no smoothing)
-  const [rewPlotSeries, setRewPlotSeries] = useState('DISPLAY'); // 'RAW' | 'ENGINE' | 'DISPLAY'
-  const [auditUiEnabled, setAuditUiEnabled] = useState(
-    typeof globalThis !== 'undefined' && globalThis.__B44_BASS_AUDIT === true
-  ); // Bass audit UI visibility
-  const [auditEpoch, setAuditEpoch] = useState(0); // Force re-simulation when audit toggled
-  const [modalProbeEnabled, setModalProbeEnabled] = useState(false); // Modal Probe toggle
-  const [debugDisableSealedGain, setDebugDisableSealedGain] = useState(false); // Debug: disable sealed-room LF gain
-  const [debugDisableNullRepair, setDebugDisableNullRepair] = useState(false); // Debug: disable null repair/fill
-  const [rewStrictParity, setRewStrictParity] = useState(false); // REW Strict: disable all presentation shapers
 
   // Drag performance tracking
   const [isDraggingSub, setIsDraggingSub] = useState(false);
-  const dragIdleTimerRef = useRef(null);
-  const dragThrottleTimerRef = useRef(null);
-  const dragSettleTimerRef = useRef(null);
-  const lastDragUpdateRef = useRef(0);
-  const calcEpochRef = useRef(0); // Request cancellation
-  const yDomainBeforeDragRef = useRef(null);
-  const yDomainDuringDragRef = React.useRef(null);
-  const [dragYDomain, setDragYDomain] = React.useState(null);
-  
-  // UI safety: never let REW datasets become null (prevents "No graph data yet")
-  const lastGoodRewModesAbsRef = React.useRef({ data: [], debug: { note: "init" } });
-  const lastGoodRewRoomPlusAbsRef = React.useRef({ data: [], debug: { note: "init" } });
-  
-  // Force re-sim key that ACTUALLY triggers re-render (ref.current does not)
-  const [calcEpoch, setCalcEpoch] = useState(0);
-  
-  // Preview positions captured during drag (throttled)
-  const previewFrontSubsRef = useRef(null);
-  const previewRearSubsRef = useRef(null);
-  
-  // Draft vs committed positions (freeze simulation during drag)
-  const [committedFrontSubs, setCommittedFrontSubs] = useState(null);
-  const [committedRearSubs, setCommittedRearSubs] = useState(null);
   const lastStablePlotRef = useRef(null);
-  
-  // Sensitivity audit refs (track previous run)
-  const prevSourceSigRef = useRef(null);
-  const prevFinalDbRef = useRef(null);
-  const prevFreqsRef = useRef(null);
-  const prevCouplingRef = useRef(null);
-
-  // REW failure cache (prevent same-input errors from looping)
-  const lastRewFailSigRef = useRef(null);
-  const lastRewFailResultRef = useRef(null);
-  
-  // REW bounce detector (track stable run key to prevent unnecessary reruns)
-  const lastRewRunKeyRef = useRef("");
-  
-  // Throttled debug state (prevent jumping during drag)
-  const lastStableDebugRef = useRef(null);
-  const lastDebugUpdateTimeRef = useRef(0);
-  const isDraggingRef = useRef(false);
-  
-  // REW Compare baseline snapshot (captured once when Compare View is enabled)
-  const rewCompareBaselineRef = useRef(null);
-  
-  // Per-mode excitation tracking (Part G - diagnostic overlay)
-  const lastModeExcitationsRef = useRef(null);
-  const [showModeExcitationDiag, setShowModeExcitationDiag] = useState(false);
-  
-  // Mode isolation toggle (Part H - single mode test harness)
-  const [modeIsolation, setModeIsolation] = useState('off'); // 'off' | '1,0,0' | '0,1,0' | '0,0,1'
-  
-  // Complex eigenfunctions toggle (Part H3 - REW parity phase behaviour)
-  const [complexEigenfunctions, setComplexEigenfunctions] = useState(false);
-  
-  // Coupling phase probe (Part HB - verify complex eigenfunctions are active)
-  const [couplingProbeMode, setCouplingProbeMode] = useState('auto'); // 'auto' or '1,0,0' etc
-  const [couplingProbeUseComplex, setCouplingProbeUseComplex] = useState(false);
-  
-  // REW-style time alignment (align all subs to MLP arrival time)
-  const [rewTimeAlign, setRewTimeAlign] = useState(false);
-  
-  // SBIR single-reflection diagnostic (63 Hz null test)
-  const [sbirDebugSingleFrontWall, setSbirDebugSingleFrontWall] = useState(false);
 
   // --- Auto-align loop guards (refs + signatures)
   const frontCfgRef = React.useRef(null);
@@ -234,51 +132,22 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
   // User's smoothing choice tracking (for restore after Compare View)
   const lastUserSmoothingRef = useRef(rewSmoothing);
 
-  // Graph smoothing used for the plotted dataset (REW Compare can force display without mutating the user's choice)
-  // MUST be defined AFTER rewSmoothing state declaration
-  const graphSmoothing = rewCompareView ? "1/3" : rewSmoothing;
+  // Convert absorption % to coefficient (0-1)
+  const absorptionCoeff = Math.max(0, Math.min(1, absorptionPct / 100));
+  const surfaceAbsorption = {
+    front: absorptionCoeff,
+    back: absorptionCoeff,
+    left: absorptionCoeff,
+    right: absorptionCoeff,
+    ceiling: absorptionCoeff,
+    floor: absorptionCoeff
+  };
 
   // Keep refs current with latest state
   React.useEffect(() => { frontCfgRef.current = frontSubsCfg; }, [frontSubsCfg]);
   React.useEffect(() => { rearCfgRef.current = rearSubsCfg; }, [rearSubsCfg]);
   React.useEffect(() => { roomDimsRef.current = roomDims; }, [roomDims]);
   React.useEffect(() => { seatingRef.current = seatingPositions; }, [seatingPositions]);
-
-  // Track user's smoothing choice when Compare View is OFF
-  useEffect(() => {
-    if (!rewCompareView) {
-      lastUserSmoothingRef.current = rewSmoothing;
-    }
-  }, [rewCompareView, rewSmoothing]);
-
-  // Bass Audit toggle handler
-  const handleAuditToggle = (enabled) => {
-    if (typeof globalThis !== 'undefined') {
-      globalThis.__B44_BASS_AUDIT = enabled;
-    }
-    setAuditUiEnabled(enabled);
-    setAuditEpoch(v => v + 1); // Force re-simulation
-  };
-
-  // Persist SBIR and Room Modes to localStorage
-  useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('b44_bass_sbirEnabled', String(rewSbirEnabled));
-    }
-  }, [rewSbirEnabled]);
-  
-  useEffect(() => {
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem('b44_bass_modesEnabled', String(modesEnabled));
-    }
-  }, [modesEnabled]);
-  
-  // Auto-enable Lock Y-axis when REW mode is turned ON
-  React.useEffect(() => {
-    if (rewStyleMode) {
-      setYAxisLocked(true);
-    }
-  }, [rewStyleMode]);
 
   // Position signatures to detect in-place array mutations
   const frontLiveSig = useMemo(() => {
@@ -366,22 +235,11 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     roomDims?.heightM,
   ]);
 
-  // Run bass simulation engine
+  // Run bass simulation engine  
   const simulationResults = useMemo(() => {
     if (hasNoSeats || hasNoSubs || !roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
       return { seatResponses: {}, metrics: null, audit: null };
     }
-    
-    // Prepare debugProbe options (use first primary seat, not selectedSeat to avoid circular dep)
-    const probeSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-    const probeSeatId = probeSeat ? (probeSeat.id || `${probeSeat.x}-${probeSeat.y}`) : "MLP";
-    
-    const debugProbeOptions = modalProbeEnabled ? {
-      enabled: true,
-      seatId: probeSeatId,
-      freqsHz: [20, 30, 40, 50, 63, 80, 100],
-      topModes: 8
-    } : null;
     
     return simulateBassAtSeats({
       roomDims: {
@@ -395,18 +253,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         globalPowerW: splConfig?.globalPowerW ?? 100,
         globalEqHeadroomDb: splConfig?.globalEqHeadroomDb ?? 0,
         radiationMode: splConfig?.radiationMode ?? 'half-space',
-        modesEnabled,
+        modesEnabled: true,
         roomDamping,
-        sbirEnabled: rewSbirEnabled
+        sbirEnabled: true
       },
-      options: {
-        debugProbe: debugProbeOptions
-      }
+      options: {}
     });
-  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, modesEnabled, roomDamping, rewSbirEnabled, hasNoSeats, hasNoSubs, auditEpoch, modalProbeEnabled]);
-  
-  const bassAudit = simulationResults.audit || null;
-  const modeProbe = bassAudit?.modeProbe || null;
+  }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, seatingPositions, subsForSimulation, splConfig, roomDamping, hasNoSeats, hasNoSubs]);
 
   // Find MLP seat for display (MUST BE DEFINED BEFORE ANY CODE THAT USES IT)
   const selectedSeat = useMemo(() => {
@@ -434,119 +287,42 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     return null;
   }, [seatingPositions, simulationResults.seatResponses]);
 
-  // Canonical analysis series: ABS + optionally smoothed, no display-only transforms
+  // Canonical analysis series: no smoothing (REW standard)
   const analysisSeriesAbs = useMemo(() => {
     if (!selectedSeat || !selectedSeat.freqsHz || !selectedSeat.splDb) {
       return [];
     }
     
-    // Convert engine output to points
-    const points = selectedSeat.freqsHz.map((frequency, i) => ({
+    // Convert engine output to points (no smoothing)
+    return selectedSeat.freqsHz.map((frequency, i) => ({
       frequency,
       spl: selectedSeat.splDb[i]
     }));
-    
-    // Apply smoothing if enabled (same logic as display smoothing)
-    const shouldSmooth = graphSmoothing && graphSmoothing !== 'none';
-    if (shouldSmooth) {
-      return applyRewStyleDisplaySmoothing(points, graphSmoothing);
-    }
-    
-    return points;
-  }, [selectedSeat, graphSmoothing]);
+  }, [selectedSeat]);
   
-  // Analysis SPL array for metrics (same smoothing as plot base, absolute only)
+  // Analysis SPL array for metrics
   const analysisSplDbAbs = useMemo(() => {
     return analysisSeriesAbs.map(p => p.spl);
   }, [analysisSeriesAbs]);
-  
-  // Dev sanity check (parity verification)
-  useEffect(() => {
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_LOGS) {
-      if (analysisSeriesAbs.length !== (selectedSeat?.freqsHz?.length || 0)) {
-        console.warn('[BASS PARITY CHECK] analysisSeriesAbs length mismatch', {
-          analysis: analysisSeriesAbs.length,
-          engine: selectedSeat?.freqsHz?.length
-        });
-      }
-      
-      const freqMismatch = analysisSeriesAbs.some((p, i) => 
-        selectedSeat?.freqsHz?.[i] && Math.abs(p.frequency - selectedSeat.freqsHz[i]) > 0.01
-      );
-      
-      if (freqMismatch) {
-        console.warn('[BASS PARITY CHECK] Frequency array mismatch detected');
-      }
-    }
-  }, [analysisSeriesAbs, selectedSeat]);
 
-  // Helper: compute axial coupling for sensitivity audit (mode 1,0,0)
-  const computeAxialCoupling = useCallback((source, seat, roomDims) => {
-    const { widthM, lengthM, heightM } = roomDims;
-    
-    // Width axial (nx=1, ny=0, nz=0)
-    const srcShape = Math.cos(1 * Math.PI * source.x / widthM);
-    const rcvShape = Math.cos(1 * Math.PI * seat.x / widthM);
-    const totalCoupling = srcShape * rcvShape;
-    
-    return { 
-      src: srcShape, 
-      rcv: rcvShape, 
-      total: totalCoupling 
-    };
-  }, []);
-
-  // Stable signatures for REW engine dependencies (prevent unnecessary reruns)
-  const stableSeatSig = useMemo(() => {
-    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-    if (!seat) return "";
-    
-    const x = fmtFixed(seat.x, 2, '0');
-    const y = fmtFixed(seat.y, 2, '0');
-    const z = fmtFixed(seat.z ?? 1.2, 2, '1.2');
-    
-    return `${x}_${y}_${z}`;
-  }, [seatingPositions]);
-
-  const stableSubSig = useMemo(() => {
-    if (!subsForSimulation || subsForSimulation.length === 0) return "";
-    
-    return subsForSimulation.map(s => {
-      const x = fmtFixed(s.x, 2, '0');
-      const y = fmtFixed(s.y, 2, '0');
-      const z = fmtFixed(s.z ?? 0, 2, '0');
-      const gainDb = fmtFixed(s.tuning?.gainDb ?? 0, 1, '0');
-      const delayMs = fmtFixed(s.tuning?.delayMs ?? 0, 1, '0');
-      const polarity = s.tuning?.polarity || 'normal';
-      
-      return `${x}_${y}_${z}_g${gainDb}_d${delayMs}_p${polarity}`;
-    }).join('|');
-  }, [subsForSimulation]);
-
-  // --- FORCE-RECOMPUTE KEY (sub movement) ---
-  // We need a stable string that changes when ANY source position/tuning changes.
-  // This prevents useMemo from reusing an old engine result (the "LF locked" symptom).
-  const b44Round = (v) => (Number.isFinite(v) ? Math.round(v * 1000) / 1000 : v);
-
-  const sourcesSig = React.useMemo(() => {
+  // Stable signature for engine dependencies
+  const sourcesSig = useMemo(() => {
     const src = Array.isArray(subsForSimulation) ? subsForSimulation : [];
     return JSON.stringify(
-      src.map((s) => ({
+      src.map(s => ({
         id: s?.id ?? "src",
-        x: b44Round(s?.x),
-        y: b44Round(s?.y),
-        z: b44Round(s?.z),
-        gain: b44Round(s?.tuning?.gainDb),
-        delay: b44Round(s?.tuning?.delayMs),
-        polarity: s?.tuning?.polarity ?? "normal",
+        x: Number.isFinite(s?.x) ? Math.round(s.x * 1000) / 1000 : 0,
+        y: Number.isFinite(s?.y) ? Math.round(s.y * 1000) / 1000 : 0,
+        z: Number.isFinite(s?.z) ? Math.round(s.z * 1000) / 1000 : 0,
+        gain: Number.isFinite(s?.tuning?.gainDb) ? Math.round(s.tuning.gainDb * 10) / 10 : 0,
+        delay: Number.isFinite(s?.tuning?.delayMs) ? Math.round(s.tuning.delayMs * 1000) / 1000 : 0,
+        polarity: s?.tuning?.polarity ?? "normal"
       }))
     );
   }, [subsForSimulation]);
 
-  // Compute REW-style time alignment delays (when enabled)
+  // REW-style time alignment delays (always enabled)
   const rewAlignmentDelays = useMemo(() => {
-    if (!rewStyleMode || !rewTimeAlign) return {};
-    
     const mlpSeat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
     if (!mlpSeat) return {};
     
@@ -554,7 +330,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     const SPEED_OF_SOUND = 343; // m/s
     
     const delays = {};
-    let minArrivalTime = Infinity;
+    let maxArrivalTime = -Infinity;
     
     // First pass: compute arrival times
     const arrivalTimes = {};
@@ -566,168 +342,29 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
       const arrivalTime = distance / SPEED_OF_SOUND;
       
       arrivalTimes[sub.id] = arrivalTime;
-      minArrivalTime = Math.min(minArrivalTime, arrivalTime);
+      maxArrivalTime = Math.max(maxArrivalTime, arrivalTime);
     });
     
-    // Second pass: compute alignment delays (earliest sub = 0ms, others delayed)
+    // Second pass: align to furthest sub (REW standard)
     subsForSimulation.forEach(sub => {
-      const alignDelayMs = (arrivalTimes[sub.id] - minArrivalTime) * 1000;
+      const alignDelayMs = (maxArrivalTime - arrivalTimes[sub.id]) * 1000;
       delays[sub.id] = alignDelayMs;
     });
     
     return delays;
-  }, [rewStyleMode, rewTimeAlign, seatingPositions, subsForSimulation]);
+  }, [seatingPositions, subsForSimulation]);
 
-  // Initialize committed positions from props ONLY on first mount
-  const isInitializedRef = useRef(false);
-  useEffect(() => {
-    if (!isInitializedRef.current) {
-      setCommittedFrontSubs(frontSubsLive);
-      setCommittedRearSubs(rearSubsLive);
-      isInitializedRef.current = true;
-    }
-  }, []);
-  
-  // Update committed positions ONLY when props change while NOT dragging
-  const prevIsDraggingRef = useRef(false);
-  useEffect(() => {
-    const wasDragging = prevIsDraggingRef.current;
-    const isNowDragging = isDraggingSub;
-    
-    // On drag end: commit live positions
-    if (wasDragging && !isNowDragging) {
-      setCommittedFrontSubs(frontSubsLive);
-      setCommittedRearSubs(rearSubsLive);
-    }
-    
-    // While not dragging: track prop changes
-    if (!isNowDragging && !wasDragging) {
-      setCommittedFrontSubs(frontSubsLive);
-      setCommittedRearSubs(rearSubsLive);
-    }
-    
-    prevIsDraggingRef.current = isNowDragging;
-  }, [frontSubsLive, rearSubsLive, isDraggingSub]);
-  
-  // Expose drag state controls to parent (if needed)
+  // Expose drag state to parent
   useEffect(() => {
     if (typeof window !== 'undefined') {
       window.__B44_setIsDraggingSub = (dragging) => {
-        // Throttle drag updates to 50ms (20 fps max)
-        const now = Date.now();
-        const timeSinceLastUpdate = now - lastDragUpdateRef.current;
-        
-        if (dragging) {
-          // DRAG START: capture a stable Y domain synchronously (must happen BEFORE setIsDraggingSub(true))
-          if (!isDraggingSub) {
-            // If axis is locked in REW mode, use the locked ±30 dB window (REW-like)
-            if (rewStyleMode && yAxisLocked && Number.isFinite(rewDisplayRefDb)) {
-              const domain = [rewDisplayRefDb - 30, rewDisplayRefDb + 30];
-              yDomainDuringDragRef.current = domain;
-              setDragYDomain(domain);
-            } else {
-              // Otherwise capture from last stable plotted series (most stable visual result)
-              const series = lastStablePlotRef.current;
-              if (Array.isArray(series) && series.length > 0) {
-                const vals = series
-                  .map(p => p?.spl)
-                  .filter(v => typeof v === "number" && Number.isFinite(v));
-
-                if (vals.length > 0) {
-                  const min = Math.min(...vals);
-                  const max = Math.max(...vals);
-
-                  const rawMin = min - 5;
-                  const rawMax = max + 5;
-                  const span = rawMax - rawMin;
-                  const step = span <= 30 ? 5 : (span <= 60 ? 10 : 20);
-
-                  const snappedMin = Math.floor(rawMin / step) * step;
-                  const snappedMax = Math.ceil(rawMax / step) * step;
-
-                  const domain = [snappedMin, snappedMax];
-                  yDomainDuringDragRef.current = domain;
-                  setDragYDomain(domain);
-                } else {
-                  const domain = [60, 120];
-                  yDomainDuringDragRef.current = domain;
-                  setDragYDomain(domain);
-                }
-              } else {
-                const domain = [60, 120];
-                yDomainDuringDragRef.current = domain;
-                setDragYDomain(domain);
-              }
-            }
-          }
-          
-          // Throttle drag updates
-          if (timeSinceLastUpdate < 50) {
-            // Too soon — schedule one trailing update if not already scheduled
-            if (!dragThrottleTimerRef.current) {
-              const wait = Math.max(0, 50 - timeSinceLastUpdate);
-              dragThrottleTimerRef.current = setTimeout(() => {
-                dragThrottleTimerRef.current = null;
-                lastDragUpdateRef.current = Date.now();
-
-                previewFrontSubsRef.current = frontSubsLive;
-                previewRearSubsRef.current = rearSubsLive;
-
-                // preview recompute tick
-                setCalcEpoch(v => v + 1);
-              }, wait);
-            }
-            return;
-          }
-          
-          lastDragUpdateRef.current = now;
-          setIsDraggingSub(true);
-          
-          // Capture latest live positions for preview (no heavy sim yet)
-          previewFrontSubsRef.current = frontSubsLive;
-          previewRearSubsRef.current = rearSubsLive;
-          
-          // Trigger a preview recompute (cheap profile because isDraggingSub = true)
-          setCalcEpoch(v => v + 1);
-          
-          // Clear settle timer if user starts dragging again
-          if (dragSettleTimerRef.current) {
-            clearTimeout(dragSettleTimerRef.current);
-            dragSettleTimerRef.current = null;
-          }
-        } else {
-          // Drag end: start settle timer for full simulation
-          setIsDraggingSub(false);
-          yDomainDuringDragRef.current = null;
-          setDragYDomain(null);
-          
-          // Clear any pending throttle timers
-          if (dragThrottleTimerRef.current) {
-            clearTimeout(dragThrottleTimerRef.current);
-            dragThrottleTimerRef.current = null;
-          }
-          
-          // Wait 250ms for positions to settle, then run full sim
-          dragSettleTimerRef.current = setTimeout(() => {
-            previewFrontSubsRef.current = null;
-            previewRearSubsRef.current = null;
-            
-            setCalcEpoch(v => v + 1); // Force full-quality recalc (real render)
-          }, 250);
-        }
+        setIsDraggingSub(dragging);
       };
     }
-    
-    return () => {
-      if (dragIdleTimerRef.current) clearTimeout(dragIdleTimerRef.current);
-      if (dragThrottleTimerRef.current) clearTimeout(dragThrottleTimerRef.current);
-      if (dragSettleTimerRef.current) clearTimeout(dragSettleTimerRef.current);
-    };
-  }, [isDraggingSub, yAxisLocked, rewDisplayRefDb, frontSubsLive, rearSubsLive]);
+  }, []);
   
-  // Audit curve (no smoothing, no normalization) for sensitivity testing
-  const rewModesDataAudit = useMemo(() => {
-    if (!rewStyleMode || !rewCompareView) return null;
+  // CANONICAL DATASET: Single REW-style simulation at RSP
+  const finalSeries = useMemo(() => {
 
     const w = roomDims?.widthM;
     const l = roomDims?.lengthM;
@@ -768,6 +405,7 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         roomDims: { widthM: w, lengthM: l, heightM: h },
         sourcePositions,
         seatPosition: seatPos,
+        mlpPosition: seatPos,
         fMin: 20,
         fMax: 200,
         pointsPerOct: 24,
@@ -777,937 +415,79 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
         includeTangential: true,
         includeOblique: true,
         includeSBIR: true,
-        sbirMaxOrder: 1,
+        sbirMaxOrder: 2,
         sbirIncludeWalls: true,
         sbirIncludeFloorCeiling: true,
         rewParityMode: true,
         smoothing: 'none',
         subFloorHeight: 0.0,
-        normalizeBandHz: null,
-        normalizeToDb: null,
-        relativeViewEnabled: false,
-        surfaceAbsorption: {
-          front: 0.30, back: 0.30, left: 0.30,
-          right: 0.30, ceiling: 0.30, floor: 0.30,
-        },
+        surfaceAbsorption,
         dampingScalar: Math.max(0.5, roomDamping / 20),
-        leakage: 0.05,
+        leakage: 0.0,
         subProductCurves: null,
-        absoluteSplMode: false,
-        componentView: 'modalPlusSbir',
-        disableSealedRoomGain: false,
-        disableNullRepair: true,
-        sbirBlendEnabled: false,
-        rewStrictParity: false,
-        sbirDebugSingleFrontWall: sbirDebugSingleFrontWall
+        isDragging: isDraggingSub
       });
 
-      if (globalThis.__B44_BASS_AUDIT && result?.debug && Array.isArray(result.freqs)) {
-        try {
-          result.debug.audit40_70 = {
-            coherentRawDb: Array.isArray(result.coherentRawDb)
-              ? peakDipDelta(result.freqs, result.coherentRawDb, 40, 70)
-              : null,
-
-            splDb: Array.isArray(result.splDb)
-              ? peakDipDelta(result.freqs, result.splDb, 40, 70)
-              : null,
-
-            splDbForPipeline: Array.isArray(result.debug?.splDbForPipeline)
-              ? peakDipDelta(result.freqs, result.debug.splDbForPipeline, 40, 70)
-              : null,
-
-            splDbSchroeder: Array.isArray(result.debug?.splDbSchroeder)
-              ? peakDipDelta(result.freqs, result.debug.splDbSchroeder, 40, 70)
-              : null,
-
-            splDbRepaired: Array.isArray(result.debug?.splDbRepaired)
-              ? peakDipDelta(result.freqs, result.debug.splDbRepaired, 40, 70)
-              : null,
-
-            plottedDb: Array.isArray(result.plottedDb)
-              ? peakDipDelta(result.freqs, result.plottedDb, 40, 70)
-              : null
-          };
-        } catch {
-          // absolute fail-safe: audit must never break rendering
-        }
-      }
-
-      // Clear failure cache on success
-      lastRewFailSigRef.current = null;
-      lastRewFailResultRef.current = null;
-
       return {
-        freqs: result.freqs,
-        splDb: result.splDb,
-        debug: result.debug
+        freqsHz: result.freqs || [],
+        splDb: result.splDb || [],
+        debug: result.debug || {}
       };
     } catch (e) {
-      // Cache this failure
-      const failResult = {
-        freqs: [],
+      return {
+        freqsHz: [],
         splDb: [],
         debug: {
-          error: "computeRoomModesResponse failed (audit)",
-          message: String(e?.message || e),
-          sig
-        }
-      };
-      lastRewFailSigRef.current = sig;
-      lastRewFailResultRef.current = failResult;
-      return failResult;
-    }
-  }, [rewStyleMode, rewCompareView, roomDims, seatingPositions, subsForSimulation, subPositionEpoch, roomDamping, seatNudgeTest]);
-
-  // REW-style room-only curve (modal response with flat/generic sub)
-  const rewModesDataAbs = useMemo(() => {
-    if (!rewStyleMode) return null;
-
-    const w = roomDims?.widthM;
-    const l = roomDims?.lengthM;
-    const h = roomDims?.heightM;
-    if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h) && w > 0 && l > 0 && h > 0)) {
-      return {
-        data: [],
-        debug: { error: "Invalid room dimensions", roomDims }
-      };
-    }
-
-    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-    if (!seat) {
-      return {
-        data: [],
-        debug: { error: "No seat position found" }
-      };
-    }
-
-    let seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
-
-    // Apply seat nudge for diagnostics (only if debug mode enabled)
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && seatNudgeTest) {
-      seatPos = { ...seatPos, x: seatPos.x - 0.30 };
-    }
-
-    // Build source positions from actual subs (with REW time alignment if enabled)
-    const sourcePositions = subsForSimulation
-      .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
-      .map(s => {
-        const userDelayMs = s.tuning?.delayMs || 0;
-        const alignDelayMs = rewAlignmentDelays[s.id] || 0;
-        const effectiveDelayMs = userDelayMs + alignDelayMs;
-        
-        return {
-          x: s.x,
-          y: s.y,
-          z: 0.0,
-          tuning: {
-            gainDb: s.tuning?.gainDb || 0,
-            delayMs: effectiveDelayMs,
-            polarity: s.tuning?.polarity || 'normal'
-          }
-        };
-      });
-
-    if (!sourcePositions.length) {
-      return {
-        data: [],
-        debug: { error: "No valid sub positions" }
-      };
-    }
-    
-    // Use stable signatures from outer scope
-    const subSig = stableSubSig;
-    const seatSig = stableSeatSig;
-
-    // Build signature for failure caching
-    const sig = `w=${fmtFixed(w, 2)}|l=${fmtFixed(l, 2)}|h=${fmtFixed(h, 2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView?1:0}|damp=${roomDamping}`;
-    
-    // Build run key for bounce detection
-    const runKey = `${fmtFixed(w, 2)}x${fmtFixed(l, 2)}x${fmtFixed(h, 2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}`;
-    
-    // Bounce detector: only log when deps actually change
-    if (runKey !== lastRewRunKeyRef.current) {
-      if (globalThis.__B44_LOGS) console.log('[REW RUN KEY CHANGED][ROOM-ONLY]', runKey);
-      lastRewRunKeyRef.current = runKey;
-    }
-
-    // Check failure cache
-    if (lastRewFailSigRef.current === sig) {
-      return lastRewFailResultRef.current || { data: [], debug: { error: "computeRoomModesResponse failed (cached)" } };
-    }
-
-    engineCallCountRef.current += 1;
-
-    // [REW ENGINE RUN][ROOM-ONLY] - Audit log
-    if (globalThis.__B44_LOGS) console.log('[REW ENGINE RUN][ROOM-ONLY]', {
-      rewView,
-      sig,
-      engineCallCount: engineCallCountRef.current
-    });
-
-    // [BASS ENGINE INPUT CHECK] - Room-only path (only if debug enabled)
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_INPUT_DEBUG) {
-      if (globalThis.__B44_LOGS) console.log("[BASS ENGINE INPUT CHECK - Room-only]", {
-        roomDims,
-        roomDimsKeys: Object.keys(roomDims || {}),
-        widthM: roomDims?.widthM,
-        lengthM: roomDims?.lengthM,
-        heightM: roomDims?.heightM,
-        rawFromAppState: roomDims,
-        w, l, h,
-        seatPosition: seatPos,
-        sourcePositionsLength: sourcePositions?.length
-      });
-      if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
-        if (globalThis.__B44_LOGS) console.warn("[BASS ENGINE INPUT FAIL] roomDims missing — bass sim will early-return", { 
-          roomDims, 
-          rawSource: roomDims 
-        });
-      }
-    }
-
-    // Room-only = flat/generic sub response (no product curves)
-    // Default to absolute SPL, optional normalize via checkbox
-    let result;
-    // Drag performance: use fast preview profile while dragging
-    const usePreviewProfile = isDraggingSub;
-    
-    try {
-      const currentEpoch = calcEpochRef.current;
-      
-      result = computeRoomModesResponse({
-        roomDims: { widthM: w, lengthM: l, heightM: h },
-        sourcePositions,
-        seatPosition: seatPos,
-        mlpPosition: seatPos,
-        fMin: 20,
-        fMax: 200,
-        pointsPerOct: usePreviewProfile ? 30 : 24, // Preview: lower grid density for speed
-        modeLimitHz: 200,
-        q: roomDamping,
-        includeAxial: true,
-        includeTangential: true,
-        includeOblique: true,
-        includeSBIR: true,
-        sbirMaxOrder: 1,
-        sbirIncludeWalls: true,
-        sbirIncludeFloorCeiling: true,
-        rewParityMode: true,
-        smoothing: 'none',
-        subFloorHeight: 0.0,
-        normalizeBandHz: null,
-        normalizeToDb: null,
-        relativeViewEnabled: false,
-        surfaceAbsorption: {
-          front: 0.30,
-          back: 0.30,
-          left: 0.30,
-          right: 0.30,
-          ceiling: 0.30,
-          floor: 0.30,
-        },
-        dampingScalar: Math.max(0.5, roomDamping / 20),
-        leakage: 0.05,
-        subProductCurves: null,
-        absoluteSplMode: true,
-        rawEngineOutput: false,
-        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null,
-        complexEigenfunctions: complexEigenfunctions,
-        componentView: 'modalPlusSbir',
-        disableSealedRoomGain: false,
-        disableNullRepair: true,
-        sbirBlendEnabled: false,
-        rewStrictParity: false,
-        isDragging: usePreviewProfile,
-        calcEpoch: currentEpoch
-      });
-      
-      // Request cancellation: NEVER return null (keeps graph alive)
-      if (currentEpoch !== calcEpochRef.current) {
-        return lastGoodRewModesAbsRef.current || { data: [], debug: { note: "stale-cancelled" } };
-      }
-    } catch (e) {
-      return {
-        data: [],
-        debug: {
-          error: "computeRoomModesResponse failed",
+          error: "Engine failed",
           message: String(e?.message || e)
         }
       };
     }
-
-    const finiteValues = result.splDb.filter(v => isFinite(v));
-    if (finiteValues.length === 0) {
-      // SBIR-only fallback: if SBIR is enabled but modal is off, curve might be very quiet
-      // Return minimal safe data so graph doesn't blank
-      if (componentView === 'sbirOnly') {
-        const fallbackData = result.freqs.map(frequency => ({ frequency, spl: null }));
-        return { 
-          data: fallbackData, 
-          debug: { ...result.debug, note: "SBIR-only: no finite values (SBIR might be very quiet or off)" } 
-        };
-      }
-      return { data: [], debug: { ...result.debug, error: "No finite values" } };
-    }
-
-    // Clear failure cache on success
-    lastRewFailSigRef.current = null;
-    lastRewFailResultRef.current = null;
-
-    // Use plottedDb for display (smoothed if requested), coherentRawDb for audit
-    const plotArray = result.plottedDb || result.splDb;
-    
-    // Compute lowest axial frequency for LF pressure rise
-    const allModes = result.debug?.modeMarkers || [];
-    const axialModes = allModes.filter(m => m.family === 'axial' && Number.isFinite(m.fHz));
-    const lowestAxialHz = axialModes.length > 0 
-      ? Math.min(...axialModes.map(m => m.fHz)) 
-      : null;
-    
-    // Apply REW-style LF pressure rise to Room-only series (display layer only)
-    // CRITICAL FIX: Add boost as gain term, do NOT replace the engine output
-    // DEBUG: When debugDisableSealedGain is ON, bypass this display-side LF rise
-    // to allow true engine LF behaviour (below lowestAxialHz) to be observed.
-    const plotArrayWithLfRise = (() => {
-      // If debugDisableSealedGain is true, bypass this display-side LF boost.
-      // This allows the engine's internal LF handling to be observed directly.
-      if (debugDisableSealedGain || !lowestAxialHz) {
-        return plotArray;
-      }
-      
-      return plotArray.map((spl, i) => {
-        const freq = result.freqs[i];
-        
-        // Guard: preserve REW-style gaps (null/undefined/NaN stay null)
-        if (!Number.isFinite(freq) || !Number.isFinite(spl)) return spl;
-        
-        // Above/at lowest axial: pass through unchanged
-        if (freq >= lowestAxialHz) {
-          return spl;
-        }
-        
-        // Below lowest axial: ADD frequency-dependent LF pressure rise as gain term
-        // This preserves the underlying position-dependent response shape
-        const boostDb = applyLfPressureRiseDb(freq, lowestAxialHz, 6, 12);
-        
-        // ADD boost to existing SPL (preserves sub position effects)
-        const withLfRiseDb = spl + boostDb;
-        
-        return Number.isFinite(withLfRiseDb) ? withLfRiseDb : null;
-      });
-    })();
-    
-    // Build data points (ensure strictly increasing X, no rounding, no duplicates)
-    const dataPoints = result.freqs
-      .map((frequency, i) => ({
-        frequency, // Keep full float precision (no toFixed)
-        spl: plotArrayWithLfRise[i]
-      }))
-      .filter((p, i, arr) => {
-        // Remove duplicate frequencies (keep first occurrence)
-        if (i === 0) return true;
-        return p.frequency !== arr[i - 1].frequency;
-      })
-      .sort((a, b) => a.frequency - b.frequency); // Ensure strictly increasing
-    
-    const finalResult = {
-      data: dataPoints,
-      debug: {
-        ...result.debug,
-        viewMode: 'Room-only (generic sub)',
-        curveType: 'Modal response + geometry',
-        lowestAxialHz: Number.isFinite(lowestAxialHz) ? lowestAxialHz : null,
-        lfPressureRiseApplied: lowestAxialHz ? 'ADDITIVE GAIN (preserves position sensitivity)' : 'NO (no axial modes)',
-        lfReplaceActive: false, // FIXED: No longer replacing data below lowestAxialHz
-        freqGridPointCount: dataPoints.length,
-        freqGridMin: dataPoints.length > 0 ? dataPoints[0].frequency : null,
-        freqGridMax: dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].frequency : null
-      },
-      freqs: result.freqs,
-      splDb: plotArrayWithLfRise,
-      coherentRawDb: result.coherentRawDb,
-      subSig,
-      seatSig
-    };
-    
-    // Cache last good dataset for UI safety (non-empty only)
-    if (Array.isArray(dataPoints) && dataPoints.length > 0) {
-      lastGoodRewModesAbsRef.current = finalResult;
-    }
-    
-    return finalResult;
-  }, [
-    rewStyleMode, 
-    roomDims?.widthM, 
-    roomDims?.lengthM, 
-    roomDims?.heightM, 
-    stableSeatSig, 
-    stableSubSig, 
-    subPositionEpoch, 
-    roomDamping, 
-    graphSmoothing, 
-    rewRelativeView, 
-    modeIsolation, 
-    complexEigenfunctions, 
-    rewSmoothing,
-    debugDisableSealedGain,
-    isDraggingSub,
-    calcEpoch,
-    sourcesSig
-  ]);
-
-  // Helper: get subwoofer anechoic response curve (anechoic FR), interpolated to freqs[]
-  const getSubAnechoicResponseDb = (modelKey, freqs) => {
-    try {
-      const key = normaliseModelKey ? normaliseModelKey(modelKey) : modelKey;
-      const curve = getSubwooferCurve ? getSubwooferCurve(key) : null;
-
-      if (!Array.isArray(curve) || curve.length < 2) return null;
-
-      // Normalise curve point format -> { hz, db }
-      const pts = curve
-        .map(p => {
-          const hz = p?.hz ?? p?.frequency ?? (Array.isArray(p) ? p[0] : undefined);
-          const db = p?.db ?? p?.spl ?? (Array.isArray(p) ? p[1] : undefined);
-          return { hz: Number(hz), db: Number(db) };
-        })
-        .filter(p => Number.isFinite(p.hz) && Number.isFinite(p.db))
-        .sort((a, b) => a.hz - b.hz);
-
-      if (pts.length < 2) return null;
-
-      // Linear interpolation in dB vs Hz (good enough for v1)
-      const out = freqs.map(f => {
-        const F = Number(f);
-        if (!Number.isFinite(F)) return 0;
-
-        // Clamp outside range
-        if (F <= pts[0].hz) return pts[0].db;
-        if (F >= pts[pts.length - 1].hz) return pts[pts.length - 1].db;
-
-        // Find bracket
-        let lo = pts[0], hi = pts[pts.length - 1];
-        for (let i = 0; i < pts.length - 1; i++) {
-          if (pts[i].hz <= F && F <= pts[i + 1].hz) {
-            lo = pts[i];
-            hi = pts[i + 1];
-            break;
-          }
-        }
-
-        const t = (F - lo.hz) / Math.max(1e-9, (hi.hz - lo.hz));
-        return lo.db + (hi.db - lo.db) * t;
-      });
-
-      return out;
-    } catch (err) {
-      if (globalThis.__B44_LOGS) console.warn("[getSubAnechoicResponseDb] Failed", modelKey, err);
-      return null;
-    }
-  };
-
-  // REW-style room + product curve (apply actual sub response before room interaction)
-  const rewRoomPlusProductDataAbs = useMemo(() => {
-    if (!rewStyleMode || rewView !== 'roomPlusProduct') return null;
-
-    const w = roomDims?.widthM;
-    const l = roomDims?.lengthM;
-    const h = roomDims?.heightM;
-    if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h) && w > 0 && l > 0 && h > 0)) {
-      return { data: [], debug: { error: "Invalid room dimensions" } };
-    }
-
-    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-    if (!seat) {
-      return { data: [], debug: { error: "No seat position" } };
-    }
-
-    const seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
-
-    // Build source positions (with REW time alignment if enabled)
-    const sourcePositions = subsForSimulation
-      .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
-      .map(s => {
-        const userDelayMs = s.tuning?.delayMs || 0;
-        const alignDelayMs = rewAlignmentDelays[s.id] || 0;
-        const effectiveDelayMs = userDelayMs + alignDelayMs;
-        
-        return {
-          x: s.x,
-          y: s.y,
-          z: 0.0,
-          tuning: {
-            gainDb: s.tuning?.gainDb || 0,
-            delayMs: effectiveDelayMs,
-            polarity: s.tuning?.polarity || 'normal'
-          }
-        };
-      });
-
-    if (!sourcePositions.length) {
-      return { data: [], debug: { error: "No valid sub positions" } };
-    }
-    
-    // Use stable signatures from outer scope
-    const subSig = stableSubSig;
-    const seatSig = stableSeatSig;
-
-    // Build signature for failure caching
-    const sig = `w=${fmtFixed(w, 2)}|l=${fmtFixed(l, 2)}|h=${fmtFixed(h, 2)}|seat=${seatSig}|subs=${subSig}|smooth=${graphSmoothing}|rel=${rewRelativeView ? 1 : 0}|damp=${roomDamping}|view=product`;
-    
-    // Build run key for bounce detection
-    const runKey = `${fmtFixed(w, 2)}x${fmtFixed(l, 2)}x${fmtFixed(h, 2)}|${seatSig}|${subSig}|${graphSmoothing}|${rewRelativeView?'rel':'abs'}|d${roomDamping}|view:product`;
-    
-    // Bounce detector: only log when deps actually change
-    if (runKey !== lastRewRunKeyRef.current) {
-      if (globalThis.__B44_LOGS) console.log('[REW RUN KEY CHANGED][ROOM+PRODUCT]', runKey);
-      lastRewRunKeyRef.current = runKey;
-    }
-
-    // Check failure cache
-    if (lastRewFailSigRef.current === sig) {
-      return lastRewFailResultRef.current || { data: [], debug: { error: "computeRoomModesResponse failed (cached)" } };
-    }
-
-    // Generate log-spaced frequency axis (REW parity - smooth curves)
-    // 1/48 octave spacing gives ~400 points from 10-200 Hz
-    const freqs = buildLogSpacedFreqs(10, 200, 48);
-
-    // Get product curves for each sub and normalize to relative gain
-    const subProductCurves = [];
-    let productDataFound = false;
-    const productCurveDebug = [];
-
-    for (const sub of subsForSimulation) {
-      if (!sub?.modelKey) {
-        subProductCurves.push(null);
-        continue;
-      }
-
-      const curveDb = getSubAnechoicResponseDb(sub.modelKey, freqs);
-      if (curveDb && curveDb.length === freqs.length) {
-        // Find value at 50 Hz (or nearest bin)
-        const idx50 = freqs.findIndex(f => f >= 50);
-        const valueAt50Hz = idx50 >= 0 ? curveDb[idx50] : null;
-
-        // Make curve relative by subtracting 50 Hz value (normalize to 0 dB at 50 Hz)
-        const relativeCurve = curveDb.map(db => db - (valueAt50Hz || 0));
-
-        // Collect debug info
-        const finite = relativeCurve.filter(v => Number.isFinite(v));
-        const minDb = finite.length > 0 ? Math.min(...finite) : 0;
-        const maxDb = finite.length > 0 ? Math.max(...finite) : 0;
-        const isRelative = Math.abs(valueAt50Hz || 0) < 5; // Check if original was already ~0 dB centered
-
-        productCurveDebug.push({
-          modelKey: sub.modelKey,
-          originalAt50Hz: fmtFixed(valueAt50Hz, 1, 'N/A'),
-          relativeMinDb: fmtFixed(minDb, 1),
-          relativeMaxDb: fmtFixed(maxDb, 1),
-          isRelative
-        });
-
-        subProductCurves.push(relativeCurve);
-        productDataFound = true;
-      } else {
-        subProductCurves.push(null);
-      }
-    }
-
-    if (!productDataFound) {
-      return {
-        data: rewModesData?.data || [],
-        debug: {
-          ...(rewModesData?.debug || {}),
-          productNote: "No anechoic data for selected sub model(s) — Room + Product will match Room-only.",
-          viewMode: 'Room + Product (no product data)',
-          productCurvesRequested: subsForSimulation.length,
-          productCurvesApplied: 0
-        }
-      };
-    }
-
-    // [BASS ENGINE INPUT CHECK] - Room + Product path (only if debug enabled)
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_INPUT_DEBUG) {
-      if (globalThis.__B44_LOGS) console.log("[BASS ENGINE INPUT CHECK - Room+Product]", {
-        roomDims,
-        roomDimsKeys: Object.keys(roomDims || {}),
-        widthM: roomDims?.widthM,
-        lengthM: roomDims?.lengthM,
-        heightM: roomDims?.heightM,
-        rawFromAppState: roomDims,
-        w, l, h,
-        seatPosition: seatPos,
-        sourcePositionsLength: sourcePositions?.length
-      });
-      if (!roomDims?.widthM || !roomDims?.lengthM || !roomDims?.heightM) {
-        if (globalThis.__B44_LOGS) console.warn("[BASS ENGINE INPUT FAIL] roomDims missing — bass sim will early-return", { 
-          roomDims, 
-          rawSource: roomDims 
-        });
-      }
-    }
-
-    // Run engine with product curves applied per-sub
-    // Default to absolute SPL, optional normalize via checkbox
-    
-    // Drag performance: use fast preview profile while dragging
-    const usePreviewProfile = isDraggingSub;
-    
-    let result;
-    try {
-      const currentEpoch = calcEpochRef.current;
-      
-      result = computeRoomModesResponse({
-        roomDims: { widthM: w, lengthM: l, heightM: h },
-        sourcePositions,
-        seatPosition: seatPos,
-        mlpPosition: seatPos,
-        fMin: 20,
-        fMax: 200,
-        pointsPerOct: usePreviewProfile ? 30 : 24,
-        modeLimitHz: 200,
-        q: roomDamping,
-        includeAxial: true,
-        includeTangential: true,
-        includeOblique: true,
-        includeSBIR: true,
-        sbirMaxOrder: 1,
-        sbirIncludeWalls: true,
-        sbirIncludeFloorCeiling: true,
-        rewParityMode: true,
-        smoothing: 'none',
-        subFloorHeight: 0.0,
-        normalizeBandHz: null,
-        normalizeToDb: null,
-        relativeViewEnabled: false,
-        surfaceAbsorption: {
-          front: 0.30,
-          back: 0.30,
-          left: 0.30,
-          right: 0.30,
-          ceiling: 0.30,
-          floor: 0.30,
-        },
-        dampingScalar: Math.max(0.5, roomDamping / 20),
-        leakage: 0.05,
-        subProductCurves,
-        absoluteSplMode: true,
-        rawEngineOutput: false,
-        modeIsolation: modeIsolation !== 'off' ? modeIsolation : null,
-        complexEigenfunctions: complexEigenfunctions,
-        componentView: 'modalPlusSbir',
-        disableSealedRoomGain: false,
-        disableNullRepair: true,
-        sbirBlendEnabled: false,
-        rewStrictParity: false,
-        isDragging: usePreviewProfile,
-        calcEpoch: currentEpoch
-      });
-      
-      // Request cancellation: NEVER return null (keeps graph alive)
-      if (currentEpoch !== calcEpochRef.current) {
-        return lastGoodRewRoomPlusAbsRef.current || { data: [], debug: { note: "stale-cancelled" } };
-      }
-    } catch (e) {
-      return {
-        data: [],
-        debug: {
-          error: "computeRoomModesResponse failed",
-          message: String(e?.message || e)
-        }
-      };
-    }
-
-    const finiteValues = result.splDb.filter(v => isFinite(v));
-    if (finiteValues.length === 0) {
-      // SBIR-only safeguard: always return valid data (even if SBIR disabled)
-      if (componentView === 'sbirOnly') {
-        // Return flat quiet line so graph never blanks
-        return { 
-          freqs: result.freqs, 
-          splDb: result.freqs.map(() => -240),
-          plottedDb: result.freqs.map(() => -240),
-          debug: { ...result.debug, note: wantSBIR ? "SBIR-only: no finite values (SBIR might be very quiet)" : "SBIR disabled" } 
-        };
-      }
-      return { freqs: [], splDb: [], plottedDb: [], debug: { ...result.debug, error: "No finite values" } };
-    }
-
-    // Clear failure cache on success
-    lastRewFailSigRef.current = null;
-    lastRewFailResultRef.current = null;
-
-    const modelKeys = subsForSimulation.map(s => s?.modelKey).filter(Boolean);
-    const uniqueKeys = Array.from(new Set(modelKeys));
-
-    // Check for SPL range issues
-    const productSplRange = Number(result.debug?.splRangeDb) || 0;
-    const roomOnlySplRange = Number(rewModesData?.debug?.splRangeDb) || 0;
-    let scaleWarning = null;
-
-    if (Math.abs(productSplRange - roomOnlySplRange) > 20) {
-      scaleWarning = `Room-only range: ${fmtFixed(roomOnlySplRange, 1)} dB, Room+Product range: ${fmtFixed(productSplRange, 1)} dB — scale mismatch detected`;
-    }
-
-    // Product curve application summary
-    const productCurvesApplied = subProductCurves.filter(c => c !== null).length;
-    const firstCurve = productCurveDebug[0] || null;
-
-    // Use plottedDb for display (smoothed if requested), coherentRawDb for audit
-    const plotArray = result.plottedDb || result.splDb;
-
-    // Build data points (ensure strictly increasing X, no rounding, no duplicates)
-    const dataPoints = result.freqs
-      .map((frequency, i) => ({
-        frequency, // Keep full float precision (no toFixed)
-        spl: plotArray[i]
-      }))
-      .filter((p, i, arr) => {
-        // Remove duplicate frequencies (keep first occurrence)
-        if (i === 0) return true;
-        return p.frequency !== arr[i - 1].frequency;
-      })
-      .sort((a, b) => a.frequency - b.frequency); // Ensure strictly increasing
-
-    const finalResult = {
-      data: dataPoints,
-      debug: {
-        ...result.debug,
-        viewMode: 'Room + Product',
-        curveType: 'Modal response + product anechoic curves',
-        productModels: uniqueKeys,
-        scaleWarning,
-        productCurvesRequested: subsForSimulation.length,
-        productCurvesApplied,
-        productCurveAt50HzDb: firstCurve?.originalAt50Hz || 'N/A',
-        productCurveMinMaxDb: firstCurve ? `${firstCurve.relativeMinDb} to ${firstCurve.relativeMaxDb}` : 'N/A',
-        productCurveIsRelative: firstCurve?.isRelative || false,
-        productCurveDebug,
-        freqGridPointCount: dataPoints.length,
-        freqGridMin: dataPoints.length > 0 ? dataPoints[0].frequency : null,
-        freqGridMax: dataPoints.length > 0 ? dataPoints[dataPoints.length - 1].frequency : null
-      },
-      freqs: result.freqs,
-      splDb: plotArray,
-      coherentRawDb: result.coherentRawDb
-    };
-    
-    // Cache last good dataset for UI safety (non-empty only)
-    if (Array.isArray(dataPoints) && dataPoints.length > 0) {
-      lastGoodRewRoomPlusAbsRef.current = finalResult;
-    }
-    
-    return finalResult;
-  }, [
-    rewStyleMode, 
-    rewView, 
-    roomDims?.widthM, 
-    roomDims?.lengthM, 
-    roomDims?.heightM, 
-    stableSeatSig, 
-    stableSubSig, 
-    subPositionEpoch, 
-    roomDamping, 
-    graphSmoothing, 
-    rewRelativeView, 
-    modeIsolation, 
-    complexEigenfunctions, 
-    rewSmoothing,
-    isDraggingSub,
-    calcEpoch,
-    sourcesSig
-  ]);
-
-
-
-  // REW Compare View display preset (does NOT mutate user smoothing state)
-  // Compare view forces display to 1/3 via graphSmoothing derivation, user's choice stays intact
-  useEffect(() => {
-    if (rewCompareView) {
-      setRewRelativeView(false);     // absolute SPL for compare
-      setYAxisLocked(true);
-      setShowRewModeLines(true);
-      setLinearHzAxis(false);        // REW-style log axis
-      // NOTE: rewSmoothing is NOT changed here - graphSmoothing handles display override
-    }
-  }, [rewCompareView]);
-
-  // Helper: apply display conditioning (REW-style nulling only, NO clamping)
-  const applyDisplayConditioningNulls = (data, rewLockedMin, rewLockedMax, yAxisLocked, isRewStyle) => {
-    const points = Array.isArray(data) ? data : [];
-    const ABS_FLOOR_DB = -60; // Absolute display floor for true "no data"
-
-    return points.map(p => {
-      const spl = typeof p?.spl === "number" && Number.isFinite(p.spl) ? p.spl : null;
-      
-      // Non-finite always becomes null
-      if (spl === null) return { ...p, spl: null };
-
-      // Below absolute floor (-60 dB): TRUE floor, break line (REW-style gap)
-      if (spl < ABS_FLOOR_DB) {
-        return { ...p, spl: null };
-      }
-
-      // Y-axis lock does NOT mutate data (viewport constraint only)
-      return p;
-    });
-  };
-
-  // Helper: apply REW-style smoothing (HOISTED for early access in useMemo)
-  // REW-style display smoothing (fractional octave) in LINEAR PRESSURE domain.
-  // This is display-only. Do not feed this back into the engine.
-  function applyRewStyleDisplaySmoothing(points, smoothingSetting) {
-    if (!points || points.length === 0) return points || [];
-
-    // Treat these as "no smoothing"
-    if (!smoothingSetting || smoothingSetting === 'none' || smoothingSetting === '0') return points;
-
-    // Map UI tokens to fractional octave width N
-    // 1/48 = very light, 1/3 = heavy (RP22)
-    const frac =
-      smoothingSetting === '1/48' ? 48 :
-      smoothingSetting === '1/24' ? 24 :
-      smoothingSetting === '1/12' ? 12 :
-      smoothingSetting === '1/6'  ? 6  :
-      smoothingSetting === '1/3'  ? 3  :
-      null;
-
-    if (!frac) return points;
-
-    // Build arrays
-    const freqs = points.map(p => p.frequency);
-    const dbIn  = points.map(p => (Number.isFinite(p.spl) ? p.spl : null));
-
-    // Convert dB -> linear pressure
-    const pIn = dbIn.map(db => (db === null ? null : Math.pow(10, db / 20)));
-
-    // Fractional-octave smoothing window:
-    // For each f0, include bins within f0 * 2^(±1/(2*frac))
-    const outDb = freqs.map((f0, i) => {
-      const p0 = pIn[i];
-      if (!Number.isFinite(f0) || p0 === null) return null;
-
-      const ratio = Math.pow(2, 1 / (2 * frac));
-      const fLo = f0 / ratio;
-      const fHi = f0 * ratio;
-
-      let sum = 0;
-      let count = 0;
-
-      // Simple scan; dataset is small enough
-      for (let j = 0; j < freqs.length; j++) {
-        const fj = freqs[j];
-        const pj = pIn[j];
-        if (pj === null) continue;
-        if (fj >= fLo && fj <= fHi) {
-          sum += pj;
-          count++;
-        }
-      }
-
-      if (count < 1) return null;
-
-      const meanP = sum / count;
-      // linear pressure -> dB
-      return 20 * Math.log10(Math.max(meanP, 1e-12));
-    });
-
-    // Rebuild points
-    return points.map((p, i) => ({
-      ...p,
-      spl: outDb[i]
-    }));
-  }
-
-  // Display-only smoothing for REW mode series (ENGINE/DISPLAY only; never RAW)
-  const applyDisplaySmoothing = (series, smoothingSetting) => {
-    if (!Array.isArray(series) || series.length === 0) return series;
-    try {
-      return applyRewStyleDisplaySmoothing(series, smoothingSetting);
-    } catch (e) {
-      return series;
-    }
-  };
-
-  // ------------------------------
-  // GRAPH SOURCE SELECTION (SAFE)
-  // ------------------------------
-
-  // Non-REW graph source: selectedSeat (product simulation engine)
-  const responseDataNonRew = useMemo(() => {
-    const freqs = selectedSeat?.freqsHz;
-    const spls = selectedSeat?.splDb;
-
-    if (!Array.isArray(freqs) || !Array.isArray(spls) || freqs.length === 0 || spls.length === 0) {
+  }, [roomDims, seatingPositions, subsForSimulation, roomDamping, sourcesSig, absorptionPct, rewAlignmentDelays, isDraggingSub]);
+
+  // Build responseData from finalSeries
+  const responseData = useMemo(() => {
+    if (!finalSeries.freqsHz || !finalSeries.splDb || finalSeries.freqsHz.length === 0) {
       return [];
     }
-
-    const n = Math.min(freqs.length, spls.length);
-
-    const out = [];
-    for (let i = 0; i < n; i++) {
-      const f = freqs[i];
-      const s = spls[i];
-      if (!Number.isFinite(f)) continue;
-      out.push({ frequency: f, spl: Number.isFinite(s) ? s : null });
-    }
-    return out;
-  }, [selectedSeat]);
-
-  // Derived REW relative datasets: normalise 30–80 Hz to 0 dB baseline
-  // Uses mean in linear PRESSURE domain (REW-like visual balance point)
-  const normalizeDatasetToRelative = React.useCallback((dataset) => {
-    if (!dataset || !Array.isArray(dataset.data) || dataset.data.length === 0) {
-      return { data: [], debug: dataset?.debug };
-    }
-
-    // Extract 30–80 Hz band SPL values
-    const band = dataset.data
-      .filter(d => d.frequency >= 30 && d.frequency <= 80)
-      .map(d => d.spl)
-      .filter(v => Number.isFinite(v));
-
-    if (band.length < 3) {
-      return { data: dataset.data, debug: dataset.debug };
-    }
-
-    // Use MEAN in LINEAR PRESSURE domain for visual balance point (REW-style)
-    const pressures = band.map(db => Math.pow(10, db / 20));
-    const meanPressure = pressures.reduce((a, b) => a + b, 0) / pressures.length;
-    const baselineDb = 20 * Math.log10(meanPressure);
-
-    // Subtract baseline from entire curve (30-80 Hz band centers at 0 dB)
-    const shifted = dataset.data.map(p => ({
-      frequency: p.frequency,
-      spl: Number.isFinite(p.spl) ? p.spl - baselineDb : p.spl
+    
+    return finalSeries.freqsHz.map((frequency, i) => ({
+      frequency,
+      spl: Number.isFinite(finalSeries.splDb[i]) ? finalSeries.splDb[i] : null
     }));
+  }, [finalSeries]);
 
-    return {
-      data: shifted,
-      debug: {
-        ...(dataset.debug || {}),
-        normRefDb: 0,
-        normOffsetAppliedDb: fmtFixed(-baselineDb, 2),
-        normBandPressureMeanDb: fmtFixed(baselineDb, 2)
-      }
-    };
-  }, []);
+  // Display data (clean for graph)
+  const displayData = useMemo(() => {
+    return responseData.filter(p => Number.isFinite(p.frequency) && p.frequency > 0);
+  }, [responseData]);
 
-  const rewModesDataRel = useMemo(() => {
-    if (!rewStyleMode) return null;
-    return normalizeDatasetToRelative(rewModesDataAbs || { data: [] });
-  }, [rewStyleMode, rewModesDataAbs, normalizeDatasetToRelative]);
+  // Safe debug object
+  const safeDebug = finalSeries.debug || {};
 
-  const rewRoomPlusProductDataRel = useMemo(() => {
-    if (!rewStyleMode) return null;
-    return normalizeDatasetToRelative(rewRoomPlusProductDataAbs || { data: [] });
-  }, [rewStyleMode, rewRoomPlusProductDataAbs, normalizeDatasetToRelative]);
+  // Build source positions from subs
+  const buildSourcePositions = (subs) => {
+    return subs
+      .filter(s => s && Number.isFinite(s.x) && Number.isFinite(s.y))
+      .map(s => {
+        const userDelayMs = s.tuning?.delayMs || 0;
+        const alignDelayMs = rewAlignmentDelays[s.id] || 0;
+        
+        return {
+          x: s.x,
+          y: s.y,
+          z: 0.0,
+          tuning: {
+            gainDb: s.tuning?.gainDb || 0,
+            delayMs: userDelayMs + alignDelayMs,
+            polarity: s.tuning?.polarity || 'normal'
+          }
+        };
+      });
+  };
 
-  // CANONICAL DATASET: Single source of truth for graph (prevents blank/undefined errors)
-  const finalSeries = useMemo(() => {
-    // Always use REW-style simulation at RSP
+  // REMOVE ALL OLD REW CODE FROM HERE TO:
+  // "// Build responseData ONLY from finalSeries"
     const w = roomDims?.widthM;
     const l = roomDims?.lengthM;
     const h = roomDims?.heightM;
@@ -1795,652 +575,31 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
     }
   }, [roomDims, seatingPositions, subsForSimulation, roomDamping, subPositionEpoch]);
 
-  // Build responseData ONLY from finalSeries
-  const responseData = useMemo(() => {
-    if (!finalSeries.freqsHz || !finalSeries.splDb || finalSeries.freqsHz.length === 0) {
-      return [];
-    }
+  // Clean plotted series for graph
+  const plottedSeries = useMemo(() => {
+    if (!displayData || displayData.length === 0) return [];
     
-    return finalSeries.freqsHz.map((frequency, i) => ({
-      frequency,
-      spl: Number.isFinite(finalSeries.splDb[i]) ? finalSeries.splDb[i] : null
-    }));
-  }, [finalSeries]);
-
-  // Safe debug object
-  const safeGraphDebug = finalSeries.debug || {};
-
-  // Safe debug alias
-  const safeDebug = safeGraphDebug || {};
-
-  // Display mode gates (CRITICAL: Relative view and Display ref are mutually exclusive)
-  const isRewStyle = !!rewStyleMode;
-  const isRelative = isRewStyle && !!rewRelativeView;
-  const isCompare = isRewStyle && !!rewCompareView;
-  
-  // IMPORTANT: Relative view must NEVER apply absolute display reference offsets
-  const allowDisplayRefOffset = isRewStyle && !isRelative;
-  
-  // REW locked window bounds (fixed ±30 dB window around display ref, like REW's 60-120 dB)
-  const rewLockedMin = isRewStyle && yAxisLocked ? (Number(rewDisplayRefDb) || 90) - 30 : null;
-  const rewLockedMax = isRewStyle && yAxisLocked ? (Number(rewDisplayRefDb) || 90) + 30 : null;
-
-  // Build displayData directly from finalSeries
-  const displayData = useMemo(() => {
-    return responseData;
-  }, [responseData]);
-
-  // TEMP DEBUG (can remove later)
-  // if (globalThis.__B44_LOGS) console.log("Bass displayData source:", { rewStyleMode, rewView, hasRoom: !!rewModesData?.data?.length, hasRoomPlus: !!rewRoomPlusProductData?.data?.length, displayLen: displayData?.length });
-
-  // REW-style display processing (display only)
-  // - If Relative view is ON: normalise 30–80 Hz band so its median becomes 0 dB (REW overlay style)
-  // - If Relative view is OFF: pass through unchanged
-  const rewSplAnchoredData = useMemo(() => {
-    const data = Array.isArray(displayData) ? displayData : [];
-    if (!data.length) return data;
-
-    // Only apply relative normalisation in REW-style mode when the toggle is on
-    if (!(rewStyleMode && rewRelativeView)) return data;
-
-    // Collect 30–80 Hz band SPL samples (finite only)
-    const band = data
-      .filter(d => d && Number.isFinite(d.frequency) && d.frequency >= 30 && d.frequency <= 80)
-      .map(d => d.spl)
-      .filter(v => Number.isFinite(v));
-
-    // Need enough points to be meaningful (avoid "offset = 0" by accident)
-    if (band.length < 10) return data;
-
-    // Median (REW-like, stable, not skewed by deep nulls)
-    const sorted = [...band].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    const medianDb =
-      sorted.length % 2 === 1
-        ? sorted[mid]
-        : (sorted[mid - 1] + sorted[mid]) / 2;
-
-    // Shift so 30–80 Hz median becomes 0 dB
-    const offsetDb = -medianDb;
-
-    // Apply constant shift to the plotted series (display-only)
-    const shifted = data.map(d => {
-      if (!d || !Number.isFinite(d.spl)) return d;
-      return { ...d, spl: d.spl + offsetDb };
-    });
-
-    // Optional debug hook (matches your existing pattern)
-    if (typeof globalThis !== "undefined" && globalThis.__B44_BASS_DEBUG) {
-      if (globalThis.__B44_LOGS) console.log("[RELATIVE VIEW NORMALISE 30–80]", {
-        bandCount: band.length,
-        medianDb: Number(medianDb.toFixed(2)),
-        offsetDb: Number(offsetDb.toFixed(2)),
-      });
-    }
-
-    return shifted;
-  }, [displayData, rewStyleMode, rewRelativeView]);
-
-  // Update engine calls UI only when deps change (not on every render)
-  useEffect(() => {
-    setEngineCallsUi(engineCallCountRef.current);
-  }, [subPositionEpoch, roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM, rewSmoothing, rewRelativeView, rewView, roomDamping]);
-
-  // Sensitivity audit: compute deltas when source position changes (throttled during drag)
-  const sensitivityAudit = useMemo(() => {
-    if (!rewCompareView || !rewModesDataAudit || !subsForSimulation.length) {
-      return lastStableDebugRef.current;
-    }
-    
-    // Throttle updates: max once per 140ms
-    const now = Date.now();
-    const timeSinceLastUpdate = now - lastDebugUpdateTimeRef.current;
-    const shouldUpdate = timeSinceLastUpdate >= 140;
-    
-    if (!shouldUpdate && lastStableDebugRef.current) {
-      return lastStableDebugRef.current;
-    }
-
-    // Use ROUNDED signatures (1cm resolution) to prevent float noise
-    const currentSourceSigRounded = subsForSimulation.map(s => 
-      `${fmtFixed(s.x, 2)}_${fmtFixed(s.y, 2)}_${fmtFixed(s.z ?? 0, 2)}`
-    ).join('|');
-
-    // Use splDbRepaired for consistent comparison (pre-smoothing, pre-normalization)
-    const currentRepairedDb = rewModesDataAudit.debug?.splDbRepaired || rewModesDataAudit.splDb;
-    const currentFreqs = rewModesDataAudit.freqs;
-
-    // Compute axial coupling for first sub (rounded to 3 decimals for stability)
-    const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-    if (!seat) return lastStableDebugRef.current || null;
-
-    let seatPos = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
-    if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && seatNudgeTest) {
-      seatPos = { ...seatPos, x: seatPos.x - 0.30 };
-    }
-
-    const firstSub = subsForSimulation[0];
-    const coupling = computeAxialCoupling(
-      { x: firstSub.x, y: firstSub.y, z: firstSub.z ?? 0.0 },
-      seatPos,
-      roomDims
-    );
-    
-    // Round coupling to 3 decimals for display stability
-    const currentCoupling = {
-      src: toNum(coupling.src) ?? 0,
-      rcv: toNum(coupling.rcv) ?? 0,
-      total: toNum(coupling.total) ?? 0
-    };
-
-    // Check if source changed significantly (>1cm)
-    const sourceChanged = prevSourceSigRef.current !== null && 
-                          prevSourceSigRef.current !== currentSourceSigRounded;
-
-    let probeDeltas = null;
-    let couplingDeltas = null;
-    let maxDelta = 0;
-    let avgDelta = 0;
-
-    if (sourceChanged && prevFinalDbRef.current && prevFreqsRef.current) {
-      const probeFreqs = [20, 25, 30, 34, 36, 38, 40, 42, 45];
-      probeDeltas = [];
-
-      for (const fProbe of probeFreqs) {
-        const currIdx = currentFreqs.findIndex(f => Math.abs(f - fProbe) < 0.6);
-        const prevIdx = prevFreqsRef.current.findIndex(f => Math.abs(f - fProbe) < 0.6);
-
-        if (currIdx >= 0 && prevIdx >= 0 && 
-            Number.isFinite(currentRepairedDb[currIdx]) && 
-            Number.isFinite(prevFinalDbRef.current[prevIdx])) {
-          const delta = currentRepairedDb[currIdx] - prevFinalDbRef.current[prevIdx];
-          probeDeltas.push({ freq: fProbe, delta });
-        }
-      }
-
-      if (probeDeltas.length > 0) {
-        const absDeltasFinite = probeDeltas
-          .map(p => p.delta)
-          .filter(d => Number.isFinite(d))
-          .map(d => Math.abs(d));
-        
-        maxDelta = absDeltasFinite.length > 0 ? Math.max(...absDeltasFinite) : 0;
-        avgDelta = absDeltasFinite.length > 0 
-          ? absDeltasFinite.reduce((a, b) => a + b, 0) / absDeltasFinite.length 
-          : 0;
-      }
-
-      if (prevCouplingRef.current) {
-        couplingDeltas = {
-          src: currentCoupling.src - prevCouplingRef.current.src,
-          rcv: currentCoupling.rcv - prevCouplingRef.current.rcv,
-          total: currentCoupling.total - prevCouplingRef.current.total
-        };
-      }
-    }
-
-    // Only update refs if source actually changed (prevents jitter)
-    if (sourceChanged) {
-      prevSourceSigRef.current = currentSourceSigRounded;
-      prevFinalDbRef.current = currentRepairedDb;
-      prevFreqsRef.current = currentFreqs;
-      prevCouplingRef.current = currentCoupling;
-    }
-
-    // Stable verdict logic (requires meaningful change)
-    const couplingChanged = couplingDeltas && Math.abs(couplingDeltas.total) >= 0.02;
-    const splChanged = maxDelta >= 0.20;
-    const responding = couplingChanged || splChanged;
-
-    const auditResult = {
-      sourceChanged,
-      currentSourceSig: currentSourceSigRounded,
-      probeDeltas,
-      couplingDeltas,
-      currentCoupling,
-      maxDelta,
-      avgDelta,
-      verdict: responding ? 'RESPONDING (engine reacts to position)' : 'NOT RESPONDING (change too small or structural bug)'
-    };
-    
-    // Update stable ref and timestamp
-    lastStableDebugRef.current = auditResult;
-    lastDebugUpdateTimeRef.current = now;
-    
-    return auditResult;
-  }, [rewCompareView, rewModesDataAudit, subsForSimulation, seatingPositions, roomDims, seatNudgeTest, computeAxialCoupling]);
-
-  // Compute stable Y-axis domain using 30–80 Hz band intelligence
-  // Auto window: refDb ± 20 dB (40 dB total span)
-  // Uses MEAN in linear PRESSURE domain for consistent visual centering
-  const computeStableYDomain = React.useCallback((data) => {
-    if (!data || data.length === 0) return null;
-
-    // 30–80 Hz band (designer-relevant reference)
-    const band = data
-      .filter(d => d.frequency >= 30 && d.frequency <= 80)
-      .map(d => d.spl)
-      .filter(v => Number.isFinite(v));
-
-    if (band.length < 3) return null; // Need at least 3 points for meaningful average
-
-    // Use MEAN in LINEAR PRESSURE domain for visual balance point
-    const pressures = band.map(db => Math.pow(10, db / 20));
-    const meanPressure = pressures.reduce((a, b) => a + b, 0) / pressures.length;
-    const refDb = 20 * Math.log10(meanPressure);
-
-    // Auto window: refDb ± 20 dB (40 dB total span)
-    const span = 40;
-    const min = refDb - 20;
-    const max = refDb + 20;
-
-    return { refDb, min, max };
-  }, []);
-
-  // REW Compare View: auto window centered on 30-80 Hz pressure mean
-  const computeRewCompareYDomain = React.useCallback((data) => {
-    if (!data || data.length === 0) return null;
-
-    // 30–80 Hz band pressure mean as reference
-    const band = data
-      .filter(d => d.frequency >= 30 && d.frequency <= 80)
-      .map(d => d.spl)
-      .filter(v => Number.isFinite(v));
-
-    if (band.length < 3) {
-      // Fallback: use default reference
-      return { refDb: 85, min: 65, max: 105 };
-    }
-
-    // Use MEAN in LINEAR PRESSURE domain for visual balance point
-    const pressures = band.map(db => Math.pow(10, db / 20));
-    const meanPressure = pressures.reduce((a, b) => a + b, 0) / pressures.length;
-    const refDb = 20 * Math.log10(meanPressure);
-
-    // Auto window: refDb ± 20 dB
-    const min = refDb - 20;
-    const max = refDb + 20;
-
-    return { refDb, min, max };
-  }, []);
-
-  // Dynamic Y domain from pre-clamp plotted data (designer-friendly)
-  const computeDynamicYDomain = (points, isRelative) => {
-    const finite = (points || []).map(p => p?.spl).filter(v => Number.isFinite(v));
-    if (finite.length === 0) {
-      return isRelative
-        ? { min: -30, max: 12, refDb: 0 }
-        : { min: 65, max: 105, refDb: 85 };
-    }
-
-    let minV = Math.min(...finite);
-    let maxV = Math.max(...finite);
-
-    // Add padding so the curve isn't pressed against the edges
-    minV = minV - 6;
-    maxV = maxV + 6;
-
-    // Hard caps to keep the chart sane
-    if (isRelative) {
-      minV = Math.max(-60, minV);
-      maxV = Math.min(20, maxV);
-      // Ensure not inverted / too narrow
-      if (maxV - minV < 20) {
-        const mid = (maxV + minV) / 2;
-        minV = mid - 10;
-        maxV = mid + 10;
-      }
-    } else {
-      minV = Math.max(40, minV);
-      maxV = Math.min(130, maxV);
-      if (maxV - minV < 20) {
-        const mid = (maxV + minV) / 2;
-        minV = mid - 10;
-        maxV = mid + 10;
-      }
-    }
-
-    return { min: minV, max: maxV, refDb: (minV + maxV) / 2 };
-  };
-
-  // Y-axis domain policy: REW mode computes from data, non-REW uses fixed windows
-  React.useEffect(() => {
-    if (!rewStyleMode) {
-      setYAxisDomain(null);
-      return;
-    }
-
-    // REW mode: Y-axis auto-computed from data in BassGraph (pass null)
-    setYAxisDomain(null);
-  }, [rewStyleMode]);
-
-  // Manual reset function
-  const handleResetScale = React.useCallback(() => {
-    if (!rewStyleMode) return;
-
-    // Reset should always snap to the designer-friendly default for the current view
-    if (rewCompareView) {
-      setYAxisDomain({ min: 65, max: 105, refDb: 85 });
-    } else if (rewRelativeView) {
-      setYAxisDomain({ min: -30, max: 12, refDb: 0 });
-    } else {
-      setYAxisDomain({ min: 65, max: 105, refDb: 85 });
-    }
-  }, [rewStyleMode, rewCompareView, rewRelativeView]);
-
-  const finalYDomain = React.useMemo(() => {
-    if (isDraggingSub) {
-      const d = yDomainDuringDragRef.current;
-      if (Array.isArray(d) && d.length === 2 && Number.isFinite(d[0]) && Number.isFinite(d[1])) return d;
-      return undefined; // IMPORTANT: do not force a random fallback window
-    }
-
-    // Not dragging: normal behaviour (locked REW window)
-    if (rewStyleMode && yAxisLocked && isRewStyle && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax)) {
-      return [rewLockedMin, rewLockedMax];
-    }
-
-    return undefined;
-  }, [isDraggingSub, rewStyleMode, yAxisLocked, isRewStyle, rewLockedMin, rewLockedMax]);
-
-  // PLOT INTEGRITY CHECK: Ensure clean, sorted, deduplicated data
-  const cleanPlottedSeries = React.useCallback((rawSeries) => {
-    if (!Array.isArray(rawSeries) || rawSeries.length === 0) return [];
-    
-    // Filter out invalid points
-    const valid = rawSeries.filter(p => {
-      const f = p?.frequency;
-      const s = p?.spl;
-      // Keep point if frequency is finite and positive (log axis safety)
-      // SPL can be null/NaN (breaks line), but frequency must be valid
-      return Number.isFinite(f) && f > 0;
-    });
-    
+    const valid = displayData.filter(p => Number.isFinite(p.frequency) && p.frequency > 0);
     if (valid.length === 0) return [];
     
-    // Sort by frequency ascending
     const sorted = [...valid].sort((a, b) => a.frequency - b.frequency);
     
-    // Remove duplicate frequencies (keep last occurrence for each unique Hz)
+    // Remove duplicates (keep first)
     const deduplicated = [];
     for (let i = 0; i < sorted.length; i++) {
       const curr = sorted[i];
       const next = sorted[i + 1];
-      
-      // If next point has same frequency, skip current (keep last)
-      if (next && Math.abs(curr.frequency - next.frequency) < 1e-9) {
-        continue;
-      }
-      
+      if (next && Math.abs(curr.frequency - next.frequency) < 1e-9) continue;
       deduplicated.push(curr);
     }
     
+    // Cache for drag stability
+    if (!isDraggingSub && deduplicated.length > 0) {
+      lastStablePlotRef.current = deduplicated;
+    }
+    
     return deduplicated;
-  }, []);
-  
-  // Final plotted series (clean for graph, no processing)
-  const plottedSeries = React.useMemo(() => {
-    // Clean for plotting (sort, deduplicate, ensure strictly increasing)
-    const cleaned = cleanPlottedSeries(displayData);
-
-    // Cache stable plot ONLY when not dragging
-    if (!isDraggingSub && cleaned && cleaned.length > 0) {
-      lastStablePlotRef.current = cleaned;
-    } else if (!lastStablePlotRef.current && cleaned && cleaned.length > 0) {
-      lastStablePlotRef.current = cleaned;
-    }
-
-    return cleaned;
-  }, [displayData, cleanPlottedSeries, isDraggingSub]);
-  
-  // Plot Integrity Check (runs before graph renders)
-  const plotIntegrityCheck = React.useMemo(() => {
-    const series = plottedSeries;
-    if (!Array.isArray(series) || series.length === 0) {
-      return {
-        status: 'NO_DATA',
-        pointCount: 0
-      };
-    }
-    
-    const pointCount = series.length;
-    
-    // Check for duplicates
-    let duplicateXCount = 0;
-    for (let i = 1; i < series.length; i++) {
-      if (Math.abs(series[i].frequency - series[i - 1].frequency) < 1e-9) {
-        duplicateXCount++;
-      }
-    }
-    
-    // Check for non-increasing
-    let nonIncreasingCount = 0;
-    for (let i = 1; i < series.length; i++) {
-      if (series[i].frequency <= series[i - 1].frequency) {
-        nonIncreasingCount++;
-      }
-    }
-    
-    // Compute spacing stats
-    const deltas = [];
-    for (let i = 1; i < series.length; i++) {
-      deltas.push(series[i].frequency - series[i - 1].frequency);
-    }
-    
-    const minDf = deltas.length > 0 ? Math.min(...deltas) : 0;
-    const maxDf = deltas.length > 0 ? Math.max(...deltas) : 0;
-    
-    // Find largest gap region
-    let largestGapIdx = 0;
-    if (deltas.length > 0) {
-      for (let i = 0; i < deltas.length; i++) {
-        if (deltas[i] === maxDf) {
-          largestGapIdx = i;
-          break;
-        }
-      }
-    }
-    const largestGapBand = largestGapIdx < series.length - 1
-    ? `${fmtFixed(series[largestGapIdx].frequency, 1)}–${fmtFixed(series[largestGapIdx + 1].frequency, 1)} Hz`
-    : 'N/A';
-    
-    // Check for NaN/Inf
-    let hasNaNOrInf = false;
-    for (const p of series) {
-      if (!Number.isFinite(p.frequency) || (p.spl !== null && !Number.isFinite(p.spl))) {
-        hasNaNOrInf = true;
-        break;
-      }
-    }
-    
-    // STEP DETECTION: Find flat runs and vertical jumps
-    const splValues = series.map(p => p.spl).filter(v => Number.isFinite(v));
-    
-    let flatRunsCount = 0;
-    let currentFlatRunLength = 0;
-    const jumps = [];
-    
-    for (let i = 1; i < series.length; i++) {
-      const prevSpl = series[i - 1].spl;
-      const currSpl = series[i].spl;
-      
-      if (!Number.isFinite(prevSpl) || !Number.isFinite(currSpl)) {
-        currentFlatRunLength = 0;
-        continue;
-      }
-      
-      const deltaSpl = Math.abs(currSpl - prevSpl);
-      const deltaF = series[i].frequency - series[i - 1].frequency;
-      
-      // Detect flat runs (≥4 consecutive points with <0.001 dB change)
-      if (deltaSpl < 0.001) {
-        currentFlatRunLength++;
-        if (currentFlatRunLength >= 3) { // 4th point in run
-          flatRunsCount++;
-        }
-      } else {
-        currentFlatRunLength = 0;
-      }
-      
-      // Collect all jumps
-      jumps.push({
-        idx: i,
-        hzPrev: series[i - 1].frequency,
-        hzNow: series[i].frequency,
-        dbPrev: prevSpl,
-        dbNow: currSpl,
-        jumpDb: currSpl - prevSpl,
-        absJumpDb: deltaSpl,
-        deltaF: deltaF
-      });
-    }
-    
-    // Find max jump
-    const maxJumpEntry = jumps.length > 0 
-      ? jumps.reduce((max, curr) => curr.absJumpDb > max.absJumpDb ? curr : max, jumps[0])
-      : null;
-    
-    const maxJumpDb = maxJumpEntry ? maxJumpEntry.absJumpDb : 0;
-    const maxJumpAtHz = maxJumpEntry ? maxJumpEntry.hzNow : null;
-    
-    // Top 5 jumps
-    const top5Jumps = [...jumps]
-      .sort((a, b) => b.absJumpDb - a.absJumpDb)
-      .slice(0, 5);
-    
-    // Build step pair debug (correlate jumps with term count data)
-    const stepPairDebug = (() => {
-      const termCountData = safeDebug?.termCountDebug55_80Hz;
-      if (!termCountData || termCountData.length === 0 || top5Jumps.length === 0) return [];
-      
-      return top5Jumps.map((jump, jumpIndex) => {
-        const f1Hz = jump.hzPrev;
-        const f2Hz = jump.hzNow;
-        const idx1 = jump.idx - 1; // Previous point index
-        const idx2 = jump.idx;      // Current point index
-        
-        // Find nearest term count rows
-        const findNearest = (targetFreq) => {
-          let best = null;
-          let minErr = Infinity;
-          
-          for (const row of termCountData) {
-            const err = Math.abs(row.exactFreqHz - targetFreq);
-            if (err < minErr) {
-              minErr = err;
-              best = row;
-            }
-          }
-          
-          return best;
-        };
-        
-        const row1 = findNearest(f1Hz);
-        const row2 = findNearest(f2Hz);
-        
-        if (!row1 || !row2) return null;
-        
-        // Extract SBIR contribution from modal total (rough approximation for display)
-        // modalDb in termCountDebug is the total coherent pressure (modal+SBIR)
-        const sbirDb1 = null; // Not separated in current debug data
-        const sbirDb2 = null;
-        
-        // Check if clamped (based on locked Y-axis window)
-        const isClamped1 = (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax))
-          ? (jump.dbPrev < rewLockedMin || jump.dbPrev > rewLockedMax)
-          : false;
-        const isClamped2 = (yAxisLocked && Number.isFinite(rewLockedMin) && Number.isFinite(rewLockedMax))
-          ? (jump.dbNow < rewLockedMin || jump.dbNow > rewLockedMax)
-          : false;
-        
-        return {
-          jumpIndex: jumpIndex + 1,
-          fromHz: f1Hz,
-          toHz: f2Hz,
-          deltaHz: f2Hz - f1Hz,
-          fromDb: jump.dbPrev,
-          toDb: jump.dbNow,
-          jumpDb: jump.jumpDb,
-          fromIndex: idx1,
-          toIndex: idx2,
-          fromRow: {
-            exactFreqHz: row1.exactFreqHz,
-            finalDb: jump.dbPrev, // Actual plotted value
-            modalDb: row1.modalDb,
-            sbirDb: sbirDb1,
-            modesConsidered: row1.modesConsidered,
-            modesUsed: row1.modesUsed,
-            sbirReflectionsUsed: row1.sbirReflectionsUsed,
-            activeTermsTotal: row1.activeTermsTotal,
-            modesSkippedBandwidth: row1.modesSkippedBandwidth,
-            modesSkippedCoupling: row1.modesSkippedCoupling,
-            isClamped: isClamped1
-          },
-          toRow: {
-            exactFreqHz: row2.exactFreqHz,
-            finalDb: jump.dbNow,
-            modalDb: row2.modalDb,
-            sbirDb: sbirDb2,
-            modesConsidered: row2.modesConsidered,
-            modesUsed: row2.modesUsed,
-            sbirReflectionsUsed: row2.sbirReflectionsUsed,
-            activeTermsTotal: row2.activeTermsTotal,
-            modesSkippedBandwidth: row2.modesSkippedBandwidth,
-            modesSkippedCoupling: row2.modesSkippedCoupling,
-            isClamped: isClamped2
-          },
-          deltas: {
-            deltaModesUsed: row2.modesUsed - row1.modesUsed,
-            deltaSbirReflectionsUsed: row2.sbirReflectionsUsed - row1.sbirReflectionsUsed,
-            deltaActiveTermsTotal: row2.activeTermsTotal - row1.activeTermsTotal,
-            deltaModalDb: row2.modalDb - row1.modalDb,
-            deltaModesSkippedBw: row2.modesSkippedBandwidth - row1.modesSkippedBandwidth,
-            deltaModesSkippedCoup: row2.modesSkippedCoupling - row1.modesSkippedCoupling
-          }
-        };
-      }).filter(Boolean);
-    })();
-    
-    return {
-      status: 'VALID',
-      pointCount,
-      duplicateXCount,
-      nonIncreasingCount,
-      minDf,
-      maxDf,
-      largestGapBand,
-      hasNaNOrInf,
-      flatRunsCount,
-      maxJumpDb,
-      maxJumpAtHz,
-      top5Jumps,
-      stepPairDebug
-    };
-  }, [plottedSeries]);
-  
-  // Compute yDomain for viewport constraint (when Y-axis is locked)
-  // During drag: freeze at captured domain
-  const yDomain = React.useMemo(() => {
-    // During drag: ALWAYS freeze to the captured domain
-    if (isDraggingSub) {
-      const d = yDomainBeforeDragRef.current;
-      return (Array.isArray(d) && d.length === 2) ? d : undefined;
-    }
-
-    // REW mode + locked: ALWAYS use the fixed ref window
-    if (isRewStyle && yAxisLocked) {
-      const lockedMin = (Number(rewDisplayRefDb) || 90) - 30;
-      const lockedMax = (Number(rewDisplayRefDb) || 90) + 30;
-      return [lockedMin, lockedMax];
-    }
-
-    return undefined;
-  }, [isDraggingSub, isRewStyle, yAxisLocked, rewDisplayRefDb]);
-  
-  // Stub for removed display conditioning
-  const belowFloor = 0;
-  const clampedToMin = 0;
-  const clampedToMax = 0;
+  }, [displayData, isDraggingSub]);
 
   // Bass Metrics (20-80 Hz) - NOW USES ANALYSIS SERIES (same as plot base)
   const bassMetrics2080Hz = useMemo(() => {
@@ -2963,217 +1122,76 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
       {/* Bass Response Graph */}
       <div style={{ border: "1px solid #DCDBD6", borderRadius: 16, background: "#FFFFFF", padding: 12 }}>
-        {/* B44 DEBUG STRIP (temporary) */}
-        <div style={{
-          marginTop: 8,
-          marginBottom: 12,
-          padding: '8px 10px',
-          border: '1px solid #DCDBD6',
-          borderRadius: 8,
-          background: '#FFF6E6',
-          fontSize: 12,
-          color: '#1B1A1A'
-        }}>
-          <div><strong>DEBUG</strong></div>
-          <div>globalThis.__B44_BASS_AUDIT: {String(globalThis?.__B44_BASS_AUDIT)}</div>
-          <div>simulationResults.audit exists: {String(!!simulationResults?.audit)}</div>
-          <div>contributors length: {String(simulationResults?.audit?.contributors?.length ?? 0)}</div>
-          <div>summations length: {String(simulationResults?.audit?.summations?.length ?? 0)}</div>
-          <div>hasNoSeats: {String(!!hasNoSeats)} | hasNoSubs: {String(!!hasNoSubs)}</div>
-        </div>
-
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4, gap: 12 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
           <div style={{ fontSize: 14, fontWeight: 700, color: "#1B1A1A" }}>
-            Bass Response
-            {isDraggingSub && (
-              <span style={{ marginLeft: 12, fontSize: 11, color: "#f59e0b", fontWeight: 600 }}>
-                ⏸ Dragging… (updates on release)
+            Bass Response at {selectedSeat?.isPrimary ? "MLP" : `Seat ${selectedSeat?.id ?? ""}`}
+          </div>
+        </div>
+
+        {/* Graph area */}
+        <div className="mt-4">
+          {displayData.length > 0 ? (
+            <BassGraph
+              responseData={plottedSeries}
+              schroederFrequency={schroederFrequency}
+              rp22Levels={rp22Levels}
+              toggles={{}}
+              crossoverFrequency={80}
+              modeFrequencies={safeDebug?.modeMarkersHz || []}
+              showModeMarkers={false}
+              modeMarkers={{ axial: [], tangential: [], oblique: [] }}
+              linearHzAxis={false}
+              rewStyleMode={true}
+              yDomain={undefined}
+              xDomain={[20, 200]}
+              showAxialOnly={false}
+              refDb={85}
+              disableHighlight={false}
+            />
+          ) : (
+            <div style={{ border: "1px solid #DCDBD6", borderRadius: 12, background: "#F8F8F7", padding: 24, color: "#3E4349", fontSize: 13, textAlign: "center" }}>
+              No bass data yet. Add at least one subwoofer and one seat.
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Absorption Control */}
+      <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
+        <div className="text-sm font-medium text-[#1B1A1A] mb-3">Room Acoustics</div>
+        <div className="space-y-3">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs text-[#3E4349]">Absorption</Label>
+              <span className="text-xs font-mono text-[#1B1A1A]">
+                {fmtFixed(absorptionPct, 0)}%
               </span>
-            )}
+            </div>
+            <input
+              type="range"
+              value={absorptionPct}
+              onChange={(e) => setAbsorptionPct(Number(e.target.value))}
+              min="0"
+              max="100"
+              step="5"
+              className="w-full"
+            />
+            <div className="flex justify-between text-xs text-[#3E4349] mt-1">
+              <span>Reflective (0%)</span>
+              <span>Absorptive (100%)</span>
+            </div>
           </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            {/* Bass Audit toggle (always visible) */}
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Label htmlFor="bass-audit" className="text-xs text-[#3E4349] whitespace-nowrap">
-                Bass Audit (REW comparison)
-              </Label>
-              <Switch
-                id="bass-audit"
-                checked={auditUiEnabled}
-                onCheckedChange={handleAuditToggle}
-              />
-              </div>
-
-              {/* REW Strict Parity toggle */}
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <Label htmlFor="rew-strict" className="text-xs text-[#3E4349] whitespace-nowrap">
-                REW Strict (Parity)
-              </Label>
-              <Switch
-                id="rew-strict"
-                checked={rewStrictParity}
-                onCheckedChange={setRewStrictParity}
-              />
-              </div>
-
-              {rewStyleMode && (
-              <>
-                {/* Advanced controls visible only when REW mode is ON */}
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <Label htmlFor="rew-compare" className="text-xs text-[#3E4349] whitespace-nowrap">
-                    REW Compare View
-                  </Label>
-                  <Switch
-                    id="rew-compare"
-                    checked={rewCompareView}
-                    onCheckedChange={setRewCompareView}
-                  />
-                </div>
-
-                {/* REW Movement Test Preset (Part D) */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    // Skip if Compare View is active (Compare forces its own smoothing)
-                    if (rewCompareView) return;
-                    
-                    // Set standardized test environment
-                    const { setRoomDims, setSeatingPositions, setFrontSubsCfg, setRearSubsCfg } = useAppState.getState ? useAppState.getState() : {};
-
-                    // Room: 5.0 × 5.0 × 3.0
-                    if (setRoomDims) {
-                      setRoomDims({ widthM: 5.0, lengthM: 5.0, heightM: 3.0 });
-                    }
-
-                    // MLP at (2.50, 2.62, 1.20)
-                    if (setSeatingPositions) {
-                      setSeatingPositions([{
-                        id: 'mlp-test',
-                        x: 2.50,
-                        y: 2.62,
-                        z: 1.20,
-                        isPrimary: true
-                      }]);
-                    }
-
-                    // One sub at front wall (2.5, 0.15, 0.0)
-                    if (setFrontSubsCfg) {
-                      setFrontSubsCfg({
-                        count: 1,
-                        model: 'SUB2-12',
-                        positions: [{ x: 2.5, y: 0.15 }],
-                        settingsById: {
-                          'front-sub-left': { gainDb: 0, delayMs: 0, polarity: 'normal' }
-                        }
-                      });
-                    }
-
-                    if (setRearSubsCfg) {
-                      setRearSubsCfg({ count: 0 });
-                    }
-
-                    // Force REW settings
-                    setRewRelativeView(false); // Absolute SPL
-                    setShowRewModeLines(true);
-                    setLinearHzAxis(false); // Log Hz axis
-                    setYAxisLocked(true);
-                  }}
-                  className="text-xs h-7 px-3 whitespace-nowrap"
-                >
-                  REW Movement Test Preset
-                </Button>
-
-                {/* MLP Nudge (Part D) */}
-                {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const currentSeats = seatingPositions || [];
-                      const mlpSeat = currentSeats.find(s => s.isPrimary) || currentSeats[0];
-
-                      if (mlpSeat) {
-                        const { setSeatingPositions } = useAppState.getState ? useAppState.getState() : {};
-
-                        if (setSeatingPositions) {
-                          const newSeats = currentSeats.map(s => 
-                            s.isPrimary || s.id === mlpSeat.id
-                              ? { ...s, x: (s.x || 0) + 0.25 }
-                              : s
-                          );
-                          setSeatingPositions(newSeats);
-                        }
-                      }
-                    }}
-                    className="text-xs h-7 px-3 whitespace-nowrap"
-                  >
-                    Nudge MLP width +0.25m
-                  </Button>
-                )}
-              </>
-            )}
-
-            {rewStyleMode && (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, borderLeft: "1px solid #DCDBD6", paddingLeft: 12 }}>
-                  <Label htmlFor="lock-y-axis" className="text-xs text-[#3E4349] whitespace-nowrap">
-                    Lock Y-axis
-                  </Label>
-                  <Switch
-                    id="lock-y-axis"
-                    checked={yAxisLocked}
-                    onCheckedChange={setYAxisLocked}
-                  />
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleResetScale}
-                  className="text-xs h-7 px-2"
-                >
-                  Reset scale
-                </Button>
-              </>
-            )}
-          </div>
-
-          <div style={{ fontSize: 12, color: "#3E4349" }}>
-            Showing: {selectedSeat?.isPrimary ? "MLP" : `Seat ${selectedSeat?.id ?? ""}`}
+          <div className="text-xs text-[#3E4349]">
+            Applies to all room surfaces. Default: 30% (typical cinema).
           </div>
         </div>
+      </div>
 
-        {/* Live Control Status Strip */}
-        <div style={{ 
-          fontSize: 10, 
-          color: "#3E4349", 
-          fontFamily: "monospace",
-          background: "#F8F8F7",
-          padding: "4px 8px",
-          borderRadius: 4,
-          border: "1px solid #DCDBD6",
-          marginBottom: 6
-        }}>
-          User smoothing: {rewSmoothing} | Graph smoothing: {graphSmoothing} | Compare: {String(rewCompareView)} | Audit: {String(globalThis?.__B44_BASS_AUDIT === true)} | Dragging: {String(isDraggingSub)} | DisableSealed: {String(debugDisableSealedGain)}
-        </div>
+      {/* REMOVE ALL DEBUG UI FROM HERE UNTIL Auto Align Controls */}
+      {/* Keep only the metrics cards and warnings that were before the graph */}
 
-        {/* Engine Parameter Verification */}
-        <div style={{ 
-          fontSize: 10, 
-          color: "#1B1A1A", 
-          fontFamily: "monospace",
-          background: "#FFF6E6",
-          padding: "4px 8px",
-          borderRadius: 4,
-          border: "1px solid #C1B6AD",
-          marginBottom: 8
-        }}>
-          seatResponses: {Object.keys(simulationResults.seatResponses || {}).length}
-        </div>
-
-        {/* REW Parity Test Case (Part E - VALIDATION) */}
-        {rewStyleMode && typeof globalThis !== 'undefined' && globalThis.__B44_BASS_REW_TEST && (() => {
+      {/* Auto Align Controls - KEEP THIS SECTION UNCHANGED */}
+      {/* START OF REMOVED SECTION - REMOVE EVERYTHING FROM "REW Parity Test Case" UNTIL HERE */}
           // Test room: 5.0 × 5.0 × 3.0 m
           const testRoomOk = Math.abs((roomDims?.widthM || 0) - 5.0) < 0.1 &&
                              Math.abs((roomDims?.lengthM || 0) - 5.0) < 0.1 &&
