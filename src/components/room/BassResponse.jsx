@@ -4239,25 +4239,13 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
 
-        {/* REW debug banner (only when REW is ON) */}
-        {rewStyleMode && (rewModesData?.debug?.error || rewModesData?.debug?.flatNote) && (
+        {/* Engine error banner */}
+        {safeGraphDebug?.error && (
           <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#C1B6AD]">
-            <div className="font-semibold mb-1">REW status</div>
-            {rewModesData?.debug?.error && (
-              <div className="text-[11px] font-mono opacity-80">Error: {rewModesData.debug.error}</div>
-            )}
-            {rewModesData?.debug?.flatNote && (
-              <div className="text-[11px] font-mono opacity-80">
-                {rewModesData.debug.flatNote.warning} (range {Number(rewModesData.debug.flatNote.rangeDb).toFixed(2)} dB)
-              </div>
-            )}
-            {rewModesData?.debug?.message && (
-              <div className="text-[11px] font-mono opacity-80">Message: {rewModesData.debug.message}</div>
-            )}
-            {rewModesData?.debug?.stack && (
-              <div className="text-[11px] font-mono opacity-80 text-red-600">
-                Stack: {rewModesData.debug.stack.split('\n')[0]}
-              </div>
+            <div className="font-semibold mb-1">Engine Error</div>
+            <div className="text-[11px] font-mono opacity-80">Error: {safeGraphDebug.error}</div>
+            {safeGraphDebug.message && (
+              <div className="text-[11px] font-mono opacity-80">Message: {safeGraphDebug.message}</div>
             )}
           </div>
         )}
@@ -4400,337 +4388,28 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
 
-        {/* REW mode info (only when REW is ON and no error) */}
-        {rewStyleMode && !activeDebug?.error && (() => {
-          // Format Schroeder frequency with off-scale indicator
-          const schroederHz = activeDebug?.schroederHz || schroederFrequency;
+        {/* Engine info (dev only) */}
+        {devMode && !safeGraphDebug?.error && (() => {
+          const schroederHz = safeGraphDebug?.schroederHz || 0;
           const schroederDisplay = schroederHz > 0
             ? (schroederHz > 200 ? `${schroederHz.toFixed(1)} Hz (off-scale)` : `${schroederHz.toFixed(1)} Hz`)
             : 'N/A';
           
-          // Frequency grid diagnostics
-          const gridPointCount = safeDebug?.freqGridPointCount || 0;
-          const gridMin = safeDebug?.freqGridMin;
-          const gridMax = safeDebug?.freqGridMax;
-          
-          // Check for duplicate frequencies in plotted series
-          const freqs = plottedSeries.map(p => p.frequency).filter(f => Number.isFinite(f));
-          const uniqueFreqs = new Set(freqs);
-          const duplicateCount = freqs.length - uniqueFreqs.size;
-          
-          // Check if strictly increasing
-          const isStrictlyIncreasing = freqs.every((f, i) => i === 0 || f > freqs[i - 1]);
-          
           return (
             <div className="text-xs text-[#3E4349] mb-2 bg-[#F8F8F7] p-2 rounded border border-[#DCDBD6]">
-            <div className="font-semibold mb-1">
-            {rewView === 'roomPlusProduct' ? 'Room + Product' : 'Room-only (generic sub)'}
-            </div>
-            <div className="text-[11px] space-y-1">
-            <div>• Complex modal summation with spatial coupling</div>
-            <div>• {safeDebug?.qMappingText || 'Q-based damping'}</div>
-            <div>• Schroeder: <strong>{schroederDisplay}</strong></div>
-            <div>• {rewRelativeView ? 'Relative (normalized to 0 dB @ 30–80 Hz)' : 'Absolute SPL'} scale</div>
-            {rewView === 'roomPlusProduct' && (
-            <div>• Product curves: {(safeDebug?.productModels || []).join(', ') || 'None'}</div>
-            )}
+              <div className="font-semibold mb-1">REW-Style Room Simulation</div>
+              <div className="text-[11px] space-y-1">
+                <div>• Complex modal summation + SBIR</div>
+                <div>• Schroeder: <strong>{schroederDisplay}</strong></div>
+                <div>• Modes: {safeGraphDebug.modeCount || 0} total ({safeGraphDebug.axialCount || 0} axial)</div>
+                <div>• Absorption: {roomAbsorptionPct}% (all surfaces)</div>
               </div>
-              
-              {/* Frequency grid diagnostics */}
-              <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5 text-[10px] font-mono">
-                <div className="font-semibold text-blue-700">Frequency Grid Stats:</div>
-                <div className={gridPointCount >= 2000 ? 'text-green-600' : gridPointCount >= 1000 ? 'text-yellow-600' : 'text-red-600'}>
-                  Point count: {gridPointCount} {gridPointCount >= 2000 ? '✓ (dense)' : gridPointCount >= 1000 ? '⚠ (moderate)' : '✗ (sparse)'}
-                </div>
-                <div>
-                  Range: {Number.isFinite(gridMin) ? gridMin.toFixed(2) : 'N/A'} - {Number.isFinite(gridMax) ? gridMax.toFixed(2) : 'N/A'} Hz
-                </div>
-                <div className="text-blue-600">
-                  Grid type: Dense log-spaced (continuous evaluation)
-                </div>
-                <div className={duplicateCount === 0 ? 'text-green-600' : 'text-red-600'}>
-                  Duplicate X: {duplicateCount} {duplicateCount === 0 ? '✓ PASS' : '✗ FAIL'}
-                </div>
-                <div className={isStrictlyIncreasing ? 'text-green-600' : 'text-red-600'}>
-                  Strictly increasing: {isStrictlyIncreasing ? '✓ PASS' : '✗ FAIL'}
-                </div>
-                {(() => {
-                  // Compute spacing stats
-                  const deltas = freqs.slice(1).map((f, i) => f - freqs[i]);
-                  if (deltas.length === 0) return null;
-                  
-                  const minDelta = Math.min(...deltas);
-                  const maxDelta = Math.max(...deltas);
-                  
-                  // Find where largest spacing occurs
-                  let maxDeltaIdx = 0;
-                  for (let i = 0; i < deltas.length; i++) {
-                    if (deltas[i] === maxDelta) {
-                      maxDeltaIdx = i;
-                      break;
-                    }
-                  }
-                  const maxDeltaRegion = maxDeltaIdx < freqs.length 
-                    ? `${freqs[maxDeltaIdx].toFixed(1)}–${freqs[maxDeltaIdx + 1].toFixed(1)} Hz`
-                    : 'N/A';
-                  
-                  return (
-                    <>
-                      <div className={maxDelta < 0.1 ? 'text-green-600' : 'text-yellow-600'}>
-                        Min Δf: {minDelta.toFixed(6)} Hz
-                      </div>
-                      <div className={maxDelta < 0.5 ? 'text-green-600' : 'text-yellow-600'}>
-                        Max Δf: {maxDelta.toFixed(6)} Hz
-                      </div>
-                      <div className="text-gray-600">
-                        Largest spacing region: {maxDeltaRegion}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-              
-              {/* Acceptance Tests Display */}
-              {safeDebug?.acceptanceTests && (
-                <div className="mt-2 pt-2 border-t border-[#C1B6AD] space-y-0.5 text-[10px] font-mono bg-green-50 p-2 rounded">
-                  <div className="font-semibold text-green-700 mb-1">REW Parity Acceptance Tests:</div>
-                  <div>1. Hover sweep test: {safeDebug.acceptanceTests.hoverSweepTest}</div>
-                  <div>2. No duplicate X test: {safeDebug.acceptanceTests.duplicateXTest}</div>
-                  <div>3. Stair/step test: {safeDebug.acceptanceTests.stairStepTest}</div>
-                  <div className="text-[9px] opacity-70 mt-1">
-                    Point count: {safeDebug.acceptanceTests.pointCount} | 
-                    Min Δf: {safeDebug.acceptanceTests.minDeltaF} Hz
-                  </div>
-                </div>
-              )}
-              <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
-                <div className="text-[10px] font-mono opacity-80 font-semibold text-blue-700">
-                  REW Inputs (Live Tracking):
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Engine calls:</strong> {engineCallsUi}
-                </div>
-                <div className="text-[10px] font-mono opacity-80 break-all">
-                  <strong>Sources:</strong> {(subsForSimulation || []).map(s => `${s.id}:${s.x.toFixed(3)},${s.y.toFixed(3)},${(s.z ?? 0).toFixed(3)}`).join(" | ")}
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Sources used:</strong> {activeDebug?.sourceCountUsed || 0}
-                </div>
-                {activeDebug?.sourcePositionsUsed && activeDebug.sourcePositionsUsed.length > 0 && (
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>Positions:</strong> {activeDebug.sourcePositionsUsed.map((p, i) => 
-                      `[${p.x},${p.y},${p.z}]`
-                    ).join(' ')}
-                  </div>
-                )}
-                <div className="text-[9px] font-mono opacity-70 break-all">
-                  <strong>SourceSig:</strong> {activeDebug?.sourceSigUsed || 'N/A'}
-                </div>
-                <div className="text-[9px] font-mono opacity-70">
-                  <strong>SeatSig:</strong> {activeDebug?.seatSigUsed || 'N/A'}
-                </div>
-                <div className="text-[10px] font-mono opacity-80">
-                  <strong>Lowest axial:</strong> {Number.isFinite(safeDebug?.lowestAxialHz) ? safeDebug.lowestAxialHz.toFixed(1) : '—'} Hz
-                </div>
-                {safeDebug?.modeCouplingSanity && (
-                  <div className="text-[10px] font-mono opacity-80 bg-yellow-100 px-1 rounded">
-                    <strong>ModeCoupling (1,0,0):</strong> seat={fmtFixed(safeDebug.modeCouplingSanity.seatShape_100, 3)} src={fmtFixed(safeDebug.modeCouplingSanity.srcShape_100, 3)} cpl={fmtFixed(safeDebug.modeCouplingSanity.coupling_100, 3)}
-                  </div>
-                )}
-                {safeDebug?.lfProbe?.lfSanityCheck && (
-                  <div className={`text-[10px] font-mono opacity-80 ${safeDebug.lfProbe.lfSanityCheck.startsWith('FAIL') ? 'text-red-600 font-bold' : 'text-green-600'}`}>
-                    <strong>LF Sanity:</strong> {safeDebug.lfProbe.lfSanityCheck}
-                  </div>
-                )}
-                {(() => {
-                  const seat = seatingPositions?.find(s => s.isPrimary) || seatingPositions?.[0];
-                  if (!seat) return null;
-                  let seatUsed = { x: seat.x, y: seat.y, z: seat.z ?? 1.2 };
-                  if (typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && seatNudgeTest) {
-                    seatUsed = { ...seatUsed, x: seatUsed.x - 0.30 };
-                  }
-                  return (
-                    <div className="text-[10px] font-mono opacity-80">
-                      <strong>Seat used (engine):</strong> {seatUsed.x.toFixed(2)}, {seatUsed.y.toFixed(2)}, {seatUsed.z.toFixed(2)}
-                    </div>
-                  );
-                })()}
-                {typeof globalThis !== 'undefined' && globalThis.__B44_BASS_DEBUG && (
-                  <div className="flex items-center gap-2 mt-2 pt-2 border-t border-[#DCDBD6]">
-                    <Checkbox 
-                      id="seat-nudge-test" 
-                      checked={seatNudgeTest}
-                      onCheckedChange={setSeatNudgeTest}
-                    />
-                    <Label htmlFor="seat-nudge-test" className="text-[10px] text-[#3E4349]">
-                      Seat nudge (test) [-0.30m X]
-                    </Label>
-                  </div>
-                )}
-              </div>
-              {activeDebug ? (
-                <div className="mt-2 pt-2 border-t border-[#DCDBD6] space-y-0.5">
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>Modes:</strong> {activeDebug.modeCount} total 
-                    ({activeDebug.axialCount} axial, {activeDebug.tangentialCount} tangential, {activeDebug.obliqueCount} oblique)
-                  </div>
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>View:</strong> {activeDebug.viewMode || rewView}
-                  </div>
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>SPL Range:</strong> {activeDebug.splMinDb} to {activeDebug.splMaxDb} dB (range: {activeDebug.splRangeDb} dB)
-                  </div>
-                  {activeDebug.rawEngineOutputMode && (
-                    <div className="text-[10px] font-mono opacity-80 text-red-600 font-semibold">
-                      <strong>RAW MODE:</strong> Unanchored, free-running SPL (no calibration)
-                    </div>
-                  )}
-                  {!activeDebug.rawEngineOutputMode && (
-                    <div className="text-[10px] font-mono opacity-80">
-                      <strong>Calibration:</strong> {activeDebug.calibrationMode || 'N/A'}
-                    </div>
-                  )}
-                  {!activeDebug.rawEngineOutputMode && activeDebug.calOffsetAppliedDb && (
-                    <div className="text-[10px] font-mono opacity-80">
-                      <strong>Calibration Offset:</strong> {activeDebug.calOffsetAppliedDb} dB
-                    </div>
-                  )}
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>UI smoothing selected:</strong> {rewSmoothing}
-                  </div>
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>Graph smoothing (effective):</strong> {graphSmoothing}
-                  </div>
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>Engine smoothing applied:</strong> {activeDebug.smoothingApplied || 'none'}
-                  </div>
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>Absolute SPL:</strong> {activeDebug.absoluteSplMode ? 'true' : 'false'}
-                  </div>
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>Normalize band:</strong> {activeDebug.normalizeBandHz ? JSON.stringify(activeDebug.normalizeBandHz) : 'none'}
-                  </div>
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>Product curves:</strong> {activeDebug.productCurvesApplied ? 'applied' : 'none'}
-                  </div>
-                  {/* Part C2: Mode density compensation status */}
-                  <div className="text-[10px] font-mono opacity-80">
-                    <strong>Mode density comp:</strong> {activeDebug.modeDensityCompActive ? 'ON' : 'OFF'}
-                    {activeDebug.blendStartHz && activeDebug.blendStartHz !== 'N/A' && (
-                      <span> (above {activeDebug.blendStartHz} Hz)</span>
-                    )}
-                  </div>
-                  {/* Schroeder blend status */}
-                  {activeDebug.blendStartHz && activeDebug.blendStartHz !== 'N/A' && (
-                    <div className="text-[10px] font-mono opacity-80">
-                      <strong>Schroeder blend:</strong> {activeDebug.blendStartHz} Hz → {activeDebug.blendEndHz} Hz (null-preserving)
-                    </div>
-                  )}
-                  {safeDebug?.lfProbe?.measurements && (
-                    <div className="text-[10px] font-mono opacity-80 text-purple-700 mt-1 pt-1 border-t border-purple-200">
-                      <strong>LF Probe (Hz → SPL + Pressure Gain):</strong><br/>
-                      {safeDebug.lfProbe.measurements.map((m, i) => (
-                        <div key={i}>
-                          {m.freq} Hz: {m.finalDbAfterCal || m.rawDbBeforeCal || 'N/A'} dB
-                          {m.pressureGainDb && Number(m.pressureGainDb) > 0 && (
-                            <span className="text-orange-600"> (+{m.pressureGainDb} dB pressure)</span>
-                          )}
-                          {m.belowLowestAxial && <span className="text-red-600"> (below axial)</span>}
-                        </div>
-                      ))}
-                      {activeDebug.lfProbe.pressureGainSettings && (
-                        <div className="text-[9px] opacity-70 mt-1">
-                          Pressure: {activeDebug.lfProbe.pressureGainSettings.enabled ? 'ON' : 'OFF'} 
-                          (k={safeDebug.lfProbe.pressureGainSettings.kDbPerOct} dB/oct, 
-                          max={safeDebug.lfProbe.pressureGainSettings.maxGainDb} dB)
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  {safeDebug.lfDebug15_45Hz && (
-                    <div className="text-[10px] font-mono opacity-80 text-green-700 mt-1 pt-1 border-t border-green-200">
-                      <strong>LF Debug (15-45 Hz):</strong><br/>
-                      Direct: {safeDebug.lfDebug15_45Hz.directMagDb} dB<br/>
-                      Modal: {safeDebug.lfDebug15_45Hz.modalMagDb} dB<br/>
-                      Blended: {safeDebug.lfDebug15_45Hz.blendedMagDb} dB<br/>
-                      <span className="text-[9px] opacity-70">{safeDebug.lfDebug15_45Hz.note}</span>
-                    </div>
-                  )}
-                  {safeDebug.productCurveStats && safeDebug.productCurveStats.length > 0 && (
-                    <div className="text-[10px] font-mono opacity-80 text-blue-700">
-                      <strong>Product curve stats:</strong><br/>
-                      {safeDebug.productCurveStats.map((stat, i) => (
-                        <div key={i}>
-                          Sub {stat.subIndex}: min={stat.productMinDb} dB, max={stat.productMaxDb} dB, @50Hz={stat.productAt50HzDb} dB
-                        </div>
-                      ))}
-                      </div>
-                      )}
-                      {safeDebug?.scaleWarning && (
-                      <div className="text-[10px] font-mono opacity-80 text-yellow-700">
-                      <strong>Warning:</strong> {safeDebug.scaleWarning}
-                      </div>
-                      )}
-                      {safeDebug?.productNote && (
-                      <div className="text-[10px] font-mono opacity-80 text-yellow-700">
-                      <strong>Note:</strong> {safeDebug.productNote}
-                      </div>
-                      )}
-                
-                {/* LF Replace Detection and Sub Movement Test */}
-                <div className="text-[10px] font-mono opacity-80 mt-1 pt-1 border-t border-[#DCDBD6]">
-                  <div><strong>lowestAxialHz:</strong> {Number.isFinite(safeDebug?.lowestAxialHz) ? safeDebug.lowestAxialHz.toFixed(2) : 'N/A'} Hz</div>
-                  <div><strong>LF replace active:</strong> {safeDebug?.lfPressureRiseApplied === 'YES (6 dB/oct, max +12 dB)' ? 'NO (gain term only)' : 'NO'}</div>
-                  {(() => {
-                    // Compute sub movement delta below lowestAxialHz
-                    const lowestAxial = safeDebug?.lowestAxialHz;
-                    if (!Number.isFinite(lowestAxial) || !safeDebug?.acceptanceTests) {
-                      return <div><strong>Below lowestAxialHz Δ:</strong> N/A (no axial modes)</div>;
-                    }
-                    
-                    // For now, show placeholder until user actually moves sub
-                    // This would require tracking previous run data
-                    return <div><strong>Below lowestAxialHz sensitivity:</strong> LIVE (not replaced)</div>;
-                  })()}
-                </div>
-                {(() => {
-                  // Debug: inspect first sub's product curve
-                  const firstSubModel = subsForSimulation[0]?.modelKey;
-                  if (!firstSubModel) return null;
-
-                  const freqs = [];
-                  for (let f = 15; f <= 200; f += 0.5) freqs.push(f);
-
-                  const curveDb = getSubAnechoicResponseDb(firstSubModel, freqs);
-                  if (!curveDb || curveDb.length === 0) return null;
-
-                  const finite = curveDb.filter(v => Number.isFinite(v));
-                  if (finite.length === 0) return null;
-
-                  const minDb = Math.min(...finite);
-                  const maxDb = Math.max(...finite);
-                  const idx50 = freqs.findIndex(f => f >= 50);
-                  const valueAt50Hz = idx50 >= 0 ? curveDb[idx50] : null;
-
-                  const looksAbsolute = (minDb >= 70 && maxDb <= 140);
-                  const label = looksAbsolute ? "curve looks like ABSOLUTE SPL" : "curve looks like RELATIVE GAIN";
-
-                  return (
-                    <div className="text-[10px] font-mono opacity-80 text-blue-700 mt-1 pt-1 border-t border-blue-200">
-                      <strong>Product Curve Debug ({firstSubModel}):</strong><br/>
-                      min={minDb.toFixed(1)} dB, max={maxDb.toFixed(1)} dB, @50Hz={valueAt50Hz?.toFixed(1) || 'N/A'} dB<br/>
-                      → {label}
-                    </div>
-                  );
-                })()}
-              </div>
-              ) : null}
             </div>
           );
         })()}
 
-        {/* REW advanced controls (visible only when REW is ON) */}
-        {rewStyleMode && (
+        {/* Advanced controls (dev only) */}
+        {devMode && (
           <div className="space-y-2 mb-2">
             <div className="flex items-center gap-3">
               <div className="text-xs text-[#3E4349]">Product:</div>
@@ -4794,18 +4473,14 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
             </div>
 
             {/* Modal Alignment Debug */}
-            {rewStyleMode && (() => {
+            {devMode && (() => {
               const w = Number(roomDims?.widthM);
               const l = Number(roomDims?.lengthM);
               const h = Number(roomDims?.heightM);
 
               if (!(Number.isFinite(w) && Number.isFinite(l) && Number.isFinite(h))) return null;
 
-              const seriesForGraph = rewStyleMode ? safeRewModesData : safeRoomModesData;
-              const dbg = seriesForGraph?.debug && typeof seriesForGraph.debug === "object"
-                ? seriesForGraph.debug
-                : {};
-
+              const dbg = safeGraphDebug || {};
               const c = Number(dbg.cMpsUsed) || 343;
 
               const fL_expected = c / (2 * l);
@@ -4860,22 +4535,16 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
 
             {/* Live state readout (audit) */}
             <div className="text-[9px] font-mono bg-yellow-50 p-1 rounded border border-yellow-300 mt-2">
-              <strong>Live State:</strong> componentView={componentView} | rewView={rewView} | engineCalls={engineCallCountRef.current} | dataset={rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'} | timeAlign={rewTimeAlign ? 'ON' : 'OFF'} | smoothingSelected={rewSmoothing} | smoothingPassedToEngine={graphSmoothing}
+              <strong>Live State:</strong> engineCalls={engineCallCountRef.current} | absorption={roomAbsorptionPct}% | subs={subsForSimulation.length} | dragging={isDraggingSub ? 'YES' : 'NO'}
               <div className="mt-1 pt-1 border-t border-yellow-400">
-                <strong>Maths:</strong> modal={(() => {
-                  const wantModal = modesEnabled && componentView !== 'sbirOnly';
-                  return wantModal ? 'ON' : 'OFF';
-                })()} | sbir={(() => {
-                  const wantSBIR = rewSbirEnabled && componentView !== 'modalOnly';
-                  return wantSBIR ? 'ON' : 'OFF';
-                })()} | dragging={isDraggingSub ? 'YES' : 'NO'} | sbirPathsUsed={(rewStyleMode ? safeRewModesData.debug : safeRoomModesData.debug)?.sbirDebugProbe40Hz?.pathsUsed || (rewStyleMode ? safeRewModesData.debug : safeRoomModesData.debug)?.sbirDebugProbe63Hz?.pathsUsed || 0}
+                <strong>SBIR paths used:</strong> {safeGraphDebug?.sbirDebugProbe40Hz?.pathsUsed || safeGraphDebug?.sbirDebugProbe63Hz?.pathsUsed || 0}
               </div>
             </div>
           </div>
         )}
 
-        {/* REW mode lines toggles (only when REW is ON) */}
-        {rewStyleMode && (
+        {/* Dev controls */}
+        {devMode && (
           <div className="flex items-center gap-4 mb-2">
             <div className="flex items-center gap-2">
               <Checkbox 
@@ -4932,8 +4601,8 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           </div>
         )}
 
-        {/* Clamp feedback (REW mode only) */}
-        {rewStyleMode && yAxisLocked && (clampedToMin + clampedToMax) > 0 && (
+        {/* Clamp feedback (dev only) */}
+        {devMode && (
           <div style={{ marginTop: 6, marginBottom: 8, fontSize: 12, color: "#8a2b2b", background: "#fff3cd", padding: "6px 10px", borderRadius: 6, border: "1px solid #ffc107" }}>
             ⚠️ Clamped: {clampedToMin} to min, {clampedToMax} to max. Curve rides window edge (REW-style). Unlock Y-axis to view full range.
           </div>
@@ -5078,68 +4747,33 @@ export default function BassResponse({ frontSubsCfg, rearSubsCfg, subWarnings, f
           );
         })()}
 
-        {/* Mode isolation plot source debug (Part C2 - prove isolation drives plot) */}
-        {rewStyleMode && (() => {
+        {/* Mode isolation plot source debug (dev only) */}
+        {devMode && (() => {
           const isolationActive = modeIsolation !== 'off';
           const modeCountUsed = safeDebug?.modalModeCountUsed || safeDebug?.modeCount || 0;
 
-          // Determine exact data array being plotted
-          const plotDataSource = rewView === 'roomPlusProduct' 
-            ? 'rewRoomPlusProductData.data' 
-            : 'rewModesData.data';
-
-          const componentLabel = {
-            'modalOnly': 'Modal only',
-            'sbirOnly': 'SBIR only',
-            'modalPlusSbir': 'Modal + SBIR'
-          }[componentView] || componentView;
-
           return (
             <div className="text-[10px] font-mono mb-1 bg-purple-50 p-1 rounded border border-purple-300 space-y-0.5">
-              <div>Plot uses: <strong>{plotDataSource}</strong> (REW {rewView === 'roomPlusProduct' ? 'Room+Product' : 'Room-only'}, {componentLabel})</div>
-              <div>Mode isolation active: <strong>{isolationActive ? 'YES' : 'NO'}</strong> {isolationActive && `(value: ${modeIsolation})`}</div>
-              <div>Modal modes actually used this run: <strong>{modeCountUsed}</strong></div>
-              <div className="mt-1 pt-1 border-t border-purple-300 font-semibold">
-                Component RMS 20–200 Hz:
-              </div>
-              <div>Modal RMS: <strong>{safeDebug?.modalRmsDb_20_200 || '—'} dB</strong></div>
-              <div>SBIR RMS: <strong>{safeDebug?.sbirRmsDb_20_200 || '—'} dB</strong></div>
-              <div>Total RMS: <strong>{safeDebug?.totalRmsDb_20_200 || '—'} dB</strong></div>
-              <div className="text-[9px] opacity-70 mt-1 border-t border-purple-300 pt-1">
-                <strong>UI componentView:</strong> {componentView}
-              </div>
-              <div className="text-[9px] opacity-70">
-                <strong>Engine componentView:</strong> {safeDebug?.componentView || 'N/A'}
-              </div>
-              {safeDebug?.subDistancesToMLP && (
-                <div className="text-[9px] opacity-70 mt-1 border-t border-purple-300 pt-1">
-                  <strong>Sub distances + effective delays:</strong><br/>
-                  {safeDebug.subDistancesToMLP.map((sub, i) => (
-                    <div key={i}>
-                      {sub.subId}: {sub.distanceM}m, delay={sub.effectiveDelayMs}ms
-                    </div>
-                  ))}
-                </div>
-              )}
+              <div>Plot uses: <strong>finalBassSeries</strong> (REW-parity, modal+SBIR always)</div>
+              <div>Mode isolation: <strong>{isolationActive ? 'YES' : 'NO'}</strong> {isolationActive && `(${modeIsolation})`}</div>
+              <div>Modes used: <strong>{modeCountUsed}</strong></div>
+              <div>Modal RMS 20–200 Hz: <strong>{safeGraphDebug?.modalRmsDb_20_200 || '—'} dB</strong></div>
+              <div>SBIR RMS 20–200 Hz: <strong>{safeGraphDebug?.sbirRmsDb_20_200 || '—'} dB</strong></div>
+              <div>Total RMS 20–200 Hz: <strong>{safeGraphDebug?.totalRmsDb_20_200 || '—'} dB</strong></div>
             </div>
           );
         })()}
 
         {/* Graph area */}
         <div className="mt-6">
-          {(belowFloor > 0 || (yAxisLocked && (clampedToMin > 0 || clampedToMax > 0))) && (
+          {devMode && (belowFloor > 0 || (clampedToMin > 0 || clampedToMax > 0)) && (
             <div className="text-[10px] text-gray-500 mb-2 italic">
-              {belowFloor > 0 && `${belowFloor} below floor (-60 dB) → null`}
-              {belowFloor > 0 && yAxisLocked && (clampedToMin > 0 || clampedToMax > 0) && ' | '}
-              {yAxisLocked && clampedToMin > 0 && `${clampedToMin} clamped to min`}
-              {yAxisLocked && clampedToMin > 0 && clampedToMax > 0 && ', '}
-              {yAxisLocked && clampedToMax > 0 && `${clampedToMax} clamped to max`}
-              {isRewStyle && yAxisLocked && ` (window: ${Number.isFinite(rewLockedMin) ? rewLockedMin.toFixed(0) : '—'} to ${Number.isFinite(rewLockedMax) ? rewLockedMax.toFixed(0) : '—'} dB)`}
+              Debug: {belowFloor} below floor, {clampedToMin} clamped low, {clampedToMax} clamped high
             </div>
-          )}
-          
-          {/* Plot Integrity Check (before graph renders) */}
-          {plotIntegrityCheck.status === 'VALID' && (
+            )}
+
+            {/* Plot Integrity Check (dev only) */}
+            {devMode && (
             <div className="text-xs mb-2 bg-blue-50 p-2 rounded border border-blue-400">
               <div className="font-semibold mb-1 text-blue-700">📊 Plot Integrity Check</div>
               
@@ -5994,8 +5628,8 @@ ${safeDebug.stepJumpInspector55_90.summary.y0.toFixed(2)} dB → ${safeDebug.ste
         </div>
       </div>
 
-      {/* REW Smoothing (only shown when REW mode is ON) */}
-      {rewStyleMode && (
+      {/* Smoothing controls (dev only) */}
+      {devMode && (
         <div className="rounded-lg border border-[#DCDBD6] bg-white p-4">
           <div className="text-sm font-medium text-[#1B1A1A] mb-3">Smoothing</div>
           <div className="space-y-2">
