@@ -138,6 +138,8 @@ export default function SpeakerPositionsOverlay({
   meterToCanvasX,
   meterToCanvasY,
   roomRect,
+  getSpeakerVisibility,
+  getCanonicalRole,
 }) {
   if (!(view === "plan" || view === "both")) return null;
 
@@ -226,25 +228,40 @@ export default function SpeakerPositionsOverlay({
     return mToCm(Hm);
   };
 
+  // Helper to check if speaker has valid position
+  const hasPos = (s) => s?.position && isNum(s.position.x) && isNum(s.position.y);
+
   // --- Filter bed speakers (no subs/LFE, no overheads) ---
+  // CRITICAL: Use same visibility filter as plan view to hide unused FW/RW
   const bedSpeakers = (Array.isArray(speakers) ? speakers : []).filter((s) => {
     const role = String(s?.role || "").toUpperCase();
     if (!role) return false;
     if (role === "SUB" || role === "LFE") return false;
     if (role.startsWith("T")) return false;
-    const x = s?.position?.x;
-    const y = s?.position?.y;
-    return isNum(x) && isNum(y);
+    if (!hasPos(s)) return false;
+    
+    // CRITICAL: Reuse plan view visibility logic to hide unused speakers (FW/RW when not in layout)
+    if (typeof getSpeakerVisibility === "function") {
+      return getSpeakerVisibility(role, s.model) !== false;
+    }
+    
+    return true;
   });
 
   // --- Overhead speakers (separate from bed speakers) ---
+  // CRITICAL: Use same visibility filter as plan view to hide inactive overheads
   const overheadSpeakers = (Array.isArray(speakers) ? speakers : []).filter((s) => {
     const role = String(s?.role || "").toUpperCase();
     if (!role) return false;
     if (!role.startsWith("T")) return false;
-    const x = s?.position?.x;
-    const y = s?.position?.y;
-    return isNum(x) && isNum(y);
+    if (!hasPos(s)) return false;
+    
+    // CRITICAL: Reuse plan view visibility logic
+    if (typeof getSpeakerVisibility === "function") {
+      return getSpeakerVisibility(role, s.model) !== false;
+    }
+    
+    return true;
   });
 
   // Split overheads into left/right columns by room midline

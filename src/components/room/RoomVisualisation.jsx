@@ -7007,6 +7007,8 @@ return (
               meterToCanvasX={meterToCanvasX}
               meterToCanvasY={meterToCanvasY}
               roomRect={roomRect}
+              getSpeakerVisibility={getSpeakerVisibility}
+              getCanonicalRole={getCanonicalRole}
             />
 
 <PlanMessages
