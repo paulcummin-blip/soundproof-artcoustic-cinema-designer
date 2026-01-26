@@ -3455,7 +3455,7 @@ React.useEffect(() => {
         return 'Other';
       };
       
-      const relevantSpeakers = (placedSpeakers || []).filter(sp => {
+      const relevantSpeakers = (visiblePlanSpeakers || []).filter(sp => {
         const canon = getCanonicalRole(sp.role);
         return surroundAndOverheadRoles.has(canon) && sp.position;
       });
@@ -3806,19 +3806,10 @@ React.useEffect(() => {
     }
 
     // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
-    // Build eligible surrounds for P5
-    const allSurrounds = (placedSpeakers || []).filter(s => {
+    // Build eligible surrounds for P5 (ONLY from actually drawn speakers)
+    const eligibleSurrounds = (visiblePlanSpeakers || []).filter(s => {
       const r = getCanonicalRole(s.role);
       return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
-    });
-
-    const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
-    const hasSR = allSurrounds.some(s => getCanonicalRole(s.role) === 'SR');
-
-    const eligibleSurrounds = allSurrounds.filter(s => {
-      const r = getCanonicalRole(s.role);
-      if (r === 'LW' || r === 'RW') return hasSL && hasSR;
-      return true;
     });
 
     let p5Val = null;
@@ -5717,6 +5708,30 @@ return {
 
   const lastRvLogSigRef = React.useRef(null);
 
+  // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
+  const visiblePlanSpeakers = useMemo(() => {
+    const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+    const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
+    
+    const speakerSystem = appState?.speakerSystem;
+    const sevenBedLayoutType = appState?.sevenBedLayoutType;
+    
+    const layoutRaw = speakerSystem?.dolbyLayout ?? speakerSystem?.dolbyPreset ?? dolbyLayout ?? "5.1";
+    const layoutKey = (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1").toString().trim().split(" ")[0].split("_")[0];
+    const useWidesInsteadOfRears = !!speakerSystem?.useWidesInsteadOfRears || speakerSystem?.sevenBedLayoutType === "wides" || sevenBedLayoutType === "wides" || false;
+    
+    const allowedRoles = new Set(rolesForLayout({ dolbyLayout: layoutKey, useWidesInsteadOfRears: !!useWidesInsteadOfRears }));
+    
+    return afterRenderable.filter((s) => {
+      const canon = getCanonicalRole(s?.role);
+      if (canon === "LFE") return false;
+      if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
+        return allowedRoles.has(canon);
+      }
+      return getSpeakerVisibility(s.role, s.model);
+    });
+  }, [placedSpeakers, dolbyLayout, appState?.speakerSystem, appState?.sevenBedLayoutType, getSpeakerVisibility, getCanonicalRole]);
+
   const renderSpeakers = useCallback(() => {
   // Start from the prop (single source of truth)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
@@ -6242,23 +6257,16 @@ const renderRp22AnglesOverlay = useCallback(() => {
   if (!Number.isFinite(scale)) return null;
   if (!effectiveHoveredSeat) return null;
 
-  // 1) Collect all surround-type speakers around this seat
-  const allSurrounds = (placedSpeakers || []).filter((s) => {
+  // 1) Collect all surround-type speakers around this seat (ONLY from actually drawn speakers)
+  const allSurrounds = (visiblePlanSpeakers || []).filter((s) => {
     const r = getCanonicalRole(s.role);
     return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r);
   });
 
   if (allSurrounds.length < 2) return null;
 
-  // 2) Wides only count if proper SL/SR exist
-  const hasSL = allSurrounds.some((s) => getCanonicalRole(s.role) === "SL");
-  const hasSR = allSurrounds.some((s) => getCanonicalRole(s.role) === "SR");
-
-  const eligibleSurrounds = allSurrounds.filter((s) => {
-    const r = getCanonicalRole(s.role);
-    if (r === "LW" || r === "RW") return hasSL && hasSR;
-    return true;
-  });
+  // 2) Use all valid surrounds (no additional filtering needed - visiblePlanSpeakers already handles layout)
+  const eligibleSurrounds = allSurrounds;
 
   if (eligibleSurrounds.length < 2) return null;
 
@@ -6371,7 +6379,7 @@ const renderRp22AnglesOverlay = useCallback(() => {
   if (!labelGroup.length) return null;
 
   return <g aria-label="rp22-surround-angles">{labelGroup}</g>;
-}, [effectiveHoveredSeat, placedSpeakers, scale, toPx, getCanonicalRole]);
+}, [effectiveHoveredSeat, visiblePlanSpeakers, scale, toPx, getCanonicalRole]);
 
   // Build HUD style safely
   const hudDynamicStyle = useMemo(() => {
