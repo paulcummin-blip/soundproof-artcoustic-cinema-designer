@@ -2073,6 +2073,8 @@ function RoomDesignerWithState() {
     };
 
     const computeGroupDepthCm = ({ roles, getYawDegForRole, speakersToProcess, widthM, lengthM, getModelMeta }) => {
+      let _dbgPrinted = false;
+      
       if (!Array.isArray(speakersToProcess) || speakersToProcess.length === 0) return null;
       const W = widthM;
       const L = lengthM;
@@ -2106,6 +2108,31 @@ function RoomDesignerWithState() {
         // Wall-hinge model: report how far the cabinet extends into room from wall plane
         const hingeAngleDeg = _hingeAngleDegFromWall(wall, yawDeg);
         const depthM_fromWall = _hingeIntrusionM(wM, dM, hingeAngleDeg);
+
+        if (!_dbgPrinted && (role === "SL" || role === "SR")) {
+          _dbgPrinted = true;
+
+          console.log("[AIM DEPTH DEBUG]",
+            {
+              aimSide: appState?.aimSideSurroundsAtMLP,
+              role,
+              id: sp?.id,
+              model: sp?.model,
+              pos: sp?.position,
+              yawRaw: sp?.yaw,
+              rotationY: sp?.rotation?.y,
+              rotationDeg: sp?.rotationDeg,
+              yawComputed: (getYawDegForRole?.(sp) ?? null),
+              yawUsed: yawDeg,
+              wall,
+              widthM: wM,
+              depthM: dM,
+              hingeAngleDeg,
+              intrusionM: depthM_fromWall,
+              intrusionCmRounded: Math.round(depthM_fromWall * 100),
+            }
+          );
+        }
 
         if (!_isNum(depthM_fromWall)) continue;
         if (maxDepthM === null || depthM_fromWall > maxDepthM) maxDepthM = depthM_fromWall;
