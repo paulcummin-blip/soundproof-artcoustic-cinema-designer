@@ -660,7 +660,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       return speaker;
     });
 
-    // Compute P17 for all seats (non-LCR HF variance) - PASS appState for aim toggles + visibility
+    // Determine if wides are actually active in the current layout
+    const widesActive =
+      String(aimState?.speakerSystem?.sevenBedLayoutType || overheadState?.sevenBedLayoutType || "") === "wides" ||
+      Boolean(aimState?.speakerSystem?.useWides || overheadState?.speakerSystem?.useWides) ||
+      Boolean(aimState?.speakerSystem?.widesEnabled || overheadState?.speakerSystem?.widesEnabled) ||
+      Boolean(aimState?.enableFrontWides || overheadState?.enableFrontWides);
+
+    // Compute P17 for all seats (non-LCR HF variance) - PASS appState for aim toggles + visibility + wides flag
 
     const p17Results = computeP17ForAllSeats({
       seats: seatsWithRoles,
@@ -670,6 +677,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       roomHeightM,
       appState: { ...(aimState || overheadState), getSpeakerVisibility: aimState?.getSpeakerVisibility || overheadState?.getSpeakerVisibility },
       getCanonicalRole,
+      widesActive,
     });
 
     // Helper to get SPL at seat for a specific role
