@@ -17,7 +17,11 @@ function getSpeakerPrice(modelId) {
   });
   
   if (!speaker) {
-    console.warn(`[Pricing] Speaker not found in database: ${modelId}`);
+    const _missingWarned = globalThis.__missingSpeakerWarned || (globalThis.__missingSpeakerWarned = new Set());
+    if (!_missingWarned.has(modelId)) {
+      _missingWarned.add(modelId);
+      console.warn(`[Pricing] Speaker not found in database: ${modelId}`);
+    }
     return 0;
   }
   

@@ -5721,31 +5721,7 @@ return {
   // Start from the prop (single source of truth)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
-  // TEMP TRACE (remove after): always log SBL/SBR state
-  try {
-    const pick = (role) => rawSpeakers.find(s => getCanonicalRole(s?.role) === role) || null;
-    const sbl = pick("SBL");
-    const sbr = pick("SBR");
 
-    const row = (sp, role) => ({
-      role,
-      exists: !!sp,
-      model: sp?.model ?? null,
-      x: Number.isFinite(sp?.position?.x) ? sp.position.x : null,
-      y: Number.isFinite(sp?.position?.y) ? sp.position.y : null,
-      z: Number.isFinite(sp?.position?.z) ? sp.position.z : null,
-    });
-
-    const out = [row(sbl, "SBL"), row(sbr, "SBR")];
-
-    if (typeof window !== "undefined") window.__SBL_SBR_TRACE__ = out;
-
-    // ALWAYS log (not gated by __B44_LOGS)
-    console.log("[SBL/SBR TRACE]", out);
-    if (console.table) console.table(out);
-  } catch (e) {
-    console.warn("[SBL/SBR TRACE] failed", e);
-  }
 
   // 1) Basic structural filter (existing helper)
   const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);

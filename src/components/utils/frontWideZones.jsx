@@ -90,10 +90,7 @@ export function computeFrontWideZonesStrict({
     const yMax = clamp(Math.max(yLo, yHi), 0, L);
     const medianY = clamp(yMed, 0, L);
 
-    if (typeof console !== 'undefined' && console.log) {
-      console.log(`[FW] ${sideName} yMin=${yMin.toFixed(3)}..yMax=${yMax.toFixed(3)} @ median=${medianY.toFixed(3)}`,
-        `inputs: F.y=${F.position.y.toFixed(3)}, S.y=${S.position.y.toFixed(3)}, MLP.y=${mlpY.toFixed(3)}, θ=${thetaDeg.toFixed(1)}°`);
-    }
+
 
     return {
       status: 'ok',

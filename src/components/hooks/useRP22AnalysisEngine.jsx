@@ -1047,16 +1047,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       }
     }
 
-    console.log(
-      "[ENGINE P16]",
-      {
-        seats: perSeatRp22 ? Object.keys(perSeatRp22) : null,
-        sampleSeat: primarySeats[0]?.id,
-        sampleP16: perSeatRp22?.[primarySeats[0]?.id]?.rp22?.[16]
-          || perSeatRp22?.[primarySeats[0]?.id]?.p16
-          || null,
-      }
-    );
+
 
     return {
       gradedParameters,
