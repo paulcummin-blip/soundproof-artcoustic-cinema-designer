@@ -804,29 +804,25 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
       // P5 - Max horizontal gap between adjacent surrounds (no wrap)
       {
-        const surroundRoles = ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'];
+        const surroundRoles = ['SL', 'SR', 'SBL', 'SBR'];
         const allSurrounds = speakersWithResolvedOverheads.filter(s => {
           const r = getCanonicalRole(s.role);
-          return surroundRoles.includes(r) && s.position;
+          return (
+            surroundRoles.includes(r) &&
+            s.position &&
+            Number.isFinite(s.position.x) &&
+            Number.isFinite(s.position.y)
+          );
         });
 
-        const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
-        const hasSR = allSurrounds.some(s => getCanonicalRole(s.role) === 'SR');
-
-        const eligibleSurrounds = allSurrounds.filter(s => {
-          const r = getCanonicalRole(s.role);
-          if (r === 'LW' || r === 'RW') return hasSL && hasSR;
-          return true;
-        });
-
-        if (eligibleSurrounds.length >= 2 && mlp && isNum(mlp.x) && isNum(mlp.y)) {
+        if (allSurrounds.length >= 2 && mlp && isNum(mlp.x) && isNum(mlp.y)) {
           const azimuthDeg = (p) => {
             const dx = p.x - seat.x;
             const dy = p.y - seat.y;
             return (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
           };
 
-          const azimuths = eligibleSurrounds
+          const azimuths = allSurrounds
             .map(s => ({ role: getCanonicalRole(s.role), az: azimuthDeg(s.position) }))
             .sort((a, b) => a.az - b.az);
 
