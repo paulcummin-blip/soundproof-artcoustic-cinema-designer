@@ -2011,9 +2011,29 @@ function RoomDesignerWithState() {
   };
   
   const _getDimsM = (modelMeta) => {
-    const d = modelMeta?.dims || modelMeta?.dimensions || {};
-    const widthM = _isNum(d.widthM) ? d.widthM : (_isNum(d.width) ? d.width : 0.18);
-    const depthM = _isNum(d.depthM) ? d.depthM : (_isNum(d.depth) ? d.depth : 0.10);
+    // Accept BOTH formats:
+    // 1) meta.widthM / meta.depthM (metres)
+    // 2) meta.widthMm / meta.depthMm (millimetres)
+    // 3) meta.dims.widthM/depthM or meta.dimensions.widthM/depthM (older)
+    const m = modelMeta || {};
+    const d = m.dims || m.dimensions || {};
+
+    const widthM =
+      (_isNum(m.widthM) ? m.widthM : null) ??
+      (_isNum(d.widthM) ? d.widthM : null) ??
+      (_isNum(m.widthMm) ? m.widthMm / 1000 : null) ??
+      (_isNum(d.widthMm) ? d.widthMm / 1000 : null) ??
+      (_isNum(d.width) ? d.width : null) ??
+      0.18;
+
+    const depthM =
+      (_isNum(m.depthM) ? m.depthM : null) ??
+      (_isNum(d.depthM) ? d.depthM : null) ??
+      (_isNum(m.depthMm) ? m.depthMm / 1000 : null) ??
+      (_isNum(d.depthMm) ? d.depthMm / 1000 : null) ??
+      (_isNum(d.depth) ? d.depth : null) ??
+      0.10;
+
     return { widthM, depthM };
   };
 
@@ -2132,7 +2152,7 @@ function RoomDesignerWithState() {
     };
 
     const getYawDegForRole = (sp) => {
-      const r = sp?.role;
+      const r = safeCanon(sp?.role);
 
       const aimToMLP = () => {
         if (!sp?.position || !mlpAnchorEffective) return 0;
