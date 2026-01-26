@@ -2274,11 +2274,17 @@ function RoomDesignerWithState() {
       aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
+      speakerSystem: appState?.speakerSystem,
+      sevenBedLayoutType: appState?.sevenBedLayoutType,
+      getSpeakerVisibility: appState?.getSpeakerVisibility,
     },
     aimState: {
       aimFrontWidesAtMLP: appState?.aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP: appState?.aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP: appState?.aimRearSurroundsAtMLP,
+      speakerSystem: appState?.speakerSystem,
+      sevenBedLayoutType: appState?.sevenBedLayoutType,
+      getSpeakerVisibility: appState?.getSpeakerVisibility,
     }
   });
 

@@ -9,7 +9,7 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 
 const LCR_ROLES = new Set(["FL", "L", "FC", "C", "FR", "R"]);
 const OVERHEAD_ROLES = new Set(["TFL", "TFR", "TL", "TR", "TML", "TMR", "TBL", "TBR", "TFC", "TBC"]);
-const SURROUND_ROLES = new Set(["SL", "SR", "SBL", "SBR", "LW", "RW"]);
+const SURROUND_ROLES = new Set(["SL", "SR", "SBL", "SBR"]);
 
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 

@@ -319,7 +319,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 // Helper to normalize role names
 const getCanonicalRole = (role) => String(role || "").toUpperCase();
 
-export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen }) => {
+export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimensions, mlpBasis, mlpPointOverride, seatSplMetrics, overheadState, aimState, p15ConstructionLevel, screen, visiblePlanSpeakers }) => {
 
   const evaluateOverheads = (speakers, seats, roomHeight) => {
     // This is where real P9, P10, P11, P13 logic would go.
@@ -648,8 +648,13 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const seatMetrics = new Map();
     const roomCenterX = (dimensions?.widthM || 0) / 2;
 
+    // Use visiblePlanSpeakers if provided, otherwise fall back to safeSpeakers
+    const speakersForP17 = Array.isArray(visiblePlanSpeakers) && visiblePlanSpeakers.length > 0
+      ? visiblePlanSpeakers
+      : safeSpeakers;
+
     // Resolve overhead models before passing to P17
-    const speakersWithResolvedOverheads = safeSpeakers.map(speaker => {
+    const speakersWithResolvedOverheads = speakersForP17.map(speaker => {
       const role = String(speaker.role || '').toUpperCase();
       if (!role.startsWith('T')) return speaker;
       
