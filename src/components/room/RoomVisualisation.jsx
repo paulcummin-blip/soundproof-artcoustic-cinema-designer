@@ -4038,22 +4038,37 @@ useEffect(() => {
       setConstraintZones(constraints);
 
       if (Object.keys(constraints).length > 0) {
-        if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
-          console.groupCollapsed('[LCR Constraints] Phase 1 - Movement Corridors');
+        // Log only when inputs actually change (prevents spam)
+        const key = JSON.stringify({
+          roomW: Number(widthM || 0).toFixed(3),
+          roomL: Number(lengthM || 0).toFixed(3),
+          mlpX: Number(mlp?.x || 0).toFixed(3),
+          mlpY: Number(mlp?.y || 0).toFixed(3),
+          flX: Number(activeSpeakers.find(s => getCanonicalRole(s.role) === 'FL')?.position?.x || 0).toFixed(3),
+          frX: Number(activeSpeakers.find(s => getCanonicalRole(s.role) === 'FR')?.position?.x || 0).toFixed(3),
+          fcX: Number(activeSpeakers.find(s => getCanonicalRole(s.role) === 'FC')?.position?.x || 0).toFixed(3),
+        });
 
-          Object.entries(constraints).forEach(([role, data]) => {
-            const { clamp, currentX, iconWidthM, travelDistance, canMove } = data;
-            if (globalThis.__B44_LOGS) console.log(`${role}:`, {
-              currentX: currentX.toFixed(3),
-              allowedRange: `[${clamp.minX.toFixed(3)}, ${clamp.maxX.toFixed(3)}]`,
-              iconWidth: `${iconWidthM.toFixed(3)}m`,
-              travelDistance: `${travelDistance.toFixed(3)}m`,
-              canMove,
-              model: data.model || 'undefined'
+        if (lcrLogOnceRef.current.key !== key) {
+          lcrLogOnceRef.current.key = key;
+          
+          if (typeof console !== 'undefined' && typeof console.groupCollapsed === 'function') {
+            console.groupCollapsed('[LCR Constraints] Phase 1 - Movement Corridors');
+
+            Object.entries(constraints).forEach(([role, data]) => {
+              const { clamp, currentX, iconWidthM, travelDistance, canMove } = data;
+              if (globalThis.__B44_LOGS) console.log(`${role}:`, {
+                currentX: currentX.toFixed(3),
+                allowedRange: `[${clamp.minX.toFixed(3)}, ${clamp.maxX.toFixed(3)}]`,
+                iconWidth: `${iconWidthM.toFixed(3)}m`,
+                travelDistance: `${travelDistance.toFixed(3)}m`,
+                canMove,
+                model: data.model || 'undefined'
+              });
             });
-          });
 
-          if (typeof console.groupEnd === 'function') console.groupEnd();
+            if (typeof console.groupEnd === 'function') console.groupEnd();
+          }
         }
       }
     } catch (error) {
@@ -5707,6 +5722,7 @@ return {
   }, [applyLcrFromDetail]);
 
   const lastRvLogSigRef = React.useRef(null);
+  const lcrLogOnceRef = React.useRef({ key: null });
 
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useMemo(() => {
