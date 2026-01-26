@@ -6098,6 +6098,7 @@ return {
 
     const RX_M = 0.10;
     const RY_M = 0.125;
+    const HIT_PADDING_PX = 8; // Extra pixels for forgiving hit area
 
     if (globalThis.__B44_LOGS) console.log('RoomVisualisation: rendering seats =', seatingPositions.length);
 
@@ -6120,27 +6121,39 @@ return {
           const isPinned = hudPinnedSeatId === seat.id;
 
           return (
-            <ellipse
-              key={seat.id}
-              cx={seatX}
-              cy={seatY}
-              rx={RX_M * scale}
-              ry={RY_M * scale}
-              fill="rgba(0,0,0,0)"
-              pointerEvents="all"
-              stroke="#213428"
-              strokeWidth={seat.isPrimary ? 2.5 : isPinned ? 2 : 1}
-              strokeDasharray={isPinned ? '4 2' : 'none'}
-              style={{ cursor: 'pointer' }}
-              aria-label="Seat — hover for RP23 and P1 analysis"
-              onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
-              onMouseEnter={() => handleSeatMouseEnter(seat)}
-              onMouseLeave={handleSeatMouseLeave}
-              onClick={(e) => {
-                e.stopPropagation();
-                handleSeatClick(seat);
-              }}
-            />
+            <g key={seat.id}>
+              {/* Invisible hit target (larger, more forgiving) */}
+              <ellipse
+                cx={seatX}
+                cy={seatY}
+                rx={RX_M * scale + HIT_PADDING_PX}
+                ry={RY_M * scale + HIT_PADDING_PX}
+                fill="transparent"
+                pointerEvents="all"
+                style={{ cursor: 'pointer' }}
+                onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
+                onMouseEnter={() => handleSeatMouseEnter(seat)}
+                onMouseLeave={handleSeatMouseLeave}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSeatClick(seat);
+                }}
+              />
+              
+              {/* Visual seat oval */}
+              <ellipse
+                cx={seatX}
+                cy={seatY}
+                rx={RX_M * scale}
+                ry={RY_M * scale}
+                fill="rgba(0,0,0,0)"
+                pointerEvents="none"
+                stroke="#213428"
+                strokeWidth={seat.isPrimary ? 2.5 : isPinned ? 2 : 1}
+                strokeDasharray={isPinned ? '4 2' : 'none'}
+                aria-label="Seat — hover for RP23 and P1 analysis"
+              />
+            </g>
           );
         })}
       </g>
