@@ -2090,7 +2090,10 @@ function RoomDesignerWithState() {
         const meta = getModelMeta?.(sp) || null;
         const { widthM: wM, depthM: dM } = _getDimsM(meta);
 
-        const yawDeg = getYawDegForRole?.(sp) ?? 0;
+        // Use live yaw if present (plan view uses this). Fallback to computed yaw.
+        const yawDeg =
+          (_isNum(sp?.yaw) ? sp.yaw : (_isNum(sp?.rotation?.y) ? sp.rotation.y : (_isNum(sp?.rotationDeg) ? sp.rotationDeg : null))) ??
+          (getYawDegForRole?.(sp) ?? 0);
 
         // Determine wall based on role
         let wall = null;
