@@ -2109,30 +2109,7 @@ function RoomDesignerWithState() {
         const hingeAngleDeg = _hingeAngleDegFromWall(wall, yawDeg);
         const depthM_fromWall = _hingeIntrusionM(wM, dM, hingeAngleDeg);
 
-        if (!_dbgPrinted && (role === "SL" || role === "SR")) {
-          _dbgPrinted = true;
-
-          console.log("[AIM DEPTH DEBUG]",
-            {
-              aimSide: appState?.aimSideSurroundsAtMLP,
-              role,
-              id: sp?.id,
-              model: sp?.model,
-              pos: sp?.position,
-              yawRaw: sp?.yaw,
-              rotationY: sp?.rotation?.y,
-              rotationDeg: sp?.rotationDeg,
-              yawComputed: (getYawDegForRole?.(sp) ?? null),
-              yawUsed: yawDeg,
-              wall,
-              widthM: wM,
-              depthM: dM,
-              hingeAngleDeg,
-              intrusionM: depthM_fromWall,
-              intrusionCmRounded: Math.round(depthM_fromWall * 100),
-            }
-          );
-        }
+        // [B44] Debug logging removed to prevent console spam
 
         if (!_isNum(depthM_fromWall)) continue;
         if (maxDepthM === null || depthM_fromWall > maxDepthM) maxDepthM = depthM_fromWall;
