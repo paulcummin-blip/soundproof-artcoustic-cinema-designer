@@ -2028,6 +2028,36 @@ function RoomDesignerWithState() {
     const aimSide = appState?.aimSideSurroundsAtMLP || false;
     const aimRear = appState?.aimRearSurroundsAtMLP || false;
 
+    // Wall-hinge depth helpers (for FW, Side, Rear surrounds only)
+    const _norm180 = (deg) => {
+      let a = ((_isNum(deg) ? deg : 0) + 180) % 360;
+      if (a < 0) a += 360;
+      return a - 180;
+    };
+
+    // Convert absolute yawDeg into an "away from flat-to-wall" angle (0..90)
+    // for each wall group, based on existing yaw conventions:
+    // LEFT wall default = +90, RIGHT wall default = -90, BACK wall default = 0
+    const _hingeAngleDeg = (wall, yawDeg) => {
+      const y = _norm180(yawDeg);
+      let delta;
+      if (wall === "LEFT") delta = y - 90;
+      else if (wall === "RIGHT") delta = y - (-90);
+      else if (wall === "BACK") delta = y - 0;
+      else delta = 0;
+      const a = Math.abs(_norm180(delta));
+      return Math.min(90, a);
+    };
+
+    // Wall-hinge intrusion (metres) = D*cos(a) + W*sin(a)
+    // where a is "away from flat-to-wall" in radians
+    const _hingeIntrusionM = (widthM, depthM, hingeAngleDeg) => {
+      const a = _degToRad(hingeAngleDeg);
+      const c = Math.abs(Math.cos(a));
+      const s = Math.abs(Math.sin(a));
+      return depthM * c + widthM * s;
+    };
+
     const computeGroupDepthCm = ({ roles, getYawDegForRole, speakersToProcess, widthM, lengthM, getModelMeta }) => {
       if (!Array.isArray(speakersToProcess) || speakersToProcess.length === 0) return null;
       const W = widthM;
@@ -2045,8 +2075,6 @@ function RoomDesignerWithState() {
 
         const meta = getModelMeta?.(sp) || null;
         const { widthM: wM, depthM: dM } = _getDimsM(meta);
-        const halfW = wM / 2;
-        const halfD = dM / 2;
 
         const yawDeg = getYawDegForRole?.(sp) ?? 0;
 
@@ -2058,24 +2086,9 @@ function RoomDesignerWithState() {
 
         if (!wall) continue;
 
-        // Calculate rotated rectangle extents
-        const a = wM / 2;
-        const b = dM / 2;
-        const r = (yawDeg || 0) * Math.PI / 180;
-        const c = Math.abs(Math.cos(r));
-        const s = Math.abs(Math.sin(r));
-        const ex = c * a + s * b; // half-extent along X
-        const ey = s * a + c * b; // half-extent along Y
-
-        // Calculate depth from wall to furthest point
-        let depthM_fromWall;
-        if (wall === "LEFT") {
-          depthM_fromWall = pos.x + ex;
-        } else if (wall === "RIGHT") {
-          depthM_fromWall = W - (pos.x - ex);
-        } else if (wall === "BACK") {
-          depthM_fromWall = L - (pos.y - ey);
-        }
+        // Wall-hinge model: report how far the cabinet extends into room from wall plane
+        const hingeAngleDeg = _hingeAngleDeg(wall, yawDeg);
+        const depthM_fromWall = _hingeIntrusionM(wM, dM, hingeAngleDeg);
 
         if (!_isNum(depthM_fromWall)) continue;
         if (maxDepthM === null || depthM_fromWall > maxDepthM) maxDepthM = depthM_fromWall;
