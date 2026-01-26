@@ -2099,15 +2099,10 @@ function RoomDesignerWithState() {
         const meta = getModelMeta?.(sp) || null;
         const { widthM: wM, depthM: dM } = _getDimsM(meta);
 
-        // Use same yaw that plan view icons use (single source of truth)
-        const yawDeg =
-          // 1) Prefer explicit yaw on the speaker (used for drawing)
-          (_isNum(sp?.yaw) ? sp.yaw : null) ??
-          (_isNum(sp?.yawDeg) ? sp.yawDeg : null) ??
-          (_isNum(sp?.rotation) ? sp.rotation : null) ??
-          (_isNum(sp?.rotationDeg) ? sp.rotationDeg : null) ??
-          // 2) Fallback: computed aim/default
-          (getYawDegForRole?.(sp) ?? 0);
+        // Yaw for clearance must match the plan icon convention:
+        // - Aim OFF: flat to wall (wall normal)
+        // - Aim ON: aim to MLP using the existing getYawDegForRole(sp)
+        const yawDeg = getYawDegForRole?.(sp) ?? 0;
 
         // Determine wall based on role
         let wall = null;
@@ -2147,10 +2142,12 @@ function RoomDesignerWithState() {
         return _wrap180(yaw);
       };
 
+      // Aim ON: compute yaw to MLP
       if ((r === "LW" || r === "RW") && aimFW) return aimToMLP();
       if ((r === "SL" || r === "SR") && aimSide) return aimToMLP();
       if ((r === "SBL" || r === "SBR") && aimRear) return aimToMLP();
 
+      // Aim OFF: flat to wall (wall normal convention)
       if (r === "LW" || r === "SL") return 90;
       if (r === "RW" || r === "SR") return -90;
       if (r === "SBL" || r === "SBR") return 0;
