@@ -2110,15 +2110,12 @@ function RoomDesignerWithState() {
     };
 
     const computeGroupDepthCm = ({ roles, getYawDegForRole, speakersToProcess, widthM, lengthM, getModelMeta }) => {
-      let _dbgPrinted = false;
-      
-      if (!Array.isArray(speakersToProcess) || speakersToProcess.length === 0) return { depthCm: null, debug: null };
+      if (!Array.isArray(speakersToProcess) || speakersToProcess.length === 0) return null;
       const W = widthM;
       const L = lengthM;
-      if (!(_isNum(W) && W > 0 && _isNum(L) && L > 0)) return { depthCm: null, debug: null };
+      if (!(_isNum(W) && W > 0 && _isNum(L) && L > 0)) return null;
 
       let maxDepthM = null;
-      let debugWorst = null;
 
       for (const sp of speakersToProcess) {
         const role = safeCanon(sp?.role);
@@ -2148,28 +2145,11 @@ function RoomDesignerWithState() {
         const depthM_fromWall = _hingeIntrusionM(wM, dM, hingeAngleDeg);
 
         if (!_isNum(depthM_fromWall)) continue;
-        
-        // Capture debug info for the worst (max depth) speaker
-        if (maxDepthM === null || depthM_fromWall > maxDepthM) {
-          maxDepthM = depthM_fromWall;
-          debugWorst = {
-            role,
-            model: sp?.model || '(none)',
-            metaRaw: meta ? { widthM: meta.widthM, depthM: meta.depthM, widthMm: meta.widthMm, depthMm: meta.depthMm, notFound: meta.notFound } : null,
-            widthMUsed: Math.round(wM * 1000) / 1000,
-            depthMUsed: Math.round(dM * 1000) / 1000,
-            yawDegUsed: Math.round(yawDeg * 10) / 10,
-            wall,
-            hingeAngleDeg: Math.round(hingeAngleDeg * 10) / 10,
-            intrusionCm: Math.round(depthM_fromWall * 100),
-            posXcm: Math.round(pos.x * 100),
-            posYcm: Math.round(pos.y * 100)
-          };
-        }
+        if (maxDepthM === null || depthM_fromWall > maxDepthM) maxDepthM = depthM_fromWall;
       }
 
-      if (maxDepthM === null) return { depthCm: null, debug: null };
-      return { depthCm: Math.round(maxDepthM * 100), debug: debugWorst };
+      if (maxDepthM === null) return null;
+      return Math.round(maxDepthM * 100);
     };
 
     const getModelMeta = (sp) => {
@@ -2228,16 +2208,7 @@ function RoomDesignerWithState() {
       getModelMeta,
     });
 
-    return { 
-      frontWides: frontWides.depthCm, 
-      sideSurrounds: sideSurrounds.depthCm, 
-      rearSurrounds: rearSurrounds.depthCm,
-      debug: {
-        frontWides: frontWides.debug,
-        sideSurrounds: sideSurrounds.debug,
-        rearSurrounds: rearSurrounds.debug
-      }
-    };
+    return { frontWides, sideSurrounds, rearSurrounds };
   }, [
     placedSpeakersForAim,
     _posSig,
@@ -4640,18 +4611,7 @@ function RoomDesignerWithState() {
                       onCheckedChange={(checked) => appState?.setAimFrontWidesAtMLP(checked)}
                       disabled={isFrozen('speakers')} />
                       </div>
-                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
-                        In-room depth: {inRoomDepthsCm.frontWides !== null ? `${inRoomDepthsCm.frontWides} cm` : '—'}
-                        {inRoomDepthsCm.debug?.frontWides && (
-                          <div className="mt-1 p-2 bg-yellow-50 border border-yellow-200 rounded text-[10px] font-mono">
-                            <div className="font-semibold mb-1">Debug (worst speaker):</div>
-                            <div>Role: {inRoomDepthsCm.debug.frontWides.role} | Model: {inRoomDepthsCm.debug.frontWides.model}</div>
-                            <div>Dims: W={inRoomDepthsCm.debug.frontWides.widthMUsed}m D={inRoomDepthsCm.debug.frontWides.depthMUsed}m</div>
-                            <div>Yaw: {inRoomDepthsCm.debug.frontWides.yawDegUsed}° | Hinge: {inRoomDepthsCm.debug.frontWides.hingeAngleDeg}°</div>
-                            <div>Intrusion: {inRoomDepthsCm.debug.frontWides.intrusionCm} cm</div>
-                          </div>
-                        )}
-                      </div>
+                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {inRoomDepthsCm.frontWides !== null ? `${inRoomDepthsCm.frontWides} cm` : '—'}</div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-side-surrounds" className="text-sm">Side Surrounds</Label>
                         <Switch
@@ -4660,31 +4620,7 @@ function RoomDesignerWithState() {
                       onCheckedChange={(checked) => appState?.setAimSideSurroundsAtMLP(checked)}
                       disabled={isFrozen('speakers')} />
                       </div>
-                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
-                        In-room depth: {inRoomDepthsCm.sideSurrounds !== null ? `${inRoomDepthsCm.sideSurrounds} cm` : '—'}
-                        {inRoomDepthsCm.debug?.sideSurrounds && (
-                          <div className="mt-1 p-2 bg-yellow-50 border border-yellow-200 rounded text-[10px] font-mono">
-                            <div className="font-semibold mb-1">Debug (worst speaker):</div>
-                            <div>Role: {inRoomDepthsCm.debug.sideSurrounds.role} | Model: {inRoomDepthsCm.debug.sideSurrounds.model}</div>
-                            <div>Dims: W={inRoomDepthsCm.debug.sideSurrounds.widthMUsed}m D={inRoomDepthsCm.debug.sideSurrounds.depthMUsed}m</div>
-                            <div>Yaw: {inRoomDepthsCm.debug.sideSurrounds.yawDegUsed}° | Hinge: {inRoomDepthsCm.debug.sideSurrounds.hingeAngleDeg}°</div>
-                            <div>Intrusion: {inRoomDepthsCm.debug.sideSurrounds.intrusionCm} cm | Pos: ({inRoomDepthsCm.debug.sideSurrounds.posXcm}, {inRoomDepthsCm.debug.sideSurrounds.posYcm}) cm</div>
-                            <div className="mt-1">
-                              metaRaw: {inRoomDepthsCm.debug.sideSurrounds.metaRaw ? JSON.stringify(inRoomDepthsCm.debug.sideSurrounds.metaRaw) : 'null'}
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const json = JSON.stringify(inRoomDepthsCm.debug.sideSurrounds, null, 2);
-                                navigator.clipboard.writeText(json);
-                              }}
-                              className="mt-1 px-2 py-1 bg-yellow-100 hover:bg-yellow-200 rounded text-[9px]"
-                            >
-                              Copy JSON
-                            </button>
-                          </div>
-                        )}
-                      </div>
+                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {inRoomDepthsCm.sideSurrounds !== null ? `${inRoomDepthsCm.sideSurrounds} cm` : '—'}</div>
                       <div className="flex items-center justify-between">
                         <Label htmlFor="aim-rear-surrounds" className="text-sm">Rear Surrounds</Label>
                         <Switch
@@ -4693,18 +4629,7 @@ function RoomDesignerWithState() {
                       onCheckedChange={(checked) => appState?.setAimRearSurroundsAtMLP(checked)}
                       disabled={isFrozen('speakers')} />
                       </div>
-                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">
-                        In-room depth: {inRoomDepthsCm.rearSurrounds !== null ? `${inRoomDepthsCm.rearSurrounds} cm` : '—'}
-                        {inRoomDepthsCm.debug?.rearSurrounds && (
-                          <div className="mt-1 p-2 bg-yellow-50 border border-yellow-200 rounded text-[10px] font-mono">
-                            <div className="font-semibold mb-1">Debug (worst speaker):</div>
-                            <div>Role: {inRoomDepthsCm.debug.rearSurrounds.role} | Model: {inRoomDepthsCm.debug.rearSurrounds.model}</div>
-                            <div>Dims: W={inRoomDepthsCm.debug.rearSurrounds.widthMUsed}m D={inRoomDepthsCm.debug.rearSurrounds.depthMUsed}m</div>
-                            <div>Yaw: {inRoomDepthsCm.debug.rearSurrounds.yawDegUsed}° | Hinge: {inRoomDepthsCm.debug.rearSurrounds.hingeAngleDeg}°</div>
-                            <div>Intrusion: {inRoomDepthsCm.debug.rearSurrounds.intrusionCm} cm</div>
-                          </div>
-                        )}
-                      </div>
+                      <div className="text-xs text-gray-500 pl-1 pt-1 text-right">In-room depth: {inRoomDepthsCm.rearSurrounds !== null ? `${inRoomDepthsCm.rearSurrounds} cm` : '—'}</div>
                     </div>
                   </details>
                   
