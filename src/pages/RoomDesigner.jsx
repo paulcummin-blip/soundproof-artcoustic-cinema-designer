@@ -1953,6 +1953,43 @@ function RoomDesignerWithState() {
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
 
+  // For "Aim Loudspeaker" depth metrics: only consider speakers active in current layout
+  // Parse bed count from Dolby preset (e.g., "5.1" → 5, "7.1" → 7, "9.1" → 9)
+  const _parseBedCount = (layoutStr) => {
+    const m = String(layoutStr || "").match(/^(\d+)(?:\.\d+)?/);
+    return m ? Number(m[1]) : null;
+  };
+
+  const _bedCount = _parseBedCount(dolbyPreset);
+
+  // Allowed bed speaker roles for the CURRENT layout (excludes ghost speakers from previous configs)
+  const _allowedBedRoles = React.useMemo(() => {
+    const s = new Set(["FL","FC","FR","SL","SR"]); // 5.1 minimum
+    if (_bedCount >= 7) {
+      // 7.x adds SBL/SBR OR LW/RW (based on sevenBedLayoutType)
+      if (_sevenBedLayoutType === 'wides') {
+        s.add("LW"); s.add("RW");
+      } else {
+        s.add("SBL"); s.add("SBR");
+      }
+    }
+    if (_bedCount >= 9) {
+      // 9.x includes BOTH rears AND wides
+      s.add("SBL"); s.add("SBR");
+      s.add("LW"); s.add("RW");
+    }
+    return s;
+  }, [_bedCount, _sevenBedLayoutType]);
+
+  // Filtered speaker list for "Aim Loudspeaker" depth calculation (excludes inactive roles)
+  const placedSpeakersForAim = React.useMemo(() => {
+    if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) return [];
+    return placedSpeakers.filter((sp) => {
+      const r = safeCanon(sp?.role);
+      return _allowedBedRoles.has(r);
+    });
+  }, [placedSpeakers, _allowedBedRoles]);
+
   // Helper functions for in-room depth calculation
   const _isNum = (v) => typeof v === "number" && Number.isFinite(v);
   
@@ -1974,8 +2011,9 @@ function RoomDesignerWithState() {
   };
 
   // NEW: In-room depth calculation (placed AFTER mlpAnchorEffective)
+  // CRITICAL: Uses placedSpeakersForAim to only measure speakers active in current layout
   const inRoomDepthsCm = React.useMemo(() => {
-    if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) {
+    if (!Array.isArray(placedSpeakersForAim) || placedSpeakersForAim.length === 0) {
       return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
     }
 
@@ -1990,16 +2028,16 @@ function RoomDesignerWithState() {
     const aimSide = appState?.aimSideSurroundsAtMLP || false;
     const aimRear = appState?.aimRearSurroundsAtMLP || false;
 
-    const computeGroupDepthCm = ({ roles, getYawDegForRole, placedSpeakers, widthM, lengthM, getModelMeta }) => {
-      if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) return null;
+    const computeGroupDepthCm = ({ roles, getYawDegForRole, speakersToProcess, widthM, lengthM, getModelMeta }) => {
+      if (!Array.isArray(speakersToProcess) || speakersToProcess.length === 0) return null;
       const W = widthM;
       const L = lengthM;
       if (!(_isNum(W) && W > 0 && _isNum(L) && L > 0)) return null;
 
       let maxDepthM = null;
 
-      for (const sp of placedSpeakers) {
-        const role = sp?.role;
+      for (const sp of speakersToProcess) {
+        const role = safeCanon(sp?.role);
         if (!role || !roles.includes(role)) continue;
 
         const pos = sp?.position || {};
@@ -2076,7 +2114,7 @@ function RoomDesignerWithState() {
     const frontWides = computeGroupDepthCm({
       roles: ["LW", "RW"],
       getYawDegForRole,
-      placedSpeakers,
+      speakersToProcess: placedSpeakersForAim,
       widthM,
       lengthM,
       getModelMeta,
@@ -2085,7 +2123,7 @@ function RoomDesignerWithState() {
     const sideSurrounds = computeGroupDepthCm({
       roles: ["SL", "SR"],
       getYawDegForRole,
-      placedSpeakers,
+      speakersToProcess: placedSpeakersForAim,
       widthM,
       lengthM,
       getModelMeta,
@@ -2094,7 +2132,7 @@ function RoomDesignerWithState() {
     const rearSurrounds = computeGroupDepthCm({
       roles: ["SBL", "SBR"],
       getYawDegForRole,
-      placedSpeakers,
+      speakersToProcess: placedSpeakersForAim,
       widthM,
       lengthM,
       getModelMeta,
@@ -2102,7 +2140,7 @@ function RoomDesignerWithState() {
 
     return { frontWides, sideSurrounds, rearSurrounds };
   }, [
-    placedSpeakers, 
+    placedSpeakersForAim, 
     stableDimensions.width, 
     stableDimensions.length,
     mlpAnchorEffective,
