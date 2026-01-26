@@ -2082,12 +2082,22 @@ function RoomDesignerWithState() {
       return 0;
     };
 
-    // Hinge angle = absolute yaw difference from wall normal, clamped 0..90
+    // Hinge angle = smallest cabinet rotation away from wall normal (0..90)
+    // IMPORTANT: yaw and yaw+180 represent the same cabinet orientation for clearance,
+    // so we must fold the angle into an acute 0..90 range.
     const _hingeAngleDegFromWall = (wall, yawDeg) => {
       const normal = _wallNormalYawDeg(wall);
+
+      // -180..+180 difference between yaw and wall normal
       const delta = _wrap180((Number(yawDeg) || 0) - normal);
-      const a = Math.abs(delta);
-      return Math.min(90, a);
+
+      // Use cabinet orientation (mod 180): pick the acute equivalent
+      // Example: 152° becomes 28°
+      const abs = Math.abs(delta);
+      const acute = Math.min(abs, 180 - abs);
+
+      // Clamp to 0..90
+      return Math.min(90, acute);
     };
 
     // Wall-hinge intrusion (metres) = D*cos(a) + W*sin(a)
