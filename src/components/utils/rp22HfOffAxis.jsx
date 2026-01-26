@@ -557,15 +557,33 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
   if (!Array.isArray(seats) || !seats.length) return {};
   if (!Array.isArray(speakers) || !speakers.length) return {};
 
+  // Helper to check if speaker has valid position
+  const hasPos = (s) => s?.position && isNum(s.position.x) && isNum(s.position.y);
+
+  // CRITICAL: Filter to only visible/active speakers (matches plan view)
+  // This prevents unused LW/RW from influencing P17 when not in the current layout
+  const isVisibleInLayout = (s) => {
+    if (!s) return false;
+    if (typeof appState?.getSpeakerVisibility === "function") {
+      const role = canonRole(s.role, getCanonicalRole);
+      return appState.getSpeakerVisibility(role, s.model) !== false;
+    }
+    return true; // Fallback: show all if visibility function not available
+  };
+
+  // Filter speakers to only those that are visible and in use
+  const visibleSpeakers = speakers.filter(hasPos).filter(isVisibleInLayout);
+
   // [B44 DEBUG] Log speakers entering P17 analysis
   if (globalThis.__B44_RV_DEBUG === true) {
     console.groupCollapsed("[P17 DEBUG] Speakers entering analysis");
-    console.log("Total speakers:", speakers.length);
-    console.table(speakers.map(s => ({
+    console.log("Total speakers (raw):", speakers.length);
+    console.log("Total speakers (visible):", visibleSpeakers.length);
+    console.table(visibleSpeakers.map(s => ({
       role: s.role,
       canonicalRole: String(s.role || "").toUpperCase(),
       model: s.model || "—",
-      hasPosition: !!(s.position && isNum(s.position.x) && isNum(s.position.y)),
+      hasPosition: hasPos(s),
       posX: s.position?.x?.toFixed(3) || "—",
       posY: s.position?.y?.toFixed(3) || "—",
     })));
@@ -596,8 +614,8 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
     // [B44 DEBUG] Track which speakers enter the per-seat loop
     const speakersProcessed = [];
 
-    // Loop over all non-LCR speakers
-    for (const spk of speakers) {
+    // Loop over VISIBLE non-LCR speakers only (filtered above)
+    for (const spk of visibleSpeakers) {
       const result = computeSurroundLikeHfLoss({
         speaker: spk,
         seat: { x: seatPos.x || seat.x, y: seatPos.y || seat.y, z: seatPos.z || seat.z },

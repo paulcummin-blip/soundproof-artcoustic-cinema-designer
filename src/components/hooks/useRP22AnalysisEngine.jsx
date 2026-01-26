@@ -660,7 +660,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       return speaker;
     });
 
-    // Compute P17 for all seats (non-LCR HF variance) - PASS appState for aim toggles
+    // Compute P17 for all seats (non-LCR HF variance) - PASS appState for aim toggles + visibility
 
     const p17Results = computeP17ForAllSeats({
       seats: seatsWithRoles,
@@ -668,7 +668,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       mlpPos: mlp,
       getSpeakerModelMeta,
       roomHeightM,
-      appState: aimState || overheadState,
+      appState: { ...(aimState || overheadState), getSpeakerVisibility: aimState?.getSpeakerVisibility || overheadState?.getSpeakerVisibility },
       getCanonicalRole,
     });
 
