@@ -2024,6 +2024,13 @@ function RoomDesignerWithState() {
       .join("|");
   }, [placedSpeakersForAim]);
 
+  // Yaw signature for live updates when speaker aim changes
+  const _yawSig = React.useMemo(() => {
+    return (placedSpeakersForAim || [])
+      .map(s => `${s.id || s.role}:${Number(s?.yaw ?? s?.yawDeg ?? s?.rotation ?? s?.rotationDeg ?? 0).toFixed(2)}`)
+      .join("|");
+  }, [placedSpeakersForAim]);
+
   // NEW: In-room depth calculation (placed AFTER mlpAnchorEffective)
   // CRITICAL: Uses placedSpeakersForAim to only measure speakers active in current layout
   const inRoomDepthsCm = React.useMemo(() => {
@@ -2092,9 +2099,14 @@ function RoomDesignerWithState() {
         const meta = getModelMeta?.(sp) || null;
         const { widthM: wM, depthM: dM } = _getDimsM(meta);
 
-        // Use live yaw if present (plan view uses this). Fallback to computed yaw.
+        // Use same yaw that plan view icons use (single source of truth)
         const yawDeg =
-          (_isNum(sp?.yaw) ? sp.yaw : (_isNum(sp?.rotation?.y) ? sp.rotation.y : (_isNum(sp?.rotationDeg) ? sp.rotationDeg : null))) ??
+          // 1) Prefer explicit yaw on the speaker (used for drawing)
+          (_isNum(sp?.yaw) ? sp.yaw : null) ??
+          (_isNum(sp?.yawDeg) ? sp.yawDeg : null) ??
+          (_isNum(sp?.rotation) ? sp.rotation : null) ??
+          (_isNum(sp?.rotationDeg) ? sp.rotationDeg : null) ??
+          // 2) Fallback: computed aim/default
           (getYawDegForRole?.(sp) ?? 0);
 
         // Determine wall based on role
@@ -2176,7 +2188,8 @@ function RoomDesignerWithState() {
     return { frontWides, sideSurrounds, rearSurrounds };
   }, [
     placedSpeakersForAim,
-    _posSig, 
+    _posSig,
+    _yawSig,
     stableDimensions.width, 
     stableDimensions.length,
     mlpAnchorEffective,
