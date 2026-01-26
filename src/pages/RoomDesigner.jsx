@@ -1995,6 +1995,13 @@ function RoomDesignerWithState() {
   
   const _degToRad = (deg) => (deg * Math.PI) / 180;
   
+  const _wrap180 = (deg) => {
+    let a = (Number(deg) || 0) % 360;
+    if (a > 180) a -= 360;
+    if (a < -180) a += 360;
+    return a;
+  };
+  
   const _projectHalfExtent = (yawDeg, halfW, halfD, normalAxis) => {
     const a = _degToRad(_isNum(yawDeg) ? yawDeg : 0);
     const c = Math.abs(Math.cos(a));
@@ -2009,6 +2016,13 @@ function RoomDesignerWithState() {
     const depthM = _isNum(d.depthM) ? d.depthM : (_isNum(d.depth) ? d.depth : 0.10);
     return { widthM, depthM };
   };
+
+  // Position signature for live updates when speaker positions change
+  const _posSig = React.useMemo(() => {
+    return (placedSpeakersForAim || [])
+      .map(s => `${s.id || s.role}:${Number(s?.position?.x).toFixed(4)},${Number(s?.position?.y).toFixed(4)}`)
+      .join("|");
+  }, [placedSpeakersForAim]);
 
   // NEW: In-room depth calculation (placed AFTER mlpAnchorEffective)
   // CRITICAL: Uses placedSpeakersForAim to only measure speakers active in current layout
@@ -2029,23 +2043,23 @@ function RoomDesignerWithState() {
     const aimRear = appState?.aimRearSurroundsAtMLP || false;
 
     // Wall-hinge depth helpers (for FW, Side, Rear surrounds only)
-    const _norm180 = (deg) => {
-      let a = ((_isNum(deg) ? deg : 0) + 180) % 360;
-      if (a < 0) a += 360;
-      return a - 180;
+    
+    // Given a wall, return the wall normal yaw (direction pointing INTO the room)
+    const _wallNormalYawDeg = (wall) => {
+      // LEFT wall points rightwards -> +90
+      // RIGHT wall points leftwards -> -90
+      // BACK wall points forward -> 0
+      if (wall === "LEFT") return 90;
+      if (wall === "RIGHT") return -90;
+      if (wall === "BACK") return 0;
+      return 0;
     };
 
-    // Convert absolute yawDeg into an "away from flat-to-wall" angle (0..90)
-    // for each wall group, based on existing yaw conventions:
-    // LEFT wall default = +90, RIGHT wall default = -90, BACK wall default = 0
-    const _hingeAngleDeg = (wall, yawDeg) => {
-      const y = _norm180(yawDeg);
-      let delta;
-      if (wall === "LEFT") delta = y - 90;
-      else if (wall === "RIGHT") delta = y - (-90);
-      else if (wall === "BACK") delta = y - 0;
-      else delta = 0;
-      const a = Math.abs(_norm180(delta));
+    // Hinge angle = absolute yaw difference from wall normal, clamped 0..90
+    const _hingeAngleDegFromWall = (wall, yawDeg) => {
+      const normal = _wallNormalYawDeg(wall);
+      const delta = _wrap180((Number(yawDeg) || 0) - normal);
+      const a = Math.abs(delta);
       return Math.min(90, a);
     };
 
@@ -2087,7 +2101,7 @@ function RoomDesignerWithState() {
         if (!wall) continue;
 
         // Wall-hinge model: report how far the cabinet extends into room from wall plane
-        const hingeAngleDeg = _hingeAngleDeg(wall, yawDeg);
+        const hingeAngleDeg = _hingeAngleDegFromWall(wall, yawDeg);
         const depthM_fromWall = _hingeIntrusionM(wM, dM, hingeAngleDeg);
 
         if (!_isNum(depthM_fromWall)) continue;
@@ -2110,7 +2124,8 @@ function RoomDesignerWithState() {
         if (!sp?.position || !mlpAnchorEffective) return 0;
         const dx = mlpAnchorEffective.x - sp.position.x;
         const dy = mlpAnchorEffective.y - sp.position.y;
-        return -Math.atan2(dx, dy) * (180 / Math.PI);
+        const yaw = -Math.atan2(dx, dy) * (180 / Math.PI);
+        return _wrap180(yaw);
       };
 
       if ((r === "LW" || r === "RW") && aimFW) return aimToMLP();
@@ -2153,7 +2168,8 @@ function RoomDesignerWithState() {
 
     return { frontWides, sideSurrounds, rearSurrounds };
   }, [
-    placedSpeakersForAim, 
+    placedSpeakersForAim,
+    _posSig, 
     stableDimensions.width, 
     stableDimensions.length,
     mlpAnchorEffective,
