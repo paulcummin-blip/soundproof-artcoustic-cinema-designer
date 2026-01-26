@@ -1539,7 +1539,23 @@ React.useEffect(() => {
     });
 
     if (needsUpdate) {
-      onSetSpeakers(updated);
+      onSetSpeakers(prev => {
+        // Only update if array actually differs (prevent infinite loop)
+        if (prev.length !== updated.length) return updated;
+        
+        const changed = prev.some((s, i) => {
+          const u = updated[i];
+          if (!s || !u) return true;
+          if (s.id !== u.id || s.role !== u.role) return true;
+          const px = s.position?.x ?? 0;
+          const py = s.position?.y ?? 0;
+          const ux = u.position?.x ?? 0;
+          const uy = u.position?.y ?? 0;
+          return Math.abs(px - ux) > 0.0001 || Math.abs(py - uy) > 0.0001;
+        });
+        
+        return changed ? updated : prev;
+      });
     }
     
   }, [
@@ -4136,7 +4152,23 @@ useEffect(() => {
     });
 
     if (needsUpdate) {
-      onSetSpeakers(updated);
+      onSetSpeakers(prev => {
+        // Only update if array actually differs (prevent infinite loop)
+        if (prev.length !== updated.length) return updated;
+        
+        const changed = prev.some((s, i) => {
+          const u = updated[i];
+          if (!s || !u) return true;
+          if (s.id !== u.id || s.role !== u.role) return true;
+          const px = s.position?.x ?? 0;
+          const py = s.position?.y ?? 0;
+          const ux = u.position?.x ?? 0;
+          const uy = u.position?.y ?? 0;
+          return Math.abs(px - ux) > 0.0001 || Math.abs(py - uy) > 0.0001;
+        });
+        
+        return changed ? updated : prev;
+      });
     }
   }, [widthM, lengthM, placedSpeakers, onSetSpeakers, getModelDimsM, getCanonicalRole]);
 
