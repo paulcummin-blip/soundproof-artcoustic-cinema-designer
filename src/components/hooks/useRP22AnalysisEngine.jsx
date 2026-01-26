@@ -660,14 +660,56 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       return speaker;
     });
 
-    // Determine if wides are actually active in the current layout
-    const widesActive =
-      String(aimState?.speakerSystem?.sevenBedLayoutType || overheadState?.sevenBedLayoutType || "") === "wides" ||
-      Boolean(aimState?.speakerSystem?.useWides || overheadState?.speakerSystem?.useWides) ||
-      Boolean(aimState?.speakerSystem?.widesEnabled || overheadState?.speakerSystem?.widesEnabled) ||
-      Boolean(aimState?.enableFrontWides || overheadState?.enableFrontWides);
+    // Parse bed count from layout string (5.1, 7.1, 9.1, etc.)
+    const parseLayoutBedCount = (layoutStr) => {
+      const m = String(layoutStr || "").match(/^(\d+)\./);
+      return m ? Number(m[1]) : null;
+    };
 
-    // Compute P17 for all seats (non-LCR HF variance) - PASS appState for aim toggles + visibility + wides flag
+    // Authoritative layout selector
+    const layoutStr =
+      aimState?.speakerSystem?.layout ||
+      overheadState?.speakerSystem?.layout ||
+      aimState?.speakerSystem?.format ||
+      overheadState?.speakerSystem?.format ||
+      aimState?.speakerSystem?.layoutName ||
+      overheadState?.speakerSystem?.layoutName ||
+      "";
+
+    const bedCount = parseLayoutBedCount(layoutStr);
+
+    // Allowed roles for P17 based on bed count (non-LCR only)
+    const allowedP17Roles = new Set();
+
+    // Always allow side surrounds when any surround bed exists
+    allowedP17Roles.add("SL");
+    allowedP17Roles.add("SR");
+
+    // 7.x and above: allow rear surrounds
+    if (bedCount >= 7) {
+      allowedP17Roles.add("SBL");
+      allowedP17Roles.add("SBR");
+    }
+
+    // 9.x and above: allow wides
+    if (bedCount >= 9) {
+      allowedP17Roles.add("LW");
+      allowedP17Roles.add("RW");
+    }
+
+    // Overheads are always part of P17 (when present)
+    allowedP17Roles.add("TFL");
+    allowedP17Roles.add("TFR");
+    allowedP17Roles.add("TML");
+    allowedP17Roles.add("TMR");
+    allowedP17Roles.add("TBL");
+    allowedP17Roles.add("TBR");
+    allowedP17Roles.add("TFC");
+    allowedP17Roles.add("TBC");
+    allowedP17Roles.add("TL");
+    allowedP17Roles.add("TR");
+
+    // Compute P17 for all seats (non-LCR HF variance) - PASS allowedP17Roles for layout-based filtering
 
     const p17Results = computeP17ForAllSeats({
       seats: seatsWithRoles,
@@ -677,7 +719,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       roomHeightM,
       appState: { ...(aimState || overheadState), getSpeakerVisibility: aimState?.getSpeakerVisibility || overheadState?.getSpeakerVisibility },
       getCanonicalRole,
-      widesActive,
+      allowedP17Roles,
     });
 
     // Helper to get SPL at seat for a specific role

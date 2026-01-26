@@ -553,21 +553,14 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
 }
 
 // P17: Compute surround/wide/overhead HF variance across all non-LCR speakers for all seats
-export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModelMeta: modelIndex, roomHeightM, debug, appState, getCanonicalRole, widesActive }) {
+export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModelMeta: modelIndex, roomHeightM, debug, appState, getCanonicalRole, allowedP17Roles }) {
   if (!Array.isArray(seats) || !seats.length) return {};
   if (!Array.isArray(speakers) || !speakers.length) return {};
 
   // Helper to check if speaker has valid position
   const hasPos = (s) => s?.position && isNum(s.position.x) && isNum(s.position.y);
 
-  // Helper to check if role is a wide (LW/RW)
-  const isWideRole = (role) => {
-    const r = canonRole(role, getCanonicalRole);
-    return r === "LW" || r === "RW";
-  };
-
   // CRITICAL: Filter to only visible/active speakers (matches plan view)
-  // This prevents unused LW/RW from influencing P17 when not in the current layout
   const isVisibleInLayout = (s) => {
     if (!s) return false;
     if (typeof appState?.getSpeakerVisibility === "function") {
@@ -577,16 +570,18 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
     return true; // Fallback: show all if visibility function not available
   };
 
-  // Filter speakers to only those that are visible and in use
-  // CRITICAL: Hard-exclude LW/RW when wides are not active
+  // Authoritative filter: only roles allowed by the current layout (5.x, 7.x, 9.x)
+  const roleAllowedByLayout = (s) => {
+    if (!allowedP17Roles || !(allowedP17Roles instanceof Set)) return true; // fallback if not provided
+    const role = canonRole(s.role, getCanonicalRole);
+    return allowedP17Roles.has(role);
+  };
+
+  // Filter speakers to only those that are visible, positioned, and allowed by layout
   const visibleSpeakers = speakers
     .filter(hasPos)
     .filter(isVisibleInLayout)
-    .filter((s) => {
-      // Drop wides unless they're actually active in the layout
-      if (!widesActive && isWideRole(s.role)) return false;
-      return true;
-    });
+    .filter(roleAllowedByLayout);
 
   // [B44 DEBUG] Log speakers entering P17 analysis
   if (globalThis.__B44_RV_DEBUG === true) {
