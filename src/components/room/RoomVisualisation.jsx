@@ -6125,7 +6125,6 @@ return {
 
     const RX_M = 0.10;
     const RY_M = 0.125;
-    const HIT_PADDING_PX = 8; // Extra pixels for forgiving hit area
 
     if (globalThis.__B44_LOGS) console.log('RoomVisualisation: rendering seats =', seatingPositions.length);
 
@@ -6149,12 +6148,12 @@ return {
 
           return (
             <g key={seat.id}>
-              {/* Invisible hit target (larger, more forgiving) */}
+              {/* Invisible hit target (2× larger for easier hover) */}
               <ellipse
                 cx={seatX}
                 cy={seatY}
-                rx={RX_M * scale + HIT_PADDING_PX}
-                ry={RY_M * scale + HIT_PADDING_PX}
+                rx={RX_M * scale * 2}
+                ry={RY_M * scale * 2}
                 fill="transparent"
                 pointerEvents="all"
                 style={{ cursor: 'pointer' }}
