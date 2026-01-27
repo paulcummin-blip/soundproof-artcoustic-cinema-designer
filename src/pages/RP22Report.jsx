@@ -206,24 +206,45 @@ function RP22ReportInner() {
 
     // Count ONLY the 12 room parameters with valid L1-L4 pills
     const roomLevelCounts = React.useMemo(() => {
-        if (!analysisResult?.gradedParameters?.primary) return { L4: 0, L3: 0, L2: 0, L1: 0 };
-        
-        const roomParamIds = [2, 3, 7, 8, 11, 12, 13, 14, 15, 18, 19, 21];
+        const primary = analysisResult?.gradedParameters?.primary;
+        if (!primary) return { L4: 0, L3: 0, L2: 0, L1: 0 };
+
+        const roomParamNums = new Set([2, 3, 7, 8, 11, 12, 13, 14, 15, 18, 19, 21]);
         const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
-        
-        roomParamIds.forEach((paramId) => {
-            const param = analysisResult.gradedParameters.primary[paramId];
-            if (!param) return;
-            
-            // Count only if level is L1, L2, L3, or L4
-            const lvl = Number(param?.level);
-            if (lvl >= 1 && lvl <= 4) {
-                counts[`L${lvl}`]++;
+
+        // primary might be an object keyed by id, or an array — handle both
+        const items = Array.isArray(primary) ? primary : Object.values(primary);
+
+        for (const p of items) {
+            if (!p) continue;
+
+            // Only the 12 room parameters
+            const num = Number(p.number ?? p.paramNumber ?? p.id ?? p.paramId);
+            if (!roomParamNums.has(num)) continue;
+
+            // Level could be: 4 / "4" / "L4" / "FAIL" / "—"
+            const raw = p.level ?? p.pill ?? p.levelLabel ?? p.status;
+            if (raw == null) continue;
+
+            let lvl = null;
+
+            if (typeof raw === "number") lvl = raw;
+            else if (typeof raw === "string") {
+                const m = raw.trim().match(/^L([1-4])$/i);
+                if (m) lvl = Number(m[1]);
+                else {
+                    const n = Number(raw);
+                    if (Number.isFinite(n)) lvl = n;
+                }
             }
-        });
-        
+
+            if (lvl >= 1 && lvl <= 4) {
+                counts[`L${lvl}`] += 1;
+            }
+        }
+
         return counts;
-    }, [analysisResult]);
+    }, [analysisResult?.gradedParameters?.primary]);
 
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (
