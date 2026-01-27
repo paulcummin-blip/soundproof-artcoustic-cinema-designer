@@ -3,11 +3,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RP22GradingPill from '../ui/RP22GradingPill';
 
-export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, p15ConstructionLevel, onP15ConstructionLevelChange, displayedLevel = null }) {
+export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, p15ConstructionLevel, onP15ConstructionLevelChange, p21EarlyReflectionPreset, onP21EarlyReflectionPresetChange, displayedLevel = null }) {
     if (!parameter) return null;
 
     const [p15Local, setP15Local] = React.useState("standard");
-    const [p21Local, setP21Local] = React.useState("l2");
+    const p21Local = p21EarlyReflectionPreset || "l2";
 
     const hasRoomResult = roomResult && typeof roomResult === 'object';
     // Use displayedLevel if provided (ensures consistency with count box)
@@ -250,7 +250,7 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                     <select
                                         className="w-full px-2 py-1.5 text-xs border border-[#DCDBD6] rounded bg-white text-[#1B1A1A]"
                                         value={p21Local}
-                                        onChange={(e) => setP21Local(e.target.value)}
+                                        onChange={(e) => onP21EarlyReflectionPresetChange?.(e.target.value)}
                                     >
                                         <option value="l1">No estimate / untreated room</option>
                                         <option value="l2">Moderately live room</option>

@@ -253,13 +253,18 @@ function RP22ReportInner() {
         }
         
         if (paramId === 21) {
-            // P21 would use a dropdown if we had it - for now return null
-            // (cards render this locally with useState, not available here)
-            return null;
+            // P21 uses early reflection preset dropdown from app state
+            const P21_MAP = {
+                l1: "L1",
+                l2: "L2",
+                l3: "L3",
+                l4: "L4",
+            };
+            return P21_MAP[app?.p21EarlyReflectionPreset || 'l2'] || null;
         }
 
         return null;
-    }, [analysisResult, getRoomResult, p2SystemConfig, app?.p15ConstructionLevel]);
+    }, [analysisResult, getRoomResult, p2SystemConfig, app?.p15ConstructionLevel, app?.p21EarlyReflectionPreset]);
 
     // Helper: get seat results for a parameter
     const getSeatResults = React.useCallback((paramId) => {
@@ -363,6 +368,8 @@ function RP22ReportInner() {
                                     systemConfig={param.id === 2 ? p2SystemConfig : null}
                                     p15ConstructionLevel={app?.p15ConstructionLevel}
                                     onP15ConstructionLevelChange={app?.setP15ConstructionLevel}
+                                    p21EarlyReflectionPreset={app?.p21EarlyReflectionPreset}
+                                    onP21EarlyReflectionPresetChange={app?.setP21EarlyReflectionPreset}
                                     displayedLevel={getDisplayedRoomLevel(param.id)}
                                 />
                             ))}
