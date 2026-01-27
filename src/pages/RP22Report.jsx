@@ -300,6 +300,31 @@ function RP22ReportInner() {
         return counts;
     }, [getDisplayedRoomLevel]);
 
+    // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
+    const seatLevelCounts = React.useMemo(() => {
+        const perSeat = analysisResult?.perSeatRp22 || {};
+        const seatIds = Object.keys(perSeat).sort();
+        
+        return seatIds.map(seatId => {
+            const rp22 = perSeat[seatId]?.rp22 || {};
+            const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
+            
+            Object.values(rp22).forEach(metric => {
+                if (!metric || !metric.level) return;
+                
+                const lvl = typeof metric.level === 'string' 
+                    ? metric.level.trim()
+                    : `L${metric.level}`;
+                
+                if (lvl.match(/^L[1-4]$/)) {
+                    counts[lvl] += 1;
+                }
+            });
+            
+            return { seatId, counts };
+        });
+    }, [analysisResult?.perSeatRp22]);
+
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
@@ -338,16 +363,32 @@ function RP22ReportInner() {
                             })()}
                         </div>
                     </div>
-                    <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
-                        <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                            Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
+                    <div className="space-y-4">
+                        <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
+                            <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
+                            </div>
+                            <div className="flex gap-2">
+                                <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
+                                <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
+                                <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
+                                <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
+                            </div>
                         </div>
-                        <div className="flex gap-2">
-                            <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
-                            <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
-                            <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
-                            <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
-                        </div>
+
+                        {seatLevelCounts.length > 0 && seatLevelCounts.map(({ seatId, counts }) => (
+                            <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
+                                <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                    Seat parameters — {seatId}
+                                </div>
+                                <div className="flex gap-2">
+                                    <RP22GradingPill level="L4" count={counts.L4} />
+                                    <RP22GradingPill level="L3" count={counts.L3} />
+                                    <RP22GradingPill level="L2" count={counts.L2} />
+                                    <RP22GradingPill level="L1" count={counts.L1} />
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
