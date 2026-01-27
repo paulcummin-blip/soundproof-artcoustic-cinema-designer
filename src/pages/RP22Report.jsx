@@ -399,9 +399,9 @@ function RP22ReportInner() {
                 </div>
 
                 {/* Counts Dashboard */}
-                <div className="flex gap-6 items-start">
+                <div className="grid grid-cols-[auto_1fr] gap-6 items-start">
                     {/* Left: Room count box */}
-                    <div className="flex-shrink-0">
+                    <div className="justify-self-start">
                         <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px]">
                             <div className="flex items-center gap-2 mb-2">
                                 <Home className="w-4 h-4 text-[#213428]" />
@@ -419,7 +419,7 @@ function RP22ReportInner() {
                     </div>
 
                     {/* Right: Seat grid blocks (2 cols × 4 rows = 8 per block) */}
-                    <div className="flex-1 space-y-4">
+                    <div className="justify-self-end space-y-4">
                         {seatGridBlocks.map((block, blockIdx) => (
                             <div key={blockIdx} className="grid grid-cols-2 gap-4">
                                 {block.map(({ seatId, counts, total }, seatIdx) => {
