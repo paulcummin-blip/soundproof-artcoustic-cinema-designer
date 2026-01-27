@@ -451,8 +451,10 @@ function RP22ReportInner() {
                         <div className="flex gap-4">
                             {seatCountsByRow.map(({ rowNum, seats }) => (
                                 <div key={rowNum} className="flex flex-col gap-4">
-                                    {seats.map(({ seatId, counts, total }) => (
-                                        <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px]">
+                                    {seats.map(({ seatId, counts, total }) => {
+                                        const isPrimary = analysisResult?.perSeatRp22?.[seatId]?.isPrimary === true;
+                                        return (
+                                        <div key={seatId} className={`rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px] ${isPrimary ? 'border-[3px] border-[#213428]' : 'border-2 border-[#213428]'}`}>
                                             <div className="flex items-center gap-2 mb-2">
                                                 <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                                     {formatSeatLabel(seatId)}
@@ -464,10 +466,11 @@ function RP22ReportInner() {
                                                 <RP22GradingPill level="L2" count={counts.L2} />
                                                 <RP22GradingPill level="L1" count={counts.L1} />
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ))}
+                                            </div>
+                                            );
+                                            })}
+                                            </div>
+                                            ))}
                         </div>
                     </div>
                 </div>
