@@ -204,24 +204,34 @@ function RP22ReportInner() {
         return results;
     }, [analysisResult]);
 
-    const levelCounts = React.useMemo(() => {
-        if (!analysisResult?.gradedParameters?.primary) return {};
-        return Object.values(analysisResult.gradedParameters.primary).reduce((acc, param) => {
+    // Count ROOM parameters only (excludes per-seat params)
+    const roomLevelCounts = React.useMemo(() => {
+        if (!analysisResult?.gradedParameters?.primary) return { L4: 0, L3: 0, L2: 0, L1: 0 };
+        
+        const perSeatParams = new Set([1, 4, 5, 6, 9, 10, 16, 17, 20]);
+        const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
+        
+        Object.entries(analysisResult.gradedParameters.primary).forEach(([paramId, param]) => {
+            const paramNum = parseInt(paramId);
+            if (perSeatParams.has(paramNum)) return; // Skip seat params
+            
             const level = param?.level;
-            if (level) {
-                acc[`L${level}`] = (acc[`L${level}`] || 0) + 1;
+            const value = param?.value;
+            const formatted = param?.formatted;
+            
+            // Only count if we have a valid level AND actual data (not FAIL/N/A/—)
+            if (!level || level === 'FAIL' || level === '—' || level === 'N/A') return;
+            if (formatted === '—' || formatted === 'N/A') return;
+            if (value === null || value === undefined) return;
+            
+            const levelKey = typeof level === 'number' ? `L${level}` : level;
+            if (counts[levelKey] !== undefined) {
+                counts[levelKey]++;
             }
-            return acc;
-        }, {});
+        });
+        
+        return counts;
     }, [analysisResult]);
-
-    const overallLevel = () => {
-        const counts = levelCounts;
-        if (counts.L4 === 21) return 'L4';
-        if ((counts.L3 || 0) + (counts.L4 || 0) >= 19) return 'L3';
-        if ((counts.L2 || 0) + (counts.L3 || 0) + (counts.L4 || 0) >= 15) return 'L2';
-        return 'L1';
-    };
 
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (
@@ -261,10 +271,15 @@ function RP22ReportInner() {
                             })()}
                         </div>
                     </div>
-                    <div className="text-right">
-                        <div className="text-2xl font-bold text-[#213428]">Overall: {overallLevel()}</div>
-                        <div className="text-sm text-[#3E4349]">
-                            {['L4', 'L3', 'L2', 'L1'].map(l => `${l}: ${levelCounts[l] || 0}`).join(' | ')}
+                    <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
+                        <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                            Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
+                        </div>
+                        <div className="flex gap-2">
+                            <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
+                            <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
+                            <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
+                            <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
                         </div>
                     </div>
                 </div>
