@@ -204,18 +204,18 @@ function RP22ReportInner() {
         return results;
     }, [analysisResult]);
 
-    // Count ROOM parameters only (excludes per-seat params)
+    // Count ONLY the 12 room parameters with valid L1-L4 pills
     const roomLevelCounts = React.useMemo(() => {
         if (!analysisResult?.gradedParameters?.primary) return { L4: 0, L3: 0, L2: 0, L1: 0 };
         
-        const perSeatParams = new Set([1, 4, 5, 6, 9, 10, 16, 17, 20]);
+        const roomParamIds = [2, 3, 7, 8, 11, 12, 13, 14, 15, 18, 19, 21];
         const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
         
-        Object.entries(analysisResult.gradedParameters.primary).forEach(([paramId, param]) => {
-            const paramNum = parseInt(paramId);
-            if (perSeatParams.has(paramNum)) return; // Skip seat params
+        roomParamIds.forEach((paramId) => {
+            const param = analysisResult.gradedParameters.primary[paramId];
+            if (!param) return;
             
-            // Count only based on level: L1, L2, L3, or L4
+            // Count only if level is L1, L2, L3, or L4
             const lvl = Number(param?.level);
             if (lvl >= 1 && lvl <= 4) {
                 counts[`L${lvl}`]++;
