@@ -444,6 +444,7 @@ function RP22ReportInner() {
                             <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                 Seat parameters
                             </div>
+                            <span className="text-sm text-gray-500">(10)</span>
                         </div>
                         
                         {/* Seat boxes grouped by row into columns */}
@@ -454,7 +455,7 @@ function RP22ReportInner() {
                                         <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px]">
                                             <div className="flex items-center gap-2 mb-2">
                                                 <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                    {formatSeatLabel(seatId)} ({total})
+                                                    {formatSeatLabel(seatId)}
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
