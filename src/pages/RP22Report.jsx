@@ -204,31 +204,51 @@ function RP22ReportInner() {
         return results;
     }, [analysisResult]);
 
-    // Count ONLY the 12 room parameters with valid L1–L4 pills (room only, not seats)
+    // Count ONLY the 12 room parameters with valid L1–L4 pills,
+    // using the SAME getter the room cards use (getRoomResult).
     const roomLevelCounts = React.useMemo(() => {
-        const primary = analysisResult?.gradedParameters?.primary;
-        if (!primary) return { L4: 0, L3: 0, L2: 0, L1: 0, total: 0 };
+        const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
 
+        // These are the 12 room parameters we show on this page
         const roomParamIds = [2, 3, 7, 8, 11, 12, 13, 14, 15, 18, 19, 21];
-        const counts = { L4: 0, L3: 0, L2: 0, L1: 0, total: 0 };
 
-        for (const paramId of roomParamIds) {
-            const param = primary[paramId];
-            if (!param) continue;
+        // Normalise level into 1..4 (or null if not countable)
+        const toLvl = (rawLevel) => {
+            if (rawLevel == null) return null;
 
-            // Level is stored like "L4" (string) in this app's analysis objects
-            const levelStr = typeof param.level === "string" ? param.level.trim() : null;
-            if (!levelStr) continue;
-
-            // Only count true L1–L4 results, ignore FAIL/no-data/blank/etc.
-            if (levelStr === "L1" || levelStr === "L2" || levelStr === "L3" || levelStr === "L4") {
-                counts[levelStr] += 1;
-                counts.total += 1;
+            // Numeric 1..4
+            if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) {
+                if (rawLevel >= 1 && rawLevel <= 4) return rawLevel;
+                return null;
             }
+
+            // Strings like "L4"
+            if (typeof rawLevel === "string") {
+                const m = rawLevel.trim().match(/^L([1-4])$/i);
+                if (m) return Number(m[1]);
+            }
+
+            return null;
+        };
+
+        for (const id of roomParamIds) {
+            const res = getRoomResult(id);
+            if (!res) continue;
+
+            const lvl = toLvl(res.level);
+            if (!lvl) continue;
+
+            // Exclude explicit no-data / fail states if they exist
+            if (res.status && typeof res.status === "string") {
+                const s = res.status.toLowerCase();
+                if (s === "no_data" || s === "fail") continue;
+            }
+
+            counts[`L${lvl}`] += 1;
         }
 
         return counts;
-    }, [analysisResult]);
+    }, [analysisResult, getRoomResult]);
 
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (
@@ -270,7 +290,7 @@ function RP22ReportInner() {
                     </div>
                     <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
                         <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                            Room parameters ({roomLevelCounts.total})
+                            Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                         </div>
                         <div className="flex gap-2">
                             <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
