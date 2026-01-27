@@ -14,6 +14,7 @@ import { computeMLPAndPrimary } from '../components/utils/computeMLPAndPrimary';
 import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
+import { formatSeatLabel } from '../components/utils/seatLabel';
 
 function RP22ReportInner() {
     const app = useAppState();
@@ -428,7 +429,7 @@ function RP22ReportInner() {
                                             <div className="flex items-center gap-2 mb-2">
                                                 {isFirstSeat && <User className="w-4 h-4 text-[#213428]" />}
                                                 <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                    Seat parameters — {seatId} ({total})
+                                                    Seat parameters — {formatSeatLabel(seatId)} ({total})
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
@@ -511,7 +512,7 @@ function RP22ReportInner() {
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                        {seatId} {isPrimary && <span className="text-xs text-green-700">(MLP)</span>}
+                                                        {formatSeatLabel(seatId)} {isPrimary && <span className="text-xs text-green-700">(MLP)</span>}
                                                     </CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="space-y-2.5 text-xs">
