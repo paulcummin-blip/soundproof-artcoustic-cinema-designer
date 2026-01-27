@@ -301,7 +301,7 @@ function RP22ReportInner() {
     }, [getDisplayedRoomLevel]);
 
     // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
-    // MUST include RP23 + all 9 RP22 params (P1, P4, P5, P6, P9, P10, P16, P17, P20)
+    // Total is always 10 (RP23 + 9 RP22 params: P1, P4, P5, P6, P9, P10, P16, P17, P20)
     const seatLevelCounts = React.useMemo(() => {
         const perSeat = analysisResult?.perSeatRp22 || {};
         const seatIds = Object.keys(perSeat).sort();
@@ -314,32 +314,36 @@ function RP22ReportInner() {
             
             const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
             
-            // Count RP23 Horizontal
-            if (rp23?.level) {
-                const lvl = typeof rp23.level === 'string' 
-                    ? rp23.level.trim()
-                    : `L${rp23.level}`;
-                
-                if (lvl.match(/^L[1-4]$/)) {
-                    counts[lvl] += 1;
+            // Normalize level helper (same as room count logic)
+            const normalizeLvl = (rawLevel) => {
+                if (rawLevel == null) return null;
+                if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) {
+                    if (rawLevel >= 1 && rawLevel <= 4) return `L${rawLevel}`;
+                    return null;
                 }
-            }
+                if (typeof rawLevel === "string") {
+                    const m = rawLevel.trim().match(/^L([1-4])$/i);
+                    if (m) return `L${m[1]}`;
+                }
+                return null;
+            };
+            
+            // Count RP23 Horizontal
+            const lvl23 = normalizeLvl(rp23?.level);
+            if (lvl23) counts[lvl23] += 1;
             
             // Count RP22 parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20)
             ['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].forEach(key => {
                 const metric = rp22Raw[key];
-                if (!metric || !metric.level) return;
-                
-                const lvl = typeof metric.level === 'string' 
-                    ? metric.level.trim()
-                    : `L${metric.level}`;
-                
-                if (lvl.match(/^L[1-4]$/)) {
-                    counts[lvl] += 1;
-                }
+                if (!metric) return;
+                const lvl = normalizeLvl(metric.level);
+                if (lvl) counts[lvl] += 1;
             });
             
-            return { seatId, counts };
+            // Total is always 10 rows (RP23 + 9 RP22 params)
+            const total = 10;
+            
+            return { seatId, counts, total };
         });
     }, [analysisResult?.perSeatRp22, app?.seatMetricsById]);
 
@@ -415,14 +419,14 @@ function RP22ReportInner() {
                     <div className="flex-1 space-y-6">
                         {seatGridBlocks.map((block, blockIdx) => (
                             <div key={blockIdx} className="grid grid-cols-2 gap-4">
-                                {block.map(({ seatId, counts }, seatIdx) => {
+                                {block.map(({ seatId, counts, total }, seatIdx) => {
                                     const isFirstSeat = blockIdx === 0 && seatIdx === 0;
                                     return (
                                         <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
                                             <div className="flex items-center gap-2 mb-2">
                                                 {isFirstSeat && <User className="w-4 h-4 text-[#213428]" />}
                                                 <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                    Seat parameters — {seatId}
+                                                    Seat parameters — {seatId} ({total})
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
