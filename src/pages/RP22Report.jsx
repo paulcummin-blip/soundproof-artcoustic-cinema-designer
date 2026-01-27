@@ -4,7 +4,7 @@ import { useRP22AnalysisEngine } from '../components/hooks/useRP22AnalysisEngine
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { BarChart4 } from 'lucide-react';
+import { BarChart4, Home, User } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import ParameterCard from '../components/report/ParameterCard';
@@ -301,15 +301,33 @@ function RP22ReportInner() {
     }, [getDisplayedRoomLevel]);
 
     // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
+    // MUST include RP23 + all 9 RP22 params (P1, P4, P5, P6, P9, P10, P16, P17, P20)
     const seatLevelCounts = React.useMemo(() => {
         const perSeat = analysisResult?.perSeatRp22 || {};
         const seatIds = Object.keys(perSeat).sort();
         
         return seatIds.map(seatId => {
-            const rp22 = perSeat[seatId]?.rp22 || {};
+            // Read from same source as seat cards: app.seatMetricsById
+            const tooltipData = app?.seatMetricsById?.[seatId];
+            const rp22Raw = tooltipData?.rp22 || {};
+            const rp23 = tooltipData?.rp23 || {};
+            
             const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
             
-            Object.values(rp22).forEach(metric => {
+            // Count RP23 Horizontal
+            if (rp23?.level) {
+                const lvl = typeof rp23.level === 'string' 
+                    ? rp23.level.trim()
+                    : `L${rp23.level}`;
+                
+                if (lvl.match(/^L[1-4]$/)) {
+                    counts[lvl] += 1;
+                }
+            }
+            
+            // Count RP22 parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20)
+            ['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].forEach(key => {
+                const metric = rp22Raw[key];
                 if (!metric || !metric.level) return;
                 
                 const lvl = typeof metric.level === 'string' 
@@ -323,16 +341,16 @@ function RP22ReportInner() {
             
             return { seatId, counts };
         });
-    }, [analysisResult?.perSeatRp22]);
+    }, [analysisResult?.perSeatRp22, app?.seatMetricsById]);
 
-    // Chunk seat counts into groups of 4 for column layout
-    const seatChunks = React.useMemo(() => {
-        const chunkSize = 4;
-        const chunks = [];
-        for (let i = 0; i < seatLevelCounts.length; i += chunkSize) {
-            chunks.push(seatLevelCounts.slice(i, i + chunkSize));
+    // Chunk seat counts into 2-column grid (8 per block: 2 cols × 4 rows)
+    const seatGridBlocks = React.useMemo(() => {
+        const blockSize = 8; // 2 columns × 4 rows
+        const blocks = [];
+        for (let i = 0; i < seatLevelCounts.length; i += blockSize) {
+            blocks.push(seatLevelCounts.slice(i, i + blockSize));
         }
-        return chunks;
+        return blocks;
     }, [seatLevelCounts]);
 
     if (!analysisResult || !analysisResult.gradedParameters) {
@@ -354,71 +372,68 @@ function RP22ReportInner() {
     return (
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <div className="max-w-7xl mx-auto space-y-6">
-                <div className="flex justify-between items-center">
-                    <div>
-                        <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
-                        <div className="text-sm text-[#3E4349] mt-1">
-                            System: {(() => {
-                                const dolbyPreset = app?.dolbyLayout || "5.1";
-                                const base = String(dolbyPreset).split(" ")[0]; // "5.1.4" or "5.1"
-                                const parts = base.split(".");
-                                const bed = parts[0] || "5";
-                                const heights = parts[2] || "";
-                                
-                                const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
-                                const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
-                                const totalSubs = frontCount + rearCount;
-                                
-                                return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-                            })()}
+                {/* Header */}
+                <div>
+                    <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
+                    <div className="text-sm text-[#3E4349] mt-1">
+                        System: {(() => {
+                            const dolbyPreset = app?.dolbyLayout || "5.1";
+                            const base = String(dolbyPreset).split(" ")[0];
+                            const parts = base.split(".");
+                            const bed = parts[0] || "5";
+                            const heights = parts[2] || "";
+                            
+                            const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
+                            const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
+                            const totalSubs = frontCount + rearCount;
+                            
+                            return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+                        })()}
+                    </div>
+                    <div className="border-b border-[#E6E4DD] mt-4" />
+                </div>
+
+                {/* Counts Dashboard */}
+                <div className="flex gap-6 items-start">
+                    {/* Room count box */}
+                    <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Home className="w-4 h-4 text-[#213428]" />
+                            <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
+                            <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
+                            <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
+                            <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
                         </div>
                     </div>
-                    <div className="flex gap-4 items-start">
-                        {/* Column 1: Room parameters + first chunk of seats */}
-                        <div className="space-y-4">
-                            <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
-                                <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                    Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
-                                </div>
-                                <div className="flex gap-2">
-                                    <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
-                                    <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
-                                    <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
-                                    <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
-                                </div>
-                            </div>
 
-                            {seatChunks.length > 0 && seatChunks[0].map(({ seatId, counts }) => (
-                                <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
-                                    <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                        Seat parameters — {seatId}
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <RP22GradingPill level="L4" count={counts.L4} />
-                                        <RP22GradingPill level="L3" count={counts.L3} />
-                                        <RP22GradingPill level="L2" count={counts.L2} />
-                                        <RP22GradingPill level="L1" count={counts.L1} />
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Columns 2+: remaining chunks of seats */}
-                        {seatChunks.slice(1).map((chunk, columnIndex) => (
-                            <div key={columnIndex} className="space-y-4">
-                                {chunk.map(({ seatId, counts }) => (
-                                    <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
-                                        <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                            Seat parameters — {seatId}
+                    {/* Seat grid blocks (2 cols × 4 rows = 8 per block) */}
+                    <div className="flex-1 space-y-6">
+                        {seatGridBlocks.map((block, blockIdx) => (
+                            <div key={blockIdx} className="grid grid-cols-2 gap-4">
+                                {block.map(({ seatId, counts }, seatIdx) => {
+                                    const isFirstSeat = blockIdx === 0 && seatIdx === 0;
+                                    return (
+                                        <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                {isFirstSeat && <User className="w-4 h-4 text-[#213428]" />}
+                                                <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                                    Seat parameters — {seatId}
+                                                </div>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <RP22GradingPill level="L4" count={counts.L4} />
+                                                <RP22GradingPill level="L3" count={counts.L3} />
+                                                <RP22GradingPill level="L2" count={counts.L2} />
+                                                <RP22GradingPill level="L1" count={counts.L1} />
+                                            </div>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <RP22GradingPill level="L4" count={counts.L4} />
-                                            <RP22GradingPill level="L3" count={counts.L3} />
-                                            <RP22GradingPill level="L2" count={counts.L2} />
-                                            <RP22GradingPill level="L1" count={counts.L1} />
-                                        </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ))}
                     </div>
