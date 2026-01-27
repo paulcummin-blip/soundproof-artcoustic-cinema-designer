@@ -1,6 +1,6 @@
 import { getLevelColors } from '@/components/utils/rp22Colors';
 
-export default function RP22GradingPill({ level = 4, children }) {
+export default function RP22GradingPill({ level = 4, count, children }) {
   // Normalize level to safe value
   const normalizeLevel = (lvl) => {
     if (typeof lvl === 'number') {
@@ -19,7 +19,8 @@ export default function RP22GradingPill({ level = 4, children }) {
   };
   
   const n = normalizeLevel(level);
-  const label = children ?? (n === -1 ? '—' : n === 0 ? 'FAIL' : `L${n}`);
+  const baseLabel = n === -1 ? '—' : n === 0 ? 'FAIL' : `L${n}`;
+  const label = children ?? (count !== undefined ? `${baseLabel}: ${count}` : baseLabel);
 
   const colors = n === -1 
     ? { bg: '#F3F4F6', border: '#E5E7EB', text: '#9CA3AF' } 
