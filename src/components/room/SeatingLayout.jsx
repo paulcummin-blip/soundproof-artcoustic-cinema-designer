@@ -37,28 +37,7 @@ function targetMlpY57_5(screen, roomFrontY = 0) {
   return screenPlaneY + targetDist_m; // THIS is the green dot Y (in meters)
 }
 
-// Helper to find primary seats within a single row
-const getRowPrimaries = (rowSeats) => {
-  const sorted = [...rowSeats].sort((a, b) => a.x - b.x);
-  const n = sorted.length;
-  const primaryIdx = new Set();
 
-  if (n <= 2) { // 1 or 2 seats, all are primary
-    for (let i = 0; i < n; i++) primaryIdx.add(i);
-  } else if (n === 3) { // 3 seats, center is primary
-    primaryIdx.add(1);
-  } else if (n === 4) { // 4 seats, center 2 are primary
-    primaryIdx.add(1);
-    primaryIdx.add(2);
-  } else { // 5+ seats, center 3 are primary
-    const mid = Math.floor(n / 2);
-    primaryIdx.add(mid - 1);
-    primaryIdx.add(mid);
-    primaryIdx.add(mid + 1);
-  }
-
-  return sorted.filter((_, i) => primaryIdx.has(i));
-};
 
 // Function to get ear height for each row
 const getEarHeightForRow = (rowNumber) => {
@@ -128,64 +107,7 @@ export default function SeatingLayout({
   // Use this everywhere instead of seatingRows for how many rows we have
   const rowCount = rowsArray.length;
 
-  // Logic to set primary seats based on MLP basis, now inside SeatingLayout
-  useEffect(() => {
-    if (!seatingPositions.length || !onSetSeatingPositions) return;
 
-    const seatsByRow = seatingPositions.reduce((acc, seat) => {
-      const row = seat.rowNumber || 1;
-      if (!acc[row]) acc[row] = [];
-      acc[row].push(seat);
-      return acc;
-    }, {});
-    
-    const rowNumbers = Object.keys(seatsByRow).map(Number).sort((a, b) => a - b);
-    if (!rowNumbers.length) return;
-
-    let targetRowNumbers = [];
-    switch (mlpBasis) {
-      case 'front':
-        targetRowNumbers = [rowNumbers[0]];
-        break;
-      case 'back':
-        targetRowNumbers = [rowNumbers[rowNumbers.length - 1]];
-        break;
-      case 'middle':
-        if (rowCount >= 3) { // Changed seatingRows to rowCount
-          if (rowCount % 2 !== 0) { // Odd number of rows
-            targetRowNumbers = [rowNumbers[Math.floor(rowCount / 2)]];
-          } else { // Even number of rows
-            targetRowNumbers = [rowNumbers[rowCount / 2 - 1], rowNumbers[rowCount / 2]];
-          }
-        } else { // Fallback for 2 rows
-             targetRowNumbers = rowNumbers;
-        }
-        break;
-      case 'all':
-      default:
-        targetRowNumbers = rowNumbers;
-        break;
-    }
-
-    const primarySeatIds = new Set();
-    targetRowNumbers.forEach(rowNum => {
-      const rowSeats = seatsByRow[rowNum] || [];
-      const primaryInRow = getRowPrimaries(rowSeats);
-      primaryInRow.forEach(seat => primarySeatIds.add(seat.id));
-    });
-
-    const newSeatsWithFlags = seatingPositions.map(seat => ({
-      ...seat,
-      isPrimary: primarySeatIds.has(seat.id)
-    }));
-
-    // Check for changes to prevent infinite loops
-    const flagsChanged = seatingPositions.some((seat, i) => seat.isPrimary !== newSeatsWithFlags[i].isPrimary);
-
-    if (flagsChanged) {
-      onSetSeatingPositions(newSeatsWithFlags);
-    }
-  }, [seatingPositions, mlpBasis, rowCount, onSetSeatingPositions]); // Changed seatingRows to rowCount
 
   const totalSeats = seatingPositions.length;
   const primarySeats = seatingPositions.filter(s => s.isPrimary).length;

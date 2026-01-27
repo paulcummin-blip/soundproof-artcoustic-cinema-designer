@@ -3965,18 +3965,31 @@ function RoomDesignerWithState() {
   useEffect(() => {
     const { seatsWithFlags } = computeMLPAndPrimary(
       Array.isArray(_seatingPositions) ? _seatingPositions : [],
-      _roomDims?.widthM || 0, // Use _roomDims properties
-      _roomDims?.lengthM || 0, // Use _roomDims properties
+      _roomDims?.widthM || 0,
+      _roomDims?.lengthM || 0,
       _mlpBasis
     );
 
-    const sameLength = (_seatingPositions || []).length === seatsWithFlags.length;
-    const flagsChanged = !sameLength || (_seatingPositions || []).some((s, i) => !!s.isPrimary !== !!seatsWithFlags[i].isPrimary);
+    // Only update if isPrimary flags actually changed
+    const prev = _seatingPositions || [];
+    const sameLength = prev.length === seatsWithFlags.length;
+    
+    if (!sameLength) {
+      (appState?.setSeatingPositions || (() => {}))(seatsWithFlags);
+      return;
+    }
+
+    // Check if any seat's isPrimary changed (must match by seatId)
+    const prevById = new Map(prev.map(s => [s.id, s]));
+    const flagsChanged = seatsWithFlags.some(s => {
+      const p = prevById.get(s.id);
+      return p && (!!p.isPrimary !== !!s.isPrimary);
+    });
 
     if (flagsChanged) {
-      (appState?.setSeatingPositions || (() => {}))(seatsWithFlags); // Call appState setter
+      (appState?.setSeatingPositions || (() => {}))(seatsWithFlags);
     }
-  }, [_seatingPositions, _roomDims?.widthM, _roomDims?.lengthM, _mlpBasis, appState?.setSeatingPositions]); // Add _roomDims to dependencies
+  }, [_seatingPositions, _roomDims?.widthM, _roomDims?.lengthM, _mlpBasis, appState?.setSeatingPositions]);
 
   const handleResetPositions = React.useCallback(() => {
     if (_isFrozen && _isFrozen('speakers')) return;

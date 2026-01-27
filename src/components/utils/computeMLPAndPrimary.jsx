@@ -1,3 +1,6 @@
+// Round to 1mm for stable comparisons
+const round3 = (n) => Math.round(n * 1000) / 1000;
+
 // Enhanced MLP calculation with basis selection
 export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
   const width = Number(W) || 0;
@@ -71,11 +74,15 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
       break;
   }
 
-  // Find RSP seat (closest to MLP green dot)
+  // Find RSP seat (closest to MLP green dot) with stable tie-breaker
   const distToMlp = (seat) => Math.hypot(seat.x - mlp.x, seat.y - mlp.y);
-  const rspSeat = valid.reduce((closest, seat) => 
-    distToMlp(seat) < distToMlp(closest) ? seat : closest
-  , valid[0]);
+  const rspSeat = valid.reduce((closest, seat) => {
+    const dA = round3(distToMlp(seat));
+    const dB = round3(distToMlp(closest));
+    if (dA < dB) return seat;
+    if (dA > dB) return closest;
+    return String(seat.id).localeCompare(String(closest.id)) < 0 ? seat : closest;
+  }, valid[0]);
 
   // Extract row number from seat ID (e.g., "seat-r2-c3" -> 2)
   const getRowNum = (seat) => {
@@ -133,7 +140,10 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
   
   seatsWithScores
     .filter(s => s.seat.id !== rspSeat.id)
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => 
+      round3(b.score) - round3(a.score) ||
+      String(a.seat.id).localeCompare(String(b.seat.id))
+    )
     .slice(0, 3)
     .forEach(s => primarySeatIds.add(s.seat.id));
 
