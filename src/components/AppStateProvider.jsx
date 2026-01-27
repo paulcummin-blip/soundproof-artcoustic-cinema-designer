@@ -984,7 +984,8 @@ function useDesignerState() {
     useMidGlobal,
     useRearGlobal,
     seatMetricsById,
-    p15ConstructionLevel
+    p15ConstructionLevel,
+    p21EarlyReflectionPreset
     ]);
 
     // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
@@ -1060,7 +1061,8 @@ function useDesignerState() {
     useMidGlobal,
     useRearGlobal,
     seatMetricsById,
-    p15ConstructionLevel
+    p15ConstructionLevel,
+    p21EarlyReflectionPreset
     ]);
 
     // --- Autosave: Manual restore/clear functions ---
