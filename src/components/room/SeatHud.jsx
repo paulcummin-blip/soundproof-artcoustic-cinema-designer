@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { formatDb } from '@/components/utils/formatDb';
 import { getRP22Definition } from '@/components/data/rp22Definitions';
 import { getLevelColors } from '@/components/utils/rp22Colors';
+import { formatSeatLabel } from '@/components/utils/seatLabel';
 
 export default function SeatHud({
   tooltipData,
@@ -167,7 +168,7 @@ export default function SeatHud({
         }}
       >
         <div>
-          {tooltipData.seatId} {tooltipData.isPrimary ? '(RSP)' : ''}
+          {formatSeatLabel(tooltipData.seatId)} {tooltipData.isPrimary ? '(RSP)' : ''}
           {isHudPinned && (
             <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 500, color: '#999' }}>(Pinned)</span>
           )}
