@@ -348,14 +348,32 @@ function RP22ReportInner() {
         });
     }, [analysisResult?.perSeatRp22, app?.seatMetricsById]);
 
-    // Chunk seat counts into 2-column grid (8 per block: 2 cols × 4 rows)
-    const seatGridBlocks = React.useMemo(() => {
-        const blockSize = 8; // 2 columns × 4 rows
-        const blocks = [];
-        for (let i = 0; i < seatLevelCounts.length; i += blockSize) {
-            blocks.push(seatLevelCounts.slice(i, i + blockSize));
-        }
-        return blocks;
+    // Group seat counts by row, sorted by seat number within each row
+    const seatCountsByRow = React.useMemo(() => {
+        const rows = {};
+
+        seatLevelCounts.forEach(({ seatId, counts, total }) => {
+            // Parse seat-r{row}-c{col}
+            const match = seatId.match(/^seat-r(\d+)-c(\d+)$/);
+            if (!match) return;
+
+            const rowNum = parseInt(match[1], 10);
+            const seatNum = parseInt(match[2], 10);
+
+            if (!rows[rowNum]) rows[rowNum] = [];
+            rows[rowNum].push({ seatId, counts, total, seatNum });
+        });
+
+        // Sort each row's seats by seat number
+        Object.keys(rows).forEach(rowNum => {
+            rows[rowNum].sort((a, b) => a.seatNum - b.seatNum);
+        });
+
+        // Return sorted row numbers
+        return Object.keys(rows)
+            .map(Number)
+            .sort((a, b) => a - b)
+            .map(rowNum => ({ rowNum, seats: rows[rowNum] }));
     }, [seatLevelCounts]);
 
     if (!analysisResult || !analysisResult.gradedParameters) {
@@ -399,7 +417,7 @@ function RP22ReportInner() {
                 </div>
 
                 {/* Counts Dashboard */}
-                <div className="grid grid-cols-[auto_1fr] gap-6 items-start">
+                <div className="grid grid-cols-[auto_1fr] gap-6 items-start mt-8">
                     {/* Left: Room count box */}
                     <div className="justify-self-start">
                         <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px]">
@@ -418,18 +436,25 @@ function RP22ReportInner() {
                         </div>
                     </div>
 
-                    {/* Right: Seat grid blocks (2 cols × 4 rows = 8 per block) */}
-                    <div className="justify-self-end space-y-4">
-                        {seatGridBlocks.map((block, blockIdx) => (
-                            <div key={blockIdx} className="grid grid-cols-2 gap-4">
-                                {block.map(({ seatId, counts, total }, seatIdx) => {
-                                    const isFirstSeat = blockIdx === 0 && seatIdx === 0;
-                                    return (
+                    {/* Right: Seat parameters section */}
+                    <div className="justify-self-end">
+                        {/* Seat parameters heading */}
+                        <div className="flex items-center gap-2 mb-3">
+                            <User className="w-4 h-4 text-[#213428]" />
+                            <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                Seat parameters
+                            </div>
+                        </div>
+                        
+                        {/* Seat boxes grouped by row into columns */}
+                        <div className="flex gap-4">
+                            {seatCountsByRow.map(({ rowNum, seats }) => (
+                                <div key={rowNum} className="flex flex-col gap-4">
+                                    {seats.map(({ seatId, counts, total }) => (
                                         <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px]">
                                             <div className="flex items-center gap-2 mb-2">
-                                                {isFirstSeat && <User className="w-4 h-4 text-[#213428]" />}
                                                 <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                    Seat parameters — {formatSeatLabel(seatId)} ({total})
+                                                    {formatSeatLabel(seatId)} ({total})
                                                 </div>
                                             </div>
                                             <div className="flex gap-2">
@@ -439,10 +464,10 @@ function RP22ReportInner() {
                                                 <RP22GradingPill level="L1" count={counts.L1} />
                                             </div>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        ))}
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
