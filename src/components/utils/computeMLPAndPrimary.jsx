@@ -1,6 +1,13 @@
 // Round to 1mm for stable comparisons
 const round3 = (n) => Math.round(n * 1000) / 1000;
 
+// Primary seat eligibility constants
+const WALL_CLEARANCE_MIN_M = 1.0;
+const ELLIPSE_A_M = 1.6;  // side-to-side radius
+const ELLIPSE_B_M = 1.4;  // front-to-back radius
+const DIST_SOFT_MAX_M = 2.6;
+const SCORE_TOLERANCE = 0.10;
+
 // Enhanced MLP calculation with basis selection
 export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
   const width = Number(W) || 0;
@@ -131,20 +138,47 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
     }
 
     const score = distScore + rowBonus - wallPenalty;
+    
+    // Wall clearance for eligibility
+    const wallClearance = minDistToWall(seat);
+    
+    // Ellipse eligibility around RSP
+    const dx = seat.x - rspSeat.x;
+    const dy = seat.y - rspSeat.y;
+    const ellipseNorm = Math.sqrt((dx / ELLIPSE_A_M) ** 2 + (dy / ELLIPSE_B_M) ** 2);
+    
+    // Eligibility gates
+    const isEligible = 
+      ellipseNorm <= 1 &&
+      wallClearance >= WALL_CLEARANCE_MIN_M &&
+      d <= DIST_SOFT_MAX_M;
 
-    return { seat, score };
+    return { seat, score, isEligible };
   });
 
-  // Select Primary seats: RSP + top 3 others by score (max 4 total)
+  // Select Primary seats using score tolerance
+  const eligibleSeats = seatsWithScores.filter(s => s.isEligible);
+  
+  // Find best score among eligible seats
+  const bestScore = eligibleSeats.length > 0
+    ? Math.max(...eligibleSeats.map(s => s.score))
+    : 0;
+  
+  // Calculate threshold (protect against bestScore = 0)
+  const threshold = bestScore > 0 
+    ? bestScore * (1 - SCORE_TOLERANCE)
+    : 0;
+  
+  // RSP is always Primary
   const primarySeatIds = new Set([rspSeat.id]);
   
-  seatsWithScores
-    .filter(s => s.seat.id !== rspSeat.id)
+  // Add all eligible seats that meet score threshold
+  eligibleSeats
+    .filter(s => s.seat.id !== rspSeat.id && s.score >= threshold)
     .sort((a, b) => 
       round3(b.score) - round3(a.score) ||
       String(a.seat.id).localeCompare(String(b.seat.id))
     )
-    .slice(0, 3)
     .forEach(s => primarySeatIds.add(s.seat.id));
 
   const seatsWithFlags = valid.map(seat => ({
