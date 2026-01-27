@@ -446,6 +446,16 @@ function useDesignerState() {
     setP15ConstructionLevel(v);
   }, []);
 
+  const [p21EarlyReflectionPreset, setP21EarlyReflectionPreset] = useState(() => (
+    (__autosavePayload && __autosavePayload.p21EarlyReflectionPreset) ? __autosavePayload.p21EarlyReflectionPreset : 'l2'
+  ));
+
+  const setP21EarlyReflectionPresetSafe = useCallback((next) => {
+    const allowed = new Set(["l1", "l2", "l3", "l4"]);
+    const v = allowed.has(next) ? next : "l2";
+    setP21EarlyReflectionPreset(v);
+  }, []);
+
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
@@ -927,7 +937,8 @@ function useDesignerState() {
       useMidGlobal,
       useRearGlobal,
       seatMetricsById,
-      p15ConstructionLevel
+      p15ConstructionLevel,
+      p21EarlyReflectionPreset
     };
 
     if (!isAutosavePayloadValid(payload)) return;
@@ -1009,7 +1020,8 @@ function useDesignerState() {
       useMidGlobal,
       useRearGlobal,
       seatMetricsById,
-      p15ConstructionLevel
+      p15ConstructionLevel,
+      p21EarlyReflectionPreset
       };
 
       try {
@@ -1397,9 +1409,14 @@ function useDesignerState() {
     resetRoomDesignerToDefaults,
     p15ConstructionLevel,
     setP15ConstructionLevelSafe,
+    p21EarlyReflectionPreset,
+    setP21EarlyReflectionPresetSafe,
     ]);
 
-    return value;
+  // Export p21 setter as convenience (same pattern as p15)
+  value.setP21EarlyReflectionPreset = setP21EarlyReflectionPresetSafe;
+
+  return value;
 }
 
 export function AppStateProvider({ children }) {
