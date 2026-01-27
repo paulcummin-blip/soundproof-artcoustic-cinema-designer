@@ -186,6 +186,81 @@ function RP22ReportInner() {
         return analysisResult?.gradedParameters?.primary?.[paramId] ?? null;
     }, [analysisResult]);
 
+    // Single helper that returns the final displayed pill level for each room parameter
+    const getDisplayedRoomLevel = React.useCallback((paramId) => {
+        // Normalise level into "L1".."L4" string (or null if not countable)
+        const normaliseLvl = (rawLevel) => {
+            if (rawLevel == null) return null;
+            
+            // Numeric 1..4
+            if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) {
+                if (rawLevel >= 1 && rawLevel <= 4) return `L${rawLevel}`;
+                return null;
+            }
+            
+            // Strings like "L4"
+            if (typeof rawLevel === "string") {
+                const m = rawLevel.trim().match(/^L([1-4])$/i);
+                if (m) return `L${m[1]}`;
+            }
+            
+            return null;
+        };
+
+        // First try to pull from getRoomResult (same as cards)
+        const res = getRoomResult(paramId);
+        if (res) {
+            // Check for explicit no-data / fail states
+            if (res.status && typeof res.status === "string") {
+                const s = res.status.toLowerCase();
+                if (s === "no_data" || s === "fail") return null;
+            }
+            
+            const lvl = normaliseLvl(res.level);
+            if (lvl) return lvl;
+        }
+
+        // Apply report-page fallback rules for specific params
+        if (paramId === 2 && p2SystemConfig) {
+            // P2 uses systemConfig.p2Level
+            return normaliseLvl(p2SystemConfig.p2Level);
+        }
+        
+        if (paramId === 3) {
+            // P3 is always L4 (no screen wall speakers outside zones)
+            return "L4";
+        }
+        
+        if (paramId === 8) {
+            // P8 is always L4 (no upfiring)
+            return "L4";
+        }
+        
+        if (paramId === 11) {
+            // P11 is always L4 (app enforces zone compliance)
+            return "L4";
+        }
+        
+        if (paramId === 15) {
+            // P15 uses construction level dropdown
+            const P15_MAP = {
+                standard: "L1",
+                "purpose-built": "L2",
+                reference: "L3",
+                studio: "L4",
+            };
+            return P15_MAP[app?.p15ConstructionLevel || 'standard'] || null;
+        }
+        
+        if (paramId === 21) {
+            // P21 would use a dropdown if we had it - for now return null
+            // (cards render this locally with useState, not available here)
+            return null;
+        }
+
+        return null;
+    }, [analysisResult, getRoomResult, p2SystemConfig, app?.p15ConstructionLevel]);
+
     // Helper: get seat results for a parameter
     const getSeatResults = React.useCallback((paramId) => {
         if (!analysisResult?.perSeatRp22) return [];
@@ -205,50 +280,20 @@ function RP22ReportInner() {
     }, [analysisResult]);
 
     // Count ONLY the 12 room parameters with valid L1–L4 pills,
-    // using the SAME getter the room cards use (getRoomResult).
+    // using the shared getDisplayedRoomLevel helper.
     const roomLevelCounts = React.useMemo(() => {
         const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
-
-        // These are the 12 room parameters we show on this page
         const roomParamIds = [2, 3, 7, 8, 11, 12, 13, 14, 15, 18, 19, 21];
 
-        // Normalise level into 1..4 (or null if not countable)
-        const toLvl = (rawLevel) => {
-            if (rawLevel == null) return null;
-
-            // Numeric 1..4
-            if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) {
-                if (rawLevel >= 1 && rawLevel <= 4) return rawLevel;
-                return null;
-            }
-
-            // Strings like "L4"
-            if (typeof rawLevel === "string") {
-                const m = rawLevel.trim().match(/^L([1-4])$/i);
-                if (m) return Number(m[1]);
-            }
-
-            return null;
-        };
-
         for (const id of roomParamIds) {
-            const res = getRoomResult(id);
-            if (!res) continue;
-
-            const lvl = toLvl(res.level);
-            if (!lvl) continue;
-
-            // Exclude explicit no-data / fail states if they exist
-            if (res.status && typeof res.status === "string") {
-                const s = res.status.toLowerCase();
-                if (s === "no_data" || s === "fail") continue;
+            const lvl = getDisplayedRoomLevel(id);
+            if (lvl && lvl.match(/^L[1-4]$/)) {
+                counts[lvl] += 1;
             }
-
-            counts[`L${lvl}`] += 1;
         }
 
         return counts;
-    }, [analysisResult, getRoomResult]);
+    }, [getDisplayedRoomLevel]);
 
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (
@@ -318,6 +363,7 @@ function RP22ReportInner() {
                                     systemConfig={param.id === 2 ? p2SystemConfig : null}
                                     p15ConstructionLevel={app?.p15ConstructionLevel}
                                     onP15ConstructionLevelChange={app?.setP15ConstructionLevel}
+                                    displayedLevel={getDisplayedRoomLevel(param.id)}
                                 />
                             ))}
                         </div>

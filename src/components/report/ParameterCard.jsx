@@ -3,14 +3,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RP22GradingPill from '../ui/RP22GradingPill';
 
-export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, p15ConstructionLevel, onP15ConstructionLevelChange }) {
+export default function ParameterCard({ parameter, roomResult, seatResults = [], systemConfig = null, p15ConstructionLevel, onP15ConstructionLevelChange, displayedLevel = null }) {
     if (!parameter) return null;
 
     const [p15Local, setP15Local] = React.useState("standard");
     const [p21Local, setP21Local] = React.useState("l2");
 
     const hasRoomResult = roomResult && typeof roomResult === 'object';
-    const level = hasRoomResult ? (roomResult.level || null) : null;
+    // Use displayedLevel if provided (ensures consistency with count box)
+    const level = displayedLevel || (hasRoomResult ? (roomResult.level || null) : null);
     const value = hasRoomResult ? roomResult.value : null;
     const formatted = hasRoomResult ? roomResult.formatted : null;
     
