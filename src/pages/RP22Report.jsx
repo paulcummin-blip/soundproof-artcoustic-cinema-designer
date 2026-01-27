@@ -379,7 +379,7 @@ function RP22ReportInner() {
                 {/* Header */}
                 <div>
                     <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
-                    <div className="text-sm text-[#3E4349] mt-1">
+                    <div className="text-base text-[#3E4349] mt-1">
                         System: {(() => {
                             const dolbyPreset = app?.dolbyLayout || "5.1";
                             const base = String(dolbyPreset).split(" ")[0];
@@ -399,30 +399,32 @@ function RP22ReportInner() {
 
                 {/* Counts Dashboard */}
                 <div className="flex gap-6 items-start">
-                    {/* Room count box */}
-                    <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
-                        <div className="flex items-center gap-2 mb-2">
-                            <Home className="w-4 h-4 text-[#213428]" />
-                            <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
+                    {/* Left: Room count box */}
+                    <div className="flex-shrink-0">
+                        <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px]">
+                            <div className="flex items-center gap-2 mb-2">
+                                <Home className="w-4 h-4 text-[#213428]" />
+                                <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                    Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
-                            <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
-                            <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
-                            <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
+                            <div className="flex gap-2">
+                                <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
+                                <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
+                                <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
+                                <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
+                            </div>
                         </div>
                     </div>
 
-                    {/* Seat grid blocks (2 cols × 4 rows = 8 per block) */}
-                    <div className="flex-1 space-y-6">
+                    {/* Right: Seat grid blocks (2 cols × 4 rows = 8 per block) */}
+                    <div className="flex-1 space-y-4">
                         {seatGridBlocks.map((block, blockIdx) => (
                             <div key={blockIdx} className="grid grid-cols-2 gap-4">
                                 {block.map(({ seatId, counts, total }, seatIdx) => {
                                     const isFirstSeat = blockIdx === 0 && seatIdx === 0;
                                     return (
-                                        <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
+                                        <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px]">
                                             <div className="flex items-center gap-2 mb-2">
                                                 {isFirstSeat && <User className="w-4 h-4 text-[#213428]" />}
                                                 <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
