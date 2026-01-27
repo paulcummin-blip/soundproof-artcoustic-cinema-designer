@@ -71,43 +71,71 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
       break;
   }
 
-  // Get primary seats for each row (for flag assignment)
-  const getRowPrimaries = (rowSeats) => {
-    const sorted = [...(rowSeats || [])].sort((a, b) => a.x - b.x);
-    const n = sorted.length;
-    const primaryIdx = new Set();
-    if (n <= 2) { for (let i = 0; i < n; i++) primaryIdx.add(i); }
-    else if (n === 3) { primaryIdx.add(1); }
-    else if (n === 4) { primaryIdx.add(1); primaryIdx.add(2); }
-    else { const mid = Math.floor(n / 2); primaryIdx.add(mid - 1); primaryIdx.add(mid); primaryIdx.add(mid + 1); }
-    return sorted.filter((_, i) => primaryIdx.has(i));
-  };
-  
-  let primaryReferenceRowNumbers = [];
-   switch (mlpBasis) {
-      case 'front': primaryReferenceRowNumbers = [rowNumbers[0]]; break;
-      case 'back': primaryReferenceRowNumbers = [rowNumbers[rowNumbers.length - 1]]; break;
-      case 'all': primaryReferenceRowNumbers = rowNumbers; break;
-      case 'middle':
-        if (rowNumbers.length >= 3) {
-            if (rowNumbers.length % 2 !== 0) {
-                primaryReferenceRowNumbers = [rowNumbers[Math.floor(rowNumbers.length / 2)]];
-            } else {
-                primaryReferenceRowNumbers = [rowNumbers[rowNumbers.length / 2 - 1], rowNumbers[rowNumbers.length / 2]];
-            }
-        } else {
-            primaryReferenceRowNumbers = rowNumbers;
-        }
-        break;
-      default: primaryReferenceRowNumbers = rowNumbers; break;
-  }
+  // Find RSP seat (closest to MLP green dot)
+  const distToMlp = (seat) => Math.hypot(seat.x - mlp.x, seat.y - mlp.y);
+  const rspSeat = valid.reduce((closest, seat) => 
+    distToMlp(seat) < distToMlp(closest) ? seat : closest
+  , valid[0]);
 
-  const primarySeatIds = new Set();
-  primaryReferenceRowNumbers.forEach(rowNum => {
-    const rowSeats = seatsByRow[rowNum] || [];
-    const primaryInRow = getRowPrimaries(rowSeats);
-    primaryInRow.forEach(seat => primarySeatIds.add(seat.id));
+  // Extract row number from seat ID (e.g., "seat-r2-c3" -> 2)
+  const getRowNum = (seat) => {
+    const match = seat.id?.match(/r(\d+)/);
+    return match ? parseInt(match[1]) : 1;
+  };
+
+  // Calculate min distance to any wall
+  const minDistToWall = (seat) => {
+    const distLeft = seat.x;
+    const distRight = width - seat.x;
+    const distFront = seat.y;
+    const distBack = length - seat.y;
+    return Math.min(distLeft, distRight, distFront, distBack);
+  };
+
+  // Score each seat
+  const seatsWithScores = valid.map(seat => {
+    const d = distToMlp(seat);
+    
+    // A) Distance to RSP (dominant factor)
+    let distScore = 0;
+    if (d <= 0.6) {
+      distScore = 1;
+    } else if (d < 2.0) {
+      distScore = 1 - ((d - 0.6) / (2.0 - 0.6));
+    }
+
+    // B) Row relationship (small bias)
+    const seatRow = getRowNum(seat);
+    const rspRow = getRowNum(rspSeat);
+    let rowBonus = 0;
+    if (seatRow === rspRow) {
+      rowBonus = 0.15;
+    } else if (Math.abs(seatRow - rspRow) === 1) {
+      rowBonus = 0.08;
+    }
+
+    // C) Wall proximity penalty (tie-breaker)
+    const w = minDistToWall(seat);
+    let wallPenalty = 0;
+    if (w <= 0.4) {
+      wallPenalty = 0.10;
+    } else if (w < 0.8) {
+      wallPenalty = ((0.8 - w) / (0.8 - 0.4)) * 0.10;
+    }
+
+    const score = distScore + rowBonus - wallPenalty;
+
+    return { seat, score };
   });
+
+  // Select Primary seats: RSP + top 3 others by score (max 4 total)
+  const primarySeatIds = new Set([rspSeat.id]);
+  
+  seatsWithScores
+    .filter(s => s.seat.id !== rspSeat.id)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 3)
+    .forEach(s => primarySeatIds.add(s.seat.id));
 
   const seatsWithFlags = valid.map(seat => ({
     ...seat,
