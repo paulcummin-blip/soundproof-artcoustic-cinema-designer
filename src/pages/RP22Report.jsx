@@ -215,18 +215,10 @@ function RP22ReportInner() {
             const paramNum = parseInt(paramId);
             if (perSeatParams.has(paramNum)) return; // Skip seat params
             
-            const level = param?.level;
-            const value = param?.value;
-            const formatted = param?.formatted;
-            
-            // Only count if we have a valid level AND actual data (not FAIL/N/A/—)
-            if (!level || level === 'FAIL' || level === '—' || level === 'N/A') return;
-            if (formatted === '—' || formatted === 'N/A') return;
-            if (value === null || value === undefined) return;
-            
-            const levelKey = typeof level === 'number' ? `L${level}` : level;
-            if (counts[levelKey] !== undefined) {
-                counts[levelKey]++;
+            // Count only based on level: L1, L2, L3, or L4
+            const lvl = Number(param?.level);
+            if (lvl >= 1 && lvl <= 4) {
+                counts[`L${lvl}`]++;
             }
         });
         
