@@ -325,6 +325,16 @@ function RP22ReportInner() {
         });
     }, [analysisResult?.perSeatRp22]);
 
+    // Chunk seat counts into groups of 4 for column layout
+    const seatChunks = React.useMemo(() => {
+        const chunkSize = 4;
+        const chunks = [];
+        for (let i = 0; i < seatLevelCounts.length; i += chunkSize) {
+            chunks.push(seatLevelCounts.slice(i, i + chunkSize));
+        }
+        return chunks;
+    }, [seatLevelCounts]);
+
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
@@ -363,30 +373,52 @@ function RP22ReportInner() {
                             })()}
                         </div>
                     </div>
-                    <div className="space-y-4">
-                        <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
-                            <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
-                            </div>
-                            <div className="flex gap-2">
-                                <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
-                                <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
-                                <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
-                                <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
-                            </div>
-                        </div>
-
-                        {seatLevelCounts.length > 0 && seatLevelCounts.map(({ seatId, counts }) => (
-                            <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
+                    <div className="flex gap-4 items-start">
+                        {/* Column 1: Room parameters + first chunk of seats */}
+                        <div className="space-y-4">
+                            <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
                                 <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                    Seat parameters — {seatId}
+                                    Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                 </div>
                                 <div className="flex gap-2">
-                                    <RP22GradingPill level="L4" count={counts.L4} />
-                                    <RP22GradingPill level="L3" count={counts.L3} />
-                                    <RP22GradingPill level="L2" count={counts.L2} />
-                                    <RP22GradingPill level="L1" count={counts.L1} />
+                                    <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
+                                    <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
+                                    <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
+                                    <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
                                 </div>
+                            </div>
+
+                            {seatChunks.length > 0 && seatChunks[0].map(({ seatId, counts }) => (
+                                <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
+                                    <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                        Seat parameters — {seatId}
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <RP22GradingPill level="L4" count={counts.L4} />
+                                        <RP22GradingPill level="L3" count={counts.L3} />
+                                        <RP22GradingPill level="L2" count={counts.L2} />
+                                        <RP22GradingPill level="L1" count={counts.L1} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Columns 2+: remaining chunks of seats */}
+                        {seatChunks.slice(1).map((chunk, columnIndex) => (
+                            <div key={columnIndex} className="space-y-4">
+                                {chunk.map(({ seatId, counts }) => (
+                                    <div key={seatId} className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white">
+                                        <div className="text-sm font-semibold text-[#1B1A1A] mb-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                            Seat parameters — {seatId}
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <RP22GradingPill level="L4" count={counts.L4} />
+                                            <RP22GradingPill level="L3" count={counts.L3} />
+                                            <RP22GradingPill level="L2" count={counts.L2} />
+                                            <RP22GradingPill level="L1" count={counts.L1} />
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         ))}
                     </div>
