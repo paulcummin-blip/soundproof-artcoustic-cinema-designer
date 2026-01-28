@@ -4,7 +4,7 @@ const round3 = (n) => Math.round(n * 1000) / 1000;
 // Primary seat eligibility constants
 const WALL_CLEARANCE_MIN_M = 1.0;
 const ELLIPSE_A_M = 1.6;  // side-to-side radius
-const ELLIPSE_B_M = 1.4;  // front-to-back radius
+const ELLIPSE_B_M = 2.0;  // front-to-back radius (allows typical 2-row spacing when MLP is centred)
 const DIST_SOFT_MAX_M = 2.6;
 const SCORE_TOLERANCE = 0.10;
 
@@ -142,9 +142,9 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
     // Wall clearance for eligibility
     const wallClearance = minDistToWall(seat);
     
-    // Ellipse eligibility around RSP
-    const dx = seat.x - rspSeat.x;
-    const dy = seat.y - rspSeat.y;
+    // Ellipse eligibility around the green-dot MLP (NOT around the chosen RSP seat)
+    const dx = seat.x - mlp.x;
+    const dy = seat.y - mlp.y;
     const ellipseNorm = Math.sqrt((dx / ELLIPSE_A_M) ** 2 + (dy / ELLIPSE_B_M) ** 2);
     
     // Eligibility gates
