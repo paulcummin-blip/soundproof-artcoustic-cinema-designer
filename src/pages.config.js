@@ -49,6 +49,7 @@
  */
 import Calculator from './pages/Calculator';
 import CinemaAgent from './pages/CinemaAgent';
+import ComplianceReportPrint from './pages/ComplianceReportPrint';
 import Home from './pages/Home';
 import PrintableReport from './pages/PrintableReport';
 import Projects from './pages/Projects';
@@ -57,13 +58,13 @@ import RoomDesigner from './pages/RoomDesigner';
 import SPLCalculator from './pages/SPLCalculator';
 import SPLCalculatorV2 from './pages/SPLCalculatorV2';
 import SpeakerDatabase from './pages/SpeakerDatabase';
-import ComplianceReportPrint from './pages/ComplianceReportPrint';
 import __Layout from './Layout.jsx';
 
 
 export const PAGES = {
     "Calculator": Calculator,
     "CinemaAgent": CinemaAgent,
+    "ComplianceReportPrint": ComplianceReportPrint,
     "Home": Home,
     "PrintableReport": PrintableReport,
     "Projects": Projects,
@@ -72,7 +73,6 @@ export const PAGES = {
     "SPLCalculator": SPLCalculator,
     "SPLCalculatorV2": SPLCalculatorV2,
     "SpeakerDatabase": SpeakerDatabase,
-    "ComplianceReportPrint": ComplianceReportPrint,
 }
 
 export const pagesConfig = {

@@ -407,7 +407,7 @@ function RP22ReportInner() {
         <style>{`
             @page {
                 size: A4 portrait;
-                margin: 12mm;
+                margin: 14mm 12mm;
             }
 
             @media print {
@@ -416,15 +416,38 @@ function RP22ReportInner() {
                     print-color-adjust: exact;
                 }
 
-                .b44-sidebar, .b44-topbar, nav, header, .no-print {
+                /* Hide anything that isn't the print layout */
+                .screen-only,
+                .no-print,
+                nav,
+                header,
+                aside,
+                footer,
+                .b44-sidebar,
+                .b44-topbar,
+                [class*="sidebar"],
+                [class*="SideBar"],
+                [class*="TopBar"],
+                [class*="navbar"],
+                [class*="NavBar"],
+                [class*="toolbar"],
+                [class*="ToolBar"],
+                [class*="api"],
+                [class*="Api"],
+                #root > div > div:first-child {
                     display: none !important;
                 }
 
+                /* Ensure print layout uses full width */
                 .print-only {
                     display: block !important;
+                    width: 100% !important;
                 }
-                .screen-only {
-                    display: none !important;
+
+                .print-root {
+                    width: 100% !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
                 }
 
                 .print-page-break-after {
@@ -450,9 +473,15 @@ function RP22ReportInner() {
             .print-only { display: none; }
             .screen-only { display: block; }
 
+            .print-root {
+                background: #FFFFFF;
+            }
+
             .print-container {
-                max-width: 190mm;
-                margin: 0 auto;
+                width: 100%;
+                max-width: 100%;
+                margin: 0;
+                padding: 0;
                 font-family: 'Didact Gothic', 'Century Gothic', sans-serif;
             }
         `}</style>
@@ -747,81 +776,144 @@ function RP22ReportInner() {
 
             {/* Print-only layout */}
             <div className="print-only">
-                <div className="print-container">
-                    {/* PAGE 1: Headline + counts only */}
-                    <div className="print-page-break-after">
-                        <div className="mb-8">
-                            <img
-                                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
-                                alt="SoundProof"
-                                style={{ height: 48, marginBottom: 14 }}
-                            />
-                            <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 28, fontWeight: 700, color: '#1B1A1A', lineHeight: 1.1 }}>
-                                RP22 Compliance Report
-                            </div>
-                            <div style={{ marginTop: 6, color: '#3E4349', fontSize: 12 }}>
-                                {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
-                            </div>
-                            <div style={{ marginTop: 2, color: '#625143', fontSize: 11 }}>
-                                System: {(() => {
-                                    const dolbyPreset = app?.dolbyLayout || "5.1";
-                                    const base = String(dolbyPreset).split(" ")[0];
-                                    const parts = base.split(".");
-                                    const bed = parts[0] || "5";
-                                    const heights = parts[2] || "";
-                                    const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
-                                    const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
-                                    const totalSubs = frontCount + rearCount;
-                                    return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-                                })()}
-                            </div>
-                            <div style={{ borderBottom: '1px solid #E6E4DD', marginTop: 14 }} />
-                        </div>
-
-                        <div className="space-y-6">
-                            <div>
-                                <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 14, fontWeight: 700, color: '#1B1A1A', marginBottom: 10 }}>
-                                    Room Parameters
-                                </div>
-                                <div className="flex gap-2">
-                                    <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
-                                    <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
-                                    <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
-                                    <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
-                                </div>
+                <div className="print-root">
+                    <div className="print-container">
+                        {/* PAGE 1: Headline + counts only */}
+                        <div className="print-page-break-after">
+                            {/* Top: centred logo */}
+                            <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+                                <img
+                                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
+                                    alt="SoundProof"
+                                    style={{ height: 56 }}
+                                />
                             </div>
 
-                            <div>
-                                <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 14, fontWeight: 700, color: '#1B1A1A', marginBottom: 10 }}>
-                                    Seat Parameters
+                            {/* Title block */}
+                            <div style={{ textAlign: 'center', marginTop: 14 }}>
+                                <div
+                                    style={{
+                                        fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                        fontSize: 28,
+                                        fontWeight: 700,
+                                        color: '#1B1A1A',
+                                        lineHeight: 1.15,
+                                    }}
+                                >
+                                    RP22 Compliance Report
                                 </div>
-                                <div className="flex gap-2">
-                                    {(() => {
-                                        const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
-                                        (seatLevelCounts || []).forEach(s => {
-                                            agg.L4 += s.counts?.L4 || 0;
-                                            agg.L3 += s.counts?.L3 || 0;
-                                            agg.L2 += s.counts?.L2 || 0;
-                                            agg.L1 += s.counts?.L1 || 0;
-                                        });
-                                        return (
-                                            <>
-                                                <RP22GradingPill level="L4" count={agg.L4} />
-                                                <RP22GradingPill level="L3" count={agg.L3} />
-                                                <RP22GradingPill level="L2" count={agg.L2} />
-                                                <RP22GradingPill level="L1" count={agg.L1} />
-                                            </>
-                                        );
-                                    })()}
+
+                                <div style={{ marginTop: 6, color: '#3E4349', fontSize: 12 }}>
+                                    {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                    <span style={{ margin: '0 10px', color: '#DCDBD6' }}>•</span>
+                                    <span style={{ color: '#625143' }}>
+                                        System: {(() => {
+                                            const dolbyPreset = app?.dolbyLayout || "5.1";
+                                            const base = String(dolbyPreset).split(" ")[0];
+                                            const parts = base.split(".");
+                                            const bed = parts[0] || "5";
+                                            const heights = parts[2] || "";
+                                            const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
+                                            const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
+                                            const totalSubs = frontCount + rearCount;
+                                            return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+                                        })()}
+                                    </span>
                                 </div>
                             </div>
+
+                            {/* Divider */}
+                            <div style={{ borderBottom: '1px solid #E6E4DD', marginTop: 18, marginBottom: 18 }} />
+
+                            {/* Counts: two clean cards */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                                {/* Room */}
+                                <div
+                                    style={{
+                                        border: '1px solid #DCDBD6',
+                                        borderRadius: 12,
+                                        padding: 14,
+                                        background: '#FFFFFF',
+                                    }}
+                                    className="print-avoid-break"
+                                >
+                                    <div
+                                        style={{
+                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            color: '#1B1A1A',
+                                            marginBottom: 10,
+                                        }}
+                                    >
+                                        Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
+                                        <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
+                                        <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
+                                        <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
+                                    </div>
+                                </div>
+
+                                {/* Seat */}
+                                <div
+                                    style={{
+                                        border: '1px solid #DCDBD6',
+                                        borderRadius: 12,
+                                        padding: 14,
+                                        background: '#FFFFFF',
+                                    }}
+                                    className="print-avoid-break"
+                                >
+                                    <div
+                                        style={{
+                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                            fontSize: 13,
+                                            fontWeight: 700,
+                                            color: '#1B1A1A',
+                                            marginBottom: 10,
+                                        }}
+                                    >
+                                        Seat parameters ({seats?.length || 0} seats)
+                                    </div>
+
+                                    <div className="flex gap-2">
+                                        {(() => {
+                                            const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
+                                            (seatLevelCounts || []).forEach(s => {
+                                                agg.L4 += s.counts?.L4 || 0;
+                                                agg.L3 += s.counts?.L3 || 0;
+                                                agg.L2 += s.counts?.L2 || 0;
+                                                agg.L1 += s.counts?.L1 || 0;
+                                            });
+                                            return (
+                                                <>
+                                                    <RP22GradingPill level="L4" count={agg.L4} />
+                                                    <RP22GradingPill level="L3" count={agg.L3} />
+                                                    <RP22GradingPill level="L2" count={agg.L2} />
+                                                    <RP22GradingPill level="L1" count={agg.L1} />
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Optional small note at bottom of page 1 */}
+                            <div style={{ marginTop: 18, fontSize: 10, color: '#3E4349', textAlign: 'center' }}>
+                                Generated from current Room Designer configuration and live analysis state.
+                            </div>
                         </div>
-                    </div>
 
                     {/* ROOM PARAMETERS */}
                     <div className="print-page-break-before">
                         <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
                             RP22 Parameters (Room)
+                        </div>
+                        <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>
+                            Room-wide compliance parameters (non seat-specific).
                         </div>
                         <div className="grid grid-cols-2 gap-3 print-grid">
                             {orderedParams.map(param => (
@@ -846,6 +938,9 @@ function RP22ReportInner() {
                     <div className="print-page-break-before" style={{ marginTop: 18 }}>
                         <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
                             RP22 Parameters (Seat)
+                        </div>
+                        <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>
+                            Seat-by-seat compliance parameters including RP23 horizontal viewing.
                         </div>
                         <div className="grid grid-cols-2 gap-4 print-grid">
                             {(() => {
@@ -937,6 +1032,7 @@ function RP22ReportInner() {
                             <SeatComplianceSummary position="middle" />
                             <SeatComplianceSummary position="right" />
                         </div>
+                    </div>
                     </div>
                 </div>
             </div>
