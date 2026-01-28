@@ -522,6 +522,26 @@ function RP22ReportInner() {
 
 
 
+                                // Compute RSP seat (closest to green dot within 5cm)
+                                const rspSeatId = React.useMemo(() => {
+                                    const greenDot = app?.mlp;
+                                    if (!greenDot || !Number.isFinite(greenDot.x) || !Number.isFinite(greenDot.y)) return null;
+                                    
+                                    let closestSeat = null;
+                                    let minDist = Infinity;
+                                    
+                                    seats.forEach(s => {
+                                        if (!Number.isFinite(s?.x) || !Number.isFinite(s?.y)) return;
+                                        const d = Math.hypot(s.x - greenDot.x, s.y - greenDot.y);
+                                        if (d < minDist) {
+                                            minDist = d;
+                                            closestSeat = s.id;
+                                        }
+                                    });
+                                    
+                                    return (minDist <= 0.05) ? closestSeat : null;
+                                }, [seats, app?.mlp]);
+
                                 return seats.map((seat, idx) => {
                                     const seatId = seat?.id || '—';
                                     
@@ -536,12 +556,17 @@ function RP22ReportInner() {
                                         return null;
                                     }
                                     
+                                    // Determine suffix label and colour
+                                    const isRsp = seatId === rspSeatId;
+                                    const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '(Secondary)');
+                                    const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
+                                    
                                     return (
                                         <div key={seatId} className="flex flex-col h-full">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                        {formatSeatLabel(seatId)} {isPrimary && <span className="text-xs text-green-700">(MLP)</span>}
+                                                        {formatSeatLabel(seatId)} <span className="text-xs font-semibold" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', color: suffixColor }}>{suffix}</span>
                                                     </CardTitle>
                                                 </CardHeader>
                                                 <CardContent className="space-y-2.5 text-xs">
