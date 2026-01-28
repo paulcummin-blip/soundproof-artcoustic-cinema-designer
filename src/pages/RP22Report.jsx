@@ -1008,7 +1008,7 @@ function RP22ReportInner() {
 
                         <section id="pdf-room-parameters">
                         {/* ROOM PARAMETERS */}
-                        <div className="print-page-break-before">
+                        <div>
                         <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
                             RP22 Parameters (Room)
                         </div>
