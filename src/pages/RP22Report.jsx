@@ -682,6 +682,9 @@ function RP22ReportInner() {
                     speakerPositionsView="off"
                     showMlpRuler={false}
                     zoomMode="off"
+                    onSetSpeakers={() => {}}
+                    onUpdateSeats={() => {}}
+                    onUpdateMlp={() => {}}
                 />
             </div>
             
