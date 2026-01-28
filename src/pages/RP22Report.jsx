@@ -1004,6 +1004,8 @@ function RP22ReportInner() {
                         </div>
                         </section>
 
+                        <section id="pdf-room-drawings"></section>
+
                         <section id="pdf-room-parameters">
                         {/* ROOM PARAMETERS */}
                         <div className="print-page-break-before">
