@@ -405,15 +405,62 @@ function RP22ReportInner() {
 
     const PrintStyles = () => (
         <style>{`
-            @page {
-                size: A4 portrait;
-                margin: 14mm 12mm;
-            }
-
             @media print {
+                /* 1) Kill anything that can clip/stop the print flow */
+                html, body {
+                    height: auto !important;
+                    overflow: visible !important;
+                }
+
+                /* Base44 / app wrappers sometimes clamp height */
+                #root, #__next, .min-h-screen, .screen-only, .print-only {
+                    height: auto !important;
+                    min-height: 0 !important;
+                    overflow: visible !important;
+                }
+
+                /* 2) Remove fixed/sticky elements during print */
+                * {
+                    position: static !important;
+                }
+
+                /* But keep your actual cards/layout intact */
+                .print-keep-layout {
+                    position: relative !important;
+                }
+
+                /* 3) Ensure background colours + borders print */
                 body {
                     -webkit-print-color-adjust: exact;
                     print-color-adjust: exact;
+                }
+
+                /* 4) Page size + margins */
+                @page {
+                    size: A4 portrait;
+                    margin: 12mm;
+                }
+
+                /* 5) Reliable page-break helpers */
+                .print-page-break-after {
+                    break-after: page;
+                    page-break-after: always;
+                }
+                .print-page-break-before {
+                    break-before: page;
+                    page-break-before: always;
+                }
+                .print-avoid-break {
+                    break-inside: avoid;
+                    page-break-inside: avoid;
+                }
+
+                /* 6) In print, avoid responsive column weirdness */
+                .print-grid-room,
+                .print-grid-seats {
+                    display: grid !important;
+                    grid-template-columns: 1fr 1fr !important;
+                    gap: 10mm !important;
                 }
 
                 /* Hide anything that isn't the print layout */
@@ -449,28 +496,12 @@ function RP22ReportInner() {
                     margin: 0 !important;
                     padding: 0 !important;
                 }
-
-                .print-page-break-after {
-                    break-after: page;
-                    page-break-after: always;
-                }
-
-                .print-page-break-before {
-                    break-before: page;
-                    page-break-before: always;
-                }
-
-                .print-avoid-break {
-                    break-inside: avoid;
-                    page-break-inside: avoid;
-                }
-
-                .print-grid {
-                    gap: 10px !important;
-                }
             }
 
-            .print-only { display: none; }
+            @media screen {
+                .print-only { display: none !important; }
+            }
+
             .screen-only { display: block; }
 
             .print-root {
@@ -782,7 +813,7 @@ function RP22ReportInner() {
             </div>
 
             {/* Print-only layout */}
-            <div className="print-only">
+            <div className="print-only print-keep-layout">
                 <div className="print-root">
                     <div className="print-container">
                         {/* PAGE 1: Headline + counts only */}
@@ -930,7 +961,7 @@ function RP22ReportInner() {
                         <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>
                             Room-wide compliance parameters (non seat-specific).
                         </div>
-                        <div className="grid grid-cols-2 gap-3 print-grid">
+                        <div className="print-grid-room">
                             {orderedParams.map(param => (
                                 <div key={param.id} className="print-avoid-break">
                                     <ParameterCard
@@ -957,7 +988,7 @@ function RP22ReportInner() {
                         <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>
                             Seat-by-seat compliance parameters including RP23 horizontal viewing.
                         </div>
-                        <div className="grid grid-cols-2 gap-4 print-grid">
+                        <div className="print-grid-seats">
                             {(() => {
                                 const greenDot = app?.mlp;
                                 let rspSeatId = null;
