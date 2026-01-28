@@ -1042,14 +1042,14 @@ function RP22ReportInner() {
                         </div>
                         </section>
 
-                        <section id="pdf-room-drawings">
+                        <section id="pdf-room-drawings" className="print-page-break-after">
                             <div style={{ 
-                                width: '100%', 
-                                maxWidth: '800px', 
-                                margin: '40px auto',
+                                height: '250mm',
+                                width: '100%',
                                 display: 'flex',
                                 justifyContent: 'center',
-                                alignItems: 'center'
+                                alignItems: 'center',
+                                padding: '20mm'
                             }}>
                                 {planImageDataUrl ? (
                                     <img 
@@ -1057,8 +1057,9 @@ function RP22ReportInner() {
                                         alt="Room Plan" 
                                         style={{
                                             width: '100%',
-                                            maxHeight: '600px',
-                                            objectFit: 'contain'
+                                            height: '100%',
+                                            objectFit: 'contain',
+                                            display: 'block'
                                         }}
                                     />
                                 ) : (
