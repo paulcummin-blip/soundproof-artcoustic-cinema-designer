@@ -5,7 +5,7 @@ const round3 = (n) => Math.round(n * 1000) / 1000;
 const WALL_CLEARANCE_MIN_M = 1.0;
 const ELLIPSE_A_M = 2.2;  // side-to-side radius (wider for adjacent seats)
 const ELLIPSE_B_M = 0.95;  // front-to-back radius (tighter for row spacing control)
-const DIST_SOFT_MAX_M = 2.0;
+const DIST_SOFT_MAX_M = 1.9;
 const SCORE_TOLERANCE = 0.10;
 
 // Enhanced MLP calculation with basis selection
@@ -156,30 +156,15 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
     return { seat, score, isEligible };
   });
 
-  // Select Primary seats using score tolerance
+  // Select Primary seats: all eligible seats (no score tolerance)
   const eligibleSeats = seatsWithScores.filter(s => s.isEligible);
   
-  // Find best score among eligible seats
-  const bestScore = eligibleSeats.length > 0
-    ? Math.max(...eligibleSeats.map(s => s.score))
-    : 0;
-  
-  // Calculate threshold (protect against bestScore = 0)
-  const threshold = bestScore > 0 
-    ? bestScore * (1 - SCORE_TOLERANCE)
-    : 0;
-  
   // RSP is always Primary
-  const primarySeatIds = new Set([rspSeat.id]);
+  const primarySeatIds = new Set();
+  primarySeatIds.add(rspSeat.id);
   
-  // Add all eligible seats that meet score threshold
-  eligibleSeats
-    .filter(s => s.seat.id !== rspSeat.id && s.score >= threshold)
-    .sort((a, b) => 
-      round3(b.score) - round3(a.score) ||
-      String(a.seat.id).localeCompare(String(b.seat.id))
-    )
-    .forEach(s => primarySeatIds.add(s.seat.id));
+  // Add all other eligible seats
+  eligibleSeats.forEach(s => primarySeatIds.add(s.seat.id));
 
   const seatsWithFlags = valid.map(seat => ({
     ...seat,
