@@ -623,12 +623,51 @@ function RP22ReportInner() {
                                 // Capture plan image first
                                 const planElement = document.querySelector('[data-plan-capture]');
                                 if (planElement) {
-                                    const canvas = await html2canvas(planElement, {
-                                        backgroundColor: '#F8F8F7',
-                                        scale: 2
-                                    });
-                                    const dataUrl = canvas.toDataURL('image/png');
-                                    setPlanImageDataUrl(dataUrl);
+                                    const svgElement = planElement.querySelector('svg');
+                                    if (svgElement) {
+                                        // Clone the SVG to avoid modifying the original
+                                        const svgClone = svgElement.cloneNode(true);
+                                        
+                                        // Find the main content group and get its bounding box
+                                        const contentGroup = svgClone.querySelector('g') || svgClone;
+                                        const bbox = contentGroup.getBBox();
+                                        
+                                        // Calculate padding (7% of shortest side)
+                                        const shortestSide = Math.min(bbox.width, bbox.height);
+                                        const padding = shortestSide * 0.07;
+                                        
+                                        // Set viewBox with padding
+                                        const viewBoxX = bbox.x - padding;
+                                        const viewBoxY = bbox.y - padding;
+                                        const viewBoxW = bbox.width + (2 * padding);
+                                        const viewBoxH = bbox.height + (2 * padding);
+                                        
+                                        svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
+                                        svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                                        svgClone.setAttribute('width', '100%');
+                                        svgClone.setAttribute('height', '100%');
+                                        
+                                        // Convert SVG to data URL
+                                        const svgString = new XMLSerializer().serializeToString(svgClone);
+                                        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                                        const url = URL.createObjectURL(svgBlob);
+                                        
+                                        // Convert to PNG using canvas for better print compatibility
+                                        const img = new Image();
+                                        img.onload = () => {
+                                            const canvas = document.createElement('canvas');
+                                            canvas.width = 2400;
+                                            canvas.height = 2400 * (viewBoxH / viewBoxW);
+                                            const ctx = canvas.getContext('2d');
+                                            ctx.fillStyle = '#F8F8F7';
+                                            ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                                            const dataUrl = canvas.toDataURL('image/png');
+                                            setPlanImageDataUrl(dataUrl);
+                                            URL.revokeObjectURL(url);
+                                        };
+                                        img.src = url;
+                                    }
                                 }
                             } catch (err) {
                                 console.warn('Failed to capture plan image:', err);
