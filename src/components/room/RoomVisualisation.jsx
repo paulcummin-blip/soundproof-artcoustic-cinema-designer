@@ -456,6 +456,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     showMlpRuler = false,
     zoomMode: zoomModeProp = 'off',
     onZoomModeChange,
+    exportMode = 'default',
   } = props;
 
   const appState = useAppState();
@@ -6631,7 +6632,7 @@ return (
             />
 
             {/* Room Dimensions Overlay */}
-            {overlaysForRendering?.ROOM_DIMS && (
+            {exportMode !== 'clean' && overlaysForRendering?.ROOM_DIMS && (
               <g data-layer="room-dimensions">
                 {/* Arrow markers */}
                 <defs>
@@ -6701,30 +6702,32 @@ return (
 
 
             {/* RP22 Zones Overlay - UNCONDITIONAL MOUNT */}
-            <g className="rp22-zones-layer" pointerEvents="none">
-              <RP22ZonesOverlay
-                overlays={overlaysForRendering}
-                zones={augmentedZones}
-                toPx={toPx}
-                lcrOnly={false}
-                placedSpeakers={placedSpeakers}
-                mlpPoint={mlp}
-                dimensions={{ width: widthM, length: lengthM, height: heightM }} // Pass room dims object
-                getModelDimsM={getModelDimsM}
-                WALL_BUFFER_M={WALL_BUFFER_M}
-                roomRect={roomRect}
-              />
-            </g>
+            {exportMode !== 'clean' && (
+              <g className="rp22-zones-layer" pointerEvents="none">
+                <RP22ZonesOverlay
+                  overlays={overlaysForRendering}
+                  zones={augmentedZones}
+                  toPx={toPx}
+                  lcrOnly={false}
+                  placedSpeakers={placedSpeakers}
+                  mlpPoint={mlp}
+                  dimensions={{ width: widthM, length: lengthM, height: heightM }} // Pass room dims object
+                  getModelDimsM={getModelDimsM}
+                  WALL_BUFFER_M={WALL_BUFFER_M}
+                  roomRect={roomRect}
+                />
+              </g>
+            )}
 
             {/* Layer 5: Other Informational Zone Overlays */}
-            {!!overlaysForRendering?.LCR && ZoneComponents.LCR}
-            {!!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
-            {!!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
-            {overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
+            {exportMode !== 'clean' && !!overlaysForRendering?.LCR && ZoneComponents.LCR}
+            {exportMode !== 'clean' && !!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
+            {exportMode !== 'clean' && !!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
+            {exportMode !== 'clean' && overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
+            {exportMode !== 'clean' && overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
             
             {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
-            {overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
+            {exportMode !== 'clean' && overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
             {renderRoomElements()}
@@ -6733,7 +6736,7 @@ return (
             {MLPMarker}
 
             {/* Layer 7.5: MLP Position Ruler (when enabled) */}
-            {showMlpRuler && (() => {
+            {exportMode !== 'clean' && showMlpRuler && (() => {
               // Render MLP position ruler using the same visual style as speaker rulers
               if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) return null;
 
@@ -7015,46 +7018,52 @@ return (
             {renderSpeakerLabels()}
 
             {/* RP22 Surround Angles Overlay */}
-            {renderRp22AnglesOverlay()}
+            {exportMode !== 'clean' && renderRp22AnglesOverlay()}
 
             {/* Speaker Positions Overlay */}
-            <SpeakerPositionsOverlay
-              speakers={placedSpeakers}
-              seatingPositions={seatingPositions}
-              dimensions={{ width: widthM, length: lengthM }}
-              view={speakerPositionsView}
-              meterToCanvasX={meterToCanvasX}
-              meterToCanvasY={meterToCanvasY}
-              roomRect={roomRect}
-              getSpeakerVisibility={getSpeakerVisibility}
-              getCanonicalRole={getCanonicalRole}
-            />
+            {exportMode !== 'clean' && (
+              <SpeakerPositionsOverlay
+                speakers={placedSpeakers}
+                seatingPositions={seatingPositions}
+                dimensions={{ width: widthM, length: lengthM }}
+                view={speakerPositionsView}
+                meterToCanvasX={meterToCanvasX}
+                meterToCanvasY={meterToCanvasY}
+                roomRect={roomRect}
+                getSpeakerVisibility={getSpeakerVisibility}
+                getCanonicalRole={getCanonicalRole}
+              />
+            )}
 
-<PlanMessages
-  dragWarning={dragWarning}
-  tooltip={tooltip}
-  hoveredSpeaker={hoveredSpeaker}
-  svgW={svgW}
-/>
+{exportMode !== 'clean' && (
+  <PlanMessages
+    dragWarning={dragWarning}
+    tooltip={tooltip}
+    hoveredSpeaker={hoveredSpeaker}
+    svgW={svgW}
+  />
+)}
 
           </g>
         </svg>
 
         {/* SEAT HOVER HUD - updated with drag and hide/show */}
-        <SeatHud
-          tooltipData={tooltipData}
-          effectiveHoveredSeat={effectiveHoveredSeat}
-          hudPosition={hudPosition}
-          isHudPinned={isHudPinned}
-          hudDynamicStyle={hudDynamicStyle}
-          onHudHeaderMouseDown={onHudHeaderMouseDown}
-          hudElRef={hudElRef}
-          setHudHiddenWhenPinned={setHudHiddenWhenPinned}
-          hudHiddenWhenPinned={hudHiddenWhenPinned}
-          renderLevelBadge={renderLevelBadge}
-          splPowerW={tooltipData?.splAtSeatMeta?.powerW}
-          splRadiationMode={tooltipData?.splAtSeatMeta?.radiationMode}
-        />
+        {exportMode !== 'clean' && (
+          <SeatHud
+            tooltipData={tooltipData}
+            effectiveHoveredSeat={effectiveHoveredSeat}
+            hudPosition={hudPosition}
+            isHudPinned={isHudPinned}
+            hudDynamicStyle={hudDynamicStyle}
+            onHudHeaderMouseDown={onHudHeaderMouseDown}
+            hudElRef={hudElRef}
+            setHudHiddenWhenPinned={setHudHiddenWhenPinned}
+            hudHiddenWhenPinned={hudHiddenWhenPinned}
+            renderLevelBadge={renderLevelBadge}
+            splPowerW={tooltipData?.splAtSeatMeta?.powerW}
+            splRadiationMode={tooltipData?.splAtSeatMeta?.radiationMode}
+          />
+        )}
 
 
       </div>

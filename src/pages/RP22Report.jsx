@@ -1004,7 +1004,33 @@ function RP22ReportInner() {
                         </div>
                         </section>
 
-                        <section id="pdf-room-drawings"></section>
+                        <section id="pdf-room-drawings">
+                            <div style={{ 
+                                width: '100%', 
+                                maxWidth: '800px', 
+                                margin: '40px auto',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                alignItems: 'center'
+                            }}>
+                                <RoomVisualisation
+                                    placedSpeakers={placedSpeakers}
+                                    seatingPositions={seatingPositions}
+                                    mlpPoint={mlp}
+                                    screen={screen}
+                                    dolbyLayout={dolbyLayout}
+                                    frontSubs={frontSubs}
+                                    rearSubs={rearSubs}
+                                    exportMode="clean"
+                                    overlays={{}}
+                                    showBaffle={true}
+                                    showScreen={true}
+                                    speakerPositionsView="off"
+                                    showMlpRuler={false}
+                                    zoomMode="off"
+                                />
+                            </div>
+                        </section>
 
                         <section id="pdf-room-parameters">
                         {/* ROOM PARAMETERS */}
