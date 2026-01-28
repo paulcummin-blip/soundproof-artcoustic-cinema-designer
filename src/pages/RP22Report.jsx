@@ -4,7 +4,7 @@ import { useRP22AnalysisEngine } from '../components/hooks/useRP22AnalysisEngine
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { BarChart4, Home, User } from 'lucide-react';
+import { BarChart4, Home, User, FileText } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
 import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import ParameterCard from '../components/report/ParameterCard';
@@ -15,6 +15,7 @@ import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngi
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
 import { formatSeatLabel } from '../components/utils/seatLabel';
+import { Button } from '@/components/ui/button';
 
 function RP22ReportInner() {
     const app = useAppState();
@@ -396,24 +397,33 @@ function RP22ReportInner() {
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
-                <div>
-                    <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
-                    <div className="text-base text-[#3E4349] mt-1">
-                        System: {(() => {
-                            const dolbyPreset = app?.dolbyLayout || "5.1";
-                            const base = String(dolbyPreset).split(" ")[0];
-                            const parts = base.split(".");
-                            const bed = parts[0] || "5";
-                            const heights = parts[2] || "";
-                            
-                            const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
-                            const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
-                            const totalSubs = frontCount + rearCount;
-                            
-                            return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-                        })()}
+                <div className="flex items-start justify-between">
+                    <div>
+                        <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
+                        <div className="text-base text-[#3E4349] mt-1">
+                            System: {(() => {
+                                const dolbyPreset = app?.dolbyLayout || "5.1";
+                                const base = String(dolbyPreset).split(" ")[0];
+                                const parts = base.split(".");
+                                const bed = parts[0] || "5";
+                                const heights = parts[2] || "";
+                                
+                                const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
+                                const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
+                                const totalSubs = frontCount + rearCount;
+                                
+                                return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+                            })()}
+                        </div>
+                        <div className="border-b border-[#E6E4DD] mt-4" />
                     </div>
-                    <div className="border-b border-[#E6E4DD] mt-4" />
+                    <Button
+                        onClick={() => window.open('/#/ComplianceReportPrint', '_blank')}
+                        className="bg-[#625143] hover:bg-[#4a3d32] text-white"
+                    >
+                        <FileText className="w-4 h-4 mr-2" />
+                        Export PDF
+                    </Button>
                 </div>
 
                 {/* Counts Dashboard */}
