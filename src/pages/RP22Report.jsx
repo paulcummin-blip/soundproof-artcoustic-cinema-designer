@@ -557,6 +557,22 @@ function RP22ReportInner() {
                                                     </div>
 
                                                     {/* RP22 Per-Seat Parameters */}
+                                                    {/* Position and distances (from HUD) */}
+                                                    <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1">
+                                                        {tooltipData?.position && (
+                                                            <div>
+                                                                <span className="font-medium">Position: </span>
+                                                                {tooltipData.position}
+                                                            </div>
+                                                        )}
+                                                        {tooltipData?.distanceToScreen && (
+                                                            <div>Distance to Screen: {tooltipData.distanceToScreen}</div>
+                                                        )}
+                                                        {tooltipData?.distanceToMLP && (
+                                                            <div>Distance to RSP: {tooltipData.distanceToMLP}</div>
+                                                        )}
+                                                    </div>
+
                                                     {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
                                                        const metric = rp22Raw[key];
                                                        const paramNum = parseInt(key.substring(1));
