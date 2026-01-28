@@ -81,9 +81,9 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front", ml
       break;
   }
 
-  // Override with live green-dot position if provided
+  // Override with live green-dot position if provided (after basis calculation)
   if (mlpOverride && Number.isFinite(mlpOverride.x) && Number.isFinite(mlpOverride.y)) {
-    mlp = { x: mlpOverride.x, y: mlpOverride.y };
+    mlp = { x: mlpOverride.x, y: mlpOverride.y, z: mlpOverride.z || 1.2 };
   }
 
   // Find RSP seat (closest to MLP green dot) with stable tie-breaker

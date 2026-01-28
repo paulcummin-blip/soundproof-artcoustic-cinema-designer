@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback, useEffect, useRef, Suspense } from "react";
 import { backSweepGaps as bsGaps, backSweepGap2 as bsGap2 } from "@/components/utils/surroundBackSweep";
 import { placeSubsForFrontWall } from "@/components/room/utils/placeSubs";
@@ -231,21 +230,8 @@ function RoomDesignerWithState() {
   // Ref to track the last processed Dolby preset
   const lastPresetRef = useRef(null);
 
-  // Derive MLP and stableDimensions for speaker calculations
-  const mlpPoint = useMemo(() => {
-    // For simplicity, take the position of the first seat.
-    // In a real app, this might be the center of the primary seating row.
-    if (seatingPositions && seatingPositions.length > 0) {
-      // Assuming seatingPositions[0] holds an {x, y, z} or similar structure
-      return {
-        x: seatingPositions[0].x,
-        y: seatingPositions[0].y,
-        z: seatingPositions[0].z || 1.1 // Default height if not specified
-      };
-    }
-    // Fallback MLP (e.g., center of the room)
-    return { x: dimensions.width / 2, y: dimensions.length * 0.7, z: 1.1 };
-  }, [seatingPositions, dimensions]); // Depends on seatingPositions and dimensions
+  // Use app.mlp from AppState (single source of truth for green dot)
+  const mlpPoint = appState?.mlp ?? null;
 
   const stableDimensions = useMemo(() => ({
     width: dimensions.width || 4, // Default if not set

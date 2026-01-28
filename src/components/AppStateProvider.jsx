@@ -456,6 +456,14 @@ function useDesignerState() {
     setP21EarlyReflectionPreset(v);
   }, []);
 
+  const [mlpOverride, setMlpOverride] = useState(() => (
+    (__autosavePayload && __autosavePayload.mlpOverride) ? __autosavePayload.mlpOverride : null
+  ));
+
+  const clearMlpOverride = useCallback(() => {
+    setMlpOverride(null);
+  }, []);
+
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
@@ -469,7 +477,7 @@ function useDesignerState() {
         widthM,
         lengthM,
         mlpBasis,
-        null // no override, compute fresh
+        mlpOverride // pass live override if user has moved the green dot
       );
       
       if (!computedMlp || !Number.isFinite(computedMlp.x) || !Number.isFinite(computedMlp.y)) return null;
@@ -483,7 +491,7 @@ function useDesignerState() {
       console.warn('[AppState] MLP computation failed:', e);
       return null;
     }
-  }, [seatingPositions, roomDims?.widthM, roomDims?.lengthM, mlpBasis]);
+  }, [seatingPositions, roomDims?.widthM, roomDims?.lengthM, mlpBasis, mlpOverride]);
 
   const setGlobalSurroundModel = useCallback((model) => {
     if (globalThis.__B44_LOGS) console.log('[AppState] setGlobalSurroundModel', { model });
@@ -939,7 +947,8 @@ function useDesignerState() {
       useRearGlobal,
       seatMetricsById,
       p15ConstructionLevel,
-      p21EarlyReflectionPreset
+      p21EarlyReflectionPreset,
+      mlpOverride
     };
 
     if (!isAutosavePayloadValid(payload)) return;
@@ -1023,7 +1032,8 @@ function useDesignerState() {
       useRearGlobal,
       seatMetricsById,
       p15ConstructionLevel,
-      p21EarlyReflectionPreset
+      p21EarlyReflectionPreset,
+      mlpOverride
       };
 
       try {
@@ -1205,6 +1215,9 @@ function useDesignerState() {
 
     // Clear seating positions (will rebuild from row config)
     setSeatingPositions([]);
+    
+    // Clear MLP override
+    setMlpOverride(null);
 
     // Speaker system
     _setSpeakerSystem({
