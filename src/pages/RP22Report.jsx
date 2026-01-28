@@ -787,17 +787,25 @@ function RP22ReportInner() {
                     <div className="print-container">
                         {/* PAGE 1: Headline + counts only */}
                         <div className="print-page-break-after">
-                            {/* Top: centred logo */}
-                            <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginTop: 4 }}>
+                            {/* Top: centred logo + title */}
+                            <div
+                                style={{
+                                    maxWidth: "520px",
+                                    margin: "0 auto",
+                                    textAlign: "center",
+                                    marginTop: 4
+                                }}
+                            >
                                 <img
                                     src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
                                     alt="SoundProof"
-                                    style={{ height: 56 }}
+                                    style={{
+                                        width: "100%",
+                                        height: "auto",
+                                        marginBottom: "12px",
+                                    }}
                                 />
-                            </div>
 
-                            {/* Title block */}
-                            <div style={{ textAlign: 'center', marginTop: 14 }}>
                                 <div
                                     style={{
                                         fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
