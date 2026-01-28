@@ -393,12 +393,55 @@ function RP22ReportInner() {
         );
     }
 
+    const handleExportPDF = React.useCallback(() => {
+        // Try navigation first (HashRouter)
+        try {
+            const printWindow = window.open('/#/ComplianceReportPrint', '_blank');
+            
+            // Fallback: If routing fails, inject print layout directly
+            if (!printWindow) {
+                throw new Error('Popup blocked');
+            }
+            
+            // Give router time to load, otherwise fallback
+            setTimeout(() => {
+                if (!printWindow.document.body || printWindow.document.body.innerText.includes('404')) {
+                    printWindow.close();
+                    // Fallback: render print content in new window
+                    const fallbackWindow = window.open('', '_blank');
+                    if (fallbackWindow) {
+                        fallbackWindow.document.write(`
+                            <!DOCTYPE html>
+                            <html>
+                            <head>
+                                <title>RP22 Compliance Report - Print</title>
+                                <style>
+                                    @page { size: A4 portrait; margin: 12mm; }
+                                    body { font-family: 'Didact Gothic', sans-serif; margin: 0; padding: 20px; }
+                                    h1 { font-family: 'Futura PT Light', sans-serif; }
+                                </style>
+                            </head>
+                            <body>
+                                <p>Print preview loading... Please navigate to the Compliance Report Print page manually.</p>
+                            </body>
+                            </html>
+                        `);
+                        fallbackWindow.print();
+                    }
+                }
+            }, 500);
+        } catch (e) {
+            console.error('Export PDF failed:', e);
+            alert('Unable to open print preview. Please check if popups are blocked.');
+        }
+    }, []);
+
     return (
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
-                <div className="flex items-start justify-between">
-                    <div>
+                <div className="flex items-start justify-between gap-4 mb-6">
+                    <div className="flex-1">
                         <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
                         <div className="text-base text-[#3E4349] mt-1">
                             System: {(() => {
@@ -415,16 +458,17 @@ function RP22ReportInner() {
                                 return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
                             })()}
                         </div>
-                        <div className="border-b border-[#E6E4DD] mt-4" />
                     </div>
                     <Button
-                        onClick={() => window.open('/#/ComplianceReportPrint', '_blank')}
-                        className="bg-[#625143] hover:bg-[#4a3d32] text-white"
+                        onClick={handleExportPDF}
+                        className="bg-[#625143] hover:bg-[#4a3d32] text-white border-2 border-[#DCDBD6] shadow-md px-6 py-3 text-base font-semibold"
+                        style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
                     >
-                        <FileText className="w-4 h-4 mr-2" />
+                        <FileText className="w-5 h-5 mr-2" />
                         Export PDF
                     </Button>
                 </div>
+                <div className="border-b border-[#E6E4DD]" />
 
                 {/* Counts Dashboard */}
                 <div className="grid grid-cols-[auto_1fr] gap-6 items-start mt-8">
