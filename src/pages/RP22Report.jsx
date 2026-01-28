@@ -16,6 +16,7 @@ import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
 import { formatSeatLabel } from '../components/utils/seatLabel';
 import { Button } from '@/components/ui/button';
+import RoomVisualisation from '@/components/room/RoomVisualisation';
 
 function RP22ReportInner() {
     const app = useAppState();
@@ -1015,12 +1016,12 @@ function RP22ReportInner() {
                             }}>
                                 <RoomVisualisation
                                     placedSpeakers={placedSpeakers}
-                                    seatingPositions={seatingPositions}
-                                    mlpPoint={mlp}
+                                    seatingPositions={seats}
+                                    mlpPoint={primarySeatingPosition}
                                     screen={screen}
                                     dolbyLayout={dolbyLayout}
-                                    frontSubs={frontSubs}
-                                    rearSubs={rearSubs}
+                                    frontSubs={frontSubsCfg?.positions || []}
+                                    rearSubs={rearSubsCfg?.positions || []}
                                     exportMode="clean"
                                     overlays={{}}
                                     showBaffle={true}
