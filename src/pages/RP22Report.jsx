@@ -514,14 +514,21 @@ function RP22ReportInner() {
                         </div>
                     </div>
                     <Button
+                        type="button"
                         onClick={() => {
                             setIsPrinting(true);
                             setTimeout(() => window.print(), 250);
                         }}
-                        className="bg-[#FFFFFF] border border-[#625143] text-[#625143] hover:bg-[#F1F0EE] hover:text-[#625143] shadow-sm disabled:border-[#DCDBD6] disabled:text-[#C1B6AD] disabled:bg-[#FFFFFF] px-5 py-2.5"
-                        style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
+                        className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
+                        style={{
+                            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                            backgroundColor: "#FFFFFF",
+                            borderColor: "#625143",
+                            color: "#625143",
+                            opacity: 1,
+                        }}
                     >
-                        <FileText className="w-4 h-4 mr-2" />
+                        <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
                         Export PDF
                     </Button>
                 </div>
