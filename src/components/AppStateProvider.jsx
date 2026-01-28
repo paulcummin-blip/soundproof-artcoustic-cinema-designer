@@ -464,19 +464,20 @@ function useDesignerState() {
     const lengthM = Number(roomDims?.lengthM) || 6.0;
     
     try {
-      const { primary } = computeMLPAndPrimary(
+      const { mlp: computedMlp } = computeMLPAndPrimary(
         seatingPositions,
         widthM,
         lengthM,
-        mlpBasis
+        mlpBasis,
+        null // no override, compute fresh
       );
       
-      if (!primary || !Number.isFinite(primary.y)) return null;
+      if (!computedMlp || !Number.isFinite(computedMlp.x) || !Number.isFinite(computedMlp.y)) return null;
       
       return {
-        x: widthM / 2, // MLP is always centered on room width
-        y: primary.y,
-        z: primary.z || 1.2,
+        x: computedMlp.x,
+        y: computedMlp.y,
+        z: computedMlp.z || 1.2,
       };
     } catch (e) {
       console.warn('[AppState] MLP computation failed:', e);
