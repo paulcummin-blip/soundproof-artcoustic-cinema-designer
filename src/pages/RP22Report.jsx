@@ -619,17 +619,20 @@ function RP22ReportInner() {
                                                             </div>
                                                             );
                                                             })}
-                                                    </CardContent>
-                                                </Card>
-                                                {/* Summary Box */}
-                                                <div className="mt-2 flex-1">
-                                                    <SeatComplianceSummary position={idx === 0 ? 'left' : idx === 1 ? 'middle' : 'right'} />
-                                                </div>
-                                            </div>
-                                            );
-                                        }).filter(Boolean); // Remove any null cards
-                                        })()}
-                        </div>
+                                                            </CardContent>
+                                                            </Card>
+                                                            </div>
+                                                            );
+                                                            }).filter(Boolean); // Remove any null cards
+                                                            })()}
+                                                            </div>
+
+                                                            {/* Explanatory Footer - render once after all seat cards */}
+                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                                                            <SeatComplianceSummary position='left' />
+                                                            <SeatComplianceSummary position='middle' />
+                                                            <SeatComplianceSummary position='right' />
+                                                            </div>
                     </CardContent>
                 </Card>
             </div>
