@@ -17,11 +17,13 @@ import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
 import { formatSeatLabel } from '../components/utils/seatLabel';
 import { Button } from '@/components/ui/button';
 import RoomVisualisation from '@/components/room/RoomVisualisation';
+import html2canvas from 'html2canvas';
 
 function RP22ReportInner() {
     const app = useAppState();
     
     const [isPrinting, setIsPrinting] = useState(false);
+    const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
 
     useEffect(() => {
         const onAfterPrint = () => {
@@ -573,6 +575,26 @@ function RP22ReportInner() {
             <PrintStyles />
             
             <div className="screen-only">
+            {/* Hidden plan capture element */}
+            <div data-plan-capture style={{ position: 'absolute', left: '-9999px', width: '1200px', height: '800px' }}>
+                <RoomVisualisation
+                    placedSpeakers={placedSpeakers}
+                    seatingPositions={seats}
+                    mlpPoint={primarySeatingPosition}
+                    screen={screen}
+                    dolbyLayout={dolbyLayout}
+                    frontSubs={frontSubsCfg?.positions || []}
+                    rearSubs={rearSubsCfg?.positions || []}
+                    exportMode="clean"
+                    overlays={{}}
+                    showBaffle={true}
+                    showScreen={true}
+                    speakerPositionsView="off"
+                    showMlpRuler={false}
+                    zoomMode="off"
+                />
+            </div>
+            
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 mb-6">
@@ -596,7 +618,22 @@ function RP22ReportInner() {
                     </div>
                     <Button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
+                            try {
+                                // Capture plan image first
+                                const planElement = document.querySelector('[data-plan-capture]');
+                                if (planElement) {
+                                    const canvas = await html2canvas(planElement, {
+                                        backgroundColor: '#F8F8F7',
+                                        scale: 2
+                                    });
+                                    const dataUrl = canvas.toDataURL('image/png');
+                                    setPlanImageDataUrl(dataUrl);
+                                }
+                            } catch (err) {
+                                console.warn('Failed to capture plan image:', err);
+                            }
+                            
                             setIsPrinting(true);
                             setTimeout(() => window.print(), 250);
                         }}
@@ -1014,22 +1051,21 @@ function RP22ReportInner() {
                                 justifyContent: 'center',
                                 alignItems: 'center'
                             }}>
-                                <RoomVisualisation
-                                    placedSpeakers={placedSpeakers}
-                                    seatingPositions={seats}
-                                    mlpPoint={primarySeatingPosition}
-                                    screen={screen}
-                                    dolbyLayout={dolbyLayout}
-                                    frontSubs={frontSubsCfg?.positions || []}
-                                    rearSubs={rearSubsCfg?.positions || []}
-                                    exportMode="clean"
-                                    overlays={{}}
-                                    showBaffle={true}
-                                    showScreen={true}
-                                    speakerPositionsView="off"
-                                    showMlpRuler={false}
-                                    zoomMode="off"
-                                />
+                                {planImageDataUrl ? (
+                                    <img 
+                                        src={planImageDataUrl} 
+                                        alt="Room Plan" 
+                                        style={{
+                                            width: '100%',
+                                            maxHeight: '600px',
+                                            objectFit: 'contain'
+                                        }}
+                                    />
+                                ) : (
+                                    <div style={{ fontSize: 11, color: '#3E4349', textAlign: 'center', padding: 20 }}>
+                                        Plan image not available
+                                    </div>
+                                )}
                             </div>
                         </section>
 
