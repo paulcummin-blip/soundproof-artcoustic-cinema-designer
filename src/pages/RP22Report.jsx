@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { AppStateProvider, useAppState } from '../components/AppStateProvider';
 import { useRP22AnalysisEngine } from '../components/hooks/useRP22AnalysisEngine';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +19,16 @@ import { Button } from '@/components/ui/button';
 
 function RP22ReportInner() {
     const app = useAppState();
+    
+    const [isPrinting, setIsPrinting] = useState(false);
+
+    useEffect(() => {
+        const onAfterPrint = () => {
+            setIsPrinting(false);
+        };
+        window.addEventListener('afterprint', onAfterPrint);
+        return () => window.removeEventListener('afterprint', onAfterPrint);
+    }, []);
     
     if (!app) {
         return (
@@ -393,51 +403,66 @@ function RP22ReportInner() {
         );
     }
 
-    const handleExportPDF = React.useCallback(() => {
-        // Try navigation first (HashRouter)
-        try {
-            const printWindow = window.open('/#/ComplianceReportPrint', '_blank');
-            
-            // Fallback: If routing fails, inject print layout directly
-            if (!printWindow) {
-                throw new Error('Popup blocked');
+    const PrintStyles = () => (
+        <style>{`
+            @page {
+                size: A4 portrait;
+                margin: 12mm;
             }
-            
-            // Give router time to load, otherwise fallback
-            setTimeout(() => {
-                if (!printWindow.document.body || printWindow.document.body.innerText.includes('404')) {
-                    printWindow.close();
-                    // Fallback: render print content in new window
-                    const fallbackWindow = window.open('', '_blank');
-                    if (fallbackWindow) {
-                        fallbackWindow.document.write(`
-                            <!DOCTYPE html>
-                            <html>
-                            <head>
-                                <title>RP22 Compliance Report - Print</title>
-                                <style>
-                                    @page { size: A4 portrait; margin: 12mm; }
-                                    body { font-family: 'Didact Gothic', sans-serif; margin: 0; padding: 20px; }
-                                    h1 { font-family: 'Futura PT Light', sans-serif; }
-                                </style>
-                            </head>
-                            <body>
-                                <p>Print preview loading... Please navigate to the Compliance Report Print page manually.</p>
-                            </body>
-                            </html>
-                        `);
-                        fallbackWindow.print();
-                    }
+
+            @media print {
+                body {
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
                 }
-            }, 500);
-        } catch (e) {
-            console.error('Export PDF failed:', e);
-            alert('Unable to open print preview. Please check if popups are blocked.');
-        }
-    }, []);
+
+                .b44-sidebar, .b44-topbar, nav, header, .no-print {
+                    display: none !important;
+                }
+
+                .print-only {
+                    display: block !important;
+                }
+                .screen-only {
+                    display: none !important;
+                }
+
+                .print-page-break-after {
+                    break-after: page;
+                    page-break-after: always;
+                }
+
+                .print-page-break-before {
+                    break-before: page;
+                    page-break-before: always;
+                }
+
+                .print-avoid-break {
+                    break-inside: avoid;
+                    page-break-inside: avoid;
+                }
+
+                .print-grid {
+                    gap: 10px !important;
+                }
+            }
+
+            .print-only { display: none; }
+            .screen-only { display: block; }
+
+            .print-container {
+                max-width: 190mm;
+                margin: 0 auto;
+                font-family: 'Didact Gothic', 'Century Gothic', sans-serif;
+            }
+        `}</style>
+    );
 
     return (
         <div className="min-h-screen bg-[#F9F8F6] p-6">
+            <PrintStyles />
+            
+            <div className="screen-only">
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 mb-6">
@@ -460,7 +485,10 @@ function RP22ReportInner() {
                         </div>
                     </div>
                     <Button
-                        onClick={handleExportPDF}
+                        onClick={() => {
+                            setIsPrinting(true);
+                            setTimeout(() => window.print(), 250);
+                        }}
                         className="bg-[#625143] hover:bg-[#4a3d32] text-white border-2 border-[#DCDBD6] shadow-md px-6 py-3 text-base font-semibold"
                         style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
                     >
@@ -714,6 +742,203 @@ function RP22ReportInner() {
                                                             </div>
                     </CardContent>
                 </Card>
+            </div>
+            </div>
+
+            {/* Print-only layout */}
+            <div className="print-only">
+                <div className="print-container">
+                    {/* PAGE 1: Headline + counts only */}
+                    <div className="print-page-break-after">
+                        <div className="mb-8">
+                            <img
+                                src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
+                                alt="SoundProof"
+                                style={{ height: 48, marginBottom: 14 }}
+                            />
+                            <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 28, fontWeight: 700, color: '#1B1A1A', lineHeight: 1.1 }}>
+                                RP22 Compliance Report
+                            </div>
+                            <div style={{ marginTop: 6, color: '#3E4349', fontSize: 12 }}>
+                                {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
+                            </div>
+                            <div style={{ marginTop: 2, color: '#625143', fontSize: 11 }}>
+                                System: {(() => {
+                                    const dolbyPreset = app?.dolbyLayout || "5.1";
+                                    const base = String(dolbyPreset).split(" ")[0];
+                                    const parts = base.split(".");
+                                    const bed = parts[0] || "5";
+                                    const heights = parts[2] || "";
+                                    const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
+                                    const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
+                                    const totalSubs = frontCount + rearCount;
+                                    return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+                                })()}
+                            </div>
+                            <div style={{ borderBottom: '1px solid #E6E4DD', marginTop: 14 }} />
+                        </div>
+
+                        <div className="space-y-6">
+                            <div>
+                                <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 14, fontWeight: 700, color: '#1B1A1A', marginBottom: 10 }}>
+                                    Room Parameters
+                                </div>
+                                <div className="flex gap-2">
+                                    <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
+                                    <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
+                                    <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
+                                    <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 14, fontWeight: 700, color: '#1B1A1A', marginBottom: 10 }}>
+                                    Seat Parameters
+                                </div>
+                                <div className="flex gap-2">
+                                    {(() => {
+                                        const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
+                                        (seatLevelCounts || []).forEach(s => {
+                                            agg.L4 += s.counts?.L4 || 0;
+                                            agg.L3 += s.counts?.L3 || 0;
+                                            agg.L2 += s.counts?.L2 || 0;
+                                            agg.L1 += s.counts?.L1 || 0;
+                                        });
+                                        return (
+                                            <>
+                                                <RP22GradingPill level="L4" count={agg.L4} />
+                                                <RP22GradingPill level="L3" count={agg.L3} />
+                                                <RP22GradingPill level="L2" count={agg.L2} />
+                                                <RP22GradingPill level="L1" count={agg.L1} />
+                                            </>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ROOM PARAMETERS */}
+                    <div className="print-page-break-before">
+                        <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
+                            RP22 Parameters (Room)
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 print-grid">
+                            {orderedParams.map(param => (
+                                <div key={param.id} className="print-avoid-break">
+                                    <ParameterCard
+                                        parameter={param}
+                                        roomResult={getRoomResult(param.id)}
+                                        seatResults={getSeatResults(param.id)}
+                                        systemConfig={param.id === 2 ? p2SystemConfig : null}
+                                        p15ConstructionLevel={app?.p15ConstructionLevel}
+                                        onP15ConstructionLevelChange={app?.setP15ConstructionLevel}
+                                        p21EarlyReflectionPreset={app?.p21EarlyReflectionPreset}
+                                        onP21EarlyReflectionPresetChange={app?.setP21EarlyReflectionPreset}
+                                        displayedLevel={getDisplayedRoomLevel(param.id)}
+                                    />
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* SEAT PARAMETERS */}
+                    <div className="print-page-break-before" style={{ marginTop: 18 }}>
+                        <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
+                            RP22 Parameters (Seat)
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 print-grid">
+                            {(() => {
+                                const greenDot = app?.mlp;
+                                let rspSeatId = null;
+                                if (greenDot && Number.isFinite(greenDot.x) && Number.isFinite(greenDot.y)) {
+                                    let closestSeat = null;
+                                    let minDist = Infinity;
+                                    seats.forEach(s => {
+                                        if (!Number.isFinite(s?.x) || !Number.isFinite(s?.y)) return;
+                                        const d = Math.hypot(s.x - greenDot.x, s.y - greenDot.y);
+                                        if (d < minDist) { minDist = d; closestSeat = s.id; }
+                                    });
+                                    if (minDist <= 0.05) rspSeatId = closestSeat;
+                                }
+
+                                return seats.map(seat => {
+                                    const seatId = seat?.id || '—';
+                                    const tooltipData = app?.seatMetricsById?.[seatId];
+                                    if (!tooltipData) return null;
+
+                                    const rp22Raw = tooltipData?.rp22 || {};
+                                    const rp23 = tooltipData?.rp23 || {};
+                                    const isPrimary = tooltipData?.isPrimary || false;
+                                    const isRsp = seatId === rspSeatId;
+                                    const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '(Secondary)');
+                                    const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
+
+                                    return (
+                                        <div key={seatId} className="print-avoid-break">
+                                            <Card className="border-[#E6E4DD]">
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                                        {formatSeatLabel(seatId)}{' '}
+                                                        <span style={{ fontSize: 11, fontWeight: 700, color: suffixColor }}>{suffix}</span>
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="space-y-2.5 text-xs">
+                                                    <div className="flex justify-between items-center">
+                                                        <div className="flex items-baseline gap-2">
+                                                            <span className="font-normal text-[#3E4349]">RP23 Horizontal:</span>
+                                                            <span className="text-sm font-bold text-[#1B1A1A]">
+                                                                {rp23?.formatted && rp23.formatted !== '—' ? rp23.formatted : '—'}
+                                                            </span>
+                                                        </div>
+                                                        <RP22GradingPill level={rp23?.level || '—'} />
+                                                    </div>
+                                                    <div className="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1">
+                                                        {tooltipData?.position && <div><span className="font-medium">Position: </span>{tooltipData.position}</div>}
+                                                        {tooltipData?.distanceToScreen && <div>Distance to Screen: {tooltipData.distanceToScreen}</div>}
+                                                        {tooltipData?.distanceToMLP && <div>Distance to RSP: {tooltipData.distanceToMLP}</div>}
+                                                    </div>
+                                                    {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
+                                                        const metric = rp22Raw[key];
+                                                        const paramNum = parseInt(key.substring(1), 10);
+                                                        return (
+                                                            <div key={key}>
+                                                                <div className="flex items-baseline justify-between">
+                                                                    <div className="flex items-baseline gap-2">
+                                                                        <span className="font-normal text-[#3E4349]">P{paramNum}:</span>
+                                                                        <span className="text-sm font-bold text-[#1B1A1A]">
+                                                                            {metric ? (metric.formatted || metric.hudLabel || '—') : '—'}
+                                                                        </span>
+                                                                    </div>
+                                                                    <RP22GradingPill level={metric ? (typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—')) : '—'} />
+                                                                </div>
+                                                                {metric && key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
+                                                                    <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
+                                                                        {metric.perSpeaker.map(s => `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`).join(', ')}
+                                                                    </div>
+                                                                )}
+                                                                {metric && key === 'p17' && metric.worstRole && (
+                                                                    <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
+                                                                        Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                    );
+                                }).filter(Boolean);
+                            })()}
+                        </div>
+                        <div className="grid grid-cols-3 gap-4 mt-6 print-avoid-break">
+                            <SeatComplianceSummary position="left" />
+                            <SeatComplianceSummary position="middle" />
+                            <SeatComplianceSummary position="right" />
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     );
