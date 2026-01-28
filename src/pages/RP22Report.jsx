@@ -865,6 +865,7 @@ function RP22ReportInner() {
             <div className="print-only print-keep-layout">
                 <div className="print-root">
                     <div className="print-container">
+                        <section id="pdf-cover">
                         {/* PAGE 1: Headline + counts only */}
                         <div className="print-page-break-after print-summary">
                             {/* Top: centred logo + title */}
@@ -1001,9 +1002,11 @@ function RP22ReportInner() {
                                 Generated from current Room Designer configuration and live analysis state.
                             </div>
                         </div>
+                        </section>
 
-                    {/* ROOM PARAMETERS */}
-                    <div className="print-page-break-before">
+                        <section id="pdf-room-parameters">
+                        {/* ROOM PARAMETERS */}
+                        <div className="print-page-break-before">
                         <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
                             RP22 Parameters (Room)
                         </div>
@@ -1027,10 +1030,12 @@ function RP22ReportInner() {
                                 </div>
                             ))}
                         </div>
-                    </div>
+                        </div>
+                        </section>
 
-                    {/* SEAT PARAMETERS */}
-                    <div className="print-page-break-before" style={{ marginTop: 18 }}>
+                        <section id="pdf-seat-parameters">
+                        {/* SEAT PARAMETERS */}
+                        <div className="print-page-break-before" style={{ marginTop: 18 }}>
                         <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
                             RP22 Parameters (Seat)
                         </div>
@@ -1127,7 +1132,8 @@ function RP22ReportInner() {
                             <SeatComplianceSummary position="middle" />
                             <SeatComplianceSummary position="right" />
                         </div>
-                    </div>
+                        </div>
+                        </section>
                     </div>
                 </div>
             </div>
