@@ -142,33 +142,16 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
     // Wall clearance for eligibility
     const wallClearance = minDistToWall(seat);
     
-    // Ellipse eligibility around the green-dot MLP (NOT around the chosen RSP seat)
+    // Ellipse eligibility around MLP (green dot)
     const dx = seat.x - mlp.x;
     const dy = seat.y - mlp.y;
     const ellipseNorm = Math.sqrt((dx / ELLIPSE_A_M) ** 2 + (dy / ELLIPSE_B_M) ** 2);
     
     // Eligibility gates
-    const passEllipse = ellipseNorm <= 1;
-    const passWall = wallClearance >= WALL_CLEARANCE_MIN_M;
-    const passDist = d <= DIST_SOFT_MAX_M;
-    const isEligible = passEllipse && passWall && passDist;
-
-    // Debug logging for eligibility decisions
-    if (globalThis.__B44_LOGS) {
-      console.log(`[MLP] Seat ${seat.id}:`, {
-        d: d.toFixed(3),
-        mlp: { x: mlp.x.toFixed(2), y: mlp.y.toFixed(2) },
-        seat: { x: seat.x.toFixed(2), y: seat.y.toFixed(2) },
-        roomDims: { width: width.toFixed(2), length: length.toFixed(2) },
-        dx: dx.toFixed(3),
-        dy: dy.toFixed(3),
-        ellipseNorm: ellipseNorm.toFixed(3),
-        wallClearance: wallClearance.toFixed(3),
-        gates: { passEllipse, passWall, passDist },
-        isEligible,
-        failedGate: !isEligible ? (!passEllipse ? 'ELLIPSE' : !passWall ? 'WALL' : 'DIST') : null
-      });
-    }
+    const isEligible = 
+      ellipseNorm <= 1 &&
+      wallClearance >= WALL_CLEARANCE_MIN_M &&
+      d <= DIST_SOFT_MAX_M;
 
     return { seat, score, isEligible };
   });
