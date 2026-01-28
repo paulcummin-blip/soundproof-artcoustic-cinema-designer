@@ -995,7 +995,8 @@ function useDesignerState() {
     useRearGlobal,
     seatMetricsById,
     p15ConstructionLevel,
-    p21EarlyReflectionPreset
+    p21EarlyReflectionPreset,
+    mlpOverride
     ]);
 
     // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
@@ -1073,7 +1074,8 @@ function useDesignerState() {
     useRearGlobal,
     seatMetricsById,
     p15ConstructionLevel,
-    p21EarlyReflectionPreset
+    p21EarlyReflectionPreset,
+    mlpOverride
     ]);
 
     // --- Autosave: Manual restore/clear functions ---
