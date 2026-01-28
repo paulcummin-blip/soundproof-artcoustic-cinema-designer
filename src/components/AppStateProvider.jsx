@@ -1429,6 +1429,9 @@ function useDesignerState() {
     setP15ConstructionLevelSafe,
     p21EarlyReflectionPreset,
     setP21EarlyReflectionPresetSafe,
+    mlpOverride,
+    setMlpOverride,
+    clearMlpOverride,
     ]);
 
   // Export p21 setter as convenience (same pattern as p15)
