@@ -24,10 +24,12 @@ function RP22ReportInner() {
     
     const [isPrinting, setIsPrinting] = useState(false);
     const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
+    const planEnabled = true;
 
     useEffect(() => {
         const onAfterPrint = () => {
             setIsPrinting(false);
+            setPlanImageDataUrl(null);
         };
         window.addEventListener('afterprint', onAfterPrint);
         return () => window.removeEventListener('afterprint', onAfterPrint);
@@ -314,6 +316,94 @@ function RP22ReportInner() {
 
         return counts;
     }, [getDisplayedRoomLevel]);
+
+    // Check if print layout is ready (all data loaded)
+    const printReady = React.useMemo(() => {
+        if (!isPrinting) return false;
+        
+        const roomCardCount = orderedParams.length;
+        const seatsOk = hasSeats && seats.length > 0;
+        const planOk = planEnabled ? !!planImageDataUrl : true;
+        
+        return roomCardCount > 0 && seatsOk && planOk;
+    }, [isPrinting, orderedParams.length, hasSeats, seats.length, planEnabled, planImageDataUrl]);
+
+    // Trigger print when ready
+    useEffect(() => {
+        if (printReady) {
+            setTimeout(() => window.print(), 100);
+        }
+    }, [printReady]);
+
+    // Capture plan when printing starts
+    useEffect(() => {
+        if (!isPrinting || planImageDataUrl !== null) return;
+        
+        const capturePlan = async () => {
+            try {
+                const planElement = document.querySelector('[data-plan-capture]');
+                if (!planElement) {
+                    setPlanImageDataUrl('');
+                    setIsPrinting(false);
+                    return;
+                }
+                
+                const svgElement = planElement.querySelector('svg');
+                if (!svgElement) {
+                    setPlanImageDataUrl('');
+                    setIsPrinting(false);
+                    return;
+                }
+                
+                const svgClone = svgElement.cloneNode(true);
+                const contentGroup = svgClone.querySelector('g') || svgClone;
+                const bbox = contentGroup.getBBox();
+                
+                const shortestSide = Math.min(bbox.width, bbox.height);
+                const padding = shortestSide * 0.07;
+                
+                const viewBoxX = bbox.x - padding;
+                const viewBoxY = bbox.y - padding;
+                const viewBoxW = bbox.width + (2 * padding);
+                const viewBoxH = bbox.height + (2 * padding);
+                
+                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
+                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                svgClone.setAttribute('width', '100%');
+                svgClone.setAttribute('height', '100%');
+                
+                const svgString = new XMLSerializer().serializeToString(svgClone);
+                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+                
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 2400;
+                    canvas.height = 2400 * (viewBoxH / viewBoxW);
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#F8F8F7';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const dataUrl = canvas.toDataURL('image/png');
+                    setPlanImageDataUrl(dataUrl);
+                    URL.revokeObjectURL(url);
+                };
+                img.onerror = () => {
+                    setPlanImageDataUrl('');
+                    setIsPrinting(false);
+                    URL.revokeObjectURL(url);
+                };
+                img.src = url;
+            } catch (err) {
+                console.warn('Failed to capture plan image:', err);
+                setPlanImageDataUrl('');
+                setIsPrinting(false);
+            }
+        };
+        
+        capturePlan();
+    }, [isPrinting, planImageDataUrl]);
 
     // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
     // Total is always 10 (RP23 + 9 RP22 params: P1, P4, P5, P6, P9, P10, P16, P17, P20)
@@ -618,63 +708,9 @@ function RP22ReportInner() {
                     </div>
                     <Button
                         type="button"
-                        onClick={async () => {
-                            try {
-                                // Capture plan image first
-                                const planElement = document.querySelector('[data-plan-capture]');
-                                if (planElement) {
-                                    const svgElement = planElement.querySelector('svg');
-                                    if (svgElement) {
-                                        // Clone the SVG to avoid modifying the original
-                                        const svgClone = svgElement.cloneNode(true);
-                                        
-                                        // Find the main content group and get its bounding box
-                                        const contentGroup = svgClone.querySelector('g') || svgClone;
-                                        const bbox = contentGroup.getBBox();
-                                        
-                                        // Calculate padding (7% of shortest side)
-                                        const shortestSide = Math.min(bbox.width, bbox.height);
-                                        const padding = shortestSide * 0.07;
-                                        
-                                        // Set viewBox with padding
-                                        const viewBoxX = bbox.x - padding;
-                                        const viewBoxY = bbox.y - padding;
-                                        const viewBoxW = bbox.width + (2 * padding);
-                                        const viewBoxH = bbox.height + (2 * padding);
-                                        
-                                        svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
-                                        svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                                        svgClone.setAttribute('width', '100%');
-                                        svgClone.setAttribute('height', '100%');
-                                        
-                                        // Convert SVG to data URL
-                                        const svgString = new XMLSerializer().serializeToString(svgClone);
-                                        const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                                        const url = URL.createObjectURL(svgBlob);
-                                        
-                                        // Convert to PNG using canvas for better print compatibility
-                                        const img = new Image();
-                                        img.onload = () => {
-                                            const canvas = document.createElement('canvas');
-                                            canvas.width = 2400;
-                                            canvas.height = 2400 * (viewBoxH / viewBoxW);
-                                            const ctx = canvas.getContext('2d');
-                                            ctx.fillStyle = '#F8F8F7';
-                                            ctx.fillRect(0, 0, canvas.width, canvas.height);
-                                            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                                            const dataUrl = canvas.toDataURL('image/png');
-                                            setPlanImageDataUrl(dataUrl);
-                                            URL.revokeObjectURL(url);
-                                        };
-                                        img.src = url;
-                                    }
-                                }
-                            } catch (err) {
-                                console.warn('Failed to capture plan image:', err);
-                            }
-                            
+                        onClick={() => {
+                            setPlanImageDataUrl(null);
                             setIsPrinting(true);
-                            setTimeout(() => window.print(), 250);
                         }}
                         className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
                         style={{
@@ -1081,16 +1117,16 @@ function RP22ReportInner() {
                         </div>
                         </section>
 
-                        <section id="pdf-room-drawings" className="print-page-break-after">
-                            <div style={{ 
-                                height: '250mm',
-                                width: '100%',
-                                display: 'flex',
-                                justifyContent: 'center',
-                                alignItems: 'center',
-                                padding: '20mm'
-                            }}>
-                                {planImageDataUrl ? (
+                        {planEnabled && planImageDataUrl && (
+                            <section id="pdf-room-drawings" className="print-page-break-after">
+                                <div style={{ 
+                                    height: '250mm',
+                                    width: '100%',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    padding: '20mm'
+                                }}>
                                     <img 
                                         src={planImageDataUrl} 
                                         alt="Room Plan" 
@@ -1101,13 +1137,9 @@ function RP22ReportInner() {
                                             display: 'block'
                                         }}
                                     />
-                                ) : (
-                                    <div style={{ fontSize: 11, color: '#3E4349', textAlign: 'center', padding: 20 }}>
-                                        Plan image not available
-                                    </div>
-                                )}
-                            </div>
-                        </section>
+                                </div>
+                            </section>
+                        )}
 
                         <section id="pdf-room-parameters">
                         {/* ROOM PARAMETERS */}
