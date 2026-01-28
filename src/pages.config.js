@@ -57,6 +57,7 @@ import RoomDesigner from './pages/RoomDesigner';
 import SPLCalculator from './pages/SPLCalculator';
 import SPLCalculatorV2 from './pages/SPLCalculatorV2';
 import SpeakerDatabase from './pages/SpeakerDatabase';
+import ComplianceReportPrint from './pages/ComplianceReportPrint';
 import __Layout from './Layout.jsx';
 
 
@@ -71,6 +72,7 @@ export const PAGES = {
     "SPLCalculator": SPLCalculator,
     "SPLCalculatorV2": SPLCalculatorV2,
     "SpeakerDatabase": SpeakerDatabase,
+    "ComplianceReportPrint": ComplianceReportPrint,
 }
 
 export const pagesConfig = {
