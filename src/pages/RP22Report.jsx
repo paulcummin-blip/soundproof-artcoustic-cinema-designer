@@ -50,6 +50,21 @@ function RP22ReportInner() {
     const safeArray = (v) => (Array.isArray(v) ? v : []);
     const safeObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
 
+    // No-op callbacks for RoomVisualisation capture render
+    const noop = () => {};
+    const rvNoops = {
+        onSetSpeakers: noop,
+        onSetSeatingPositions: noop,
+        onSetScreen: noop,
+        onSetFrontSubsCfg: noop,
+        onSetRearSubsCfg: noop,
+        onSetElements: noop,
+        onSetOverheadState: noop,
+        onSetAimState: noop,
+        onSetRoomDims: noop,
+        onSetMlpPoint: noop,
+    };
+
     // Room Designer source-of-truth keys (these must match AppStateProvider)
     const seats = safeArray(app?.seatingPositions);
     const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
@@ -323,7 +338,7 @@ function RP22ReportInner() {
         
         const roomCardCount = orderedParams.length;
         const seatsOk = hasSeats && seats.length > 0;
-        const planOk = planEnabled ? !!planImageDataUrl : true;
+        const planOk = planEnabled ? (typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0) : true;
         
         return roomCardCount > 0 && seatsOk && planOk;
     }, [isPrinting, orderedParams.length, hasSeats, seats.length, planEnabled, planImageDataUrl]);
@@ -335,14 +350,24 @@ function RP22ReportInner() {
         }
     }, [printReady]);
 
-    // Capture plan when printing starts
+    // Capture plan when printing starts (with retry logic)
     useEffect(() => {
         if (!isPrinting || planImageDataUrl !== null) return;
         
-        const capturePlan = async () => {
+        let attempts = 0;
+        const maxAttempts = 20;
+        let retryTimer = null;
+        
+        const attemptCapture = async () => {
+            attempts++;
+            
             try {
                 const planElement = document.querySelector('[data-plan-capture]');
                 if (!planElement) {
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
                     setPlanImageDataUrl('');
                     setIsPrinting(false);
                     return;
@@ -350,6 +375,10 @@ function RP22ReportInner() {
                 
                 const svgElement = planElement.querySelector('svg');
                 if (!svgElement) {
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
                     setPlanImageDataUrl('');
                     setIsPrinting(false);
                     return;
@@ -358,6 +387,17 @@ function RP22ReportInner() {
                 const svgClone = svgElement.cloneNode(true);
                 const contentGroup = svgClone.querySelector('g') || svgClone;
                 const bbox = contentGroup.getBBox();
+                
+                // Check if SVG has valid dimensions
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
+                    setPlanImageDataUrl('');
+                    setIsPrinting(false);
+                    return;
+                }
                 
                 const shortestSide = Math.min(bbox.width, bbox.height);
                 const padding = shortestSide * 0.07;
@@ -390,19 +430,31 @@ function RP22ReportInner() {
                     URL.revokeObjectURL(url);
                 };
                 img.onerror = () => {
-                    setPlanImageDataUrl('');
-                    setIsPrinting(false);
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                    } else {
+                        setPlanImageDataUrl('');
+                        setIsPrinting(false);
+                    }
                     URL.revokeObjectURL(url);
                 };
                 img.src = url;
             } catch (err) {
-                console.warn('Failed to capture plan image:', err);
-                setPlanImageDataUrl('');
-                setIsPrinting(false);
+                console.warn('Failed to capture plan image (attempt ' + attempts + '):', err);
+                if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
+                } else {
+                    setPlanImageDataUrl('');
+                    setIsPrinting(false);
+                }
             }
         };
         
-        capturePlan();
+        attemptCapture();
+        
+        return () => {
+            if (retryTimer) clearTimeout(retryTimer);
+        };
     }, [isPrinting, planImageDataUrl]);
 
     // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
@@ -665,8 +717,20 @@ function RP22ReportInner() {
             <PrintStyles />
             
             <div className="screen-only">
-            {/* Hidden plan capture element */}
-            <div data-plan-capture style={{ position: 'absolute', left: '-9999px', width: '1200px', height: '800px' }}>
+            {/* Hidden plan capture element - MUST be in DOM (not display:none) for SVG capture */}
+            <div 
+                data-plan-capture 
+                style={{ 
+                    position: 'fixed',
+                    left: 0,
+                    top: 0,
+                    width: '1200px',
+                    height: '800px',
+                    opacity: 0,
+                    pointerEvents: 'none',
+                    zIndex: -1
+                }}
+            >
                 <RoomVisualisation
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
@@ -682,9 +746,16 @@ function RP22ReportInner() {
                     speakerPositionsView="off"
                     showMlpRuler={false}
                     zoomMode="off"
-                    onSetSpeakers={() => {}}
-                    onUpdateSeats={() => {}}
-                    onUpdateMlp={() => {}}
+                    onSetSpeakers={rvNoops.onSetSpeakers}
+                    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
+                    onSetScreen={rvNoops.onSetScreen}
+                    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
+                    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
+                    onSetElements={rvNoops.onSetElements}
+                    onSetOverheadState={rvNoops.onSetOverheadState}
+                    onSetAimState={rvNoops.onSetAimState}
+                    onSetRoomDims={rvNoops.onSetRoomDims}
+                    onSetMlpPoint={rvNoops.onSetMlpPoint}
                 />
             </div>
             
@@ -1120,7 +1191,7 @@ function RP22ReportInner() {
                         </div>
                         </section>
 
-                        {planEnabled && planImageDataUrl && (
+                        {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && (
                             <section id="pdf-room-drawings" className="print-page-break-after">
                                 <div style={{ 
                                     height: '250mm',
