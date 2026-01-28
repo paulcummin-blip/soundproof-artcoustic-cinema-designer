@@ -22,48 +22,6 @@ function RP22ReportInner() {
     
     const [isPrinting, setIsPrinting] = useState(false);
 
-    // --- PRINT: wait for full print layout to be ready before printing ---
-    const [hasPrintedOnce, setHasPrintedOnce] = React.useState(false);
-
-    const printReady = React.useMemo(() => {
-        if (!isPrinting) return false;
-
-        // Seats must exist (or we at least shouldn't block forever if there are none)
-        const seatCount = Array.isArray(seats) ? seats.length : 0;
-
-        // Seat HUD cache must be present for all seats (this is what your seat cards read)
-        const metrics = app?.seatMetricsById || {};
-        const metricsCount = Object.keys(metrics).length;
-
-        // Room cards list must exist
-        const roomCardCount = Array.isArray(orderedParams) ? orderedParams.length : 0;
-
-        // If you have seats, require metrics for all seats.
-        // If you have no seats, don't block printing.
-        const seatsOk = seatCount === 0 ? true : (metricsCount >= seatCount);
-
-        // You want room cards AND (if seats exist) seat metrics ready
-        return roomCardCount > 0 && seatsOk;
-    }, [isPrinting, seats, app?.seatMetricsById, orderedParams]);
-
-    React.useEffect(() => {
-        if (!isPrinting) {
-            setHasPrintedOnce(false);
-            return;
-        }
-
-        if (!printReady) return;
-        if (hasPrintedOnce) return;
-
-        // Give React/layout/images a bit of time to settle
-        const t = window.setTimeout(() => {
-            setHasPrintedOnce(true);
-            window.print();
-        }, 900);
-
-        return () => window.clearTimeout(t);
-    }, [isPrinting, printReady, hasPrintedOnce]);
-
     useEffect(() => {
         const onAfterPrint = () => {
             setIsPrinting(false);
@@ -590,6 +548,7 @@ function RP22ReportInner() {
                         type="button"
                         onClick={() => {
                             setIsPrinting(true);
+                            setTimeout(() => window.print(), 250);
                         }}
                         className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
                         style={{
