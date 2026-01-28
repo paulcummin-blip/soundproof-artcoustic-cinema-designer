@@ -455,12 +455,31 @@ function RP22ReportInner() {
                     page-break-inside: avoid;
                 }
 
-                /* 6) In print, avoid responsive column weirdness */
+                /* 6) PRINT SAFE: avoid CSS grid (Chrome can truncate PDF output) */
                 .print-grid-room,
                 .print-grid-seats {
-                    display: grid !important;
-                    grid-template-columns: 1fr 1fr !important;
-                    gap: 10mm !important;
+                    display: block !important;
+                    
+                    /* two-column print-safe layout */
+                    column-count: 2 !important;
+                    column-gap: 10mm !important;
+                    column-fill: auto !important;
+                    
+                    width: 100% !important;
+                }
+                
+                /* each card wrapper becomes a column item */
+                .print-grid-room > .print-avoid-break,
+                .print-grid-seats > .print-avoid-break {
+                    display: inline-block !important;
+                    width: 100% !important;
+                    
+                    /* keep cards intact where possible */
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                    
+                    /* spacing between cards */
+                    margin: 0 0 10mm 0 !important;
                 }
 
                 /* Hide anything that isn't the print layout */
@@ -495,6 +514,13 @@ function RP22ReportInner() {
                     width: 100% !important;
                     margin: 0 !important;
                     padding: 0 !important;
+                }
+                
+                /* extra safety: Card internals must not clip */
+                .print-only .card,
+                .print-only .card * {
+                    overflow: visible !important;
+                    max-height: none !important;
                 }
             }
 
