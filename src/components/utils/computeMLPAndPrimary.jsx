@@ -9,7 +9,7 @@ const DIST_SOFT_MAX_M = 1.9;
 const SCORE_TOLERANCE = 0.10;
 
 // Enhanced MLP calculation with basis selection
-export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
+export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front", mlpOverride = null) {
   const width = Number(W) || 0;
   const length = Number(L) || 0;
 
@@ -79,6 +79,11 @@ export function computeMLPAndPrimary(seats, W = 0, L = 0, mlpBasis = "front") {
       const totalY = rowCenters.reduce((sum, center) => sum + center.y, 0);
       mlp = { x: totalX / rowCenters.length, y: totalY / rowCenters.length };
       break;
+  }
+
+  // Override with live green-dot position if provided
+  if (mlpOverride && Number.isFinite(mlpOverride.x) && Number.isFinite(mlpOverride.y)) {
+    mlp = { x: mlpOverride.x, y: mlpOverride.y };
   }
 
   // Find RSP seat (closest to MLP green dot) with stable tie-breaker
