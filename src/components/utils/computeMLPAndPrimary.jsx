@@ -4,8 +4,8 @@ const round3 = (n) => Math.round(n * 1000) / 1000;
 // Primary seat eligibility constants
 const WALL_CLEARANCE_MIN_M = 1.0;
 const ELLIPSE_A_M = 2.2;  // side-to-side radius (wider for adjacent seats)
-const ELLIPSE_B_M = 1.8;  // front-to-back radius (slightly longer)
-const DIST_SOFT_MAX_M = 3.0;
+const ELLIPSE_B_M = 0.95;  // front-to-back radius (tighter for row spacing control)
+const DIST_SOFT_MAX_M = 2.0;
 const SCORE_TOLERANCE = 0.10;
 
 // Enhanced MLP calculation with basis selection
