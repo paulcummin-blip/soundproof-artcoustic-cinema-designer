@@ -450,9 +450,32 @@ function RP22ReportInner() {
                     break-before: page;
                     page-break-before: always;
                 }
+                
+                /* IMPORTANT: Chrome PDF preview can truncate if large cards are "unbreakable".
+                   So we do NOT force avoid-break on all cards. */
                 .print-avoid-break {
-                    break-inside: avoid;
-                    page-break-inside: avoid;
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
+                }
+                
+                /* Keep the top summary blocks intact (safe + small) */
+                .print-summary .print-avoid-break {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
+                
+                /* For the big room/seat cards: allow splitting if needed */
+                .print-grid-room > .print-avoid-break,
+                .print-grid-seats > .print-avoid-break {
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
+                }
+                
+                /* Make sure Card content can flow */
+                .print-only .rounded-xl,
+                .print-only .rounded-xl * {
+                    overflow: visible !important;
+                    max-height: none !important;
                 }
 
                 /* 6) PRINT SAFE: avoid CSS grid (Chrome can truncate PDF output) */
@@ -843,7 +866,7 @@ function RP22ReportInner() {
                 <div className="print-root">
                     <div className="print-container">
                         {/* PAGE 1: Headline + counts only */}
-                        <div className="print-page-break-after">
+                        <div className="print-page-break-after print-summary">
                             {/* Top: centred logo + title */}
                             <div
                                 style={{
