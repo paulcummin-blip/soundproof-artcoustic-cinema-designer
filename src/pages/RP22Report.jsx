@@ -126,52 +126,80 @@ function RP22ReportInner() {
 
     // Resolver: compute screen metrics using same logic as Room Designer Live Metrics
     const resolveScreenMetricsSnapshot = React.useCallback(() => {
-        // Inputs (same as ViewingAnglePanel)
-        const mlpY_m = app?.mlp?.y ?? stableDimensions.length * 0.58;
-        const screenFrontPlaneM = app?.screenFrontPlaneM ?? app?.screen?.frontPlaneYm ?? null;
-        const visibleWidthInches = app?.screen?.visibleWidthInches ?? app?.screen?.visibleWidthIn ?? null;
-        const aspectRatio = app?.screen?.aspectRatio ?? "16:9";
+        try {
+            // Inputs (same as ViewingAnglePanel)
+            const mlpY_m = app?.mlp?.y ?? stableDimensions.length * 0.58;
+            const screenFrontPlaneM = app?.screenFrontPlaneM ?? app?.screen?.frontPlaneYm ?? null;
+            const visibleWidthInches = app?.screen?.visibleWidthInches ?? app?.screen?.visibleWidthIn ?? null;
+            const aspectRatio = app?.screen?.aspectRatio ?? "16:9";
 
-        // Check if we have the minimum required data
-        if (!Number.isFinite(screenFrontPlaneM) || !Number.isFinite(visibleWidthInches) || visibleWidthInches <= 0) {
-            return { ok: false, reason: "Not specified" };
+            // Check if we have the minimum required data
+            if (!Number.isFinite(screenFrontPlaneM) || !Number.isFinite(visibleWidthInches) || visibleWidthInches <= 0) {
+                return {
+                    ok: true, // allow export to continue
+                    viewWm: null,
+                    viewHm: null,
+                    overallWm: null,
+                    overallHm: null,
+                    horizontalDeg: null,
+                    verticalDeg: null,
+                    wallDistM: null,
+                    wallCm: null,
+                    wallIn: null,
+                    screenChoiceLabel: formatScreenChoiceLabel(app?.screen),
+                };
+            }
+
+            // Use computeScreenMetrics to get dimensions in meters
+            const { viewWm, viewHm, overallWm, overallHm } = computeScreenMetrics(visibleWidthInches, aspectRatio);
+
+            // Calculate horizontal viewing angle (same as ViewingAnglePanel)
+            const horizDeg = calculateViewingAngle(
+                { y: mlpY_m },
+                visibleWidthInches,
+                aspectRatio,
+                { y: screenFrontPlaneM }
+            );
+
+            // Calculate vertical viewing angle
+            const viewerDistance = Math.abs(mlpY_m - screenFrontPlaneM);
+            const vertDeg = viewerDistance > 0 ? 
+                2 * Math.atan(viewHm / (2 * viewerDistance)) * (180 / Math.PI) : 
+                0;
+
+            // Wall distance (screenFrontPlaneM is already the distance from front wall)
+            const wallDistM = screenFrontPlaneM;
+            const wallCm = (screenFrontPlaneM * 100).toFixed(0);
+            const wallIn = (screenFrontPlaneM * 39.3701).toFixed(1);
+
+            return {
+                ok: true,
+                viewWm,
+                viewHm,
+                overallWm,
+                overallHm,
+                horizontalDeg: horizDeg ?? 0,
+                verticalDeg,
+                wallDistM,
+                wallCm,
+                wallIn,
+                screenChoiceLabel: formatScreenChoiceLabel(app?.screen)
+            };
+        } catch (e) {
+            return {
+                ok: true, // allow export to continue even on error
+                viewWm: null,
+                viewHm: null,
+                overallWm: null,
+                overallHm: null,
+                horizontalDeg: null,
+                verticalDeg: null,
+                wallDistM: null,
+                wallCm: null,
+                wallIn: null,
+                screenChoiceLabel: formatScreenChoiceLabel(app?.screen),
+            };
         }
-
-        // Use computeScreenMetrics to get dimensions in meters
-        const { viewWm, viewHm, overallWm, overallHm } = computeScreenMetrics(visibleWidthInches, aspectRatio);
-
-        // Calculate horizontal viewing angle (same as ViewingAnglePanel)
-        const horizDeg = calculateViewingAngle(
-            { y: mlpY_m },
-            visibleWidthInches,
-            aspectRatio,
-            { y: screenFrontPlaneM }
-        );
-
-        // Calculate vertical viewing angle
-        const viewerDistance = Math.abs(mlpY_m - screenFrontPlaneM);
-        const vertDeg = viewerDistance > 0 ? 
-            2 * Math.atan(viewHm / (2 * viewerDistance)) * (180 / Math.PI) : 
-            0;
-
-        // Wall distance (screenFrontPlaneM is already the distance from front wall)
-        const wallDistM = screenFrontPlaneM;
-        const wallCm = (screenFrontPlaneM * 100).toFixed(0);
-        const wallIn = (screenFrontPlaneM * 39.3701).toFixed(1);
-
-        return {
-            ok: true,
-            viewWm,
-            viewHm,
-            overallWm,
-            overallHm,
-            horizontalDeg: horizDeg ?? 0,
-            verticalDeg,
-            wallDistM,
-            wallCm,
-            wallIn,
-            screenChoiceLabel: formatScreenChoiceLabel(app?.screen)
-        };
     }, [app?.mlp?.y, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.visibleWidthIn, app?.screen?.aspectRatio, stableDimensions.length]);
 
     // Compute SPL metrics for all seats (needed by analysis engine)
@@ -425,8 +453,9 @@ function RP22ReportInner() {
         const dimsOk = planEnabled ? (typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0) : true;
         const speakerDimsOk = planEnabled ? (typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0) : true;
         const planOk = cleanOk && dimsOk && speakerDimsOk;
+        const screenOk = true; // never block on screen metrics
         
-        return roomCardCount > 0 && seatsOk && planOk;
+        return roomCardCount > 0 && seatsOk && planOk && screenOk;
     }, [isPrinting, orderedParams.length, seats.length, planEnabled, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl, app?.seatMetricsById]);
 
     // Trigger print when ready (with print-once guard)
@@ -1618,23 +1647,16 @@ function RP22ReportInner() {
                         <Button
                             type="button"
                             onClick={() => {
-                                setExportStatus("Resolving screen metrics…");
+                                // Resolve screen metrics immediately (synchronously)
+                                setScreenMetricsForPrint(resolveScreenMetricsSnapshot());
+                                setScreenMetricsStatus("Ready");
+                                
+                                setExportStatus("Capturing plan images…");
                                 setExportDebug({ isPrinting: true, planLen: 0, printReady: false });
                                 setHasPrintedOnce(false);
                                 setPlanImageDataUrl(null);
                                 setPlanDimsImageDataUrl(null);
                                 setPlanSpeakerDimsImageDataUrl(null);
-                                setScreenMetricsForPrint(null);
-                                
-                                // Resolve screen metrics BEFORE printing
-                                const snap = resolveScreenMetricsSnapshot();
-                                if (snap.ok) {
-                                    setScreenMetricsForPrint(snap);
-                                    setScreenMetricsStatus("OK");
-                                } else {
-                                    setScreenMetricsForPrint({ ok: false });
-                                    setScreenMetricsStatus("Not specified");
-                                }
                                 
                                 setIsPrinting(true);
                             }}
