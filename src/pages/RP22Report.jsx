@@ -1774,31 +1774,32 @@ function RP22ReportInner() {
                             {/* Divider */}
                             <div style={{ borderBottom: '1px solid #E6E4DD', marginTop: 18, marginBottom: 18 }} />
 
-                            {/* Counts: two clean cards */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+                            {/* Counts: two stacked full-width cards */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6mm' }}>
                                 {/* Room */}
                                 <div
                                     style={{
                                         border: '1px solid #DCDBD6',
                                         borderRadius: 12,
-                                        padding: 14,
+                                        padding: 18,
                                         background: '#FFFFFF',
+                                        width: '100%',
                                     }}
                                     className="print-avoid-break"
                                 >
                                     <div
                                         style={{
                                             fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                            fontSize: 13,
+                                            fontSize: 15,
                                             fontWeight: 700,
                                             color: '#1B1A1A',
-                                            marginBottom: 10,
+                                            marginBottom: 12,
                                         }}
                                     >
                                         Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                     </div>
 
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-3">
                                         <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
                                         <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
                                         <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
@@ -1811,24 +1812,25 @@ function RP22ReportInner() {
                                     style={{
                                         border: '1px solid #DCDBD6',
                                         borderRadius: 12,
-                                        padding: 14,
+                                        padding: 18,
                                         background: '#FFFFFF',
+                                        width: '100%',
                                     }}
                                     className="print-avoid-break"
                                 >
                                     <div
                                         style={{
                                             fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                            fontSize: 13,
+                                            fontSize: 15,
                                             fontWeight: 700,
                                             color: '#1B1A1A',
-                                            marginBottom: 10,
+                                            marginBottom: 12,
                                         }}
                                     >
                                         Seat parameters ({seats?.length || 0} seats)
                                     </div>
 
-                                    <div className="flex gap-2">
+                                    <div className="flex gap-3">
                                         {(() => {
                                             const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
                                             (seatLevelCounts || []).forEach(s => {
