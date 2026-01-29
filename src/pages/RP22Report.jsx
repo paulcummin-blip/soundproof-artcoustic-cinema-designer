@@ -24,6 +24,7 @@ function RP22ReportInner() {
     
     const [isPrinting, setIsPrinting] = useState(false);
     const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
+    const [hasPrintedOnce, setHasPrintedOnce] = useState(false);
     const planEnabled = true;
 
     useEffect(() => {
@@ -337,18 +338,28 @@ function RP22ReportInner() {
         if (!isPrinting) return false;
         
         const roomCardCount = orderedParams.length;
-        const seatsOk = hasSeats && seats.length > 0;
+        const seatsOk = !hasSeats || seats.length > 0;
         const planOk = planEnabled ? (typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0) : true;
         
         return roomCardCount > 0 && seatsOk && planOk;
     }, [isPrinting, orderedParams.length, hasSeats, seats.length, planEnabled, planImageDataUrl]);
 
-    // Trigger print when ready
+    // Trigger print when ready (with print-once guard)
     useEffect(() => {
-        if (printReady) {
-            setTimeout(() => window.print(), 100);
+        if (!isPrinting) {
+            setHasPrintedOnce(false);
+            return;
         }
-    }, [printReady]);
+        if (!printReady) return;
+        if (hasPrintedOnce) return;
+
+        const t = setTimeout(() => {
+            setHasPrintedOnce(true);
+            window.print();
+        }, 250);
+
+        return () => clearTimeout(t);
+    }, [isPrinting, printReady, hasPrintedOnce]);
 
     // Capture plan when printing starts (with retry logic)
     useEffect(() => {
@@ -1192,23 +1203,30 @@ function RP22ReportInner() {
                         </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && (
-                            <section id="pdf-room-drawings" className="print-page-break-after">
-                                <div style={{ 
-                                    height: '250mm',
-                                    width: '100%',
-                                    display: 'flex',
-                                    justifyContent: 'center',
-                                    alignItems: 'center',
-                                    padding: '20mm'
-                                }}>
-                                    <img 
-                                        src={planImageDataUrl} 
-                                        alt="Room Plan" 
+                            <section className="print-page-break-after">
+                                <h2 style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: '14pt', margin: '0 0 6mm 0' }}>
+                                    Room plan
+                                </h2>
+
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        height: '240mm',
+                                        border: '1px solid #DCDBD6',
+                                        borderRadius: '10px',
+                                        padding: '6mm',
+                                        background: '#FFFFFF',
+                                        boxSizing: 'border-box',
+                                    }}
+                                >
+                                    <img
+                                        src={planImageDataUrl}
+                                        alt="Room Plan"
                                         style={{
                                             width: '100%',
                                             height: '100%',
                                             objectFit: 'contain',
-                                            display: 'block'
+                                            display: 'block',
                                         }}
                                     />
                                 </div>
