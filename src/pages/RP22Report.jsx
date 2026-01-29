@@ -1945,7 +1945,7 @@ function RP22ReportInner() {
                             <div
                                 style={{
                                     maxWidth: "460px",
-                                    margin: "0 auto 18mm auto",
+                                    margin: "0 auto 28mm auto",
                                     textAlign: "center",
                                 }}
                             >
