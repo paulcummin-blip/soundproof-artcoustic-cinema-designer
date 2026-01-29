@@ -2058,18 +2058,17 @@ function RP22ReportInner() {
                                         Screen & Viewing Geometry
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '8mm' }}>
+                                    <div style={{ display: 'flex', gap: '10mm' }}>
                                         {/* Left: Screen size */}
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 600, fontSize: '10pt', color: '#1B1A1A', marginBottom: '3mm' }}>
+                                            <div style={{ fontWeight: 700, fontSize: '10.5pt', color: '#1B1A1A', marginBottom: '4mm', fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                                 Screen size
                                             </div>
                                             {(() => {
                                                 if (!screenMetricsForPrint?.ok) {
                                                     return (
-                                                        <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.6 }}>
-                                                            <div><strong>Viewable area:</strong> Not specified</div>
-                                                            <div style={{ marginTop: '2mm' }}><strong>Overall with border:</strong> Not specified</div>
+                                                        <div style={{ fontSize: '9pt', color: '#625143', lineHeight: 1.5 }}>
+                                                            <div>Not specified</div>
                                                         </div>
                                                     );
                                                 }
@@ -2079,21 +2078,21 @@ function RP22ReportInner() {
                                                 const overallWm = screenMetricsForPrint.overallWm;
                                                 const overallHm = screenMetricsForPrint.overallHm;
                                                 
-                                                const cmW = (viewWm * 100).toFixed(0);
-                                                const cmH = (viewHm * 100).toFixed(0);
+                                                const cmW = Math.round(viewWm * 100);
+                                                const cmH = Math.round(viewHm * 100);
                                                 const inW = (viewWm * 39.3701).toFixed(1);
                                                 const inH = (viewHm * 39.3701).toFixed(1);
                                                 
-                                                const overallCmW = (overallWm * 100).toFixed(0);
-                                                const overallCmH = (overallHm * 100).toFixed(0);
+                                                const overallCmW = Math.round(overallWm * 100);
+                                                const overallCmH = Math.round(overallHm * 100);
                                                 const overallInW = (overallWm * 39.3701).toFixed(1);
                                                 const overallInH = (overallHm * 39.3701).toFixed(1);
                                                 
                                                 return (
-                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.6 }}>
-                                                        <div><strong>Viewable area:</strong></div>
+                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.5 }}>
+                                                        <div style={{ marginBottom: '2mm' }}><strong style={{ color: '#1B1A1A' }}>Viewable area</strong></div>
                                                         <div>{cmW} × {cmH} cm ({inW}" × {inH}")</div>
-                                                        <div style={{ marginTop: '2mm' }}><strong>Overall with border:</strong></div>
+                                                        <div style={{ marginTop: '3mm', marginBottom: '2mm' }}><strong style={{ color: '#1B1A1A' }}>Overall with border</strong></div>
                                                         <div>{overallCmW} × {overallCmH} cm ({overallInW}" × {overallInH}")</div>
                                                     </div>
                                                 );
@@ -2102,25 +2101,23 @@ function RP22ReportInner() {
 
                                         {/* Right: Viewing angles + wall distance */}
                                         <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 600, fontSize: '10pt', color: '#1B1A1A', marginBottom: '3mm' }}>
+                                            <div style={{ fontWeight: 700, fontSize: '10.5pt', color: '#1B1A1A', marginBottom: '4mm', fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                                 Viewing geometry
                                             </div>
                                             {(() => {
                                                 if (!screenMetricsForPrint?.ok) {
                                                     return (
-                                                        <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.6 }}>
-                                                            <div><strong>Horizontal viewing angle:</strong> Not specified</div>
-                                                            <div><strong>Vertical viewing angle:</strong> Not specified</div>
-                                                            <div style={{ marginTop: '2mm' }}><strong>Distance from front wall:</strong> Not specified</div>
+                                                        <div style={{ fontSize: '9pt', color: '#625143', lineHeight: 1.5 }}>
+                                                            <div>Not specified</div>
                                                         </div>
                                                     );
                                                 }
                                                 
                                                 return (
-                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.6 }}>
-                                                        <div><strong>Horizontal viewing angle:</strong> {screenMetricsForPrint.horizDeg.toFixed(1)}°</div>
-                                                        <div><strong>Vertical viewing angle:</strong> {screenMetricsForPrint.vertDeg.toFixed(1)}°</div>
-                                                        <div style={{ marginTop: '2mm' }}><strong>Distance from front wall:</strong></div>
+                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.5 }}>
+                                                        <div style={{ marginBottom: '1.5mm' }}><strong style={{ color: '#1B1A1A' }}>Horizontal viewing angle:</strong> {screenMetricsForPrint.horizDeg.toFixed(1)}°</div>
+                                                        <div style={{ marginBottom: '1.5mm' }}><strong style={{ color: '#1B1A1A' }}>Vertical viewing angle:</strong> {screenMetricsForPrint.vertDeg.toFixed(1)}°</div>
+                                                        <div style={{ marginTop: '3mm', marginBottom: '2mm' }}><strong style={{ color: '#1B1A1A' }}>Distance from front wall</strong></div>
                                                         <div>{screenMetricsForPrint.wallCm} cm ({screenMetricsForPrint.wallIn}")</div>
                                                     </div>
                                                 );
