@@ -4,6 +4,10 @@ import { getSpeakerModelMeta, normaliseModelKey } from "@/components/models/spea
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const mToCm = (m) => Math.round(Number(m) * 100);
 
+// Export font family constant (Century Gothic for print/export)
+const EXPORT_FONT_FAMILY = 'Century Gothic, sans-serif';
+const DEFAULT_FONT_FAMILY = 'system-ui, sans-serif';
+
 // Dynamic font sizing based on local label crowding
 const computeDynamicFontSize = (labels, defaultSize = 11) => {
   if (!labels || !labels.length) return defaultSize;
@@ -140,6 +144,7 @@ export default function SpeakerPositionsOverlay({
   roomRect,
   getSpeakerVisibility,
   getCanonicalRole,
+  exportMode = 'default',
 }) {
   if (!(view === "plan" || view === "both")) return null;
 
@@ -397,6 +402,7 @@ export default function SpeakerPositionsOverlay({
     
     const fontSize = computeDynamicFontSize(distanceLabels, 11);
     const roleFontSize = computeDynamicFontSize(roleLabels, 12);
+    const fontFamily = exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY;
 
     return (
       <g data-layer="speaker-positions-front" pointerEvents="none">
@@ -452,7 +458,9 @@ export default function SpeakerPositionsOverlay({
                 x={xPx - leftOffset}
                 y={yLine - 8}
                 textAnchor="end"
-                style={{ fontSize, fill: "#1B1A1A" }}
+                fontFamily={fontFamily}
+                fontSize={fontSize}
+                fill="#1B1A1A"
               >
                 {leftCm}cm
               </text>
@@ -462,7 +470,9 @@ export default function SpeakerPositionsOverlay({
                 x={xPx + rightOffset}
                 y={yLine - 8}
                 textAnchor="start"
-                style={{ fontSize, fill: "#1B1A1A" }}
+                fontFamily={fontFamily}
+                fontSize={fontSize}
+                fill="#1B1A1A"
               >
                 {rightCm}cm
               </text>
@@ -472,7 +482,10 @@ export default function SpeakerPositionsOverlay({
                 x={xPx}
                 y={yLine + 16}
                 textAnchor="middle"
-                style={{ fontSize: roleFontSize, fill: "#1B1A1A", fontWeight: 700 }}
+                fontFamily={fontFamily}
+                fontSize={roleFontSize}
+                fill="#1B1A1A"
+                fontWeight={700}
               >
                 {role}
               </text>
@@ -482,7 +495,10 @@ export default function SpeakerPositionsOverlay({
                 x={xPx + 18}
                 y={yLine + 16}
                 textAnchor="start"
-                style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
+                fontFamily={fontFamily}
+                fontSize={fontSize}
+                fill="#3E4349"
+                fontWeight={400}
               >
                 {`H${hCm}cm`}
               </text>
@@ -530,8 +546,7 @@ export default function SpeakerPositionsOverlay({
     
     const fontSize = computeDynamicFontSize(distanceLabels, 11);
     const roleFontSize = computeDynamicFontSize(roleLabels, 12);
-
-
+    const fontFamily = exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY;
 
     return (
       <g data-layer="speaker-positions-back" pointerEvents="none">
@@ -561,7 +576,9 @@ export default function SpeakerPositionsOverlay({
                 x={xPx - 14}
                 y={distTextY}
                 textAnchor="end"
-                style={{ fontSize, fill: textFill }}
+                fontFamily={fontFamily}
+                fontSize={fontSize}
+                fill={textFill}
               >
                 {mToCm(s.xM)}cm
               </text>
@@ -571,7 +588,9 @@ export default function SpeakerPositionsOverlay({
                 x={xPx + 14}
                 y={distTextY}
                 textAnchor="start"
-                style={{ fontSize, fill: textFill }}
+                fontFamily={fontFamily}
+                fontSize={fontSize}
+                fill={textFill}
               >
                 {mToCm(W - s.xM)}cm
               </text>
@@ -581,7 +600,10 @@ export default function SpeakerPositionsOverlay({
                 x={xPx}
                 y={labelYpx}
                 textAnchor="middle"
-                style={{ fontSize: roleFontSize, fill: textFill, fontWeight: 700 }}
+                fontFamily={fontFamily}
+                fontSize={roleFontSize}
+                fill={textFill}
+                fontWeight={700}
               >
                 {s.role}
               </text>
@@ -590,7 +612,10 @@ export default function SpeakerPositionsOverlay({
                 x={xPx + 18}
                 y={labelYpx}
                 textAnchor="start"
-                style={{ fontSize, fill: "#3E4349", fontWeight: 400 }}
+                fontFamily={fontFamily}
+                fontSize={fontSize}
+                fill="#3E4349"
+                fontWeight={400}
               >
                 {`H${hCm}cm`}
               </text>
@@ -617,6 +642,7 @@ export default function SpeakerPositionsOverlay({
     const roleSize = calcFontSize(12, roomRect.width);
     const crowdedSize = getCrowdedFontSize(yList, baseSize);
     const crowdedRoleSize = Math.max(9, Math.min(roleSize, crowdedSize + 1));
+    const fontFamily = exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY;
 
     return (
       <g data-layer="speaker-positions-right" pointerEvents="none">
@@ -748,6 +774,7 @@ export default function SpeakerPositionsOverlay({
     const yList = overheadLeft.map(s => meterToCanvasY(s.position.y)).sort((a, b) => a - b);
     const baseSize = calcFontSize(11, roomRect.width);
     const crowdedSize = getCrowdedFontSize(yList, baseSize);
+    const fontFamily = exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY;
 
     const drawColumn = (list, rulerX, keyPrefix) => {
       if (!list.length) return null;
@@ -786,7 +813,9 @@ export default function SpeakerPositionsOverlay({
                 x={-distDx}
                 y={distY + stagger}
                 textAnchor="end"
-                style={{ fontSize: crowdedSize, fill: textFill }}
+                fontFamily={fontFamily}
+                fontSize={crowdedSize}
+                fill={textFill}
               >
                 {distBack}cm
               </text>
@@ -795,7 +824,9 @@ export default function SpeakerPositionsOverlay({
                 x={distDx}
                 y={distY + stagger}
                 textAnchor="start"
-                style={{ fontSize: crowdedSize, fill: textFill }}
+                fontFamily={fontFamily}
+                fontSize={crowdedSize}
+                fill={textFill}
               >
                 {distFront}cm
               </text>
@@ -931,6 +962,7 @@ export default function SpeakerPositionsOverlay({
           });
           
           const fontSize = computeDynamicFontSize(distanceLabels, 11);
+          const fontFamily = exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY;
 
           return (
             <g key={`oh-row-top`}>
@@ -957,7 +989,9 @@ export default function SpeakerPositionsOverlay({
                       x={xPx - 14}
                       y={distTextY}
                       textAnchor="end"
-                      style={{ fontSize, fill: textFill }}
+                      fontFamily={fontFamily}
+                      fontSize={fontSize}
+                      fill={textFill}
                     >
                       {mToCm(it.xM)}cm
                     </text>
@@ -966,7 +1000,9 @@ export default function SpeakerPositionsOverlay({
                       x={xPx + 14}
                       y={distTextY}
                       textAnchor="start"
-                      style={{ fontSize, fill: textFill }}
+                      fontFamily={fontFamily}
+                      fontSize={fontSize}
+                      fill={textFill}
                     >
                       {mToCm(W - it.xM)}cm
                     </text>
@@ -1099,7 +1135,10 @@ export default function SpeakerPositionsOverlay({
                 x={dotX}
                 y={dotY + 16}
                 textAnchor="middle"
-                style={{ fontSize: 13, fill: textFill, fontWeight: 700 }}
+                fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}
+                fontSize={13}
+                fill={textFill}
+                fontWeight={700}
               >
                 {roleText}
               </text>
@@ -1109,7 +1148,10 @@ export default function SpeakerPositionsOverlay({
                 x={dotX + 18}
                 y={dotY + 16}
                 textAnchor="start"
-                style={{ fontSize: 12, fill: "#3E4349", fontWeight: 400 }}
+                fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}
+                fontSize={12}
+                fill="#3E4349"
+                fontWeight={400}
               >
                 {heightText}
               </text>
@@ -1166,7 +1208,9 @@ export default function SpeakerPositionsOverlay({
                         x={-distDx}
                         y={distY + stagger}
                         textAnchor="end"
-                        style={{ fontSize: baseSize, fill: textFill }}
+                        fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}
+                        fontSize={baseSize}
+                        fill={textFill}
                       >
                         {distLeft}cm
                       </text>
@@ -1175,7 +1219,9 @@ export default function SpeakerPositionsOverlay({
                         x={distDx}
                         y={distY + stagger}
                         textAnchor="start"
-                        style={{ fontSize: baseSize, fill: textFill }}
+                        fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}
+                        fontSize={baseSize}
+                        fill={textFill}
                       >
                         {distRight}cm
                       </text>
@@ -1187,7 +1233,10 @@ export default function SpeakerPositionsOverlay({
                         x={0}
                         y={roleY}
                         textAnchor="middle"
-                        style={{ fontSize: roleSize, fill: textFill, fontWeight: 700 }}
+                        fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}
+                        fontSize={roleSize}
+                        fill={textFill}
+                        fontWeight={700}
                       >
                         {roleText}
                       </text>
@@ -1196,7 +1245,10 @@ export default function SpeakerPositionsOverlay({
                         x={hDx}
                         y={roleY}
                         textAnchor="start"
-                        style={{ fontSize: baseSize, fill: "#3E4349", fontWeight: 400 }}
+                        fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}
+                        fontSize={baseSize}
+                        fill="#3E4349"
+                        fontWeight={400}
                       >
                         {heightText}
                       </text>

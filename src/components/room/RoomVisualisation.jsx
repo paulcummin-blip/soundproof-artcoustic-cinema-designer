@@ -7038,6 +7038,7 @@ return (
                 roomRect={roomRect}
                 getSpeakerVisibility={getSpeakerVisibility}
                 getCanonicalRole={getCanonicalRole}
+                exportMode={exportMode}
               />
             )}
 
