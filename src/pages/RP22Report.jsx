@@ -409,12 +409,15 @@ function RP22ReportInner() {
                     return;
                 }
                 
-                // Get bbox from live DOM element (not clone)
-                const content = svgElement.querySelector('g') || svgElement;
+                // Get bbox from live DOM element (not clone) - try export-specific selectors first
+                let boundsNode = svgElement.querySelector('[data-export-bounds]') || 
+                                 svgElement.querySelector('#export-bounds') || 
+                                 svgElement.querySelector('g') || 
+                                 svgElement;
                 let bbox;
                 
                 try {
-                    bbox = content.getBBox();
+                    bbox = boundsNode.getBBox();
                 } catch (e) {
                     bbox = null;
                 }
@@ -455,8 +458,9 @@ function RP22ReportInner() {
                     return;
                 }
                 
+                // Add adaptive padding (8% of shortest side, minimum 20 units)
                 const shortestSide = Math.min(bbox.width, bbox.height);
-                const padding = shortestSide * 0.07;
+                const padding = Math.max(shortestSide * 0.08, 20);
                 
                 const viewBoxX = bbox.x - padding;
                 const viewBoxY = bbox.y - padding;
@@ -1274,11 +1278,11 @@ function RP22ReportInner() {
                                 <div
                                     style={{
                                         width: '100%',
-                                        height: '240mm',
+                                        height: '250mm',
                                         border: '1px solid #DCDBD6',
                                         borderRadius: '10px',
-                                        padding: '6mm',
-                                        background: '#FFFFFF',
+                                        padding: '10mm',
+                                        background: '#F8F8F7',
                                         boxSizing: 'border-box',
                                     }}
                                 >
