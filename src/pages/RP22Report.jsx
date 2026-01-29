@@ -517,9 +517,9 @@ function RP22ReportInner() {
                     return;
                 }
                 
-                // Tight padding (2% of shortest side, minimum 10 units)
+                // Clean plan: tight padding (3%, min 12)
                 const shortestSide = Math.min(bbox.width, bbox.height);
-                const padding = Math.max(shortestSide * 0.02, 10);
+                const padding = Math.max(shortestSide * 0.03, 12);
                 
                 const viewBoxX = bbox.x - padding;
                 const viewBoxY = bbox.y - padding;
@@ -725,9 +725,9 @@ function RP22ReportInner() {
                     return;
                 }
                 
-                // Tight padding (2% of shortest side, minimum 10 units)
+                // Room dimensions plan: medium padding (5%, min 18)
                 const shortestSide = Math.min(bbox.width, bbox.height);
-                const padding = Math.max(shortestSide * 0.02, 10);
+                const padding = Math.max(shortestSide * 0.05, 18);
                 
                 const viewBoxX = bbox.x - padding;
                 const viewBoxY = bbox.y - padding;
@@ -921,8 +921,9 @@ function RP22ReportInner() {
                     return;
                 }
                 
+                // Speaker dimensions plan: largest padding (8%, min 24) to prevent leader/label clipping
                 const shortestSide = Math.min(bbox.width, bbox.height);
-                const padding = Math.max(shortestSide * 0.02, 10);
+                const padding = Math.max(shortestSide * 0.08, 24);
                 
                 const viewBoxX = bbox.x - padding;
                 const viewBoxY = bbox.y - padding;
