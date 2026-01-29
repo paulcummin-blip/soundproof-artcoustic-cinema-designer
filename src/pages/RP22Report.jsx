@@ -86,6 +86,26 @@ function RP22ReportInner() {
     const dolbyLayout = app?.dolbyLayout || "5.1";
     const mlpBasis = app?.mlpBasis || "front";
 
+    // --- Screen label helpers (print) ---
+    const cleanAspectLabel = (v) => {
+        const s = String(v ?? "").trim();
+        if (!s) return "";
+        // normalise common forms
+        if (s === "16x9" || s === "16/9") return "16:9";
+        if (s === "235" || s === "2.35" || s === "2.35/1" || s === "2.35:1") return "2.35:1";
+        if (s === "239" || s === "2.39" || s === "2.39/1" || s === "2.39:1") return "2.39:1";
+        return s;
+    };
+
+    const formatScreenChoiceLabel = (scr) => {
+        const inches = Number(scr?.visibleWidthInches || scr?.diagonalInches || scr?.sizeInches);
+        const ratio = cleanAspectLabel(scr?.aspectRatio);
+        const inchesTxt = Number.isFinite(inches) && inches > 0 ? `${Math.round(inches)}"` : "";
+        const ratioTxt = ratio ? ratio : "";
+        const joined = [inchesTxt, ratioTxt].filter(Boolean).join(" ");
+        return joined || "Not specified";
+    };
+
     // Optional subs (won't break if missing)
     const frontSubsCfg = safeObj(app?.frontSubsCfg);
     const rearSubsCfg = safeObj(app?.rearSubsCfg);
@@ -135,6 +155,7 @@ function RP22ReportInner() {
             0;
 
         // Wall distance (screenFrontPlaneM is already the distance from front wall)
+        const wallDistM = screenFrontPlaneM;
         const wallCm = (screenFrontPlaneM * 100).toFixed(0);
         const wallIn = (screenFrontPlaneM * 39.3701).toFixed(1);
 
@@ -144,10 +165,12 @@ function RP22ReportInner() {
             viewHm,
             overallWm,
             overallHm,
-            horizDeg: horizDeg ?? 0,
-            vertDeg,
+            horizontalDeg: horizDeg ?? 0,
+            verticalDeg,
+            wallDistM,
             wallCm,
-            wallIn
+            wallIn,
+            screenChoiceLabel: formatScreenChoiceLabel(app?.screen)
         };
     }, [app?.mlp?.y, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.visibleWidthIn, app?.screen?.aspectRatio, stableDimensions.length]);
 
@@ -2031,10 +2054,7 @@ function RP22ReportInner() {
                             </div>
 
                             {/* Screen & Viewing Geometry */}
-                            <div style={{
-                                maxWidth: '185mm',
-                                margin: '8mm auto 0',
-                            }}>
+                            <div style={{ maxWidth: '185mm', margin: '8mm auto 0' }}>
                                 <div
                                     style={{
                                         border: '1px solid #E6E4DD',
@@ -2055,75 +2075,88 @@ function RP22ReportInner() {
                                             textAlign: 'center',
                                         }}
                                     >
-                                        Screen & Viewing Geometry
+                                        Screen &amp; Viewing Geometry
                                     </div>
 
-                                    <div style={{ display: 'flex', gap: '10mm' }}>
-                                        {/* Left: Screen size */}
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 700, fontSize: '10.5pt', color: '#1B1A1A', marginBottom: '4mm', fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                Screen size
-                                            </div>
-                                            {(() => {
-                                                if (!screenMetricsForPrint?.ok) {
-                                                    return (
-                                                        <div style={{ fontSize: '9pt', color: '#625143', lineHeight: 1.5 }}>
-                                                            <div>Not specified</div>
-                                                        </div>
-                                                    );
-                                                }
-                                                
-                                                const viewWm = screenMetricsForPrint.viewWm;
-                                                const viewHm = screenMetricsForPrint.viewHm;
-                                                const overallWm = screenMetricsForPrint.overallWm;
-                                                const overallHm = screenMetricsForPrint.overallHm;
-                                                
-                                                const cmW = Math.round(viewWm * 100);
-                                                const cmH = Math.round(viewHm * 100);
-                                                const inW = (viewWm * 39.3701).toFixed(1);
-                                                const inH = (viewHm * 39.3701).toFixed(1);
-                                                
-                                                const overallCmW = Math.round(overallWm * 100);
-                                                const overallCmH = Math.round(overallHm * 100);
-                                                const overallInW = (overallWm * 39.3701).toFixed(1);
-                                                const overallInH = (overallHm * 39.3701).toFixed(1);
-                                                
-                                                return (
-                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.5 }}>
-                                                        <div style={{ marginBottom: '2mm' }}><strong style={{ color: '#1B1A1A' }}>Viewable area</strong></div>
-                                                        <div>{cmW} × {cmH} cm ({inW}" × {inH}")</div>
-                                                        <div style={{ marginTop: '3mm', marginBottom: '2mm' }}><strong style={{ color: '#1B1A1A' }}>Overall with border</strong></div>
-                                                        <div>{overallCmW} × {overallCmH} cm ({overallInW}" × {overallInH}")</div>
-                                                    </div>
-                                                );
-                                            })()}
-                                        </div>
+                                    {(() => {
+                                        // Prefer the resolved snapshot created before export
+                                        const snap = screenMetricsForPrint;
 
-                                        {/* Right: Viewing angles + wall distance */}
-                                        <div style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: 700, fontSize: '10.5pt', color: '#1B1A1A', marginBottom: '4mm', fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                Viewing geometry
-                                            </div>
-                                            {(() => {
-                                                if (!screenMetricsForPrint?.ok) {
-                                                    return (
-                                                        <div style={{ fontSize: '9pt', color: '#625143', lineHeight: 1.5 }}>
-                                                            <div>Not specified</div>
-                                                        </div>
-                                                    );
-                                                }
-                                                
-                                                return (
-                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.5 }}>
-                                                        <div style={{ marginBottom: '1.5mm' }}><strong style={{ color: '#1B1A1A' }}>Horizontal viewing angle:</strong> {screenMetricsForPrint.horizDeg.toFixed(1)}°</div>
-                                                        <div style={{ marginBottom: '1.5mm' }}><strong style={{ color: '#1B1A1A' }}>Vertical viewing angle:</strong> {screenMetricsForPrint.vertDeg.toFixed(1)}°</div>
-                                                        <div style={{ marginTop: '3mm', marginBottom: '2mm' }}><strong style={{ color: '#1B1A1A' }}>Distance from front wall</strong></div>
-                                                        <div>{screenMetricsForPrint.wallCm} cm ({screenMetricsForPrint.wallIn}")</div>
+                                        const viewWm = Number(snap?.viewWm);
+                                        const viewHm = Number(snap?.viewHm);
+                                        const overallWm = Number(snap?.overallWm);
+                                        const overallHm = Number(snap?.overallHm);
+
+                                        const horizontalDeg = Number(snap?.horizontalDeg);
+                                        const verticalDeg = Number(snap?.verticalDeg);
+                                        const wallDistM = Number(snap?.wallDistM);
+
+                                        const choiceLabel = String(snap?.screenChoiceLabel || formatScreenChoiceLabel(screen) || "Not specified");
+
+                                        const hasViewable = Number.isFinite(viewWm) && viewWm > 0 && Number.isFinite(viewHm) && viewHm > 0;
+                                        const hasOverall = Number.isFinite(overallWm) && overallWm > 0 && Number.isFinite(overallHm) && overallHm > 0;
+                                        const hasAngles = Number.isFinite(horizontalDeg) && horizontalDeg > 0 && Number.isFinite(verticalDeg) && verticalDeg > 0;
+                                        const hasWallDist = Number.isFinite(wallDistM) && wallDistM > 0;
+
+                                        const fmtCm = (m) => `${Math.round(m * 100)}`;
+                                        const fmtIn = (m) => `${(m * 39.3701).toFixed(1)}`;
+
+                                        return (
+                                            <div style={{ display: 'flex', gap: '8mm' }}>
+                                                {/* Left: Screen size */}
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: 600, fontSize: '10pt', color: '#1B1A1A', marginBottom: '3mm' }}>
+                                                        Screen size — {choiceLabel}
                                                     </div>
-                                                );
-                                            })()}
-                                        </div>
-                                    </div>
+
+                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.55 }}>
+                                                        <div><strong>Viewable area</strong></div>
+                                                        {hasViewable ? (
+                                                            <div>
+                                                                {fmtCm(viewWm)} × {fmtCm(viewHm)} cm ({fmtIn(viewWm)}" × {fmtIn(viewHm)}")
+                                                            </div>
+                                                        ) : (
+                                                            <div>Not specified</div>
+                                                        )}
+
+                                                        <div style={{ marginTop: '2mm' }}><strong>Overall with border</strong></div>
+                                                        {hasOverall ? (
+                                                            <div>
+                                                                {fmtCm(overallWm)} × {fmtCm(overallHm)} cm ({fmtIn(overallWm)}" × {fmtIn(overallHm)}")
+                                                            </div>
+                                                        ) : (
+                                                            <div>Not specified</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                {/* Right: Viewing geometry */}
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: 600, fontSize: '10pt', color: '#1B1A1A', marginBottom: '3mm' }}>
+                                                        Viewing geometry
+                                                    </div>
+
+                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.55 }}>
+                                                        <div>
+                                                            <strong>Horizontal viewing angle:</strong>{" "}
+                                                            {hasAngles ? `${horizontalDeg.toFixed(1)}°` : "Not specified"}
+                                                        </div>
+                                                        <div>
+                                                            <strong>Vertical viewing angle:</strong>{" "}
+                                                            {hasAngles ? `${verticalDeg.toFixed(1)}°` : "Not specified"}
+                                                        </div>
+
+                                                        <div style={{ marginTop: '2mm' }}><strong>Distance from front wall</strong></div>
+                                                        {hasWallDist ? (
+                                                            <div>{Math.round(wallDistM * 100)} cm ({(wallDistM * 39.3701).toFixed(1)}")</div>
+                                                        ) : (
+                                                            <div>Not specified</div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                             </div>
 
