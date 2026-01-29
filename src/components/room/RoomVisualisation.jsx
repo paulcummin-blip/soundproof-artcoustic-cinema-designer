@@ -6669,7 +6669,9 @@ return (
                   x={roomRect.x + roomRect.width / 2}
                   y={roomRect.y - 28}
                   textAnchor="middle"
-                  style={{ fontSize: 12, fill: "#1B1A1A" }}
+                  fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                  fontSize={12}
+                  fill="#1B1A1A"
                 >
                   {`${(widthM ?? 0).toFixed(2)} m`}
                 </text>
@@ -6690,7 +6692,9 @@ return (
                   y={roomRect.y + roomRect.height / 2}
                   textAnchor="middle"
                   transform={`rotate(-90 ${roomRect.x - 28} ${roomRect.y + roomRect.height / 2})`}
-                  style={{ fontSize: 12, fill: "#1B1A1A" }}
+                  fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                  fontSize={12}
+                  fill="#1B1A1A"
                 >
                   {`${(lengthM ?? 0).toFixed(2)} m`}
                 </text>
@@ -6803,7 +6807,7 @@ return (
                     textAnchor="middle"
                     fontSize={fontSize}
                     fill={rulerColor}
-                    fontFamily="system-ui, sans-serif"
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
                   >
                     {distLeftWall.toFixed(2)}m
                   </text>
@@ -6815,7 +6819,7 @@ return (
                     textAnchor="middle"
                     fontSize={fontSize}
                     fill={rulerColor}
-                    fontFamily="system-ui, sans-serif"
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
                   >
                     {distRightWall.toFixed(2)}m
                   </text>
@@ -6856,7 +6860,7 @@ return (
                     textAnchor="middle"
                     fontSize={fontSize}
                     fill={rulerColor}
-                    fontFamily="system-ui, sans-serif"
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
                     transform={`rotate(-90 ${mlpX_px - labelOffset} ${(screenY_px + mlpY_px) / 2})`}
                   >
                     {distScreen.toFixed(2)}m
@@ -6869,7 +6873,7 @@ return (
                     textAnchor="middle"
                     fontSize={fontSize}
                     fill={rulerColor}
-                    fontFamily="system-ui, sans-serif"
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
                     transform={`rotate(-90 ${mlpX_px + labelOffset} ${(mlpY_px + roomRect.y + roomRect.height) / 2})`}
                   >
                     {distBackWall.toFixed(2)}m
@@ -6910,7 +6914,7 @@ return (
                     textAnchor="middle"
                     fontSize={fontSize}
                     fill={rulerColor}
-                    fontFamily="system-ui, sans-serif"
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
                     transform={`rotate(-90 ${secondaryRulerX_px + labelOffset} ${(roomRect.y + mlpY_px) / 2})`}
                   >
                     {distFrontWall.toFixed(2)}m
