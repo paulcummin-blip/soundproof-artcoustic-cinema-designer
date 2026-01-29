@@ -1945,7 +1945,7 @@ function RP22ReportInner() {
                             <div
                                 style={{
                                     maxWidth: "460px",
-                                    margin: "0 auto 12mm auto",
+                                    margin: "0 auto 18mm auto",
                                     textAlign: "center",
                                 }}
                             >
@@ -1993,7 +1993,7 @@ function RP22ReportInner() {
                             {/* Master stack wrapper (all 4 panels + footer) */}
                             <div style={{ 
                                 maxWidth: '185mm',
-                                margin: '16mm auto 0',
+                                margin: '0 auto 0',
                                 display: 'flex',
                                 flexDirection: 'column',
                                 gap: '8mm',
