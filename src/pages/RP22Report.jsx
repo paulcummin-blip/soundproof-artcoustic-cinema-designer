@@ -2072,15 +2072,13 @@ function RP22ReportInner() {
                                         })()}
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Screen & Viewing Geometry */}
-                            <div style={{ maxWidth: '185mm', margin: '8mm auto 0' }}>
+                                {/* Screen & Viewing Geometry */}
                                 <div
                                     style={{
                                         border: '1.5px solid #D9D5CE',
                                         borderRadius: '10px',
-                                        padding: '7mm 9mm',
+                                        padding: '8mm 10mm',
                                         background: '#FBFAF8',
                                         width: '100%',
                                     }}
@@ -2088,10 +2086,10 @@ function RP22ReportInner() {
                                 >
                                     <div
                                         style={{
-                                            fontSize: '14pt',
+                                            fontSize: '15pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
-                                            marginBottom: '5mm',
+                                            marginBottom: '4mm',
                                             textAlign: 'center',
                                         }}
                                     >
