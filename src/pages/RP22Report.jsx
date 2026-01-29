@@ -794,136 +794,83 @@ function RP22ReportInner() {
         };
     }, [isPrinting, planDimsImageDataUrl]);
 
-    // Capture speaker dimensions plan when printing starts (with retry logic)
+    // Capture speaker positions plan when printing starts (with retry logic)
     useEffect(() => {
         if (!isPrinting || planSpeakerDimsImageDataUrl !== null) return;
-        
-        setExportStatus("Capturing speaker dims plan: waiting for SVG…");
-        
+
+        setExportStatus("Capturing speaker positions plan: waiting for SVG…");
+
         let attempts = 0;
         const maxAttempts = 20;
         let retryTimer = null;
-        
+
         const attemptCapture = async () => {
             attempts++;
-            
+
             try {
                 const planElement = document.querySelector('[data-plan-capture-speaker-dims]');
                 if (!planElement) {
-                    setExportStatus(`Capturing speaker dims: container not found (attempt ${attempts}/${maxAttempts})`);
+                    setExportStatus(`Capturing speaker positions: container not found (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
                         return;
                     }
-                    setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
+                    setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
                     setPlanSpeakerDimsImageDataUrl('__SKIP__');
                     return;
                 }
-                
+
                 const svgElement = planElement.querySelector('svg');
                 if (!svgElement) {
-                    setExportStatus(`Capturing speaker dims: SVG not found (attempt ${attempts}/${maxAttempts})`);
+                    setExportStatus(`Capturing speaker positions: SVG not found (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
                         return;
                     }
-                    setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
+                    setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
                     setPlanSpeakerDimsImageDataUrl('__SKIP__');
                     return;
                 }
-                
-                // Build union bbox from meaningful content
+
+                // SPEAKER POSITIONS: Use full SVG viewBox (don't tight-crop to room box)
                 let bbox = null;
-                
-                try {
-                    const exportBounds = svgElement.querySelector('#export-bounds');
-                    if (exportBounds) {
-                        bbox = exportBounds.getBBox();
+
+                // Parse viewBox directly from SVG
+                const viewBoxAttr = svgElement.getAttribute('viewBox');
+                if (viewBoxAttr) {
+                    const parts = viewBoxAttr.split(/\s+/);
+                    if (parts.length === 4) {
+                        bbox = {
+                            x: parseFloat(parts[0]),
+                            y: parseFloat(parts[1]),
+                            width: parseFloat(parts[2]),
+                            height: parseFloat(parts[3])
+                        };
                     }
-                } catch (e) {
-                    bbox = null;
                 }
-                
+
+                // Fallback: getBBox if no viewBox
                 if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
                     try {
-                        let svgWidth = 1200, svgHeight = 800;
-                        const vb = svgElement.getAttribute('viewBox');
-                        if (vb) {
-                            const parts = vb.split(/\s+/);
-                            if (parts.length === 4) {
-                                svgWidth = parseFloat(parts[2]);
-                                svgHeight = parseFloat(parts[3]);
-                            }
-                        } else {
-                            const rect = svgElement.getBoundingClientRect();
-                            if (rect.width > 0) svgWidth = rect.width;
-                            if (rect.height > 0) svgHeight = rect.height;
-                        }
-                        
-                        const candidates = svgElement.querySelectorAll('rect, path, line, polyline, polygon, circle, ellipse');
-                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                        let count = 0;
-                        
-                        candidates.forEach(el => {
-                            const opacity = el.getAttribute('opacity');
-                            const display = el.getAttribute('display');
-                            if (opacity === '0' || display === 'none') return;
-                            
-                            try {
-                                const b = el.getBBox();
-                                if (!b || b.width <= 0 || b.height <= 0) return;
-                                if (b.width > svgWidth * 0.9 || b.height > svgHeight * 0.9) return;
-                                
-                                minX = Math.min(minX, b.x);
-                                minY = Math.min(minY, b.y);
-                                maxX = Math.max(maxX, b.x + b.width);
-                                maxY = Math.max(maxY, b.y + b.height);
-                                count++;
-                            } catch (e) {}
-                        });
-                        
-                        if (count > 0 && Number.isFinite(minX) && Number.isFinite(maxX)) {
-                            bbox = {
-                                x: minX,
-                                y: minY,
-                                width: maxX - minX,
-                                height: maxY - minY
-                            };
-                        }
+                        bbox = svgElement.getBBox();
                     } catch (e) {
                         bbox = null;
                     }
                 }
-                
+
                 if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    const viewBoxAttr = svgElement.getAttribute('viewBox');
-                    if (viewBoxAttr) {
-                        const parts = viewBoxAttr.split(/\s+/);
-                        if (parts.length === 4) {
-                            bbox = {
-                                x: parseFloat(parts[0]),
-                                y: parseFloat(parts[1]),
-                                width: parseFloat(parts[2]),
-                                height: parseFloat(parts[3])
-                            };
-                        }
-                    }
-                }
-                
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    setExportStatus(`Capturing speaker dims: SVG bbox invalid (attempt ${attempts}/${maxAttempts})`);
+                    setExportStatus(`Capturing speaker positions: SVG bbox invalid (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
                         return;
                     }
-                    setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
+                    setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
                     setPlanSpeakerDimsImageDataUrl('__SKIP__');
                     return;
                 }
-                
-                // Speaker dimensions plan: largest padding (8%, min 24) to prevent leader/label clipping
-                const shortestSide = Math.min(bbox.width, bbox.height);
-                const padding = Math.max(shortestSide * 0.08, 24);
+
+                // Speaker positions plan: small fixed padding (leaders/labels are inside SVG viewBox)
+                const padding = 12;
                 
                 const viewBoxX = bbox.x - padding;
                 const viewBoxY = bbox.y - padding;
