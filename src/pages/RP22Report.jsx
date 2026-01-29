@@ -1595,7 +1595,7 @@ function RP22ReportInner() {
                         </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan" className="print-page-break-after">
+                            <section id="pdf-room-plan" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <h2
                                     style={{
                                         fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
@@ -1604,29 +1604,31 @@ function RP22ReportInner() {
                                         letterSpacing: '0.3px',
                                         color: '#1B1A1A',
                                         margin: '0 0 6mm 0',
+                                        background: 'transparent',
+                                        padding: 0,
                                     }}
                                 >
                                     Room plan
                                 </h2>
 
-                                <div style={{ width: '100%' }}>
-                                    <img
-                                        src={planImageDataUrl}
-                                        alt="Room plan"
-                                        style={{
-                                            width: '100%',
-                                            height: 'auto',
-                                            objectFit: 'contain',
-                                            display: 'block',
-                                            margin: '0 auto',
-                                        }}
-                                    />
-                                </div>
+                                <img
+                                    src={planImageDataUrl}
+                                    alt="Room plan"
+                                    style={{
+                                        width: '100%',
+                                        height: 'auto',
+                                        objectFit: 'contain',
+                                        display: 'block',
+                                        margin: '0',
+                                        padding: 0,
+                                        background: 'transparent',
+                                    }}
+                                />
                             </section>
                         )}
 
                         {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-dims" className="print-page-break-after">
+                            <section id="pdf-room-plan-dims" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <h2
                                     style={{
                                         fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
@@ -1635,24 +1637,26 @@ function RP22ReportInner() {
                                         letterSpacing: '0.3px',
                                         color: '#1B1A1A',
                                         margin: '0 0 6mm 0',
+                                        background: 'transparent',
+                                        padding: 0,
                                     }}
                                 >
                                     Room plan (dimensions)
                                 </h2>
 
-                                <div style={{ width: '100%' }}>
-                                    <img
-                                        src={planDimsImageDataUrl}
-                                        alt="Room plan (dimensions)"
-                                        style={{
-                                            width: '100%',
-                                            height: 'auto',
-                                            objectFit: 'contain',
-                                            display: 'block',
-                                            margin: '0 auto',
-                                        }}
-                                    />
-                                </div>
+                                <img
+                                    src={planDimsImageDataUrl}
+                                    alt="Room plan (dimensions)"
+                                    style={{
+                                        width: '100%',
+                                        height: 'auto',
+                                        objectFit: 'contain',
+                                        display: 'block',
+                                        margin: '0',
+                                        padding: 0,
+                                        background: 'transparent',
+                                    }}
+                                />
                             </section>
                         )}
 
