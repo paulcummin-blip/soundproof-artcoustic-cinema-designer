@@ -342,11 +342,11 @@ function RP22ReportInner() {
         if (!isPrinting) return false;
         
         const roomCardCount = orderedParams.length;
-        const seatsOk = !hasSeats || seats.length > 0;
-        const planOk = planEnabled ? (typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0) : true;
+        const seatsOk = (seats.length === 0) ? true : (Object.keys(app?.seatMetricsById || {}).length >= seats.length);
+        const planOk = planEnabled ? (typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__') : true;
         
         return roomCardCount > 0 && seatsOk && planOk;
-    }, [isPrinting, orderedParams.length, hasSeats, seats.length, planEnabled, planImageDataUrl]);
+    }, [isPrinting, orderedParams.length, seats.length, planEnabled, planImageDataUrl, app?.seatMetricsById]);
 
     // Trigger print when ready (with print-once guard)
     useEffect(() => {
@@ -392,10 +392,8 @@ function RP22ReportInner() {
                         retryTimer = setTimeout(attemptCapture, 100);
                         return;
                     }
-                    setExportStatus("Export failed: plan capture never became ready");
-                    setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
-                    setPlanImageDataUrl('');
-                    setIsPrinting(false);
+                    setExportStatus("Plan skipped: continuing without plan");
+                    setPlanImageDataUrl('__SKIP__');
                     return;
                 }
                 
@@ -406,28 +404,54 @@ function RP22ReportInner() {
                         retryTimer = setTimeout(attemptCapture, 100);
                         return;
                     }
-                    setExportStatus("Export failed: plan capture never became ready");
-                    setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
-                    setPlanImageDataUrl('');
-                    setIsPrinting(false);
+                    setExportStatus("Plan skipped: continuing without plan");
+                    setPlanImageDataUrl('__SKIP__');
                     return;
                 }
                 
-                const svgClone = svgElement.cloneNode(true);
-                const contentGroup = svgClone.querySelector('g') || svgClone;
-                const bbox = contentGroup.getBBox();
+                // Get bbox from live DOM element (not clone)
+                const content = svgElement.querySelector('g') || svgElement;
+                let bbox;
                 
-                // Check if SVG has valid dimensions
+                try {
+                    bbox = content.getBBox();
+                } catch (e) {
+                    bbox = null;
+                }
+                
+                // Fallback 1: Use viewBox if bbox is invalid
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    const viewBoxAttr = svgElement.getAttribute('viewBox');
+                    if (viewBoxAttr) {
+                        const parts = viewBoxAttr.split(/\s+/);
+                        if (parts.length === 4) {
+                            bbox = {
+                                x: parseFloat(parts[0]),
+                                y: parseFloat(parts[1]),
+                                width: parseFloat(parts[2]),
+                                height: parseFloat(parts[3])
+                            };
+                        }
+                    }
+                }
+                
+                // Fallback 2: Use getBoundingClientRect
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    const rect = svgElement.getBoundingClientRect();
+                    if (rect.width > 0 && rect.height > 0) {
+                        bbox = { x: 0, y: 0, width: rect.width, height: rect.height };
+                    }
+                }
+                
+                // Check if we have valid dimensions
                 if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
                     setExportStatus(`Capturing plan: SVG bbox invalid (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
                         return;
                     }
-                    setExportStatus("Export failed: plan capture never became ready");
-                    setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
-                    setPlanImageDataUrl('');
-                    setIsPrinting(false);
+                    setExportStatus("Plan skipped: continuing without plan");
+                    setPlanImageDataUrl('__SKIP__');
                     return;
                 }
                 
@@ -439,6 +463,8 @@ function RP22ReportInner() {
                 const viewBoxW = bbox.width + (2 * padding);
                 const viewBoxH = bbox.height + (2 * padding);
                 
+                // Now clone and apply the computed viewBox
+                const svgClone = svgElement.cloneNode(true);
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 svgClone.setAttribute('width', '100%');
@@ -449,10 +475,13 @@ function RP22ReportInner() {
                 const url = URL.createObjectURL(svgBlob);
                 
                 const img = new Image();
+                img.crossOrigin = 'anonymous';
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    canvas.width = 2400;
-                    canvas.height = 2400 * (viewBoxH / viewBoxW);
+                    const targetW = 2400;
+                    const targetH = Math.round(targetW * (viewBoxH / viewBoxW));
+                    canvas.width = targetW;
+                    canvas.height = targetH;
                     const ctx = canvas.getContext('2d');
                     ctx.fillStyle = '#F8F8F7';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -467,10 +496,8 @@ function RP22ReportInner() {
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
                     } else {
-                        setExportStatus("Export failed: plan capture never became ready");
-                        setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
-                        setPlanImageDataUrl('');
-                        setIsPrinting(false);
+                        setExportStatus("Plan skipped: continuing without plan");
+                        setPlanImageDataUrl('__SKIP__');
                     }
                     URL.revokeObjectURL(url);
                 };
@@ -480,10 +507,8 @@ function RP22ReportInner() {
                 if (attempts < maxAttempts) {
                     retryTimer = setTimeout(attemptCapture, 100);
                 } else {
-                    setExportStatus("Export failed: plan capture never became ready");
-                    setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
-                    setPlanImageDataUrl('');
-                    setIsPrinting(false);
+                    setExportStatus("Plan skipped: continuing without plan");
+                    setPlanImageDataUrl('__SKIP__');
                 }
             }
         };
@@ -1240,7 +1265,7 @@ function RP22ReportInner() {
                         </div>
                         </section>
 
-                        {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && (
+                        {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
                             <section className="print-page-break-after">
                                 <h2 style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: '14pt', margin: '0 0 6mm 0' }}>
                                     Room plan
