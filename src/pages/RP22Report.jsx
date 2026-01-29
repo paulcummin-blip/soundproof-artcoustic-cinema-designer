@@ -130,7 +130,7 @@ function RP22ReportInner() {
             // Inputs (same as ViewingAnglePanel)
             const mlpY_m = app?.mlp?.y ?? stableDimensions.length * 0.58;
             const screenFrontPlaneM = app?.screenFrontPlaneM ?? app?.screen?.frontPlaneYm ?? null;
-            const visibleWidthInches = app?.screen?.visibleWidthInches ?? app?.screen?.visibleWidthIn ?? null;
+            const visibleWidthInches = Number(app?.screen?.visibleWidthInches);
             const aspectRatio = app?.screen?.aspectRatio ?? "16:9";
 
             // Check if we have the minimum required data
@@ -163,9 +163,9 @@ function RP22ReportInner() {
 
             // Calculate vertical viewing angle
             const viewerDistance = Math.abs(mlpY_m - screenFrontPlaneM);
-            const vertDeg = viewerDistance > 0 ? 
-                2 * Math.atan(viewHm / (2 * viewerDistance)) * (180 / Math.PI) : 
-                0;
+            const verticalDeg = viewerDistance > 0
+                ? (2 * Math.atan(viewHm / (2 * viewerDistance)) * (180 / Math.PI))
+                : 0;
 
             // Wall distance (screenFrontPlaneM is already the distance from front wall)
             const wallDistM = screenFrontPlaneM;
@@ -2117,8 +2117,8 @@ function RP22ReportInner() {
 
                                         const hasViewable = Number.isFinite(viewWm) && viewWm > 0 && Number.isFinite(viewHm) && viewHm > 0;
                                         const hasOverall = Number.isFinite(overallWm) && overallWm > 0 && Number.isFinite(overallHm) && overallHm > 0;
-                                        const hasAngles = Number.isFinite(horizontalDeg) && horizontalDeg > 0 && Number.isFinite(verticalDeg) && verticalDeg > 0;
-                                        const hasWallDist = Number.isFinite(wallDistM) && wallDistM > 0;
+                                        const hasAngles = Number.isFinite(horizontalDeg) && Number.isFinite(verticalDeg);
+                                        const hasWallDist = Number.isFinite(wallDistM) && wallDistM >= 0;
 
                                         const fmtCm = (m) => `${Math.round(m * 100)}`;
                                         const fmtIn = (m) => `${(m * 39.3701).toFixed(1)}`;
