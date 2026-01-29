@@ -523,8 +523,8 @@ function RP22ReportInner() {
                 const svgClone = svgElement.cloneNode(true);
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.setAttribute('width', '100%');
-                svgClone.setAttribute('height', '100%');
+                svgClone.setAttribute('width', String(viewBoxW));
+                svgClone.setAttribute('height', String(viewBoxH));
                 
                 const svgString = new XMLSerializer().serializeToString(svgClone);
                 const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -535,15 +535,12 @@ function RP22ReportInner() {
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
                     
-                    // Use A4-ish aspect ratio so plan fills the page better
-                    const targetW = 2400;
-                    
-                    // Keep proportional to cropped viewBox, but clamp to sensible range
-                    let targetH = Math.round(targetW * (viewBoxH / viewBoxW));
-                    targetH = Math.max(2600, Math.min(3400, targetH));
+                    // Keep exact aspect ratio from the cropped viewBox
+                    const targetW = 3000;
+                    const ratio = viewBoxH / viewBoxW;
                     
                     canvas.width = targetW;
-                    canvas.height = targetH;
+                    canvas.height = Math.round(targetW * ratio);
                     const ctx = canvas.getContext('2d');
                     ctx.fillStyle = '#F8F8F7';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -1366,8 +1363,10 @@ function RP22ReportInner() {
                                             src={planImageDataUrl}
                                             alt="Room plan"
                                             style={{
-                                                width: '100%',
-                                                height: '100%',
+                                                maxWidth: '100%',
+                                                maxHeight: '100%',
+                                                width: 'auto',
+                                                height: 'auto',
                                                 objectFit: 'contain',
                                                 objectPosition: 'center',
                                                 display: 'block',
