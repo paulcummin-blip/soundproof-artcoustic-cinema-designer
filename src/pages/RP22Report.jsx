@@ -25,6 +25,7 @@ function RP22ReportInner() {
     const [isPrinting, setIsPrinting] = useState(false);
     const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
     const [planDimsImageDataUrl, setPlanDimsImageDataUrl] = useState(null);
+    const [planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl] = useState(null);
     const [hasPrintedOnce, setHasPrintedOnce] = useState(false);
     const [exportStatus, setExportStatus] = useState("Idle");
     const [exportDebug, setExportDebug] = useState({ isPrinting: false, planLen: 0, printReady: false });
@@ -36,6 +37,8 @@ function RP22ReportInner() {
             setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
             setIsPrinting(false);
             setPlanImageDataUrl(null);
+            setPlanDimsImageDataUrl(null);
+            setPlanSpeakerDimsImageDataUrl(null);
         };
         window.addEventListener('afterprint', onAfterPrint);
         return () => window.removeEventListener('afterprint', onAfterPrint);
@@ -346,10 +349,11 @@ function RP22ReportInner() {
         const seatsOk = (seats.length === 0) ? true : (Object.keys(app?.seatMetricsById || {}).length >= seats.length);
         const cleanOk = planEnabled ? (typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0) : true;
         const dimsOk = planEnabled ? (typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0) : true;
-        const planOk = cleanOk && dimsOk;
+        const speakerDimsOk = planEnabled ? (typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0) : true;
+        const planOk = cleanOk && dimsOk && speakerDimsOk;
         
         return roomCardCount > 0 && seatsOk && planOk;
-    }, [isPrinting, orderedParams.length, seats.length, planEnabled, planImageDataUrl, planDimsImageDataUrl, app?.seatMetricsById]);
+    }, [isPrinting, orderedParams.length, seats.length, planEnabled, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl, app?.seatMetricsById]);
 
     // Trigger print when ready (with print-once guard)
     useEffect(() => {
@@ -790,6 +794,199 @@ function RP22ReportInner() {
         };
     }, [isPrinting, planDimsImageDataUrl]);
 
+    // Capture speaker dimensions plan when printing starts (with retry logic)
+    useEffect(() => {
+        if (!isPrinting || planSpeakerDimsImageDataUrl !== null) return;
+        
+        setExportStatus("Capturing speaker dims plan: waiting for SVG…");
+        
+        let attempts = 0;
+        const maxAttempts = 20;
+        let retryTimer = null;
+        
+        const attemptCapture = async () => {
+            attempts++;
+            
+            try {
+                const planElement = document.querySelector('[data-plan-capture-speaker-dims]');
+                if (!planElement) {
+                    setExportStatus(`Capturing speaker dims: container not found (attempt ${attempts}/${maxAttempts})`);
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
+                    setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
+                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                    return;
+                }
+                
+                const svgElement = planElement.querySelector('svg');
+                if (!svgElement) {
+                    setExportStatus(`Capturing speaker dims: SVG not found (attempt ${attempts}/${maxAttempts})`);
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
+                    setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
+                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                    return;
+                }
+                
+                // Build union bbox from meaningful content
+                let bbox = null;
+                
+                try {
+                    const exportBounds = svgElement.querySelector('#export-bounds');
+                    if (exportBounds) {
+                        bbox = exportBounds.getBBox();
+                    }
+                } catch (e) {
+                    bbox = null;
+                }
+                
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    try {
+                        let svgWidth = 1200, svgHeight = 800;
+                        const vb = svgElement.getAttribute('viewBox');
+                        if (vb) {
+                            const parts = vb.split(/\s+/);
+                            if (parts.length === 4) {
+                                svgWidth = parseFloat(parts[2]);
+                                svgHeight = parseFloat(parts[3]);
+                            }
+                        } else {
+                            const rect = svgElement.getBoundingClientRect();
+                            if (rect.width > 0) svgWidth = rect.width;
+                            if (rect.height > 0) svgHeight = rect.height;
+                        }
+                        
+                        const candidates = svgElement.querySelectorAll('rect, path, line, polyline, polygon, circle, ellipse');
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        let count = 0;
+                        
+                        candidates.forEach(el => {
+                            const opacity = el.getAttribute('opacity');
+                            const display = el.getAttribute('display');
+                            if (opacity === '0' || display === 'none') return;
+                            
+                            try {
+                                const b = el.getBBox();
+                                if (!b || b.width <= 0 || b.height <= 0) return;
+                                if (b.width > svgWidth * 0.9 || b.height > svgHeight * 0.9) return;
+                                
+                                minX = Math.min(minX, b.x);
+                                minY = Math.min(minY, b.y);
+                                maxX = Math.max(maxX, b.x + b.width);
+                                maxY = Math.max(maxY, b.y + b.height);
+                                count++;
+                            } catch (e) {}
+                        });
+                        
+                        if (count > 0 && Number.isFinite(minX) && Number.isFinite(maxX)) {
+                            bbox = {
+                                x: minX,
+                                y: minY,
+                                width: maxX - minX,
+                                height: maxY - minY
+                            };
+                        }
+                    } catch (e) {
+                        bbox = null;
+                    }
+                }
+                
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    const viewBoxAttr = svgElement.getAttribute('viewBox');
+                    if (viewBoxAttr) {
+                        const parts = viewBoxAttr.split(/\s+/);
+                        if (parts.length === 4) {
+                            bbox = {
+                                x: parseFloat(parts[0]),
+                                y: parseFloat(parts[1]),
+                                width: parseFloat(parts[2]),
+                                height: parseFloat(parts[3])
+                            };
+                        }
+                    }
+                }
+                
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    setExportStatus(`Capturing speaker dims: SVG bbox invalid (attempt ${attempts}/${maxAttempts})`);
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
+                    setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
+                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                    return;
+                }
+                
+                const shortestSide = Math.min(bbox.width, bbox.height);
+                const padding = Math.max(shortestSide * 0.02, 10);
+                
+                const viewBoxX = bbox.x - padding;
+                const viewBoxY = bbox.y - padding;
+                const viewBoxW = bbox.width + (2 * padding);
+                const viewBoxH = bbox.height + (2 * padding);
+                
+                const svgClone = svgElement.cloneNode(true);
+                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
+                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                svgClone.setAttribute('width', String(viewBoxW));
+                svgClone.setAttribute('height', String(viewBoxH));
+                
+                const svgString = new XMLSerializer().serializeToString(svgClone);
+                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+                
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    
+                    const targetW = 3000;
+                    const ratio = viewBoxH / viewBoxW;
+                    
+                    canvas.width = targetW;
+                    canvas.height = Math.round(targetW * ratio);
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const dataUrl = canvas.toDataURL('image/png');
+                    setExportStatus("Speaker dimensions plan captured: image ready");
+                    setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
+                    setPlanSpeakerDimsImageDataUrl(dataUrl);
+                    URL.revokeObjectURL(url);
+                };
+                img.onerror = () => {
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                    } else {
+                        setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
+                        setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                    }
+                    URL.revokeObjectURL(url);
+                };
+                img.src = url;
+            } catch (err) {
+                console.warn('Failed to capture speaker dims plan (attempt ' + attempts + '):', err);
+                if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
+                } else {
+                    setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
+                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                }
+            }
+        };
+        
+        attemptCapture();
+        
+        return () => {
+            if (retryTimer) clearTimeout(retryTimer);
+        };
+    }, [isPrinting, planSpeakerDimsImageDataUrl]);
+
     // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
     // Total is always 10 (RP23 + 9 RP22 params: P1, P4, P5, P6, P9, P10, P16, P17, P20)
     const seatLevelCounts = React.useMemo(() => {
@@ -1161,6 +1358,48 @@ function RP22ReportInner() {
                 />
             </div>
             
+            {/* Hidden plan capture element (SPEAKER DIMENSIONS) */}
+            <div 
+                data-plan-capture-speaker-dims
+                style={{ 
+                    position: 'fixed',
+                    left: 0,
+                    top: 0,
+                    width: '1200px',
+                    height: '800px',
+                    opacity: 0,
+                    pointerEvents: 'none',
+                    zIndex: -1
+                }}
+            >
+                <RoomVisualisation
+                    placedSpeakers={placedSpeakers}
+                    seatingPositions={seats}
+                    mlpPoint={primarySeatingPosition}
+                    screen={screen}
+                    dolbyLayout={dolbyLayout}
+                    frontSubs={frontSubsCfg?.positions || []}
+                    rearSubs={rearSubsCfg?.positions || []}
+                    exportMode="clean"
+                    overlays={{}}
+                    showBaffle={true}
+                    showScreen={true}
+                    speakerPositionsView="on"
+                    showMlpRuler={true}
+                    zoomMode="off"
+                    onSetSpeakers={rvNoops.onSetSpeakers}
+                    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
+                    onSetScreen={rvNoops.onSetScreen}
+                    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
+                    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
+                    onSetElements={rvNoops.onSetElements}
+                    onSetOverheadState={rvNoops.onSetOverheadState}
+                    onSetAimState={rvNoops.onSetAimState}
+                    onSetRoomDims={rvNoops.onSetRoomDims}
+                    onSetMlpPoint={rvNoops.onSetMlpPoint}
+                />
+            </div>
+            
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex items-start justify-between gap-4 mb-6">
@@ -1191,6 +1430,7 @@ function RP22ReportInner() {
                                 setHasPrintedOnce(false);
                                 setPlanImageDataUrl(null);
                                 setPlanDimsImageDataUrl(null);
+                                setPlanSpeakerDimsImageDataUrl(null);
                                 setIsPrinting(true);
                             }}
                             className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
@@ -1658,6 +1898,39 @@ function RP22ReportInner() {
                                 <img
                                     src={planDimsImageDataUrl}
                                     alt="Room plan (dimensions)"
+                                    style={{
+                                        width: '100%',
+                                        height: 'auto',
+                                        objectFit: 'contain',
+                                        display: 'block',
+                                        margin: '0',
+                                        padding: 0,
+                                        background: 'transparent',
+                                    }}
+                                />
+                            </section>
+                        )}
+
+                        {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
+                            <section id="pdf-room-plan-speaker-dims" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                                <h2
+                                    style={{
+                                        fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                        fontSize: '20pt',
+                                        fontWeight: 500,
+                                        letterSpacing: '0.3px',
+                                        color: '#1B1A1A',
+                                        margin: '0 0 6mm 0',
+                                        background: 'transparent',
+                                        padding: 0,
+                                    }}
+                                >
+                                    Room plan (speaker dimensions)
+                                </h2>
+
+                                <img
+                                    src={planSpeakerDimsImageDataUrl}
+                                    alt="Room plan (speaker dimensions)"
                                     style={{
                                         width: '100%',
                                         height: 'auto',
