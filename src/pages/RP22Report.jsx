@@ -890,8 +890,19 @@ function RP22ReportInner() {
                     overflow: visible !important;
                 }
                 
-                /* Force pure white backgrounds */
-                html, body, .print-root, .print-container, .print-only {
+                /* Force pure white backgrounds (kill the pale side bars) */
+                html, body, #root, #__next {
+                    background: #FFFFFF !important;
+                }
+                
+                /* Outer wrapper is bg-[#F9F8F6] p-6 — force white + no padding in print */
+                .min-h-screen {
+                    background: #FFFFFF !important;
+                    padding: 0 !important;
+                }
+                
+                /* Ensure print layout is pure white */
+                .print-root, .print-container, .print-only, section {
                     background: #FFFFFF !important;
                     box-shadow: none !important;
                     border: none !important;
