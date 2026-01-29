@@ -999,6 +999,73 @@ function RP22ReportInner() {
         };
     }, [isPrinting, planSpeakerDimsImageDataUrl]);
 
+    // System summary: group speakers by role and model
+    const systemSummary = React.useMemo(() => {
+        const summary = {
+            lcr: [],
+            surrounds: [],
+            overheads: [],
+            subs: []
+        };
+
+        // Helper to normalize model name
+        const normalizeModel = (model) => {
+            if (!model || model === 'off' || model === 'none') return null;
+            return String(model).trim();
+        };
+
+        // Group speakers by category and model
+        const speakersByCategory = {
+            lcr: {},
+            surrounds: {},
+            overheads: {}
+        };
+
+        placedSpeakers.forEach(spk => {
+            const role = String(spk?.role || '').toUpperCase();
+            const model = normalizeModel(spk?.model);
+            if (!model) return;
+
+            let category = null;
+            if (['FL', 'FC', 'FR', 'L', 'C', 'R'].includes(role)) {
+                category = 'lcr';
+            } else if (['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'LS', 'RS', 'LR', 'RR', 'FWL', 'FWR'].includes(role)) {
+                category = 'surrounds';
+            } else if (role.startsWith('T') || role.startsWith('U')) {
+                category = 'overheads';
+            }
+
+            if (category) {
+                speakersByCategory[category][model] = (speakersByCategory[category][model] || 0) + 1;
+            }
+        });
+
+        // Format speaker lists
+        Object.keys(speakersByCategory).forEach(cat => {
+            const models = Object.entries(speakersByCategory[cat])
+                .map(([model, count]) => count > 1 ? `${model} × ${count}` : model)
+                .sort();
+            summary[cat] = models.length > 0 ? models : ['None selected'];
+        });
+
+        // Subwoofers
+        const frontSubs = frontSubsCfg?.count || 0;
+        const rearSubs = rearSubsCfg?.count || 0;
+        const frontModel = normalizeModel(frontSubsCfg?.model);
+        const rearModel = normalizeModel(rearSubsCfg?.model);
+
+        const subList = [];
+        if (frontSubs > 0 && frontModel) {
+            subList.push(frontSubs > 1 ? `${frontModel} × ${frontSubs} (front)` : `${frontModel} (front)`);
+        }
+        if (rearSubs > 0 && rearModel) {
+            subList.push(rearSubs > 1 ? `${rearModel} × ${rearSubs} (rear)` : `${rearModel} (rear)`);
+        }
+        summary.subs = subList.length > 0 ? subList : ['None selected'];
+
+        return summary;
+    }, [placedSpeakers, frontSubsCfg, rearSubsCfg]);
+
     // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
     // Total is always 10 (RP23 + 9 RP22 params: P1, P4, P5, P6, P9, P10, P16, P17, P20)
     const seatLevelCounts = React.useMemo(() => {
@@ -1856,6 +1923,89 @@ function RP22ReportInner() {
                                                 </>
                                             );
                                         })()}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* System Summary */}
+                            <div style={{
+                                maxWidth: '170mm',
+                                margin: '6mm auto 0',
+                            }}>
+                                <div
+                                    style={{
+                                        border: '1px solid #D9D5CE',
+                                        borderRadius: '12px',
+                                        padding: '6mm 8mm',
+                                        background: '#FBFAF8',
+                                        width: '100%',
+                                    }}
+                                    className="print-avoid-break"
+                                >
+                                    <div
+                                        style={{
+                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                            fontSize: '12pt',
+                                            fontWeight: 700,
+                                            color: '#1B1A1A',
+                                            marginBottom: '2mm',
+                                            textAlign: 'center',
+                                        }}
+                                    >
+                                        System summary
+                                    </div>
+                                    <div
+                                        style={{
+                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                            fontSize: '9pt',
+                                            color: '#3E4349',
+                                            marginBottom: '4mm',
+                                            textAlign: 'center',
+                                        }}
+                                    >
+                                        Selected loudspeaker models
+                                    </div>
+
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3mm' }}>
+                                        {/* LCR */}
+                                        <div style={{ display: 'flex', paddingBottom: '3mm', borderBottom: '1px solid #EEEAE3' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10pt', color: '#1B1A1A' }}>
+                                                LCR
+                                            </div>
+                                            <div style={{ width: '70%', fontSize: '10pt', color: '#3E4349' }}>
+                                                {systemSummary.lcr.join(', ')}
+                                            </div>
+                                        </div>
+
+                                        {/* Surrounds */}
+                                        <div style={{ display: 'flex', paddingBottom: '3mm', borderBottom: '1px solid #EEEAE3' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10pt', color: '#1B1A1A' }}>
+                                                Surrounds
+                                            </div>
+                                            <div style={{ width: '70%', fontSize: '10pt', color: '#3E4349' }}>
+                                                {systemSummary.surrounds.join(', ')}
+                                            </div>
+                                        </div>
+
+                                        {/* Overheads */}
+                                        <div style={{ display: 'flex', paddingBottom: '3mm', borderBottom: '1px solid #EEEAE3' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10pt', color: '#1B1A1A' }}>
+                                                Overheads
+                                            </div>
+                                            <div style={{ width: '70%', fontSize: '10pt', color: '#3E4349' }}>
+                                                {systemSummary.overheads.join(', ')}
+                                            </div>
+                                        </div>
+
+                                        {/* Subwoofers */}
+                                        <div style={{ display: 'flex' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10pt', color: '#1B1A1A' }}>
+                                                Subwoofers
+                                            </div>
+                                            <div style={{ width: '70%', fontSize: '10pt', color: '#3E4349' }}>
+                                                {systemSummary.subs.join(', ')}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
