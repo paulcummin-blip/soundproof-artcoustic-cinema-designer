@@ -25,10 +25,14 @@ function RP22ReportInner() {
     const [isPrinting, setIsPrinting] = useState(false);
     const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
     const [hasPrintedOnce, setHasPrintedOnce] = useState(false);
+    const [exportStatus, setExportStatus] = useState("Idle");
+    const [exportDebug, setExportDebug] = useState({ isPrinting: false, planLen: 0, printReady: false });
     const planEnabled = true;
 
     useEffect(() => {
         const onAfterPrint = () => {
+            setExportStatus("Done");
+            setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
             setIsPrinting(false);
             setPlanImageDataUrl(null);
         };
@@ -354,6 +358,7 @@ function RP22ReportInner() {
         if (hasPrintedOnce) return;
 
         const t = setTimeout(() => {
+            setExportStatus("Opening PDF preview…");
             setHasPrintedOnce(true);
             window.print();
         }, 250);
@@ -361,9 +366,16 @@ function RP22ReportInner() {
         return () => clearTimeout(t);
     }, [isPrinting, printReady, hasPrintedOnce]);
 
+    // Mirror printReady state to debug
+    useEffect(() => {
+        setExportDebug(d => ({ ...d, isPrinting, printReady }));
+    }, [isPrinting, printReady]);
+
     // Capture plan when printing starts (with retry logic)
     useEffect(() => {
         if (!isPrinting || planImageDataUrl !== null) return;
+        
+        setExportStatus("Capturing plan: waiting for SVG…");
         
         let attempts = 0;
         const maxAttempts = 20;
@@ -375,10 +387,13 @@ function RP22ReportInner() {
             try {
                 const planElement = document.querySelector('[data-plan-capture]');
                 if (!planElement) {
+                    setExportStatus(`Capturing plan: plan container not found (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
                         return;
                     }
+                    setExportStatus("Export failed: plan capture never became ready");
+                    setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
                     setPlanImageDataUrl('');
                     setIsPrinting(false);
                     return;
@@ -386,10 +401,13 @@ function RP22ReportInner() {
                 
                 const svgElement = planElement.querySelector('svg');
                 if (!svgElement) {
+                    setExportStatus(`Capturing plan: SVG not found (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
                         return;
                     }
+                    setExportStatus("Export failed: plan capture never became ready");
+                    setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
                     setPlanImageDataUrl('');
                     setIsPrinting(false);
                     return;
@@ -401,10 +419,13 @@ function RP22ReportInner() {
                 
                 // Check if SVG has valid dimensions
                 if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    setExportStatus(`Capturing plan: SVG bbox invalid (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
                         return;
                     }
+                    setExportStatus("Export failed: plan capture never became ready");
+                    setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
                     setPlanImageDataUrl('');
                     setIsPrinting(false);
                     return;
@@ -437,6 +458,8 @@ function RP22ReportInner() {
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     const dataUrl = canvas.toDataURL('image/png');
+                    setExportStatus("Plan captured: image ready");
+                    setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
                     setPlanImageDataUrl(dataUrl);
                     URL.revokeObjectURL(url);
                 };
@@ -444,6 +467,8 @@ function RP22ReportInner() {
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
                     } else {
+                        setExportStatus("Export failed: plan capture never became ready");
+                        setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
                         setPlanImageDataUrl('');
                         setIsPrinting(false);
                     }
@@ -455,6 +480,8 @@ function RP22ReportInner() {
                 if (attempts < maxAttempts) {
                     retryTimer = setTimeout(attemptCapture, 100);
                 } else {
+                    setExportStatus("Export failed: plan capture never became ready");
+                    setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
                     setPlanImageDataUrl('');
                     setIsPrinting(false);
                 }
@@ -791,24 +818,35 @@ function RP22ReportInner() {
                             })()}
                         </div>
                     </div>
-                    <Button
-                        type="button"
-                        onClick={() => {
-                            setPlanImageDataUrl(null);
-                            setIsPrinting(true);
-                        }}
-                        className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
-                        style={{
-                            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-                            backgroundColor: "#FFFFFF",
-                            borderColor: "#625143",
-                            color: "#625143",
-                            opacity: 1,
-                        }}
-                    >
-                        <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
-                        Export PDF
-                    </Button>
+                    <div>
+                        <Button
+                            type="button"
+                            onClick={() => {
+                                setExportStatus("Clicked: starting export…");
+                                setExportDebug({ isPrinting: true, planLen: 0, printReady: false });
+                                setHasPrintedOnce(false);
+                                setPlanImageDataUrl(null);
+                                setIsPrinting(true);
+                            }}
+                            className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
+                            style={{
+                                fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                                backgroundColor: "#FFFFFF",
+                                borderColor: "#625143",
+                                color: "#625143",
+                                opacity: 1,
+                            }}
+                        >
+                            <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
+                            Export PDF
+                        </Button>
+                        <div style={{ marginTop: 6, textAlign: "right", fontSize: 12, color: "#3E4349" }}>
+                            <div><strong>Export status:</strong> {exportStatus}</div>
+                            <div style={{ fontSize: 11, color: "#625143" }}>
+                                isPrinting: {String(exportDebug.isPrinting)} · planLen: {exportDebug.planLen} · printReady: {String(exportDebug.printReady)}
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div className="border-b border-[#E6E4DD]" />
 
