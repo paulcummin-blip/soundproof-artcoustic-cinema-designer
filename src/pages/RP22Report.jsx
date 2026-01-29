@@ -893,6 +893,17 @@ function RP22ReportInner() {
                 /* Force pure white backgrounds */
                 html, body, .print-root, .print-container, .print-only {
                     background: #FFFFFF !important;
+                    box-shadow: none !important;
+                    border: none !important;
+                }
+                
+                /* Kill gutters on plan pages */
+                #pdf-room-plan, #pdf-room-plan-dims {
+                    background: #FFFFFF !important;
+                    padding-left: 0 !important;
+                    padding-right: 0 !important;
+                    margin-left: 0 !important;
+                    margin-right: 0 !important;
                 }
 
                 /* Base44 / app wrappers sometimes clamp height */
