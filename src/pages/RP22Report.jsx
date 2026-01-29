@@ -1996,14 +1996,14 @@ function RP22ReportInner() {
                                 flexDirection: 'column', 
                                 gap: '8mm',
                                 maxWidth: '185mm',
-                                margin: '0 auto',
+                                margin: '12mm auto 0',
                             }}>
                                 {/* Room parameters */}
                                 <div
                                     style={{
                                         border: '1.5px solid #D9D5CE',
                                         borderRadius: '10px',
-                                        padding: '7mm 9mm',
+                                        padding: '8mm 10mm',
                                         background: '#FBFAF8',
                                         width: '100%',
                                     }}
@@ -2011,7 +2011,7 @@ function RP22ReportInner() {
                                 >
                                     <div
                                         style={{
-                                            fontSize: '14pt',
+                                            fontSize: '15pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
                                             marginBottom: '4mm',
@@ -2034,7 +2034,7 @@ function RP22ReportInner() {
                                     style={{
                                         border: '1.5px solid #D9D5CE',
                                         borderRadius: '10px',
-                                        padding: '7mm 9mm',
+                                        padding: '8mm 10mm',
                                         background: '#FBFAF8',
                                         width: '100%',
                                     }}
@@ -2042,7 +2042,7 @@ function RP22ReportInner() {
                                 >
                                     <div
                                         style={{
-                                            fontSize: '14pt',
+                                            fontSize: '15pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
                                             marginBottom: '4mm',
@@ -2125,12 +2125,12 @@ function RP22ReportInner() {
                                             <div style={{ display: 'flex', gap: '8mm' }}>
                                                 {/* Left: Screen size */}
                                                 <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 600, fontSize: '10pt', color: '#1B1A1A', marginBottom: '3mm' }}>
+                                                    <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>
                                                         Screen size — {choiceLabel}
                                                     </div>
 
-                                                    <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.6 }}>
-                                                    <div><strong>Viewable area</strong></div>
+                                                         <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.7 }}>
+                                                         <div><strong>Viewable area</strong></div>
                                                     {hasViewable ? (
                                                         <div>
                                                             {fmtCm(viewWm)} × {fmtCm(viewHm)} cm ({fmtIn(viewWm)}" × {fmtIn(viewHm)}")
@@ -2152,11 +2152,11 @@ function RP22ReportInner() {
 
                                                     {/* Right: Viewing geometry */}
                                                     <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>
-                                                    Viewing geometry
-                                                    </div>
+                                                        <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>
+                                                            Viewing geometry
+                                                        </div>
 
-                                                    <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.6 }}>
+                                                        <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.7 }}>
                                                     <div>
                                                         <strong>Horizontal viewing angle:</strong>{" "}
                                                         {hasAngles ? `${horizontalDeg.toFixed(1)}°` : "Not specified"}
@@ -2189,7 +2189,7 @@ function RP22ReportInner() {
                                     style={{
                                         border: '1.5px solid #D9D5CE',
                                         borderRadius: '10px',
-                                        padding: '7mm 9mm',
+                                        padding: '8mm 10mm',
                                         background: '#FBFAF8',
                                         width: '100%',
                                     }}
@@ -2197,7 +2197,7 @@ function RP22ReportInner() {
                                 >
                                     <div
                                         style={{
-                                            fontSize: '14pt',
+                                            fontSize: '15pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
                                             marginBottom: '4mm',
@@ -2217,43 +2217,43 @@ function RP22ReportInner() {
                                         Selected loudspeaker models
                                     </div>
 
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3.5mm' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4mm' }}>
                                         {/* LCR */}
-                                        <div style={{ display: 'flex', paddingBottom: '3.5mm', borderBottom: '1px solid #EEEAE3' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10.5pt', color: '#1B1A1A' }}>
+                                        <div style={{ display: 'flex', paddingBottom: '4mm', borderBottom: '1px solid #EEEAE3' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A' }}>
                                                 LCR
                                             </div>
-                                            <div style={{ width: '70%', fontSize: '10.5pt', color: '#3E4349' }}>
+                                            <div style={{ width: '70%', fontSize: '11.5pt', color: '#3E4349' }}>
                                                 {systemSummary.lcr.join(', ')}
                                             </div>
                                         </div>
 
                                         {/* Surrounds */}
-                                        <div style={{ display: 'flex', paddingBottom: '3.5mm', borderBottom: '1px solid #EEEAE3' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10.5pt', color: '#1B1A1A' }}>
+                                        <div style={{ display: 'flex', paddingBottom: '4mm', borderBottom: '1px solid #EEEAE3' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A' }}>
                                                 Surrounds
                                             </div>
-                                            <div style={{ width: '70%', fontSize: '10.5pt', color: '#3E4349' }}>
+                                            <div style={{ width: '70%', fontSize: '11.5pt', color: '#3E4349' }}>
                                                 {systemSummary.surrounds.join(', ')}
                                             </div>
                                         </div>
 
                                         {/* Overheads */}
-                                        <div style={{ display: 'flex', paddingBottom: '3.5mm', borderBottom: '1px solid #EEEAE3' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10.5pt', color: '#1B1A1A' }}>
+                                        <div style={{ display: 'flex', paddingBottom: '4mm', borderBottom: '1px solid #EEEAE3' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A' }}>
                                                 Overheads
                                             </div>
-                                            <div style={{ width: '70%', fontSize: '10.5pt', color: '#3E4349' }}>
+                                            <div style={{ width: '70%', fontSize: '11.5pt', color: '#3E4349' }}>
                                                 {systemSummary.overheads.join(', ')}
                                             </div>
                                         </div>
 
                                         {/* Subwoofers */}
                                         <div style={{ display: 'flex' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10.5pt', color: '#1B1A1A' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A' }}>
                                                 Subwoofers
                                             </div>
-                                            <div style={{ width: '70%', fontSize: '10.5pt', color: '#3E4349' }}>
+                                            <div style={{ width: '70%', fontSize: '11.5pt', color: '#3E4349' }}>
                                                 {systemSummary.subs.join(', ')}
                                             </div>
                                         </div>
