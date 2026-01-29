@@ -1860,16 +1860,20 @@ function RP22ReportInner() {
                         )}
 
                         {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-speaker-dims" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                            <section
+                                id="pdf-room-plan-positions"
+                                className="print-page-break-after"
+                                style={{ background: "transparent", padding: 0, margin: 0 }}
+                            >
                                 <h2
                                     style={{
-                                        fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                        fontSize: '20pt',
+                                        fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                                        fontSize: "20pt",
                                         fontWeight: 500,
-                                        letterSpacing: '0.3px',
-                                        color: '#1B1A1A',
-                                        margin: '0 0 6mm 0',
-                                        background: 'transparent',
+                                        letterSpacing: "0.3px",
+                                        color: "#1B1A1A",
+                                        margin: "0 0 6mm 0",
+                                        background: "transparent",
                                         padding: 0,
                                     }}
                                 >
@@ -1880,13 +1884,13 @@ function RP22ReportInner() {
                                     src={planSpeakerDimsImageDataUrl}
                                     alt="Room plan (speaker positions)"
                                     style={{
-                                        width: '100%',
-                                        height: 'auto',
-                                        objectFit: 'contain',
-                                        display: 'block',
-                                        margin: '0',
+                                        width: "100%",
+                                        height: "auto",
+                                        objectFit: "contain",
+                                        display: "block",
+                                        margin: 0,
                                         padding: 0,
-                                        background: 'transparent',
+                                        background: "transparent",
                                     }}
                                 />
                             </section>
