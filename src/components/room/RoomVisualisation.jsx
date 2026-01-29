@@ -6620,16 +6620,18 @@ return (
               })()}
             </g>
 
-            {/* Layer 2: Room Outline and Furniture */}
-            <rect
-              x={roomRect.x}
-              y={roomRect.y}
-              width={roomRect.width}
-              height={roomRect.height}
-              fill="none"
-              stroke="#DCDBD6"
-              strokeWidth={2}
-            />
+            {/* Wrapper for export bounds */}
+            <g id="export-bounds">
+              {/* Layer 2: Room Outline and Furniture */}
+              <rect
+                x={roomRect.x}
+                y={roomRect.y}
+                width={roomRect.width}
+                height={roomRect.height}
+                fill="none"
+                stroke="#DCDBD6"
+                strokeWidth={2}
+              />
 
             {/* Room Dimensions Overlay */}
             {exportMode !== 'clean' && overlaysForRendering?.ROOM_DIMS && (
@@ -7034,6 +7036,8 @@ return (
                 getCanonicalRole={getCanonicalRole}
               />
             )}
+
+            </g>{/* End export-bounds wrapper */}
 
 {exportMode !== 'clean' && (
   <PlanMessages
