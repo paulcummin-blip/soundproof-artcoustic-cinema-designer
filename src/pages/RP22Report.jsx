@@ -1380,7 +1380,7 @@ function RP22ReportInner() {
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
-                    exportMode="clean"
+                    exportMode="dimensions"
                     overlays={{}}
                     showBaffle={true}
                     showScreen={true}
