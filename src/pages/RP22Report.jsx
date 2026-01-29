@@ -1784,6 +1784,7 @@ function RP22ReportInner() {
                                         padding: 18,
                                         background: '#FFFFFF',
                                         width: '100%',
+                                        textAlign: 'center',
                                     }}
                                     className="print-avoid-break"
                                 >
@@ -1799,7 +1800,7 @@ function RP22ReportInner() {
                                         Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                     </div>
 
-                                    <div className="flex gap-3">
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
                                         <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
                                         <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
                                         <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
@@ -1815,6 +1816,7 @@ function RP22ReportInner() {
                                         padding: 18,
                                         background: '#FFFFFF',
                                         width: '100%',
+                                        textAlign: 'center',
                                     }}
                                     className="print-avoid-break"
                                 >
@@ -1830,7 +1832,7 @@ function RP22ReportInner() {
                                         Seat parameters ({seats?.length || 0} seats)
                                     </div>
 
-                                    <div className="flex gap-3">
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
                                         {(() => {
                                             const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
                                             (seatLevelCounts || []).forEach(s => {
