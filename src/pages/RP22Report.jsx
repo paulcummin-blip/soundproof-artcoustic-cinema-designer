@@ -24,6 +24,7 @@ function RP22ReportInner() {
     
     const [isPrinting, setIsPrinting] = useState(false);
     const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
+    const [planDimsImageDataUrl, setPlanDimsImageDataUrl] = useState(null);
     const [hasPrintedOnce, setHasPrintedOnce] = useState(false);
     const [exportStatus, setExportStatus] = useState("Idle");
     const [exportDebug, setExportDebug] = useState({ isPrinting: false, planLen: 0, printReady: false });
@@ -343,10 +344,12 @@ function RP22ReportInner() {
         
         const roomCardCount = orderedParams.length;
         const seatsOk = (seats.length === 0) ? true : (Object.keys(app?.seatMetricsById || {}).length >= seats.length);
-        const planOk = planEnabled ? (typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__') : true;
+        const cleanOk = planEnabled ? (typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0) : true;
+        const dimsOk = planEnabled ? (typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0) : true;
+        const planOk = cleanOk && dimsOk;
         
         return roomCardCount > 0 && seatsOk && planOk;
-    }, [isPrinting, orderedParams.length, seats.length, planEnabled, planImageDataUrl, app?.seatMetricsById]);
+    }, [isPrinting, orderedParams.length, seats.length, planEnabled, planImageDataUrl, planDimsImageDataUrl, app?.seatMetricsById]);
 
     // Trigger print when ready (with print-once guard)
     useEffect(() => {
@@ -578,6 +581,214 @@ function RP22ReportInner() {
             if (retryTimer) clearTimeout(retryTimer);
         };
     }, [isPrinting, planImageDataUrl]);
+
+    // Capture dimensioned plan when printing starts (with retry logic)
+    useEffect(() => {
+        if (!isPrinting || planDimsImageDataUrl !== null) return;
+        
+        setExportStatus("Capturing dimensioned plan: waiting for SVG…");
+        
+        let attempts = 0;
+        const maxAttempts = 20;
+        let retryTimer = null;
+        
+        const attemptCapture = async () => {
+            attempts++;
+            
+            try {
+                const planElement = document.querySelector('[data-plan-capture-dims]');
+                if (!planElement) {
+                    setExportStatus(`Capturing dims plan: container not found (attempt ${attempts}/${maxAttempts})`);
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
+                    setExportStatus("Dims plan skipped: continuing without dimensioned plan");
+                    setPlanDimsImageDataUrl('__SKIP__');
+                    return;
+                }
+                
+                const svgElement = planElement.querySelector('svg');
+                if (!svgElement) {
+                    setExportStatus(`Capturing dims plan: SVG not found (attempt ${attempts}/${maxAttempts})`);
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
+                    setExportStatus("Dims plan skipped: continuing without dimensioned plan");
+                    setPlanDimsImageDataUrl('__SKIP__');
+                    return;
+                }
+                
+                // Build union bbox from meaningful content (not background grid)
+                let bbox = null;
+                
+                try {
+                    // Try export-bounds wrapper first
+                    const exportBounds = svgElement.querySelector('#export-bounds');
+                    if (exportBounds) {
+                        bbox = exportBounds.getBBox();
+                    }
+                } catch (e) {
+                    bbox = null;
+                }
+                
+                // Fallback: build union bbox from visible geometry
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    try {
+                        // Get SVG dimensions for filtering
+                        let svgWidth = 1200, svgHeight = 800;
+                        const vb = svgElement.getAttribute('viewBox');
+                        if (vb) {
+                            const parts = vb.split(/\s+/);
+                            if (parts.length === 4) {
+                                svgWidth = parseFloat(parts[2]);
+                                svgHeight = parseFloat(parts[3]);
+                            }
+                        } else {
+                            const rect = svgElement.getBoundingClientRect();
+                            if (rect.width > 0) svgWidth = rect.width;
+                            if (rect.height > 0) svgHeight = rect.height;
+                        }
+                        
+                        // Collect meaningful geometry
+                        const candidates = svgElement.querySelectorAll('rect, path, line, polyline, polygon, circle, ellipse');
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        let count = 0;
+                        
+                        candidates.forEach(el => {
+                            // Skip invisible or background elements
+                            const opacity = el.getAttribute('opacity');
+                            const display = el.getAttribute('display');
+                            if (opacity === '0' || display === 'none') return;
+                            
+                            try {
+                                const b = el.getBBox();
+                                if (!b || b.width <= 0 || b.height <= 0) return;
+                                
+                                // Skip background-sized elements (90% of SVG or larger)
+                                if (b.width > svgWidth * 0.9 || b.height > svgHeight * 0.9) return;
+                                
+                                // Accumulate bounds
+                                minX = Math.min(minX, b.x);
+                                minY = Math.min(minY, b.y);
+                                maxX = Math.max(maxX, b.x + b.width);
+                                maxY = Math.max(maxY, b.y + b.height);
+                                count++;
+                            } catch (e) {
+                                // Skip elements that can't be measured
+                            }
+                        });
+                        
+                        if (count > 0 && Number.isFinite(minX) && Number.isFinite(maxX)) {
+                            bbox = {
+                                x: minX,
+                                y: minY,
+                                width: maxX - minX,
+                                height: maxY - minY
+                            };
+                        }
+                    } catch (e) {
+                        bbox = null;
+                    }
+                }
+                
+                // Fallback: Use viewBox if bbox still invalid
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    const viewBoxAttr = svgElement.getAttribute('viewBox');
+                    if (viewBoxAttr) {
+                        const parts = viewBoxAttr.split(/\s+/);
+                        if (parts.length === 4) {
+                            bbox = {
+                                x: parseFloat(parts[0]),
+                                y: parseFloat(parts[1]),
+                                width: parseFloat(parts[2]),
+                                height: parseFloat(parts[3])
+                            };
+                        }
+                    }
+                }
+                
+                // Check if we have valid dimensions
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    setExportStatus(`Capturing dims plan: SVG bbox invalid (attempt ${attempts}/${maxAttempts})`);
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
+                    setExportStatus("Dims plan skipped: continuing without dimensioned plan");
+                    setPlanDimsImageDataUrl('__SKIP__');
+                    return;
+                }
+                
+                // Tight padding (2% of shortest side, minimum 10 units)
+                const shortestSide = Math.min(bbox.width, bbox.height);
+                const padding = Math.max(shortestSide * 0.02, 10);
+                
+                const viewBoxX = bbox.x - padding;
+                const viewBoxY = bbox.y - padding;
+                const viewBoxW = bbox.width + (2 * padding);
+                const viewBoxH = bbox.height + (2 * padding);
+                
+                // Now clone and apply the computed viewBox
+                const svgClone = svgElement.cloneNode(true);
+                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
+                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                svgClone.setAttribute('width', String(viewBoxW));
+                svgClone.setAttribute('height', String(viewBoxH));
+                
+                const svgString = new XMLSerializer().serializeToString(svgClone);
+                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+                
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    
+                    // Keep exact aspect ratio from the cropped viewBox
+                    const targetW = 3000;
+                    const ratio = viewBoxH / viewBoxW;
+                    
+                    canvas.width = targetW;
+                    canvas.height = Math.round(targetW * ratio);
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    const dataUrl = canvas.toDataURL('image/png');
+                    setExportStatus("Dimensioned plan captured: image ready");
+                    setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
+                    setPlanDimsImageDataUrl(dataUrl);
+                    URL.revokeObjectURL(url);
+                };
+                img.onerror = () => {
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                    } else {
+                        setExportStatus("Dims plan skipped: continuing without dimensioned plan");
+                        setPlanDimsImageDataUrl('__SKIP__');
+                    }
+                    URL.revokeObjectURL(url);
+                };
+                img.src = url;
+            } catch (err) {
+                console.warn('Failed to capture dimensioned plan (attempt ' + attempts + '):', err);
+                if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
+                } else {
+                    setExportStatus("Dims plan skipped: continuing without dimensioned plan");
+                    setPlanDimsImageDataUrl('__SKIP__');
+                }
+            }
+        };
+        
+        attemptCapture();
+        
+        return () => {
+            if (retryTimer) clearTimeout(retryTimer);
+        };
+    }, [isPrinting, planDimsImageDataUrl]);
 
     // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
     // Total is always 10 (RP23 + 9 RP22 params: P1, P4, P5, P6, P9, P10, P16, P17, P20)
@@ -844,7 +1055,7 @@ function RP22ReportInner() {
             <PrintStyles />
             
             <div className="screen-only">
-            {/* Hidden plan capture element - MUST be in DOM (not display:none) for SVG capture */}
+            {/* Hidden plan capture element (CLEAN) - MUST be in DOM (not display:none) for SVG capture */}
             <div 
                 data-plan-capture 
                 style={{ 
@@ -872,6 +1083,48 @@ function RP22ReportInner() {
                     showScreen={true}
                     speakerPositionsView="off"
                     showMlpRuler={false}
+                    zoomMode="off"
+                    onSetSpeakers={rvNoops.onSetSpeakers}
+                    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
+                    onSetScreen={rvNoops.onSetScreen}
+                    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
+                    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
+                    onSetElements={rvNoops.onSetElements}
+                    onSetOverheadState={rvNoops.onSetOverheadState}
+                    onSetAimState={rvNoops.onSetAimState}
+                    onSetRoomDims={rvNoops.onSetRoomDims}
+                    onSetMlpPoint={rvNoops.onSetMlpPoint}
+                />
+            </div>
+            
+            {/* Hidden plan capture element (DIMENSIONED) */}
+            <div 
+                data-plan-capture-dims
+                style={{ 
+                    position: 'fixed',
+                    left: 0,
+                    top: 0,
+                    width: '1200px',
+                    height: '800px',
+                    opacity: 0,
+                    pointerEvents: 'none',
+                    zIndex: -1
+                }}
+            >
+                <RoomVisualisation
+                    placedSpeakers={placedSpeakers}
+                    seatingPositions={seats}
+                    mlpPoint={primarySeatingPosition}
+                    screen={screen}
+                    dolbyLayout={dolbyLayout}
+                    frontSubs={frontSubsCfg?.positions || []}
+                    rearSubs={rearSubsCfg?.positions || []}
+                    exportMode="dimensions"
+                    overlays={{}}
+                    showBaffle={true}
+                    showScreen={true}
+                    speakerPositionsView="on"
+                    showMlpRuler={true}
                     zoomMode="off"
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
@@ -915,6 +1168,7 @@ function RP22ReportInner() {
                                 setExportDebug({ isPrinting: true, planLen: 0, printReady: false });
                                 setHasPrintedOnce(false);
                                 setPlanImageDataUrl(null);
+                                setPlanDimsImageDataUrl(null);
                                 setIsPrinting(true);
                             }}
                             className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
@@ -1366,6 +1620,58 @@ function RP22ReportInner() {
                                         <img
                                             src={planImageDataUrl}
                                             alt="Room plan"
+                                            style={{
+                                                maxWidth: '100%',
+                                                maxHeight: '100%',
+                                                width: 'auto',
+                                                height: 'auto',
+                                                objectFit: 'contain',
+                                                objectPosition: 'center',
+                                                display: 'block',
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
+                        {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
+                            <section id="pdf-room-plan-dims" className="print-page-break-after">
+                                <div
+                                    style={{
+                                        height: '271mm',
+                                        display: 'flex',
+                                        flexDirection: 'column',
+                                    }}
+                                >
+                                    <h2
+                                        style={{
+                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                            fontSize: '18pt',
+                                            fontWeight: 600,
+                                            letterSpacing: '0.2px',
+                                            color: '#1B1A1A',
+                                            margin: '0 0 8mm 0',
+                                        }}
+                                    >
+                                        Room plan (dimensions)
+                                    </h2>
+
+                                    <div
+                                        style={{
+                                            flex: 1,
+                                            background: '#FFFFFF',
+                                            border: '1px solid #DCDBD6',
+                                            borderRadius: '10px',
+                                            padding: '6mm',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
+                                        }}
+                                    >
+                                        <img
+                                            src={planDimsImageDataUrl}
+                                            alt="Room plan (dimensions)"
                                             style={{
                                                 maxWidth: '100%',
                                                 maxHeight: '100%',
