@@ -1308,8 +1308,8 @@ function RP22ReportInner() {
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
-                    exportMode="clean"
-                    overlays={{}}
+                    exportMode="dimensions"
+                    overlays={{ ROOM_DIMS: true }}
                     showBaffle={true}
                     showScreen={true}
                     speakerPositionsView="off"
@@ -1393,7 +1393,7 @@ function RP22ReportInner() {
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
                     exportMode="dimensions"
-                    overlays={{ ROOM_DIMS: true }}
+                    overlays={{}}
                     showBaffle={true}
                     showScreen={true}
                     speakerPositionsView="plan"
