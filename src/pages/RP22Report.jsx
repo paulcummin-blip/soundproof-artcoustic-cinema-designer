@@ -832,29 +832,92 @@ function RP22ReportInner() {
                     return;
                 }
 
-                // SPEAKER POSITIONS: Use full SVG viewBox (don't tight-crop to room box)
+                // Build union bbox from meaningful content (not background grid)
                 let bbox = null;
-
-                // Parse viewBox directly from SVG
-                const viewBoxAttr = svgElement.getAttribute('viewBox');
-                if (viewBoxAttr) {
-                    const parts = viewBoxAttr.split(/\s+/);
-                    if (parts.length === 4) {
-                        bbox = {
-                            x: parseFloat(parts[0]),
-                            y: parseFloat(parts[1]),
-                            width: parseFloat(parts[2]),
-                            height: parseFloat(parts[3])
-                        };
+                
+                try {
+                    // Try export-bounds wrapper first
+                    const exportBounds = svgElement.querySelector('#export-bounds');
+                    if (exportBounds) {
+                        bbox = exportBounds.getBBox();
                     }
+                } catch (e) {
+                    bbox = null;
                 }
-
-                // Fallback: getBBox if no viewBox
+                
+                // Fallback: build union bbox from visible geometry
                 if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
                     try {
-                        bbox = svgElement.getBBox();
+                        // Get SVG dimensions for filtering
+                        let svgWidth = 1200, svgHeight = 800;
+                        const vb = svgElement.getAttribute('viewBox');
+                        if (vb) {
+                            const parts = vb.split(/\s+/);
+                            if (parts.length === 4) {
+                                svgWidth = parseFloat(parts[2]);
+                                svgHeight = parseFloat(parts[3]);
+                            }
+                        } else {
+                            const rect = svgElement.getBoundingClientRect();
+                            if (rect.width > 0) svgWidth = rect.width;
+                            if (rect.height > 0) svgHeight = rect.height;
+                        }
+                        
+                        // Collect meaningful geometry
+                        const candidates = svgElement.querySelectorAll('rect, path, line, polyline, polygon, circle, ellipse');
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+                        let count = 0;
+                        
+                        candidates.forEach(el => {
+                            // Skip invisible or background elements
+                            const opacity = el.getAttribute('opacity');
+                            const display = el.getAttribute('display');
+                            if (opacity === '0' || display === 'none') return;
+                            
+                            try {
+                                const b = el.getBBox();
+                                if (!b || b.width <= 0 || b.height <= 0) return;
+                                
+                                // Skip background-sized elements (90% of SVG or larger)
+                                if (b.width > svgWidth * 0.9 || b.height > svgHeight * 0.9) return;
+                                
+                                // Accumulate bounds
+                                minX = Math.min(minX, b.x);
+                                minY = Math.min(minY, b.y);
+                                maxX = Math.max(maxX, b.x + b.width);
+                                maxY = Math.max(maxY, b.y + b.height);
+                                count++;
+                            } catch (e) {
+                                // Skip elements that can't be measured
+                            }
+                        });
+                        
+                        if (count > 0 && Number.isFinite(minX) && Number.isFinite(maxX)) {
+                            bbox = {
+                                x: minX,
+                                y: minY,
+                                width: maxX - minX,
+                                height: maxY - minY
+                            };
+                        }
                     } catch (e) {
                         bbox = null;
+                    }
+                }
+                
+                // Fallback: Use viewBox if bbox still invalid
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    const viewBoxAttr = svgElement.getAttribute('viewBox');
+                    if (viewBoxAttr) {
+                        const parts = viewBoxAttr.split(/\s+/);
+                        if (parts.length === 4) {
+                            bbox = {
+                                x: parseFloat(parts[0]),
+                                y: parseFloat(parts[1]),
+                                width: parseFloat(parts[2]),
+                                height: parseFloat(parts[3])
+                            };
+                        }
                     }
                 }
 
@@ -869,8 +932,9 @@ function RP22ReportInner() {
                     return;
                 }
 
-                // Speaker positions plan: small fixed padding (leaders/labels are inside SVG viewBox)
-                const padding = 12;
+                // Speaker positions plan: larger padding to accommodate measurement leaders/labels
+                const shortestSide = Math.min(bbox.width, bbox.height);
+                const padding = Math.max(shortestSide * 0.05, 24);
                 
                 const viewBoxX = bbox.x - padding;
                 const viewBoxY = bbox.y - padding;
