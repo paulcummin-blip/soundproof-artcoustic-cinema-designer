@@ -18,6 +18,8 @@ import { formatSeatLabel } from '../components/utils/seatLabel';
 import { Button } from '@/components/ui/button';
 import RoomVisualisation from '@/components/room/RoomVisualisation';
 import html2canvas from 'html2canvas';
+import { computeScreenMetrics } from '../components/utils/screenMetrics';
+import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 
 function RP22ReportInner() {
     const app = useAppState();
@@ -30,6 +32,8 @@ function RP22ReportInner() {
     const [exportStatus, setExportStatus] = useState("Idle");
     const [exportDebug, setExportDebug] = useState({ isPrinting: false, planLen: 0, printReady: false });
     const planEnabled = true;
+    const [screenMetricsForPrint, setScreenMetricsForPrint] = useState(null);
+    const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
 
     useEffect(() => {
         const onAfterPrint = () => {
@@ -99,6 +103,53 @@ function RP22ReportInner() {
 
     // Get MLP from AppState context (same as Room Designer uses)
     const primarySeatingPosition = app?.mlp || null;
+
+    // Resolver: compute screen metrics using same logic as Room Designer Live Metrics
+    const resolveScreenMetricsSnapshot = React.useCallback(() => {
+        // Inputs (same as ViewingAnglePanel)
+        const mlpY_m = app?.mlp?.y ?? stableDimensions.length * 0.58;
+        const screenFrontPlaneM = app?.screenFrontPlaneM ?? app?.screen?.frontPlaneYm ?? null;
+        const visibleWidthInches = app?.screen?.visibleWidthInches ?? app?.screen?.visibleWidthIn ?? null;
+        const aspectRatio = app?.screen?.aspectRatio ?? "16:9";
+
+        // Check if we have the minimum required data
+        if (!Number.isFinite(screenFrontPlaneM) || !Number.isFinite(visibleWidthInches) || visibleWidthInches <= 0) {
+            return { ok: false, reason: "Not specified" };
+        }
+
+        // Use computeScreenMetrics to get dimensions in meters
+        const { viewWm, viewHm, overallWm, overallHm } = computeScreenMetrics(visibleWidthInches, aspectRatio);
+
+        // Calculate horizontal viewing angle (same as ViewingAnglePanel)
+        const horizDeg = calculateViewingAngle(
+            { y: mlpY_m },
+            visibleWidthInches,
+            aspectRatio,
+            { y: screenFrontPlaneM }
+        );
+
+        // Calculate vertical viewing angle
+        const viewerDistance = Math.abs(mlpY_m - screenFrontPlaneM);
+        const vertDeg = viewerDistance > 0 ? 
+            2 * Math.atan(viewHm / (2 * viewerDistance)) * (180 / Math.PI) : 
+            0;
+
+        // Wall distance (screenFrontPlaneM is already the distance from front wall)
+        const wallCm = (screenFrontPlaneM * 100).toFixed(0);
+        const wallIn = (screenFrontPlaneM * 39.3701).toFixed(1);
+
+        return {
+            ok: true,
+            viewWm,
+            viewHm,
+            overallWm,
+            overallHm,
+            horizDeg: horizDeg ?? 0,
+            vertDeg,
+            wallCm,
+            wallIn
+        };
+    }, [app?.mlp?.y, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.visibleWidthIn, app?.screen?.aspectRatio, stableDimensions.length]);
 
     // Compute SPL metrics for all seats (needed by analysis engine)
     const allSeatSplMetrics = React.useMemo(() => {
@@ -1544,12 +1595,24 @@ function RP22ReportInner() {
                         <Button
                             type="button"
                             onClick={() => {
-                                setExportStatus("Clicked: starting export…");
+                                setExportStatus("Resolving screen metrics…");
                                 setExportDebug({ isPrinting: true, planLen: 0, printReady: false });
                                 setHasPrintedOnce(false);
                                 setPlanImageDataUrl(null);
                                 setPlanDimsImageDataUrl(null);
                                 setPlanSpeakerDimsImageDataUrl(null);
+                                setScreenMetricsForPrint(null);
+                                
+                                // Resolve screen metrics BEFORE printing
+                                const snap = resolveScreenMetricsSnapshot();
+                                if (snap.ok) {
+                                    setScreenMetricsForPrint(snap);
+                                    setScreenMetricsStatus("OK");
+                                } else {
+                                    setScreenMetricsForPrint({ ok: false });
+                                    setScreenMetricsStatus("Not specified");
+                                }
+                                
                                 setIsPrinting(true);
                             }}
                             className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
@@ -1567,7 +1630,7 @@ function RP22ReportInner() {
                         <div style={{ marginTop: 6, textAlign: "right", fontSize: 12, color: "#3E4349" }}>
                             <div><strong>Export status:</strong> {exportStatus}</div>
                             <div style={{ fontSize: 11, color: "#625143" }}>
-                                isPrinting: {String(exportDebug.isPrinting)} · planLen: {exportDebug.planLen} · printReady: {String(exportDebug.printReady)}
+                                isPrinting: {String(exportDebug.isPrinting)} · planLen: {exportDebug.planLen} · printReady: {String(exportDebug.printReady)} · screen: {screenMetricsStatus}
                             </div>
                         </div>
                     </div>
@@ -2002,20 +2065,29 @@ function RP22ReportInner() {
                                                 Screen size
                                             </div>
                                             {(() => {
-                                                const viewableW = screen?.viewableWidthM || 0;
-                                                const viewableH = screen?.viewableHeightM || 0;
-                                                const overallW = screen?.overallWidthM || viewableW;
-                                                const overallH = screen?.overallHeightM || viewableH;
+                                                if (!screenMetricsForPrint?.ok) {
+                                                    return (
+                                                        <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.6 }}>
+                                                            <div><strong>Viewable area:</strong> Not specified</div>
+                                                            <div style={{ marginTop: '2mm' }}><strong>Overall with border:</strong> Not specified</div>
+                                                        </div>
+                                                    );
+                                                }
                                                 
-                                                const cmW = (viewableW * 100).toFixed(0);
-                                                const cmH = (viewableH * 100).toFixed(0);
-                                                const inW = (viewableW * 39.3701).toFixed(1);
-                                                const inH = (viewableH * 39.3701).toFixed(1);
+                                                const viewWm = screenMetricsForPrint.viewWm;
+                                                const viewHm = screenMetricsForPrint.viewHm;
+                                                const overallWm = screenMetricsForPrint.overallWm;
+                                                const overallHm = screenMetricsForPrint.overallHm;
                                                 
-                                                const overallCmW = (overallW * 100).toFixed(0);
-                                                const overallCmH = (overallH * 100).toFixed(0);
-                                                const overallInW = (overallW * 39.3701).toFixed(1);
-                                                const overallInH = (overallH * 39.3701).toFixed(1);
+                                                const cmW = (viewWm * 100).toFixed(0);
+                                                const cmH = (viewHm * 100).toFixed(0);
+                                                const inW = (viewWm * 39.3701).toFixed(1);
+                                                const inH = (viewHm * 39.3701).toFixed(1);
+                                                
+                                                const overallCmW = (overallWm * 100).toFixed(0);
+                                                const overallCmH = (overallHm * 100).toFixed(0);
+                                                const overallInW = (overallWm * 39.3701).toFixed(1);
+                                                const overallInH = (overallHm * 39.3701).toFixed(1);
                                                 
                                                 return (
                                                     <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.6 }}>
@@ -2034,31 +2106,22 @@ function RP22ReportInner() {
                                                 Viewing geometry
                                             </div>
                                             {(() => {
-                                                // Calculate viewing angles from MLP
-                                                const mlp = primarySeatingPosition || { x: stableDimensions.width / 2, y: stableDimensions.length * 0.58, z: 1.2 };
-                                                const screenCenterX = stableDimensions.width / 2;
-                                                const screenCenterY = screen?.frontPlaneYm || 0.5;
-                                                const screenCenterZ = (screen?.bottomEdgeZ || 1.2) + (screen?.viewableHeightM || 2) / 2;
-                                                
-                                                const dx = mlp.x - screenCenterX;
-                                                const dy = mlp.y - screenCenterY;
-                                                const dz = mlp.z - screenCenterZ;
-                                                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
-                                                
-                                                const horizontalAngle = 2 * Math.atan((screen?.viewableWidthM || 0) / (2 * Math.sqrt(dy * dy + dx * dx))) * (180 / Math.PI);
-                                                const verticalAngle = 2 * Math.atan((screen?.viewableHeightM || 0) / (2 * distance)) * (180 / Math.PI);
-                                                
-                                                // Wall distance
-                                                const wallDist = screen?.frontPlaneYm || 0;
-                                                const wallDistCm = (wallDist * 100).toFixed(0);
-                                                const wallDistIn = (wallDist * 39.3701).toFixed(1);
+                                                if (!screenMetricsForPrint?.ok) {
+                                                    return (
+                                                        <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.6 }}>
+                                                            <div><strong>Horizontal viewing angle:</strong> Not specified</div>
+                                                            <div><strong>Vertical viewing angle:</strong> Not specified</div>
+                                                            <div style={{ marginTop: '2mm' }}><strong>Distance from front wall:</strong> Not specified</div>
+                                                        </div>
+                                                    );
+                                                }
                                                 
                                                 return (
                                                     <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.6 }}>
-                                                        <div><strong>Horizontal viewing angle:</strong> {horizontalAngle.toFixed(1)}°</div>
-                                                        <div><strong>Vertical viewing angle:</strong> {verticalAngle.toFixed(1)}°</div>
+                                                        <div><strong>Horizontal viewing angle:</strong> {screenMetricsForPrint.horizDeg.toFixed(1)}°</div>
+                                                        <div><strong>Vertical viewing angle:</strong> {screenMetricsForPrint.vertDeg.toFixed(1)}°</div>
                                                         <div style={{ marginTop: '2mm' }}><strong>Distance from front wall:</strong></div>
-                                                        <div>{wallDistCm} cm ({wallDistIn}")</div>
+                                                        <div>{screenMetricsForPrint.wallCm} cm ({screenMetricsForPrint.wallIn}")</div>
                                                     </div>
                                                 );
                                             })()}
