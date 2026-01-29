@@ -1967,6 +1967,106 @@ function RP22ReportInner() {
                                 </div>
                             </div>
 
+                            {/* Screen & Viewing Geometry */}
+                            <div style={{
+                                maxWidth: '185mm',
+                                margin: '8mm auto 0',
+                            }}>
+                                <div
+                                    style={{
+                                        border: '1px solid #E6E4DD',
+                                        borderRadius: '12px',
+                                        padding: '7mm 10mm',
+                                        background: '#FDFCFB',
+                                        width: '100%',
+                                    }}
+                                    className="print-avoid-break"
+                                >
+                                    <div
+                                        style={{
+                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                            fontSize: '13pt',
+                                            fontWeight: 700,
+                                            color: '#1B1A1A',
+                                            marginBottom: '5mm',
+                                            textAlign: 'center',
+                                        }}
+                                    >
+                                        Screen & Viewing Geometry
+                                    </div>
+
+                                    <div style={{ display: 'flex', gap: '8mm' }}>
+                                        {/* Left: Screen size */}
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 600, fontSize: '10pt', color: '#1B1A1A', marginBottom: '3mm' }}>
+                                                Screen size
+                                            </div>
+                                            {(() => {
+                                                const viewableW = screen?.viewableWidthM || 0;
+                                                const viewableH = screen?.viewableHeightM || 0;
+                                                const overallW = screen?.overallWidthM || viewableW;
+                                                const overallH = screen?.overallHeightM || viewableH;
+                                                
+                                                const cmW = (viewableW * 100).toFixed(0);
+                                                const cmH = (viewableH * 100).toFixed(0);
+                                                const inW = (viewableW * 39.3701).toFixed(1);
+                                                const inH = (viewableH * 39.3701).toFixed(1);
+                                                
+                                                const overallCmW = (overallW * 100).toFixed(0);
+                                                const overallCmH = (overallH * 100).toFixed(0);
+                                                const overallInW = (overallW * 39.3701).toFixed(1);
+                                                const overallInH = (overallH * 39.3701).toFixed(1);
+                                                
+                                                return (
+                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.6 }}>
+                                                        <div><strong>Viewable area:</strong></div>
+                                                        <div>{cmW} × {cmH} cm ({inW}" × {inH}")</div>
+                                                        <div style={{ marginTop: '2mm' }}><strong>Overall with border:</strong></div>
+                                                        <div>{overallCmW} × {overallCmH} cm ({overallInW}" × {overallInH}")</div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+
+                                        {/* Right: Viewing angles + wall distance */}
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 600, fontSize: '10pt', color: '#1B1A1A', marginBottom: '3mm' }}>
+                                                Viewing geometry
+                                            </div>
+                                            {(() => {
+                                                // Calculate viewing angles from MLP
+                                                const mlp = primarySeatingPosition || { x: stableDimensions.width / 2, y: stableDimensions.length * 0.58, z: 1.2 };
+                                                const screenCenterX = stableDimensions.width / 2;
+                                                const screenCenterY = screen?.frontPlaneYm || 0.5;
+                                                const screenCenterZ = (screen?.bottomEdgeZ || 1.2) + (screen?.viewableHeightM || 2) / 2;
+                                                
+                                                const dx = mlp.x - screenCenterX;
+                                                const dy = mlp.y - screenCenterY;
+                                                const dz = mlp.z - screenCenterZ;
+                                                const distance = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                                                
+                                                const horizontalAngle = 2 * Math.atan((screen?.viewableWidthM || 0) / (2 * Math.sqrt(dy * dy + dx * dx))) * (180 / Math.PI);
+                                                const verticalAngle = 2 * Math.atan((screen?.viewableHeightM || 0) / (2 * distance)) * (180 / Math.PI);
+                                                
+                                                // Wall distance
+                                                const wallDist = screen?.frontPlaneYm || 0;
+                                                const wallDistCm = (wallDist * 100).toFixed(0);
+                                                const wallDistIn = (wallDist * 39.3701).toFixed(1);
+                                                
+                                                return (
+                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.6 }}>
+                                                        <div><strong>Horizontal viewing angle:</strong> {horizontalAngle.toFixed(1)}°</div>
+                                                        <div><strong>Vertical viewing angle:</strong> {verticalAngle.toFixed(1)}°</div>
+                                                        <div style={{ marginTop: '2mm' }}><strong>Distance from front wall:</strong></div>
+                                                        <div>{wallDistCm} cm ({wallDistIn}")</div>
+                                                    </div>
+                                                );
+                                            })()}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* System Summary */}
                             <div style={{
                                 maxWidth: '185mm',
