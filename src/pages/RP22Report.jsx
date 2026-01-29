@@ -1329,10 +1329,10 @@ function RP22ReportInner() {
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
                     exportMode="dimensions"
-                    overlays={{}}
+                    overlays={{ ROOM_DIMS: true }}
                     showBaffle={true}
                     showScreen={true}
-                    speakerPositionsView="on"
+                    speakerPositionsView="plan"
                     showMlpRuler={false}
                     zoomMode="off"
                     onSetSpeakers={rvNoops.onSetSpeakers}
