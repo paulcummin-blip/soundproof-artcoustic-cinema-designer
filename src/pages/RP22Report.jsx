@@ -1598,26 +1598,16 @@ function RP22ReportInner() {
                                     Room plan
                                 </h2>
 
-                                <div
-                                    style={{
-                                        width: '100%',
-                                        height: '260mm',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                    }}
-                                >
+                                <div style={{ width: '100%' }}>
                                     <img
                                         src={planImageDataUrl}
                                         alt="Room plan"
                                         style={{
-                                            maxWidth: '100%',
-                                            maxHeight: '100%',
-                                            width: 'auto',
+                                            width: '100%',
                                             height: 'auto',
                                             objectFit: 'contain',
-                                            objectPosition: 'center',
                                             display: 'block',
+                                            margin: '0 auto',
                                         }}
                                     />
                                 </div>
@@ -1639,26 +1629,16 @@ function RP22ReportInner() {
                                     Room plan (dimensions)
                                 </h2>
 
-                                <div
-                                    style={{
-                                        width: '100%',
-                                        height: '260mm',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                    }}
-                                >
+                                <div style={{ width: '100%' }}>
                                     <img
                                         src={planDimsImageDataUrl}
                                         alt="Room plan (dimensions)"
                                         style={{
-                                            maxWidth: '100%',
-                                            maxHeight: '100%',
-                                            width: 'auto',
+                                            width: '100%',
                                             height: 'auto',
                                             objectFit: 'contain',
-                                            objectPosition: 'center',
                                             display: 'block',
+                                            margin: '0 auto',
                                         }}
                                     />
                                 </div>
