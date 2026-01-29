@@ -1585,104 +1585,82 @@ function RP22ReportInner() {
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
                             <section id="pdf-room-plan" className="print-page-break-after">
-                                <div
+                                <h2
                                     style={{
-                                        height: '271mm',
-                                        display: 'flex',
-                                        flexDirection: 'column',
+                                        fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                        fontSize: '20pt',
+                                        fontWeight: 500,
+                                        letterSpacing: '0.3px',
+                                        color: '#1B1A1A',
+                                        margin: '0 0 6mm 0',
                                     }}
                                 >
-                                    <h2
-                                        style={{
-                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                            fontSize: '18pt',
-                                            fontWeight: 600,
-                                            letterSpacing: '0.2px',
-                                            color: '#1B1A1A',
-                                            margin: '0 0 8mm 0',
-                                        }}
-                                    >
-                                        Room plan
-                                    </h2>
+                                    Room plan
+                                </h2>
 
-                                    <div
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        height: '260mm',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <img
+                                        src={planImageDataUrl}
+                                        alt="Room plan"
                                         style={{
-                                            flex: 1,
-                                            background: '#FFFFFF',
-                                            border: '1px solid #DCDBD6',
-                                            borderRadius: '10px',
-                                            padding: '6mm',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
+                                            maxWidth: '100%',
+                                            maxHeight: '100%',
+                                            width: 'auto',
+                                            height: 'auto',
+                                            objectFit: 'contain',
+                                            objectPosition: 'center',
+                                            display: 'block',
                                         }}
-                                    >
-                                        <img
-                                            src={planImageDataUrl}
-                                            alt="Room plan"
-                                            style={{
-                                                maxWidth: '100%',
-                                                maxHeight: '100%',
-                                                width: 'auto',
-                                                height: 'auto',
-                                                objectFit: 'contain',
-                                                objectPosition: 'center',
-                                                display: 'block',
-                                            }}
-                                        />
-                                    </div>
+                                    />
                                 </div>
                             </section>
                         )}
 
                         {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
                             <section id="pdf-room-plan-dims" className="print-page-break-after">
-                                <div
+                                <h2
                                     style={{
-                                        height: '271mm',
-                                        display: 'flex',
-                                        flexDirection: 'column',
+                                        fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                        fontSize: '20pt',
+                                        fontWeight: 500,
+                                        letterSpacing: '0.3px',
+                                        color: '#1B1A1A',
+                                        margin: '0 0 6mm 0',
                                     }}
                                 >
-                                    <h2
-                                        style={{
-                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                            fontSize: '18pt',
-                                            fontWeight: 600,
-                                            letterSpacing: '0.2px',
-                                            color: '#1B1A1A',
-                                            margin: '0 0 8mm 0',
-                                        }}
-                                    >
-                                        Room plan (dimensions)
-                                    </h2>
+                                    Room plan (dimensions)
+                                </h2>
 
-                                    <div
+                                <div
+                                    style={{
+                                        width: '100%',
+                                        height: '260mm',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}
+                                >
+                                    <img
+                                        src={planDimsImageDataUrl}
+                                        alt="Room plan (dimensions)"
                                         style={{
-                                            flex: 1,
-                                            background: '#FFFFFF',
-                                            border: '1px solid #DCDBD6',
-                                            borderRadius: '10px',
-                                            padding: '6mm',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
+                                            maxWidth: '100%',
+                                            maxHeight: '100%',
+                                            width: 'auto',
+                                            height: 'auto',
+                                            objectFit: 'contain',
+                                            objectPosition: 'center',
+                                            display: 'block',
                                         }}
-                                    >
-                                        <img
-                                            src={planDimsImageDataUrl}
-                                            alt="Room plan (dimensions)"
-                                            style={{
-                                                maxWidth: '100%',
-                                                maxHeight: '100%',
-                                                width: 'auto',
-                                                height: 'auto',
-                                                objectFit: 'contain',
-                                                objectPosition: 'center',
-                                                display: 'block',
-                                            }}
-                                        />
-                                    </div>
+                                    />
                                 </div>
                             </section>
                         )}
