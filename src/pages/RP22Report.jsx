@@ -1083,7 +1083,7 @@ function RP22ReportInner() {
                     return count > 1 ? `${displayName} × ${count}` : displayName;
                 })
                 .sort();
-            summary[cat] = models.length > 0 ? models : ['None selected'];
+            summary[cat] = models.length > 0 ? models : ['None specified'];
         });
 
         // Subwoofers with display names
@@ -1101,7 +1101,7 @@ function RP22ReportInner() {
             const displayName = getDisplayName(rearModel) || rearModel;
             subList.push(rearSubs > 1 ? `${displayName} × ${rearSubs} (rear)` : `${displayName} (rear)`);
         }
-        summary.subs = subList.length > 0 ? subList : ['None selected'];
+        summary.subs = subList.length > 0 ? subList : ['None specified'];
 
         return summary;
     }, [placedSpeakers, frontSubsCfg, rearSubsCfg]);
