@@ -1775,14 +1775,20 @@ function RP22ReportInner() {
                             <div style={{ borderBottom: '1px solid #E6E4DD', marginTop: 18, marginBottom: 18 }} />
 
                             {/* Counts: two stacked full-width cards */}
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6mm' }}>
+                            <div style={{ 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                gap: '6mm',
+                                maxWidth: '170mm',
+                                margin: '6mm auto 0',
+                            }}>
                                 {/* Room */}
                                 <div
                                     style={{
-                                        border: '1px solid #DCDBD6',
-                                        borderRadius: 12,
-                                        padding: 18,
-                                        background: '#FFFFFF',
+                                        border: '1px solid #D9D5CE',
+                                        borderRadius: '12px',
+                                        padding: '6mm 8mm',
+                                        background: '#FBFAF8',
                                         width: '100%',
                                         textAlign: 'center',
                                     }}
@@ -1791,16 +1797,16 @@ function RP22ReportInner() {
                                     <div
                                         style={{
                                             fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                            fontSize: 15,
+                                            fontSize: '12pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
-                                            marginBottom: 12,
+                                            marginBottom: '3mm',
                                         }}
                                     >
                                         Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                     </div>
 
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '4mm', marginTop: '2mm' }}>
                                         <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
                                         <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
                                         <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
@@ -1811,10 +1817,10 @@ function RP22ReportInner() {
                                 {/* Seat */}
                                 <div
                                     style={{
-                                        border: '1px solid #DCDBD6',
-                                        borderRadius: 12,
-                                        padding: 18,
-                                        background: '#FFFFFF',
+                                        border: '1px solid #D9D5CE',
+                                        borderRadius: '12px',
+                                        padding: '6mm 8mm',
+                                        background: '#FBFAF8',
                                         width: '100%',
                                         textAlign: 'center',
                                     }}
@@ -1823,16 +1829,16 @@ function RP22ReportInner() {
                                     <div
                                         style={{
                                             fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                            fontSize: 15,
+                                            fontSize: '12pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
-                                            marginBottom: 12,
+                                            marginBottom: '3mm',
                                         }}
                                     >
                                         Seat parameters ({seats?.length || 0} seats)
                                     </div>
 
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '4mm', marginTop: '2mm' }}>
                                         {(() => {
                                             const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
                                             (seatLevelCounts || []).forEach(s => {
@@ -1855,7 +1861,7 @@ function RP22ReportInner() {
                             </div>
 
                             {/* Optional small note at bottom of page 1 */}
-                            <div style={{ marginTop: 18, fontSize: 10, color: '#3E4349', textAlign: 'center' }}>
+                            <div style={{ marginTop: '5mm', fontSize: 10, color: '#3E4349', textAlign: 'center' }}>
                                 Generated from current Room Designer configuration and live analysis state.
                             </div>
                         </div>
