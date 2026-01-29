@@ -1945,7 +1945,7 @@ function RP22ReportInner() {
                             <div
                                 style={{
                                     maxWidth: "460px",
-                                    margin: "0 auto 8mm auto",
+                                    margin: "0 auto 12mm auto",
                                     textAlign: "center",
                                 }}
                             >
@@ -1994,7 +1994,7 @@ function RP22ReportInner() {
                             <div style={{ 
                                 display: 'flex', 
                                 flexDirection: 'column', 
-                                gap: '6mm',
+                                gap: '8mm',
                                 maxWidth: '185mm',
                                 margin: '0 auto',
                             }}>
@@ -2075,7 +2075,7 @@ function RP22ReportInner() {
                             </div>
 
                             {/* Screen & Viewing Geometry */}
-                            <div style={{ maxWidth: '185mm', margin: '6mm auto 0' }}>
+                            <div style={{ maxWidth: '185mm', margin: '8mm auto 0' }}>
                                 <div
                                     style={{
                                         border: '1.5px solid #D9D5CE',
@@ -2183,7 +2183,7 @@ function RP22ReportInner() {
                             {/* System Summary */}
                             <div style={{
                                 maxWidth: '185mm',
-                                margin: '6mm auto 0',
+                                margin: '8mm auto 0',
                             }}>
                                 <div
                                     style={{
@@ -2200,7 +2200,7 @@ function RP22ReportInner() {
                                             fontSize: '14pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
-                                            marginBottom: '3mm',
+                                            marginBottom: '4mm',
                                             textAlign: 'center',
                                         }}
                                     >
@@ -2262,7 +2262,7 @@ function RP22ReportInner() {
                             </div>
 
                             {/* Optional small note at bottom of page 1 */}
-                            <div style={{ marginTop: '8mm', fontSize: '9pt', color: '#625143', textAlign: 'center', opacity: 0.75 }}>
+                            <div style={{ marginTop: '8mm', fontSize: '9pt', color: '#625143', textAlign: 'center' }}>
                                 Generated from current Room Designer configuration and live analysis state.
                             </div>
                         </div>
