@@ -1008,10 +1008,45 @@ function RP22ReportInner() {
             subs: []
         };
 
-        // Helper to normalize model name
+        // Helper to normalize model name to display format (strips suffixes, proper capitalisation)
         const normalizeModel = (model) => {
             if (!model || model === 'off' || model === 'none') return null;
             return String(model).trim();
+        };
+
+        // Helper to get display-ready speaker name (matches Room Designer UI)
+        const getDisplayName = (modelKey) => {
+            if (!modelKey) return null;
+            
+            // Get metadata from registry
+            const meta = getSpeakerModelMeta(modelKey);
+            
+            // Use registry label if available (most reliable)
+            if (meta?.label && !meta.notFound) {
+                return meta.label;
+            }
+            
+            // Fallback: manual cleanup
+            let name = String(modelKey).trim();
+            
+            // Strip any trailing variant suffix (_s, _m, _l, etc.)
+            name = name.replace(/[_-][sml]$/i, '');
+            
+            // Convert kebab-case to spaces and title case
+            name = name
+                .split(/[-_]+/)
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                .join(' ');
+            
+            // Final defensive check: strip any remaining underscores
+            if (name.includes('_')) {
+                name = name.split('_')[0];
+                if (typeof console !== 'undefined' && console.warn) {
+                    console.warn('[RP22Report] Model name still contains underscore after normalisation:', modelKey);
+                }
+            }
+            
+            return name;
         };
 
         // Group speakers by category and model
@@ -1040,15 +1075,18 @@ function RP22ReportInner() {
             }
         });
 
-        // Format speaker lists
+        // Format speaker lists with display names
         Object.keys(speakersByCategory).forEach(cat => {
             const models = Object.entries(speakersByCategory[cat])
-                .map(([model, count]) => count > 1 ? `${model} × ${count}` : model)
+                .map(([modelKey, count]) => {
+                    const displayName = getDisplayName(modelKey) || modelKey;
+                    return count > 1 ? `${displayName} × ${count}` : displayName;
+                })
                 .sort();
             summary[cat] = models.length > 0 ? models : ['None selected'];
         });
 
-        // Subwoofers
+        // Subwoofers with display names
         const frontSubs = frontSubsCfg?.count || 0;
         const rearSubs = rearSubsCfg?.count || 0;
         const frontModel = normalizeModel(frontSubsCfg?.model);
@@ -1056,10 +1094,12 @@ function RP22ReportInner() {
 
         const subList = [];
         if (frontSubs > 0 && frontModel) {
-            subList.push(frontSubs > 1 ? `${frontModel} × ${frontSubs} (front)` : `${frontModel} (front)`);
+            const displayName = getDisplayName(frontModel) || frontModel;
+            subList.push(frontSubs > 1 ? `${displayName} × ${frontSubs} (front)` : `${displayName} (front)`);
         }
         if (rearSubs > 0 && rearModel) {
-            subList.push(rearSubs > 1 ? `${rearModel} × ${rearSubs} (rear)` : `${rearModel} (rear)`);
+            const displayName = getDisplayName(rearModel) || rearModel;
+            subList.push(rearSubs > 1 ? `${displayName} × ${rearSubs} (rear)` : `${displayName} (rear)`);
         }
         summary.subs = subList.length > 0 ? subList : ['None selected'];
 
