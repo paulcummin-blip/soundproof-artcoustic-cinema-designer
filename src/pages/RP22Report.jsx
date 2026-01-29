@@ -17,6 +17,8 @@ import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
 import { formatSeatLabel } from '../components/utils/seatLabel';
 import { Button } from '@/components/ui/button';
 import RoomVisualisation from '@/components/room/RoomVisualisation';
+import { generateSVG, generateDXF, downloadTextFile } from '../components/utils/cadExport';
+import { Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { computeScreenMetrics } from '../components/utils/screenMetrics';
 import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
@@ -34,6 +36,7 @@ function RP22ReportInner() {
     const planEnabled = true;
     const [screenMetricsForPrint, setScreenMetricsForPrint] = useState(null);
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
+    const [showCadExportMenu, setShowCadExportMenu] = useState(false);
 
     useEffect(() => {
         const onAfterPrint = () => {
@@ -1648,7 +1651,7 @@ function RP22ReportInner() {
                             })()}
                         </div>
                     </div>
-                    <div>
+                    <div className="flex gap-3">
                         <Button
                             type="button"
                             onClick={() => {
@@ -1677,6 +1680,111 @@ function RP22ReportInner() {
                             <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
                             Export PDF
                         </Button>
+                        
+                        <div style={{ position: 'relative' }}>
+                            <Button
+                                type="button"
+                                onClick={() => setShowCadExportMenu(!showCadExportMenu)}
+                                className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
+                                style={{
+                                    fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                                    backgroundColor: "#FFFFFF",
+                                    borderColor: "#625143",
+                                    color: "#625143",
+                                    opacity: 1,
+                                }}
+                            >
+                                <Download className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
+                                Export CAD overlay
+                            </Button>
+                            
+                            {showCadExportMenu && (
+                                <div 
+                                    style={{
+                                        position: 'absolute',
+                                        top: '100%',
+                                        right: 0,
+                                        marginTop: '8px',
+                                        backgroundColor: '#FFFFFF',
+                                        border: '1px solid #E6E4DD',
+                                        borderRadius: '8px',
+                                        padding: '12px',
+                                        minWidth: '240px',
+                                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                        zIndex: 1000,
+                                    }}
+                                >
+                                    <div style={{ fontSize: '11px', color: '#3E4349', marginBottom: '10px' }}>
+                                        Plan view only • true scale • overlay use
+                                    </div>
+                                    
+                                    <Button
+                                        type="button"
+                                        onClick={() => {
+                                            const projectName = 'RP22Report';
+                                            const date = new Date().toISOString().split('T')[0];
+                                            const filename = `RP22_CAD_Overlay_${projectName}_${date}.svg`;
+                                            
+                                            const svgContent = generateSVG({
+                                                roomDims,
+                                                seatingPositions: seats,
+                                                placedSpeakers,
+                                                screenFrontPlaneM: app?.screenFrontPlaneM,
+                                                mlp: primarySeatingPosition,
+                                                frontSubsCfg,
+                                                rearSubsCfg,
+                                            });
+                                            
+                                            downloadTextFile(svgContent, filename, 'image/svg+xml');
+                                            setShowCadExportMenu(false);
+                                        }}
+                                        className="w-full mb-2 px-4 py-2 text-sm hover:bg-[#F9F8F6]"
+                                        style={{
+                                            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                                            backgroundColor: "#FFFFFF",
+                                            border: '1px solid #E6E4DD',
+                                            color: "#1B1A1A",
+                                            justifyContent: 'flex-start',
+                                        }}
+                                    >
+                                        Download SVG
+                                    </Button>
+                                    
+                                    <Button
+                                        type="button"
+                                        onClick={() => {
+                                            const projectName = 'RP22Report';
+                                            const date = new Date().toISOString().split('T')[0];
+                                            const filename = `RP22_CAD_Overlay_${projectName}_${date}.dxf`;
+                                            
+                                            const dxfContent = generateDXF({
+                                                roomDims,
+                                                seatingPositions: seats,
+                                                placedSpeakers,
+                                                screenFrontPlaneM: app?.screenFrontPlaneM,
+                                                mlp: primarySeatingPosition,
+                                                frontSubsCfg,
+                                                rearSubsCfg,
+                                            });
+                                            
+                                            downloadTextFile(dxfContent, filename, 'application/dxf');
+                                            setShowCadExportMenu(false);
+                                        }}
+                                        className="w-full px-4 py-2 text-sm hover:bg-[#F9F8F6]"
+                                        style={{
+                                            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                                            backgroundColor: "#FFFFFF",
+                                            border: '1px solid #E6E4DD',
+                                            color: "#1B1A1A",
+                                            justifyContent: 'flex-start',
+                                        }}
+                                    >
+                                        Download DXF
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+                        
                         <div style={{ marginTop: 6, textAlign: "right", fontSize: 12, color: "#3E4349" }}>
                             <div><strong>Export status:</strong> {exportStatus}</div>
                             <div style={{ fontSize: 11, color: "#625143" }}>
