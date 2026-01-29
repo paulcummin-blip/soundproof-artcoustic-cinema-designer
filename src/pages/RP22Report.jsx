@@ -1317,7 +1317,7 @@ function RP22ReportInner() {
                 />
             </div>
             
-            {/* Hidden plan capture element (DIMENSIONED) */}
+            {/* Hidden plan capture element (ROOM DIMENSIONS) */}
             <div 
                 data-plan-capture-dims
                 style={{ 
@@ -1343,7 +1343,7 @@ function RP22ReportInner() {
                     overlays={{}}
                     showBaffle={true}
                     showScreen={true}
-                    speakerPositionsView="on"
+                    speakerPositionsView="off"
                     showMlpRuler={true}
                     zoomMode="off"
                     onSetSpeakers={rvNoops.onSetSpeakers}
@@ -1359,7 +1359,7 @@ function RP22ReportInner() {
                 />
             </div>
             
-            {/* Hidden plan capture element (SPEAKER DIMENSIONS) */}
+            {/* Hidden plan capture element (SPEAKER POSITIONS) */}
             <div 
                 data-plan-capture-speaker-dims
                 style={{ 
@@ -1386,7 +1386,7 @@ function RP22ReportInner() {
                     showBaffle={true}
                     showScreen={true}
                     speakerPositionsView="on"
-                    showMlpRuler={true}
+                    showMlpRuler={false}
                     zoomMode="off"
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
@@ -1926,12 +1926,12 @@ function RP22ReportInner() {
                                         padding: 0,
                                     }}
                                 >
-                                    Room plan (speaker dimensions)
+                                    Room plan (speaker positions)
                                 </h2>
 
                                 <img
                                     src={planSpeakerDimsImageDataUrl}
-                                    alt="Room plan (speaker dimensions)"
+                                    alt="Room plan (speaker positions)"
                                     style={{
                                         width: '100%',
                                         height: 'auto',
