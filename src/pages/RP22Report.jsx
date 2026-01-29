@@ -1940,7 +1940,7 @@ function RP22ReportInner() {
                     <div className="print-container">
                         <section id="pdf-cover">
                         {/* PAGE 1: Headline + counts only */}
-                        <div className="print-page-break-after print-summary">
+                        <div className="print-page-break-after print-summary" style={{ paddingTop: '18mm' }}>
                             {/* Top: centred logo + title */}
                             <div
                                 style={{
