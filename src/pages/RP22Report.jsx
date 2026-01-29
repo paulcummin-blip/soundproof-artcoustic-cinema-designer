@@ -542,7 +542,7 @@ function RP22ReportInner() {
                     canvas.width = targetW;
                     canvas.height = Math.round(targetW * ratio);
                     const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#F8F8F7';
+                    ctx.fillStyle = '#FFFFFF';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
                     const dataUrl = canvas.toDataURL('image/png');
@@ -677,6 +677,11 @@ function RP22ReportInner() {
                 html, body {
                     height: auto !important;
                     overflow: visible !important;
+                }
+                
+                /* Force pure white backgrounds */
+                html, body, .print-root, .print-container, .print-only {
+                    background: #FFFFFF !important;
                 }
 
                 /* Base44 / app wrappers sometimes clamp height */
@@ -1333,26 +1338,25 @@ function RP22ReportInner() {
                                         flexDirection: 'column',
                                     }}
                                 >
-                                    <div style={{ marginBottom: '6mm' }}>
-                                        <div
-                                            style={{
-                                                fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                                fontSize: '14pt',
-                                                fontWeight: 600,
-                                                color: '#1B1A1A',
-                                            }}
-                                        >
-                                            Room plan
-                                        </div>
-                                        <div style={{ height: '1px', background: '#DCDBD6', marginTop: '3mm' }} />
-                                    </div>
+                                    <h2
+                                        style={{
+                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                            fontSize: '18pt',
+                                            fontWeight: 600,
+                                            letterSpacing: '0.2px',
+                                            color: '#1B1A1A',
+                                            margin: '0 0 8mm 0',
+                                        }}
+                                    >
+                                        Room plan
+                                    </h2>
 
                                     <div
                                         style={{
                                             flex: 1,
+                                            background: '#FFFFFF',
                                             border: '1px solid #DCDBD6',
                                             borderRadius: '10px',
-                                            background: '#FFFFFF',
                                             padding: '6mm',
                                             display: 'flex',
                                             alignItems: 'center',
