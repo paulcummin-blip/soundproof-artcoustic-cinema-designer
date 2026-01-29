@@ -33,9 +33,9 @@ export const artcousticSpeakers = [
     "canonicalProductId": "Spitfire Q-4-3",
     "verticalOffAxisAvailable": true,
     "category": "Spitfire",
-    "widthM": 0.27,
-    "depthM": 0.08,
-    "heightM": 0.27,
+    "widthM": 0.28,
+    "depthM": 0.115,
+    "heightM": 0.21,
     "price": 1820
   },
   {
@@ -71,9 +71,9 @@ export const artcousticSpeakers = [
     "accessories": "Accessories None",
     "price": 2090,
     "category": "Spitfire",
-    "widthM": 0.27,
-    "depthM": 0.08,
-    "heightM": 0.40,
+    "widthM": 0.28,
+    "depthM": 0.115,
+    "heightM": 0.28,
   },
   {
     "id": "spitfire-q-4-5",
@@ -106,7 +106,10 @@ export const artcousticSpeakers = [
     "description": "LF – 5.5\" woofer (x4); HF – 1.5\" woofer (x4)",
     "transducers": "Transducers LF – 5.5\" woofer (x 4) HF – 1.5\" woofer (x 4)",
     "enclosure": "Enclosure Medium density Fiber board. Elite Composite. Elite Composite",
-    "accessories": "Accessories None"
+    "accessories": "Accessories None",
+    "widthM": 0.5,
+    "depthM": 0.165,
+    "heightM": 0.4
   },
   {
     "id": "spitfire-q-8-5",
@@ -141,9 +144,9 @@ export const artcousticSpeakers = [
     "accessories": "Accessories None",
     "price": 5810,
     "category": "Spitfire",
-    "widthM": 0.27,
-    "depthM": 0.135,
-    "heightM": 0.79
+    "widthM": 0.5,
+    "depthM": 0.165,
+    "heightM": 0.6
   },
   {
     "id": "evolve_2_1",
