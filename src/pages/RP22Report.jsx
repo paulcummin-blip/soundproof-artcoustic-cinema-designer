@@ -1990,13 +1990,13 @@ function RP22ReportInner() {
                                 </div>
                             </div>
 
-                            {/* Panels: consistent grid */}
+                            {/* Master stack wrapper (all 4 panels + footer) */}
                             <div style={{ 
-                                display: 'flex', 
-                                flexDirection: 'column', 
-                                gap: '8mm',
                                 maxWidth: '185mm',
-                                margin: '12mm auto 0',
+                                margin: '16mm auto 0',
+                                display: 'flex',
+                                flexDirection: 'column',
+                                gap: '8mm',
                             }}>
                                 {/* Room parameters */}
                                 <div
@@ -2178,13 +2178,8 @@ function RP22ReportInner() {
                                         );
                                     })()}
                                 </div>
-                            </div>
 
-                            {/* System Summary */}
-                            <div style={{
-                                maxWidth: '185mm',
-                                margin: '8mm auto 0',
-                            }}>
+                                {/* System Summary */}
                                 <div
                                     style={{
                                         border: '1.5px solid #D9D5CE',
@@ -2259,11 +2254,11 @@ function RP22ReportInner() {
                                         </div>
                                     </div>
                                 </div>
-                            </div>
 
-                            {/* Optional small note at bottom of page 1 */}
-                            <div style={{ marginTop: '8mm', fontSize: '9pt', color: '#625143', textAlign: 'center' }}>
-                                Generated from current Room Designer configuration and live analysis state.
+                                {/* Optional small note at bottom of page 1 */}
+                                <div style={{ marginTop: '2mm', fontSize: '8.5pt', color: '#625143', textAlign: 'center' }}>
+                                    Generated from current Room Designer configuration and live analysis state.
+                                </div>
                             </div>
                         </div>
                         </section>
