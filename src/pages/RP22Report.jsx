@@ -1303,6 +1303,11 @@ function RP22ReportInner() {
     const PrintStyles = () => (
         <style>{`
             @media print {
+                /* Global typography: Century Gothic everywhere */
+                * {
+                    font-family: 'Century Gothic', 'Futura PT Light', 'Didact Gothic', sans-serif !important;
+                }
+                
                 /* 1) Kill anything that can clip/stop the print flow */
                 html, body {
                     height: auto !important;
@@ -1939,10 +1944,9 @@ function RP22ReportInner() {
                             {/* Top: centred logo + title */}
                             <div
                                 style={{
-                                    maxWidth: "520px",
-                                    margin: "0 auto",
+                                    maxWidth: "460px",
+                                    margin: "0 auto 8mm auto",
                                     textAlign: "center",
-                                    marginTop: 4
                                 }}
                             >
                                 <img
@@ -1951,25 +1955,25 @@ function RP22ReportInner() {
                                     style={{
                                         width: "100%",
                                         height: "auto",
-                                        marginBottom: "12px",
+                                        marginBottom: "8mm",
                                     }}
                                 />
 
                                 <div
                                     style={{
-                                        fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                        fontSize: 28,
+                                        fontSize: '26pt',
                                         fontWeight: 700,
                                         color: '#1B1A1A',
-                                        lineHeight: 1.15,
+                                        lineHeight: 1.2,
+                                        marginBottom: '3mm',
                                     }}
                                 >
                                     RP22 Compliance Report
                                 </div>
 
-                                <div style={{ marginTop: 6, color: '#3E4349', fontSize: 12 }}>
+                                <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.4 }}>
                                     {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                    <span style={{ margin: '0 10px', color: '#DCDBD6' }}>•</span>
+                                    <span style={{ margin: '0 8px', color: '#DCDBD6' }}>•</span>
                                     <span style={{ color: '#625143' }}>
                                         System: {(() => {
                                             const dolbyPreset = app?.dolbyLayout || "5.1";
@@ -1986,42 +1990,38 @@ function RP22ReportInner() {
                                 </div>
                             </div>
 
-                            {/* Divider */}
-                            <div style={{ borderBottom: '1px solid #E6E4DD', marginTop: 14, marginBottom: 14 }} />
-
-                            {/* Counts: two stacked full-width cards */}
+                            {/* Panels: consistent grid */}
                             <div style={{ 
                                 display: 'flex', 
                                 flexDirection: 'column', 
-                                gap: '8mm',
+                                gap: '6mm',
                                 maxWidth: '185mm',
-                                margin: '4mm auto 0',
+                                margin: '0 auto',
                             }}>
-                                {/* Room */}
+                                {/* Room parameters */}
                                 <div
                                     style={{
-                                        border: '1px solid #D9D5CE',
-                                        borderRadius: '12px',
-                                        padding: '8mm 10mm',
+                                        border: '1.5px solid #D9D5CE',
+                                        borderRadius: '10px',
+                                        padding: '7mm 9mm',
                                         background: '#FBFAF8',
                                         width: '100%',
-                                        textAlign: 'center',
                                     }}
                                     className="print-avoid-break"
                                 >
                                     <div
                                         style={{
-                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                            fontSize: '13pt',
+                                            fontSize: '14pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
                                             marginBottom: '4mm',
+                                            textAlign: 'center',
                                         }}
                                     >
                                         Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                     </div>
 
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', marginTop: '3mm', fontSize: '110%' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
                                         <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
                                         <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
                                         <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
@@ -2029,31 +2029,30 @@ function RP22ReportInner() {
                                     </div>
                                 </div>
 
-                                {/* Seat */}
+                                {/* Seat parameters */}
                                 <div
                                     style={{
-                                        border: '1px solid #D9D5CE',
-                                        borderRadius: '12px',
-                                        padding: '8mm 10mm',
+                                        border: '1.5px solid #D9D5CE',
+                                        borderRadius: '10px',
+                                        padding: '7mm 9mm',
                                         background: '#FBFAF8',
                                         width: '100%',
-                                        textAlign: 'center',
                                     }}
                                     className="print-avoid-break"
                                 >
                                     <div
                                         style={{
-                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                            fontSize: '13pt',
+                                            fontSize: '14pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
                                             marginBottom: '4mm',
+                                            textAlign: 'center',
                                         }}
                                     >
                                         Seat parameters ({seats?.length || 0} seats)
                                     </div>
 
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', marginTop: '3mm', fontSize: '110%' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
                                         {(() => {
                                             const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
                                             (seatLevelCounts || []).forEach(s => {
@@ -2076,21 +2075,20 @@ function RP22ReportInner() {
                             </div>
 
                             {/* Screen & Viewing Geometry */}
-                            <div style={{ maxWidth: '185mm', margin: '8mm auto 0' }}>
+                            <div style={{ maxWidth: '185mm', margin: '6mm auto 0' }}>
                                 <div
                                     style={{
-                                        border: '1px solid #E6E4DD',
-                                        borderRadius: '12px',
-                                        padding: '7mm 10mm',
-                                        background: '#FDFCFB',
+                                        border: '1.5px solid #D9D5CE',
+                                        borderRadius: '10px',
+                                        padding: '7mm 9mm',
+                                        background: '#FBFAF8',
                                         width: '100%',
                                     }}
                                     className="print-avoid-break"
                                 >
                                     <div
                                         style={{
-                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                            fontSize: '13pt',
+                                            fontSize: '14pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
                                             marginBottom: '5mm',
@@ -2131,49 +2129,49 @@ function RP22ReportInner() {
                                                         Screen size — {choiceLabel}
                                                     </div>
 
-                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.55 }}>
-                                                        <div><strong>Viewable area</strong></div>
-                                                        {hasViewable ? (
-                                                            <div>
-                                                                {fmtCm(viewWm)} × {fmtCm(viewHm)} cm ({fmtIn(viewWm)}" × {fmtIn(viewHm)}")
-                                                            </div>
-                                                        ) : (
-                                                            <div>Not specified</div>
-                                                        )}
+                                                    <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.6 }}>
+                                                    <div><strong>Viewable area</strong></div>
+                                                    {hasViewable ? (
+                                                        <div>
+                                                            {fmtCm(viewWm)} × {fmtCm(viewHm)} cm ({fmtIn(viewWm)}" × {fmtIn(viewHm)}")
+                                                        </div>
+                                                    ) : (
+                                                        <div>Not specified</div>
+                                                    )}
 
-                                                        <div style={{ marginTop: '2mm' }}><strong>Overall with border</strong></div>
-                                                        {hasOverall ? (
-                                                            <div>
-                                                                {fmtCm(overallWm)} × {fmtCm(overallHm)} cm ({fmtIn(overallWm)}" × {fmtIn(overallHm)}")
-                                                            </div>
-                                                        ) : (
-                                                            <div>Not specified</div>
-                                                        )}
+                                                    <div style={{ marginTop: '2.5mm' }}><strong>Overall with border</strong></div>
+                                                    {hasOverall ? (
+                                                        <div>
+                                                            {fmtCm(overallWm)} × {fmtCm(overallHm)} cm ({fmtIn(overallWm)}" × {fmtIn(overallHm)}")
+                                                        </div>
+                                                    ) : (
+                                                        <div>Not specified</div>
+                                                    )}
                                                     </div>
-                                                </div>
-
-                                                {/* Right: Viewing geometry */}
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 600, fontSize: '10pt', color: '#1B1A1A', marginBottom: '3mm' }}>
-                                                        Viewing geometry
                                                     </div>
 
-                                                    <div style={{ fontSize: '9pt', color: '#3E4349', lineHeight: 1.55 }}>
-                                                        <div>
-                                                            <strong>Horizontal viewing angle:</strong>{" "}
-                                                            {hasAngles ? `${horizontalDeg.toFixed(1)}°` : "Not specified"}
-                                                        </div>
-                                                        <div>
-                                                            <strong>Vertical viewing angle:</strong>{" "}
-                                                            {hasAngles ? `${verticalDeg.toFixed(1)}°` : "Not specified"}
-                                                        </div>
+                                                    {/* Right: Viewing geometry */}
+                                                    <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>
+                                                    Viewing geometry
+                                                    </div>
 
-                                                        <div style={{ marginTop: '2mm' }}><strong>Distance from front wall</strong></div>
-                                                        {hasWallDist ? (
-                                                            <div>{Math.round(wallDistM * 100)} cm ({(wallDistM * 39.3701).toFixed(1)}")</div>
-                                                        ) : (
-                                                            <div>Not specified</div>
-                                                        )}
+                                                    <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.6 }}>
+                                                    <div>
+                                                        <strong>Horizontal viewing angle:</strong>{" "}
+                                                        {hasAngles ? `${horizontalDeg.toFixed(1)}°` : "Not specified"}
+                                                    </div>
+                                                    <div>
+                                                        <strong>Vertical viewing angle:</strong>{" "}
+                                                        {hasAngles ? `${verticalDeg.toFixed(1)}°` : "Not specified"}
+                                                    </div>
+
+                                                    <div style={{ marginTop: '2.5mm' }}><strong>Distance from front wall</strong></div>
+                                                    {hasWallDist ? (
+                                                        <div>{Math.round(wallDistM * 100)} cm ({(wallDistM * 39.3701).toFixed(1)}")</div>
+                                                    ) : (
+                                                        <div>Not specified</div>
+                                                    )}
                                                     </div>
                                                 </div>
                                             </div>
@@ -2185,13 +2183,13 @@ function RP22ReportInner() {
                             {/* System Summary */}
                             <div style={{
                                 maxWidth: '185mm',
-                                margin: '8mm auto 0',
+                                margin: '6mm auto 0',
                             }}>
                                 <div
                                     style={{
-                                        border: '1px solid #D9D5CE',
-                                        borderRadius: '12px',
-                                        padding: '8mm 10mm',
+                                        border: '1.5px solid #D9D5CE',
+                                        borderRadius: '10px',
+                                        padding: '7mm 9mm',
                                         background: '#FBFAF8',
                                         width: '100%',
                                     }}
@@ -2199,8 +2197,7 @@ function RP22ReportInner() {
                                 >
                                     <div
                                         style={{
-                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                            fontSize: '13pt',
+                                            fontSize: '14pt',
                                             fontWeight: 700,
                                             color: '#1B1A1A',
                                             marginBottom: '3mm',
@@ -2211,7 +2208,6 @@ function RP22ReportInner() {
                                     </div>
                                     <div
                                         style={{
-                                            fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
                                             fontSize: '10pt',
                                             color: '#3E4349',
                                             marginBottom: '5mm',
@@ -2221,43 +2217,43 @@ function RP22ReportInner() {
                                         Selected loudspeaker models
                                     </div>
 
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3mm' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '3.5mm' }}>
                                         {/* LCR */}
-                                        <div style={{ display: 'flex', paddingBottom: '3mm', borderBottom: '1px solid #EEEAE3' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10pt', color: '#1B1A1A' }}>
+                                        <div style={{ display: 'flex', paddingBottom: '3.5mm', borderBottom: '1px solid #EEEAE3' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10.5pt', color: '#1B1A1A' }}>
                                                 LCR
                                             </div>
-                                            <div style={{ width: '70%', fontSize: '10pt', color: '#3E4349' }}>
+                                            <div style={{ width: '70%', fontSize: '10.5pt', color: '#3E4349' }}>
                                                 {systemSummary.lcr.join(', ')}
                                             </div>
                                         </div>
 
                                         {/* Surrounds */}
-                                        <div style={{ display: 'flex', paddingBottom: '3mm', borderBottom: '1px solid #EEEAE3' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10pt', color: '#1B1A1A' }}>
+                                        <div style={{ display: 'flex', paddingBottom: '3.5mm', borderBottom: '1px solid #EEEAE3' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10.5pt', color: '#1B1A1A' }}>
                                                 Surrounds
                                             </div>
-                                            <div style={{ width: '70%', fontSize: '10pt', color: '#3E4349' }}>
+                                            <div style={{ width: '70%', fontSize: '10.5pt', color: '#3E4349' }}>
                                                 {systemSummary.surrounds.join(', ')}
                                             </div>
                                         </div>
 
                                         {/* Overheads */}
-                                        <div style={{ display: 'flex', paddingBottom: '3mm', borderBottom: '1px solid #EEEAE3' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10pt', color: '#1B1A1A' }}>
+                                        <div style={{ display: 'flex', paddingBottom: '3.5mm', borderBottom: '1px solid #EEEAE3' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10.5pt', color: '#1B1A1A' }}>
                                                 Overheads
                                             </div>
-                                            <div style={{ width: '70%', fontSize: '10pt', color: '#3E4349' }}>
+                                            <div style={{ width: '70%', fontSize: '10.5pt', color: '#3E4349' }}>
                                                 {systemSummary.overheads.join(', ')}
                                             </div>
                                         </div>
 
                                         {/* Subwoofers */}
                                         <div style={{ display: 'flex' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10pt', color: '#1B1A1A' }}>
+                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '10.5pt', color: '#1B1A1A' }}>
                                                 Subwoofers
                                             </div>
-                                            <div style={{ width: '70%', fontSize: '10pt', color: '#3E4349' }}>
+                                            <div style={{ width: '70%', fontSize: '10.5pt', color: '#3E4349' }}>
                                                 {systemSummary.subs.join(', ')}
                                             </div>
                                         </div>
@@ -2266,7 +2262,7 @@ function RP22ReportInner() {
                             </div>
 
                             {/* Optional small note at bottom of page 1 */}
-                            <div style={{ marginTop: '6mm', fontSize: 9, color: '#625143', textAlign: 'center', opacity: 0.8 }}>
+                            <div style={{ marginTop: '8mm', fontSize: '9pt', color: '#625143', textAlign: 'center', opacity: 0.75 }}>
                                 Generated from current Room Designer configuration and live analysis state.
                             </div>
                         </div>
