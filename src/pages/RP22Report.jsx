@@ -510,9 +510,9 @@ function RP22ReportInner() {
                     return;
                 }
                 
-                // Tight padding (3% of shortest side, minimum 12 units)
+                // Tight padding (2% of shortest side, minimum 10 units)
                 const shortestSide = Math.min(bbox.width, bbox.height);
-                const padding = Math.max(shortestSide * 0.03, 12);
+                const padding = Math.max(shortestSide * 0.02, 10);
                 
                 const viewBoxX = bbox.x - padding;
                 const viewBoxY = bbox.y - padding;
@@ -534,8 +534,14 @@ function RP22ReportInner() {
                 img.crossOrigin = 'anonymous';
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
+                    
+                    // Use A4-ish aspect ratio so plan fills the page better
                     const targetW = 2400;
-                    const targetH = Math.round(targetW * (viewBoxH / viewBoxW));
+                    
+                    // Keep proportional to cropped viewBox, but clamp to sensible range
+                    let targetH = Math.round(targetW * (viewBoxH / viewBoxW));
+                    targetH = Math.max(2600, Math.min(3400, targetH));
+                    
                     canvas.width = targetW;
                     canvas.height = targetH;
                     const ctx = canvas.getContext('2d');
@@ -1322,33 +1328,52 @@ function RP22ReportInner() {
                         </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
-                            <section className="print-page-break-after">
-                                <h2 style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: '14pt', margin: '0 0 6mm 0' }}>
-                                    Room plan
-                                </h2>
-
+                            <section id="pdf-room-plan" className="print-page-break-after">
                                 <div
                                     style={{
-                                        width: '100%',
-                                        height: '270mm',
-                                        border: '1px solid #DCDBD6',
-                                        borderRadius: '10px',
-                                        padding: '6mm',
-                                        background: '#F8F8F7',
-                                        boxSizing: 'border-box',
+                                        height: '271mm',
+                                        display: 'flex',
+                                        flexDirection: 'column',
                                     }}
                                 >
-                                    <img
-                                        src={planImageDataUrl}
-                                        alt="Room Plan"
+                                    <div style={{ marginBottom: '6mm' }}>
+                                        <div
+                                            style={{
+                                                fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
+                                                fontSize: '14pt',
+                                                fontWeight: 600,
+                                                color: '#1B1A1A',
+                                            }}
+                                        >
+                                            Room plan
+                                        </div>
+                                        <div style={{ height: '1px', background: '#DCDBD6', marginTop: '3mm' }} />
+                                    </div>
+
+                                    <div
                                         style={{
-                                            width: '100%',
-                                            height: '100%',
-                                            objectFit: 'contain',
-                                            objectPosition: 'center',
-                                            display: 'block',
+                                            flex: 1,
+                                            border: '1px solid #DCDBD6',
+                                            borderRadius: '10px',
+                                            background: '#FFFFFF',
+                                            padding: '6mm',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
                                         }}
-                                    />
+                                    >
+                                        <img
+                                            src={planImageDataUrl}
+                                            alt="Room plan"
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'contain',
+                                                objectPosition: 'center',
+                                                display: 'block',
+                                            }}
+                                        />
+                                    </div>
                                 </div>
                             </section>
                         )}
