@@ -1783,32 +1783,17 @@ function RP22ReportInner() {
                     page-break-inside: auto !important;
                 }
 
-                /* ===== PRINT FIX: Seat section must NOT use CSS grid (Chrome PDF grid pagination bug) ===== */
-                /* Seat cards container: switch from grid to flex-wrap (print-safe) */
+                /* ===== PRINT FIX: Seat section uses simple block layout (100% reliable pagination) ===== */
                 .rp22-report #pdf-seat-parameters .rp22-params-grid,
                 .rp22-report #pdf-seat-parameters .rp22-cards-grid {
-                    display: flex !important;
-                    flex-wrap: wrap !important;
-                    gap: 10mm !important;
-                    align-items: flex-start !important;
-                    justify-content: space-between !important;
+                    display: block !important;
                 }
 
-                /* Each card wrapper becomes a 2-column item */
                 .rp22-report #pdf-seat-parameters .rp22-card-wrap {
-                    width: calc(50% - 5mm) !important;
-                    margin: 0 !important;
-                    break-inside: avoid !important;       /* try to keep a card together */
+                    width: 100% !important;
+                    break-inside: avoid !important;
                     page-break-inside: avoid !important;
-                }
-
-                /* If a seat card is too tall, allow the CONTENT to split rather than blank the page */
-                .rp22-report #pdf-seat-parameters .rp22-param-card,
-                .rp22-report #pdf-seat-parameters .rp22-seat-card,
-                .rp22-report #pdf-seat-parameters .rp22-param-card *,
-                .rp22-report #pdf-seat-parameters .rp22-seat-card * {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
+                    margin-bottom: 8mm !important;
                 }
             }
 
