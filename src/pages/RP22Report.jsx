@@ -1791,9 +1791,15 @@ function RP22ReportInner() {
 
                 .rp22-report #pdf-seat-parameters .rp22-card-wrap {
                     width: 100% !important;
-                    break-inside: avoid !important;
-                    page-break-inside: avoid !important;
                     margin-bottom: 8mm !important;
+                }
+                
+                /* Seat section: force print engine to allow fragmentation */
+                .rp22-report #pdf-seat-parameters .rp22-card-wrap,
+                .rp22-report #pdf-seat-parameters .rp22-seat-card,
+                .rp22-report #pdf-seat-parameters .rp22-param-card {
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
                 }
             }
 
