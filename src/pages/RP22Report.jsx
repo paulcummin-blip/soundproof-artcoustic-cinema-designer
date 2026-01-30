@@ -1829,6 +1829,17 @@ function RP22ReportInner() {
                     break-inside: auto !important;
                     page-break-inside: auto !important;
                 }
+                
+                /* Remove any debug overlays in print */
+                .print-debug,
+                .debug,
+                [data-debug],
+                [data-print-debug],
+                .pdf-debug-print-banner,
+                .pdf-debug-overlay,
+                .pdf-debug-tag {
+                    display: none !important;
+                }
             }
 
             .rp22-report .rp22-param-card {
