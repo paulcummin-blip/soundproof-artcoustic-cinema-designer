@@ -37,6 +37,17 @@ function RP22ReportInner() {
     const [screenMetricsForPrint, setScreenMetricsForPrint] = useState(null);
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
+    
+    // Print diagnostics toggle (enabled via ?printDebug=1)
+    const [printDebug, setPrintDebug] = useState(false);
+    const [printDiagnostics, setPrintDiagnostics] = useState(null);
+    
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            setPrintDebug(params.get('printDebug') === '1');
+        }
+    }, []);
 
     useEffect(() => {
         const onAfterPrint = () => {
@@ -50,6 +61,155 @@ function RP22ReportInner() {
         window.addEventListener('afterprint', onAfterPrint);
         return () => window.removeEventListener('afterprint', onAfterPrint);
     }, []);
+    
+    // Capture print diagnostics when printing starts
+    useEffect(() => {
+        if (!printDebug) return;
+        
+        const captureDiagnostics = () => {
+            const diagnostics = {
+                capturedAt: new Date().toISOString(),
+                nodes: []
+            };
+            
+            try {
+                // 1) section#pdf-seat-parameters
+                const section = document.querySelector('#pdf-seat-parameters');
+                if (section) {
+                    const computed = window.getComputedStyle(section);
+                    const rect = section.getBoundingClientRect();
+                    diagnostics.nodes.push({
+                        selector: 'section#pdf-seat-parameters',
+                        rect: { top: rect.top, bottom: rect.bottom, height: rect.height },
+                        computed: {
+                            display: computed.display,
+                            position: computed.position,
+                            overflow: computed.overflow,
+                            overflowX: computed.overflowX,
+                            overflowY: computed.overflowY,
+                            height: computed.height,
+                            minHeight: computed.minHeight,
+                            maxHeight: computed.maxHeight,
+                            breakInside: computed.breakInside,
+                            pageBreakInside: computed.pageBreakInside,
+                            contain: computed.contain,
+                            transform: computed.transform,
+                            filter: computed.filter
+                        }
+                    });
+                }
+                
+                // 2) #pdf-seat-parameters .rp22-params-grid.rp22-cards-grid
+                const grid = document.querySelector('#pdf-seat-parameters .rp22-params-grid.rp22-cards-grid');
+                if (grid) {
+                    const computed = window.getComputedStyle(grid);
+                    const rect = grid.getBoundingClientRect();
+                    diagnostics.nodes.push({
+                        selector: '#pdf-seat-parameters .rp22-params-grid.rp22-cards-grid',
+                        rect: { top: rect.top, bottom: rect.bottom, height: rect.height },
+                        computed: {
+                            display: computed.display,
+                            position: computed.position,
+                            overflow: computed.overflow,
+                            overflowX: computed.overflowX,
+                            overflowY: computed.overflowY,
+                            height: computed.height,
+                            minHeight: computed.minHeight,
+                            maxHeight: computed.maxHeight,
+                            breakInside: computed.breakInside,
+                            pageBreakInside: computed.pageBreakInside,
+                            contain: computed.contain,
+                            transform: computed.transform,
+                            filter: computed.filter
+                        }
+                    });
+                }
+                
+                // 3) All .rp22-card-wrap inside seat section (first 12)
+                const wrappers = document.querySelectorAll('#pdf-seat-parameters .rp22-card-wrap');
+                wrappers.forEach((wrapper, idx) => {
+                    if (idx >= 12) return; // limit to first 12
+                    
+                    const computed = window.getComputedStyle(wrapper);
+                    const rect = wrapper.getBoundingClientRect();
+                    const seatLabel = wrapper.getAttribute('data-print-seat') || '—';
+                    const seatIndex = wrapper.getAttribute('data-print-index') || '—';
+                    
+                    const wrapperData = {
+                        selector: `seatWrap[${idx}]`,
+                        seatLabel,
+                        seatIndex,
+                        rect: { top: rect.top, bottom: rect.bottom, height: rect.height },
+                        computed: {
+                            display: computed.display,
+                            position: computed.position,
+                            overflow: computed.overflow,
+                            overflowX: computed.overflowX,
+                            overflowY: computed.overflowY,
+                            height: computed.height,
+                            minHeight: computed.minHeight,
+                            maxHeight: computed.maxHeight,
+                            breakInside: computed.breakInside,
+                            pageBreakInside: computed.pageBreakInside,
+                            contain: computed.contain,
+                            transform: computed.transform,
+                            filter: computed.filter
+                        }
+                    };
+                    
+                    // Also capture the seat card inside this wrapper
+                    const seatCard = wrapper.querySelector('.rp22-seat-card');
+                    if (seatCard) {
+                        const cardComputed = window.getComputedStyle(seatCard);
+                        const cardRect = seatCard.getBoundingClientRect();
+                        wrapperData.innerCard = {
+                            rect: { top: cardRect.top, bottom: cardRect.bottom, height: cardRect.height },
+                            computed: {
+                                display: cardComputed.display,
+                                position: cardComputed.position,
+                                overflow: cardComputed.overflow,
+                                overflowX: cardComputed.overflowX,
+                                overflowY: cardComputed.overflowY,
+                                height: cardComputed.height,
+                                minHeight: cardComputed.minHeight,
+                                maxHeight: cardComputed.maxHeight,
+                                breakInside: cardComputed.breakInside,
+                                pageBreakInside: cardComputed.pageBreakInside,
+                                contain: cardComputed.contain,
+                                transform: cardComputed.transform,
+                                filter: cardComputed.filter
+                            }
+                        };
+                    }
+                    
+                    diagnostics.nodes.push(wrapperData);
+                });
+            } catch (e) {
+                diagnostics.error = String(e);
+            }
+            
+            setPrintDiagnostics(diagnostics);
+        };
+        
+        const onBeforePrint = () => {
+            captureDiagnostics();
+        };
+        
+        const mediaQueryList = window.matchMedia('print');
+        const onMediaChange = (e) => {
+            if (e.matches) {
+                captureDiagnostics();
+            }
+        };
+        
+        window.addEventListener('beforeprint', onBeforePrint);
+        mediaQueryList.addEventListener('change', onMediaChange);
+        
+        return () => {
+            window.removeEventListener('beforeprint', onBeforePrint);
+            mediaQueryList.removeEventListener('change', onMediaChange);
+        };
+    }, [printDebug]);
     
     if (!app) {
         return (
@@ -2663,6 +2823,38 @@ function RP22ReportInner() {
                         </div>
                         </section>
 
+                        {/* Print diagnostics panel (only when ?printDebug=1) */}
+                        {printDebug && (
+                            <div style={{
+                                border: '2px solid #FF0000',
+                                padding: '10mm',
+                                marginBottom: '8mm',
+                                background: '#FFF9F0',
+                                pageBreakInside: 'avoid',
+                                breakInside: 'avoid'
+                            }}>
+                                <h3 style={{ 
+                                    fontSize: '14pt', 
+                                    fontWeight: 700, 
+                                    color: '#FF0000', 
+                                    marginBottom: '4mm',
+                                    fontFamily: 'monospace'
+                                }}>
+                                    PRINT DIAGNOSTICS (TEMP)
+                                </h3>
+                                <pre style={{ 
+                                    fontSize: '7pt', 
+                                    fontFamily: 'monospace', 
+                                    whiteSpace: 'pre-wrap',
+                                    color: '#333',
+                                    maxHeight: 'none',
+                                    overflow: 'visible'
+                                }}>
+                                    {printDiagnostics ? JSON.stringify(printDiagnostics, null, 2) : 'Diagnostics not yet captured (waiting for print event)'}
+                                </pre>
+                            </div>
+                        )}
+                        
                         <section id="pdf-seat-parameters">
                         {/* SEAT PARAMETERS */}
                         <div className="print-page-break-before" style={{ marginTop: 18 }}>
@@ -2687,7 +2879,7 @@ function RP22ReportInner() {
                                     if (minDist <= 0.05) rspSeatId = closestSeat;
                                 }
 
-                                return seats.map(seat => {
+                                return seats.map((seat, seatIdx) => {
                                     const seatId = seat?.id || '—';
                                     const tooltipData = app?.seatMetricsById?.[seatId];
                                     if (!tooltipData) return null;
@@ -2698,9 +2890,15 @@ function RP22ReportInner() {
                                     const isRsp = seatId === rspSeatId;
                                     const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '(Secondary)');
                                     const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
+                                    const seatLabel = formatSeatLabel(seatId);
 
                                     return (
-                                        <div key={seatId} className="rp22-card-wrap">
+                                        <div 
+                                            key={seatId} 
+                                            className="rp22-card-wrap"
+                                            data-print-seat={seatLabel}
+                                            data-print-index={seatIdx}
+                                        >
                                         <div className="rp22-param-card rp22-seat-card">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
@@ -2748,16 +2946,30 @@ function RP22ReportInner() {
                                                                         Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
                                                                     </div>
                                                                 )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </CardContent>
-                                                </Card>
-                                                </div>
-                                                </div>
-                                                );
-                                                }).filter(Boolean);
-                                                })()}
+                                                                </div>
+                                                                );
+                                                                })}
+
+                                                                {/* Debug marker - only when printDebug=1 */}
+                                                                {printDebug && (
+                                                                <div style={{
+                                                                   fontSize: '6pt',
+                                                                   color: '#999',
+                                                                   fontFamily: 'monospace',
+                                                                   marginTop: '2mm',
+                                                                   borderTop: '1px solid #EEE',
+                                                                   paddingTop: '1mm'
+                                                                }}>
+                                                                   DEBUG END MARKER — {seatLabel}
+                                                                </div>
+                                                                )}
+                                                                </CardContent>
+                                                                </Card>
+                                                                </div>
+                                                                </div>
+                                                                );
+                                                                }).filter(Boolean);
+                                                                })()}
                                                 </div>
                         <div className="grid grid-cols-3 gap-4 mt-6 print-avoid-break">
                             <SeatComplianceSummary position="left" />
