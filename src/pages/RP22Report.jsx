@@ -1593,25 +1593,6 @@ function RP22ReportInner() {
                     break-inside: auto !important;
                     page-break-inside: auto !important;
                 }
-
-                /* ===== PRINT FIX: Seat section uses simple block layout (100% reliable pagination) ===== */
-                .rp22-report #pdf-seat-parameters .rp22-params-grid,
-                .rp22-report #pdf-seat-parameters .rp22-cards-grid {
-                    display: block !important;
-                }
-
-                .rp22-report #pdf-seat-parameters .rp22-card-wrap {
-                    width: 100% !important;
-                    margin-bottom: 8mm !important;
-                }
-                
-                /* Seat section: force print engine to allow fragmentation */
-                .rp22-report #pdf-seat-parameters .rp22-card-wrap,
-                .rp22-report #pdf-seat-parameters .rp22-seat-card,
-                .rp22-report #pdf-seat-parameters .rp22-param-card {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
-                }
             }
 
             .rp22-report .rp22-param-card {
