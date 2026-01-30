@@ -1534,6 +1534,34 @@ function RP22ReportInner() {
                     overflow: visible !important;
                 }
                 
+                /* PRINT: neutralise app shell clipping (main/layout wrappers) */
+                main,
+                main * {
+                    overflow: visible !important;
+                    max-height: none !important;
+                }
+
+                /* These are common Base44/Tailwind shell wrappers that clip print flow */
+                main {
+                    display: block !important;
+                    height: auto !important;
+                    min-height: 0 !important;
+                }
+
+                /* Safety: if any shell wrapper still carries overflow-hidden, defeat it in print */
+                .overflow-hidden,
+                [class~="overflow-hidden"] {
+                    overflow: visible !important;
+                }
+
+                /* Some shells constrain height via flex growth */
+                .flex-1,
+                [class~="flex-1"] {
+                    height: auto !important;
+                    min-height: 0 !important;
+                    max-height: none !important;
+                }
+                
                 /* Force pure white backgrounds (kill the pale side bars) */
                 html, body, #root, #__next {
                     background: #FFFFFF !important;
