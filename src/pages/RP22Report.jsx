@@ -1536,6 +1536,29 @@ function RP22ReportInner() {
                     height: auto !important;
                     min-height: 0 !important;
                 }
+
+                /* Allow report cards to split across pages to prevent clipping */
+                .rp22-report .rp22-param-card,
+                .rp22-report .rp22-seat-card {
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
+                    overflow: visible !important;
+                }
+
+                /* Neutralise any inherited avoid-break rules */
+                .rp22-report .rp22-param-card.print-avoid-break,
+                .rp22-report .rp22-seat-card.print-avoid-break,
+                .rp22-report .rp22-param-card .print-avoid-break,
+                .rp22-report .rp22-seat-card .print-avoid-break {
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
+                }
+
+                /* Ensure card children don't clip */
+                .rp22-report .rp22-param-card *,
+                .rp22-report .rp22-seat-card * {
+                    overflow: visible !important;
+                }
             }
 
             .rp22-report .rp22-param-card {
