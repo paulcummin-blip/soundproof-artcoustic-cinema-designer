@@ -1351,15 +1351,7 @@ function RP22ReportInner() {
                     overflow: visible !important;
                 }
 
-                /* 2) Remove fixed/sticky elements during print */
-                * {
-                    position: static !important;
-                }
-
-                /* But keep your actual cards/layout intact */
-                .print-keep-layout {
-                    position: relative !important;
-                }
+                /* 2) Allow normal positioning in print (removed global reset) */
 
                 /* 3) Ensure background colours + borders print */
                 body {
@@ -1410,32 +1402,7 @@ function RP22ReportInner() {
                     max-height: none !important;
                 }
 
-                /* 6) PRINT SAFE: avoid CSS grid (Chrome can truncate PDF output) */
-                .print-grid-room,
-                .print-grid-seats {
-                    display: block !important;
-                    
-                    /* two-column print-safe layout */
-                    column-count: 2 !important;
-                    column-gap: 10mm !important;
-                    column-fill: auto !important;
-                    
-                    width: 100% !important;
-                }
-                
-                /* each card wrapper becomes a column item */
-                .print-grid-room > .print-avoid-break,
-                .print-grid-seats > .print-avoid-break {
-                    display: inline-block !important;
-                    width: 100% !important;
-                    
-                    /* keep cards intact where possible */
-                    break-inside: avoid !important;
-                    page-break-inside: avoid !important;
-                    
-                    /* spacing between cards */
-                    margin: 0 0 10mm 0 !important;
-                }
+                /* 6) Print grid uses standard CSS grid (removed column-count approach) */
 
                 /* Hide anything that isn't the print layout */
                 .screen-only,
@@ -1566,24 +1533,24 @@ function RP22ReportInner() {
                     min-height: 0 !important;
                 }
 
-                /* Card wrappers prevent breaking (try to keep intact) */
-                .rp22-report .rp22-card-wrap {
-                    break-inside: avoid !important;
-                    page-break-inside: avoid !important;
-                    margin: 0 !important;
-                }
-
-                /* Grid maintains consistent spacing */
+                /* Report grid: stable 2-column layout for print */
                 .rp22-report .rp22-cards-grid {
                     display: grid !important;
                     grid-template-columns: 1fr 1fr !important;
                     gap: 10mm 10mm !important;
+                    align-items: start !important;
                 }
 
-                /* Cards have no clipping */
+                /* Card wrappers and cards prevent breaking */
+                .rp22-report .rp22-card-wrap {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
+
                 .rp22-report .rp22-param-card,
                 .rp22-report .rp22-seat-card {
-                    overflow: visible !important;
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
                 }
 
                 /* Safe breakpoints inside cards */
@@ -2646,8 +2613,8 @@ function RP22ReportInner() {
                         </div>
                         <div className="rp22-params-grid rp22-cards-grid">
                             {orderedParams.map(param => (
-                                <div className="rp22-card-wrap">
-                                    <div key={param.id} className="rp22-param-card">
+                                <div key={param.id} className="rp22-card-wrap">
+                                    <div className="rp22-param-card">
                                     <ParameterCard
                                         parameter={param}
                                         roomResult={getRoomResult(param.id)}
@@ -2703,8 +2670,8 @@ function RP22ReportInner() {
                                     const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
 
                                     return (
-                                        <div className="rp22-card-wrap">
-                                        <div key={seatId} className="rp22-param-card rp22-seat-card">
+                                        <div key={seatId} className="rp22-card-wrap">
+                                        <div className="rp22-param-card rp22-seat-card">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
