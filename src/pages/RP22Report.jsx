@@ -1514,6 +1514,28 @@ function RP22ReportInner() {
                 .rp22-report {
                     padding-bottom: 12mm;
                 }
+
+                /* Critical: Remove fixed heights from seat cards in print */
+                .rp22-report .rp22-seat-card,
+                .rp22-report .rp22-param-card {
+                    height: auto !important;
+                    min-height: 0 !important;
+                    max-height: none !important;
+                }
+
+                /* Remove height constraints from card internals */
+                .rp22-report .rp22-seat-card *,
+                .rp22-report .rp22-param-card * {
+                    max-height: none !important;
+                }
+
+                /* Ensure wrappers auto-size */
+                .rp22-report .card-content,
+                .rp22-report .CardContent,
+                .rp22-report [class*="CardContent"] {
+                    height: auto !important;
+                    min-height: 0 !important;
+                }
             }
 
             .rp22-report .rp22-param-card {
@@ -2619,7 +2641,7 @@ function RP22ReportInner() {
                                     const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
 
                                     return (
-                                        <div key={seatId} className="rp22-param-card">
+                                        <div key={seatId} className="rp22-param-card rp22-seat-card">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
