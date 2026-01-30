@@ -1496,6 +1496,76 @@ function RP22ReportInner() {
                 padding: 0;
                 font-family: 'Didact Gothic', 'Century Gothic', sans-serif;
             }
+
+            /* Export-only parameter cards styling (scoped to report) */
+            .rp22-report .rp22-params-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 10mm;
+                align-items: start;
+            }
+
+            .rp22-report .rp22-param-card {
+                border: 1.5px solid #D9D5CE;
+                border-radius: 10px;
+                background: #FFFFFF;
+                box-shadow: none;
+                overflow: hidden;
+                break-inside: avoid;
+                page-break-inside: avoid;
+                min-height: 75mm;
+                position: relative;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .rp22-report .rp22-param-card-inner {
+                padding: 7mm 8mm;
+                flex: 1;
+                display: flex;
+                flex-direction: column;
+            }
+
+            .rp22-report .rp22-param-title {
+                font-size: 11.5pt;
+                font-weight: 700;
+                line-height: 1.25;
+                margin: 0 0 2.5mm 0;
+                color: #1B1A1A;
+            }
+
+            .rp22-report .rp22-param-subtitle {
+                font-size: 9pt;
+                color: #3E4349;
+                margin: 0 0 5mm 0;
+                line-height: 1.4;
+            }
+
+            .rp22-report .rp22-param-divider {
+                height: 1px;
+                background: #EEEAE3;
+                margin: 5mm 0;
+            }
+
+            .rp22-report .rp22-level-pill {
+                position: absolute;
+                right: 7mm;
+                bottom: 7mm;
+            }
+
+            .rp22-report .rp22-param-content {
+                flex: 1;
+                font-size: 9.5pt;
+                color: #3E4349;
+                line-height: 1.5;
+            }
+
+            .rp22-report .rp22-param-value {
+                font-size: 11pt;
+                font-weight: 700;
+                color: #1B1A1A;
+                margin-top: 2mm;
+            }
         `}</style>
     );
 
@@ -2045,7 +2115,7 @@ function RP22ReportInner() {
             {/* Print-only layout */}
             <div className="print-only print-keep-layout">
                 <div className="print-root">
-                    <div className="print-container">
+                    <div className="print-container rp22-report">
                         <section id="pdf-cover">
                         {/* PAGE 1: Headline + counts only */}
                         <div className="print-page-break-after print-summary">
@@ -2481,9 +2551,9 @@ function RP22ReportInner() {
                         <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>
                             Room-wide compliance parameters (non seat-specific).
                         </div>
-                        <div className="print-grid-room">
+                        <div className="rp22-params-grid">
                             {orderedParams.map(param => (
-                                <div key={param.id} className="print-avoid-break">
+                                <div key={param.id} className="rp22-param-card">
                                     <ParameterCard
                                         parameter={param}
                                         roomResult={getRoomResult(param.id)}
@@ -2510,7 +2580,7 @@ function RP22ReportInner() {
                         <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>
                             Seat-by-seat compliance parameters including RP23 horizontal viewing.
                         </div>
-                        <div className="print-grid-seats">
+                        <div className="rp22-params-grid">
                             {(() => {
                                 const greenDot = app?.mlp;
                                 let rspSeatId = null;
@@ -2538,7 +2608,7 @@ function RP22ReportInner() {
                                     const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
 
                                     return (
-                                        <div key={seatId} className="print-avoid-break">
+                                        <div key={seatId} className="rp22-param-card">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
