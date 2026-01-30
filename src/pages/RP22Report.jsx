@@ -37,74 +37,6 @@ function RP22ReportInner() {
     const [screenMetricsForPrint, setScreenMetricsForPrint] = useState(null);
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
-    
-    // Print diagnostics toggle (enabled via ?printDebug=1)
-    const [printDebug, setPrintDebug] = useState(false);
-    const [printDiagnostics, setPrintDiagnostics] = useState(null);
-    
-    useEffect(() => {
-        if (typeof window !== 'undefined') {
-            const params = new URLSearchParams(window.location.search);
-            setPrintDebug(params.get('printDebug') === '1');
-        }
-    }, []);
-    
-    // --- PDF DEBUG (REMOVE ME) ---
-    const [pdfDebug, setPdfDebug] = React.useState(false);
-    const [cardHeights, setCardHeights] = React.useState({});
-    
-    React.useEffect(() => {
-        // Enable by URL query string OR localStorage
-        try {
-            const params = new URLSearchParams(window.location.search);
-            if (params.get('printDebug') === '1') {
-                window.localStorage.setItem("rp22PdfDebug", "1");
-                setPdfDebug(true);
-            } else {
-                setPdfDebug(window.localStorage.getItem("rp22PdfDebug") === "1");
-            }
-        } catch (e) {}
-    }, []);
-    
-    // Measure card heights before print
-    React.useEffect(() => {
-        if (!pdfDebug) return;
-        
-        const measureHeights = () => {
-            const heights = {};
-            const wrappers = document.querySelectorAll('#pdf-seat-parameters .rp22-card-wrap');
-            wrappers.forEach((wrap, idx) => {
-                const rect = wrap.getBoundingClientRect();
-                const card = wrap.querySelector('.rp22-seat-card');
-                const cardRect = card?.getBoundingClientRect();
-                heights[idx] = {
-                    wrapH: rect ? Math.round(rect.height) : 0,
-                    cardH: cardRect ? Math.round(cardRect.height) : 0,
-                    wrapHmm: rect ? Math.round(rect.height * 0.264583) : 0, // px to mm
-                    cardHmm: cardRect ? Math.round(cardRect.height * 0.264583) : 0,
-                };
-            });
-            setCardHeights(heights);
-        };
-        
-        const onBeforePrint = () => measureHeights();
-        const mediaQueryList = window.matchMedia('print');
-        const onMediaChange = (e) => {
-            if (e.matches) measureHeights();
-        };
-        
-        // Measure immediately for initial state
-        measureHeights();
-        
-        window.addEventListener('beforeprint', onBeforePrint);
-        mediaQueryList.addEventListener('change', onMediaChange);
-        
-        return () => {
-            window.removeEventListener('beforeprint', onBeforePrint);
-            mediaQueryList.removeEventListener('change', onMediaChange);
-        };
-    }, [pdfDebug]);
-    // --- /PDF DEBUG (REMOVE ME) ---
 
     useEffect(() => {
         const onAfterPrint = () => {
@@ -118,155 +50,6 @@ function RP22ReportInner() {
         window.addEventListener('afterprint', onAfterPrint);
         return () => window.removeEventListener('afterprint', onAfterPrint);
     }, []);
-    
-    // Capture print diagnostics when printing starts
-    useEffect(() => {
-        if (!printDebug) return;
-        
-        const captureDiagnostics = () => {
-            const diagnostics = {
-                capturedAt: new Date().toISOString(),
-                nodes: []
-            };
-            
-            try {
-                // 1) section#pdf-seat-parameters
-                const section = document.querySelector('#pdf-seat-parameters');
-                if (section) {
-                    const computed = window.getComputedStyle(section);
-                    const rect = section.getBoundingClientRect();
-                    diagnostics.nodes.push({
-                        selector: 'section#pdf-seat-parameters',
-                        rect: { top: rect.top, bottom: rect.bottom, height: rect.height },
-                        computed: {
-                            display: computed.display,
-                            position: computed.position,
-                            overflow: computed.overflow,
-                            overflowX: computed.overflowX,
-                            overflowY: computed.overflowY,
-                            height: computed.height,
-                            minHeight: computed.minHeight,
-                            maxHeight: computed.maxHeight,
-                            breakInside: computed.breakInside,
-                            pageBreakInside: computed.pageBreakInside,
-                            contain: computed.contain,
-                            transform: computed.transform,
-                            filter: computed.filter
-                        }
-                    });
-                }
-                
-                // 2) #pdf-seat-parameters .rp22-params-grid.rp22-cards-grid
-                const grid = document.querySelector('#pdf-seat-parameters .rp22-params-grid.rp22-cards-grid');
-                if (grid) {
-                    const computed = window.getComputedStyle(grid);
-                    const rect = grid.getBoundingClientRect();
-                    diagnostics.nodes.push({
-                        selector: '#pdf-seat-parameters .rp22-params-grid.rp22-cards-grid',
-                        rect: { top: rect.top, bottom: rect.bottom, height: rect.height },
-                        computed: {
-                            display: computed.display,
-                            position: computed.position,
-                            overflow: computed.overflow,
-                            overflowX: computed.overflowX,
-                            overflowY: computed.overflowY,
-                            height: computed.height,
-                            minHeight: computed.minHeight,
-                            maxHeight: computed.maxHeight,
-                            breakInside: computed.breakInside,
-                            pageBreakInside: computed.pageBreakInside,
-                            contain: computed.contain,
-                            transform: computed.transform,
-                            filter: computed.filter
-                        }
-                    });
-                }
-                
-                // 3) All .rp22-card-wrap inside seat section (first 12)
-                const wrappers = document.querySelectorAll('#pdf-seat-parameters .rp22-card-wrap');
-                wrappers.forEach((wrapper, idx) => {
-                    if (idx >= 12) return; // limit to first 12
-                    
-                    const computed = window.getComputedStyle(wrapper);
-                    const rect = wrapper.getBoundingClientRect();
-                    const seatLabel = wrapper.getAttribute('data-print-seat') || '—';
-                    const seatIndex = wrapper.getAttribute('data-print-index') || '—';
-                    
-                    const wrapperData = {
-                        selector: `seatWrap[${idx}]`,
-                        seatLabel,
-                        seatIndex,
-                        rect: { top: rect.top, bottom: rect.bottom, height: rect.height },
-                        computed: {
-                            display: computed.display,
-                            position: computed.position,
-                            overflow: computed.overflow,
-                            overflowX: computed.overflowX,
-                            overflowY: computed.overflowY,
-                            height: computed.height,
-                            minHeight: computed.minHeight,
-                            maxHeight: computed.maxHeight,
-                            breakInside: computed.breakInside,
-                            pageBreakInside: computed.pageBreakInside,
-                            contain: computed.contain,
-                            transform: computed.transform,
-                            filter: computed.filter
-                        }
-                    };
-                    
-                    // Also capture the seat card inside this wrapper
-                    const seatCard = wrapper.querySelector('.rp22-seat-card');
-                    if (seatCard) {
-                        const cardComputed = window.getComputedStyle(seatCard);
-                        const cardRect = seatCard.getBoundingClientRect();
-                        wrapperData.innerCard = {
-                            rect: { top: cardRect.top, bottom: cardRect.bottom, height: cardRect.height },
-                            computed: {
-                                display: cardComputed.display,
-                                position: cardComputed.position,
-                                overflow: cardComputed.overflow,
-                                overflowX: cardComputed.overflowX,
-                                overflowY: cardComputed.overflowY,
-                                height: cardComputed.height,
-                                minHeight: cardComputed.minHeight,
-                                maxHeight: cardComputed.maxHeight,
-                                breakInside: cardComputed.breakInside,
-                                pageBreakInside: cardComputed.pageBreakInside,
-                                contain: cardComputed.contain,
-                                transform: cardComputed.transform,
-                                filter: cardComputed.filter
-                            }
-                        };
-                    }
-                    
-                    diagnostics.nodes.push(wrapperData);
-                });
-            } catch (e) {
-                diagnostics.error = String(e);
-            }
-            
-            setPrintDiagnostics(diagnostics);
-        };
-        
-        const onBeforePrint = () => {
-            captureDiagnostics();
-        };
-        
-        const mediaQueryList = window.matchMedia('print');
-        const onMediaChange = (e) => {
-            if (e.matches) {
-                captureDiagnostics();
-            }
-        };
-        
-        window.addEventListener('beforeprint', onBeforePrint);
-        mediaQueryList.addEventListener('change', onMediaChange);
-        
-        return () => {
-            window.removeEventListener('beforeprint', onBeforePrint);
-            mediaQueryList.removeEventListener('change', onMediaChange);
-        };
-    }, [printDebug]);
     
     if (!app) {
         return (
@@ -1892,120 +1675,12 @@ function RP22ReportInner() {
             color: #1B1A1A;
             margin-top: 2mm;
             }
-
-            /* --- PDF DEBUG (REMOVE ME) --- */
-            @media print {
-                .pdf-debug-print-banner {
-                    display: block !important;
-                    position: fixed !important;
-                    top: 0 !important;
-                    left: 0 !important;
-                    right: 0 !important;
-                    background: #FF0000 !important;
-                    color: #FFFFFF !important;
-                    padding: 3mm !important;
-                    font-size: 10pt !important;
-                    font-weight: 700 !important;
-                    text-align: center !important;
-                    z-index: 9999999 !important;
-                    border-bottom: 3px solid #000 !important;
-                    font-family: monospace !important;
-                }
-
-                .pdf-debug-overlay {
-                    position: fixed !important;
-                    top: 15mm !important;
-                    right: 6mm !important;
-                    z-index: 999999 !important;
-                    border: 2px solid #000 !important;
-                    background: #fff !important;
-                    color: #000 !important;
-                    padding: 4mm !important;
-                    font-size: 9pt !important;
-                    max-width: 70mm !important;
-                }
-                .pdf-debug-title { font-weight: 700 !important; margin-bottom: 2mm !important; }
-                .pdf-debug-instructions { font-size: 8pt !important; line-height: 1.2 !important; }
-
-                .rp22-report #pdf-seat-parameters .rp22-card-wrap {
-                    position: relative !important;
-                }
-
-                /* Debug outlines for seat section */
-                .rp22-report #pdf-seat-parameters {
-                    outline: 2px solid #FF0000 !important;
-                    outline-offset: -1px !important;
-                }
-
-                .rp22-report #pdf-seat-parameters .rp22-card-wrap {
-                    outline: 1px solid #0000FF !important;
-                    outline-offset: -1px !important;
-                }
-
-                .rp22-report #pdf-seat-parameters .pdf-debug-tag {
-                    position: absolute !important;
-                    top: 0mm !important;
-                    left: 0mm !important;
-                    z-index: 999998 !important;
-                    background: #FFFF00 !important;
-                    color: #000 !important;
-                    border: 1px solid #000 !important;
-                    padding: 1mm 2mm !important;
-                    font-size: 7pt !important;
-                    line-height: 1.2 !important;
-                    pointer-events: none !important;
-                    font-family: monospace !important;
-                }
-            }
-
-            @media screen {
-                .pdf-debug-print-banner {
-                    display: none !important;
-                }
-            }
-            /* --- /PDF DEBUG (REMOVE ME) --- */
             `}</style>
             );
 
     return (
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <PrintStyles />
-            
-            {/* --- PDF DEBUG: Proof of component mounting (REMOVE ME) --- */}
-            <div style={{
-                position: 'fixed',
-                top: '10px',
-                right: '10px',
-                background: '#FF0',
-                color: '#000',
-                padding: '4px 8px',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                zIndex: 999999,
-                border: '2px solid #000',
-                fontFamily: 'monospace'
-            }}>
-                RP22Report mounted
-            </div>
-            
-            {pdfDebug && (
-                <div style={{
-                    position: 'fixed',
-                    bottom: '10px',
-                    right: '10px',
-                    background: '#F00',
-                    color: '#FFF',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    zIndex: 999999,
-                    border: '2px solid #000',
-                    fontFamily: 'monospace'
-                }}>
-                    PDF DEBUG ENABLED (RP22Report)
-                </div>
-            )}
-            {/* --- /PDF DEBUG (REMOVE ME) --- */}
             
             <div className="screen-only">
             {/* Hidden plan capture element (CLEAN) - MUST be in DOM (not display:none) for SVG capture */}
@@ -2288,13 +1963,6 @@ function RP22ReportInner() {
                                 </div>
                             )}
                         </div>
-                        
-                        <div style={{ marginTop: 6, textAlign: "right", fontSize: 12, color: "#3E4349" }}>
-                            <div><strong>Export status:</strong> {exportStatus}</div>
-                            <div style={{ fontSize: 11, color: "#625143" }}>
-                                isPrinting: {String(exportDebug.isPrinting)} · planLen: {exportDebug.planLen} · printReady: {String(exportDebug.printReady)} · screen: {screenMetricsStatus}
-                            </div>
-                        </div>
                     </div>
                 </div>
                 <div className="border-b border-[#E6E4DD]" />
@@ -2550,20 +2218,6 @@ function RP22ReportInner() {
             <div className="print-only print-keep-layout">
                 <div className="print-root">
                     <div className="print-container rp22-report">
-                        {pdfDebug && (
-                            <>
-                                <div className="pdf-debug-print-banner">
-                                    PRINT DEBUG ENABLED (RP22Report) — Component: pages/RP22Report.jsx
-                                </div>
-                                <div className="pdf-debug-overlay">
-                                    <div className="pdf-debug-title">PDF DEBUG (print only)</div>
-                                    <div className="pdf-debug-instructions">
-                                        Set localStorage key <b>rp22PdfDebug</b> = "1" to show this.
-                                        To disable: remove key or set to "0".
-                                    </div>
-                                </div>
-                            </>
-                        )}
                         <section id="pdf-cover">
                         {/* PAGE 1: Headline + counts only */}
                         <div className="print-page-break-after print-summary">
@@ -3020,38 +2674,6 @@ function RP22ReportInner() {
                                         </div>
                         </div>
                         </section>
-
-                        {/* Print diagnostics panel (only when ?printDebug=1) */}
-                        {printDebug && (
-                            <div style={{
-                                border: '2px solid #FF0000',
-                                padding: '10mm',
-                                marginBottom: '8mm',
-                                background: '#FFF9F0',
-                                pageBreakInside: 'avoid',
-                                breakInside: 'avoid'
-                            }}>
-                                <h3 style={{ 
-                                    fontSize: '14pt', 
-                                    fontWeight: 700, 
-                                    color: '#FF0000', 
-                                    marginBottom: '4mm',
-                                    fontFamily: 'monospace'
-                                }}>
-                                    PRINT DIAGNOSTICS (TEMP)
-                                </h3>
-                                <pre style={{ 
-                                    fontSize: '7pt', 
-                                    fontFamily: 'monospace', 
-                                    whiteSpace: 'pre-wrap',
-                                    color: '#333',
-                                    maxHeight: 'none',
-                                    overflow: 'visible'
-                                }}>
-                                    {printDiagnostics ? JSON.stringify(printDiagnostics, null, 2) : 'Diagnostics not yet captured (waiting for print event)'}
-                                </pre>
-                            </div>
-                        )}
                         
                         <section id="pdf-seat-parameters">
                         {/* SEAT PARAMETERS */}
@@ -3097,17 +2719,6 @@ function RP22ReportInner() {
                                             data-print-seat={seatLabel}
                                             data-print-index={seatIdx}
                                         >
-                                            {pdfDebug && (
-                                                <div className="pdf-debug-tag">
-                                                    {cardHeights[seatIdx] ? (
-                                                        <>
-                                                            Wrap: {cardHeights[seatIdx].wrapH}px ({cardHeights[seatIdx].wrapHmm}mm)
-                                                            <br />
-                                                            Card: {cardHeights[seatIdx].cardH}px ({cardHeights[seatIdx].cardHmm}mm)
-                                                        </>
-                                                    ) : 'Measuring...'}
-                                                </div>
-                                            )}
                                         <div className="rp22-param-card rp22-seat-card">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
@@ -3158,20 +2769,6 @@ function RP22ReportInner() {
                                                                 </div>
                                                                 );
                                                                 })}
-
-                                                                {/* Debug marker - only when printDebug=1 */}
-                                                                {printDebug && (
-                                                                <div style={{
-                                                                   fontSize: '6pt',
-                                                                   color: '#999',
-                                                                   fontFamily: 'monospace',
-                                                                   marginTop: '2mm',
-                                                                   borderTop: '1px solid #EEE',
-                                                                   paddingTop: '1mm'
-                                                                }}>
-                                                                   DEBUG END MARKER — {seatLabel}
-                                                                </div>
-                                                                )}
                                                                 </CardContent>
                                                                 </Card>
                                                                 </div>
