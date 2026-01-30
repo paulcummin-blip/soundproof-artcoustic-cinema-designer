@@ -1505,15 +1505,26 @@ function RP22ReportInner() {
                 align-items: start;
             }
 
+            @media print {
+                .rp22-report .rp22-params-grid {
+                    break-inside: auto;
+                    page-break-inside: auto;
+                }
+
+                .rp22-report {
+                    padding-bottom: 12mm;
+                }
+            }
+
             .rp22-report .rp22-param-card {
                 border: 1.5px solid #D9D5CE;
                 border-radius: 10px;
                 background: #FFFFFF;
                 box-shadow: none;
-                overflow: hidden;
+                overflow: visible;
                 break-inside: avoid;
                 page-break-inside: avoid;
-                min-height: 75mm;
+                min-height: 68mm;
                 position: relative;
                 display: flex;
                 flex-direction: column;
