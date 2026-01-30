@@ -1506,6 +1506,35 @@ function RP22ReportInner() {
             }
 
             @media print {
+                /* Force all containers to allow pagination */
+                html, body {
+                    height: auto !important;
+                    overflow: visible !important;
+                }
+
+                /* Export report: ensure nothing clips pagination */
+                .rp22-report,
+                .rp22-report * {
+                    overflow: visible !important;
+                    max-height: none !important;
+                }
+
+                /* Neutralise app shell constraints */
+                .rp22-report,
+                .rp22-report .print-summary,
+                .rp22-report .print-root,
+                .rp22-report .print-pages,
+                .rp22-report [class*="scroll"],
+                .rp22-report [class*="Scroll"],
+                .rp22-report [class*="container"],
+                .rp22-report [class*="Container"] {
+                    height: auto !important;
+                    min-height: 0 !important;
+                    max-height: none !important;
+                    overflow: visible !important;
+                    position: static !important;
+                }
+
                 .rp22-report .rp22-params-grid {
                     break-inside: auto;
                     page-break-inside: auto;
