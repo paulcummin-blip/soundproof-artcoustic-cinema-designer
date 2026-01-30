@@ -1972,23 +1972,25 @@ function RP22ReportInner() {
             <PrintStyles />
             
             {/* --- PDF DEBUG: Proof of component mounting (REMOVE ME) --- */}
-            <div style={{
-                position: 'fixed',
-                top: '10px',
-                right: '10px',
-                background: '#FF0',
-                color: '#000',
-                padding: '4px 8px',
-                fontSize: '11px',
-                fontWeight: 'bold',
-                zIndex: 999999,
-                border: '2px solid #000',
-                fontFamily: 'monospace'
-            }}>
-                RP22Report mounted
-            </div>
+            {!isPrinting && (
+                <div style={{
+                    position: 'fixed',
+                    top: '10px',
+                    right: '10px',
+                    background: '#FF0',
+                    color: '#000',
+                    padding: '4px 8px',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    zIndex: 999999,
+                    border: '2px solid #000',
+                    fontFamily: 'monospace'
+                }}>
+                    RP22Report mounted
+                </div>
+            )}
             
-            {pdfDebug && (
+            {pdfDebug && !isPrinting && (
                 <div style={{
                     position: 'fixed',
                     bottom: '10px',
@@ -2550,20 +2552,7 @@ function RP22ReportInner() {
             <div className="print-only print-keep-layout">
                 <div className="print-root">
                     <div className="print-container rp22-report">
-                        {pdfDebug && (
-                            <>
-                                <div className="pdf-debug-print-banner">
-                                    PRINT DEBUG ENABLED (RP22Report) — Component: pages/RP22Report.jsx
-                                </div>
-                                <div className="pdf-debug-overlay">
-                                    <div className="pdf-debug-title">PDF DEBUG (print only)</div>
-                                    <div className="pdf-debug-instructions">
-                                        Set localStorage key <b>rp22PdfDebug</b> = "1" to show this.
-                                        To disable: remove key or set to "0".
-                                    </div>
-                                </div>
-                            </>
-                        )}
+
                         <section id="pdf-cover">
                         {/* PAGE 1: Headline + counts only */}
                         <div className="print-page-break-after print-summary">
@@ -3097,17 +3086,7 @@ function RP22ReportInner() {
                                             data-print-seat={seatLabel}
                                             data-print-index={seatIdx}
                                         >
-                                            {pdfDebug && (
-                                                <div className="pdf-debug-tag">
-                                                    {cardHeights[seatIdx] ? (
-                                                        <>
-                                                            Wrap: {cardHeights[seatIdx].wrapH}px ({cardHeights[seatIdx].wrapHmm}mm)
-                                                            <br />
-                                                            Card: {cardHeights[seatIdx].cardH}px ({cardHeights[seatIdx].cardHmm}mm)
-                                                        </>
-                                                    ) : 'Measuring...'}
-                                                </div>
-                                            )}
+
                                         <div className="rp22-param-card rp22-seat-card">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
@@ -3159,19 +3138,7 @@ function RP22ReportInner() {
                                                                 );
                                                                 })}
 
-                                                                {/* Debug marker - only when printDebug=1 */}
-                                                                {printDebug && (
-                                                                <div style={{
-                                                                   fontSize: '6pt',
-                                                                   color: '#999',
-                                                                   fontFamily: 'monospace',
-                                                                   marginTop: '2mm',
-                                                                   borderTop: '1px solid #EEE',
-                                                                   paddingTop: '1mm'
-                                                                }}>
-                                                                   DEBUG END MARKER — {seatLabel}
-                                                                </div>
-                                                                )}
+
                                                                 </CardContent>
                                                                 </Card>
                                                                 </div>
