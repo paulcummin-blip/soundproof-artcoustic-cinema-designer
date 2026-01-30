@@ -48,6 +48,17 @@ function RP22ReportInner() {
             setPrintDebug(params.get('printDebug') === '1');
         }
     }, []);
+    
+    // --- PDF DEBUG (REMOVE ME) ---
+    const [pdfDebug, setPdfDebug] = React.useState(false);
+    
+    React.useEffect(() => {
+        // Enable by setting localStorage key: rp22PdfDebug = "1"
+        try {
+            setPdfDebug(window.localStorage.getItem("rp22PdfDebug") === "1");
+        } catch (e) {}
+    }, []);
+    // --- /PDF DEBUG (REMOVE ME) ---
 
     useEffect(() => {
         const onAfterPrint = () => {
@@ -1811,13 +1822,49 @@ function RP22ReportInner() {
             }
 
             .rp22-report .rp22-param-value {
-                font-size: 11pt;
-                font-weight: 700;
-                color: #1B1A1A;
-                margin-top: 2mm;
+            font-size: 11pt;
+            font-weight: 700;
+            color: #1B1A1A;
+            margin-top: 2mm;
             }
-        `}</style>
-    );
+
+            /* --- PDF DEBUG (REMOVE ME) --- */
+            @media print {
+            .pdf-debug-overlay {
+                position: fixed !important;
+                top: 6mm !important;
+                right: 6mm !important;
+                z-index: 999999 !important;
+                border: 1px solid #000 !important;
+                background: #fff !important;
+                color: #000 !important;
+                padding: 4mm !important;
+                font-size: 9pt !important;
+                max-width: 70mm !important;
+            }
+            .pdf-debug-title { font-weight: 700 !important; margin-bottom: 2mm !important; }
+            .pdf-debug-instructions { font-size: 8pt !important; line-height: 1.2 !important; }
+
+            .rp22-report #pdf-seat-parameters .rp22-card-wrap {
+                position: relative !important;
+            }
+
+            .rp22-report #pdf-seat-parameters .pdf-debug-tag {
+                position: absolute !important;
+                top: 0mm !important;
+                left: 0mm !important;
+                z-index: 999998 !important;
+                background: #fff !important;
+                color: #000 !important;
+                border: 1px solid #000 !important;
+                padding: 1mm 2mm !important;
+                font-size: 8pt !important;
+                pointer-events: none !important;
+            }
+            }
+            /* --- /PDF DEBUG (REMOVE ME) --- */
+            `}</style>
+            );
 
     return (
         <div className="min-h-screen bg-[#F9F8F6] p-6">
@@ -2366,6 +2413,15 @@ function RP22ReportInner() {
             <div className="print-only print-keep-layout">
                 <div className="print-root">
                     <div className="print-container rp22-report">
+                        {pdfDebug && (
+                            <div className="pdf-debug-overlay">
+                                <div className="pdf-debug-title">PDF DEBUG (print only)</div>
+                                <div className="pdf-debug-instructions">
+                                    Set localStorage key <b>rp22PdfDebug</b> = "1" to show this.
+                                    To disable: remove key or set to "0".
+                                </div>
+                            </div>
+                        )}
                         <section id="pdf-cover">
                         {/* PAGE 1: Headline + counts only */}
                         <div className="print-page-break-after print-summary">
@@ -2899,6 +2955,22 @@ function RP22ReportInner() {
                                             data-print-seat={seatLabel}
                                             data-print-index={seatIdx}
                                         >
+                                            {pdfDebug && (
+                                                <div
+                                                    className="pdf-debug-tag"
+                                                    ref={(el) => {
+                                                        if (!el) return;
+                                                        const wrap = el.closest(".rp22-card-wrap");
+                                                        const card = el.closest(".rp22-card-wrap")?.querySelector(".rp22-seat-card");
+                                                        const wrapRect = wrap?.getBoundingClientRect?.();
+                                                        const cardRect = card?.getBoundingClientRect?.();
+                                                        const txt =
+                                                            "wrapH=" + (wrapRect ? Math.round(wrapRect.height) : "na") +
+                                                            " cardH=" + (cardRect ? Math.round(cardRect.height) : "na");
+                                                        el.textContent = txt;
+                                                    }}
+                                                />
+                                            )}
                                         <div className="rp22-param-card rp22-seat-card">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
