@@ -1537,27 +1537,35 @@ function RP22ReportInner() {
                     min-height: 0 !important;
                 }
 
-                /* Allow report cards to split across pages to prevent clipping */
+                /* Card wrappers prevent breaking (try to keep intact) */
+                .rp22-report .rp22-card-wrap {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                    margin: 0 !important;
+                }
+
+                /* Grid maintains consistent spacing */
+                .rp22-report .rp22-cards-grid {
+                    display: grid !important;
+                    grid-template-columns: 1fr 1fr !important;
+                    gap: 10mm 10mm !important;
+                }
+
+                /* Cards have no clipping */
                 .rp22-report .rp22-param-card,
                 .rp22-report .rp22-seat-card {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
                     overflow: visible !important;
                 }
 
-                /* Neutralise any inherited avoid-break rules */
-                .rp22-report .rp22-param-card.print-avoid-break,
-                .rp22-report .rp22-seat-card.print-avoid-break,
-                .rp22-report .rp22-param-card .print-avoid-break,
-                .rp22-report .rp22-seat-card .print-avoid-break {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
+                /* Safe breakpoints inside cards */
+                .rp22-report .rp22-break-avoid {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
                 }
 
-                /* Ensure card children don't clip */
-                .rp22-report .rp22-param-card *,
-                .rp22-report .rp22-seat-card * {
-                    overflow: visible !important;
+                .rp22-report .rp22-break-ok {
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
                 }
             }
 
@@ -2607,9 +2615,10 @@ function RP22ReportInner() {
                         <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>
                             Room-wide compliance parameters (non seat-specific).
                         </div>
-                        <div className="rp22-params-grid">
+                        <div className="rp22-params-grid rp22-cards-grid">
                             {orderedParams.map(param => (
-                                <div key={param.id} className="rp22-param-card">
+                                <div className="rp22-card-wrap">
+                                    <div key={param.id} className="rp22-param-card">
                                     <ParameterCard
                                         parameter={param}
                                         roomResult={getRoomResult(param.id)}
@@ -2620,10 +2629,11 @@ function RP22ReportInner() {
                                         p21EarlyReflectionPreset={app?.p21EarlyReflectionPreset}
                                         onP21EarlyReflectionPresetChange={app?.setP21EarlyReflectionPreset}
                                         displayedLevel={getDisplayedRoomLevel(param.id)}
-                                    />
-                                </div>
-                            ))}
-                        </div>
+                                        />
+                                        </div>
+                                        </div>
+                                        ))}
+                                        </div>
                         </div>
                         </section>
 
@@ -2636,7 +2646,7 @@ function RP22ReportInner() {
                         <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>
                             Seat-by-seat compliance parameters including RP23 horizontal viewing.
                         </div>
-                        <div className="rp22-params-grid">
+                        <div className="rp22-params-grid rp22-cards-grid">
                             {(() => {
                                 const greenDot = app?.mlp;
                                 let rspSeatId = null;
@@ -2664,6 +2674,7 @@ function RP22ReportInner() {
                                     const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
 
                                     return (
+                                        <div className="rp22-card-wrap">
                                         <div key={seatId} className="rp22-param-card rp22-seat-card">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
@@ -2715,12 +2726,13 @@ function RP22ReportInner() {
                                                         );
                                                     })}
                                                 </CardContent>
-                                            </Card>
-                                        </div>
-                                    );
-                                }).filter(Boolean);
-                            })()}
-                        </div>
+                                                </Card>
+                                                </div>
+                                                </div>
+                                                );
+                                                }).filter(Boolean);
+                                                })()}
+                                                </div>
                         <div className="grid grid-cols-3 gap-4 mt-6 print-avoid-break">
                             <SeatComplianceSummary position="left" />
                             <SeatComplianceSummary position="middle" />
