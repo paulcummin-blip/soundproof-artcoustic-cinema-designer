@@ -1539,6 +1539,8 @@ function RP22ReportInner() {
                     grid-template-columns: 1fr 1fr !important;
                     gap: 10mm 10mm !important;
                     align-items: start !important;
+                    align-content: start !important;
+                    grid-auto-rows: auto !important;
                 }
 
                 /* Card wrappers and cards prevent breaking */
@@ -1547,10 +1549,12 @@ function RP22ReportInner() {
                     page-break-inside: avoid !important;
                 }
 
+                /* CRITICAL: Do NOT make the card itself "unbreakable" in print.
+                   Keep the wrapper as avoid, but allow the card to break if the engine needs it. */
                 .rp22-report .rp22-param-card,
                 .rp22-report .rp22-seat-card {
-                    break-inside: avoid !important;
-                    page-break-inside: avoid !important;
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
                 }
 
                 /* Safe breakpoints inside cards */
