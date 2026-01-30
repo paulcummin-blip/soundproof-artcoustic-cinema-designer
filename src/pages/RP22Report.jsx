@@ -1351,9 +1351,7 @@ function RP22ReportInner() {
                     overflow: visible !important;
                 }
 
-                /* 2) Allow normal positioning in print (removed global reset) */
-
-                /* 3) Ensure background colours + borders print */
+                /* 2) Ensure background colours + borders print */
                 body {
                     -webkit-print-color-adjust: exact;
                     print-color-adjust: exact;
@@ -1564,6 +1562,34 @@ function RP22ReportInner() {
                 }
 
                 .rp22-report .rp22-break-ok {
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
+                }
+
+                /* ===== PRINT FIX: Seat section must NOT use CSS grid (Chrome PDF grid pagination bug) ===== */
+                /* Seat cards container: switch from grid to flex-wrap (print-safe) */
+                .rp22-report #pdf-seat-parameters .rp22-params-grid,
+                .rp22-report #pdf-seat-parameters .rp22-cards-grid {
+                    display: flex !important;
+                    flex-wrap: wrap !important;
+                    gap: 10mm !important;
+                    align-items: flex-start !important;
+                    justify-content: space-between !important;
+                }
+
+                /* Each card wrapper becomes a 2-column item */
+                .rp22-report #pdf-seat-parameters .rp22-card-wrap {
+                    width: calc(50% - 5mm) !important;
+                    margin: 0 !important;
+                    break-inside: avoid !important;       /* try to keep a card together */
+                    page-break-inside: avoid !important;
+                }
+
+                /* If a seat card is too tall, allow the CONTENT to split rather than blank the page */
+                .rp22-report #pdf-seat-parameters .rp22-param-card,
+                .rp22-report #pdf-seat-parameters .rp22-seat-card,
+                .rp22-report #pdf-seat-parameters .rp22-param-card *,
+                .rp22-report #pdf-seat-parameters .rp22-seat-card * {
                     break-inside: auto !important;
                     page-break-inside: auto !important;
                 }
