@@ -7115,60 +7115,44 @@ return (
               return null; // Extra surrounds now render through renderSpeakers()
               
               if (!Array.isArray(extraSurrounds) || extraSurrounds.length === 0) return null;
-              
+...
+              );
+            })()}
+            
+            {/* DEBUG: Extra surrounds data receipt (remove after confirmed) */}
+            {(() => {
+              const n = Array.isArray(extraSurrounds) ? extraSurrounds.length : -1;
+              const first = Array.isArray(extraSurrounds) && extraSurrounds[0] ? extraSurrounds[0] : null;
+
+              const txt = [
+                `extraSurrounds.len=${n}`,
+                first ? `first=${first.label || first.id || "?"}` : `first=(none)`,
+                first && first.position
+                  ? `x=${Number(first.position.x).toFixed(2)} y=${Number(first.position.y).toFixed(2)}`
+                  : `pos=(none)`
+              ].join(" | ");
+
               return (
-                <g data-layer="extra-surrounds">
-                  {extraSurrounds.map((extra) => {
-                    // Skip if no position
-                    if (!extra?.position || !Number.isFinite(extra.position.x) || !Number.isFinite(extra.position.y)) {
-                      return null;
-                    }
-                    
-                    // Get model dimensions (use modelKey or fallback)
-                    const model = extra.modelKey || 'evolve-2-1';
-                    const dims = getModelDimsM(model);
-                    const widthM_spk = dims.widthM || 0.27;
-                    const depthM_spk = dims.depthM || 0.082;
-                    
-                    // Convert position to canvas
-                    const canvasX = roomRect.x + (extra.position.x * scale);
-                    const canvasY = roomRect.y + (extra.position.y * scale);
-                    
-                    // Use yaw from data or default to 0
-                    const yawDeg = Number(extra.yaw) || 0;
-                    
-                    // Derive role from label for SpeakerIcon compatibility
-                    const rawLabel = String(extra.label || '').toUpperCase();
-                    const role = rawLabel.startsWith('SL') ? 'SL' : 
-                                 rawLabel.startsWith('SR') ? 'SR' :
-                                 (extra.position.x < widthM / 2 ? 'SL' : 'SR');
-                    
-                    // Build speaker object for SpeakerIcon
-                    const speakerForIcon = {
-                      id: extra.id,
-                      role,
-                      model,
-                      position: extra.position,
-                      yaw: yawDeg,
-                      label: extra.label,
-                      _isExtraSurround: true
-                    };
-                    
-                    return (
-                      <SpeakerIcon
-                        key={extra.id}
-                        speaker={speakerForIcon}
-                        canvasX={canvasX}
-                        canvasY_raw={canvasY}
-                        yawDeg={yawDeg}
-                        widthM={widthM_spk}
-                        depthM={depthM_spk}
-                        scale={scale}
-                        speakerMouseDownHandler={undefined}
-                        setHoveredSpeaker={setHoveredSpeaker}
-                      />
-                    );
-                  })}
+                <g data-layer="debug-extra-surrounds">
+                  <rect
+                    x={roomRect.x + 8}
+                    y={roomRect.y + 8}
+                    width={Math.min(420, roomRect.width - 16)}
+                    height={26}
+                    rx={6}
+                    ry={6}
+                    fill="white"
+                    opacity={0.85}
+                    stroke="#999"
+                  />
+                  <text
+                    x={roomRect.x + 16}
+                    y={roomRect.y + 26}
+                    fontSize="12"
+                    fill="#111"
+                  >
+                    {txt}
+                  </text>
                 </g>
               );
             })()}
