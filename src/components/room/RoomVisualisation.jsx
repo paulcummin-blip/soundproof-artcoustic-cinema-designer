@@ -7150,13 +7150,35 @@ return (
               );
             })()}
             
-            {(() => {
-              return null; // Extra surrounds now render through renderSpeakers()
-              
-              if (!Array.isArray(extraSurrounds) || extraSurrounds.length === 0) return null;
-...
-              );
-            })()}
+{(() => {
+  if (!Array.isArray(extraSurrounds) || extraSurrounds.length === 0) return null;
+
+  return (
+    <g data-layer="extra-surrounds">
+      {extraSurrounds.map((extra) => {
+        if (
+          !extra?.position ||
+          !Number.isFinite(extra.position.x) ||
+          !Number.isFinite(extra.position.y)
+        ) {
+          return null;
+        }
+
+        const canvasX = roomRect.x + (extra.position.x * scale);
+        const canvasY = roomRect.y + (extra.position.y * scale);
+
+        return (
+          <g key={extra.id || extra.label || `${extra.position.x}-${extra.position.y}`}>
+            <circle cx={canvasX} cy={canvasY} r={6} fill="#FF6B00" opacity={0.8} />
+            <text x={canvasX + 8} y={canvasY + 4} fontSize={11} fill="#333">
+              {String(extra.label || "")}
+            </text>
+          </g>
+        );
+      })}
+    </g>
+  );
+})()}
             
             {/* DEBUG: Extra surrounds data receipt (remove after confirmed) */}
             {(() => {
