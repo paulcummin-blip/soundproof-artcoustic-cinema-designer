@@ -37,18 +37,35 @@ function RP22ReportInner() {
     const [screenMetricsForPrint, setScreenMetricsForPrint] = useState(null);
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
+    const printLockRef = React.useRef(false);
+    const cleanupTimeoutRef = React.useRef(null);
 
     useEffect(() => {
-        const onAfterPrint = () => {
+        const cleanup = () => {
             setExportStatus("Done");
             setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
             setIsPrinting(false);
             setPlanImageDataUrl(null);
             setPlanDimsImageDataUrl(null);
             setPlanSpeakerDimsImageDataUrl(null);
+            printLockRef.current = false;
+            if (cleanupTimeoutRef.current) {
+                clearTimeout(cleanupTimeoutRef.current);
+                cleanupTimeoutRef.current = null;
+            }
         };
+        
+        const onAfterPrint = () => {
+            cleanup();
+        };
+        
         window.addEventListener('afterprint', onAfterPrint);
-        return () => window.removeEventListener('afterprint', onAfterPrint);
+        return () => {
+            window.removeEventListener('afterprint', onAfterPrint);
+            if (cleanupTimeoutRef.current) {
+                clearTimeout(cleanupTimeoutRef.current);
+            }
+        };
     }, []);
     
     if (!app) {
@@ -461,19 +478,36 @@ function RP22ReportInner() {
         return roomCardCount > 0 && seatsOk && planOk && screenOk;
     }, [isPrinting, orderedParams.length, seats.length, planEnabled, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl, app?.seatMetricsById]);
 
-    // Trigger print when ready (with print-once guard)
+    // Trigger print when ready (with print-once guard + re-entry protection)
     useEffect(() => {
         if (!isPrinting) {
             setHasPrintedOnce(false);
+            printLockRef.current = false;
             return;
         }
         if (!printReady) return;
         if (hasPrintedOnce) return;
+        if (printLockRef.current) return; // Re-entry guard
 
         const t = setTimeout(() => {
             setExportStatus("Opening PDF preview…");
             setHasPrintedOnce(true);
+            printLockRef.current = true; // Lock before calling print
+            
             window.print();
+            
+            // Safety timeout: cleanup after 2s if afterprint doesn't fire
+            cleanupTimeoutRef.current = setTimeout(() => {
+                if (isPrinting) {
+                    setExportStatus("Done (timeout)");
+                    setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
+                    setIsPrinting(false);
+                    setPlanImageDataUrl(null);
+                    setPlanDimsImageDataUrl(null);
+                    setPlanSpeakerDimsImageDataUrl(null);
+                    printLockRef.current = false;
+                }
+            }, 2000);
         }, 250);
 
         return () => clearTimeout(t);

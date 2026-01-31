@@ -987,13 +987,20 @@ const byId = useMemo(() => {
     screenPlaneMode
   ]);
 
-  // Publish screen front plane to AppState with guards (rounded to mm)
+  // Publish screen front plane to AppState with guards (rounded to mm + change detection)
+  const lastScreenFrontPlaneRef = React.useRef(null);
+  
   useEffect(() => {
     if (!appState?.setScreenFrontPlaneM) return;
     if (!Number.isFinite(actualScreenFrontY)) return;
 
     // Round to mm to avoid jitter/loops
     const v = Math.round(actualScreenFrontY * 1000) / 1000;
+    
+    // Only update if value actually changed
+    if (lastScreenFrontPlaneRef.current === v) return;
+    lastScreenFrontPlaneRef.current = v;
+    
     appState.setScreenFrontPlaneM(v);
   }, [actualScreenFrontY, appState?.setScreenFrontPlaneM]);
 
@@ -1015,15 +1022,18 @@ React.useEffect(() => {
   if (typeof onScreenPlaneChange !== 'function') return;
   if (!Number.isFinite(actualScreenFrontY)) return;
 
+  // Round to 0.1mm to prevent float jitter
+  const rounded = Math.round(actualScreenFrontY * 10000) / 10000;
+
   // If unchanged, skip update
-  if (lastSentRef.current === actualScreenFrontY) return;
+  if (lastSentRef.current === rounded) return;
 
   // Debounce updates to prevent API overload (1 second)
   clearTimeout(screenSendTimerRef.current);
   screenSendTimerRef.current = setTimeout(() => {
-    if (lastSentRef.current !== actualScreenFrontY) {
-      lastSentRef.current = actualScreenFrontY;
-      onScreenPlaneChange(actualScreenFrontY);
+    if (lastSentRef.current !== rounded) {
+      lastSentRef.current = rounded;
+      onScreenPlaneChange(rounded);
     }
   }, 1000);
 
@@ -1031,6 +1041,8 @@ React.useEffect(() => {
 }, [actualScreenFrontY, onScreenPlaneChange]);
 
 // NEW: Publish live screen plane Y to screen object for Live Metrics (immediate, no debounce)
+const lastSentScreenPlaneYRef = React.useRef(null);
+
 React.useEffect(() => {
   if (typeof props.onScreenPlaneYChange !== 'function') return;
   if (!Number.isFinite(actualScreenFrontY)) return;
@@ -1039,8 +1051,8 @@ React.useEffect(() => {
   const rounded = Math.round(actualScreenFrontY * 1000) / 1000;
   
   // Only call if value actually changed
-  if (lastSentScreenPlaneRef.current === rounded) return;
-  lastSentScreenPlaneRef.current = rounded;
+  if (lastSentScreenPlaneYRef.current === rounded) return;
+  lastSentScreenPlaneYRef.current = rounded;
   
   props.onScreenPlaneYChange(rounded);
 }, [actualScreenFrontY, props.onScreenPlaneYChange]);
@@ -3893,9 +3905,24 @@ React.useEffect(() => {
 
   // AUTOMATIC SEAT METRICS CACHE - SOLE WRITER for seatMetricsById (powers both HUD and Report)
   const lastCacheSignatureRef = useRef(null);
+  const captureDoneRef = React.useRef(false);
   
   useEffect(() => {
     if (!appState?.setSeatMetricsById) return;
+    
+    // CRITICAL: Freeze during print/export to prevent update loops
+    if (exportMode === 'dimensions' || props.isPrinting) {
+      // One-shot capture on first print render
+      if (!captureDoneRef.current) {
+        captureDoneRef.current = true;
+        // Allow this render to compute, but block subsequent ones
+      } else {
+        return; // Block all subsequent updates during print
+      }
+    } else {
+      // Reset capture flag when not printing
+      captureDoneRef.current = false;
+    }
     
     // Guard: if no seats, clear cache and exit
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
@@ -3912,7 +3939,7 @@ React.useEffect(() => {
     // Build cheap signature to detect actual changes (prevents spam updates)
     const seatIds = seatingPositions.map(s => s.id).join(',');
     const seatPosFingerprint = seatingPositions
-      .map(s => `${s.id}:${Math.round((s.x || 0) * 100)}:${Math.round((s.y || 0) * 100)}`)
+      .map(s => `${s.id}:${Math.round((s.x || 0) * 1000)}:${Math.round((s.y || 0) * 1000)}`)
       .join(',');
     
     // P5-relevant speaker positions fingerprint (surrounds/wides that affect P5)
@@ -3921,8 +3948,8 @@ React.useEffect(() => {
       .filter(s => s?.position && p5Roles.includes(getCanonicalRole(s.role)))
       .map(s => ({
         role: getCanonicalRole(s.role),
-        x: Math.round((s.position.x || 0) * 100),
-        y: Math.round((s.position.y || 0) * 100),
+        x: Math.round((s.position.x || 0) * 1000),
+        y: Math.round((s.position.y || 0) * 1000),
       }))
       .sort((a, b) => a.role.localeCompare(b.role))
       .map(s => `${s.role}:${s.x}:${s.y}`)
@@ -3930,8 +3957,9 @@ React.useEffect(() => {
     
     const layout = dolbyLayout || '5.1';
     const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
-    const mlpRp23 = mlp ? Math.floor((mlp.y || 0) * 100) : 0;
-    const signature = `${seatIds}|${seatPosFingerprint}|${speakerPosFingerprint}|${layout}|${aimFlags}|${mlpRp23}`;
+    const mlpRp23 = mlp ? Math.round((mlp.y || 0) * 1000) : 0;
+    const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
+    const signature = `${seatIds}|${seatPosFingerprint}|${speakerPosFingerprint}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}`;
     
     // Skip if nothing changed
     if (lastCacheSignatureRef.current === signature) {
@@ -3977,9 +4005,15 @@ React.useEffect(() => {
       }
     }
 
-    // Write once (no clear-then-refill pattern)
-    appState.setSeatMetricsById(nextMetrics);
-    lastCacheSignatureRef.current = signature;
+    // Write once (no clear-then-refill pattern) - with final guard
+    const prevKeys = Object.keys(appState?.seatMetricsById || {}).sort().join(',');
+    const nextKeys = Object.keys(nextMetrics).sort().join(',');
+    
+    // Only write if the set of seat IDs changed, or signature changed
+    if (prevKeys !== nextKeys || lastCacheSignatureRef.current !== signature) {
+      appState.setSeatMetricsById(nextMetrics);
+      lastCacheSignatureRef.current = signature;
+    }
     
   }, [
     seatingPositions,
@@ -3999,7 +4033,10 @@ React.useEffect(() => {
     analysisResult,
     dolbyLayout,
     appState?.setSeatMetricsById,
+    appState?.seatMetricsById,
     appState?.splConfig,
+    exportMode,
+    props.isPrinting,
   ]);
 
 // 1) Auto-position HUD near the currently hovered/pinned seat
