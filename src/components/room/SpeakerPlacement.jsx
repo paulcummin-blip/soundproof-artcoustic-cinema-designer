@@ -868,6 +868,8 @@ function UnifiedSurroundsConfig({
   setSurroundConfig,
   needsSurroundResetRef,
   lastSurroundModelKeyRef,
+  extraSurrounds,
+  setExtraSurrounds,
 }) {
   // Local dimsSafe for UnifiedSurroundsConfig scope
   const dimsSafe = React.useMemo(() => {
@@ -3100,6 +3102,8 @@ function SpeakerPlacementImpl(props) {
           setSurroundConfig={setSurroundConfig}
           needsSurroundResetRef={needsSurroundResetRef}
           lastSurroundModelKeyRef={lastSurroundModelKeyRef}
+          extraSurrounds={extraSurrounds}
+          setExtraSurrounds={setExtraSurrounds}
         />
 
         {/* NEW: Surround SPL @ RSP strip */}
