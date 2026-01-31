@@ -13,13 +13,14 @@ import {
 export default function RP22AnglesOverlay({
   mlp,
   visiblePlacedSpeakers,
+  extraSurrounds = [],
   toPx,
   enabled = false
 }) {
   // Eligible surrounds for overlay
   const eligibleSurrounds = useMemo(() => {
-    return getEligibleSurroundsForAngles(visiblePlacedSpeakers, mlp);
-  }, [visiblePlacedSpeakers, mlp]);
+    return getEligibleSurroundsForAngles(visiblePlacedSpeakers, mlp, extraSurrounds);
+  }, [visiblePlacedSpeakers, mlp, extraSurrounds]);
 
   // Ordered sequence (no wrap)
   const surroundAnglesSequence = useMemo(() => {
