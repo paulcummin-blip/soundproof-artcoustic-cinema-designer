@@ -464,6 +464,21 @@ function useDesignerState() {
     setMlpOverride(null);
   }, []);
 
+  const [extraSurroundCount, _setExtraSurroundCount] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.extraSurroundCount === 'number') ? __autosavePayload.extraSurroundCount : 0
+  ));
+
+  const setExtraSurroundCount = useCallback((next) => {
+    const allowed = new Set([0, 2, 4, 6, 8]);
+    const v = Number(next);
+    const clamped = allowed.has(v) ? v : 0;
+    _setExtraSurroundCount(clamped);
+  }, []);
+
+  const [extraSurrounds, setExtraSurrounds] = useState(() => (
+    (__autosavePayload && Array.isArray(__autosavePayload.extraSurrounds)) ? __autosavePayload.extraSurrounds : []
+  ));
+
   // --- EXTRA SURROUNDS SYNC EFFECT ---
   useEffect(() => {
     const count = extraSurroundCount || 0;
@@ -531,22 +546,7 @@ function useDesignerState() {
 
       setExtraSurrounds(final);
     }
-  }, [extraSurroundCount, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel]);
-
-  const [extraSurroundCount, _setExtraSurroundCount] = useState(() => (
-    (__autosavePayload && typeof __autosavePayload.extraSurroundCount === 'number') ? __autosavePayload.extraSurroundCount : 0
-  ));
-
-  const setExtraSurroundCount = useCallback((next) => {
-    const allowed = new Set([0, 2, 4, 6, 8]);
-    const v = Number(next);
-    const clamped = allowed.has(v) ? v : 0;
-    _setExtraSurroundCount(clamped);
-  }, []);
-
-  const [extraSurrounds, setExtraSurrounds] = useState(() => (
-    (__autosavePayload && Array.isArray(__autosavePayload.extraSurrounds)) ? __autosavePayload.extraSurrounds : []
-  ));
+  }, [extraSurroundCount, extraSurrounds, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel]);
 
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
