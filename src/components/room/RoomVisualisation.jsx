@@ -7111,7 +7111,7 @@ return (
             {renderSpeakers()}
 
             {/* Layer 10.5: Extra Surrounds - DISABLED (now rendered via renderSpeakers pipeline) */}
-            
+
             {/* DEBUG: Extra surrounds data receipt (remove after confirmed) */}
             {(() => {
               const n = Array.isArray(extraSurrounds) ? extraSurrounds.length : -1;
@@ -7149,73 +7149,35 @@ return (
                 </g>
               );
             })()}
-            
-{(() => {
-  if (!Array.isArray(extraSurrounds) || extraSurrounds.length === 0) return null;
 
-  return (
-    <g data-layer="extra-surrounds">
-      {extraSurrounds.map((extra) => {
-        if (
-          !extra?.position ||
-          !Number.isFinite(extra.position.x) ||
-          !Number.isFinite(extra.position.y)
-        ) {
-          return null;
-        }
+            {(() => {
+            if (!Array.isArray(extraSurrounds) || extraSurrounds.length === 0) return null;
 
-        const canvasX = roomRect.x + (extra.position.x * scale);
-        const canvasY = roomRect.y + (extra.position.y * scale);
+            return (
+            <g data-layer="extra-surrounds">
+            {extraSurrounds.map((extra) => {
+            if (
+            !extra?.position ||
+            !Number.isFinite(extra.position.x) ||
+            !Number.isFinite(extra.position.y)
+            ) {
+            return null;
+            }
 
-        return (
-          <g key={extra.id || extra.label || `${extra.position.x}-${extra.position.y}`}>
+            const canvasX = roomRect.x + (extra.position.x * scale);
+            const canvasY = roomRect.y + (extra.position.y * scale);
+
+            return (
+            <g key={extra.id || extra.label || `${extra.position.x}-${extra.position.y}`}>
             <circle cx={canvasX} cy={canvasY} r={6} fill="#FF6B00" opacity={0.8} />
             <text x={canvasX + 8} y={canvasY + 4} fontSize={11} fill="#333">
               {String(extra.label || "")}
             </text>
-          </g>
-        );
-      })}
-    </g>
-  );
-})()}
-            
-            {/* DEBUG: Extra surrounds data receipt (remove after confirmed) */}
-            {(() => {
-              const n = Array.isArray(extraSurrounds) ? extraSurrounds.length : -1;
-              const first = Array.isArray(extraSurrounds) && extraSurrounds[0] ? extraSurrounds[0] : null;
-
-              const txt = [
-                `extraSurrounds.len=${n}`,
-                first ? `first=${first.label || first.id || "?"}` : `first=(none)`,
-                first && first.position
-                  ? `x=${Number(first.position.x).toFixed(2)} y=${Number(first.position.y).toFixed(2)}`
-                  : `pos=(none)`
-              ].join(" | ");
-
-              return (
-                <g data-layer="debug-extra-surrounds">
-                  <rect
-                    x={roomRect.x + 8}
-                    y={roomRect.y + 8}
-                    width={Math.min(420, roomRect.width - 16)}
-                    height={26}
-                    rx={6}
-                    ry={6}
-                    fill="white"
-                    opacity={0.85}
-                    stroke="#999"
-                  />
-                  <text
-                    x={roomRect.x + 16}
-                    y={roomRect.y + 26}
-                    fontSize="12"
-                    fill="#111"
-                  >
-                    {txt}
-                  </text>
-                </g>
-              );
+            </g>
+            );
+            })}
+            </g>
+            );
             })()}
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
