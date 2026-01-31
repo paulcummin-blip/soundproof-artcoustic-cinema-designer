@@ -464,6 +464,75 @@ function useDesignerState() {
     setMlpOverride(null);
   }, []);
 
+  // --- EXTRA SURROUNDS SYNC EFFECT ---
+  useEffect(() => {
+    const count = extraSurroundCount || 0;
+    const current = Array.isArray(extraSurrounds) ? extraSurrounds : [];
+
+    // Skip if count matches current length
+    if (current.length === count) return;
+
+    // Get room dims (with safe fallbacks for seeding)
+    const widthM = Number(roomDims?.widthM) || 4.5;
+    const lengthM = Number(roomDims?.lengthM) || 6.0;
+
+    // Get current surround model (use globalSurroundModel or 'off')
+    const modelKey = globalSurroundModel || 'off';
+
+    if (count > current.length) {
+      // Add new items
+      const toAdd = count - current.length;
+      const newItems = [];
+
+      for (let i = 0; i < toAdd; i++) {
+        const index = current.length + i;
+        const id = `extra-surround-${index + 1}`;
+
+        // Alternate left/right: 0,2,4,6 = left; 1,3,5,7 = right
+        const isLeft = index % 2 === 0;
+        const x = isLeft ? 0.1 : widthM - 0.1;
+
+        // Distribute Y between 35% and 75% of room length
+        const yMin = lengthM * 0.35;
+        const yMax = lengthM * 0.75;
+        const yRange = yMax - yMin;
+        const yStep = count > 1 ? yRange / (count - 1) : 0;
+        const y = yMin + (index * yStep);
+
+        newItems.push({
+          id,
+          type: 'extraSurround',
+          modelKey,
+          position: { x, y, z: 1.2 },
+          yaw: 0,
+          positionSource: 'auto'
+        });
+      }
+
+      setExtraSurrounds([...current, ...newItems]);
+    } else {
+      // Remove items from the end (skip user-positioned items)
+      const toRemove = current.length - count;
+      let removed = 0;
+      const kept = [];
+
+      // Remove from end, preserving user-positioned items
+      for (let i = current.length - 1; i >= 0 && removed < toRemove; i--) {
+        if (current[i]?.positionSource === 'user') {
+          kept.unshift(current[i]); // Keep user items
+        } else {
+          removed++; // Remove auto items
+        }
+      }
+
+      // Keep all items before the removal zone
+      const startIndex = current.length - toRemove - kept.length;
+      const final = current.slice(0, Math.max(0, startIndex)).concat(kept);
+
+      setExtraSurrounds(final);
+    }
+  }, [extraSurroundCount, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel]);
+
   const [extraSurroundCount, _setExtraSurroundCount] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.extraSurroundCount === 'number') ? __autosavePayload.extraSurroundCount : 0
   ));
@@ -474,6 +543,10 @@ function useDesignerState() {
     const clamped = allowed.has(v) ? v : 0;
     _setExtraSurroundCount(clamped);
   }, []);
+
+  const [extraSurrounds, setExtraSurrounds] = useState(() => (
+    (__autosavePayload && Array.isArray(__autosavePayload.extraSurrounds)) ? __autosavePayload.extraSurrounds : []
+  ));
 
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
@@ -960,7 +1033,8 @@ function useDesignerState() {
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
       mlpOverride,
-      extraSurroundCount
+      extraSurroundCount,
+      extraSurrounds
       };
 
       if (!isAutosavePayloadValid(payload)) return;
@@ -1009,7 +1083,8 @@ function useDesignerState() {
     p15ConstructionLevel,
     p21EarlyReflectionPreset,
     mlpOverride,
-    extraSurroundCount
+    extraSurroundCount,
+    extraSurrounds
     ]);
 
     // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
@@ -1048,7 +1123,8 @@ function useDesignerState() {
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
       mlpOverride,
-      extraSurroundCount
+      extraSurroundCount,
+      extraSurrounds
       };
 
       try {
@@ -1090,7 +1166,8 @@ function useDesignerState() {
     p15ConstructionLevel,
     p21EarlyReflectionPreset,
     mlpOverride,
-    extraSurroundCount
+    extraSurroundCount,
+    extraSurrounds
     ]);
 
     // --- Autosave: Manual restore/clear functions ---
@@ -1238,6 +1315,7 @@ function useDesignerState() {
 
     // Extra Surrounds
     _setExtraSurroundCount(0);
+    setExtraSurrounds([]);
 
     // Speaker system
     _setSpeakerSystem({
