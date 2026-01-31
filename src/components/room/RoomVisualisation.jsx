@@ -590,6 +590,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const zoomMode = zoomModeProp;
   const lastPointerRef = useRef({ x: 0, y: 0 });
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
+  const lastCalcMinScreenDepthRef = React.useRef(null);
   const [containerW, setContainerW] = useState(0);
   const [containerH, setContainerH] = useState(0);
   const [hoveredSeat, setHoveredSeat] = useState(null);
@@ -955,6 +956,15 @@ const byId = useMemo(() => {
       aimAtMLP: aimAtMLP,
     });
 
+    // Guard: only update if value actually changed (prevent loops)
+    const prev = lastCalcMinScreenDepthRef.current;
+    if (typeof calculatedValue === "number" && typeof prev === "number") {
+      const nextR = Math.round(calculatedValue * 1000) / 1000;
+      const prevR = Math.round(prev * 1000) / 1000;
+      if (nextR === prevR) return;
+    }
+
+    lastCalcMinScreenDepthRef.current = calculatedValue;
     setCalculatedMinScreenDepthM(calculatedValue);
 
   }, [
