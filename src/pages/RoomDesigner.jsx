@@ -1813,6 +1813,18 @@ function RoomDesignerWithState() {
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  
+  // Extra Surrounds state (read from window where SpeakerPlacement publishes it)
+  const [extraSurrounds, setExtraSurrounds] = useState([]);
+  
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof window !== 'undefined' && window.__EXTRA_SURROUNDS__) {
+        setExtraSurrounds(window.__EXTRA_SURROUNDS__);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, []);
 
   // Layout emphasis: controls how wide the left plan vs right menu are.
   // "balanced" keeps your current look.
@@ -4445,12 +4457,14 @@ function RoomDesignerWithState() {
                   analysisResult={analysisResult || {}
                   }
                   placedSpeakers={placedSpeakers}
+                  extraSurrounds={extraSurrounds}
                   frontSubs={frontSubsForRendering}
                   rearSubs={rearSubsForRendering}
                   dimensions={stableDimensions}
                   seatingPositions={_seatingPositions}
                   screen={_screen}
                   onSetSpeakers={setSpeakers}
+                  onSetExtraSurrounds={setExtraSurrounds}
                   onSetSeatingPositions={appState?.setSeatingPositions}
                   onSetFrontSubs={appState?.setFrontSubsCfg}
                   onSetRearSubs={appState?.setRearSubsCfg}

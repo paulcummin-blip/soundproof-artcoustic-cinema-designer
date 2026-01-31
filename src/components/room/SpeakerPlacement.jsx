@@ -2997,6 +2997,13 @@ function SpeakerPlacementImpl(props) {
     setSpeakers,
   ]);
 
+  // Expose extra surrounds to parent
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__EXTRA_SURROUNDS__ = extraSurrounds;
+    }
+  }, [extraSurrounds]);
+
   return (
     <div className="space-y-4 font-sans" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
       <div className="space-y-3">
