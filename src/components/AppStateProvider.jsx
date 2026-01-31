@@ -484,18 +484,34 @@ function useDesignerState() {
     const count = extraSurroundCount || 0;
     const current = Array.isArray(extraSurrounds) ? extraSurrounds : [];
 
-    // Skip if count matches current length
-    if (current.length === count) return;
-
     // Get room dims (with safe fallbacks for seeding)
     const widthM = Number(roomDims?.widthM) || 4.5;
     const lengthM = Number(roomDims?.lengthM) || 6.0;
 
-    // Get current surround model (use globalSurroundModel or 'off')
-    const modelKey = globalSurroundModel || 'off';
+    // Always keep modelKey aligned to the current surround model
+    const modelKey = globalSurroundModel || "off";
 
+    // If the count matches, we STILL need to ensure modelKey is updated
+    if (current.length === count) {
+      // Only touch auto items (never overwrite user-placed ones)
+      const next = current.map((it) => {
+        if (!it) return it;
+        if (it.positionSource === "user") return it;
+        if (it.modelKey === modelKey) return it;
+        return { ...it, modelKey };
+      });
+
+      // If nothing changed, do nothing
+      const changed =
+        next.length !== current.length ||
+        next.some((it, i) => (it?.modelKey || "") !== (current[i]?.modelKey || ""));
+
+      if (changed) setExtraSurrounds(next);
+      return;
+    }
+
+    // If count differs, build up / trim as before
     if (count > current.length) {
-      // Add new items
       const toAdd = count - current.length;
       const newItems = [];
 
@@ -512,41 +528,38 @@ function useDesignerState() {
         const yMax = lengthM * 0.75;
         const yRange = yMax - yMin;
         const yStep = count > 1 ? yRange / (count - 1) : 0;
-        const y = yMin + (index * yStep);
+        const y = yMin + index * yStep;
 
         // Stable label: SL2/SR2/SL3/SR3...
-        const side = isLeft ? 'SL' : 'SR';
+        const side = isLeft ? "SL" : "SR";
         const number = 2 + Math.floor(index / 2);
         const label = `${side}${number}`;
 
         newItems.push({
           id,
-          type: 'extraSurround',
+          type: "extraSurround",
           modelKey,
           position: { x, y, z: 1.2 },
           yaw: 0,
-          positionSource: 'auto',
-          label
+          positionSource: "auto",
+          label,
         });
       }
 
       setExtraSurrounds([...current, ...newItems]);
     } else {
-      // Remove items from the end (skip user-positioned items)
       const toRemove = current.length - count;
       let removed = 0;
       const kept = [];
 
-      // Remove from end, preserving user-positioned items
       for (let i = current.length - 1; i >= 0 && removed < toRemove; i--) {
-        if (current[i]?.positionSource === 'user') {
-          kept.unshift(current[i]); // Keep user items
+        if (current[i]?.positionSource === "user") {
+          kept.unshift(current[i]);
         } else {
-          removed++; // Remove auto items
+          removed++;
         }
       }
 
-      // Keep all items before the removal zone
       const startIndex = current.length - toRemove - kept.length;
       const final = current.slice(0, Math.max(0, startIndex)).concat(kept);
 
