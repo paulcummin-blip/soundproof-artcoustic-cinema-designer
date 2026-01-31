@@ -457,6 +457,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     zoomMode: zoomModeProp = 'off',
     onZoomModeChange,
     exportMode = 'default',
+    extraSurrounds = [],
   } = props;
 
   const appState = useAppState();
@@ -7055,7 +7056,49 @@ return (
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
             {renderSpeakers()}
 
-
+            {/* Layer 10.5: Extra Surrounds (read-only for now) */}
+            {(() => {
+              if (!Array.isArray(extraSurrounds) || extraSurrounds.length === 0) return null;
+              
+              return (
+                <g data-layer="extra-surrounds">
+                  {extraSurrounds.map((extra) => {
+                    // Skip if no position
+                    if (!extra?.position || !Number.isFinite(extra.position.x) || !Number.isFinite(extra.position.y)) {
+                      return null;
+                    }
+                    
+                    // Get model dimensions (use modelKey or fallback)
+                    const model = extra.modelKey || 'evolve-2-1';
+                    const dims = getModelDimsM(model);
+                    const widthM_spk = dims.widthM || 0.27;
+                    const depthM_spk = dims.depthM || 0.082;
+                    
+                    // Convert position to canvas
+                    const canvasX = roomRect.x + (extra.position.x * scale);
+                    const canvasY = roomRect.y + (extra.position.y * scale);
+                    
+                    // Use yaw from data or default to 0
+                    const yawDeg = Number(extra.yaw) || 0;
+                    
+                    return (
+                      <SpeakerIcon
+                        key={extra.id}
+                        speaker={{ ...extra, model, role: 'ExtraSurround' }}
+                        canvasX={canvasX}
+                        canvasY_raw={canvasY}
+                        yawDeg={yawDeg}
+                        widthM={widthM_spk}
+                        depthM={depthM_spk}
+                        scale={scale}
+                        speakerMouseDownHandler={undefined}
+                        setHoveredSpeaker={setHoveredSpeaker}
+                      />
+                    );
+                  })}
+                </g>
+              );
+            })()}
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
             {renderSpeakerLabels()}

@@ -4469,7 +4469,8 @@ function RoomDesignerWithState() {
                   showMlpRuler={showMlpRuler}
                   zoomMode={zoomMode}
                   onZoomModeChange={setZoomMode}
-                  isDraggingRef={isDraggingRef} />
+                  isDraggingRef={isDraggingRef}
+                  extraSurrounds={appState?.extraSurrounds || []} />
 
               </Suspense>
             </ErrorBoundary>
