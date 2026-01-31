@@ -929,10 +929,25 @@ const byId = useMemo(() => {
     const averageAngle = Number.isFinite(avg) ? avg : 0;
     const maxAbs = Math.max(Math.abs(angleL), Math.abs(angleR));
 
-    if (typeof onLcrAngleComputed === "function") onLcrAngleComputed(averageAngle);
-
     return { L: angleL, R: angleR, averageAngle, maxAbs };
-  }, [aimAtMLP, placedSpeakers, mlpDotX_m, mlpDotY_m, onLcrAngleComputed, getCanonicalRole]);
+  }, [aimAtMLP, placedSpeakers, mlpDotX_m, mlpDotY_m, getCanonicalRole]);
+
+  // Report LCR angle to parent (guarded - only when rounded value changes)
+  const lastReportedLcrAngleRef = useRef(null);
+  
+  useEffect(() => {
+    if (typeof onLcrAngleComputed !== "function") return;
+    if (!Number.isFinite(lcrAngleInfo.averageAngle)) return;
+    
+    // Round to 0.1° to prevent float noise triggering updates
+    const rounded = Math.round(lcrAngleInfo.averageAngle * 10) / 10;
+    
+    // Only call if value actually changed
+    if (lastReportedLcrAngleRef.current === rounded) return;
+    lastReportedLcrAngleRef.current = rounded;
+    
+    onLcrAngleComputed(rounded);
+  }, [lcrAngleInfo.averageAngle, onLcrAngleComputed]);
 
   // LIVE EMIT: recompute minimum screen depth whenever anything relevant changes
   useEffect(() => {
