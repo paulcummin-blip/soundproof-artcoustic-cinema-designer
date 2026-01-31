@@ -503,12 +503,8 @@ function useDesignerState() {
         const index = current.length + i;
         const id = `extra-surround-${index + 1}`;
 
-        // Stable label: SL2/SR2/SL3/SR3... (deterministic, never renumbered)
+        // Alternate left/right: 0,2,4,6 = left; 1,3,5,7 = right
         const isLeft = index % 2 === 0;
-        const side = isLeft ? 'SL' : 'SR';
-        const number = 2 + Math.floor(index / 2);
-        const label = `${side}${number}`;
-
         const x = isLeft ? 0.1 : widthM - 0.1;
 
         // Distribute Y between 35% and 75% of room length
@@ -518,14 +514,19 @@ function useDesignerState() {
         const yStep = count > 1 ? yRange / (count - 1) : 0;
         const y = yMin + (index * yStep);
 
+        // Stable label: SL2/SR2/SL3/SR3...
+        const side = isLeft ? 'SL' : 'SR';
+        const number = 2 + Math.floor(index / 2);
+        const label = `${side}${number}`;
+
         newItems.push({
           id,
-          label,
           type: 'extraSurround',
           modelKey,
           position: { x, y, z: 1.2 },
           yaw: 0,
-          positionSource: 'auto'
+          positionSource: 'auto',
+          label
         });
       }
 
