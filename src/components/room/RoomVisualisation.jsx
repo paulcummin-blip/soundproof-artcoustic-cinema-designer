@@ -7106,32 +7106,16 @@ return (
                     // Use yaw from data or default to 0
                     const yawDeg = Number(extra.yaw) || 0;
                     
-                    // Derive render role from label for SpeakerIcon compatibility
-                    const label = String(extra?.label || "").toUpperCase();
-                    const renderRole =
-                      label.startsWith("SR") ? "SR" :
-                      label.startsWith("SL") ? "SL" :
-                      "SL";
-                    
                     return (
-                      <SpeakerIcon
-                        key={extra.id}
-                        speaker={{
-                          ...extra,
-                          model,
-                          role: renderRole,     // IMPORTANT: known role so SpeakerIcon draws
-                          label: extra.label,   // keep SL2/SR2 etc for any label rendering
-                          type: "extraSurround" // keep type for future logic, harmless here
-                        }}
-                        canvasX={canvasX}
-                        canvasY_raw={canvasY}
-                        yawDeg={yawDeg}
-                        widthM={widthM_spk}
-                        depthM={depthM_spk}
-                        scale={scale}
-                        speakerMouseDownHandler={undefined}
-                        setHoveredSpeaker={setHoveredSpeaker}
-                      />
+                      <g key={extra.id}>
+                        {/* Debug dot: proves the item exists and has a valid canvas position */}
+                        <circle cx={canvasX} cy={canvasY} r={6} fill="red" />
+
+                        {/* Debug label next to the dot */}
+                        <text x={canvasX + 10} y={canvasY + 4} fontSize={12} fill="black">
+                          {extra.label || extra.id}
+                        </text>
+                      </g>
                     );
                   })}
                 </g>
