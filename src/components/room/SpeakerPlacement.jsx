@@ -1960,6 +1960,9 @@ function SpeakerPlacementImpl(props) {
     };
   });
 
+  // Input signature ref for idempotence
+  const lastSurroundResetSigRef = React.useRef(null);
+
   // MOVE resetSurroundPositions HERE (before it's used in handlers/effects)
   const resetSurroundPositions = useCallback(
     (layoutString, mlp, dims, currentSpeakers, modelKeyParam) => {
@@ -1967,6 +1970,24 @@ function SpeakerPlacementImpl(props) {
 
       const W = Number(dims?.width);
       const L = Number(dims?.length);
+
+      // GUARD 1: Input signature check - skip if inputs haven't changed
+      const sig = JSON.stringify({
+        layout: String(layoutString || ''),
+        model: String(modelKeyParam || '').trim(),
+        W: Math.round((W || 0) * 1000) / 1000,
+        L: Math.round((L || 0) * 1000) / 1000,
+        mode: sevenBedLayoutType,
+        mlpX: Math.round((mlp?.x || 0) * 1000) / 1000,
+        mlpY: Math.round((mlp?.y || 0) * 1000) / 1000,
+      });
+
+      if (lastSurroundResetSigRef.current === sig) {
+        console.log('[SP resetSurroundPositions CALLBACK] NO-OP (same inputs)');
+        return list;
+      }
+
+      lastSurroundResetSigRef.current = sig;
 
       console.log('[SP resetSurroundPositions CALLBACK] HIT', { layoutString, modelKeyParam, W, L, dims, speakerCount: Array.isArray(currentSpeakers) ? currentSpeakers.length : null });
 
@@ -2041,6 +2062,42 @@ function SpeakerPlacementImpl(props) {
       }
 
       const out = Array.from(byCanon.values());
+
+      // GUARD 2: Position comparison - only return new array if positions actually changed
+      const EPS = 0.001;
+      const posChanged = (a, b) => {
+        if (!a || !b) return true;
+        const dx = Math.abs((a.x ?? 0) - (b.x ?? 0));
+        const dy = Math.abs((a.y ?? 0) - (b.y ?? 0));
+        const dz = Math.abs((a.z ?? 0) - (b.z ?? 0));
+        return dx > EPS || dy > EPS || dz > EPS;
+      };
+
+      const isSurroundRole = (role) => {
+        const r = String(role || "").toUpperCase();
+        return r === "SL" || r === "SR" || r === "SBL" || r === "SBR" || r === "LW" || r === "RW";
+      };
+
+      const currByRole = new Map();
+      list.forEach(s => {
+        const r = String(s?.role || "").toUpperCase();
+        if (r) currByRole.set(r, s);
+      });
+
+      let anyChanged = false;
+      out.forEach(s => {
+        if (!isSurroundRole(s?.role)) return;
+        const prev = currByRole.get(String(s.role).toUpperCase());
+        if (!prev) { anyChanged = true; return; }
+        if (posChanged(prev.position, s.position)) {
+          anyChanged = true;
+        }
+      });
+
+      if (!anyChanged) {
+        console.log('[SP resetSurroundPositions CALLBACK] NO-OP (positions unchanged)');
+        return list;
+      }
 
       if (globalThis.__B44_LOGS) {
         const trace = out
