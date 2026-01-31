@@ -1528,6 +1528,10 @@ function useDesignerState() {
     mlpOverride,
     setMlpOverride,
     clearMlpOverride,
+    extraSurroundCount,
+    setExtraSurroundCount,
+    extraSurrounds,
+    setExtraSurrounds,
     ]);
 
   // Export p21 setter as convenience (same pattern as p15)
