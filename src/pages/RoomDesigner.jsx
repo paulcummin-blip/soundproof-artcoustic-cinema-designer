@@ -1824,12 +1824,24 @@ function RoomDesignerWithState() {
   const layoutMajor = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) || 5;
   const useWidesInsteadOfRears = _sevenBedLayoutType === "wides";
   const expectsRears = layoutMajor >= 9 || layoutMajor === 7 && !useWidesInsteadOfRears;
+  
+  // NEW: Extra surrounds gating (only allow for 9.x.x+)
+  const layoutString = String(dolbyPreset || '9.1.6');
+  const major = parseInt(layoutString.split('.')[0], 10) || 0;
+  const allowExtraSurrounds = major >= 9;
 
   // screen state is now managed directly by AppState, removed local useState here.
 
   // Track preset changes to prevent unnecessary re-seeding
   const lastPresetRef = React.useRef(dolbyPreset);
   useEffect(() => {lastPresetRef.current = dolbyPreset;}, [dolbyPreset]);
+  
+  // NEW: Auto-reset extra surrounds count when layout doesn't allow them
+  useEffect(() => {
+    if (!allowExtraSurrounds && Number(appState?.extraSurroundCount || 0) !== 0) {
+      appState?.setExtraSurroundCount?.(0);
+    }
+  }, [allowExtraSurrounds, appState]);
 
   // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
 
@@ -4317,19 +4329,18 @@ function RoomDesignerWithState() {
                 }}>
 
                 {(() => {
-                  const base = (dolbyPreset || "").split(" ")[0]; // "5.1.4" or "5.1"
-                  const parts = String(base || "5.1").split(".");
-                  const bed = parts[0] || "5";
-                  const heights = parts[2] || ""; // may be missing for "5.1"
+                 const extraN = allowExtraSurrounds ? Number(appState?.extraSurroundCount || 0) : 0;
+                 const parts = layoutString.split('.');
+                 const displayMajor = (parseInt(parts[0], 10) || 0) + extraN;
 
-                  const frontCount = Number(_frontSubsCfg?.count ?? 0);
-                  const rearCount = Number(_rearSubsCfg?.count ?? 0);
-                  const totalSubs = frontCount + rearCount;
+                 const frontCount = Number(_frontSubsCfg?.count ?? 0);
+                 const rearCount = Number(_rearSubsCfg?.count ?? 0);
+                 const totalSubs = frontCount + rearCount;
 
-                  const subDisplay = totalSubs; // Show actual count (including 0)
+                 const heights = parts[2] || ""; // may be missing for "5.1"
 
-                  // If there are heights, show bed.sub.heights. If not, show bed.sub.
-                  return heights ? `${bed}.${subDisplay}.${heights}` : `${bed}.${subDisplay}`;
+                 // If there are heights, show displayMajor.sub.heights. If not, show displayMajor.sub.
+                 return heights ? `${displayMajor}.${totalSubs}.${heights}` : `${displayMajor}.${totalSubs}`;
                 })()}
               </strong>
 
@@ -4681,31 +4692,33 @@ function RoomDesignerWithState() {
 
                   </Suspense>
                   
-                  <div className="px-4 py-3 border-t border-gray-200">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor="extra-surrounds" className="text-sm font-medium">Extra Surrounds</Label>
-                        <Select
-                          value={String(appState?.extraSurroundCount ?? 0)}
-                          onValueChange={(val) => appState?.setExtraSurroundCount ? appState.setExtraSurroundCount(Number(val)) : null}
-                          disabled={isFrozen('speakers')}>
-                          <SelectTrigger id="extra-surrounds" className="w-24">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="0">0</SelectItem>
-                            <SelectItem value="2">2</SelectItem>
-                            <SelectItem value="4">4</SelectItem>
-                            <SelectItem value="6">6</SelectItem>
-                            <SelectItem value="8">8</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        Adds additional surround positions (rendering added in next step).
+                  {allowExtraSurrounds && (
+                    <div className="px-4 py-3 border-t border-gray-200">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor="extra-surrounds" className="text-sm font-medium">Extra Surrounds</Label>
+                          <Select
+                            value={String(appState?.extraSurroundCount ?? 0)}
+                            onValueChange={(val) => appState?.setExtraSurroundCount ? appState.setExtraSurroundCount(Number(val)) : null}
+                            disabled={isFrozen('speakers')}>
+                            <SelectTrigger id="extra-surrounds" className="w-24">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="0">0</SelectItem>
+                              <SelectItem value="2">2</SelectItem>
+                              <SelectItem value="4">4</SelectItem>
+                              <SelectItem value="6">6</SelectItem>
+                              <SelectItem value="8">8</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Adds additional surround positions (rendering added in next step).
+                        </div>
                       </div>
                     </div>
-                  </div>
+                  )}
                   
                   <div className="px-4 py-3 border-t border-gray-200">
                     <div className="flex items-center justify-between mb-2">

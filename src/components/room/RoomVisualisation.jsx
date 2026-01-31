@@ -5811,11 +5811,39 @@ return {
   const renderSpeakers = useCallback(() => {
   // Start from the prop (single source of truth)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+  
+  // NEW: Inject extra surrounds into the same render pipeline
+  const extras = Array.isArray(extraSurrounds) ? extraSurrounds : [];
+  
+  const extraAsSpeakers = extras
+    .filter(e => Number.isFinite(e?.position?.x) && Number.isFinite(e?.position?.y))
+    .map((e) => {
+      const label = String(e.label || '').toUpperCase();
+      const role =
+        label.startsWith('SL') ? 'SL' :
+        label.startsWith('SR') ? 'SR' :
+        (Number(e.position.x) < (widthM / 2) ? 'SL' : 'SR');
+
+      const model = e.modelKey || e.model || 'evolve-2-1';
+
+      return {
+        id: e.id || `extra-${label || Math.random().toString(36).slice(2)}`,
+        role,
+        model,
+        position: e.position,
+        yaw: Number(e.yaw) || 0,
+        label: e.label || label,
+        type: 'extraSurround',
+        _isExtraSurround: true,
+      };
+    });
+
+  const renderList = [...rawSpeakers, ...extraAsSpeakers];
 
 
 
   // 1) Basic structural filter (existing helper)
-  const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
+  const afterRenderable = renderList.filter(isRenderableSpeaker);
 
   // 2) Bed/overhead visibility must come from the layout roles, not model timing.
   const speakerSystem = appState?.speakerSystem;
@@ -6095,6 +6123,7 @@ return {
   setHoveredSpeaker,
   SpeakerIcon,
   placedSpeakers,
+  extraSurrounds,
 ]);
 
   // Renders rear subwoofers using SpeakerRect
