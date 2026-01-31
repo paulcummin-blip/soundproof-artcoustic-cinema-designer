@@ -1154,7 +1154,7 @@ function UnifiedSurroundsConfig({
         model: modelValid ? masterModel : null,
       }));
     });
-  }, [surroundConfig?.value?.extraCount, surroundConfig?.value?.master, effectiveDims, mlpPoint]);
+  }, [surroundConfig?.value?.extraCount, surroundConfig?.value?.master, dimsSafe, mlpPoint]);
   
   // [B44 FIX] REMOVED: Removed the backfill effect that was setting master model on null speakers.
   // This effect was redundant and could conflict with user selections.
