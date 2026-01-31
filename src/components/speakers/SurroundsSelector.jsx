@@ -85,33 +85,6 @@ export default function SurroundsSelector({
         </Select>
         <p className="text-xs text-[#625143]">Applies to all surrounds unless overridden.</p>
 
-        {/* Extra Surrounds Control */}
-        <div className="mt-4 space-y-2">
-          <Label className="text-sm font-medium text-[#3E4349]">Extra Surrounds</Label>
-          <Select
-            value={String(value?.extraCount || 0)}
-            onValueChange={(newCount) => {
-              onChange({
-                value: { ...value, extraCount: Number(newCount) },
-                override
-              });
-            }}
-            disabled={disabled}
-          >
-            <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-white border-[#DCDBD6]">
-              <SelectItem value="0">0</SelectItem>
-              <SelectItem value="2">2</SelectItem>
-              <SelectItem value="4">4</SelectItem>
-              <SelectItem value="6">6</SelectItem>
-              <SelectItem value="8">8</SelectItem>
-            </SelectContent>
-          </Select>
-          <p className="text-xs text-[#625143]">Wall-clamped additional surrounds (inherit Surround Model).</p>
-        </div>
-
         {/* Individual Control toggle */}
         <button
           type="button"

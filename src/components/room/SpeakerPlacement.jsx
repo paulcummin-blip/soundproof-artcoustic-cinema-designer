@@ -868,8 +868,6 @@ function UnifiedSurroundsConfig({
   setSurroundConfig,
   needsSurroundResetRef,
   lastSurroundModelKeyRef,
-  extraSurrounds,
-  setExtraSurrounds,
 }) {
   // Local dimsSafe for UnifiedSurroundsConfig scope
   const dimsSafe = React.useMemo(() => {
@@ -897,7 +895,6 @@ function UnifiedSurroundsConfig({
         side: String(config?.value?.side || "off"),
         rear: String(config?.value?.rear || "off"),
         wide: String(config?.value?.wide || "off"),
-        extraCount: Number(config?.value?.extraCount || 0),
       },
       override: {
         side: !!config?.override?.side,
@@ -1088,73 +1085,6 @@ function UnifiedSurroundsConfig({
     needsSurroundResetRef,
     lastSurroundModelKeyRef,
   ]);
-
-  // Extra Surrounds: create/update when count changes
-  useEffect(() => {
-    const count = Number(surroundConfig?.value?.extraCount || 0);
-    const masterModel = surroundConfig?.value?.master;
-    const modelValid = masterModel && String(masterModel).toLowerCase() !== 'off' && String(masterModel).toLowerCase() !== 'none';
-    
-    const W = Number(effectiveDims?.width ?? effectiveDims?.widthM) || 0;
-    const L = Number(effectiveDims?.length ?? effectiveDims?.lengthM) || 0;
-    
-    // Skip if no room dims
-    if (W <= 0 || L <= 0) {
-      setExtraSurrounds([]);
-      return;
-    }
-    
-    setExtraSurrounds(prev => {
-      const current = Array.isArray(prev) ? prev : [];
-      
-      // Remove extras if count decreased
-      if (count < current.length) {
-        return current.slice(0, count);
-      }
-      
-      // Add new extras if count increased
-      if (count > current.length) {
-        const toAdd = count - current.length;
-        const newExtras = [];
-        
-        // Evenly space along side walls around seating region
-        const mlpY = Number.isFinite(mlpPoint?.y) ? mlpPoint.y : L * 0.58;
-        const spacing = L * 0.3; // Total vertical spread
-        const startY = Math.max(0.1, mlpY - spacing / 2);
-        
-        for (let i = 0; i < toAdd; i++) {
-          const idx = current.length + i;
-          const isLeft = idx % 2 === 0;
-          const wallPairIdx = Math.floor(idx / 2);
-          
-          // Distribute vertically along wall
-          const yOffset = (spacing / Math.max(1, Math.ceil(count / 2) - 1)) * wallPairIdx;
-          const y = Math.max(0.05, Math.min(L - 0.05, startY + yOffset));
-          
-          newExtras.push({
-            id: `extra-surround-${Date.now()}-${idx}`,
-            kind: 'extraSurround',
-            position: {
-              x: isLeft ? 0.02 : W - 0.02,
-              y: y,
-              z: 1.1
-            },
-            wall: isLeft ? 'left' : 'right',
-            model: modelValid ? masterModel : null,
-            draggable: true,
-          });
-        }
-        
-        return [...current, ...newExtras];
-      }
-      
-      // Update models on existing extras when master model changes
-      return current.map(extra => ({
-        ...extra,
-        model: modelValid ? masterModel : null,
-      }));
-    });
-  }, [surroundConfig?.value?.extraCount, surroundConfig?.value?.master, effectiveDims, mlpPoint]);
   
   // [B44 FIX] REMOVED: Removed the backfill effect that was setting master model on null speakers.
   // This effect was redundant and could conflict with user selections.
@@ -2025,13 +1955,10 @@ function SpeakerPlacementImpl(props) {
       : savedModel;
     const master = cleanedModel && cleanedModel !== 'off' && cleanedModel !== 'none' ? cleanedModel : "off";
     return {
-      value: { master, side: "off", rear: "off", wide: "off", extraCount: 0 },
+      value: { master, side: "off", rear: "off", wide: "off" },
       override: { side: false, rear: false, wide: false },
     };
   });
-
-  // Extra surrounds state
-  const [extraSurrounds, setExtraSurrounds] = useState([]);
 
   // MOVE resetSurroundPositions HERE (before it's used in handlers/effects)
   const resetSurroundPositions = useCallback(
@@ -3102,8 +3029,6 @@ function SpeakerPlacementImpl(props) {
           setSurroundConfig={setSurroundConfig}
           needsSurroundResetRef={needsSurroundResetRef}
           lastSurroundModelKeyRef={lastSurroundModelKeyRef}
-          extraSurrounds={extraSurrounds}
-          setExtraSurrounds={setExtraSurrounds}
         />
 
         {/* NEW: Surround SPL @ RSP strip */}
