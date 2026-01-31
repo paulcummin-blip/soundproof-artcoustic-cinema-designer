@@ -7106,16 +7106,36 @@ return (
                     // Use yaw from data or default to 0
                     const yawDeg = Number(extra.yaw) || 0;
                     
+                    // Derive role from label for SpeakerIcon compatibility
+                    const rawLabel = String(extra.label || '').toUpperCase();
+                    const role = rawLabel.startsWith('SL') ? 'SL' : 
+                                 rawLabel.startsWith('SR') ? 'SR' :
+                                 (extra.position.x < widthM / 2 ? 'SL' : 'SR');
+                    
+                    // Build speaker object for SpeakerIcon
+                    const speakerForIcon = {
+                      id: extra.id,
+                      role,
+                      model,
+                      position: extra.position,
+                      yaw: yawDeg,
+                      label: extra.label,
+                      _isExtraSurround: true
+                    };
+                    
                     return (
-                      <g key={extra.id}>
-                        {/* Debug dot: proves the item exists and has a valid canvas position */}
-                        <circle cx={canvasX} cy={canvasY} r={6} fill="red" />
-
-                        {/* Debug label next to the dot */}
-                        <text x={canvasX + 10} y={canvasY + 4} fontSize={12} fill="black">
-                          {extra.label || extra.id}
-                        </text>
-                      </g>
+                      <SpeakerIcon
+                        key={extra.id}
+                        speaker={speakerForIcon}
+                        canvasX={canvasX}
+                        canvasY_raw={canvasY}
+                        yawDeg={yawDeg}
+                        widthM={widthM_spk}
+                        depthM={depthM_spk}
+                        scale={scale}
+                        speakerMouseDownHandler={undefined}
+                        setHoveredSpeaker={setHoveredSpeaker}
+                      />
                     );
                   })}
                 </g>
