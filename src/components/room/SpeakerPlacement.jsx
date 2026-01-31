@@ -1095,8 +1095,8 @@ function UnifiedSurroundsConfig({
     const masterModel = surroundConfig?.value?.master;
     const modelValid = masterModel && String(masterModel).toLowerCase() !== 'off' && String(masterModel).toLowerCase() !== 'none';
     
-    const W = Number(effectiveDims?.width ?? effectiveDims?.widthM) || 0;
-    const L = Number(effectiveDims?.length ?? effectiveDims?.lengthM) || 0;
+    const W = Number(dimsSafe?.width) || 0;
+    const L = Number(dimsSafe?.length) || 0;
     
     // Skip if no room dims
     if (W <= 0 || L <= 0) {
