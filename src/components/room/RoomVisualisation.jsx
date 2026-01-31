@@ -426,9 +426,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const {
     analysisResult,
     placedSpeakers = [],
-    extraSurrounds = [],
     onSetSpeakers,
-    onSetExtraSurrounds,
     onSetSeatingPositions,
     onSetFrontSubs,
     onSetRearSubs,
@@ -1627,23 +1625,6 @@ React.useEffect(() => {
     (e, id, type) => {
       e.preventDefault();
       e.stopPropagation();
-
-      // Extra surround handling
-      if (type === 'extraSurround') {
-        const extra = extraSurrounds.find(ex => ex.id === id);
-        if (!extra) return;
-        
-        const cursorPos = canvasToRoom({ x: e.clientX, y: e.clientY });
-        dragOffsetRoomRef.current = {
-          x: extra.position.x - cursorPos.x,
-          y: extra.position.y - cursorPos.y
-        };
-        
-        isAnyDraggingRef.current = true;
-        setDragState({ dragging: true, draggedItemId: id, dragType: 'extraSurround' });
-        setDragWarning({ show: false });
-        return;
-      }
 
       const target = byId.get(id);
       if (!target) return;
@@ -2941,49 +2922,6 @@ React.useEffect(() => {
       y: cursorRoom.y + dragOffsetRoomRef.current.y
     };
     
-    // Handle extra surround drag (wall-clamp logic)
-    if (dragType === 'extraSurround') {
-      if (!onSetExtraSurrounds) return;
-      
-      // Import wall-clamp helper inline (to avoid circular imports)
-      const clampExtraSurroundToWall = (position, roomDims) => {
-        const W = Number(roomDims?.width ?? roomDims?.widthM) || 0;
-        const L = Number(roomDims?.length ?? roomDims?.lengthM) || 0;
-        
-        if (W <= 0 || L <= 0) return { ...position, wall: 'left' };
-        
-        const INSET = 0.02;
-        const { x, y, z } = position;
-        
-        const distToLeft = Math.abs(x - 0);
-        const distToRight = Math.abs(x - W);
-        const distToRear = Math.abs(y - L);
-        
-        const distances = [
-          { wall: 'left', dist: distToLeft, x: INSET, y },
-          { wall: 'right', dist: distToRight, x: W - INSET, y },
-          { wall: 'rear', dist: distToRear, x, y: L - INSET },
-        ];
-        
-        distances.sort((a, b) => a.dist - b.dist);
-        const nearest = distances[0];
-        
-        const clampedX = Math.max(INSET, Math.min(W - INSET, nearest.x));
-        const clampedY = Math.max(INSET, Math.min(L - INSET, nearest.y));
-        
-        return { x: clampedX, y: clampedY, z: z || 1.1, wall: nearest.wall };
-      };
-      
-      const clamped = clampExtraSurroundToWall(targetRoomPos, { width: widthM, length: lengthM });
-      
-      onSetExtraSurrounds(prev => prev.map(ex => 
-        ex.id === draggedItemId 
-          ? { ...ex, position: clamped, wall: clamped.wall }
-          : ex
-      ));
-      return;
-    }
-    
     // Convert back to canvas for existing logic
     const targetCanvasPos = roomToCanvas(targetRoomPos);
 
@@ -3052,10 +2990,8 @@ React.useEffect(() => {
       handleSeatDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'sub') {
       handleSubDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
-    } else if (dragType === 'extraSurround') {
-      // Extra surrounds handled in handleMouseMove (wall-clamp applied there)
     }
-  }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, handleSubDrag, placedSpeakers, onSetSpeakers, onSetExtraSurrounds, extraSurrounds, widthM, lengthM, constraintZones, svgRef, canvasToRoom, roomToCanvas, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, dragOffsetRoomRef]);
+  }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, handleSubDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, roomToCanvas, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, dragOffsetRoomRef]);
 
   // Helper to commit draft sub positions to real state
   const commitDraftSubPositions = useCallback(() => {
@@ -6180,82 +6116,6 @@ return {
   const renderSpeakerLabels = useCallback(() => {
     return <g data-layer="speaker-labels"></g>;
   }, []);
-  
-  // Render extra surrounds
-  const renderExtraSurrounds = useCallback(() => {
-    if (!Array.isArray(extraSurrounds) || extraSurrounds.length === 0) return null;
-    
-    // Helper to get label dynamically
-    const getExtraSurroundLabel = (extra, allExtras) => {
-      if (!extra?.wall) return 'Extra';
-      const sameWall = allExtras.filter(e => e.wall === extra.wall);
-      const index = sameWall.findIndex(e => e.id === extra.id);
-      const num = index + 1;
-      return extra.wall === 'rear' ? `Extra Rear ${num}` : `Extra Side ${num}`;
-    };
-    
-    return (
-      <g data-layer="extra-surrounds">
-        {extraSurrounds.map((extra) => {
-          if (!extra?.position) return null;
-          
-          const [px, py] = toPx(extra.position.x, extra.position.y);
-          const label = getExtraSurroundLabel(extra, extraSurrounds);
-          const isSelected = extra.id === draggedItemId;
-          
-          return (
-            <g
-              key={extra.id}
-              data-extra-surround-id={extra.id}
-              style={{ cursor: extra.draggable ? 'move' : 'default' }}
-              onMouseDown={(e) => {
-                if (extra.draggable) {
-                  e.stopPropagation();
-                  handleMouseDown(e, extra.id, 'extraSurround');
-                }
-              }}
-            >
-              <circle
-                cx={px}
-                cy={py}
-                r={12}
-                fill="#FFFFFF"
-                stroke={isSelected ? '#213428' : '#625143'}
-                strokeWidth={isSelected ? 2.5 : 1.5}
-                strokeDasharray="3 2"
-              />
-              
-              <text
-                x={px}
-                y={py}
-                fontSize={14}
-                fontWeight="700"
-                fill="#625143"
-                textAnchor="middle"
-                dominantBaseline="middle"
-                pointerEvents="none"
-                style={{ userSelect: 'none' }}
-              >
-                +
-              </text>
-              
-              <text
-                x={px}
-                y={py + 24}
-                fontSize={11}
-                fill="#3E4349"
-                textAnchor="middle"
-                pointerEvents="none"
-                style={{ userSelect: 'none', fontStyle: 'italic' }}
-              >
-                {label}
-              </text>
-            </g>
-          );
-        })}
-      </g>
-    );
-  }, [extraSurrounds, toPx, draggedItemId, handleMouseDown]);
 
   // --- Seats: always render from the latest seatingPositions prop ---
   const renderSeatingPositions = () => {
@@ -6405,24 +6265,20 @@ const renderLevelBadge = useCallback((level) => {
 }, []);
 
 const renderRp22AnglesOverlay = useCallback(() => {
-// For now, always try to render when a seat is hovered.
-if (!Number.isFinite(scale)) return null;
-if (!effectiveHoveredSeat) return null;
+  // For now, always try to render when a seat is hovered.
+  if (!Number.isFinite(scale)) return null;
+  if (!effectiveHoveredSeat) return null;
 
-// 1) Collect all surround-type speakers around this seat (ONLY from actually drawn speakers)
-const allSurrounds = (visiblePlanSpeakers || []).filter((s) => {
-  const r = getCanonicalRole(s.role);
-  return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r);
-});
+  // 1) Collect all surround-type speakers around this seat (ONLY from actually drawn speakers)
+  const allSurrounds = (visiblePlanSpeakers || []).filter((s) => {
+    const r = getCanonicalRole(s.role);
+    return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r);
+  });
 
-// Include extra surrounds in angle calculations (with valid positions)
-const validExtras = (extraSurrounds || []).filter(ex => ex?.position && ex?.kind === 'extraSurround');
-const allSurroundsWithExtras = [...allSurrounds, ...validExtras];
+  if (allSurrounds.length < 2) return null;
 
-if (allSurroundsWithExtras.length < 2) return null;
-
-// 2) Use all valid surrounds including extras
-const eligibleSurrounds = allSurroundsWithExtras;
+  // 2) Use all valid surrounds (no additional filtering needed - visiblePlanSpeakers already handles layout)
+  const eligibleSurrounds = allSurrounds;
 
   if (eligibleSurrounds.length < 2) return null;
 
@@ -7161,9 +7017,8 @@ return (
 
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
             {renderSpeakers()}
-            
-            {/* Layer 10.5: Extra Surrounds (render after standard speakers) */}
-            {renderExtraSurrounds()}
+
+
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
             {renderSpeakerLabels()}

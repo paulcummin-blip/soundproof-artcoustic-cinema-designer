@@ -1095,8 +1095,8 @@ function UnifiedSurroundsConfig({
     const masterModel = surroundConfig?.value?.master;
     const modelValid = masterModel && String(masterModel).toLowerCase() !== 'off' && String(masterModel).toLowerCase() !== 'none';
     
-    const W = Number(dimsSafe?.width) || 0;
-    const L = Number(dimsSafe?.length) || 0;
+    const W = Number(effectiveDims?.width ?? effectiveDims?.widthM) || 0;
+    const L = Number(effectiveDims?.length ?? effectiveDims?.lengthM) || 0;
     
     // Skip if no room dims
     if (W <= 0 || L <= 0) {
@@ -1154,7 +1154,7 @@ function UnifiedSurroundsConfig({
         model: modelValid ? masterModel : null,
       }));
     });
-  }, [surroundConfig?.value?.extraCount, surroundConfig?.value?.master, dimsSafe, mlpPoint]);
+  }, [surroundConfig?.value?.extraCount, surroundConfig?.value?.master, effectiveDims, mlpPoint]);
   
   // [B44 FIX] REMOVED: Removed the backfill effect that was setting master model on null speakers.
   // This effect was redundant and could conflict with user selections.
@@ -2996,13 +2996,6 @@ function SpeakerPlacementImpl(props) {
     allowedRoles,
     setSpeakers,
   ]);
-
-  // Expose extra surrounds to parent
-  React.useEffect(() => {
-    if (typeof window !== 'undefined') {
-      window.__EXTRA_SURROUNDS__ = extraSurrounds;
-    }
-  }, [extraSurrounds]);
 
   return (
     <div className="space-y-4 font-sans" style={{ fontFamily: 'Didact Gothic, Century Gothic, sans-serif' }}>
