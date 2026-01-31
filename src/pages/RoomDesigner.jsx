@@ -4681,6 +4681,32 @@ function RoomDesignerWithState() {
                   </Suspense>
                   
                   <div className="px-4 py-3 border-t border-gray-200">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="extra-surrounds" className="text-sm font-medium">Extra Surrounds</Label>
+                        <Select
+                          value={String(appState?.extraSurroundCount ?? 0)}
+                          onValueChange={(val) => appState?.setExtraSurroundCount(Number(val))}
+                          disabled={isFrozen('speakers')}>
+                          <SelectTrigger id="extra-surrounds" className="w-24">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="0">0</SelectItem>
+                            <SelectItem value="2">2</SelectItem>
+                            <SelectItem value="4">4</SelectItem>
+                            <SelectItem value="6">6</SelectItem>
+                            <SelectItem value="8">8</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Adds additional surround positions (rendering added in next step).
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="px-4 py-3 border-t border-gray-200">
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-medium text-gray-700">Speaker Positions</div>
                       <select

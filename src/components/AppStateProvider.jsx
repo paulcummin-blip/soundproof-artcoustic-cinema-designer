@@ -464,6 +464,17 @@ function useDesignerState() {
     setMlpOverride(null);
   }, []);
 
+  const [extraSurroundCount, _setExtraSurroundCount] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.extraSurroundCount === 'number') ? __autosavePayload.extraSurroundCount : 0
+  ));
+
+  const setExtraSurroundCount = useCallback((next) => {
+    const allowed = new Set([0, 2, 4, 6, 8]);
+    const v = Number(next);
+    const clamped = allowed.has(v) ? v : 0;
+    _setExtraSurroundCount(clamped);
+  }, []);
+
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
@@ -948,10 +959,11 @@ function useDesignerState() {
       seatMetricsById,
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
-      mlpOverride
-    };
+      mlpOverride,
+      extraSurroundCount
+      };
 
-    if (!isAutosavePayloadValid(payload)) return;
+      if (!isAutosavePayloadValid(payload)) return;
 
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
 
@@ -996,7 +1008,8 @@ function useDesignerState() {
     seatMetricsById,
     p15ConstructionLevel,
     p21EarlyReflectionPreset,
-    mlpOverride
+    mlpOverride,
+    extraSurroundCount
     ]);
 
     // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
@@ -1034,7 +1047,8 @@ function useDesignerState() {
       seatMetricsById,
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
-      mlpOverride
+      mlpOverride,
+      extraSurroundCount
       };
 
       try {
@@ -1075,7 +1089,8 @@ function useDesignerState() {
     seatMetricsById,
     p15ConstructionLevel,
     p21EarlyReflectionPreset,
-    mlpOverride
+    mlpOverride,
+    extraSurroundCount
     ]);
 
     // --- Autosave: Manual restore/clear functions ---
@@ -1220,6 +1235,9 @@ function useDesignerState() {
     
     // Clear MLP override
     setMlpOverride(null);
+
+    // Extra Surrounds
+    _setExtraSurroundCount(0);
 
     // Speaker system
     _setSpeakerSystem({
