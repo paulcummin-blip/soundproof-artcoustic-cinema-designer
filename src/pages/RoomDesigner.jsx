@@ -4481,7 +4481,8 @@ function RoomDesignerWithState() {
                   zoomMode={zoomMode}
                   onZoomModeChange={setZoomMode}
                   isDraggingRef={isDraggingRef}
-                  extraSurrounds={appState?.extraSurrounds || []} />
+                  extraSurrounds={appState?.extraSurrounds || []}
+                  extraSurroundCount={appState?.extraSurroundCount ?? 0} />
 
               </Suspense>
             </ErrorBoundary>

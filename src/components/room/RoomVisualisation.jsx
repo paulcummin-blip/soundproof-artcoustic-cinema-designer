@@ -458,6 +458,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     onZoomModeChange,
     exportMode = 'default',
     extraSurrounds = [],
+    extraSurroundCount = 0,
   } = props;
 
   const appState = useAppState();
@@ -7114,16 +7115,14 @@ return (
 
             {/* DEBUG: Extra surrounds data receipt (remove after confirmed) */}
             {(() => {
-              const n = Array.isArray(extraSurrounds) ? extraSurrounds.length : -1;
+              const n = Array.isArray(extraSurrounds) ? extraSurrounds.length : 'NA';
               const first = Array.isArray(extraSurrounds) && extraSurrounds[0] ? extraSurrounds[0] : null;
+              const firstLabel = first ? (first.label || first.id || "?") : "(none)";
+              const posText = (first && first.position) 
+                ? `x=${Number(first.position.x).toFixed(2)} y=${Number(first.position.y).toFixed(2)}` 
+                : `pos=(none)`;
 
-              const txt = [
-                `extraSurrounds.len=${n}`,
-                first ? `first=${first.label || first.id || "?"}` : `first=(none)`,
-                first && first.position
-                  ? `x=${Number(first.position.x).toFixed(2)} y=${Number(first.position.y).toFixed(2)}`
-                  : `pos=(none)`
-              ].join(" | ");
+              const txt = `extraSurroundCount=${extraSurroundCount} | extraSurrounds.len=${n} | first=${firstLabel} | ${posText}`;
 
               return (
                 <g data-layer="debug-extra-surrounds">
