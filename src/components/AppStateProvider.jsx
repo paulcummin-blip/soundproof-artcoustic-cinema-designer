@@ -514,13 +514,19 @@ function useDesignerState() {
         const yStep = count > 1 ? yRange / (count - 1) : 0;
         const y = yMin + (index * yStep);
 
+        // Stable label: SL2/SR2/SL3/SR3...
+        const side = isLeft ? 'SL' : 'SR';
+        const number = 2 + Math.floor(index / 2);
+        const label = `${side}${number}`;
+
         newItems.push({
           id,
           type: 'extraSurround',
           modelKey,
           position: { x, y, z: 1.2 },
           yaw: 0,
-          positionSource: 'auto'
+          positionSource: 'auto',
+          label
         });
       }
 
