@@ -7110,8 +7110,10 @@ return (
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
             {renderSpeakers()}
 
-            {/* Layer 10.5: Extra Surrounds (read-only for now) */}
+            {/* Layer 10.5: Extra Surrounds - DISABLED (now rendered via renderSpeakers pipeline) */}
             {(() => {
+              return null; // Extra surrounds now render through renderSpeakers()
+              
               if (!Array.isArray(extraSurrounds) || extraSurrounds.length === 0) return null;
               
               return (
