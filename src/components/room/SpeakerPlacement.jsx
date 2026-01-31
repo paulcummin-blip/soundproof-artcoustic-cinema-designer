@@ -2070,6 +2070,13 @@ function SpeakerPlacementImpl(props) {
     setSpeakers(prev => {
       const layout = String(effectivePreset || "5.1").split(" ")[0].split("_")[0];
       const next = resetSurroundPositions(layout, mlpPoint, effectiveDims, prev, modelKey);
+      
+      // IDEMPOTENT GUARD: only update if something actually changed
+      if (__b44SameSpeakers(prev, next)) {
+        console.log('[SP resetSurroundPositions CALLBACK] NO-OP (positions unchanged)');
+        return prev;
+      }
+      
       return Array.isArray(next) ? next : prev;
     });
 
