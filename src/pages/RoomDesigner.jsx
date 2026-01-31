@@ -4687,7 +4687,7 @@ function RoomDesignerWithState() {
                         <Label htmlFor="extra-surrounds" className="text-sm font-medium">Extra Surrounds</Label>
                         <Select
                           value={String(appState?.extraSurroundCount ?? 0)}
-                          onValueChange={(val) => appState?.setExtraSurroundCount(Number(val))}
+                          onValueChange={(val) => appState?.setExtraSurroundCount ? appState.setExtraSurroundCount(Number(val)) : null}
                           disabled={isFrozen('speakers')}>
                           <SelectTrigger id="extra-surrounds" className="w-24">
                             <SelectValue />
