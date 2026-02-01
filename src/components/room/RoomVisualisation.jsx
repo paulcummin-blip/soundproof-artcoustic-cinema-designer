@@ -577,6 +577,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [hoveredSpeaker, setHoveredSpeaker] = useState(null);
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
   const [dragState, setDragState] = useState({ dragging: false, draggedItemId: null, dragType: null });
+  const [speakerTooltip, setSpeakerTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
+  const rvWrapRef = useRef(null);
   const { dragging, draggedItemId, dragType } = dragState;
   const [draggingRole, setDraggingRole] = useState(null);
   const [hasManualOverheadEdit, setHasManualOverheadEdit] = useState(false);
@@ -3206,6 +3208,50 @@ React.useEffect(() => {
     if (!hudPinnedSeatId) setHoveredSeat(null);
   }, [hudPinnedSeatId]);
 
+  // Helper to get friendly speaker model name
+  const getSpeakerModelDisplayName = useCallback((modelKey) => {
+    if (!modelKey) return 'Unknown model';
+    const meta = getSpeakerModelMeta(modelKey);
+    if (meta?.displayName) return meta.displayName;
+    if (meta?.name) return meta.name;
+    // Fallback: clean up the model key for display
+    return String(modelKey).replace(/_s$/, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+  }, []);
+
+  // Speaker icon tooltip handlers
+  const handleIconEnter = useCallback((e, speaker) => {
+    if (!speaker) return;
+    const role = getCanonicalRole(speaker.role);
+    const displayName = getSpeakerModelDisplayName(speaker.model);
+    const text = `${role} — ${displayName}`;
+    
+    // Position immediately on enter
+    const rect = rvWrapRef.current?.getBoundingClientRect();
+    if (rect) {
+      setSpeakerTooltip({
+        visible: true,
+        text,
+        x: e.clientX - rect.left + 12,
+        y: e.clientY - rect.top + 12
+      });
+    }
+  }, [getCanonicalRole, getSpeakerModelDisplayName]);
+
+  const handleIconMove = useCallback((e, speaker) => {
+    const rect = rvWrapRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    setSpeakerTooltip(prev => ({
+      ...prev,
+      x: e.clientX - rect.left + 12,
+      y: e.clientY - rect.top + 12
+    }));
+  }, []);
+
+  const handleIconLeave = useCallback(() => {
+    setSpeakerTooltip({ visible: false, text: '', x: 0, y: 0 });
+  }, []);
+
   const mlpAnchorEffective = mlp;
 
   // Combine hoveredSeat and pinnedSeat for effective display
@@ -4908,6 +4954,9 @@ useEffect(() => {
               scale={scale}
               speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id)}
               setHoveredSpeaker={setHoveredSpeaker}
+              onIconEnter={handleIconEnter}
+              onIconMove={handleIconMove}
+              onIconLeave={handleIconLeave}
             />
           );
         })}
@@ -6096,6 +6145,9 @@ return {
         scale={scale}
         speakerMouseDownHandler={speakerDragHandler}
         setHoveredSpeaker={setHoveredSpeaker}
+        onIconEnter={handleIconEnter}
+        onIconMove={handleIconMove}
+        onIconLeave={handleIconLeave}
       />
     );
   });
@@ -6517,7 +6569,10 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
 
 return (
   <div
-    ref={planBoundsRef} // Renamed from containerRef
+    ref={(el) => {
+      planBoundsRef.current = el;
+      rvWrapRef.current = el;
+    }}
     className="relative w-full h-full overflow-auto bg-gray-50"
     style={{
       aspectRatio: aspect,
@@ -7205,6 +7260,29 @@ return (
           />
         )}
 
+        {/* SPEAKER TOOLTIP - Light style, non-interfering */}
+        {speakerTooltip.visible && (
+          <div
+            style={{
+              position: 'absolute',
+              left: speakerTooltip.x,
+              top: speakerTooltip.y,
+              pointerEvents: 'none',
+              background: '#F5F5F5',
+              color: '#111',
+              border: '1px solid rgba(0,0,0,0.12)',
+              borderRadius: 8,
+              padding: '6px 10px',
+              fontSize: 12,
+              fontFamily: 'system-ui, sans-serif',
+              zIndex: 9999,
+              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {speakerTooltip.text}
+          </div>
+        )}
 
       </div>
     </div>
