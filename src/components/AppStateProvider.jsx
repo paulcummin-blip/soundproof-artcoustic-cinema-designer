@@ -1563,7 +1563,8 @@ function useDesignerState() {
     setExtraSurroundCount,
     extraSurrounds,
     setExtraSurrounds,
-  }), [
+  };
+}, [
     dimensions, setDimensions,
     roomDims, setRoomDims,
     setRoomWidthM, setRoomLengthM, setRoomHeightM,
