@@ -1015,6 +1015,7 @@ function useDesignerState() {
       if (typeof p.aimFrontWidesAtMLP === "boolean") setAimFrontWidesAtMLP(p.aimFrontWidesAtMLP);
       if (typeof p.aimSideSurroundsAtMLP === "boolean") setAimSideSurroundsAtMLP(p.aimSideSurroundsAtMLP);
       if (typeof p.aimRearSurroundsAtMLP === "boolean") setAimRearSurroundsAtMLP(p.aimRearSurroundsAtMLP);
+      if (typeof p.extraSurroundCount === "number") _setExtraSurroundCount(p.extraSurroundCount);
 
       setAutosaveMeta(getAutosaveMeta());
     } catch {
