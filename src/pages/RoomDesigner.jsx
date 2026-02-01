@@ -4689,7 +4689,10 @@ function RoomDesignerWithState() {
                 setGlobalSurroundModel={appState?.setGlobalSurroundModel}
 
                 allSeatSplMetrics={allSeatSplMetrics}
-                frontWideOverlay={frontWideZones} />
+                frontWideOverlay={frontWideZones}
+                
+                extraSurroundCount={allowExtraSurrounds ? (appState?.extraSurroundCount ?? 0) : undefined}
+                onExtraSurroundCountChange={allowExtraSurrounds ? appState?.setExtraSurroundCount : undefined} />
 
                   </Suspense>
                   

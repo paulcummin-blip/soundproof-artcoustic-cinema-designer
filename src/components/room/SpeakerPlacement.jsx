@@ -868,6 +868,8 @@ function UnifiedSurroundsConfig({
   setSurroundConfig,
   needsSurroundResetRef,
   lastSurroundModelKeyRef,
+  extraSurroundCount,
+  onExtraSurroundCountChange,
 }) {
   // Local dimsSafe for UnifiedSurroundsConfig scope
   const dimsSafe = React.useMemo(() => {
@@ -1128,6 +1130,8 @@ function UnifiedSurroundsConfig({
         onChange={handleSurroundModelChange}
         activeRoles={activeRoles}
         disabled={disabled}
+        extraSurroundCount={extraSurroundCount}
+        onExtraSurroundCountChange={onExtraSurroundCountChange}
       />
     </div>
   );
@@ -1460,6 +1464,8 @@ function SpeakerPlacementImpl(props) {
     onChangeLcrAimMode = () => {},
     lcrAngleDeg = 0,
     allSeatSplMetrics, // NEW: SPL data from parent
+    extraSurroundCount,
+    onExtraSurroundCountChange,
   } = props;
 
 
@@ -3093,6 +3099,8 @@ function SpeakerPlacementImpl(props) {
           setSurroundConfig={setSurroundConfig}
           needsSurroundResetRef={needsSurroundResetRef}
           lastSurroundModelKeyRef={lastSurroundModelKeyRef}
+          extraSurroundCount={extraSurroundCount}
+          onExtraSurroundCountChange={onExtraSurroundCountChange}
         />
 
         {/* NEW: Surround SPL @ RSP strip */}
@@ -3463,5 +3471,13 @@ function SpeakerPlacementImpl(props) {
 }
 
 export default function SpeakerPlacement(props) {
-  return <SpeakerPlacementImpl {...props} />;
+  const { extraSurroundCount, onExtraSurroundCountChange, ...restProps } = props;
+  
+  return (
+    <SpeakerPlacementImpl 
+      {...restProps}
+      extraSurroundCount={extraSurroundCount}
+      onExtraSurroundCountChange={onExtraSurroundCountChange}
+    />
+  );
 }
