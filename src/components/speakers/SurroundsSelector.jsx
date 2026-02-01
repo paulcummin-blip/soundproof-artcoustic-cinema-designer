@@ -11,7 +11,9 @@ export default function SurroundsSelector({
   override,
   onChange,
   activeRoles,
-  disabled
+  disabled,
+  extraSurroundCount,
+  onExtraSurroundCountChange
 }) {
   const [showSurroundOverrides, setShowSurroundOverrides] = React.useState(false);
 
@@ -84,6 +86,32 @@ export default function SurroundsSelector({
           </SelectContent>
         </Select>
         <p className="text-xs text-[#625143]">Applies to all surrounds unless overridden.</p>
+
+        {/* Extra Surrounds selector */}
+        {typeof extraSurroundCount !== 'undefined' && onExtraSurroundCountChange && (
+          <>
+            <Label className="text-sm font-medium text-[#3E4349]" style={{ marginTop: 16 }}>Extra Surrounds</Label>
+            <Select
+              value={String(extraSurroundCount || 0)}
+              onValueChange={(v) => {
+                const count = Number(v);
+                if ([0, 2].includes(count)) {
+                  onExtraSurroundCountChange(count);
+                }
+              }}
+              disabled={disabled}
+            >
+              <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-white border-[#DCDBD6]">
+                <SelectItem value="0" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">Off</SelectItem>
+                <SelectItem value="2" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">2 (One pair)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-[#625143]">Adds additional surround positions behind side surrounds.</p>
+          </>
+        )}
 
         {/* Individual Control toggle */}
         <button
