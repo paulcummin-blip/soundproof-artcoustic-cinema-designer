@@ -149,6 +149,18 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   // Get color (currently always black)
   const color = getChannelColor(role);
   
+  // Build clean hover label (no _s suffix, no aim angle)
+  const roleLabel = speaker?.displayRole || speaker?.role || "";
+  const modelLabel = speaker?.displayModelName || (
+    modelMeta?.label || String(model || "")
+      .replace(/_s\b/gi, "")
+      .replace(/_l\b/gi, "")
+      .replace(/_r\b/gi, "")
+      .trim()
+      .toUpperCase()
+  );
+  const hoverLabel = `${roleLabel} — ${modelLabel}`;
+
   // For round speakers (overheads), render as circle
   if (isRound) {
     const diameter = modelMeta?.diameterM || safeWidthM;
@@ -159,11 +171,12 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
         pointerEvents="all"
         onMouseDown={speakerMouseDownHandler}
         onMouseEnter={() =>
-          setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
+          setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg, label: hoverLabel })
         }
         onMouseLeave={() => setHoveredSpeaker?.(null)}
         className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
       >
+        <title>{hoverLabel}</title>
         <circle
           cx={canvasX}
           cy={canvasY_raw}
@@ -190,11 +203,12 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       pointerEvents="all"
       onMouseDown={speakerMouseDownHandler}
       onMouseEnter={() =>
-        setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
+        setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg, label: hoverLabel })
       }
       onMouseLeave={() => setHoveredSpeaker?.(null)}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
+      <title>{hoverLabel}</title>
       <path
         d={pathData}
         fill={color || "#000000"}

@@ -5919,22 +5919,32 @@ return {
   
   const extraAsSpeakers = extras
     .filter(e => Number.isFinite(e?.position?.x) && Number.isFinite(e?.position?.y))
-    .map((e) => {
+    .map((e, i) => {
       const label = String(e.label || '').toUpperCase();
-      const role =
-        label.startsWith('SL') ? 'SL' :
-        label.startsWith('SR') ? 'SR' :
-        (Number(e.position.x) < (widthM / 2) ? 'SL' : 'SR');
+      const isLeft = label.startsWith('SL') || Number(e.position.x) < (widthM / 2);
+      const role = isLeft ? 'SL' : 'SR';
 
-      const model = e.modelKey || e.model || 'evolve-2-1';
+      const rawModel = e.modelKey || e.model || 'evolve-2-1';
+      
+      // Extract display fields for clean hover labels
+      const cleanedKey = String(rawModel).replace(/_s\b/i, "").replace(/_l\b/i, "").replace(/_r\b/i, "");
+      const modelMeta = cleanedKey ? getSpeakerModelMeta(cleanedKey) : null;
+
+      const displayModelName = (modelMeta?.label || cleanedKey || "")
+        .toString()
+        .replace(/_s\b/i, "")
+        .trim()
+        .toUpperCase();
 
       return {
         id: e.id || `extra-${label || Math.random().toString(36).slice(2)}`,
         role,
-        model,
+        model: rawModel,
         position: e.position,
         yaw: Number(e.yaw) || 0,
         label: e.label || label,
+        displayRole: e.label || label, // SL2, SR2, etc.
+        displayModelName,
         type: 'extraSurround',
         _isExtraSurround: true,
       };
