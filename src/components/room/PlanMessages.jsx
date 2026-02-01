@@ -75,9 +75,6 @@ export default function PlanMessages({
             }}
           >
             {(hoveredSpeaker?.role ?? "—")} — {(hoveredSpeaker?.model ?? "—")}
-            {Number.isFinite(hoveredSpeaker?.angle)
-              ? ` (${Math.round(hoveredSpeaker.angle)}°)`
-              : ""}
           </div>
         </foreignObject>
       )}

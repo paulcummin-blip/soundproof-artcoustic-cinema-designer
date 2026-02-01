@@ -3962,10 +3962,18 @@ React.useEffect(() => {
     }
 
     // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
-    // Build eligible surrounds for P5 (ONLY from actually drawn speakers)
+    // Build eligible surrounds for P5 (includes extra surrounds like SL2, SR2)
     const eligibleSurrounds = (visiblePlanSpeakers || []).filter(s => {
-      const r = getCanonicalRole(s.role);
-      return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
+      const raw = String(s?.role || '').toUpperCase();
+      const r = getCanonicalRole(raw);
+      
+      // Include standard surrounds
+      if (['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r)) return true;
+      
+      // Include extra side surrounds (SL2, SR2, SL3, SR3, etc.)
+      if (/^SL\d+$/.test(raw) || /^SR\d+$/.test(raw)) return true;
+      
+      return false;
     });
 
     let p5Val = null;
@@ -6477,10 +6485,18 @@ const renderRp22AnglesOverlay = useCallback(() => {
   if (!Number.isFinite(scale)) return null;
   if (!effectiveHoveredSeat) return null;
 
-  // 1) Collect all surround-type speakers around this seat (ONLY from actually drawn speakers)
+  // 1) Collect all surround-type speakers around this seat (includes extra surrounds)
   const allSurrounds = (visiblePlanSpeakers || []).filter((s) => {
-    const r = getCanonicalRole(s.role);
-    return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r);
+    const raw = String(s?.role || '').toUpperCase();
+    const r = getCanonicalRole(raw);
+    
+    // Include standard surrounds
+    if (["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r)) return true;
+    
+    // Include extra side surrounds (SL2, SR2, SL3, SR3, etc.)
+    if (/^SL\d+$/.test(raw) || /^SR\d+$/.test(raw)) return true;
+    
+    return false;
   });
 
   if (allSurrounds.length < 2) return null;
