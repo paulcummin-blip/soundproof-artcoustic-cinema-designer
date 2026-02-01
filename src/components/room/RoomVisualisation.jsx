@@ -2177,10 +2177,25 @@ React.useEffect(() => {
       return;
     }
 
-    // Handle special symmetrical drag for SL and SR
-    if ((canonicalRole === 'SL' || canonicalRole === 'SR')) {
-      const slSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
-      const srSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+    // Handle special symmetrical drag for SL and SR (and extra surrounds SL2/SR2/etc)
+    const isExtraSurround = speaker._isExtraSurround || false;
+    const extraLabel = isExtraSurround ? (speaker.label || '') : '';
+    const isSL2_SR2_pair = extraLabel.match(/^S[LR]2$/);
+    
+    if ((canonicalRole === 'SL' || canonicalRole === 'SR') || isSL2_SR2_pair) {
+      // For extra surrounds, find the pair from extraSurrounds array
+      let slSpeaker, srSpeaker;
+      if (isSL2_SR2_pair) {
+        const pairSpeakers = renderList.filter(s => {
+          const lbl = s.label || s._isExtraSurround && String(s.role).toUpperCase() + '2';
+          return lbl === 'SL2' || lbl === 'SR2';
+        });
+        slSpeaker = pairSpeakers.find(s => (s.label || '').startsWith('SL'));
+        srSpeaker = pairSpeakers.find(s => (s.label || '').startsWith('SR'));
+      } else {
+        slSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
+        srSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+      }
       if (!slSpeaker || !srSpeaker) return;
 
       const W = widthM || 0;
@@ -2279,12 +2294,24 @@ React.useEffect(() => {
         lastInteractionEpoch.current = timeNowMs();
 
         if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
-        onSetSpeakers(prev => prev.map(s => {
-          const role = getCanonicalRole(s.role);
-          if (role === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_side, y: yStar } };
-          if (role === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_side, y: yStar } };
-          return s;
-        }));
+
+        // For extra surrounds, update via setExtraSurrounds instead
+        if (isSL2_SR2_pair && appState?.setExtraSurrounds) {
+          appState.setExtraSurrounds(prev => prev.map(e => {
+            if (!e) return e;
+            const lbl = e.label || '';
+            if (lbl === 'SL2') return { ...e, position: { ...(e.position || {}), x: xL_side, y: yStar } };
+            if (lbl === 'SR2') return { ...e, position: { ...(e.position || {}), x: xR_side, y: yStar } };
+            return e;
+          }));
+        } else {
+          onSetSpeakers(prev => prev.map(s => {
+            const role = getCanonicalRole(s.role);
+            if (role === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_side, y: yStar } };
+            if (role === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_side, y: yStar } };
+            return s;
+          }));
+        }
         if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: SL/SR side mode complete");
         return;
       }
@@ -2333,14 +2360,26 @@ React.useEffect(() => {
 
       // write positions (Y stays at back-wall Y you already computed: y_back_m)
       if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
-      onSetSpeakers(prev =>
-        prev.map(s => {
-          const r = getCanonicalRole(s.role);
-          if (r === 'SL') return { ...s, position: { ...(s.position||{}), x: xL_star, y: y_back_m_L } };
-          if (r === 'SR') return { ...s, position: { ...(s.position||{}), x: xR_star, y: y_back_m_R } };
-          return s;
-        })
-      );
+      
+      // For extra surrounds, update via setExtraSurrounds instead
+      if (isSL2_SR2_pair && appState?.setExtraSurrounds) {
+        appState.setExtraSurrounds(prev => prev.map(e => {
+          if (!e) return e;
+          const lbl = e.label || '';
+          if (lbl === 'SL2') return { ...e, position: { ...(e.position || {}), x: xL_star, y: y_back_m_L } };
+          if (lbl === 'SR2') return { ...e, position: { ...(e.position || {}), x: xR_star, y: y_back_m_R } };
+          return e;
+        }));
+      } else {
+        onSetSpeakers(prev =>
+          prev.map(s => {
+            const r = getCanonicalRole(s.role);
+            if (r === 'SL') return { ...s, position: { ...(s.position||{}), x: xL_star, y: y_back_m_L } };
+            if (r === 'SR') return { ...s, position: { ...(s.position||{}), x: xR_star, y: y_back_m_R } };
+            return s;
+          })
+        );
+      }
       if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: SL/SR back mode complete");
       return;
     }

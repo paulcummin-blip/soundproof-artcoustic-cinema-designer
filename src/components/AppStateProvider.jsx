@@ -491,6 +491,17 @@ function useDesignerState() {
     // Always keep modelKey aligned to the current surround model
     const modelKey = globalSurroundModel || "off";
 
+    // Get anchor speakers (SL/SR) from speakerSystem
+    const placedSpeakers = Array.isArray(speakerSystem?.placedSpeakers) ? speakerSystem.placedSpeakers : [];
+    const slSpeaker = placedSpeakers.find(s => {
+      const r = String(s?.role || '').toUpperCase();
+      return r === 'SL' || r === 'LS';
+    });
+    const srSpeaker = placedSpeakers.find(s => {
+      const r = String(s?.role || '').toUpperCase();
+      return r === 'SR' || r === 'RS';
+    });
+
     // If the count matches, we STILL need to ensure modelKey is updated
     if (current.length === count) {
       // Only touch auto items (never overwrite user-placed ones)
@@ -521,14 +532,28 @@ function useDesignerState() {
 
         // Alternate left/right: 0,2,4,6 = left; 1,3,5,7 = right
         const isLeft = index % 2 === 0;
-        const x = isLeft ? 0.1 : widthM - 0.1;
+        
+        // NEW: For first pair (index 0,1), anchor to SL/SR if available
+        let x, y;
+        if (index === 0 && slSpeaker?.position) {
+          // SL2: anchor to SL position + 1.0m towards rear
+          x = Number(slSpeaker.position.x) || 0.1;
+          y = (Number(slSpeaker.position.y) || lengthM * 0.5) + 1.0;
+        } else if (index === 1 && srSpeaker?.position) {
+          // SR2: anchor to SR position + 1.0m towards rear
+          x = Number(srSpeaker.position.x) || (widthM - 0.1);
+          y = (Number(srSpeaker.position.y) || lengthM * 0.5) + 1.0;
+        } else {
+          // Fallback: use wall position for subsequent pairs
+          x = isLeft ? 0.1 : widthM - 0.1;
 
-        // Distribute Y between 35% and 75% of room length
-        const yMin = lengthM * 0.35;
-        const yMax = lengthM * 0.75;
-        const yRange = yMax - yMin;
-        const yStep = count > 1 ? yRange / (count - 1) : 0;
-        const y = yMin + index * yStep;
+          // Distribute Y between 35% and 75% of room length
+          const yMin = lengthM * 0.35;
+          const yMax = lengthM * 0.75;
+          const yRange = yMax - yMin;
+          const yStep = count > 1 ? yRange / (count - 1) : 0;
+          y = yMin + index * yStep;
+        }
 
         // Stable label: SL2/SR2/SL3/SR3...
         const side = isLeft ? "SL" : "SR";
@@ -565,7 +590,7 @@ function useDesignerState() {
 
       setExtraSurrounds(final);
     }
-  }, [extraSurroundCount, extraSurrounds, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel]);
+  }, [extraSurroundCount, extraSurrounds, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel, speakerSystem?.placedSpeakers]);
 
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
