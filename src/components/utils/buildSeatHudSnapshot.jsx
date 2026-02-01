@@ -642,29 +642,17 @@ export function buildSeatHudSnapshot({
 
   // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
   // Build eligible surrounds for P5
-  const allSurrounds = (placedSpeakers || []).filter((s) => {
+  const allSurrounds = (placedSpeakers || []).filter(s => {
     const r = getCanonicalRole(s.role);
-
-    // Standard P5 surrounds
-    if (['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r)) return true;
-
-    // Extra surrounds: match labels like SL2 / SR2 / SL3 / SR3 etc.
-    const label = String(s?.label || '').trim().toUpperCase();
-    if (/^(SL|SR)\d+$/.test(label)) return true;
-
-    return false;
+    return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
   });
 
-  const hasSL = allSurrounds.some((s) => getCanonicalRole(s.role) === 'SL');
-  const hasSR = allSurrounds.some((s) => getCanonicalRole(s.role) === 'SR');
+  const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
+  const hasSR = allSurrounds.some(s => getCanonicalRole(s.role) === 'SR');
 
-  const eligibleSurrounds = allSurrounds.filter((s) => {
+  const eligibleSurrounds = allSurrounds.filter(s => {
     const r = getCanonicalRole(s.role);
-
-    // Keep your existing rule: only allow wides if BOTH side surrounds exist
     if (r === 'LW' || r === 'RW') return hasSL && hasSR;
-
-    // Everything else already passed the "is it a surround or extra surround?" gate above
     return true;
   });
 
