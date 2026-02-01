@@ -2887,7 +2887,7 @@ React.useEffect(() => {
     }
     lastInteractionEpoch.current = timeNowMs();
     if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: generic fallback complete");
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, dolbyLayout, placedSpeakers, extraSurrounds, setExtraSurrounds, roomWidthM]);
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, dolbyLayout, placedSpeakers, extraSurrounds, onSetExtraSurrounds, roomWidthM]);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
