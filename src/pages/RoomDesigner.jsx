@@ -4481,7 +4481,6 @@ function RoomDesignerWithState() {
                   zoomMode={zoomMode}
                   onZoomModeChange={setZoomMode}
                   isDraggingRef={isDraggingRef}
-                  extraSurrounds={appState?.extraSurrounds ?? []}
                   extraSurroundCount={appState?.extraSurroundCount ?? 0} />
 
               </Suspense>
@@ -4689,10 +4688,7 @@ function RoomDesignerWithState() {
                 setGlobalSurroundModel={appState?.setGlobalSurroundModel}
 
                 allSeatSplMetrics={allSeatSplMetrics}
-                frontWideOverlay={frontWideZones}
-                
-                extraSurroundCount={allowExtraSurrounds ? (appState?.extraSurroundCount ?? 0) : undefined}
-                onExtraSurroundCountChange={allowExtraSurrounds ? appState?.setExtraSurroundCount : undefined} />
+                frontWideOverlay={frontWideZones} />
 
                   </Suspense>
                   
