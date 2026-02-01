@@ -1,3 +1,4 @@
+
 // components/utils/seatMetrics.js
 // Pure helpers for per-seat metrics. No React imports, no hooks.
 
@@ -141,15 +142,10 @@ export function rp22LevelForP5_NoWrap(valueDeg) {
 }
 
 /**
- * Helper: canonical role normalization for surrounds (includes extra surrounds like SL2, SR2)
+ * Helper: canonical role normalization for surrounds
  */
 export function getCanonicalSurroundRole(role) {
   const r = String(role || '').toUpperCase();
-  
-  // Extra surrounds (SL2, SR2, SL3, SR3, etc.) - keep separate for P5
-  if (/^SL\d+$/.test(r)) return r;
-  if (/^SR\d+$/.test(r)) return r;
-  
   // Normalize common variants
   if (r.includes('SBL') || r === 'RL' || r === 'RSL') return 'SBL';
   if (r.includes('SBR') || r === 'RR' || r === 'RSR') return 'SBR';
