@@ -514,17 +514,12 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   // --- MLP: use RoomDesigner anchor if available; DO NOT stick to seats ---
 
-  // We assume widthM and lengthM are already defined earlier in this file.
-  // If not, you can safely use 0 as fallback.
-  const roomWidthM  = Number(widthM)  || 0;
-  const roomLengthM = Number(lengthM) || 0;
-
   // Keep MLP Y safely inside the room
   const clampMlpY = (y) => {
-    if (!Number.isFinite(y)) return roomLengthM > 0 ? roomLengthM * 0.58 : 3;
+    if (!Number.isFinite(y)) return lengthM > 0 ? lengthM * 0.58 : 3;
     const margin = 0.4; // 40cm buffer from front/back walls
     const minY = margin;
-    const maxY = roomLengthM > 0 ? Math.max(minY, roomLengthM - margin) : y;
+    const maxY = lengthM > 0 ? Math.max(minY, lengthM - margin) : y;
     return Math.max(minY, Math.min(maxY, y));
   };
 
@@ -566,10 +561,10 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     }
 
     // 3. Last-resort fallback: middle of room, ~60% back
-    const cx = roomWidthM > 0 ? roomWidthM / 2 : 0;
-    const fy = clampMlpY(roomLengthM > 0 ? roomLengthM * 0.58 : 3);
+    const cx = widthM > 0 ? widthM / 2 : 0;
+    const fy = clampMlpY(lengthM > 0 ? lengthM * 0.58 : 3);
     return { x: cx, y: fy, z: 1.2 };
-  }, [mlpPoint, seatingPositions, mlpBasis, roomWidthM, roomLengthM]);
+  }, [mlpPoint, seatingPositions, mlpBasis, widthM, lengthM]);
 
   const mlp = MLP_calculated;
   const mlpDotX_m = mlp.x;
