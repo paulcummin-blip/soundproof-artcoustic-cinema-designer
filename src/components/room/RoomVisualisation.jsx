@@ -3214,8 +3214,7 @@ React.useEffect(() => {
     const meta = getSpeakerModelMeta(modelKey);
     if (meta?.displayName) return meta.displayName;
     if (meta?.name) return meta.name;
-    // Fallback: clean up the model key for display (remove _s suffix, convert to title case)
-    return String(modelKey).replace(/_s$/, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    return 'Unknown model';
   }, []);
 
   // Speaker icon tooltip handlers
