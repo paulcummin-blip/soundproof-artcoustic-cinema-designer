@@ -6130,7 +6130,7 @@ return {
       });
     }
 
-    const speakerDragHandler = isDraggable(speaker)
+    const speakerDragHandler = (isDraggable(speaker) || speaker._isExtraSurround)
       ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
       : undefined;
 
