@@ -189,9 +189,14 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       transform={transform}
       pointerEvents="all"
       onMouseDown={speakerMouseDownHandler}
-      onMouseEnter={() =>
-        setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
-      }
+      onMouseEnter={() => {
+        // Build tooltip: "ROLE — MODEL" (no _s, no angle)
+        const modelDisplay = model 
+          ? String(model).replace(/_s$/, '').toUpperCase().replace(/-/g, ' ')
+          : 'OFF';
+        const tooltip = `${role} — ${modelDisplay}`;
+        setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg, tooltip });
+      }}
       onMouseLeave={() => setHoveredSpeaker?.(null)}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
