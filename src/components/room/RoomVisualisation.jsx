@@ -867,6 +867,31 @@ const byId = useMemo(() => {
     if (spk.role) map.set(String(spk.role).toUpperCase(), spk);
   });
 
+  // Index extra surrounds (convert to speaker-like objects, same as renderSpeakers does)
+  (extraSurrounds || []).forEach((e) => {
+    if (!e || !Number.isFinite(e?.position?.x) || !Number.isFinite(e?.position?.y)) return;
+    
+    const label = String(e.label || '').toUpperCase();
+    const role = label.startsWith('SL') ? 'SL' :
+                 label.startsWith('SR') ? 'SR' :
+                 (Number(e.position.x) < (widthM / 2) ? 'SL' : 'SR');
+    
+    const model = e.modelKey || e.model || 'evolve-2-1';
+    
+    const speakerObj = {
+      id: e.id || `extra-${label || Math.random().toString(36).slice(2)}`,
+      role,
+      model,
+      position: e.position,
+      yaw: Number(e.yaw) || 0,
+      label: e.label || label,
+      type: 'extraSurround',
+      _isExtraSurround: true,
+    };
+    
+    if (speakerObj.id) map.set(speakerObj.id, speakerObj);
+  });
+
   // Index seats (keep existing behaviour)
   (seatingPositions || []).forEach((seat) => {
     if (!seat) return;
@@ -887,7 +912,7 @@ const byId = useMemo(() => {
   });
 
   return map;
-}, [placedSpeakers, seatingPositions, frontSubs, rearSubs]);
+}, [placedSpeakers, seatingPositions, frontSubs, rearSubs, extraSurrounds, widthM]);
 
   // Removed seatBandXBounds - computed after overheadZones is defined
 
