@@ -467,7 +467,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     exportMode = 'default',
     extraSurrounds = [],
     extraSurroundCount = 0,
-    setExtraSurrounds,
+    onSetExtraSurrounds,
     roomWidthM,
   } = props;
 
@@ -2392,7 +2392,7 @@ React.useEffect(() => {
     }
 
     // Handle extra surrounds (SL2/SR2 pairs) - mirror-locked like LW/RW
-    if (speaker._isExtraSurround && setExtraSurrounds && roomWidthM > 0) {
+    if (speaker._isExtraSurround && onSetExtraSurrounds && roomWidthM > 0) {
       const W = roomWidthM;
       const L = lengthM || 6.0;
       
@@ -2414,7 +2414,7 @@ React.useEffect(() => {
       const clampedY = Math.max(margin, Math.min(L - margin, rawY));
       
       // Update both speakers in the pair
-      setExtraSurrounds(prev => {
+      onSetExtraSurrounds(prev => {
         return (prev || []).map(e => {
           const eLabel = String(e.label || '').toUpperCase();
           
@@ -3019,14 +3019,14 @@ React.useEffect(() => {
     if (dragState?.kind === "extraSurround") {
       const draggedLabel = String(dragState.label || "");
       
-      if (typeof setExtraSurrounds !== "function") return;
+      if (typeof onSetExtraSurrounds !== "function") return;
       if (!Number.isFinite(roomWidthM) || roomWidthM <= 0) return;
 
       const nextRoomX = targetRoomPos.x;
       const nextRoomY = targetRoomPos.y;
       const mateLabel = getExtraMateLabel(draggedLabel);
 
-      setExtraSurrounds((prev) => {
+      onSetExtraSurrounds((prev) => {
         const arr = Array.isArray(prev) ? prev : [];
         if (arr.length === 0) return prev;
 
@@ -4329,6 +4329,58 @@ useEffect(() => {
       });
     }
   }, [widthM, lengthM, placedSpeakers, onSetSpeakers, getModelDimsM, getCanonicalRole]);
+
+  // [EXTRA SURROUNDS] Apply the same 1cm wall buffer rule to SL2/SR2 etc.
+  useEffect(() => {
+    if (!onSetExtraSurrounds) return;
+    if (!Array.isArray(extraSurrounds) || extraSurrounds.length === 0) return;
+
+    const W = Number(widthM) || 0;
+    const L = Number(lengthM) || 0;
+    if (!W || !L) return;
+
+    const FW_WALL_BUFFER_M = 0.01;
+
+    const next = extraSurrounds.map((sp) => {
+      if (!sp || !sp.position) return sp;
+
+      // Decide which wall this extra surround belongs to.
+      // Prefer label (SL2/SR2), otherwise fallback to x position.
+      const label = String(sp.label || '').toUpperCase();
+      const isLeft = label.startsWith('SL') ? true : label.startsWith('SR') ? false : (sp.position.x < W / 2);
+
+      // Use model depth to keep cabinet off the wall in a realistic way
+      const depthM = Number(sp?.dims?.depthM) || Number(sp?.depthM) || 0.082;
+      const halfDepth = depthM / 2;
+
+      const targetX = isLeft
+        ? (FW_WALL_BUFFER_M + halfDepth)
+        : (W - FW_WALL_BUFFER_M - halfDepth);
+
+      // Only adjust x (side-wall behaviour). Keep y as user-set.
+      const dx = Math.abs((sp.position.x ?? 0) - targetX);
+      if (dx <= 0.001) return sp;
+
+      return {
+        ...sp,
+        position: { ...sp.position, x: targetX },
+      };
+    });
+
+    // Only commit if something actually changed (prevents loops)
+    let changed = false;
+    for (let i = 0; i < next.length; i++) {
+      const a = extraSurrounds[i]?.position?.x;
+      const b = next[i]?.position?.x;
+      if (Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) > 0.001) {
+        changed = true;
+        break;
+      }
+    }
+    if (!changed) return;
+
+    onSetExtraSurrounds(next);
+  }, [widthM, lengthM, extraSurrounds, onSetExtraSurrounds]);
 
   // [FC_CENTERLINE_LOCK] — Enforce FC always at room centerline
   useEffect(() => {

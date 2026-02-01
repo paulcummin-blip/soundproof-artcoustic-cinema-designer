@@ -4483,7 +4483,7 @@ function RoomDesignerWithState() {
                   isDraggingRef={isDraggingRef}
                   extraSurrounds={appState?.extraSurrounds ?? []}
                   extraSurroundCount={appState?.extraSurroundCount ?? 0}
-                  setExtraSurrounds={appState?.setExtraSurrounds}
+                  onSetExtraSurrounds={appState?.setExtraSurrounds}
                   roomWidthM={Number(appState?.roomDims?.widthM) || 0} />
 
               </Suspense>
