@@ -1558,7 +1558,8 @@ function useDesignerState() {
     mlpOverride,
     setMlpOverride,
     clearMlpOverride,
-  }), [
+    };
+  }, [
     dimensions, setDimensions,
     roomDims, setRoomDims,
     setRoomWidthM, setRoomLengthM, setRoomHeightM,
