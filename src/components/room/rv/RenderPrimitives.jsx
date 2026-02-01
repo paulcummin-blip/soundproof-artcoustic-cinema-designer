@@ -126,7 +126,6 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   depthM,
   scale,
   speakerMouseDownHandler,
-  setHoveredSpeaker,
   onIconEnter,
   onIconMove,
   onIconLeave
@@ -161,15 +160,6 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       <g
         pointerEvents="all"
         onMouseDown={speakerMouseDownHandler}
-        onMouseEnter={(e) => {
-          setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg });
-          onIconEnter?.(e, speaker);
-        }}
-        onMouseMove={(e) => onIconMove?.(e, speaker)}
-        onMouseLeave={(e) => {
-          setHoveredSpeaker?.(null);
-          onIconLeave?.(e);
-        }}
         className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
       >
         <circle
@@ -180,6 +170,9 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
           stroke="#000000"
           strokeWidth={1}
           opacity={1}
+          onMouseEnter={(e) => onIconEnter?.(e, speaker)}
+          onMouseMove={(e) => onIconMove?.(e, speaker)}
+          onMouseLeave={(e) => onIconLeave?.(e)}
         />
       </g>
     );
@@ -197,15 +190,6 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       transform={transform}
       pointerEvents="all"
       onMouseDown={speakerMouseDownHandler}
-      onMouseEnter={(e) => {
-        setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg });
-        onIconEnter?.(e, speaker);
-      }}
-      onMouseMove={(e) => onIconMove?.(e, speaker)}
-      onMouseLeave={(e) => {
-        setHoveredSpeaker?.(null);
-        onIconLeave?.(e);
-      }}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
       <path
@@ -214,6 +198,9 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
         stroke="#000000"
         strokeWidth={1}
         opacity={1}
+        onMouseEnter={(e) => onIconEnter?.(e, speaker)}
+        onMouseMove={(e) => onIconMove?.(e, speaker)}
+        onMouseLeave={(e) => onIconLeave?.(e)}
       />
     </g>
   );

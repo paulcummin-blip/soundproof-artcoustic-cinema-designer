@@ -3210,11 +3210,11 @@ React.useEffect(() => {
 
   // Helper to get friendly speaker model name
   const getSpeakerModelDisplayName = useCallback((modelKey) => {
-    if (!modelKey) return 'Unknown model';
+    if (!modelKey || modelKey === 'off' || modelKey === 'none') return 'Unknown model';
     const meta = getSpeakerModelMeta(modelKey);
     if (meta?.displayName) return meta.displayName;
     if (meta?.name) return meta.name;
-    // Fallback: clean up the model key for display
+    // Fallback: clean up the model key for display (remove _s suffix, convert to title case)
     return String(modelKey).replace(/_s$/, '').replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   }, []);
 
@@ -3225,17 +3225,10 @@ React.useEffect(() => {
     const displayName = getSpeakerModelDisplayName(speaker.model);
     const text = `${role} — ${displayName}`;
     
-    // Position immediately on enter
-    const rect = rvWrapRef.current?.getBoundingClientRect();
-    if (rect) {
-      setSpeakerTooltip({
-        visible: true,
-        text,
-        x: e.clientX - rect.left + 12,
-        y: e.clientY - rect.top + 12
-      });
-    }
-  }, [getCanonicalRole, getSpeakerModelDisplayName]);
+    setSpeakerTooltip({ visible: true, text, x: 0, y: 0 });
+    // Position immediately via move handler
+    handleIconMove(e, speaker);
+  }, [getSpeakerModelDisplayName]);
 
   const handleIconMove = useCallback((e, speaker) => {
     const rect = rvWrapRef.current?.getBoundingClientRect();
@@ -4953,7 +4946,6 @@ useEffect(() => {
               depthM={0.27}
               scale={scale}
               speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id)}
-              setHoveredSpeaker={setHoveredSpeaker}
               onIconEnter={handleIconEnter}
               onIconMove={handleIconMove}
               onIconLeave={handleIconLeave}
@@ -6144,7 +6136,6 @@ return {
         depthM={depthM_spk}
         scale={scale}
         speakerMouseDownHandler={speakerDragHandler}
-        setHoveredSpeaker={setHoveredSpeaker}
         onIconEnter={handleIconEnter}
         onIconMove={handleIconMove}
         onIconLeave={handleIconLeave}
@@ -7276,7 +7267,7 @@ return (
               fontSize: 12,
               fontFamily: 'system-ui, sans-serif',
               zIndex: 9999,
-              boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+              boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
               whiteSpace: 'nowrap',
             }}
           >
