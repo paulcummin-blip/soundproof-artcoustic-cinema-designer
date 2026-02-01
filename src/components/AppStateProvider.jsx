@@ -600,14 +600,22 @@ function useDesignerState() {
       setExtraSurrounds(merged);
       return;
     } else {
-      // Remove items from the end (simple + reliable)
-      // If user reduces the count, we always truncate to match exactly.
-      if (count <= 0) {
-        setExtraSurrounds([]);
-        return;
+      const toRemove = current.length - count;
+      let removed = 0;
+      const kept = [];
+
+      for (let i = current.length - 1; i >= 0 && removed < toRemove; i--) {
+        if (current[i]?.positionSource === "user") {
+          kept.unshift(current[i]);
+        } else {
+          removed++;
+        }
       }
 
-      setExtraSurrounds(current.slice(0, count));
+      const startIndex = current.length - toRemove - kept.length;
+      const final = current.slice(0, Math.max(0, startIndex)).concat(kept);
+
+      setExtraSurrounds(final);
     }
   }, [extraSurroundCount, extraSurrounds, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel, dolbyLayout]);
 
