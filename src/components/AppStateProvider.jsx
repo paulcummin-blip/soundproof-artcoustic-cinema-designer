@@ -554,6 +554,8 @@ function useDesignerState() {
   );
 
   // --- EXTRA SURROUNDS SYNC EFFECT (promoted to real speakers with canonical roles SL2/SR2...) ---
+  // TRUE IDEMPOTENCE: only update when speakersShallowEqual detects a real change.
+  // Preserves user-dragged positions for existing extra surround speakers.
   useEffect(() => {
     const count = extraSurroundCount || 0;
     
@@ -590,13 +592,17 @@ function useDesignerState() {
       // If count is 0, remove all extras
       if (count === 0) {
         if (existing.length === 0) return prev; // Already clean
-        return { ...prev, placedSpeakers: nonExtras };
+        const nextPlaced = nonExtras;
+        
+        // Use speakersShallowEqual for true idempotence
+        if (speakersShallowEqual(current, nextPlaced)) return prev;
+        return { ...prev, placedSpeakers: nextPlaced };
       }
       
       // Calculate how many pairs we need (count is total speakers, pairs are count/2)
       const pairsNeeded = count / 2;
       
-      // Build required extra speakers
+      // Build required extra speakers, preserving user edits
       const nextExtras = [];
       
       for (let pairIndex = 0; pairIndex < pairsNeeded; pairIndex++) {
@@ -604,18 +610,18 @@ function useDesignerState() {
         const roleSL = `SL${pairNumber}`;
         const roleSR = `SR${pairNumber}`;
         
-        // Calculate Y position: each pair is 1.00m further from screen than the previous
+        // Calculate default Y position: each pair is 1.00m further from screen than the previous
         const offsetM = pairIndex * 1.00;
         const baseY = (slY !== null && srY !== null) 
           ? ((slY + srY) / 2) + 1.00 + offsetM
           : (Number(roomDims?.lengthM) || 6.0) * 0.65 + offsetM;
         
-        // Find existing speakers for this pair (to preserve user edits)
+        // CRITICAL: reuse existing speaker if present (preserves user-dragged position)
         const existingSL = existing.find(s => String(s.role).toUpperCase() === roleSL);
         const existingSR = existing.find(s => String(s.role).toUpperCase() === roleSR);
         
-        // SL speaker (left)
-        nextExtras.push(existingSL || {
+        // SL speaker (left) - reuse if exists, otherwise create new
+        nextExtras.push(existingSL ? { ...existingSL } : {
           id: `${roleSL.toLowerCase()}-${timeNowMs() + pairIndex * 2}`,
           role: roleSL,
           model: modelKey && modelKey !== 'off' ? modelKey : undefined,
@@ -625,8 +631,8 @@ function useDesignerState() {
           positionSource: 'auto',
         });
         
-        // SR speaker (right)
-        nextExtras.push(existingSR || {
+        // SR speaker (right) - reuse if exists, otherwise create new
+        nextExtras.push(existingSR ? { ...existingSR } : {
           id: `${roleSR.toLowerCase()}-${timeNowMs() + pairIndex * 2 + 1}`,
           role: roleSR,
           model: modelKey && modelKey !== 'off' ? modelKey : undefined,
@@ -637,14 +643,16 @@ function useDesignerState() {
         });
       }
       
-      // Only update if something changed
+      // Build final speaker list
       const nextPlaced = [...nonExtras, ...nextExtras];
       
-      // Simple equality check (compare roles only for speed)
-      const currentRoles = current.map(s => s.role).sort().join(',');
-      const nextRoles = nextPlaced.map(s => s.role).sort().join(',');
-      
-      if (currentRoles === nextRoles) return prev;
+      // IDEMPOTENCE CHECK: use speakersShallowEqual for robust comparison
+      if (speakersShallowEqual(current, nextPlaced)) {
+        if (globalThis.__B44_LOGS) {
+          console.log('[ExtraSurrounds] No change detected, skipping update');
+        }
+        return prev;
+      }
       
       return { ...prev, placedSpeakers: nextPlaced };
     });
