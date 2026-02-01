@@ -641,10 +641,18 @@ export function buildSeatHudSnapshot({
   }
 
   // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
-  // Build eligible surrounds for P5
+  // Build eligible surrounds for P5 (includes extra surrounds like SL2, SR2)
   const allSurrounds = (placedSpeakers || []).filter(s => {
-    const r = getCanonicalRole(s.role);
-    return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
+    const raw = String(s?.role || '').toUpperCase();
+    const r = getCanonicalRole(raw);
+    
+    // Include standard surrounds
+    if (['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r)) return true;
+    
+    // Include extra side surrounds (SL2, SR2, SL3, SR3, etc.)
+    if (/^SL\d+$/.test(raw) || /^SR\d+$/.test(raw)) return true;
+    
+    return false;
   });
 
   const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
