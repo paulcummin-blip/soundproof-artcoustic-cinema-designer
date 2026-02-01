@@ -504,42 +504,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     };
   }, []);
 
-  const getSpeakerModelDisplayName = useCallback((modelKey) => {
-    if (!modelKey) return 'Unknown model';
-    const meta = getSpeakerModelMeta?.(modelKey);
-    if (meta?.displayName) return meta.displayName;
-    if (meta?.model) return meta.model;
-    
-    // Fallback: clean up internal key for display
-    const cleaned = String(modelKey)
-      .replace(/_s$/, '')
-      .replace(/-/g, ' ')
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-    
-    return cleaned || 'Unknown model';
-  }, []);
-
-  const handleSpeakerIconHover = useCallback((e, speaker) => {
-    if (!speaker) return;
-    
-    const roleLabel = String(speaker.role || '').toUpperCase();
-    const modelName = getSpeakerModelDisplayName(speaker.model);
-    const text = `${roleLabel} — ${modelName}`;
-    
-    setSpeakerTooltip({
-      visible: true,
-      text,
-      x: e.clientX + 12,
-      y: e.clientY + 12
-    });
-  }, [getSpeakerModelDisplayName]);
-
-  const handleSpeakerIconLeave = useCallback(() => {
-    setSpeakerTooltip({ visible: false, text: '', x: 0, y: 0 });
-  }, []);
-
   const getCanonicalRole = useCallback((role) => {
     const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
     const r = String(role || '').toUpperCase();
@@ -612,7 +576,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   const [hoveredSpeaker, setHoveredSpeaker] = useState(null);
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
-  const [speakerTooltip, setSpeakerTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
   const [dragState, setDragState] = useState({ dragging: false, draggedItemId: null, dragType: null });
   const { dragging, draggedItemId, dragType } = dragState;
   const [draggingRole, setDraggingRole] = useState(null);
@@ -4945,8 +4908,6 @@ useEffect(() => {
               scale={scale}
               speakerMouseDownHandler={(e) => bedLayerSpeakerMouseDownHandler(e, spk.id)}
               setHoveredSpeaker={setHoveredSpeaker}
-              onIconHover={handleSpeakerIconHover}
-              onIconLeave={handleSpeakerIconLeave}
             />
           );
         })}
@@ -6135,8 +6096,6 @@ return {
         scale={scale}
         speakerMouseDownHandler={speakerDragHandler}
         setHoveredSpeaker={setHoveredSpeaker}
-        onIconHover={handleSpeakerIconHover}
-        onIconLeave={handleSpeakerIconLeave}
       />
     );
   });
@@ -7246,30 +7205,6 @@ return (
           />
         )}
 
-        {/* Custom Speaker Tooltip (light background, dark text, non-interfering) */}
-        {speakerTooltip.visible && (
-          <div
-            style={{
-              position: 'absolute',
-              left: speakerTooltip.x,
-              top: speakerTooltip.y,
-              background: '#F5F5F5',
-              color: '#111',
-              border: '1px solid rgba(0,0,0,0.12)',
-              borderRadius: '8px',
-              padding: '6px 10px',
-              fontSize: '12px',
-              lineHeight: '1.2',
-              boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
-              pointerEvents: 'none',
-              zIndex: 9999,
-              whiteSpace: 'nowrap',
-              fontFamily: 'system-ui, sans-serif'
-            }}
-          >
-            {speakerTooltip.text}
-          </div>
-        )}
 
       </div>
     </div>

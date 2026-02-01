@@ -126,9 +126,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
   depthM,
   scale,
   speakerMouseDownHandler,
-  setHoveredSpeaker,
-  onIconHover,
-  onIconLeave
+  setHoveredSpeaker
 }) {
   const { model, role, id } = speaker || {};
   
@@ -160,6 +158,10 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       <g
         pointerEvents="all"
         onMouseDown={speakerMouseDownHandler}
+        onMouseEnter={() =>
+          setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
+        }
+        onMouseLeave={() => setHoveredSpeaker?.(null)}
         className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
       >
         <circle
@@ -170,14 +172,6 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
           stroke="#000000"
           strokeWidth={1}
           opacity={1}
-          onMouseEnter={(e) => {
-            setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg });
-            onIconHover?.(e, speaker);
-          }}
-          onMouseLeave={(e) => {
-            setHoveredSpeaker?.(null);
-            onIconLeave?.(e);
-          }}
         />
       </g>
     );
@@ -195,6 +189,10 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       transform={transform}
       pointerEvents="all"
       onMouseDown={speakerMouseDownHandler}
+      onMouseEnter={() =>
+        setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg })
+      }
+      onMouseLeave={() => setHoveredSpeaker?.(null)}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
     >
       <path
@@ -203,14 +201,6 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
         stroke="#000000"
         strokeWidth={1}
         opacity={1}
-        onMouseEnter={(e) => {
-          setHoveredSpeaker?.({ id, role, model, x: canvasX, y: canvasY_raw, angle: yawDeg });
-          onIconHover?.(e, speaker);
-        }}
-        onMouseLeave={(e) => {
-          setHoveredSpeaker?.(null);
-          onIconLeave?.(e);
-        }}
       />
     </g>
   );
