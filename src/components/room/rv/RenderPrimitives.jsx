@@ -200,7 +200,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       <path
         d={pathData}
         fill={color || "#000000"}
-        stroke="#000000"}
+        stroke="#000000"
         strokeWidth={1}
         opacity={1}
         onMouseEnter={(e) => {
