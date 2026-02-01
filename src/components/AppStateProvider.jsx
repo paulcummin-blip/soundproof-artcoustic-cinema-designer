@@ -5,6 +5,7 @@ import { SHOW_DEBUG_LOGS } from '@/components/utils/diagnostics';
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getAutosaveMeta, isAutosavePayloadValid } from "@/components/utils/sessionAutosave";
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
+import { SIDE_SPK_WALL_BUFFER_M } from "@/components/room/constants/screenDepth";
 
 // --- ATMOS PROTECTION HELPERS ---
 const safeCanonRole = (role) => {
@@ -521,7 +522,12 @@ function useDesignerState() {
 
         // Alternate left/right: 0,2,4,6 = left; 1,3,5,7 = right
         const isLeft = index % 2 === 0;
-        const x = isLeft ? 0.1 : widthM - 0.1;
+
+        // Use same 1cm buffer as SL/SR/LW/RW
+        const depthM = 0.082; // fallback depth used elsewhere
+        const halfDepth = depthM / 2;
+        const xInset = SIDE_SPK_WALL_BUFFER_M + halfDepth;
+        const x = isLeft ? xInset : (widthM - xInset);
 
         // Distribute Y between 35% and 75% of room length
         const yMin = lengthM * 0.35;

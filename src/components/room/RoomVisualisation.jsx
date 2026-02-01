@@ -12,7 +12,7 @@ import { buildRoleMap, isDraggable, clampSideSurroundDrag, clampRearSurroundDrag
 import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
 import { rolesForLayout, getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from '../room/constraints/lcrConstraints';
-import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
+import { SCREEN_BUFFER_M, WALL_BUFFER_M, SIDE_SPK_WALL_BUFFER_M } from "./constants/screenDepth";
 import RP22ZonesOverlay from '@/components/room/RP22ZonesOverlay';
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import BackSweepOverlay from "./BackSweepOverlay";
@@ -3242,15 +3242,14 @@ React.useEffect(() => {
             ));
           }
         } else if (isFrontWide) {
-          // CRITICAL: Lock LW/RW to wall after drag (0.01m buffer)
+          // CRITICAL: Lock LW/RW to wall after drag (1cm buffer)
           const W = widthM || 0;
-          const FW_WALL_BUFFER_M = 0.01;
           const dims = getModelDimsM(spk.model);
           const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
           
           const targetX = canonicalRole === 'LW'
-            ? (FW_WALL_BUFFER_M + halfDepth)
-            : (W - FW_WALL_BUFFER_M - halfDepth);
+            ? (SIDE_SPK_WALL_BUFFER_M + halfDepth)
+            : (W - SIDE_SPK_WALL_BUFFER_M - halfDepth);
           
           // Force X to wall, keep Y from drag
           onSetSpeakers(prev => prev.map(s => 
@@ -4296,12 +4295,11 @@ useEffect(() => {
       const isLeft = ['SL', 'LW'].includes(canon);
       const side = isLeft ? 'L' : 'R';
 
-      // Calculate correct wall-hugged X using 0.01m buffer
-      const FW_WALL_BUFFER_M = 0.01;
+      // Calculate correct wall-hugged X using 1cm buffer
       const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
       const targetX = isLeft 
-        ? (FW_WALL_BUFFER_M + halfDepth)
-        : (W - FW_WALL_BUFFER_M - halfDepth);
+        ? (SIDE_SPK_WALL_BUFFER_M + halfDepth)
+        : (W - SIDE_SPK_WALL_BUFFER_M - halfDepth);
       
       const currentX = Number(spk.position.x) || 0;
 
