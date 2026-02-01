@@ -2011,8 +2011,7 @@ React.useEffect(() => {
       </>
     );
 
-    const roomWidthM = widthM || 4.5;
-    const screenCenterX_m = roomWidthM / 2;
+    const screenCenterX_m = widthM / 2;
 
     return { BaffleAndScreen: component, screenPlaneY, screenCenterX_m, visibleWidthM: visibleWm };
   }, [screen?.visibleWidthInches, screen?.borderThicknessCm, screen?.frameThicknessCm, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M, lengthM, meterToCanvasX]);
