@@ -34,26 +34,6 @@ export default function PlanMessages({
         </foreignObject>
       )}
 
-      {/* Tooltip */}
-      {tooltip?.show && (
-        <foreignObject x="10" y="45" width="220" height="30">
-          <div
-            style={{
-              backgroundColor: "#3E4349",
-              color: "#FFFFFF",
-              padding: "4px 8px",
-              borderRadius: 4,
-              fontSize: 12,
-              fontWeight: 700,
-              fontFamily: "Didact Gothic, Century Gothic, sans-serif",
-              pointerEvents: "none",
-            }}
-          >
-            {tooltip.text}
-          </div>
-        </foreignObject>
-      )}
-
       {/* Hovered speaker */}
       {hasHS && (
         <foreignObject
@@ -74,10 +54,7 @@ export default function PlanMessages({
               pointerEvents: "none",
             }}
           >
-            {(hoveredSpeaker?.role ?? "—")} — {(hoveredSpeaker?.model ?? "—")}
-            {Number.isFinite(hoveredSpeaker?.angle)
-              ? ` (${Math.round(hoveredSpeaker.angle)}°)`
-              : ""}
+            {hoveredSpeaker?.label || `${(hoveredSpeaker?.role ?? "—")} — ${(hoveredSpeaker?.model ?? "—")}`}
           </div>
         </foreignObject>
       )}
