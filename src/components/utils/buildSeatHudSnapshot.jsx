@@ -34,10 +34,15 @@ const fmtDeg = (deg) => {
   return n !== null ? `${n}°` : '—';
 };
 
-// Safe role canonicalization
+// Safe role canonicalization (handles extra surrounds like SL2 → SL)
 const getCanonicalRole = (role) => {
   const map = { SL:'SL',LS:'SL', SR:'SR',RS:'SR', SBL:'SBL',SBR:'SBR', LW:'LW',RW:'RW', FL:'FL',L:'FL', FC:'FC',C:'FC', FR:'FR',R:'FR' };
   const r = String(role || '').toUpperCase();
+  
+  // Map extra surrounds (SL2, SR2, etc.) to canonical roles for metrics
+  if (/^SL\d+$/.test(r)) return 'SL';
+  if (/^SR\d+$/.test(r)) return 'SR';
+  
   return map[r] || r;
 };
 
