@@ -1473,7 +1473,6 @@ function useDesignerState() {
     perSeatMetrics,
     setPerSeatMetricsForSeat,
     seatMetricsById,
-    setSeatMetricsById,
     roomResetEpoch,
     resetRoomDesignerToDefaults,
     p15ConstructionLevel,
