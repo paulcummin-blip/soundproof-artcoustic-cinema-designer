@@ -475,10 +475,6 @@ function useDesignerState() {
     _setExtraSurroundCount(clamped);
   }, []);
 
-  const [extraSurrounds, setExtraSurrounds] = useState(() => (
-    (__autosavePayload && Array.isArray(__autosavePayload.extraSurrounds)) ? __autosavePayload.extraSurrounds : []
-  ));
-
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
