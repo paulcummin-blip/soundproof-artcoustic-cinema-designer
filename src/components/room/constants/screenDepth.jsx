@@ -13,6 +13,10 @@ export const SCREEN_BUFFER_CM = 1;
 export const WALL_BUFFER_M = WALL_BUFFER_CM / 100;
 export const SCREEN_BUFFER_M = SCREEN_BUFFER_CM / 100;
 
+// For side-wall speaker placement only (SL/SR/LW/RW + extra surrounds)
+export const SIDE_SPK_WALL_BUFFER_CM = 1;
+export const SIDE_SPK_WALL_BUFFER_M = SIDE_SPK_WALL_BUFFER_CM / 100; // 0.01m
+
 // Screen depth presets (centimetres)
 export const SCREEN_DEPTH_OPTIONS_CM = [10, 20, 30]; // UI caps 10–30 cm
 export const DEFAULT_SCREEN_DEPTH_CM = 20;
