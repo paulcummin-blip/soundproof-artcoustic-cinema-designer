@@ -4482,9 +4482,7 @@ function RoomDesignerWithState() {
                   onZoomModeChange={setZoomMode}
                   isDraggingRef={isDraggingRef}
                   extraSurrounds={appState?.extraSurrounds ?? []}
-                  extraSurroundCount={appState?.extraSurroundCount ?? 0}
-                  setExtraSurrounds={appState?.setExtraSurrounds}
-                  roomWidthM={Number(appState?.roomDims?.widthM) || 0} />
+                  extraSurroundCount={appState?.extraSurroundCount ?? 0} />
 
               </Suspense>
             </ErrorBoundary>

@@ -5,7 +5,6 @@ import { SHOW_DEBUG_LOGS } from '@/components/utils/diagnostics';
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getAutosaveMeta, isAutosavePayloadValid } from "@/components/utils/sessionAutosave";
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
-import { SIDE_SPK_WALL_BUFFER_M } from "@/components/room/constants/screenDepth";
 
 // --- ATMOS PROTECTION HELPERS ---
 const safeCanonRole = (role) => {
@@ -365,10 +364,6 @@ function useDesignerState() {
   const [speakerSystem, _setSpeakerSystem] = useState(() => (
     (__autosavePayload && __autosavePayload.speakerSystem) ? __autosavePayload.speakerSystem : { placedSpeakers: [], lastUpdated: timeNowMs() }
   ));
-  
-  const [seatMetricsById, setSeatMetricsById] = useState(() => (
-    (__autosavePayload && __autosavePayload.seatMetricsById) ? __autosavePayload.seatMetricsById : {}
-  ));
   const [speakersEpoch, setSpeakersEpoch] = useState(0);
   const [enableLayoutSPLWidget, setEnableLayoutSPLWidget] = useState(true);
   
@@ -437,6 +432,10 @@ function useDesignerState() {
   const [isHydrated, setIsHydrated] = useState(true);
   const [perSeatMetrics, setPerSeatMetrics] = useState({});
   const [roomResetEpoch, setRoomResetEpoch] = useState(0);
+  const [seatMetricsById, setSeatMetricsById] = useState(() => (
+    (__autosavePayload && __autosavePayload.seatMetricsById) ? __autosavePayload.seatMetricsById : {}
+  ));
+
   const [p15ConstructionLevel, setP15ConstructionLevel] = useState(() => (
     (__autosavePayload && __autosavePayload.p15ConstructionLevel) ? __autosavePayload.p15ConstructionLevel : 'standard'
   ));
@@ -513,77 +512,41 @@ function useDesignerState() {
 
     // If count differs, build up / trim as before
     if (count > current.length) {
-      // Add new items in mirrored L/R pairs: (SL2 + SR2), (SL3 + SR3), etc.
       const toAdd = count - current.length;
       const newItems = [];
 
-      const modelKey = globalSurroundModel || "off";
+      for (let i = 0; i < toAdd; i++) {
+        const index = current.length + i;
+        const id = `extra-surround-${index + 1}`;
 
-      // Determine how many PAIRS we need in total
-      const totalPairsNeeded = Math.floor(count / 2);
+        // Alternate left/right: 0,2,4,6 = left; 1,3,5,7 = right
+        const isLeft = index % 2 === 0;
+        const x = isLeft ? 0.1 : widthM - 0.1;
 
-      // Determine how many pairs already exist (based on current length)
-      const existingPairs = Math.floor(current.length / 2);
+        // Distribute Y between 35% and 75% of room length
+        const yMin = lengthM * 0.35;
+        const yMax = lengthM * 0.75;
+        const yRange = yMax - yMin;
+        const yStep = count > 1 ? yRange / (count - 1) : 0;
+        const y = yMin + index * yStep;
 
-      // Base Y reference: main side surrounds (if present), otherwise 0.55L
-      // We want extras to start ~1.0m further back than SL/SR
-      const findRoleY = (role) => {
-        const r = String(role || "").toUpperCase();
-        const sp = (speakerSystem?.placedSpeakers || []).find(s => String(s?.role || "").toUpperCase() === r);
-        return Number(sp?.position?.y);
-      };
+        // Stable label: SL2/SR2/SL3/SR3...
+        const side = isLeft ? "SL" : "SR";
+        const number = 2 + Math.floor(index / 2);
+        const label = `${side}${number}`;
 
-      const mainSLy = findRoleY("SL");
-      const mainSRy = findRoleY("SR");
-      const mainSideY =
-        Number.isFinite(mainSLy) ? mainSLy :
-        Number.isFinite(mainSRy) ? mainSRy :
-        (lengthM * 0.55);
-
-      // Start extras 1.0m behind main SL/SR, but clamp to safe in-room range
-      const yStart = Math.min(Math.max(mainSideY + 1.0, lengthM * 0.35), lengthM * 0.85);
-
-      // Distribute pairs between yStart and 0.85L (so they look intentional)
-      const yEnd = lengthM * 0.85;
-      const denom = Math.max(1, totalPairsNeeded - 1);
-
-      const depthM = 0.082;
-      const halfDepth = depthM / 2;
-      const xInset = SIDE_SPK_WALL_BUFFER_M + halfDepth;
-
-      for (let pairIndex = existingPairs; pairIndex < totalPairsNeeded; pairIndex++) {
-        const pairNum = 2 + pairIndex; // SL2/SR2 starts at pairIndex=0 -> 2
-
-        const t = denom === 0 ? 0 : (pairIndex / denom);
-        const y = yStart + (yEnd - yStart) * t;
-
-        // Left item
         newItems.push({
-          id: `extra-surround-SL${pairNum}`,
+          id,
           type: "extraSurround",
           modelKey,
-          position: { x: xInset, y, z: 1.2 },
+          position: { x, y, z: 1.2 },
           yaw: 0,
           positionSource: "auto",
-          label: `SL${pairNum}`,
-        });
-
-        // Right item (mirrored)
-        newItems.push({
-          id: `extra-surround-SR${pairNum}`,
-          type: "extraSurround",
-          modelKey,
-          position: { x: widthM - xInset, y, z: 1.2 },
-          yaw: 0,
-          positionSource: "auto",
-          label: `SR${pairNum}`,
+          label,
         });
       }
 
-      // If someone picks an odd count (shouldn't happen), trim to requested size
-      const merged = [...current, ...newItems].slice(0, count);
-      setExtraSurrounds(merged);
-      return;
+      setExtraSurrounds([...current, ...newItems]);
     } else {
       const toRemove = current.length - count;
       let removed = 0;
@@ -1524,10 +1487,8 @@ function useDesignerState() {
     setExtraSurroundCount,
     extraSurrounds,
     setExtraSurrounds,
-    seatMetricsById,
-    setSeatMetricsById,
     };
-    }, [
+  }, [
     dimensions, setDimensions,
     roomDims, setRoomDims,
     setRoomWidthM, setRoomLengthM, setRoomHeightM,
@@ -1602,10 +1563,9 @@ function useDesignerState() {
     setExtraSurroundCount,
     extraSurrounds,
     setExtraSurrounds,
-    seatMetricsById,
-    ]);
+  ]);
 
-    // Export p21 setter as convenience (same pattern as p15)
+  // Export p21 setter as convenience (same pattern as p15)
   value.setP21EarlyReflectionPreset = setP21EarlyReflectionPresetSafe;
 
   return value;

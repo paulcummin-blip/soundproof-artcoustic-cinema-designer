@@ -12,7 +12,7 @@ import { buildRoleMap, isDraggable, clampSideSurroundDrag, clampRearSurroundDrag
 import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
 import { rolesForLayout, getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from '../room/constraints/lcrConstraints';
-import { SCREEN_BUFFER_M, WALL_BUFFER_M, SIDE_SPK_WALL_BUFFER_M } from "./constants/screenDepth";
+import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
 import RP22ZonesOverlay from '@/components/room/RP22ZonesOverlay';
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import BackSweepOverlay from "./BackSweepOverlay";
@@ -56,14 +56,6 @@ const floorDeg = (deg) => {
   if (deg === null || deg === undefined) return null;
   const n = Number(deg);
   return Number.isFinite(n) ? Math.floor(n + 1e-9) : null;
-};
-
-// Helper to get mirrored mate label for extra surrounds
-const getExtraMateLabel = (label) => {
-  const s = String(label || "");
-  if (s.startsWith("SL")) return "SR" + s.slice(2);
-  if (s.startsWith("SR")) return "SL" + s.slice(2);
-  return "";
 };
 
 // --- OVERHEAD HELPERS (RoomVisualisation) ---
@@ -467,8 +459,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     exportMode = 'default',
     extraSurrounds = [],
     extraSurroundCount = 0,
-    setExtraSurrounds,
-    roomWidthM,
   } = props;
 
   const appState = useAppState();
@@ -522,12 +512,17 @@ export default forwardRef(function RoomVisualisation(props, ref) {
 
   // --- MLP: use RoomDesigner anchor if available; DO NOT stick to seats ---
 
+  // We assume widthM and lengthM are already defined earlier in this file.
+  // If not, you can safely use 0 as fallback.
+  const roomWidthM  = Number(widthM)  || 0;
+  const roomLengthM = Number(lengthM) || 0;
+
   // Keep MLP Y safely inside the room
   const clampMlpY = (y) => {
-    if (!Number.isFinite(y)) return lengthM > 0 ? lengthM * 0.58 : 3;
+    if (!Number.isFinite(y)) return roomLengthM > 0 ? roomLengthM * 0.58 : 3;
     const margin = 0.4; // 40cm buffer from front/back walls
     const minY = margin;
-    const maxY = lengthM > 0 ? Math.max(minY, lengthM - margin) : y;
+    const maxY = roomLengthM > 0 ? Math.max(minY, roomLengthM - margin) : y;
     return Math.max(minY, Math.min(maxY, y));
   };
 
@@ -569,10 +564,10 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     }
 
     // 3. Last-resort fallback: middle of room, ~60% back
-    const cx = widthM > 0 ? widthM / 2 : 0;
-    const fy = clampMlpY(lengthM > 0 ? lengthM * 0.58 : 3);
+    const cx = roomWidthM > 0 ? roomWidthM / 2 : 0;
+    const fy = clampMlpY(roomLengthM > 0 ? roomLengthM * 0.58 : 3);
     return { x: cx, y: fy, z: 1.2 };
-  }, [mlpPoint, seatingPositions, mlpBasis, widthM, lengthM]);
+  }, [mlpPoint, seatingPositions, mlpBasis, roomWidthM, roomLengthM]);
 
   const mlp = MLP_calculated;
   const mlpDotX_m = mlp.x;
@@ -2019,7 +2014,8 @@ React.useEffect(() => {
       </>
     );
 
-    const screenCenterX_m = widthM / 2;
+    const roomWidthM = widthM || 4.5;
+    const screenCenterX_m = roomWidthM / 2;
 
     return { BaffleAndScreen: component, screenPlaneY, screenCenterX_m, visibleWidthM: visibleWm };
   }, [screen?.visibleWidthInches, screen?.borderThicknessCm, screen?.frameThicknessCm, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M, lengthM, meterToCanvasX]);
@@ -2395,60 +2391,6 @@ React.useEffect(() => {
 
       lastInteractionEpoch.current = timeNowMs();
       if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: SBL/SBR complete");
-      return;
-    }
-
-    // Handle extra surrounds (SL2/SR2 pairs) - mirror-locked like LW/RW
-    if (speaker._isExtraSurround && setExtraSurrounds && roomWidthM > 0) {
-      const W = roomWidthM;
-      const L = lengthM || 6.0;
-      
-      const { y: rawY } = canvasToRoom(newCanvasPos);
-      
-      // Determine which pair this belongs to (SL2/SR2, SL3/SR3, etc.)
-      const label = String(speaker.label || '').toUpperCase();
-      const isLeft = label.startsWith('SL');
-      const pairNumber = parseInt(label.replace(/[^\d]/g, ''), 10) || 2;
-      
-      // Find both members of this pair
-      const pairLabel = isLeft ? `SR${pairNumber}` : `SL${pairNumber}`;
-      const partnerExtra = extraSurrounds.find(e => String(e.label || '').toUpperCase() === pairLabel);
-      
-      if (!partnerExtra) return; // Partner doesn't exist, abort
-      
-      // Clamp Y to room bounds (with small margin)
-      const margin = 0.1;
-      const clampedY = Math.max(margin, Math.min(L - margin, rawY));
-      
-      // Update both speakers in the pair
-      setExtraSurrounds(prev => {
-        return (prev || []).map(e => {
-          const eLabel = String(e.label || '').toUpperCase();
-          
-          // Update dragged speaker
-          if (e.id === speaker.id || eLabel === label) {
-            return {
-              ...e,
-              position: { ...e.position, y: clampedY },
-              positionSource: 'user'
-            };
-          }
-          
-          // Update mirrored partner
-          if (e.id === partnerExtra.id || eLabel === pairLabel) {
-            return {
-              ...e,
-              position: { ...e.position, y: clampedY },
-              positionSource: 'user'
-            };
-          }
-          
-          return e;
-        });
-      });
-      
-      lastInteractionEpoch.current = timeNowMs();
-      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: extra surround pair complete");
       return;
     }
 
@@ -2894,7 +2836,7 @@ React.useEffect(() => {
     }
     lastInteractionEpoch.current = timeNowMs();
     if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: generic fallback complete");
-  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, dolbyLayout, placedSpeakers, extraSurrounds, setExtraSurrounds, roomWidthM]);
+  }, [byId, canvasToRoom, widthM, lengthM, getModelDimsM, frontWideZones, mlp, onSetSpeakers, sideSurroundVisualSpanM, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, isOnSideWall, rsRearCorridor, fwOffsetRef, getCanonicalRole, constraintZones, screenCenterX_m, centerX_m, overheadZones, dolbyLayout, placedSpeakers]);
 
   const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
     if (!onSetSeatingPositions) return;
@@ -2998,7 +2940,7 @@ React.useEffect(() => {
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
-    if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType, kind: dragState.kind });
+    if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
 
@@ -3021,49 +2963,6 @@ React.useEffect(() => {
     
     // Convert back to canvas for existing logic
     const targetCanvasPos = roomToCanvas(targetRoomPos);
-
-    // Handle extra surround drag (mirror-locked pairs)
-    if (dragState?.kind === "extraSurround") {
-      const draggedLabel = String(dragState.label || "");
-      
-      if (typeof setExtraSurrounds !== "function") return;
-      if (!Number.isFinite(roomWidthM) || roomWidthM <= 0) return;
-
-      const nextRoomX = targetRoomPos.x;
-      const nextRoomY = targetRoomPos.y;
-      const mateLabel = getExtraMateLabel(draggedLabel);
-
-      setExtraSurrounds((prev) => {
-        const arr = Array.isArray(prev) ? prev : [];
-        if (arr.length === 0) return prev;
-
-        return arr.map((ex) => {
-          if (!ex || !ex.position) return ex;
-
-          // Move the dragged one
-          if (ex.id === draggedItemId) {
-            return {
-              ...ex,
-              position: { ...ex.position, x: nextRoomX, y: nextRoomY },
-              positionSource: "user",
-            };
-          }
-
-          // Move the mate as a mirrored pair
-          if (mateLabel && ex.label === mateLabel) {
-            return {
-              ...ex,
-              position: { ...ex.position, x: (roomWidthM - nextRoomX), y: nextRoomY },
-              positionSource: "user",
-            };
-          }
-
-          return ex;
-        });
-      });
-
-      return; // Stop normal speaker-drag path from running
-    }
 
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
     if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
@@ -3242,14 +3141,15 @@ React.useEffect(() => {
             ));
           }
         } else if (isFrontWide) {
-          // CRITICAL: Lock LW/RW to wall after drag (1cm buffer)
+          // CRITICAL: Lock LW/RW to wall after drag (0.01m buffer)
           const W = widthM || 0;
+          const FW_WALL_BUFFER_M = 0.01;
           const dims = getModelDimsM(spk.model);
           const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
           
           const targetX = canonicalRole === 'LW'
-            ? (SIDE_SPK_WALL_BUFFER_M + halfDepth)
-            : (W - SIDE_SPK_WALL_BUFFER_M - halfDepth);
+            ? (FW_WALL_BUFFER_M + halfDepth)
+            : (W - FW_WALL_BUFFER_M - halfDepth);
           
           // Force X to wall, keep Y from drag
           onSetSpeakers(prev => prev.map(s => 
@@ -4281,12 +4181,10 @@ useEffect(() => {
     let needsUpdate = false;
     const updated = placedSpeakers.map(spk => {
       const canon = getCanonicalRole(spk.role);
-      const lbl = String(spk?.label || "").toUpperCase();
-      const isExtraSide = !!spk?._isExtraSurround || lbl.startsWith("SL") || lbl.startsWith("SR");
       
-      // Process ALL side wall speakers: SL/SR, LW/RW, and extra surrounds
+      // Process ALL side wall speakers: SL/SR and LW/RW
       // SBL/SBR are handled by SpeakerPlacement and stay on back wall
-      if (!['SL', 'SR', 'LW', 'RW'].includes(canon) && !isExtraSide) return spk;
+      if (!['SL', 'SR', 'LW', 'RW'].includes(canon)) return spk;
       if (!spk.position || !spk.model) return spk;
       
       // [B44 POSITION LOCK] Skip user-positioned speakers (except during wall-hug restore)
@@ -4297,11 +4195,12 @@ useEffect(() => {
       const isLeft = ['SL', 'LW'].includes(canon);
       const side = isLeft ? 'L' : 'R';
 
-      // Calculate correct wall-hugged X using 1cm buffer
+      // Calculate correct wall-hugged X using 0.01m buffer
+      const FW_WALL_BUFFER_M = 0.01;
       const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
       const targetX = isLeft 
-        ? (SIDE_SPK_WALL_BUFFER_M + halfDepth)
-        : (W - SIDE_SPK_WALL_BUFFER_M - halfDepth);
+        ? (FW_WALL_BUFFER_M + halfDepth)
+        : (W - FW_WALL_BUFFER_M - halfDepth);
       
       const currentX = Number(spk.position.x) || 0;
 
@@ -6181,23 +6080,7 @@ return {
       });
     }
 
-    const speakerDragHandler = speaker._isExtraSurround
-      ? (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (!id) return;
-          setDragState({
-            dragging: true,
-            draggedItemId: id,
-            dragType: 'speaker',
-            kind: "extraSurround",
-            label: speaker.label || "",
-          });
-          setDragWarning({ show: false });
-          isAnyDraggingRef.current = true;
-          isDraggingSpeakerRef.current = true;
-        }
-      : isDraggable(speaker)
+    const speakerDragHandler = isDraggable(speaker)
       ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
       : undefined;
 
