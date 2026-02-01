@@ -480,24 +480,9 @@ function useDesignerState() {
     (__autosavePayload && Array.isArray(__autosavePayload.extraSurrounds)) ? __autosavePayload.extraSurrounds : []
   ));
 
-  // Helper to extract major channel count from layout
-  const getMajorFromLayout = (layout) => {
-    const key = String(layout || "").split(" ")[0].split("_")[0];
-    const major = parseInt(key.split(".")[0], 10);
-    return Number.isFinite(major) ? major : 5;
-  };
-
   // --- EXTRA SURROUNDS SYNC EFFECT ---
-          useEffect(() => {
-            // Guard: only allow extras in 9.x+ layouts
-            const major = getMajorFromLayout(dolbyLayout);
-            if (major < 9) {
-              if ((extraSurroundCount || 0) !== 0) _setExtraSurroundCount(0);
-              if (Array.isArray(extraSurrounds) && extraSurrounds.length) setExtraSurrounds([]);
-              return;
-            }
-
-            const count = extraSurroundCount || 0;
+  useEffect(() => {
+    const count = extraSurroundCount || 0;
     const current = Array.isArray(extraSurrounds) ? extraSurrounds : [];
 
     // Get room dims (with safe fallbacks for seeding)
@@ -617,16 +602,7 @@ function useDesignerState() {
 
       setExtraSurrounds(final);
     }
-  }, [extraSurroundCount, extraSurrounds, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel, dolbyLayout]);
-
-  // Force-clear extras when layout drops below 9.x
-  useEffect(() => {
-    const major = getMajorFromLayout(dolbyLayout);
-    if (major < 9) {
-      _setExtraSurroundCount(0);
-      setExtraSurrounds([]);
-    }
-  }, [dolbyLayout]);
+  }, [extraSurroundCount, extraSurrounds, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel]);
 
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
@@ -1079,7 +1055,6 @@ function useDesignerState() {
 
   useEffect(() => {
     // Build payload (ONLY what we need to restore the room session)
-    const major = getMajorFromLayout(dolbyLayout);
     const payload = {
       roomDims,
       dimensions,
@@ -1114,8 +1089,8 @@ function useDesignerState() {
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
       mlpOverride,
-      extraSurroundCount: (major >= 9) ? extraSurroundCount : 0,
-      extraSurrounds: (major >= 9) ? extraSurrounds : []
+      extraSurroundCount,
+      extraSurrounds
       };
 
       if (!isAutosavePayloadValid(payload)) return;
@@ -1170,7 +1145,6 @@ function useDesignerState() {
 
     // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
     useEffect(() => {
-    const major = getMajorFromLayout(dolbyLayout);
     const payload = {
       roomDims,
       dimensions,
@@ -1205,8 +1179,8 @@ function useDesignerState() {
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
       mlpOverride,
-      extraSurroundCount: (major >= 9) ? extraSurroundCount : 0,
-      extraSurrounds: (major >= 9) ? extraSurrounds : []
+      extraSurroundCount,
+      extraSurrounds
       };
 
       try {
