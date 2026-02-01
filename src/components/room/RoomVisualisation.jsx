@@ -580,6 +580,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const mlpDotZ_m = mlp.z;
 
   const [hoveredSpeaker, setHoveredSpeaker] = useState(null);
+  const [tooltip, setTooltip] = useState({ show: false, text: '' });
   const [dragState, setDragState] = useState({ dragging: false, draggedItemId: null, dragType: null });
   const { dragging, draggedItemId, dragType } = dragState;
   const [draggingRole, setDraggingRole] = useState(null);
@@ -1684,6 +1685,12 @@ React.useEffect(() => {
       // 2) For non-overhead speakers, keep the existing "locked" behaviour.
       //    Overheads bypass this, so they never show "Position is locked".
       if (type === "speaker" && !isOverhead && !isDraggable(target)) {
+        setTooltip({ show: true, text: "Position is locked" });
+        setTimeout(() => {
+          setTooltip((t) =>
+            t.text === "Position is locked" ? { show: false } : t
+          );
+        }, 1500);
         return;
       }
 
@@ -1809,7 +1816,7 @@ React.useEffect(() => {
         }
       }
     },
-    [byId, setDragState, setDragWarning, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef]
+    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef]
   );
 
   // Shared drag handler wrapper for all speakers (bed-layer and overhead)
@@ -3269,6 +3276,7 @@ React.useEffect(() => {
       dragType: null,
     });
     setDragWarning({ show: false });
+    setTooltip({ show: false });
     rsDragLockRef.current = null;
     isDraggingRearRef.current = 0;
     isDraggingFW.current = false;
@@ -3277,7 +3285,7 @@ React.useEffect(() => {
     draggedSubWallRef.current = null;
     draggedSubTypeRef.current = null;
 
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, rsDragLockRef, isDraggingRearRef, isDraggingFW, props.isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions]);
+  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, props.isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions]);
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
@@ -7297,6 +7305,7 @@ return (
 {exportMode !== 'clean' && (
   <PlanMessages
     dragWarning={dragWarning}
+    tooltip={tooltip}
     hoveredSpeaker={hoveredSpeaker}
     svgW={svgW}
   />
