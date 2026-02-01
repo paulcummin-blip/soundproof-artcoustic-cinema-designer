@@ -1413,7 +1413,8 @@ function useDesignerState() {
     }
   }, []);
 
-  const value = useMemo(() => ({
+  const value = useMemo(() => {
+    return {
     dimensions, setDimensions, 
     roomDims, setRoomDims,
     setRoomWidthM, setRoomLengthM, setRoomHeightM,
