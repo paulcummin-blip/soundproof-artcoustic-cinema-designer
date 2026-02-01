@@ -3,7 +3,7 @@
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
 import { Layers3, Compass } from 'lucide-react';
 import SeatHud from "@/components/room/SeatHud";
-import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
+import { getSpeakerModelMeta, normaliseModelKey as registryNormaliseModelKey } from "@/components/models/speakers/registry";
 import {
   rp23HorizontalAngleForSeat,
   verticalViewingAngleDeg,
@@ -291,7 +291,6 @@ import {
   hasPos,
   isRenderableSpeaker,
   getChannelColor,
-  normaliseModelKey,
   RAD, rad2deg, yawDegToMLP, safeYawToMLP,
   PADDING, DEFAULT_W, DEFAULT_H,
   SCREEN_BAR_PX, SCREEN_BAR_HALF_PX,
@@ -3211,10 +3210,9 @@ React.useEffect(() => {
   // Helper to get friendly speaker model name
   const getSpeakerModelDisplayName = useCallback((modelKey) => {
     if (!modelKey || modelKey === 'off' || modelKey === 'none') return 'Unknown model';
-    const normalized = normaliseModelKey(modelKey);
+    const normalized = registryNormaliseModelKey(modelKey);
     const meta = getSpeakerModelMeta(normalized);
-    if (meta?.displayName) return meta.displayName;
-    if (meta?.name) return meta.name;
+    if (meta?.label) return meta.label;
     return 'Unknown model';
   }, []);
 
