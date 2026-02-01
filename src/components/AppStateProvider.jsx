@@ -1547,10 +1547,6 @@ function useDesignerState() {
     mlpOverride,
     setMlpOverride,
     clearMlpOverride,
-    extraSurroundCount,
-    setExtraSurroundCount,
-    extraSurrounds,
-    setExtraSurrounds,
   }), [
     dimensions, setDimensions,
     roomDims, setRoomDims,
