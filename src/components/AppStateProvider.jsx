@@ -1484,6 +1484,7 @@ function useDesignerState() {
     clearMlpOverride,
     extraSurroundCount,
     setExtraSurroundCount,
+    mlp,
     };
   }, [
     dimensions, setDimensions,
