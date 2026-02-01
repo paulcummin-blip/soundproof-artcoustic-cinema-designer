@@ -176,6 +176,7 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
         onMouseLeave={() => setHoveredSpeaker?.(null)}
         className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
       >
+        <title>{hoverLabel}</title>
         <circle
           cx={canvasX}
           cy={canvasY_raw}
@@ -206,7 +207,8 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
       }
       onMouseLeave={() => setHoveredSpeaker?.(null)}
       className={speakerMouseDownHandler ? "cursor-grab active:cursor-grabbing" : ""}
-      >
+    >
+      <title>{hoverLabel}</title>
       <path
         d={pathData}
         fill={color || "#000000"}
