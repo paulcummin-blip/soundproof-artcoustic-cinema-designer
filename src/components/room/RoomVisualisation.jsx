@@ -459,6 +459,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     exportMode = 'default',
     extraSurrounds = [],
     extraSurroundCount = 0,
+    setExtraSurrounds,
+    roomWidthM,
   } = props;
 
   const appState = useAppState();
@@ -2391,6 +2393,60 @@ React.useEffect(() => {
 
       lastInteractionEpoch.current = timeNowMs();
       if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: SBL/SBR complete");
+      return;
+    }
+
+    // Handle extra surrounds (SL2/SR2 pairs) - mirror-locked like LW/RW
+    if (speaker._isExtraSurround && setExtraSurrounds && roomWidthM > 0) {
+      const W = roomWidthM;
+      const L = lengthM || 6.0;
+      
+      const { y: rawY } = canvasToRoom(newCanvasPos);
+      
+      // Determine which pair this belongs to (SL2/SR2, SL3/SR3, etc.)
+      const label = String(speaker.label || '').toUpperCase();
+      const isLeft = label.startsWith('SL');
+      const pairNumber = parseInt(label.replace(/[^\d]/g, ''), 10) || 2;
+      
+      // Find both members of this pair
+      const pairLabel = isLeft ? `SR${pairNumber}` : `SL${pairNumber}`;
+      const partnerExtra = extraSurrounds.find(e => String(e.label || '').toUpperCase() === pairLabel);
+      
+      if (!partnerExtra) return; // Partner doesn't exist, abort
+      
+      // Clamp Y to room bounds (with small margin)
+      const margin = 0.1;
+      const clampedY = Math.max(margin, Math.min(L - margin, rawY));
+      
+      // Update both speakers in the pair
+      setExtraSurrounds(prev => {
+        return (prev || []).map(e => {
+          const eLabel = String(e.label || '').toUpperCase();
+          
+          // Update dragged speaker
+          if (e.id === speaker.id || eLabel === label) {
+            return {
+              ...e,
+              position: { ...e.position, y: clampedY },
+              positionSource: 'user'
+            };
+          }
+          
+          // Update mirrored partner
+          if (e.id === partnerExtra.id || eLabel === pairLabel) {
+            return {
+              ...e,
+              position: { ...e.position, y: clampedY },
+              positionSource: 'user'
+            };
+          }
+          
+          return e;
+        });
+      });
+      
+      lastInteractionEpoch.current = timeNowMs();
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: extra surround pair complete");
       return;
     }
 
