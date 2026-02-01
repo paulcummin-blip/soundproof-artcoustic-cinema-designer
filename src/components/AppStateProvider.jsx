@@ -1056,8 +1056,7 @@ function useDesignerState() {
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
       mlpOverride,
-      extraSurroundCount,
-      extraSurrounds
+      extraSurroundCount
       };
 
       if (!isAutosavePayloadValid(payload)) return;
