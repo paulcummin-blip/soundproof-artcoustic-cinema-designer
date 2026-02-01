@@ -513,6 +513,147 @@ function useDesignerState() {
     _setGlobalSurroundModel(model);
   }, []);
 
+  const setSpeakerSystem = useCallback(
+    (updater) => {
+      _setSpeakerSystem((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        if (!next) return prev;
+
+        // Start from next.placedSpeakers if present, otherwise keep previous.
+        let speakers = Array.isArray(next.placedSpeakers)
+          ? next.placedSpeakers.slice()
+          : Array.isArray(prev.placedSpeakers)
+          ? prev.placedSpeakers.slice()
+          : [];
+
+        // IDEMPOTENCE CHECK: if speakers haven't actually changed, don't update state
+        if (speakersShallowEqual(prev.placedSpeakers, speakers)) {
+          if (globalThis.__B44_LOGS) {
+            console.log("[AS] setSpeakerSystem: speakers unchanged, returning prev");
+          }
+          return prev;
+        }
+
+        // DEBUG: show exactly what roles we are receiving and storing.
+        if (globalThis.__B44_LOGS) {
+          console.log("[AS] setSpeakerSystem RAW incoming roles:",
+            speakers.map(s => s && String(s.role)));
+        }
+
+        const result = {
+          ...prev,
+          ...next,
+          placedSpeakers: speakers,
+        };
+
+        if (globalThis.__B44_LOGS) {
+          console.log("[AS] setSpeakerSystem STORED roles:",
+            (result.placedSpeakers || []).map(s => s && String(s.role)));
+        }
+
+        return result;
+      });
+    },
+    []
+  );
+
+  // --- EXTRA SURROUNDS SYNC EFFECT (promoted to real speakers with canonical roles SL2/SR2...) ---
+  useEffect(() => {
+    const count = extraSurroundCount || 0;
+    
+    // Always keep modelKey aligned to the current surround model
+    const modelKey = globalSurroundModel || "off";
+    
+    // 1cm wall buffer (single source of truth for ALL surrounds)
+    const WALL_BUFFER_M = 0.01;
+
+    // Get SL/SR positions to calculate spawn positions
+    const slSpeaker = (speakerSystem?.placedSpeakers || []).find(s => {
+      const r = String(s?.role || '').toUpperCase();
+      return r === 'SL' || r === 'LS';
+    });
+    const srSpeaker = (speakerSystem?.placedSpeakers || []).find(s => {
+      const r = String(s?.role || '').toUpperCase();
+      return r === 'SR' || r === 'RS';
+    });
+
+    const slY = Number.isFinite(slSpeaker?.position?.y) ? slSpeaker.position.y : null;
+    const srY = Number.isFinite(srSpeaker?.position?.y) ? srSpeaker.position.y : null;
+    const slX = Number.isFinite(slSpeaker?.position?.x) ? slSpeaker.position.x : WALL_BUFFER_M;
+    const srX = Number.isFinite(srSpeaker?.position?.x) ? srSpeaker.position.x : (Number(roomDims?.widthM) || 4.5) - WALL_BUFFER_M;
+
+    // Inject extra speakers directly into placedSpeakers array
+    setSpeakerSystem(prev => {
+      const current = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
+      
+      // Find existing extra surrounds (roles SL2, SR2, SL3, SR3, ...)
+      const extraRolePattern = /^(SL|SR)\d+$/;
+      const existing = current.filter(s => extraRolePattern.test(String(s.role).toUpperCase()));
+      const nonExtras = current.filter(s => !extraRolePattern.test(String(s.role).toUpperCase()));
+      
+      // If count is 0, remove all extras
+      if (count === 0) {
+        if (existing.length === 0) return prev; // Already clean
+        return { ...prev, placedSpeakers: nonExtras };
+      }
+      
+      // Calculate how many pairs we need (count is total speakers, pairs are count/2)
+      const pairsNeeded = count / 2;
+      
+      // Build required extra speakers
+      const nextExtras = [];
+      
+      for (let pairIndex = 0; pairIndex < pairsNeeded; pairIndex++) {
+        const pairNumber = pairIndex + 2; // SL2/SR2 start at pair 2
+        const roleSL = `SL${pairNumber}`;
+        const roleSR = `SR${pairNumber}`;
+        
+        // Calculate Y position: each pair is 1.00m further from screen than the previous
+        const offsetM = pairIndex * 1.00;
+        const baseY = (slY !== null && srY !== null) 
+          ? ((slY + srY) / 2) + 1.00 + offsetM
+          : (Number(roomDims?.lengthM) || 6.0) * 0.65 + offsetM;
+        
+        // Find existing speakers for this pair (to preserve user edits)
+        const existingSL = existing.find(s => String(s.role).toUpperCase() === roleSL);
+        const existingSR = existing.find(s => String(s.role).toUpperCase() === roleSR);
+        
+        // SL speaker (left)
+        nextExtras.push(existingSL || {
+          id: `${roleSL.toLowerCase()}-${timeNowMs() + pairIndex * 2}`,
+          role: roleSL,
+          model: modelKey && modelKey !== 'off' ? modelKey : undefined,
+          position: { x: slX, y: baseY, z: 1.2 },
+          rotation: { x: 0, y: 0, z: 0 },
+          draggable: true,
+          positionSource: 'auto',
+        });
+        
+        // SR speaker (right)
+        nextExtras.push(existingSR || {
+          id: `${roleSR.toLowerCase()}-${timeNowMs() + pairIndex * 2 + 1}`,
+          role: roleSR,
+          model: modelKey && modelKey !== 'off' ? modelKey : undefined,
+          position: { x: srX, y: baseY, z: 1.2 },
+          rotation: { x: 0, y: 0, z: 0 },
+          draggable: true,
+          positionSource: 'auto',
+        });
+      }
+      
+      // Only update if something changed
+      const nextPlaced = [...nonExtras, ...nextExtras];
+      
+      // Simple equality check (compare roles only for speed)
+      const currentRoles = current.map(s => s.role).sort().join(',');
+      const nextRoles = nextPlaced.map(s => s.role).sort().join(',');
+      
+      if (currentRoles === nextRoles) return prev;
+      
+      return { ...prev, placedSpeakers: nextPlaced };
+    });
+  }, [extraSurroundCount, globalSurroundModel, speakerSystem?.placedSpeakers, roomDims?.widthM, roomDims?.lengthM, setSpeakerSystem]);
+
   const [splConfig, setSplConfig] = useState(() => {
       const autosaveConfig = __autosavePayload?.splConfig || {};
 
