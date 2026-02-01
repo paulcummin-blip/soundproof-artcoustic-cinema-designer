@@ -456,8 +456,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     zoomMode: zoomModeProp = 'off',
     onZoomModeChange,
     exportMode = 'default',
-    extraSurrounds = [],
-    extraSurroundCount = 0,
   } = props;
 
   const appState = useAppState();
@@ -856,40 +854,15 @@ const onHudHeaderMouseDown = useCallback((event) => {
 const byId = useMemo(() => {
   const map = new Map();
 
-  // Index speakers
+  // Index speakers (including extra surrounds with canonical roles SL2/SR2/...)
   (placedSpeakers || []).forEach((spk) => {
     if (!spk) return;
 
     // 1) Primary key: id (if present)
     if (spk.id) map.set(spk.id, spk);
 
-    // 2) Fallback key: role (needed for overheads when id is missing/unstable)
+    // 2) Fallback key: role (needed for overheads and extras when id is missing/unstable)
     if (spk.role) map.set(String(spk.role).toUpperCase(), spk);
-  });
-
-  // Index extra surrounds (convert to speaker-like objects, same as renderSpeakers does)
-  (extraSurrounds || []).forEach((e) => {
-    if (!e || !Number.isFinite(e?.position?.x) || !Number.isFinite(e?.position?.y)) return;
-    
-    const label = String(e.label || '').toUpperCase();
-    const role = label.startsWith('SL') ? 'SL' :
-                 label.startsWith('SR') ? 'SR' :
-                 (Number(e.position.x) < (widthM / 2) ? 'SL' : 'SR');
-    
-    const model = e.modelKey || e.model || 'evolve-2-1';
-    
-    const speakerObj = {
-      id: e.id || `extra-${label || Math.random().toString(36).slice(2)}`,
-      role,
-      model,
-      position: e.position,
-      yaw: Number(e.yaw) || 0,
-      label: e.label || label,
-      type: 'extraSurround',
-      _isExtraSurround: true,
-    };
-    
-    if (speakerObj.id) map.set(speakerObj.id, speakerObj);
   });
 
   // Index seats (keep existing behaviour)
@@ -912,7 +885,7 @@ const byId = useMemo(() => {
   });
 
   return map;
-}, [placedSpeakers, seatingPositions, frontSubs, rearSubs, extraSurrounds, widthM]);
+}, [placedSpeakers, seatingPositions, frontSubs, rearSubs]);
 
   // Removed seatBandXBounds - computed after overheadZones is defined
 
@@ -5874,36 +5847,11 @@ return {
   }, [placedSpeakers, dolbyLayout, appState?.speakerSystem, appState?.sevenBedLayoutType, getSpeakerVisibility, getCanonicalRole]);
 
   const renderSpeakers = useCallback(() => {
-  // Start from the prop (single source of truth)
+  // Start from the prop (single source of truth - now includes extra surrounds with canonical roles)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
   
-  // NEW: Inject extra surrounds into the same render pipeline
-  const extras = Array.isArray(extraSurrounds) ? extraSurrounds : [];
-  
-  const extraAsSpeakers = extras
-    .filter(e => Number.isFinite(e?.position?.x) && Number.isFinite(e?.position?.y))
-    .map((e) => {
-      const label = String(e.label || '').toUpperCase();
-      const role =
-        label.startsWith('SL') ? 'SL' :
-        label.startsWith('SR') ? 'SR' :
-        (Number(e.position.x) < (widthM / 2) ? 'SL' : 'SR');
-
-      const model = e.modelKey || e.model || 'evolve-2-1';
-
-      return {
-        id: e.id || `extra-${label || Math.random().toString(36).slice(2)}`,
-        role,
-        model,
-        position: e.position,
-        yaw: Number(e.yaw) || 0,
-        label: e.label || label,
-        type: 'extraSurround',
-        _isExtraSurround: true,
-      };
-    });
-
-  const renderList = [...rawSpeakers, ...extraAsSpeakers];
+  // Extra surrounds are now real speakers in placedSpeakers array (no separate injection needed)
+  const renderList = rawSpeakers;
 
 
 
@@ -6008,7 +5956,9 @@ return {
 
     const isLCR = (canon === "FL" || canon === "FR" || canon === "FC");
     const isFrontWide = (canon === "LW" || canon === "RW");
-    const isSideSurround = (canon === "SL" || canon === "SR");
+    const extraSurroundPattern = /^(SL|SR)\d+$/;
+    const isExtraSurround = extraSurroundPattern.test(String(rawRole || '').toUpperCase());
+    const isSideSurround = (canon === "SL" || canon === "SR" || isExtraSurround);
     const isRearSurround = (canon === "SBL" || canon === "SBR");
 
     if (isLCR) {
@@ -6190,7 +6140,6 @@ return {
   setHoveredSpeaker,
   SpeakerIcon,
   placedSpeakers,
-  extraSurrounds,
 ]);
 
   // Renders rear subwoofers using SpeakerRect
@@ -7179,44 +7128,6 @@ return (
 
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
             {renderSpeakers()}
-
-            {/* Layer 10.5: Extra Surrounds - DISABLED (now rendered via renderSpeakers pipeline) */}
-
-            {/* DEBUG: Extra surrounds data receipt (remove after confirmed) */}
-            {(() => {
-              const n = Array.isArray(extraSurrounds) ? extraSurrounds.length : 'NA';
-              const first = Array.isArray(extraSurrounds) && extraSurrounds[0] ? extraSurrounds[0] : null;
-              const firstLabel = first ? (first.label || first.id || "?") : "(none)";
-              const posText = (first && first.position) 
-                ? `x=${Number(first.position.x).toFixed(2)} y=${Number(first.position.y).toFixed(2)}` 
-                : `pos=(none)`;
-
-              const txt = `extraSurroundCount=${extraSurroundCount} | extraSurrounds.len=${n} | first=${firstLabel} | ${posText}`;
-
-              return (
-                <g data-layer="debug-extra-surrounds">
-                  <rect
-                    x={roomRect.x + 8}
-                    y={roomRect.y + 8}
-                    width={Math.min(420, roomRect.width - 16)}
-                    height={26}
-                    rx={6}
-                    ry={6}
-                    fill="white"
-                    opacity={0.85}
-                    stroke="#999"
-                  />
-                  <text
-                    x={roomRect.x + 16}
-                    y={roomRect.y + 26}
-                    fontSize="12"
-                    fill="#111"
-                  >
-                    {txt}
-                  </text>
-                </g>
-              );
-            })()}
 
 
 

@@ -479,113 +479,102 @@ function useDesignerState() {
     (__autosavePayload && Array.isArray(__autosavePayload.extraSurrounds)) ? __autosavePayload.extraSurrounds : []
   ));
 
-  // --- EXTRA SURROUNDS SYNC EFFECT (spawns 1.00m behind SL/SR with 1cm wall buffer) ---
+  // --- EXTRA SURROUNDS SYNC EFFECT (promoted to real speakers with canonical roles SL2/SR2...) ---
   useEffect(() => {
     const count = extraSurroundCount || 0;
-    const current = Array.isArray(extraSurrounds) ? extraSurrounds : [];
-
-    // Get room dims (with safe fallbacks for seeding)
-    const widthM = Number(roomDims?.widthM) || 4.5;
-    const lengthM = Number(roomDims?.lengthM) || 6.0;
-
+    
     // Always keep modelKey aligned to the current surround model
     const modelKey = globalSurroundModel || "off";
     
     // 1cm wall buffer (single source of truth for ALL surrounds)
     const WALL_BUFFER_M = 0.01;
 
-    // If the count matches, we STILL need to ensure modelKey is updated
-    if (current.length === count) {
-      // Only touch auto items (never overwrite user-placed ones)
-      const next = current.map((it) => {
-        if (!it) return it;
-        if (it.positionSource === "user") return it;
-        if (it.modelKey === modelKey) return it;
-        return { ...it, modelKey };
-      });
+    // Get SL/SR positions to calculate spawn positions
+    const slSpeaker = (speakerSystem?.placedSpeakers || []).find(s => {
+      const r = String(s?.role || '').toUpperCase();
+      return r === 'SL' || r === 'LS';
+    });
+    const srSpeaker = (speakerSystem?.placedSpeakers || []).find(s => {
+      const r = String(s?.role || '').toUpperCase();
+      return r === 'SR' || r === 'RS';
+    });
 
-      // If nothing changed, do nothing
-      const changed =
-        next.length !== current.length ||
-        next.some((it, i) => (it?.modelKey || "") !== (current[i]?.modelKey || ""));
+    const slY = Number.isFinite(slSpeaker?.position?.y) ? slSpeaker.position.y : null;
+    const srY = Number.isFinite(srSpeaker?.position?.y) ? srSpeaker.position.y : null;
+    const slX = Number.isFinite(slSpeaker?.position?.x) ? slSpeaker.position.x : WALL_BUFFER_M;
+    const srX = Number.isFinite(srSpeaker?.position?.x) ? srSpeaker.position.x : (Number(roomDims?.widthM) || 4.5) - WALL_BUFFER_M;
 
-      if (changed) setExtraSurrounds(next);
-      return;
-    }
-
-    // If count differs, build up / trim
-    if (count > current.length) {
-      const toAdd = count - current.length;
-      const newItems = [];
-
-      // Get SL/SR positions to spawn extras 1.00m behind them
-      const slSpeaker = (speakerSystem?.placedSpeakers || []).find(s => {
-        const r = String(s?.role || '').toUpperCase();
-        return r === 'SL' || r === 'LS';
-      });
-      const srSpeaker = (speakerSystem?.placedSpeakers || []).find(s => {
-        const r = String(s?.role || '').toUpperCase();
-        return r === 'SR' || r === 'RS';
-      });
-
-      const slY = Number.isFinite(slSpeaker?.position?.y) ? slSpeaker.position.y : null;
-      const srY = Number.isFinite(srSpeaker?.position?.y) ? srSpeaker.position.y : null;
-
-      // Base Y for extras: 1.00m further from front wall than SL/SR
-      const baseY = (slY !== null && srY !== null) 
-        ? ((slY + srY) / 2) + 1.00 
-        : lengthM * 0.65;
-
-      for (let i = 0; i < toAdd; i++) {
-        const index = current.length + i;
-        const id = `extra-surround-${index + 1}`;
-
-        // Alternate left/right: 0,2,4,6 = left; 1,3,5,7 = right
-        const isLeft = index % 2 === 0;
+    // Inject extra speakers directly into placedSpeakers array
+    setSpeakerSystem(prev => {
+      const current = Array.isArray(prev?.placedSpeakers) ? prev.placedSpeakers : [];
+      
+      // Find existing extra surrounds (roles SL2, SR2, SL3, SR3, ...)
+      const extraRolePattern = /^(SL|SR)\d+$/;
+      const existing = current.filter(s => extraRolePattern.test(String(s.role).toUpperCase()));
+      const nonExtras = current.filter(s => !extraRolePattern.test(String(s.role).toUpperCase()));
+      
+      // If count is 0, remove all extras
+      if (count === 0) {
+        if (existing.length === 0) return prev; // Already clean
+        return { ...prev, placedSpeakers: nonExtras };
+      }
+      
+      // Calculate how many pairs we need (count is total speakers, pairs are count/2)
+      const pairsNeeded = count / 2;
+      
+      // Build required extra speakers
+      const nextExtras = [];
+      
+      for (let pairIndex = 0; pairIndex < pairsNeeded; pairIndex++) {
+        const pairNumber = pairIndex + 2; // SL2/SR2 start at pair 2
+        const roleSL = `SL${pairNumber}`;
+        const roleSR = `SR${pairNumber}`;
         
-        // Apply 1cm wall buffer consistently
-        const x = isLeft ? WALL_BUFFER_M : (widthM - WALL_BUFFER_M);
-
-        // Y position: spawn at baseY, then distribute if multiple pairs
-        const yOffset = toAdd > 2 ? (index * 0.4) : 0;
-        const y = baseY + yOffset;
-
-        // Stable label: SL2/SR2/SL3/SR3...
-        const side = isLeft ? "SL" : "SR";
-        const number = 2 + Math.floor(index / 2);
-        const label = `${side}${number}`;
-
-        newItems.push({
-          id,
-          type: "extraSurround",
-          modelKey,
-          position: { x, y, z: 1.2 },
-          yaw: 0,
-          positionSource: "auto",
-          label,
+        // Calculate Y position: each pair is 1.00m further from screen than the previous
+        const offsetM = pairIndex * 1.00;
+        const baseY = (slY !== null && srY !== null) 
+          ? ((slY + srY) / 2) + 1.00 + offsetM
+          : (Number(roomDims?.lengthM) || 6.0) * 0.65 + offsetM;
+        
+        // Find existing speakers for this pair (to preserve user edits)
+        const existingSL = existing.find(s => String(s.role).toUpperCase() === roleSL);
+        const existingSR = existing.find(s => String(s.role).toUpperCase() === roleSR);
+        
+        // SL speaker (left)
+        nextExtras.push(existingSL || {
+          id: `${roleSL.toLowerCase()}-${timeNowMs() + pairIndex * 2}`,
+          role: roleSL,
+          model: modelKey && modelKey !== 'off' ? modelKey : undefined,
+          position: { x: slX, y: baseY, z: 1.2 },
+          rotation: { x: 0, y: 0, z: 0 },
+          draggable: true,
+          positionSource: 'auto',
+        });
+        
+        // SR speaker (right)
+        nextExtras.push(existingSR || {
+          id: `${roleSR.toLowerCase()}-${timeNowMs() + pairIndex * 2 + 1}`,
+          role: roleSR,
+          model: modelKey && modelKey !== 'off' ? modelKey : undefined,
+          position: { x: srX, y: baseY, z: 1.2 },
+          rotation: { x: 0, y: 0, z: 0 },
+          draggable: true,
+          positionSource: 'auto',
         });
       }
-
-      setExtraSurrounds([...current, ...newItems]);
-    } else {
-      const toRemove = current.length - count;
-      let removed = 0;
-      const kept = [];
-
-      for (let i = current.length - 1; i >= 0 && removed < toRemove; i--) {
-        if (current[i]?.positionSource === "user") {
-          kept.unshift(current[i]);
-        } else {
-          removed++;
-        }
-      }
-
-      const startIndex = current.length - toRemove - kept.length;
-      const final = current.slice(0, Math.max(0, startIndex)).concat(kept);
-
-      setExtraSurrounds(final);
-    }
-  }, [extraSurroundCount, extraSurrounds, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel, speakerSystem?.placedSpeakers]);
+      
+      // Only update if something changed
+      const nextPlaced = [...nonExtras, ...nextExtras];
+      
+      // Simple equality check (compare roles only for speed)
+      const currentRoles = current.map(s => s.role).sort().join(',');
+      const nextRoles = nextPlaced.map(s => s.role).sort().join(',');
+      
+      if (currentRoles === nextRoles) return prev;
+      
+      return { ...prev, placedSpeakers: nextPlaced };
+    });
+  }, [extraSurroundCount, globalSurroundModel, speakerSystem?.placedSpeakers, roomDims?.widthM, roomDims?.lengthM, setSpeakerSystem]);
 
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {

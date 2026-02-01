@@ -327,8 +327,11 @@ export function buildSeatHudSnapshot({
   // ALWAYS compute P17 locally using LIVE plan-view yaw logic (matches icon rotation)
   {
     const surroundAndOverheadRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR']);
+    const extraSurroundPattern = /^(SL|SR)\d+$/;
     
     const groupForRole = (role) => {
+      const roleUpper = String(role || '').toUpperCase();
+      if (extraSurroundPattern.test(roleUpper)) return 'Extra Surrounds';
       if (role === 'LW' || role === 'RW') return 'Front Wides';
       if (role === 'SL' || role === 'SR') return 'Side Surrounds';
       if (role === 'SBL' || role === 'SBR') return 'Rear Surrounds';
@@ -338,7 +341,8 @@ export function buildSeatHudSnapshot({
     
     const relevantSpeakers = (placedSpeakers || []).filter(sp => {
       const canon = getCanonicalRole(sp.role);
-      return surroundAndOverheadRoles.has(canon) && sp.position;
+      const roleUpper = String(sp.role || '').toUpperCase();
+      return (surroundAndOverheadRoles.has(canon) || extraSurroundPattern.test(roleUpper)) && sp.position;
     });
 
     if (relevantSpeakers.length > 0) {
@@ -399,13 +403,15 @@ export function buildSeatHudSnapshot({
             // Wall-flat: left wall = -90, right wall = +90
             aimDeg = (canon === 'LW') ? -90 : 90;
           }
-        } else if (isSL_SR) {
-          // Side Surrounds: check toggle (LIVE)
+        } else if (isSL_SR || extraSurroundPattern.test(String(sp.role || '').toUpperCase())) {
+          // Side Surrounds + Extra Surrounds: check toggle (LIVE)
           if (aimSideSurroundsAtMLP) {
             aimDeg = safeYawToMLP(pos, mlp);
           } else {
-            // Wall-flat: left wall = -90, right wall = +90
-            aimDeg = (canon === 'SL') ? -90 : 90;
+            // Wall-flat: left wall = -90 for SL*/SR*, right wall = +90
+            const roleUpper = String(sp.role || '').toUpperCase();
+            const isLeftSide = roleUpper.startsWith('SL');
+            aimDeg = isLeftSide ? 90 : -90;
           }
         } else if (isSBL_SBR) {
           // Rear Surrounds: check toggle (LIVE)
@@ -636,10 +642,12 @@ export function buildSeatHudSnapshot({
   }
 
   // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
-  // Build eligible surrounds for P5
+  // Build eligible surrounds for P5 (includes extra surrounds SL2/SR2/...)
+  const extraSurroundPattern = /^(SL|SR)\d+$/;
   const allSurrounds = (placedSpeakers || []).filter(s => {
     const r = getCanonicalRole(s.role);
-    return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
+    const roleUpper = String(s.role || '').toUpperCase();
+    return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
   });
 
   const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
