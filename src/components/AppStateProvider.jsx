@@ -479,7 +479,7 @@ function useDesignerState() {
     (__autosavePayload && Array.isArray(__autosavePayload.extraSurrounds)) ? __autosavePayload.extraSurrounds : []
   ));
 
-  // --- EXTRA SURROUNDS SYNC EFFECT ---
+  // --- EXTRA SURROUNDS SYNC EFFECT (spawns 1.00m behind SL/SR with 1cm wall buffer) ---
   useEffect(() => {
     const count = extraSurroundCount || 0;
     const current = Array.isArray(extraSurrounds) ? extraSurrounds : [];
@@ -490,6 +490,9 @@ function useDesignerState() {
 
     // Always keep modelKey aligned to the current surround model
     const modelKey = globalSurroundModel || "off";
+    
+    // 1cm wall buffer (single source of truth for ALL surrounds)
+    const WALL_BUFFER_M = 0.01;
 
     // If the count matches, we STILL need to ensure modelKey is updated
     if (current.length === count) {
@@ -510,10 +513,28 @@ function useDesignerState() {
       return;
     }
 
-    // If count differs, build up / trim as before
+    // If count differs, build up / trim
     if (count > current.length) {
       const toAdd = count - current.length;
       const newItems = [];
+
+      // Get SL/SR positions to spawn extras 1.00m behind them
+      const slSpeaker = (speakerSystem?.placedSpeakers || []).find(s => {
+        const r = String(s?.role || '').toUpperCase();
+        return r === 'SL' || r === 'LS';
+      });
+      const srSpeaker = (speakerSystem?.placedSpeakers || []).find(s => {
+        const r = String(s?.role || '').toUpperCase();
+        return r === 'SR' || r === 'RS';
+      });
+
+      const slY = Number.isFinite(slSpeaker?.position?.y) ? slSpeaker.position.y : null;
+      const srY = Number.isFinite(srSpeaker?.position?.y) ? srSpeaker.position.y : null;
+
+      // Base Y for extras: 1.00m further from front wall than SL/SR
+      const baseY = (slY !== null && srY !== null) 
+        ? ((slY + srY) / 2) + 1.00 
+        : lengthM * 0.65;
 
       for (let i = 0; i < toAdd; i++) {
         const index = current.length + i;
@@ -521,14 +542,13 @@ function useDesignerState() {
 
         // Alternate left/right: 0,2,4,6 = left; 1,3,5,7 = right
         const isLeft = index % 2 === 0;
-        const x = isLeft ? 0.1 : widthM - 0.1;
+        
+        // Apply 1cm wall buffer consistently
+        const x = isLeft ? WALL_BUFFER_M : (widthM - WALL_BUFFER_M);
 
-        // Distribute Y between 35% and 75% of room length
-        const yMin = lengthM * 0.35;
-        const yMax = lengthM * 0.75;
-        const yRange = yMax - yMin;
-        const yStep = count > 1 ? yRange / (count - 1) : 0;
-        const y = yMin + index * yStep;
+        // Y position: spawn at baseY, then distribute if multiple pairs
+        const yOffset = toAdd > 2 ? (index * 0.4) : 0;
+        const y = baseY + yOffset;
 
         // Stable label: SL2/SR2/SL3/SR3...
         const side = isLeft ? "SL" : "SR";
@@ -565,7 +585,7 @@ function useDesignerState() {
 
       setExtraSurrounds(final);
     }
-  }, [extraSurroundCount, extraSurrounds, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel]);
+  }, [extraSurroundCount, extraSurrounds, roomDims?.widthM, roomDims?.lengthM, globalSurroundModel, speakerSystem?.placedSpeakers]);
 
   // Compute MLP point from seating positions (stable, always available when seats exist)
   const mlp = useMemo(() => {
