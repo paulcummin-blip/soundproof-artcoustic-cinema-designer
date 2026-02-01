@@ -1,3 +1,4 @@
+
 // components/utils/seatMetrics.js
 // Pure helpers for per-seat metrics. No React imports, no hooks.
 
@@ -100,35 +101,11 @@ export function azimuthDegFromSeat(seat, pt) {
 export function metricP5_maxSurroundGapNoWrap({ seat, surrounds, toPoint }) {
   if (!seat || !Array.isArray(surrounds)) return null;
 
-  const getP5Role = (spk) => {
-    const label = String(spk?.label || "").trim().toUpperCase();
-    if (/^(SL|SR)\d+$/.test(label)) return label; // SL2 / SR2 / SL3 / SR3 ...
-    return String(spk?.role || "").trim().toUpperCase();
-  };
-
-  const isP5BedSurroundRole = (r) => {
-    const role = String(r || "").trim().toUpperCase();
-    return (
-      role === "SL" ||
-      role === "SR" ||
-      role === "SBL" ||
-      role === "SBR" ||
-      role === "LW" ||
-      role === "RW" ||
-      /^(SL|SR)\d+$/.test(role) // SL2 / SR2 / SL3 / SR3 ...
-    );
-  };
-
   const pts = [];
   for (const sp of surrounds) {
     const p = toPoint ? toPoint(sp) : sp?.position;
     const a = azimuthDegFromSeat(seat, p);
-    if (!Number.isFinite(a)) continue;
-
-    const p5Role = getP5Role(sp);
-    if (!isP5BedSurroundRole(p5Role)) continue;
-
-    pts.push({ a, sp, p5Role });
+    if (Number.isFinite(a)) pts.push({ a, sp });
   }
   if (pts.length < 2) return null;
 
