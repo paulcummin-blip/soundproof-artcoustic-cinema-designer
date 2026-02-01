@@ -966,38 +966,6 @@ function useDesignerState() {
     screenWall,
   ]);
 
-  const [extraSurrounds, setExtraSurrounds] = useState(() => (
-    (__autosavePayload && Array.isArray(__autosavePayload.extraSurrounds)) ? __autosavePayload.extraSurrounds : []
-  ));
-
-  // Compute MLP point from seating positions (stable, always available when seats exist)
-  const mlp = useMemo(() => {
-    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return null;
-    
-    const widthM = Number(roomDims?.widthM) || 4.5;
-    const lengthM = Number(roomDims?.lengthM) || 6.0;
-    
-    try {
-      const { mlp: computedMlp } = computeMLPAndPrimary(
-        seatingPositions,
-        widthM,
-        lengthM,
-        mlpBasis,
-        mlpOverride // pass live override if user has moved the green dot
-      );
-      
-      if (!computedMlp || !Number.isFinite(computedMlp.x) || !Number.isFinite(computedMlp.y)) return null;
-      
-      return {
-        x: computedMlp.x,
-        y: computedMlp.y,
-        z: computedMlp.z || 1.2,
-      };
-    } catch (e) {
-      console.warn('[AppState] MLP computation failed:', e);
-      return null;
-    }
-
   useEffect(() => {
     // OLD RESTORE LOGIC (disabled - now happens in useState initializers)
     const data = loadAutosave();
