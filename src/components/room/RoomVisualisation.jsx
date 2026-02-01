@@ -58,6 +58,14 @@ const floorDeg = (deg) => {
   return Number.isFinite(n) ? Math.floor(n + 1e-9) : null;
 };
 
+// Helper to get mirrored mate label for extra surrounds
+const getExtraMateLabel = (label) => {
+  const s = String(label || "");
+  if (s.startsWith("SL")) return "SR" + s.slice(2);
+  if (s.startsWith("SR")) return "SL" + s.slice(2);
+  return "";
+};
+
 // --- OVERHEAD HELPERS (RoomVisualisation) ---
 const rvSafeCanonRole = (role) => String(role || '').toUpperCase();
 
@@ -2990,7 +2998,7 @@ React.useEffect(() => {
 
   // Mouse handling with CTM guard
   const handleMouseMove = useCallback((e) => {
-    if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType });
+    if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE", { dragging: dragState.dragging, draggedItemId: dragState.draggedItemId, dragType: dragState.dragType, kind: dragState.kind });
     if (!dragging || !draggedItemId) return;
     setDragWarning({ show: false });
 
@@ -3013,6 +3021,49 @@ React.useEffect(() => {
     
     // Convert back to canvas for existing logic
     const targetCanvasPos = roomToCanvas(targetRoomPos);
+
+    // Handle extra surround drag (mirror-locked pairs)
+    if (dragState?.kind === "extraSurround") {
+      const draggedLabel = String(dragState.label || "");
+      
+      if (typeof setExtraSurrounds !== "function") return;
+      if (!Number.isFinite(roomWidthM) || roomWidthM <= 0) return;
+
+      const nextRoomX = targetRoomPos.x;
+      const nextRoomY = targetRoomPos.y;
+      const mateLabel = getExtraMateLabel(draggedLabel);
+
+      setExtraSurrounds((prev) => {
+        const arr = Array.isArray(prev) ? prev : [];
+        if (arr.length === 0) return prev;
+
+        return arr.map((ex) => {
+          if (!ex || !ex.position) return ex;
+
+          // Move the dragged one
+          if (ex.id === draggedItemId) {
+            return {
+              ...ex,
+              position: { ...ex.position, x: nextRoomX, y: nextRoomY },
+              positionSource: "user",
+            };
+          }
+
+          // Move the mate as a mirrored pair
+          if (mateLabel && ex.label === mateLabel) {
+            return {
+              ...ex,
+              position: { ...ex.position, x: (roomWidthM - nextRoomX), y: nextRoomY },
+              positionSource: "user",
+            };
+          }
+
+          return ex;
+        });
+      });
+
+      return; // Stop normal speaker-drag path from running
+    }
 
     const speaker = placedSpeakers.find(s => s.id === draggedItemId);
     if (globalThis.__B44_LOGS) console.log("[DRAG] MOVE_LOOKUP", { draggedItemId, found: !!speaker });
@@ -6130,7 +6181,23 @@ return {
       });
     }
 
-    const speakerDragHandler = (isDraggable(speaker) || speaker._isExtraSurround)
+    const speakerDragHandler = speaker._isExtraSurround
+      ? (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!id) return;
+          setDragState({
+            dragging: true,
+            draggedItemId: id,
+            dragType: 'speaker',
+            kind: "extraSurround",
+            label: speaker.label || "",
+          });
+          setDragWarning({ show: false });
+          isAnyDraggingRef.current = true;
+          isDraggingSpeakerRef.current = true;
+        }
+      : isDraggable(speaker)
       ? (e) => bedLayerSpeakerMouseDownHandler(e, id)
       : undefined;
 
