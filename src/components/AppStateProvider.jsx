@@ -1106,8 +1106,7 @@ function useDesignerState() {
     p15ConstructionLevel,
     p21EarlyReflectionPreset,
     mlpOverride,
-    extraSurroundCount,
-    extraSurrounds
+    extraSurroundCount
     ]);
 
     // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
@@ -1146,8 +1145,7 @@ function useDesignerState() {
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
       mlpOverride,
-      extraSurroundCount,
-      extraSurrounds
+      extraSurroundCount
       };
 
       try {
@@ -1189,8 +1187,7 @@ function useDesignerState() {
     p15ConstructionLevel,
     p21EarlyReflectionPreset,
     mlpOverride,
-    extraSurroundCount,
-    extraSurrounds
+    extraSurroundCount
     ]);
 
     // --- Autosave: Manual restore/clear functions ---
@@ -1338,7 +1335,6 @@ function useDesignerState() {
 
     // Extra Surrounds
     _setExtraSurroundCount(0);
-    setExtraSurrounds([]);
 
     // Speaker system
     _setSpeakerSystem({
@@ -1489,8 +1485,6 @@ function useDesignerState() {
     clearMlpOverride,
     extraSurroundCount,
     setExtraSurroundCount,
-    extraSurrounds,
-    setExtraSurrounds,
     };
   }, [
     dimensions, setDimensions,
@@ -1565,8 +1559,6 @@ function useDesignerState() {
     clearMlpOverride,
     extraSurroundCount,
     setExtraSurroundCount,
-    extraSurrounds,
-    setExtraSurrounds,
   ]);
 
   // Export p21 setter as convenience (same pattern as p15)
