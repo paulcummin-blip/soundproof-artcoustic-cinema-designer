@@ -4281,10 +4281,12 @@ useEffect(() => {
     let needsUpdate = false;
     const updated = placedSpeakers.map(spk => {
       const canon = getCanonicalRole(spk.role);
+      const lbl = String(spk?.label || "").toUpperCase();
+      const isExtraSide = !!spk?._isExtraSurround || lbl.startsWith("SL") || lbl.startsWith("SR");
       
-      // Process ALL side wall speakers: SL/SR and LW/RW
+      // Process ALL side wall speakers: SL/SR, LW/RW, and extra surrounds
       // SBL/SBR are handled by SpeakerPlacement and stay on back wall
-      if (!['SL', 'SR', 'LW', 'RW'].includes(canon)) return spk;
+      if (!['SL', 'SR', 'LW', 'RW'].includes(canon) && !isExtraSide) return spk;
       if (!spk.position || !spk.model) return spk;
       
       // [B44 POSITION LOCK] Skip user-positioned speakers (except during wall-hug restore)
