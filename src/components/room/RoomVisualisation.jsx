@@ -3211,7 +3211,8 @@ React.useEffect(() => {
   // Helper to get friendly speaker model name
   const getSpeakerModelDisplayName = useCallback((modelKey) => {
     if (!modelKey || modelKey === 'off' || modelKey === 'none') return 'Unknown model';
-    const meta = getSpeakerModelMeta(modelKey);
+    const normalized = normaliseModelKey(modelKey);
+    const meta = getSpeakerModelMeta(normalized);
     if (meta?.displayName) return meta.displayName;
     if (meta?.name) return meta.name;
     return 'Unknown model';
