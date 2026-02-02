@@ -96,35 +96,39 @@ export default function SurroundsSelector({
         </Select>
         <p className="text-xs text-[#625143]">Applies to all surrounds unless overridden.</p>
 
-        {/* Extra Surrounds selector - ALWAYS RENDERS, 9.x.x GATED */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 16 }}>
-          <Label className="text-sm font-medium text-[#3E4349]">Extra Surrounds</Label>
-          <Select
-            value={String(safeExtraCount)}
-            onValueChange={(v) => {
-              if (!isNineX || !hasExtraHandler) return; // Block changes outside 9.x.x or if no handler
-              
-              const count = Number(v);
-              if ([0, 2, 4, 6, 8].includes(count)) {
-                onExtraSurroundCountChange(count);
-              }
-            }}
-            disabled={disabled || !isNineX || !hasExtraHandler}
-          >
-            <SelectTrigger className="w-32 bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-white border-[#DCDBD6]">
-              <SelectItem value="0" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">Off</SelectItem>
-              <SelectItem value="2" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">2</SelectItem>
-              <SelectItem value="4" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">4</SelectItem>
-              <SelectItem value="6" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">6</SelectItem>
-              <SelectItem value="8" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">8</SelectItem>
-            </SelectContent>
-          </Select>
+        {/* Extra Surrounds - ALWAYS RENDER; DISABLE when not allowed */}
+        <div style={{ marginTop: 10, marginBottom: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ fontWeight: 600, minWidth: 130 }}>Extra Surrounds</div>
+
+            <div style={{ flex: 1 }}>
+              <Select
+                value={String(safeExtraCount)}
+                onValueChange={(v) => {
+                  const n = parseInt(v, 10);
+                  if (typeof onExtraSurroundCountChange === "function") {
+                    onExtraSurroundCountChange(Number.isFinite(n) ? n : 0);
+                  }
+                }}
+                disabled={disabled || !isNineX || !hasExtraHandler}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+
+                <SelectContent>
+                  <SelectItem value="0">Off</SelectItem>
+                  <SelectItem value="2">2</SelectItem>
+                  <SelectItem value="4">4</SelectItem>
+                  <SelectItem value="6">6</SelectItem>
+                  <SelectItem value="8">8</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </div>
         {!isNineX && (
-          <p className="text-xs text-[#625143] italic" style={{ marginTop: -12 }}>
+          <p className="text-xs text-[#625143] italic" style={{ marginTop: -8 }}>
             Available for 9.x.x layouts only
           </p>
         )}
