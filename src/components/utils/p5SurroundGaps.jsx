@@ -36,11 +36,9 @@ export function isEligibleP5Surround(role) {
  * Compute surround ring gaps from a seat's perspective
  * Returns { worstGapDeg, gaps[], sortedSurrounds[] }
  * 
- * CRITICAL: Uses HORSESHOE ordering (LW → SL → SL2 → ... → SBL → SBR → ... → SR2 → SR → RW)
- * NOT azimuth-sorted adjacency. This ensures:
- * - SBL↔SBR gap always exists (rear angle label appears)
- * - LW↔RW gap never exists (never adjacent)
- * - Extra surrounds (SL2/SR2...) are correctly inserted
+ * CRITICAL: Sorts by theta (0..360°) instead of azimuth (-180..+180°).
+ * This ensures SBL/SBR are adjacent (both near 180°), not split across ±180 boundary.
+ * NO WRAP: drops the FRONT gap (near 0°/360°), preserves the REAR gap.
  */
 export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
   if (!seat || !speakers?.length) {
@@ -59,94 +57,55 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
     return { worstGapDeg: null, gaps: [], sortedSurrounds: [] };
   }
 
-  // 2) Compute azimuth for each speaker (for gap calculation)
-  const speakerAzimuths = new Map();
+  // 2) Compute azimuth AND theta for each speaker
+  const withAzimuth = [];
   for (const sp of eligible) {
     const az = azimuthDegFromSeat(seat, sp.position);
     if (Number.isFinite(az)) {
-      speakerAzimuths.set(sp, az);
+      // Convert azimuth (-180..+180) to theta (0..360)
+      // 0° = front/screen, clockwise positive
+      const theta = (az + 360) % 360;
+      withAzimuth.push({ az, theta, speaker: sp });
     }
   }
 
-  if (speakerAzimuths.size < 2) {
+  if (withAzimuth.length < 2) {
     return { worstGapDeg: null, gaps: [], sortedSurrounds: [] };
   }
 
-  // 3) Build HORSESHOE order: LW → SL → SL2 → SL3 → ... → SBL → SBR → ... → SR3 → SR2 → SR → RW
-  const horseshoeOrder = [];
-  
-  // Build role map for quick lookup
-  const speakerByCanonRole = new Map();
-  for (const sp of eligible) {
-    const canon = getCanonicalRole ? getCanonicalRole(sp.role) : String(sp.role).toUpperCase();
-    speakerByCanonRole.set(canon, sp);
-  }
-  
-  // Helper to extract SL/SR extra number (e.g., "SL2" → 2, "SR3" → 3)
-  const extractExtraNumber = (role) => {
-    const match = String(role).match(/^(SL|SR)(\d+)$/);
-    return match ? parseInt(match[2], 10) : 0;
-  };
-  
-  // Left side: LW → SL → SL2 → SL3 → ... (ascending extras)
-  if (speakerByCanonRole.has('LW')) horseshoeOrder.push(speakerByCanonRole.get('LW'));
-  if (speakerByCanonRole.has('SL')) horseshoeOrder.push(speakerByCanonRole.get('SL'));
-  
-  // SL extras (ascending order: SL2, SL3, SL4...)
-  const slExtras = Array.from(speakerByCanonRole.keys())
-    .filter(r => /^SL\d+$/.test(r))
-    .sort((a, b) => extractExtraNumber(a) - extractExtraNumber(b));
-  for (const role of slExtras) {
-    horseshoeOrder.push(speakerByCanonRole.get(role));
-  }
-  
-  // Rear: SBL → SBR
-  if (speakerByCanonRole.has('SBL')) horseshoeOrder.push(speakerByCanonRole.get('SBL'));
-  if (speakerByCanonRole.has('SBR')) horseshoeOrder.push(speakerByCanonRole.get('SBR'));
-  
-  // Right side: ... → SR3 → SR2 → SR → RW (descending extras)
-  const srExtras = Array.from(speakerByCanonRole.keys())
-    .filter(r => /^SR\d+$/.test(r))
-    .sort((a, b) => extractExtraNumber(b) - extractExtraNumber(a)); // Descending
-  for (const role of srExtras) {
-    horseshoeOrder.push(speakerByCanonRole.get(role));
-  }
-  
-  if (speakerByCanonRole.has('SR')) horseshoeOrder.push(speakerByCanonRole.get('SR'));
-  if (speakerByCanonRole.has('RW')) horseshoeOrder.push(speakerByCanonRole.get('RW'));
-  
-  // 4) Compute gaps along horseshoe order (angle between rays)
+  // 3) Sort by theta (0..360°), NOT azimuth
+  const sorted = withAzimuth.sort((a, b) => a.theta - b.theta);
+
+  // 4) Compute consecutive gaps using theta (NO WRAP)
+  // NO WRAP: only i → i+1, never last → first
+  // This drops the FRONT gap (360° → 0°), preserves the REAR gap
   const gaps = [];
-  
-  for (let i = 0; i < horseshoeOrder.length - 1; i++) {
-    const current = horseshoeOrder[i];
-    const next = horseshoeOrder[i + 1];
+
+  for (let i = 0; i < sorted.length - 1; i++) {
+    const current = sorted[i];
+    const next = sorted[i + 1];
     
-    const a1 = speakerAzimuths.get(current);
-    const a2 = speakerAzimuths.get(next);
-    
-    if (!Number.isFinite(a1) || !Number.isFinite(a2)) continue;
-    
-    // Compute smallest angle between two rays (handles ±180 boundary)
-    let d = a2 - a1;
-    d = ((d + 540) % 360) - 180; // Normalize to -180..+180
-    const gapDeg = Math.abs(d); // 0..180
+    // Gap = difference in theta (both ascending in 0..360)
+    const gapDeg = next.theta - current.theta;
     
     gaps.push({
       deg: gapDeg,
-      fromRole: current.role,
-      toRole: next.role,
-      fromAz: a1,
-      toAz: a2,
+      fromRole: current.speaker.role,
+      toRole: next.speaker.role,
+      fromAz: current.az,
+      toAz: next.az,
+      fromTheta: current.theta,
+      toTheta: next.theta,
     });
   }
 
-  // Compute worst gap from horseshoe gaps only
+  // Compute worst gap from no-wrap gaps only
   const worstGapDeg = gaps.length > 0 ? Math.max(...gaps.map(g => g.deg)) : null;
 
   // DEBUG: Build formatted debug strings (temporary)
-  const sortedRoles = horseshoeOrder.map(s => s.role).join(', ');
-  const sortedAz = horseshoeOrder.map(s => `${s.role}:${speakerAzimuths.get(s)?.toFixed(1) || '—'}`).join(', ');
+  const sortedRoles = sorted.map(s => s.speaker.role).join(', ');
+  const sortedAz = sorted.map(s => `${s.speaker.role}:${s.az.toFixed(1)}`).join(', ');
+  const sortedTheta = sorted.map(s => `${s.speaker.role}:θ${s.theta.toFixed(1)}`).join(', ');
   const gapList = gaps.map(g => `${g.fromRole}→${g.toRole}:${g.deg.toFixed(1)}`).join(', ');
   const worstGap = gaps.length > 0 
     ? gaps.reduce((max, g) => g.deg > max.deg ? g : max, gaps[0])
@@ -156,10 +115,11 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
   return {
     worstGapDeg,
     gaps,
-    sortedSurrounds: horseshoeOrder,
+    sortedSurrounds: sorted.map(s => s.speaker),
     // DEBUG fields (temporary)
     sortedRoles,
     sortedAz,
+    sortedTheta,
     gapList,
     worstGapStr,
   };
