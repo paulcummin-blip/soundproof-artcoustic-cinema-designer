@@ -5894,6 +5894,15 @@ return {
     // Always hide LFE
     if (canon === "LFE") return false;
 
+    // CRITICAL: Treat extra surrounds (SL2/SR2...) as Side Surrounds for visibility
+    const extraSurroundPattern = /^(SL|SR)\d+$/;
+    const isExtraSurround = extraSurroundPattern.test(canon);
+    
+    if (isExtraSurround) {
+      // Extra surrounds are visible when base SL/SR are allowed by layout
+      return allowedRoles.has("SL") || allowedRoles.has("SR");
+    }
+
     // Bed surrounds are controlled by layout role visibility, not model.
     // This prevents "rear surrounds vanish" when model is null during hydration.
     if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
@@ -5957,7 +5966,7 @@ return {
     const isLCR = (canon === "FL" || canon === "FR" || canon === "FC");
     const isFrontWide = (canon === "LW" || canon === "RW");
     const extraSurroundPattern = /^(SL|SR)\d+$/;
-    const isExtraSurround = extraSurroundPattern.test(String(rawRole || '').toUpperCase());
+    const isExtraSurround = extraSurroundPattern.test(canon);
     const isSideSurround = (canon === "SL" || canon === "SR" || isExtraSurround);
     const isRearSurround = (canon === "SBL" || canon === "SBR");
 

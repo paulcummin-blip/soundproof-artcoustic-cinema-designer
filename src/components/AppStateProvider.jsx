@@ -836,10 +836,24 @@ function useDesignerState() {
       return visibleRoles.has(canon);
     }
 
+    // CRITICAL: Extra surrounds (SL2/SR2/SL3/SR3...) are treated as Side Surrounds
+    // Check for numbered side surround pattern: SL2+, SR2+
+    const extraSurroundPattern = /^(SL|SR)\d+$/;
+    const isExtraSurround = extraSurroundPattern.test(canon);
+
+    if (isExtraSurround) {
+      // Extra surrounds are visible when base SL/SR are expected by layout
+      const isSideSurroundExpected = visibleRoles.has("SL") || visibleRoles.has("SR");
+      if (globalThis.__B44_LOGS) {
+        console.log("[VIS]", { role, canon, expected: isSideSurroundExpected, reason: "extra surround" });
+      }
+      return isSideSurroundExpected;
+    }
+
     // For bed channels: if the layout expects this channel, show it even if model is blank
     // This prevents LW/RW and SBL/SBR from vanishing due to model assignment timing
     const isExpectedByLayout = visibleRoles.has(canon);
-    
+
     if (isExpectedByLayout) {
       // Debug log if enabled
       if (globalThis.__B44_LOGS) {
