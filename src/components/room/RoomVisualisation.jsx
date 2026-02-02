@@ -4027,10 +4027,15 @@ React.useEffect(() => {
       .map(s => `${s.id}:${Math.round((s.x || 0) * 1000)}:${Math.round((s.y || 0) * 1000)}`)
       .join(',');
     
-    // P5-relevant speaker positions fingerprint (surrounds/wides that affect P5)
-    const p5Roles = ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'];
+    // P5-relevant speaker positions fingerprint (ALL surrounds including extras)
+    const extraSurroundPattern = /^(SL|SR)\d+$/;
     const speakerPosFingerprint = (placedSpeakers || [])
-      .filter(s => s?.position && p5Roles.includes(getCanonicalRole(s.role)))
+      .filter(s => {
+        if (!s?.position) return false;
+        const r = getCanonicalRole(s.role);
+        const roleUpper = String(s.role || '').toUpperCase();
+        return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
+      })
       .map(s => ({
         role: getCanonicalRole(s.role),
         x: Math.round((s.position.x || 0) * 1000),
@@ -6423,53 +6428,45 @@ const renderRp22AnglesOverlay = useCallback(() => {
   if (!Number.isFinite(scale)) return null;
   if (!effectiveHoveredSeat) return null;
 
-  // 1) Collect all surround-type speakers (includes extra surrounds SL2/SR2/...)
-  const extraSurroundPattern = /^(SL|SR)\d+$/;
-  const allSurrounds = (visiblePlanSpeakers || []).filter((s) => {
-    if (!s?.position || !Number.isFinite(s.position.x) || !Number.isFinite(s.position.y)) return false;
+  // CRITICAL: Use shared P5 gap calculator (same as HUD)
+  const { gaps: p5Gaps, sortedSurrounds } = (() => {
+    try {
+      const { computeSurroundRingGaps } = require('@/components/utils/p5SurroundGaps');
+      return computeSurroundRingGaps({
+        seat: effectiveHoveredSeat,
+        speakers: visiblePlanSpeakers || [],
+        getCanonicalRole,
+      });
+    } catch (e) {
+      console.warn('[RP22 Angles] Failed to compute gaps:', e);
+      return { gaps: [], sortedSurrounds: [] };
+    }
+  })();
+
+  if (p5Gaps.length < 1) return null;
+
+  // Convert gaps to segments for rendering
+  const segments = p5Gaps.map((gap, idx) => {
+    const sp1 = sortedSurrounds.find(s => s.speaker.role === gap.fromRole)?.speaker;
+    const sp2 = sortedSurrounds.find(s => s.speaker.role === gap.toRole)?.speaker;
     
-    const r = getCanonicalRole(s.role);
-    const roleUpper = String(s.role || '').toUpperCase();
-    return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r) || extraSurroundPattern.test(roleUpper);
-  });
-
-  if (allSurrounds.length < 2) return null;
-
-  // 2) Use all valid surrounds (no additional filtering needed - visiblePlanSpeakers already handles layout)
-  const eligibleSurrounds = allSurrounds;
-
-  if (eligibleSurrounds.length < 2) return null;
-
-  // 3) Compute azimuth of each surround from this seat
-  const az = [];
-  for (const sp of eligibleSurrounds) {
-    const a = azimuthDegFromSeat(effectiveHoveredSeat, sp.position);
-    if (Number.isFinite(a)) az.push({ a, sp });
-  }
-
-  if (az.length < 2) return null;
-
-  // 4) Sort by raw angle (-180..+180)
-  const sortedItems = az.sort((a, b) => a.a - b.a);
-
-  // 5) Build segments between each neighbour
-  const segments = [];
-  for (let i = 0; i < sortedItems.length; i++) {
-    const current = sortedItems[i];
-    const next = sortedItems[(i + 1) % sortedItems.length];
-
-    let angle1 = current.a;
-    let angle2 = next.a;
-
-    if (angle2 < angle1) angle2 += 360;
-
-    segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2 });
-  }
+    return {
+      sp1,
+      sp2,
+      angleA: gap.fromAz,
+      angleB: gap.toAz,
+      deg: gap.deg,
+    };
+  }).filter(seg => seg.sp1 && seg.sp2);
 
   const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
   const labelGroup = [];
 
-  segments.forEach(({ sp1, sp2, angleA, angleB }, idx) => {
+  segments.forEach((seg, idx) => {
+    const { sp1, sp2, angleA, angleB, deg } = seg;
+    
+    if (!sp1 || !sp2 || !Number.isFinite(deg) || deg <= 0) return;
+
     // 1) Work out the mid-angle of this segment
     const rawMid = (angleA + angleB) / 2;
 
@@ -6483,15 +6480,7 @@ const renderRp22AnglesOverlay = useCallback(() => {
       return;
     }
 
-    // 3) Compute the smaller arc angle between the two speakers
-    let deg = angleB - angleA;
-    if (deg > 180) deg = 360 - deg;
-
-    if (!Number.isFinite(deg) || deg <= 0) {
-      return;
-    }
-
-    // 4) Draw lines from seat to each speaker
+    // 3) Draw lines from seat to each speaker
     const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
     const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
 
