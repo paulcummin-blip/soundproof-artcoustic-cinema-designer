@@ -655,12 +655,26 @@ export function buildSeatHudSnapshot({
     p5Formatted = `${Math.floor(p5Val)}°`;
   }
   
+  // Find worst gap pair
+  let worstPair = null;
+  if (p5Gaps && p5Gaps.length > 0) {
+    const worst = p5Gaps.reduce((max, g) => g.deg > max.deg ? g : max, p5Gaps[0]);
+    worstPair = `${worst.fromRole}→${worst.toRole}`;
+  }
+
   // Publish P5 to HUD
   data.rp22.p5 = { 
     valueDeg: p5Val, 
     level: p5Level, 
     formatted: p5Formatted,
-    gaps: p5Gaps, // Store for debugging/overlay reuse
+    gaps: p5Gaps,
+    debug: {
+      seatXY: `(${seatX.toFixed(2)}, ${seatY.toFixed(2)})`,
+      eligibleCount: p5Gaps?.length || 0,
+      roleList: p5Gaps?.map(g => `${g.fromRole}→${g.toRole}`).join(', ') || 'none',
+      worstPair: worstPair || 'none',
+      worstGapRounded: p5Val !== null ? Math.floor(p5Val) : null,
+    }
   };
 
   // --- P6: Surround SPL delta (requires ≥2 surrounds) ---
