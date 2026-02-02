@@ -6463,11 +6463,12 @@ const renderRp22AnglesOverlay = useCallback(() => {
   // Sort by raw angle (-180..+180)
   const sortedItems = az.sort((a, b) => a.a - b.a);
 
-  // Build segments between each neighbour
+  // Build segments between each neighbour (NO WRAP - enforced)
   const segments = [];
-  for (let i = 0; i < sortedItems.length; i++) {
+  // CRITICAL: NO WRAP - only compute adjacent pairs (i → i+1), never last → first
+  for (let i = 0; i < sortedItems.length - 1; i++) {
     const current = sortedItems[i];
-    const next = sortedItems[(i + 1) % sortedItems.length];
+    const next = sortedItems[i + 1];
 
     let angle1 = current.a;
     let angle2 = next.a;
