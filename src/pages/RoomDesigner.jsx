@@ -1836,12 +1836,17 @@ function RoomDesignerWithState() {
   const lastPresetRef = React.useRef(dolbyPreset);
   useEffect(() => {lastPresetRef.current = dolbyPreset;}, [dolbyPreset]);
   
-  // NEW: Auto-reset extra surrounds count when layout doesn't allow them
+  // NEW: Auto-reset extra surrounds count when layout doesn't allow them (idempotent)
   useEffect(() => {
-    if (!allowExtraSurrounds && Number(appState?.extraSurroundCount || 0) !== 0) {
-      appState?.setExtraSurroundCount?.(0);
+    const currentCount = Number(appState?.extraSurroundCount || 0);
+    
+    // Only reset if NOT allowed AND count is currently non-zero (idempotent)
+    if (!allowExtraSurrounds && currentCount !== 0) {
+      if (typeof appState?.setExtraSurroundCount === 'function') {
+        appState.setExtraSurroundCount(0);
+      }
     }
-  }, [allowExtraSurrounds, appState]);
+  }, [allowExtraSurrounds, appState?.extraSurroundCount, appState?.setExtraSurroundCount]);
 
   // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
 

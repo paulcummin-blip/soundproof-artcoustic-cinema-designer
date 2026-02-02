@@ -37,6 +37,15 @@ export default function SurroundsSelector({
   const rearOverride = !!override?.rear;
   const wideOverride = !!override?.wide;
 
+  // 9.x.x gating: only enable Extra Surrounds for 9.x layouts
+  const layoutStr = String(layout || '');
+  const layoutMajor = parseInt(layoutStr.split('.')[0], 10) || 0;
+  const isNineX = layoutMajor >= 9;
+
+  // Safe value and handler for Extra Surrounds
+  const safeExtraCount = Number.isFinite(extraSurroundCount) ? extraSurroundCount : 0;
+  const hasExtraHandler = typeof onExtraSurroundCountChange === 'function';
+
   // Look up display label from registry (canonical source)
   const getModelLabel = (modelKey) => {
     if (!modelKey || modelKey === 'off' || modelKey === 'OFF') return 'Off';
@@ -87,18 +96,20 @@ export default function SurroundsSelector({
         </Select>
         <p className="text-xs text-[#625143]">Applies to all surrounds unless overridden.</p>
 
-        {/* Extra Surrounds selector - ALWAYS VISIBLE */}
+        {/* Extra Surrounds selector - ALWAYS RENDERS, 9.x.x GATED */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16, marginBottom: 16 }}>
           <Label className="text-sm font-medium text-[#3E4349]">Extra Surrounds</Label>
           <Select
-            value={String(Number.isFinite(extraSurroundCount) ? extraSurroundCount : 0)}
+            value={String(safeExtraCount)}
             onValueChange={(v) => {
+              if (!isNineX || !hasExtraHandler) return; // Block changes outside 9.x.x or if no handler
+              
               const count = Number(v);
-              if ([0, 2, 4, 6, 8].includes(count) && typeof onExtraSurroundCountChange === 'function') {
+              if ([0, 2, 4, 6, 8].includes(count)) {
                 onExtraSurroundCountChange(count);
               }
             }}
-            disabled={disabled}
+            disabled={disabled || !isNineX || !hasExtraHandler}
           >
             <SelectTrigger className="w-32 bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
               <SelectValue />
@@ -112,6 +123,11 @@ export default function SurroundsSelector({
             </SelectContent>
           </Select>
         </div>
+        {!isNineX && (
+          <p className="text-xs text-[#625143] italic" style={{ marginTop: -12 }}>
+            Available for 9.x.x layouts only
+          </p>
+        )}
 
         {/* Individual Control toggle */}
         <button
