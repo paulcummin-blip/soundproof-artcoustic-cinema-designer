@@ -18,19 +18,17 @@ export default function SurroundsSelector({
 }) {
   const [showSurroundOverrides, setShowSurroundOverrides] = React.useState(false);
 
-  // IMPORTANT: Never return null.
-  // During startup/restart, activeRoles/choices can be briefly empty while state hydrates.
-  // If we return null, the Extra Surrounds control disappears and looks unreliable.
-  const safeActiveRoles = Array.isArray(activeRoles) ? activeRoles : [];
-  const safeChoices = Array.isArray(choices) ? choices : [];
+  const rolesReady = Array.isArray(activeRoles) && activeRoles.length > 0;
+  const choicesReady = Array.isArray(choices) && choices.length > 0;
+  const ready = rolesReady && choicesReady;
 
-  // Disable selects until choices are ready, but keep the UI visible.
-  const choicesReady = safeChoices.length > 0;
-  const uiDisabled = !!disabled || !choicesReady;
+  // If not ready, render UI but disable model selectors.
+  // Extra Surrounds must still show (stable control).
+  const uiDisabled = disabled || !ready;
 
-  const showSides = safeActiveRoles.includes('SL');
-  const showRears = safeActiveRoles.includes('SBL');
-  const showWides = safeActiveRoles.includes('LW');
+  const showSides = (activeRoles || []).includes('SL');
+  const showRears = (activeRoles || []).includes('SBL');
+  const showWides = (activeRoles || []).includes('LW');
 
   // Default to true Off unless the stored value is a real model
   const isReal = (m) => !!m && m !== '(none)' && m !== 'off' && m !== 'none';
@@ -82,7 +80,7 @@ export default function SurroundsSelector({
             </span>
           </SelectTrigger>
           <SelectContent className="bg-white border-[#DCDBD6]">
-            {safeChoices.map((choice) => (
+            {(choices || []).map((choice) => (
               <SelectItem
                 key={choice.value}
                 value={choice.value}
@@ -191,7 +189,7 @@ export default function SurroundsSelector({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
-                      {safeChoices.map((choice) => (
+                      {(choices || []).map((choice) => (
                         <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                           {choice.label}
                         </SelectItem>
@@ -238,7 +236,7 @@ export default function SurroundsSelector({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
-                      {safeChoices.map((choice) => (
+                      {(choices || []).map((choice) => (
                         <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                           {choice.label}
                         </SelectItem>
@@ -285,7 +283,7 @@ export default function SurroundsSelector({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
-                      {safeChoices.map((choice) => (
+                      {(choices || []).map((choice) => (
                         <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                           {choice.label}
                         </SelectItem>
