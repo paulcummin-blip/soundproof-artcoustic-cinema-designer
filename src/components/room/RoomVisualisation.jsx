@@ -2175,21 +2175,32 @@ React.useEffect(() => {
       return;
     }
 
-    // Handle special symmetrical drag for SL and SR
-    if ((canonicalRole === 'SL' || canonicalRole === 'SR')) {
-      const slSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
-      const srSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
-      if (!slSpeaker || !srSpeaker) return;
+    // Handle special symmetrical drag for SL and SR (including extra surrounds SL2/SR2, SL3/SR3, etc.)
+    const extraSurroundPattern = /^(SL|SR)(\d+)?$/;
+    const extraMatch = canonicalRole.match(extraSurroundPattern);
+    const isAnySideSurround = extraMatch !== null;
+    
+    if (isAnySideSurround) {
+      // Extract base role (SL or SR) and number (2, 3, 4, etc., or undefined for base SL/SR)
+      const baseSide = extraMatch[1]; // "SL" or "SR"
+      const pairNumber = extraMatch[2]; // "2", "3", etc., or undefined
+      
+      // Determine partner role: SL2 ↔ SR2, SL3 ↔ SR3, etc.
+      const partnerBaseSide = baseSide === 'SL' ? 'SR' : 'SL';
+      const partnerRole = pairNumber ? `${partnerBaseSide}${pairNumber}` : partnerBaseSide;
+      
+      const thisSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === canonicalRole);
+      const partnerSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === partnerRole);
+      if (!thisSpeaker || !partnerSpeaker) return;
 
       const W = widthM || 0;
       const L = lengthM || 0;
       if (!(W > 0 && L > 0)) return;
 
-      // Fixed X against side walls (unchanged)
-      const dimsL = getSpeakerDims(slSpeaker.model);
-      const dimsR = getSpeakerDims(srSpeaker.model);
-      const xL_side = fixedSideX(W, dimsL, 'L');
-      const xR_side = fixedSideX(W, dimsR, 'R');
+      // CRITICAL: 1cm wall buffer for ALL side surrounds (no depth calculation)
+      const SIDE_SURROUND_WALL_BUFFER_M = 0.01;
+      const xL_side = SIDE_SURROUND_WALL_BUFFER_M;
+      const xR_side = W - SIDE_SURROUND_WALL_BUFFER_M;
 
       // Visual side band Y span with corner clearance at rear
       const yMin_side = Number(sideSurroundVisualSpanM?.minY) || 0;
@@ -2279,13 +2290,20 @@ React.useEffect(() => {
         if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
         onSetSpeakers(prev => prev.map(s => {
           const role = getCanonicalRole(s.role);
-          if (role === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_side, y: yStar } };
-          if (role === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_side, y: yStar } };
+          // Update both dragged speaker and its mirror partner
+          if (role === canonicalRole) {
+            const xSide = baseSide === 'SL' ? xL_side : xR_side;
+            return { ...s, position: { ...(s.position || {}), x: xSide, y: yStar } };
+          }
+          if (role === partnerRole) {
+            const xPartner = partnerBaseSide === 'SL' ? xL_side : xR_side;
+            return { ...s, position: { ...(s.position || {}), x: xPartner, y: yStar } };
+          }
           return s;
         }));
-        if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: SL/SR side mode complete");
+        if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: side surround side mode complete");
         return;
-      }
+        }
 
       // back-wall mode (symmetric, lanes, fixed Y near back wall)
       const roomWidth = widthM || 0;
@@ -2331,15 +2349,22 @@ React.useEffect(() => {
 
       // write positions (Y stays at back-wall Y you already computed: y_back_m)
       if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+      
+      // For back-wall mode, we need to recalculate Y for each speaker based on its dims
+      const dimsL = getSpeakerDims(thisSpeaker.model);
+      const dimsR = getSpeakerDims(partnerSpeaker.model);
+      const y_back_m_this = backWallYForDims(baseSide === 'SL' ? dimsL : dimsR, L, WALL_BUFFER_M);
+      const y_back_m_partner = backWallYForDims(partnerBaseSide === 'SL' ? dimsL : dimsR, L, WALL_BUFFER_M);
+      
       onSetSpeakers(prev =>
         prev.map(s => {
           const r = getCanonicalRole(s.role);
-          if (r === 'SL') return { ...s, position: { ...(s.position||{}), x: xL_star, y: y_back_m_L } };
-          if (r === 'SR') return { ...s, position: { ...(s.position||{}), x: xR_star, y: y_back_m_R } };
+          if (r === canonicalRole) return { ...s, position: { ...(s.position||{}), x: xL_star, y: y_back_m_this } };
+          if (r === partnerRole) return { ...s, position: { ...(s.position||{}), x: xR_star, y: y_back_m_partner } };
           return s;
         })
       );
-      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: SL/SR back mode complete");
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: side surround back mode complete");
       return;
     }
 
@@ -4217,25 +4242,38 @@ useEffect(() => {
     const updated = placedSpeakers.map(spk => {
       const canon = getCanonicalRole(spk.role);
       
-      // Process ALL side wall speakers: SL/SR and LW/RW
+      // CRITICAL: Detect ALL side surrounds (including numbered pairs SL2/SR2/SL3/SR3...)
+      const extraSurroundPattern = /^(SL|SR)\d*$/;
+      const isSideSurround = extraSurroundPattern.test(canon);
+      const isFrontWide = (canon === 'LW' || canon === 'RW');
+      
+      // Process ALL side wall speakers: SL/SR/SL2/SR2/... and LW/RW
       // SBL/SBR are handled by SpeakerPlacement and stay on back wall
-      if (!['SL', 'SR', 'LW', 'RW'].includes(canon)) return spk;
+      if (!isSideSurround && !isFrontWide) return spk;
       if (!spk.position || !spk.model) return spk;
       
       // [B44 POSITION LOCK] Skip user-positioned speakers (except during wall-hug restore)
       // Note: Even user-positioned FW speakers must hug the wall
-      if (spk.positionSource === 'user' && !['LW', 'RW'].includes(canon)) return spk;
+      if (spk.positionSource === 'user' && !isFrontWide) return spk;
 
-      const dims = getModelDimsM(spk.model);
-      const isLeft = ['SL', 'LW'].includes(canon);
-      const side = isLeft ? 'L' : 'R';
-
-      // Calculate correct wall-hugged X using 0.01m buffer
-      const FW_WALL_BUFFER_M = 0.01;
-      const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
-      const targetX = isLeft 
-        ? (FW_WALL_BUFFER_M + halfDepth)
-        : (W - FW_WALL_BUFFER_M - halfDepth);
+      // CRITICAL: 1cm wall buffer for side surrounds (direct, no depth calculation)
+      const SIDE_SURROUND_WALL_BUFFER_M = 0.01;
+      
+      // Determine if this speaker is on the left or right wall
+      const isLeft = canon.startsWith('SL') || canon === 'LW';
+      
+      let targetX;
+      if (isSideSurround) {
+        // Side surrounds: use 1cm buffer only
+        targetX = isLeft ? SIDE_SURROUND_WALL_BUFFER_M : (W - SIDE_SURROUND_WALL_BUFFER_M);
+      } else {
+        // Front Wides: keep existing depth-based calculation
+        const dims = getModelDimsM(spk.model);
+        const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
+        targetX = isLeft 
+          ? (SIDE_SURROUND_WALL_BUFFER_M + halfDepth)
+          : (W - SIDE_SURROUND_WALL_BUFFER_M - halfDepth);
+      }
       
       const currentX = Number(spk.position.x) || 0;
 
