@@ -2197,10 +2197,9 @@ React.useEffect(() => {
       const L = lengthM || 0;
       if (!(W > 0 && L > 0)) return;
 
-      // CRITICAL: 1cm wall buffer for ALL side surrounds (no depth calculation)
-      const SIDE_SURROUND_WALL_BUFFER_M = 0.01;
-      const xL_side = SIDE_SURROUND_WALL_BUFFER_M;
-      const xR_side = W - SIDE_SURROUND_WALL_BUFFER_M;
+      // Use shared SURROUND_WALL_BUFFER_M constant (defined above)
+      const xL_side = SURROUND_WALL_BUFFER_M;
+      const xR_side = W - SURROUND_WALL_BUFFER_M;
 
       // Visual side band Y span with corner clearance at rear
       const yMin_side = Number(sideSurroundVisualSpanM?.minY) || 0;
@@ -4229,7 +4228,10 @@ useEffect(() => {
 
   // [REMOVED] Redundant useEffect for LCR yaw was here.
 
-  // [NEW] Auto-hug surrounds to walls when room dimensions change (INCLUDES LW/RW)
+  // CRITICAL: Single constant for ALL surround wall buffering (no depth offsets anywhere)
+  const SURROUND_WALL_BUFFER_M = 0.01;
+
+  // [NEW] Auto-hug ALL surrounds to walls when room dimensions change
   useEffect(() => {
     if (isAnyDraggingRef.current) return;
     if (!onSetSpeakers || !placedSpeakers?.length) return;
@@ -4242,47 +4244,46 @@ useEffect(() => {
     const updated = placedSpeakers.map(spk => {
       const canon = getCanonicalRole(spk.role);
       
-      // CRITICAL: Detect ALL side surrounds (including numbered pairs SL2/SR2/SL3/SR3...)
+      // Detect ALL wall-mounted surrounds:
+      // - Side surrounds: SL/SR/SL2/SR2/SL3/SR3...
+      // - Front Wides: LW/RW
+      // - Rear surrounds: SBL/SBR
       const extraSurroundPattern = /^(SL|SR)\d*$/;
       const isSideSurround = extraSurroundPattern.test(canon);
       const isFrontWide = (canon === 'LW' || canon === 'RW');
+      const isRearSurround = (canon === 'SBL' || canon === 'SBR');
       
-      // Process ALL side wall speakers: SL/SR/SL2/SR2/... and LW/RW
-      // SBL/SBR are handled by SpeakerPlacement and stay on back wall
-      if (!isSideSurround && !isFrontWide) return spk;
+      // Process ALL wall-mounted surrounds
+      if (!isSideSurround && !isFrontWide && !isRearSurround) return spk;
       if (!spk.position || !spk.model) return spk;
       
-      // [B44 POSITION LOCK] Skip user-positioned speakers (except during wall-hug restore)
-      // Note: Even user-positioned FW speakers must hug the wall
-      if (spk.positionSource === 'user' && !isFrontWide) return spk;
+      // [B44 POSITION LOCK] Skip user-positioned speakers (they've been manually placed)
+      if (spk.positionSource === 'user') return spk;
 
-      // CRITICAL: 1cm wall buffer for side surrounds (direct, no depth calculation)
-      const SIDE_SURROUND_WALL_BUFFER_M = 0.01;
+      // CRITICAL: 0.01m wall buffer for ALL surrounds (no depth/size logic)
+      let targetX = spk.position.x; // Default: keep current X
+      let targetY = spk.position.y; // Default: keep current Y
       
-      // Determine if this speaker is on the left or right wall
-      const isLeft = canon.startsWith('SL') || canon === 'LW';
+      // Side wall speakers (SL/SR/SL2/SR2.../LW/RW)
+      if (isSideSurround || isFrontWide) {
+        const isLeft = canon.startsWith('SL') || canon === 'LW';
+        targetX = isLeft ? SURROUND_WALL_BUFFER_M : (W - SURROUND_WALL_BUFFER_M);
+      }
       
-      let targetX;
-      if (isSideSurround) {
-        // Side surrounds: use 1cm buffer only
-        targetX = isLeft ? SIDE_SURROUND_WALL_BUFFER_M : (W - SIDE_SURROUND_WALL_BUFFER_M);
-      } else {
-        // Front Wides: keep existing depth-based calculation
-        const dims = getModelDimsM(spk.model);
-        const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
-        targetX = isLeft 
-          ? (SIDE_SURROUND_WALL_BUFFER_M + halfDepth)
-          : (W - SIDE_SURROUND_WALL_BUFFER_M - halfDepth);
+      // Rear wall speakers (SBL/SBR)
+      if (isRearSurround) {
+        targetY = L - SURROUND_WALL_BUFFER_M;
       }
       
       const currentX = Number(spk.position.x) || 0;
+      const currentY = Number(spk.position.y) || 0;
 
       // Only update if position has actually changed
-      if (Math.abs(currentX - targetX) > 0.001) {
+      if (Math.abs(currentX - targetX) > 0.001 || Math.abs(currentY - targetY) > 0.001) {
         needsUpdate = true;
         return {
           ...spk,
-          position: { ...spk.position, x: targetX }
+          position: { ...spk.position, x: targetX, y: targetY }
         };
       }
 
