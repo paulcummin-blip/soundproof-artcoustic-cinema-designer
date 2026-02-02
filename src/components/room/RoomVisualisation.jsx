@@ -6428,75 +6428,34 @@ const renderRp22AnglesOverlay = useCallback(() => {
   if (!effectiveHoveredSeat) return null;
 
   // CRITICAL: Use shared P5 gap calculator (single source of truth)
-  const extraSurroundPattern = /^(SL|SR)\d+$/;
-  const allSurrounds = (visiblePlanSpeakers || []).filter((s) => {
-    if (!s?.position || !Number.isFinite(s.position.x) || !Number.isFinite(s.position.y)) return false;
-    
-    const r = getCanonicalRole(s.role);
-    const roleUpper = String(s.role || '').toUpperCase();
-    return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r) || extraSurroundPattern.test(roleUpper);
-  });
+  const { gaps: p5Gaps } = (() => {
+    try {
+      const { computeSurroundRingGaps } = require('@/components/utils/p5SurroundGaps');
+      return computeSurroundRingGaps({
+        seat: effectiveHoveredSeat,
+        speakers: visiblePlanSpeakers || [],
+        getCanonicalRole,
+      });
+    } catch (e) {
+      console.warn('[RP22 Angles] Failed to compute gaps:', e);
+      return { gaps: [] };
+    }
+  })();
 
-  if (allSurrounds.length < 2) return null;
-
-  // Compute azimuth of each surround from this seat
-  const azimuthDegFromSeat = (seat, pt) => {
-    if (!seat || !pt) return null;
-    const dx = Number(pt.x) - Number(seat.x);
-    const dy = Number(pt.y) - Number(seat.y);
-    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
-    const rad = Math.atan2(dx, -dy);
-    let deg = rad * (180 / Math.PI);
-    if (deg > 180) deg -= 360;
-    if (deg <= -180) deg += 360;
-    return deg;
-  };
-
-  const az = [];
-  for (const sp of allSurrounds) {
-    const a = azimuthDegFromSeat(effectiveHoveredSeat, sp.position);
-    if (Number.isFinite(a)) az.push({ a, sp });
-  }
-
-  if (az.length < 2) return null;
-
-  // Sort by raw angle (-180..+180)
-  const sortedItems = az.sort((a, b) => a.a - b.a);
-
-  // Build segments between each neighbour
-  const segments = [];
-  for (let i = 0; i < sortedItems.length; i++) {
-    const current = sortedItems[i];
-    const next = sortedItems[(i + 1) % sortedItems.length];
-
-    let angle1 = current.a;
-    let angle2 = next.a;
-
-    if (angle2 < angle1) angle2 += 360;
-
-    segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2 });
-  }
+  if (p5Gaps.length < 1) return null;
 
   const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
   const labelGroup = [];
 
-  segments.forEach(({ sp1, sp2, angleA, angleB }, idx) => {
-    // Work out the mid-angle of this segment
-    const rawMid = (angleA + angleB) / 2;
-    const midNorm = ((rawMid + 540) % 360) - 180;
+  p5Gaps.forEach((gap) => {
+    // Find speaker objects by role
+    const sp1 = (visiblePlanSpeakers || []).find(s => s.role === gap.fromRole);
+    const sp2 = (visiblePlanSpeakers || []).find(s => s.role === gap.toRole);
+    
+    if (!sp1 || !sp2) return;
 
-    // Skip segments whose midpoint is in front of the listener
-    if (Math.abs(midNorm) < 60) {
-      return;
-    }
-
-    // Compute the smaller arc angle between the two speakers
-    let deg = angleB - angleA;
-    if (deg > 180) deg = 360 - deg;
-
-    if (!Number.isFinite(deg) || deg <= 0) {
-      return;
-    }
+    const deg = gap.deg;
+    if (!Number.isFinite(deg) || deg <= 0) return;
 
     // Draw lines from seat to each speaker
     const [x1, y1] = toPx(sp1.position.x, sp1.position.y);

@@ -69,7 +69,7 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
   // 3) Sort clockwise by azimuth
   const sorted = withAzimuth.sort((a, b) => a.az - b.az);
 
-  // 4) Compute consecutive gaps (no wrap)
+  // 4) Compute consecutive gaps (NO WRAP - exclude gaps crossing the front)
   const gaps = [];
   let worstGapDeg = 0;
 
@@ -79,6 +79,18 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
     
     let gapDeg = next.az - current.az;
     if (gapDeg < 0) gapDeg += 360;
+    
+    // Calculate midpoint of the gap
+    let midAz = (current.az + next.az) / 2;
+    // Normalize midpoint to -180..+180
+    if (midAz > 180) midAz -= 360;
+    if (midAz < -180) midAz += 360;
+    
+    // Skip gaps that cross the front (screen area, within ±60° of 0°)
+    // This prevents LW→RW from being measured
+    if (Math.abs(midAz) < 60) {
+      continue;
+    }
     
     gaps.push({
       deg: gapDeg,
