@@ -644,10 +644,6 @@ export function buildSeatHudSnapshot({
   const { 
     worstGapDeg: p5Val, 
     gaps: p5Gaps,
-    sortedRoles,
-    sortedAz,
-    gapList,
-    worstGapStr,
   } = computeSurroundRingGaps({
     seat,
     speakers: placedSpeakers,
@@ -675,8 +671,6 @@ export function buildSeatHudSnapshot({
     level: p5Level, 
     formatted: p5Formatted,
     gaps: p5Gaps,
-    debugLine: `noWrap=true | seat(${seatX.toFixed(2)},${seatY.toFixed(2)}) | gaps=${p5Gaps?.length || 0} | worst ${worstPair || 'none'} ${p5Val !== null ? Math.floor(p5Val) : '—'}°`,
-    debugLine2: `sortedRoles=[${sortedRoles || 'none'}] | sortedAz=[${sortedAz || 'none'}] | gaps=[${gapList || 'none'}] | worst=${worstGapStr || 'none'}`,
   };
 
   // --- P6: Surround SPL delta (requires ≥2 surrounds) ---
