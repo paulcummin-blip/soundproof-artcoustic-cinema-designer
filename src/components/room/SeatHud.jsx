@@ -287,10 +287,10 @@ export default function SeatHud({
                     </div>
 
                     {/* P5 debug info */}
-                    {key === 'p5' && isHudPinned && metric?.debug && (
-                    <div style={{ fontSize: 10, color: '#666', marginTop: 2, marginLeft: 8 }}>
-                    P5 debug: seat {metric.debug.seatXY} | gaps {metric.debug.eligibleCount} | worst {metric.debug.worstPair} {metric.debug.worstGapRounded}°
-                    </div>
+                    {key === 'p5' && isHudPinned && metric?.debugLine && (
+                      <div style={{ fontSize: 10, color: '#666', marginTop: 2, marginLeft: 8 }}>
+                        P5 debug: {metric.debugLine}
+                      </div>
                     )}
 
                     {/* P16 debug info */}
