@@ -25,6 +25,7 @@ export const azimuthDegFromSeat = (seat, pt) => {
 /**
  * Build eligible surrounds for angles overlay
  * SL/SR always if visible; SBL/SBR if visible; LW/RW only if SL & SR exist
+ * CRITICAL: Now includes extra surrounds (SL2/SR2/SL3/SR3...)
  */
 export function getEligibleSurroundsForAngles(visiblePlacedSpeakers, mlp) {
   const src = asArray(visiblePlacedSpeakers);
@@ -32,6 +33,14 @@ export function getEligibleSurroundsForAngles(visiblePlacedSpeakers, mlp) {
 
   const pick = (roles) =>
     src.filter(s => roles.includes((s?.role || '').toUpperCase()) && s?.position);
+
+  // CRITICAL: Extra surround pattern (SL2/SR2/SL3/SR3...)
+  const extraSurroundPattern = /^(SL|SR)\d+$/;
+  const extraSurrounds = src.filter(s => {
+    if (!s?.position) return false;
+    const roleUpper = String(s?.role || '').toUpperCase();
+    return extraSurroundPattern.test(roleUpper);
+  });
 
   const SL_SR = pick(['SL', 'SR']);
   const SBL_SBR = pick(['SBL', 'SBR']);
@@ -41,6 +50,7 @@ export function getEligibleSurroundsForAngles(visiblePlacedSpeakers, mlp) {
 
   const out = [
     ...SL_SR,
+    ...extraSurrounds, // CRITICAL: Include extra surrounds in the ring
     ...SBL_SBR,
     ...(hasSides ? LW_RW : []),
   ];
