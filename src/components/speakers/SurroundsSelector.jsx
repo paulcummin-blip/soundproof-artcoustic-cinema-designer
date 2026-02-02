@@ -87,34 +87,30 @@ export default function SurroundsSelector({
         </Select>
         <p className="text-xs text-[#625143]">Applies to all surrounds unless overridden.</p>
 
-        {/* Extra Surrounds selector */}
-        {typeof extraSurroundCount !== 'undefined' && onExtraSurroundCountChange && (
-          <>
-            <Label className="text-sm font-medium text-[#3E4349]" style={{ marginTop: 16 }}>Extra Surrounds</Label>
-            <Select
-              value={String(extraSurroundCount || 0)}
-              onValueChange={(v) => {
-                const count = Number(v);
-                if ([0, 2, 4, 6, 8].includes(count)) {
-                  onExtraSurroundCountChange(count);
-                }
-              }}
-              disabled={disabled}
-            >
-              <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="bg-white border-[#DCDBD6]">
-                <SelectItem value="0" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">Off</SelectItem>
-                <SelectItem value="2" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">2</SelectItem>
-                <SelectItem value="4" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">4</SelectItem>
-                <SelectItem value="6" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">6</SelectItem>
-                <SelectItem value="8" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">8</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-[#625143]">Adds additional surround positions behind side surrounds.</p>
-          </>
-        )}
+        {/* Extra Surrounds selector - ALWAYS VISIBLE */}
+        <Label className="text-sm font-medium text-[#3E4349]" style={{ marginTop: 16 }}>Extra Surrounds</Label>
+        <Select
+          value={String(Number.isFinite(extraSurroundCount) ? extraSurroundCount : 0)}
+          onValueChange={(v) => {
+            const count = Number(v);
+            if ([0, 2, 4, 6, 8].includes(count) && typeof onExtraSurroundCountChange === 'function') {
+              onExtraSurroundCountChange(count);
+            }
+          }}
+          disabled={disabled}
+        >
+          <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="bg-white border-[#DCDBD6]">
+            <SelectItem value="0" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">Off</SelectItem>
+            <SelectItem value="2" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">2</SelectItem>
+            <SelectItem value="4" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">4</SelectItem>
+            <SelectItem value="6" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">6</SelectItem>
+            <SelectItem value="8" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">8</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-[#625143]">Adds additional surround positions behind side surrounds.</p>
 
         {/* Individual Control toggle */}
         <button

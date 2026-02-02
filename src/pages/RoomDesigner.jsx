@@ -4688,9 +4688,11 @@ function RoomDesignerWithState() {
                 setGlobalSurroundModel={appState?.setGlobalSurroundModel}
 
                 allSeatSplMetrics={allSeatSplMetrics}
-                frontWideOverlay={frontWideZones} />
+                frontWideOverlay={frontWideZones}
+                extraSurroundCount={appState?.extraSurroundCount ?? 0}
+                onExtraSurroundCountChange={appState?.setExtraSurroundCount} />
 
-                  </Suspense>
+                 </Suspense>
                   
                   <div className="px-4 py-3 border-t border-gray-200">
                     <div className="flex items-center justify-between mb-2">
