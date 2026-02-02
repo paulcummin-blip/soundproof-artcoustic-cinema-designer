@@ -95,7 +95,7 @@ export default function SurroundsSelector({
               value={String(extraSurroundCount || 0)}
               onValueChange={(v) => {
                 const count = Number(v);
-                if ([0, 2].includes(count)) {
+                if ([0, 2, 4, 6, 8].includes(count)) {
                   onExtraSurroundCountChange(count);
                 }
               }}
@@ -106,7 +106,10 @@ export default function SurroundsSelector({
               </SelectTrigger>
               <SelectContent className="bg-white border-[#DCDBD6]">
                 <SelectItem value="0" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">Off</SelectItem>
-                <SelectItem value="2" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">2 (One pair)</SelectItem>
+                <SelectItem value="2" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">2</SelectItem>
+                <SelectItem value="4" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">4</SelectItem>
+                <SelectItem value="6" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">6</SelectItem>
+                <SelectItem value="8" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">8</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-[#625143]">Adds additional surround positions behind side surrounds.</p>
