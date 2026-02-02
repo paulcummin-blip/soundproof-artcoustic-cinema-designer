@@ -891,6 +891,12 @@ function UnifiedSurroundsConfig({
     return roles;
   }, [allowedRoles]);
 
+  // SAFE DEFAULTS: Ensure props are always defined, even during hydration/restart
+  const safeExtraSurroundCount = Number.isFinite(extraSurroundCount) ? extraSurroundCount : 0;
+  const safeOnExtraSurroundCountChange =
+    typeof onExtraSurroundCountChange === "function" ? onExtraSurroundCountChange : () => {};
+  const safeAllowExtraSurrounds = !!allowExtraSurrounds;
+
   const handleSurroundModelChange = useCallback((config) => {
     const safeConfig = {
       value: {
@@ -1131,9 +1137,9 @@ function UnifiedSurroundsConfig({
         onChange={handleSurroundModelChange}
         activeRoles={activeRoles}
         disabled={disabled}
-        extraSurroundCount={extraSurroundCount}
-        onExtraSurroundCountChange={onExtraSurroundCountChange}
-        allowExtraSurrounds={allowExtraSurrounds}
+        extraSurroundCount={safeExtraSurroundCount}
+        onExtraSurroundCountChange={safeOnExtraSurroundCountChange}
+        allowExtraSurrounds={safeAllowExtraSurrounds}
       />
     </div>
   );
