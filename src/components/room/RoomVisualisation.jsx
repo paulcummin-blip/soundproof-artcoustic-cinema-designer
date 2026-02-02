@@ -33,13 +33,25 @@ import PlanMessages from '@/components/room/PlanMessages';
 import SvgDefs from '@/components/room/SvgDefs';
 import SpeakerPositionsOverlay from '@/components/room/overlays/SpeakerPositionsOverlay';
 
-// local shim for fixedSideX — guaranteed available in this file
-const fixedSideX = (roomWidth, dims, side, wallBufferM = WALL_BUFFER_M) => {
+// CRITICAL: Single constant for visible wall gap (icon edge to wall)
+const SURROUND_WALL_GAP_M = 0.01;
+
+// Helper: compute X position for side-wall speakers (icon edge 1cm from wall)
+const sideWallX = (roomWidth, dims, side) => {
   const halfDepth = (dims?.depthM ?? 0.082) / 2;
-  if (side === 'L') return wallBufferM + halfDepth;
-  if (side === 'R') return roomWidth - (wallBufferM + halfDepth);
+  if (side === 'L') return SURROUND_WALL_GAP_M + halfDepth;
+  if (side === 'R') return roomWidth - (SURROUND_WALL_GAP_M + halfDepth);
   return 0;
 };
+
+// Helper: compute Y position for rear-wall speakers (icon edge 1cm from wall)
+const rearWallY = (roomLength, dims) => {
+  const halfDepth = (dims?.depthM ?? 0.082) / 2;
+  return roomLength - (SURROUND_WALL_GAP_M + halfDepth);
+};
+
+// Legacy alias for backward compatibility
+const fixedSideX = sideWallX;
 
 // Overhead speaker L/R pair map
 const OVERHEAD_PAIR_MAP = {
@@ -2197,9 +2209,11 @@ React.useEffect(() => {
       const L = lengthM || 0;
       if (!(W > 0 && L > 0)) return;
 
-      // Use shared SURROUND_WALL_BUFFER_M constant (defined above)
-      const xL_side = SURROUND_WALL_BUFFER_M;
-      const xR_side = W - SURROUND_WALL_BUFFER_M;
+      // Use icon-edge positioning for visible 1cm gap
+      const dimsThis = getModelDimsM(thisSpeaker.model);
+      const dimsPartner = getModelDimsM(partnerSpeaker.model);
+      const xL_side = sideWallX(W, baseSide === 'SL' ? dimsThis : dimsPartner, 'L');
+      const xR_side = sideWallX(W, partnerBaseSide === 'SL' ? dimsThis : dimsPartner, 'R');
 
       // Visual side band Y span with corner clearance at rear
       const yMin_side = Number(sideSurroundVisualSpanM?.minY) || 0;
@@ -2349,11 +2363,11 @@ React.useEffect(() => {
       // write positions (Y stays at back-wall Y you already computed: y_back_m)
       if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
       
-      // For back-wall mode, we need to recalculate Y for each speaker based on its dims
+      // For back-wall mode, use icon-edge positioning for visible 1cm gap
       const dimsL = getSpeakerDims(thisSpeaker.model);
       const dimsR = getSpeakerDims(partnerSpeaker.model);
-      const y_back_m_this = backWallYForDims(baseSide === 'SL' ? dimsL : dimsR, L, WALL_BUFFER_M);
-      const y_back_m_partner = backWallYForDims(partnerBaseSide === 'SL' ? dimsL : dimsR, L, WALL_BUFFER_M);
+      const y_back_m_this = rearWallY(L, baseSide === 'SL' ? dimsL : dimsR);
+      const y_back_m_partner = rearWallY(L, partnerBaseSide === 'SL' ? dimsL : dimsR);
       
       onSetSpeakers(prev =>
         prev.map(s => {
@@ -2367,7 +2381,7 @@ React.useEffect(() => {
       return;
     }
 
-    // Handle SBL/SBR rear surrounds - ALWAYS keep them on back wall
+    // Handle SBL/SBR rear surrounds - ALWAYS keep them on back wall with icon-edge gap
     if (canonicalRole === 'SBL' || canonicalRole === 'SBR') {
       const isLeft = canonicalRole === 'SBL';
       const { x: rawX, y: rawY } = canvasToRoom(newCanvasPos);
@@ -2387,7 +2401,7 @@ React.useEffect(() => {
       const c = rsRearCorridor(side, { widthM: W, lengthM: L }, spDims);
 
       const finalX = clamp(rawX, c.xMin, c.xMax);
-      const finalY = c.y; // Always back wall Y
+      const finalY = rearWallY(L, spDims); // Icon edge 1cm from back wall
 
       // Mirror partner
       const partnerRole = canonicalRole === 'SBL' ? 'SBR' : 'SBL';
@@ -2398,7 +2412,7 @@ React.useEffect(() => {
       const cPartner = rsRearCorridor(partnerSide, { widthM: W, lengthM: L }, spDims);
 
       const partnerXClamped = clamp(partnerX, cPartner.xMin, cPartner.xMax);
-      const partnerY = cPartner.y; // Always back wall Y
+      const partnerY = rearWallY(L, spDims); // Icon edge 1cm from back wall
 
       // Update both speakers
       if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
@@ -2424,25 +2438,21 @@ React.useEffect(() => {
       const W = widthM || 4.5;
       const L = lengthM || 6.0;
       const dims = getModelDimsM(spk.model);
-      const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
       const halfWidth = (Number(dims?.widthM) || 0.20) / 2;
-      const WALL_BUFFER_FW = 0.02;
 
       const zonesReady = frontWideZones?.status === 'ok';
       const zone = zonesReady ? (canonicalRole === 'LW' ? frontWideZones.left : frontWideZones.right) : null;
       const partnerZone = zonesReady ? (canonicalRole === 'LW' ? frontWideZones.right : frontWideZones.left) : null;
       const partnerRole = (canonicalRole === 'LW') ? 'RW' : 'LW';
 
-      // Pin X to the wall
-      const xAtWall = (canonicalRole === 'LW')
-        ? (WALL_BUFFER_FW + halfDepth)
-        : (W - WALL_BUFFER_FW - halfDepth);
+      // Pin X to the wall (icon edge 1cm from wall)
+      const xAtWall = sideWallX(W, dims, canonicalRole === 'LW' ? 'L' : 'R');
 
       const { y: rawY } = canvasToRoom(newCanvasPos);
       
       // Fallback: use safe room bounds when zones are not ready
-      const fallbackYMin = WALL_BUFFER_FW + halfWidth;
-      const fallbackYMax = L - WALL_BUFFER_FW - halfWidth;
+      const fallbackYMin = SURROUND_WALL_GAP_M + halfWidth;
+      const fallbackYMax = L - SURROUND_WALL_GAP_M - halfWidth;
       const fallbackMedianY = L / 2;
       
       const yMinClamped = zone ? ((zone.yMin || 0) + (halfWidth * SIDE_ALLOW_OVERHANG)) : fallbackYMin;
@@ -2456,18 +2466,14 @@ React.useEffect(() => {
       const sideOffsetKey = canonicalRole === 'LW' ? 'L' : 'R';
       fwOffsetRef.current[sideOffsetKey] = offset;
 
-      // CRITICAL: Lock LW/RW to wall during drag (no wall breaking)
-      const fwWallBuffer = 0.05;
+      // CRITICAL: Lock LW/RW to wall during drag using icon-edge positioning
       const fwDims = getModelDimsM?.(spk.model) || {};
-      const fwDepthM = Number(fwDims.depthM) || 0.082;
-      const fwHalfDepth = fwDepthM / 2;
+      const fwHalfWidth = (Number(fwDims.widthM) || 0.20) / 2;
 
-      const lockedX = (canonicalRole === "LW") 
-        ? (fwWallBuffer + fwHalfDepth) 
-        : (W - fwWallBuffer - fwHalfDepth);
+      const lockedX = sideWallX(W, fwDims, canonicalRole === "LW" ? 'L' : 'R');
       
-      const fwFrontY = fwWallBuffer + fwHalfDepth;
-      const fwBackY = (L - fwWallBuffer - fwHalfDepth);
+      const fwFrontY = SURROUND_WALL_GAP_M + fwHalfWidth;
+      const fwBackY = L - (SURROUND_WALL_GAP_M + fwHalfWidth);
       const fwClampedY = Math.max(fwFrontY, Math.min(fwBackY, yClamped));
 
       const nextPos = { x: lockedX, y: fwClampedY, z: spk.position?.z ?? 1.1 };
@@ -2488,21 +2494,14 @@ React.useEffect(() => {
             // Update mirrored partner (also mark as user-positioned)
             if (partner && s.id === partner.id) {
               const partnerDims = getModelDimsM(partner.model);
-              const partnerHalfDepth = (Number(partnerDims?.depthM) || 0.082) / 2;
               const partnerHalfWidth = (Number(partnerDims?.widthM) || 0.20) / 2;
 
-              // CRITICAL: Lock partner to wall (same logic as dragged speaker)
-              const fwPartnerDims = getModelDimsM?.(partner.model) || {};
-              const fwPartnerDepthM = Number(fwPartnerDims.depthM) || 0.082;
-              const fwPartnerHalfDepth = fwPartnerDepthM / 2;
-              
-              const partnerLockedX = (canonicalRole === 'LW')
-                ? (W - fwWallBuffer - fwPartnerHalfDepth)
-                : (fwWallBuffer + fwPartnerHalfDepth);
+              // CRITICAL: Lock partner to wall using icon-edge positioning
+              const partnerLockedX = sideWallX(W, partnerDims, canonicalRole === 'LW' ? 'R' : 'L');
 
               // Fallback for partner zone bounds
-              const partnerFallbackYMin = fwWallBuffer + fwPartnerHalfDepth;
-              const partnerFallbackYMax = L - fwWallBuffer - fwPartnerHalfDepth;
+              const partnerFallbackYMin = SURROUND_WALL_GAP_M + partnerHalfWidth;
+              const partnerFallbackYMax = L - SURROUND_WALL_GAP_M - partnerHalfWidth;
               const partnerFallbackMedianY = L / 2;
               
               const partnerMedianY = partnerZone?.medianY || partnerFallbackMedianY;
@@ -3164,15 +3163,11 @@ React.useEffect(() => {
             ));
           }
         } else if (isFrontWide) {
-          // CRITICAL: Lock LW/RW to wall after drag (0.01m buffer)
+          // CRITICAL: Lock LW/RW to wall after drag (icon edge 1cm from wall)
           const W = widthM || 0;
-          const FW_WALL_BUFFER_M = 0.01;
           const dims = getModelDimsM(spk.model);
-          const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
           
-          const targetX = canonicalRole === 'LW'
-            ? (FW_WALL_BUFFER_M + halfDepth)
-            : (W - FW_WALL_BUFFER_M - halfDepth);
+          const targetX = sideWallX(W, dims, canonicalRole === 'LW' ? 'L' : 'R');
           
           // Force X to wall, keep Y from drag
           onSetSpeakers(prev => prev.map(s => 
@@ -4228,10 +4223,7 @@ useEffect(() => {
 
   // [REMOVED] Redundant useEffect for LCR yaw was here.
 
-  // CRITICAL: Single constant for ALL surround wall buffering (no depth offsets anywhere)
-  const SURROUND_WALL_BUFFER_M = 0.01;
-
-  // [NEW] Auto-hug ALL surrounds to walls when room dimensions change
+  // [NEW] Auto-hug ALL surrounds to walls when room dimensions change (ICON-EDGE positioning)
   useEffect(() => {
     if (isAnyDraggingRef.current) return;
     if (!onSetSpeakers || !placedSpeakers?.length) return;
@@ -4260,25 +4252,27 @@ useEffect(() => {
       // [B44 POSITION LOCK] Skip user-positioned speakers (they've been manually placed)
       if (spk.positionSource === 'user') return spk;
 
-      // CRITICAL: 0.01m wall buffer for ALL surrounds (no depth/size logic)
+      // Get speaker icon dimensions
+      const dims = getModelDimsM(spk.model);
+      
       let targetX = spk.position.x; // Default: keep current X
       let targetY = spk.position.y; // Default: keep current Y
       
-      // Side wall speakers (SL/SR/SL2/SR2.../LW/RW)
+      // Side wall speakers: icon edge 1cm from wall
       if (isSideSurround || isFrontWide) {
         const isLeft = canon.startsWith('SL') || canon === 'LW';
-        targetX = isLeft ? SURROUND_WALL_BUFFER_M : (W - SURROUND_WALL_BUFFER_M);
+        targetX = sideWallX(W, dims, isLeft ? 'L' : 'R');
       }
       
-      // Rear wall speakers (SBL/SBR)
+      // Rear wall speakers: icon edge 1cm from wall
       if (isRearSurround) {
-        targetY = L - SURROUND_WALL_BUFFER_M;
+        targetY = rearWallY(L, dims);
       }
       
       const currentX = Number(spk.position.x) || 0;
       const currentY = Number(spk.position.y) || 0;
 
-      // Only update if position has actually changed
+      // Only update if position has actually changed (prevents jitter)
       if (Math.abs(currentX - targetX) > 0.001 || Math.abs(currentY - targetY) > 0.001) {
         needsUpdate = true;
         return {
