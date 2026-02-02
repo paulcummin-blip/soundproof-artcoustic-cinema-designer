@@ -340,9 +340,12 @@ export function buildSeatHudSnapshot({
     };
     
     const relevantSpeakers = (placedSpeakers || []).filter(sp => {
+      // CRITICAL: Must have valid position for angle calculation
+      if (!sp?.position || !Number.isFinite(sp.position.x) || !Number.isFinite(sp.position.y)) return false;
+      
       const canon = getCanonicalRole(sp.role);
       const roleUpper = String(sp.role || '').toUpperCase();
-      return (surroundAndOverheadRoles.has(canon) || extraSurroundPattern.test(roleUpper)) && sp.position;
+      return surroundAndOverheadRoles.has(canon) || extraSurroundPattern.test(roleUpper);
     });
 
     if (relevantSpeakers.length > 0) {
@@ -645,6 +648,9 @@ export function buildSeatHudSnapshot({
   // Build eligible surrounds for P5 (includes extra surrounds SL2/SR2/...)
   const extraSurroundPattern = /^(SL|SR)\d+$/;
   const allSurrounds = (placedSpeakers || []).filter(s => {
+    // CRITICAL: Must have valid position for angle calculation
+    if (!s?.position || !Number.isFinite(s.position.x) || !Number.isFinite(s.position.y)) return false;
+    
     const r = getCanonicalRole(s.role);
     const roleUpper = String(s.role || '').toUpperCase();
     return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
@@ -679,7 +685,16 @@ export function buildSeatHudSnapshot({
   data.rp22.p5 = { valueDeg: p5Val, level: p5Level, formatted: p5Formatted };
 
   // --- P6: Surround SPL delta (requires ≥2 surrounds) ---
-  if (placedSur.length >= 2 && seatSplData?.surrounds) {
+  // CRITICAL: Include extra surrounds (SL2/SR2...) in surround count
+  const allSurroundsForP6 = (placedSpeakers || []).filter(s => {
+    if (!s?.position) return false;
+    const r = getCanonicalRole(s.role);
+    const roleUpper = String(s.role || '').toUpperCase();
+    const isExtraSurround = extraSurroundPattern.test(roleUpper);
+    return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || isExtraSurround;
+  });
+
+  if (allSurroundsForP6.length >= 2 && seatSplData?.surrounds) {
     const surSplValues = Object.values(seatSplData.surrounds)
       .map(s => s.value)
       .filter(Number.isFinite);
