@@ -641,7 +641,7 @@ export function buildSeatHudSnapshot({
 
   // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
   // CRITICAL: Use shared helper (single source of truth for HUD + overlay)
-  const { worstGapDeg: p5Val, gaps: p5Gaps, sortedRoles } = computeSurroundRingGaps({
+  const { worstGapDeg: p5Val, gaps: p5Gaps } = computeSurroundRingGaps({
     seat,
     speakers: placedSpeakers,
     getCanonicalRole,
@@ -668,7 +668,7 @@ export function buildSeatHudSnapshot({
     level: p5Level, 
     formatted: p5Formatted,
     gaps: p5Gaps,
-    debugLine: `noWrap=true | speakers=${sortedRoles?.length || 0} | gaps=${p5Gaps?.length || 0} | worst ${worstPair || 'none'} ${p5Val !== null ? Math.floor(p5Val) : '—'}° | roles: ${sortedRoles?.join(', ') || 'none'}`,
+    debugLine: `noWrap=true | seat(${seatX.toFixed(2)},${seatY.toFixed(2)}) | gaps=${p5Gaps?.length || 0} | worst ${worstPair || 'none'} ${p5Val !== null ? Math.floor(p5Val) : '—'}°`,
   };
 
   // --- P6: Surround SPL delta (requires ≥2 surrounds) ---

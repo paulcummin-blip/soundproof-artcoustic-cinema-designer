@@ -82,8 +82,8 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
     const current = sorted[i];
     const next = sorted[i + 1];
     
-    // NO modulo, NO shortest-arc conversion - just consecutive azimuth delta
-    const gapDeg = next.az - current.az;
+    let gapDeg = next.az - current.az;
+    if (gapDeg < 0) gapDeg += 360;
     
     gaps.push({
       deg: gapDeg,
@@ -91,20 +91,28 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
       toRole: next.speaker.role,
       fromAz: current.az,
       toAz: next.az,
-      sp1: current.speaker,
-      sp2: next.speaker,
     });
+  }
+
+  // Belt-and-braces: Remove any accidental closing gap (last→first)
+  // This should never happen with the loop above, but guards against future edits
+  if (gaps.length > 0 && sorted.length > 0) {
+    const firstRole = sorted[0].speaker.role;
+    const lastRole = sorted[sorted.length - 1].speaker.role;
+    const finalGap = gaps[gaps.length - 1];
+    
+    if (finalGap.fromRole === lastRole && finalGap.toRole === firstRole) {
+      gaps.pop(); // Remove the closing gap
+    }
   }
 
   // Compute worst gap from the no-wrap gaps only
   const worstGapDeg = gaps.length > 0 ? Math.max(...gaps.map(g => g.deg)) : null;
-  const sortedRoles = sorted.map(s => s.speaker.role);
 
   return {
     worstGapDeg,
     gaps,
     sortedSurrounds: sorted.map(s => s.speaker),
-    sortedRoles,
   };
 }
 
