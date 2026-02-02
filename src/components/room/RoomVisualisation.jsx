@@ -6424,63 +6424,81 @@ const renderLevelBadge = useCallback((level) => {
 }, []);
 
 const renderRp22AnglesOverlay = useCallback(() => {
-  // For now, always try to render when a seat is hovered.
   if (!Number.isFinite(scale)) return null;
   if (!effectiveHoveredSeat) return null;
 
-  // CRITICAL: Use shared P5 gap calculator (same as HUD)
-  const { gaps: p5Gaps, sortedSurrounds } = (() => {
-    try {
-      const { computeSurroundRingGaps } = require('@/components/utils/p5SurroundGaps');
-      return computeSurroundRingGaps({
-        seat: effectiveHoveredSeat,
-        speakers: visiblePlanSpeakers || [],
-        getCanonicalRole,
-      });
-    } catch (e) {
-      console.warn('[RP22 Angles] Failed to compute gaps:', e);
-      return { gaps: [], sortedSurrounds: [] };
-    }
-  })();
-
-  if (p5Gaps.length < 1) return null;
-
-  // Convert gaps to segments for rendering
-  const segments = p5Gaps.map((gap, idx) => {
-    const sp1 = sortedSurrounds.find(s => s.speaker.role === gap.fromRole)?.speaker;
-    const sp2 = sortedSurrounds.find(s => s.speaker.role === gap.toRole)?.speaker;
+  // CRITICAL: Use shared P5 gap calculator (single source of truth)
+  const extraSurroundPattern = /^(SL|SR)\d+$/;
+  const allSurrounds = (visiblePlanSpeakers || []).filter((s) => {
+    if (!s?.position || !Number.isFinite(s.position.x) || !Number.isFinite(s.position.y)) return false;
     
-    return {
-      sp1,
-      sp2,
-      angleA: gap.fromAz,
-      angleB: gap.toAz,
-      deg: gap.deg,
-    };
-  }).filter(seg => seg.sp1 && seg.sp2);
+    const r = getCanonicalRole(s.role);
+    const roleUpper = String(s.role || '').toUpperCase();
+    return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r) || extraSurroundPattern.test(roleUpper);
+  });
+
+  if (allSurrounds.length < 2) return null;
+
+  // Compute azimuth of each surround from this seat
+  const azimuthDegFromSeat = (seat, pt) => {
+    if (!seat || !pt) return null;
+    const dx = Number(pt.x) - Number(seat.x);
+    const dy = Number(pt.y) - Number(seat.y);
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return null;
+    const rad = Math.atan2(dx, -dy);
+    let deg = rad * (180 / Math.PI);
+    if (deg > 180) deg -= 360;
+    if (deg <= -180) deg += 360;
+    return deg;
+  };
+
+  const az = [];
+  for (const sp of allSurrounds) {
+    const a = azimuthDegFromSeat(effectiveHoveredSeat, sp.position);
+    if (Number.isFinite(a)) az.push({ a, sp });
+  }
+
+  if (az.length < 2) return null;
+
+  // Sort by raw angle (-180..+180)
+  const sortedItems = az.sort((a, b) => a.a - b.a);
+
+  // Build segments between each neighbour
+  const segments = [];
+  for (let i = 0; i < sortedItems.length; i++) {
+    const current = sortedItems[i];
+    const next = sortedItems[(i + 1) % sortedItems.length];
+
+    let angle1 = current.a;
+    let angle2 = next.a;
+
+    if (angle2 < angle1) angle2 += 360;
+
+    segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2 });
+  }
 
   const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
   const labelGroup = [];
 
-  segments.forEach((seg, idx) => {
-    const { sp1, sp2, angleA, angleB, deg } = seg;
-    
-    if (!sp1 || !sp2 || !Number.isFinite(deg) || deg <= 0) return;
-
-    // 1) Work out the mid-angle of this segment
+  segments.forEach(({ sp1, sp2, angleA, angleB }, idx) => {
+    // Work out the mid-angle of this segment
     const rawMid = (angleA + angleB) / 2;
-
-    // Normalise mid-angle to range -180..+180 (0° = straight ahead to screen)
     const midNorm = ((rawMid + 540) % 360) - 180;
 
-    // 2) Skip segments whose midpoint is in front of the listener
-    //    RP22 P5 cares about the surround field, not a gap across the screen.
-    //    Anything within ±60° of straight ahead is treated as "front" and ignored.
+    // Skip segments whose midpoint is in front of the listener
     if (Math.abs(midNorm) < 60) {
       return;
     }
 
-    // 3) Draw lines from seat to each speaker
+    // Compute the smaller arc angle between the two speakers
+    let deg = angleB - angleA;
+    if (deg > 180) deg = 360 - deg;
+
+    if (!Number.isFinite(deg) || deg <= 0) {
+      return;
+    }
+
+    // Draw lines from seat to each speaker
     const [x1, y1] = toPx(sp1.position.x, sp1.position.y);
     const [x2, y2] = toPx(sp2.position.x, sp2.position.y);
 
