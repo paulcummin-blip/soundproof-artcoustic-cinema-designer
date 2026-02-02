@@ -18,14 +18,19 @@ export default function SurroundsSelector({
 }) {
   const [showSurroundOverrides, setShowSurroundOverrides] = React.useState(false);
 
-  // Guard: don't render until roles/options are ready (prevents early seeding)
-  if (!Array.isArray(activeRoles) || activeRoles.length === 0 || !Array.isArray(choices) || choices.length === 0) {
-    return null;
-  }
+  // IMPORTANT: Never return null.
+  // During startup/restart, activeRoles/choices can be briefly empty while state hydrates.
+  // If we return null, the Extra Surrounds control disappears and looks unreliable.
+  const safeActiveRoles = Array.isArray(activeRoles) ? activeRoles : [];
+  const safeChoices = Array.isArray(choices) ? choices : [];
 
-  const showSides = activeRoles.includes('SL');
-  const showRears = activeRoles.includes('SBL');
-  const showWides = activeRoles.includes('LW');
+  // Disable selects until choices are ready, but keep the UI visible.
+  const choicesReady = safeChoices.length > 0;
+  const uiDisabled = !!disabled || !choicesReady;
+
+  const showSides = safeActiveRoles.includes('SL');
+  const showRears = safeActiveRoles.includes('SBL');
+  const showWides = safeActiveRoles.includes('LW');
 
   // Default to true Off unless the stored value is a real model
   const isReal = (m) => !!m && m !== '(none)' && m !== 'off' && m !== 'none';
@@ -69,7 +74,7 @@ export default function SurroundsSelector({
               override
             });
           }}
-          disabled={disabled}
+          disabled={uiDisabled}
         >
           <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
             <span className="text-2xl font-semibold" style={{ color: "#213428" }}>
@@ -77,7 +82,7 @@ export default function SurroundsSelector({
             </span>
           </SelectTrigger>
           <SelectContent className="bg-white border-[#DCDBD6]">
-            {choices.map((choice) => (
+            {safeChoices.map((choice) => (
               <SelectItem
                 key={choice.value}
                 value={choice.value}
@@ -92,7 +97,7 @@ export default function SurroundsSelector({
         <p className="text-xs text-[#625143]">Applies to all surrounds unless overridden.</p>
 
         {/* Extra Surrounds - ALWAYS RENDER; DISABLE when not allowed */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 10, marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12, marginBottom: 18 }}>
           <div style={{ fontWeight: 600, fontSize: 14 }}>Extra Surrounds</div>
           
           <div style={{ width: 150 }}>
@@ -104,7 +109,7 @@ export default function SurroundsSelector({
                   onExtraSurroundCountChange(Number.isFinite(n) ? n : 0);
                 }
               }}
-              disabled={disabled || !allowExtraSurrounds}
+              disabled={uiDisabled || !allowExtraSurrounds}
             >
               <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
                 <SelectValue />
@@ -167,7 +172,7 @@ export default function SurroundsSelector({
                           override: { ...override, side: !checked }
                         });
                       }}
-                      disabled={disabled}
+                      disabled={uiDisabled}
                     />
                   </div>
                 </div>
@@ -180,13 +185,13 @@ export default function SurroundsSelector({
                         override
                       });
                     }}
-                    disabled={disabled}
+                    disabled={uiDisabled}
                   >
                     <SelectTrigger className="w-full bg-white border-[#DCDBD6] text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
-                      {choices.map((choice) => (
+                      {safeChoices.map((choice) => (
                         <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                           {choice.label}
                         </SelectItem>
@@ -214,7 +219,7 @@ export default function SurroundsSelector({
                           override: { ...override, rear: !checked }
                         });
                       }}
-                      disabled={disabled}
+                      disabled={uiDisabled}
                     />
                   </div>
                 </div>
@@ -227,13 +232,13 @@ export default function SurroundsSelector({
                         override
                       });
                     }}
-                    disabled={disabled}
+                    disabled={uiDisabled}
                   >
                     <SelectTrigger className="w-full bg-white border-[#DCDBD6] text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
-                      {choices.map((choice) => (
+                      {safeChoices.map((choice) => (
                         <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                           {choice.label}
                         </SelectItem>
@@ -261,7 +266,7 @@ export default function SurroundsSelector({
                           override: { ...override, wide: !checked }
                         });
                       }}
-                      disabled={disabled}
+                      disabled={uiDisabled}
                     />
                   </div>
                 </div>
@@ -274,13 +279,13 @@ export default function SurroundsSelector({
                         override
                       });
                     }}
-                    disabled={disabled}
+                    disabled={uiDisabled}
                   >
                     <SelectTrigger className="w-full bg-white border-[#DCDBD6] text-[#1B1A1A] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-white border-[#DCDBD6]">
-                      {choices.map((choice) => (
+                      {safeChoices.map((choice) => (
                         <SelectItem key={choice.value} value={choice.value} className="text-[#1B1A1A] hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">
                           {choice.label}
                         </SelectItem>
