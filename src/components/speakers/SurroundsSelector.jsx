@@ -13,7 +13,8 @@ export default function SurroundsSelector({
   activeRoles,
   disabled,
   extraSurroundCount,
-  onExtraSurroundCountChange
+  onExtraSurroundCountChange,
+  allowExtraSurrounds
 }) {
   const [showSurroundOverrides, setShowSurroundOverrides] = React.useState(false);
 
@@ -37,14 +38,8 @@ export default function SurroundsSelector({
   const rearOverride = !!override?.rear;
   const wideOverride = !!override?.wide;
 
-  // 9.x.x gating: only enable Extra Surrounds for 9.x layouts
-  const layoutStr = String(layout || '');
-  const layoutMajor = parseInt(layoutStr.split('.')[0], 10) || 0;
-  const isNineX = layoutMajor >= 9;
-
-  // Safe value and handler for Extra Surrounds
+  // Safe value for Extra Surrounds (always defined)
   const safeExtraCount = Number.isFinite(extraSurroundCount) ? extraSurroundCount : 0;
-  const hasExtraHandler = typeof onExtraSurroundCountChange === 'function';
 
   // Look up display label from registry (canonical source)
   const getModelLabel = (modelKey) => {
@@ -97,38 +92,36 @@ export default function SurroundsSelector({
         <p className="text-xs text-[#625143]">Applies to all surrounds unless overridden.</p>
 
         {/* Extra Surrounds - ALWAYS RENDER; DISABLE when not allowed */}
-        <div style={{ marginTop: 10, marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ fontWeight: 600, minWidth: 130 }}>Extra Surrounds</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 10, marginBottom: 14 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>Extra Surrounds</div>
+          
+          <div style={{ width: 150 }}>
+            <Select
+              value={String(safeExtraCount)}
+              onValueChange={(v) => {
+                const n = parseInt(v, 10);
+                if (typeof onExtraSurroundCountChange === 'function') {
+                  onExtraSurroundCountChange(Number.isFinite(n) ? n : 0);
+                }
+              }}
+              disabled={disabled || !allowExtraSurrounds}
+            >
+              <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
+                <SelectValue />
+              </SelectTrigger>
 
-            <div style={{ flex: 1 }}>
-              <Select
-                value={String(safeExtraCount)}
-                onValueChange={(v) => {
-                  const n = parseInt(v, 10);
-                  if (typeof onExtraSurroundCountChange === "function") {
-                    onExtraSurroundCountChange(Number.isFinite(n) ? n : 0);
-                  }
-                }}
-                disabled={disabled || !isNineX || !hasExtraHandler}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-
-                <SelectContent>
-                  <SelectItem value="0">Off</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="4">4</SelectItem>
-                  <SelectItem value="6">6</SelectItem>
-                  <SelectItem value="8">8</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+              <SelectContent className="bg-white border-[#DCDBD6]">
+                <SelectItem value="0" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">Off</SelectItem>
+                <SelectItem value="2" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">2</SelectItem>
+                <SelectItem value="4" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">4</SelectItem>
+                <SelectItem value="6" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">6</SelectItem>
+                <SelectItem value="8" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">8</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
-        {!isNineX && (
-          <p className="text-xs text-[#625143] italic" style={{ marginTop: -8 }}>
+        {!allowExtraSurrounds && (
+          <p className="text-xs text-[#625143] italic" style={{ marginTop: -10 }}>
             Available for 9.x.x layouts only
           </p>
         )}
@@ -138,7 +131,7 @@ export default function SurroundsSelector({
           type="button"
           onClick={() => setShowSurroundOverrides(v => !v)}
           style={{
-            marginTop: 0,
+            marginTop: 16,
             marginBottom: 8,
             padding: 0,
             border: "none",

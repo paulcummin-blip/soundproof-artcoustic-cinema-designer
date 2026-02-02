@@ -1825,8 +1825,8 @@ function RoomDesignerWithState() {
   const useWidesInsteadOfRears = _sevenBedLayoutType === "wides";
   const expectsRears = layoutMajor >= 9 || layoutMajor === 7 && !useWidesInsteadOfRears;
   
-  // NEW: Extra surrounds gating (only allow for 9.x.x+)
-  const layoutString = String(dolbyPreset || '9.1.6');
+  // NEW: Extra surrounds gating (only allow for 9.x.x+) - ALWAYS compute this
+  const layoutString = String(dolbyPreset || '5.1');
   const major = parseInt(layoutString.split('.')[0], 10) || 0;
   const allowExtraSurrounds = major >= 9;
 
@@ -4695,7 +4695,8 @@ function RoomDesignerWithState() {
                 allSeatSplMetrics={allSeatSplMetrics}
                 frontWideOverlay={frontWideZones}
                 extraSurroundCount={appState?.extraSurroundCount ?? 0}
-                onExtraSurroundCountChange={appState?.setExtraSurroundCount} />
+                onExtraSurroundCountChange={appState?.setExtraSurroundCount}
+                allowExtraSurrounds={allowExtraSurrounds} />
 
                  </Suspense>
                   
