@@ -2506,8 +2506,8 @@ React.useEffect(() => {
               
               const partnerMedianY = partnerZone?.medianY || partnerFallbackMedianY;
               const partnerTargetY = partnerMedianY + offset;
-              const partnerYMinClamped = partnerZone ? ((partnerZone.yMin || 0) + fwPartnerHalfDepth) : partnerFallbackYMin;
-              const partnerYMaxClamped = partnerZone ? ((partnerZone.yMax || L) - fwPartnerHalfDepth) : partnerFallbackYMax;
+              const partnerYMinClamped = partnerZone ? ((partnerZone.yMin || 0) + partnerHalfWidth) : partnerFallbackYMin;
+              const partnerYMaxClamped = partnerZone ? ((partnerZone.yMax || L) - partnerHalfWidth) : partnerFallbackYMax;
               const partnerYClamped = clamp(partnerTargetY, partnerYMinClamped, partnerYMaxClamped);
 
               const partnerPos = { x: partnerLockedX, y: partnerYClamped, z: partner.position?.z ?? 1.1 };
