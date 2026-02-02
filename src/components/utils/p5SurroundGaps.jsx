@@ -70,8 +70,7 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
   const sorted = withAzimuth.sort((a, b) => a.az - b.az);
 
   // 4) Compute consecutive gaps (NO WRAP)
-  // P5 NO WRAP: do not close the ring (never compute last->first gap).
-  // We measure only adjacent pairs: i→i+1, never last→first.
+  // P5 NO WRAP: only i -> i+1, never last -> first
   const gaps = [];
 
   if (sorted.length < 2) {
@@ -82,8 +81,8 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
     const current = sorted[i];
     const next = sorted[i + 1];
     
-    let gapDeg = next.az - current.az;
-    if (gapDeg < 0) gapDeg += 360;
+    // Gap is simply next azimuth minus current azimuth (both ascending)
+    const gapDeg = next.az - current.az;
     
     gaps.push({
       deg: gapDeg,
