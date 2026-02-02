@@ -6486,6 +6486,7 @@ const renderRp22AnglesOverlay = useCallback(() => {
     const currentTheta = sortedItems[idx].theta;
     const nextTheta = sortedItems[idx + 1].theta;
     const midTheta = (currentTheta + nextTheta) / 2;
+    const rawMid = midTheta;
     const midNorm = ((midTheta + 180) % 360) - 180;
 
     // Skip segments whose midpoint is in front of the listener
