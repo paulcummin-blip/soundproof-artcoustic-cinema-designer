@@ -108,10 +108,24 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
   // Compute worst gap from the no-wrap gaps only
   const worstGapDeg = gaps.length > 0 ? Math.max(...gaps.map(g => g.deg)) : null;
 
+  // DEBUG: Build formatted debug strings (temporary)
+  const sortedRoles = sorted.map(s => s.speaker.role).join(', ');
+  const sortedAz = sorted.map(s => `${s.speaker.role}:${s.az.toFixed(1)}`).join(', ');
+  const gapList = gaps.map(g => `${g.fromRole}→${g.toRole}:${g.deg.toFixed(1)}`).join(', ');
+  const worstGap = gaps.length > 0 
+    ? gaps.reduce((max, g) => g.deg > max.deg ? g : max, gaps[0])
+    : null;
+  const worstGapStr = worstGap ? `${worstGap.fromRole}→${worstGap.toRole}:${worstGap.deg.toFixed(1)}` : 'none';
+
   return {
     worstGapDeg,
     gaps,
     sortedSurrounds: sorted.map(s => s.speaker),
+    // DEBUG fields (temporary)
+    sortedRoles,
+    sortedAz,
+    gapList,
+    worstGapStr,
   };
 }
 
