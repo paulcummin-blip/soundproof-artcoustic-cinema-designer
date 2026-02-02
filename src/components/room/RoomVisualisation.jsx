@@ -4037,7 +4037,7 @@ React.useEffect(() => {
         const roleUpper = String(s.role || '').toUpperCase();
         return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
       })
-      .map(s => `${s.id}:${(s.position.x || 0).toFixed(2)}:${(s.position.y || 0).toFixed(2)}`)
+      .map(s => `${s.id}:${(s.position.x || 0).toFixed(4)}:${(s.position.y || 0).toFixed(4)}`)
       .join('|');
     
     const layout = dolbyLayout || '5.1';
@@ -6450,13 +6450,17 @@ const renderRp22AnglesOverlay = useCallback(() => {
   const az = [];
   for (const sp of allSurrounds) {
     const a = azimuthDegFromSeat(effectiveHoveredSeat, sp.position);
-    if (Number.isFinite(a)) az.push({ a, sp });
+    if (Number.isFinite(a)) {
+      // Convert azimuth (-180..+180) to theta (0..360)
+      const theta = (a + 360) % 360;
+      az.push({ a, theta, sp });
+    }
   }
 
   if (az.length < 2) return null;
 
-  // Sort by raw angle (-180..+180)
-  const sortedItems = az.sort((a, b) => a.a - b.a);
+  // Sort by theta (0..360) instead of azimuth
+  const sortedItems = az.sort((a, b) => a.theta - b.theta);
 
   // Build segments between each neighbour (NO WRAP - enforced)
   const segments = [];
@@ -6465,30 +6469,32 @@ const renderRp22AnglesOverlay = useCallback(() => {
     const current = sortedItems[i];
     const next = sortedItems[i + 1];
 
-    let angle1 = current.a;
-    let angle2 = next.a;
+    const angle1 = current.a;
+    const angle2 = next.a;
+    
+    // Gap = difference in theta (both ascending in 0..360)
+    const gapDeg = next.theta - current.theta;
 
-    if (angle2 < angle1) angle2 += 360;
-
-    segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2 });
+    segments.push({ sp1: current.sp, sp2: next.sp, angleA: angle1, angleB: angle2, gapDeg });
   }
 
   const seatPx = toPx(effectiveHoveredSeat.x, effectiveHoveredSeat.y);
   const labelGroup = [];
 
-  segments.forEach(({ sp1, sp2, angleA, angleB }, idx) => {
-    // Work out the mid-angle of this segment
-    const rawMid = (angleA + angleB) / 2;
-    const midNorm = ((rawMid + 540) % 360) - 180;
+  segments.forEach(({ sp1, sp2, angleA, angleB, gapDeg }, idx) => {
+    // Work out the mid-angle of this segment using theta
+    const currentTheta = sortedItems[idx].theta;
+    const nextTheta = sortedItems[idx + 1].theta;
+    const midTheta = (currentTheta + nextTheta) / 2;
+    const midNorm = ((midTheta + 180) % 360) - 180;
 
     // Skip segments whose midpoint is in front of the listener
     if (Math.abs(midNorm) < 60) {
       return;
     }
 
-    // Compute the smaller arc angle between the two speakers
-    let deg = angleB - angleA;
-    if (deg > 180) deg = 360 - deg;
+    // Use the gapDeg computed from theta
+    const deg = gapDeg;
 
     if (!Number.isFinite(deg) || deg <= 0) {
       return;
