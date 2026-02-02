@@ -35,6 +35,12 @@ export function isEligibleP5Surround(role) {
 /**
  * Compute surround ring gaps from a seat's perspective
  * Returns { worstGapDeg, gaps[], sortedSurrounds[] }
+ * 
+ * CRITICAL: Uses HORSESHOE ordering (LW → SL → SL2 → ... → SBL → SBR → ... → SR2 → SR → RW)
+ * NOT azimuth-sorted adjacency. This ensures:
+ * - SBL↔SBR gap always exists (rear angle label appears)
+ * - LW↔RW gap never exists (never adjacent)
+ * - Extra surrounds (SL2/SR2...) are correctly inserted
  */
 export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
   if (!seat || !speakers?.length) {
@@ -53,64 +59,94 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
     return { worstGapDeg: null, gaps: [], sortedSurrounds: [] };
   }
 
-  // 2) Compute azimuth for each
-  const withAzimuth = [];
+  // 2) Compute azimuth for each speaker (for gap calculation)
+  const speakerAzimuths = new Map();
   for (const sp of eligible) {
     const az = azimuthDegFromSeat(seat, sp.position);
     if (Number.isFinite(az)) {
-      withAzimuth.push({ az, speaker: sp });
+      speakerAzimuths.set(sp, az);
     }
   }
 
-  if (withAzimuth.length < 2) {
+  if (speakerAzimuths.size < 2) {
     return { worstGapDeg: null, gaps: [], sortedSurrounds: [] };
   }
 
-  // 3) Sort clockwise by azimuth
-  const sorted = withAzimuth.sort((a, b) => a.az - b.az);
-
-  // 4) Compute consecutive gaps (NO WRAP)
-  // P5 NO WRAP: only i -> i+1, never last -> first
+  // 3) Build HORSESHOE order: LW → SL → SL2 → SL3 → ... → SBL → SBR → ... → SR3 → SR2 → SR → RW
+  const horseshoeOrder = [];
+  
+  // Build role map for quick lookup
+  const speakerByCanonRole = new Map();
+  for (const sp of eligible) {
+    const canon = getCanonicalRole ? getCanonicalRole(sp.role) : String(sp.role).toUpperCase();
+    speakerByCanonRole.set(canon, sp);
+  }
+  
+  // Helper to extract SL/SR extra number (e.g., "SL2" → 2, "SR3" → 3)
+  const extractExtraNumber = (role) => {
+    const match = String(role).match(/^(SL|SR)(\d+)$/);
+    return match ? parseInt(match[2], 10) : 0;
+  };
+  
+  // Left side: LW → SL → SL2 → SL3 → ... (ascending extras)
+  if (speakerByCanonRole.has('LW')) horseshoeOrder.push(speakerByCanonRole.get('LW'));
+  if (speakerByCanonRole.has('SL')) horseshoeOrder.push(speakerByCanonRole.get('SL'));
+  
+  // SL extras (ascending order: SL2, SL3, SL4...)
+  const slExtras = Array.from(speakerByCanonRole.keys())
+    .filter(r => /^SL\d+$/.test(r))
+    .sort((a, b) => extractExtraNumber(a) - extractExtraNumber(b));
+  for (const role of slExtras) {
+    horseshoeOrder.push(speakerByCanonRole.get(role));
+  }
+  
+  // Rear: SBL → SBR
+  if (speakerByCanonRole.has('SBL')) horseshoeOrder.push(speakerByCanonRole.get('SBL'));
+  if (speakerByCanonRole.has('SBR')) horseshoeOrder.push(speakerByCanonRole.get('SBR'));
+  
+  // Right side: ... → SR3 → SR2 → SR → RW (descending extras)
+  const srExtras = Array.from(speakerByCanonRole.keys())
+    .filter(r => /^SR\d+$/.test(r))
+    .sort((a, b) => extractExtraNumber(b) - extractExtraNumber(a)); // Descending
+  for (const role of srExtras) {
+    horseshoeOrder.push(speakerByCanonRole.get(role));
+  }
+  
+  if (speakerByCanonRole.has('SR')) horseshoeOrder.push(speakerByCanonRole.get('SR'));
+  if (speakerByCanonRole.has('RW')) horseshoeOrder.push(speakerByCanonRole.get('RW'));
+  
+  // 4) Compute gaps along horseshoe order (angle between rays)
   const gaps = [];
-
-  if (sorted.length < 2) {
-    return { worstGapDeg: null, gaps: [], sortedSurrounds: [] };
-  }
-
-  for (let i = 0; i < sorted.length - 1; i++) {
-    const current = sorted[i];
-    const next = sorted[i + 1];
+  
+  for (let i = 0; i < horseshoeOrder.length - 1; i++) {
+    const current = horseshoeOrder[i];
+    const next = horseshoeOrder[i + 1];
     
-    // Gap is simply next azimuth minus current azimuth (both ascending)
-    const gapDeg = next.az - current.az;
+    const a1 = speakerAzimuths.get(current);
+    const a2 = speakerAzimuths.get(next);
+    
+    if (!Number.isFinite(a1) || !Number.isFinite(a2)) continue;
+    
+    // Compute smallest angle between two rays (handles ±180 boundary)
+    let d = a2 - a1;
+    d = ((d + 540) % 360) - 180; // Normalize to -180..+180
+    const gapDeg = Math.abs(d); // 0..180
     
     gaps.push({
       deg: gapDeg,
-      fromRole: current.speaker.role,
-      toRole: next.speaker.role,
-      fromAz: current.az,
-      toAz: next.az,
+      fromRole: current.role,
+      toRole: next.role,
+      fromAz: a1,
+      toAz: a2,
     });
   }
 
-  // Belt-and-braces: Remove any accidental closing gap (last→first)
-  // This should never happen with the loop above, but guards against future edits
-  if (gaps.length > 0 && sorted.length > 0) {
-    const firstRole = sorted[0].speaker.role;
-    const lastRole = sorted[sorted.length - 1].speaker.role;
-    const finalGap = gaps[gaps.length - 1];
-    
-    if (finalGap.fromRole === lastRole && finalGap.toRole === firstRole) {
-      gaps.pop(); // Remove the closing gap
-    }
-  }
-
-  // Compute worst gap from the no-wrap gaps only
+  // Compute worst gap from horseshoe gaps only
   const worstGapDeg = gaps.length > 0 ? Math.max(...gaps.map(g => g.deg)) : null;
 
   // DEBUG: Build formatted debug strings (temporary)
-  const sortedRoles = sorted.map(s => s.speaker.role).join(', ');
-  const sortedAz = sorted.map(s => `${s.speaker.role}:${s.az.toFixed(1)}`).join(', ');
+  const sortedRoles = horseshoeOrder.map(s => s.role).join(', ');
+  const sortedAz = horseshoeOrder.map(s => `${s.role}:${speakerAzimuths.get(s)?.toFixed(1) || '—'}`).join(', ');
   const gapList = gaps.map(g => `${g.fromRole}→${g.toRole}:${g.deg.toFixed(1)}`).join(', ');
   const worstGap = gaps.length > 0 
     ? gaps.reduce((max, g) => g.deg > max.deg ? g : max, gaps[0])
@@ -120,7 +156,7 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
   return {
     worstGapDeg,
     gaps,
-    sortedSurrounds: sorted.map(s => s.speaker),
+    sortedSurrounds: horseshoeOrder,
     // DEBUG fields (temporary)
     sortedRoles,
     sortedAz,

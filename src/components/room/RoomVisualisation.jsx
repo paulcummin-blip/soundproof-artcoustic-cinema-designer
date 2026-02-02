@@ -4028,28 +4028,23 @@ React.useEffect(() => {
       .join(',');
     
     // P5-relevant speaker positions fingerprint (ALL surrounds including extras)
+    // CRITICAL: Include speaker ID + position to invalidate cache when ANY speaker moves
     const extraSurroundPattern = /^(SL|SR)\d+$/;
-    const speakerPosFingerprint = (placedSpeakers || [])
+    const speakerRevision = (placedSpeakers || [])
       .filter(s => {
-        if (!s?.position) return false;
+        if (!s?.id || !s?.position) return false;
         const r = getCanonicalRole(s.role);
         const roleUpper = String(s.role || '').toUpperCase();
         return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
       })
-      .map(s => ({
-        role: getCanonicalRole(s.role),
-        x: Math.round((s.position.x || 0) * 1000),
-        y: Math.round((s.position.y || 0) * 1000),
-      }))
-      .sort((a, b) => a.role.localeCompare(b.role))
-      .map(s => `${s.role}:${s.x}:${s.y}`)
-      .join(',');
+      .map(s => `${s.id}:${(s.position.x || 0).toFixed(2)}:${(s.position.y || 0).toFixed(2)}`)
+      .join('|');
     
     const layout = dolbyLayout || '5.1';
     const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
     const mlpRp23 = mlp ? Math.round((mlp.y || 0) * 1000) : 0;
     const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
-    const signature = `${seatIds}|${seatPosFingerprint}|${speakerPosFingerprint}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}`;
+    const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}`;
     
     // Skip if nothing changed
     if (lastCacheSignatureRef.current === signature) {
