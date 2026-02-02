@@ -276,17 +276,24 @@ export default function SeatHud({
                     }}
                   >
                     {key.toUpperCase()}
-                  </span>
-                  {key === 'p16' && metric.hudLabel ? (
+                    </span>
+                    {key === 'p16' && metric.hudLabel ? (
                     `: ${metric.hudLabel}`
-                  ) : (
+                    ) : (
                     `: ${metric.formatted || '—'}`
-                  )}
-                </span>
-                {renderLevelBadge(normalizeLevel(metric.level))}
-              </div>
+                    )}
+                    </span>
+                    {renderLevelBadge(normalizeLevel(metric.level))}
+                    </div>
 
-              {/* P16 debug info */}
+                    {/* P5 debug info */}
+                    {key === 'p5' && isHudPinned && metric?.debug && (
+                    <div style={{ fontSize: 10, color: '#666', marginTop: 2, marginLeft: 8 }}>
+                    P5 debug: seat {metric.debug.seatXY} | gaps {metric.debug.eligibleCount} | worst {metric.debug.worstPair} {metric.debug.worstGapRounded}°
+                    </div>
+                    )}
+
+                    {/* P16 debug info */}
               {key === 'p16' && metric?.perSpeaker && metric.perSpeaker.length > 0 && (
                 <div
                   style={{
