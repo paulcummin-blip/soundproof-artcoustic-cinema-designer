@@ -645,6 +645,9 @@ export function buildSeatHudSnapshot({
   // Build eligible surrounds for P5 (includes extra surrounds SL2/SR2/...)
   const extraSurroundPattern = /^(SL|SR)\d+$/;
   const allSurrounds = (placedSpeakers || []).filter(s => {
+    // CRITICAL: Must have valid position for angle calculation
+    if (!s?.position || !Number.isFinite(s.position.x) || !Number.isFinite(s.position.y)) return false;
+    
     const r = getCanonicalRole(s.role);
     const roleUpper = String(s.role || '').toUpperCase();
     return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);

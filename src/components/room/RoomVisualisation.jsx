@@ -3916,10 +3916,14 @@ React.useEffect(() => {
     }
 
     // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
-    // Build eligible surrounds for P5 (ONLY from actually drawn speakers)
+    // Build eligible surrounds for P5 (includes extra surrounds SL2/SR2/...)
+    const extraSurroundPattern = /^(SL|SR)\d+$/;
     const eligibleSurrounds = (visiblePlanSpeakers || []).filter(s => {
+      if (!s?.position || !Number.isFinite(s.position.x) || !Number.isFinite(s.position.y)) return false;
+      
       const r = getCanonicalRole(s.role);
-      return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r);
+      const roleUpper = String(s.role || '').toUpperCase();
+      return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
     });
 
     let p5Val = null;
@@ -6419,10 +6423,14 @@ const renderRp22AnglesOverlay = useCallback(() => {
   if (!Number.isFinite(scale)) return null;
   if (!effectiveHoveredSeat) return null;
 
-  // 1) Collect all surround-type speakers around this seat (ONLY from actually drawn speakers)
+  // 1) Collect all surround-type speakers (includes extra surrounds SL2/SR2/...)
+  const extraSurroundPattern = /^(SL|SR)\d+$/;
   const allSurrounds = (visiblePlanSpeakers || []).filter((s) => {
+    if (!s?.position || !Number.isFinite(s.position.x) || !Number.isFinite(s.position.y)) return false;
+    
     const r = getCanonicalRole(s.role);
-    return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r);
+    const roleUpper = String(s.role || '').toUpperCase();
+    return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r) || extraSurroundPattern.test(roleUpper);
   });
 
   if (allSurrounds.length < 2) return null;
