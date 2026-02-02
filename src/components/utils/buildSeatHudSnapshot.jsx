@@ -10,11 +10,9 @@ import {
   metricP1_nearestWallM, 
   rp22LevelForP1, 
   rp22LevelForP4,
-  metricP5_maxSurroundGapNoWrap,
-  rp22LevelForP5_NoWrap,
-  azimuthDegFromSeat
 } from '@/components/utils/seatMetrics';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
+import { computeSurroundRingGaps, rp22LevelForP5 } from '@/components/utils/p5SurroundGaps';
 
 // Helper for safe number extraction
 const finite = (v, fallback) => {
@@ -642,44 +640,28 @@ export function buildSeatHudSnapshot({
   }
 
   // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
-  // Build eligible surrounds for P5 (includes extra surrounds SL2/SR2/...)
-  const extraSurroundPattern = /^(SL|SR)\d+$/;
-  const allSurrounds = (placedSpeakers || []).filter(s => {
-    // CRITICAL: Must have valid position for angle calculation
-    if (!s?.position || !Number.isFinite(s.position.x) || !Number.isFinite(s.position.y)) return false;
-    
-    const r = getCanonicalRole(s.role);
-    const roleUpper = String(s.role || '').toUpperCase();
-    return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
+  // CRITICAL: Use shared helper (single source of truth for HUD + overlay)
+  const { worstGapDeg: p5Val, gaps: p5Gaps } = computeSurroundRingGaps({
+    seat,
+    speakers: placedSpeakers,
+    getCanonicalRole,
   });
 
-  const hasSL = allSurrounds.some(s => getCanonicalRole(s.role) === 'SL');
-  const hasSR = allSurrounds.some(s => getCanonicalRole(s.role) === 'SR');
-
-  const eligibleSurrounds = allSurrounds.filter(s => {
-    const r = getCanonicalRole(s.role);
-    if (r === 'LW' || r === 'RW') return hasSL && hasSR;
-    return true;
-  });
-
-  let p5Val = null;
   let p5Level = '—';
   let p5Formatted = '—';
 
-  if (seat && Array.isArray(eligibleSurrounds) && eligibleSurrounds.length >= 2) {
-    p5Val = metricP5_maxSurroundGapNoWrap({
-      seat: seat,
-      surrounds: eligibleSurrounds,
-      toPoint: sp => sp?.position,
-    });
-    
-    if (Number.isFinite(p5Val)) {
-      p5Level = rp22LevelForP5_NoWrap(p5Val);
-      p5Formatted = `${Math.floor(p5Val)}°`;
-    }
+  if (Number.isFinite(p5Val)) {
+    p5Level = rp22LevelForP5(p5Val);
+    p5Formatted = `${Math.floor(p5Val)}°`;
   }
+  
   // Publish P5 to HUD
-  data.rp22.p5 = { valueDeg: p5Val, level: p5Level, formatted: p5Formatted };
+  data.rp22.p5 = { 
+    valueDeg: p5Val, 
+    level: p5Level, 
+    formatted: p5Formatted,
+    gaps: p5Gaps, // Store for debugging/overlay reuse
+  };
 
   // --- P6: Surround SPL delta (requires ≥2 surrounds) ---
   if (placedSur.length >= 2 && seatSplData?.surrounds) {
