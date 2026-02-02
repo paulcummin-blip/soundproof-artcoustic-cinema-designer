@@ -69,11 +69,10 @@ export function computeSurroundRingGaps({ seat, speakers, getCanonicalRole }) {
   // 3) Sort clockwise by azimuth
   const sorted = withAzimuth.sort((a, b) => a.az - b.az);
 
-  // 4) Compute consecutive gaps (NO WRAP - do not close the ring)
+  // 4) Compute consecutive gaps (no wrap)
   const gaps = [];
   let worstGapDeg = 0;
 
-  // Only measure gaps between adjacent speakers, excluding last→first
   for (let i = 0; i < sorted.length - 1; i++) {
     const current = sorted[i];
     const next = sorted[i + 1];
