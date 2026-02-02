@@ -3294,10 +3294,34 @@ React.useEffect(() => {
   const tooltipData = useMemo(() => {
     if (!effectiveHoveredSeat) return null;
     
-    // CRITICAL: Pure reader - get pre-computed snapshot from AppState cache
-    const cached = appState?.seatMetricsById?.[effectiveHoveredSeat.id];
+    // Build current signature (same logic as cache-writing effect)
+    const seatIds = seatingPositions.map(s => s.id).join(',');
+    const seatPosFingerprint = seatingPositions
+      .map(s => `${s.id}:${Math.round((s.x || 0) * 1000)}:${Math.round((s.y || 0) * 1000)}`)
+      .join(',');
     
-    if (cached) {
+    const extraSurroundPattern = /^(SL|SR)\d+$/;
+    const speakerRevision = (placedSpeakers || [])
+      .filter(s => {
+        if (!s?.id || !s?.position) return false;
+        const r = getCanonicalRole(s.role);
+        const roleUpper = String(s.role || '').toUpperCase();
+        return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
+      })
+      .map(s => `${s.id}:${(s.position.x || 0).toFixed(4)}:${(s.position.y || 0).toFixed(4)}`)
+      .join('|');
+    
+    const layout = dolbyLayout || '5.1';
+    const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
+    const mlpRp23 = mlp ? Math.round((mlp.y || 0) * 1000) : 0;
+    const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
+    const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}`;
+    
+    // CRITICAL: Only trust cache if it was built for THIS exact signature
+    const seatId = effectiveHoveredSeat?.id;
+    const cached = seatId ? appState?.seatMetricsById?.[seatId] : null;
+    
+    if (cached && cached.__sig === signature) {
       return cached; // Use cached snapshot (guarantees HUD === Report)
     }
     
@@ -4078,7 +4102,7 @@ React.useEffect(() => {
         });
         
         if (snapshot) {
-          nextMetrics[seat.id] = snapshot;
+          nextMetrics[seat.id] = { ...snapshot, __sig: signature };
         }
       } catch (err) {
         console.warn(`[SeatMetrics] failed seat ${seat.id}:`, err);
