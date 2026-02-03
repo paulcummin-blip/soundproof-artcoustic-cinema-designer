@@ -51,13 +51,13 @@ export const RP22_DEFINITIONS = {
   },
   
   P9: {
-    title: "9. Vertical viewing angle to top of image",
-    description: "This parameter ensures comfortable neck posture and optimal image perception. It measures the vertical angle from the listener's eye position to the top edge of the visible image.",
+    title: "9. Maximum allowable vertical angle between adjacent (L/R rows of) upper speakers",
+    description: "To ensure that sound movement is smooth and localisation is accurate, this metric specifies the maximum vertical angle between adjacent upper speakers at the seating location. Excludes top middle centre (\"Voice of God\") and height centre speakers.",
     thresholds: [
-      { level: 1, criteria: "≤35°" },
-      { level: 2, criteria: "≤30°" },
-      { level: 3, criteria: "≤25°" },
-      { level: 4, criteria: "≤20°" }
+      { level: 1, criteria: "> 80.1°" },
+      { level: 2, criteria: "≤ 80°" },
+      { level: 3, criteria: "≤ 60°" },
+      { level: 4, criteria: "≤ 50°" }
     ],
     scope: "Per seat"
   },
