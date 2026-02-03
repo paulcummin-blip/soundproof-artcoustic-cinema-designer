@@ -269,30 +269,25 @@ export default function SpeakerPositionsOverlay({
     return true;
   });
 
-  // Split overheads for vertical dimension rulers:
-  // - Front overheads → left ruler
-  // - Mid overheads → right ruler (more space for text)
-  // - Rear overheads → left ruler
-  const overheadLeft = overheadSpeakers.filter((s) => {
-    const role = String(s.role || "").toUpperCase();
-    return role.startsWith("TF") || role.startsWith("TR");
-  }).sort((a, b) => (a.position.y ?? 0) - (b.position.y ?? 0));
+  // Split overheads into left/right columns by room midline
+  const overheadLeft = overheadSpeakers
+    .filter((s) => (s.position.x ?? 0) < (W / 2))
+    .sort((a, b) => (a.position.y ?? 0) - (b.position.y ?? 0));
 
-  const overheadRight = overheadSpeakers.filter((s) => {
-    const role = String(s.role || "").toUpperCase();
-    return role.startsWith("TM");
-  }).sort((a, b) => (a.position.y ?? 0) - (b.position.y ?? 0));
+  const overheadRight = overheadSpeakers
+    .filter((s) => (s.position.x ?? 0) >= (W / 2))
+    .sort((a, b) => (a.position.y ?? 0) - (b.position.y ?? 0));
 
   // Overhead rows should ONLY exist if the corresponding overhead roles exist.
   // Front row: TF*
   // Mid row:   TM*
-  // Rear row:  TR* (FIXED: was TB*, should be TR* for TRL/TRR)
+  // Rear row:  TB*
   const overheadRows = (() => {
     const rows = [];
 
     const front = overheadSpeakers.filter(s => String(s.role || "").toUpperCase().startsWith("TF"));
     const mid   = overheadSpeakers.filter(s => String(s.role || "").toUpperCase().startsWith("TM"));
-    const rear  = overheadSpeakers.filter(s => String(s.role || "").toUpperCase().startsWith("TR"));
+    const rear  = overheadSpeakers.filter(s => String(s.role || "").toUpperCase().startsWith("TB"));
 
     const makeRow = (label, list) => {
       if (!list.length) return null;
@@ -317,15 +312,6 @@ export default function SpeakerPositionsOverlay({
     return rows;
   })();
 
-  // --- Detect wides mode for label mapping ---
-  const widesMode = bedSpeakers.some(s => {
-    const role = String(s.role || "").toUpperCase();
-    return role === "LW" || role === "RW";
-  }) && !bedSpeakers.some(s => {
-    const role = String(s.role || "").toUpperCase();
-    return role === "SBL" || role === "SBR";
-  });
-
   // --- Split LCR vs surrounds ---
   const lcrRoles = new Set(["FL","FC","FR","L","C","R"]);
   const lcr = bedSpeakers
@@ -339,10 +325,6 @@ export default function SpeakerPositionsOverlay({
     const xM = s.position.x;
     const yM = s.position.y;
     const role = String(s.role).toUpperCase();
-    
-    // Map RW → FW label when in wides mode (export only)
-    const displayRole = (widesMode && role === "RW") ? "FW" : 
-                        (widesMode && role === "LW") ? "FW" : role;
 
     const dFront = yM;
     const dBack = L - yM;
@@ -355,7 +337,7 @@ export default function SpeakerPositionsOverlay({
     if (dLeft < min) { wall = "left"; min = dLeft; }
     if (dRight < min) { wall = "right"; min = dRight; }
 
-    return { ...s, wall, xM, yM, role, displayRole };
+    return { ...s, wall, xM, yM, role };
   });
 
   // Group by wall and sort
@@ -623,7 +605,7 @@ export default function SpeakerPositionsOverlay({
                 fill={textFill}
                 fontWeight={700}
               >
-                {s.displayRole || s.role}
+                {s.role}
               </text>
 
               <text
@@ -739,22 +721,16 @@ export default function SpeakerPositionsOverlay({
                   x={0}
                   y={roleY}
                   textAnchor="middle"
-                  fontFamily={fontFamily}
-                  fontSize={crowdedRoleSize}
-                  fill={textFill}
-                  fontWeight={700}
+                  style={{ fontSize: crowdedRoleSize, fill: textFill, fontWeight: 700 }}
                 >
-                  {s.displayRole || s.role}
+                  {s.role}
                 </text>
 
                 <text
                   x={hDx}
                   y={roleY}
                   textAnchor="start"
-                  fontFamily={fontFamily}
-                  fontSize={crowdedSize}
-                  fill="#3E4349"
-                  fontWeight={400}
+                  style={{ fontSize: crowdedSize, fill: "#3E4349", fontWeight: 400 }}
                 >
                   {`H${hCm}cm`}
                 </text>
@@ -789,26 +765,18 @@ export default function SpeakerPositionsOverlay({
     // Clamp so it always stays inside the roomRect
     const xLeftRuler = Math.max(roomRect.x + SAFE_INSET_PX, desiredLeftRulerX);
 
-    // Right overhead ruler: mirror logic for right column (mid overheads)
-    const rightMostOhEdgePx = overheadRight.length
-      ? Math.max(...overheadRight.map(s => meterToCanvasX(s.position.x) + ICON_R_PX))
-      : (roomRect.x + roomRect.width - SAFE_INSET_PX);
-
-    const desiredRightRulerX = rightMostOhEdgePx + GAP_PX;
-    const xRightRuler = Math.min(roomRect.x + roomRect.width - SAFE_INSET_PX, desiredRightRulerX);
+    // (we're no longer drawing the right overhead ruler)
 
     const yTopPx = roomRect.y;
     const yBottomPx = roomRect.y + roomRect.height;
 
     // Compute crowded font size for overhead vertical ruler
     const yList = overheadLeft.map(s => meterToCanvasY(s.position.y)).sort((a, b) => a - b);
-    const yListRight = overheadRight.map(s => meterToCanvasY(s.position.y)).sort((a, b) => a - b);
     const baseSize = calcFontSize(11, roomRect.width);
     const crowdedSize = getCrowdedFontSize(yList, baseSize);
-    const crowdedSizeRight = getCrowdedFontSize(yListRight, baseSize);
     const fontFamily = exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY;
 
-    const drawColumn = (list, rulerX, keyPrefix, side = 'left') => {
+    const drawColumn = (list, rulerX, keyPrefix) => {
       if (!list.length) return null;
 
       return list.map((s, idx) => {
@@ -821,10 +789,8 @@ export default function SpeakerPositionsOverlay({
         const distBack = mToCm(L - yM);
 
         const distDx = 14;
-        const rot = -90;
-        
-        // PART 3: Move left-side overhead text to the LEFT of the line
-        const distY = (side === 'left') ? -12 : 12;
+        const distY  = 12;
+        const rot    = -90;
         
         // Compute stagger for very close dots
         let stagger = 0;
@@ -886,23 +852,7 @@ export default function SpeakerPositionsOverlay({
           />
         ) : null}
 
-        {drawColumn(overheadLeft, xLeftRuler, "ohL", 'left')}
-
-        {/* Right vertical ruler */}
-        {overheadRight.length ? (
-          <line
-            x1={xRightRuler}
-            y1={yTopPx}
-            x2={xRightRuler}
-            y2={yBottomPx}
-            stroke={stroke}
-            strokeWidth={2}
-            markerStart="url(#spk-dim-arrow)"
-            markerEnd="url(#spk-dim-arrow)"
-          />
-        ) : null}
-
-        {drawColumn(overheadRight, xRightRuler, "ohR", 'right')}
+        {drawColumn(overheadLeft, xLeftRuler, "ohL")}
       </g>
     );
   };
@@ -1260,17 +1210,17 @@ export default function SpeakerPositionsOverlay({
 
                     {/* Role + H: identical spacing to LCR, but positioned between wall and ruler, rotated as a unit */}
                     <g transform={`translate(${labelX}, ${dotY}) rotate(${rot})`}>
-                     <text
-                       x={0}
-                       y={roleY}
-                       textAnchor="middle"
-                       fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}
-                       fontSize={roleSize}
-                       fill={textFill}
-                       fontWeight={700}
-                     >
-                       {s.displayRole || roleText}
-                     </text>
+                      <text
+                        x={0}
+                        y={roleY}
+                        textAnchor="middle"
+                        fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}
+                        fontSize={roleSize}
+                        fill={textFill}
+                        fontWeight={700}
+                      >
+                        {roleText}
+                      </text>
 
                       <text
                         x={hDx}
