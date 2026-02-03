@@ -1852,6 +1852,47 @@ function RP22ReportInner() {
                     onSetMlpPoint={rvNoops.onSetMlpPoint}
                 />
             </div>
+
+            {/* Hidden seat-metrics builder (NOT for export): keeps app.seatMetricsById live for Report + HUD */}
+            <div
+                data-seat-metrics-builder
+                style={{
+                    position: "fixed",
+                    left: 0,
+                    top: 0,
+                    width: "1200px",
+                    height: "800px",
+                    opacity: 0,
+                    pointerEvents: "none",
+                    zIndex: -1,
+                }}
+            >
+                <RoomVisualisation
+                    placedSpeakers={placedSpeakers}
+                    seatingPositions={seats}
+                    mlpPoint={primarySeatingPosition}
+                    screen={screen}
+                    dolbyLayout={dolbyLayout}
+                    frontSubs={frontSubsCfg?.positions || []}
+                    rearSubs={rearSubsCfg?.positions || []}
+                    overlays={{}}
+                    showBaffle={true}
+                    showScreen={true}
+                    speakerPositionsView="off"
+                    showMlpRuler={false}
+                    zoomMode="off"
+                    onSetSpeakers={rvNoops.onSetSpeakers}
+                    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
+                    onSetScreen={rvNoops.onSetScreen}
+                    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
+                    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
+                    onSetElements={rvNoops.onSetElements}
+                    onSetOverheadState={rvNoops.onSetOverheadState}
+                    onSetAimState={rvNoops.onSetAimState}
+                    onSetRoomDims={rvNoops.onSetRoomDims}
+                    onSetMlpPoint={rvNoops.onSetMlpPoint}
+                />
+            </div>
             
             <div className="max-w-7xl mx-auto space-y-6">
                 {/* Header */}
