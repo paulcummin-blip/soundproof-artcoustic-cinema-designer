@@ -3264,11 +3264,15 @@ React.useEffect(() => {
 
   // Combine hoveredSeat and pinnedSeat for effective display
   const effectiveHoveredSeat = useMemo(() => {
-    if (hudPinnedSeatId) {
-      return seatingPositions.find(s => s.id === hudPinnedSeatId) || null;
-    }
-    return hoveredSeat;
-  }, [hudPinnedSeatId, hoveredSeat, seatingPositions]);
+    // Try to resolve pinned seat from seatingPositions (by id)
+    const pinnedSeatId = appState?.hudPinnedSeatId || hudPinnedSeatId || null;
+    const pinnedSeat = pinnedSeatId && Array.isArray(seatingPositions)
+      ? seatingPositions.find(s => String(s?.id) === String(pinnedSeatId)) || null
+      : null;
+    
+    // If not pinned, fall back to hovered seat
+    return pinnedSeat || hoveredSeat || null;
+  }, [appState?.hudPinnedSeatId, hudPinnedSeatId, hoveredSeat, seatingPositions]);
 
   // SPL metrics: Use prop from RoomDesigner if available (single source of truth)
   // Only compute locally if prop not provided (fallback for standalone use)
@@ -3293,6 +3297,8 @@ React.useEffect(() => {
   // Build tooltip data: READ from cache (single source of truth)
   const tooltipData = useMemo(() => {
     if (!effectiveHoveredSeat) return null;
+    
+    const pinnedSeatId = appState?.hudPinnedSeatId || hudPinnedSeatId || null;
     
     // Build current signature (same logic as cache-writing effect)
     const seatIds = seatingPositions.map(s => s.id).join(',');
@@ -3319,7 +3325,7 @@ React.useEffect(() => {
     
     // FORCE LIVE: Pinned HUD always recomputes (bypasses cache for instant updates)
     const seatId = effectiveHoveredSeat?.id;
-    const isPinnedSeat = !!seatId && !!hudPinnedSeatId && seatId === hudPinnedSeatId;
+    const isPinnedSeat = !!seatId && !!pinnedSeatId && String(seatId) === String(pinnedSeatId);
     
     if (isPinnedSeat) {
       try {
@@ -3996,6 +4002,7 @@ React.useEffect(() => {
     END ORIGINAL INLINE LOGIC */
   }, [
     effectiveHoveredSeat,
+    appState?.hudPinnedSeatId,
     hudPinnedSeatId,
     placedSpeakers,
     widthM,
