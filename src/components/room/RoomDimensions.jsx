@@ -45,28 +45,40 @@ export default function RoomDimensions({ disabled }) {
   }, [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
   const handleDimensionChange = (key, raw) => {
-    const value = raw;
+    // Allow digits, single decimal point, and trailing decimal
+    if (!/^\d*\.?\d*$/.test(raw)) return;
 
     setDraftDims((prev) => ({
       ...prev,
-      [key]: value,
+      [key]: raw,
     }));
-
-    const parsed = parseDimensionInput(value);
-    if (parsed === null) {
-      return;
-    }
-
-    if (key === 'width') {
-      setRoomWidthM(parsed);
-    } else if (key === 'length') {
-      setRoomLengthM(parsed);
-    } else if (key === 'height') {
-      setRoomHeightM(parsed);
-    }
   };
 
   const handleDimensionBlur = (key) => {
+    const value = draftDims[key];
+    
+    // Skip invalid states
+    if (value === "" || value === ".") {
+      setDraftDims((prev) => ({
+        ...prev,
+        [key]: formatDimension(roomDims?.[`${key}M`]),
+      }));
+      return;
+    }
+
+    // Parse and commit
+    const parsed = parseDimensionInput(value);
+    if (parsed !== null) {
+      if (key === 'width') {
+        setRoomWidthM(parsed);
+      } else if (key === 'length') {
+        setRoomLengthM(parsed);
+      } else if (key === 'height') {
+        setRoomHeightM(parsed);
+      }
+    }
+
+    // Format to clean display
     setDraftDims((prev) => ({
       ...prev,
       [key]: formatDimension(roomDims?.[`${key}M`]),
