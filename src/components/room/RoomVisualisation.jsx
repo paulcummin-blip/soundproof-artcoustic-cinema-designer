@@ -3362,31 +3362,54 @@ React.useEffect(() => {
       return cached;
     }
     
-    // NEW: Hover fallback — build a live snapshot WITHOUT caching
-    if (effectiveHoveredSeat) {
-      try {
-        return buildSeatHudSnapshot({
-          seat: effectiveHoveredSeat,
-          placedSpeakers,
-          widthM,
-          lengthM,
-          heightM,
-          screenFrontPlaneM,
-          screen,
-          mlp: mlp || { x: widthM / 2, y: lengthM * 0.58, z: 1.2 },
-          allSeatSplMetrics,
-          aimAtMLP,
-          aimFrontWidesAtMLP,
-          aimSideSurroundsAtMLP,
-          aimRearSurroundsAtMLP,
-          lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 },
-          analysisResult: analysisResult || {},
-          seatingPositions,
-          splConfig: appState?.splConfig || {},
-        });
-      } catch (err) {
-        console.warn('[HUD] Failed to compute hover seat snapshot:', err);
+    // If cache is stale or missing, compute live snapshot for hover
+    const data = buildSeatHudSnapshot({
+      seat: effectiveHoveredSeat,
+      placedSpeakers,
+      widthM,
+      lengthM,
+      heightM,
+      screenFrontPlaneM,
+      screen,
+      mlp: mlp || { x: widthM / 2, y: lengthM * 0.58, z: 1.2 },
+      allSeatSplMetrics,
+      aimAtMLP,
+      aimFrontWidesAtMLP,
+      aimSideSurroundsAtMLP,
+      aimRearSurroundsAtMLP,
+      lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 },
+      analysisResult: analysisResult || {},
+      seatingPositions,
+      splConfig: appState?.splConfig || {},
+    });
+    
+    if (data) {
+      // IMPORTANT: seed the shared cache so RP22Report can render seat cards
+      // Keep this very conservative: only write if missing or different.
+      if (appState?.setSeatMetricsById) {
+        const prevAll = appState?.seatMetricsById || {};
+        const prevSeat = prevAll?.[seatId];
+
+        // Prefer the snapshot signature if available
+        const sig = data.__signature || data.__sig || prevSeat?.__sig || null;
+
+        const nextSeat = { ...data, __sig: sig };
+
+        const shouldWrite =
+          !prevSeat ||
+          (sig && prevSeat.__sig !== sig) ||
+          // If signature isn't available, do a minimal shape check
+          (!sig && (!!prevSeat?.rp22 !== !!nextSeat?.rp22));
+
+        if (shouldWrite) {
+          appState.setSeatMetricsById({
+            ...prevAll,
+            [seatId]: nextSeat,
+          });
+        }
       }
+
+      return data;
     }
     
     return null;
