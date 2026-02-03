@@ -122,20 +122,15 @@ export default function OverheadChannelSelector({
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-[#625143]">Use Global</span>
                     <Switch
-                      checked={!frontHasOverride}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          onUseFrontGlobalChange(true);
-                          onFrontOverrideChange(null);
-                        } else {
-                          onUseFrontGlobalChange(false);
-                        }
+                      checked={!!useFrontGlobal}
+                      onCheckedChange={(next) => {
+                        if (typeof onUseFrontGlobalChange === "function") onUseFrontGlobalChange(!!next);
                       }}
                       disabled={rowsDisabled}
                     />
                   </div>
                 </div>
-                {frontHasOverride ? (
+                {!useFrontGlobal ? (
                   <Select
                     value={frontOverride}
                     onValueChange={(val) => {
@@ -168,20 +163,15 @@ export default function OverheadChannelSelector({
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-[#625143]">Use Global</span>
                     <Switch
-                      checked={!midHasOverride}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          onUseMidGlobalChange(true);
-                          onMidOverrideChange(null);
-                        } else {
-                          onUseMidGlobalChange(false);
-                        }
+                      checked={!!useMidGlobal}
+                      onCheckedChange={(next) => {
+                        if (typeof onUseMidGlobalChange === "function") onUseMidGlobalChange(!!next);
                       }}
                       disabled={rowsDisabled}
                     />
                   </div>
                 </div>
-                {midHasOverride ? (
+                {!useMidGlobal ? (
                   <Select
                     value={midOverride}
                     onValueChange={(val) => {
@@ -214,20 +204,15 @@ export default function OverheadChannelSelector({
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-[#625143]">Use Global</span>
                     <Switch
-                      checked={!rearHasOverride}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          onUseRearGlobalChange(true);
-                          onRearOverrideChange(null);
-                        } else {
-                          onUseRearGlobalChange(false);
-                        }
+                      checked={!!useRearGlobal}
+                      onCheckedChange={(next) => {
+                        if (typeof onUseRearGlobalChange === "function") onUseRearGlobalChange(!!next);
                       }}
                       disabled={rowsDisabled}
                     />
                   </div>
                 </div>
-                {rearHasOverride ? (
+                {!useRearGlobal ? (
                   <Select
                     value={rearOverride}
                     onValueChange={(val) => {
