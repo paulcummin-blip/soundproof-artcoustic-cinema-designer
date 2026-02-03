@@ -3317,16 +3317,11 @@ React.useEffect(() => {
     const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
     const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}`;
     
-    // CRITICAL: Only trust cache if it was built for THIS exact signature
+    // FORCE LIVE: Pinned HUD always recomputes (bypasses cache for instant updates)
     const seatId = effectiveHoveredSeat?.id;
-    const cached = seatId ? appState?.seatMetricsById?.[seatId] : null;
+    const isPinnedSeat = !!seatId && !!hudPinnedSeatId && seatId === hudPinnedSeatId;
     
-    if (cached && cached.__sig === signature) {
-      return cached; // Use cached snapshot (guarantees HUD === Report)
-    }
-    
-    // PINNED HUD: If seat is pinned but cache miss, try to compute immediately (don't show dashes)
-    if (hudPinnedSeatId === effectiveHoveredSeat.id) {
+    if (isPinnedSeat) {
       try {
         const snapshot = buildSeatHudSnapshot({
           seat: effectiveHoveredSeat,
@@ -3342,7 +3337,7 @@ React.useEffect(() => {
           aimFrontWidesAtMLP,
           aimSideSurroundsAtMLP,
           aimRearSurroundsAtMLP,
-          lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 }, // Safe default
+          lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 },
           analysisResult: analysisResult || {},
           seatingPositions,
           splConfig: appState?.splConfig || {},
@@ -3352,6 +3347,13 @@ React.useEffect(() => {
       } catch (err) {
         console.warn('[HUD] Failed to compute pinned seat snapshot:', err);
       }
+    }
+    
+    // Non-pinned hover: use cache for performance
+    const cached = seatId ? appState?.seatMetricsById?.[seatId] : null;
+    
+    if (cached && cached.__sig === signature) {
+      return cached;
     }
     
     // Fallback: If cache miss and not pinned, show "Analysis in progress..." (no flicker)
@@ -3994,6 +3996,7 @@ React.useEffect(() => {
     END ORIGINAL INLINE LOGIC */
   }, [
     effectiveHoveredSeat,
+    hudPinnedSeatId,
     placedSpeakers,
     widthM,
     lengthM,
@@ -4010,6 +4013,7 @@ React.useEffect(() => {
     analysisResult,
     seatingPositions,
     appState?.splConfig,
+    appState?.seatMetricsById,
   ]);
 
   // AUTOMATIC SEAT METRICS CACHE - SOLE WRITER for seatMetricsById (powers both HUD and Report)
