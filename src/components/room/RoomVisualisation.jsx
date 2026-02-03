@@ -3355,35 +3355,41 @@ React.useEffect(() => {
       }
     }
     
-    // Non-pinned hover: use cache for performance
+    // Non-pinned hover: try cache first
     const cached = seatId ? appState?.seatMetricsById?.[seatId] : null;
     
     if (cached && cached.__sig === signature) {
       return cached;
     }
     
-    // Fallback: If cache miss and not pinned, show "Analysis in progress..." (no flicker)
-    return {
-      seatId: effectiveHoveredSeat.id || 'Seat',
-      isPrimary: effectiveHoveredSeat.isPrimary || false,
-      position: '—',
-      distanceToScreen: '—',
-      distanceToMLP: '—',
-      rp23: { formatted: 'Analysis in progress…', level: '—' },
-      rp22: {
-        p1: { formatted: 'Analysis in progress…', level: '—' },
-        p4: { formatted: 'Analysis in progress…', level: '—' },
-        p5: { formatted: 'Analysis in progress…', level: '—' },
-        p6: { formatted: 'Analysis in progress…', level: '—' },
-        p9: { formatted: 'Analysis in progress…', level: '—' },
-        p10: { formatted: 'Analysis in progress…', level: '—' },
-        p16: { formatted: 'Analysis in progress…', level: '—' },
-        p17: { formatted: 'Analysis in progress…', level: '—' },
-        p20: { formatted: 'Analysis in progress…', level: '—' },
-      },
-      splAtSeat: { lcr: {}, surrounds: {}, overheads: {} },
-      splAtSeatMeta: { powerW: 100, radiationMode: 'half-space' },
-    };
+    // NEW: Hover fallback — build a live snapshot WITHOUT caching
+    if (effectiveHoveredSeat) {
+      try {
+        return buildSeatHudSnapshot({
+          seat: effectiveHoveredSeat,
+          placedSpeakers,
+          widthM,
+          lengthM,
+          heightM,
+          screenFrontPlaneM,
+          screen,
+          mlp: mlp || { x: widthM / 2, y: lengthM * 0.58, z: 1.2 },
+          allSeatSplMetrics,
+          aimAtMLP,
+          aimFrontWidesAtMLP,
+          aimSideSurroundsAtMLP,
+          aimRearSurroundsAtMLP,
+          lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 },
+          analysisResult: analysisResult || {},
+          seatingPositions,
+          splConfig: appState?.splConfig || {},
+        });
+      } catch (err) {
+        console.warn('[HUD] Failed to compute hover seat snapshot:', err);
+      }
+    }
+    
+    return null;
 
     /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
 
