@@ -912,42 +912,23 @@ export default function SpeakerPositionsOverlay({
 
     return (
       <g data-layer="speaker-positions-overheads-horizontal" pointerEvents="none">
-        {(() => {
-          const row = overheadRows[0];
-          if (!row) return null;
-
+        {overheadRows.map((row, rowIndex) => {
           const ySpeakerPx = meterToCanvasY(row.yM);
 
-          // Keep the horizontal ruler a clean distance away from:
-          // 1) the overhead icon edges
-          // 2) the vertical ruler's label block (so it never clashes)
-          //
-          // Tunables:
+          // Constants
           const ICON_R_PX = 12;
           const GAP_FROM_ICON_PX = 20;
           const SAFE_INSET_PX = 12;
 
-          // This should match what you used for the vertical ruler label placement.
-          // In your vertical overhead code you used: translate(rulerX + 22, ...) then rotate(-90)
-          // That label block projects into the room by roughly this much:
-          const V_LABEL_PROJECT_PX = 70;
-
-          // If the vertical ruler exists, keep the horizontal line to the RIGHT of that label zone.
-          // (We can't literally "move a horizontal line right", so instead we shift the y a bit
-          // so the nearby text doesn't sit on top of the line.)
           const avoidLabelExtraY = overheadLeft.length ? 10 : 0;
-
-          // Desired y: just BELOW the overhead icons for that row
-          // Extra clearance so the horizontal ruler never clashes with the vertical ruler text lane
           const EXTRA_CLEAR_PX = overheadLeft.length ? 28 : 0;
+          
           let yPxRaw = ySpeakerPx + ICON_R_PX + GAP_FROM_ICON_PX + avoidLabelExtraY + EXTRA_CLEAR_PX;
-
-          // Clamp so it stays inside the room (and doesn't sit on the border)
           yPxRaw = Math.max(roomRect.y + SAFE_INSET_PX, Math.min(roomRect.y + roomRect.height - SAFE_INSET_PX, yPxRaw));
 
           const yPx = pushRowDownIfNeeded(yPxRaw);
 
-          // Build label slots for this overhead horizontal ruler
+          // Build label slots for dynamic font sizing
           const distanceLabels = [];
           row.items.forEach((it, idx) => {
             const xPx = meterToCanvasX(it.xM);
@@ -965,7 +946,7 @@ export default function SpeakerPositionsOverlay({
           const fontFamily = exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY;
 
           return (
-            <g key={`oh-row-top`}>
+            <g key={`oh-row-${row.label}-${rowIndex}`}>
               <line
                 x1={xLeftPx}
                 y1={yPx}
@@ -982,7 +963,7 @@ export default function SpeakerPositionsOverlay({
                 const distTextY = yPx + 12;
 
                 return (
-                  <g key={`oh-top-${idx}`}>
+                  <g key={`oh-${row.label}-${idx}`}>
                     <circle cx={xPx} cy={yPx} r={5} fill={dotFill} />
 
                     <text
@@ -1011,7 +992,7 @@ export default function SpeakerPositionsOverlay({
               })}
             </g>
           );
-        })()}
+        })}
       </g>
     );
   };
@@ -1264,7 +1245,7 @@ export default function SpeakerPositionsOverlay({
                 };
 
   return (
-    <g data-layer="speaker-positions-overlay" pointerEvents="none">
+    <g data-layer="speaker-positions-overlay" pointerEvents="none" fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}>
       <defs>
         <marker
           id="spk-dim-arrow"
