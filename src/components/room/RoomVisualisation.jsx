@@ -4108,7 +4108,9 @@ React.useEffect(() => {
     const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
     const mlpRp23 = mlp ? Math.round((mlp.y || 0) * 1000) : 0;
     const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
-    const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}`;
+    const analysisKey = analysisResult?.__rev ?? (analysisResult?.perSeatRp22 ? Object.keys(analysisResult.perSeatRp22).length : 0);
+    const splKey = allSeatSplMetrics?.__rev ?? (allSeatSplMetrics ? Object.keys(allSeatSplMetrics).length : 0);
+    const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}|A${analysisKey}|S${splKey}`;
     
     // Skip if nothing changed
     if (lastCacheSignatureRef.current === signature) {
