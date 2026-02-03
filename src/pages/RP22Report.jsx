@@ -39,6 +39,10 @@ function RP22ReportInner() {
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
     const printLockRef = React.useRef(false);
     const cleanupTimeoutRef = React.useRef(null);
+    const exportGuardRef = React.useRef({ active: false, startedAt: 0 });
+    const exportTimeoutRef = React.useRef(null);
+    
+    const EXPORT_TIMEOUT_MS = 20000; // 20s is enough for slow captures
 
     useEffect(() => {
         const cleanup = () => {
@@ -53,6 +57,11 @@ function RP22ReportInner() {
                 clearTimeout(cleanupTimeoutRef.current);
                 cleanupTimeoutRef.current = null;
             }
+            if (exportTimeoutRef.current) {
+                clearTimeout(exportTimeoutRef.current);
+                exportTimeoutRef.current = null;
+            }
+            exportGuardRef.current.active = false;
         };
         
         const onAfterPrint = () => {
@@ -64,6 +73,9 @@ function RP22ReportInner() {
             window.removeEventListener('afterprint', onAfterPrint);
             if (cleanupTimeoutRef.current) {
                 clearTimeout(cleanupTimeoutRef.current);
+            }
+            if (exportTimeoutRef.current) {
+                clearTimeout(exportTimeoutRef.current);
             }
         };
     }, []);
@@ -494,6 +506,11 @@ function RP22ReportInner() {
             setHasPrintedOnce(true);
             printLockRef.current = true; // Lock before calling print
             
+            // Clear export guard on success
+            if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
+            exportTimeoutRef.current = null;
+            exportGuardRef.current.active = false;
+            
             window.print();
             
             // Safety timeout: cleanup after 2s if afterprint doesn't fire
@@ -713,8 +730,12 @@ function RP22ReportInner() {
                 if (attempts < maxAttempts) {
                     retryTimer = setTimeout(attemptCapture, 100);
                 } else {
-                    setExportStatus("Plan skipped: continuing without plan");
-                    setPlanImageDataUrl('__SKIP__');
+                    setExportStatus("Plan capture failed — opening Print fallback…");
+                    if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
+                    exportTimeoutRef.current = null;
+                    exportGuardRef.current.active = false;
+                    setIsPrinting(false);
+                    setTimeout(() => window.print(), 250);
                 }
             }
         };
@@ -921,8 +942,12 @@ function RP22ReportInner() {
                 if (attempts < maxAttempts) {
                     retryTimer = setTimeout(attemptCapture, 100);
                 } else {
-                    setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                    setPlanDimsImageDataUrl('__SKIP__');
+                    setExportStatus("Dims plan capture failed — opening Print fallback…");
+                    if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
+                    exportTimeoutRef.current = null;
+                    exportGuardRef.current.active = false;
+                    setIsPrinting(false);
+                    setTimeout(() => window.print(), 250);
                 }
             }
         };
@@ -1126,8 +1151,12 @@ function RP22ReportInner() {
                 if (attempts < maxAttempts) {
                     retryTimer = setTimeout(attemptCapture, 100);
                 } else {
-                    setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
-                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                    setExportStatus("Speaker dims capture failed — opening Print fallback…");
+                    if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
+                    exportTimeoutRef.current = null;
+                    exportGuardRef.current.active = false;
+                    setIsPrinting(false);
+                    setTimeout(() => window.print(), 250);
                 }
             }
         };
@@ -1849,18 +1878,50 @@ function RP22ReportInner() {
                         <Button
                             type="button"
                             onClick={() => {
+                                // Prevent double-click / overlapping exports
+                                if (exportGuardRef.current.active) return;
+
+                                exportGuardRef.current = { active: true, startedAt: Date.now() };
+
                                 // Resolve screen metrics immediately (synchronously)
-                                setScreenMetricsForPrint(resolveScreenMetricsSnapshot());
-                                setScreenMetricsStatus("Ready");
-                                
+                                try {
+                                    setScreenMetricsForPrint(resolveScreenMetricsSnapshot());
+                                    setScreenMetricsStatus("Ready");
+                                } catch (e) {
+                                    // If this fails, we still allow Print fallback
+                                    setScreenMetricsStatus("Error");
+                                }
+
+                                // Reset export pipeline state (your existing behaviour)
                                 setExportStatus("Capturing plan images…");
                                 setExportDebug({ isPrinting: true, planLen: 0, printReady: false });
                                 setHasPrintedOnce(false);
                                 setPlanImageDataUrl(null);
                                 setPlanDimsImageDataUrl(null);
                                 setPlanSpeakerDimsImageDataUrl(null);
-                                
+
+                                // Start the capture/print pipeline
                                 setIsPrinting(true);
+
+                                // SAFETY NET: if nothing finishes, fallback to browser print
+                                if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
+                                exportTimeoutRef.current = setTimeout(() => {
+                                    // If export is still active after timeout, fallback
+                                    if (!exportGuardRef.current.active) return;
+
+                                    exportGuardRef.current.active = false;
+                                    setIsPrinting(false);
+
+                                    setExportStatus("Export stalled — opening Print fallback…");
+                                    try {
+                                        alert(
+                                            "PDF export stalled. We'll open Print instead. In the print window choose 'Save as PDF'."
+                                        );
+                                        setTimeout(() => window.print(), 250);
+                                    } catch (err) {
+                                        alert("Export stalled and Print fallback couldn't open. Please try again.");
+                                    }
+                                }, EXPORT_TIMEOUT_MS);
                             }}
                             className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
                             style={{
