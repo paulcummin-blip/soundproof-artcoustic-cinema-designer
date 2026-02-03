@@ -312,6 +312,15 @@ export default function SpeakerPositionsOverlay({
     return rows;
   })();
 
+  // --- Detect wides mode for label mapping ---
+  const widesMode = bedSpeakers.some(s => {
+    const role = String(s.role || "").toUpperCase();
+    return role === "LW" || role === "RW";
+  }) && !bedSpeakers.some(s => {
+    const role = String(s.role || "").toUpperCase();
+    return role === "SBL" || role === "SBR";
+  });
+
   // --- Split LCR vs surrounds ---
   const lcrRoles = new Set(["FL","FC","FR","L","C","R"]);
   const lcr = bedSpeakers
@@ -325,6 +334,10 @@ export default function SpeakerPositionsOverlay({
     const xM = s.position.x;
     const yM = s.position.y;
     const role = String(s.role).toUpperCase();
+    
+    // Map RW → FW label when in wides mode (export only)
+    const displayRole = (widesMode && role === "RW") ? "FW" : 
+                        (widesMode && role === "LW") ? "FW" : role;
 
     const dFront = yM;
     const dBack = L - yM;
@@ -337,7 +350,7 @@ export default function SpeakerPositionsOverlay({
     if (dLeft < min) { wall = "left"; min = dLeft; }
     if (dRight < min) { wall = "right"; min = dRight; }
 
-    return { ...s, wall, xM, yM, role };
+    return { ...s, wall, xM, yM, role, displayRole };
   });
 
   // Group by wall and sort
@@ -605,7 +618,7 @@ export default function SpeakerPositionsOverlay({
                 fill={textFill}
                 fontWeight={700}
               >
-                {s.role}
+                {s.displayRole || s.role}
               </text>
 
               <text
@@ -776,7 +789,7 @@ export default function SpeakerPositionsOverlay({
     const crowdedSize = getCrowdedFontSize(yList, baseSize);
     const fontFamily = exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY;
 
-    const drawColumn = (list, rulerX, keyPrefix) => {
+    const drawColumn = (list, rulerX, keyPrefix, side = 'left') => {
       if (!list.length) return null;
 
       return list.map((s, idx) => {
@@ -789,8 +802,10 @@ export default function SpeakerPositionsOverlay({
         const distBack = mToCm(L - yM);
 
         const distDx = 14;
-        const distY  = 12;
-        const rot    = -90;
+        const rot = -90;
+        
+        // PART 3: Move left-side overhead text to the LEFT of the line
+        const distY = (side === 'left') ? -12 : 12;
         
         // Compute stagger for very close dots
         let stagger = 0;
@@ -852,7 +867,7 @@ export default function SpeakerPositionsOverlay({
           />
         ) : null}
 
-        {drawColumn(overheadLeft, xLeftRuler, "ohL")}
+        {drawColumn(overheadLeft, xLeftRuler, "ohL", 'left')}
       </g>
     );
   };
@@ -1210,17 +1225,17 @@ export default function SpeakerPositionsOverlay({
 
                     {/* Role + H: identical spacing to LCR, but positioned between wall and ruler, rotated as a unit */}
                     <g transform={`translate(${labelX}, ${dotY}) rotate(${rot})`}>
-                      <text
-                        x={0}
-                        y={roleY}
-                        textAnchor="middle"
-                        fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}
-                        fontSize={roleSize}
-                        fill={textFill}
-                        fontWeight={700}
-                      >
-                        {roleText}
-                      </text>
+                     <text
+                       x={0}
+                       y={roleY}
+                       textAnchor="middle"
+                       fontFamily={exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY}
+                       fontSize={roleSize}
+                       fill={textFill}
+                       fontWeight={700}
+                     >
+                       {s.displayRole || roleText}
+                     </text>
 
                       <text
                         x={hDx}
