@@ -1014,7 +1014,7 @@ export default function SpeakerPositionsOverlay({
                   <g key={`oh-${row.label}-${idx}`}>
                     <circle cx={xPx} cy={yPx} r={5} fill={dotFill} />
 
-                    {row.label === "front" && it.xM < (W / 2) && (
+                    {((row.label === "front" && it.xM < (W / 2)) || row.label === "rear") && (
                       <>
                         <text
                           x={xPx - 14}
