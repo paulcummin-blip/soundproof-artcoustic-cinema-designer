@@ -653,21 +653,37 @@ export function buildSeatHudSnapshot({
   let p5Level = '—';
   let p5Formatted = '—';
 
-  if (Number.isFinite(p5Val)) {
-    p5Level = rp22LevelForP5(p5Val);
-    p5Formatted = `${Math.floor(p5Val)}°`;
+  if (Number.isFinite(p5WorstDeg)) {
+    p5Level = rp22LevelForP5(p5WorstDeg);
+    p5Formatted = `${Math.round(p5WorstDeg)}°`; // stable, no 69/70 jitter
   }
   
-  // Find worst gap pair for debug
+  // Find worst gap pair for debug (rounded + stable tie-break)
   let worstPair = null;
+  const roundP5 = (v) => Math.round(v * 10) / 10; // 0.1° resolution (stable)
+  let p5WorstDeg = p5Val; // default to raw value
+  
   if (p5Gaps && p5Gaps.length > 0) {
-    const worst = p5Gaps.reduce((max, g) => g.deg > max.deg ? g : max, p5Gaps[0]);
+    const worst = p5Gaps.reduce((max, g) => {
+      const a = roundP5(max.deg);
+      const b = roundP5(g.deg);
+
+      // Compare rounded values first (stability)
+      if (b > a) return g;
+      if (b < a) return max;
+
+      // Deterministic tie-break so it never flips frame-to-frame
+      const keyMax = `${String(max.fromRole || "")}->${String(max.toRole || "")}`;
+      const keyG   = `${String(g.fromRole || "")}->${String(g.toRole || "")}`;
+      return (keyG < keyMax) ? g : max;
+    }, p5Gaps[0]);
     worstPair = `${worst.fromRole}→${worst.toRole}`;
+    p5WorstDeg = (worst && Number.isFinite(worst.deg)) ? roundP5(worst.deg) : p5Val;
   }
 
   // Publish P5 to HUD
   data.rp22.p5 = { 
-    valueDeg: p5Val, 
+    valueDeg: p5WorstDeg, 
     level: p5Level, 
     formatted: p5Formatted,
     gaps: p5Gaps,
