@@ -266,12 +266,57 @@ export default function SpeakerPositionsReadout({
                   {r.wall}
                 </td>
 
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(r.fromFront)}</td>
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(r.fromBack)}</td>
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(r.fromLeft)}</td>
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(r.fromRight)}</td>
+                {(() => {
+                  const role = String(r.role || "").toUpperCase();
 
-                <td className="py-1 text-right text-gray-700 font-mono">{mToCm(r.height)}</td>
+                  const isOverhead = role.startsWith("T");
+                  const isLCR = role === "FL" || role === "FC" || role === "FR";
+                  const isRearSurround = role === "SBL" || role === "SBR";
+                  const isFrontWideOrSideSurround =
+                    role === "LW" || role === "RW" || role === "SL" || role === "SR" || role === "SL2" || role === "SR2";
+
+                  // Defaults: show nothing unless allowed
+                  let showFrontBack = false;
+                  let showLeftRight = false;
+
+                  if (isOverhead) {
+                    // Keep overheads meaningful: show all four distances (they're ceiling, so wall distances still matter)
+                    showFrontBack = true;
+                    showLeftRight = true;
+                  } else if (isLCR || isRearSurround) {
+                    // LCR + rear surrounds: only left/right
+                    showLeftRight = true;
+                  } else if (isFrontWideOrSideSurround) {
+                    // Front wides + side surrounds: only front/back
+                    showFrontBack = true;
+                  } else {
+                    // Fallback (any other bed roles): keep existing behaviour (show all)
+                    showFrontBack = true;
+                    showLeftRight = true;
+                  }
+
+                  const cell = (enabled, value) => (
+                    <td className="py-1 pr-2 text-right text-gray-700 font-mono">
+                      {enabled ? mToCm(value) : "-"}
+                    </td>
+                  );
+
+                  const heightCell = () => (
+                    <td className="py-1 text-right text-gray-700 font-mono">
+                      {isOverhead ? "-" : mToCm(r.height)}
+                    </td>
+                  );
+
+                  return (
+                    <>
+                      {cell(showFrontBack, r.fromFront)}
+                      {cell(showFrontBack, r.fromBack)}
+                      {cell(showLeftRight, r.fromLeft)}
+                      {cell(showLeftRight, r.fromRight)}
+                      {heightCell()}
+                    </>
+                  );
+                })()}
               </tr>
             ))}
           </tbody>
