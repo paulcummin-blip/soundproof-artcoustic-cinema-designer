@@ -293,6 +293,21 @@ export default function SeatHud({
                       </div>
                     )}
 
+                    {/* P9 detail */}
+                    {key === 'p9' && tooltipData.rp22.p9Detail && (
+                      <div
+                        style={{
+                          fontSize: 10,
+                          color: '#999',
+                          paddingLeft: 16,
+                          paddingBottom: 3,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {tooltipData.rp22.p9Detail}
+                      </div>
+                    )}
+
                     {/* P16 debug info */}
               {key === 'p16' && metric?.perSpeaker && metric.perSpeaker.length > 0 && (
                 <div
