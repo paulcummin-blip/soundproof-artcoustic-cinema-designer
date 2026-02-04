@@ -899,8 +899,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           else if (maxVerticalGapDeg <= 60) level9 = 3;
           else if (maxVerticalGapDeg <= 80) level9 = 2;
           
-          // Build breakdown rows (like P16/P17)
-          const gaps = Array.isArray(result?.gaps) ? result.gaps : [];
+          // Build breakdown (like P16/P17)
           const elevations = Array.isArray(result?.elevations) ? result.elevations : [];
 
           const roleOrderIndex = (role) => {
@@ -911,10 +910,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             return 99;
           };
 
-          const orderLabel = (idx) => (idx === 0 ? "TF" : idx === 1 ? "TM" : idx === 2 ? "TR" : "T?");
-          const sideLabel = (isLeft) => (isLeft ? "L" : "R");
-
-          // Build left/right lists from elevations (already includes isLeft + role + elevDeg)
+          // Build left/right lists from elevations
           const leftList  = elevations.filter(e => e.isLeft).sort((a,b) => {
             const pa = roleOrderIndex(a.role);
             const pb = roleOrderIndex(b.role);
@@ -928,65 +924,38 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
             return (a.y ?? 0) - (b.y ?? 0);
           });
 
-          // Helper: create adjacent pair rows for one side
-          const buildPairs = (list, isLeftSide) => {
-            const out = [];
-            for (let i = 1; i < list.length; i++) {
-              const a = list[i - 1];
-              const b = list[i];
-              const gap = Math.abs((b.elevDeg ?? 0) - (a.elevDeg ?? 0));
-              out.push({
-                fromRole: a.role,
-                toRole: b.role,
-                gapDeg: gap,
-                // Optional compact label: TFL ↔ TML, etc.
-                label: `${a.role} ↔ ${b.role}`,
-                // Optional "row" label: TF(L) ↔ TM(L)
-                rowLabel: `${orderLabel(roleOrderIndex(a.role))}${sideLabel(isLeftSide)} ↔ ${orderLabel(roleOrderIndex(b.role))}${sideLabel(isLeftSide)}`,
-              });
-            }
-            return out;
-          };
-
-          const p9Pairs = [
-            ...buildPairs(leftList, true),
-            ...buildPairs(rightList, false),
-          ];
-
-          // Find worst pair (stable tie-break so it won't flicker)
-          let worstPair = null;
-          if (p9Pairs.length) {
-            worstPair = p9Pairs.reduce((best, cur) => {
-              if (!best) return cur;
-              if (cur.gapDeg > best.gapDeg + 1e-6) return cur;
-              // Tie-break by label so it's deterministic
-              if (Math.abs(cur.gapDeg - best.gapDeg) <= 1e-6) {
-                return String(cur.label).localeCompare(String(best.label)) < 0 ? cur : best;
-              }
-              return best;
-            }, null);
+          // Build gap detail objects
+          const gapDetails = [];
+          
+          // Process left side
+          for (let i = 1; i < leftList.length; i++) {
+            const gap = Math.abs((leftList[i].elevDeg ?? 0) - (leftList[i-1].elevDeg ?? 0));
+            gapDetails.push({
+              a: leftList[i-1].role,
+              b: leftList[i].role,
+              deg: gap
+            });
           }
+          
+          // Process right side
+          for (let i = 1; i < rightList.length; i++) {
+            const gap = Math.abs((rightList[i].elevDeg ?? 0) - (rightList[i-1].elevDeg ?? 0));
+            gapDetails.push({
+              a: rightList[i-1].role,
+              b: rightList[i].role,
+              deg: gap
+            });
+          }
+
+          const breakdown = gapDetails
+            .map(g => `${g.a} ↔ ${g.b} ${g.deg.toFixed(0)}°`)
+            .join(', ');
 
           metrics.p9 = {
             value: maxVerticalGapDeg,
             formatted: `${maxVerticalGapDeg.toFixed(1)}°`,
             level: level9,
-
-            // NEW: breakdown (mirrors P16/P17 style)
-            pairs: p9Pairs.map(p => ({
-              fromRole: p.fromRole,
-              toRole: p.toRole,
-              gapDeg: p.gapDeg,
-              label: p.label,
-              rowLabel: p.rowLabel,
-            })),
-            worstPair: worstPair ? {
-              fromRole: worstPair.fromRole,
-              toRole: worstPair.toRole,
-              gapDeg: worstPair.gapDeg,
-              label: worstPair.label,
-              rowLabel: worstPair.rowLabel,
-            } : null,
+            detail: breakdown ? `${breakdown} (worst)` : null
           };
         }
       }
