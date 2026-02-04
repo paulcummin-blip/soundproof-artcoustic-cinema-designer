@@ -830,29 +830,39 @@ export default function SpeakerPositionsOverlay({
 
             {/* distances either side of the dot (like LCR), but turned 90° */}
             {/* IMPORTANT: keep the same "rear on the left, front on the right" reading order */}
-            <g transform={`translate(${rulerX}, ${yPx}) rotate(${rot})`}>
-              <text
-                x={-distDx}
-                y={distY + stagger}
-                textAnchor="end"
-                fontFamily={fontFamily}
-                fontSize={crowdedSize}
-                fill={textFill}
-              >
-                {distBack}cm
-              </text>
+            {(() => {
+              // Keep ONLY the front-left overhead vertical labels.
+              // This removes the exact "red box" label pairs without touching lines/dots/other measurements.
+              const showLabels = role === "TFL";
 
-              <text
-                x={distDx}
-                y={distY + stagger}
-                textAnchor="start"
-                fontFamily={fontFamily}
-                fontSize={crowdedSize}
-                fill={textFill}
-              >
-                {distFront}cm
-              </text>
-            </g>
+              if (!showLabels) return null;
+
+              return (
+                <g transform={`translate(${rulerX}, ${yPx}) rotate(${rot})`}>
+                  <text
+                    x={-distDx}
+                    y={distY + stagger}
+                    textAnchor="end"
+                    fontFamily={fontFamily}
+                    fontSize={crowdedSize}
+                    fill={textFill}
+                  >
+                    {distBack}cm
+                  </text>
+
+                  <text
+                    x={distDx}
+                    y={distY + stagger}
+                    textAnchor="start"
+                    fontFamily={fontFamily}
+                    fontSize={crowdedSize}
+                    fill={textFill}
+                  >
+                    {distFront}cm
+                  </text>
+                </g>
+              );
+            })()}
           </g>
         );
       });
