@@ -803,6 +803,10 @@ export default function SpeakerPositionsOverlay({
 
       return list.map((s, idx) => {
         const role = String(s.role || "").toUpperCase();
+        
+        // Keep ONLY TFL overhead vertical measurement (labels + dot)
+        if (role !== "TFL") return null;
+        
         const yM = s.position.y;
         const yPx = meterToCanvasY(yM);
 
