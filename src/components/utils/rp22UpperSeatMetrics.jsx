@@ -120,22 +120,34 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
     };
   });
 
-  // Split by side (deterministic order: front -> mid -> rear, then tie-break by Y)
-  const leftUppers  = elevations.filter(e => e.isLeft).sort(upperSort);
-  const rightUppers = elevations.filter(e => !e.isLeft).sort(upperSort);
+  // RP22-PURE ADJACENCY: Only compare front↔mid and mid↔rear on SAME SIDE
+  const byRow = (list) => {
+    const rows = { front: null, mid: null, rear: null };
 
-  // Compute gaps within each side
+    for (const e of list) {
+      const r = String(e.role || "").toUpperCase();
+      if (r.startsWith("TF")) rows.front = e;
+      else if (r.startsWith("TM")) rows.mid = e;
+      else if (r.startsWith("TR") || r.startsWith("TB")) rows.rear = e;
+    }
+
+    return rows;
+  };
+
   const gaps = [];
 
-  const computeSideGaps = (side) => {
-    for (let i = 1; i < side.length; i++) {
-      const gap = Math.abs(side[i].elevDeg - side[i - 1].elevDeg);
-      gaps.push(gap);
+  const evalSide = (sideList) => {
+    const rows = byRow(sideList);
+    if (rows.front && rows.mid) {
+      gaps.push(Math.abs(rows.front.elevDeg - rows.mid.elevDeg));
+    }
+    if (rows.mid && rows.rear) {
+      gaps.push(Math.abs(rows.mid.elevDeg - rows.rear.elevDeg));
     }
   };
 
-  computeSideGaps(leftUppers);
-  computeSideGaps(rightUppers);
+  evalSide(elevations.filter(e => e.isLeft));
+  evalSide(elevations.filter(e => !e.isLeft));
 
   const maxVerticalGapDeg = gaps.length > 0 ? Math.max(...gaps) : null;
 
