@@ -830,31 +830,29 @@ export default function SpeakerPositionsOverlay({
 
             {/* distances either side of the dot (like LCR), but turned 90° */}
             {/* IMPORTANT: keep the same "rear on the left, front on the right" reading order */}
-            {String(role).toUpperCase().startsWith("TF") && (s.position.x ?? 0) < (W / 2) && (
-              <g transform={`translate(${rulerX}, ${yPx}) rotate(${rot})`}>
-                <text
-                  x={-distDx}
-                  y={distY + stagger}
-                  textAnchor="end"
-                  fontFamily={fontFamily}
-                  fontSize={crowdedSize}
-                  fill={textFill}
-                >
-                  {distBack}cm
-                </text>
+            <g transform={`translate(${rulerX}, ${yPx}) rotate(${rot})`}>
+              <text
+                x={-distDx}
+                y={distY + stagger}
+                textAnchor="end"
+                fontFamily={fontFamily}
+                fontSize={crowdedSize}
+                fill={textFill}
+              >
+                {distBack}cm
+              </text>
 
-                <text
-                  x={distDx}
-                  y={distY + stagger}
-                  textAnchor="start"
-                  fontFamily={fontFamily}
-                  fontSize={crowdedSize}
-                  fill={textFill}
-                >
-                  {distFront}cm
-                </text>
-              </g>
-            )}
+              <text
+                x={distDx}
+                y={distY + stagger}
+                textAnchor="start"
+                fontFamily={fontFamily}
+                fontSize={crowdedSize}
+                fill={textFill}
+              >
+                {distFront}cm
+              </text>
+            </g>
           </g>
         );
       });
