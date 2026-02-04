@@ -806,6 +806,8 @@ export default function SpeakerPositionsOverlay({
         
         // REMOVE ONLY TML from the vertical overhead ruler
         if (role === "TML") return null;
+        // Remove ONLY this overhead vertical measurement
+        if (role === "TFR") return null;
         
         const yM = s.position.y;
         const yPx = meterToCanvasY(yM);
@@ -1011,6 +1013,10 @@ export default function SpeakerPositionsOverlay({
               />
 
               {row.items.map((it, idx) => {
+                const role = String(it?.s?.role || "").toUpperCase();
+                // Remove ONLY the mid-row horizontal measurement for TML + TMR
+                if (row.label === "mid" && (role === "TML" || role === "TMR")) return null;
+                
                 const xPx = meterToCanvasX(it.xM);
                 const distTextY = yPx + 12;
 
