@@ -23,17 +23,19 @@ const CANONICAL_ROLE_MAP = {
   LW: "LW", FWL: "LW",
   RW: "RW", FWR: "RW",
 
-  // Height / Atmos - Front
+  // --- Overheads (Dolby Atmos canonical roles) ---
+  // Keep explicit Dolby roles. Do NOT collapse to TL/TR, and do NOT remap TRL/TRR to TB*.
+  // Allow legacy aliases (TS*) to map into the correct Dolby mid roles.
   TFL: "TFL", TF: "TFL",
   TFR: "TFR",
-
-  // Height / Atmos - Middle/Side
-  TL: "TL", TML: "TL", TSL: "TL",
-  TR: "TR", TMR: "TR", TSR: "TR",
-
-  // Height / Atmos - Rear
-  TBL: "TBL", TRL: "TBL",
-  TBR: "TBR", TRR: "TBR",
+  TML: "TML",
+  TMR: "TMR",
+  TSL: "TML",   // legacy alias -> Top Mid Left
+  TSR: "TMR",   // legacy alias -> Top Mid Right
+  TRL: "TRL",
+  TRR: "TRR",
+  TBL: "TBL",
+  TBR: "TBR",
 
   // Up-firing (if used)
   UFL: "UFL",
