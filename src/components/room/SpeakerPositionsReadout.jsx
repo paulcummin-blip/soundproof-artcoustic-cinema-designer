@@ -254,9 +254,37 @@ export default function SpeakerPositionsReadout({
             </tr>
           </thead>
           <tbody>
-            {installerRows.map((r, i) => (
+            {[...installerRows]
+              .sort((a, b) => {
+                const ra = String(a.role || "").toUpperCase();
+                const rb = String(b.role || "").toUpperCase();
+
+                const rank = (r) => {
+                  if (r === "FL") return 0; // L
+                  if (r === "FC") return 1; // C
+                  if (r === "FR") return 2; // R
+                  return 10;
+                };
+
+                const aRank = rank(ra);
+                const bRank = rank(rb);
+
+                if (aRank !== bRank) return aRank - bRank;
+
+                // keep the rest stable + predictable (role alphabetical)
+                return ra.localeCompare(rb);
+              })
+              .map((r, i) => (
               <tr key={`${r.role}-${i}`} className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-gray-700">{r.role}</td>
+                <td className="py-1 pr-2 text-gray-700">
+                  {(() => {
+                    const role = String(r.role || "").toUpperCase();
+                    if (role === "FL") return "L";
+                    if (role === "FC") return "C";
+                    if (role === "FR") return "R";
+                    return r.role;
+                  })()}
+                </td>
 
                 <td className="py-1 pr-2 text-gray-600 truncate max-w-[100px]" title={modelLabel(r.model)}>
                   {modelLabel(r.model)}
@@ -323,9 +351,7 @@ export default function SpeakerPositionsReadout({
         </table>
       </div>
       
-      <div className="mt-2 text-xs text-gray-500">
-        All distances in centimetres (±1 cm). Along wall is the tape-measure distance along the wall run. Nearest end is the closest end of that wall. Height is cabinet centre height.
-      </div>
+
     </div>
   );
 }
