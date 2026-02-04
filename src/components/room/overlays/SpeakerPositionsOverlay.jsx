@@ -808,8 +808,8 @@ export default function SpeakerPositionsOverlay({
         if (role === "TML") return null;
         // Remove ONLY this overhead vertical measurement
         if (role === "TFR") return null;
-        // Remove ONLY rear overhead vertical measurements (TRL/TRR)
-        if (role === "TRL" || role === "TRR") return null;
+        // Hide ONLY TRR (keep TRL visible)
+        if (role === "TRR") return null;
         
         const yM = s.position.y;
         const yPx = meterToCanvasY(yM);
