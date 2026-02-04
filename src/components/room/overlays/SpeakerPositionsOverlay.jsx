@@ -255,17 +255,23 @@ export default function SpeakerPositionsOverlay({
 
   // --- Overhead speakers (separate from bed speakers) ---
   // CRITICAL: Use same visibility filter as plan view to hide inactive overheads
+  // IMPORTANT: Use CANONICAL role for visibility + grouping (handles TRL/TRR aliases etc.)
   const overheadSpeakers = (Array.isArray(speakers) ? speakers : []).filter((s) => {
-    const role = String(s?.role || "").toUpperCase();
-    if (!role) return false;
-    if (!role.startsWith("T")) return false;
+    const rawRole = String(s?.role || "").toUpperCase();
+    if (!rawRole) return false;
+    if (!rawRole.startsWith("T")) return false;
     if (!hasPos(s)) return false;
-    
-    // CRITICAL: Reuse plan view visibility logic
+
+    const canonRole =
+      typeof getCanonicalRole === "function"
+        ? String(getCanonicalRole(rawRole) || rawRole).toUpperCase()
+        : rawRole;
+
+    // CRITICAL: Reuse plan view visibility logic (but feed canonical role)
     if (typeof getSpeakerVisibility === "function") {
-      return getSpeakerVisibility(role, s.model) !== false;
+      return getSpeakerVisibility(canonRole, s.model) !== false;
     }
-    
+
     return true;
   });
 
@@ -285,9 +291,21 @@ export default function SpeakerPositionsOverlay({
   const overheadRows = (() => {
     const rows = [];
 
-    const front = overheadSpeakers.filter(s => String(s.role || "").toUpperCase().startsWith("TF"));
-    const mid   = overheadSpeakers.filter(s => String(s.role || "").toUpperCase().startsWith("TM"));
-    const rear  = overheadSpeakers.filter(s => String(s.role || "").toUpperCase().startsWith("TB"));
+    const roleU = (s) => {
+      const raw = String(s?.role || "").toUpperCase();
+      const canon =
+        typeof getCanonicalRole === "function"
+          ? String(getCanonicalRole(raw) || raw).toUpperCase()
+          : raw;
+      return canon;
+    };
+
+    // Front row: TF*
+    // Mid row:   TM*
+    // Rear row:  TB* (and accept TR* as legacy/alt naming for rear)
+    const front = overheadSpeakers.filter(s => roleU(s).startsWith("TF"));
+    const mid   = overheadSpeakers.filter(s => roleU(s).startsWith("TM"));
+    const rear  = overheadSpeakers.filter(s => roleU(s).startsWith("TB") || roleU(s).startsWith("TR"));
 
     const makeRow = (label, list) => {
       if (!list.length) return null;
