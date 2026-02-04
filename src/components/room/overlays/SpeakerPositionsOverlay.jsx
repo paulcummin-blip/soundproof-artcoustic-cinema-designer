@@ -291,21 +291,25 @@ export default function SpeakerPositionsOverlay({
   const overheadRows = (() => {
     const rows = [];
 
-    const roleU = (s) => {
-      const raw = String(s?.role || "").toUpperCase();
-      const canon =
-        typeof getCanonicalRole === "function"
-          ? String(getCanonicalRole(raw) || raw).toUpperCase()
-          : raw;
-      return canon;
-    };
+    // Normalise role naming for row grouping ONLY.
+    // We support:
+    // Front: TF*
+    // Mid:   TM* (and legacy TL/TR if they exist)
+    // Rear:  TB* (and TRL/TRR legacy naming)
+    const roleUpper = (s) => String(s?.role || "").toUpperCase();
 
-    // Front row: TF*
-    // Mid row:   TM*
-    // Rear row:  TB* (and accept TR* as legacy/alt naming for rear)
-    const front = overheadSpeakers.filter(s => roleU(s).startsWith("TF"));
-    const mid   = overheadSpeakers.filter(s => roleU(s).startsWith("TM"));
-    const rear  = overheadSpeakers.filter(s => roleU(s).startsWith("TB") || roleU(s).startsWith("TR"));
+    const isFront = (r) => r.startsWith("TF");
+    const isMid = (r) =>
+      r.startsWith("TM") ||
+      r === "TL" || r === "TR" || r === "TSL" || r === "TSR"; // safety/legacy
+    const isRear = (r) =>
+      r.startsWith("TB") ||
+      r === "TBL" || r === "TBR" ||
+      r === "TRL" || r === "TRR"; // Dolby Top Rear legacy naming
+
+    const front = overheadSpeakers.filter(s => isFront(roleUpper(s)));
+    const mid   = overheadSpeakers.filter(s => isMid(roleUpper(s)));
+    const rear  = overheadSpeakers.filter(s => isRear(roleUpper(s)));
 
     const makeRow = (label, list) => {
       if (!list.length) return null;
@@ -854,6 +858,17 @@ export default function SpeakerPositionsOverlay({
       });
     };
 
+    // Right overhead ruler: dynamically sit ~20px to the RIGHT of the right-most overhead icon edge,
+    // but never outside the room.
+    const rightMostOhEdgePx = overheadRight.length
+      ? Math.max(...overheadRight.map(s => meterToCanvasX(s.position.x) + ICON_R_PX))
+      : (roomRect.x + roomRect.width - SAFE_INSET_PX);
+
+    const desiredRightRulerX = rightMostOhEdgePx + GAP_PX;
+
+    // Clamp so it always stays inside the roomRect
+    const xRightRuler = Math.min(roomRect.x + roomRect.width - SAFE_INSET_PX, desiredRightRulerX);
+
     return (
       <g data-layer="speaker-positions-overheads-vertical" pointerEvents="none">
         {/* Left vertical ruler */}
@@ -870,7 +885,22 @@ export default function SpeakerPositionsOverlay({
           />
         ) : null}
 
+        {/* Right vertical ruler */}
+        {overheadRight.length ? (
+          <line
+            x1={xRightRuler}
+            y1={yTopPx}
+            x2={xRightRuler}
+            y2={yBottomPx}
+            stroke={stroke}
+            strokeWidth={2}
+            markerStart="url(#spk-dim-arrow)"
+            markerEnd="url(#spk-dim-arrow)"
+          />
+        ) : null}
+
         {drawColumn(overheadLeft, xLeftRuler, "ohL")}
+        {drawColumn(overheadRight, xRightRuler, "ohR")}
       </g>
     );
   };
