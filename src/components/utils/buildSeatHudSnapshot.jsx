@@ -652,16 +652,16 @@ export function buildSeatHudSnapshot({
 
   let p5Level = '—';
   let p5Formatted = '—';
-
-  if (Number.isFinite(p5WorstDeg)) {
-    p5Level = rp22LevelForP5(p5WorstDeg);
-    p5Formatted = `${Math.round(p5WorstDeg)}°`; // stable, no 69/70 jitter
-  }
   
   // Find worst gap pair for debug (rounded + stable tie-break)
   let worstPair = null;
   const roundP5 = (v) => Math.round(v * 10) / 10; // 0.1° resolution (stable)
   let p5WorstDeg = p5Val; // default to raw value
+
+  if (Number.isFinite(p5WorstDeg)) {
+    p5Level = rp22LevelForP5(p5WorstDeg);
+    p5Formatted = `${Math.round(p5WorstDeg)}°`; // stable, no 69/70 jitter
+  }
   
   if (p5Gaps && p5Gaps.length > 0) {
     const worst = p5Gaps.reduce((max, g) => {
