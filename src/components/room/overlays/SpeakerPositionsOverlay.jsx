@@ -969,6 +969,10 @@ export default function SpeakerPositionsOverlay({
     return (
       <g data-layer="speaker-positions-overheads-horizontal" pointerEvents="none">
         {overheadRows.map((row, rowIndex) => {
+          // ONLY keep the REAR overhead horizontal ruler.
+          // This removes the two clutter lines (front + mid) and their dots.
+          if (row.label !== "rear") return null;
+
           const ySpeakerPx = meterToCanvasY(row.yM);
 
           // Constants
@@ -984,23 +988,27 @@ export default function SpeakerPositionsOverlay({
 
           const yPx = pushRowDownIfNeeded(yPxRaw);
 
-          // Build label slots for dynamic font sizing
+          // Build label slots for dynamic font sizing (only for TRR now)
           const distanceLabels = [];
           row.items.forEach((it, idx) => {
-            const xPx = meterToCanvasX(it.xM);
-            const distTextY = yPx + 12;
-            const leftDist = mToCm(it.xM);
-            const rightDist = mToCm(W - it.xM);
-            
-            distanceLabels.push(
-              { x: xPx - 14, y: distTextY, text: `${leftDist}cm`, textAnchor: 'end' },
-              { x: xPx + 14, y: distTextY, text: `${rightDist}cm`, textAnchor: 'start' }
-            );
+            const role = String(it?.s?.role || "").toUpperCase();
+            if (role === "TRR") {
+              const xPx = meterToCanvasX(it.xM);
+              const distTextY = yPx + 12;
+              const leftDist = mToCm(it.xM);
+              const rightDist = mToCm(W - it.xM);
+              
+              distanceLabels.push(
+                { x: xPx - 14, y: distTextY, text: `${leftDist}cm`, textAnchor: 'end' },
+                { x: xPx + 14, y: distTextY, text: `${rightDist}cm`, textAnchor: 'start' }
+              );
+            }
           });
           
           const fontSize = computeDynamicFontSize(distanceLabels, 11);
           const fontFamily = exportMode === 'dimensions' ? EXPORT_FONT_FAMILY : DEFAULT_FONT_FAMILY;
 
+          // Keep the rear horizontal ruler line
           return (
             <g key={`oh-row-${row.label}-${rowIndex}`}>
               <line
@@ -1014,54 +1022,45 @@ export default function SpeakerPositionsOverlay({
                 markerEnd="url(#spk-dim-arrow)"
               />
 
+              {/* Put the X (left/right) measurement ONLY on TRR (more empty space) */}
               {row.items.map((it, idx) => {
                 const role = String(it?.s?.role || "").toUpperCase();
-                // Remove ONLY the mid-row horizontal measurement for TML + TMR
-                if (row.label === "mid" && (role === "TML" || role === "TMR")) return null;
-                // Remove ONLY rear overhead horizontal measurements (TRL/TRR)
-                if (row.label === "rear" && (role === "TRL" || role === "TRR")) return null;
+                if (role !== "TRR") return null;
 
                 const xPx = meterToCanvasX(it.xM);
                 const distTextY = yPx + 12;
 
-                const isTRR = role === "TRR";
-
                 return (
-                  <g key={`oh-${row.label}-${idx}`}>
+                  <g key={`oh-${row.label}-TRR`}>
                     <circle cx={xPx} cy={yPx} r={5} fill={dotFill} />
 
-                    {/* Show the horizontal wall distances ONLY on TRR (instead of TFL) */}
-                    {isTRR ? (
-                      <>
-                        <text
-                          x={xPx - 14}
-                          y={distTextY}
-                          textAnchor="end"
-                          fontFamily={fontFamily}
-                          fontSize={fontSize}
-                          fill={textFill}
-                        >
-                          {mToCm(it.xM)}cm
-                        </text>
+                    <text
+                      x={xPx - 14}
+                      y={distTextY}
+                      textAnchor="end"
+                      fontFamily={fontFamily}
+                      fontSize={fontSize}
+                      fill={textFill}
+                    >
+                      {mToCm(it.xM)}cm
+                    </text>
 
-                        <text
-                          x={xPx + 14}
-                          y={distTextY}
-                          textAnchor="start"
-                          fontFamily={fontFamily}
-                          fontSize={fontSize}
-                          fill={textFill}
-                        >
-                          {mToCm(W - it.xM)}cm
-                        </text>
-                      </>
-                    ) : null}
+                    <text
+                      x={xPx + 14}
+                      y={distTextY}
+                      textAnchor="start"
+                      fontFamily={fontFamily}
+                      fontSize={fontSize}
+                      fill={textFill}
+                    >
+                      {mToCm(W - it.xM)}cm
+                    </text>
                   </g>
                 );
               })}
             </g>
           );
-        })}
+        }).filter(Boolean)}
       </g>
     );
   };
