@@ -94,9 +94,34 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
     };
   });
 
-  // Split by side
-  const leftUppers = elevations.filter(e => e.isLeft).sort((a, b) => a.y - b.y); // front to back
-  const rightUppers = elevations.filter(e => !e.isLeft).sort((a, b) => a.y - b.y);
+  // Split by side (deterministic order: front -> mid -> rear, then tie-break by Y)
+  const upperOrderIndex = (role) => {
+    const r = String(role || "").toUpperCase();
+
+    // Front
+    if (r === "TFL" || r === "TFR" || r.startsWith("TF")) return 0;
+
+    // Mid
+    if (r === "TML" || r === "TMR" || r.startsWith("TM")) return 1;
+
+    // Rear (support both naming styles)
+    if (r === "TRL" || r === "TRR" || r === "TBL" || r === "TBR" || r.startsWith("TB")) return 2;
+
+    // Anything else should not influence adjacency
+    return 99;
+  };
+
+  const upperSort = (a, b) => {
+    const pa = upperOrderIndex(a.role);
+    const pb = upperOrderIndex(b.role);
+    if (pa !== pb) return pa - pb;
+
+    // Tie-break: front-to-back stability
+    return (a.y ?? 0) - (b.y ?? 0);
+  };
+
+  const leftUppers  = elevations.filter(e => e.isLeft).sort(upperSort);
+  const rightUppers = elevations.filter(e => !e.isLeft).sort(upperSort);
 
   // Compute gaps within each side
   const gaps = [];
