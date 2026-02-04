@@ -982,9 +982,11 @@ export default function SpeakerPositionsOverlay({
             const xPx = meterToCanvasX(it.xM);
             const distTextY = yPx + 12;
             const leftDist = mToCm(it.xM);
+            const rightDist = mToCm(W - it.xM);
             
             distanceLabels.push(
-              { x: xPx - 14, y: distTextY, text: `${leftDist}cm`, textAnchor: 'end' }
+              { x: xPx - 14, y: distTextY, text: `${leftDist}cm`, textAnchor: 'end' },
+              { x: xPx + 14, y: distTextY, text: `${rightDist}cm`, textAnchor: 'start' }
             );
           });
           
@@ -1021,6 +1023,17 @@ export default function SpeakerPositionsOverlay({
                       fill={textFill}
                     >
                       {mToCm(it.xM)}cm
+                    </text>
+
+                    <text
+                      x={xPx + 14}
+                      y={distTextY}
+                      textAnchor="start"
+                      fontFamily={fontFamily}
+                      fontSize={fontSize}
+                      fill={textFill}
+                    >
+                      {mToCm(W - it.xM)}cm
                     </text>
                   </g>
                 );
