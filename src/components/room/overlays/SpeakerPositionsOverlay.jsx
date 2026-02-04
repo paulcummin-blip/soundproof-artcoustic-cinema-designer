@@ -1014,27 +1014,31 @@ export default function SpeakerPositionsOverlay({
                   <g key={`oh-${row.label}-${idx}`}>
                     <circle cx={xPx} cy={yPx} r={5} fill={dotFill} />
 
-                    <text
-                      x={xPx - 14}
-                      y={distTextY}
-                      textAnchor="end"
-                      fontFamily={fontFamily}
-                      fontSize={fontSize}
-                      fill={textFill}
-                    >
-                      {mToCm(it.xM)}cm
-                    </text>
+                    {row.label === "front" && it.xM < (W / 2) && (
+                      <>
+                        <text
+                          x={xPx - 14}
+                          y={distTextY}
+                          textAnchor="end"
+                          fontFamily={fontFamily}
+                          fontSize={fontSize}
+                          fill={textFill}
+                        >
+                          {mToCm(it.xM)}cm
+                        </text>
 
-                    <text
-                      x={xPx + 14}
-                      y={distTextY}
-                      textAnchor="start"
-                      fontFamily={fontFamily}
-                      fontSize={fontSize}
-                      fill={textFill}
-                    >
-                      {mToCm(W - it.xM)}cm
-                    </text>
+                        <text
+                          x={xPx + 14}
+                          y={distTextY}
+                          textAnchor="start"
+                          fontFamily={fontFamily}
+                          fontSize={fontSize}
+                          fill={textFill}
+                        >
+                          {mToCm(W - it.xM)}cm
+                        </text>
+                      </>
+                    )}
                   </g>
                 );
               })}
