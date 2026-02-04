@@ -199,7 +199,12 @@ export function buildSeatHudSnapshot({
   // Pull per-seat RP22 metrics from analysisResult (single source of truth)
   const seatMetrics = analysisResult?.seatMetrics?.get?.(seat.id);
   if (seatMetrics) {
-    if (seatMetrics.p9)  data.rp22.p9  = seatMetrics.p9;
+    if (seatMetrics.p9) {
+      data.rp22.p9 = seatMetrics.p9;
+      if (seatMetrics.p9.detail) {
+        data.rp22.p9Detail = seatMetrics.p9.detail;
+      }
+    }
     if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
     // P16 is computed locally below (skip analysisResult)
     if (seatMetrics.p17) data.rp22.p17 = seatMetrics.p17;
