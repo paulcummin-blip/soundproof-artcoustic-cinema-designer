@@ -111,8 +111,8 @@ export default function SpeakerPositionsReadout({
         const fromBack = L - y;
         const nearestEnd = Math.min(fromFront, fromBack);
         
-        // Height = actual Z position (or room height as fallback)
-        const height = safeNum(z) ? z : (Number(roomWidth) || 2.4); // Use roomWidth as fallback for room height
+        // Height: not meaningful for ceiling speakers in this table (avoid fixed/incorrect 225cm)
+        const height = null;
         
         out.push({
           role,
