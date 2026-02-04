@@ -37,7 +37,11 @@ export default function SpeakerPositionsReadout({
     return raw.replace(/[_-]+/g, ' ').replace(/\b\w/g, m => m.toUpperCase());
   };
 
-  const mToCm = (m) => Math.round(Number(m) * 100);
+  const mToCm = (m) => {
+    const n = Number(m);
+    if (!Number.isFinite(n)) return "-";
+    return Math.round(n * 100);
+  };
 
   const recommendedBedHeightM = (speakerY, seats) => {
     const seatArray = Array.isArray(seats) ? seats : [];
@@ -223,25 +227,49 @@ export default function SpeakerPositionsReadout({
             <tr className="border-b border-gray-200 text-left">
               <th className="py-1 pr-2 font-medium text-gray-600">Role</th>
               <th className="py-1 pr-2 font-medium text-gray-600">Model</th>
-              <th className="py-1 pr-2 font-medium text-gray-600">Wall</th>
-              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Along wall (cm)</th>
-              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Nearest end (cm)</th>
+              <th className="py-1 pr-2 font-medium text-gray-600" style={{ textTransform: "capitalize" }}>Wall</th>
+
+              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Front (cm)</th>
+              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Back (cm)</th>
+              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Left (cm)</th>
+              <th className="py-1 pr-2 font-medium text-gray-600 text-right">Right (cm)</th>
+
               <th className="py-1 font-medium text-gray-600 text-right">Height (cm)</th>
             </tr>
           </thead>
           <tbody>
-            {installerRows.map((r, i) => (
-              <tr key={`${r.role}-${i}`} className="border-b border-gray-100">
-                <td className="py-1 pr-2 text-gray-700">{r.role}</td>
-                <td className="py-1 pr-2 text-gray-600 truncate max-w-[100px]" title={modelLabel(r.model)}>
-                  {modelLabel(r.model)}
-                </td>
-                <td className="py-1 pr-2 text-gray-600" style={{ textTransform: 'capitalize' }}>{r.wall}</td>
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(r.along)}</td>
-                <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(r.nearestEnd)}</td>
-                <td className="py-1 text-right text-gray-700 font-mono">{mToCm(r.height)}</td>
-              </tr>
-            ))}
+            {installerRows.map((r, i) => {
+              // Prefer explicit per-wall distances if present, otherwise fall back to the old fields
+              const frontM = (r.front ?? r.fromFront ?? r.y);
+              const backM  = (r.back  ?? r.fromBack  ?? (Number.isFinite(r.y) && Number.isFinite(r.L) ? (r.L - r.y) : undefined));
+              const leftM  = (r.left  ?? r.fromLeft  ?? r.x);
+              const rightM = (r.right ?? r.fromRight ?? (Number.isFinite(r.x) && Number.isFinite(r.W) ? (r.W - r.x) : undefined));
+
+              // Overheads: do not show numeric height (avoid stuck 225 / 0 clutter)
+              const isOverhead = String(r.role || "").toUpperCase().startsWith("T");
+              const heightCell = isOverhead ? "-" : mToCm(r.height);
+
+              return (
+                <tr key={`${r.role}-${i}`} className="border-b border-gray-100">
+                  <td className="py-1 pr-2 text-gray-700">{r.role}</td>
+
+                  <td className="py-1 pr-2 text-gray-600 truncate max-w-[100px]" title={modelLabel(r.model)}>
+                    {modelLabel(r.model)}
+                  </td>
+
+                  <td className="py-1 pr-2 text-gray-600" style={{ textTransform: "capitalize" }}>
+                    {r.wall}
+                  </td>
+
+                  <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(frontM)}</td>
+                  <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(backM)}</td>
+                  <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(leftM)}</td>
+                  <td className="py-1 pr-2 text-right text-gray-700 font-mono">{mToCm(rightM)}</td>
+
+                  <td className="py-1 text-right text-gray-700 font-mono">{heightCell}</td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
