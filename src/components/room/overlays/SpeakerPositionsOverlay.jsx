@@ -1020,15 +1020,18 @@ export default function SpeakerPositionsOverlay({
                 if (row.label === "mid" && (role === "TML" || role === "TMR")) return null;
                 // Remove ONLY rear overhead horizontal measurements (TRL/TRR)
                 if (row.label === "rear" && (role === "TRL" || role === "TRR")) return null;
-                
+
                 const xPx = meterToCanvasX(it.xM);
                 const distTextY = yPx + 12;
+
+                const isTRR = role === "TRR";
 
                 return (
                   <g key={`oh-${row.label}-${idx}`}>
                     <circle cx={xPx} cy={yPx} r={5} fill={dotFill} />
 
-                    {((row.label === "front" && it.xM < (W / 2)) || row.label === "rear") && (
+                    {/* Show the horizontal wall distances ONLY on TRR (instead of TFL) */}
+                    {isTRR ? (
                       <>
                         <text
                           x={xPx - 14}
@@ -1052,7 +1055,7 @@ export default function SpeakerPositionsOverlay({
                           {mToCm(W - it.xM)}cm
                         </text>
                       </>
-                    )}
+                    ) : null}
                   </g>
                 );
               })}
