@@ -91,15 +91,41 @@ export default function SpeakerPositionsReadout({
       // Skip LFE and subs for wall-mounted installer table
       if (canonRole === 'LFE' || canonRole === 'SUB') continue;
       
-      // Skip overheads (treat separately later)
-      if (canonRole.startsWith('T')) continue;
-      
       const model = s?.model || null;
       const x = s?.position?.x;
       const y = s?.position?.y;
+      const z = s?.position?.z;
 
       if (!safeNum(x) || !safeNum(y) || !(W > 0 && L > 0)) continue;
 
+      // OVERHEAD SPEAKERS (ceiling-mounted)
+      if (canonRole.startsWith('T')) {
+        // Wall = "Ceiling" or "Overhead"
+        const wall = 'Ceiling';
+        
+        // Along wall = Y (front-to-back distance)
+        const along = y;
+        
+        // Nearest end = min distance to front or back wall
+        const fromFront = y;
+        const fromBack = L - y;
+        const nearestEnd = Math.min(fromFront, fromBack);
+        
+        // Height = actual Z position (or room height as fallback)
+        const height = safeNum(z) ? z : (Number(roomWidth) || 2.4); // Use roomWidth as fallback for room height
+        
+        out.push({
+          role,
+          model,
+          wall,
+          along,
+          nearestEnd,
+          height,
+        });
+        continue;
+      }
+
+      // BED SPEAKERS (wall-mounted)
       // Determine nearest wall (front/back/left/right) by distance
       const dFront = y;
       const dBack  = L - y;
