@@ -20,7 +20,7 @@ export function getUpperSpeakersForSeat(seat, placedSpeakers, getCanonicalRole) 
   if (!isNum(seatX) || !isNum(seatY) || !isNum(seatZ)) return [];
 
   // Upper/height roles per RP22 spec
-  const upperRoles = new Set(['TFL', 'TFR', 'TML', 'TMR', 'TBL', 'TBR', 'TL', 'TR', 'TFC', 'TBC']);
+  const upperRoles = new Set(['TFL','TFR','TML','TMR','TBL','TBR','TRL','TRR','TL','TR']);
 
   return placedSpeakers
     .filter(spk => {
