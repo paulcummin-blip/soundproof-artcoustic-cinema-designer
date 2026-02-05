@@ -138,22 +138,35 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
 
   const evalSide = (sideList) => {
     const rows = byRow(sideList);
+
     if (rows.front && rows.mid) {
-      gaps.push(Math.abs(rows.front.elevDeg - rows.mid.elevDeg));
+      gaps.push({
+        pair: `${rows.front.role} ↔ ${rows.mid.role}`,
+        deg: Math.abs(rows.front.elevDeg - rows.mid.elevDeg),
+      });
     }
+
     if (rows.mid && rows.rear) {
-      gaps.push(Math.abs(rows.mid.elevDeg - rows.rear.elevDeg));
+      gaps.push({
+        pair: `${rows.mid.role} ↔ ${rows.rear.role}`,
+        deg: Math.abs(rows.mid.elevDeg - rows.rear.elevDeg),
+      });
     }
   };
 
   evalSide(elevations.filter(e => e.isLeft));
   evalSide(elevations.filter(e => !e.isLeft));
 
-  const maxVerticalGapDeg = gaps.length > 0 ? Math.max(...gaps) : null;
+  const worst = gaps.length > 0
+    ? gaps.reduce((max, g) => (g.deg > max.deg ? g : max), gaps[0])
+    : null;
+
+  const maxVerticalGapDeg = worst ? worst.deg : null;
 
   return {
     maxVerticalGapDeg,
     gaps,
+    worstGap: worst || null,
     elevations,
   };
 }

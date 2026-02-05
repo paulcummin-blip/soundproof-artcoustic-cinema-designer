@@ -891,7 +891,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       const upperSpeakers = getUpperSpeakersForSeat(seat, safeSpeakers, getCanonicalRole);
       if (upperSpeakers.length >= 2) {
         const result = computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCenterX);
-        const { maxVerticalGapDeg } = result;
+        const { maxVerticalGapDeg, gaps, worstGap } = result;
         
         if (isNum(maxVerticalGapDeg)) {
           let level9 = 1;
@@ -899,63 +899,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
           else if (maxVerticalGapDeg <= 60) level9 = 3;
           else if (maxVerticalGapDeg <= 80) level9 = 2;
           
-          // Build breakdown (like P16/P17)
-          const elevations = Array.isArray(result?.elevations) ? result.elevations : [];
-
-          const roleOrderIndex = (role) => {
-            const r = String(role || "").toUpperCase();
-            if (r === "TFL" || r === "TFR" || r.startsWith("TF")) return 0;
-            if (r === "TML" || r === "TMR" || r.startsWith("TM")) return 1;
-            if (r === "TRL" || r === "TRR" || r === "TBL" || r === "TBR" || r.startsWith("TB")) return 2;
-            return 99;
-          };
-
-          // Build left/right lists from elevations
-          const leftList  = elevations.filter(e => e.isLeft).sort((a,b) => {
-            const pa = roleOrderIndex(a.role);
-            const pb = roleOrderIndex(b.role);
-            if (pa !== pb) return pa - pb;
-            return (a.y ?? 0) - (b.y ?? 0);
-          });
-          const rightList = elevations.filter(e => !e.isLeft).sort((a,b) => {
-            const pa = roleOrderIndex(a.role);
-            const pb = roleOrderIndex(b.role);
-            if (pa !== pb) return pa - pb;
-            return (a.y ?? 0) - (b.y ?? 0);
-          });
-
-          // Build gap detail objects
-          const gapDetails = [];
-          
-          // Process left side
-          for (let i = 1; i < leftList.length; i++) {
-            const gap = Math.abs((leftList[i].elevDeg ?? 0) - (leftList[i-1].elevDeg ?? 0));
-            gapDetails.push({
-              a: leftList[i-1].role,
-              b: leftList[i].role,
-              deg: gap
-            });
-          }
-          
-          // Process right side
-          for (let i = 1; i < rightList.length; i++) {
-            const gap = Math.abs((rightList[i].elevDeg ?? 0) - (rightList[i-1].elevDeg ?? 0));
-            gapDetails.push({
-              a: rightList[i-1].role,
-              b: rightList[i].role,
-              deg: gap
-            });
-          }
-
-          const breakdown = gapDetails
-            .map(g => `${g.a} ↔ ${g.b} ${g.deg.toFixed(0)}°`)
-            .join(', ');
-
           metrics.p9 = {
             value: maxVerticalGapDeg,
             formatted: `${maxVerticalGapDeg.toFixed(1)}°`,
             level: level9,
-            detail: breakdown ? `${breakdown} (worst)` : null
+            details: {
+              gaps,
+              worst: worstGap,
+            },
           };
         }
       }

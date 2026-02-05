@@ -201,8 +201,19 @@ export function buildSeatHudSnapshot({
   if (seatMetrics) {
     if (seatMetrics.p9) {
       data.rp22.p9 = seatMetrics.p9;
-      if (seatMetrics.p9.detail) {
-        data.rp22.p9Detail = seatMetrics.p9.detail;
+      
+      // Build compact explanation from structured gap data
+      if (seatMetrics.p9.details?.gaps?.length) {
+        const lines = seatMetrics.p9.details.gaps.map(
+          g => `${g.pair} ${g.deg.toFixed(0)}°`
+        );
+        
+        const worst = seatMetrics.p9.details.worst;
+        if (worst) {
+          data.rp22.p9Detail = `${lines.join(', ')} (worst: ${worst.deg.toFixed(0)}°)`;
+        } else {
+          data.rp22.p9Detail = lines.join(', ');
+        }
       }
     }
     if (seatMetrics.p10) data.rp22.p10 = seatMetrics.p10;
