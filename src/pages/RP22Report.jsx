@@ -303,6 +303,101 @@ function RP22ReportInner() {
         p15ConstructionLevel: app?.p15ConstructionLevel
     });
 
+    // Build local HUD snapshots for all seats (same logic as Room Designer)
+    const reportSeatHudById = React.useMemo(() => {
+        const out = {};
+        const list = safeArray(seats);
+
+        // Compute LCR angle info for buildSeatHudSnapshot
+        const aimAtMLP = app?.aimLeftRightAtMLP ?? false;
+        const lcrAngleInfo = { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
+        
+        if (aimAtMLP && primarySeatingPosition) {
+            const mlpTarget = { x: primarySeatingPosition.x, y: primarySeatingPosition.y };
+            const flSpeaker = placedSpeakers?.find(s => {
+                const canon = String(s?.role || '').toUpperCase();
+                return (canon === 'FL' || canon === 'L') && s?.position;
+            });
+            const frSpeaker = placedSpeakers?.find(s => {
+                const canon = String(s?.role || '').toUpperCase();
+                return (canon === 'FR' || canon === 'R') && s?.position;
+            });
+
+            if (flSpeaker?.position && Number.isFinite(mlpTarget.x) && Number.isFinite(mlpTarget.y)) {
+                const dx = mlpTarget.x - flSpeaker.position.x;
+                const dy = mlpTarget.y - flSpeaker.position.y;
+                lcrAngleInfo.L = Math.atan2(dx, dy) * (180 / Math.PI);
+            }
+            if (frSpeaker?.position && Number.isFinite(mlpTarget.x) && Number.isFinite(mlpTarget.y)) {
+                const dx = mlpTarget.x - frSpeaker.position.x;
+                const dy = mlpTarget.y - frSpeaker.position.y;
+                lcrAngleInfo.R = Math.atan2(dx, dy) * (180 / Math.PI);
+            }
+
+            const avg = (Math.abs(lcrAngleInfo.L) + Math.abs(lcrAngleInfo.R)) / 2;
+            lcrAngleInfo.averageAngle = Number.isFinite(avg) ? avg : 0;
+            lcrAngleInfo.maxAbs = Math.max(Math.abs(lcrAngleInfo.L), Math.abs(lcrAngleInfo.R));
+        }
+
+        for (let i = 0; i < list.length; i++) {
+            const seat = list[i];
+            const seatId = seat?.id;
+            if (!seatId) continue;
+
+            try {
+                const snapshot = buildSeatHudSnapshot({
+                    seat: seat,
+                    placedSpeakers: placedSpeakers,
+                    widthM: stableDimensions.width,
+                    lengthM: stableDimensions.length,
+                    heightM: stableDimensions.height,
+                    screenFrontPlaneM: app?.screenFrontPlaneM ?? (app?.screen?.frontPlaneYm || 0),
+                    screen: screen,
+                    mlp: primarySeatingPosition || { 
+                        x: stableDimensions.width / 2, 
+                        y: stableDimensions.length * 0.58, 
+                        z: 1.2 
+                    },
+                    allSeatSplMetrics: allSeatSplMetrics,
+                    aimAtMLP: aimAtMLP,
+                    aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP ?? false,
+                    aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP ?? false,
+                    aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP ?? false,
+                    lcrAngleInfo: lcrAngleInfo,
+                    analysisResult: analysisResult || {},
+                    seatingPositions: seats,
+                    splConfig: app?.splConfig || {},
+                });
+
+                if (snapshot) out[seatId] = snapshot;
+            } catch (e) {
+                // Keep seat missing rather than crashing the whole report
+                if (typeof console !== 'undefined' && console.warn) {
+                    console.warn(`[RP22Report] Failed to build HUD for seat ${seatId}:`, e);
+                }
+            }
+        }
+
+        return out;
+    }, [
+        seats,
+        placedSpeakers,
+        stableDimensions.width,
+        stableDimensions.length,
+        stableDimensions.height,
+        screen,
+        primarySeatingPosition,
+        allSeatSplMetrics,
+        app?.aimLeftRightAtMLP,
+        app?.aimFrontWidesAtMLP,
+        app?.aimSideSurroundsAtMLP,
+        app?.aimRearSurroundsAtMLP,
+        app?.screenFrontPlaneM,
+        app?.screen?.frontPlaneYm,
+        app?.splConfig,
+        analysisResult,
+    ]);
+
 
 
     // Build ordered parameters list (1-21)
@@ -2261,8 +2356,11 @@ function RP22ReportInner() {
                                 return seats.map((seat, idx) => {
                                     const seatId = seat?.id || '—';
                                     
-                                    // HUD cache is the single source of truth for seat panels (match Room Designer HUD)
-                                    const tooltipData = app?.seatMetricsById?.[seatId] || null;
+                                    // LOCAL HUD SNAPSHOT FIRST (report-specific), fallback to app cache
+                                    const tooltipData =
+                                        reportSeatHudById?.[seatId] ??
+                                        app?.seatMetricsById?.[seatId] ??
+                                        null;
                                     const rp23 = tooltipData?.rp23 || {};
                                     const rp22Hud = tooltipData?.rp22 || {};
 
@@ -2872,8 +2970,11 @@ function RP22ReportInner() {
                                 return seats.map((seat, seatIdx) => {
                                     const seatId = seat?.id || '—';
                                     
-                                    // HUD cache is the single source of truth for seat panels (match Room Designer HUD)
-                                    const tooltipData = app?.seatMetricsById?.[seatId] || null;
+                                    // LOCAL HUD SNAPSHOT FIRST (report-specific), fallback to app cache
+                                    const tooltipData =
+                                        reportSeatHudById?.[seatId] ??
+                                        app?.seatMetricsById?.[seatId] ??
+                                        null;
                                     const rp23 = tooltipData?.rp23 || {};
                                     const rp22Hud = tooltipData?.rp22 || {};
 
