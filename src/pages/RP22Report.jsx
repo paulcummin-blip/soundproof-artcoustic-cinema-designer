@@ -2899,8 +2899,6 @@ function RP22ReportInner() {
                                     // Primary-seat badge (leave unchanged)
                                     const isPrimary = tooltipData?.isPrimary || false;
                                     
-                                    // Skip seats with no data at all
-                                    if (!rp22Raw || Object.keys(rp22Raw).length === 0) return null;
                                     const isRsp = seatId === rspSeatId;
                                     const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '(Secondary)');
                                     const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
