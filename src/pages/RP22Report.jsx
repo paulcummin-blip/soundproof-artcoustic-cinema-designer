@@ -1376,52 +1376,24 @@ function RP22ReportInner() {
         // Always iterate real seats (so cards never disappear)
         const seatIds = (safeArray(seats).map(s => s?.id).filter(Boolean)).sort();
         
-        // Helper: engine per-seat RP22 can be either an object or a Map
-        const getEngineRp22ForSeat = (seatId) => {
-            const perSeat = analysisResult?.perSeatRp22;
-            
-            if (!perSeat) return null;
-            
-            // Map case
-            if (typeof perSeat.get === "function") {
-                return perSeat.get(seatId) || null;
-            }
-            
-            // Object case
-            if (typeof perSeat === "object") {
-                return perSeat[seatId] || null;
-            }
-            
-            return null;
-        };
-        
         return seatIds.map(seatId => {
             const counts = { L1: 0, L2: 0, L3: 0, L4: 0 };
             
-            // HUD cache (fallback only)
-            const tooltipData = app?.seatMetricsById?.[seatId];
-            const rp22FromHud = tooltipData?.rp22 || {};
-            
-            // Engine output (primary) is a seat object: { seatId, ..., rp22: { 1: metric, 4: metric, ... } }
-            const engineSeat = getEngineRp22ForSeat(seatId);
+            // LOCAL HUD SNAPSHOT FIRST (report-specific), fallback to app cache
+            const tooltipData =
+                reportSeatHudById?.[seatId] ??
+                app?.seatMetricsById?.[seatId] ??
+                null;
+            const rp23 = tooltipData?.rp23 || {};
+            const rp22Hud = tooltipData?.rp22 || {};
 
-            // Convert engineSeat.rp22 numeric keys -> { p1: metric, p4: metric, ... } to match report expectations
-            // Normalise HUD rp22 keys so the renderer can always read p1/p4/...
-            // HUD might store { p1: {...} } OR { 1: {...} }
             const getRp22Metric = (key) => {
                 const n = parseInt(String(key).replace("p", ""), 10);
                 if (!Number.isFinite(n)) return null;
 
-                // Prefer p-key, but allow numeric-key as fallback
-                return (
-                    rp22FromHud[`p${n}`] ??
-                    rp22FromHud[n] ??
-                    rp22FromHud[String(n)] ??
-                    null
-                );
+                // Support both formats (HUD historically used p9, engine used 9)
+                return rp22Hud[key] ?? rp22Hud[`p${n}`] ?? rp22Hud[n] ?? rp22Hud[String(n)] ?? null;
             };
-            
-            const rp23 = tooltipData?.rp23 || {};
             
             // Normalize level helper (same as room count logic)
             const normalizeLvl = (rawLevel) => {
@@ -1454,7 +1426,7 @@ function RP22ReportInner() {
             
             return { seatId, counts, total };
         });
-    }, [analysisResult?.perSeatRp22, app?.seatMetricsById, seats]);
+    }, [reportSeatHudById, app?.seatMetricsById, seats]);
 
     // Group seat counts by row, sorted by seat number within each row
     const seatCountsByRow = React.useMemo(() => {
