@@ -283,6 +283,8 @@ function RP22ReportInner() {
         primarySeatingPosition,
         dimensions: stableDimensions,
         mlpBasis,
+        sevenBedLayoutType: app?.sevenBedLayoutType,
+        extraSurroundCount: app?.extraSurroundCount,
         seatSplMetrics: allSeatSplMetrics,
         overheadState: {
             globalModel: app?.overheadGlobalModel,

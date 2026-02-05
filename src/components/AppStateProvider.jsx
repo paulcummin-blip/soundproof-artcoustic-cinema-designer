@@ -302,7 +302,11 @@ function useDesignerState() {
   }, []);
 
   const [seededChannels, setSeededChannels] = useState([]);
-  const [sevenBedLayoutType, setSevenBedLayoutType] = useState('rears');
+  const [sevenBedLayoutType, setSevenBedLayoutType] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.sevenBedLayoutType === "string")
+      ? __autosavePayload.sevenBedLayoutType
+      : "rears"
+  ));
   const [seatingPositions, setSeatingPositions] = useState(() => (
     (__autosavePayload && Array.isArray(__autosavePayload.seatingPositions)) ? __autosavePayload.seatingPositions : []
   ));
@@ -424,6 +428,18 @@ function useDesignerState() {
   const [aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.aimRearSurroundsAtMLP === "boolean") ? __autosavePayload.aimRearSurroundsAtMLP : false
   ));
+
+  // LCR aim mode (persisted) — "flat" | "angled"
+  const [lcrAimMode, _setLcrAimMode] = useState(() => (
+    (__autosavePayload && typeof __autosavePayload.lcrAimMode === "string")
+      ? __autosavePayload.lcrAimMode
+      : "flat"
+  ));
+
+  const setLcrAimMode = useCallback((mode) => {
+    const m = (mode === "angled") ? "angled" : "flat";
+    _setLcrAimMode(m);
+  }, []);
 
   const [autosaveMeta, setAutosaveMeta] = useState(null);
   const [globalSurroundModel, _setGlobalSurroundModel] = useState(() => (
@@ -1029,6 +1045,8 @@ function useDesignerState() {
       if (typeof p.aimFrontWidesAtMLP === "boolean") setAimFrontWidesAtMLP(p.aimFrontWidesAtMLP);
       if (typeof p.aimSideSurroundsAtMLP === "boolean") setAimSideSurroundsAtMLP(p.aimSideSurroundsAtMLP);
       if (typeof p.aimRearSurroundsAtMLP === "boolean") setAimRearSurroundsAtMLP(p.aimRearSurroundsAtMLP);
+      if (typeof p.lcrAimMode === "string") setLcrAimMode(p.lcrAimMode);
+      if (typeof p.sevenBedLayoutType === "string") setSevenBedLayoutType(p.sevenBedLayoutType);
       if (typeof p.extraSurroundCount === "number") _setExtraSurroundCount(p.extraSurroundCount);
 
       setAutosaveMeta(getAutosaveMeta());

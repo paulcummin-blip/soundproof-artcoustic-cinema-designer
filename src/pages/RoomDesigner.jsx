@@ -1801,9 +1801,7 @@ function RoomDesignerWithState() {
 
   // Use AppState dolbyLayout directly (no local state override)
   const dolbyPreset = appState?.dolbyLayout || "5.1";
-  const isNineBedLayout = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) === 9;
   const setDolbyPreset = appState?.setDolbyLayout;
-  const [lcrAimMode, setLcrAimMode] = useState("flat"); // "flat" | "angled"
   const [lcrAngleDeg, setLcrAngleDeg] = useState(0); // Live angle readout
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
 
@@ -1823,11 +1821,16 @@ function RoomDesignerWithState() {
 
   // --- bed rears required? (SBL/SBR) ---
   const layoutMajor = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) || 5;
+  const isNineBedLayout = layoutMajor >= 9;
   const useWidesInsteadOfRears = _sevenBedLayoutType === "wides";
   const expectsRears = layoutMajor >= 9 || layoutMajor === 7 && !useWidesInsteadOfRears;
   
-  // Extra surrounds only for 9.x.x layouts (using isNineBedLayout defined earlier)
+  // Extra surrounds only for 9.x.x layouts
   const allowExtraSurrounds = isNineBedLayout;
+  
+  // LCR aim from AppState (persisted)
+  const lcrAimMode = appState?.lcrAimMode || "flat";
+  const setLcrAimMode = appState?.setLcrAimMode;
 
   // screen state is now managed directly by AppState, removed local useState here.
 
@@ -1838,9 +1841,12 @@ function RoomDesignerWithState() {
   // NEW: Auto-reset extra surrounds count when layout doesn't allow them (idempotent)
   useEffect(() => {
     if (!isNineBedLayout) {
-      if ((appState?.extraSurroundCount ?? 0) !== 0) appState?.setExtraSurroundCount?.(0);
+      // Only force reset when the control is not allowed
+      if ((appState?.extraSurroundCount ?? 0) !== 0) {
+        appState?.setExtraSurroundCount?.(0);
+      }
     }
-  }, [isNineBedLayout, appState]);
+  }, [isNineBedLayout, appState?.extraSurroundCount, appState?.setExtraSurroundCount]);
 
   // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
 
@@ -4617,7 +4623,7 @@ function RoomDesignerWithState() {
                         <Switch
                       id="aim-lcr"
                       checked={lcrAimMode === "angled"}
-                      onCheckedChange={(checked) => setLcrAimMode(checked ? "angled" : "flat")}
+                      onCheckedChange={(checked) => setLcrAimMode?.(checked ? "angled" : "flat")}
                       disabled={isFrozen('speakers')} />
 
                       </div>
