@@ -415,6 +415,9 @@ function useDesignerState() {
     (__autosavePayload && typeof __autosavePayload.useRearGlobal === "boolean") ? __autosavePayload.useRearGlobal : true
   ));
 
+  const [lcrAimMode, setLcrAimMode] = useState(() => (
+    (__autosavePayload && __autosavePayload.lcrAimMode) ? __autosavePayload.lcrAimMode : "flat"
+  ));
   const [aimFrontWidesAtMLP, setAimFrontWidesAtMLP] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.aimFrontWidesAtMLP === "boolean") ? __autosavePayload.aimFrontWidesAtMLP : false
   ));

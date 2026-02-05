@@ -1802,7 +1802,8 @@ function RoomDesignerWithState() {
   // Use AppState dolbyLayout directly (no local state override)
   const dolbyPreset = appState?.dolbyLayout || "5.1";
   const setDolbyPreset = appState?.setDolbyLayout;
-  const [lcrAimMode, setLcrAimMode] = useState("flat"); // "flat" | "angled"
+  const lcrAimMode = appState?.lcrAimMode || "flat";
+  const setLcrAimMode = (v) => appState?.setLcrAimMode?.(v);
   const [lcrAngleDeg, setLcrAngleDeg] = useState(0); // Live angle readout
   const [subWarnings, setSubWarnings] = useState({ front: [], rear: [] });
 
