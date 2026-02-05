@@ -2890,8 +2890,29 @@ function RP22ReportInner() {
                                     // FALLBACK SOURCE (what the HUD cached previously)
                                     const rp22FromHud = tooltipData?.rp22 || {};
                                     
-                                    // Use engine first, fallback to HUD
-                                    const rp22Raw = Object.keys(rp22FromEngine).length ? rp22FromEngine : rp22FromHud;
+                                    // Use ENGINE first (preferred), fallback to HUD cache
+                                    // Engine shape: { seatId, isPrimary, rp22: { 1: metric, 4: metric, ... } }
+                                    // HUD shape:    { p1: metric, p4: metric, ... }
+                                    const engineRp22Numeric = rp22FromEngine?.rp22 || null;
+
+                                    const rp22FromEngineAsPKeys = engineRp22Numeric
+                                      ? {
+                                          p1:  engineRp22Numeric[1],
+                                          p4:  engineRp22Numeric[4],
+                                          p5:  engineRp22Numeric[5],
+                                          p6:  engineRp22Numeric[6],
+                                          p9:  engineRp22Numeric[9],
+                                          p10: engineRp22Numeric[10],
+                                          p16: engineRp22Numeric[16],
+                                          p17: engineRp22Numeric[17],
+                                          p20: engineRp22Numeric[20],
+                                        }
+                                      : null;
+
+                                    const rp22Raw =
+                                      (rp22FromEngineAsPKeys && Object.keys(rp22FromEngineAsPKeys).some(k => rp22FromEngineAsPKeys[k]))
+                                        ? rp22FromEngineAsPKeys
+                                        : (rp22FromHud || {});
                                     
                                     // RP23 still comes from HUD cache for now (leave this untouched)
                                     const rp23 = tooltipData?.rp23 || {};
