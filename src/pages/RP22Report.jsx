@@ -1311,22 +1311,20 @@ function RP22ReportInner() {
             const engineSeat = getEngineRp22ForSeat(seatId);
 
             // Convert engineSeat.rp22 numeric keys -> { p1: metric, p4: metric, ... } to match report expectations
-            const normalizeEngineRp22 = (seatObj) => {
-                const src = seatObj?.rp22;
-                if (!src || typeof src !== "object") return {};
-                const out = {};
-                Object.keys(src).forEach((k) => {
-                    const n = Number(k);
-                    if (!Number.isFinite(n)) return;
-                    out[`p${n}`] = src[k];
-                });
-                return out;
+            // Normalise HUD rp22 keys so the renderer can always read p1/p4/...
+            // HUD might store { p1: {...} } OR { 1: {...} }
+            const getRp22Metric = (key) => {
+                const n = parseInt(String(key).replace("p", ""), 10);
+                if (!Number.isFinite(n)) return null;
+
+                // Prefer p-key, but allow numeric-key as fallback
+                return (
+                    rp22FromHud[`p${n}`] ??
+                    rp22FromHud[n] ??
+                    rp22FromHud[String(n)] ??
+                    null
+                );
             };
-
-            const rp22FromEngine = normalizeEngineRp22(engineSeat);
-
-            // Use engine first (if it has any keys), otherwise HUD fallback
-            const rp22Raw = (rp22FromEngine && Object.keys(rp22FromEngine).length) ? rp22FromEngine : rp22FromHud;
             
             const rp23 = tooltipData?.rp23 || {};
             
@@ -1350,7 +1348,7 @@ function RP22ReportInner() {
             
             // Count RP22 parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20)
             ['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].forEach(key => {
-                const metric = rp22Raw[key];
+                const metric = getRp22Metric(key);
                 if (!metric) return;
                 const lvl = normalizeLvl(metric.level);
                 if (lvl) counts[lvl] += 1;
@@ -2329,8 +2327,8 @@ function RP22ReportInner() {
                                                     </div>
 
                                                     {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
-                                                       const metric = rp22Raw[key];
-                                                       const paramNum = parseInt(key.substring(1));
+                                                        const metric = getRp22Metric(key);
+                                                        const paramNum = parseInt(key.substring(1));
 
                                                         return (
                                                             <div key={key}>
@@ -2956,7 +2954,7 @@ function RP22ReportInner() {
                                                         {tooltipData?.distanceToMLP && <div>Distance to RSP: {tooltipData.distanceToMLP}</div>}
                                                     </div>
                                                     {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
-                                                        const metric = rp22Raw[key];
+                                                        const metric = getRp22Metric(key);
                                                         const paramNum = parseInt(key.substring(1), 10);
                                                         return (
                                                             <div key={key}>
