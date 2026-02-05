@@ -1307,10 +1307,25 @@ function RP22ReportInner() {
             const tooltipData = app?.seatMetricsById?.[seatId];
             const rp22FromHud = tooltipData?.rp22 || {};
             
-            // Engine output (primary)
-            const rp22FromEngine = getEngineRp22ForSeat(seatId) || {};
-            
-            // Use engine first, fallback to HUD
+            // Engine output (primary) is a seat object: { seatId, ..., rp22: { 1: metric, 4: metric, ... } }
+            const engineSeat = getEngineRp22ForSeat(seatId);
+
+            // Convert engineSeat.rp22 numeric keys -> { p1: metric, p4: metric, ... } to match report expectations
+            const normalizeEngineRp22 = (seatObj) => {
+                const src = seatObj?.rp22;
+                if (!src || typeof src !== "object") return {};
+                const out = {};
+                Object.keys(src).forEach((k) => {
+                    const n = Number(k);
+                    if (!Number.isFinite(n)) return;
+                    out[`p${n}`] = src[k];
+                });
+                return out;
+            };
+
+            const rp22FromEngine = normalizeEngineRp22(engineSeat);
+
+            // Use engine first (if it has any keys), otherwise HUD fallback
             const rp22Raw = (rp22FromEngine && Object.keys(rp22FromEngine).length) ? rp22FromEngine : rp22FromHud;
             
             const rp23 = tooltipData?.rp23 || {};
