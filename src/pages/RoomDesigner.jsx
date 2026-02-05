@@ -1801,6 +1801,7 @@ function RoomDesignerWithState() {
 
   // Use AppState dolbyLayout directly (no local state override)
   const dolbyPreset = appState?.dolbyLayout || "5.1";
+  const isNineBedLayout = String(dolbyPreset || "").trim().startsWith("9.");
   const setDolbyPreset = appState?.setDolbyLayout;
   const [lcrAimMode, setLcrAimMode] = useState("flat"); // "flat" | "angled"
   const [lcrAngleDeg, setLcrAngleDeg] = useState(0); // Live angle readout
@@ -1826,9 +1827,7 @@ function RoomDesignerWithState() {
   const expectsRears = layoutMajor >= 9 || layoutMajor === 7 && !useWidesInsteadOfRears;
   
   // NEW: Extra surrounds gating (only allow for 9.x.x+) - ALWAYS compute this
-  const layoutString = String(dolbyPreset || '5.1');
-  const major = parseInt(layoutString.split('.')[0], 10) || 0;
-  const allowExtraSurrounds = major >= 9;
+  const allowExtraSurrounds = isNineBedLayout;
 
   // screen state is now managed directly by AppState, removed local useState here.
 
@@ -1838,15 +1837,13 @@ function RoomDesignerWithState() {
   
   // NEW: Auto-reset extra surrounds count when layout doesn't allow them (idempotent)
   useEffect(() => {
-    const currentCount = Number(appState?.extraSurroundCount || 0);
-    
-    // Only reset if NOT allowed AND count is currently non-zero (idempotent)
-    if (!allowExtraSurrounds && currentCount !== 0) {
-      if (typeof appState?.setExtraSurroundCount === 'function') {
+    if (!isNineBedLayout) {
+      const current = appState?.extraSurroundCount ?? 0;
+      if (current !== 0 && typeof appState?.setExtraSurroundCount === "function") {
         appState.setExtraSurroundCount(0);
       }
     }
-  }, [allowExtraSurrounds, appState?.extraSurroundCount, appState?.setExtraSurroundCount]);
+  }, [isNineBedLayout, appState]);
 
   // NOTE: stableDimensions is already defined earlier (line 1539) - do not redeclare
 
@@ -4696,7 +4693,7 @@ function RoomDesignerWithState() {
                 frontWideOverlay={frontWideZones}
                 extraSurroundCount={appState?.extraSurroundCount ?? 0}
                 onExtraSurroundCountChange={appState?.setExtraSurroundCount}
-                allowExtraSurrounds={allowExtraSurrounds} />
+                allowExtraSurrounds={isNineBedLayout} />
 
                  </Suspense>
                   
