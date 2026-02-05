@@ -113,7 +113,6 @@ function RP22ReportInner() {
     // Room Designer source-of-truth keys (these must match AppStateProvider)
     const seats = safeArray(app?.seatingPositions);
     const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
-    const sevenBedLayoutType = app?.sevenBedLayoutType || app?._sevenBedLayoutType || app?.speakerSystem?.sevenBedLayoutType;
     const roomDims = app?.roomDims || {};
     const screen = app?.screen || {};
     const dolbyLayout = app?.dolbyLayout || "5.1";
@@ -283,7 +282,6 @@ function RP22ReportInner() {
         primarySeatingPosition,
         dimensions: stableDimensions,
         mlpBasis,
-        sevenBedLayoutType,
         seatSplMetrics: allSeatSplMetrics,
         overheadState: {
             globalModel: app?.overheadGlobalModel,
@@ -1287,10 +1285,11 @@ function RP22ReportInner() {
             // Read from same source as seat cards: app.seatMetricsById
             const tooltipData = app?.seatMetricsById?.[seatId];
             
-            // PRIORITY: Use analysis engine (live), fallback to HUD cache if engine hasn't computed yet
-            const rp22Raw =
-              (analysisResult?.perSeatRp22 && analysisResult.perSeatRp22[seatId]) ? analysisResult.perSeatRp22[seatId]
-              : (tooltipData?.rp22 || {});
+            const rp22FromHud = tooltipData?.rp22 || null;
+            const rp22FromEngine = perSeat?.[seatId] || null;
+            
+            // Prefer HUD (single source of truth), fallback to analysis engine if HUD not present yet
+            const rp22Raw = rp22FromHud || rp22FromEngine || {};
             
             const rp23 = tooltipData?.rp23 || {};
             
