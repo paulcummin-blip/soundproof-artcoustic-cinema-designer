@@ -2261,28 +2261,21 @@ function RP22ReportInner() {
                                 return seats.map((seat, idx) => {
                                     const seatId = seat?.id || '—';
                                     
-                                    // Keep HUD cache (used by the Room Designer HUD) as a fallback only
-                                    const tooltipData = app?.seatMetricsById?.[seatId];
-                                    
-                                    // PRIMARY SOURCE (report should be self-contained): analysis engine output
-                                    const rp22FromEngine = analysisResult?.perSeatRp22?.[seatId] || {};
-                                    
-                                    // FALLBACK SOURCE (what the HUD cached previously)
-                                    const rp22FromHud = tooltipData?.rp22 || {};
-                                    
-                                    // Use engine first, fallback to HUD
-                                    const rp22Raw = Object.keys(rp22FromEngine).length ? rp22FromEngine : rp22FromHud;
-                                    
-                                    // RP23 still comes from HUD cache for now (leave this untouched)
+                                    // HUD cache is the single source of truth for seat panels (match Room Designer HUD)
+                                    const tooltipData = app?.seatMetricsById?.[seatId] || null;
                                     const rp23 = tooltipData?.rp23 || {};
+                                    const rp22Hud = tooltipData?.rp22 || {};
+
+                                    const getRp22Metric = (key) => {
+                                      const n = parseInt(String(key).replace("p", ""), 10);
+                                      if (!Number.isFinite(n)) return null;
+
+                                      // Support both formats (HUD historically used p9, engine used 9)
+                                      return rp22Hud[key] ?? rp22Hud[`p${n}`] ?? rp22Hud[n] ?? rp22Hud[String(n)] ?? null;
+                                    };
                                     
                                     // Primary-seat badge (leave unchanged)
                                     const isPrimary = tooltipData?.isPrimary || false;
-
-                                    // If no metrics computed yet for this seat, show placeholders
-                                    if (!tooltipData) {
-                                        return null;
-                                    }
                                     
                                     // Determine suffix label and colour
                                     const isRsp = seatId === rspSeatId;
