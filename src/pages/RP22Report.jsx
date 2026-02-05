@@ -1278,22 +1278,42 @@ function RP22ReportInner() {
     // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
     // Total is always 10 (RP23 + 9 RP22 params: P1, P4, P5, P6, P9, P10, P16, P17, P20)
     const seatLevelCounts = React.useMemo(() => {
-        const perSeat = analysisResult?.perSeatRp22 || {};
-        const seatIds = Object.keys(perSeat).sort();
+        // Always iterate real seats (so cards never disappear)
+        const seatIds = (safeArray(seats).map(s => s?.id).filter(Boolean)).sort();
+        
+        // Helper: engine per-seat RP22 can be either an object or a Map
+        const getEngineRp22ForSeat = (seatId) => {
+            const perSeat = analysisResult?.perSeatRp22;
+            
+            if (!perSeat) return null;
+            
+            // Map case
+            if (typeof perSeat.get === "function") {
+                return perSeat.get(seatId) || null;
+            }
+            
+            // Object case
+            if (typeof perSeat === "object") {
+                return perSeat[seatId] || null;
+            }
+            
+            return null;
+        };
         
         return seatIds.map(seatId => {
-            // Read from same source as seat cards: app.seatMetricsById
+            const counts = { L1: 0, L2: 0, L3: 0, L4: 0 };
+            
+            // HUD cache (fallback only)
             const tooltipData = app?.seatMetricsById?.[seatId];
+            const rp22FromHud = tooltipData?.rp22 || {};
             
-            const rp22FromHud = tooltipData?.rp22 || null;
-            const rp22FromEngine = perSeat?.[seatId] || null;
+            // Engine output (primary)
+            const rp22FromEngine = getEngineRp22ForSeat(seatId) || {};
             
-            // Prefer HUD (single source of truth), fallback to analysis engine if HUD not present yet
-            const rp22Raw = rp22FromHud || rp22FromEngine || {};
+            // Use engine first, fallback to HUD
+            const rp22Raw = (rp22FromEngine && Object.keys(rp22FromEngine).length) ? rp22FromEngine : rp22FromHud;
             
             const rp23 = tooltipData?.rp23 || {};
-            
-            const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
             
             // Normalize level helper (same as room count logic)
             const normalizeLvl = (rawLevel) => {
@@ -1326,7 +1346,7 @@ function RP22ReportInner() {
             
             return { seatId, counts, total };
         });
-    }, [analysisResult?.perSeatRp22, app?.seatMetricsById]);
+    }, [analysisResult?.perSeatRp22, app?.seatMetricsById, seats]);
 
     // Group seat counts by row, sorted by seat number within each row
     const seatCountsByRow = React.useMemo(() => {
