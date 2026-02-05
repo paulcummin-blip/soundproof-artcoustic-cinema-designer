@@ -4332,7 +4332,7 @@ function RoomDesignerWithState() {
 
                 {(() => {
                  const extraN = allowExtraSurrounds ? Number(appState?.extraSurroundCount || 0) : 0;
-                 const parts = layoutString.split('.');
+                 const parts = dolbyPreset.split('.');
                  const displayMajor = (parseInt(parts[0], 10) || 0) + extraN;
 
                  const frontCount = Number(_frontSubsCfg?.count ?? 0);
