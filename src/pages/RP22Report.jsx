@@ -2219,10 +2219,22 @@ function RP22ReportInner() {
                                 return seats.map((seat, idx) => {
                                     const seatId = seat?.id || '—';
                                     
-                                    // CRITICAL: Read from HUD cache (same source as Seat HUD tooltip)
+                                    // Keep HUD cache (used by the Room Designer HUD) as a fallback only
                                     const tooltipData = app?.seatMetricsById?.[seatId];
-                                    const rp22Raw = tooltipData?.rp22 || {};
+                                    
+                                    // PRIMARY SOURCE (report should be self-contained): analysis engine output
+                                    const rp22FromEngine = analysisResult?.perSeatRp22?.[seatId] || {};
+                                    
+                                    // FALLBACK SOURCE (what the HUD cached previously)
+                                    const rp22FromHud = tooltipData?.rp22 || {};
+                                    
+                                    // Use engine first, fallback to HUD
+                                    const rp22Raw = Object.keys(rp22FromEngine).length ? rp22FromEngine : rp22FromHud;
+                                    
+                                    // RP23 still comes from HUD cache for now (leave this untouched)
                                     const rp23 = tooltipData?.rp23 || {};
+                                    
+                                    // Primary-seat badge (leave unchanged)
                                     const isPrimary = tooltipData?.isPrimary || false;
 
                                     // If no metrics computed yet for this seat, show placeholders
@@ -2824,12 +2836,27 @@ function RP22ReportInner() {
 
                                 return seats.map((seat, seatIdx) => {
                                     const seatId = seat?.id || '—';
+                                    
+                                    // Keep HUD cache (used by the Room Designer HUD) as a fallback only
                                     const tooltipData = app?.seatMetricsById?.[seatId];
-                                    if (!tooltipData) return null;
-
-                                    const rp22Raw = tooltipData?.rp22 || {};
+                                    
+                                    // PRIMARY SOURCE (report should be self-contained): analysis engine output
+                                    const rp22FromEngine = analysisResult?.perSeatRp22?.[seatId] || {};
+                                    
+                                    // FALLBACK SOURCE (what the HUD cached previously)
+                                    const rp22FromHud = tooltipData?.rp22 || {};
+                                    
+                                    // Use engine first, fallback to HUD
+                                    const rp22Raw = Object.keys(rp22FromEngine).length ? rp22FromEngine : rp22FromHud;
+                                    
+                                    // RP23 still comes from HUD cache for now (leave this untouched)
                                     const rp23 = tooltipData?.rp23 || {};
+                                    
+                                    // Primary-seat badge (leave unchanged)
                                     const isPrimary = tooltipData?.isPrimary || false;
+                                    
+                                    // Skip seats with no data at all
+                                    if (!rp22Raw || Object.keys(rp22Raw).length === 0) return null;
                                     const isRsp = seatId === rspSeatId;
                                     const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '(Secondary)');
                                     const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
