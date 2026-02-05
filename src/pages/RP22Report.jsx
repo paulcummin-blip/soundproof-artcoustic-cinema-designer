@@ -2879,41 +2879,18 @@ function RP22ReportInner() {
                                 return seats.map((seat, seatIdx) => {
                                     const seatId = seat?.id || '—';
                                     
-                                    // Keep HUD cache (used by the Room Designer HUD) as a fallback only
-                                    const tooltipData = app?.seatMetricsById?.[seatId];
-                                    
-                                    // PRIMARY SOURCE (report should be self-contained): analysis engine output
-                                    const rp22FromEngine = analysisResult?.perSeatRp22?.[seatId] || {};
-                                    
-                                    // FALLBACK SOURCE (what the HUD cached previously)
-                                    const rp22FromHud = tooltipData?.rp22 || {};
-                                    
-                                    // Use ENGINE first (preferred), fallback to HUD cache
-                                    // Engine shape: { seatId, isPrimary, rp22: { 1: metric, 4: metric, ... } }
-                                    // HUD shape:    { p1: metric, p4: metric, ... }
-                                    const engineRp22Numeric = rp22FromEngine?.rp22 || null;
-
-                                    const rp22FromEngineAsPKeys = engineRp22Numeric
-                                      ? {
-                                          p1:  engineRp22Numeric[1],
-                                          p4:  engineRp22Numeric[4],
-                                          p5:  engineRp22Numeric[5],
-                                          p6:  engineRp22Numeric[6],
-                                          p9:  engineRp22Numeric[9],
-                                          p10: engineRp22Numeric[10],
-                                          p16: engineRp22Numeric[16],
-                                          p17: engineRp22Numeric[17],
-                                          p20: engineRp22Numeric[20],
-                                        }
-                                      : null;
-
-                                    const rp22Raw =
-                                      (rp22FromEngineAsPKeys && Object.keys(rp22FromEngineAsPKeys).some(k => rp22FromEngineAsPKeys[k]))
-                                        ? rp22FromEngineAsPKeys
-                                        : (rp22FromHud || {});
-                                    
-                                    // RP23 still comes from HUD cache for now (leave this untouched)
+                                    // HUD cache is the single source of truth for seat panels (match Room Designer HUD)
+                                    const tooltipData = app?.seatMetricsById?.[seatId] || null;
                                     const rp23 = tooltipData?.rp23 || {};
+                                    const rp22Hud = tooltipData?.rp22 || {};
+
+                                    const getRp22Metric = (key) => {
+                                      const n = parseInt(String(key).replace("p", ""), 10);
+                                      if (!Number.isFinite(n)) return null;
+
+                                      // Support both formats (HUD historically used p9, engine used 9)
+                                      return rp22Hud[key] ?? rp22Hud[`p${n}`] ?? rp22Hud[n] ?? rp22Hud[String(n)] ?? null;
+                                    };
                                     
                                     // Primary-seat badge (leave unchanged)
                                     const isPrimary = tooltipData?.isPrimary || false;
