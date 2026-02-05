@@ -37,12 +37,13 @@ function RP22ReportInner() {
     const [screenMetricsForPrint, setScreenMetricsForPrint] = useState(null);
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
+    const [printReady, setPrintReady] = useState(false);
     const printLockRef = React.useRef(false);
     const cleanupTimeoutRef = React.useRef(null);
     const exportGuardRef = React.useRef({ active: false, startedAt: 0 });
     const exportTimeoutRef = React.useRef(null);
     
-    const EXPORT_TIMEOUT_MS = 20000; // 20s is enough for slow captures
+    const EXPORT_TIMEOUT_MS = 60000; // allow enough time for 3 SVG→PNG captures on slower machines
 
     useEffect(() => {
         const cleanup = () => {
@@ -570,26 +571,34 @@ function RP22ReportInner() {
         return counts;
     }, [getDisplayedRoomLevel]);
 
-    // Check if print layout is ready (all data loaded)
-    const printReady = React.useMemo(() => {
-        if (!isPrinting) return false;
-        
-        const roomCardCount = orderedParams.length;
-        const seatsOk = (seats.length === 0) ? true : (Object.keys(app?.seatMetricsById || {}).length >= seats.length);
-        const cleanOk = planEnabled ? (typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0) : true;
-        const dimsOk = planEnabled ? (typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0) : true;
-        const speakerDimsOk = planEnabled ? (typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0) : true;
-        const planOk = cleanOk && dimsOk && speakerDimsOk;
-        const screenOk = true; // never block on screen metrics
-        
-        return roomCardCount > 0 && seatsOk && planOk && screenOk;
-    }, [isPrinting, orderedParams.length, seats.length, planEnabled, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl, app?.seatMetricsById]);
+    // Mark printReady when all plan captures have finished (image or __SKIP__)
+    useEffect(() => {
+        if (!isPrinting) return;
+
+        const hasPlan = planImageDataUrl !== null;
+        const hasDims = planDimsImageDataUrl !== null;
+        const hasSpeakerDims = planSpeakerDimsImageDataUrl !== null;
+
+        if (hasPlan && hasDims && hasSpeakerDims) {
+            // Only flip once
+            setExportDebug(d => ({ ...d, printReady: true }));
+            setPrintReady(true);
+            setExportStatus("Capture complete — preparing print…");
+
+            // Once we're ready, do not allow the stall timeout to fire
+            if (exportTimeoutRef.current) {
+                clearTimeout(exportTimeoutRef.current);
+                exportTimeoutRef.current = null;
+            }
+        }
+    }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl]);
 
     // Trigger print when ready (with print-once guard + re-entry protection)
     useEffect(() => {
         if (!isPrinting) {
             setHasPrintedOnce(false);
             printLockRef.current = false;
+            setPrintReady(false);
             return;
         }
         if (!printReady) return;
