@@ -78,15 +78,20 @@ export function getUpperSpeakersForSeat(seat, placedSpeakers, getCanonicalRole) 
 
 /**
  * Compute vertical elevation angles for upper speakers from a seat
- * Returns max gap between adjacent uppers on each side
+ * ROW-BASED RP22-PURE LOGIC (2026-02-05):
+ * - Groups speakers by row (front/mid/rear) using canonical roles
+ * - Computes ONE elevation angle per row (based on average Y position)
+ * - Only compares adjacent rows: front↔mid, mid↔rear
+ * - Ignores left/right differences (P9 is about vertical spacing only)
+ * 
  * @param {Object} seat - Seat with x, y, z
  * @param {Array} upperSpeakers - Array from getUpperSpeakersForSeat
- * @param {Number} roomCenterX - Room center X coordinate for left/right split
- * @returns {Object} { maxVerticalGapDeg, gaps, elevations }
+ * @param {Number} roomCenterX - Room center X coordinate (unused in row-based logic)
+ * @returns {Object} { maxVerticalGapDeg, gaps, worstGap, rowElevations }
  */
 export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCenterX = 0) {
   if (!seat || !Array.isArray(upperSpeakers) || upperSpeakers.length < 2) {
-    return { maxVerticalGapDeg: null, gaps: [], elevations: [] };
+    return { maxVerticalGapDeg: null, gaps: [], worstGap: null, rowElevations: [] };
   }
 
   const seatX = Number(seat.x ?? seat.position?.x);
@@ -94,69 +99,93 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
   const seatZ = Number(seat.z ?? seat.position?.z ?? 1.2);
 
   if (!isNum(seatX) || !isNum(seatY) || !isNum(seatZ)) {
-    return { maxVerticalGapDeg: null, gaps: [], elevations: [] };
+    return { maxVerticalGapDeg: null, gaps: [], worstGap: null, rowElevations: [] };
   }
 
-  // Compute elevation angle for each upper speaker
-  const elevations = upperSpeakers.map(spk => {
-    const pos = spk.position;
-    const dx = pos.x - seatX;
-    const dy = pos.y - seatY;
-    const dz = pos.z - seatZ;
-    
-    // Planar distance
-    const rPlanar = Math.hypot(dx, dy);
-    
-    // Elevation angle in degrees
-    const elevDeg = Math.atan2(dz, rPlanar) * 180 / Math.PI;
-    
-    return {
-      role: spk.role,
-      elevDeg,
-      x: pos.x,
-      y: pos.y,
-      z: pos.z,
-      isLeft: pos.x < roomCenterX,
-    };
-  });
-
-  // RP22-PURE ADJACENCY: Only compare front↔mid and mid↔rear on SAME SIDE
-  const byRow = (list) => {
-    const rows = { front: null, mid: null, rear: null };
-
-    for (const e of list) {
-      const r = String(e.role || "").toUpperCase();
-      if (r.startsWith("TF")) rows.front = e;
-      else if (r.startsWith("TM")) rows.mid = e;
-      else if (r.startsWith("TR") || r.startsWith("TB")) rows.rear = e;
-    }
-
-    return rows;
+  // Group speakers by row using canonical roles
+  const rows = {
+    front: [],
+    mid: [],
+    rear: [],
   };
 
+  for (const spk of upperSpeakers) {
+    const role = String(spk.role || "").toUpperCase();
+    const pos = spk.position;
+    
+    if (!isNum(pos.x) || !isNum(pos.y) || !isNum(pos.z)) continue;
+    
+    if (role.startsWith("TF")) {
+      rows.front.push(spk);
+    } else if (role.startsWith("TM")) {
+      rows.mid.push(spk);
+    } else if (role.startsWith("TR") || role.startsWith("TB")) {
+      rows.rear.push(spk);
+    }
+  }
+
+  // Compute elevation angle for each row that has speakers
+  const rowElevations = [];
+
+  const computeRowElevation = (rowName, speakers) => {
+    if (speakers.length === 0) return null;
+
+    // Average Y position of this row
+    const avgY = speakers.reduce((sum, s) => sum + s.position.y, 0) / speakers.length;
+    
+    // Average Z position of this row
+    const avgZ = speakers.reduce((sum, s) => sum + s.position.z, 0) / speakers.length;
+
+    // Elevation angle from seat to row center
+    const dz = avgZ - seatZ;
+    const dy = Math.abs(avgY - seatY);
+    
+    const elevDeg = Math.atan2(dz, dy) * 180 / Math.PI;
+
+    // Build role label (e.g., "TFL/TFR" for front row)
+    const roleLabel = speakers.map(s => s.role).join('/');
+
+    return {
+      row: rowName,
+      roleLabel,
+      elevDeg,
+      avgY,
+      avgZ,
+      speakerCount: speakers.length,
+    };
+  };
+
+  const frontElev = computeRowElevation('front', rows.front);
+  const midElev = computeRowElevation('mid', rows.mid);
+  const rearElev = computeRowElevation('rear', rows.rear);
+
+  if (frontElev) rowElevations.push(frontElev);
+  if (midElev) rowElevations.push(midElev);
+  if (rearElev) rowElevations.push(rearElev);
+
+  // Require at least 2 rows for P9
+  if (rowElevations.length < 2) {
+    return { maxVerticalGapDeg: null, gaps: [], worstGap: null, rowElevations };
+  }
+
+  // Compute adjacent row gaps only
   const gaps = [];
 
-  const evalSide = (sideList) => {
-    const rows = byRow(sideList);
+  if (frontElev && midElev) {
+    gaps.push({
+      pair: `${frontElev.roleLabel} ↔ ${midElev.roleLabel}`,
+      deg: Math.abs(frontElev.elevDeg - midElev.elevDeg),
+    });
+  }
 
-    if (rows.front && rows.mid) {
-      gaps.push({
-        pair: `${rows.front.role} ↔ ${rows.mid.role}`,
-        deg: Math.abs(rows.front.elevDeg - rows.mid.elevDeg),
-      });
-    }
+  if (midElev && rearElev) {
+    gaps.push({
+      pair: `${midElev.roleLabel} ↔ ${rearElev.roleLabel}`,
+      deg: Math.abs(midElev.elevDeg - rearElev.elevDeg),
+    });
+  }
 
-    if (rows.mid && rows.rear) {
-      gaps.push({
-        pair: `${rows.mid.role} ↔ ${rows.rear.role}`,
-        deg: Math.abs(rows.mid.elevDeg - rows.rear.elevDeg),
-      });
-    }
-  };
-
-  evalSide(elevations.filter(e => e.isLeft));
-  evalSide(elevations.filter(e => !e.isLeft));
-
+  // Find worst gap
   const worst = gaps.length > 0
     ? gaps.reduce((max, g) => (g.deg > max.deg ? g : max), gaps[0])
     : null;
@@ -166,8 +195,8 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
   return {
     maxVerticalGapDeg,
     gaps,
-    worstGap: worst || null,
-    elevations,
+    worstGap: worst,
+    rowElevations,
   };
 }
 
