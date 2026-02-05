@@ -1067,6 +1067,7 @@ function useDesignerState() {
       mlpBasis,
       autoSeatByRP23,
       seatingBlockOffset,
+      lcrAimMode,
       aimFrontWidesAtMLP,
       aimSideSurroundsAtMLP,
       aimRearSurroundsAtMLP,
