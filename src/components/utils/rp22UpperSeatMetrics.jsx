@@ -80,13 +80,14 @@ export function getUpperSpeakersForSeat(seat, placedSpeakers, getCanonicalRole) 
  * Compute vertical elevation angles for upper speakers from a seat
  * ROW-BASED RP22-PURE LOGIC (2026-02-05):
  * - Groups speakers by row (front/mid/rear) using canonical roles
- * - Computes ONE elevation angle per row (based on average Y position)
+ * - Computes ONE elevation angle per row per side (based on average Y of row)
  * - Only compares adjacent rows: front↔mid, mid↔rear
- * - Ignores left/right differences (P9 is about vertical spacing only)
+ * - Left and right sides computed independently
+ * - Works with 2 or 3 rows (does not require mid to exist)
  * 
  * @param {Object} seat - Seat with x, y, z
  * @param {Array} upperSpeakers - Array from getUpperSpeakersForSeat
- * @param {Number} roomCenterX - Room center X coordinate (unused in row-based logic)
+ * @param {Number} roomCenterX - Room center X coordinate for left/right split
  * @returns {Object} { maxVerticalGapDeg, gaps, worstGap, rowElevations }
  */
 export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCenterX = 0) {
@@ -102,11 +103,10 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
     return { maxVerticalGapDeg: null, gaps: [], worstGap: null, rowElevations: [] };
   }
 
-  // Group speakers by row using canonical roles
-  const rows = {
-    front: [],
-    mid: [],
-    rear: [],
+  // Group speakers by row AND side using canonical roles
+  const rowsByLR = {
+    left: { front: [], mid: [], rear: [] },
+    right: { front: [], mid: [], rear: [] },
   };
 
   for (const spk of upperSpeakers) {
@@ -115,88 +115,94 @@ export function computeUpperVerticalAnglesForSeat(seat, upperSpeakers, roomCente
     
     if (!isNum(pos.x) || !isNum(pos.y) || !isNum(pos.z)) continue;
     
+    const side = pos.x < roomCenterX ? 'left' : 'right';
+    
     if (role.startsWith("TF")) {
-      rows.front.push(spk);
+      rowsByLR[side].front.push(spk);
     } else if (role.startsWith("TM")) {
-      rows.mid.push(spk);
+      rowsByLR[side].mid.push(spk);
     } else if (role.startsWith("TR") || role.startsWith("TB")) {
-      rows.rear.push(spk);
+      rowsByLR[side].rear.push(spk);
     }
   }
 
-  // Compute elevation angle for each row that has speakers
-  const rowElevations = [];
+  // For each side, compute elevation angles for rows that exist
+  const allGaps = [];
+  const allRowElevations = [];
 
-  const computeRowElevation = (rowName, speakers) => {
-    if (speakers.length === 0) return null;
+  const processSide = (sideName, sideRows) => {
+    // Compute elevation for each row on this side
+    const rowData = [];
 
-    // Average Y position of this row
-    const avgY = speakers.reduce((sum, s) => sum + s.position.y, 0) / speakers.length;
-    
-    // Average Z position of this row
-    const avgZ = speakers.reduce((sum, s) => sum + s.position.z, 0) / speakers.length;
+    const computeRowElev = (rowName, rowIndex, speakers) => {
+      if (speakers.length === 0) return null;
 
-    // Elevation angle from seat to row center
-    const dz = avgZ - seatZ;
-    const dy = Math.abs(avgY - seatY);
-    
-    const elevDeg = Math.atan2(dz, dy) * 180 / Math.PI;
+      // Average Y and Z of this row
+      const avgY = speakers.reduce((sum, s) => sum + s.position.y, 0) / speakers.length;
+      const avgZ = speakers.reduce((sum, s) => sum + s.position.z, 0) / speakers.length;
 
-    // Build role label (e.g., "TFL/TFR" for front row)
-    const roleLabel = speakers.map(s => s.role).join('/');
+      // Elevation from seat to row center
+      const dz = avgZ - seatZ;
+      const dy = Math.abs(avgY - seatY);
+      const elevDeg = Math.atan2(dz, dy) * 180 / Math.PI;
 
-    return {
-      row: rowName,
-      roleLabel,
-      elevDeg,
-      avgY,
-      avgZ,
-      speakerCount: speakers.length,
+      // Build role label
+      const roleLabel = speakers.map(s => s.role).join('/');
+
+      return {
+        sideName,
+        rowName,
+        rowIndex,
+        roleLabel,
+        elevDeg,
+        avgY,
+        avgZ,
+      };
     };
+
+    const frontRow = computeRowElev('front', 0, sideRows.front);
+    const midRow = computeRowElev('mid', 1, sideRows.mid);
+    const rearRow = computeRowElev('rear', 2, sideRows.rear);
+
+    // Collect rows that exist
+    if (frontRow) rowData.push(frontRow);
+    if (midRow) rowData.push(midRow);
+    if (rearRow) rowData.push(rearRow);
+
+    // Store for return
+    allRowElevations.push(...rowData);
+
+    // Need at least 2 rows on this side to compute gaps
+    if (rowData.length < 2) return;
+
+    // Sort by rowIndex (front=0, mid=1, rear=2)
+    rowData.sort((a, b) => a.rowIndex - b.rowIndex);
+
+    // Compute adjacent row gaps
+    for (let i = 1; i < rowData.length; i++) {
+      const gap = Math.abs(rowData[i].elevDeg - rowData[i - 1].elevDeg);
+      allGaps.push({
+        pair: `${rowData[i - 1].roleLabel} ↔ ${rowData[i].roleLabel}`,
+        deg: gap,
+      });
+    }
   };
 
-  const frontElev = computeRowElevation('front', rows.front);
-  const midElev = computeRowElevation('mid', rows.mid);
-  const rearElev = computeRowElevation('rear', rows.rear);
-
-  if (frontElev) rowElevations.push(frontElev);
-  if (midElev) rowElevations.push(midElev);
-  if (rearElev) rowElevations.push(rearElev);
-
-  // Require at least 2 rows for P9
-  if (rowElevations.length < 2) {
-    return { maxVerticalGapDeg: null, gaps: [], worstGap: null, rowElevations };
-  }
-
-  // Compute adjacent row gaps only
-  const gaps = [];
-
-  if (frontElev && midElev) {
-    gaps.push({
-      pair: `${frontElev.roleLabel} ↔ ${midElev.roleLabel}`,
-      deg: Math.abs(frontElev.elevDeg - midElev.elevDeg),
-    });
-  }
-
-  if (midElev && rearElev) {
-    gaps.push({
-      pair: `${midElev.roleLabel} ↔ ${rearElev.roleLabel}`,
-      deg: Math.abs(midElev.elevDeg - rearElev.elevDeg),
-    });
-  }
+  processSide('left', rowsByLR.left);
+  processSide('right', rowsByLR.right);
 
   // Find worst gap
-  const worst = gaps.length > 0
-    ? gaps.reduce((max, g) => (g.deg > max.deg ? g : max), gaps[0])
+  const worst = allGaps.length > 0
+    ? allGaps.reduce((max, g) => (g.deg > max.deg ? g : max), allGaps[0])
     : null;
 
   const maxVerticalGapDeg = worst ? worst.deg : null;
 
   return {
     maxVerticalGapDeg,
-    gaps,
+    gaps: allGaps,
     worstGap: worst,
-    rowElevations,
+    rowElevations: allRowElevations,
   };
 }
 
