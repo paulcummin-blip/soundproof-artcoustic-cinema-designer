@@ -1284,7 +1284,13 @@ function RP22ReportInner() {
         return seatIds.map(seatId => {
             // Read from same source as seat cards: app.seatMetricsById
             const tooltipData = app?.seatMetricsById?.[seatId];
-            const rp22Raw = tooltipData?.rp22 || {};
+            
+            const rp22FromHud = tooltipData?.rp22 || null;
+            const rp22FromEngine = perSeat?.[seatId] || null;
+            
+            // Prefer HUD (single source of truth), fallback to analysis engine if HUD not present yet
+            const rp22Raw = rp22FromHud || rp22FromEngine || {};
+            
             const rp23 = tooltipData?.rp23 || {};
             
             const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
