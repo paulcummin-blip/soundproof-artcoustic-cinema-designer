@@ -1355,10 +1355,19 @@ function RP22ReportInner() {
         seatLevelCounts.forEach(({ seatId, counts, total }) => {
             // Parse seat-r{row}-c{col}
             const match = seatId.match(/^seat-r(\d+)-c(\d+)$/);
-            if (!match) return;
 
-            const rowNum = parseInt(match[1], 10);
-            const seatNum = parseInt(match[2], 10);
+            let rowNum;
+            let seatNum;
+
+            if (match) {
+                // Normal case: structured seat IDs
+                rowNum = parseInt(match[1], 10);
+                seatNum = parseInt(match[2], 10);
+            } else {
+                // Fallback: keep seat, group under row 0, preserve stable order
+                rowNum = 0;
+                seatNum = Number.MAX_SAFE_INTEGER;
+            }
 
             if (!rows[rowNum]) rows[rowNum] = [];
             rows[rowNum].push({ seatId, counts, total, seatNum });
