@@ -94,39 +94,38 @@ export default function SurroundsSelector({
         </Select>
         <p className="text-xs text-[#625143]">Applies to all surrounds unless overridden.</p>
 
-        {/* Extra Surrounds - ALWAYS RENDER; DISABLE when not allowed */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12, marginBottom: 18 }}>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>Extra Surrounds</div>
-          
-          <div style={{ width: 150 }}>
-            <Select
-              value={String(safeExtraCount)}
-              onValueChange={(v) => {
-                const n = parseInt(v, 10);
-                if (typeof onExtraSurroundCountChange === 'function') {
-                  onExtraSurroundCountChange(Number.isFinite(n) ? n : 0);
-                }
-              }}
-              disabled={uiDisabled || !allowExtraSurrounds}
-            >
-              <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
-                <SelectValue />
-              </SelectTrigger>
+        {/* Extra Surrounds - ONLY SHOW for 9.x.x layouts */}
+        {allowExtraSurrounds && (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 12, marginBottom: 18 }}>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>Extra Surrounds</div>
+              
+              <div style={{ width: 150 }}>
+                <Select
+                  value={String(safeExtraCount)}
+                  onValueChange={(v) => {
+                    const n = parseInt(v, 10);
+                    if (typeof onExtraSurroundCountChange === 'function') {
+                      onExtraSurroundCountChange(Number.isFinite(n) ? n : 0);
+                    }
+                  }}
+                  disabled={uiDisabled}
+                >
+                  <SelectTrigger className="w-full bg-white border-[#DCDBD6] hover:border-[#213428] focus:border-[#213428] focus:ring-1 focus:ring-[#213428]">
+                    <SelectValue />
+                  </SelectTrigger>
 
-              <SelectContent className="bg-white border-[#DCDBD6]">
-                <SelectItem value="0" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">Off</SelectItem>
-                <SelectItem value="2" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">2</SelectItem>
-                <SelectItem value="4" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">4</SelectItem>
-                <SelectItem value="6" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">6</SelectItem>
-                <SelectItem value="8" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">8</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        {!allowExtraSurrounds && (
-          <p className="text-xs text-[#625143] italic" style={{ marginTop: -10 }}>
-            Available for 9.x.x layouts only
-          </p>
+                  <SelectContent className="bg-white border-[#DCDBD6]">
+                    <SelectItem value="0" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">Off</SelectItem>
+                    <SelectItem value="2" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">2</SelectItem>
+                    <SelectItem value="4" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">4</SelectItem>
+                    <SelectItem value="6" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">6</SelectItem>
+                    <SelectItem value="8" className="hover:bg-[#F8F8F7] focus:bg-[#F1F0EE]">8</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </>
         )}
 
         {/* Individual Control toggle */}

@@ -1826,7 +1826,8 @@ function RoomDesignerWithState() {
   const useWidesInsteadOfRears = _sevenBedLayoutType === "wides";
   const expectsRears = layoutMajor >= 9 || layoutMajor === 7 && !useWidesInsteadOfRears;
   
-  // NEW: Extra surrounds gating (only allow for 9.x.x+) - ALWAYS compute this
+  // Extra surrounds only for 9.x.x layouts
+  const isNineBedLayout = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) === 9;
   const allowExtraSurrounds = isNineBedLayout;
 
   // screen state is now managed directly by AppState, removed local useState here.
@@ -1838,10 +1839,7 @@ function RoomDesignerWithState() {
   // NEW: Auto-reset extra surrounds count when layout doesn't allow them (idempotent)
   useEffect(() => {
     if (!isNineBedLayout) {
-      const current = appState?.extraSurroundCount ?? 0;
-      if (current !== 0 && typeof appState?.setExtraSurroundCount === "function") {
-        appState.setExtraSurroundCount(0);
-      }
+      if ((appState?.extraSurroundCount ?? 0) !== 0) appState?.setExtraSurroundCount?.(0);
     }
   }, [isNineBedLayout, appState]);
 
@@ -4691,9 +4689,9 @@ function RoomDesignerWithState() {
 
                 allSeatSplMetrics={allSeatSplMetrics}
                 frontWideOverlay={frontWideZones}
-                extraSurroundCount={appState?.extraSurroundCount ?? 0}
-                onExtraSurroundCountChange={appState?.setExtraSurroundCount}
-                allowExtraSurrounds={isNineBedLayout} />
+                allowExtraSurrounds={isNineBedLayout}
+                extraSurroundCount={isNineBedLayout ? (appState?.extraSurroundCount ?? 0) : 0}
+                onExtraSurroundCountChange={isNineBedLayout ? appState?.setExtraSurroundCount : undefined} />
 
                  </Suspense>
                   
