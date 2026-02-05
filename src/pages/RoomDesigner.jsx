@@ -1801,7 +1801,7 @@ function RoomDesignerWithState() {
 
   // Use AppState dolbyLayout directly (no local state override)
   const dolbyPreset = appState?.dolbyLayout || "5.1";
-  const isNineBedLayout = String(dolbyPreset || "").trim().startsWith("9.");
+  const isNineBedLayout = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) === 9;
   const setDolbyPreset = appState?.setDolbyLayout;
   const [lcrAimMode, setLcrAimMode] = useState("flat"); // "flat" | "angled"
   const [lcrAngleDeg, setLcrAngleDeg] = useState(0); // Live angle readout
@@ -1826,8 +1826,7 @@ function RoomDesignerWithState() {
   const useWidesInsteadOfRears = _sevenBedLayoutType === "wides";
   const expectsRears = layoutMajor >= 9 || layoutMajor === 7 && !useWidesInsteadOfRears;
   
-  // Extra surrounds only for 9.x.x layouts
-  const isNineBedLayout = parseInt(String(dolbyPreset || "5.1").split(".")[0], 10) === 9;
+  // Extra surrounds only for 9.x.x layouts (using isNineBedLayout defined earlier)
   const allowExtraSurrounds = isNineBedLayout;
 
   // screen state is now managed directly by AppState, removed local useState here.
