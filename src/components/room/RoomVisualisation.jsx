@@ -3,6 +3,7 @@
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
 import { Layers3, Compass } from 'lucide-react';
 import SeatHud from "@/components/room/SeatHud";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { getSpeakerModelMeta, normaliseModelKey as registryNormaliseModelKey } from "@/components/models/speakers/registry";
 import {
   rp23HorizontalAngleForSeat,
@@ -6533,23 +6534,9 @@ const renderLevelBadge = useCallback((level) => {
     return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
   }
 
-  const bgColor = level === 'L4' ? '#213428' :
-                  level === 'L3' ? '#3E4349' :
-                  level === 'L2' ? '#625143' :
-                  '#4A230F';
-
   return (
-    <span 
-      style={{
-        fontWeight: 600, 
-        fontSize: 10,
-        padding: '2px 6px',
-        borderRadius: 4,
-        background: bgColor,
-        color: 'white'
-      }}
-    >
-      {level}
+    <span style={{ transform: 'scale(0.85)', transformOrigin: 'right center', display: 'inline-flex' }}>
+      <RP22GradingPill level={level} />
     </span>
   );
 }, []);

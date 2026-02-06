@@ -2379,10 +2379,10 @@ function RP22ReportInner() {
                                 return seats.map((seat, idx) => {
                                     const seatId = seat?.id || '—';
                                     
-                                    // LOCAL HUD SNAPSHOT FIRST (report-specific), fallback to app cache
+                                    // SINGLE SOURCE OF TRUTH FIRST: use the same cached seat snapshot Room Designer HUD uses
                                     const tooltipData =
-                                        reportSeatHudById?.[seatId] ??
                                         app?.seatMetricsById?.[seatId] ??
+                                        reportSeatHudById?.[seatId] ??
                                         null;
                                     const rp23 = tooltipData?.rp23 || {};
                                     const rp22Hud = tooltipData?.rp22 || {};
