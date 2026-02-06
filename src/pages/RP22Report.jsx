@@ -1871,7 +1871,12 @@ function RP22ReportInner() {
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
-                    screen={screen}
+                    screen={{
+                      ...(screen || {}),
+                      floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
+                        ? Number(app.screenFrontPlaneM)
+                        : Number(screen?.floatDepthM) || 0
+                    }}
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
