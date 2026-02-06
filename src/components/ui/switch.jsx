@@ -13,7 +13,10 @@ const Switch = React.forwardRef(
         type="button"
         role="switch"
         aria-checked={!!checked}
-        onClick={() => onCheckedChange?.(!checked)}
+        onClick={() => {
+          if (props?.disabled) return;
+          onCheckedChange?.(!checked);
+        }}
         className={cn(
           // Track base styles
           "peer inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border transition-colors",
