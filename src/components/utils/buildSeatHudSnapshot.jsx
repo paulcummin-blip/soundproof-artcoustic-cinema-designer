@@ -157,7 +157,7 @@ export function buildSeatHudSnapshot({
       else if (rp23AngleDeg >= 45 && rp23AngleDeg <= 70) rp23Level = 'L3';
       else if (rp23AngleDeg >= 40 && rp23AngleDeg <= 75) rp23Level = 'L2';
       else if (rp23AngleDeg >= 35 && rp23AngleDeg <= 80) rp23Level = 'L1';
-      else rp23Level = 'N/A';
+      else rp23Level = 'FAIL';
     }
   }
 
