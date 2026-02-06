@@ -1986,8 +1986,17 @@ React.useEffect(() => {
     const frameWm = visibleWm + (2 * borderM);
     
     // Screen front plane depth
-    // Always draw the screen using the computed live depth (includes min-depth clearance logic)
-    const planeDepthM = actualScreenFrontY;
+    // LIVE: use actualScreenFrontY (autoTight stays untouched)
+    // EXPORT: only lock to saved screenFrontPlaneM when screenPlaneMode is FIXED
+    const exportPlaneM = Number(screenFrontPlaneM);
+
+    const planeDepthM =
+      (exportMode === "dimensions" &&
+        screenPlaneMode === "fixed" &&
+        Number.isFinite(exportPlaneM) &&
+        exportPlaneM > 0)
+        ? exportPlaneM
+        : actualScreenFrontY;
 
     // Centre the screen on the room centreline
     const xCentre = widthM / 2;
