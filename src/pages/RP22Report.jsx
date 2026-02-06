@@ -1892,7 +1892,7 @@ function RP22ReportInner() {
                     speakerPositionsView="off"
                     showMlpRuler={false}
                     zoomMode="off"
-                    screenPlaneMode="autoTight"
+                    screenPlaneMode="fixed"
                     lcrAimMode={app?.lcrAimMode || "flat"}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
@@ -1946,7 +1946,7 @@ function RP22ReportInner() {
                     speakerPositionsView="off"
                     showMlpRuler={true}
                     zoomMode="off"
-                    screenPlaneMode="autoTight"
+                    screenPlaneMode="fixed"
                     lcrAimMode={app?.lcrAimMode || "flat"}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
@@ -2000,7 +2000,7 @@ function RP22ReportInner() {
                     speakerPositionsView="plan"
                     showMlpRuler={false}
                     zoomMode="off"
-                    screenPlaneMode="autoTight"
+                    screenPlaneMode="fixed"
                     lcrAimMode={app?.lcrAimMode || "flat"}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
