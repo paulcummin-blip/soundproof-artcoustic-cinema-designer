@@ -582,11 +582,16 @@ appState, // Pass appState directly for setters
       setSevenBedLayoutType(p?.seven_bed_layout_type || "rears");
     }
 
+    const didHydrateLcrAimModeRef = React.useRef(false);
+    
     const hydratedLcrAimMode = p?.lcr_aim_mode;
+    
     if (
-    (hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") &&
-    typeof setLcrAimMode === "function")
-    {
+      !didHydrateLcrAimModeRef.current &&
+      (hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") &&
+      typeof setLcrAimMode === "function"
+    ) {
+      didHydrateLcrAimModeRef.current = true;
       setLcrAimMode(hydratedLcrAimMode);
     }
 
@@ -4623,7 +4628,7 @@ function RoomDesignerWithState() {
                         <Switch
                       id="aim-lcr"
                       checked={lcrAimMode === "angled"}
-                      onCheckedChange={(checked) => setLcrAimMode?.(checked ? "angled" : "flat")}
+                      onCheckedChange={(checked) => setLcrAimMode(checked ? "angled" : "flat")}
                       disabled={isFrozen('speakers')} />
 
                       </div>
