@@ -212,7 +212,7 @@ export default function SeatHud({
           }}
         >
           <span>RP23 Horizontal: {tooltipData.rp23.formatted}</span>
-          {renderLevelBadge(tooltipData.rp23.level)}
+          <RP22GradingPill level={tooltipData.rp23.level} />
         </div>
       )}
 
