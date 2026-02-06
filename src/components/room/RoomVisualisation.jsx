@@ -1009,6 +1009,15 @@ const byId = useMemo(() => {
 
   // actualScreenFrontY declaration and calculation
   const actualScreenFrontY = React.useMemo(() => {
+    // EXPORT MUST MATCH LIVE:
+    // If AppState has a published screenFrontPlaneM, use it during export rendering
+    const savedPlaneM = Number(appState?.screenFrontPlaneM);
+    const isExport = !!exportMode;
+    if (isExport && Number.isFinite(savedPlaneM)) {
+      // clamp just to avoid absurd values, but keep real behaviour
+      return Math.max(0, Math.min(savedPlaneM, (lengthM || 0) * 0.9));
+    }
+
     const floatDepthM = Number(screen?.floatDepthM) || 0.0;
 
     // calculatedMinScreenDepthM already includes the 1cm gap, don't add it again
@@ -1020,6 +1029,9 @@ const byId = useMemo(() => {
       return Math.max(floatDepthM, minDepthForSpeakersToClear);
     }
   }, [
+    appState?.screenFrontPlaneM,
+    exportMode,
+    lengthM,
     calculatedMinScreenDepthM,
     screen?.floatDepthM,
     screenPlaneMode
