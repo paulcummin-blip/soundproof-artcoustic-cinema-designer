@@ -1871,7 +1871,12 @@ function RP22ReportInner() {
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
-                    screen={screen}
+                    screen={{
+                      ...(screen || {}),
+                      floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
+                        ? Number(app.screenFrontPlaneM)
+                        : Number(screen?.floatDepthM) || 0
+                    }}
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
@@ -1882,6 +1887,7 @@ function RP22ReportInner() {
                     speakerPositionsView="off"
                     showMlpRuler={false}
                     zoomMode="off"
+                    screenPlaneMode="fixed"
                     lcrAimMode={app?.lcrAimMode || "flat"}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
@@ -1914,7 +1920,12 @@ function RP22ReportInner() {
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
-                    screen={screen}
+                    screen={{
+                      ...(screen || {}),
+                      floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
+                        ? Number(app.screenFrontPlaneM)
+                        : Number(screen?.floatDepthM) || 0
+                    }}
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
@@ -1925,6 +1936,7 @@ function RP22ReportInner() {
                     speakerPositionsView="off"
                     showMlpRuler={true}
                     zoomMode="off"
+                    screenPlaneMode="fixed"
                     lcrAimMode={app?.lcrAimMode || "flat"}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
@@ -1957,7 +1969,12 @@ function RP22ReportInner() {
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
-                    screen={screen}
+                    screen={{
+                      ...(screen || {}),
+                      floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
+                        ? Number(app.screenFrontPlaneM)
+                        : Number(screen?.floatDepthM) || 0
+                    }}
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
@@ -1968,6 +1985,7 @@ function RP22ReportInner() {
                     speakerPositionsView="plan"
                     showMlpRuler={false}
                     zoomMode="off"
+                    screenPlaneMode="fixed"
                     lcrAimMode={app?.lcrAimMode || "flat"}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
