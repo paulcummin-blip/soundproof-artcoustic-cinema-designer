@@ -4,6 +4,7 @@ import { formatDb } from '@/components/utils/formatDb';
 import { getRP22Definition } from '@/components/data/rp22Definitions';
 import { getLevelColors } from '@/components/utils/rp22Colors';
 import { formatSeatLabel } from '@/components/utils/seatLabel';
+import RP22GradingPill from '@/components/ui/RP22GradingPill';
 
 export default function SeatHud({
   tooltipData,
@@ -283,7 +284,7 @@ export default function SeatHud({
                     `: ${metric.formatted || '—'}`
                     )}
                     </span>
-                    {renderLevelBadge(normalizeLevel(metric.level))}
+                    <RP22GradingPill level={normalizeLevel(metric.level)} />
                     </div>
 
                     {/* P5 debug info */}

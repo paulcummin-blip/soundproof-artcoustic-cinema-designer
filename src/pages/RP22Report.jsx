@@ -312,7 +312,7 @@ function RP22ReportInner() {
         const list = safeArray(seats);
 
         // Compute LCR angle info for buildSeatHudSnapshot
-        const aimAtMLP = app?.aimLeftRightAtMLP ?? false;
+        const aimAtMLP = app?.aimAtMLP ?? false;
         const lcrAngleInfo = { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
         
         if (aimAtMLP && primarySeatingPosition) {
@@ -391,7 +391,7 @@ function RP22ReportInner() {
         screen,
         primarySeatingPosition,
         allSeatSplMetrics,
-        app?.aimLeftRightAtMLP,
+        app?.aimAtMLP,
         app?.aimFrontWidesAtMLP,
         app?.aimSideSurroundsAtMLP,
         app?.aimRearSurroundsAtMLP,
@@ -2441,7 +2441,7 @@ function RP22ReportInner() {
                                                     </div>
 
                                                     {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
-                                                        const metric = getRp22Metric(key);
+                                                        const metric = tooltipData?.rp22?.[key];
                                                         const paramNum = parseInt(key.substring(1));
 
                                                         return (
@@ -3048,7 +3048,7 @@ function RP22ReportInner() {
                                                         {tooltipData?.distanceToMLP && <div>Distance to RSP: {tooltipData.distanceToMLP}</div>}
                                                     </div>
                                                     {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
-                                                        const metric = getRp22Metric(key);
+                                                        const metric = tooltipData?.rp22?.[key];
                                                         const paramNum = parseInt(key.substring(1), 10);
                                                         return (
                                                             <div key={key}>

@@ -711,22 +711,23 @@ export function buildSeatHudSnapshot({
       .map(s => s.value)
       .filter(Number.isFinite);
 
-    const p6RawDb = maxPairwiseDelta(surSplValues);
-    if (Number.isFinite(p6RawDb)) {
-      // RP22 RULE: round DOWN before grading and display
-      const p6Db = Math.floor(p6RawDb);
+    const p6ValueDb = maxPairwiseDelta(surSplValues);
+    if (Number.isFinite(p6ValueDb)) {
+      // OPTION B: always round DOWN to nearest integer BEFORE grading and display
+      const p6FloorDb = Math.floor(p6ValueDb);
 
       let level = '—';
-      if (p6Db <= 2) level = 'L4';
-      else if (p6Db <= 4) level = 'L3';
-      else if (p6Db <= 6) level = 'L2';
-      else if (p6Db <= 10) level = 'L1';
+      if (p6FloorDb <= 2) level = 'L4';
+      else if (p6FloorDb <= 4) level = 'L3';
+      else if (p6FloorDb <= 6) level = 'L2';
+      else if (p6FloorDb <= 10) level = 'L1';
       else level = 'FAIL';
 
       data.rp22.p6 = {
-        valueDb: p6Db,        // ← critical: store the floored value
+        valueDb: p6ValueDb,                 // keep raw value for any future deep-dive
+        valueDbFloor: p6FloorDb,            // explicit floored value (for consistency/debug)
         level,
-        formatted: `${p6Db} dB`
+        formatted: `${p6FloorDb} dB`        // DISPLAY MUST MATCH GRADE INPUT
       };
     }
   }
