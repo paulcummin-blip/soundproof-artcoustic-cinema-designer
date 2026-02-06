@@ -22,6 +22,7 @@ import { Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import { computeScreenMetrics } from '../components/utils/screenMetrics';
 import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
+import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 
 function RP22ReportInner() {
     const app = useAppState();
@@ -333,29 +334,30 @@ function RP22ReportInner() {
         const list = safeArray(seats);
 
         // Compute LCR angle info for buildSeatHudSnapshot
+        // IMPORTANT: Must match RoomVisualisation yaw convention (safeYawToMLP), otherwise P16 won't match HUD
         const aimAtMLP = app?.aimAtMLP ?? false;
         const lcrAngleInfo = { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
         
         if (aimAtMLP && primarySeatingPosition) {
             const mlpTarget = { x: primarySeatingPosition.x, y: primarySeatingPosition.y };
+
             const flSpeaker = placedSpeakers?.find(s => {
                 const canon = String(s?.role || '').toUpperCase();
                 return (canon === 'FL' || canon === 'L') && s?.position;
             });
+
             const frSpeaker = placedSpeakers?.find(s => {
                 const canon = String(s?.role || '').toUpperCase();
                 return (canon === 'FR' || canon === 'R') && s?.position;
             });
 
+            // Use the SAME yaw convention as the live HUD
             if (flSpeaker?.position && Number.isFinite(mlpTarget.x) && Number.isFinite(mlpTarget.y)) {
-                const dx = mlpTarget.x - flSpeaker.position.x;
-                const dy = mlpTarget.y - flSpeaker.position.y;
-                lcrAngleInfo.L = Math.atan2(dx, dy) * (180 / Math.PI);
+                lcrAngleInfo.L = safeYawToMLP(flSpeaker.position, mlpTarget);
             }
+
             if (frSpeaker?.position && Number.isFinite(mlpTarget.x) && Number.isFinite(mlpTarget.y)) {
-                const dx = mlpTarget.x - frSpeaker.position.x;
-                const dy = mlpTarget.y - frSpeaker.position.y;
-                lcrAngleInfo.R = Math.atan2(dx, dy) * (180 / Math.PI);
+                lcrAngleInfo.R = safeYawToMLP(frSpeaker.position, mlpTarget);
             }
 
             const avg = (Math.abs(lcrAngleInfo.L) + Math.abs(lcrAngleInfo.R)) / 2;
