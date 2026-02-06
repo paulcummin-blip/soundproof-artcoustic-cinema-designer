@@ -119,6 +119,32 @@ function RP22ReportInner() {
     const dolbyLayout = app?.dolbyLayout || "5.1";
     const mlpBasis = app?.mlpBasis || "front";
 
+    // Export must use resolved screen snapshot (includes buffered wall offset)
+    const screenForExport = React.useMemo(() => {
+      const base = (screen && typeof screen === "object") ? screen : {};
+      const snap = (screenMetricsForPrint && screenMetricsForPrint.ok)
+        ? screenMetricsForPrint
+        : null;
+
+      if (!snap) return base;
+
+      return {
+        ...base,
+
+        // Physical size used by RoomVisualisation
+        viewWm: snap.viewWm,
+        viewHm: snap.viewHm,
+        overallWm: snap.overallWm,
+        overallHm: snap.overallHm,
+
+        // CRITICAL: front-wall offset used by plan + dimensions
+        wallDistM: snap.wallDistM,
+
+        // Optional metadata (safe, non-breaking)
+        screenChoiceLabel: snap.screenChoiceLabel
+      };
+    }, [screen, screenMetricsForPrint]);
+
     // --- Screen label helpers (print) ---
     const cleanAspectLabel = (v) => {
         const s = String(v ?? "").trim();
@@ -1871,7 +1897,7 @@ function RP22ReportInner() {
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
-                    screen={screen}
+                    screen={screenForExport}
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
@@ -1914,7 +1940,7 @@ function RP22ReportInner() {
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
-                    screen={screen}
+                    screen={screenForExport}
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
@@ -1957,7 +1983,7 @@ function RP22ReportInner() {
                     placedSpeakers={placedSpeakers}
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
-                    screen={screen}
+                    screen={screenForExport}
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
