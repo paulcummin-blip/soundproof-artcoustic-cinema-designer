@@ -196,6 +196,12 @@ export function buildSeatHudSnapshot({
     p20: { valueDb: null, level: '—', formatted: '—' },
   };
 
+  // Detect if overheads exist (for P9/P10 applicability)
+  const hasOverheads = placedSpeakers.some(s => {
+    const r = getCanonicalRole(s.role);
+    return r.startsWith('T'); // TFL, TFR, TML, etc
+  });
+
   // Pull per-seat RP22 metrics from analysisResult (single source of truth)
   const seatMetrics = analysisResult?.seatMetrics?.get?.(seat.id);
   if (seatMetrics) {
@@ -220,6 +226,15 @@ export function buildSeatHudSnapshot({
     // P16 is computed locally below (skip analysisResult)
     if (seatMetrics.p17) data.rp22.p17 = seatMetrics.p17;
     if (seatMetrics.p20) data.rp22.p20 = seatMetrics.p20;
+  }
+
+  // P9: Set N/A if no overheads
+  if (!hasOverheads && !data.rp22.p9.value) {
+    data.rp22.p9 = {
+      value: null,
+      formatted: 'N/A',
+      level: 'N/A',
+    };
   }
 
   // ALWAYS compute P16 locally using LIVE plan-view yaw logic (matches icon rotation)
@@ -547,44 +562,52 @@ export function buildSeatHudSnapshot({
 
   // HUD-local P10 – Maximum SPL difference between upper speakers
   {
-    const upperEntries = seatSplData?.uppers
-      ? Object.values(seatSplData.uppers)
-      : [];
-
-    const upperValues = upperEntries
-      .map((o) =>
-        o && typeof o.value === 'number' && Number.isFinite(o.value)
-          ? o.value
-          : null
-      )
-      .filter((v) => typeof v === 'number' && Number.isFinite(v));
-
-    if (upperValues.length >= 2) {
-      const maxSpl = Math.max(...upperValues);
-      const minSpl = Math.min(...upperValues);
-      const delta  = Math.abs(maxSpl - minSpl);
-
-      // Round to 0.1 dB
-      const deltaRounded = Math.round(delta * 10) / 10;
-
-      // RP22 P10 thresholds
-      let level10 = 1;
-      if (deltaRounded <= 2)      level10 = 4;
-      else if (deltaRounded <= 5) level10 = 3;
-      else if (deltaRounded <= 8) level10 = 2;
-      else                        level10 = 1;
-
+    if (!hasOverheads) {
       data.rp22.p10 = {
-        value:     deltaRounded,
-        formatted: `±${deltaRounded.toFixed(1)} dB`,
-        level:     level10,
+        value: null,
+        formatted: 'N/A',
+        level: 'N/A',
       };
     } else {
-      data.rp22.p10 = {
-        value:     null,
-        formatted: 'N/A (insufficient data)',
-        level:     '—',
-      };
+      const upperEntries = seatSplData?.uppers
+        ? Object.values(seatSplData.uppers)
+        : [];
+
+      const upperValues = upperEntries
+        .map((o) =>
+          o && typeof o.value === 'number' && Number.isFinite(o.value)
+            ? o.value
+            : null
+        )
+        .filter((v) => typeof v === 'number' && Number.isFinite(v));
+
+      if (upperValues.length >= 2) {
+        const maxSpl = Math.max(...upperValues);
+        const minSpl = Math.min(...upperValues);
+        const delta  = Math.abs(maxSpl - minSpl);
+
+        // Round to 0.1 dB
+        const deltaRounded = Math.round(delta * 10) / 10;
+
+        // RP22 P10 thresholds
+        let level10 = 1;
+        if (deltaRounded <= 2)      level10 = 4;
+        else if (deltaRounded <= 5) level10 = 3;
+        else if (deltaRounded <= 8) level10 = 2;
+        else                        level10 = 1;
+
+        data.rp22.p10 = {
+          value:     deltaRounded,
+          formatted: `±${deltaRounded.toFixed(1)} dB`,
+          level:     level10,
+        };
+      } else {
+        data.rp22.p10 = {
+          value:     null,
+          formatted: 'N/A (insufficient data)',
+          level:     '—',
+        };
+      }
     }
   }
 
