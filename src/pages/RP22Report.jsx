@@ -1877,6 +1877,11 @@ function RP22ReportInner() {
                         ? Number(app.screenFrontPlaneM)
                         : Number(screen?.floatDepthM) || 0
                     }}
+                    screenFrontPlaneM={
+                      Number.isFinite(Number(app?.screenFrontPlaneM))
+                        ? Number(app.screenFrontPlaneM)
+                        : undefined
+                    }
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
@@ -1926,6 +1931,11 @@ function RP22ReportInner() {
                         ? Number(app.screenFrontPlaneM)
                         : Number(screen?.floatDepthM) || 0
                     }}
+                    screenFrontPlaneM={
+                      Number.isFinite(Number(app?.screenFrontPlaneM))
+                        ? Number(app.screenFrontPlaneM)
+                        : undefined
+                    }
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
@@ -1975,6 +1985,11 @@ function RP22ReportInner() {
                         ? Number(app.screenFrontPlaneM)
                         : Number(screen?.floatDepthM) || 0
                     }}
+                    screenFrontPlaneM={
+                      Number.isFinite(Number(app?.screenFrontPlaneM))
+                        ? Number(app.screenFrontPlaneM)
+                        : undefined
+                    }
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
