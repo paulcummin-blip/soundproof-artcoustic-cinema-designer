@@ -1007,12 +1007,53 @@ const byId = useMemo(() => {
     getCanonicalRole
   ]);
 
+  // EXPORT-ONLY: compute min screen depth synchronously so PDF capture doesn't grab the default state value
+  const exportMinScreenDepthM = React.useMemo(() => {
+    if (exportMode !== 'dimensions') return null;
+
+    // Same front-object selection rule as the live effect
+    const frontObjectsToCalculate = [...(placedSpeakers || []), ...(frontSubs || [])]
+      .filter(s => {
+        const r = getCanonicalRole?.(s?.role);
+        return r === 'FL' || r === 'FC' || r === 'FR' || isSubRole(r);
+      });
+
+    try {
+      const value = computeMinimumScreenDepthM({
+        frontObjects: frontObjectsToCalculate,
+        getDims: getModelDimsM,
+        lcrAngles: { L: lcrAngleInfo?.L ?? 0, R: lcrAngleInfo?.R ?? 0 },
+        aimAtMLP: !!aimAtMLP,
+      });
+
+      return Number.isFinite(value) ? value : null;
+    } catch (e) {
+      return null;
+    }
+  }, [
+    exportMode,
+    placedSpeakers,
+    frontSubs,
+    aimAtMLP,
+    lcrAngleInfo?.L,
+    lcrAngleInfo?.R,
+    screen?.visibleWidthInches,
+    getModelDimsM,
+    getCanonicalRole
+  ]);
+
+  // Effective min depth: export uses sync value (if available), live uses state (effect-driven)
+  const effectiveMinScreenDepthM =
+    (exportMode === 'dimensions' && Number.isFinite(exportMinScreenDepthM))
+      ? exportMinScreenDepthM
+      : calculatedMinScreenDepthM;
+
   // actualScreenFrontY declaration and calculation
   const actualScreenFrontY = React.useMemo(() => {
     const floatDepthM = Number(screen?.floatDepthM) || 0.0;
 
-    // calculatedMinScreenDepthM already includes the 1cm gap, don't add it again
-    const minDepthForSpeakersToClear = calculatedMinScreenDepthM;
+    // effectiveMinScreenDepthM already includes the 1cm gap, don't add it again
+    const minDepthForSpeakersToClear = effectiveMinScreenDepthM;
 
     if (screenPlaneMode === 'autoTight') {
       return minDepthForSpeakersToClear;
@@ -1020,7 +1061,7 @@ const byId = useMemo(() => {
       return Math.max(floatDepthM, minDepthForSpeakersToClear);
     }
   }, [
-    calculatedMinScreenDepthM,
+    effectiveMinScreenDepthM,
     screen?.floatDepthM,
     screenPlaneMode
   ]);
