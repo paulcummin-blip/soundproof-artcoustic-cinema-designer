@@ -1579,6 +1579,8 @@ function useDesignerState() {
     aimFrontWidesAtMLP, setAimFrontWidesAtMLP,
     aimSideSurroundsAtMLP, setAimSideSurroundsAtMLP,
     aimRearSurroundsAtMLP, setAimRearSurroundsAtMLP,
+    lcrAimMode,
+    setLcrAimMode,
     splConfig,
     getEffectiveSplInputs,
     updateGlobalSpl,
