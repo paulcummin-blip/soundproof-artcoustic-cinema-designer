@@ -344,7 +344,8 @@ const getPlanAimDeg = (speaker, mlp, widthM, lengthM, aimLeftRightAtMLP, aimFron
     if (aimFrontWidesAtMLP) {
       return safeYawToMLP(pos, mlp);
     }
-    return canon === 'LW' ? -90 : 90;
+    // Aim OFF: sit flat to side walls, facing INTO the room
+    return canon === 'LW' ? 90 : -90;
   }
   
   // Side Surrounds
@@ -6122,7 +6123,14 @@ return {
     const isExport = typeof exportMode === "string" && exportMode.length > 0;
     if (isExport) {
       const savedYaw = speaker?.rotation?.y;
-      if (typeof savedYaw === "number" && Number.isFinite(savedYaw)) {
+
+      // IMPORTANT:
+      // Many speakers (especially auto-placed) may carry a default rotation object like { y: 0 }.
+      // That must NOT override the normal LW/RW aim logic, otherwise wides get stuck facing "flat/0°".
+      const hasMeaningfulSavedYaw =
+        (typeof savedYaw === "number" && Number.isFinite(savedYaw) && Math.abs(savedYaw) > 0.001);
+
+      if (hasMeaningfulSavedYaw) {
         // NOTE: invert sign to match SVG rotate() direction used in RenderPrimitives
         yawDeg = -savedYaw;
       }
@@ -6147,8 +6155,8 @@ return {
       if (aimFrontWidesAtMLP) {
         yawDeg = getAimingYawDeg(speaker, mlp);
       } else {
-        // Aim OFF: sit flat to side walls
-        yawDeg = (canon === "LW") ? -90 : +90;
+        // Aim OFF: sit flat to side walls, facing INTO the room
+        yawDeg = (canon === "LW") ? +90 : -90;
       }
     } else if (yawDeg == null && isSideSurround) {
       if (aimSideSurroundsAtMLP) {
