@@ -3083,14 +3083,31 @@ function RoomDesignerWithState() {
       if (canon === 'SBL' || canon === 'SBR') shouldAim = aimRear;
 
       if (!shouldAim) {
-        // Reset to flat if toggle is off
-        if (canon === 'FL' || canon === 'FR' || canon === 'LW' || canon === 'RW' ||
-        canon === 'SL' || canon === 'SR' || canon === 'SBL' || canon === 'SBR') {
+        // IMPORTANT:
+        // LCR reset is governed ONLY by lcrAimMode.
+        // Other groups must not force a global reset cycle.
+        if (canon === 'FL' || canon === 'FR') {
+          if (lcrAimMode === "flat") {
+            const currentYaw = spk.rotation?.y || 0;
+            if (Math.abs(currentYaw) > 0.001) {
+              return { ...spk, rotation: { ...(spk.rotation || {}), y: 0 } };
+            }
+          }
+          return spk;
+        }
+
+        // Non-LCR groups reset only under their own toggles
+        if (
+          canon === 'LW' || canon === 'RW' ||
+          canon === 'SL' || canon === 'SR' ||
+          canon === 'SBL' || canon === 'SBR'
+        ) {
           const currentYaw = spk.rotation?.y || 0;
           if (Math.abs(currentYaw) > 0.001) {
             return { ...spk, rotation: { ...(spk.rotation || {}), y: 0 } };
           }
         }
+
         return spk;
       }
 
