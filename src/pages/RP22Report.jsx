@@ -2994,7 +2994,7 @@ function RP22ReportInner() {
 
                                 return seats.map((seat, seatIdx) => {
                                     const seatId = seat?.id || '—';
-                                    
+
                                     // SINGLE SOURCE OF TRUTH: always use the local buildSeatHudSnapshot result first
                                     // (this is the only way to guarantee the Report matches the live HUD logic)
                                     const tooltipData =

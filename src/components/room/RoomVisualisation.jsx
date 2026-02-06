@@ -198,6 +198,7 @@ import { computeAllSeatSplMetrics, getSeatSplMetrics, getMlpSeat } from "@/compo
 // NEW: Import shared seat HUD metrics calculator
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
+import { getLevelColors } from '@/components/utils/rp22Colors';
 
 
 import {
@@ -6530,15 +6531,29 @@ return {
 
 // Helper to render level badge
 const renderLevelBadge = useCallback((level) => {
-  if (!level || level === 'N/A' || level === '—' || level === 'Below L1') {
+  // Match the report pill behaviour and colours exactly
+  const str = String(level || '—').toUpperCase();
+
+  // Neutral / missing
+  if (!level || str === 'N/A' || str === '—' || str === '-' || str === 'BELOW L1') {
     return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
   }
 
-  return (
-    <span style={{ transform: 'scale(0.85)', transformOrigin: 'right center', display: 'inline-flex' }}>
-      <RP22GradingPill level={level} />
-    </span>
-  );
+  // PASS THROUGH L1–L4 / FAIL exactly
+  if (str === 'FAIL') return <RP22GradingPill level="FAIL" />;
+
+  if (str === 'L1' || str === 'L2' || str === 'L3' || str === 'L4') {
+    return <RP22GradingPill level={str} />;
+  }
+
+  // If some old numeric sneaks in
+  const n = Number(level);
+  if (Number.isFinite(n)) {
+    if (n >= 1 && n <= 4) return <RP22GradingPill level={`L${n}`} />;
+    return <span style={{ fontSize: 10, color: '#999' }}>—</span>;
+  }
+
+  return <span style={{ fontSize: 10, color: '#999' }}>—</span>;
 }, []);
 
 const renderRp22AnglesOverlay = useCallback(() => {
