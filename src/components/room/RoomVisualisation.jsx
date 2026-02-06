@@ -6066,12 +6066,6 @@ return {
     // --- YAW CALCULATION ---
     let yawDeg;
 
-    // Primary truth: if Room Designer already wrote a yaw, use it (export must match live plan)
-    const savedYaw = speaker?.rotation?.y;
-    if (typeof savedYaw === "number" && Number.isFinite(savedYaw)) {
-      yawDeg = savedYaw;
-    }
-
     const isLCR = (canon === "FL" || canon === "FR" || canon === "FC");
     const isFrontWide = (canon === "LW" || canon === "RW");
     const extraSurroundPattern = /^(SL|SR)\d+$/;
@@ -6079,7 +6073,7 @@ return {
     const isSideSurround = (canon === "SL" || canon === "SR" || isExtraSurround);
     const isRearSurround = (canon === "SBL" || canon === "SBR");
 
-    if (yawDeg == null && isLCR) {
+    if (isLCR) {
       if (aimAtMLP) {
         if (canon === 'FL') yawDeg = lcrAngleInfo?.L ?? 0;
         else if (canon === 'FR') yawDeg = lcrAngleInfo?.R ?? 0;
@@ -6087,21 +6081,21 @@ return {
       } else {
         yawDeg = 0;
       }
-    } else if (yawDeg == null && isFrontWide) {
+    } else if (isFrontWide) {
       if (aimFrontWidesAtMLP) {
         yawDeg = getAimingYawDeg(speaker, mlp);
       } else {
         // Aim OFF: sit flat to side walls
         yawDeg = (canon === "LW") ? -90 : +90;
       }
-    } else if (yawDeg == null && isSideSurround) {
+    } else if (isSideSurround) {
       if (aimSideSurroundsAtMLP) {
         yawDeg = getAimingYawDeg(speaker, mlp);
       } else {
         // Aim OFF: sit flat to side walls
         yawDeg = (canon === "SL") ? 90 : -90;
       }
-    } else if (yawDeg == null && isRearSurround) {
+    } else if (isRearSurround) {
       if (aimRearSurroundsAtMLP) {
         yawDeg = getAimingYawDeg(speaker, mlp);
       } else {
@@ -6118,7 +6112,7 @@ return {
         else if (minDist === distRight) yawDeg = -90;
         else yawDeg = 180;
       }
-    } else if (yawDeg == null) {
+    } else {
       // Fallback for any other speaker type, including overheads
       yawDeg = 0;
     }
