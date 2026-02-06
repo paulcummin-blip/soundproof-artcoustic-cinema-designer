@@ -114,6 +114,27 @@ function RP22ReportInner() {
     // Room Designer source-of-truth keys (these must match AppStateProvider)
     const seats = safeArray(app?.seatingPositions);
     const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
+
+    // Compute RSP seat (closest to green dot within 5cm)
+    const rspSeatId = React.useMemo(() => {
+        const greenDot = app?.mlp;
+        if (!greenDot || !Number.isFinite(greenDot.x) || !Number.isFinite(greenDot.y)) return null;
+        
+        let closestSeat = null;
+        let minDist = Infinity;
+        
+        seats.forEach(s => {
+            if (!Number.isFinite(s?.x) || !Number.isFinite(s?.y)) return;
+            const d = Math.hypot(s.x - greenDot.x, s.y - greenDot.y);
+            if (d < minDist) {
+                minDist = d;
+                closestSeat = s.id;
+            }
+        });
+        
+        return (minDist <= 0.05) ? closestSeat : null;
+    }, [seats, app?.mlp]);
+
     const roomDims = app?.roomDims || {};
     const screen = app?.screen || {};
     const dolbyLayout = app?.dolbyLayout || "5.1";
@@ -2355,29 +2376,7 @@ function RP22ReportInner() {
                                     );
                                 }
 
-
-
-                                // Compute RSP seat (closest to green dot within 5cm)
-                                const rspSeatId = React.useMemo(() => {
-                                    const greenDot = app?.mlp;
-                                    if (!greenDot || !Number.isFinite(greenDot.x) || !Number.isFinite(greenDot.y)) return null;
-                                    
-                                    let closestSeat = null;
-                                    let minDist = Infinity;
-                                    
-                                    seats.forEach(s => {
-                                        if (!Number.isFinite(s?.x) || !Number.isFinite(s?.y)) return;
-                                        const d = Math.hypot(s.x - greenDot.x, s.y - greenDot.y);
-                                        if (d < minDist) {
-                                            minDist = d;
-                                            closestSeat = s.id;
-                                        }
-                                    });
-                                    
-                                    return (minDist <= 0.05) ? closestSeat : null;
-                                }, [seats, app?.mlp]);
-
-                                return seats.map((seat, idx) => {
+                                return seats.map((seat, seatIdx) => {
                                     const seatId = seat?.id || '—';
                                     
                                     // SINGLE SOURCE OF TRUTH: always use the local buildSeatHudSnapshot result first
@@ -2406,7 +2405,7 @@ function RP22ReportInner() {
                                     const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
                                     
                                     return (
-                                        <div key={seatId} className="flex flex-col h-full">
+                                        <div key={seatId} className="flex flex-col h-full" data-seat-index={seatIdx}>
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
