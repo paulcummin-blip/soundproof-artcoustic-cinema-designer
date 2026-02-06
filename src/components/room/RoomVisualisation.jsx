@@ -1945,7 +1945,13 @@ React.useEffect(() => {
     const frameWm = visibleWm + (2 * borderM);
     
     // Screen front plane depth
-    const planeDepthM = actualScreenFrontY;
+    // LIVE: use actualScreenFrontY (autoTight stays untouched)
+    // EXPORT: lock to saved screenFrontPlaneM if present
+    const exportPlaneM = Number(screenFrontPlaneM);
+    const planeDepthM =
+      (exportMode === "dimensions" && Number.isFinite(exportPlaneM) && exportPlaneM > 0)
+        ? exportPlaneM
+        : actualScreenFrontY;
 
     // Centre the screen on the room centreline
     const xCentre = widthM / 2;
@@ -2029,7 +2035,7 @@ React.useEffect(() => {
     const screenCenterX_m = roomWidthM / 2;
 
     return { BaffleAndScreen: component, screenPlaneY, screenCenterX_m, visibleWidthM: visibleWm };
-  }, [screen?.visibleWidthInches, screen?.borderThicknessCm, screen?.frameThicknessCm, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M, lengthM, meterToCanvasX]);
+  }, [screen?.visibleWidthInches, screen?.borderThicknessCm, screen?.frameThicknessCm, roomRect, scale, actualScreenFrontY, showBaffle, showScreen, widthM, SCREEN_THICKNESS_M, lengthM, meterToCanvasX, exportMode, screenFrontPlaneM]);
 
 
   // Compute LCR zone blocks with ZONE_DEPTH_M
