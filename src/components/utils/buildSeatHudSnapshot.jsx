@@ -718,6 +718,7 @@ export function buildSeatHudSnapshot({
       else if (p6ValueDb <= 4) level = 'L3';
       else if (p6ValueDb <= 6) level = 'L2';
       else if (p6ValueDb <= 10) level = 'L1';
+      else level = 'FAIL';
 
       data.rp22.p6 = {
         valueDb: p6ValueDb,
