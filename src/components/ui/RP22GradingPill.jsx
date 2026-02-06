@@ -13,16 +13,18 @@ export default function RP22GradingPill({ level = 4, count, children }) {
     if (str === 'L3') return 3;
     if (str === 'L4') return 4;
     if (str === 'FAIL') return 0;
+    if (str === 'N/A') return -2;
+    if (str === 'NO DATA') return -3;
     
     // Treat undefined, "—", "-", or unknown values as neutral
     return -1;
   };
   
   const n = normalizeLevel(level);
-  const baseLabel = n === -1 ? '—' : n === 0 ? 'FAIL' : `L${n}`;
+  const baseLabel = n === -1 ? '—' : n === -2 ? 'N/A' : n === -3 ? 'NO DATA' : n === 0 ? 'FAIL' : `L${n}`;
   const label = children ?? (count !== undefined ? `${baseLabel}: ${count}` : baseLabel);
 
-  const colors = n === -1 
+  const colors = (n === -1 || n === -2 || n === -3)
     ? { bg: '#F3F4F6', border: '#E5E7EB', text: '#9CA3AF' } 
     : getLevelColors(n);
 

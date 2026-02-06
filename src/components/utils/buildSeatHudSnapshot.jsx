@@ -193,7 +193,7 @@ export function buildSeatHudSnapshot({
     p10: { valueDb: null, level: '—', formatted: '—' },
     p16: { valueDb: null, level: '—', formatted: '—' },
     p17: { valueDb: null, level: '—', formatted: '—' },
-    p20: { valueDb: null, level: '—', formatted: '—' },
+    p20: { valueDb: null, level: '—', formatted: 'Not Calculated' },
   };
 
   // Detect if overheads exist (for P9/P10 applicability)
@@ -232,7 +232,7 @@ export function buildSeatHudSnapshot({
   if (!hasOverheads && !data.rp22.p9.value) {
     data.rp22.p9 = {
       value: null,
-      formatted: 'N/A',
+      formatted: '—',
       level: 'N/A',
     };
   }
@@ -565,7 +565,7 @@ export function buildSeatHudSnapshot({
     if (!hasOverheads) {
       data.rp22.p10 = {
         value: null,
-        formatted: 'N/A',
+        formatted: '—',
         level: 'N/A',
       };
     } else {
@@ -604,8 +604,8 @@ export function buildSeatHudSnapshot({
       } else {
         data.rp22.p10 = {
           value:     null,
-          formatted: 'N/A (insufficient data)',
-          level:     '—',
+          formatted: '—',
+          level:     'NO DATA',
         };
       }
     }

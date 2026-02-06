@@ -346,6 +346,11 @@ export default function ParameterCard({ parameter, roomResult, seatResults = [],
                                 </span>
                                 {renderLevelBadge(level)}
                             </div>
+                        ) : (parameter.id === 14 || parameter.id === 18 || parameter.id === 19) ? (
+                            <div className="flex justify-between items-center">
+                                <span className="text-xs text-gray-400 italic">Not Calculated</span>
+                                {renderLevelBadge('—')}
+                            </div>
                         ) : (
                             <div className="flex justify-between items-center">
                                 <span className="text-xs text-gray-400 italic">—</span>
