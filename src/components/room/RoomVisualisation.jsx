@@ -1987,8 +1987,18 @@ React.useEffect(() => {
     
     // Screen front plane depth
     // LIVE: use actualScreenFrontY (autoTight stays untouched)
-    // EXPORT: lock to saved screenFrontPlaneM if present
-    const exportPlaneM = Number(screenFrontPlaneM);
+    // EXPORT: lock to saved export plane if present
+    // Priority:
+    // 1) screen.floatDepthM (used by RP22 report export RV)
+    // 2) screenFrontPlaneM (legacy prop, if still used anywhere)
+    const exportPlaneFromScreen = Number(screen?.floatDepthM);
+    const exportPlaneLegacy = Number(screenFrontPlaneM);
+
+    const exportPlaneM =
+      (Number.isFinite(exportPlaneFromScreen) && exportPlaneFromScreen > 0)
+        ? exportPlaneFromScreen
+        : exportPlaneLegacy;
+
     const planeDepthM =
       (exportMode === "dimensions" && Number.isFinite(exportPlaneM) && exportPlaneM > 0)
         ? exportPlaneM
