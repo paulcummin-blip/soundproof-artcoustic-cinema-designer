@@ -1894,7 +1894,7 @@ function RP22ReportInner() {
                     zoomMode="off"
                     screenPlaneMode="fixed"
                     lcrAimMode={app?.lcrAimMode || "flat"}
-                    aimAtMLP={app?.aimLeftRightAtMLP ?? false}
+                    aimAtMLP={app?.aimAtMLP ?? false}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
                     onSetScreen={rvNoops.onSetScreen}
@@ -1949,7 +1949,7 @@ function RP22ReportInner() {
                     zoomMode="off"
                     screenPlaneMode="fixed"
                     lcrAimMode={app?.lcrAimMode || "flat"}
-                    aimAtMLP={app?.aimLeftRightAtMLP ?? false}
+                    aimAtMLP={app?.aimAtMLP ?? false}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
                     onSetScreen={rvNoops.onSetScreen}
@@ -2004,7 +2004,7 @@ function RP22ReportInner() {
                     zoomMode="off"
                     screenPlaneMode="fixed"
                     lcrAimMode={app?.lcrAimMode || "flat"}
-                    aimAtMLP={app?.aimLeftRightAtMLP ?? false}
+                    aimAtMLP={app?.aimAtMLP ?? false}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
                     onSetScreen={rvNoops.onSetScreen}
@@ -2046,7 +2046,7 @@ function RP22ReportInner() {
                     speakerPositionsView="off"
                     showMlpRuler={false}
                     zoomMode="off"
-                    aimAtMLP={app?.aimLeftRightAtMLP ?? false}
+                    aimAtMLP={app?.aimAtMLP ?? false}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
                     onSetScreen={rvNoops.onSetScreen}
