@@ -2046,6 +2046,7 @@ function RP22ReportInner() {
                     speakerPositionsView="off"
                     showMlpRuler={false}
                     zoomMode="off"
+                    aimAtMLP={app?.aimLeftRightAtMLP ?? false}
                     onSetSpeakers={rvNoops.onSetSpeakers}
                     onSetSeatingPositions={rvNoops.onSetSeatingPositions}
                     onSetScreen={rvNoops.onSetScreen}
