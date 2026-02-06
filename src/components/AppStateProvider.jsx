@@ -1100,7 +1100,8 @@ function useDesignerState() {
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
       mlpOverride,
-      extraSurroundCount
+      extraSurroundCount,
+      screenFrontPlaneM
       };
 
       if (!isAutosavePayloadValid(payload)) return;
@@ -1190,7 +1191,8 @@ function useDesignerState() {
       p15ConstructionLevel,
       p21EarlyReflectionPreset,
       mlpOverride,
-      extraSurroundCount
+      extraSurroundCount,
+      screenFrontPlaneM
       };
 
       try {
