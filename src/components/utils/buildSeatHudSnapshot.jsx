@@ -711,19 +711,22 @@ export function buildSeatHudSnapshot({
       .map(s => s.value)
       .filter(Number.isFinite);
 
-    const p6ValueDb = maxPairwiseDelta(surSplValues);
-    if (Number.isFinite(p6ValueDb)) {
+    const p6RawDb = maxPairwiseDelta(surSplValues);
+    if (Number.isFinite(p6RawDb)) {
+      // RP22 RULE: round DOWN before grading and display
+      const p6Db = Math.floor(p6RawDb);
+
       let level = '—';
-      if (p6ValueDb <= 2) level = 'L4';
-      else if (p6ValueDb <= 4) level = 'L3';
-      else if (p6ValueDb <= 6) level = 'L2';
-      else if (p6ValueDb <= 10) level = 'L1';
+      if (p6Db <= 2) level = 'L4';
+      else if (p6Db <= 4) level = 'L3';
+      else if (p6Db <= 6) level = 'L2';
+      else if (p6Db <= 10) level = 'L1';
       else level = 'FAIL';
 
       data.rp22.p6 = {
-        valueDb: p6ValueDb,
+        valueDb: p6Db,        // ← critical: store the floored value
         level,
-        formatted: `${floorDeg(p6ValueDb) || 0} dB`
+        formatted: `${p6Db} dB`
       };
     }
   }
