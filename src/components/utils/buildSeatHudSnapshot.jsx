@@ -118,6 +118,8 @@ export function buildSeatHudSnapshot({
   analysisResult = {},
   seatingPositions = [],
   splConfig = {},
+  sevenBedMode = '',
+  dolbyLayout = '5.1',
 }) {
   if (!seat) return null;
 
@@ -708,7 +710,7 @@ export function buildSeatHudSnapshot({
     }
   }
 
-  // --- P5: Max horizontal gap between adjacent surrounds/wides (INCLUDE WRAP, MATCH PLAN ANGLES) ---
+  // --- P5: Max horizontal gap between adjacent surrounds/wides (NO WRAP, MATCH PLAN ANGLES) ---
   {
     const extraSurroundPattern = /^(SL|SR)\d+$/;
 
@@ -716,33 +718,32 @@ export function buildSeatHudSnapshot({
       const canon = getCanonicalRole(s?.role);
       const roleUpper = String(s?.role || '').toUpperCase();
 
-      // Decide which 7-bed roles are "active".
-      // If both LW/RW and SBL/SBR exist, we assume 9-bed (include both).
-      const hasLW = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'LW');
-      const hasRW = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'RW');
-      const hasSBL = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'SBL');
-      const hasSBR = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'SBR');
+      // Decide which roles are ACTIVE for P5 based on layout + 7-bed mode.
+      // This must match what the plan view is showing (hidden roles must be ignored).
+      const mode = String(sevenBedMode || '').toLowerCase();
 
-      const isNineBed = (hasLW || hasRW) && (hasSBL || hasSBR);
+      // 9-bed layouts: always include both wides and rears.
+      const isNineBedLayout = String(dolbyLayout || '').startsWith('9');
 
-      // 7-bed wides mode = LW/RW present, but NOT 9-bed
-      const isSevenBedWides = (hasLW || hasRW) && !isNineBed;
-
-      // 7-bed rears mode = SBL/SBR present, but NOT 9-bed
-      const isSevenBedRears = (hasSBL || hasSBR) && !isNineBed;
-
-      // Build the active set
       let active = new Set(['SL', 'SR']); // always include sides
 
-      if (isNineBed) {
+      if (isNineBedLayout) {
         active = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
-      } else if (isSevenBedWides) {
-        active = new Set(['SL', 'SR', 'LW', 'RW']);   // ignore SBL/SBR
-      } else if (isSevenBedRears) {
-        active = new Set(['SL', 'SR', 'SBL', 'SBR']); // ignore LW/RW
-      } else {
-        // fallback (5-bed etc): keep sides (and any wides if they exist)
+      } else if (mode === 'wides' || mode === 'true') {
+        // 7-bed WIDES mode
         active = new Set(['SL', 'SR', 'LW', 'RW']);
+      } else if (mode === 'rears' || mode === 'false') {
+        // 7-bed REARS mode
+        active = new Set(['SL', 'SR', 'SBL', 'SBR']);
+      } else {
+        // Fallback: keep whatever the user has, but prefer LW/RW if present, else SBL/SBR
+        const hasLW = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'LW');
+        const hasRW = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'RW');
+        const hasSBL = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'SBL');
+        const hasSBR = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'SBR');
+
+        if (hasLW || hasRW) active = new Set(['SL', 'SR', 'LW', 'RW']);
+        else if (hasSBL || hasSBR) active = new Set(['SL', 'SR', 'SBL', 'SBR']);
       }
 
       const isStandard = active.has(canon);
@@ -766,23 +767,10 @@ export function buildSeatHudSnapshot({
 
       azList.sort((a, b) => a.az - b.az);
 
-      // Compute max gap between adjacent speakers INCLUDING WRAP (last → first)
+      // Compute max gap ONLY between adjacent speakers in sorted order (NO WRAP GAP)
       let maxGap = -Infinity;
-
-      for (let i = 0; i < azList.length; i++) {
-        const a = azList[i];
-        const b = azList[(i + 1) % azList.length];
-
-        // Skip the Front Wide pair gap (LW ↔ RW) — this is NOT part of P5 by definition
-        const isWidePair =
-          (a.canon === 'LW' && b.canon === 'RW') ||
-          (a.canon === 'RW' && b.canon === 'LW');
-
-        if (isWidePair) continue;
-
-        let gap = b.az - a.az;
-        if (gap < 0) gap += 360;
-
+      for (let i = 0; i < azList.length - 1; i++) {
+        const gap = azList[i + 1].az - azList[i].az;
         if (gap > maxGap) maxGap = gap;
       }
 
