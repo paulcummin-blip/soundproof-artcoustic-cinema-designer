@@ -3437,6 +3437,8 @@ React.useEffect(() => {
       analysisResult: analysisResult || {},
       seatingPositions,
       splConfig: appState?.splConfig || {},
+      sevenBedMode,
+      dolbyLayout,
     });
     
     if (data) {
@@ -4199,6 +4201,8 @@ React.useEffect(() => {
           analysisResult: analysisResult || {},
           seatingPositions,
           splConfig: appState?.splConfig || {},
+          sevenBedMode,
+          dolbyLayout,
         });
         
         if (snapshot) {
