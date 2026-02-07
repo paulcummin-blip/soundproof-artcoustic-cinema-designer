@@ -472,9 +472,6 @@ export function buildSeatHudSnapshot({
           : Math.abs(offAxisRaw);
         const offAxisDegInt = Math.floor(offAxisDeg + 1e-9);
         
-        // Clamp to 0..180 for HF falloff lookup
-        const offAxisClamped = Math.min(180, Math.max(0, offAxisDeg));
-        
         // Product-dependent P17 "bucket" using the model's horizontal dispersion windows
         const meta = getSpeakerModelMeta(sp.model);
         const dispRaw = meta?.dispersion?.horizontal;
@@ -486,43 +483,56 @@ export function buildSeatHudSnapshot({
             }
           : null;
         
-        let lossDb = 3.0; // Default L2 fallback
-        let levelBucket = 2;
-        
+        // P17 LOSS BUCKETS (3-state only, no L1, no FAIL)
+        // Use FLOORED integer angle for bucket decisions to avoid boundary twitch
+        const offAxisForBucket = Math.floor(offAxisDeg + 1e-9);
+        const offAxisClamped = Math.min(180, Math.max(0, offAxisForBucket));
+
+        // Default: assume we're outside the -3 dB window -> treat as ">=4 dB down" (L2)
+        // This ensures we can actually produce L2 under the new spec.
+        let lossDb = 4.0;
+
         if (disp && disp.minus1p5dB != null && disp.minus3dB != null) {
+          // disp values are already half-angles via halfDispersionDeg(...)
           if (offAxisClamped <= disp.minus1p5dB) {
-            lossDb = 0.0;
-            levelBucket = 4;
+            lossDb = 1.5;  // "no more than 1.5 dB down" => L4
           } else if (offAxisClamped <= disp.minus3dB) {
-            lossDb = 1.5;
-            levelBucket = 3;
+            lossDb = 3.0;  // "no more than 3 dB down" => L3
           } else {
-            lossDb = 3.0;
-            levelBucket = 2;
+            lossDb = 4.0;  // outside -3 window => L2 (>=4 dB down)
           }
+        } else {
+          // No dispersion data: still enforce the same 3-state rule using safe generic half-angle thresholds
+          // (These are conservative defaults and keep the system stable.)
+          if (offAxisClamped <= 28) lossDb = 1.5;
+          else if (offAxisClamped <= 41) lossDb = 3.0;
+          else lossDb = 4.0;
         }
+
+        // Round DOWN to integer dB for grading (3.9 => 3)
+        const lossDbFloor = Math.floor(lossDb + 1e-9);
         
         const isBeyondNonLcrLimit = false; // P17 never uses "beyond limit" logic
         
         perSpeaker.push({
           role: canon,
-          angleDeg: floorDeg(offAxisDegInt),
+          angleDeg: offAxisDegInt,       // already floored int
           rawAngleDeg: offAxisDegInt,
-          lossDb: Math.round(lossDb * 10) / 10,
+          lossDb: lossDbFloor,           // store the floored dB bucket for consistent UI + report
           isBeyondNonLcrLimit,
         });
         
-        // Worst = highest loss within valid range
+        // Worst = highest (floored) loss bucket, then highest angle
         if (!isBeyondNonLcrLimit) {
           const angleInt = offAxisDegInt;
 
           const isBetter =
-            (lossDb > worstLossDb) ||
-            (lossDb === worstLossDb && angleInt > (worstAngleDeg ?? -Infinity)) ||
-            (lossDb === worstLossDb && angleInt === (worstAngleDeg ?? -Infinity) && String(canon).localeCompare(String(worstRole)) < 0);
+            (lossDbFloor > worstLossDb) ||
+            (lossDbFloor === worstLossDb && angleInt > (worstAngleDeg ?? -Infinity)) ||
+            (lossDbFloor === worstLossDb && angleInt === (worstAngleDeg ?? -Infinity) && String(canon).localeCompare(String(worstRole)) < 0);
 
           if (isBetter) {
-            worstLossDb = lossDb;
+            worstLossDb = lossDbFloor;
             worstRole = canon;
             worstAngleDeg = angleInt;
             worstGroup = groupForRole(canon);
@@ -530,12 +540,14 @@ export function buildSeatHudSnapshot({
         }
       }
       
-      // Calculate max loss for level
+      // P17 LEVELS (ONLY L4/L3/L2, no L1, no FAIL) using floored integer dB
       let level17 = '—';
       if (Number.isFinite(worstLossDb)) {
-        if (worstLossDb <= 1.5) level17 = 'L4';
-        else if (worstLossDb < 3.0) level17 = 'L3';
-        else level17 = 'L2';
+        // worstLossDb is already an integer bucket (1, 3, or 4+)
+        if (worstLossDb <= 1) level17 = 'L4';     // (shouldn't occur with our buckets, but safe)
+        else if (worstLossDb <= 2) level17 = 'L4'; // treat 2 as L4 (conservative)
+        else if (worstLossDb <= 3) level17 = 'L3'; // 3 => L3
+        else level17 = 'L2';                       // 4+ => L2
       }
       
       data.rp22.p17 = {
