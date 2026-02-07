@@ -744,6 +744,13 @@ export function buildSeatHudSnapshot({
         const a = azList[i];
         const b = azList[(i + 1) % azList.length];
 
+        // Skip the Front Wide pair gap (LW ↔ RW) — this is NOT part of P5 by definition
+        const isWidePair =
+          (a.canon === 'LW' && b.canon === 'RW') ||
+          (a.canon === 'RW' && b.canon === 'LW');
+
+        if (isWidePair) continue;
+
         let gap = b.az - a.az;
         if (gap < 0) gap += 360;
 
