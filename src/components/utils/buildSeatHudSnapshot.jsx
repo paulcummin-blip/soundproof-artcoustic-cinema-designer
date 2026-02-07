@@ -708,55 +708,65 @@ export function buildSeatHudSnapshot({
     }
   }
 
-  // --- Compute P5: Max horizontal gap between adjacent surrounds (no wrap) ---
-  // CRITICAL: Use shared helper (single source of truth for HUD + overlay)
-  const { 
-    worstGapDeg: p5Val, 
-    gaps: p5Gaps,
-  } = computeSurroundRingGaps({
-    seat,
-    speakers: placedSpeakers,
-    getCanonicalRole,
-  });
+  // --- P5: Max horizontal gap between adjacent surrounds/wides (NO WRAP) ---
+  {
+    const extraSurroundPattern = /^(SL|SR)\d+$/;
 
-  let p5Level = '—';
-  let p5Formatted = '—';
-  
-  // Find worst gap pair for debug (rounded + stable tie-break)
-  let worstPair = null;
-  const roundP5 = (v) => Math.round(v * 10) / 10; // 0.1° resolution (stable)
-  let p5WorstDeg = p5Val; // default to raw value
+    const p5Speakers = (placedSpeakers || []).filter(s => {
+      const canon = getCanonicalRole(s?.role);
+      const roleUpper = String(s?.role || '').toUpperCase();
 
-  if (Number.isFinite(p5WorstDeg)) {
-    p5Level = rp22LevelForP5(p5WorstDeg);
-    p5Formatted = `${Math.round(p5WorstDeg)}°`; // stable, no 69/70 jitter
+      const isStandard = ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(canon);
+      const isExtraSide = extraSurroundPattern.test(roleUpper);
+
+      return (isStandard || isExtraSide) &&
+        s?.position &&
+        Number.isFinite(s.position.x) &&
+        Number.isFinite(s.position.y);
+    });
+
+    if (p5Speakers.length >= 2) {
+      // Azimuth from seat → speaker, mapped to 0..360
+      const azList = p5Speakers.map(s => {
+        const dx = (s.position.x - seatX);
+        const dy = (s.position.y - seatY);
+        let az = Math.atan2(dx, dy) * (180 / Math.PI);
+        az = ((az % 360) + 360) % 360;
+        return { canon: getCanonicalRole(s.role), roleUpper: String(s.role || '').toUpperCase(), az };
+      });
+
+      azList.sort((a, b) => a.az - b.az);
+
+      // Compute max gap ONLY between adjacent speakers in sorted order (NO WRAP GAP)
+      let maxGap = -Infinity;
+      for (let i = 0; i < azList.length - 1; i++) {
+        const gap = azList[i + 1].az - azList[i].az;
+        if (gap > maxGap) maxGap = gap;
+      }
+
+      // Guard
+      if (!Number.isFinite(maxGap)) maxGap = null;
+
+      // P5 grading (keep your existing thresholds if already correct in this file)
+      // If you already have a gradeP5(...) helper, use that instead and just feed maxGap.
+      let level = '—';
+      if (Number.isFinite(maxGap)) {
+        const gapFloor = Math.floor(maxGap + 1e-9);
+
+        // RP22 P5 thresholds (as currently used in your app)
+        if (gapFloor <= 50) level = 'L4';
+        else if (gapFloor <= 60) level = 'L3';
+        else if (gapFloor <= 80) level = 'L2';
+        else level = 'L1';
+
+        data.rp22.p5 = {
+          valueDeg: maxGap,
+          formatted: `${gapFloor}°`,
+          level,
+        };
+      }
+    }
   }
-  
-  if (p5Gaps && p5Gaps.length > 0) {
-    const worst = p5Gaps.reduce((max, g) => {
-      const a = roundP5(max.deg);
-      const b = roundP5(g.deg);
-
-      // Compare rounded values first (stability)
-      if (b > a) return g;
-      if (b < a) return max;
-
-      // Deterministic tie-break so it never flips frame-to-frame
-      const keyMax = `${String(max.fromRole || "")}->${String(max.toRole || "")}`;
-      const keyG   = `${String(g.fromRole || "")}->${String(g.toRole || "")}`;
-      return (keyG < keyMax) ? g : max;
-    }, p5Gaps[0]);
-    worstPair = `${worst.fromRole}→${worst.toRole}`;
-    p5WorstDeg = (worst && Number.isFinite(worst.deg)) ? roundP5(worst.deg) : p5Val;
-  }
-
-  // Publish P5 to HUD
-  data.rp22.p5 = { 
-    valueDeg: p5WorstDeg, 
-    level: p5Level, 
-    formatted: p5Formatted,
-    gaps: p5Gaps,
-  };
 
   // --- P6: Surround SPL delta (requires ≥2 surrounds) ---
   if (placedSur.length >= 2 && seatSplData?.surrounds) {
