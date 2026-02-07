@@ -6,7 +6,7 @@ import MedianAngleReset from './MedianAngleReset';
 
 /**
  * Displays SPL @ RSP for surround speakers.
- * Groups: Side Surrounds, Rear Surrounds (for 7.x+), Front Wides (for 9.x)
+ * Groups: Side Surrounds, Rear Surrounds (for 7.x+), Front Wides (for 9.x or 7.x with toggle)
  */
 export default function SurroundSplStrip({ 
   allSeatSplMetrics, 
@@ -17,7 +17,8 @@ export default function SurroundSplStrip({
   roomDims,
   setSpeakers,
   disabled = false,
-  frontWideOverlay = null
+  frontWideOverlay = null,
+  sevenBedLayoutType = 'rears' // NEW: Add toggle state for 7.x layouts
 }) {
   const mlpSplData = useMemo(() => {
     if (!allSeatSplMetrics) return null;
@@ -52,26 +53,35 @@ export default function SurroundSplStrip({
       });
     }
     
-    // 7.x and above have rear surrounds (SBL/SBR)
+    // 7.x: second group follows toggle (rears vs wides)
+    // 9.x: BOTH groups always present
     if (major >= 7) {
-      result.push({
-        key: 'rears',
-        label: 'Rear Surrounds',
-        roles: ['SBL', 'SBR'],
-      });
-    }
-    
-    // 9.x can have front wides
-    if (major >= 9) {
-      result.push({
-        key: 'wides',
-        label: 'Front Wides',
-        roles: ['LW', 'RW'],
-      });
+      const useWides = sevenBedLayoutType === 'wides';
+      
+      if (major === 7) {
+        // For 7.x: show ONLY the active group based on toggle
+        result.push(
+          useWides
+            ? { key: 'wides', label: 'Front Wides', roles: ['LW', 'RW'] }
+            : { key: 'rears', label: 'Rear Surrounds', roles: ['SBL', 'SBR'] }
+        );
+      } else {
+        // For 9.x: show BOTH groups always
+        result.push({
+          key: 'rears',
+          label: 'Rear Surrounds',
+          roles: ['SBL', 'SBR'],
+        });
+        result.push({
+          key: 'wides',
+          label: 'Front Wides',
+          roles: ['LW', 'RW'],
+        });
+      }
     }
     
     return result;
-  }, [dolbyLayout]);
+  }, [dolbyLayout, sevenBedLayoutType]);
 
   // Calculate representative SPL for each group (max value)
   const groupSplValues = useMemo(() => {
@@ -122,7 +132,7 @@ export default function SurroundSplStrip({
               </CardHeader>
               <CardContent className="px-3 pb-3">
                 <div className="text-lg font-bold" style={{ color: '#1B1A1A' }}>
-                  {formatDb(splValue)}
+                  {hasValue ? formatDb(splValue) : 'Not Calculated'}
                 </div>
               </CardContent>
             </Card>
