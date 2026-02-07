@@ -3368,7 +3368,7 @@ React.useEffect(() => {
         const roleUpper = String(s.role || '').toUpperCase();
         return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
       })
-      .map(s => `${s.id}:${(s.position.x || 0).toFixed(4)}:${(s.position.y || 0).toFixed(4)}`)
+      .map(s => `${s.id}:${getCanonicalRole(s.role)}:${(s.position.x || 0).toFixed(4)}:${(s.position.y || 0).toFixed(4)}`)
       .join('|');
     
     const layout = dolbyLayout || '5.1';
@@ -4155,7 +4155,7 @@ React.useEffect(() => {
         const roleUpper = String(s.role || '').toUpperCase();
         return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
       })
-      .map(s => `${s.id}:${(s.position.x || 0).toFixed(4)}:${(s.position.y || 0).toFixed(4)}`)
+      .map(s => `${s.id}:${getCanonicalRole(s.role)}:${(s.position.x || 0).toFixed(4)}:${(s.position.y || 0).toFixed(4)}`)
       .join('|');
     
     const layout = dolbyLayout || '5.1';
