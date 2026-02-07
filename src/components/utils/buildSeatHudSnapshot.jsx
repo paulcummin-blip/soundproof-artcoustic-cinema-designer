@@ -708,7 +708,7 @@ export function buildSeatHudSnapshot({
     }
   }
 
-  // --- P5: Max horizontal gap between adjacent surrounds/wides (NO WRAP) ---
+  // --- P5: Max horizontal gap between adjacent surrounds/wides (INCLUDE WRAP, EXCLUDE ONLY LW↔RW) ---
   {
     const extraSurroundPattern = /^(SL|SR)\d+$/;
 
@@ -726,29 +726,58 @@ export function buildSeatHudSnapshot({
     });
 
     if (p5Speakers.length >= 2) {
+      // We only exclude the LW↔RW "front wrap" gap IF both LW and RW exist
+      const hasLW = p5Speakers.some(s => getCanonicalRole(s?.role) === 'LW');
+      const hasRW = p5Speakers.some(s => getCanonicalRole(s?.role) === 'RW');
+      const excludeFrontWrapGap = hasLW && hasRW;
+
       // Azimuth from seat → speaker, mapped to 0..360
       const azList = p5Speakers.map(s => {
         const dx = (s.position.x - seatX);
         const dy = (s.position.y - seatY);
         let az = Math.atan2(dx, dy) * (180 / Math.PI);
         az = ((az % 360) + 360) % 360;
-        return { canon: getCanonicalRole(s.role), roleUpper: String(s.role || '').toUpperCase(), az };
+        return {
+          canon: getCanonicalRole(s.role),
+          roleUpper: String(s.role || '').toUpperCase(),
+          az
+        };
       });
 
       azList.sort((a, b) => a.az - b.az);
 
-      // Compute max gap ONLY between adjacent speakers in sorted order (NO WRAP GAP)
-      let maxGap = -Infinity;
-      for (let i = 0; i < azList.length - 1; i++) {
-        const gap = azList[i + 1].az - azList[i].az;
-        if (gap > maxGap) maxGap = gap;
+      // Build adjacent gaps INCLUDING wrap (last → first)
+      const gaps = [];
+      for (let i = 0; i < azList.length; i++) {
+        const a = azList[i];
+        const b = azList[(i + 1) % azList.length];
+
+        let gap = b.az - a.az;
+        if (gap < 0) gap += 360;
+
+        gaps.push({
+          aCanon: a.canon,
+          bCanon: b.canon,
+          gap
+        });
       }
 
-      // Guard
+      // Remove ONLY the LW↔RW gap from scoring (either direction), but only when both exist
+      const scoredGaps = excludeFrontWrapGap
+        ? gaps.filter(g => !(
+            (g.aCanon === 'LW' && g.bCanon === 'RW') ||
+            (g.aCanon === 'RW' && g.bCanon === 'LW')
+          ))
+        : gaps;
+
+      // Max gap among scored gaps
+      let maxGap = -Infinity;
+      for (const g of scoredGaps) {
+        if (Number.isFinite(g.gap) && g.gap > maxGap) maxGap = g.gap;
+      }
+
       if (!Number.isFinite(maxGap)) maxGap = null;
 
-      // P5 grading (keep your existing thresholds if already correct in this file)
-      // If you already have a gradeP5(...) helper, use that instead and just feed maxGap.
       let level = '—';
       if (Number.isFinite(maxGap)) {
         const gapFloor = Math.floor(maxGap + 1e-9);
