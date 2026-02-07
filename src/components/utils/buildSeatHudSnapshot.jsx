@@ -406,30 +406,25 @@ export function buildSeatHudSnapshot({
         const isOverhead = canon.startsWith('T');
         
         if (isOverhead) {
-          // --- 3D OFF-AXIS FOR OVERHEADS: AIM = overhead centre → MLP centre-line ---
-          // Speaker position (ceiling)
-          const sp3 = v3(pos.x, pos.y, Number.isFinite(heightM) ? heightM : 2.4);
+          // --- OVERHEAD GEOMETRY: 0° is straight DOWN ---
+          // Speaker is at ceiling height, seat is at seatZ (head height)
+          const zSp = Number.isFinite(heightM) ? Number(heightM) : 2.4;
+          const zSeat = Number.isFinite(seatZ) ? Number(seatZ) : 1.2;
 
-          // MLP and seat positions (listener height)
-          const mlp3  = v3(mlp.x, mlp.y, 1.2);
-          const seat3 = v3(seatX, seatY, seatZ);
+          const dx = (seatX - pos.x);
+          const dy = (seatY - pos.y);
+          const horiz = Math.hypot(dx, dy);
 
-          // Aim vector = speaker → MLP (always)
-          const aimVec = v3sub(mlp3, sp3);
+          const drop = Math.max(0.01, zSp - zSeat); // avoid divide by zero
+          let angleFromDownDeg = Math.atan2(horiz, drop) * (180 / Math.PI);
 
-          // Seat vector = speaker → seat (the seat being evaluated)
-          const seatVec = v3sub(seat3, sp3);
-
-          // Raw off-axis = 3D angle between aim axis and seat direction
-          let offAxisDeg = angleBetweenDeg(aimVec, seatVec);
-
-          // Apply built-in tilt: tilt reduces off-axis angle (can't go below 0)
+          // Apply built-in tilt (tilt reduces the required angle)
           const meta = getSpeakerModelMeta(sp.model);
           const builtInTilt = Number(meta?.builtInTiltDeg) || 0;
-          offAxisDeg = Math.max(0, offAxisDeg - builtInTilt);
+          angleFromDownDeg = Math.max(0, angleFromDownDeg - builtInTilt);
 
-          // Store for later use
-          sp.__p17_overheadOffAxisDeg = offAxisDeg;
+          // Store for later use (we bypass 2D yaw math for overheads)
+          sp.__p17_overheadOffAxisDeg = angleFromDownDeg;
 
           // Skip 2D dirDeg/aimDeg calculation for overheads
         } else if (isLW_RW) {
