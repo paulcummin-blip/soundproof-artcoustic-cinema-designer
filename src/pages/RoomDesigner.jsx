@@ -1923,6 +1923,10 @@ function RoomDesignerWithState() {
     // 5. Store the FIXED MLP position (for green dot and speaker placement)
     const mlpRounded = Math.round(fixedMlpY * 1000) / 1000;
 
+    if (!Number.isFinite(mlpRounded)) {
+      return;
+    }
+
     if (typeof appState?.setMlpY_m === 'function') {
       appState.setMlpY_m((prev) => {
         const prevRounded = prev ? Math.round(prev * 1000) : null;
@@ -1962,16 +1966,43 @@ function RoomDesignerWithState() {
 
   // Use computed MLP as the effective anchor (for backwards compatibility)
   const mlpAnchorEffective = useMemo(() => {
-    const mlpY = appState?.mlpY_m;
-    if (!Number.isFinite(mlpY)) return null;
-
     const roomWidthM = Number(stableDimensions?.width) || 0;
-    return {
-      x: roomWidthM > 0 ? roomWidthM / 2 : 0,
-      y: mlpY,
-      z: 1.2
-    };
-  }, [appState?.mlpY_m, stableDimensions?.width]);
+    const cx = roomWidthM > 0 ? roomWidthM / 2 : 0;
+
+    // Primary: use stored MLP Y when valid
+    const mlpY = appState?.mlpY_m;
+    if (Number.isFinite(mlpY)) {
+      return { x: cx, y: mlpY, z: 1.2 };
+    }
+
+    // Fallback (only while mlpY_m is not ready):
+    // lock the dot to the centre seat so it ALWAYS visually matches the seating layout.
+    const seats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
+    if (seats.length > 0 && Number.isFinite(roomWidthM)) {
+      let best = null;
+      let bestDx = Infinity;
+
+      for (const s of seats) {
+        const sx = Number(s?.x);
+        const sy = Number(s?.y);
+        if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
+
+        const dx = Math.abs(sx - cx);
+        if (dx < bestDx) {
+          bestDx = dx;
+          best = s;
+        }
+      }
+
+      if (best && Number.isFinite(best.y)) {
+        const z = Number.isFinite(best?.z) ? Number(best.z) : 1.2;
+        return { x: cx, y: Number(best.y), z };
+      }
+    }
+
+    // If no seats yet, keep null so RV can do its own last-resort fallback
+    return null;
+  }, [appState?.mlpY_m, appState?.seatingPositions, stableDimensions?.width]);
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
 
