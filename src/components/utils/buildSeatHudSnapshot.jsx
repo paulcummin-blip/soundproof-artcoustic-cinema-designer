@@ -716,7 +716,36 @@ export function buildSeatHudSnapshot({
       const canon = getCanonicalRole(s?.role);
       const roleUpper = String(s?.role || '').toUpperCase();
 
-      const isStandard = ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(canon);
+      // Decide which 7-bed roles are "active".
+      // If both LW/RW and SBL/SBR exist, we assume 9-bed (include both).
+      const hasLW = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'LW');
+      const hasRW = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'RW');
+      const hasSBL = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'SBL');
+      const hasSBR = (placedSpeakers || []).some(sp => getCanonicalRole(sp?.role) === 'SBR');
+
+      const isNineBed = (hasLW || hasRW) && (hasSBL || hasSBR);
+
+      // 7-bed wides mode = LW/RW present, but NOT 9-bed
+      const isSevenBedWides = (hasLW || hasRW) && !isNineBed;
+
+      // 7-bed rears mode = SBL/SBR present, but NOT 9-bed
+      const isSevenBedRears = (hasSBL || hasSBR) && !isNineBed;
+
+      // Build the active set
+      let active = new Set(['SL', 'SR']); // always include sides
+
+      if (isNineBed) {
+        active = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW']);
+      } else if (isSevenBedWides) {
+        active = new Set(['SL', 'SR', 'LW', 'RW']);   // ignore SBL/SBR
+      } else if (isSevenBedRears) {
+        active = new Set(['SL', 'SR', 'SBL', 'SBR']); // ignore LW/RW
+      } else {
+        // fallback (5-bed etc): keep sides (and any wides if they exist)
+        active = new Set(['SL', 'SR', 'LW', 'RW']);
+      }
+
+      const isStandard = active.has(canon);
       const isExtraSide = extraSurroundPattern.test(roleUpper);
 
       return (isStandard || isExtraSide) &&
