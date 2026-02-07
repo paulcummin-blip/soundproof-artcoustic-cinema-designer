@@ -3125,6 +3125,7 @@ function SpeakerPlacementImpl(props) {
             setSpeakers={setSpeakers}
             disabled={disabled}
             frontWideOverlay={props.frontWideOverlay}
+            sevenBedLayoutType={sevenBedLayoutType}
           />
 
           {/* Amplifier Power (Surrounds) */}
