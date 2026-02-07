@@ -469,14 +469,29 @@ export function buildSeatHudSnapshot({
           }
         }
         
+        // P17: always keep the smaller of the two possible angles.
+        // Example: 151° should be treated as 29° (180-151).
+        const smallestOffAxisDeg = (deg) => {
+          const a = Math.min(180, Math.max(0, Number(deg) || 0));
+          return Math.min(a, 180 - a);
+        };
+
         // Calculate off-axis angle (shortest arc)
         let offAxisRaw = dirDeg - aimDeg;
         // Normalize to -180..+180
         while (offAxisRaw > 180) offAxisRaw -= 360;
         while (offAxisRaw < -180) offAxisRaw += 360;
-        const offAxisDeg = isOverhead && Number.isFinite(sp.__p17_overheadOffAxisDeg)
+
+        // Overheads keep their 3D off-axis result.
+        // ALL wall speakers must use the smaller angle (eg 151° -> 29°).
+        const offAxisDegRaw = isOverhead && Number.isFinite(sp.__p17_overheadOffAxisDeg)
           ? sp.__p17_overheadOffAxisDeg
           : Math.abs(offAxisRaw);
+
+        const offAxisDeg = isOverhead
+          ? offAxisDegRaw
+          : smallestOffAxisDeg(offAxisDegRaw);
+
         const offAxisDegInt = Math.floor(offAxisDeg + 1e-9);
         
         // Product-dependent P17 "bucket" using the model's horizontal dispersion windows
