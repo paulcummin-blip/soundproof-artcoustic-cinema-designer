@@ -708,7 +708,7 @@ export function buildSeatHudSnapshot({
     }
   }
 
-  // --- P5: Max horizontal gap between adjacent surrounds/wides (INCLUDE WRAP, EXCLUDE ONLY LW↔RW) ---
+  // --- P5: Max horizontal gap between adjacent surrounds/wides (INCLUDE WRAP, MATCH PLAN ANGLES) ---
   {
     const extraSurroundPattern = /^(SL|SR)\d+$/;
 
@@ -726,28 +726,20 @@ export function buildSeatHudSnapshot({
     });
 
     if (p5Speakers.length >= 2) {
-      // We only exclude the LW↔RW "front wrap" gap IF both LW and RW exist
-      const hasLW = p5Speakers.some(s => getCanonicalRole(s?.role) === 'LW');
-      const hasRW = p5Speakers.some(s => getCanonicalRole(s?.role) === 'RW');
-      const excludeFrontWrapGap = hasLW && hasRW;
-
-      // Azimuth from seat → speaker, mapped to 0..360
+      // Azimuth from seat → speaker, mapped to 0..360 (same convention as plan maths)
       const azList = p5Speakers.map(s => {
         const dx = (s.position.x - seatX);
         const dy = (s.position.y - seatY);
         let az = Math.atan2(dx, dy) * (180 / Math.PI);
         az = ((az % 360) + 360) % 360;
-        return {
-          canon: getCanonicalRole(s.role),
-          roleUpper: String(s.role || '').toUpperCase(),
-          az
-        };
+        return { canon: getCanonicalRole(s.role), az };
       });
 
       azList.sort((a, b) => a.az - b.az);
 
-      // Build adjacent gaps INCLUDING wrap (last → first)
-      const gaps = [];
+      // Compute max gap between adjacent speakers INCLUDING WRAP (last → first)
+      let maxGap = -Infinity;
+
       for (let i = 0; i < azList.length; i++) {
         const a = azList[i];
         const b = azList[(i + 1) % azList.length];
@@ -755,25 +747,7 @@ export function buildSeatHudSnapshot({
         let gap = b.az - a.az;
         if (gap < 0) gap += 360;
 
-        gaps.push({
-          aCanon: a.canon,
-          bCanon: b.canon,
-          gap
-        });
-      }
-
-      // Remove ONLY the LW↔RW gap from scoring (either direction), but only when both exist
-      const scoredGaps = excludeFrontWrapGap
-        ? gaps.filter(g => !(
-            (g.aCanon === 'LW' && g.bCanon === 'RW') ||
-            (g.aCanon === 'RW' && g.bCanon === 'LW')
-          ))
-        : gaps;
-
-      // Max gap among scored gaps
-      let maxGap = -Infinity;
-      for (const g of scoredGaps) {
-        if (Number.isFinite(g.gap) && g.gap > maxGap) maxGap = g.gap;
+        if (gap > maxGap) maxGap = gap;
       }
 
       if (!Number.isFinite(maxGap)) maxGap = null;
@@ -782,7 +756,7 @@ export function buildSeatHudSnapshot({
       if (Number.isFinite(maxGap)) {
         const gapFloor = Math.floor(maxGap + 1e-9);
 
-        // RP22 P5 thresholds (as currently used in your app)
+        // RP22 P5 thresholds (keep existing app thresholds)
         if (gapFloor <= 50) level = 'L4';
         else if (gapFloor <= 60) level = 'L3';
         else if (gapFloor <= 80) level = 'L2';
