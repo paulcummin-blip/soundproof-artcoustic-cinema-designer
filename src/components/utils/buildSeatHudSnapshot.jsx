@@ -275,6 +275,7 @@ export function buildSeatHudSnapshot({
         while (offAxisRaw > 180) offAxisRaw -= 360;
         while (offAxisRaw < -180) offAxisRaw += 360;
         const offAxisDeg = Math.abs(offAxisRaw);
+        const offAxisFloor = Math.floor(offAxisDeg);
 
         // Dispersion windows (HALF the stored values, rounded up)
         const meta = getSpeakerModelMeta(sp.model);
@@ -284,67 +285,67 @@ export function buildSeatHudSnapshot({
         const w3 = Number.isFinite(disp?.minus3dB) ? Math.ceil(disp.minus3dB / 2) : null;
         const w5 = Number.isFinite(disp?.minus5dB) ? Math.ceil(disp.minus5dB / 2) : null;
 
-        // Threshold-based step classification (NO interpolation)
+        // Threshold-based step classification: L4/L2/L1/FAIL only (NO L3)
         let lossLabel = 'FAIL';
-        let level = 1;
+        let levelStr = 'FAIL';
 
         if (Number.isFinite(w1) && Number.isFinite(w3) && Number.isFinite(w5)) {
-          if (offAxisDeg <= w1) {
+          if (offAxisFloor <= w1) {
             lossLabel = '≤1.5 dB';
-            level = 4;
-          } else if (offAxisDeg <= w3) {
+            levelStr = 'L4';
+          } else if (offAxisFloor <= w3) {
             lossLabel = '≤3.0 dB';
-            level = 3;
-          } else if (offAxisDeg <= w5) {
+            levelStr = 'L2';
+          } else if (offAxisFloor <= w5) {
             lossLabel = '≤5.0 dB';
-            level = 2;
+            levelStr = 'L1';
           } else {
             lossLabel = 'FAIL';
-            level = 1;
+            levelStr = 'FAIL';
           }
         } else {
           // Fallback to generic thresholds
-          if (offAxisDeg <= 28) {
+          if (offAxisFloor <= 28) {
             lossLabel = '≤1.5 dB';
-            level = 4;
-          } else if (offAxisDeg <= 41) {
+            levelStr = 'L4';
+          } else if (offAxisFloor <= 41) {
             lossLabel = '≤3.0 dB';
-            level = 3;
-          } else if (offAxisDeg <= 55) {
+            levelStr = 'L2';
+          } else if (offAxisFloor <= 55) {
             lossLabel = '≤5.0 dB';
-            level = 2;
+            levelStr = 'L1';
           } else {
             lossLabel = 'FAIL';
-            level = 1;
+            levelStr = 'FAIL';
           }
         }
 
         perSpeaker.push({
           role: canon,
-          angleDeg: floorDeg(offAxisDeg),
+          angleDeg: offAxisFloor,
           rawAngleDeg: offAxisDeg,
           lossLabel,
-          level,
+          level: levelStr,
         });
 
-        // Worst = lowest level, then highest angle
-        if (level < worstLevel || (level === worstLevel && offAxisDeg > (worstAngleDeg || 0))) {
-          worstLevel = level;
+        // Worst = FAIL worst, then L1 > L2 > L4, then highest angle
+        const levelRank = { 'FAIL': 0, 'L1': 1, 'L2': 2, 'L4': 4 };
+        const currRank = levelRank[levelStr] || 0;
+        const worstRank = levelRank[worstLevel] || 0;
+        
+        if (currRank < worstRank || (currRank === worstRank && offAxisFloor > (worstAngleDeg || 0))) {
+          worstLevel = levelStr;
           worstLossLabel = lossLabel;
           worstRole = canon;
-          worstAngleDeg = offAxisDeg;
+          worstAngleDeg = offAxisFloor;
         }
       }
-
-      // Map level to string (or FAIL)
-      const isFail = worstLossLabel === 'FAIL';
-      const levelStr = isFail ? 'FAIL' : (worstLevel === 4 ? 'L4' : worstLevel === 3 ? 'L3' : worstLevel === 2 ? 'L2' : 'L1');
 
       data.rp22.p16 = {
         value: null, // No numeric value, only step labels
         formatted: worstRole || '—', // Just the role (e.g., "FR")
         hudLabel: worstRole || '—',
-        level: levelStr, // "FAIL" or "L1".."L4"
+        level: worstLevel || '—', // "FAIL" or "L4"/"L2"/"L1"
         perSpeaker,
         worstRole,
         worstAngleDeg,
