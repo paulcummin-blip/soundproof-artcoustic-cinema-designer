@@ -376,6 +376,13 @@ export function buildSeatHudSnapshot({
     });
 
     if (relevantSpeakers.length > 0) {
+      // Local yaw helper: FROM -> TO (0° = +Y, +90° = +X, -90° = -X, 180° = -Y)
+      const yawFromToDeg = (from, to) => {
+        const dx = (to?.x ?? 0) - (from?.x ?? 0);
+        const dy = (to?.y ?? 0) - (from?.y ?? 0);
+        return Math.atan2(dx, dy) * (180 / Math.PI);
+      };
+
       const perSpeaker = [];
       let worstLossDb = -Infinity;
       let worstRole = null;
@@ -389,7 +396,7 @@ export function buildSeatHudSnapshot({
         // Calculate direction from speaker to seat
         const dx = seatX - pos.x;
         const dy = seatY - pos.y;
-        const dirDeg = safeYawToMLP(pos, { x: seatX, y: seatY });
+        const dirDeg = yawFromToDeg(pos, { x: seatX, y: seatY });
         
         // CRITICAL: Get speaker's aim using EXACT same logic as renderSpeakers
         let aimDeg = 0;
