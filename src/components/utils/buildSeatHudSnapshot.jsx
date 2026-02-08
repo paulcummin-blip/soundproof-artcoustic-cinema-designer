@@ -720,7 +720,11 @@ export function buildSeatHudSnapshot({
 
       // Decide which roles are ACTIVE for P5 based on layout + 7-bed mode.
       // This must match what the plan view is showing (hidden roles must be ignored).
-      const mode = String(sevenBedMode || '').toLowerCase();
+      const modeRaw = String(sevenBedMode || '').toLowerCase();
+      const mode =
+        (modeRaw === 'wides' || modeRaw === 'rears')
+          ? modeRaw
+          : (modeRaw === 'true' ? 'wides' : (modeRaw === 'false' ? 'rears' : modeRaw));
 
       // 9-bed layouts: always include both wides and rears.
       const isNineBedLayout = String(dolbyLayout || '').startsWith('9');

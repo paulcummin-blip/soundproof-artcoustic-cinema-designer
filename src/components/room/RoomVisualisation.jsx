@@ -3375,8 +3375,12 @@ React.useEffect(() => {
     const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
     const mlpRp23 = mlp ? Math.round((mlp.y || 0) * 1000) : 0;
     const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
-    const sevenBedMode =
-      String(_overlays?.sevenBedLayoutType || _overlays?.useFrontWidesInsteadOfRearSurrounds || '').toLowerCase();
+    const sevenBedMode = String(
+      appState?.sevenBedLayoutType
+      || appState?.speakerSystem?.sevenBedLayoutType
+      || (appState?.speakerSystem?.useWidesInsteadOfRears ? 'wides' : '')
+      || 'rears'
+    ).toLowerCase();
     const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}|${sevenBedMode}`;
     
     // FORCE LIVE: Pinned HUD always recomputes (bypasses cache for instant updates)
@@ -4104,6 +4108,9 @@ React.useEffect(() => {
     seatingPositions,
     appState?.splConfig,
     appState?.seatMetricsById,
+    appState?.sevenBedLayoutType,
+    appState?.speakerSystem?.sevenBedLayoutType,
+    appState?.speakerSystem?.useWidesInsteadOfRears,
   ]);
 
   // AUTOMATIC SEAT METRICS CACHE - SOLE WRITER for seatMetricsById (powers both HUD and Report)
@@ -4162,8 +4169,12 @@ React.useEffect(() => {
     const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
     const mlpRp23 = mlp ? Math.round((mlp.y || 0) * 1000) : 0;
     const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
-    const sevenBedMode =
-      String(_overlays?.sevenBedLayoutType || _overlays?.useFrontWidesInsteadOfRearSurrounds || '').toLowerCase();
+    const sevenBedMode = String(
+      appState?.sevenBedLayoutType
+      || appState?.speakerSystem?.sevenBedLayoutType
+      || (appState?.speakerSystem?.useWidesInsteadOfRears ? 'wides' : '')
+      || 'rears'
+    ).toLowerCase();
     const analysisKey = analysisResult?.__rev ?? (analysisResult?.perSeatRp22 ? Object.keys(analysisResult.perSeatRp22).length : 0);
     const splKey = allSeatSplMetrics?.__rev ?? (allSeatSplMetrics ? Object.keys(allSeatSplMetrics).length : 0);
     const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}|${sevenBedMode}|A${analysisKey}|S${splKey}`;
