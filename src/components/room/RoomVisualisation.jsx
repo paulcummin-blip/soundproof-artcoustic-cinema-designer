@@ -6480,6 +6480,27 @@ return {
 
     if (!Array.isArray(roomElements) || roomElements.length === 0) return null;
 
+    // Only consider speakers that should actually appear on the plan.
+    // This prevents "phantom" roles (e.g. front wides not active) from triggering warnings.
+    const speakersForCollision = (Array.isArray(placedSpeakers) ? placedSpeakers : []).filter((sp) => {
+      const canon = String(getCanonicalRole?.(sp?.role) ?? sp?.role ?? '').toUpperCase();
+
+      // Must have a real model (if the icon wouldn't show, it shouldn't collide)
+      const m = String(sp?.model ?? '').toLowerCase();
+      if (!m || m === 'off' || m === 'none' || m === 'null' || m === 'undefined') return false;
+
+      // Must have a real position
+      const x = Number(sp?.position?.x);
+      const y = Number(sp?.position?.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+
+      // HARD GUARD: ignore front-wide roles unless they are actually part of the layout + visible.
+      // (These are the usual offenders for "phantom" collisions.)
+      if (['LW', 'RW', 'FWL', 'FWR'].includes(canon)) return false;
+
+      return true;
+    });
+
     return (
       <g data-layer="room-elements" pointerEvents="none">
         {roomElements.map((element, idx) => {
@@ -6544,10 +6565,10 @@ return {
             return { x: x - w / 2, y: y - d / 2, w, h: d };
           };
 
-          const isNearSpeaker = (Array.isArray(placedSpeakers) ? placedSpeakers : [])
+          const isNearSpeaker = speakersForCollision
             .map(getSpeakerAabbM)
             .filter(Boolean)
-            .some(aabb => intersects(warnRectM, aabb));
+            .some((aabb) => intersects(warnRectM, aabb));
 
           // Colours (consistent for ALL element types)
           const NORMAL_FILL = 'rgba(220,219,214,0.45)';   // based on #DCDBD6
