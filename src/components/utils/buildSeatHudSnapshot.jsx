@@ -710,7 +710,7 @@ export function buildSeatHudSnapshot({
     }
   }
 
-  // --- P5: Max horizontal gap between adjacent surrounds/wides (NO WRAP, MATCH PLAN ANGLES) ---
+  // --- P5: Max horizontal gap between adjacent surrounds/wides (NO WRAP, MATCH PLAN OVERLAY) ---
   {
     const extraSurroundPattern = /^(SL|SR)\d+$/;
 
@@ -756,41 +756,67 @@ export function buildSeatHudSnapshot({
     });
 
     if (p5Speakers.length >= 2) {
-      // Azimuth from seat → speaker, mapped to 0..360 (same convention as plan maths)
-      const azList = p5Speakers.map(s => {
+      // MATCH PLAN OVERLAY:
+      // 1) azimuth a = atan2(dx, -dy) in degrees, normalised to [-180..+180]
+      // 2) theta = (a + 360) % 360 for sorting
+      // 3) NO WRAP: max gap only between adjacent theta values
+
+      const items = [];
+      for (const s of p5Speakers) {
         const dx = (s.position.x - seatX);
         const dy = (s.position.y - seatY);
-        let az = Math.atan2(dx, dy) * (180 / Math.PI);
-        az = ((az % 360) + 360) % 360;
-        return { canon: getCanonicalRole(s.role), az };
-      });
 
-      azList.sort((a, b) => a.az - b.az);
+        const rad = Math.atan2(dx, -dy);
+        let a = rad * (180 / Math.PI);
+        if (a > 180) a -= 360;
+        if (a <= -180) a += 360;
 
-      // Compute max gap ONLY between adjacent speakers in sorted order (NO WRAP GAP)
-      let maxGap = -Infinity;
-      for (let i = 0; i < azList.length - 1; i++) {
-        const gap = azList[i + 1].az - azList[i].az;
-        if (gap > maxGap) maxGap = gap;
+        if (!Number.isFinite(a)) continue;
+
+        const theta = (a + 360) % 360;
+        items.push({
+          canon: getCanonicalRole(s.role),
+          a,
+          theta
+        });
       }
 
-      if (!Number.isFinite(maxGap)) maxGap = null;
+      if (items.length >= 2) {
+        items.sort((m, n) => m.theta - n.theta);
 
-      let level = '—';
-      if (Number.isFinite(maxGap)) {
-        const gapFloor = Math.floor(maxGap + 1e-9);
+        let maxGap = -Infinity;
+        let maxPair = null;
 
-        // RP22 P5 thresholds (keep existing app thresholds)
-        if (gapFloor <= 50) level = 'L4';
-        else if (gapFloor <= 60) level = 'L3';
-        else if (gapFloor <= 80) level = 'L2';
-        else level = 'L1';
+        for (let i = 0; i < items.length - 1; i++) {
+          const gapDeg = items[i + 1].theta - items[i].theta; // NO WRAP
+          if (gapDeg > maxGap) {
+            maxGap = gapDeg;
+            maxPair = { from: items[i], to: items[i + 1], gapDeg };
+          }
+        }
 
-        data.rp22.p5 = {
-          valueDeg: maxGap,
-          formatted: `${gapFloor}°`,
-          level,
-        };
+        if (!Number.isFinite(maxGap)) maxGap = null;
+
+        let level = '—';
+        if (Number.isFinite(maxGap)) {
+          const gapFloor = Math.floor(maxGap + 1e-9);
+
+          // RP22 P5 thresholds (keep existing app thresholds)
+          if (gapFloor <= 50) level = 'L4';
+          else if (gapFloor <= 60) level = 'L3';
+          else if (gapFloor <= 80) level = 'L2';
+          else level = 'L1';
+
+          data.rp22.p5 = {
+            valueDeg: maxGap,
+            formatted: `${gapFloor}°`,
+            level,
+            // optional: show what pair generated the max gap when HUD is pinned
+            debugLine: maxPair
+              ? `${maxPair.from.canon}→${maxPair.to.canon} = ${Math.floor(maxPair.gapDeg + 1e-9)}°`
+              : undefined,
+          };
+        }
       }
     }
   }
