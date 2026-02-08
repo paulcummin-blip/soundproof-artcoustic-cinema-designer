@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -9,111 +8,233 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2 } from 'lucide-react';
 
 export default function RoomElements({ elements = [], onChange }) {
-  const addElement = () => {
+  // Create a stable next id that won't collide if you add quickly
+  const makeId = () => `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+
+  const addDoor = () => {
+    const doorCount = (elements || []).filter(e => String(e?.type) === 'door').length;
     const newElement = {
-      id: Date.now(),
+      id: makeId(),
       type: 'door',
-      wall: 'back',
-      width: 0.9,
-      height: 2.1,
-      x_position: 1,
-      z_position: 0,
+
+      // Placement
+      wall: 'rear', // Front / Rear / Left / Right (screen is on Front)
+      length_m: 0.9, // along the wall
+      thickness_m: 0.05, // 5cm
+
+      // Position along the wall:
+      // - If Front/Rear: use x_m (0..room width)
+      // - If Left/Right: use y_m (0..room length)
+      x_m: 1.0,
+      y_m: 1.0,
+
+      // Vertical placement (kept for later – you already had z_position)
+      z_m: 0,
+
+      // UI
+      label: `Door ${doorCount + 1}`,
     };
-    onChange([...elements, newElement]);
+
+    onChange([...(elements || []), newElement]);
   };
 
   const updateElement = (id, field, value) => {
-    const newElements = elements.map(el => {
-      if (el.id === id) {
-        const parsedValue = ['width', 'height', 'x_position', 'z_position'].includes(field) ? parseFloat(value) : value;
-        return { ...el, [field]: parsedValue };
-      }
-      return el;
+    const numberFields = new Set(['length_m', 'x_m', 'y_m', 'z_m']);
+    const parsed = numberFields.has(field) ? parseFloat(value) : value;
+
+    const next = (elements || []).map(el => {
+      if (el.id !== id) return el;
+      return { ...el, [field]: Number.isFinite(parsed) ? parsed : parsed };
     });
-    onChange(newElements);
+
+    onChange(next);
   };
 
   const removeElement = (id) => {
-    onChange(elements.filter(el => el.id !== id));
+    onChange((elements || []).filter(el => el.id !== id));
+  };
+
+  const wallLabel = (w) => {
+    const v = String(w || '').toLowerCase();
+    if (v === 'front') return 'Front';
+    if (v === 'rear') return 'Rear';
+    if (v === 'left') return 'Left';
+    if (v === 'right') return 'Right';
+    // back-compat with your older saved data that used "back"
+    if (v === 'back') return 'Rear';
+    return 'Rear';
+  };
+
+  const normaliseWallValue = (w) => {
+    const v = String(w || '').toLowerCase();
+    if (v === 'back') return 'rear';
+    if (v === 'front' || v === 'rear' || v === 'left' || v === 'right') return v;
+    return 'rear';
   };
 
   return (
     <div className="space-y-4 font-body">
-      <div className="flex justify-end">
-        <Button size="sm" onClick={addElement} className="bg-[#213428] hover:bg-[#3E4349] text-white"><Plus className="w-4 h-4 mr-2" />Add</Button>
-      </div>
-      {elements.length === 0 ? (
-        <p className="text-[#3E4349] text-center py-8">No room elements added. Click "Add" to create doors, windows, or built-ins.</p>
-      ) : (
-        elements.map(element => (
-          <div key={element.id} className="brand-border border rounded-lg p-4">
-            <div className="flex justify-between items-center mb-3">
-              <h4 className="font-medium text-[#1B1A1A] capitalize">{element.type}</h4>
-              <button
-                type="button"
-                className="text-brand-rust px-2 py-1 rounded-md hover-bg-brand-sand"
-                onClick={() => removeElement(element.id)}
-                aria-label="Remove element"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label className="text-[#3E4349]">Type</Label>
-                <Select value={element.type} onValueChange={(value) => updateElement(element.id, 'type', value)} modal={false}>
-                  <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent 
-                    position="popper" 
-                    sideOffset={6}
-                    className="z-[70]"
-                  >
-                    <SelectItem value="door">Door</SelectItem>
-                    <SelectItem value="window">Window</SelectItem>
-                    <SelectItem value="fireplace">Fireplace</SelectItem>
-                    <SelectItem value="built_in">Built-in</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-[#3E4349]">Wall</Label>
-                <Select value={element.wall} onValueChange={(value) => updateElement(element.id, 'wall', value)} modal={false}>
-                  <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent 
-                    position="popper" 
-                    sideOffset={6}
-                    className="z-[70]"
-                  >
-                    <SelectItem value="front">Front</SelectItem>
-                    <SelectItem value="back">Back</SelectItem>
-                    <SelectItem value="left">Left</SelectItem>
-                    <SelectItem value="right">Right</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label className="text-[#3E4349]">Width (m)</Label>
-                <Input type="number" step="0.1" value={element.width} onChange={(e) => updateElement(element.id, 'width', e.target.value)} className="bg-white border-[#DCDBD6] text-[#1B1A1A]" />
-              </div>
-              <div>
-                <Label className="text-[#3E4349]">Height (m)</Label>
-                <Input type="number" step="0.1" value={element.height} onChange={(e) => updateElement(element.id, 'height', e.target.value)} className="bg-white border-[#DCDBD6] text-[#1B1A1A]" />
-              </div>
-              <div>
-                <Label className="text-[#3E4349]">Position (m)</Label>
-                <Input type="number" step="0.1" value={element.x_position} onChange={(e) => updateElement(element.id, 'x_position', e.target.value)} className="bg-white border-[#DCDBD6] text-[#1B1A1A]" />
-              </div>
-              <div>
-                <Label className="text-[#3E4349]">Height from floor (m)</Label>
-                <Input type="number" step="0.1" value={element.z_position} onChange={(e) => updateElement(element.id, 'z_position', e.target.value)} className="bg-white border-[#DCDBD6] text-[#1B1A1A]" />
-              </div>
-            </div>
+      {/* CREATE ROOM ELEMENT */}
+      <div
+        className="rounded-lg border p-3"
+        style={{
+          borderColor: '#DCDBD6',
+          background: 'rgba(27, 26, 26, 0.04)',
+        }}
+      >
+        <div className="text-xs font-semibold" style={{ color: '#1B1A1A', letterSpacing: 0.3 }}>
+          CREATE ROOM ELEMENT
+        </div>
+
+        <div className="mt-2 flex items-center justify-between">
+          <div className="text-sm" style={{ color: '#1B1A1A' }}>
+            Add Door
           </div>
-        ))
+
+          <button
+            type="button"
+            onClick={addDoor}
+            className="inline-flex items-center justify-center rounded-md"
+            style={{
+              width: 34,
+              height: 34,
+              border: '1px solid #DCDBD6',
+              background: '#FFFFFF',
+              color: '#213428',
+            }}
+            aria-label="Add Door"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="mt-2 text-xs" style={{ color: '#625143' }}>
+          Click + multiple times to add multiple doors.
+        </div>
+      </div>
+
+      {/* EMPTY STATE */}
+      {(elements || []).length === 0 ? (
+        <p className="text-[#3E4349] text-center py-8">
+          No room elements added. Use "Add Door" above to create one.
+        </p>
+      ) : (
+        (elements || []).map((element) => {
+          const wall = normaliseWallValue(element?.wall);
+          const isFrontOrRear = wall === 'front' || wall === 'rear';
+
+          return (
+            <div
+              key={element.id}
+              className="rounded-lg border p-4"
+              style={{
+                borderColor: '#DCDBD6',
+                background: 'rgba(27, 26, 26, 0.04)',
+              }}
+            >
+              <div className="flex justify-between items-center mb-3">
+                <div>
+                  <div className="text-sm font-medium" style={{ color: '#1B1A1A' }}>
+                    {String(element?.type || 'door').toUpperCase()}
+                  </div>
+                  <div className="text-xs" style={{ color: '#625143' }}>
+                    {wallLabel(wall)}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => removeElement(element.id)}
+                  className="px-2 py-1 rounded-md"
+                  style={{
+                    border: '1px solid #DCDBD6',
+                    background: '#FFFFFF',
+                    color: '#1B1A1A',
+                  }}
+                  aria-label="Remove element"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                {/* WALL */}
+                <div>
+                  <Label className="text-[#3E4349]">Wall</Label>
+                  <Select
+                    value={wall}
+                    onValueChange={(value) => updateElement(element.id, 'wall', value)}
+                    modal={false}
+                  >
+                    <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent position="popper" sideOffset={6} className="z-[70]">
+                      <SelectItem value="front">Front</SelectItem>
+                      <SelectItem value="rear">Rear</SelectItem>
+                      <SelectItem value="left">Left</SelectItem>
+                      <SelectItem value="right">Right</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
+                    Screen is always on the Front wall.
+                  </div>
+                </div>
+
+                {/* LENGTH */}
+                <div>
+                  <Label className="text-[#3E4349]">Length (m)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={Number.isFinite(element?.length_m) ? element.length_m : 0.9}
+                    onChange={(e) => updateElement(element.id, 'length_m', e.target.value)}
+                    className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                  />
+                </div>
+
+                {/* LABEL */}
+                <div>
+                  <Label className="text-[#3E4349]">Label</Label>
+                  <Input
+                    type="text"
+                    value={element?.label ?? ''}
+                    onChange={(e) => updateElement(element.id, 'label', e.target.value)}
+                    className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                    placeholder="e.g. Entrance door"
+                  />
+                </div>
+
+                {/* POSITION */}
+                <div>
+                  <Label className="text-[#3E4349]">
+                    {isFrontOrRear ? 'X Position (m)' : 'Y Position (m)'}
+                  </Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={
+                      isFrontOrRear
+                        ? (Number.isFinite(element?.x_m) ? element.x_m : 0)
+                        : (Number.isFinite(element?.y_m) ? element.y_m : 0)
+                    }
+                    onChange={(e) =>
+                      updateElement(
+                        element.id,
+                        isFrontOrRear ? 'x_m' : 'y_m',
+                        e.target.value
+                      )
+                    }
+                    className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                  />
+                  <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
+                    Origin is top-left (0,0). Position is measured from the Left wall (for X) or Front wall (for Y).
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })
       )}
     </div>
   );
