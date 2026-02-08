@@ -12,7 +12,7 @@ export default function RoomElements({ elements = [], onChange }) {
   const makeId = () => `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 
   const addDoor = () => {
-    const doorCount = (elements || []).filter(e => String(e?.type) === 'door').length;
+    const elementCount = (elements || []).length;
     const newElement = {
       id: makeId(),
       type: 'door',
@@ -32,7 +32,7 @@ export default function RoomElements({ elements = [], onChange }) {
       z_m: 0,
 
       // UI
-      label: `Door ${doorCount + 1}`,
+      label: `Element ${elementCount + 1}`,
     };
 
     onChange([...(elements || []), newElement]);
@@ -82,13 +82,9 @@ export default function RoomElements({ elements = [], onChange }) {
           background: 'rgba(27, 26, 26, 0.04)',
         }}
       >
-        <div className="text-xs font-semibold" style={{ color: '#1B1A1A', letterSpacing: 0.3 }}>
-          CREATE ROOM ELEMENT
-        </div>
-
-        <div className="mt-2 flex items-center justify-between">
-          <div className="text-sm" style={{ color: '#1B1A1A' }}>
-            Add Door
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold" style={{ color: '#1B1A1A', letterSpacing: 0.3 }}>
+            CREATE ROOM ELEMENT
           </div>
 
           <button
@@ -102,14 +98,10 @@ export default function RoomElements({ elements = [], onChange }) {
               background: '#FFFFFF',
               color: '#213428',
             }}
-            aria-label="Add Door"
+            aria-label="Add Element"
           >
             <Plus className="w-4 h-4" />
           </button>
-        </div>
-
-        <div className="mt-2 text-xs" style={{ color: '#625143' }}>
-          Click + multiple times to add multiple doors.
         </div>
       </div>
 
@@ -135,7 +127,7 @@ export default function RoomElements({ elements = [], onChange }) {
               <div className="flex justify-between items-center mb-3">
                 <div>
                   <div className="text-sm font-medium" style={{ color: '#1B1A1A' }}>
-                    {String(element?.type || 'door').toUpperCase()}
+                    {element?.label || 'Element'}
                   </div>
                   <div className="text-xs" style={{ color: '#625143' }}>
                     {wallLabel(wall)}
