@@ -4837,7 +4837,11 @@ function RoomDesignerWithState() {
                     </div>
               }
                   <Suspense fallback={<div>Loading...</div>}>
-                      <RP22CompliancePanel analysisResult={analysisResult} screen={_screen} />
+                      <RP22CompliancePanel 
+                        analysisResult={analysisResult} 
+                        screen={_screen}
+                        seatHudSnapshots={appState?.seatMetricsById}
+                        mlpSeatId={primarySeatingPosition?.id || "mlp"} />
                   </Suspense>
               </CollapsiblePanel>
               

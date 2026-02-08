@@ -1,4 +1,3 @@
-
 // components/rp22/RP22CompliancePanel.jsx
 import React from "react";
 import { computeScreenMetrics } from "@/components/utils/screenMetrics";
@@ -43,7 +42,15 @@ function levelFor(value, t) {
   return 0;
 }
 
-const levelText = { 0: "Fail", 1: "L1", 2: "L2", 3: "L3", 4: "L4" };
+const levelText = (lvl) => {
+  const str = String(lvl).toUpperCase();
+  if (str === "L4" || lvl === 4) return "L4";
+  if (str === "L3" || lvl === 3) return "L3";
+  if (str === "L2" || lvl === 2) return "L2";
+  if (str === "L1" || lvl === 1) return "L1";
+  if (str === "FAIL" || lvl === 0) return "Fail";
+  return str; // Return as-is for "—", "N/A", etc.
+};
 
 const pillStyle = (lvl) => {
   const base = {
@@ -56,10 +63,17 @@ const pillStyle = (lvl) => {
     alignItems: "center",
     lineHeight: 1,
   };
-  if (lvl === 4) return { ...base, background: "#F6F3EE", color: "#213428" };
-  if (lvl === 3) return { ...base, background: "#E9ECEF", color: "#3E4349" };
-  if (lvl === 2) return { ...base, background: "#EFEAE4", color: "#625143" };
-  return { ...base, background: "#FBE9E7", color: "#A7302F" }; // L1/Fail
+  
+  // Handle string levels ("L4", "L3", "L2", "L1", "FAIL", "N/A", "—")
+  const lvlStr = String(lvl).toUpperCase();
+  if (lvlStr === "L4" || lvl === 4) return { ...base, background: "#F6F3EE", color: "#213428" };
+  if (lvlStr === "L3" || lvl === 3) return { ...base, background: "#E9ECEF", color: "#3E4349" };
+  if (lvlStr === "L2" || lvl === 2) return { ...base, background: "#EFEAE4", color: "#625143" };
+  if (lvlStr === "L1" || lvl === 1) return { ...base, background: "#FBE9E7", color: "#A7302F" };
+  if (lvlStr === "FAIL" || lvl === 0) return { ...base, background: "#FBE9E7", color: "#A7302F" };
+  if (lvlStr === "N/A" || lvlStr === "—" || lvlStr === "-" || lvlStr === "NO DATA") return { ...base, background: "#F0F0F0", color: "#999" };
+  
+  return { ...base, background: "#FBE9E7", color: "#A7302F" }; // Default to fail/L1
 };
 
 const chip = {
@@ -277,7 +291,7 @@ const RP22_PARAMS = [
 
 /* ---------- Panel ---------- */
 
-export default function RP22CompliancePanel({ analysisResult, screen }) {
+export default function RP22CompliancePanel({ analysisResult, screen, seatHudSnapshots, roomHudSnapshot, mlpSeatId }) {
   // RP23 range (50–65°)
   const rp23 = React.useMemo(() => {
     const { viewWm } = computeScreenMetrics(
@@ -295,8 +309,120 @@ export default function RP22CompliancePanel({ analysisResult, screen }) {
     };
   }, [screen]);
 
+  // Build simple seat ID map from cache (cache keys are "seatId|signature")
+  const seatSnapshotsById = React.useMemo(() => {
+    const cache = (seatHudSnapshots && typeof seatHudSnapshots === "object") ? seatHudSnapshots : {};
+    const byId = {};
+    
+    for (const [cacheKey, snapshot] of Object.entries(cache)) {
+      const seatId = String(cacheKey).split('|')[0];
+      if (seatId) {
+        byId[seatId] = snapshot;
+      }
+    }
+    
+    return byId;
+  }, [seatHudSnapshots]);
+
+  const sourceOptions = React.useMemo(() => {
+    const seatIds = Object.keys(seatSnapshotsById);
+
+    // Prefer showing "mlp" first if present
+    const ordered = [
+      ...(seatIds.includes("mlp") ? ["mlp"] : []),
+      ...seatIds.filter((k) => k !== "mlp"),
+    ];
+
+    const seats = ordered.map((seatId) => ({
+      value: `seat:${seatId}`,
+      label: seatId === "mlp" ? "Seat: RSP (green dot)" : `Seat: ${seatId}`,
+    }));
+
+    const room = [{ value: "room", label: "Room (room-level results)" }];
+    const rp23Seat = [{ value: "rp23", label: "RP23 (selected seat)" }];
+
+    return [...seats, ...room, ...rp23Seat];
+  }, [seatSnapshotsById]);
+
+  const defaultSeatKey = React.useMemo(() => {
+    // Always prefer synthetic mlp if present
+    if (seatSnapshotsById["mlp"]) return "seat:mlp";
+    if (mlpSeatId && seatSnapshotsById[mlpSeatId]) return `seat:${mlpSeatId}`;
+    const first = Object.keys(seatSnapshotsById)[0];
+    return first ? `seat:${first}` : "room";
+  }, [seatSnapshotsById, mlpSeatId]);
+
+  const [reportSource, setReportSource] = React.useState(defaultSeatKey);
+
+  React.useEffect(() => {
+    // If seats load later, keep the default stable and sensible
+    setReportSource((prev) => prev || defaultSeatKey);
+  }, [defaultSeatKey]);
+
+  const getHudLevelForParam = React.useCallback((paramId) => {
+    const pid = Number(paramId);
+
+    // RP23 uses the seat snapshot's rp23.level
+    if (reportSource === "rp23") {
+      const seatKey = defaultSeatKey.startsWith("seat:") ? defaultSeatKey.split(":")[1] : "mlp";
+      const snap = seatSnapshotsById[seatKey] || seatSnapshotsById["mlp"] || null;
+      return snap?.rp23?.level || "—";
+    }
+
+    // Room-level: prefer explicit room snapshot if provided
+    if (reportSource === "room") {
+      const roomSnap = roomHudSnapshot || analysisResult?.roomHudSnapshot || null;
+      const key = `p${pid}`;
+      return roomSnap?.rp22?.[key]?.level || "—";
+    }
+
+    // Seat-level
+    if (String(reportSource).startsWith("seat:")) {
+      const seatId = String(reportSource).split(":")[1];
+      const snap =
+        seatSnapshotsById?.[seatId] ||
+        seatSnapshotsById?.["mlp"] ||
+        (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) ||
+        null;
+
+      const key = `p${pid}`;
+      return snap?.rp22?.[key]?.level || "—";
+    }
+
+    return "—";
+  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey]);
+
   return (
     <div>
+      {/* Report Source */}
+      <div style={{ ...card, marginBottom: 12 }}>
+        <div style={head}>
+          <div style={title}>Report Source</div>
+          <div style={sub}>Choose what the level pills reflect</div>
+        </div>
+        <div style={body}>
+          <select
+            value={reportSource}
+            onChange={(e) => setReportSource(e.target.value)}
+            style={{
+              width: "100%",
+              height: 40,
+              borderRadius: 10,
+              border: "1px solid #DCDBD6",
+              padding: "0 12px",
+              background: "#FFFFFF",
+              color: "#1B1A1A",
+              fontSize: 14,
+              outline: "none",
+            }}
+          >
+            {sourceOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
       {/* RP23 Screen Size Guide */}
       <div style={{ ...card, marginBottom: 12 }}>
         <div style={head}>
@@ -322,25 +448,7 @@ export default function RP22CompliancePanel({ analysisResult, screen }) {
       {/* RP22 Parameters (1–21) */}
       <div style={{ display: "grid", gap: 12 }}>
         {RP22_PARAMS.map((p) => {
-          const val =
-            typeof p.valueFromAnalysis === "function"
-              ? p.valueFromAnalysis(analysisResult)
-              : null;
-
-          // pretty-value formatting
-          const pretty = (function () {
-              if (val == null) return "n/a";
-              if (typeof val === "number") {
-                const dp = (p.unit === "± dB" || p.unit === "dB") ? 1 : (p.unit === "Hz" ? 0 : 2);
-                return `${val.toFixed(dp)}${p.unit === "°" ? "°" : ""}`;
-              }
-              return renderPrimitive(val);
-            })();
-
-          const lvl = levelFor(
-            typeof val === "string" ? val : typeof val === "number" ? val : null,
-            p.thresholds
-          );
+          const lvl = getHudLevelForParam(p.id);
 
           return (
             <div key={p.id} style={card}>
@@ -360,30 +468,8 @@ export default function RP22CompliancePanel({ analysisResult, screen }) {
                 <div style={{ ...row, marginTop: 0 }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                     <span style={{ fontSize: 12, color: "#625143" }}>Achieved</span>
-                    <span
-                      style={{
-                        fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace",
-                        fontSize: 12,
-                        color: "#3E4349",
-                      }}
-                    >
-                      {pretty}
-                      {typeof val === "number" && p.unit && !["Yes/No", "speakers"].includes(p.unit)
-                        ? p.unit === "± dB"
-                          ? " dB"
-                          : p.unit === "dB"
-                          ? " dB"
-                          : p.unit === "Hz"
-                          ? " Hz"
-                          : p.unit === "°"
-                          ? "°"
-                          : p.unit === "m"
-                          ? " m"
-                          : ""
-                        : ""}
-                    </span>
                   </div>
-                  <span style={pillStyle(lvl)}>{levelText[lvl]}</span>
+                  <span style={pillStyle(lvl)}>{levelText(lvl)}</span>
                 </div>
 
                 {/* thresholds grid */}
