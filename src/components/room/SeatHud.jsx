@@ -287,13 +287,6 @@ export default function SeatHud({
                     <RP22GradingPill level={normalizeLevel(metric.level)} />
                     </div>
 
-                    {/* P5 debug info */}
-                    {key === 'p5' && isHudPinned && metric?.debugLine && (
-                      <div style={{ fontSize: 10, color: '#666', marginTop: 2, marginLeft: 8 }}>
-                        P5 debug: {metric.debugLine}
-                      </div>
-                    )}
-
                     {/* P9 detail */}
                     {key === 'p9' && tooltipData.rp22.p9Detail && (
                       <div
