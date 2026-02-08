@@ -6443,16 +6443,28 @@ return {
         Number(el?.thicknessM) ||
         0.05;
 
-      // Position along the wall:
-      // front/rear => use x
-      // left/right => use y
-      const posM =
-        Number.isFinite(Number(el?.pos_m)) ? Number(el?.pos_m) :
-        Number.isFinite(Number(el?.x_m)) ? Number(el?.x_m) :
-        Number.isFinite(Number(el?.y_m)) ? Number(el?.y_m) :
-        Number.isFinite(Number(el?.x_position)) ? Number(el?.x_position) :
-        Number.isFinite(Number(el?.y_position)) ? Number(el?.y_position) :
+      // Position along the wall (metres):
+      // IMPORTANT: for LEFT/RIGHT walls, position is measured DOWN from the FRONT wall (so use Y fields first).
+      // For FRONT/REAR walls, position is measured RIGHT from the LEFT wall (so use X fields first).
+      const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+
+      const posFrontRear =
+        n(el?.pos_m) ??
+        n(el?.x_m) ??
+        n(el?.x_position) ??
+        n(el?.y_m) ??           // fallback if old saves used the wrong field
+        n(el?.y_position) ??
         0;
+
+      const posLeftRight =
+        n(el?.pos_m) ??
+        n(el?.y_m) ??
+        n(el?.y_position) ??
+        n(el?.x_m) ??           // fallback if old saves used the wrong field
+        n(el?.x_position) ??
+        0;
+
+      const posM = (wall === 'left' || wall === 'right') ? posLeftRight : posFrontRear;
 
       const label = String(el?.label || '').trim();
 
@@ -6476,7 +6488,16 @@ return {
           // Build element rectangle in METRES (then convert via scale/toPx)
           const L = Math.max(0.01, Number(e.__lengthM) || 0.9);
           const T = Math.max(0.01, Number(e.__thicknessM) || 0.05);
-          const p = Math.max(0, Number(e.__posM) || 0);
+          
+          // Position along the wall (clamped so the element always stays on that wall)
+          const rawP = Number(e.__posM) || 0;
+
+          const maxP =
+            (e.wall === 'left' || e.wall === 'right')
+              ? Math.max(0, lengthM - L)
+              : Math.max(0, widthM - L);
+
+          const p = Math.max(0, Math.min(rawP, maxP));
 
           // NOTE: origin is top-left (0,0). Position is measured from the FRONT wall for Y, and LEFT wall for X.
           // So for LEFT/RIGHT walls, p is distance DOWN from front wall.
