@@ -6435,6 +6435,38 @@ return {
       return 'rear';
     };
 
+    const WARN_GAP_M = 0.05; // 5cm
+
+    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+    // Distance from a point (px,py) to an axis-aligned rect (rx,ry,rw,rh), all in METRES.
+    // Returns 0 if the point is inside the rect.
+    const pointToRectDistanceM = (px, py, rx, ry, rw, rh) => {
+      const cx = clamp(px, rx, rx + rw);
+      const cy = clamp(py, ry, ry + rh);
+      const dx = px - cx;
+      const dy = py - cy;
+      return Math.hypot(dx, dy);
+    };
+
+    const speakerRadiusM = (spk) => {
+      try {
+        const meta = getModelDimsM?.(spk?.model);
+        const w = Number(meta?.widthM);
+        const d = Number(meta?.depthM);
+        if (Number.isFinite(w) || Number.isFinite(d)) {
+          const maxDim = Math.max(Number.isFinite(w) ? w : 0, Number.isFinite(d) ? d : 0);
+          // half footprint feels closest to "icon touches"
+          return Math.max(0.05, maxDim / 2);
+        }
+      } catch (e) {}
+      // fallback if model dims missing
+      return 0.15;
+    };
+
+    const hasSpeakerPos = (s) =>
+      s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
+
     // Read element fields with backward-compatible fallbacks (in case older saves exist)
     const getLenM = (el) =>
       safeNum(
@@ -6449,6 +6481,10 @@ return {
       safeNum(el?.y_m ?? el?.yM ?? el?.y_position ?? el?.y ?? el?.posY_m, 0);
 
     if (!Array.isArray(roomElements) || roomElements.length === 0) return null;
+
+    const speakersForCollision = Array.isArray(placedSpeakers)
+      ? placedSpeakers.filter(hasSpeakerPos)
+      : [];
 
     return (
       <g data-layer="room-elements" pointerEvents="none">
@@ -6521,6 +6557,18 @@ return {
           const labelXpx = meterToCanvasX(labelXM);
           const labelYpx = meterToCanvasY(labelYM);
 
+          const isWarn = speakersForCollision.some((spk) => {
+            const sx = Number(spk.position.x);
+            const sy = Number(spk.position.y);
+            if (!Number.isFinite(sx) || !Number.isFinite(sy)) return false;
+
+            const r = speakerRadiusM(spk);
+            const dist = pointToRectDistanceM(sx, sy, rectXM, rectYM, rectWm, rectHm);
+
+            // Warn when the speaker's "edge" is within 5cm of the element
+            return dist <= (WARN_GAP_M + r);
+          });
+
           const label = String(el?.label || `Element ${idx + 1}`);
 
           return (
@@ -6530,10 +6578,10 @@ return {
                 y={yPx}
                 width={Math.max(0, wPx)}
                 height={Math.max(0, hPx)}
-                fill="#1B1A1A"
-                fillOpacity={0.12}
-                stroke="#1B1A1A"
-                strokeOpacity={0.65}
+                fill={isWarn ? "#C46A1A" : "#1B1A1A"}
+                fillOpacity={isWarn ? 0.16 : 0.12}
+                stroke={isWarn ? "#C46A1A" : "#1B1A1A"}
+                strokeOpacity={isWarn ? 0.75 : 0.65}
                 strokeWidth={1.5}
                 vectorEffect="non-scaling-stroke"
               />
@@ -6553,7 +6601,7 @@ return {
         })}
       </g>
     );
-  }, [roomElements, widthM, lengthM, scale, meterToCanvasX, meterToCanvasY]);
+  }, [roomElements, widthM, lengthM, scale, meterToCanvasX, meterToCanvasY, placedSpeakers, getModelDimsM]);
 
   // Renders speaker labels. Not implemented in the original code, so a placeholder.
   const renderSpeakerLabels = useCallback(() => {
