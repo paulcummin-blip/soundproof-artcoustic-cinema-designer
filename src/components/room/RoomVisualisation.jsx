@@ -6569,7 +6569,7 @@ return {
           const label = String(e.__label || `Element ${idx + 1}`);
 
           return (
-            <g key={String(el?.id ?? `el-${idx}`)}>
+            <g key={String(e?.id ?? element?.id ?? `el-${idx}`)}>
               <rect
                 x={xPx}
                 y={yPx}
