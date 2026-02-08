@@ -8,15 +8,18 @@ import { formatDb } from '@/components/utils/formatDb';
  * Groups: Upper Front (TFL/TFR), Top Middle (TL/TR), Upper Rear (TBL/TBR)
  */
 export default function OverheadSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayout }) {
-  const rspSplData = useMemo(() => {
+  const mlpSplData = useMemo(() => {
     if (!allSeatSplMetrics) return null;
-
-    // "SPL @ RSP" must come from the real seat, not the synthetic green-dot MLP entry.
+    
+    // Prefer synthetic "mlp" entry (green dot), fallback to mlpSeat
+    const mlpMetrics = allSeatSplMetrics.get("mlp");
+    if (mlpMetrics?.spl) return mlpMetrics.spl;
+    
     if (mlpSeat) {
       const metrics = allSeatSplMetrics.get(mlpSeat.id);
       return metrics?.spl || null;
     }
-
+    
     return null;
   }, [mlpSeat, allSeatSplMetrics]);
 
@@ -78,13 +81,13 @@ export default function OverheadSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayo
 
   // Calculate representative SPL for each group (max value)
   const groupSplValues = useMemo(() => {
-    if (!rspSplData?.uppers) return {};
+    if (!mlpSplData?.uppers) return {};
     
     const result = {};
     
     for (const group of groups) {
       const splValues = group.roles
-        .map(role => rspSplData.uppers[role]?.value)
+        .map(role => mlpSplData.uppers[role]?.value)
         .filter(Number.isFinite);
       
       if (splValues.length > 0) {
@@ -93,7 +96,7 @@ export default function OverheadSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayo
     }
     
     return result;
-  }, [rspSplData, groups]);
+  }, [mlpSplData, groups]);
 
   if (!mlpSeat || groups.length === 0) {
     return null;
