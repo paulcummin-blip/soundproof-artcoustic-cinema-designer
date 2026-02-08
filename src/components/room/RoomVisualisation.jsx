@@ -3411,10 +3411,11 @@ React.useEffect(() => {
       }
     }
     
-    // Non-pinned hover: try cache first
-    const cached = seatId ? appState?.seatMetricsById?.[seatId] : null;
+    // Non-pinned hover: try cache first (MUST include signature so toggles invalidate)
+    const cacheKey = `${seatId}|${signature}`;
+    const cached = seatId ? appState?.seatMetricsById?.[cacheKey] : null;
     
-    if (cached && cached.__sig === signature) {
+    if (cached) {
       return cached;
     }
     
@@ -3446,23 +3447,16 @@ React.useEffect(() => {
       // Keep this very conservative: only write if missing or different.
       if (appState?.setSeatMetricsById) {
         const prevAll = appState?.seatMetricsById || {};
-        const prevSeat = prevAll?.[seatId];
+        const prevSeat = prevAll?.[cacheKey];
 
-        // Prefer the snapshot signature if available
-        const sig = data.__signature || data.__sig || prevSeat?.__sig || null;
+        const nextSeat = { ...data };
 
-        const nextSeat = { ...data, __sig: sig };
-
-        const shouldWrite =
-          !prevSeat ||
-          (sig && prevSeat.__sig !== sig) ||
-          // If signature isn't available, do a minimal shape check
-          (!sig && (!!prevSeat?.rp22 !== !!nextSeat?.rp22));
+        const shouldWrite = !prevSeat || JSON.stringify(prevSeat) !== JSON.stringify(nextSeat);
 
         if (shouldWrite) {
           appState.setSeatMetricsById({
             ...prevAll,
-            [seatId]: nextSeat,
+            [cacheKey]: nextSeat,
           });
         }
       }
@@ -4206,7 +4200,8 @@ React.useEffect(() => {
         });
         
         if (snapshot) {
-          nextMetrics[seat.id] = { ...snapshot, __sig: signature };
+          const seatCacheKey = `${seat.id}|${signature}`;
+          nextMetrics[seatCacheKey] = { ...snapshot };
         }
       } catch (err) {
         console.warn(`[SeatMetrics] failed seat ${seat.id}:`, err);
