@@ -54,7 +54,7 @@ export default function OverheadSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayo
       result.push({
         key: 'rear',
         label: 'Upper Rear',
-        roles: ['TRL', 'TRR', 'TBC'],
+        roles: ['TRL', 'TRR', 'TBL', 'TBR', 'TBC'],
       });
     }
     
@@ -73,7 +73,7 @@ export default function OverheadSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayo
       result.push({
         key: 'rear',
         label: 'Upper Rear',
-        roles: ['TRL', 'TRR', 'TBC'],
+        roles: ['TRL', 'TRR', 'TBL', 'TBR', 'TBC'],
       });
     }
     
