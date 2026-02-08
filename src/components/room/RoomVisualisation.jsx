@@ -6418,8 +6418,142 @@ return {
 
   // Renders generic room elements. `roomElements` prop is available.
   const renderRoomElements = useCallback(() => {
-    return <g data-layer="room-elements"></g>;
-  }, []);
+    const THICKNESS_M = 0.05;     // 5cm
+    const LABEL_INSET_M = 0.10;   // 10cm inside the room
+
+    const safeNum = (v, fallback) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    const normWall = (w) => {
+      const s = String(w || '').toLowerCase();
+      if (s === 'front') return 'front';
+      if (s === 'rear' || s === 'back') return 'rear';
+      if (s === 'left') return 'left';
+      if (s === 'right') return 'right';
+      return 'rear';
+    };
+
+    // Read element fields with backward-compatible fallbacks (in case older saves exist)
+    const getLenM = (el) =>
+      safeNum(
+        el?.length_m ?? el?.lengthM ?? el?.length ?? el?.width ?? el?.width_m ?? el?.widthM,
+        0.9
+      );
+
+    const getXM = (el) =>
+      safeNum(el?.x_m ?? el?.xM ?? el?.x_position ?? el?.x ?? el?.posX_m, 0);
+
+    const getYM = (el) =>
+      safeNum(el?.y_m ?? el?.yM ?? el?.y_position ?? el?.y ?? el?.posY_m, 0);
+
+    if (!Array.isArray(roomElements) || roomElements.length === 0) return null;
+
+    return (
+      <g data-layer="room-elements" pointerEvents="none">
+        {roomElements.map((el, idx) => {
+          const wall = normWall(el?.wall);
+          const lenM_raw = getLenM(el);
+          const tM = safeNum(el?.thickness_m ?? el?.thicknessM, THICKNESS_M);
+
+          // Clamp length so it can't exceed the wall length
+          const maxLen = (wall === 'left' || wall === 'right') ? lengthM : widthM;
+          const lenM = Math.max(0, Math.min(lenM_raw, maxLen));
+
+          // START position from wall origin (top-left is 0,0)
+          let startM = (wall === 'left' || wall === 'right') ? getYM(el) : getXM(el);
+          startM = safeNum(startM, 0);
+
+          // Clamp START so the element stays on the wall
+          startM = Math.max(0, Math.min(startM, Math.max(0, maxLen - lenM)));
+
+          // Compute rectangle in metres (x,y are top-left in metres)
+          let rectXM = 0;
+          let rectYM = 0;
+          let rectWm = 0;
+          let rectHm = 0;
+
+          // Label anchor point (in metres)
+          let labelXM = 0;
+          let labelYM = 0;
+
+          if (wall === 'front') {
+            rectXM = startM;
+            rectYM = 0;
+            rectWm = lenM;
+            rectHm = tM;
+
+            labelXM = rectXM + 0.02; // tiny nudge
+            labelYM = rectYM + tM + LABEL_INSET_M;
+          } else if (wall === 'rear') {
+            rectXM = startM;
+            rectYM = Math.max(0, lengthM - tM);
+            rectWm = lenM;
+            rectHm = tM;
+
+            labelXM = rectXM + 0.02;
+            labelYM = rectYM - LABEL_INSET_M; // inside the room (upwards)
+          } else if (wall === 'left') {
+            rectXM = 0;
+            rectYM = startM;
+            rectWm = tM;
+            rectHm = lenM;
+
+            labelXM = rectXM + tM + LABEL_INSET_M;
+            labelYM = rectYM + 0.18; // slight down so it doesn't sit on the top edge
+          } else if (wall === 'right') {
+            rectXM = Math.max(0, widthM - tM);
+            rectYM = startM;
+            rectWm = tM;
+            rectHm = lenM;
+
+            labelXM = rectXM - LABEL_INSET_M; // inside the room (leftwards)
+            labelYM = rectYM + 0.18;
+          }
+
+          // Convert to canvas pixels
+          const xPx = meterToCanvasX(rectXM);
+          const yPx = meterToCanvasY(rectYM);
+          const wPx = rectWm * scale;
+          const hPx = rectHm * scale;
+
+          const labelXpx = meterToCanvasX(labelXM);
+          const labelYpx = meterToCanvasY(labelYM);
+
+          const label = String(el?.label || `Element ${idx + 1}`);
+
+          return (
+            <g key={String(el?.id ?? `el-${idx}`)}>
+              <rect
+                x={xPx}
+                y={yPx}
+                width={Math.max(0, wPx)}
+                height={Math.max(0, hPx)}
+                fill="#1B1A1A"
+                fillOpacity={0.12}
+                stroke="#1B1A1A"
+                strokeOpacity={0.65}
+                strokeWidth={1.5}
+                vectorEffect="non-scaling-stroke"
+              />
+              <text
+                x={labelXpx}
+                y={labelYpx}
+                fill="#1B1A1A"
+                fillOpacity={0.9}
+                fontSize={11}
+                fontWeight={700}
+                style={{ userSelect: 'none' }}
+              >
+                {label}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  }, [roomElements, widthM, lengthM, scale, meterToCanvasX, meterToCanvasY]);
 
   // Renders speaker labels. Not implemented in the original code, so a placeholder.
   const renderSpeakerLabels = useCallback(() => {
