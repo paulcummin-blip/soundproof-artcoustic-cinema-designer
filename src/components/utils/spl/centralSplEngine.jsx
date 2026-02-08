@@ -177,7 +177,7 @@ function calculateSplAtPoint({
   // ─────────────────────────────────────────────────────────────────────────
   const dx = speakerPos.x - seatPos.x;
   const dy = speakerPos.y - seatPos.y;
-  const dz = (speakerPos.z || 1.2) - (seatPos.z || 1.2);
+  const dz = (speakerPos.z ?? 1.2) - (seatPos.z ?? 1.2);
   
   const distance = Math.max(0.10, Math.hypot(dx, dy, dz)); // 10cm floor
   const distanceLoss = 20 * Math.log10(Math.max(1, distance)); // Floor at 1m for log
@@ -217,12 +217,15 @@ export function computeAllSeatSplMetrics({
   screenLoss_dB = 0,
   eqHeadroom_dB = 0,
   mlpPoint = null, // NEW: canonical MLP point (green dot)
+  heightM = 2.4, // NEW: room height for overhead z-fix
 }) {
   const metricsMap = new Map();
   
   if (!Array.isArray(seats) || !Array.isArray(placedSpeakers)) {
     return metricsMap;
   }
+
+  const roomHeightM = Number.isFinite(Number(heightM)) ? Number(heightM) : 2.4;
 
   // NEW: Add synthetic "mlp" seat if mlpPoint is provided
   let seatsToProcess = [...seats];
@@ -286,9 +289,20 @@ export function computeAllSeatSplMetrics({
         // Get effective SPL inputs (power, sensitivity overrides)
         const effectiveSplInputs = getEffectiveSplInputs(spk.role);
 
+        const isOverhead = String(role || '').startsWith('T');
+
+        // CRITICAL: Overheads must be at ceiling height for SPL distance.
+        // If z is missing/0/etc, force to roomHeightM.
+        const rawZ = spk?.position?.z;
+        const zFixed = (Number.isFinite(rawZ) && rawZ > 0.01) ? rawZ : roomHeightM;
+
+        const speakerPosFixed = isOverhead
+          ? { ...spk.position, z: zFixed }
+          : { ...spk.position };
+
         // Calculate SPL using UNIFIED logic with 1m capability cap
         const splValue = calculateSplAtPoint({
-          speakerPos: spk.position,
+          speakerPos: speakerPosFixed,
           seatPos,
           // Pass model name for speakerData.js lookup
           speakerModel: spk.model,
