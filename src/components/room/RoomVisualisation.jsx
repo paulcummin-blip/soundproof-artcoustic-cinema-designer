@@ -3341,6 +3341,7 @@ React.useEffect(() => {
       getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
       getModelDimsM,
       mlpPoint: mlp, // NEW: Pass green dot MLP for synthetic "mlp" seat
+      heightM, // NEW: Pass room height for overhead z-fix
     });
   }, [allSeatSplMetricsProp, seatingPositions, placedSpeakers, getCanonicalRole, appState?.getEffectiveSplInputs, getModelDimsM, mlp]);
 
