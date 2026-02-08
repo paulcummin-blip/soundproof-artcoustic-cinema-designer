@@ -10,18 +10,19 @@ import { formatDb } from '@/components/utils/formatDb';
 export default function OverheadSplStrip({ allSeatSplMetrics, mlpSeat, dolbyLayout }) {
   const mlpSplData = useMemo(() => {
     if (!allSeatSplMetrics) return null;
-    
-    // Prefer synthetic "mlp" entry (green dot), fallback to mlpSeat
+
+    // SPL @ RSP must use the green dot reference ("mlp") first.
     const mlpMetrics = allSeatSplMetrics.get("mlp");
     if (mlpMetrics?.spl) return mlpMetrics.spl;
-    
-    if (mlpSeat) {
+
+    // Fallback only if "mlp" isn't present (older saves / edge cases)
+    if (mlpSeat?.id) {
       const metrics = allSeatSplMetrics.get(mlpSeat.id);
       return metrics?.spl || null;
     }
-    
+
     return null;
-  }, [mlpSeat, allSeatSplMetrics]);
+  }, [allSeatSplMetrics, mlpSeat?.id]);
 
   // Determine which overhead groups to show based on layout
   const groups = useMemo(() => {
