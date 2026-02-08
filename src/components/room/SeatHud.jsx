@@ -278,8 +278,8 @@ export default function SeatHud({
                   >
                     {key.toUpperCase()}
                     </span>
-                    {key === 'p16' && metric.hudLabel ? (
-                    `: ${metric.hudLabel}`
+                    {key === 'p16' ? (
+                    `: ${metric.hudLabel || metric.worstRole || '—'}`
                     ) : (
                     `: ${metric.formatted || '—'}`
                     )}
