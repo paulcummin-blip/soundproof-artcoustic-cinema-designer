@@ -177,7 +177,9 @@ function calculateSplAtPoint({
   // ─────────────────────────────────────────────────────────────────────────
   const dx = speakerPos.x - seatPos.x;
   const dy = speakerPos.y - seatPos.y;
-  const dz = (speakerPos.z ?? 1.2) - (seatPos.z ?? 1.2);
+  const spz = Number.isFinite(speakerPos?.z) ? speakerPos.z : 1.2;
+  const sez = Number.isFinite(seatPos?.z) ? seatPos.z : 1.2;
+  const dz = spz - sez;
   
   const distance = Math.max(0.10, Math.hypot(dx, dy, dz)); // 10cm floor
   const distanceLoss = 20 * Math.log10(Math.max(1, distance)); // Floor at 1m for log
@@ -289,30 +291,18 @@ export function computeAllSeatSplMetrics({
         // Get effective SPL inputs (power, sensitivity overrides)
         const effectiveSplInputs = getEffectiveSplInputs(spk.role);
 
+        // --- Overhead SPL must always assume ceiling mount height ---
+        // Do NOT trust spk.position.z for overheads (often missing/0/legacy).
         const canonRole = getCanonicalRole(spk.role);
         const isOverhead = String(canonRole).startsWith('T');
 
-        const spX = Number(spk?.position?.x);
-        const spY = Number(spk?.position?.y);
-
-        // CRITICAL: Overheads must default to CEILING height if z is missing.
-        // Non-overheads default to 1.2m if z is missing.
-        const zRaw = spk?.position?.z;
-        const zUsed = Number.isFinite(Number(zRaw))
-          ? Number(zRaw)
-          : (isOverhead ? (Number.isFinite(Number(roomHeightM)) ? Number(roomHeightM) : 2.4) : 1.2);
-
-        const speakerPos3D = { x: spX, y: spY, z: zUsed };
-
-        // Debug distance (3D) so we can verify symmetry
-        const dxD = speakerPos3D.x - seatPos.x;
-        const dyD = speakerPos3D.y - seatPos.y;
-        const dzD = speakerPos3D.z - seatPos.z;
-        const distanceM = Math.max(0.10, Math.hypot(dxD, dyD, dzD));
+        const speakerPosForSpl = isOverhead
+          ? { ...spk.position, z: Number.isFinite(heightM) ? Number(heightM) : 2.4 }
+          : spk.position;
 
         // Calculate SPL using UNIFIED logic with 1m capability cap
         const splValue = calculateSplAtPoint({
-          speakerPos: speakerPos3D,
+          speakerPos: speakerPosForSpl,
           seatPos,
           // Pass model name for speakerData.js lookup
           speakerModel: spk.model,
@@ -337,9 +327,6 @@ export function computeAllSeatSplMetrics({
           spl[categoryKey][role] = {
             value: splValue,
             formatted: `${splValue.toFixed(1)} dB`,
-            // Debug (safe to ignore by UI)
-            distanceM,
-            zUsed,
           };
         }
       }
