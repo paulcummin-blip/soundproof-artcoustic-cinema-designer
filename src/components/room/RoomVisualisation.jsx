@@ -6418,158 +6418,155 @@ return {
 
   // Renders generic room elements. `roomElements` prop is available.
   const renderRoomElements = useCallback(() => {
-    const THICKNESS_M = 0.05;     // 5cm
     const LABEL_INSET_M = 0.10;   // 10cm inside the room
 
-    const safeNum = (v, fallback) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : fallback;
+    const normalizeElement = (el) => {
+      const wallRaw = String(el?.wall || el?.side || 'front').toLowerCase();
+      const wall =
+        wallRaw === 'back' ? 'rear' :
+        wallRaw === 'rear' ? 'rear' :
+        wallRaw === 'front' ? 'front' :
+        wallRaw === 'left' ? 'left' :
+        wallRaw === 'right' ? 'right' : 'front';
+
+      // Support BOTH schemas:
+      // - old: width, height, x_position, z_position
+      // - new: length_m, thickness_m, x_m/y_m, label
+      const lengthM =
+        Number(el?.length_m) ||
+        Number(el?.lengthM) ||
+        Number(el?.width) ||          // old "door" uses width as length along wall
+        0.9;
+
+      const thicknessM =
+        Number(el?.thickness_m) ||
+        Number(el?.thicknessM) ||
+        0.05;
+
+      // Position along the wall:
+      // front/rear => use x
+      // left/right => use y
+      const posM =
+        Number.isFinite(Number(el?.pos_m)) ? Number(el?.pos_m) :
+        Number.isFinite(Number(el?.x_m)) ? Number(el?.x_m) :
+        Number.isFinite(Number(el?.y_m)) ? Number(el?.y_m) :
+        Number.isFinite(Number(el?.x_position)) ? Number(el?.x_position) :
+        Number.isFinite(Number(el?.y_position)) ? Number(el?.y_position) :
+        0;
+
+      const label = String(el?.label || '').trim();
+
+      return {
+        ...el,
+        wall,
+        __lengthM: lengthM,
+        __thicknessM: thicknessM,
+        __posM: posM,
+        __label: label,
+      };
     };
-
-    const normWall = (w) => {
-      const s = String(w || '').toLowerCase();
-      if (s === 'front') return 'front';
-      if (s === 'rear' || s === 'back') return 'rear';
-      if (s === 'left') return 'left';
-      if (s === 'right') return 'right';
-      return 'rear';
-    };
-
-    const WARN_GAP_M = 0.05; // 5cm
-
-    const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-
-    // Distance from a point (px,py) to an axis-aligned rect (rx,ry,rw,rh), all in METRES.
-    // Returns 0 if the point is inside the rect.
-    const pointToRectDistanceM = (px, py, rx, ry, rw, rh) => {
-      const cx = clamp(px, rx, rx + rw);
-      const cy = clamp(py, ry, ry + rh);
-      const dx = px - cx;
-      const dy = py - cy;
-      return Math.hypot(dx, dy);
-    };
-
-    const speakerRadiusM = (spk) => {
-      try {
-        const meta = getModelDimsM?.(spk?.model);
-        const w = Number(meta?.widthM);
-        const d = Number(meta?.depthM);
-        if (Number.isFinite(w) || Number.isFinite(d)) {
-          const maxDim = Math.max(Number.isFinite(w) ? w : 0, Number.isFinite(d) ? d : 0);
-          // half footprint feels closest to "icon touches"
-          return Math.max(0.05, maxDim / 2);
-        }
-      } catch (e) {}
-      // fallback if model dims missing
-      return 0.15;
-    };
-
-    const hasSpeakerPos = (s) =>
-      s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
-
-    // Read element fields with backward-compatible fallbacks (in case older saves exist)
-    const getLenM = (el) =>
-      safeNum(
-        el?.length_m ?? el?.lengthM ?? el?.length ?? el?.width ?? el?.width_m ?? el?.widthM,
-        0.9
-      );
-
-    const getXM = (el) =>
-      safeNum(el?.x_m ?? el?.xM ?? el?.x_position ?? el?.x ?? el?.posX_m, 0);
-
-    const getYM = (el) =>
-      safeNum(el?.y_m ?? el?.yM ?? el?.y_position ?? el?.y ?? el?.posY_m, 0);
 
     if (!Array.isArray(roomElements) || roomElements.length === 0) return null;
 
-    const speakersForCollision = Array.isArray(placedSpeakers)
-      ? placedSpeakers.filter(hasSpeakerPos)
-      : [];
-
     return (
       <g data-layer="room-elements" pointerEvents="none">
-        {roomElements.map((el, idx) => {
-          const wall = normWall(el?.wall);
-          const lenM_raw = getLenM(el);
-          const tM = safeNum(el?.thickness_m ?? el?.thicknessM, THICKNESS_M);
+        {roomElements.map((element, idx) => {
+          const e = normalizeElement(element);
 
-          // Clamp length so it can't exceed the wall length
-          const maxLen = (wall === 'left' || wall === 'right') ? lengthM : widthM;
-          const lenM = Math.max(0, Math.min(lenM_raw, maxLen));
+          // Build element rectangle in METRES (then convert via scale/toPx)
+          const L = Math.max(0.01, Number(e.__lengthM) || 0.9);
+          const T = Math.max(0.01, Number(e.__thicknessM) || 0.05);
+          const p = Math.max(0, Number(e.__posM) || 0);
 
-          // START position from wall origin (top-left is 0,0)
-          let startM = (wall === 'left' || wall === 'right') ? getYM(el) : getXM(el);
-          startM = safeNum(startM, 0);
+          // NOTE: origin is top-left (0,0). Position is measured from the FRONT wall for Y, and LEFT wall for X.
+          // So for LEFT/RIGHT walls, p is distance DOWN from front wall.
+          // For FRONT/REAR walls, p is distance RIGHT from left wall.
 
-          // Clamp START so the element stays on the wall
-          startM = Math.max(0, Math.min(startM, Math.max(0, maxLen - lenM)));
+          let rectM = { x: 0, y: 0, w: 0, h: 0 };
 
-          // Compute rectangle in metres (x,y are top-left in metres)
-          let rectXM = 0;
-          let rectYM = 0;
-          let rectWm = 0;
-          let rectHm = 0;
+          if (e.wall === 'front') {
+            rectM = { x: p, y: 0, w: L, h: T };
+          } else if (e.wall === 'rear') {
+            rectM = { x: p, y: lengthM - T, w: L, h: T };
+          } else if (e.wall === 'left') {
+            rectM = { x: 0, y: p, w: T, h: L };
+          } else if (e.wall === 'right') {
+            rectM = { x: widthM - T, y: p, w: T, h: L };
+          }
+
+          // 5cm warning buffer
+          const WARN_M = 0.05;
+          const warnRectM = {
+            x: rectM.x - WARN_M,
+            y: rectM.y - WARN_M,
+            w: rectM.w + 2 * WARN_M,
+            h: rectM.h + 2 * WARN_M,
+          };
+
+          // AABB intersect (metres)
+          const intersects = (a, b) =>
+            a.x < b.x + b.w &&
+            a.x + a.w > b.x &&
+            a.y < b.y + b.h &&
+            a.y + a.h > b.y;
+
+          const getSpeakerAabbM = (sp) => {
+            if (!sp?.position) return null;
+            const x = Number(sp.position.x);
+            const y = Number(sp.position.y);
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+            const dims = getModelDimsM?.(sp.model) || {};
+            const w = Math.max(0.01, Number(dims.widthM) || 0.2);
+            const d = Math.max(0.01, Number(dims.depthM) || 0.2);
+
+            return { x: x - w / 2, y: y - d / 2, w, h: d };
+          };
+
+          const isNearSpeaker = (Array.isArray(placedSpeakers) ? placedSpeakers : [])
+            .map(getSpeakerAabbM)
+            .filter(Boolean)
+            .some(aabb => intersects(warnRectM, aabb));
+
+          // Colours (consistent for ALL element types)
+          const NORMAL_FILL = 'rgba(220,219,214,0.45)';   // based on #DCDBD6
+          const NORMAL_STROKE = 'rgba(27,26,26,0.55)';    // based on #1B1A1A
+
+          // warning dark orange
+          const WARN_FILL = 'rgba(199,106,27,0.28)';
+          const WARN_STROKE = '#C76A1B';
+
+          const fill = isNearSpeaker ? WARN_FILL : NORMAL_FILL;
+          const stroke = isNearSpeaker ? WARN_STROKE : NORMAL_STROKE;
 
           // Label anchor point (in metres)
           let labelXM = 0;
           let labelYM = 0;
 
-          if (wall === 'front') {
-            rectXM = startM;
-            rectYM = 0;
-            rectWm = lenM;
-            rectHm = tM;
-
-            labelXM = rectXM + 0.02; // tiny nudge
-            labelYM = rectYM + tM + LABEL_INSET_M;
-          } else if (wall === 'rear') {
-            rectXM = startM;
-            rectYM = Math.max(0, lengthM - tM);
-            rectWm = lenM;
-            rectHm = tM;
-
-            labelXM = rectXM + 0.02;
-            labelYM = rectYM - LABEL_INSET_M; // inside the room (upwards)
-          } else if (wall === 'left') {
-            rectXM = 0;
-            rectYM = startM;
-            rectWm = tM;
-            rectHm = lenM;
-
-            labelXM = rectXM + tM + LABEL_INSET_M;
-            labelYM = rectYM + 0.18; // slight down so it doesn't sit on the top edge
-          } else if (wall === 'right') {
-            rectXM = Math.max(0, widthM - tM);
-            rectYM = startM;
-            rectWm = tM;
-            rectHm = lenM;
-
-            labelXM = rectXM - LABEL_INSET_M; // inside the room (leftwards)
-            labelYM = rectYM + 0.18;
+          if (e.wall === 'front') {
+            labelXM = rectM.x + 0.02; // tiny nudge
+            labelYM = rectM.y + T + LABEL_INSET_M;
+          } else if (e.wall === 'rear') {
+            labelXM = rectM.x + 0.02;
+            labelYM = rectM.y - LABEL_INSET_M; // inside the room (upwards)
+          } else if (e.wall === 'left') {
+            labelXM = rectM.x + T + LABEL_INSET_M;
+            labelYM = rectM.y + 0.18; // slight down so it doesn't sit on the top edge
+          } else if (e.wall === 'right') {
+            labelXM = rectM.x - LABEL_INSET_M; // inside the room (leftwards)
+            labelYM = rectM.y + 0.18;
           }
 
           // Convert to canvas pixels
-          const xPx = meterToCanvasX(rectXM);
-          const yPx = meterToCanvasY(rectYM);
-          const wPx = rectWm * scale;
-          const hPx = rectHm * scale;
+          const xPx = meterToCanvasX(rectM.x);
+          const yPx = meterToCanvasY(rectM.y);
+          const wPx = rectM.w * scale;
+          const hPx = rectM.h * scale;
 
           const labelXpx = meterToCanvasX(labelXM);
           const labelYpx = meterToCanvasY(labelYM);
 
-          const isWarn = speakersForCollision.some((spk) => {
-            const sx = Number(spk.position.x);
-            const sy = Number(spk.position.y);
-            if (!Number.isFinite(sx) || !Number.isFinite(sy)) return false;
-
-            const r = speakerRadiusM(spk);
-            const dist = pointToRectDistanceM(sx, sy, rectXM, rectYM, rectWm, rectHm);
-
-            // Warn when the speaker's "edge" is within 5cm of the element
-            return dist <= (WARN_GAP_M + r);
-          });
-
-          const label = String(el?.label || `Element ${idx + 1}`);
+          const label = String(e.__label || `Element ${idx + 1}`);
 
           return (
             <g key={String(el?.id ?? `el-${idx}`)}>
@@ -6578,11 +6575,9 @@ return {
                 y={yPx}
                 width={Math.max(0, wPx)}
                 height={Math.max(0, hPx)}
-                fill={isWarn ? "#C46A1A" : "#1B1A1A"}
-                fillOpacity={isWarn ? 0.16 : 0.12}
-                stroke={isWarn ? "#C46A1A" : "#1B1A1A"}
-                strokeOpacity={isWarn ? 0.75 : 0.65}
-                strokeWidth={1.5}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={2}
                 vectorEffect="non-scaling-stroke"
               />
               <text
