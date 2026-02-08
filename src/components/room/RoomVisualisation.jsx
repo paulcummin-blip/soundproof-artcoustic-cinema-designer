@@ -6480,25 +6480,63 @@ return {
 
     if (!Array.isArray(roomElements) || roomElements.length === 0) return null;
 
-    // Only consider speakers that should actually appear on the plan.
-    // This prevents "phantom" roles (e.g. front wides not active) from triggering warnings.
-    const speakersForCollision = (Array.isArray(placedSpeakers) ? placedSpeakers : []).filter((sp) => {
-      const canon = String(getCanonicalRole?.(sp?.role) ?? sp?.role ?? '').toUpperCase();
+    // Build a collision list that matches what is actually RENDERED.
+    // This prevents "phantom" LW/RW (front wides) from triggering warnings when FW are not enabled.
+    const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
-      // Must have a real model (if the icon wouldn't show, it shouldn't collide)
-      const m = String(sp?.model ?? '').toLowerCase();
-      if (!m || m === 'off' || m === 'none' || m === 'null' || m === 'undefined') return false;
+    // 1) Structural filter (same as renderSpeakers)
+    const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
 
-      // Must have a real position
-      const x = Number(sp?.position?.x);
-      const y = Number(sp?.position?.y);
-      if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    // 2) Layout visibility filter (same idea as renderSpeakers)
+    const speakerSystem = appState?.speakerSystem;
+    const sevenBedLayoutType = appState?.sevenBedLayoutType;
 
-      // HARD GUARD: ignore front-wide roles unless they are actually part of the layout + visible.
-      // (These are the usual offenders for "phantom" collisions.)
-      if (['LW', 'RW', 'FWL', 'FWR'].includes(canon)) return false;
+    const layoutRaw =
+      speakerSystem?.dolbyLayout ??
+      speakerSystem?.dolbyPreset ??
+      dolbyLayout ??
+      "5.1";
 
-      return true;
+    const layoutKey =
+      (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1")
+        .toString()
+        .trim()
+        .split(" ")[0]
+        .split("_")[0];
+
+    const useWidesInsteadOfRears =
+      !!speakerSystem?.useWidesInsteadOfRears ||
+      speakerSystem?.sevenBedLayoutType === "wides" ||
+      sevenBedLayoutType === "wides" ||
+      false;
+
+    const allowedRoles = new Set(
+      rolesForLayout({
+        dolbyLayout: layoutKey,
+        useWidesInsteadOfRears: !!useWidesInsteadOfRears,
+      })
+    );
+
+    const speakersForCollision = afterRenderable.filter((s) => {
+      const canon = getCanonicalRole(s?.role);
+
+      // Always ignore LFE for collision
+      if (canon === "LFE") return false;
+
+      // Extra surrounds (SL2/SR2...) follow SL/SR visibility
+      const extraSurroundPattern = /^(SL|SR)\d+$/;
+      const isExtraSurround = extraSurroundPattern.test(canon);
+      if (isExtraSurround) {
+        return allowedRoles.has("SL") || allowedRoles.has("SR");
+      }
+
+      // Bed surrounds + wides are controlled by the layout roles
+      if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
+        return allowedRoles.has(canon);
+      }
+
+      // Everything else keeps existing behaviour (includes overheads)
+      return getSpeakerVisibility(s.role, s.model);
     });
 
     return (
@@ -6611,7 +6649,7 @@ return {
           const label = String(e.__label || `Element ${idx + 1}`);
 
           return (
-            <g key={String(e?.id ?? element?.id ?? `el-${idx}`)}>
+            <g key={String(element?.id ?? `el-${idx}`)}>
               <rect
                 x={xPx}
                 y={yPx}
