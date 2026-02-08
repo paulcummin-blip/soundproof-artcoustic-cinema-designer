@@ -13,6 +13,7 @@ import {
 } from '@/components/utils/seatMetrics';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 import { computeSurroundRingGaps, rp22LevelForP5 } from '@/components/utils/p5SurroundGaps';
+import { getSpeakerVisibilityFor } from '@/components/AppStateProvider';
 
 // Helper for safe number extraction
 const finite = (v, fallback) => {
@@ -360,9 +361,10 @@ export function buildSeatHudSnapshot({
 
   // ALWAYS compute P17 locally using LIVE plan-view yaw logic (matches icon rotation)
   {
-    const surroundAndOverheadRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR']);
+    // P17 MUST only consider speakers that would actually render for the current layout.
+    // Otherwise we get phantom LW/RW in 5.1, etc.
     const extraSurroundPattern = /^(SL|SR)\d+$/;
-    
+
     const groupForRole = (role) => {
       const roleUpper = String(role || '').toUpperCase();
       if (extraSurroundPattern.test(roleUpper)) return 'Extra Surrounds';
@@ -372,11 +374,57 @@ export function buildSeatHudSnapshot({
       if (String(role).startsWith('T')) return 'Overheads';
       return 'Other';
     };
-    
-    const relevantSpeakers = (placedSpeakers || []).filter(sp => {
+
+    // Build allowed roles for the current layout (same intent as RoomVisualisation visibility)
+    const layoutRaw =
+      speakerSystem?.dolbyLayout ??
+      speakerSystem?.dolbyPreset ??
+      dolbyLayout ??
+      "5.1";
+
+    const layoutKey =
+      (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1")
+        .toString()
+        .trim()
+        .split(" ")[0]
+        .split("_")[0];
+
+    const sevenType =
+      speakerSystem?.sevenBedLayoutType ??
+      sevenBedMode ??
+      "rears";
+
+    const allowedRoles = getSpeakerVisibilityFor(layoutKey, sevenType);
+
+    // Keep P17 limited to these groups, BUT only if the role is actually allowed by layout.
+    const isP17CandidateRole = (canon, rawRoleUpper) => {
+      if (!canon) return false;
+
+      // Always exclude LFE
+      if (canon === "LFE") return false;
+
+      // Extra surrounds: treat as SL/SR visibility
+      if (extraSurroundPattern.test(rawRoleUpper)) {
+        return allowedRoles.has("SL") || allowedRoles.has("SR");
+      }
+
+      // Candidate set (bed surrounds + wides + overheads)
+      if (
+        canon === "SL" || canon === "SR" ||
+        canon === "SBL" || canon === "SBR" ||
+        canon === "LW" || canon === "RW" ||
+        String(canon).startsWith("T")
+      ) {
+        return allowedRoles.has(canon);
+      }
+
+      return false;
+    };
+
+    const relevantSpeakers = (placedSpeakers || []).filter((sp) => {
       const canon = getCanonicalRole(sp.role);
-      const roleUpper = String(sp.role || '').toUpperCase();
-      return (surroundAndOverheadRoles.has(canon) || extraSurroundPattern.test(roleUpper)) && sp.position;
+      const roleUpper = String(sp.role || "").toUpperCase();
+      return !!sp?.position && isP17CandidateRole(canon, roleUpper);
     });
 
     if (relevantSpeakers.length > 0) {
