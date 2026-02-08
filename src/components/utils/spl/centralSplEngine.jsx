@@ -289,20 +289,30 @@ export function computeAllSeatSplMetrics({
         // Get effective SPL inputs (power, sensitivity overrides)
         const effectiveSplInputs = getEffectiveSplInputs(spk.role);
 
-        const isOverhead = String(role || '').startsWith('T');
+        const canonRole = getCanonicalRole(spk.role);
+        const isOverhead = String(canonRole).startsWith('T');
 
-        // CRITICAL: Overheads must be at ceiling height for SPL distance.
-        // If z is missing/0/etc, force to roomHeightM.
-        const rawZ = spk?.position?.z;
-        const zFixed = (Number.isFinite(rawZ) && rawZ > 0.01) ? rawZ : roomHeightM;
+        const spX = Number(spk?.position?.x);
+        const spY = Number(spk?.position?.y);
 
-        const speakerPosFixed = isOverhead
-          ? { ...spk.position, z: zFixed }
-          : { ...spk.position };
+        // CRITICAL: Overheads must default to CEILING height if z is missing.
+        // Non-overheads default to 1.2m if z is missing.
+        const zRaw = spk?.position?.z;
+        const zUsed = Number.isFinite(Number(zRaw))
+          ? Number(zRaw)
+          : (isOverhead ? (Number.isFinite(Number(roomHeightM)) ? Number(roomHeightM) : 2.4) : 1.2);
+
+        const speakerPos3D = { x: spX, y: spY, z: zUsed };
+
+        // Debug distance (3D) so we can verify symmetry
+        const dxD = speakerPos3D.x - seatPos.x;
+        const dyD = speakerPos3D.y - seatPos.y;
+        const dzD = speakerPos3D.z - seatPos.z;
+        const distanceM = Math.max(0.10, Math.hypot(dxD, dyD, dzD));
 
         // Calculate SPL using UNIFIED logic with 1m capability cap
         const splValue = calculateSplAtPoint({
-          speakerPos: speakerPosFixed,
+          speakerPos: speakerPos3D,
           seatPos,
           // Pass model name for speakerData.js lookup
           speakerModel: spk.model,
@@ -327,6 +337,9 @@ export function computeAllSeatSplMetrics({
           spl[categoryKey][role] = {
             value: splValue,
             formatted: `${splValue.toFixed(1)} dB`,
+            // Debug (safe to ignore by UI)
+            distanceM,
+            zUsed,
           };
         }
       }
