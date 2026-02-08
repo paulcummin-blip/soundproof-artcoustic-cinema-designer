@@ -251,7 +251,7 @@ export function buildSeatHudSnapshot({
     if (lcrSpeakers.length > 0) {
       const perSpeaker = [];
       let worstLossLabel = null;
-      let worstLevel = 4;
+      let worstLevel = 'L4';
       let worstRole = null;
       let worstAngleDeg = null;
 
@@ -332,10 +332,12 @@ export function buildSeatHudSnapshot({
 
         // Worst = FAIL worst, then L1 > L2 > L4, then highest angle
         const levelRank = { 'FAIL': 0, 'L1': 1, 'L2': 2, 'L4': 4 };
-        const currRank = levelRank[levelStr] || 0;
-        const worstRank = levelRank[worstLevel] || 0;
-        
-        if (currRank < worstRank || (currRank === worstRank && offAxisFloor > (worstAngleDeg || 0))) {
+        const currRank = (levelRank[levelStr] != null) ? levelRank[levelStr] : 0;
+        const worstRank = (levelRank[worstLevel] != null) ? levelRank[worstLevel] : 4;
+
+        const currentWorstAngle = Number.isFinite(worstAngleDeg) ? worstAngleDeg : -Infinity;
+
+        if (currRank < worstRank || (currRank === worstRank && offAxisFloor > currentWorstAngle)) {
           worstLevel = levelStr;
           worstLossLabel = lossLabel;
           worstRole = canon;
@@ -345,8 +347,8 @@ export function buildSeatHudSnapshot({
 
       data.rp22.p16 = {
         value: null, // No numeric value, only step labels
-        formatted: worstRole || '—', // Just the role (e.g., "FR")
-        hudLabel: worstRole || '—',
+        formatted: worstRole && Number.isFinite(worstAngleDeg) ? `${worstRole} ${worstAngleDeg}°` : '—',
+        hudLabel: worstRole && Number.isFinite(worstAngleDeg) ? `${worstRole} ${worstAngleDeg}°` : '—',
         level: worstLevel || '—', // "FAIL" or "L4"/"L2"/"L1"
         perSpeaker,
         worstRole,
