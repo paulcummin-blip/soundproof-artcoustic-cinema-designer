@@ -298,7 +298,20 @@ export default function SeatHud({
                           lineHeight: 1.4,
                         }}
                       >
-                        {tooltipData.rp22.p9Detail}
+                        {(() => {
+                          const s = String(tooltipData.rp22.p9Detail || '');
+                          const m = s.match(/\(worst:\s*([0-9.]+)°\)/);
+                          if (!m) return s;
+                          const worst = m[1];
+                          const parts = s.split(`(worst: ${worst}°)`);
+                          return (
+                            <>
+                              {parts[0]}
+                              (worst: <span style={{ fontWeight: 700 }}>{worst}°</span>)
+                              {parts[1] || ''}
+                            </>
+                          );
+                        })()}
                       </div>
                     )}
 
@@ -313,23 +326,16 @@ export default function SeatHud({
                     lineHeight: 1.4,
                   }}
                 >
-                  {metric.perSpeaker
-                    .slice()
-                    .sort((a, b) => a.role.localeCompare(b.role))
-                    .map(s => {
-                      const angle = Math.floor(s?.angleDeg || 0);
-                      const loss = s?.lossLabel || '—';
-                      const text = `${s.role} ${angle}° / ${loss}`;
-                      const isWorst = metric?.worstRole === s.role;
-                      return isWorst ? <strong key={s.role}>{text}</strong> : <span key={s.role}>{text}</span>;
-                    })
-                    .reduce((acc, item, i, arr) => {
-                      if (i === 0) return [item];
-                      return [...acc, ', ', item];
-                    }, [])}
-                  {metric?.worstRole && (
-                    <strong> (worst: {metric.worstRole})</strong>
-                  )}
+                  {metric.perSpeaker.map((sp, idx) => {
+                    const isWorst = String(sp.role) === String(metric.worstRole);
+                    const text = `${sp.role} ${sp.angleDeg}° / ${sp.lossLabel}`;
+                    return (
+                      <span key={`${sp.role}-${idx}`}>
+                        {idx > 0 ? ', ' : ''}
+                        <span style={{ fontWeight: isWorst ? 700 : 400 }}>{text}</span>
+                      </span>
+                    );
+                  })}
                 </div>
               )}
 
