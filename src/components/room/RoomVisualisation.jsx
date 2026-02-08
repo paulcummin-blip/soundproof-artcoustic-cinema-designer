@@ -3403,6 +3403,8 @@ React.useEffect(() => {
           analysisResult: analysisResult || {},
           seatingPositions,
           splConfig: appState?.splConfig || {},
+          sevenBedMode,
+          dolbyLayout,
         });
         
         if (snapshot) return snapshot;
