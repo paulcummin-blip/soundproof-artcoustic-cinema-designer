@@ -297,7 +297,7 @@ export function computeAllSeatSplMetrics({
         const isOverhead = String(canonRole).startsWith('T');
 
         const speakerPosForSpl = isOverhead
-          ? { ...spk.position, z: Number.isFinite(heightM) ? Number(heightM) : 2.4 }
+          ? { ...spk.position, z: roomHeightM }
           : spk.position;
 
         // Calculate SPL using UNIFIED logic with 1m capability cap
