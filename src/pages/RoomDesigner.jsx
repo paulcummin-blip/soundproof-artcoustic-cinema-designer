@@ -2289,10 +2289,12 @@ function RoomDesignerWithState() {
     const splConfig = appState?.splConfig || {};
     const screenLoss = Number(splConfig.screenLossDb) || 0;
     const eqHeadroom = Number(splConfig.globalEqHeadroomDb) || 0;
+    const roomHeightM = Number(appState?.roomDims?.heightM) || 2.4;
 
     return computeAllSeatSplMetrics({
       seats: _seatingPositions || [],
       placedSpeakers: placedSpeakers || [],
+      heightM: roomHeightM,
       getCanonicalRole: getCanonicalRoleLocal,
       getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
       getModelDimsM: (model) => {
@@ -2315,7 +2317,14 @@ function RoomDesignerWithState() {
       eqHeadroom_dB: eqHeadroom,
       mlpPoint: mlpAnchorEffective // NEW: Pass green dot MLP for synthetic "mlp" seat
     });
-  }, [_seatingPositions, placedSpeakers, appState?.getEffectiveSplInputs, appState?.splConfig, mlpAnchorEffective]);
+  }, [
+  _seatingPositions,
+  placedSpeakers,
+  appState?.getEffectiveSplInputs,
+  appState?.splConfig,
+  mlpAnchorEffective,
+  appState?.roomDims?.heightM
+]);
 
   // Compute diagnostic values
   const widthM =
