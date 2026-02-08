@@ -279,7 +279,9 @@ export default function SeatHud({
                     {key.toUpperCase()}
                     </span>
                     {key === 'p16' ? (
-                    `: ${metric.hudLabel || metric.worstRole || '—'}`
+                    `: ${(metric.worstRole || metric.hudLabel || '—')}${Number.isFinite(metric.worstAngleDeg) ? ` ${metric.worstAngleDeg}°` : ''}`
+                    ) : key === 'p17' ? (
+                    `: ${(metric.formatted || '—')}${Number.isFinite(metric.worstAngleDeg) ? ` ${metric.worstAngleDeg}°` : ''}`
                     ) : (
                     `: ${metric.formatted || '—'}`
                     )}
