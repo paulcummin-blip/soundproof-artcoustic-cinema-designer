@@ -2646,12 +2646,21 @@ function SpeakerPlacementImpl(props) {
     if (__b44LastEffectSigRef.current.overheadModels === __sig) return;
     __b44LastEffectSigRef.current.overheadModels = __sig;
     
-    const OVERHEAD_ROLES = new Set(['TFL', 'TFR', 'TFC', 'TL', 'TR', 'TML', 'TMR', 'TBL', 'TBR', 'TBC']);
+    const OVERHEAD_ROLES = new Set([
+      'TFL', 'TFR', 'TFC',
+      'TL', 'TR', 'TML', 'TMR',
+      // rear family A (common)
+      'TRL', 'TRR',
+      // rear family B (some layouts / legacy)
+      'TBL', 'TBR',
+      'TBC'
+    ]);
     
     // Define which roles belong to which groups
     const FRONT_ROLES = new Set(['TFL', 'TFR', 'TFC']);
     const MID_ROLES = new Set(['TL', 'TR', 'TML', 'TMR']);
-    const REAR_ROLES = new Set(['TBL', 'TBR', 'TBC']);
+    // Treat BOTH role families as "Rear Overhead"
+    const REAR_ROLES = new Set(['TRL', 'TRR', 'TBL', 'TBR', 'TBC']);
     
     setSpeakers(prev => {
       const list = Array.isArray(prev) ? prev : [];
