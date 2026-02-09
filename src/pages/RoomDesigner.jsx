@@ -161,33 +161,60 @@ function isOverheadRole(role) {
   return r.startsWith('T') || r.startsWith('U');
 }
 
-function mergePreserveOverheads(prevList, draftNextList) {
+function mergePreserveOverheads(prevList, draftNextList, activeDolbyPreset) {
   const prev = Array.isArray(prevList) ? prevList : [];
   const next = Array.isArray(draftNextList) ? draftNextList : [];
 
-  // Collect overhead speakers from both lists
-  const prevOverheads = prev.filter((s) => isOverheadRole(safeCanon(s.role)));
-  const nextOverheads = next.filter((s) => isOverheadRole(safeCanon(s.role)));
+  // Normalise preset string, e.g. "9.1.6 Dolby Atmos" -> "9.1.6"
+  const normalizedPreset = activeDolbyPreset
+    ? String(activeDolbyPreset).split(" ")[0].split("_")[0]
+    : "";
 
-  // If the draft has overheads, use those; otherwise keep previous
+  const parts = normalizedPreset.split(".");
+  const heights = parts.length >= 3 ? (parseInt(parts[2], 10) || 0) : 0;
+
+  const layoutAllowsOverheads = heights > 0;
+
+  // Always split next into bed + overhead
+  const nextBeds = next.filter((s) => !isOverheadRole(safeCanon(s?.role)));
+  const nextOverheads = next.filter((s) => isOverheadRole(safeCanon(s?.role)));
+
+  // If layout has NO height layer: DO NOT carry old overheads forward.
+  // Also strip any overheads from "next" just in case something tried to sneak them in.
+  if (!layoutAllowsOverheads) {
+    const finalList = [...nextBeds];
+
+    if (globalThis.__B44_LOGS) console.log('[RD] mergePreserveOverheads (NO HEIGHTS)', {
+      preset: normalizedPreset,
+      heights,
+      prevCount: prev.length,
+      nextCount: next.length,
+      finalCount: finalList.length
+    });
+
+    return finalList;
+  }
+
+  // Layout DOES allow overheads: keep draft overheads if present; otherwise preserve previous overheads.
+  const prevOverheads = prev.filter((s) => isOverheadRole(safeCanon(s?.role)));
   const overheadsToKeep = nextOverheads.length > 0 ? nextOverheads : prevOverheads;
 
   // Deduplicate overheads by canonical role (last one wins)
   const overheadMap = new Map();
   overheadsToKeep.forEach((s) => {
-    overheadMap.set(safeCanon(s.role), s);
+    overheadMap.set(safeCanon(s?.role), s);
   });
 
-  // Build final list: bed speakers from draft + deduplicated overheads
-  const nextBeds = next.filter((s) => !isOverheadRole(safeCanon(s.role)));
   const mergedOverheads = Array.from(overheadMap.values());
   const finalList = [...nextBeds, ...mergedOverheads];
 
   if (globalThis.__B44_LOGS) console.log('[RD] mergePreserveOverheads', {
+    preset: normalizedPreset,
+    heights,
     prevCount: prev.length,
     nextCount: next.length,
     finalCount: finalList.length,
-    overheads: mergedOverheads.map((s) => safeCanon(s.role))
+    overheads: mergedOverheads.map((s) => safeCanon(s?.role))
   });
 
   return finalList;
@@ -3046,7 +3073,7 @@ function RoomDesignerWithState() {
 
       if (needsUpdate) {
         if (globalThis.__B44_LOGS) debug('[Resize Re-clamp] Adjusting LCR positions due to model change or constraint violation.');
-        setSpeakers((prev) => mergePreserveOverheads(prev, updatedSpeakers));
+        setSpeakers((prev) => mergePreserveOverheads(prev, updatedSpeakers, dolbyPreset));
       }
     } catch (error) {
       if (typeof console !== 'undefined' && typeof console.warn === 'function') {
@@ -3171,7 +3198,7 @@ function RoomDesignerWithState() {
     });
 
     if (needsUpdate) {
-      setSpeakers((prev) => mergePreserveOverheads(prev, updated));
+      setSpeakers((prev) => mergePreserveOverheads(prev, updated, dolbyPreset));
     }
   }, [placedSpeakers, _isFrozen, setSpeakers, lcrAimMode, mlpAnchorEffective]);
 
@@ -3380,7 +3407,7 @@ function RoomDesignerWithState() {
       });
       if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map((s) => safeCanon(s.role)));
       setSpeakers((prev) => {
-        let merged = mergePreserveOverheads(prev, nextList);
+        let merged = mergePreserveOverheads(prev, nextList, dolbyPreset);
 
         // CRITICAL: Ensure wides inherit globalSurroundModel if they have no model
         const globalSurroundModel = appState?.globalSurroundModel;
@@ -3423,7 +3450,7 @@ function RoomDesignerWithState() {
       });
       if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map((s) => safeCanon(s.role)));
       setSpeakers((prev) => {
-        let merged = mergePreserveOverheads(prev, nextList);
+        let merged = mergePreserveOverheads(prev, nextList, dolbyPreset);
 
         // CRITICAL: Ensure rears inherit globalSurroundModel if they have no model
         const globalSurroundModel = appState?.globalSurroundModel;
@@ -4293,7 +4320,7 @@ function RoomDesignerWithState() {
       });
 
       if (globalThis.__B44_LOGS) console.log('[RD] optimiseAll -> roles', merged.map((s) => safeCanon(s.role)));
-      setSpeakers((prev) => mergePreserveOverheads(prev, merged));
+      setSpeakers((prev) => mergePreserveOverheads(prev, merged, dolbyPreset));
     } catch (e) {
       if (globalThis.__B44_LOGS) console.error("[OptimiseAll] failed:", e);
     }
