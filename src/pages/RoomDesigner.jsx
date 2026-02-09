@@ -4841,7 +4841,7 @@ function RoomDesignerWithState() {
                         analysisResult={analysisResult} 
                         screen={_screen}
                         seatingPositions={_seatingPositions}
-                        seatHudSnapshots={appState?.seatMetricsById}
+                        seatHudSnapshots={appState?.perSeatMetrics || appState?.seatMetricsById || {}}
                         mlpSeatId={primarySeatingPosition?.id || "mlp"} />
                   </Suspense>
               </CollapsiblePanel>
