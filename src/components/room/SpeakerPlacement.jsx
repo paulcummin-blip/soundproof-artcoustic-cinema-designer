@@ -1435,13 +1435,17 @@ function formatDolbyLabel(key) {
 function SpeakerPlacementImpl(props) {
   const dimensions = props?.dimensions; // legacy alias to prevent ReferenceError
   
-  // Get app state with splConfig early (before any usage)
-  const appStateContext = useAppState();
-  const { splConfig = {}, updateGlobalSpl } = appStateContext || {};
-  
+  // SINGLE app-state read (do not call useAppState twice)
+  const appState = useAppState() || {};
+  const { splConfig = {}, updateGlobalSpl } = appState;
+
   // Local state for Surrounds and Overheads power inputs
-  const [surroundsPowerInputValue, setSurroundsPowerInputValue] = useState(String(splConfig?.surroundsW || 100));
-  const [overheadsPowerInputValue, setOverheadsPowerInputValue] = useState(String(splConfig?.overheadsW || 100));
+  const [surroundsPowerInputValue, setSurroundsPowerInputValue] = useState(
+    String(splConfig?.surroundsW ?? 100)
+  );
+  const [overheadsPowerInputValue, setOverheadsPowerInputValue] = useState(
+    String(splConfig?.overheadsW ?? 100)
+  );
 
   useEffect(() => {
     setSurroundsPowerInputValue(String(splConfig?.surroundsW || 100));
@@ -1479,9 +1483,6 @@ function SpeakerPlacementImpl(props) {
 
 
 
-  const app = useAppState();
-  const appState = app;
-
   const {
     speakerSystem, setSpeakerSystem, seatingPositions, setDolbyConfig, dolbyConfig,
     showToast,
@@ -1501,7 +1502,7 @@ function SpeakerPlacementImpl(props) {
     useRearGlobal,
     setUseRearGlobal,
     enableFrontWides, // <-- FW overlay state
-  } = appState || {};
+  } = appState;
 
   // CRITICAL: Effective room dimensions - NEVER empty, always has valid numbers
   // This ensures resetSurroundPositions always gets usable W/L/H values
