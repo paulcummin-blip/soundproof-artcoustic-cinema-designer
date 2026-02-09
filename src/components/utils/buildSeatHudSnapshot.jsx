@@ -31,6 +31,13 @@ const hasRealModel = (s) => {
   return !!ms && ms !== "off" && ms !== "none";
 };
 
+const notCalculatedHud = () => ({
+  value: null,
+  formatted: "Not Calculated",
+  hudLabel: "Not Calculated",
+  level: "—",
+});
+
 // Angle display helpers - whole degrees only (floor), no decimals
 const floorDeg = (deg) => {
   if (deg === null || deg === undefined) return null;
@@ -245,8 +252,8 @@ export function buildSeatHudSnapshot({
   if (!hasOverheads && !data.rp22.p9.value) {
     data.rp22.p9 = {
       value: null,
-      formatted: '—',
-      level: 'N/A',
+      formatted: 'Not Calculated',
+      level: '—',
     };
   }
 
@@ -367,10 +374,7 @@ export function buildSeatHudSnapshot({
 
       if (!(_p16HasFL && _p16HasFC && _p16HasFR)) {
         data.rp22.p16 = {
-          value: null,
-          formatted: "—",
-          hudLabel: "—",
-          level: "N/A",
+          ...notCalculatedHud(),
           perSpeaker: [],
           worstRole: null,
           worstAngleDeg: null,
@@ -654,9 +658,7 @@ export function buildSeatHudSnapshot({
 
       if (!(_p17HasSL && _p17HasSR)) {
         data.rp22.p17 = {
-          value: null,
-          formatted: "—",
-          level: "N/A",
+          ...notCalculatedHud(),
           perSpeaker: [],
           worstRole: null,
           worstAngleDeg: null,
@@ -694,8 +696,8 @@ export function buildSeatHudSnapshot({
     if (!hasOverheads) {
       data.rp22.p10 = {
         value: null,
-        formatted: '—',
-        level: 'N/A',
+        formatted: 'Not Calculated',
+        level: '—',
       };
     } else {
       const upperEntries = seatSplData?.uppers
@@ -733,8 +735,8 @@ export function buildSeatHudSnapshot({
       } else {
         data.rp22.p10 = {
           value:     null,
-          formatted: '—',
-          level:     'NO DATA',
+          formatted: 'Not Calculated',
+          level:     '—',
         };
       }
     }
@@ -920,8 +922,8 @@ export function buildSeatHudSnapshot({
           if (_p5Candidates.length < 2) {
             data.rp22.p5 = {
               valueDeg: null,
-              formatted: "—",
-              level: "N/A",
+              formatted: "Not Calculated",
+              level: "—",
               debugLine: undefined,
             };
           } else {
