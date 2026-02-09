@@ -4118,6 +4118,20 @@ React.useEffect(() => {
   const lastCacheSignatureRef = useRef(null);
   const captureDoneRef = React.useRef(false);
   
+  // ---- Stable primitive revision inputs (avoid update loops) ----
+  const analysisRev =
+    Number.isFinite(Number(analysisResult?.__rev)) ? Number(analysisResult.__rev) : 0;
+
+  const splRev =
+    Number.isFinite(Number(allSeatSplMetrics?.__rev)) ? Number(allSeatSplMetrics.__rev) : 0;
+
+  const mlpX = Number.isFinite(Number(mlp?.x)) ? Number(mlp.x) : NaN;
+  const mlpY = Number.isFinite(Number(mlp?.y)) ? Number(mlp.y) : NaN;
+  const mlpZ = Number.isFinite(Number(mlp?.z)) ? Number(mlp.z) : NaN;
+
+  const lcrL = Number.isFinite(Number(lcrAngleInfo?.L)) ? Number(lcrAngleInfo.L) : 0;
+  const lcrR = Number.isFinite(Number(lcrAngleInfo?.R)) ? Number(lcrAngleInfo.R) : 0;
+
   useEffect(() => {
     if (!appState?.setSeatMetricsById) return;
     
@@ -4170,17 +4184,22 @@ React.useEffect(() => {
     
     const layout = dolbyLayout || '5.1';
     const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
-    const mlpRp23 = mlp ? Math.round((mlp.y || 0) * 1000) : 0;
-    const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
     const sevenBedMode = String(
       appState?.sevenBedLayoutType
       || appState?.speakerSystem?.sevenBedLayoutType
       || (appState?.speakerSystem?.useWidesInsteadOfRears ? 'wides' : '')
       || 'rears'
     ).toLowerCase();
-    const analysisKey = analysisResult?.__rev ?? (analysisResult?.perSeatRp22 ? Object.keys(analysisResult.perSeatRp22).length : 0);
-    const splKey = allSeatSplMetrics?.__rev ?? (allSeatSplMetrics ? Object.keys(allSeatSplMetrics).length : 0);
-    const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}|${sevenBedMode}|A${analysisKey}|S${splKey}`;
+
+    const mlpFingerprint =
+      Number.isFinite(mlpX) && Number.isFinite(mlpY)
+        ? `${Math.round(mlpX * 1000)}:${Math.round(mlpY * 1000)}:${Math.round((Number.isFinite(mlpZ) ? mlpZ : 1.2) * 1000)}`
+        : "na";
+
+    const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
+
+    const signature =
+      `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|MLP${mlpFingerprint}|SCR${screenRounded}|7B${sevenBedMode}|A${analysisRev}|S${splRev}|LCR${Math.round(lcrL*10)}:${Math.round(lcrR*10)}`;
     
     // Skip if nothing changed
     if (lastCacheSignatureRef.current === signature) {
@@ -4239,14 +4258,17 @@ React.useEffect(() => {
     heightM,
     screenFrontPlaneM,
     screen?.visibleWidthInches,
-    mlp,
-    allSeatSplMetrics,
+    analysisRev,
+    splRev,
+    mlpX,
+    mlpY,
+    mlpZ,
+    lcrL,
+    lcrR,
     aimAtMLP,
     aimFrontWidesAtMLP,
     aimSideSurroundsAtMLP,
     aimRearSurroundsAtMLP,
-    lcrAngleInfo,
-    analysisResult,
     dolbyLayout,
     appState?.setSeatMetricsById,
     appState?.splConfig,
