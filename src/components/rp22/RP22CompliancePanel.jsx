@@ -312,12 +312,7 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
   // --- Seat layout pill grids (HUD-matched) ---
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
 
-  const seatHudSnapshotsCache =
-    seatHudSnapshots ||                               // ✅ always prefer the prop (live HUD)
-    analysisResult?.seatHudSnapshots ||
-    analysisResult?.hud?.seatHudSnapshots ||
-    analysisResult?.seatHud ||
-    {};
+  const seatHudSnapshotsCache = seatHudSnapshots || {};
 
   const getSnapshotForSeat = React.useCallback((seat) => {
     if (!seat) return null;
@@ -392,16 +387,6 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
   };
 
   const renderSeatPillGridForParam = (pId) => {
-    console.log(
-      '[RP22][Compliance] Cache keys:',
-      Object.keys(seatHudSnapshotsCache || {}).slice(0, 10)
-    );
-
-    console.log(
-      '[RP22][Compliance] Seat IDs:',
-      (seats || []).slice(0, 10).map(s => s?.id)
-    );
-
     if (!rows.length) return null;
 
     const pKey = `p${Number(pId)}`; // "p1" etc
