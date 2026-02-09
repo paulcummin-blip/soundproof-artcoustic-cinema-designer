@@ -4840,6 +4840,7 @@ function RoomDesignerWithState() {
                       <RP22CompliancePanel 
                         analysisResult={analysisResult} 
                         screen={_screen}
+                        seatingPositions={_seatingPositions}
                         seatHudSnapshots={appState?.seatMetricsById}
                         mlpSeatId={primarySeatingPosition?.id || "mlp"} />
                   </Suspense>

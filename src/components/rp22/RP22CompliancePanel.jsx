@@ -291,7 +291,7 @@ const RP22_PARAMS = [
 
 /* ---------- Panel ---------- */
 
-export default function RP22CompliancePanel({ analysisResult, screen, seatHudSnapshots, roomHudSnapshot, mlpSeatId }) {
+export default function RP22CompliancePanel({ analysisResult, screen, seatingPositions, seatHudSnapshots, roomHudSnapshot, mlpSeatId }) {
   // RP23 range (50–65°)
   const rp23 = React.useMemo(() => {
     const { viewWm } = computeScreenMetrics(
@@ -308,6 +308,115 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatHudSna
       ar: screen?.aspectRatio || "16:9",
     };
   }, [screen]);
+
+  // --- Seat layout pill grids (HUD-matched) ---
+  const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
+
+  const seatHudSnapshotsCache =
+    analysisResult?.seatHudSnapshots ||
+    analysisResult?.hud?.seatHudSnapshots ||
+    analysisResult?.seatHud ||
+    seatHudSnapshots ||
+    {};
+
+  const getSnapshotForSeat = React.useCallback((seat) => {
+    if (!seat) return null;
+
+    const sid = String(seat.id || "").trim();
+    if (!sid) return null;
+
+    // 1) direct match on snapshot.seatId
+    const direct = Object.values(seatHudSnapshotsCache || {}).find((snap) => String(snap?.seatId || "") === sid);
+    if (direct) return direct;
+
+    // 2) common key pattern: "seatId|sig"
+    const key = Object.keys(seatHudSnapshotsCache || {}).find((k) => String(k).startsWith(`${sid}|`));
+    if (key) return seatHudSnapshotsCache[key];
+
+    return null;
+  }, [seatHudSnapshotsCache]);
+
+  const rows = React.useMemo(() => {
+    // Group by row number (fallback: 1)
+    const map = new Map();
+    for (const s of seats) {
+      const r = Number(s?.row || s?.rowNumber) || 1;
+      if (!map.has(r)) map.set(r, []);
+      map.get(r).push(s);
+    }
+
+    // Sort rows front-to-back: Row 1, Row 2, ...
+    const rowNums = Array.from(map.keys()).sort((a, b) => a - b);
+
+    // Within a row: show Seat 1 on the RIGHT (so indexInRow DESC for display)
+    return rowNums.map((r) => {
+      const list = map.get(r) || [];
+      const sorted = list.slice().sort((a, b) => {
+        const ia = Number(a?.indexInRow) || 0;
+        const ib = Number(b?.indexInRow) || 0;
+        return ib - ia;
+      });
+      return { row: r, seats: sorted };
+    });
+  }, [seats]);
+
+  const seatLevelText = (lvl) => {
+    if (!lvl) return "—";
+    const up = String(lvl).toUpperCase();
+    if (up === "L4" || up === "L3" || up === "L2" || up === "L1") return up;
+    if (up === "FAIL") return "Fail";
+    if (up === "N/A" || up === "NA") return "N/A";
+    if (up === "—") return "—";
+    return up;
+  };
+
+  const renderSeatPillGridForParam = (pId) => {
+    if (!rows.length) return null;
+
+    const pKey = `p${Number(pId)}`; // "p1" etc
+
+    return (
+      <div style={{ display: "grid", gap: 6 }}>
+        {rows.map((rowObj) => (
+          <div
+            key={`row-${rowObj.row}`}
+            style={{
+              display: "grid",
+              gridAutoFlow: "column",
+              gridAutoColumns: "min-content",
+              justifyContent: "end",
+              gap: 6,
+            }}
+          >
+            {rowObj.seats.map((seat) => {
+              const snap = getSnapshotForSeat(seat);
+              const lvl = snap?.rp22?.[pKey]?.level || "—";
+              const text = seatLevelText(lvl);
+              const isPrimary = !!seat?.isPrimary;
+
+              return (
+                <span
+                  key={`seat-${seat?.id || Math.random()}`}
+                  style={{
+                    ...pillStyle(String(lvl).toUpperCase() === "FAIL" ? "FAIL" : String(lvl).toUpperCase()),
+                    minWidth: 34,
+                    textAlign: "center",
+                    borderWidth: isPrimary ? 2 : 1,
+                    borderStyle: "solid",
+                    borderColor: isPrimary ? "#213428" : (pillStyle(String(lvl).toUpperCase())?.borderColor || "#DCDBD6"),
+                    boxShadow: isPrimary ? "0 0 0 2px rgba(33,52,40,0.10)" : "none",
+                  }}
+                  title={`${seat?.id || ""}  Row ${seat?.row || seat?.rowNumber || 1} Seat ${seat?.indexInRow || ""}${isPrimary ? " (RSP)" : ""}`}
+                >
+                  {text}
+                </span>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   // Build simple seat ID map from cache (cache keys are "seatId|signature")
   const seatSnapshotsById = React.useMemo(() => {
@@ -467,9 +576,25 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatHudSna
               <div style={body}>
                 <div style={{ ...row, marginTop: 0 }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                    <span style={{ fontSize: 12, color: "#625143" }}>Achieved</span>
+                    <span style={{ fontSize: 12, color: "#625143" }}>
+                      {String(p.scope || "").toLowerCase() === "seat" ? "Per-seat levels" : "Achieved"}
+                    </span>
                   </div>
-                  <span style={pillStyle(lvl)}>{levelText(lvl)}</span>
+                  {(() => {
+                    const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
+
+                    // ROOM scope: keep existing single pill behaviour
+                    if (!isSeatScope) {
+                      return <span style={pillStyle(lvl)}>{levelText(lvl)}</span>;
+                    }
+
+                    // SEAT scope: NO overall pill, only per-seat pill grid
+                    return (
+                      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                        {renderSeatPillGridForParam(p.id)}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* thresholds grid */}
