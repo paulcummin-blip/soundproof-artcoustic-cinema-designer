@@ -6,6 +6,37 @@ import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getAutosaveMeta, isAutosavePayloadValid } from "@/components/utils/sessionAutosave";
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 
+// --- ROOM ELEMENTS NORMALISER ---
+function normaliseRoomElements(list) {
+  const arr = Array.isArray(list) ? list : [];
+  return arr
+    .filter(Boolean)
+    .map((el, i) => {
+      const id = el.id ?? el._id ?? (i + 1);
+      const type = el.type ?? "door";
+      const wall = el.wall ?? "front";
+      const length_m = Number.isFinite(el.length_m) ? el.length_m : 0.9;
+      const thickness_m = Number.isFinite(el.thickness_m) ? el.thickness_m : 0.05;
+      const pos_m = Number.isFinite(el.pos_m) ? el.pos_m : 0;
+
+      // keep BOTH id styles so any renderer/export code will find one
+      const label = (el.label ?? el.__label ?? "").toString();
+
+      return {
+        ...el,
+        id,
+        _id: id,
+        type,
+        wall,
+        length_m,
+        thickness_m,
+        pos_m,
+        label,
+        __label: label,
+      };
+    });
+}
+
 // --- ATMOS PROTECTION HELPERS ---
 const safeCanonRole = (role) => {
   const raw = String(role || "").trim();
@@ -335,7 +366,11 @@ function useDesignerState() {
   const [autoSeatByRP23, setAutoSeatByRP23] = useState(() => (
     (__autosavePayload && typeof __autosavePayload.autoSeatByRP23 === "boolean") ? __autosavePayload.autoSeatByRP23 : true
   ));
-  const [roomElements, setRoomElements] = useState([]);
+  const [roomElements, setRoomElements] = useState(() => (
+    (__autosavePayload && Array.isArray(__autosavePayload.roomElements))
+      ? normaliseRoomElements(__autosavePayload.roomElements)
+      : []
+  ));
   const [subwoofers, setSubwoofers] = useState([]);
   const [frontSubsCfg, setFrontSubsCfg] = useState(() => (
     (__autosavePayload && __autosavePayload.frontSubsCfg) ? __autosavePayload.frontSubsCfg : {
@@ -1102,7 +1137,8 @@ function useDesignerState() {
       p21EarlyReflectionPreset,
       mlpOverride,
       extraSurroundCount,
-      screenFrontPlaneM
+      screenFrontPlaneM,
+      roomElements: normaliseRoomElements(roomElements),
       };
 
       if (!isAutosavePayloadValid(payload)) return;
@@ -1193,7 +1229,8 @@ function useDesignerState() {
       p21EarlyReflectionPreset,
       mlpOverride,
       extraSurroundCount,
-      screenFrontPlaneM
+      screenFrontPlaneM,
+      roomElements: normaliseRoomElements(roomElements),
       };
 
       try {
@@ -1264,6 +1301,7 @@ function useDesignerState() {
       if (typeof p.mlpBasis === "string") setMlpBasis(p.mlpBasis);
       if (typeof p.autoSeatByRP23 === "boolean") setAutoSeatByRP23(p.autoSeatByRP23);
       if (typeof p.seatingBlockOffset === "number") setSeatingBlockOffset(p.seatingBlockOffset);
+      if (Array.isArray(p.roomElements)) setRoomElements(normaliseRoomElements(p.roomElements));
 
       setAutosaveMeta(getAutosaveMeta());
       return true;

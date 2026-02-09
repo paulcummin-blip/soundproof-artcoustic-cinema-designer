@@ -6692,7 +6692,7 @@ return {
             labelXM = rectM.x + T + LABEL_INSET_M;
             labelYM = rectM.y + 0.18; // slight down so it doesn't sit on the top edge
           } else if (e.wall === 'right') {
-            labelXM = rectM.x - LABEL_INSET_M; // inside the room (leftwards)
+            labelXM = rectM.x - 0.10; // 10cm inside the room
             labelYM = rectM.y + 0.18;
           }
 
@@ -6726,6 +6726,7 @@ return {
                 fillOpacity={0.9}
                 fontSize={11}
                 fontWeight={700}
+                textAnchor={e.wall === "right" ? "end" : "start"}
                 style={{ userSelect: 'none' }}
               >
                 {label}
