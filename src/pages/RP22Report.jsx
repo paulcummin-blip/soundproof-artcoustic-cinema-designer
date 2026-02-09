@@ -141,6 +141,21 @@ function RP22ReportInner() {
     const dolbyLayout = app?.dolbyLayout || "5.1";
     const mlpBasis = app?.mlpBasis || "front";
 
+    // Match RoomVisualisation: layout + sevenBedMode must be passed into buildSeatHudSnapshot
+    const reportDolbyLayout =
+      app?.dolbyLayout ??
+      app?.dolbyConfig ??
+      app?.speakerSystem?.dolbyLayout ??
+      app?.speakerSystem?.dolbyPreset ??
+      "5.1";
+
+    const reportSevenBedMode = String(
+      app?.sevenBedLayoutType
+      || app?.speakerSystem?.sevenBedLayoutType
+      || (app?.speakerSystem?.useWidesInsteadOfRears ? "wides" : "")
+      || "rears"
+    ).toLowerCase();
+
     // --- Screen label helpers (print) ---
     const cleanAspectLabel = (v) => {
         const s = String(v ?? "").trim();
@@ -393,6 +408,8 @@ function RP22ReportInner() {
                     analysisResult: analysisResult || {},
                     seatingPositions: seats,
                     splConfig: app?.splConfig || {},
+                    sevenBedMode: reportSevenBedMode,
+                    dolbyLayout: reportDolbyLayout,
                 });
 
                 if (snapshot) out[seatId] = snapshot;
@@ -422,6 +439,8 @@ function RP22ReportInner() {
         app?.screen?.frontPlaneYm,
         app?.splConfig,
         analysisResult,
+        reportSevenBedMode,
+        reportDolbyLayout,
     ]);
 
 
