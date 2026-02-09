@@ -787,21 +787,65 @@ const onHudHeaderMouseDown = useCallback((event) => {
 
   // 4. HOOKS AND DERIVED STATE
   // Effect to cache the default position of side surrounds when they are first added
+  // CRITICAL: Must be one-shot per speaker id to avoid update loops when other code rehydrates speakers.
+  const slsrDefaultCapturedRef = useRef(new Set());
+
   useEffect(() => {
-    const needsDefaultPosition = placedSpeakers.some(s => {
-      const role = getCanonicalRole(s.role);
-      return (role === 'SL' || role === 'SR') && !s.defaultPosition && s.position;
+    if (typeof onSetSpeakers !== "function") return;
+    if (!Array.isArray(placedSpeakers) || placedSpeakers.length === 0) return;
+
+    // Quick check: do we have any SL/SR that lacks defaultPosition but has a real position?
+    const needs = placedSpeakers.some(s => {
+      const canon = getCanonicalRole(s?.role);
+      if (canon !== "SL" && canon !== "SR") return false;
+
+      const id = String(s?.id || "");
+      if (!id) return false;
+
+      // already captured once -> never try again (prevents loops if other code keeps dropping the field)
+      if (slsrDefaultCapturedRef.current.has(id)) return false;
+
+      const hasPos = Number.isFinite(s?.position?.x) && Number.isFinite(s?.position?.y);
+      const hasDefault = !!s?.defaultPosition;
+      return hasPos && !hasDefault;
     });
 
-    if (needsDefaultPosition) {
-      onSetSpeakers(prev => prev.map(s => {
-        const role = getCanonicalRole(s.role);
-        if ((role === 'SL' || role === 'SR') && !s.defaultPosition && s.position) {
+    if (!needs) return;
+
+    onSetSpeakers(prev => {
+      if (!Array.isArray(prev) || prev.length === 0) return prev;
+
+      let changed = false;
+
+      const next = prev.map(s => {
+        const canon = getCanonicalRole(s?.role);
+        if (canon !== "SL" && canon !== "SR") return s;
+
+        const id = String(s?.id || "");
+        if (!id) return s;
+
+        // If we've already captured once for this id, never write again
+        if (slsrDefaultCapturedRef.current.has(id)) return s;
+
+        const hasPos = Number.isFinite(s?.position?.x) && Number.isFinite(s?.position?.y);
+        const hasDefault = !!s?.defaultPosition;
+
+        if (hasPos && !hasDefault) {
+          changed = true;
+          slsrDefaultCapturedRef.current.add(id);
           return { ...s, defaultPosition: { ...s.position } };
         }
+
+        // Even if it already has defaultPosition, mark captured so we don't keep checking it
+        if (hasDefault) {
+          slsrDefaultCapturedRef.current.add(id);
+        }
+
         return s;
-      }));
-    }
+      });
+
+      return changed ? next : prev; // IMPORTANT: return prev to avoid pointless rerenders
+    });
   }, [placedSpeakers, onSetSpeakers, getCanonicalRole]);
 
   // [B44] Bed surrounds are now seeded by SpeakerPlacement only.
