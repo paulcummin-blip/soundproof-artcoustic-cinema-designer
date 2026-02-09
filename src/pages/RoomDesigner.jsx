@@ -34,7 +34,7 @@ import { placeSubsForFrontWall } from "@/components/room/utils/placeSubs";
 import { debug } from "@/components/utils/consolePolyfill";
 import { safeGroup, safeTable } from "@/components/utils/safeLog"; // NEW: Import safe logging
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry"; // NEW: For model metadata
-import { yHalfExtentM } from "@/components/room/rv/RenderPrimitives"; // NEW: For stroke-aware positioning
+import { yHalfExtentM, isRenderableSpeaker } from "@/components/room/rv/RenderPrimitives"; // NEW: For stroke-aware positioning
 import { calculateLcrConstraints } from "@/components/room/constraints/lcrConstraints"; // NEW: For LCR constraints
 import { placeSubwoofers } from '@/components/room/placement/placeSubwoofers'; // NEW import // FIX: Added 'from' keyword
 import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones"; // NEW import
@@ -43,6 +43,7 @@ import { distanceFor57_5FromWidth, buildRowCenters } from '@/components/room/sea
 import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/centralSplEngine";
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
+import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 
 // B44 shim: some older logic expects getModelDimsM()
 const getModelDimsM = (model) => {
@@ -2006,6 +2007,68 @@ function RoomDesignerWithState() {
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
 
+  // ANALYSIS MUST ONLY USE SPEAKERS THAT ARE ACTUALLY "IN THE DRAWING"
+  // (VALID POSITION + REAL MODEL + VISIBLE BY LAYOUT RULES)
+  const analysisSpeakers = useMemo(() => {
+    const raw = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+
+    // 1) Must be drawable (same rule as plan icons)
+    const afterRenderable = raw.filter(isRenderableSpeaker);
+
+    // 2) Respect layout visibility (same logic concept as plan)
+    const speakerSystem = appState?.speakerSystem;
+    const sevenBedLayoutType = appState?.sevenBedLayoutType;
+
+    const layoutRaw =
+      speakerSystem?.dolbyLayout ??
+      speakerSystem?.dolbyPreset ??
+      dolbyPreset ??
+      "5.1";
+
+    const layoutKey =
+      (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1")
+        .toString()
+        .trim()
+        .split(" ")[0]
+        .split("_")[0];
+
+    const useWidesInsteadOfRears =
+      !!speakerSystem?.useWidesInsteadOfRears ||
+      speakerSystem?.sevenBedLayoutType === "wides" ||
+      sevenBedLayoutType === "wides" ||
+      false;
+
+    const allowedRoles = new Set(
+      rolesForLayout({
+        dolbyLayout: layoutKey,
+        useWidesInsteadOfRears: !!useWidesInsteadOfRears,
+      })
+    );
+
+    return afterRenderable.filter((s) => {
+      const canon = safeCanon(s?.role);
+
+      // Always exclude LFE from plan + analysis
+      if (canon === "LFE") return false;
+
+      // Bed surrounds are controlled by layout role visibility
+      if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
+        return allowedRoles.has(canon);
+      }
+
+      // Everything else uses existing visibility logic
+      return appState?.getSpeakerVisibility
+        ? appState.getSpeakerVisibility(s.role, s.model)
+        : true;
+    });
+  }, [
+    placedSpeakers,
+    appState?.speakerSystem,
+    appState?.sevenBedLayoutType,
+    appState?.getSpeakerVisibility,
+    dolbyPreset,
+  ]);
+
   // For "Aim Loudspeaker" depth metrics: only consider speakers active in current layout
   // Parse bed count from Dolby preset (e.g., "5.1" → 5, "7.1" → 7, "9.1" → 9)
   const _parseBedCount = (layoutStr) => {
@@ -2293,7 +2356,7 @@ function RoomDesignerWithState() {
 
     return computeAllSeatSplMetrics({
       seats: _seatingPositions || [],
-      placedSpeakers: placedSpeakers || [],
+      placedSpeakers: analysisSpeakers || [],
       heightM: roomHeightM,
       getCanonicalRole: getCanonicalRoleLocal,
       getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
@@ -2319,7 +2382,7 @@ function RoomDesignerWithState() {
     });
   }, [
   _seatingPositions,
-  placedSpeakers,
+  analysisSpeakers,
   appState?.getEffectiveSplInputs,
   appState?.splConfig,
   mlpAnchorEffective,
@@ -2428,7 +2491,8 @@ function RoomDesignerWithState() {
 
   // ✅ analysisResult uses internal overlay calculation (no props needed)
   const analysisResult = useRP22AnalysisEngine({
-    placedSpeakers: placedSpeakers,
+    placedSpeakers: analysisSpeakers,
+    visiblePlanSpeakers: analysisSpeakers,
     seatingPositions: _seatingPositions,
     primarySeatingPosition: primarySeatingPosition,
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)

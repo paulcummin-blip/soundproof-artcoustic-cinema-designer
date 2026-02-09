@@ -25,8 +25,10 @@ function azimuthFromMLP(mlp, p) {
   return (deg + 360) % 360; // 0..360
 }
 
-function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis = "front") {
-  const speakers = asArr(placedSpeakers);
+function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis = "front", visiblePlanSpeakers = null) {
+  const speakers = Array.isArray(visiblePlanSpeakers)
+    ? visiblePlanSpeakers
+    : asArr(placedSpeakers);
   const seats = asArr(seatingPositions);
   if (!speakers.length || !seats.length) return null;
 
@@ -75,7 +77,11 @@ function evaluateParameter5AllLayouts(placedSpeakers, seatingPositions, mlpBasis
   };
 }
 
-function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPointOverride = null, dimensions = null) {
+function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPointOverride = null, dimensions = null, visiblePlanSpeakers = null) {
+  // Use visiblePlanSpeakers when provided
+  const speakersToUse = Array.isArray(visiblePlanSpeakers)
+    ? visiblePlanSpeakers
+    : (Array.isArray(speakers) ? speakers : []);
   const seatsWithRoles = computeSeatRoles(asArr(seating));
   const primarySeats = seatsWithRoles.filter(s => s.isPrimary);
   const src = primarySeats.length ? primarySeats : seatsWithRoles;
@@ -113,7 +119,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
 
   // Find speakers by normalized role
   const findSpeaker = (targetRole) => {
-    const spk = speakers.find(s => normalizeRole(s.role) === targetRole);
+    const spk = speakersToUse.find(s => normalizeRole(s.role) === targetRole);
     if (!spk) return null;
     const pos = getPos(spk);
     return pos ? { ...spk, position: pos } : null;
@@ -151,7 +157,7 @@ function evaluateFrontWideDeviation(speakers, seating, mlpBasis = "front", mlpPo
         const fwZones = computeFrontWideZonesStrict({
           mlpPoint: mlpUsed,
           dimensions: { width: roomWidthM, length: roomLengthM },
-          placedSpeakers: speakers,
+          placedSpeakers: speakersToUse,
           getModelDims: getSpeakerModelMeta,
           rp22BoundDeg: 10
         });
@@ -399,7 +405,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const hasSecondarySeating = secondarySeats.length > 0;
 
     // RP22 Parameter 5 — graded entry
-    const p5Result = evaluateParameter5AllLayouts(safeSpeakers, safeSeats, mlpBasis);
+    const p5Result = evaluateParameter5AllLayouts(safeSpeakers, safeSeats, mlpBasis, visiblePlanSpeakers);
     if (p5Result) {
       gradedParameters.primary[p5Result.number] = {
         title: p5Result.title,
@@ -417,7 +423,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const surroundRegex = /^(LS|RS|LSS|RSS|LRS|RRS|LW|RW|SL|SR|SBL|SBR|LR|RR|FWL|FWR)$/i;
     const mlpSrc = primarySeats.length ? primarySeats : seatsWithRoles;
     const mlp = pickMLP(mlpBasis, mlpSrc);
-    const surrounds = safeSpeakers
+    const speakersForP5Detail = Array.isArray(visiblePlanSpeakers) ? visiblePlanSpeakers : safeSpeakers;
+    const surrounds = speakersForP5Detail
       .filter(s => surroundRegex.test(String(s.role)))
       .filter(s => isNum(s?.position?.x) && isNum(s?.position?.y))
       .map(s => ({ id: String(s.id || s.role), role: String(s.role), position: { x: Number(s.position.x), y: Number(s.position.y) } }));
@@ -463,7 +470,8 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       safeSeats, 
       mlpBasis, 
       mlpPointOverride,
-      dimensions
+      dimensions,
+      visiblePlanSpeakers
     );
     if (p7Result.level !== null) {
       gradedParameters.primary[p7Result.number] = {
@@ -648,8 +656,9 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const seatMetrics = new Map();
     const roomCenterX = (dimensions?.widthM || 0) / 2;
 
-    // Use visiblePlanSpeakers if provided, otherwise fall back to safeSpeakers
-    const speakersForP17 = Array.isArray(visiblePlanSpeakers) && visiblePlanSpeakers.length > 0
+    // IF visiblePlanSpeakers IS PROVIDED (EVEN EMPTY), IT IS THE SOURCE OF TRUTH.
+    // DO NOT FALL BACK TO safeSpeakers, OR GHOST SPEAKERS RETURN.
+    const speakersForP17 = Array.isArray(visiblePlanSpeakers)
       ? visiblePlanSpeakers
       : safeSpeakers;
 
