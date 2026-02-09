@@ -2157,43 +2157,7 @@ function SpeakerPlacementImpl(props) {
     needsSurroundResetRef.current = false;
   }, [setSpeakers, resetSurroundPositions, effectivePreset, mlpPoint, dimensions]);
 
-  const handleResetPositions = useCallback(() => {
-    const W = Number(effectiveDims?.width ?? effectiveDims?.widthM) || 0;
-    const L = Number(effectiveDims?.length ?? effectiveDims?.lengthM) || 0;
-    const H = Number(effectiveDims?.height ?? effectiveDims?.heightM) || 2.4;
 
-    if (!mlpPoint || !effectiveDims ||
-        !Number.isFinite(Number(effectiveDims?.width ?? effectiveDims?.widthM)) ||
-        !Number.isFinite(Number(effectiveDims?.length ?? effectiveDims?.lengthM)) ||
-        !Number.isFinite(Number(effectiveDims?.height ?? effectiveDims?.heightM))
-    ) {
-      if (showToast) {
-        if (globalThis.__B44_LOGS) console.error('Cannot reset speakers: Room dimensions or MLP not set.');
-        showToast('Cannot reset speakers: Room dimensions or MLP not set.', 'error');
-      }
-      return;
-    }
-
-    setSpeakers(currentSpeakers => {
-      if (!Array.isArray(currentSpeakers) || currentSpeakers.length === 0) {
-        return currentSpeakers;
-      }
-
-      // Use UI-selected model for reset, same as speakerApply effect
-      const uiModelRaw = String(surroundConfig?.value?.master || "off").trim();
-      const uiModelLower = uiModelRaw.toLowerCase();
-      const modelKeyForPlacement = (uiModelLower === "off" || uiModelLower === "none") ? null : uiModelRaw;
-
-      const reset = resetSurroundPositions(effectivePreset, mlpPoint, dimsSafe, currentSpeakers, modelKeyForPlacement);
-      // Clear positionSource for all speakers (return to auto mode)
-      return reset.map(s => ({ ...s, positionSource: 'auto' }));
-    });
-
-    if (showToast) {
-      const layoutKey = effectivePreset.startsWith('5.1') ? '5.1' : effectivePreset.startsWith('9.') ? '9.x' : '7.1';
-      showToast(`Speaker positions reset for ${layoutKey} layout with 50cm corner clearance.`, 'success');
-    }
-  }, [effectivePreset, mlpPoint, effectiveDims, resetSurroundPositions, setSpeakers, showToast, globalSurroundModel]);
 
   // NEW: Auto-hydrate surround positions when layout or 7.x toggle changes
   // This ensures SBL/SBR and LW/RW appear WITHOUT requiring zone toggles
@@ -3038,19 +3002,7 @@ function SpeakerPlacementImpl(props) {
         </Select>
       </div>
 
-      <div className="flex gap-2">
-        <Button
-          onClick={handleResetPositions}
-          variant="outline"
-          size="sm"
-          disabled={disabled || !mlpPoint || !effectiveDims}
-          className="flex-1 border-[#DCDBD6] text-[#1B1A1A] hover:bg-[#F8F8F7]"
-          title="Re-position surrounds for the current layout. 5.1.x = ±120°. 7.1.x = ±100° sides and ±142.5° rears."
-        >
-          <RotateCcw className="w-4 h-4 mr-2" />
-          Reset Positions
-        </Button>
-      </div>
+
       
       {is7ChannelBed && (
         <SevenLayoutSwitcher
