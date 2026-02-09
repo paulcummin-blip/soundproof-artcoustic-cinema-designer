@@ -2012,8 +2012,31 @@ function RoomDesignerWithState() {
   const analysisSpeakers = useMemo(() => {
     const raw = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
-    // 1) Must be drawable (same rule as plan icons)
-    const afterRenderable = raw.filter(isRenderableSpeaker);
+    // ANALYSIS IS STRICTER THAN DRAWING:
+    // - VALID POSITION
+    // - REAL MODEL SELECTED (NO "OFF/NONE/BLANK")
+    // - NO REAR-SURROUND "MODEL LAG" EXCEPTION
+    const isAnalysableSpeaker = (spk) => {
+      if (!spk) return false;
+
+      const pos = spk.position;
+      if (
+        !pos ||
+        typeof pos.x !== "number" ||
+        typeof pos.y !== "number" ||
+        !Number.isFinite(pos.x) ||
+        !Number.isFinite(pos.y)
+      ) {
+        return false;
+      }
+
+      const ms = String(spk?.model ?? "").trim().toLowerCase();
+      if (!ms || ms === "off" || ms === "none") return false;
+
+      return true;
+    };
+
+    const afterRenderable = raw.filter(isAnalysableSpeaker);
 
     // 2) Respect layout visibility (same logic concept as plan)
     const speakerSystem = appState?.speakerSystem;
@@ -2056,9 +2079,11 @@ function RoomDesignerWithState() {
         return allowedRoles.has(canon);
       }
 
-      // Everything else uses existing visibility logic
+      // FOR ANALYSIS: IF IT GOT THIS FAR, IT ALREADY HAS A REAL MODEL.
+      // SO WE ONLY APPLY VISIBILITY IF IT IS EXPLICITLY TURNED OFF BY LAYOUT,
+      // BUT WE DO NOT "AUTO-TRUE" JUST BECAUSE A ROLE IS EXPECTED.
       return appState?.getSpeakerVisibility
-        ? appState.getSpeakerVisibility(s.role, s.model)
+        ? appState.getSpeakerVisibility(s.role, s.model) === true
         : true;
     });
   }, [

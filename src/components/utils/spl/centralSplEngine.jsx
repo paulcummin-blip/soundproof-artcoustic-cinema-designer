@@ -252,11 +252,28 @@ export function computeAllSeatSplMetrics({
     return canon.startsWith('T'); // TFL, TFR, TML, TMR, TRL, TRR, TL, TR, TBL, TBR, TFC, TRC, TBC...
   };
 
-  // Filter speakers with valid positions
-  const hasPos = s => s?.position && Number.isFinite(s.position.x) && Number.isFinite(s.position.y);
-  const placedLCR = placedSpeakers.filter(s => hasPos(s) && screenRoles.has(getCanonicalRole(s.role)));
-  const placedSur = placedSpeakers.filter(s => hasPos(s) && surroundRoles.has(getCanonicalRole(s.role)));
-  const placedOH = placedSpeakers.filter(s => hasPos(s) && isOverheadRole(s.role));
+  // Filter speakers with valid positions AND real models
+  const hasPos = (s) =>
+    s?.position &&
+    Number.isFinite(s.position.x) &&
+    Number.isFinite(s.position.y);
+
+  const hasRealModel = (s) => {
+    const ms = String(s?.model ?? "").trim().toLowerCase();
+    return !!ms && ms !== "off" && ms !== "none";
+  };
+
+  // SPL METRICS MUST NOT RUN ON "EXPECTED BY LAYOUT" SPEAKERS.
+  // REAL MODEL IS REQUIRED.
+  const placedLCR = placedSpeakers.filter(
+    (s) => hasPos(s) && hasRealModel(s) && screenRoles.has(getCanonicalRole(s.role))
+  );
+  const placedSur = placedSpeakers.filter(
+    (s) => hasPos(s) && hasRealModel(s) && surroundRoles.has(getCanonicalRole(s.role))
+  );
+  const placedOH = placedSpeakers.filter(
+    (s) => hasPos(s) && hasRealModel(s) && isOverheadRole(s.role)
+  );
 
   // Process each seat (including synthetic MLP)
   for (const seat of seatsToProcess) {
