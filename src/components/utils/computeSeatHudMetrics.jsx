@@ -446,7 +446,7 @@ export function computeSeatHudMetrics({
     let level17 = '—';
     if (Number.isFinite(worstLossDb)) {
       if (worstLossDb <= 1.5) level17 = 'L4';
-      else if (worstLossDb < 3.0) level17 = 'L3';
+      else if (worstLossDb <= 3.0) level17 = 'L3';
       else level17 = 'L2';
     }
 
