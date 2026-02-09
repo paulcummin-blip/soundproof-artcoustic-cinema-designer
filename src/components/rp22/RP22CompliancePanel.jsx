@@ -313,10 +313,10 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
   const seats = Array.isArray(seatingPositions) ? seatingPositions : [];
 
   const seatHudSnapshotsCache =
+    seatHudSnapshots ||                               // ✅ always prefer the prop (live HUD)
     analysisResult?.seatHudSnapshots ||
     analysisResult?.hud?.seatHudSnapshots ||
     analysisResult?.seatHud ||
-    seatHudSnapshots ||
     {};
 
   const getSnapshotForSeat = React.useCallback((seat) => {
@@ -325,16 +325,36 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     const sid = String(seat.id || "").trim();
     if (!sid) return null;
 
+    const values = Object.values(seatHudSnapshotsCache || {});
+    const keys = Object.keys(seatHudSnapshotsCache || {});
+
+    // Helper: find by snap.seatId
+    const findBySeatId = (wantedId) =>
+      values.find((snap) => String(snap?.seatId || "") === wantedId) || null;
+
+    // Helper: find by key prefix "seatId|"
+    const findByKeyPrefix = (wantedId) => {
+      const k = keys.find((kk) => String(kk).startsWith(`${wantedId}|`));
+      return k ? seatHudSnapshotsCache[k] : null;
+    };
+
     // 1) direct match on snapshot.seatId
-    const direct = Object.values(seatHudSnapshotsCache || {}).find((snap) => String(snap?.seatId || "") === sid);
-    if (direct) return direct;
+    let snap = findBySeatId(sid);
+    if (snap) return snap;
 
     // 2) common key pattern: "seatId|sig"
-    const key = Object.keys(seatHudSnapshotsCache || {}).find((k) => String(k).startsWith(`${sid}|`));
-    if (key) return seatHudSnapshotsCache[key];
+    snap = findByKeyPrefix(sid);
+    if (snap) return snap;
+
+    // 3) Primary seat fallback (mlpSeatId ↔ "mlp")
+    const isPrimarySeat = (String(mlpSeatId || "").trim() && sid === String(mlpSeatId).trim()) || !!seat?.isPrimary;
+    if (isPrimarySeat) {
+      snap = findBySeatId("mlp") || findByKeyPrefix("mlp");
+      if (snap) return snap;
+    }
 
     return null;
-  }, [seatHudSnapshotsCache]);
+  }, [seatHudSnapshotsCache, mlpSeatId]);
 
   const rows = React.useMemo(() => {
     // Group by row number (fallback: 1)
@@ -396,7 +416,7 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
 
               return (
                 <span
-                  key={`seat-${seat?.id || Math.random()}`}
+                  key={`seat-${seat?.id || `${rowObj.row}-${seat?.indexInRow || ""}`}`}
                   style={{
                     ...pillStyle(String(lvl).toUpperCase() === "FAIL" ? "FAIL" : String(lvl).toUpperCase()),
                     minWidth: 34,
