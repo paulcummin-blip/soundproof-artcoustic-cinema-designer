@@ -6069,6 +6069,18 @@ return {
     
     const allowedRoles = new Set(rolesForLayout({ dolbyLayout: layoutKey, useWidesInsteadOfRears: !!useWidesInsteadOfRears }));
     
+    // Overheads are OFF if the overhead global model is OFF/none/blank
+    const overheadGlobalModel =
+      appState?.overheadGlobalModel ??
+      appState?.overheadState?.globalModel ??
+      speakerSystem?.overheadGlobalModel ??
+      null;
+
+    const overheadsAreOff = (() => {
+      const ms = String(overheadGlobalModel ?? "").trim().toLowerCase();
+      return !ms || ms === "off" || ms === "none";
+    })();
+    
     return afterRenderable.filter((s) => {
       const canon = getCanonicalRole(s?.role);
 
@@ -6077,7 +6089,10 @@ return {
 
       // Overheads: must be allowed by the layout (5.1 must hide all "T*" roles)
       if (String(canon).toUpperCase().startsWith("T")) {
-        return allowedRoles.has(canon);
+        // Must be supported by the layout AND not globally turned OFF
+        if (!allowedRoles.has(canon)) return false;
+        if (overheadsAreOff) return false;
+        return true;
       }
 
       // Bed surrounds: controlled by layout role visibility
@@ -6132,6 +6147,18 @@ return {
     })
   );
 
+  // Overheads are OFF if the overhead global model is OFF/none/blank
+  const overheadGlobalModel =
+    appState?.overheadGlobalModel ??
+    appState?.overheadState?.globalModel ??
+    speakerSystem?.overheadGlobalModel ??
+    null;
+
+  const overheadsAreOff = (() => {
+    const ms = String(overheadGlobalModel ?? "").trim().toLowerCase();
+    return !ms || ms === "off" || ms === "none";
+  })();
+
   let afterVisibility = afterRenderable.filter((s) => {
     const canon = getCanonicalRole(s?.role);
 
@@ -6149,7 +6176,10 @@ return {
 
     // Overheads: must be allowed by the layout (5.1 must hide all "T*" roles)
     if (String(canon).toUpperCase().startsWith("T")) {
-      return allowedRoles.has(canon);
+      // Must be supported by the layout AND not globally turned OFF
+      if (!allowedRoles.has(canon)) return false;
+      if (overheadsAreOff) return false;
+      return true;
     }
 
     // Bed surrounds are controlled by layout role visibility, not model.
