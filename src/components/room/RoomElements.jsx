@@ -206,14 +206,12 @@ export default function RoomElements({ elements = [], onChange }) {
                     type="number"
                     step="0.01"
                     value={
-                      isFrontOrRear
-                        ? (Number.isFinite(element?.x_m) ? element.x_m : 0)
-                        : (Number.isFinite(element?.y_m) ? element.y_m : 0)
+                      Number.isFinite(element?.pos_m) ? element.pos_m : 0
                     }
                     onChange={(e) =>
                       updateElement(
                         element.id,
-                        isFrontOrRear ? 'x_m' : 'y_m',
+                        'pos_m',
                         e.target.value
                       )
                     }
