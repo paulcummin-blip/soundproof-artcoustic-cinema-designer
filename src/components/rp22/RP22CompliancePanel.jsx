@@ -325,32 +325,33 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     const sid = String(seat.id || "").trim();
     if (!sid) return null;
 
-    const values = Object.values(seatHudSnapshotsCache || {});
-    const keys = Object.keys(seatHudSnapshotsCache || {});
+    const cache = seatHudSnapshotsCache || {};
 
-    // Helper: find by snap.seatId
-    const findBySeatId = (wantedId) =>
-      values.find((snap) => String(snap?.seatId || "") === wantedId) || null;
+    // 0) exact key match (fast path)
+    if (cache[sid]) return cache[sid];
 
-    // Helper: find by key prefix "seatId|"
-    const findByKeyPrefix = (wantedId) => {
-      const k = keys.find((kk) => String(kk).startsWith(`${wantedId}|`));
-      return k ? seatHudSnapshotsCache[k] : null;
-    };
+    // 1) common key pattern: "seatId|sig"
+    const prefKey = Object.keys(cache).find((k) => String(k).startsWith(`${sid}|`));
+    if (prefKey) return cache[prefKey];
 
-    // 1) direct match on snapshot.seatId
-    let snap = findBySeatId(sid);
-    if (snap) return snap;
+    // 2) fallback: search values by snapshot.seatId (handles "mlp", etc.)
+    const values = Object.values(cache);
+    const direct = values.find((snap) => String(snap?.seatId || "").trim() === sid);
+    if (direct) return direct;
 
-    // 2) common key pattern: "seatId|sig"
-    snap = findByKeyPrefix(sid);
-    if (snap) return snap;
+    // 3) Primary seat fallback: if this seat is the primary seat, also accept "mlp"
+    const isPrimarySeat =
+      (!!seat?.isPrimary) ||
+      (String(mlpSeatId || "").trim() && sid === String(mlpSeatId).trim());
 
-    // 3) Primary seat fallback (mlpSeatId ↔ "mlp")
-    const isPrimarySeat = (String(mlpSeatId || "").trim() && sid === String(mlpSeatId).trim()) || !!seat?.isPrimary;
     if (isPrimarySeat) {
-      snap = findBySeatId("mlp") || findByKeyPrefix("mlp");
-      if (snap) return snap;
+      if (cache["mlp"]) return cache["mlp"];
+
+      const mlpKey = Object.keys(cache).find((k) => String(k).startsWith(`mlp|`));
+      if (mlpKey) return cache[mlpKey];
+
+      const mlpDirect = values.find((snap) => String(snap?.seatId || "").trim() === "mlp");
+      if (mlpDirect) return mlpDirect;
     }
 
     return null;
