@@ -3338,7 +3338,9 @@ React.useEffect(() => {
         if (!s?.id || !s?.position) return false;
         const r = getCanonicalRole(s.role);
         const roleUpper = String(s.role || '').toUpperCase();
-        return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
+        return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r)
+          || extraSurroundPattern.test(roleUpper)
+          || String(r || '').startsWith('T');
       })
       .map(s => `${s.id}:${getCanonicalRole(s.role)}:${(s.position.x || 0).toFixed(4)}:${(s.position.y || 0).toFixed(4)}`)
       .join('|');
@@ -3349,7 +3351,7 @@ React.useEffect(() => {
     const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
     const sevenBedMode = String(
       appState?.sevenBedLayoutType
-      || appState?.speakerSystem?.sevenBedLayoutType
+      || appState?.sevenBedLayoutType
       || (appState?.speakerSystem?.useWidesInsteadOfRears ? 'wides' : '')
       || 'rears'
     ).toLowerCase();
@@ -4146,7 +4148,9 @@ React.useEffect(() => {
         if (!s?.id || !s?.position) return false;
         const r = getCanonicalRole(s.role);
         const roleUpper = String(s.role || '').toUpperCase();
-        return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
+        return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r)
+          || extraSurroundPattern.test(roleUpper)
+          || String(r || '').startsWith('T');
       })
       .slice()
       .sort((a, b) => String(a.id).localeCompare(String(b.id)))
