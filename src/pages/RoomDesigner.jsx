@@ -2811,7 +2811,50 @@ function RoomDesignerWithState() {
   const setRowSpacingGuarded = useGuardedSetter(_setRowSpacingM, 'seating');
   const setSeatingBlockOffsetGuarded = useGuardedSetter(appState?.setSeatingBlockOffset, 'seating');
   const setMlpBasisGuarded = useGuardedSetter(appState?.setMlpBasis, 'seating');
-  const setRoomElementsGuarded = useGuardedSetter(appState?.setRoomElements, 'elements');
+  const setRoomElementsGuarded = useGuardedSetter((next) => {
+    const widthM = Number(appState?.roomDims?.widthM ?? appState?.dimensions?.widthM);
+    const lengthM = Number(appState?.roomDims?.lengthM ?? appState?.dimensions?.lengthM);
+
+    const safe = Array.isArray(next) ? next : [];
+
+    const normalised = safe.map((e, idx) => {
+      const wall = String(e?.wall || 'front');
+
+      const L = Number.isFinite(Number(e?.length_m)) ? Number(e.length_m) : 0.9;
+      const T = Number.isFinite(Number(e?.thickness_m)) ? Number(e.thickness_m) : 0.05;
+
+      // pos_m is ALWAYS "along the wall":
+      // front/rear => X distance from left
+      // left/right => Y distance from front
+      let p = Number(e?.pos_m);
+      if (!Number.isFinite(p)) p = 0;
+
+      // clamp so it never jumps out of range on restore
+      if (Number.isFinite(widthM) && Number.isFinite(lengthM)) {
+        if (wall === 'front' || wall === 'rear') {
+          const maxP = Math.max(0, widthM - L);
+          p = Math.min(Math.max(0, p), maxP);
+        } else if (wall === 'left' || wall === 'right') {
+          const maxP = Math.max(0, lengthM - L);
+          p = Math.min(Math.max(0, p), maxP);
+        }
+      }
+
+      return {
+        ...e,
+        // keep stable identity
+        _id: e?._id ?? idx + 1,
+        // keep types consistent across page changes
+        wall,
+        length_m: L,
+        thickness_m: T,
+        pos_m: p,
+        __label: String(e?.label || e?.__label || `Element ${idx + 1}`),
+      };
+    });
+
+    appState?.setRoomElements(normalised);
+  }, 'elements');
 
   // Pass appState as the first argument to useProjectLoader
   const {

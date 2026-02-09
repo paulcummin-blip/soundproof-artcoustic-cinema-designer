@@ -6692,7 +6692,8 @@ return {
             labelXM = rectM.x + T + LABEL_INSET_M;
             labelYM = rectM.y + 0.18; // slight down so it doesn't sit on the top edge
           } else if (e.wall === 'right') {
-            labelXM = rectM.x - 0.10; // 10cm inside the room
+            // 10 cm extra inset so the last letter stays inside the room
+            labelXM = rectM.x - LABEL_INSET_M - 0.10;
             labelYM = rectM.y + 0.18;
           }
 
@@ -6726,8 +6727,9 @@ return {
                 fillOpacity={0.9}
                 fontSize={11}
                 fontWeight={700}
-                textAnchor={e.wall === "right" ? "end" : "start"}
                 style={{ userSelect: 'none' }}
+                textAnchor="end"
+                dominantBaseline="hanging"
               >
                 {label}
               </text>
