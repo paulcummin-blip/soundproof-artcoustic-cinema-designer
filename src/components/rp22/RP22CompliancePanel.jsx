@@ -392,6 +392,16 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
   };
 
   const renderSeatPillGridForParam = (pId) => {
+    console.log(
+      '[RP22][Compliance] Cache keys:',
+      Object.keys(seatHudSnapshotsCache || {}).slice(0, 10)
+    );
+
+    console.log(
+      '[RP22][Compliance] Seat IDs:',
+      (seats || []).slice(0, 10).map(s => s?.id)
+    );
+
     if (!rows.length) return null;
 
     const pKey = `p${Number(pId)}`; // "p1" etc
