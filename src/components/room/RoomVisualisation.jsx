@@ -6071,10 +6071,21 @@ return {
     
     return afterRenderable.filter((s) => {
       const canon = getCanonicalRole(s?.role);
+
+      // Always hide LFE
       if (canon === "LFE") return false;
+
+      // Overheads: must be allowed by the layout (5.1 must hide all "T*" roles)
+      if (String(canon).toUpperCase().startsWith("T")) {
+        return allowedRoles.has(canon);
+      }
+
+      // Bed surrounds: controlled by layout role visibility
       if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
         return allowedRoles.has(canon);
       }
+
+      // Everything else keeps existing behaviour
       return getSpeakerVisibility(s.role, s.model);
     });
   }, [placedSpeakers, dolbyLayout, appState?.speakerSystem, appState?.sevenBedLayoutType, getSpeakerVisibility, getCanonicalRole]);
@@ -6134,6 +6145,11 @@ return {
     if (isExtraSurround) {
       // Extra surrounds are visible when base SL/SR are allowed by layout
       return allowedRoles.has("SL") || allowedRoles.has("SR");
+    }
+
+    // Overheads: must be allowed by the layout (5.1 must hide all "T*" roles)
+    if (String(canon).toUpperCase().startsWith("T")) {
+      return allowedRoles.has(canon);
     }
 
     // Bed surrounds are controlled by layout role visibility, not model.
