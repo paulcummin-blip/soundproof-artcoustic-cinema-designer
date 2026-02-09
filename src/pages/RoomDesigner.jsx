@@ -1359,9 +1359,24 @@ function ensureAtmosOverheads({
   const parts = normalizedPreset.split(".");
   const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
 
-  // If no height layer, don't touch anything
+  // If no height layer, REMOVE any existing overheads (they must not persist)
   if (!heights) {
-    return current;
+    const withoutOverheads = current.filter((spk) => {
+      const role = String(spk?.role || "").toUpperCase();
+      return !(role.startsWith("T") || role.startsWith("U"));
+    });
+
+    // Avoid churn if nothing changed
+    if (withoutOverheads.length === current.length) return current;
+
+    if (globalThis.__B44_LOGS) {
+      console.log("[RD ATMOS FAILSAFE] heights=0 -> stripping overheads", {
+        before: current.map((s) => s.role),
+        after: withoutOverheads.map((s) => s.role),
+      });
+    }
+
+    return withoutOverheads;
   }
 
   const targetOverheadIds = getTargetOverheadIds(normalizedPreset);
