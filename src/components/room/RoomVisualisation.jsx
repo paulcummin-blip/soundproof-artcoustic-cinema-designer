@@ -4163,6 +4163,8 @@ React.useEffect(() => {
         const roleUpper = String(s.role || '').toUpperCase();
         return ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) || extraSurroundPattern.test(roleUpper);
       })
+      .slice()
+      .sort((a, b) => String(a.id).localeCompare(String(b.id)))
       .map(s => `${s.id}:${getCanonicalRole(s.role)}:${(s.position.x || 0).toFixed(4)}:${(s.position.y || 0).toFixed(4)}`)
       .join('|');
     
@@ -4214,8 +4216,7 @@ React.useEffect(() => {
         });
         
         if (snapshot) {
-          const seatCacheKey = `${seat.id}|${signature}`;
-          nextMetrics[seatCacheKey] = { ...snapshot };
+          nextMetrics[String(seat.id)] = { ...snapshot };
         }
       } catch (err) {
         console.warn(`[SeatMetrics] failed seat ${seat.id}:`, err);
@@ -4227,15 +4228,8 @@ React.useEffect(() => {
       }
     }
 
-    // Write once (no clear-then-refill pattern) - with final guard
-    const prevKeys = Object.keys(appState?.seatMetricsById || {}).sort().join(',');
-    const nextKeys = Object.keys(nextMetrics).sort().join(',');
-    
-    // Only write if the set of seat IDs changed, or signature changed
-    if (prevKeys !== nextKeys || lastCacheSignatureRef.current !== signature) {
-      appState.setSeatMetricsById(nextMetrics);
-      lastCacheSignatureRef.current = signature;
-    }
+    appState.setSeatMetricsById(nextMetrics);
+    lastCacheSignatureRef.current = signature;
     
   }, [
     seatingPositions,
