@@ -376,11 +376,7 @@ export function buildSeatHudSnapshot({
     };
 
     // Build allowed roles for the current layout (same intent as RoomVisualisation visibility)
-    const layoutRaw =
-      speakerSystem?.dolbyLayout ??
-      speakerSystem?.dolbyPreset ??
-      dolbyLayout ??
-      "5.1";
+    const layoutRaw = dolbyLayout ?? "5.1";
 
     const layoutKey =
       (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1")
@@ -389,10 +385,7 @@ export function buildSeatHudSnapshot({
         .split(" ")[0]
         .split("_")[0];
 
-    const sevenType =
-      speakerSystem?.sevenBedLayoutType ??
-      sevenBedMode ??
-      "rears";
+    const sevenType = sevenBedMode ?? "rears";
 
     const allowedRoles = getSpeakerVisibilityFor(layoutKey, sevenType);
 
