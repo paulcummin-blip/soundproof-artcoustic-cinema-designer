@@ -397,8 +397,6 @@ export function buildSeatHudSnapshot({
 
   // ALWAYS compute P17 locally using LIVE plan-view yaw logic (matches icon rotation)
   {
-    // P17 MUST only consider speakers that would actually render for the current layout.
-    // Otherwise we get phantom LW/RW in 5.1, etc.
     const extraSurroundPattern = /^(SL|SR)\d+$/;
 
     const groupForRole = (role) => {
@@ -411,41 +409,28 @@ export function buildSeatHudSnapshot({
       return 'Other';
     };
 
-    // Build allowed roles for the current layout (same intent as RoomVisualisation visibility)
-    const layoutRaw = dolbyLayout ?? "5.1";
+    // P17 MUST measure ALL non-screen speakers that ACTUALLY EXIST in the drawing
+    // (real model + real XY position). Exclude subs/LFE and screen-wall speakers.
 
-    const layoutKey =
-      (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1")
-        .toString()
-        .trim()
-        .split(" ")[0]
-        .split("_")[0];
-
-    const sevenType = sevenBedMode ?? "rears";
-
-    const allowedRoles = getSpeakerVisibilityFor(layoutKey, sevenType);
-
-    // Keep P17 limited to these groups, BUT only if the role is actually allowed by layout.
-    const isP17CandidateRole = (canon, rawRoleUpper) => {
+    const isP17EligibleRole = (canon, rawRoleUpper) => {
       if (!canon) return false;
 
-      // Always exclude LFE
+      // Exclude subs / LFE
       if (canon === "LFE") return false;
 
-      // Extra surrounds: treat as SL/SR visibility
-      if (extraSurroundPattern.test(rawRoleUpper)) {
-        return allowedRoles.has("SL") || allowedRoles.has("SR");
-      }
+      // Exclude screen wall speakers
+      if (canon === "FL" || canon === "FC" || canon === "FR") return false;
 
-      // Candidate set (bed surrounds + wides + overheads)
-      if (
-        canon === "SL" || canon === "SR" ||
-        canon === "SBL" || canon === "SBR" ||
-        canon === "LW" || canon === "RW" ||
-        String(canon).startsWith("T")
-      ) {
-        return allowedRoles.has(canon);
-      }
+      // Extra surrounds count as surrounds
+      if (extraSurroundPattern.test(rawRoleUpper)) return true;
+
+      // Bed surrounds + wides
+      if (canon === "SL" || canon === "SR" ||
+          canon === "SBL" || canon === "SBR" ||
+          canon === "LW" || canon === "RW") return true;
+
+      // Overheads (include any T* or U* just in case)
+      if (String(canon).startsWith("T") || String(canon).startsWith("U")) return true;
 
       return false;
     };
@@ -453,7 +438,12 @@ export function buildSeatHudSnapshot({
     const relevantSpeakers = (placedSpeakers || []).filter((sp) => {
       const canon = getCanonicalRole(sp.role);
       const roleUpper = String(sp.role || "").toUpperCase();
-      return !!sp?.position && isP17CandidateRole(canon, roleUpper);
+
+      // Must have real XY and a real model (prevents ghosts)
+      if (!hasXY(sp)) return false;
+      if (!hasRealModel(sp)) return false;
+
+      return isP17EligibleRole(canon, roleUpper);
     });
 
     if (relevantSpeakers.length > 0) {
