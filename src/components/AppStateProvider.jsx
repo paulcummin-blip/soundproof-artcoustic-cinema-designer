@@ -1187,7 +1187,8 @@ function useDesignerState() {
     p15ConstructionLevel,
     p21EarlyReflectionPreset,
     mlpOverride,
-    extraSurroundCount
+    extraSurroundCount,
+    roomElements
     ]);
 
     // --- ALWAYS-SAVE EFFECT (instant working copy on every change) ---
@@ -1272,7 +1273,8 @@ function useDesignerState() {
     p15ConstructionLevel,
     p21EarlyReflectionPreset,
     mlpOverride,
-    extraSurroundCount
+    extraSurroundCount,
+    roomElements
     ]);
 
     // --- Autosave: Manual restore/clear functions ---
