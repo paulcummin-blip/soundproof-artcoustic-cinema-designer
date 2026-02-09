@@ -15,6 +15,10 @@ import { computeFrontWideZonesStrict } from "@/components/utils/frontWideZones";
 // Safe helpers
 const asArr = (x) => (Array.isArray(x) ? x : []);
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+const hasRealModel = (s) => {
+  const ms = String(s?.model ?? "").trim().toLowerCase();
+  return !!ms && ms !== "off" && ms !== "none";
+};
 
 // plan view: x = lateral, y = fore/aft
 function azimuthFromMLP(mlp, p) {
@@ -424,10 +428,16 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
     const mlpSrc = primarySeats.length ? primarySeats : seatsWithRoles;
     const mlp = pickMLP(mlpBasis, mlpSrc);
     const speakersForP5Detail = Array.isArray(visiblePlanSpeakers) ? visiblePlanSpeakers : safeSpeakers;
+
     const surrounds = speakersForP5Detail
       .filter(s => surroundRegex.test(String(s.role)))
       .filter(s => isNum(s?.position?.x) && isNum(s?.position?.y))
-      .map(s => ({ id: String(s.id || s.role), role: String(s.role), position: { x: Number(s.position.x), y: Number(s.position.y) } }));
+      .filter(hasRealModel) // CRITICAL: NO MODEL = NO SPEAKER (NO GHOSTS)
+      .map(s => ({
+        id: String(s.id || s.role),
+        role: String(s.role),
+        position: { x: Number(s.position.x), y: Number(s.position.y) }
+      }));
 
     let param5 = { gaps: [], maxGap: 0, std: 0, level: 4, target: 80, label: "Back-arc gaps (MLP)" };
     let surroundGaps = null;
@@ -662,11 +672,14 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
       ? visiblePlanSpeakers
       : safeSpeakers;
 
-    // Resolve overhead models before passing to P17
-    const speakersWithResolvedOverheads = speakersForP17.map(speaker => {
-      const role = String(speaker.role || '').toUpperCase();
-      if (!role.startsWith('T')) return speaker;
-      
+    // ONLY RESOLVE OVERHEAD MODELS IF THE SPEAKER ALREADY HAS A REAL MODEL.
+    // IF MODEL IS EMPTY/UNDEFINED, DO NOT INVENT ONE FOR ANALYSIS.
+    const speakersWithResolvedOverheads = speakersForP17.map((speaker) => {
+      const role = String(speaker.role || "").toUpperCase();
+      if (!role.startsWith("T")) return speaker;
+
+      if (!hasRealModel(speaker)) return speaker;
+
       const resolvedModel = resolveOverheadModel(speaker, overheadState);
       if (resolvedModel && resolvedModel !== speaker.model) {
         return { ...speaker, model: resolvedModel };
@@ -727,7 +740,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
     const p17Results = computeP17ForAllSeats({
       seats: seatsWithRoles,
-      speakers: speakersWithResolvedOverheads,
+      speakers: speakersWithResolvedOverheads.filter(hasRealModel), // CRITICAL: NO MODEL = NO P17
       mlpPos: mlp,
       getSpeakerModelMeta,
       roomHeightM,
@@ -971,7 +984,7 @@ export const useRP22AnalysisEngine = ({ placedSpeakers, seatingPositions, dimens
 
       // P16 – LCR horizontal off-axis HF loss (RP22 Param 16)
       {
-        const p16 = computeP16ForSeat(seat, safeSpeakers, getSpeakerModelMeta, mlp);
+        const p16 = computeP16ForSeat(seat, safeSpeakers.filter(hasRealModel), getSpeakerModelMeta, mlp);
 
         if (p16) {
           // Add note if any LCR is beyond 55°
