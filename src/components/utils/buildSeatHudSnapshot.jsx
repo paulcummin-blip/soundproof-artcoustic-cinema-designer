@@ -807,6 +807,10 @@ export function buildSeatHudSnapshot({
         formatted: `${floorDeg(valueDb) || 0} dB`
       };
     }
+  } else {
+    data.rp22.p4 = {
+      ...notCalculatedHud(),
+    };
   }
 
   // --- P5: Max horizontal gap between adjacent surrounds/wides (NO WRAP, MATCH PLAN OVERLAY) ---
@@ -967,6 +971,10 @@ export function buildSeatHudSnapshot({
         formatted: `${p6FloorDb} dB`        // DISPLAY MUST MATCH GRADE INPUT
       };
     }
+  } else {
+    data.rp22.p6 = {
+      ...notCalculatedHud(),
+    };
   }
 
   // Legacy bridge
