@@ -336,9 +336,24 @@ export function computeSeatHudMetrics({
 
   // --- P17 (surround/overhead off-axis) ---
   const surroundAndOverheadRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR']);
+
+  const hasFiniteXY = (p) =>
+    !!p && Number.isFinite(p.x) && Number.isFinite(p.y);
+
+  const hasValidModel = (m) => {
+    const s = String(m || '').trim().toLowerCase();
+    return !!s && s !== 'off' && s !== 'none';
+  };
+
   const relevantSpeakers = (placedSpeakers || []).filter(sp => {
     const canon = getCanonicalRole(sp.role);
-    return surroundAndOverheadRoles.has(canon) && sp.position;
+    if (!surroundAndOverheadRoles.has(canon)) return false;
+    if (!hasFiniteXY(sp.position)) return false;
+
+    // CRITICAL: exclude "not really there" speakers (hidden/off/none)
+    if (!hasValidModel(sp.model)) return false;
+
+    return true;
   });
 
   if (relevantSpeakers.length > 0 && hasSeatPos && hasMlp) {
@@ -420,11 +435,17 @@ export function computeSeatHudMetrics({
         minus5dB: halfDispersionDeg(dispRaw.minus5dB),
       } : null;
 
-      let lossDb = 3.0;
+      let lossDb = 3.0; // keep for worstLossDb tracking
+      let lossLabel = '>3.0 dB';
+
       if (disp && disp.minus1p5dB != null && disp.minus3dB != null) {
-        if (offAxisDeg <= disp.minus1p5dB) lossDb = 0.0;
-        else if (offAxisDeg <= disp.minus3dB) lossDb = 1.5;
-        else lossDb = 3.0;
+        if (offAxisDeg <= disp.minus1p5dB) { lossDb = 1.5; lossLabel = '≤1.5 dB'; }
+        else if (offAxisDeg <= disp.minus3dB) { lossDb = 3.0; lossLabel = '≤3.0 dB'; }
+        else { lossDb = 3.1; lossLabel = '>3.0 dB'; } // 3.1 is ONLY an internal marker for "over 3"
+      } else {
+        // If dispersion is missing, treat as worst case for P17
+        lossDb = 3.1;
+        lossLabel = '>3.0 dB';
       }
 
       const offAxisDegInt = Math.floor(offAxisDeg + 1e-9);
@@ -433,6 +454,7 @@ export function computeSeatHudMetrics({
         angleDeg: offAxisDegInt,
         rawAngleDeg: offAxisDegInt,
         lossDb: Math.round(lossDb * 10) / 10,
+        lossLabel, // NEW: always one of "≤1.5 dB", "≤3.0 dB", ">3.0 dB"
         isBeyondNonLcrLimit: false,
       });
 
@@ -447,17 +469,20 @@ export function computeSeatHudMetrics({
     if (Number.isFinite(worstLossDb)) {
       if (worstLossDb <= 1.5) level17 = 'L4';
       else if (worstLossDb <= 3.0) level17 = 'L3';
-      else level17 = 'L2';
+      else level17 = 'L2'; // ONLY when > 3.0
     }
+
+    const worstLossLabel = perSpeaker.find(s => s.role === worstRole)?.lossLabel || '—';
 
     metrics.rp22.p17 = {
       value: worstLossDb,
-      formatted: Number.isFinite(worstLossDb) ? `±${worstLossDb.toFixed(1)} dB` : '—',
+      formatted: worstLossLabel, // show threshold label, not a pretend "dB reading"
       level: level17,
       perSpeaker,
       worstRole,
       worstAngleDeg,
       worstLossDb,
+      worstLossLabel,
     };
   }
 
