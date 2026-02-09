@@ -4249,7 +4249,6 @@ React.useEffect(() => {
     analysisResult,
     dolbyLayout,
     appState?.setSeatMetricsById,
-    appState?.seatMetricsById,
     appState?.splConfig,
     exportMode,
     props.isPrinting,
