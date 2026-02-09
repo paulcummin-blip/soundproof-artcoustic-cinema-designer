@@ -355,6 +355,15 @@ export default function SeatHud({
                   >
                     {metric.perSpeaker
               .slice()
+              .filter(s => {
+                // If the active layout has no height layer (e.g. "5.1", "7.1"), do NOT show any overhead roles in P17.
+                const preset = String(tooltipData?.dolbyLayout || '').split(' ')[0].split('_')[0]; // e.g. "9.1.6"
+                const parts = preset.split('.');
+                const heights = parts.length >= 3 ? (parseInt(parts[2], 10) || 0) : 0;
+                const canonRole = String(s?.role || '').toUpperCase();
+                if (!heights && canonRole.startsWith('T')) return false;
+                return true;
+              })
               .sort((a, b) => a.role.localeCompare(b.role))
               .map(s => {
                 // Use rawAngleDeg if available (for overheads), otherwise angleDeg
@@ -362,7 +371,27 @@ export default function SeatHud({
                 const angle = Number.isFinite(displayAngle)
                   ? String(Math.floor(Math.abs(displayAngle) + 1e-9))
                   : '—';
-                const loss = s?.isBeyondNonLcrLimit ? 'N/A' : (Number.isFinite(s?.lossDb) ? `${s.lossDb.toFixed(1)} dB` : '—');
+                
+                // P17 buckets MUST be 0.0 / 1.5 / 3.0 only (never show 4.0).
+                // Any value > 3.0 displays as ">3.0 dB" (which is L2 by RP22 rule).
+                const rawLoss = Number.isFinite(s?.lossDb) ? Number(s.lossDb) : null;
+
+                let lossText = '—';
+                if (s?.isBeyondNonLcrLimit) {
+                  lossText = 'N/A';
+                } else if (rawLoss == null) {
+                  lossText = '—';
+                } else if (rawLoss <= 0.0) {
+                  lossText = '0.0 dB';
+                } else if (rawLoss <= 1.5) {
+                  lossText = '1.5 dB';
+                } else if (rawLoss <= 3.0) {
+                  lossText = '3.0 dB';
+                } else {
+                  lossText = '>3.0 dB';
+                }
+
+                const loss = lossText;
                 const text = `${s.role} ${angle}° / ${loss}`;
                 const isWorst = metric?.worstRole === s.role;
                 return isWorst ? <strong key={s.role}>{text}</strong> : <span key={s.role}>{text}</span>;
@@ -371,9 +400,29 @@ export default function SeatHud({
                 if (i === 0) return [item];
                 return [...acc, ', ', item];
               }, [])}
-                    {metric?.worstRole && Number.isFinite(metric?.worstAngleDeg) && Number.isFinite(metric?.worstLossDb) && (
-                      <strong> (worst: {metric.worstRole} {String(Math.floor(Math.abs(metric.worstAngleDeg) + 1e-9))}° / {metric.worstLossDb.toFixed(1)} dB)</strong>
-                    )}
+                    {metric?.worstRole && Number.isFinite(metric?.worstAngleDeg) && Number.isFinite(metric?.worstLossDb) && (() => {
+                      const preset = String(tooltipData?.dolbyLayout || '').split(' ')[0].split('_')[0];
+                      const parts = preset.split('.');
+                      const heights = parts.length >= 3 ? (parseInt(parts[2], 10) || 0) : 0;
+                      const worstRole = String(metric.worstRole || '').toUpperCase();
+
+                      // Hide worst overhead summary if the layout has no height layer (prevents "ghost overhead worst").
+                      if (!heights && worstRole.startsWith('T')) return null;
+
+                      const raw = Number(metric.worstLossDb);
+                      const worstLossText =
+                        raw <= 0.0 ? '0.0 dB' :
+                        raw <= 1.5 ? '1.5 dB' :
+                        raw <= 3.0 ? '3.0 dB' :
+                        '>3.0 dB';
+
+                      return (
+                        <strong>
+                          {' '}
+                          (worst: {metric.worstRole} {String(Math.floor(Math.abs(metric.worstAngleDeg) + 1e-9))}° / {worstLossText})
+                        </strong>
+                      );
+                    })()}
                   </div>
                   {/* Debug info for first overhead speaker */}
                   {metric.perSpeaker.length > 0 && metric.perSpeaker[0].debug && (
