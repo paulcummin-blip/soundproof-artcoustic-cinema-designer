@@ -644,17 +644,39 @@ export function buildSeatHudSnapshot({
         else level17 = 'L2';                       // 4+ => L2
       }
       
-      data.rp22.p17 = {
-        value: worstLossDb,
-        formatted: worstGroup || '—', // Show worst group name (e.g., "Side Surrounds")
-        level: level17,
-        perSpeaker,
-        worstRole,
-        worstAngleDeg,
-        worstLossDb,
-        worstGroup,
-        p17HasNaAngles: perSpeaker.some(s => s.isBeyondNonLcrLimit),
-      };
+      // P17 MUST BE N/A UNTIL REAL SL + SR SPEAKERS EXIST (NO GHOSTS)
+      const _p17Candidates = (placedSpeakers || [])
+        .filter(hasXY)
+        .filter(hasRealModel);
+
+      const _p17HasSL = _p17Candidates.some(s => getCanonicalRole(s.role) === "SL");
+      const _p17HasSR = _p17Candidates.some(s => getCanonicalRole(s.role) === "SR");
+
+      if (!(_p17HasSL && _p17HasSR)) {
+        data.rp22.p17 = {
+          value: null,
+          formatted: "—",
+          level: "N/A",
+          perSpeaker: [],
+          worstRole: null,
+          worstAngleDeg: null,
+          worstLossDb: null,
+          worstGroup: null,
+          p17HasNaAngles: false,
+        };
+      } else {
+        data.rp22.p17 = {
+          value: worstLossDb,
+          formatted: worstGroup || '—', // Show worst group name (e.g., "Side Surrounds")
+          level: level17,
+          perSpeaker,
+          worstRole,
+          worstAngleDeg,
+          worstLossDb,
+          worstGroup,
+          p17HasNaAngles: perSpeaker.some(s => s.isBeyondNonLcrLimit),
+        };
+      }
     }
   }
 
@@ -886,15 +908,33 @@ export function buildSeatHudSnapshot({
           else if (gapFloor <= 80) level = 'L2';
           else level = 'L1';
 
-          data.rp22.p5 = {
-            valueDeg: maxGap,
-            formatted: `${gapFloor}°`,
-            level,
-            // optional: show what pair generated the max gap when HUD is pinned
-            debugLine: maxPair
-              ? `${maxPair.from.canon}→${maxPair.to.canon} = ${Math.floor(maxPair.gapDeg + 1e-9)}°`
-              : undefined,
-          };
+          // P5 MUST BE N/A UNTIL AT LEAST TWO REAL SURROUND SPEAKERS EXIST (NO GHOSTS)
+          const _p5Candidates = (placedSpeakers || [])
+            .filter(hasXY)
+            .filter(hasRealModel)
+            .filter((s) => {
+              const r = getCanonicalRole(s.role);
+              return ["SL", "SR", "SBL", "SBR", "LW", "RW"].includes(r);
+            });
+
+          if (_p5Candidates.length < 2) {
+            data.rp22.p5 = {
+              valueDeg: null,
+              formatted: "—",
+              level: "N/A",
+              debugLine: undefined,
+            };
+          } else {
+            data.rp22.p5 = {
+              valueDeg: maxGap,
+              formatted: `${gapFloor}°`,
+              level,
+              // optional: show what pair generated the max gap when HUD is pinned
+              debugLine: maxPair
+                ? `${maxPair.from.canon}→${maxPair.to.canon} = ${Math.floor(maxPair.gapDeg + 1e-9)}°`
+                : undefined,
+            };
+          }
         }
       }
     }
