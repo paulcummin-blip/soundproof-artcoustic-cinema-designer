@@ -1491,67 +1491,9 @@ React.useEffect(() => {
     getCanonicalRole
   ]);
 
-  // Auto-seed FW speakers when enabled (runs once when conditions are met)
-  useEffect(() => {
-    if (!onSetSpeakers) return;
-    if (frontWideZones?.status !== 'ok') return;
-
-    const hasLW = placedSpeakers?.some(s => getCanonicalRole(s.role) === 'LW');
-    const hasRW = placedSpeakers?.some(s => getCanonicalRole(s.role) === 'RW');
-
-    if (hasLW && hasRW) return;
-
-    const W = widthM || 4.5;
-    const WALL_BUFFER_FW = 0.02;
-
-    // Get model from first surround speaker as fallback
-    const surroundModel = placedSpeakers?.find(s =>
-      ['SL', 'SR'].includes(getCanonicalRole(s.role))
-    )?.model || 'off';
-
-    if (surroundModel === 'off') return;
-
-    const dims = getModelDimsM(surroundModel);
-    const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
-
-    const newSpeakers = [...(placedSpeakers || [])];
-    let speakersAdded = false;
-
-    if (!hasLW && frontWideZones.left) {
-      newSpeakers.push({
-        id: `LW-${timeNowMs()}`,
-        role: 'LW',
-        model: surroundModel,
-        position: {
-          x: WALL_BUFFER_FW + halfDepth,
-          y: frontWideZones.left.medianY,
-          z: 1.1
-        },
-        draggable: true
-      });
-      speakersAdded = true;
-    }
-
-    if (!hasRW && frontWideZones.right) {
-      newSpeakers.push({
-        id: `RW-${timeNowMs() + 1}`,
-        role: 'RW',
-        model: surroundModel,
-        position: {
-          x: W - WALL_BUFFER_FW - halfDepth,
-          y: frontWideZones.right.medianY,
-          z: 1.1
-        },
-        rotation: { x: 0, y: 0, z: 0 },
-        draggable: true
-      });
-      speakersAdded = true;
-    }
-
-    if (speakersAdded) {
-      onSetSpeakers(newSpeakers);
-    }
-  }, [frontWideZones, placedSpeakers, widthM, getModelDimsM, onSetSpeakers, getCanonicalRole]);
+  // [DISABLED] Auto-seed FW speakers when enabled
+  // Reason: RoomDesigner already creates LW/RW via 7.x swap logic.
+  // This auto-seed introduces duplicate creation / re-creation timing issues.
 
   // --- OVERHEAD ZONES (must be declared EARLY, before handleSpeakerDrag) ---
   const overheadZones = useMemo(
@@ -1630,76 +1572,61 @@ React.useEffect(() => {
     const L = lengthM || 6.0;
     const WALL_BUFFER_FW = 0.02;
 
-    let needsUpdate = false;
-    const updated = (placedSpeakers || []).map(s => {
-      const role = getCanonicalRole(s.role);
-      if (role !== 'LW' && role !== 'RW') return s;
+    // [FIX] Settle tolerance to prevent flicker (1mm)
+    const POS_TOL = 0.001;
+    const roundMm = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
 
-      // [B44 FIX] Skip user-positioned speakers
-      if (s.positionSource === 'user') return s;
+    onSetSpeakers((prev) => {
+      const list = Array.isArray(prev) ? prev : [];
 
-      const zone = role === 'LW' ? frontWideZones.left : frontWideZones.right;
-      if (!zone || !zone.medianY) return s;
+      let changed = false;
 
-      const dims = getModelDimsM(s.model);
-      const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
-      const halfWidth = (Number(dims?.widthM) || 0.20) / 2;
+      const next = list.map((s) => {
+        const role = getCanonicalRole(s?.role);
+        if (role !== "LW" && role !== "RW") return s;
 
-      const xAtWall = role === 'LW'
-        ? (WALL_BUFFER_FW + halfDepth)
-        : (W - WALL_BUFFER_FW - halfDepth);
+        if (s.positionSource === "user") return s;
 
-      const sideOffsetKey = role === 'LW' ? 'L' : 'R';
-      const currentOffset = fwOffsetRef.current[sideOffsetKey] || 0;
+        const zone = role === "LW" ? frontWideZones.left : frontWideZones.right;
+        if (!zone || !zone.medianY) return s;
 
-      const targetYWithOffset = zone.medianY + currentOffset;
-      const yMinClamped = (zone.yMin || 0) + (halfWidth * SIDE_ALLOW_OVERHANG);
-      const yMaxClamped = (zone.yMax || L) - (halfWidth * SIDE_ALLOW_OVERHANG);
+        const dims = getModelDimsM(s.model);
+        const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
+        const halfWidth = (Number(dims?.widthM) || 0.20) / 2;
 
-      const yClamped = clamp(targetYWithOffset, yMinClamped, yMaxClamped);
+        const xAtWall = role === "LW"
+          ? (WALL_BUFFER_FW + halfDepth)
+          : (W - WALL_BUFFER_FW - halfDepth);
 
-      const currentY = s.position?.y ?? 0;
-      const currentX = s.position?.x ?? 0;
+        const sideOffsetKey = role === "LW" ? "L" : "R";
+        const currentOffset = fwOffsetRef.current[sideOffsetKey] || 0;
 
-      if (Math.abs(currentY - yClamped) > EPS || Math.abs(currentX - xAtWall) > EPS) {
-        needsUpdate = true;
-        return {
-          ...s,
-          position: {
-            ...s.position,
-            x: xAtWall,
-            y: yClamped,
-            z: s.position?.z ?? 1.1
-          }
-        };
-      }
+        const targetYWithOffset = zone.medianY + currentOffset;
+        const yMinClamped = (zone.yMin || 0) + (halfWidth * SIDE_ALLOW_OVERHANG);
+        const yMaxClamped = (zone.yMax || L) - (halfWidth * SIDE_ALLOW_OVERHANG);
 
-      return s;
-    });
+        const yClamped = roundMm(clamp(targetYWithOffset, yMinClamped, yMaxClamped));
+        const xAtWallRounded = roundMm(xAtWall);
 
-    if (needsUpdate) {
-      onSetSpeakers(prev => {
-        // Only update if array actually differs (prevent infinite loop)
-        if (prev.length !== updated.length) return updated;
-        
-        const changed = prev.some((s, i) => {
-          const u = updated[i];
-          if (!s || !u) return true;
-          if (s.id !== u.id || s.role !== u.role) return true;
-          const px = s.position?.x ?? 0;
-          const py = s.position?.y ?? 0;
-          const ux = u.position?.x ?? 0;
-          const uy = u.position?.y ?? 0;
-          return Math.abs(px - ux) > 0.0001 || Math.abs(py - uy) > 0.0001;
-        });
-        
-        return changed ? updated : prev;
+        const currentY = s.position?.y ?? 0;
+        const currentX = s.position?.x ?? 0;
+
+        if (Math.abs(currentY - yClamped) > POS_TOL || Math.abs(currentX - xAtWallRounded) > POS_TOL) {
+          changed = true;
+          return {
+            ...s,
+            position: { ...(s.position || {}), x: xAtWallRounded, y: yClamped, z: s.position?.z ?? 1.1 }
+          };
+        }
+
+        return s;
       });
-    }
+
+      return changed ? next : prev;
+    });
     
   }, [
     frontWideZones,
-    placedSpeakers,
     widthM,
     lengthM,
     speakersEpoch,
