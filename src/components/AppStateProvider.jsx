@@ -808,6 +808,7 @@ function useDesignerState() {
     if (major >= 5) { roles.add("SL"); roles.add("SR"); }
     if (showRears) { roles.add("SBL"); roles.add("SBR"); }
     if (showWides) { roles.add("LW"); roles.add("RW"); }
+    if (showWides) { roles.add("LW"); roles.add("RW"); }
 
     // Add overhead channels (from original getSpeakerVisibilityFor)
     const heights = parseInt(layoutKey.split(".")[2], 10) || 0;

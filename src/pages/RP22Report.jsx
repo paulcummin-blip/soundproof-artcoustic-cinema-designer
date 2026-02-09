@@ -1312,6 +1312,12 @@ function RP22ReportInner() {
             return String(model).trim();
         };
 
+        // Filter speakers to only those active in current layout (prevents counting ghost speakers in 7.x wides mode)
+        const activeSpeakers = placedSpeakers.filter(spk => {
+            // Always use getSpeakerVisibility to filter (same as Room Designer and RoomVisualisation)
+            return app?.getSpeakerVisibility?.(spk?.role, spk?.model) ?? true;
+        });
+
         // Helper to get display-ready speaker name (matches Room Designer UI)
         const getDisplayName = (modelKey) => {
             if (!modelKey) return null;
@@ -1354,7 +1360,7 @@ function RP22ReportInner() {
             overheads: {}
         };
 
-        placedSpeakers.forEach(spk => {
+        activeSpeakers.forEach(spk => {
             const role = String(spk?.role || '').toUpperCase();
             const model = normalizeModel(spk?.model);
             if (!model) return;
@@ -1402,7 +1408,7 @@ function RP22ReportInner() {
         summary.subs = subList.length > 0 ? subList : ['None specified'];
 
         return summary;
-    }, [placedSpeakers, frontSubsCfg, rearSubsCfg]);
+    }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility]);
 
     // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
     // Total is always 10 (RP23 + 9 RP22 params: P1, P4, P5, P6, P9, P10, P16, P17, P20)
@@ -1909,6 +1915,7 @@ function RP22ReportInner() {
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
+                    roomElements={app?.roomElements || []}
                     exportMode="dimensions"
                     overlays={{ ROOM_DIMS: true }}
                     showBaffle={true}
@@ -1964,6 +1971,7 @@ function RP22ReportInner() {
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
+                    roomElements={app?.roomElements || []}
                     exportMode="dimensions"
                     overlays={{}}
                     showBaffle={true}
@@ -2019,6 +2027,7 @@ function RP22ReportInner() {
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
+                    roomElements={app?.roomElements || []}
                     exportMode="dimensions"
                     overlays={{}}
                     showBaffle={true}
