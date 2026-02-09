@@ -21,6 +21,16 @@ const finite = (v, fallback) => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+const hasXY = (s) =>
+  s?.position &&
+  Number.isFinite(s.position.x) &&
+  Number.isFinite(s.position.y);
+
+const hasRealModel = (s) => {
+  const ms = String(s?.model ?? "").trim().toLowerCase();
+  return !!ms && ms !== "off" && ms !== "none";
+};
+
 // Angle display helpers - whole degrees only (floor), no decimals
 const floorDeg = (deg) => {
   if (deg === null || deg === undefined) return null;
@@ -346,16 +356,38 @@ export function buildSeatHudSnapshot({
         }
       }
 
-      data.rp22.p16 = {
-        value: null, // No numeric value, only step labels
-        formatted: worstRole && Number.isFinite(worstAngleDeg) ? `${worstRole} ${worstAngleDeg}°` : '—',
-        hudLabel: worstRole && Number.isFinite(worstAngleDeg) ? `${worstRole} ${worstAngleDeg}°` : '—',
-        level: worstLevel || '—', // "FAIL" or "L4"/"L2"/"L1"
-        perSpeaker,
-        worstRole,
-        worstAngleDeg,
-        worstLossLabel,
-      };
+      // P16 MUST BE N/A UNTIL REAL FL/FC/FR SPEAKERS EXIST (NO GHOSTS)
+      const _p16Candidates = (placedSpeakers || [])
+        .filter(hasXY)
+        .filter(hasRealModel);
+
+      const _p16HasFL = _p16Candidates.some(s => getCanonicalRole(s.role) === "FL");
+      const _p16HasFC = _p16Candidates.some(s => getCanonicalRole(s.role) === "FC");
+      const _p16HasFR = _p16Candidates.some(s => getCanonicalRole(s.role) === "FR");
+
+      if (!(_p16HasFL && _p16HasFC && _p16HasFR)) {
+        data.rp22.p16 = {
+          value: null,
+          formatted: "—",
+          hudLabel: "—",
+          level: "N/A",
+          perSpeaker: [],
+          worstRole: null,
+          worstAngleDeg: null,
+          worstLossLabel: null,
+        };
+      } else {
+        data.rp22.p16 = {
+          value: null, // No numeric value, only step labels
+          formatted: worstRole && Number.isFinite(worstAngleDeg) ? `${worstRole} ${worstAngleDeg}°` : '—',
+          hudLabel: worstRole && Number.isFinite(worstAngleDeg) ? `${worstRole} ${worstAngleDeg}°` : '—',
+          level: worstLevel || '—', // "FAIL" or "L4"/"L2"/"L1"
+          perSpeaker,
+          worstRole,
+          worstAngleDeg,
+          worstLossLabel,
+        };
+      }
     }
   }
 
