@@ -556,8 +556,14 @@ export function buildSeatHudSnapshot({
           ? offAxisDegRaw
           : smallestOffAxisDeg(offAxisDegRaw);
 
-        const offAxisDegStable = Math.round(offAxisDeg * 10) / 10; // 0.1° stability
-        const offAxisDegInt = Math.floor(offAxisDegStable + 1e-9);
+        // Stabilise wall-speaker off-axis to stop 1° flicker (eg 20↔21).
+        // Use the same stabilised value for display AND bucket decisions.
+        const SNAP_STEP_DEG = 0.5; // 0.5° is enough to kill wobble without "rounding away" real changes
+        const offAxisDegStable = isOverhead
+          ? offAxisDeg
+          : (Math.round(offAxisDeg / SNAP_STEP_DEG) * SNAP_STEP_DEG);
+
+        const offAxisDegInt = Math.round(offAxisDegStable);
         
         // Product-dependent P17 "bucket" using the model's horizontal dispersion windows
         const meta = getSpeakerModelMeta(sp.model);
@@ -572,7 +578,7 @@ export function buildSeatHudSnapshot({
         
         // P17 LOSS BUCKETS (3-state only, no L1, no FAIL)
         // Use a rounded value (0.1°) for bucket decisions to stop threshold wobble
-        const offAxisForBucket = Math.round((offAxisDeg + 1e-9) * 10) / 10;
+        const offAxisForBucket = offAxisDegStable;
         const offAxisClamped = Math.min(180, Math.max(0, offAxisForBucket));
 
         // Small tolerance so 24.0000001° doesn't flip buckets
