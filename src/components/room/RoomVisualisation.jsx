@@ -606,8 +606,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const lastPointerRef = useRef({ x: 0, y: 0 });
   const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
   const lastCalcMinScreenDepthRef = React.useRef(null);
-  const [containerW, setContainerW] = useState(0);
-  const [containerH, setContainerH] = useState(0);
+  const [containerW, setContainerW] = useState(null);
+  const [containerH, setContainerH] = useState(null);
   const [hoveredSeat, setHoveredSeat] = useState(null);
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
   const [hudHiddenWhenPinned, setHudHiddenWhenPinned] = useState(false);
@@ -1185,21 +1185,29 @@ React.useEffect(() => {
 
   const TOP_GUTTER_PX = 150; // reserved space above room for dimension lines
   
-  const availW = (containerW || DEFAULT_W) - 2 * PADDING;
-  const availH = (containerH || DEFAULT_H) - 2 * PADDING - TOP_GUTTER_PX;
-  const scale = useMemo(() =>
-    Math.min(availW / widthM, availH / lengthM),
-    [availW, availH, widthM, lengthM]);
+  const availW = (Number.isFinite(containerW) ? containerW : 0) - 2 * PADDING;
+  const availH = (Number.isFinite(containerH) ? containerH : 0) - 2 * PADDING - TOP_GUTTER_PX;
+  const scale = useMemo(() => {
+    if (!Number.isFinite(availW) || !Number.isFinite(availH)) return null;
+    if (availW <= 0 || availH <= 0) return null;
+    if (!Number.isFinite(widthM) || !Number.isFinite(lengthM)) return null;
+    if (widthM <= 0 || lengthM <= 0) return null;
+    return Math.min(availW / widthM, availH / lengthM);
+  }, [availW, availH, widthM, lengthM]);
 
-  const roomRect = useMemo(() => ({
-    x: PADDING, 
-    y: PADDING + TOP_GUTTER_PX,
-    width: widthM * scale, 
-    height: lengthM * scale
-  }), [widthM, lengthM, scale]);
+  const roomRect = useMemo(() => {
+    if (!Number.isFinite(scale)) return null;
+    return {
+      x: PADDING,
+      y: PADDING + TOP_GUTTER_PX,
+      width: widthM * scale,
+      height: lengthM * scale,
+    };
+  }, [widthM, lengthM, scale]);
 
   // Update toPx for pixel-perfect rendering
   const toPx = useCallback((x_m, y_m) => {
+    if (!roomRect || !Number.isFinite(scale)) return [0, 0];
     const x = roomRect.x + x_m * scale;
     const y = roomRect.y + y_m * scale;
     return [Math.round(x) + 0.5, Math.round(y) + 0.5];
@@ -7111,7 +7119,12 @@ return (
         onMouseLeave={handleMouseUp}
       >
 
-
+        {!roomRect || !Number.isFinite(scale) ? (
+          <text x="50%" y="50%" textAnchor="middle" fill="#777" fontSize="12">
+            Loading plan…
+          </text>
+        ) : (
+          <>
         {/* TEMP DEBUG: Surround Hydration State */}
         {globalThis.__B44_DEBUG_UI === true && (() => {
           const targets = ["SBL", "SBR", "LW", "RW"];
@@ -7693,6 +7706,8 @@ return (
 )}
 
           </g>
+          </>
+        )}
         </svg>
 
         {/* SEAT HOVER HUD - updated with drag and hide/show */}
