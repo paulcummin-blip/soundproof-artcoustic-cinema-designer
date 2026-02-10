@@ -3402,9 +3402,12 @@ React.useEffect(() => {
     const cacheKey = `${seatId}|${signature}`;
     const cached = seatId ? appState?.seatMetricsById?.[cacheKey] : null;
     
-    if (cached) {
+    const cachedHasLayout = !!cached?.dolbyLayout;
+    
+    if (cached && cachedHasLayout) {
       return cached;
     }
+    // If cached exists but has no dolbyLayout, treat it as stale and recompute live.
     
     // If cache is stale or missing, compute live snapshot for hover
     const data = buildSeatHudSnapshot({

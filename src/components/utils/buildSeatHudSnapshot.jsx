@@ -447,12 +447,8 @@ export function buildSeatHudSnapshot({
     });
 
     if (relevantSpeakers.length > 0) {
-      // Local yaw helper: FROM -> TO (0° = +Y, +90° = +X, -90° = -X, 180° = -Y)
-      const yawFromToDeg = (from, to) => {
-        const dx = (to?.x ?? 0) - (from?.x ?? 0);
-        const dy = (to?.y ?? 0) - (from?.y ?? 0);
-        return Math.atan2(dx, dy) * (180 / Math.PI);
-      };
+      // DELETED: yawFromToDeg (was causing yaw convention mismatch)
+      // P17 now uses safeYawToMLP for BOTH dirDeg and aimDeg
 
       const perSpeaker = [];
       let worstLossDb = -Infinity;
@@ -464,10 +460,8 @@ export function buildSeatHudSnapshot({
         const canon = getCanonicalRole(sp.role);
         const pos = sp.position;
         
-        // Calculate direction from speaker to seat
-        const dx = seatX - pos.x;
-        const dy = seatY - pos.y;
-        const dirDeg = yawFromToDeg(pos, { x: seatX, y: seatY });
+        // Calculate direction from speaker to seat (using same convention as aim)
+        const dirDeg = safeYawToMLP(pos, { x: seatX, y: seatY });
         
         // CRITICAL: Get speaker's aim using EXACT same logic as renderSpeakers
         let aimDeg = 0;
@@ -562,7 +556,8 @@ export function buildSeatHudSnapshot({
           ? offAxisDegRaw
           : smallestOffAxisDeg(offAxisDegRaw);
 
-        const offAxisDegInt = Math.floor(offAxisDeg + 1e-9);
+        const offAxisDegStable = Math.round(offAxisDeg * 10) / 10; // 0.1° stability
+        const offAxisDegInt = Math.floor(offAxisDegStable + 1e-9);
         
         // Product-dependent P17 "bucket" using the model's horizontal dispersion windows
         const meta = getSpeakerModelMeta(sp.model);
