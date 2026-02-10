@@ -355,15 +355,6 @@ export default function SeatHud({
                   >
                     {metric.perSpeaker
               .slice()
-              .filter(s => {
-                // If the active layout has no height layer (e.g. "5.1", "7.1"), do NOT show any overhead roles in P17.
-                const preset = String(tooltipData?.dolbyLayout || '').split(' ')[0].split('_')[0]; // e.g. "9.1.6"
-                const parts = preset.split('.');
-                const heights = parts.length >= 3 ? (parseInt(parts[2], 10) || 0) : 0;
-                const canonRole = String(s?.role || '').toUpperCase();
-                if (!heights && canonRole.startsWith('T')) return false;
-                return true;
-              })
               .sort((a, b) => a.role.localeCompare(b.role))
               .map(s => {
                 // Use rawAngleDeg if available (for overheads), otherwise angleDeg
@@ -401,14 +392,7 @@ export default function SeatHud({
                 return [...acc, ', ', item];
               }, [])}
                     {metric?.worstRole && Number.isFinite(metric?.worstAngleDeg) && Number.isFinite(metric?.worstLossDb) && (() => {
-                      const preset = String(tooltipData?.dolbyLayout || '').split(' ')[0].split('_')[0];
-                      const parts = preset.split('.');
-                      const heights = parts.length >= 3 ? (parseInt(parts[2], 10) || 0) : 0;
                       const worstRole = String(metric.worstRole || '').toUpperCase();
-
-                      // Hide worst overhead summary if the layout has no height layer (prevents "ghost overhead worst").
-                      if (!heights && worstRole.startsWith('T')) return null;
-
                       const raw = Number(metric.worstLossDb);
                       const worstLossText =
                         raw <= 0.0 ? '0.0 dB' :
