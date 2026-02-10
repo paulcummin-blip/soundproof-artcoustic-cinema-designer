@@ -2084,9 +2084,13 @@ function RoomDesignerWithState() {
         }
       }
 
-      if (best && Number.isFinite(best.y)) {
-        const z = Number.isFinite(best?.z) ? Number(best.z) : 1.2;
-        return { x: cx, y: Number(best.y), z };
+      if (best) {
+        const by = Number(best.y ?? best.position?.y);
+        const bz = Number(best.z ?? best.position?.z);
+        if (Number.isFinite(by)) {
+          const z = Number.isFinite(bz) ? bz : 1.2;
+          return { x: cx, y: by, z };
+        }
       }
     }
 
