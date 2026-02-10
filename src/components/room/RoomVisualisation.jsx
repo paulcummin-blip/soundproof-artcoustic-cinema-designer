@@ -1215,17 +1215,20 @@ React.useEffect(() => {
 
   // New helper functions for single-axis meter to pixel conversion
   const meterToCanvasX = useCallback((xM) => {
+    if (!roomRect || !Number.isFinite(scale)) return 0;
     const x = roomRect.x + (xM * scale);
     return Math.round(x) + 0.5;
   }, [roomRect, scale]);
 
   const meterToCanvasY = useCallback((yM) => {
+    if (!roomRect || !Number.isFinite(scale)) return 0;
     const y = roomRect.y + (yM * scale);
     return Math.round(y) + 0.5;
   }, [roomRect, scale]);
 
   const canvasToRoom = useCallback((posPx) => {
     if (!posPx) return { x: 0, y: 0 };
+    if (!roomRect || !Number.isFinite(scale)) return { x: 0, y: 0 };
     // Account for view offset from pan
     const xM = (posPx.x - roomRect.x - viewOffsetPx.x) / scale;
     const yM = (posPx.y - roomRect.y - viewOffsetPx.y) / scale;
@@ -1234,6 +1237,7 @@ React.useEffect(() => {
 
   const roomToCanvas = useCallback((posM) => {
     if (!posM) return { x: 0, y: 0 };
+    if (!roomRect || !Number.isFinite(scale)) return { x: 0, y: 0 };
     const xPx = roomRect.x + (posM.x * scale);
     const yPx = roomRect.y + (posM.y * scale);
     return { x: Math.round(xPx) + 0.5, y: Math.round(yPx) + 0.5 };
