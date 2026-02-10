@@ -1911,6 +1911,31 @@ function RoomDesignerWithState() {
     manualHeightM: Number(_screen?.manualHeightM) || 0
   }), [_screen?.visibleWidthInches, _screen?.aspectRatio, _screen?.floatDepthM, _screen?.heightFromFloorM, _screen?.manualMode, _screen?.manualWidthM, _screen?.manualHeightM, _screen?.mountMode]);
 
+  // --- Screen width used for MLP + row centres (must be available even if Screen Size panel was never opened) ---
+  const screenVisibleWidthInchesEffective = useMemo(() => {
+    const s = stableScreen || _screen || appState?.screen || {};
+
+    // 1) Preferred: already in inches
+    const vwi = Number(s?.visibleWidthInches);
+    if (Number.isFinite(vwi) && vwi > 0) return vwi;
+
+    // 2) Manual width in metres -> inches
+    const mw = Number(s?.manualWidthM);
+    if (Number.isFinite(mw) && mw > 0) return mw / 0.0254;
+
+    // 3) Manual height + aspect ratio -> width
+    const mh = Number(s?.manualHeightM);
+    const ar = Number(s?.aspectRatio);
+    if (Number.isFinite(mh) && mh > 0 && Number.isFinite(ar) && ar > 0) {
+      return (mh * ar) / 0.0254;
+    }
+
+    // 4) If nothing exists yet, use a conservative default so we DON'T drift
+    // (This is only a temporary geometry anchor; once the real screen width arrives,
+    //  the effect will run again and seats/MLP will update.)
+    return 120; // 120" default
+  }, [stableScreen, _screen, appState?.screen]);
+
   // Compute MLP (green dot) and row centers from screen plane
   useEffect(() => {
     // Pull needed values
@@ -1928,13 +1953,8 @@ function RoomDesignerWithState() {
       Number.isFinite(_screen?.floatDepthM) ? Number(_screen.floatDepthM) :
       0;
 
-    // Visible width: prefer inches, but fall back to manual width if needed
-    const visibleWidthIn = Number(stableScreen?.visibleWidthInches);
-    const manualWidthM = Number(stableScreen?.manualWidthM ?? _screen?.manualWidthM);
-
     const screenVisibleWidthM =
-      Number.isFinite(visibleWidthIn) && visibleWidthIn > 0 ? (visibleWidthIn * 0.0254) :
-      (Number.isFinite(manualWidthM) && manualWidthM > 0 ? manualWidthM : null);
+      Number(screenVisibleWidthInchesEffective) * 0.0254;
 
     /* Y-only viewing offset (lock X to centre) */
     const viewingOffsetM = Number(_seatingBlockOffset) || 0;
@@ -2014,7 +2034,7 @@ function RoomDesignerWithState() {
     }
   }, [
   appState?.screenFrontPlaneM,
-  stableScreen?.visibleWidthInches,
+  screenVisibleWidthInchesEffective,
   _seatingBlockOffset,
   _seatingRows,
   _mlpBasis,
@@ -2024,9 +2044,7 @@ function RoomDesignerWithState() {
   stableDimensions?.length,
   appState?.roomDims?.lengthM,
   _screen?.screenPlaneY_m,
-  _screen?.floatDepthM,
-  stableScreen?.manualWidthM,
-  _screen?.manualWidthM]
+  _screen?.floatDepthM]
   );
 
   // Use computed MLP as the effective anchor (for backwards compatibility)
