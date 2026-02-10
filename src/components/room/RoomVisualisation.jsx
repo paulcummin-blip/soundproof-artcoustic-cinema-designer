@@ -6781,6 +6781,9 @@ return {
 
     return (
       <g className="seats-layer" style={{ pointerEvents: 'auto' }}>
+        {/* MLP marker MUST live in the same layer as seats to prevent transform drift */}
+        {MLPMarker}
+
         {seatingPositions.map((seat) => {
           // accept either { x, y } or { position: { x, y } }
           const xM = Number(
@@ -7410,9 +7413,6 @@ return (
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
             {renderRoomElements()}
-
-            {/* Layer 7: MLP Marker (Fixed point, generally on top of zones but under draggable items) */}
-            {MLPMarker}
 
             {/* Layer 7.5: MLP Position Ruler (when enabled) */}
             {exportMode !== 'clean' && showMlpRuler && (() => {
