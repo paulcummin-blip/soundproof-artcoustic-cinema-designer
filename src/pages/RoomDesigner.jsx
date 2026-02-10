@@ -1951,19 +1951,14 @@ function RoomDesignerWithState() {
   // Compute MLP (green dot) and row centers from screen plane
   useEffect(() => {
     // Pull needed values
-    // Prefer the published screen front plane, but fall back to screen state so MLP can initialise
+    // Prefer the published screen front plane from RV.
+    // IMPORTANT: Do NOT calculate/store mlpY_m until this is a real finite number,
+    // otherwise the MLP dot "locks in" a consistent wrong offset on first load.
     const screenFrontPlaneM_raw = appState?.screenFrontPlaneM;
-
-    // Fallback order:
-    // 1) appState.screenFrontPlaneM (published by RV)
-    // 2) _screen.screenPlaneY_m (if you store it)
-    // 3) _screen.floatDepthM (better than nothing)
-    // 4) 0
-    const screenFrontPlaneM =
-      Number.isFinite(screenFrontPlaneM_raw) ? Number(screenFrontPlaneM_raw) :
-      Number.isFinite(_screen?.screenPlaneY_m) ? Number(_screen.screenPlaneY_m) :
-      Number.isFinite(_screen?.floatDepthM) ? Number(_screen.floatDepthM) :
-      0;
+    if (!Number.isFinite(screenFrontPlaneM_raw)) {
+      return;
+    }
+    const screenFrontPlaneM = Number(screenFrontPlaneM_raw);
 
     const screenVisibleWidthM =
       Number(screenVisibleWidthInchesEffective) * 0.0254;
@@ -2078,8 +2073,8 @@ function RoomDesignerWithState() {
       let bestDx = Infinity;
 
       for (const s of seats) {
-        const sx = Number(s?.x);
-        const sy = Number(s?.y);
+        const sx = Number(s?.x ?? s?.position?.x);
+        const sy = Number(s?.y ?? s?.position?.y);
         if (!Number.isFinite(sx) || !Number.isFinite(sy)) continue;
 
         const dx = Math.abs(sx - cx);
