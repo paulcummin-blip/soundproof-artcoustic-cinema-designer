@@ -572,9 +572,12 @@ export function buildSeatHudSnapshot({
           : null;
         
         // P17 LOSS BUCKETS (3-state only, no L1, no FAIL)
-        // Use FLOORED integer angle for bucket decisions to avoid boundary twitch
-        const offAxisForBucket = Math.floor(offAxisDeg + 1e-9);
+        // Use a rounded value (0.1°) for bucket decisions to stop threshold wobble
+        const offAxisForBucket = Math.round((offAxisDeg + 1e-9) * 10) / 10;
         const offAxisClamped = Math.min(180, Math.max(0, offAxisForBucket));
+
+        // Small tolerance so 24.0000001° doesn't flip buckets
+        const EPS_DEG = 0.2;
 
         // Default: assume we're outside the -3 dB window -> treat as ">=4 dB down" (L2)
         // This ensures we can actually produce L2 under the new spec.
@@ -582,9 +585,9 @@ export function buildSeatHudSnapshot({
 
         if (disp && disp.minus1p5dB != null && disp.minus3dB != null) {
           // disp values are already half-angles via halfDispersionDeg(...)
-          if (offAxisClamped <= disp.minus1p5dB) {
+          if (offAxisClamped <= (disp.minus1p5dB + EPS_DEG)) {
             lossDb = 1.5;  // "no more than 1.5 dB down" => L4
-          } else if (offAxisClamped <= disp.minus3dB) {
+          } else if (offAxisClamped <= (disp.minus3dB + EPS_DEG)) {
             lossDb = 3.0;  // "no more than 3 dB down" => L3
           } else {
             lossDb = 4.0;  // outside -3 window => L2 (>=4 dB down)
@@ -592,8 +595,8 @@ export function buildSeatHudSnapshot({
         } else {
           // No dispersion data: still enforce the same 3-state rule using safe generic half-angle thresholds
           // (These are conservative defaults and keep the system stable.)
-          if (offAxisClamped <= 28) lossDb = 1.5;
-          else if (offAxisClamped <= 41) lossDb = 3.0;
+          if (offAxisClamped <= (28 + EPS_DEG)) lossDb = 1.5;
+          else if (offAxisClamped <= (41 + EPS_DEG)) lossDb = 3.0;
           else lossDb = 4.0;
         }
 
