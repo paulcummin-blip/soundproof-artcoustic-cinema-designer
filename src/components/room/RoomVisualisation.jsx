@@ -628,6 +628,26 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const lastCalcMinScreenDepthRef = React.useRef(null);
   const [containerW, setContainerW] = useState(null);
   const [containerH, setContainerH] = useState(null);
+
+  // Force a real measurement on mount/visibility.
+  // (ResizeObserver sometimes doesn't fire until a later layout change.)
+  const measurePlanBoundsNow = React.useCallback(() => {
+    const el = planBoundsRef.current;
+    if (!el) return;
+
+    const r = el.getBoundingClientRect();
+    if (!r || r.width <= 0 || r.height <= 0) return;
+
+    // Round to 0.1px to avoid tiny wobble
+    const w = Math.round(r.width * 10) / 10;
+    const h = Math.round(r.height * 10) / 10;
+
+    setContainerW((prev) => (prev === w ? prev : w));
+    setContainerH((prev) => {
+      const next = Math.max(420, h);
+      return prev === next ? prev : next;
+    });
+  }, []);
   const [hoveredSeat, setHoveredSeat] = useState(null);
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
   const [hudHiddenWhenPinned, setHudHiddenWhenPinned] = useState(false);
@@ -980,13 +1000,41 @@ const byId = useMemo(() => {
       const cr = entries[0]?.contentRect;
       if (!cr || cr.width === 0 || cr.height === 0) return;
 
-      setContainerW(cr.width);
-      // leave some breathing room for toolbars; never below 420px
-      setContainerH(Math.max(420, cr.height || 0));
+      const w = Math.round((cr.width || 0) * 10) / 10;
+      const h = Math.round((cr.height || 0) * 10) / 10;
+
+      if (w > 0 && h > 0) {
+        setContainerW((prev) => (prev === w ? prev : w));
+        setContainerH((prev) => {
+          const next = Math.max(420, h);
+          return prev === next ? prev : next;
+        });
+      }
     });
     ro.observe(planBoundsRef.current); // Changed from containerRef
     return () => ro.disconnect();
   }, [planBoundsRef]); // Changed from containerRef
+
+  // First-paint measurement (and a second pass on the next frame) so the plan
+  // doesn't wait for some unrelated UI change (like opening Screen Size) to align.
+  React.useLayoutEffect(() => {
+    measurePlanBoundsNow();
+
+    const raf1 = requestAnimationFrame(() => {
+      measurePlanBoundsNow();
+      const raf2 = requestAnimationFrame(() => {
+        measurePlanBoundsNow();
+      });
+      // store raf2 id in closure
+      (globalThis.__rvRaf2 = raf2);
+    });
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (globalThis.__rvRaf2) cancelAnimationFrame(globalThis.__rvRaf2);
+      globalThis.__rvRaf2 = null;
+    };
+  }, [measurePlanBoundsNow]);
 
 
   const aspect = `${Math.max(0.1, widthM)} / ${Math.max(0.1, lengthM)}`;
