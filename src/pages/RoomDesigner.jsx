@@ -1914,18 +1914,36 @@ function RoomDesignerWithState() {
   // Compute MLP (green dot) and row centers from screen plane
   useEffect(() => {
     // Pull needed values
-    const screenFrontPlaneM = appState?.screenFrontPlaneM;
-    const screenVisibleWidthM = stableScreen?.visibleWidthInches ?
-    stableScreen.visibleWidthInches * 0.0254 :
-    null;
+    // Prefer the published screen front plane, but fall back to screen state so MLP can initialise
+    const screenFrontPlaneM_raw = appState?.screenFrontPlaneM;
+
+    // Fallback order:
+    // 1) appState.screenFrontPlaneM (published by RV)
+    // 2) _screen.screenPlaneY_m (if you store it)
+    // 3) _screen.floatDepthM (better than nothing)
+    // 4) 0
+    const screenFrontPlaneM =
+      Number.isFinite(screenFrontPlaneM_raw) ? Number(screenFrontPlaneM_raw) :
+      Number.isFinite(_screen?.screenPlaneY_m) ? Number(_screen.screenPlaneY_m) :
+      Number.isFinite(_screen?.floatDepthM) ? Number(_screen.floatDepthM) :
+      0;
+
+    // Visible width: prefer inches, but fall back to manual width if needed
+    const visibleWidthIn = Number(stableScreen?.visibleWidthInches);
+    const manualWidthM = Number(stableScreen?.manualWidthM ?? _screen?.manualWidthM);
+
+    const screenVisibleWidthM =
+      Number.isFinite(visibleWidthIn) && visibleWidthIn > 0 ? (visibleWidthIn * 0.0254) :
+      (Number.isFinite(manualWidthM) && manualWidthM > 0 ? manualWidthM : null);
+
     /* Y-only viewing offset (lock X to centre) */
     const viewingOffsetM = Number(_seatingBlockOffset) || 0;
     const rows = Number(_seatingRows) || 1;
     const rowSpacing = Number(_rowSpacingM) || 1.8; // default 1.8m
     const mlpReference = _mlpBasis; // 'front' | 'back' | 'all'
 
-    // Must have screen plane and width
-    if (!Number.isFinite(screenFrontPlaneM) || !Number.isFinite(screenVisibleWidthM)) {
+    // Must have screen width
+    if (!Number.isFinite(screenVisibleWidthM)) {
       return;
     }
 
@@ -2004,7 +2022,11 @@ function RoomDesignerWithState() {
   appState?.setMlpY_m,
   appState?.setRowCentersM,
   stableDimensions?.length,
-  appState?.roomDims?.lengthM]
+  appState?.roomDims?.lengthM,
+  _screen?.screenPlaneY_m,
+  _screen?.floatDepthM,
+  stableScreen?.manualWidthM,
+  _screen?.manualWidthM]
   );
 
   // Use computed MLP as the effective anchor (for backwards compatibility)
