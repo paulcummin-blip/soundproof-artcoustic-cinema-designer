@@ -1205,24 +1205,26 @@ React.useEffect(() => {
     };
   }, [widthM, lengthM, scale]);
 
+  const hasRoomRect = !!roomRect && Number.isFinite((roomRect?.x ?? 0)) && Number.isFinite((roomRect?.y ?? 0));
+
   // Update toPx for pixel-perfect rendering
   const toPx = useCallback((x_m, y_m) => {
     if (!roomRect || !Number.isFinite(scale)) return [0, 0];
-    const x = roomRect.x + x_m * scale;
-    const y = roomRect.y + y_m * scale;
+    const x = (roomRect?.x ?? 0) + x_m * scale;
+    const y = (roomRect?.y ?? 0) + y_m * scale;
     return [Math.round(x) + 0.5, Math.round(y) + 0.5];
   }, [roomRect, scale]);
 
   // New helper functions for single-axis meter to pixel conversion
   const meterToCanvasX = useCallback((xM) => {
     if (!roomRect || !Number.isFinite(scale)) return 0;
-    const x = roomRect.x + (xM * scale);
+    const x = (roomRect?.x ?? 0) + (xM * scale);
     return Math.round(x) + 0.5;
   }, [roomRect, scale]);
 
   const meterToCanvasY = useCallback((yM) => {
     if (!roomRect || !Number.isFinite(scale)) return 0;
-    const y = roomRect.y + (yM * scale);
+    const y = (roomRect?.y ?? 0) + (yM * scale);
     return Math.round(y) + 0.5;
   }, [roomRect, scale]);
 
@@ -1230,16 +1232,16 @@ React.useEffect(() => {
     if (!posPx) return { x: 0, y: 0 };
     if (!roomRect || !Number.isFinite(scale)) return { x: 0, y: 0 };
     // Account for view offset from pan
-    const xM = (posPx.x - roomRect.x - viewOffsetPx.x) / scale;
-    const yM = (posPx.y - roomRect.y - viewOffsetPx.y) / scale;
+    const xM = (posPx.x - (roomRect?.x ?? 0) - viewOffsetPx.x) / scale;
+    const yM = (posPx.y - (roomRect?.y ?? 0) - viewOffsetPx.y) / scale;
     return { x: xM, y: yM };
   }, [roomRect, scale, viewOffsetPx]);
 
   const roomToCanvas = useCallback((posM) => {
     if (!posM) return { x: 0, y: 0 };
     if (!roomRect || !Number.isFinite(scale)) return { x: 0, y: 0 };
-    const xPx = roomRect.x + (posM.x * scale);
-    const yPx = roomRect.y + (posM.y * scale);
+    const xPx = (roomRect?.x ?? 0) + (posM.x * scale);
+    const yPx = (roomRect?.y ?? 0) + (posM.y * scale);
     return { x: Math.round(xPx) + 0.5, y: Math.round(yPx) + 0.5 };
   }, [roomRect, scale]);
 
@@ -1960,6 +1962,8 @@ React.useEffect(() => {
 
   // Memoize baffle and screen calculations for performance
   const { BaffleAndScreen, screenPlaneY, screenCenterX_m, visibleWidthM } = useMemo(() => {
+    if (!hasRoomRect) return { BaffleAndScreen: null, screenPlaneY: 0, screenCenterX_m: widthM / 2, visibleWidthM: 0 };
+
     const inch2m = 0.0254;
     
     // Border thickness in metres (default 8cm if not specified)
@@ -1988,8 +1992,8 @@ React.useEffect(() => {
     const xCentre = widthM / 2;
     
     // Calculate canvas coordinates
-    const roomCenterX_px = roomRect.x + roomRect.width / 2;
-    const yFront = roomRect.y;
+    const roomCenterX_px = (roomRect?.x ?? 0) + (roomRect?.width ?? 0) / 2;
+    const yFront = (roomRect?.y ?? 0);
     
     // Dotted line (speaker space) = visible width (inset by border on each side)
     const xVisibleL = meterToCanvasX(xCentre - visibleWm / 2);
@@ -3079,8 +3083,8 @@ React.useEffect(() => {
     }
 
 
-    const clampedCanvasX = Math.max(roomRect.x, Math.min(roomRect.x + roomRect.width, targetCanvasPos.x));
-    const clampedCanvasY = Math.max(roomRect.y, Math.min(roomRect.y + roomRect.height, targetCanvasPos.y));
+    const clampedCanvasX = Math.max(roomRect?.x ?? 0, Math.min((roomRect?.x ?? 0) + (roomRect?.width ?? 0), targetCanvasPos.x));
+    const clampedCanvasY = Math.max(roomRect?.y ?? 0, Math.min((roomRect?.y ?? 0) + (roomRect?.height ?? 0), targetCanvasPos.y));
 
     if (dragType === 'speaker') {
       handleSpeakerDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
@@ -4942,6 +4946,8 @@ useEffect(() => {
 
   // Consolidate overlays for rendering
   const overlaysForRendering = useMemo(() => {
+    if (!hasRoomRect) return {};
+
     const base = { ...(_overlays || {}) };
 
     // NEW: Add listening area bounds for overhead zone clamping
@@ -5160,6 +5166,8 @@ useEffect(() => {
 
   // Front-wide zone rendering helper (shows zones whenever toggle is on, regardless of status)
   const renderFrontWideZones = useCallback(() => {
+    if (!hasRoomRect) return null;
+
     // This function is now called conditionally by `overlaysForRendering.enableFrontWides`.
     // It should only render if frontWideZones are available and valid.
     // The enableFrontWides from appState is passed through overlaysForRendering, so we check it there.
@@ -5182,8 +5190,8 @@ useEffect(() => {
         <g pointerEvents="none">
           {/* Left zone */}
           <rect
-            x={roomRect.x + (WALL * scale)}
-            y={roomRect.y + (leftZone.yMin * scale)}
+            x={(roomRect?.x ?? 0) + (WALL * scale)}
+            y={(roomRect?.y ?? 0) + (leftZone.yMin * scale)}
             width={ZONE_DEPTH_M * scale}
             height={(leftZone.yMax - leftZone.yMin) * scale}
             fill="#4A230F"
@@ -5194,10 +5202,10 @@ useEffect(() => {
             strokeDasharray="4,4"
           />
           <line
-            x1={roomRect.x + (WALL * scale)}
-            y1={roomRect.y + (leftZone.medianY * scale)}
-            x2={roomRect.x + ((WALL + ZONE_DEPTH_M) * scale)}
-            y2={roomRect.y + (leftZone.medianY * scale)}
+            x1={(roomRect?.x ?? 0) + (WALL * scale)}
+            y1={(roomRect?.y ?? 0) + (leftZone.medianY * scale)}
+            x2={(roomRect?.x ?? 0) + ((WALL + ZONE_DEPTH_M) * scale)}
+            y2={(roomRect?.y ?? 0) + (leftZone.medianY * scale)}
             stroke="#4A230F"
             strokeWidth="2"
             strokeOpacity={0.6}
@@ -5205,8 +5213,8 @@ useEffect(() => {
 
           {/* Right zone */}
           <rect
-            x={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
-            y={roomRect.y + (rightZone.yMin * scale)}
+            x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) - ((WALL + ZONE_DEPTH_M) * scale)}
+            y={(roomRect?.y ?? 0) + (rightZone.yMin * scale)}
             width={ZONE_DEPTH_M * scale}
             height={(rightZone.yMax - rightZone.yMin) * scale}
             fill="#213428"
@@ -5217,10 +5225,10 @@ useEffect(() => {
             strokeDasharray="4,4"
           />
           <line
-            x1={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
-            y1={roomRect.y + (rightZone.medianY * scale)}
-            x2={roomRect.x + roomRect.width - (WALL * scale)}
-            y2={roomRect.y + (rightZone.medianY * scale)}
+            x1={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) - ((WALL + ZONE_DEPTH_M) * scale)}
+            y1={(roomRect?.y ?? 0) + (rightZone.medianY * scale)}
+            x2={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) - (WALL * scale)}
+            y2={(roomRect?.y ?? 0) + (rightZone.medianY * scale)}
             stroke="#213428"
             strokeWidth="2"
             strokeOpacity={0.6}
@@ -5242,15 +5250,15 @@ useEffect(() => {
       const placeholderOpacity = 0.15;
 
       // Centre label using actual canvas rect
-      const labelX = roomRect.x + (roomRect.width / 2);
-      const labelY = roomRect.y + (approxMedian * scale) - 10;
+      const labelX = (roomRect?.x ?? 0) + ((roomRect?.width ?? 0) / 2);
+      const labelY = (roomRect?.y ?? 0) + (approxMedian * scale) - 10;
 
       return (
         <g pointerEvents="none">
           {/* Left placeholder zone */}
           <rect
-            x={roomRect.x + (WALL * scale)}
-            y={roomRect.y + (approxYmin * scale)}
+            x={(roomRect?.x ?? 0) + (WALL * scale)}
+            y={(roomRect?.y ?? 0) + (approxYmin * scale)}
             width={ZONE_DEPTH_M * scale}
             height={(approxYmax - approxYmin) * scale}
             fill="#4A230F"
@@ -5261,10 +5269,10 @@ useEffect(() => {
             strokeDasharray="8,8"
           />
           <line
-            x1={roomRect.x + (WALL * scale)}
-            y1={roomRect.y + (approxMedian * scale)}
-            x2={roomRect.x + ((WALL + ZONE_DEPTH_M) * scale)}
-            y2={roomRect.y + (approxMedian * scale)}
+            x1={(roomRect?.x ?? 0) + (WALL * scale)}
+            y1={(roomRect?.y ?? 0) + (approxMedian * scale)}
+            x2={(roomRect?.x ?? 0) + ((WALL + ZONE_DEPTH_M) * scale)}
+            y2={(roomRect?.y ?? 0) + (approxMedian * scale)}
             stroke="#4A230F"
             strokeWidth="1.5"
             strokeOpacity={0.4}
@@ -5273,8 +5281,8 @@ useEffect(() => {
 
           {/* Right placeholder zone */}
           <rect
-            x={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
-            y={roomRect.y + (approxYmin * scale)}
+            x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) - ((WALL + ZONE_DEPTH_M) * scale)}
+            y={(roomRect?.y ?? 0) + (approxYmin * scale)}
             width={ZONE_DEPTH_M * scale}
             height={(approxYmax - approxYmin) * scale}
             fill="#213428"
@@ -5285,10 +5293,10 @@ useEffect(() => {
             strokeDasharray="8,8"
           />
           <line
-            x1={roomRect.x + roomRect.width - ((WALL + ZONE_DEPTH_M) * scale)}
-            y1={roomRect.y + (approxMedian * scale)}
-            x2={roomRect.x + roomRect.width - (WALL * scale)}
-            y2={roomRect.y + (approxMedian * scale)}
+            x1={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) - ((WALL + ZONE_DEPTH_M) * scale)}
+            y1={(roomRect?.y ?? 0) + (approxMedian * scale)}
+            x2={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) - (WALL * scale)}
+            y2={(roomRect?.y ?? 0) + (approxMedian * scale)}
             stroke="#213428"
             strokeWidth="1.5"
             strokeOpacity={0.4}
@@ -5403,6 +5411,7 @@ useEffect(() => {
   }, []);
 
   const renderDolbyZones = useCallback(() => {
+    if (!hasRoomRect) return null;
     if (!overlaysForRendering?.enableDolbyZones) return null;
 
     const seat = mlp;
@@ -5524,8 +5533,8 @@ useEffect(() => {
       const [x2Px] = toPx(zone.x_end, 0);
 
       // Y-coordinates are from the front wall (y=0) to ZONE_DEPTH_M
-      const yTopPx = roomRect.y;
-      const yBottomPx = roomRect.y + (ZONE_DEPTH_M * scale);
+      const yTopPx = (roomRect?.y ?? 0);
+      const yBottomPx = (roomRect?.y ?? 0) + (ZONE_DEPTH_M * scale);
 
       const rectX = Math.min(xStartPx, x2Px);
       const rectWidth = Math.abs(x2Px - xStartPx);
@@ -5562,10 +5571,10 @@ useEffect(() => {
       const fadeLen_px = FADE_LEN_M * scale;
 
       // ROOM BOUNDS
-      const roomLeft = roomRect.x;
-      const roomRight = roomRect.x + roomRect.width;
-      const roomTop = roomRect.y;
-      const roomBottom = roomRect.y + roomRect.height;
+      const roomLeft = (roomRect?.x ?? 0);
+      const roomRight = (roomRect?.x ?? 0) + (roomRect?.width ?? 0);
+      const roomTop = (roomRect?.y ?? 0);
+      const roomBottom = (roomRect?.y ?? 0) + (roomRect?.height ?? 0);
 
       // CORE POSITIONS
       const [, mlpY_px] = toPx(0, mlpY_m);
@@ -5691,10 +5700,10 @@ useEffect(() => {
       const fadeLen_px = FADE_LEN_M * scale;
 
       // Room bounds and core positions
-      const roomLeft = roomRect.x;
-      const roomRight = roomRect.x + roomRect.width;
-      const roomTop = roomRect.y;
-      const roomBottom = roomRect.y + roomRect.height;
+      const roomLeft = (roomRect?.x ?? 0);
+      const roomRight = (roomRect?.x ?? 0) + (roomRect?.width ?? 0);
+      const roomTop = (roomRect?.y ?? 0);
+      const roomBottom = (roomRect?.y ?? 0) + (roomRect?.height ?? 0);
       const [, rearWallY_px] = toPx(0, lengthM); // Use new lengthM
       const bandW_px = ZONE_DEPTH_M * scale;
 
@@ -6066,6 +6075,8 @@ return {
   }, [placedSpeakers, dolbyLayout, appState?.speakerSystem, appState?.sevenBedLayoutType, getSpeakerVisibility, getCanonicalRole]);
 
   const renderSpeakers = useCallback(() => {
+  if (!hasRoomRect) return null;
+
   // Start from the prop (single source of truth - now includes extra surrounds with canonical roles)
   const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
   
@@ -6155,12 +6166,12 @@ return {
   // Local NaN-safe coordinate mappers (must be inside this loop)
   const toCanvasX = (xM) => {
     const safeX = Number.isFinite(xM) ? xM : 0;
-    return roomRect.x + (safeX * scale);
+    return (roomRect?.x ?? 0) + (safeX * scale);
   };
 
   const toCanvasY = (yM) => {
     const safeY = Number.isFinite(yM) ? yM : 0;
-    return roomRect.y + (safeY * scale);
+    return (roomRect?.y ?? 0) + (safeY * scale);
   };
 
   // 3) Map to icons
@@ -6410,6 +6421,8 @@ return {
 
   // Renders rear subwoofers using SpeakerRect
   const renderSubwoofers = React.useCallback(() => {
+    if (!hasRoomRect) return null;
+
     const subsToRender = Array.isArray(rearSubs) ? rearSubs : [];
     if (!subsToRender.length) return null;
     return (
@@ -6483,6 +6496,8 @@ return {
 
   // Renders generic room elements. `roomElements` prop is available.
   const renderRoomElements = useCallback(() => {
+    if (!hasRoomRect) return null;
+
     const LABEL_INSET_M = 0.10;   // 10cm inside the room
 
     const normalizeElement = (el) => {
@@ -6753,6 +6768,7 @@ return {
 
   // --- Seats: always render from the latest seatingPositions prop ---
   const renderSeatingPositions = () => {
+    if (!hasRoomRect) return null;
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
       if (globalThis.__B44_LOGS) console.log('RoomVisualisation: rendering seats = 0');
       return null;
@@ -6899,6 +6915,7 @@ const renderLevelBadge = useCallback((level) => {
 }, []);
 
 const renderRp22AnglesOverlay = useCallback(() => {
+  if (!hasRoomRect) return null;
   if (!Number.isFinite(scale)) return null;
   if (!effectiveHoveredSeat) return null;
 
@@ -7169,10 +7186,10 @@ return (
             {/* Background hit area for pan (must be FIRST child, behind everything) */}
             {Number.isFinite(roomRect?.x) && Number.isFinite(roomRect?.y) && (
               <rect
-                x={roomRect.x - 1000}
-                y={roomRect.y - 1000}
-                width={roomRect.width + 2000}
-                height={roomRect.height + 2000}
+                x={(roomRect?.x ?? 0) - 1000}
+                y={(roomRect?.y ?? 0) - 1000}
+                width={(roomRect?.width ?? 0) + 2000}
+                height={(roomRect?.height ?? 0) + 2000}
                 fill="transparent"
                 pointerEvents={zoom > 1 ? "auto" : "none"}
                 style={{ 
@@ -7198,9 +7215,9 @@ return (
                   <line
                     key="grid-x-centre"
                     x1={centreXCanvas}
-                    y1={roomRect.y}
+                    y1={(roomRect?.y ?? 0)}
                     x2={centreXCanvas}
-                    y2={roomRect.y + roomRect.height}
+                    y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
                     stroke="#E6E4DD"
                     strokeWidth="0.5"
                   />
@@ -7219,9 +7236,9 @@ return (
                       <line
                         key={`grid-x-left-${offsetIndex}`}
                         x1={xCanvas}
-                        y1={roomRect.y}
+                        y1={(roomRect?.y ?? 0)}
                         x2={xCanvas}
-                        y2={roomRect.y + roomRect.height}
+                        y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
                         stroke="#E6E4DD"
                         strokeWidth="0.5"
                       />
@@ -7235,9 +7252,9 @@ return (
                       <line
                         key={`grid-x-right-${offsetIndex}`}
                         x1={xCanvas}
-                        y1={roomRect.y}
+                        y1={(roomRect?.y ?? 0)}
                         x2={xCanvas}
-                        y2={roomRect.y + roomRect.height}
+                        y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
                         stroke="#E6E4DD"
                         strokeWidth="0.5"
                       />
@@ -7262,9 +7279,9 @@ return (
                   horizontalLines.push(
                     <line
                       key={`grid-y-${yM}`}
-                      x1={roomRect.x}
+                      x1={(roomRect?.x ?? 0)}
                       y1={yCanvas}
-                      x2={roomRect.x + roomRect.width}
+                      x2={(roomRect?.x ?? 0) + (roomRect?.width ?? 0)}
                       y2={yCanvas}
                       stroke="#E6E4DD"
                       strokeWidth="0.5"
@@ -7280,10 +7297,10 @@ return (
             <g id="export-bounds">
               {/* Layer 2: Room Outline and Furniture */}
               <rect
-                x={roomRect.x}
-                y={roomRect.y}
-                width={roomRect.width}
-                height={roomRect.height}
+                x={(roomRect?.x ?? 0)}
+                y={(roomRect?.y ?? 0)}
+                width={(roomRect?.width ?? 0)}
+                height={(roomRect?.height ?? 0)}
                 fill="none"
                 stroke="#DCDBD6"
                 strokeWidth={2}
@@ -7312,18 +7329,18 @@ return (
 
                 {/* Horizontal (width) line – top of the room (screen wall) */}
                 <line
-                  x1={roomRect.x}
-                  y1={roomRect.y - 20}
-                  x2={roomRect.x + roomRect.width}
-                  y2={roomRect.y - 20}
+                  x1={(roomRect?.x ?? 0)}
+                  y1={(roomRect?.y ?? 0) - 20}
+                  x2={(roomRect?.x ?? 0) + (roomRect?.width ?? 0)}
+                  y2={(roomRect?.y ?? 0) - 20}
                   stroke="#DCDBD6"
                   strokeWidth={2}
                   markerStart="url(#dim-arrow)"
                   markerEnd="url(#dim-arrow)"
                 />
                 <text
-                  x={roomRect.x + roomRect.width / 2}
-                  y={roomRect.y - 28}
+                  x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) / 2}
+                  y={(roomRect?.y ?? 0) - 28}
                   textAnchor="middle"
                   fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
                   fontSize={12}
@@ -7334,20 +7351,20 @@ return (
 
                 {/* Vertical (length) line – left side of the room */}
                 <line
-                  x1={roomRect.x - 20}
-                  y1={roomRect.y}
-                  x2={roomRect.x - 20}
-                  y2={roomRect.y + roomRect.height}
+                  x1={(roomRect?.x ?? 0) - 20}
+                  y1={(roomRect?.y ?? 0)}
+                  x2={(roomRect?.x ?? 0) - 20}
+                  y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
                   stroke="#DCDBD6"
                   strokeWidth={2}
                   markerStart="url(#dim-arrow)"
                   markerEnd="url(#dim-arrow)"
                 />
                 <text
-                  x={roomRect.x - 28}
-                  y={roomRect.y + roomRect.height / 2}
+                  x={(roomRect?.x ?? 0) - 28}
+                  y={(roomRect?.y ?? 0) + (roomRect?.height ?? 0) / 2}
                   textAnchor="middle"
-                  transform={`rotate(-90 ${roomRect.x - 28} ${roomRect.y + roomRect.height / 2})`}
+                  transform={`rotate(-90 ${(roomRect?.x ?? 0) - 28} ${(roomRect?.y ?? 0) + (roomRect?.height ?? 0) / 2})`}
                   fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
                   fontSize={12}
                   fill="#1B1A1A"
@@ -7405,7 +7422,7 @@ return (
               const [mlpX_px, mlpY_px] = toPx(mlpDotX_m, mlpDotY_m);
               
               // Screen position (for screen → MLP distance)
-              const screenY_px = roomRect.y + (screenFrontPlaneM * scale);
+              const screenY_px = (roomRect?.y ?? 0) + (screenFrontPlaneM * scale);
               
               // Ruler styling (match speaker rulers)
               const rulerColor = '#625143';
@@ -7423,15 +7440,15 @@ return (
 
               // Secondary ruler X position: 20% from left wall toward MLP centerline
               // Formula: x = leftWallX + 0.20 * (mlpCenterX - leftWallX)
-              const secondaryRulerX_px = roomRect.x + 0.20 * (mlpX_px - roomRect.x);
+              const secondaryRulerX_px = (roomRect?.x ?? 0) + 0.20 * (mlpX_px - (roomRect?.x ?? 0));
 
               return (
                 <g data-layer="mlp-ruler" pointerEvents="none">
                   {/* Horizontal ruler (left wall ↔ MLP ↔ right wall) */}
                   <line
-                    x1={roomRect.x}
+                    x1={(roomRect?.x ?? 0)}
                     y1={mlpY_px}
-                    x2={roomRect.x + roomRect.width}
+                    x2={(roomRect?.x ?? 0) + (roomRect?.width ?? 0)}
                     y2={mlpY_px}
                     stroke={rulerColor}
                     strokeWidth={rulerStroke}
@@ -7440,7 +7457,7 @@ return (
                   
                   {/* Left wall dot */}
                   <circle
-                    cx={roomRect.x}
+                    cx={(roomRect?.x ?? 0)}
                     cy={mlpY_px}
                     r={dotRadius}
                     fill={rulerColor}
@@ -7449,7 +7466,7 @@ return (
                   
                   {/* Right wall dot */}
                   <circle
-                    cx={roomRect.x + roomRect.width}
+                    cx={(roomRect?.x ?? 0) + (roomRect?.width ?? 0)}
                     cy={mlpY_px}
                     r={dotRadius}
                     fill={rulerColor}
@@ -7458,7 +7475,7 @@ return (
                   
                   {/* Left wall → MLP distance label */}
                   <text
-                    x={(roomRect.x + mlpX_px) / 2}
+                    x={((roomRect?.x ?? 0) + mlpX_px) / 2}
                     y={mlpY_px - labelOffset}
                     textAnchor="middle"
                     fontSize={fontSize}
@@ -7470,7 +7487,7 @@ return (
                   
                   {/* MLP → Right wall distance label */}
                   <text
-                    x={(mlpX_px + roomRect.x + roomRect.width) / 2}
+                    x={(mlpX_px + (roomRect?.x ?? 0) + (roomRect?.width ?? 0)) / 2}
                     y={mlpY_px - labelOffset}
                     textAnchor="middle"
                     fontSize={fontSize}
@@ -7485,7 +7502,7 @@ return (
                     x1={mlpX_px}
                     y1={screenY_px}
                     x2={mlpX_px}
-                    y2={roomRect.y + roomRect.height}
+                    y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
                     stroke={rulerColor}
                     strokeWidth={rulerStroke}
                     opacity={0.6}
@@ -7503,7 +7520,7 @@ return (
                   {/* Back wall dot */}
                   <circle
                     cx={mlpX_px}
-                    cy={roomRect.y + roomRect.height}
+                    cy={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
                     r={dotRadius}
                     fill={rulerColor}
                     opacity={0.8}
@@ -7525,12 +7542,12 @@ return (
                   {/* MLP → Back wall distance label (rotated, right side) */}
                   <text
                     x={mlpX_px + labelOffset}
-                    y={(mlpY_px + roomRect.y + roomRect.height) / 2}
+                    y={(mlpY_px + (roomRect?.y ?? 0) + (roomRect?.height ?? 0)) / 2}
                     textAnchor="middle"
                     fontSize={fontSize}
                     fill={rulerColor}
                     fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
-                    transform={`rotate(-90 ${mlpX_px + labelOffset} ${(mlpY_px + roomRect.y + roomRect.height) / 2})`}
+                    transform={`rotate(-90 ${mlpX_px + labelOffset} ${(mlpY_px + (roomRect?.y ?? 0) + (roomRect?.height ?? 0)) / 2})`}
                   >
                     {distBackWall.toFixed(2)}m
                   </text>
@@ -7553,7 +7570,7 @@ return (
                   {/* Vertical line from front wall to MLP horizontal ruler */}
                   <line
                     x1={secondaryRulerX_px}
-                    y1={roomRect.y}
+                    y1={(roomRect?.y ?? 0)}
                     x2={secondaryRulerX_px}
                     y2={mlpY_px}
                     stroke={rulerColor}
@@ -7566,12 +7583,12 @@ return (
                   {/* MLP → Front wall distance label (rotated, reading bottom to top) */}
                   <text
                     x={secondaryRulerX_px + labelOffset}
-                    y={(roomRect.y + mlpY_px) / 2}
+                    y={((roomRect?.y ?? 0) + mlpY_px) / 2}
                     textAnchor="middle"
                     fontSize={fontSize}
                     fill={rulerColor}
                     fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
-                    transform={`rotate(-90 ${secondaryRulerX_px + labelOffset} ${(roomRect.y + mlpY_px) / 2})`}
+                    transform={`rotate(-90 ${secondaryRulerX_px + labelOffset} ${((roomRect?.y ?? 0) + mlpY_px) / 2})`}
                   >
                     {distFrontWall.toFixed(2)}m
                   </text>
