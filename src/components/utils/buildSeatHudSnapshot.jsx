@@ -494,7 +494,7 @@ export function buildSeatHudSnapshot({
           const builtInTilt = Number(meta?.builtInTiltDeg) || 0;
           angleFromDownDeg = Math.max(0, angleFromDownDeg - builtInTilt);
 
-          // Store for later use (we bypass 2D yaw math for overheads)
+          // Store overhead off-axis locally (no mutation)
           sp.__p17_overheadOffAxisDeg = angleFromDownDeg;
 
           // Skip 2D dirDeg/aimDeg calculation for overheads
@@ -503,8 +503,9 @@ export function buildSeatHudSnapshot({
           if (aimFrontWidesAtMLP) {
             aimDeg = safeYawToMLP(pos, mlp);
           } else {
-            // Wall-flat: left wall = -90, right wall = +90
-            aimDeg = (canon === 'LW') ? -90 : 90;
+            // Wall-flat MUST match RoomVisualisation yaw:
+            // LW = +90, RW = -90
+            aimDeg = (canon === 'LW') ? 90 : -90;
           }
         } else if (isSL_SR || extraSurroundPattern.test(String(sp.role || '').toUpperCase())) {
           // Side Surrounds + Extra Surrounds: check toggle (LIVE)
@@ -548,11 +549,14 @@ export function buildSeatHudSnapshot({
         while (offAxisRaw > 180) offAxisRaw -= 360;
         while (offAxisRaw < -180) offAxisRaw += 360;
 
-        // Overheads keep their 3D off-axis result.
+        // Overheads keep their 3D off-axis result (local value, no mutation)
+        const overheadOffAxis = isOverhead ? (sp.__p17_overheadOffAxisDeg || 0) : null;
+
         // ALL wall speakers must use the smaller angle (eg 151° -> 29°).
-        const offAxisDegRaw = isOverhead && Number.isFinite(sp.__p17_overheadOffAxisDeg)
-          ? sp.__p17_overheadOffAxisDeg
-          : Math.abs(offAxisRaw);
+        const offAxisDegRaw =
+          (isOverhead && Number.isFinite(overheadOffAxis))
+            ? overheadOffAxis
+            : Math.abs(offAxisRaw);
 
         const offAxisDeg = isOverhead
           ? offAxisDegRaw
