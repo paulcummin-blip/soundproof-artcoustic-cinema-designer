@@ -553,22 +553,42 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       };
     }
 
-    // 2. If no mlpPoint, we FALL BACK to seats to choose something sensible.
+    // 2. If no mlpPoint, FALL BACK to seats — but make it STABLE.
+    //    Priority: primary seat → first seat → then generic room fallback.
     if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
-      let picked = null;
+      // Prefer an explicitly marked primary seat (most stable + matches user expectation)
+      const primary =
+        seatingPositions.find(s => s?.isPrimary) ||
+        seatingPositions.find(s => String(s?.id || '') === 'primary') ||
+        null;
 
+      const pickedSeat = primary || seatingPositions[0];
+
+      const sx = Number(pickedSeat?.x ?? pickedSeat?.position?.x);
+      const sy = Number(pickedSeat?.y ?? pickedSeat?.position?.y);
+      const sz = Number(pickedSeat?.z ?? pickedSeat?.position?.z);
+
+      if (Number.isFinite(sx) && Number.isFinite(sy)) {
+        return {
+          x: sx,
+          y: clampMlpY(sy),
+          z: Number.isFinite(sz) ? sz : 1.2,
+        };
+      }
+
+      // If seat objects are present but malformed, try the older pickMLP route as a backup
+      let picked = null;
       try {
         if (typeof pickMLP === 'function') {
           picked = pickMLP(mlpBasis || 'all', seatingPositions);
         }
       } catch (err) {
-        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error('pickMLP failed in RoomVisualisation:', err);
         picked = null;
       }
 
       if (picked && Number.isFinite(picked.x) && Number.isFinite(picked.y)) {
         return {
-          x: Number(picked.x), // Use picked.x directly
+          x: Number(picked.x),
           y: clampMlpY(Number(picked.y)),
           z: Number.isFinite(picked.z) ? Number(picked.z) : 1.2,
         };
