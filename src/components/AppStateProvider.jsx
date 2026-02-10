@@ -1109,7 +1109,7 @@ function useDesignerState() {
     try {
       if (p.roomDims) setRoomDims(p.roomDims);
       if (p.dimensions) setDimensions(p.dimensions);
-      if (p.seatingPositions) setSeatingPositions(p.seatingPositions);
+      if (p.seatingPositions) setSeatingPositions(normaliseSeatingPositions(p.seatingPositions, p.roomDims || p.roomDimensions || roomDims || null));
       if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
       if (p.frontSubsCfg) setFrontSubsCfg(p.frontSubsCfg);
       if (p.rearSubsCfg) setRearSubsCfg(p.rearSubsCfg);
@@ -1337,7 +1337,7 @@ function useDesignerState() {
     try {
       if (p.roomDims) setRoomDims(p.roomDims);
       if (p.dimensions) setDimensions(p.dimensions);
-      if (p.seatingPositions) setSeatingPositions(p.seatingPositions);
+      if (p.seatingPositions) setSeatingPositions(normaliseSeatingPositions(p.seatingPositions, p.roomDims || p.roomDimensions || roomDims || null));
       if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
       if (p.frontSubsCfg) setFrontSubsCfg(p.frontSubsCfg);
       if (p.rearSubsCfg) setRearSubsCfg(p.rearSubsCfg);
