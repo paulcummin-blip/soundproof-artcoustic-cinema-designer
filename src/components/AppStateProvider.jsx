@@ -1084,9 +1084,13 @@ function useDesignerState() {
       if (typeof p.lcrAimMode === "string") setLcrAimMode(p.lcrAimMode);
       if (typeof p.sevenBedLayoutType === "string") setSevenBedLayoutType(p.sevenBedLayoutType);
       if (typeof p.extraSurroundCount === "number") _setExtraSurroundCount(p.extraSurroundCount);
-      if (typeof p.screenFrontPlaneM === "number") setScreenFrontPlaneM(p.screenFrontPlaneM);
 
       setAutosaveMeta(getAutosaveMeta());
+      
+      // Derived geometry must always be recalculated live
+      setScreenFrontPlaneM(null);
+      setMlpY_m(null);
+      setRowCentersM([]);
     } catch {
       // never crash
     } finally {
