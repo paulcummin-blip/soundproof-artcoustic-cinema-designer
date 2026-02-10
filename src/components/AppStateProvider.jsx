@@ -6,6 +6,50 @@ import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { loadAutosave, saveAutosave, clearAutosave as clearAutosaveStorage, getAutosaveMeta, isAutosavePayloadValid } from "@/components/utils/sessionAutosave";
 import { computeMLPAndPrimary } from "@/components/utils/computeMLPAndPrimary";
 
+// --- SEATING POSITIONS NORMALISER ---
+const normaliseSeatingPositions = (seats, roomDims) => {
+  if (!Array.isArray(seats)) return [];
+
+  const widthM = Number(roomDims?.widthM ?? roomDims?.width) || 4.5;
+  const lengthM = Number(roomDims?.lengthM ?? roomDims?.length) || 6.0;
+
+  const MIN = 0.40;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  const minX = MIN;
+  const maxX = Math.max(minX, widthM - MIN);
+  const minY = MIN;
+  const maxY = Math.max(minY, lengthM - MIN);
+
+  return seats
+    .map((s, i) => {
+      const px = s?.x ?? s?.position?.x;
+      const py = s?.y ?? s?.position?.y;
+      const pz = s?.z ?? s?.position?.z;
+
+      const x = Number(px);
+      const y = Number(py);
+      const z = Number.isFinite(Number(pz)) ? Number(pz) : 1.2;
+
+      if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+      return {
+        ...s,
+        // force canonical flat coords
+        x: clamp(x, minX, maxX),
+        y: clamp(y, minY, maxY),
+        z,
+        // keep id stable if it exists
+        id: s?.id ?? `seat-${i + 1}`,
+        // keep rowNumber if present; otherwise leave as-is (seat rebuild can set it later)
+        rowNumber: Number.isInteger(s?.rowNumber) ? s.rowNumber : s?.rowNumber,
+        // drop legacy nested position to avoid disagreement between readers
+        position: undefined
+      };
+    })
+    .filter(Boolean);
+};
+
 // --- ROOM ELEMENTS NORMALISER ---
 function normaliseRoomElements(list) {
   const arr = Array.isArray(list) ? list : [];
@@ -339,7 +383,9 @@ function useDesignerState() {
       : "rears"
   ));
   const [seatingPositions, setSeatingPositions] = useState(() => (
-    (__autosavePayload && Array.isArray(__autosavePayload.seatingPositions)) ? __autosavePayload.seatingPositions : []
+    (__autosavePayload && Array.isArray(__autosavePayload.seatingPositions))
+      ? normaliseSeatingPositions(__autosavePayload.seatingPositions, __autosavePayload.roomDims || __autosavePayload.roomDimensions || null)
+      : []
   ));
   const [baselineSeatingPositions, setBaselineSeatingPositions] = useState([]);
   const [seatingRows, setSeatingRows] = useState(() => (
