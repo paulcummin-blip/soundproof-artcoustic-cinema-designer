@@ -1762,6 +1762,7 @@ function RoomDesignerWithState() {
   const isDraggingRef = useRef(false);
   const visualisationRef = React.useRef(null);
   const didUserRequestResetRef = useRef(false);
+  const didInitialSeatSyncRef = useRef(false);
 
   // Temporary variables for values that might be undefined if appState is null
   // (Assumes AppStateProvider has been updated to provide these)
@@ -4095,9 +4096,26 @@ function RoomDesignerWithState() {
     // CRITICAL: Wait for autosave hydration
     if (!appState?.isHydrated) return;
 
-    // If we've just loaded a real project, don't overwrite its seating layout (UNLESS reset was triggered)
+    // If we just loaded a real project, normally don't overwrite seats.
+    // BUT: allow ONE initial sync rebuild when rowCentersM becomes valid,
+    // because seats may have been auto-created before MLP/rowCenters were ready.
     if (loadState?.phase === "loaded" && !didUserRequestResetRef.current && !(appState?.roomResetEpoch > 0)) {
-      return;
+      const existing = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
+
+      const looksAuto =
+        existing.length > 0 &&
+        existing.every(s => String(s?.id || '').startsWith('seat-r'));
+
+      const centersReady =
+        Array.isArray(appState?.rowCentersM) &&
+        appState.rowCentersM.length >= (Array.isArray(_seatsPerRowByRow) && _seatsPerRowByRow.length
+          ? _seatsPerRowByRow.length
+          : Math.max(1, Number(_seatingRows) || 1));
+
+      if (!(looksAuto && centersReady && !didInitialSeatSyncRef.current)) {
+        return;
+      }
+      // else: allow the rebuild to run once and then lock it out below
     }
 
     const setSeats = appState?.setSeatingPositions;
@@ -4184,6 +4202,7 @@ function RoomDesignerWithState() {
 
     // 5) Commit to app state
     setSeats(seats);
+    didInitialSeatSyncRef.current = true;
 
     if (globalThis.__B44_LOGS) console.log(
       '[RD] seating rebuilt: rows=',
