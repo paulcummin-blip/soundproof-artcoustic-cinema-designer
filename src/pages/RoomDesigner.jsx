@@ -4111,20 +4111,49 @@ function RoomDesignerWithState() {
       () => Math.max(1, Number(_seatsPerRow) || 1)
     );
 
-    // 2) Row centre Y positions - ALWAYS use pre-computed row centers from first effect
-    //    Do NOT recalculate from _rowSpacingM here.
-    let centers = Array.isArray(appState?.rowCentersM) && appState.rowCentersM.length ?
-    appState.rowCentersM.slice(0, list.length) :
-    [];
+    // 2) Row centre Y positions
+    // IMPORTANT: Do NOT rebuild seats using fallback row centres.
+    // That causes a temporary "drift" where seats are from fallback but MLP is already from the real computed mlpY.
+    // Instead: if rowCentersM isn't ready, try to generate it once from the current MLP, store it, then exit.
+    // The effect will re-run immediately with real rowCentersM and seats will match the MLP.
 
-    // If we have no centers yet (e.g. first render before MLP effect runs), use a safe fallback
-    // This fallback does NOT depend on _rowSpacingM - it's just a placeholder until the first effect runs.
-    const fallbackStartY = 2; // 2m from screen as a safe default
-    const fallbackSpacing = 1.8; // fixed fallback, not from state
+    let centers = Array.isArray(appState?.rowCentersM) ? appState.rowCentersM.slice(0, list.length) : [];
 
-    while (centers.length < list.length) {
-      const i = centers.length;
-      centers.push(fallbackStartY + i * fallbackSpacing);
+    // If rowCentersM is missing/too short, attempt to generate it from current mlpY_m
+    if (centers.length < list.length) {
+      const rowsNeeded = list.length;
+
+      const mlpY = appState?.mlpY_m;
+      const rowSpacing = Number(_rowSpacingM) || 1.8;
+      const mlpReference = _mlpBasis; // 'front' | 'back' | 'all'
+
+      if (Number.isFinite(mlpY) && typeof buildRowCenters === 'function' && typeof appState?.setRowCentersM === 'function') {
+        let generated = [];
+
+        try {
+          generated = buildRowCenters(mlpY, rowsNeeded, rowSpacing, mlpReference) || [];
+        } catch (e) {
+          generated = [];
+        }
+
+        // Clamp to room bounds, mirroring the MLP/rows effect
+        const len = Number(stableDimensions?.length) || Number(appState?.roomDims?.lengthM) || 6.0;
+        const MIN_Y = 0.40;
+        const MAX_Y = len - 0.40;
+        const clampY = (y) => Math.max(MIN_Y, Math.min(MAX_Y, y));
+
+        if (Array.isArray(generated) && generated.length === rowsNeeded) {
+          const clamped = generated.map((y) => clampY(Number(y)));
+          appState.setRowCentersM(clamped);
+        }
+
+        // Exit now — seats will rebuild on the next pass with real rowCentersM
+        return;
+      }
+
+      // If we cannot generate centres yet, do NOT rebuild seats.
+      // This prevents the "fallback seats" pass that creates drift.
+      return;
     }
 
     // 3) Basic geometry
