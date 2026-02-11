@@ -1046,17 +1046,17 @@ function RP22ReportInner() {
                 const viewBoxW = bbox.width + (2 * padding);
                 const viewBoxH = bbox.height + (2 * padding);
                 
+                // Store aspect ratio for fit-to-page logic
+                if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
+                    setPlanDimsAspect(viewBoxW / viewBoxH);
+                }
+                
                 // Now clone and apply the computed viewBox
                 const svgClone = svgElement.cloneNode(true);
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 svgClone.setAttribute('width', String(viewBoxW));
                 svgClone.setAttribute('height', String(viewBoxH));
-                
-                // Store aspect ratio for fit-to-page logic
-                if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
-                    setPlanDimsAspect(viewBoxW / viewBoxH);
-                }
                 
                 const svgString = new XMLSerializer().serializeToString(svgClone);
                 const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
