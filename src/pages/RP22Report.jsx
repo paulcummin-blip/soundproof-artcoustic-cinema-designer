@@ -2902,8 +2902,7 @@ function RP22ReportInner() {
 
                                 <div style={{
                                     width: '100%',
-                                    maxWidth: '190mm',
-                                    maxHeight: '240mm',
+                                    height: '240mm',
                                     margin: '0 auto',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -2915,7 +2914,7 @@ function RP22ReportInner() {
                                         alt="Room plan"
                                         style={{
                                             maxWidth: '100%',
-                                            maxHeight: '240mm',
+                                            maxHeight: '100%',
                                             width: 'auto',
                                             height: 'auto',
                                             objectFit: 'contain',
@@ -2947,8 +2946,7 @@ function RP22ReportInner() {
 
                                 <div style={{
                                     width: '100%',
-                                    maxWidth: '190mm',
-                                    maxHeight: '240mm',
+                                    height: '240mm',
                                     margin: '0 auto',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -2960,7 +2958,7 @@ function RP22ReportInner() {
                                         alt="Room plan (dimensions)"
                                         style={{
                                             maxWidth: '100%',
-                                            maxHeight: '240mm',
+                                            maxHeight: '100%',
                                             width: 'auto',
                                             height: 'auto',
                                             objectFit: 'contain',
@@ -2996,8 +2994,7 @@ function RP22ReportInner() {
 
                                 <div style={{
                                     width: '100%',
-                                    maxWidth: '190mm',
-                                    maxHeight: '240mm',
+                                    height: '240mm',
                                     margin: '0 auto',
                                     display: 'flex',
                                     alignItems: 'center',
@@ -3009,7 +3006,7 @@ function RP22ReportInner() {
                                         alt="Room plan (speaker positions)"
                                         style={{
                                             maxWidth: '100%',
-                                            maxHeight: '240mm',
+                                            maxHeight: '100%',
                                             width: 'auto',
                                             height: 'auto',
                                             objectFit: 'contain',
