@@ -881,36 +881,7 @@ function RP22ReportInner() {
                 
                 // Now clone and apply the computed viewBox
                 const svgClone = svgElement.cloneNode(true);
-                
-                // --- EXPORT FIX: remove global zoom/pan transform so getBBox + viewBox match rendered geometry ---
-                try {
-                  // Preferred: known wrapper used for the main content transform
-                  const mainGroup = svgClone.querySelector('#main-svg-content-group');
-                  if (mainGroup) {
-                    mainGroup.removeAttribute('transform');
-                    // also clear CSS transforms if any exist
-                    if (mainGroup.style) {
-                      mainGroup.style.transform = '';
-                      mainGroup.style.transformOrigin = '';
-                    }
-                  } else {
-                    // Fallback: remove the nearest ancestor transform above #export-bounds / #export-crop-bounds
-                    const anchor =
-                      svgClone.querySelector('#export-crop-bounds') ||
-                      svgClone.querySelector('#export-bounds');
-
-                    const tNode = anchor && anchor.closest ? anchor.closest('g[transform]') : null;
-                    if (tNode) {
-                      tNode.removeAttribute('transform');
-                      if (tNode.style) {
-                        tNode.style.transform = '';
-                        tNode.style.transformOrigin = '';
-                      }
-                    }
-                  }
-                } catch (e) {
-                  // ignore – capture still proceeds
-                }
+                stripExportTransformsFromClone(svgClone);
                 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1134,36 +1105,7 @@ function RP22ReportInner() {
                 
                 // Now clone and apply the computed viewBox
                 const svgClone = svgElement.cloneNode(true);
-                
-                // --- EXPORT FIX: remove global zoom/pan transform so getBBox + viewBox match rendered geometry ---
-                try {
-                  // Preferred: known wrapper used for the main content transform
-                  const mainGroup = svgClone.querySelector('#main-svg-content-group');
-                  if (mainGroup) {
-                    mainGroup.removeAttribute('transform');
-                    // also clear CSS transforms if any exist
-                    if (mainGroup.style) {
-                      mainGroup.style.transform = '';
-                      mainGroup.style.transformOrigin = '';
-                    }
-                  } else {
-                    // Fallback: remove the nearest ancestor transform above #export-bounds / #export-crop-bounds
-                    const anchor =
-                      svgClone.querySelector('#export-crop-bounds') ||
-                      svgClone.querySelector('#export-bounds');
-
-                    const tNode = anchor && anchor.closest ? anchor.closest('g[transform]') : null;
-                    if (tNode) {
-                      tNode.removeAttribute('transform');
-                      if (tNode.style) {
-                        tNode.style.transform = '';
-                        tNode.style.transformOrigin = '';
-                      }
-                    }
-                  }
-                } catch (e) {
-                  // ignore – capture still proceeds
-                }
+                stripExportTransformsFromClone(svgClone);
                 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1385,36 +1327,7 @@ function RP22ReportInner() {
                 const viewBoxH = bbox.height + (2 * padding);
                 
                 const svgClone = svgElement.cloneNode(true);
-                
-                // --- EXPORT FIX: remove global zoom/pan transform so getBBox + viewBox match rendered geometry ---
-                try {
-                  // Preferred: known wrapper used for the main content transform
-                  const mainGroup = svgClone.querySelector('#main-svg-content-group');
-                  if (mainGroup) {
-                    mainGroup.removeAttribute('transform');
-                    // also clear CSS transforms if any exist
-                    if (mainGroup.style) {
-                      mainGroup.style.transform = '';
-                      mainGroup.style.transformOrigin = '';
-                    }
-                  } else {
-                    // Fallback: remove the nearest ancestor transform above #export-bounds / #export-crop-bounds
-                    const anchor =
-                      svgClone.querySelector('#export-crop-bounds') ||
-                      svgClone.querySelector('#export-bounds');
-
-                    const tNode = anchor && anchor.closest ? anchor.closest('g[transform]') : null;
-                    if (tNode) {
-                      tNode.removeAttribute('transform');
-                      if (tNode.style) {
-                        tNode.style.transform = '';
-                        tNode.style.transformOrigin = '';
-                      }
-                    }
-                  }
-                } catch (e) {
-                  // ignore – capture still proceeds
-                }
+                stripExportTransformsFromClone(svgClone);
                 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
