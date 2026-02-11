@@ -1068,13 +1068,13 @@ function RP22ReportInner() {
                 }
                 
                 // Track bbox details for diagnostics
-                const aspect = viewBoxH > 0 ? (viewBoxW / viewBoxH) : 0;
+                const bboxAspect = viewBoxH > 0 ? (viewBoxW / viewBoxH) : 0;
                 
                 setExportStatus(
                   `Dims bbox: ${bboxSource}\n` +
                   `bbox: ${bbox.width.toFixed(1)}×${bbox.height.toFixed(1)}\n` +
                   `viewBox: ${viewBoxW.toFixed(1)}×${viewBoxH.toFixed(1)}\n` +
-                  `aspect: ${aspect.toFixed(3)}`
+                  `aspect: ${bboxAspect.toFixed(3)}`
                 );
                 
                 // Track bbox details for diagnostics
