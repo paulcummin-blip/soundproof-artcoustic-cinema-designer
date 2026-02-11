@@ -683,6 +683,44 @@ function RP22ReportInner() {
         setExportDebug(d => ({ ...d, isPrinting, printReady }));
     }, [isPrinting, printReady]);
 
+    // Helper to strip zoom/pan transforms from cloned SVG for export
+    function stripExportTransformsFromClone(svgClone) {
+        try {
+            const anchor =
+                svgClone.querySelector('#export-crop-bounds') ||
+                svgClone.querySelector('#export-bounds');
+
+            if (!anchor) return;
+
+            // Walk up from anchor to the root SVG and strip any transforms/clipPaths
+            let n = anchor.parentNode;
+            while (n && n !== svgClone) {
+                if (n.nodeType === 1) {
+                    const tag = (n.tagName || '').toLowerCase();
+
+                    // Only care about groups (the zoom group is a <g>)
+                    if (tag === 'g') {
+                        // Remove zoom/pan scale/translate
+                        n.removeAttribute('transform');
+
+                        // Remove viewport clipping that can mess with export framing
+                        n.removeAttribute('clip-path');
+                        n.removeAttribute('clipPath');
+
+                        // Also clear CSS transforms if any exist
+                        if (n.style) {
+                            n.style.transform = '';
+                            n.style.transformOrigin = '';
+                        }
+                    }
+                }
+                n = n.parentNode;
+            }
+        } catch (e) {
+            // ignore – export can still proceed
+        }
+    }
+
     // Capture plan when printing starts (with retry logic)
     useEffect(() => {
         if (!isPrinting || planImageDataUrl !== null) return;
