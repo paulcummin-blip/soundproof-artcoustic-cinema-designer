@@ -789,6 +789,26 @@ function RP22ReportInner() {
                 
                 // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
+// Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
+try {
+  const anchor =
+    svgClone.querySelector('#export-crop-bounds') ||
+    svgClone.querySelector('#export-bounds');
+
+  if (anchor) {
+    let node = anchor.parentNode;
+    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
+      if (node.nodeName.toLowerCase() === 'g') {
+        node.removeAttribute('transform');
+        node.removeAttribute('clipPath');
+        node.removeAttribute('clip-path');
+        if (node.style) node.style.transform = 'none';
+      }
+      node = node.parentNode;
+    }
+  }
+} catch (e) {}
+
                 stripExportViewportTransforms(svgClone);
 
                 // Prefer export-crop-bounds if it exists, otherwise export-bounds
@@ -931,6 +951,26 @@ function RP22ReportInner() {
                 
                 // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
+// Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
+try {
+  const anchor =
+    svgClone.querySelector('#export-crop-bounds') ||
+    svgClone.querySelector('#export-bounds');
+
+  if (anchor) {
+    let node = anchor.parentNode;
+    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
+      if (node.nodeName.toLowerCase() === 'g') {
+        node.removeAttribute('transform');
+        node.removeAttribute('clipPath');
+        node.removeAttribute('clip-path');
+        if (node.style) node.style.transform = 'none';
+      }
+      node = node.parentNode;
+    }
+  }
+} catch (e) {}
+
                 stripExportViewportTransforms(svgClone);
 
                 // Prefer export-crop-bounds if it exists, otherwise export-bounds
@@ -1073,6 +1113,26 @@ function RP22ReportInner() {
 
                 // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
+// Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
+try {
+  const anchor =
+    svgClone.querySelector('#export-crop-bounds') ||
+    svgClone.querySelector('#export-bounds');
+
+  if (anchor) {
+    let node = anchor.parentNode;
+    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
+      if (node.nodeName.toLowerCase() === 'g') {
+        node.removeAttribute('transform');
+        node.removeAttribute('clipPath');
+        node.removeAttribute('clip-path');
+        if (node.style) node.style.transform = 'none';
+      }
+      node = node.parentNode;
+    }
+  }
+} catch (e) {}
+
                 stripExportViewportTransforms(svgClone);
 
                 // Prefer export-crop-bounds if it exists, otherwise export-bounds
