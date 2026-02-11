@@ -345,7 +345,7 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
   const effectiveAngleDeg = Math.max(0, rawAngleDeg - tiltDeg);
 
   // Use model-specific dispersion windows if available
-  // For overheads: average horizontal and vertical limits when both exist
+  // For overheads: use MAX(horizontal, vertical) per threshold (forgiving approach)
   let lossDb;
   if (meta?.dispersion?.horizontal) {
     const dispH = meta.dispersion.horizontal;
@@ -356,21 +356,17 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
     const h3 = halfDispersionDeg(dispH.minus3dB ?? dispH.minus3);
     const h5 = halfDispersionDeg(dispH.minus5dB ?? dispH.minus5);
     
-    // If vertical exists, average with horizontal
+    // Use MAX(horizontal, vertical) for each threshold (honest but forgiving)
     let minus1p5, minus3, minus5;
     if (dispV) {
       const v1p5 = halfDispersionDeg(dispV.minus1p5dB ?? dispV.minus1p5);
       const v3 = halfDispersionDeg(dispV.minus3dB ?? dispV.minus3);
       const v5 = halfDispersionDeg(dispV.minus5dB ?? dispV.minus5);
       
-      if (h1p5 != null && v1p5 != null) minus1p5 = (h1p5 + v1p5) / 2;
-      else minus1p5 = h1p5;
-      
-      if (h3 != null && v3 != null) minus3 = (h3 + v3) / 2;
-      else minus3 = h3;
-      
-      if (h5 != null && v5 != null) minus5 = (h5 + v5) / 2;
-      else minus5 = h5;
+      // Use the wider (more forgiving) limit per threshold
+      minus1p5 = (h1p5 != null && v1p5 != null) ? Math.max(h1p5, v1p5) : (h1p5 ?? v1p5);
+      minus3 = (h3 != null && v3 != null) ? Math.max(h3, v3) : (h3 ?? v3);
+      minus5 = (h5 != null && v5 != null) ? Math.max(h5, v5) : (h5 ?? v5);
     } else {
       // No vertical data: use horizontal only
       minus1p5 = h1p5;
