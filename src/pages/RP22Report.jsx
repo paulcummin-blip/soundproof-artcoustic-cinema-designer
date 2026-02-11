@@ -714,6 +714,41 @@ function RP22ReportInner() {
         }
     }
 
+    // Helper to measure bbox from a clone (temporary mount for reliable getBBox)
+    function measureBboxFromClone(svgClone, selector) {
+        // getBBox() is unreliable on detached SVG in some browsers, so temporarily mount it off-screen.
+        let host = null;
+        try {
+            const el = svgClone.querySelector(selector);
+            if (!el) return null;
+
+            host = document.createElement('div');
+            host.setAttribute('data-export-measure-host', '1');
+            host.style.position = 'fixed';
+            host.style.left = '-10000px';
+            host.style.top = '-10000px';
+            host.style.width = '1px';
+            host.style.height = '1px';
+            host.style.overflow = 'hidden';
+            host.style.pointerEvents = 'none';
+            host.style.opacity = '0';
+
+            document.body.appendChild(host);
+            host.appendChild(svgClone);
+
+            const b = el.getBBox();
+            if (!b || !(b.width > 0) || !(b.height > 0)) return null;
+
+            return { x: b.x, y: b.y, width: b.width, height: b.height };
+        } catch (e) {
+            return null;
+        } finally {
+            try {
+                if (host && host.parentNode) host.parentNode.removeChild(host);
+            } catch (e2) {}
+        }
+    }
+
     // Capture plan when printing starts (with retry logic)
     useEffect(() => {
         if (!isPrinting || planImageDataUrl !== null) return;
@@ -752,101 +787,22 @@ function RP22ReportInner() {
                     return;
                 }
                 
-                // Build union bbox from meaningful content (not background grid)
-                let bbox = null;
-                
-                try {
-                    // Prefer the tight export crop target
-                    const crop = svgElement.querySelector('#export-crop-bounds');
-                    if (crop) {
-                        bbox = crop.getBBox();
-                    }
-                } catch (e) {
-                    bbox = null;
-                }
-                
-                // Fallback: export-bounds wrapper (legacy)
+                // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
+                const svgClone = svgElement.cloneNode(true);
+                stripExportViewportTransforms(svgClone);
+
+                // Prefer export-crop-bounds if it exists, otherwise export-bounds
+                let bbox =
+                    measureBboxFromClone(svgClone, '#export-crop-bounds') ||
+                    measureBboxFromClone(svgClone, '#export-bounds');
+
+                // If still missing, fall back to the clone's viewBox (last resort)
                 if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    try {
-                        const exportBounds = svgElement.querySelector('#export-bounds');
-                        if (exportBounds) bbox = exportBounds.getBBox();
-                    } catch (e) {
-                        bbox = null;
-                    }
-                }
-                
-                // Fallback: build union bbox from visible geometry
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    try {
-                        // Get SVG dimensions for filtering
-                        let svgWidth = 1200, svgHeight = 800;
-                        const vb = svgElement.getAttribute('viewBox');
-                        if (vb) {
-                            const parts = vb.split(/\s+/);
-                            if (parts.length === 4) {
-                                svgWidth = parseFloat(parts[2]);
-                                svgHeight = parseFloat(parts[3]);
-                            }
-                        } else {
-                            const rect = svgElement.getBoundingClientRect();
-                            if (rect.width > 0) svgWidth = rect.width;
-                            if (rect.height > 0) svgHeight = rect.height;
-                        }
-                        
-                        // Collect meaningful geometry
-                        const candidates = svgElement.querySelectorAll('rect, path, line, polyline, polygon, circle, ellipse');
-                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                        let count = 0;
-                        
-                        candidates.forEach(el => {
-                            // Skip invisible or background elements
-                            const opacity = el.getAttribute('opacity');
-                            const display = el.getAttribute('display');
-                            if (opacity === '0' || display === 'none') return;
-                            
-                            try {
-                                const b = el.getBBox();
-                                if (!b || b.width <= 0 || b.height <= 0) return;
-                                
-                                // Skip background-sized elements (90% of SVG or larger)
-                                if (b.width > svgWidth * 0.9 || b.height > svgHeight * 0.9) return;
-                                
-                                // Accumulate bounds
-                                minX = Math.min(minX, b.x);
-                                minY = Math.min(minY, b.y);
-                                maxX = Math.max(maxX, b.x + b.width);
-                                maxY = Math.max(maxY, b.y + b.height);
-                                count++;
-                            } catch (e) {
-                                // Skip elements that can't be measured
-                            }
-                        });
-                        
-                        if (count > 0 && Number.isFinite(minX) && Number.isFinite(maxX)) {
-                            bbox = {
-                                x: minX,
-                                y: minY,
-                                width: maxX - minX,
-                                height: maxY - minY
-                            };
-                        }
-                    } catch (e) {
-                        bbox = null;
-                    }
-                }
-                
-                // Fallback: Use viewBox if bbox still invalid
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    const viewBoxAttr = svgElement.getAttribute('viewBox');
+                    const viewBoxAttr = svgClone.getAttribute('viewBox');
                     if (viewBoxAttr) {
-                        const parts = viewBoxAttr.split(/\s+/);
-                        if (parts.length === 4) {
-                            bbox = {
-                                x: parseFloat(parts[0]),
-                                y: parseFloat(parts[1]),
-                                width: parseFloat(parts[2]),
-                                height: parseFloat(parts[3])
-                            };
+                        const parts = viewBoxAttr.split(/\s+/).map(Number);
+                        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                            bbox = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
                         }
                     }
                 }
@@ -872,11 +828,7 @@ function RP22ReportInner() {
                 const viewBoxW = bbox.width + (2 * padding);
                 const viewBoxH = bbox.height + (2 * padding);
                 
-                // Now clone and apply the computed viewBox
-                const svgClone = svgElement.cloneNode(true);
-                stripExportViewportTransforms(svgClone);
-                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                
+                // Apply the computed viewBox to the clone
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 svgClone.setAttribute('width', String(viewBoxW));
@@ -977,101 +929,22 @@ function RP22ReportInner() {
                     return;
                 }
                 
-                // Build union bbox from meaningful content (not background grid)
-                let bbox = null;
-                
-                try {
-                    // Prefer the tight export crop target
-                    const crop = svgElement.querySelector('#export-crop-bounds');
-                    if (crop) {
-                        bbox = crop.getBBox();
-                    }
-                } catch (e) {
-                    bbox = null;
-                }
-                
-                // Fallback: export-bounds wrapper (legacy)
+                // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
+                const svgClone = svgElement.cloneNode(true);
+                stripExportViewportTransforms(svgClone);
+
+                // Prefer export-crop-bounds if it exists, otherwise export-bounds
+                let bbox =
+                    measureBboxFromClone(svgClone, '#export-crop-bounds') ||
+                    measureBboxFromClone(svgClone, '#export-bounds');
+
+                // If still missing, fall back to the clone's viewBox (last resort)
                 if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    try {
-                        const exportBounds = svgElement.querySelector('#export-bounds');
-                        if (exportBounds) bbox = exportBounds.getBBox();
-                    } catch (e) {
-                        bbox = null;
-                    }
-                }
-                
-                // Fallback: build union bbox from visible geometry
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    try {
-                        // Get SVG dimensions for filtering
-                        let svgWidth = 1200, svgHeight = 800;
-                        const vb = svgElement.getAttribute('viewBox');
-                        if (vb) {
-                            const parts = vb.split(/\s+/);
-                            if (parts.length === 4) {
-                                svgWidth = parseFloat(parts[2]);
-                                svgHeight = parseFloat(parts[3]);
-                            }
-                        } else {
-                            const rect = svgElement.getBoundingClientRect();
-                            if (rect.width > 0) svgWidth = rect.width;
-                            if (rect.height > 0) svgHeight = rect.height;
-                        }
-                        
-                        // Collect meaningful geometry
-                        const candidates = svgElement.querySelectorAll('rect, path, line, polyline, polygon, circle, ellipse');
-                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                        let count = 0;
-                        
-                        candidates.forEach(el => {
-                            // Skip invisible or background elements
-                            const opacity = el.getAttribute('opacity');
-                            const display = el.getAttribute('display');
-                            if (opacity === '0' || display === 'none') return;
-                            
-                            try {
-                                const b = el.getBBox();
-                                if (!b || b.width <= 0 || b.height <= 0) return;
-                                
-                                // Skip background-sized elements (90% of SVG or larger)
-                                if (b.width > svgWidth * 0.9 || b.height > svgHeight * 0.9) return;
-                                
-                                // Accumulate bounds
-                                minX = Math.min(minX, b.x);
-                                minY = Math.min(minY, b.y);
-                                maxX = Math.max(maxX, b.x + b.width);
-                                maxY = Math.max(maxY, b.y + b.height);
-                                count++;
-                            } catch (e) {
-                                // Skip elements that can't be measured
-                            }
-                        });
-                        
-                        if (count > 0 && Number.isFinite(minX) && Number.isFinite(maxX)) {
-                            bbox = {
-                                x: minX,
-                                y: minY,
-                                width: maxX - minX,
-                                height: maxY - minY
-                            };
-                        }
-                    } catch (e) {
-                        bbox = null;
-                    }
-                }
-                
-                // Fallback: Use viewBox if bbox still invalid
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    const viewBoxAttr = svgElement.getAttribute('viewBox');
+                    const viewBoxAttr = svgClone.getAttribute('viewBox');
                     if (viewBoxAttr) {
-                        const parts = viewBoxAttr.split(/\s+/);
-                        if (parts.length === 4) {
-                            bbox = {
-                                x: parseFloat(parts[0]),
-                                y: parseFloat(parts[1]),
-                                width: parseFloat(parts[2]),
-                                height: parseFloat(parts[3])
-                            };
+                        const parts = viewBoxAttr.split(/\s+/).map(Number);
+                        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                            bbox = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
                         }
                     }
                 }
@@ -1097,11 +970,7 @@ function RP22ReportInner() {
                 const viewBoxW = bbox.width + (2 * padding);
                 const viewBoxH = bbox.height + (2 * padding);
                 
-                // Now clone and apply the computed viewBox
-                const svgClone = svgElement.cloneNode(true);
-                stripExportViewportTransforms(svgClone);
-                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                
+                // Apply the computed viewBox to the clone
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 svgClone.setAttribute('width', String(viewBoxW));
@@ -1202,101 +1071,22 @@ function RP22ReportInner() {
                     return;
                 }
 
-                // Build union bbox from meaningful content (not background grid)
-                let bbox = null;
-                
-                try {
-                    // Prefer the tight export crop target
-                    const crop = svgElement.querySelector('#export-crop-bounds');
-                    if (crop) {
-                        bbox = crop.getBBox();
-                    }
-                } catch (e) {
-                    bbox = null;
-                }
-                
-                // Fallback: export-bounds wrapper (legacy)
+                // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
+                const svgClone = svgElement.cloneNode(true);
+                stripExportViewportTransforms(svgClone);
+
+                // Prefer export-crop-bounds if it exists, otherwise export-bounds
+                let bbox =
+                    measureBboxFromClone(svgClone, '#export-crop-bounds') ||
+                    measureBboxFromClone(svgClone, '#export-bounds');
+
+                // If still missing, fall back to the clone's viewBox (last resort)
                 if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    try {
-                        const exportBounds = svgElement.querySelector('#export-bounds');
-                        if (exportBounds) bbox = exportBounds.getBBox();
-                    } catch (e) {
-                        bbox = null;
-                    }
-                }
-                
-                // Fallback: build union bbox from visible geometry
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    try {
-                        // Get SVG dimensions for filtering
-                        let svgWidth = 1200, svgHeight = 800;
-                        const vb = svgElement.getAttribute('viewBox');
-                        if (vb) {
-                            const parts = vb.split(/\s+/);
-                            if (parts.length === 4) {
-                                svgWidth = parseFloat(parts[2]);
-                                svgHeight = parseFloat(parts[3]);
-                            }
-                        } else {
-                            const rect = svgElement.getBoundingClientRect();
-                            if (rect.width > 0) svgWidth = rect.width;
-                            if (rect.height > 0) svgHeight = rect.height;
-                        }
-                        
-                        // Collect meaningful geometry
-                        const candidates = svgElement.querySelectorAll('rect, path, line, polyline, polygon, circle, ellipse');
-                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-                        let count = 0;
-                        
-                        candidates.forEach(el => {
-                            // Skip invisible or background elements
-                            const opacity = el.getAttribute('opacity');
-                            const display = el.getAttribute('display');
-                            if (opacity === '0' || display === 'none') return;
-                            
-                            try {
-                                const b = el.getBBox();
-                                if (!b || b.width <= 0 || b.height <= 0) return;
-                                
-                                // Skip background-sized elements (90% of SVG or larger)
-                                if (b.width > svgWidth * 0.9 || b.height > svgHeight * 0.9) return;
-                                
-                                // Accumulate bounds
-                                minX = Math.min(minX, b.x);
-                                minY = Math.min(minY, b.y);
-                                maxX = Math.max(maxX, b.x + b.width);
-                                maxY = Math.max(maxY, b.y + b.height);
-                                count++;
-                            } catch (e) {
-                                // Skip elements that can't be measured
-                            }
-                        });
-                        
-                        if (count > 0 && Number.isFinite(minX) && Number.isFinite(maxX)) {
-                            bbox = {
-                                x: minX,
-                                y: minY,
-                                width: maxX - minX,
-                                height: maxY - minY
-                            };
-                        }
-                    } catch (e) {
-                        bbox = null;
-                    }
-                }
-                
-                // Fallback: Use viewBox if bbox still invalid
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    const viewBoxAttr = svgElement.getAttribute('viewBox');
+                    const viewBoxAttr = svgClone.getAttribute('viewBox');
                     if (viewBoxAttr) {
-                        const parts = viewBoxAttr.split(/\s+/);
-                        if (parts.length === 4) {
-                            bbox = {
-                                x: parseFloat(parts[0]),
-                                y: parseFloat(parts[1]),
-                                width: parseFloat(parts[2]),
-                                height: parseFloat(parts[3])
-                            };
+                        const parts = viewBoxAttr.split(/\s+/).map(Number);
+                        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
+                            bbox = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
                         }
                     }
                 }
@@ -1321,10 +1111,7 @@ function RP22ReportInner() {
                 const viewBoxW = bbox.width + (2 * padding);
                 const viewBoxH = bbox.height + (2 * padding);
                 
-                const svgClone = svgElement.cloneNode(true);
-                stripExportViewportTransforms(svgClone);
-                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                
+                // Apply the computed viewBox to the clone
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 svgClone.setAttribute('width', String(viewBoxW));
