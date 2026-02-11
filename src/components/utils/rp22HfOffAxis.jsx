@@ -610,31 +610,19 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
   if (!Array.isArray(seats) || !seats.length) return {};
   if (!Array.isArray(speakers) || !speakers.length) return {};
 
-  // Helper to check if speaker has valid position
-  const hasPos = (s) => s?.position && isNum(s.position.x) && isNum(s.position.y);
+  // CRITICAL: ONLY use speakers that are actually in the drawing
+  // Source of truth: must have real position AND real model (no "off"/"none"/blank)
+  const candidates = (Array.isArray(speakers) ? speakers : []).filter(s => {
+    // Must have valid position
+    const hasPos = !!s?.position && isNum(s.position.x) && isNum(s.position.y);
+    if (!hasPos) return false;
 
-  // CRITICAL: Filter to only visible/active speakers (matches plan view)
-  const isVisibleInLayout = (s) => {
-    if (!s) return false;
-    if (typeof appState?.getSpeakerVisibility === "function") {
-      const role = canonRole(s.role, getCanonicalRole);
-      return appState.getSpeakerVisibility(role, s.model) !== false;
-    }
-    return true; // Fallback: show all if visibility function not available
-  };
+    // Must have a real model selected
+    const model = String(s?.model || '').toLowerCase();
+    if (!model || model === 'off' || model === 'none' || model === 'undefined') return false;
 
-  // Authoritative filter: only roles allowed by the current layout (5.x, 7.x, 9.x)
-  const roleAllowedByLayout = (s) => {
-    if (!allowedP17Roles || !(allowedP17Roles instanceof Set)) return true; // fallback if not provided
-    const role = canonRole(s.role, getCanonicalRole);
-    return allowedP17Roles.has(role);
-  };
-
-  // Filter speakers to only those that are visible, positioned, and allowed by layout
-  const visibleSpeakers = speakers
-    .filter(hasPos)
-    .filter(isVisibleInLayout)
-    .filter(roleAllowedByLayout);
+    return true;
+  });
 
   // [B44 DEBUG] Log speakers entering P17 analysis
   if (globalThis.__B44_RV_DEBUG === true) {
@@ -676,8 +664,12 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
     // [B44 DEBUG] Track which speakers enter the per-seat loop
     const speakersProcessed = [];
 
-    // Loop over VISIBLE non-LCR speakers only (filtered above)
-    for (const spk of visibleSpeakers) {
+    // Loop over ONLY speakers in the drawing (candidates filtered above)
+    for (const spk of candidates) {
+      // Skip LCR for P17 (P16 handles LCR)
+      const r = canonRole(spk.role, getCanonicalRole);
+      if (r === 'FL' || r === 'FC' || r === 'FR') continue;
+
       const result = computeSurroundLikeHfLoss({
         speaker: spk,
         seat: { x: seatPos.x || seat.x, y: seatPos.y || seat.y, z: seatPos.z || seat.z },
