@@ -533,6 +533,9 @@ function useDesignerState() {
     (__autosavePayload && __autosavePayload.seatMetricsById) ? __autosavePayload.seatMetricsById : {}
   ));
 
+  // Latest seat snapshot (no signature, just seat.id -> full snapshot)
+  const [seatSnapshotBySeatId, setSeatSnapshotBySeatId] = useState({});
+
   const [p15ConstructionLevel, setP15ConstructionLevel] = useState(() => (
     (__autosavePayload && __autosavePayload.p15ConstructionLevel) ? __autosavePayload.p15ConstructionLevel : 'standard'
   ));

@@ -3510,6 +3510,10 @@ React.useEffect(() => {
           dolbyLayout,
         });
         
+        if (snapshot && seatId && appState?.setSeatSnapshotBySeatId) {
+          appState.setSeatSnapshotBySeatId(prev => ({ ...prev, [seatId]: snapshot }));
+        }
+        
         if (snapshot) return snapshot;
       } catch (err) {
         console.warn('[HUD] Failed to compute pinned seat snapshot:', err);
@@ -3551,6 +3555,11 @@ React.useEffect(() => {
     });
     
     if (data) {
+      // Write to latest seat snapshot map (no signature, just seat.id)
+      if (seatId && appState?.setSeatSnapshotBySeatId) {
+        appState.setSeatSnapshotBySeatId(prev => ({ ...prev, [seatId]: data }));
+      }
+      
       // IMPORTANT: seed the shared cache so RP22Report can render seat cards
       // Keep this very conservative: only write if missing or different.
       if (appState?.setSeatMetricsById) {
