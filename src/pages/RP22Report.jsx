@@ -27,6 +27,25 @@ import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 function RP22ReportInner() {
     const app = useAppState();
     
+    // Helper: compute plan box size respecting A4 printable area
+    const getPlanBoxMm = (planAspect) => {
+        const MAX_PRINT_WIDTH_MM = 186;
+        const MAX_PRINT_HEIGHT_MM = 235;
+        const round2 = (v) => Math.round(v * 100) / 100;
+        
+        // Start with max width
+        let width = MAX_PRINT_WIDTH_MM;
+        let height = width / planAspect;
+        
+        // If height exceeds limit, recalculate from max height
+        if (height > MAX_PRINT_HEIGHT_MM) {
+            height = MAX_PRINT_HEIGHT_MM;
+            width = height * planAspect;
+        }
+        
+        return { widthMm: round2(width), heightMm: round2(height) };
+    };
+    
     const [isPrinting, setIsPrinting] = useState(false);
     const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
     const [planDimsImageDataUrl, setPlanDimsImageDataUrl] = useState(null);
@@ -2880,19 +2899,29 @@ function RP22ReportInner() {
                                     Room plan
                                 </h2>
 
-                                <img
-                                    src={planImageDataUrl}
-                                    alt="Room plan"
-                                    style={{
-                                        width: '100%',
-                                        height: 'auto',
-                                        objectFit: 'contain',
-                                        display: 'block',
-                                        margin: '0',
-                                        padding: 0,
-                                        background: 'transparent',
-                                    }}
-                                />
+                                {(() => {
+                                    // Compute aspect from viewBox or default to room aspect
+                                    const roomW = Number(roomDims?.widthM) || 4.5;
+                                    const roomL = Number(roomDims?.lengthM) || 6.0;
+                                    const planAspect = roomW / roomL;
+                                    const box = getPlanBoxMm(planAspect);
+                                    
+                                    return (
+                                        <img
+                                            src={planImageDataUrl}
+                                            alt="Room plan"
+                                            style={{
+                                                width: `${box.widthMm}mm`,
+                                                height: `${box.heightMm}mm`,
+                                                objectFit: 'contain',
+                                                display: 'block',
+                                                margin: '0 auto',
+                                                padding: 0,
+                                                background: 'transparent',
+                                            }}
+                                        />
+                                    );
+                                })()}
                             </section>
                         )}
 
@@ -2913,19 +2942,28 @@ function RP22ReportInner() {
                                     Room plan (dimensions)
                                 </h2>
 
-                                <img
-                                    src={planDimsImageDataUrl}
-                                    alt="Room plan (dimensions)"
-                                    style={{
-                                        width: '100%',
-                                        height: 'auto',
-                                        objectFit: 'contain',
-                                        display: 'block',
-                                        margin: '0',
-                                        padding: 0,
-                                        background: 'transparent',
-                                    }}
-                                />
+                                {(() => {
+                                    const roomW = Number(roomDims?.widthM) || 4.5;
+                                    const roomL = Number(roomDims?.lengthM) || 6.0;
+                                    const planAspect = roomW / roomL;
+                                    const box = getPlanBoxMm(planAspect);
+                                    
+                                    return (
+                                        <img
+                                            src={planDimsImageDataUrl}
+                                            alt="Room plan (dimensions)"
+                                            style={{
+                                                width: `${box.widthMm}mm`,
+                                                height: `${box.heightMm}mm`,
+                                                objectFit: 'contain',
+                                                display: 'block',
+                                                margin: '0 auto',
+                                                padding: 0,
+                                                background: 'transparent',
+                                            }}
+                                        />
+                                    );
+                                })()}
                             </section>
                         )}
 
@@ -2950,19 +2988,28 @@ function RP22ReportInner() {
                                     Room plan (speaker positions)
                                 </h2>
 
-                                <img
-                                    src={planSpeakerDimsImageDataUrl}
-                                    alt="Room plan (speaker positions)"
-                                    style={{
-                                        width: "100%",
-                                        height: "auto",
-                                        objectFit: "contain",
-                                        display: "block",
-                                        margin: 0,
-                                        padding: 0,
-                                        background: "transparent",
-                                    }}
-                                />
+                                {(() => {
+                                    const roomW = Number(roomDims?.widthM) || 4.5;
+                                    const roomL = Number(roomDims?.lengthM) || 6.0;
+                                    const planAspect = roomW / roomL;
+                                    const box = getPlanBoxMm(planAspect);
+                                    
+                                    return (
+                                        <img
+                                            src={planSpeakerDimsImageDataUrl}
+                                            alt="Room plan (speaker positions)"
+                                            style={{
+                                                width: `${box.widthMm}mm`,
+                                                height: `${box.heightMm}mm`,
+                                                objectFit: "contain",
+                                                display: "block",
+                                                margin: "0 auto",
+                                                padding: 0,
+                                                background: "transparent",
+                                            }}
+                                        />
+                                    );
+                                })()}
                             </section>
                         )}
 
