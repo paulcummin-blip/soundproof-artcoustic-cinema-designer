@@ -1582,6 +1582,24 @@ function RP22ReportInner() {
                     min-height: 0 !important;
                     max-height: none !important;
                 }
+
+                /* Plan image fit-box: A4 printable area is 186mm wide (210 - 2*12mm) */
+                .plan-fitbox {
+                    width: 186mm !important;
+                    height: 240mm !important; /* safe height for plan + title on its page */
+                    margin: 0 auto !important;
+                    display: flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    overflow: hidden !important;
+                }
+
+                .plan-fitbox > img {
+                    width: 100% !important;
+                    height: 100% !important;
+                    object-fit: contain !important;
+                    display: block !important;
+                }
                 
                 /* Force pure white backgrounds (kill the pale side bars) */
                 html, body, #root, #__next {
