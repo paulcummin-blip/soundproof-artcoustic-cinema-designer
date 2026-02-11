@@ -684,7 +684,7 @@ function RP22ReportInner() {
     }, [isPrinting, printReady]);
 
     // Helper to strip zoom/pan transforms from cloned SVG for export
-    function stripExportTransformsFromClone(svgClone) {
+    function stripExportViewportTransforms(svgClone) {
         try {
             const anchor =
                 svgClone.querySelector('#export-crop-bounds') ||
@@ -692,32 +692,25 @@ function RP22ReportInner() {
 
             if (!anchor) return;
 
-            // Walk up from anchor to the root SVG and strip any transforms/clipPaths
-            let n = anchor.parentNode;
-            while (n && n !== svgClone) {
-                if (n.nodeType === 1) {
-                    const tag = (n.tagName || '').toLowerCase();
+            // Walk up from export group to the root SVG, removing any viewport transforms
+            let node = anchor.parentNode;
+            while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
+                if (node.nodeName.toLowerCase() === 'g') {
+                    // Kill SVG transform + clipping that affects getBBox/viewBox math
+                    node.removeAttribute('transform');
+                    node.removeAttribute('clip-path');
+                    node.removeAttribute('clipPath');
 
-                    // Only care about groups (the zoom group is a <g>)
-                    if (tag === 'g') {
-                        // Remove zoom/pan scale/translate
-                        n.removeAttribute('transform');
-
-                        // Remove viewport clipping that can mess with export framing
-                        n.removeAttribute('clip-path');
-                        n.removeAttribute('clipPath');
-
-                        // Also clear CSS transforms if any exist
-                        if (n.style) {
-                            n.style.transform = '';
-                            n.style.transformOrigin = '';
-                        }
+                    // Kill CSS transforms if any
+                    if (node.style) {
+                        node.style.transform = 'none';
+                        node.style.transformOrigin = '0 0';
                     }
                 }
-                n = n.parentNode;
+                node = node.parentNode;
             }
         } catch (e) {
-            // ignore – export can still proceed
+            // ignore, capture still proceeds
         }
     }
 
