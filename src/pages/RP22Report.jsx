@@ -1017,6 +1017,7 @@ function RP22ReportInner() {
                                 width: maxX - minX,
                                 height: maxY - minY
                             };
+                            bboxSource = 'union';
                         }
                     } catch (e) {
                         bbox = null;
@@ -1035,6 +1036,7 @@ function RP22ReportInner() {
                                 width: parseFloat(parts[2]),
                                 height: parseFloat(parts[3])
                             };
+                            bboxSource = 'viewBox';
                         }
                     }
                 }
@@ -1064,6 +1066,16 @@ function RP22ReportInner() {
                 if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
                     setPlanDimsAspect(viewBoxW / viewBoxH);
                 }
+                
+                // Track bbox details for diagnostics
+                const aspect = viewBoxH > 0 ? (viewBoxW / viewBoxH) : 0;
+                
+                setExportStatus(
+                  `Dims bbox: ${bboxSource}\n` +
+                  `bbox: ${bbox.width.toFixed(1)}×${bbox.height.toFixed(1)}\n` +
+                  `viewBox: ${viewBoxW.toFixed(1)}×${viewBoxH.toFixed(1)}\n` +
+                  `aspect: ${aspect.toFixed(3)}`
+                );
                 
                 // Track bbox details for diagnostics
                 const aspect = viewBoxH > 0 ? (viewBoxW / viewBoxH) : 0;
