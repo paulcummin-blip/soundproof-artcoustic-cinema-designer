@@ -31,9 +31,6 @@ function RP22ReportInner() {
     const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
     const [planDimsImageDataUrl, setPlanDimsImageDataUrl] = useState(null);
     const [planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl] = useState(null);
-    const [planAspect, setPlanAspect] = useState(null);
-    const [planDimsAspect, setPlanDimsAspect] = useState(null);
-    const [planSpeakerDimsAspect, setPlanSpeakerDimsAspect] = useState(null);
     const [hasPrintedOnce, setHasPrintedOnce] = useState(false);
     const [exportStatus, setExportStatus] = useState("Idle");
     const [exportDebug, setExportDebug] = useState({ isPrinting: false, planLen: 0, printReady: false });
@@ -727,26 +724,14 @@ function RP22ReportInner() {
                 // Build union bbox from meaningful content (not background grid)
                 let bbox = null;
                 
-                // Prefer the tight export crop target (prevents rulers/labels inflating bbox)
                 try {
-                    const crop = svgElement.querySelector('#export-crop-bounds');
-                    if (crop) {
-                        bbox = crop.getBBox();
+                    // Try export-bounds wrapper first
+                    const exportBounds = svgElement.querySelector('#export-bounds');
+                    if (exportBounds) {
+                        bbox = exportBounds.getBBox();
                     }
                 } catch (e) {
                     bbox = null;
-                }
-                
-                // Fallback: original export-bounds (legacy)
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    try {
-                        const exportBounds = svgElement.querySelector('#export-bounds');
-                        if (exportBounds) {
-                            bbox = exportBounds.getBBox();
-                        }
-                    } catch (e) {
-                        bbox = null;
-                    }
                 }
                 
                 // Fallback: build union bbox from visible geometry
@@ -950,14 +935,12 @@ function RP22ReportInner() {
                 
                 // Build union bbox from meaningful content (not background grid)
                 let bbox = null;
-                let bboxSource = 'none';
                 
                 try {
                     // Try export-bounds wrapper first
                     const exportBounds = svgElement.querySelector('#export-bounds');
                     if (exportBounds) {
                         bbox = exportBounds.getBBox();
-                        bboxSource = 'export-bounds';
                     }
                 } catch (e) {
                     bbox = null;
@@ -1017,7 +1000,6 @@ function RP22ReportInner() {
                                 width: maxX - minX,
                                 height: maxY - minY
                             };
-                            bboxSource = 'union';
                         }
                     } catch (e) {
                         bbox = null;
@@ -1036,7 +1018,6 @@ function RP22ReportInner() {
                                 width: parseFloat(parts[2]),
                                 height: parseFloat(parts[3])
                             };
-                            bboxSource = 'viewBox';
                         }
                     }
                 }
@@ -1061,46 +1042,6 @@ function RP22ReportInner() {
                 const viewBoxY = bbox.y - padding;
                 const viewBoxW = bbox.width + (2 * padding);
                 const viewBoxH = bbox.height + (2 * padding);
-                
-                // Store aspect ratio for fit-to-page logic
-                if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
-                    setPlanDimsAspect(viewBoxW / viewBoxH);
-                }
-                
-                // DEBUG: show the actual numbers on-page (no console)
-                if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
-                  const bboxAspect = viewBoxW / viewBoxH;
-
-                  // Mirror getPlanBoxMm logic locally so we can display the mm result
-                  const MAX_W_MM = 190;
-                  const MAX_H_MM = 235;
-
-                  let mmW = MAX_W_MM;
-                  let mmH = mmW / bboxAspect;
-
-                  // If height would exceed max, clamp by height instead
-                  if (mmH > MAX_H_MM) {
-                    mmH = MAX_H_MM;
-                    mmW = mmH * bboxAspect;
-                  }
-
-                  // Final safety clamps
-                  mmW = Math.min(MAX_W_MM, mmW);
-                  mmH = Math.min(MAX_H_MM, mmH);
-
-                  const r1 = (n) => (Number.isFinite(n) ? Math.round(n * 10) / 10 : n);
-                  const r2 = (n) => (Number.isFinite(n) ? Math.round(n * 100) / 100 : n);
-
-                  setExportStatus(
-                    "Dims capture — numbers\n" +
-                    `bboxSource: ${bboxSource}\n` +
-                    `bbox: x=${r1(bbox.x)} y=${r1(bbox.y)} w=${r1(bbox.width)} h=${r1(bbox.height)}\n` +
-                    `pad(px): ${r1(padding)}\n` +
-                    `viewBox: x=${r1(viewBoxX)} y=${r1(viewBoxY)} w=${r1(viewBoxW)} h=${r1(viewBoxH)}\n` +
-                    `aspect(viewBoxW/viewBoxH): ${r2(bboxAspect)}\n` +
-                    `printBox(mm): ${r1(mmW)} × ${r1(mmH)} (max ${MAX_W_MM}×${MAX_H_MM})`
-                  );
-                }
                 
                 // Now clone and apply the computed viewBox
                 const svgClone = svgElement.cloneNode(true);
@@ -1207,26 +1148,14 @@ function RP22ReportInner() {
                 // Build union bbox from meaningful content (not background grid)
                 let bbox = null;
                 
-                // Prefer the tight export crop target (prevents rulers/labels inflating bbox)
                 try {
-                    const crop = svgElement.querySelector('#export-crop-bounds');
-                    if (crop) {
-                        bbox = crop.getBBox();
+                    // Try export-bounds wrapper first
+                    const exportBounds = svgElement.querySelector('#export-bounds');
+                    if (exportBounds) {
+                        bbox = exportBounds.getBBox();
                     }
                 } catch (e) {
                     bbox = null;
-                }
-                
-                // Fallback: original export-bounds (legacy)
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    try {
-                        const exportBounds = svgElement.querySelector('#export-bounds');
-                        if (exportBounds) {
-                            bbox = exportBounds.getBBox();
-                        }
-                    } catch (e) {
-                        bbox = null;
-                    }
                 }
                 
                 // Fallback: build union bbox from visible geometry
@@ -1330,11 +1259,6 @@ function RP22ReportInner() {
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 svgClone.setAttribute('width', String(viewBoxW));
                 svgClone.setAttribute('height', String(viewBoxH));
-                
-                // Store aspect ratio for fit-to-page logic
-                if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
-                    setPlanSpeakerDimsAspect(viewBoxW / viewBoxH);
-                }
                 
                 const svgString = new XMLSerializer().serializeToString(svgClone);
                 const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -1617,38 +1541,6 @@ function RP22ReportInner() {
         );
     }
 
-    // Helper to calculate optimal plan box size based on aspect ratio
-    const getPlanBoxMm = (aspect) => {
-        // Target area inside the page for the plan image.
-        const MAX_W_MM = 190;
-        const MAX_H_MM = 235;
-
-        // If we don't know aspect yet, fall back to old box
-        if (!Number.isFinite(aspect) || aspect <= 0) {
-            return { w: MAX_W_MM, h: 220 };
-        }
-
-        // Fit-to-box: grow until width OR height hits the max
-        let w = MAX_W_MM;
-        let h = w / aspect;
-
-        // If height would exceed max, clamp by height instead
-        if (h > MAX_H_MM) {
-            h = MAX_H_MM;
-            w = h * aspect;
-        }
-
-        // Final safety clamps
-        w = Math.min(MAX_W_MM, w);
-        h = Math.min(MAX_H_MM, h);
-
-        // Keep sensible minimums
-        w = Math.max(120, w);
-        h = Math.max(120, h);
-
-        return { w, h };
-    };
-
     const PrintStyles = () => (
         <style>{`
             @media print {
@@ -1921,31 +1813,12 @@ function RP22ReportInner() {
                     page-break-inside: avoid !important;
                 }
 
-                /* REPORT EXPORT: PREVENT PAGE SPLITS */
-                .no-split,
-                .rp22-section,
-                .rp22-card,
-                .rp22-seat-card,
-                .rp22-plan-block,
+                /* CRITICAL: Do NOT make the card itself "unbreakable" in print.
+                   Keep the wrapper as avoid, but allow the card to break if the engine needs it. */
                 .rp22-report .rp22-param-card,
                 .rp22-report .rp22-seat-card {
-                    break-inside: avoid !important;
-                    page-break-inside: avoid !important;
-                }
-                
-                /* Avoid splitting captions from images */
-                .rp22-plan-caption,
-                .rp22-caption {
-                    break-after: avoid !important;
-                    page-break-after: avoid !important;
-                }
-                
-                /* Make images behave predictably */
-                img, svg {
-                    max-width: 100%;
-                    height: auto;
-                    break-inside: avoid !important;
-                    page-break-inside: avoid !important;
+                    break-inside: auto !important;
+                    page-break-inside: auto !important;
                 }
 
                 /* Safe breakpoints inside cards */
@@ -2261,8 +2134,7 @@ function RP22ReportInner() {
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <Button
+                        <Button
                             type="button"
                             onClick={() => {
                                 // Prevent double-click / overlapping exports
@@ -2286,9 +2158,6 @@ function RP22ReportInner() {
                                 setPlanImageDataUrl(null);
                                 setPlanDimsImageDataUrl(null);
                                 setPlanSpeakerDimsImageDataUrl(null);
-                                setPlanAspect(null);
-                                setPlanDimsAspect(null);
-                                setPlanSpeakerDimsAspect(null);
 
                                 // Start the capture/print pipeline
                                 setIsPrinting(true);
@@ -2325,23 +2194,6 @@ function RP22ReportInner() {
                             <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
                             Export PDF
                         </Button>
-
-                        {isPrinting && (
-                          <div
-                            style={{
-                              marginTop: '6px',
-                              maxWidth: '260px',
-                              fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-                              fontSize: '11px',
-                              lineHeight: 1.2,
-                              color: '#3E4349',
-                              whiteSpace: 'pre-wrap',
-                            }}
-                          >
-                            {exportStatus}
-                          </div>
-                        )}
-                        </div>
                         
                         <div style={{ position: 'relative' }}>
                             <Button
@@ -3012,9 +2864,8 @@ function RP22ReportInner() {
                         </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan" className="rp22-plan-block no-split print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0, overflow: 'visible' }}>
+                            <section id="pdf-room-plan" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <h2
-                                    className="rp22-plan-caption"
                                     style={{
                                         fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
                                         fontSize: '20pt',
@@ -3029,40 +2880,25 @@ function RP22ReportInner() {
                                     Room plan
                                 </h2>
 
-                                {(() => {
-                                    const box = getPlanBoxMm(planAspect);
-                                    return (
-                                        <div style={{
-                                            width: `${box.w}mm`,
-                                            height: `${box.h}mm`,
-                                            margin: '0 auto',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            background: 'transparent',
-                                            boxSizing: 'border-box',
-                                        }}>
-                                            <img
-                                                src={planImageDataUrl}
-                                                alt="Room plan"
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'contain',
-                                                    display: 'block',
-                                                    background: 'transparent',
-                                                }}
-                                            />
-                                        </div>
-                                    );
-                                })()}
+                                <img
+                                    src={planImageDataUrl}
+                                    alt="Room plan"
+                                    style={{
+                                        width: '100%',
+                                        height: 'auto',
+                                        objectFit: 'contain',
+                                        display: 'block',
+                                        margin: '0',
+                                        padding: 0,
+                                        background: 'transparent',
+                                    }}
+                                />
                             </section>
                         )}
 
                         {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-dims" className="rp22-plan-block no-split print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0, overflow: 'visible' }}>
+                            <section id="pdf-room-plan-dims" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <h2
-                                    className="rp22-plan-caption"
                                     style={{
                                         fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
                                         fontSize: '20pt',
@@ -3077,44 +2913,29 @@ function RP22ReportInner() {
                                     Room plan (dimensions)
                                 </h2>
 
-                                {(() => {
-                                    const box = getPlanBoxMm(planDimsAspect);
-                                    return (
-                                        <div style={{
-                                            width: `${box.w}mm`,
-                                            height: `${box.h}mm`,
-                                            margin: '0 auto',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            background: 'transparent',
-                                            boxSizing: 'border-box',
-                                        }}>
-                                            <img
-                                                src={planDimsImageDataUrl}
-                                                alt="Room plan (dimensions)"
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'contain',
-                                                    display: 'block',
-                                                    background: 'transparent',
-                                                }}
-                                            />
-                                        </div>
-                                    );
-                                })()}
+                                <img
+                                    src={planDimsImageDataUrl}
+                                    alt="Room plan (dimensions)"
+                                    style={{
+                                        width: '100%',
+                                        height: 'auto',
+                                        objectFit: 'contain',
+                                        display: 'block',
+                                        margin: '0',
+                                        padding: 0,
+                                        background: 'transparent',
+                                    }}
+                                />
                             </section>
                         )}
 
                         {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
                             <section
                                 id="pdf-room-plan-positions"
-                                className="rp22-plan-block no-split print-page-break-after"
-                                style={{ background: "transparent", padding: 0, margin: 0, overflow: 'visible' }}
+                                className="print-page-break-after"
+                                style={{ background: "transparent", padding: 0, margin: 0 }}
                             >
                                 <h2
-                                    className="rp22-plan-caption"
                                     style={{
                                         fontFamily: "Futura PT Light, Century Gothic, sans-serif",
                                         fontSize: "20pt",
@@ -3129,37 +2950,23 @@ function RP22ReportInner() {
                                     Room plan (speaker positions)
                                 </h2>
 
-                                {(() => {
-                                    const box = getPlanBoxMm(planSpeakerDimsAspect);
-                                    return (
-                                        <div style={{
-                                            width: `${box.w}mm`,
-                                            height: `${box.h}mm`,
-                                            margin: '0 auto',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            background: 'transparent',
-                                            boxSizing: 'border-box',
-                                        }}>
-                                            <img
-                                                src={planSpeakerDimsImageDataUrl}
-                                                alt="Room plan (speaker positions)"
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'contain',
-                                                    display: 'block',
-                                                    background: 'transparent',
-                                                }}
-                                            />
-                                        </div>
-                                    );
-                                })()}
+                                <img
+                                    src={planSpeakerDimsImageDataUrl}
+                                    alt="Room plan (speaker positions)"
+                                    style={{
+                                        width: "100%",
+                                        height: "auto",
+                                        objectFit: "contain",
+                                        display: "block",
+                                        margin: 0,
+                                        padding: 0,
+                                        background: "transparent",
+                                    }}
+                                />
                             </section>
                         )}
 
-                        <section id="pdf-room-parameters" className="rp22-section">
+                        <section id="pdf-room-parameters">
                         {/* ROOM PARAMETERS */}
                         <div>
                         <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
@@ -3170,8 +2977,8 @@ function RP22ReportInner() {
                         </div>
                         <div className="rp22-params-grid rp22-cards-grid">
                             {orderedParams.map(param => (
-                                <div key={param.id} className="rp22-card-wrap no-split">
-                                    <div className="rp22-param-card no-split">
+                                <div key={param.id} className="rp22-card-wrap">
+                                    <div className="rp22-param-card">
                                     <ParameterCard
                                         parameter={param}
                                         roomResult={getRoomResult(param.id)}
@@ -3190,7 +2997,7 @@ function RP22ReportInner() {
                         </div>
                         </section>
                         
-                        <section id="pdf-seat-parameters" className="rp22-section">
+                        <section id="pdf-seat-parameters">
                         {/* SEAT PARAMETERS */}
                         <div className="print-page-break-before" style={{ marginTop: 18 }}>
                         <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
@@ -3245,11 +3052,11 @@ function RP22ReportInner() {
                                     return (
                                         <div 
                                             key={seatId} 
-                                            className="rp22-card-wrap no-split"
+                                            className="rp22-card-wrap"
                                             data-print-seat={seatLabel}
                                             data-print-index={seatIdx}
                                         >
-                                        <div className="rp22-param-card rp22-seat-card no-split">
+                                        <div className="rp22-param-card rp22-seat-card">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
