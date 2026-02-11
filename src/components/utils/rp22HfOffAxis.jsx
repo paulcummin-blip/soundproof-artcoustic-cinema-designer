@@ -16,6 +16,41 @@ const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 // Quantise degrees to 0.5° steps (floor, favourable + stable)
 const q05 = (deg) => (typeof deg === "number" && Number.isFinite(deg) ? Math.floor(deg * 2) / 2 : deg);
 
+// 3D vector helpers for overhead aim calculation
+const seatXYZ = (seat) => ({
+  x: Number(seat?.x ?? seat?.position?.x),
+  y: Number(seat?.y ?? seat?.position?.y),
+  z: Number(seat?.z ?? seat?.position?.z ?? 1.2),
+});
+
+const spkXYZ = (spk, roomHeightM) => ({
+  x: Number(spk?.position?.x),
+  y: Number(spk?.position?.y),
+  z: Number.isFinite(roomHeightM) ? Number(roomHeightM) : Number(spk?.position?.z),
+});
+
+const norm3 = (v) => {
+  const m = Math.hypot(v.x, v.y, v.z);
+  if (!Number.isFinite(m) || m <= 1e-9) return null;
+  return { x: v.x / m, y: v.y / m, z: v.z / m };
+};
+
+const dot3 = (a, b) => a.x*b.x + a.y*b.y + a.z*b.z;
+
+const angleBetweenDeg = (a, b) => {
+  const na = norm3(a);
+  const nb = norm3(b);
+  if (!na || !nb) return null;
+  let d = dot3(na, nb);
+  d = Math.max(-1, Math.min(1, d));
+  return Math.acos(d) * 180 / Math.PI;
+};
+
+const isOverheadRole = (role) => {
+  const r = String(role || "");
+  return r.startsWith("T");
+};
+
 // Plan-view yaw convention (MUST match icon rotation in RoomVisualisation)
 // 0° = +Y (into room), clockwise positive, range -180..+180
 const yawFromToPlan = (from, to) => {
@@ -296,38 +331,22 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, mode
   // Ensure the speaker is always above the listener
   const speakerZ = Math.max(earZ + 0.01, speakerZRaw);
 
-  // NEW: Calculate angle assuming speaker aims at RSP (green dot)
-  // If RSP position is available, calculate 3D angle between (speaker→seat) and (speaker→RSP)
+  // Calculate angle assuming speaker aims at RSP (green dot)
   let rawAngleDeg;
   
+  // Build aim vector (speaker → RSP) and seat vector (speaker → seat)
   if (rspPos && isNum(rspPos.x) && isNum(rspPos.y)) {
-    // Vector from speaker to seat (3D)
-    const toSeatX = Number(seatPos.x) - Number(speakerPos.x);
-    const toSeatY = Number(seatPos.y) - Number(speakerPos.y);
-    const toSeatZ = earZ - speakerZ;
-    const toSeatMag = Math.sqrt(toSeatX * toSeatX + toSeatY * toSeatY + toSeatZ * toSeatZ);
-    
-    // Vector from speaker to RSP (3D)
-    const toRspX = Number(rspPos.x) - Number(speakerPos.x);
-    const toRspY = Number(rspPos.y) - Number(speakerPos.y);
-    const toRspZ = earZ - speakerZ;
-    const toRspMag = Math.sqrt(toRspX * toRspX + toRspY * toRspY + toRspZ * toRspZ);
-    
-    if (toSeatMag > 0.001 && toRspMag > 0.001) {
-      // Dot product to get angle between the two vectors
-      const dotProduct = (toSeatX * toRspX + toSeatY * toRspY + toSeatZ * toRspZ);
-      const cosAngle = dotProduct / (toSeatMag * toRspMag);
-      // Clamp to [-1, 1] to avoid NaN from acos due to floating point errors
-      const cosAngleClamped = Math.max(-1, Math.min(1, cosAngle));
-      rawAngleDeg = rad2deg(Math.acos(cosAngleClamped));
-    } else {
-      // Fallback: straight down calculation
-      const horizontalDist = Math.hypot(toSeatX, toSeatY);
-      const verticalDist = speakerZ - earZ;
-      rawAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
-    }
+    const spk = spkXYZ({ position: speakerPos }, roomHeightM);
+    const seat = seatXYZ(seatPos);
+    const rsp = { x: Number(rspPos.x), y: Number(rspPos.y), z: Number(rspPos.z ?? 1.2) };
+
+    const aimVec = { x: rsp.x - spk.x, y: rsp.y - spk.y, z: rsp.z - spk.z };
+    const seatVec = { x: seat.x - spk.x, y: seat.y - spk.y, z: seat.z - spk.z };
+
+    const ang = angleBetweenDeg(aimVec, seatVec);
+    rawAngleDeg = Number.isFinite(ang) ? ang : 0;
   } else {
-    // Fallback: old "straight down" method
+    // Fallback: straight down method
     const horizontalDist = Math.hypot(
       Number(seatPos.x) - Number(speakerPos.x),
       Number(seatPos.y) - Number(speakerPos.y)
@@ -610,19 +629,13 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
   if (!Array.isArray(seats) || !seats.length) return {};
   if (!Array.isArray(speakers) || !speakers.length) return {};
 
-  // CRITICAL: ONLY use speakers that are actually in the drawing
-  // Source of truth: must have real position AND real model (no "off"/"none"/blank)
-  const candidates = (Array.isArray(speakers) ? speakers : []).filter(s => {
-    // Must have valid position
-    const hasPos = !!s?.position && isNum(s.position.x) && isNum(s.position.y);
-    if (!hasPos) return false;
+  // ONLY speakers that actually exist in the drawing (source of truth)
+  const isFinitePos = (p) => p && Number.isFinite(p.x) && Number.isFinite(p.y);
+  const EXCLUDE_LCR = new Set(["FL","FC","FR","FCL","FCR"]);
 
-    // Must have a real model selected
-    const model = String(s?.model || '').toLowerCase();
-    if (!model || model === 'off' || model === 'none' || model === 'undefined') return false;
-
-    return true;
-  });
+  const p17Speakers = (speakers || [])
+    .filter(s => s && s.role && s.model && isFinitePos(s.position))
+    .filter(s => !EXCLUDE_LCR.has(String(s.role).toUpperCase()));
 
   // [B44 DEBUG] Log speakers entering P17 analysis
   if (globalThis.__B44_RV_DEBUG === true) {
@@ -664,12 +677,8 @@ export function computeP17ForAllSeats({ seats, speakers, mlpPos, getSpeakerModel
     // [B44 DEBUG] Track which speakers enter the per-seat loop
     const speakersProcessed = [];
 
-    // Loop over ONLY speakers in the drawing (candidates filtered above)
-    for (const spk of candidates) {
-      // Skip LCR for P17 (P16 handles LCR)
-      const r = canonRole(spk.role, getCanonicalRole);
-      if (r === 'FL' || r === 'FC' || r === 'FR') continue;
-
+    // Loop over ONLY speakers in the drawing (p17Speakers filtered above)
+    for (const spk of p17Speakers) {
       const result = computeSurroundLikeHfLoss({
         speaker: spk,
         seat: { x: seatPos.x || seat.x, y: seatPos.y || seat.y, z: seatPos.z || seat.z },
