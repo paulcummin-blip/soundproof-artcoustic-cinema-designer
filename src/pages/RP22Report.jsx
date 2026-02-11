@@ -933,44 +933,21 @@ function RP22ReportInner() {
                     return;
                 }
                 
-                // Build bbox from stable crop target first (prevents inflated aspect ratios)
+                // Build union bbox from meaningful content (not background grid)
                 let bbox = null;
-                let bboxType = 'none';
                 
                 try {
-                    const crop = svgElement.querySelector('#export-crop-bounds');
-                    if (crop) {
-                        const b = crop.getBBox();
-                        if (b && b.width > 0 && b.height > 0) {
-                            bbox = b;
-                            bboxType = 'crop';
-                        }
+                    // Try export-bounds wrapper first
+                    const exportBounds = svgElement.querySelector('#export-bounds');
+                    if (exportBounds) {
+                        bbox = exportBounds.getBBox();
                     }
                 } catch (e) {
                     bbox = null;
-                    bboxType = 'crop-error';
-                }
-                
-                // Fallback to export-bounds ONLY if crop is missing/invalid
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    try {
-                        const exportBounds = svgElement.querySelector('#export-bounds');
-                        if (exportBounds) {
-                            const b = exportBounds.getBBox();
-                            if (b && b.width > 0 && b.height > 0) {
-                                bbox = b;
-                                bboxType = 'export-bounds';
-                            }
-                        }
-                    } catch (e) {
-                        bbox = null;
-                        bboxType = 'export-bounds-error';
-                    }
                 }
                 
                 // Fallback: build union bbox from visible geometry
                 if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    bboxType = 'union';
                     try {
                         // Get SVG dimensions for filtering
                         let svgWidth = 1200, svgHeight = 800;
@@ -1065,14 +1042,6 @@ function RP22ReportInner() {
                 const viewBoxY = bbox.y - padding;
                 const viewBoxW = bbox.width + (2 * padding);
                 const viewBoxH = bbox.height + (2 * padding);
-                
-                // Visible debug (no console): shows bbox source and aspect ratio
-                if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
-                    const aspect = viewBoxW / viewBoxH;
-                    setExportStatus(
-                        `Dims plan bbox=${bboxType} • vb=${Math.round(viewBoxW)}×${Math.round(viewBoxH)} • aspect=${aspect.toFixed(3)}`
-                    );
-                }
                 
                 // Now clone and apply the computed viewBox
                 const svgClone = svgElement.cloneNode(true);
