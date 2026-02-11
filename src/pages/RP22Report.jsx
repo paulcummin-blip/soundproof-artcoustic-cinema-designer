@@ -31,6 +31,9 @@ function RP22ReportInner() {
     const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
     const [planDimsImageDataUrl, setPlanDimsImageDataUrl] = useState(null);
     const [planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl] = useState(null);
+    const [planAspect, setPlanAspect] = useState(null);
+    const [planDimsAspect, setPlanDimsAspect] = useState(null);
+    const [planSpeakerDimsAspect, setPlanSpeakerDimsAspect] = useState(null);
     const [hasPrintedOnce, setHasPrintedOnce] = useState(false);
     const [exportStatus, setExportStatus] = useState("Idle");
     const [exportDebug, setExportDebug] = useState({ isPrinting: false, planLen: 0, printReady: false });
@@ -1050,6 +1053,11 @@ function RP22ReportInner() {
                 svgClone.setAttribute('width', String(viewBoxW));
                 svgClone.setAttribute('height', String(viewBoxH));
                 
+                // Store aspect ratio for fit-to-page logic
+                if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
+                    setPlanDimsAspect(viewBoxW / viewBoxH);
+                }
+                
                 const svgString = new XMLSerializer().serializeToString(svgClone);
                 const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
                 const url = URL.createObjectURL(svgBlob);
@@ -1259,6 +1267,11 @@ function RP22ReportInner() {
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 svgClone.setAttribute('width', String(viewBoxW));
                 svgClone.setAttribute('height', String(viewBoxH));
+                
+                // Store aspect ratio for fit-to-page logic
+                if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
+                    setPlanSpeakerDimsAspect(viewBoxW / viewBoxH);
+                }
                 
                 const svgString = new XMLSerializer().serializeToString(svgClone);
                 const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -1540,6 +1553,38 @@ function RP22ReportInner() {
             </div>
         );
     }
+
+    // Helper to calculate optimal plan box size based on aspect ratio
+    const getPlanBoxMm = (aspect) => {
+        // Target area inside the page for the plan image.
+        const MAX_W_MM = 190;
+        const MAX_H_MM = 235;
+
+        // If we don't know aspect yet, fall back to old box
+        if (!Number.isFinite(aspect) || aspect <= 0) {
+            return { w: MAX_W_MM, h: 220 };
+        }
+
+        // Fit-to-box: grow until width OR height hits the max
+        let w = MAX_W_MM;
+        let h = w / aspect;
+
+        // If height would exceed max, clamp by height instead
+        if (h > MAX_H_MM) {
+            h = MAX_H_MM;
+            w = h * aspect;
+        }
+
+        // Final safety clamps
+        w = Math.min(MAX_W_MM, w);
+        h = Math.min(MAX_H_MM, h);
+
+        // Keep sensible minimums
+        w = Math.max(120, w);
+        h = Math.max(120, h);
+
+        return { w, h };
+    };
 
     const PrintStyles = () => (
         <style>{`
@@ -2177,6 +2222,9 @@ function RP22ReportInner() {
                                 setPlanImageDataUrl(null);
                                 setPlanDimsImageDataUrl(null);
                                 setPlanSpeakerDimsImageDataUrl(null);
+                                setPlanAspect(null);
+                                setPlanDimsAspect(null);
+                                setPlanSpeakerDimsAspect(null);
 
                                 // Start the capture/print pipeline
                                 setIsPrinting(true);
@@ -2883,7 +2931,7 @@ function RP22ReportInner() {
                         </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan" className="rp22-plan-block no-split print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan" className="rp22-plan-block no-split print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0, overflow: 'visible' }}>
                                 <h2
                                     className="rp22-plan-caption"
                                     style={{
@@ -2900,35 +2948,38 @@ function RP22ReportInner() {
                                     Room plan
                                 </h2>
 
-                                <div style={{
-                                    width: '190mm',
-                                    height: '220mm',
-                                    margin: '0 auto',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: 'transparent',
-                                    boxSizing: 'border-box',
-                                }}>
-                                    <img
-                                        src={planImageDataUrl}
-                                        alt="Room plan"
-                                        style={{
-                                            maxWidth: '100%',
-                                            maxHeight: '100%',
-                                            width: 'auto',
-                                            height: 'auto',
-                                            objectFit: 'contain',
-                                            display: 'block',
+                                {(() => {
+                                    const box = getPlanBoxMm(planAspect);
+                                    return (
+                                        <div style={{
+                                            width: `${box.w}mm`,
+                                            height: `${box.h}mm`,
+                                            margin: '0 auto',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
                                             background: 'transparent',
-                                        }}
-                                    />
-                                </div>
+                                            boxSizing: 'border-box',
+                                        }}>
+                                            <img
+                                                src={planImageDataUrl}
+                                                alt="Room plan"
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'contain',
+                                                    display: 'block',
+                                                    background: 'transparent',
+                                                }}
+                                            />
+                                        </div>
+                                    );
+                                })()}
                             </section>
                         )}
 
                         {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-dims" className="rp22-plan-block no-split print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan-dims" className="rp22-plan-block no-split print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0, overflow: 'visible' }}>
                                 <h2
                                     className="rp22-plan-caption"
                                     style={{
@@ -2945,30 +2996,33 @@ function RP22ReportInner() {
                                     Room plan (dimensions)
                                 </h2>
 
-                                <div style={{
-                                    width: '190mm',
-                                    height: '220mm',
-                                    margin: '0 auto',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: 'transparent',
-                                    boxSizing: 'border-box',
-                                }}>
-                                    <img
-                                        src={planDimsImageDataUrl}
-                                        alt="Room plan (dimensions)"
-                                        style={{
-                                            maxWidth: '100%',
-                                            maxHeight: '100%',
-                                            width: 'auto',
-                                            height: 'auto',
-                                            objectFit: 'contain',
-                                            display: 'block',
+                                {(() => {
+                                    const box = getPlanBoxMm(planDimsAspect);
+                                    return (
+                                        <div style={{
+                                            width: `${box.w}mm`,
+                                            height: `${box.h}mm`,
+                                            margin: '0 auto',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
                                             background: 'transparent',
-                                        }}
-                                    />
-                                </div>
+                                            boxSizing: 'border-box',
+                                        }}>
+                                            <img
+                                                src={planDimsImageDataUrl}
+                                                alt="Room plan (dimensions)"
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'contain',
+                                                    display: 'block',
+                                                    background: 'transparent',
+                                                }}
+                                            />
+                                        </div>
+                                    );
+                                })()}
                             </section>
                         )}
 
@@ -2976,7 +3030,7 @@ function RP22ReportInner() {
                             <section
                                 id="pdf-room-plan-positions"
                                 className="rp22-plan-block no-split print-page-break-after"
-                                style={{ background: "transparent", padding: 0, margin: 0 }}
+                                style={{ background: "transparent", padding: 0, margin: 0, overflow: 'visible' }}
                             >
                                 <h2
                                     className="rp22-plan-caption"
@@ -2994,30 +3048,33 @@ function RP22ReportInner() {
                                     Room plan (speaker positions)
                                 </h2>
 
-                                <div style={{
-                                    width: '190mm',
-                                    height: '220mm',
-                                    margin: '0 auto',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: 'transparent',
-                                    boxSizing: 'border-box',
-                                }}>
-                                    <img
-                                        src={planSpeakerDimsImageDataUrl}
-                                        alt="Room plan (speaker positions)"
-                                        style={{
-                                            maxWidth: '100%',
-                                            maxHeight: '100%',
-                                            width: 'auto',
-                                            height: 'auto',
-                                            objectFit: 'contain',
-                                            display: 'block',
+                                {(() => {
+                                    const box = getPlanBoxMm(planSpeakerDimsAspect);
+                                    return (
+                                        <div style={{
+                                            width: `${box.w}mm`,
+                                            height: `${box.h}mm`,
+                                            margin: '0 auto',
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            justifyContent: 'center',
                                             background: 'transparent',
-                                        }}
-                                    />
-                                </div>
+                                            boxSizing: 'border-box',
+                                        }}>
+                                            <img
+                                                src={planSpeakerDimsImageDataUrl}
+                                                alt="Room plan (speaker positions)"
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'contain',
+                                                    display: 'block',
+                                                    background: 'transparent',
+                                                }}
+                                            />
+                                        </div>
+                                    );
+                                })()}
                             </section>
                         )}
 
