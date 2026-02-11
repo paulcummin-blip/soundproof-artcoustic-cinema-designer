@@ -7413,6 +7413,36 @@ return (
 
             {/* Wrapper for export bounds */}
             <g id="export-bounds">
+              {/* EXPORT CROP TARGET (tight, stable) */}
+              {exportMode ? (() => {
+                const rx = Number(roomRect?.x ?? 0);
+                const ry = Number(roomRect?.y ?? 0);
+                const rw = Number(roomRect?.width ?? 0);
+                const rh = Number(roomRect?.height ?? 0);
+
+                // Allow a little space for dimension arrows + labels, but keep it bounded.
+                // This is the key: fixed, predictable gutters so extreme rooms don't create giant whitespace.
+                const GUTTER_X = 90;   // left/right space for arrows + labels
+                const GUTTER_TOP = 90; // top labels
+                const GUTTER_BOT = 110; // bottom labels / markers
+
+                // Safety clamp (avoid negative / nonsense)
+                if (!(rw > 0 && rh > 0)) return null;
+
+                return (
+                  <rect
+                    id="export-crop-bounds"
+                    x={rx - GUTTER_X}
+                    y={ry - GUTTER_TOP}
+                    width={rw + (2 * GUTTER_X)}
+                    height={rh + GUTTER_TOP + GUTTER_BOT}
+                    fill="transparent"
+                    stroke="none"
+                    opacity="0"
+                    pointerEvents="none"
+                  />
+                );
+              })() : null}
               {/* Layer 2: Room Outline and Furniture */}
               <rect
                 x={(roomRect?.x ?? 0)}
