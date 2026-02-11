@@ -5688,7 +5688,14 @@ useEffect(() => {
       const roomBottom = (roomRect?.y ?? 0) + (roomRect?.height ?? 0);
 
       // CORE POSITIONS
-      const [, mlpY_px] = toPx(0, mlpY_m);
+      // Use FRONT ROW (closest-to-screen seats) as the anchor for side surround zones.
+      // Front row = smallest seat y. If no seats, fall back to mlpY_m (current behaviour).
+      const seatYs_m = Array.isArray(seatingPositions)
+        ? seatingPositions.map(s => Number(s?.y)).filter(Number.isFinite)
+        : [];
+
+      const frontRowY_m = seatYs_m.length ? Math.min(...seatYs_m) : Number(mlpY_m);
+      const [, frontRowY_px_raw] = toPx(0, frontRowY_m);
       const [, rearWallY_px] = toPx(0, lengthM); // Use new lengthM
       const [, screenWallY_px] = toPx(0, 0);
 
@@ -5702,7 +5709,8 @@ useEffect(() => {
       // VERTICAL BAND: Rendered as a single seamless rectangle
       const vTop_px = Math.max(roomTop, screenWallY_px);
       const vBottom_px = Math.min(roomBottom, rearWallY_px);
-      const mlpClamped_px = Math.max(vTop_px, Math.min(vBottom_px, mlpY_px));
+      const frontRowY_px = Math.max(vTop_px, Math.min(vBottom_px, frontRowY_px_raw));
+      const mlpClamped_px = frontRowY_px;
 
       const fadeEndY_px = mlpClamped_px;
       const fadeStartY_px = Math.max(vTop_px, fadeEndY_px - fadeLen_px);
