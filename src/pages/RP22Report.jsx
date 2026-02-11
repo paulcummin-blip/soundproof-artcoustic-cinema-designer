@@ -1831,36 +1831,6 @@ function RP22ReportInner() {
                     break-inside: auto !important;
                     page-break-inside: auto !important;
                 }
-
-                /* --- PLAN IMAGE FIT-TO-BOX (print only) --------------------------------- */
-                /* Usable A4 portrait width with 12mm margins: 186mm */
-                #pdf-room-plan,
-                #pdf-room-plan-dims,
-                #pdf-room-plan-positions {
-                  /* keep each plan page self-contained */
-                  break-inside: avoid !important;
-                  page-break-inside: avoid !important;
-
-                  /* optional: helps centring when image shrinks */
-                  display: flex !important;
-                  flex-direction: column !important;
-                  align-items: center !important;
-                }
-
-                /* IMPORTANT: keep width:100% but cap height; browser will shrink if too tall */
-                #pdf-room-plan img,
-                #pdf-room-plan-dims img,
-                #pdf-room-plan-positions img {
-                  max-width: 186mm !important;
-                  max-height: 235mm !important;
-
-                  width: 100% !important;
-                  height: auto !important;
-
-                  object-fit: contain !important;
-                  display: block !important;
-                  margin: 0 auto !important;
-                }
             }
 
             .rp22-report .rp22-param-card {
