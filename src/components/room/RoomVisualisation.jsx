@@ -1357,8 +1357,19 @@ React.useEffect(() => {
   // Memo for the valid Y-range for the *center* of SL/SR speakers, incorporating overhang.
   const sideSurroundVisualSpanM = useMemo(() => {
     const roomLength = lengthM || 6.0;
+    
+    // Determine FRONT ROW anchor (minimum seat Y)
+    const seatYs = seatingPositions
+      ?.map(s => Number(s.y))
+      .filter(Number.isFinite) || [];
+
+    const frontRowY_m =
+      seatYs.length > 0
+        ? Math.min(...seatYs)
+        : mlpY_m; // fallback for single-row or no-seat case
+    
     // These `zoneMinY_meters` and `zoneMaxY_meters` represent the visual extent of the zone polygon.
-    const zoneMinY_meters = Math.max(0, mlpY_m - FADE_LEN_M);
+    const zoneMinY_meters = Math.max(0, frontRowY_m - FADE_LEN_M);
     const zoneMaxY_meters = roomLength;
 
     // Determine an effective speaker height for calculating the valid center range.
@@ -1382,7 +1393,7 @@ React.useEffect(() => {
       minY: Math.max(0, effectiveMinY_forCenter),
       maxY: Math.min(roomLength, effectiveMaxY_forCenter)
     };
-  }, [mlpY_m, placedSpeakers, getModelDimsM, lengthM, getCanonicalRole]);
+  }, [mlpY_m, seatingPositions, placedSpeakers, getModelDimsM, lengthM, getCanonicalRole]);
 
   // Initialize rear mode once (safe guard on mount or when speakers appear)
   React.useEffect(() => {
