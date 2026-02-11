@@ -874,7 +874,8 @@ function RP22ReportInner() {
                 
                 // Now clone and apply the computed viewBox
                 const svgClone = svgElement.cloneNode(true);
-                stripExportTransformsFromClone(svgClone);
+                stripExportViewportTransforms(svgClone);
+                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1098,7 +1099,8 @@ function RP22ReportInner() {
                 
                 // Now clone and apply the computed viewBox
                 const svgClone = svgElement.cloneNode(true);
-                stripExportTransformsFromClone(svgClone);
+                stripExportViewportTransforms(svgClone);
+                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1320,7 +1322,8 @@ function RP22ReportInner() {
                 const viewBoxH = bbox.height + (2 * padding);
                 
                 const svgClone = svgElement.cloneNode(true);
-                stripExportTransformsFromClone(svgClone);
+                stripExportViewportTransforms(svgClone);
+                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
                 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
