@@ -1063,6 +1063,16 @@ function RP22ReportInner() {
                     setPlanDimsAspect(viewBoxW / viewBoxH);
                 }
                 
+                // Track bbox details for diagnostics
+                const aspect = viewBoxH > 0 ? (viewBoxW / viewBoxH) : 0;
+                
+                setExportStatus(
+                  `Dims bbox: ${bboxSource}\n` +
+                  `bbox: ${bbox.width.toFixed(1)}×${bbox.height.toFixed(1)}\n` +
+                  `viewBox: ${viewBoxW.toFixed(1)}×${viewBoxH.toFixed(1)}\n` +
+                  `aspect: ${aspect.toFixed(3)}`
+                );
+                
                 // Now clone and apply the computed viewBox
                 const svgClone = svgElement.cloneNode(true);
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
@@ -2222,7 +2232,8 @@ function RP22ReportInner() {
                         </div>
                     </div>
                     <div className="flex gap-3">
-                        <Button
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <Button
                             type="button"
                             onClick={() => {
                                 // Prevent double-click / overlapping exports
@@ -2285,6 +2296,23 @@ function RP22ReportInner() {
                             <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
                             Export PDF
                         </Button>
+
+                        {isPrinting && (
+                          <div
+                            style={{
+                              marginTop: '6px',
+                              maxWidth: '260px',
+                              fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                              fontSize: '11px',
+                              lineHeight: 1.2,
+                              color: '#3E4349',
+                              whiteSpace: 'pre-wrap',
+                            }}
+                          >
+                            {exportStatus}
+                          </div>
+                        )}
+                        </div>
                         
                         <div style={{ position: 'relative' }}>
                             <Button
