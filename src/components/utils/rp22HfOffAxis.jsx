@@ -269,13 +269,14 @@ function getOverheadTiltDeg(modelKey) {
  *
  * - speakerPos: { x, y, z? }  (z will be ignored if roomHeightM is provided)
  * - seatPos: { x, y }
+ * - rspPos: { x, y } RSP/MLP position (green dot) - speaker aims here
  * - earHeightM: listener ear height in metres
  * - modelKey: string used to look up built-in tilt and dispersion
  * - roomHeightM: current room ceiling height (if finite, overrides speakerPos.z)
  *
  * Returns: effective off-axis angle (raw - aim offset) and predicted HF loss using model dispersion.
  */
-function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, roomHeightM) {
+function computeVerticalOffAxisDeg(speakerPos, seatPos, rspPos, earHeightM, modelKey, roomHeightM) {
   if (!seatPos || !speakerPos) {
     return { offAxisDeg: 0, lossDb: 1.5, rawAngleDeg: 0 };
   }
@@ -295,35 +296,90 @@ function computeVerticalOffAxisDeg(speakerPos, seatPos, earHeightM, modelKey, ro
   // Ensure the speaker is always above the listener
   const speakerZ = Math.max(earZ + 0.01, speakerZRaw);
 
-  // Horizontal distance in plan view
-  const horizontalDist = Math.hypot(
-    Number(seatPos.x) - Number(speakerPos.x),
-    Number(seatPos.y) - Number(speakerPos.y)
-  );
-
-  const verticalDist = speakerZ - earZ;
-
-  // Geometric angle from vertical (0° straight down, 90° horizontal)
-  const rawAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
+  // NEW: Calculate angle assuming speaker aims at RSP (green dot)
+  // If RSP position is available, calculate 3D angle between (speaker→seat) and (speaker→RSP)
+  let rawAngleDeg;
+  
+  if (rspPos && isNum(rspPos.x) && isNum(rspPos.y)) {
+    // Vector from speaker to seat (3D)
+    const toSeatX = Number(seatPos.x) - Number(speakerPos.x);
+    const toSeatY = Number(seatPos.y) - Number(speakerPos.y);
+    const toSeatZ = earZ - speakerZ;
+    const toSeatMag = Math.sqrt(toSeatX * toSeatX + toSeatY * toSeatY + toSeatZ * toSeatZ);
+    
+    // Vector from speaker to RSP (3D)
+    const toRspX = Number(rspPos.x) - Number(speakerPos.x);
+    const toRspY = Number(rspPos.y) - Number(speakerPos.y);
+    const toRspZ = earZ - speakerZ;
+    const toRspMag = Math.sqrt(toRspX * toRspX + toRspY * toRspY + toRspZ * toRspZ);
+    
+    if (toSeatMag > 0.001 && toRspMag > 0.001) {
+      // Dot product to get angle between the two vectors
+      const dotProduct = (toSeatX * toRspX + toSeatY * toRspY + toSeatZ * toRspZ);
+      const cosAngle = dotProduct / (toSeatMag * toRspMag);
+      // Clamp to [-1, 1] to avoid NaN from acos due to floating point errors
+      const cosAngleClamped = Math.max(-1, Math.min(1, cosAngle));
+      rawAngleDeg = rad2deg(Math.acos(cosAngleClamped));
+    } else {
+      // Fallback: straight down calculation
+      const horizontalDist = Math.hypot(toSeatX, toSeatY);
+      const verticalDist = speakerZ - earZ;
+      rawAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
+    }
+  } else {
+    // Fallback: old "straight down" method
+    const horizontalDist = Math.hypot(
+      Number(seatPos.x) - Number(speakerPos.x),
+      Number(seatPos.y) - Number(speakerPos.y)
+    );
+    const verticalDist = speakerZ - earZ;
+    rawAngleDeg = rad2deg(Math.atan2(horizontalDist, verticalDist));
+  }
 
   // Get model metadata for aim offset and dispersion
   const meta = getSpeakerModelMeta(modelKey);
   const aimOffsetDeg = meta?.builtInTiltDeg ?? getOverheadTiltDeg(modelKey) ?? 0;
 
-  // Effective off-axis angle: raw angle minus the speaker's built-in aim
-  // This treats the aim direction as 0° on-axis
-  const effectiveAngleDeg = Math.abs(rawAngleDeg - aimOffsetDeg);
+  // Built-in tilt reduces effective off-axis angle (simple discount)
+  const tiltDeg = Number.isFinite(aimOffsetDeg) ? Number(aimOffsetDeg) : 0;
+  const effectiveAngleDeg = Math.max(0, rawAngleDeg - tiltDeg);
 
   // Use model-specific dispersion windows if available
+  // For overheads: average horizontal and vertical limits when both exist
   let lossDb;
   if (meta?.dispersion?.horizontal) {
-    const disp = meta.dispersion.horizontal;
-    const minus1p5 = halfDispersionDeg(disp.minus1p5dB ?? disp.minus1p5);
-    const minus3 = halfDispersionDeg(disp.minus3dB ?? disp.minus3);
-    const minus5 = halfDispersionDeg(disp.minus5dB ?? disp.minus5);
+    const dispH = meta.dispersion.horizontal;
+    const dispV = meta.dispersion.vertical;
+    
+    // Extract horizontal limits
+    const h1p5 = halfDispersionDeg(dispH.minus1p5dB ?? dispH.minus1p5);
+    const h3 = halfDispersionDeg(dispH.minus3dB ?? dispH.minus3);
+    const h5 = halfDispersionDeg(dispH.minus5dB ?? dispH.minus5);
+    
+    // If vertical exists, average with horizontal
+    let minus1p5, minus3, minus5;
+    if (dispV) {
+      const v1p5 = halfDispersionDeg(dispV.minus1p5dB ?? dispV.minus1p5);
+      const v3 = halfDispersionDeg(dispV.minus3dB ?? dispV.minus3);
+      const v5 = halfDispersionDeg(dispV.minus5dB ?? dispV.minus5);
+      
+      if (h1p5 != null && v1p5 != null) minus1p5 = (h1p5 + v1p5) / 2;
+      else minus1p5 = h1p5;
+      
+      if (h3 != null && v3 != null) minus3 = (h3 + v3) / 2;
+      else minus3 = h3;
+      
+      if (h5 != null && v5 != null) minus5 = (h5 + v5) / 2;
+      else minus5 = h5;
+    } else {
+      // No vertical data: use horizontal only
+      minus1p5 = h1p5;
+      minus3 = h3;
+      minus5 = h5;
+    }
 
     if (minus1p5 != null && minus3 != null && minus5 != null) {
-      // Use model's actual dispersion windows directly on effective angle
+      // Use averaged dispersion windows on effective angle
       if (effectiveAngleDeg <= minus1p5) lossDb = 1.5;
       else if (effectiveAngleDeg <= minus3) lossDb = 3.0;
       else if (effectiveAngleDeg <= minus5) lossDb = 5.0;
@@ -454,12 +510,13 @@ function computeSurroundLikeHfLoss({ speaker, seat, mlpPos, earHeightM, modelMet
 
   let offAxisDeg = null;
 
-  // Overhead speakers: use vertical off-axis
+  // Overhead speakers: use vertical off-axis with RSP aim
   if (OVERHEAD_ROLES.has(role)) {
-    // Overheads: use room height + model tilt
+    // Overheads: use room height + model tilt + RSP position for aim
     const vert = computeVerticalOffAxisDeg(
       speaker.position,
       seat,
+      mlpPos, // Pass RSP/MLP position for aim calculation
       earHeightM,
       speaker.model,
       roomHeightM

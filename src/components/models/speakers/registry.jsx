@@ -111,9 +111,14 @@ export const MODELS = [
     builtInTiltDeg: 20,
     dispersion: {
       horizontal: {
-        minus1p5dB: 19,
-        minus3dB: 33,
-        minus5dB: 52,
+        minus1p5dB: 43,
+        minus3dB: 60,
+        minus5dB: 82,
+      },
+      vertical: {
+        minus1p5dB: 24,
+        minus3dB: 40,
+        minus5dB: 60,
       }
     }
   },
