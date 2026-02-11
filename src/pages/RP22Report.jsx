@@ -950,12 +950,14 @@ function RP22ReportInner() {
                 
                 // Build union bbox from meaningful content (not background grid)
                 let bbox = null;
+                let bboxSource = 'none';
                 
                 try {
                     // Try export-bounds wrapper first
                     const exportBounds = svgElement.querySelector('#export-bounds');
                     if (exportBounds) {
                         bbox = exportBounds.getBBox();
+                        bboxSource = 'export-bounds';
                     }
                 } catch (e) {
                     bbox = null;
