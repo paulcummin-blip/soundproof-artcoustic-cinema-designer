@@ -2880,19 +2880,15 @@ function RP22ReportInner() {
                                     Room plan
                                 </h2>
 
-                                <img
-                                    src={planImageDataUrl}
-                                    alt="Room plan"
-                                    style={{
-                                        width: '100%',
-                                        height: 'auto',
-                                        objectFit: 'contain',
-                                        display: 'block',
-                                        margin: '0',
-                                        padding: 0,
-                                        background: 'transparent',
-                                    }}
-                                />
+                                <div className="plan-fitbox">
+                                    <img
+                                        src={planImageDataUrl}
+                                        alt="Room plan"
+                                        style={{
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                </div>
                             </section>
                         )}
 
@@ -2913,19 +2909,15 @@ function RP22ReportInner() {
                                     Room plan (dimensions)
                                 </h2>
 
-                                <img
-                                    src={planDimsImageDataUrl}
-                                    alt="Room plan (dimensions)"
-                                    style={{
-                                        width: '100%',
-                                        height: 'auto',
-                                        objectFit: 'contain',
-                                        display: 'block',
-                                        margin: '0',
-                                        padding: 0,
-                                        background: 'transparent',
-                                    }}
-                                />
+                                <div className="plan-fitbox">
+                                    <img
+                                        src={planDimsImageDataUrl}
+                                        alt="Room plan (dimensions)"
+                                        style={{
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                </div>
                             </section>
                         )}
 
@@ -2950,19 +2942,15 @@ function RP22ReportInner() {
                                     Room plan (speaker positions)
                                 </h2>
 
-                                <img
-                                    src={planSpeakerDimsImageDataUrl}
-                                    alt="Room plan (speaker positions)"
-                                    style={{
-                                        width: "100%",
-                                        height: "auto",
-                                        objectFit: "contain",
-                                        display: "block",
-                                        margin: 0,
-                                        padding: 0,
-                                        background: "transparent",
-                                    }}
-                                />
+                                <div className="plan-fitbox">
+                                    <img
+                                        src={planSpeakerDimsImageDataUrl}
+                                        alt="Room plan (speaker positions)"
+                                        style={{
+                                            background: "transparent",
+                                        }}
+                                    />
+                                </div>
                             </section>
                         )}
 
