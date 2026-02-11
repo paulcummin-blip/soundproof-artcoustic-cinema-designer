@@ -1831,6 +1831,33 @@ function RP22ReportInner() {
                     break-inside: auto !important;
                     page-break-inside: auto !important;
                 }
+
+                /* --- FIX: keep plan images inside one page in print --- */
+                #pdf-room-plan img,
+                #pdf-room-plan-dims img,
+                #pdf-room-plan-positions img {
+                    /* Height is the limiting dimension for tall/narrow plans */
+                    max-height: 235mm !important;
+
+                    /* Let width shrink when height becomes the constraint */
+                    width: auto !important;
+                    height: auto !important;
+
+                    /* Keep aspect ratio */
+                    object-fit: contain !important;
+
+                    /* Avoid odd inline-gap behaviour */
+                    display: block !important;
+                    margin: 0 auto !important;
+                }
+
+                /* Keep each plan section together */
+                #pdf-room-plan,
+                #pdf-room-plan-dims,
+                #pdf-room-plan-positions {
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
             }
 
             .rp22-report .rp22-param-card {
