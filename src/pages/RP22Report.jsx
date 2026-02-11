@@ -2906,6 +2906,8 @@ function RP22ReportInner() {
                                     style={{
                                         width: '100%',
                                         height: 'auto',
+                                        maxWidth: '100%',
+                                        maxHeight: '250mm',
                                         objectFit: 'contain',
                                         display: 'block',
                                         margin: '0',
@@ -2940,6 +2942,8 @@ function RP22ReportInner() {
                                     style={{
                                         width: '100%',
                                         height: 'auto',
+                                        maxWidth: '100%',
+                                        maxHeight: '250mm',
                                         objectFit: 'contain',
                                         display: 'block',
                                         margin: '0',
@@ -2978,6 +2982,8 @@ function RP22ReportInner() {
                                     style={{
                                         width: "100%",
                                         height: "auto",
+                                        maxWidth: "100%",
+                                        maxHeight: "250mm",
                                         objectFit: "contain",
                                         display: "block",
                                         margin: 0,
