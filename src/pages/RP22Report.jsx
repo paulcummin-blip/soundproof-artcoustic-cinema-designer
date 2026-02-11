@@ -2901,13 +2901,14 @@ function RP22ReportInner() {
                                 </h2>
 
                                 <div style={{
-                                    width: '100%',
-                                    height: '240mm',
+                                    width: '190mm',
+                                    height: '220mm',
                                     margin: '0 auto',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     background: 'transparent',
+                                    boxSizing: 'border-box',
                                 }}>
                                     <img
                                         src={planImageDataUrl}
@@ -2945,13 +2946,14 @@ function RP22ReportInner() {
                                 </h2>
 
                                 <div style={{
-                                    width: '100%',
-                                    height: '240mm',
+                                    width: '190mm',
+                                    height: '220mm',
                                     margin: '0 auto',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     background: 'transparent',
+                                    boxSizing: 'border-box',
                                 }}>
                                     <img
                                         src={planDimsImageDataUrl}
@@ -2993,13 +2995,14 @@ function RP22ReportInner() {
                                 </h2>
 
                                 <div style={{
-                                    width: '100%',
-                                    height: '240mm',
+                                    width: '190mm',
+                                    height: '220mm',
                                     margin: '0 auto',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     background: 'transparent',
+                                    boxSizing: 'border-box',
                                 }}>
                                     <img
                                         src={planSpeakerDimsImageDataUrl}
