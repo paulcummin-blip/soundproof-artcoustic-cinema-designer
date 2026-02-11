@@ -2900,21 +2900,30 @@ function RP22ReportInner() {
                                     Room plan
                                 </h2>
 
-                                <img
-                                    src={planImageDataUrl}
-                                    alt="Room plan"
-                                    style={{
-                                        width: '100%',
-                                        height: 'auto',
-                                        maxWidth: '100%',
-                                        maxHeight: '250mm',
-                                        objectFit: 'contain',
-                                        display: 'block',
-                                        margin: '0',
-                                        padding: 0,
-                                        background: 'transparent',
-                                    }}
-                                />
+                                <div style={{
+                                    width: '100%',
+                                    maxWidth: '190mm',
+                                    maxHeight: '240mm',
+                                    margin: '0 auto',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'transparent',
+                                }}>
+                                    <img
+                                        src={planImageDataUrl}
+                                        alt="Room plan"
+                                        style={{
+                                            maxWidth: '100%',
+                                            maxHeight: '240mm',
+                                            width: 'auto',
+                                            height: 'auto',
+                                            objectFit: 'contain',
+                                            display: 'block',
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                </div>
                             </section>
                         )}
 
@@ -2936,21 +2945,30 @@ function RP22ReportInner() {
                                     Room plan (dimensions)
                                 </h2>
 
-                                <img
-                                    src={planDimsImageDataUrl}
-                                    alt="Room plan (dimensions)"
-                                    style={{
-                                        width: '100%',
-                                        height: 'auto',
-                                        maxWidth: '100%',
-                                        maxHeight: '250mm',
-                                        objectFit: 'contain',
-                                        display: 'block',
-                                        margin: '0',
-                                        padding: 0,
-                                        background: 'transparent',
-                                    }}
-                                />
+                                <div style={{
+                                    width: '100%',
+                                    maxWidth: '190mm',
+                                    maxHeight: '240mm',
+                                    margin: '0 auto',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'transparent',
+                                }}>
+                                    <img
+                                        src={planDimsImageDataUrl}
+                                        alt="Room plan (dimensions)"
+                                        style={{
+                                            maxWidth: '100%',
+                                            maxHeight: '240mm',
+                                            width: 'auto',
+                                            height: 'auto',
+                                            objectFit: 'contain',
+                                            display: 'block',
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                </div>
                             </section>
                         )}
 
@@ -2976,21 +2994,30 @@ function RP22ReportInner() {
                                     Room plan (speaker positions)
                                 </h2>
 
-                                <img
-                                    src={planSpeakerDimsImageDataUrl}
-                                    alt="Room plan (speaker positions)"
-                                    style={{
-                                        width: "100%",
-                                        height: "auto",
-                                        maxWidth: "100%",
-                                        maxHeight: "250mm",
-                                        objectFit: "contain",
-                                        display: "block",
-                                        margin: 0,
-                                        padding: 0,
-                                        background: "transparent",
-                                    }}
-                                />
+                                <div style={{
+                                    width: '100%',
+                                    maxWidth: '190mm',
+                                    maxHeight: '240mm',
+                                    margin: '0 auto',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: 'transparent',
+                                }}>
+                                    <img
+                                        src={planSpeakerDimsImageDataUrl}
+                                        alt="Room plan (speaker positions)"
+                                        style={{
+                                            maxWidth: '100%',
+                                            maxHeight: '240mm',
+                                            width: 'auto',
+                                            height: 'auto',
+                                            objectFit: 'contain',
+                                            display: 'block',
+                                            background: 'transparent',
+                                        }}
+                                    />
+                                </div>
                             </section>
                         )}
 
