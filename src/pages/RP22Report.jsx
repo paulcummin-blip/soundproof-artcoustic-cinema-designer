@@ -1549,6 +1549,37 @@ function RP22ReportInner() {
                     font-family: 'Century Gothic', 'Futura PT Light', 'Didact Gothic', sans-serif !important;
                 }
                 
+                /* — Plan sections: create a stable "fit box" for the plan image — */
+                #pdf-room-plan,
+                #pdf-room-plan-dims,
+                #pdf-room-plan-positions {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    align-items: center !important;
+                    justify-content: flex-start !important;
+                    /* Prevent any inherited overflow-visible behaviour from letting it spill */
+                    overflow: hidden !important;
+                }
+
+                /* — The plan images: fit to whichever constraint is hit first — */
+                #pdf-room-plan img,
+                #pdf-room-plan-dims img,
+                #pdf-room-plan-positions img {
+                    /* Never exceed printable width */
+                    max-width: 100% !important;
+
+                    /* Never exceed printable height (safe box for A4 portrait with title) */
+                    max-height: 240mm !important;
+
+                    /* Let the browser pick width or height based on aspect */
+                    width: auto !important;
+                    height: auto !important;
+
+                    object-fit: contain !important;
+                    display: block !important;
+                    margin: 0 auto !important;
+                }
+                
                 /* 1) Kill anything that can clip/stop the print flow */
                 html, body {
                     height: auto !important;
