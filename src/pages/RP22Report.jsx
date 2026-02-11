@@ -1067,25 +1067,40 @@ function RP22ReportInner() {
                     setPlanDimsAspect(viewBoxW / viewBoxH);
                 }
                 
-                // Track bbox details for diagnostics
-                const bboxAspect = viewBoxH > 0 ? (viewBoxW / viewBoxH) : 0;
-                
-                setExportStatus(
-                  `Dims bbox: ${bboxSource}\n` +
-                  `bbox: ${bbox.width.toFixed(1)}×${bbox.height.toFixed(1)}\n` +
-                  `viewBox: ${viewBoxW.toFixed(1)}×${viewBoxH.toFixed(1)}\n` +
-                  `aspect: ${bboxAspect.toFixed(3)}`
-                );
-                
-                // Track bbox details for diagnostics
-                const aspect = viewBoxH > 0 ? (viewBoxW / viewBoxH) : 0;
-                
-                setExportStatus(
-                  `Dims bbox: ${bboxSource}\n` +
-                  `bbox: ${bbox.width.toFixed(1)}×${bbox.height.toFixed(1)}\n` +
-                  `viewBox: ${viewBoxW.toFixed(1)}×${viewBoxH.toFixed(1)}\n` +
-                  `aspect: ${aspect.toFixed(3)}`
-                );
+                // DEBUG: show the actual numbers on-page (no console)
+                if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
+                  const bboxAspect = viewBoxW / viewBoxH;
+
+                  // Mirror getPlanBoxMm logic locally so we can display the mm result
+                  const MAX_W_MM = 190;
+                  const MAX_H_MM = 235;
+
+                  let mmW = MAX_W_MM;
+                  let mmH = mmW / bboxAspect;
+
+                  // If height would exceed max, clamp by height instead
+                  if (mmH > MAX_H_MM) {
+                    mmH = MAX_H_MM;
+                    mmW = mmH * bboxAspect;
+                  }
+
+                  // Final safety clamps
+                  mmW = Math.min(MAX_W_MM, mmW);
+                  mmH = Math.min(MAX_H_MM, mmH);
+
+                  const r1 = (n) => (Number.isFinite(n) ? Math.round(n * 10) / 10 : n);
+                  const r2 = (n) => (Number.isFinite(n) ? Math.round(n * 100) / 100 : n);
+
+                  setExportStatus(
+                    "Dims capture — numbers\n" +
+                    `bboxSource: ${bboxSource}\n` +
+                    `bbox: x=${r1(bbox.x)} y=${r1(bbox.y)} w=${r1(bbox.width)} h=${r1(bbox.height)}\n` +
+                    `pad(px): ${r1(padding)}\n` +
+                    `viewBox: x=${r1(viewBoxX)} y=${r1(viewBoxY)} w=${r1(viewBoxW)} h=${r1(viewBoxH)}\n` +
+                    `aspect(viewBoxW/viewBoxH): ${r2(bboxAspect)}\n` +
+                    `printBox(mm): ${r1(mmW)} × ${r1(mmH)} (max ${MAX_W_MM}×${MAX_H_MM})`
+                  );
+                }
                 
                 // Now clone and apply the computed viewBox
                 const svgClone = svgElement.cloneNode(true);
