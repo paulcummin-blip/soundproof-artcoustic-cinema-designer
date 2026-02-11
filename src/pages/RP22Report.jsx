@@ -1438,9 +1438,9 @@ function RP22ReportInner() {
         return seatIds.map(seatId => {
             const counts = { L1: 0, L2: 0, L3: 0, L4: 0 };
             
-            // SINGLE SOURCE OF TRUTH: always use the local buildSeatHudSnapshot result first
-            // (this is the only way to guarantee the Report matches the live HUD logic)
+            // SINGLE SOURCE OF TRUTH: use latest seat snapshot (matches HUD exactly)
             const tooltipData =
+                app?.seatSnapshotBySeatId?.[seatId] ??
                 reportSeatHudById?.[seatId] ??
                 app?.seatMetricsById?.[seatId] ??
                 null;
@@ -3024,9 +3024,9 @@ function RP22ReportInner() {
                                 return seats.map((seat, seatIdx) => {
                                     const seatId = seat?.id || '—';
 
-                                    // SINGLE SOURCE OF TRUTH: always use the local buildSeatHudSnapshot result first
-                                    // (this is the only way to guarantee the Report matches the live HUD logic)
+                                    // SINGLE SOURCE OF TRUTH: use latest seat snapshot (matches HUD exactly)
                                     const tooltipData =
+                                        app?.seatSnapshotBySeatId?.[seatId] ??
                                         reportSeatHudById?.[seatId] ??
                                         app?.seatMetricsById?.[seatId] ??
                                         null;
