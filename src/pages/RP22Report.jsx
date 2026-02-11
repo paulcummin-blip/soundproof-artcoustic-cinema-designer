@@ -727,14 +727,26 @@ function RP22ReportInner() {
                 // Build union bbox from meaningful content (not background grid)
                 let bbox = null;
                 
+                // Prefer the tight export crop target (prevents rulers/labels inflating bbox)
                 try {
-                    // Try export-bounds wrapper first
-                    const exportBounds = svgElement.querySelector('#export-bounds');
-                    if (exportBounds) {
-                        bbox = exportBounds.getBBox();
+                    const crop = svgElement.querySelector('#export-crop-bounds');
+                    if (crop) {
+                        bbox = crop.getBBox();
                     }
                 } catch (e) {
                     bbox = null;
+                }
+                
+                // Fallback: original export-bounds (legacy)
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    try {
+                        const exportBounds = svgElement.querySelector('#export-bounds');
+                        if (exportBounds) {
+                            bbox = exportBounds.getBBox();
+                        }
+                    } catch (e) {
+                        bbox = null;
+                    }
                 }
                 
                 // Fallback: build union bbox from visible geometry
@@ -1156,14 +1168,26 @@ function RP22ReportInner() {
                 // Build union bbox from meaningful content (not background grid)
                 let bbox = null;
                 
+                // Prefer the tight export crop target (prevents rulers/labels inflating bbox)
                 try {
-                    // Try export-bounds wrapper first
-                    const exportBounds = svgElement.querySelector('#export-bounds');
-                    if (exportBounds) {
-                        bbox = exportBounds.getBBox();
+                    const crop = svgElement.querySelector('#export-crop-bounds');
+                    if (crop) {
+                        bbox = crop.getBBox();
                     }
                 } catch (e) {
                     bbox = null;
+                }
+                
+                // Fallback: original export-bounds (legacy)
+                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
+                    try {
+                        const exportBounds = svgElement.querySelector('#export-bounds');
+                        if (exportBounds) {
+                            bbox = exportBounds.getBBox();
+                        }
+                    } catch (e) {
+                        bbox = null;
+                    }
                 }
                 
                 // Fallback: build union bbox from visible geometry
