@@ -1813,12 +1813,31 @@ function RP22ReportInner() {
                     page-break-inside: avoid !important;
                 }
 
-                /* CRITICAL: Do NOT make the card itself "unbreakable" in print.
-                   Keep the wrapper as avoid, but allow the card to break if the engine needs it. */
+                /* REPORT EXPORT: PREVENT PAGE SPLITS */
+                .no-split,
+                .rp22-section,
+                .rp22-card,
+                .rp22-seat-card,
+                .rp22-plan-block,
                 .rp22-report .rp22-param-card,
                 .rp22-report .rp22-seat-card {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
+                }
+                
+                /* Avoid splitting captions from images */
+                .rp22-plan-caption,
+                .rp22-caption {
+                    break-after: avoid !important;
+                    page-break-after: avoid !important;
+                }
+                
+                /* Make images behave predictably */
+                img, svg {
+                    max-width: 100%;
+                    height: auto;
+                    break-inside: avoid !important;
+                    page-break-inside: avoid !important;
                 }
 
                 /* Safe breakpoints inside cards */
@@ -2864,8 +2883,9 @@ function RP22ReportInner() {
                         </section>
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan" className="rp22-plan-block no-split print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <h2
+                                    className="rp22-plan-caption"
                                     style={{
                                         fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
                                         fontSize: '20pt',
@@ -2897,8 +2917,9 @@ function RP22ReportInner() {
                         )}
 
                         {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-dims" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                            <section id="pdf-room-plan-dims" className="rp22-plan-block no-split print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <h2
+                                    className="rp22-plan-caption"
                                     style={{
                                         fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
                                         fontSize: '20pt',
@@ -2932,10 +2953,11 @@ function RP22ReportInner() {
                         {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
                             <section
                                 id="pdf-room-plan-positions"
-                                className="print-page-break-after"
+                                className="rp22-plan-block no-split print-page-break-after"
                                 style={{ background: "transparent", padding: 0, margin: 0 }}
                             >
                                 <h2
+                                    className="rp22-plan-caption"
                                     style={{
                                         fontFamily: "Futura PT Light, Century Gothic, sans-serif",
                                         fontSize: "20pt",
@@ -2966,7 +2988,7 @@ function RP22ReportInner() {
                             </section>
                         )}
 
-                        <section id="pdf-room-parameters">
+                        <section id="pdf-room-parameters" className="rp22-section">
                         {/* ROOM PARAMETERS */}
                         <div>
                         <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
@@ -2977,8 +2999,8 @@ function RP22ReportInner() {
                         </div>
                         <div className="rp22-params-grid rp22-cards-grid">
                             {orderedParams.map(param => (
-                                <div key={param.id} className="rp22-card-wrap">
-                                    <div className="rp22-param-card">
+                                <div key={param.id} className="rp22-card-wrap no-split">
+                                    <div className="rp22-param-card no-split">
                                     <ParameterCard
                                         parameter={param}
                                         roomResult={getRoomResult(param.id)}
@@ -2997,7 +3019,7 @@ function RP22ReportInner() {
                         </div>
                         </section>
                         
-                        <section id="pdf-seat-parameters">
+                        <section id="pdf-seat-parameters" className="rp22-section">
                         {/* SEAT PARAMETERS */}
                         <div className="print-page-break-before" style={{ marginTop: 18 }}>
                         <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
@@ -3052,11 +3074,11 @@ function RP22ReportInner() {
                                     return (
                                         <div 
                                             key={seatId} 
-                                            className="rp22-card-wrap"
+                                            className="rp22-card-wrap no-split"
                                             data-print-seat={seatLabel}
                                             data-print-index={seatIdx}
                                         >
-                                        <div className="rp22-param-card rp22-seat-card">
+                                        <div className="rp22-param-card rp22-seat-card no-split">
                                             <Card className="border-[#E6E4DD]">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
