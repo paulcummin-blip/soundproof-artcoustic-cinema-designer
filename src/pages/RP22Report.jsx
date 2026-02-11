@@ -1043,6 +1043,14 @@ function RP22ReportInner() {
                 const viewBoxW = bbox.width + (2 * padding);
                 const viewBoxH = bbox.height + (2 * padding);
                 
+                // Visible debug (no console): shows bbox source and aspect ratio
+                if (Number.isFinite(viewBoxW) && Number.isFinite(viewBoxH) && viewBoxH > 0) {
+                    const aspect = viewBoxW / viewBoxH;
+                    setExportStatus(
+                        `Dims plan bbox=${bboxType} • vb=${Math.round(viewBoxW)}×${Math.round(viewBoxH)} • aspect=${aspect.toFixed(3)}`
+                    );
+                }
+                
                 // Now clone and apply the computed viewBox
                 const svgClone = svgElement.cloneNode(true);
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
