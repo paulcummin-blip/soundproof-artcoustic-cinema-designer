@@ -615,27 +615,17 @@ function RP22ReportInner() {
         return counts;
     }, [getDisplayedRoomLevel]);
 
-    // Mark printReady when all plan captures have finished (image or __SKIP__)
+    // Print-ready: no PNG capture needed; mark ready as soon as printing starts
     useEffect(() => {
         if (!isPrinting) return;
-
-        const hasPlan = planImageDataUrl !== null;
-        const hasDims = planDimsImageDataUrl !== null;
-        const hasSpeakerDims = planSpeakerDimsImageDataUrl !== null;
-
-        if (hasPlan && hasDims && hasSpeakerDims) {
-            // Only flip once
-            setExportDebug(d => ({ ...d, printReady: true }));
-            setPrintReady(true);
-            setExportStatus("Capture complete — preparing print…");
-
-            // Once we're ready, do not allow the stall timeout to fire
-            if (exportTimeoutRef.current) {
-                clearTimeout(exportTimeoutRef.current);
-                exportTimeoutRef.current = null;
-            }
+        setExportDebug(d => ({ ...d, printReady: true }));
+        setPrintReady(true);
+        setExportStatus("Preparing print…");
+        if (exportTimeoutRef.current) {
+            clearTimeout(exportTimeoutRef.current);
+            exportTimeoutRef.current = null;
         }
-    }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl]);
+    }, [isPrinting]);
 
     // Trigger print when ready (with print-once guard + re-entry protection)
     useEffect(() => {
@@ -1631,19 +1621,20 @@ try {
                 }
 
                 .plan-fitbox {
-                    width: 186mm !important;              /* full printable width (A4 portrait with 12mm margins) */
-                    margin: 0 auto !important;
-                    padding: 0 !important;
-                    overflow: visible !important;         /* don’t crop */
-                    display: block !important;            /* stop centring shrink behaviour */
-                    height: auto !important;              /* let content define height */
+                  width: 186mm !important;
+                  margin: 0 auto !important;
+                  padding: 0 !important;
+                  overflow: hidden !important;
                 }
 
-                .plan-fitbox > img {
-                    display: block !important;
-                    width: 100% !important;               /* ALWAYS fill the page width */
-                    height: auto !important;              /* keep correct aspect ratio */
-                    max-height: 240mm !important;         /* safety cap so it can’t run off the page */
+                .plan-fitbox svg {
+                  width: 186mm !important;
+                  height: auto !important;
+                  display: block !important;
+                }
+
+                .plan-fitbox > div {
+                  width: 186mm !important;
                 }
                 
                 /* Force pure white backgrounds (kill the pale side bars) */
@@ -2934,7 +2925,7 @@ try {
                         </div>
                         </section>
 
-                        {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
+                        {planEnabled && (
                             <section id="pdf-room-plan" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <h2
                                     style={{
@@ -2952,18 +2943,44 @@ try {
                                 </h2>
 
                                 <div className="plan-fitbox">
-                                    <img
-                                        src={planImageDataUrl}
-                                        alt="Room plan"
-                                        style={{
-                                            background: 'transparent',
-                                        }}
-                                    />
-                                </div>
+  <RoomVisualisation
+    placedSpeakers={placedSpeakers}
+    seatingPositions={seats}
+    mlpPoint={primarySeatingPosition}
+    screen={screen}
+    screenFrontPlaneM={Number.isFinite(Number(app?.screenFrontPlaneM)) ? Number(app.screenFrontPlaneM) : undefined}
+    dolbyLayout={dolbyLayout}
+    frontSubs={frontSubsCfg?.positions || []}
+    rearSubs={rearSubsCfg?.positions || []}
+    roomElements={app?.roomElements || []}
+    exportMode="dimensions"
+    exportWidthPx={1200}
+    exportHeightPx={800}
+    overlays={{ ROOM_DIMS: true }}
+    showBaffle={true}
+    showScreen={true}
+    speakerPositionsView="off"
+    showMlpRuler={false}
+    zoomMode="off"
+    screenPlaneMode="fixed"
+    lcrAimMode={app?.lcrAimMode || "flat"}
+    aimAtMLP={app?.aimAtMLP ?? false}
+    onSetSpeakers={rvNoops.onSetSpeakers}
+    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
+    onSetScreen={rvNoops.onSetScreen}
+    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
+    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
+    onSetElements={rvNoops.onSetElements}
+    onSetOverheadState={rvNoops.onSetOverheadState}
+    onSetAimState={rvNoops.onSetAimState}
+    onSetRoomDims={rvNoops.onSetRoomDims}
+    onSetMlpPoint={rvNoops.onSetMlpPoint}
+  />
+</div>
                             </section>
                         )}
 
-                        {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
+                        {planEnabled && (
                             <section id="pdf-room-plan-dims" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
                                 <h2
                                     style={{
@@ -2981,18 +2998,44 @@ try {
                                 </h2>
 
                                 <div className="plan-fitbox">
-                                    <img
-                                        src={planDimsImageDataUrl}
-                                        alt="Room plan (dimensions)"
-                                        style={{
-                                            background: 'transparent',
-                                        }}
-                                    />
-                                </div>
+  <RoomVisualisation
+    placedSpeakers={placedSpeakers}
+    seatingPositions={seats}
+    mlpPoint={primarySeatingPosition}
+    screen={screen}
+    screenFrontPlaneM={Number.isFinite(Number(app?.screenFrontPlaneM)) ? Number(app.screenFrontPlaneM) : undefined}
+    dolbyLayout={dolbyLayout}
+    frontSubs={frontSubsCfg?.positions || []}
+    rearSubs={rearSubsCfg?.positions || []}
+    roomElements={app?.roomElements || []}
+    exportMode="dimensions"
+    exportWidthPx={1200}
+    exportHeightPx={800}
+    overlays={{}}
+    showBaffle={true}
+    showScreen={true}
+    speakerPositionsView="off"
+    showMlpRuler={true}
+    zoomMode="off"
+    screenPlaneMode="fixed"
+    lcrAimMode={app?.lcrAimMode || "flat"}
+    aimAtMLP={app?.aimAtMLP ?? false}
+    onSetSpeakers={rvNoops.onSetSpeakers}
+    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
+    onSetScreen={rvNoops.onSetScreen}
+    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
+    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
+    onSetElements={rvNoops.onSetElements}
+    onSetOverheadState={rvNoops.onSetOverheadState}
+    onSetAimState={rvNoops.onSetAimState}
+    onSetRoomDims={rvNoops.onSetRoomDims}
+    onSetMlpPoint={rvNoops.onSetMlpPoint}
+  />
+</div>
                             </section>
                         )}
 
-                        {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
+                        {planEnabled && (
                             <section
                                 id="pdf-room-plan-positions"
                                 className="print-page-break-after"
@@ -3014,14 +3057,40 @@ try {
                                 </h2>
 
                                 <div className="plan-fitbox">
-                                    <img
-                                        src={planSpeakerDimsImageDataUrl}
-                                        alt="Room plan (speaker positions)"
-                                        style={{
-                                            background: "transparent",
-                                        }}
-                                    />
-                                </div>
+  <RoomVisualisation
+    placedSpeakers={placedSpeakers}
+    seatingPositions={seats}
+    mlpPoint={primarySeatingPosition}
+    screen={screen}
+    screenFrontPlaneM={Number.isFinite(Number(app?.screenFrontPlaneM)) ? Number(app.screenFrontPlaneM) : undefined}
+    dolbyLayout={dolbyLayout}
+    frontSubs={frontSubsCfg?.positions || []}
+    rearSubs={rearSubsCfg?.positions || []}
+    roomElements={app?.roomElements || []}
+    exportMode="dimensions"
+    exportWidthPx={1200}
+    exportHeightPx={800}
+    overlays={{}}
+    showBaffle={true}
+    showScreen={true}
+    speakerPositionsView="plan"
+    showMlpRuler={false}
+    zoomMode="off"
+    screenPlaneMode="fixed"
+    lcrAimMode={app?.lcrAimMode || "flat"}
+    aimAtMLP={app?.aimAtMLP ?? false}
+    onSetSpeakers={rvNoops.onSetSpeakers}
+    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
+    onSetScreen={rvNoops.onSetScreen}
+    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
+    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
+    onSetElements={rvNoops.onSetElements}
+    onSetOverheadState={rvNoops.onSetOverheadState}
+    onSetAimState={rvNoops.onSetAimState}
+    onSetRoomDims={rvNoops.onSetRoomDims}
+    onSetMlpPoint={rvNoops.onSetMlpPoint}
+  />
+</div>
                             </section>
                         )}
 
