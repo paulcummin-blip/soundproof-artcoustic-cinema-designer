@@ -1829,12 +1829,7 @@ try {
                     page-break-inside: avoid !important;
                 }
                 
-                /* For the big room/seat cards: allow splitting if needed */
-                .print-grid-room > .print-avoid-break,
-                .print-grid-seats > .print-avoid-break {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
-                }
+
                 
                 /* Make sure Card content can flow */
                 .print-only .rounded-xl,
@@ -2085,6 +2080,33 @@ try {
               #pdf-room-plan-dims,
               #pdf-room-plan-positions {
                 zoom: 1 !important;
+              }
+            }
+
+            /* --- NEVER split cards across pages --- */
+            @media print {
+
+              /* Make the grid items (wrappers) unbreakable */
+              .rp22-report .rp22-card-wrap,
+              .rp22-report .print-avoid-break {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+              }
+
+              /* Also protect the actual card containers (belt + braces) */
+              .rp22-report .rp22-param-card,
+              .rp22-report .rp22-seat-card {
+                break-inside: avoid !important;
+                page-break-inside: avoid !important;
+              }
+
+              /* IMPORTANT: allow normal flow (don’t clip) */
+              .rp22-report .rp22-param-card,
+              .rp22-report .rp22-seat-card,
+              .rp22-report .rp22-param-card *,
+              .rp22-report .rp22-seat-card * {
+                overflow: visible !important;
+                max-height: none !important;
               }
             }
             `}</style>
