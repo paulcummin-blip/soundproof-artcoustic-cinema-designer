@@ -7444,8 +7444,8 @@ return (
             {Number.isFinite(scale) && roomRect && (
               <rect
                 id="export-crop-bounds"
-                x={PADDING}
-                y={PADDING}
+                x={roomRect.x}
+                y={roomRect.y - TOP_GUTTER_PX}
                 width={roomRect.width}
                 height={
                   roomRect.height
