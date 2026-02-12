@@ -886,6 +886,7 @@ function flattenExportTransforms(svgClone) {
                 
                 // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
+                flattenExportTransforms(svgClone);
 // Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
 try {
   const anchor =
@@ -1100,6 +1101,7 @@ try {
                 
                 // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
+                flattenExportTransforms(svgClone);
 // Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
 try {
   const anchor =
@@ -1314,6 +1316,7 @@ try {
 
                                     // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
+                flattenExportTransforms(svgClone);
 // Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
 try {
   const anchor =
