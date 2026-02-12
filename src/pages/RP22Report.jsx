@@ -1206,6 +1206,44 @@ try {
                                         return;
                                     }
 
+                                    // --- Wait until RoomVisualisation has actually rendered export-bounds (not the placeholder) ---
+                                    let liveAnchor = null;
+                                    try {
+                                      liveAnchor =
+                                        svgElement.querySelector('#export-crop-bounds') ||
+                                        svgElement.querySelector('#export-bounds');
+                                    } catch (e) {
+                                      liveAnchor = null;
+                                    }
+
+                                    if (!liveAnchor) {
+                                      setExportStatus(`Capturing speaker positions: waiting for export-bounds… (attempt ${attempts}/${maxAttempts})`);
+                                      if (attempts < maxAttempts) {
+                                        retryTimer = setTimeout(attemptCapture, 100);
+                                        return;
+                                      }
+                                      setExportStatus("Speaker positions plan skipped: export-bounds never appeared");
+                                      setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                                      return;
+                                    }
+
+                                    // Optional but important: reject “microscopic but >0” layouts
+                                    try {
+                                      const b = liveAnchor.getBBox?.();
+                                      if (b && Number.isFinite(b.width) && Number.isFinite(b.height) && (b.width < 200 || b.height < 200)) {
+                                        setExportStatus(`Capturing speaker positions: export-bounds too small (${Math.round(b.width)}×${Math.round(b.height)}) (attempt ${attempts}/${maxAttempts})`);
+                                        if (attempts < maxAttempts) {
+                                          retryTimer = setTimeout(attemptCapture, 100);
+                                          return;
+                                        }
+                                        setExportStatus("Speaker positions plan skipped: export-bounds stayed too small");
+                                        setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                                        return;
+                                      }
+                                    } catch (e) {
+                                      // if getBBox fails, just continue to retry logic below by treating as not ready
+                                    }
+
                                     // IMPORTANT: RoomVisualisation always renders an <svg>, even when it's still "Loading plan…".
                                     // Only proceed once the real export group exists.
                                     if (!hasRvExportBounds(svgElement)) {
