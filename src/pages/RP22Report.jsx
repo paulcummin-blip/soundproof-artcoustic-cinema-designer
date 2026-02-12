@@ -1998,10 +1998,10 @@ try {
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}
                     roomElements={app?.roomElements || []}
-                    exportMode="dimensions"
+                    exportMode="clean"
                     exportWidthPx={1200}
                     exportHeightPx={800}
-                    overlays={{ ROOM_DIMS: true }}
+                    overlays={{}}
                     showBaffle={true}
                     showScreen={true}
                     speakerPositionsView="off"
