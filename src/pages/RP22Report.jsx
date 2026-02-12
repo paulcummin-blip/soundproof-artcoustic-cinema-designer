@@ -684,7 +684,22 @@ function RP22ReportInner() {
     }, [isPrinting, printReady]);
 
     // Helper to strip zoom/pan transforms from cloned SVG for export
-    function stripExportViewportTransforms(svgClone) {
+    // --- Export readiness + sanity thresholds (prevents tiny/placeholder captures) ---
+const MIN_EXPORT_BBOX_PX = 200; // anything smaller is almost certainly "not ready" or hidden
+
+function hasRvExportBounds(svgEl) {
+  try {
+    return !!(svgEl && svgEl.querySelector && svgEl.querySelector('#export-bounds'));
+  } catch (e) {
+    return false;
+  }
+}
+
+function bboxLooksUsable(b) {
+  return !!(b && Number.isFinite(b.width) && Number.isFinite(b.height) && b.width >= MIN_EXPORT_BBOX_PX && b.height >= MIN_EXPORT_BBOX_PX);
+}
+
+function stripExportViewportTransforms(svgClone) {
         try {
             const anchor =
                 svgClone.querySelector('#export-crop-bounds') ||
@@ -787,6 +802,19 @@ function RP22ReportInner() {
                     return;
                 }
                 
+                // IMPORTANT: RoomVisualisation always renders an <svg>, even when it's still "Loading plan…".
+                // Only proceed once the real export group exists.
+                if (!hasRvExportBounds(svgElement)) {
+                  setExportStatus(`Capturing plan: waiting for plan render (#export-bounds) (attempt ${attempts}/${maxAttempts})`);
+                  if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
+                    return;
+                  }
+                  setExportStatus("Plan skipped: continuing without plan");
+                  setPlanImageDataUrl('__SKIP__');
+                  return;
+                }
+                
                 // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
 // Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
@@ -816,27 +844,16 @@ try {
                     measureBboxFromClone(svgClone, '#export-crop-bounds') ||
                     measureBboxFromClone(svgClone, '#export-bounds');
 
-                // If still missing, fall back to the clone's viewBox (last resort)
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    const viewBoxAttr = svgClone.getAttribute('viewBox');
-                    if (viewBoxAttr) {
-                        const parts = viewBoxAttr.split(/\s+/).map(Number);
-                        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
-                            bbox = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
-                        }
-                    }
-                }
-                
-                // Check if we have valid dimensions
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    setExportStatus(`Capturing plan: SVG bbox invalid (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Plan skipped: continuing without plan");
-                    setPlanImageDataUrl('__SKIP__');
+                // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
+                if (!bboxLooksUsable(bbox)) {
+                  setExportStatus(`Capturing plan: bbox not ready (attempt ${attempts}/${maxAttempts})`);
+                  if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
                     return;
+                  }
+                  setExportStatus("Plan skipped: continuing without plan");
+                  setPlanImageDataUrl('__SKIP__');
+                  return;
                 }
                 
                 // Clean plan: tight padding (3%, min 12)
@@ -949,6 +966,19 @@ try {
                     return;
                 }
                 
+                // IMPORTANT: RoomVisualisation always renders an <svg>, even when it's still "Loading plan…".
+                // Only proceed once the real export group exists.
+                if (!hasRvExportBounds(svgElement)) {
+                  setExportStatus(`Capturing plan: waiting for plan render (#export-bounds) (attempt ${attempts}/${maxAttempts})`);
+                  if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
+                    return;
+                  }
+                  setExportStatus("Dims plan skipped: continuing without dimensioned plan");
+                  setPlanDimsImageDataUrl('__SKIP__');
+                  return;
+                }
+                
                 // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
 // Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
@@ -978,27 +1008,16 @@ try {
                     measureBboxFromClone(svgClone, '#export-crop-bounds') ||
                     measureBboxFromClone(svgClone, '#export-bounds');
 
-                // If still missing, fall back to the clone's viewBox (last resort)
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    const viewBoxAttr = svgClone.getAttribute('viewBox');
-                    if (viewBoxAttr) {
-                        const parts = viewBoxAttr.split(/\s+/).map(Number);
-                        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
-                            bbox = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
-                        }
-                    }
-                }
-                
-                // Check if we have valid dimensions
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    setExportStatus(`Capturing dims plan: SVG bbox invalid (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                    setPlanDimsImageDataUrl('__SKIP__');
+                // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
+                if (!bboxLooksUsable(bbox)) {
+                  setExportStatus(`Capturing plan: bbox not ready (attempt ${attempts}/${maxAttempts})`);
+                  if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
                     return;
+                  }
+                  setExportStatus("Dims plan skipped: continuing without dimensioned plan");
+                  setPlanDimsImageDataUrl('__SKIP__');
+                  return;
                 }
                 
                 // Room dimensions plan: medium padding (5%, min 18)
@@ -1102,16 +1121,29 @@ try {
                 const svgElement = planElement.querySelector('svg');
                 if (!svgElement) {
                     setExportStatus(`Capturing speaker positions: SVG not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
-                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                    return;
-                }
+                                        if (attempts < maxAttempts) {
+                                            retryTimer = setTimeout(attemptCapture, 100);
+                                            return;
+                                        }
+                                        setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
+                                        setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                                        return;
+                                    }
 
-                // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
+                                    // IMPORTANT: RoomVisualisation always renders an <svg>, even when it's still "Loading plan…".
+                                    // Only proceed once the real export group exists.
+                                    if (!hasRvExportBounds(svgElement)) {
+                                      setExportStatus(`Capturing plan: waiting for plan render (#export-bounds) (attempt ${attempts}/${maxAttempts})`);
+                                      if (attempts < maxAttempts) {
+                                        retryTimer = setTimeout(attemptCapture, 100);
+                                        return;
+                                      }
+                                      setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
+                                      setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                                      return;
+                                    }
+
+                                    // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
 // Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
 try {
