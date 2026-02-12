@@ -1146,11 +1146,7 @@ try {
         };
     }, [isPrinting, planDimsImageDataUrl]);
 
-    // Capture speaker positions plan when printing starts (with retry logic)
-    useEffect(() => {
-        if (!isPrinting || planSpeakerDimsImageDataUrl !== null) return;
 
-        setExportStatus("Capturing speaker positions plan: waiting for SVG…");
 
         let attempts = 0;
         const maxAttempts = 20;
