@@ -1522,22 +1522,20 @@ try {
                     max-height: none !important;
                 }
 
-                /* Plan image fit-box: A4 printable area is 186mm wide (210 - 2*12mm) */
                 .plan-fitbox {
-                    width: 186mm !important;
-                    height: 240mm !important; /* safe height for plan + title on its page */
+                    width: 186mm !important;              /* full printable width (A4 portrait with 12mm margins) */
                     margin: 0 auto !important;
-                    display: flex !important;
-                    align-items: center !important;
-                    justify-content: center !important;
-                    overflow: hidden !important;
+                    padding: 0 !important;
+                    overflow: visible !important;         /* don’t crop */
+                    display: block !important;            /* stop centring shrink behaviour */
+                    height: auto !important;              /* let content define height */
                 }
 
                 .plan-fitbox > img {
-                    width: 100% !important;
-                    height: 100% !important;
-                    object-fit: contain !important;
                     display: block !important;
+                    width: 100% !important;               /* ALWAYS fill the page width */
+                    height: auto !important;              /* keep correct aspect ratio */
+                    max-height: 240mm !important;         /* safety cap so it can’t run off the page */
                 }
                 
                 /* Force pure white backgrounds (kill the pale side bars) */
