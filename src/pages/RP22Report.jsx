@@ -754,11 +754,7 @@ function stripExportViewportTransforms(svgClone) {
         }
     }
 
-    // Capture plan when printing starts (with retry logic)
-    useEffect(() => {
-        if (!isPrinting || planImageDataUrl !== null) return;
-        
-        setExportStatus("Capturing plan: waiting for SVG…");
+
         
         let attempts = 0;
         const maxAttempts = 20;
