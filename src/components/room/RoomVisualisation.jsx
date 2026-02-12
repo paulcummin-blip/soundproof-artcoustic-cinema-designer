@@ -7440,6 +7440,24 @@ return (
               })()}
             </g>
 
+            {/* Deterministic crop area for exports */}
+            {Number.isFinite(scale) && roomRect && (
+              <rect
+                id="export-crop-bounds"
+                x={PADDING}
+                y={PADDING}
+                width={roomRect.width}
+                height={
+                  roomRect.height
+                  + (exportMode === "dimensions" ? TOP_GUTTER_PX : 0)
+                  + (speakerPositionsView === "plan" ? BOTTOM_GUTTER_PX : 0)
+                }
+                fill="none"
+                stroke="none"
+                opacity={0}
+                pointerEvents="none"
+              />
+            )}
             {/* Wrapper for export bounds */}
             <g id="export-bounds">
               {/* Layer 2: Room Outline and Furniture */}

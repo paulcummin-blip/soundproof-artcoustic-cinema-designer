@@ -878,9 +878,7 @@ try {
                 stripExportViewportTransforms(svgClone);
 
                 // Prefer export-crop-bounds if it exists, otherwise export-bounds
-                let bbox =
-                    measureBboxFromClone(svgClone, '#export-crop-bounds') ||
-                    measureBboxFromClone(svgClone, '#export-bounds');
+                let bbox = measureBboxFromClone(svgClone, '#export-crop-bounds');
 
                 // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
                 if (!bboxLooksUsable(bbox) || (bbox && (bbox.width < 200 || bbox.height < 200))) {
@@ -1080,9 +1078,7 @@ try {
                 stripExportViewportTransforms(svgClone);
 
                 // Prefer export-crop-bounds if it exists, otherwise export-bounds
-                let bbox =
-                    measureBboxFromClone(svgClone, '#export-crop-bounds') ||
-                    measureBboxFromClone(svgClone, '#export-bounds');
+                let bbox = measureBboxFromClone(svgClone, '#export-crop-bounds');
 
                 // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
                 if (!bboxLooksUsable(bbox) || (bbox && (bbox.width < 200 || bbox.height < 200))) {
@@ -1282,9 +1278,7 @@ try {
                 stripExportViewportTransforms(svgClone);
 
                 // Prefer export-crop-bounds if it exists, otherwise export-bounds
-                let bbox =
-                    measureBboxFromClone(svgClone, '#export-crop-bounds') ||
-                    measureBboxFromClone(svgClone, '#export-bounds');
+                let bbox = measureBboxFromClone(svgClone, '#export-crop-bounds');
 
                 // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
                 if (!bboxLooksUsable(bbox) || (bbox && (bbox.width < 200 || bbox.height < 200))) {
