@@ -2070,6 +2070,23 @@ try {
             color: #1B1A1A;
             margin-top: 1mm;
             }
+
+            /* --- PRINT SCALE CONTROL (non-plan pages 75%, plan pages 100%) --- */
+            @media print {
+              /* Non-plan pages: shrink everything by 75% */
+              #pdf-cover,
+              #pdf-room-parameters,
+              #pdf-seat-parameters {
+                zoom: 0.75 !important;
+              }
+
+              /* Plan pages: MUST remain full size */
+              #pdf-room-plan,
+              #pdf-room-plan-dims,
+              #pdf-room-plan-positions {
+                zoom: 1 !important;
+              }
+            }
             `}</style>
             );
 
