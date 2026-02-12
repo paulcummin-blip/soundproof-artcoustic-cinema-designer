@@ -7449,7 +7449,7 @@ return (
                 width={roomRect.width}
                 height={
                   roomRect.height
-                  + (exportMode === "dimensions" ? TOP_GUTTER_PX : 0)
+                  + (overlaysForRendering?.ROOM_DIMS ? TOP_GUTTER_PX : 0)
                   + (speakerPositionsView === "plan" ? BOTTOM_GUTTER_PX : 0)
                 }
                 fill="none"
