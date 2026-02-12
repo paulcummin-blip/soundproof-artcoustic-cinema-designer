@@ -1645,34 +1645,6 @@ try {
                     height: auto !important;              /* keep correct aspect ratio */
                     max-height: 240mm !important;         /* safety cap so it can’t run off the page */
                 }
-
-                /* Live plan print sizing */
-                .plan-fitbox {
-                  width: 186mm !important;
-                  height: 240mm !important;
-                  margin: 0 auto !important;
-                }
-
-                .plan-live {
-                  width: 186mm !important;
-                  height: 240mm !important;
-                  overflow: hidden !important;
-                }
-
-                .plan-live * {
-                  pointer-events: none !important;
-                }
-
-                .plan-live svg {
-                  display: block !important;
-                  width: 100% !important;
-                  height: 100% !important;  /* key: fill the box */
-                }
-
-                .plan-live > div {
-                  width: 100% !important;
-                  height: 100% !important;
-                }
                 
                 /* Force pure white backgrounds (kill the pale side bars) */
                 html, body, #root, #__next {
@@ -2980,50 +2952,13 @@ try {
                                 </h2>
 
                                 <div className="plan-fitbox">
-                                  <div className="plan-live">
-                                    <RoomVisualisation
-                                      placedSpeakers={placedSpeakers}
-                                      seatingPositions={seats}
-                                      mlpPoint={primarySeatingPosition}
-                                      screen={{
-                                        ...(screen || {}),
-                                        floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
-                                          ? Number(app.screenFrontPlaneM)
-                                          : Number(screen?.floatDepthM) || 0
-                                      }}
-                                      screenFrontPlaneM={
-                                        Number.isFinite(Number(app?.screenFrontPlaneM))
-                                          ? Number(app.screenFrontPlaneM)
-                                          : undefined
-                                      }
-                                      dolbyLayout={dolbyLayout}
-                                      frontSubs={frontSubsCfg?.positions || []}
-                                      rearSubs={rearSubsCfg?.positions || []}
-                                      roomElements={app?.roomElements || []}
-                                      exportMode="dimensions"
-                                      exportWidthPx={1200}
-                                      exportHeightPx={800}
-                                      overlays={{ ROOM_DIMS: true }}
-                                      showBaffle={true}
-                                      showScreen={true}
-                                      speakerPositionsView="off"
-                                      showMlpRuler={false}
-                                      zoomMode="off"
-                                      screenPlaneMode="fixed"
-                                      lcrAimMode={app?.lcrAimMode || "flat"}
-                                      aimAtMLP={app?.aimAtMLP ?? false}
-                                      onSetSpeakers={rvNoops.onSetSpeakers}
-                                      onSetSeatingPositions={rvNoops.onSetSeatingPositions}
-                                      onSetScreen={rvNoops.onSetScreen}
-                                      onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
-                                      onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
-                                      onSetElements={rvNoops.onSetElements}
-                                      onSetOverheadState={rvNoops.onSetOverheadState}
-                                      onSetAimState={rvNoops.onSetAimState}
-                                      onSetRoomDims={rvNoops.onSetRoomDims}
-                                      onSetMlpPoint={rvNoops.onSetMlpPoint}
+                                    <img
+                                        src={planImageDataUrl}
+                                        alt="Room plan"
+                                        style={{
+                                            background: 'transparent',
+                                        }}
                                     />
-                                  </div>
                                 </div>
                             </section>
                         )}
@@ -3046,50 +2981,13 @@ try {
                                 </h2>
 
                                 <div className="plan-fitbox">
-                                  <div className="plan-live">
-                                    <RoomVisualisation
-                                      placedSpeakers={placedSpeakers}
-                                      seatingPositions={seats}
-                                      mlpPoint={primarySeatingPosition}
-                                      screen={{
-                                        ...(screen || {}),
-                                        floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
-                                          ? Number(app.screenFrontPlaneM)
-                                          : Number(screen?.floatDepthM) || 0
-                                      }}
-                                      screenFrontPlaneM={
-                                        Number.isFinite(Number(app?.screenFrontPlaneM))
-                                          ? Number(app.screenFrontPlaneM)
-                                          : undefined
-                                      }
-                                      dolbyLayout={dolbyLayout}
-                                      frontSubs={frontSubsCfg?.positions || []}
-                                      rearSubs={rearSubsCfg?.positions || []}
-                                      roomElements={app?.roomElements || []}
-                                      exportMode="dimensions"
-                                      exportWidthPx={1200}
-                                      exportHeightPx={800}
-                                      overlays={{}}
-                                      showBaffle={true}
-                                      showScreen={true}
-                                      speakerPositionsView="off"
-                                      showMlpRuler={true}
-                                      zoomMode="off"
-                                      screenPlaneMode="fixed"
-                                      lcrAimMode={app?.lcrAimMode || "flat"}
-                                      aimAtMLP={app?.aimAtMLP ?? false}
-                                      onSetSpeakers={rvNoops.onSetSpeakers}
-                                      onSetSeatingPositions={rvNoops.onSetSeatingPositions}
-                                      onSetScreen={rvNoops.onSetScreen}
-                                      onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
-                                      onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
-                                      onSetElements={rvNoops.onSetElements}
-                                      onSetOverheadState={rvNoops.onSetOverheadState}
-                                      onSetAimState={rvNoops.onSetAimState}
-                                      onSetRoomDims={rvNoops.onSetRoomDims}
-                                      onSetMlpPoint={rvNoops.onSetMlpPoint}
+                                    <img
+                                        src={planDimsImageDataUrl}
+                                        alt="Room plan (dimensions)"
+                                        style={{
+                                            background: 'transparent',
+                                        }}
                                     />
-                                  </div>
                                 </div>
                             </section>
                         )}
@@ -3116,50 +3014,13 @@ try {
                                 </h2>
 
                                 <div className="plan-fitbox">
-                                  <div className="plan-live">
-                                    <RoomVisualisation
-                                      placedSpeakers={placedSpeakers}
-                                      seatingPositions={seats}
-                                      mlpPoint={primarySeatingPosition}
-                                      screen={{
-                                        ...(screen || {}),
-                                        floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
-                                          ? Number(app.screenFrontPlaneM)
-                                          : Number(screen?.floatDepthM) || 0
-                                      }}
-                                      screenFrontPlaneM={
-                                        Number.isFinite(Number(app?.screenFrontPlaneM))
-                                          ? Number(app.screenFrontPlaneM)
-                                          : undefined
-                                      }
-                                      dolbyLayout={dolbyLayout}
-                                      frontSubs={frontSubsCfg?.positions || []}
-                                      rearSubs={rearSubsCfg?.positions || []}
-                                      roomElements={app?.roomElements || []}
-                                      exportMode="dimensions"
-                                      exportWidthPx={1200}
-                                      exportHeightPx={800}
-                                      overlays={{}}
-                                      showBaffle={true}
-                                      showScreen={true}
-                                      speakerPositionsView="plan"
-                                      showMlpRuler={false}
-                                      zoomMode="off"
-                                      screenPlaneMode="fixed"
-                                      lcrAimMode={app?.lcrAimMode || "flat"}
-                                      aimAtMLP={app?.aimAtMLP ?? false}
-                                      onSetSpeakers={rvNoops.onSetSpeakers}
-                                      onSetSeatingPositions={rvNoops.onSetSeatingPositions}
-                                      onSetScreen={rvNoops.onSetScreen}
-                                      onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
-                                      onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
-                                      onSetElements={rvNoops.onSetElements}
-                                      onSetOverheadState={rvNoops.onSetOverheadState}
-                                      onSetAimState={rvNoops.onSetAimState}
-                                      onSetRoomDims={rvNoops.onSetRoomDims}
-                                      onSetMlpPoint={rvNoops.onSetMlpPoint}
+                                    <img
+                                        src={planSpeakerDimsImageDataUrl}
+                                        alt="Room plan (speaker positions)"
+                                        style={{
+                                            background: "transparent",
+                                        }}
                                     />
-                                  </div>
                                 </div>
                             </section>
                         )}
