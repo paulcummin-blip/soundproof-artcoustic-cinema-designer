@@ -764,6 +764,37 @@ function stripExportViewportTransforms(svgClone) {
         }
     }
 
+function flattenExportTransforms(svgClone) {
+  try {
+    const anchor =
+      svgClone.querySelector('#export-bounds') ||
+      svgClone.querySelector('#export-crop-bounds');
+
+    if (!anchor) return;
+
+    // Walk up to <svg>, removing transforms + clip paths that can shrink/offset the drawing
+    let node = anchor;
+    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
+      if (node.nodeName.toLowerCase() === 'g') {
+        node.removeAttribute('transform');
+        node.removeAttribute('clipPath');
+        node.removeAttribute('clip-path');
+        if (node.style) {
+          node.style.transform = 'none';
+          node.style.clipPath = 'none';
+        }
+      }
+      node = node.parentNode;
+    }
+
+    // Also ensure the root SVG isn't clipping unexpectedly
+    const rootSvg = svgClone.querySelector('svg') || svgClone;
+    if (rootSvg && rootSvg.style) {
+      rootSvg.style.overflow = 'visible';
+    }
+  } catch (e) {}
+}
+
     // Capture plan when printing starts (with retry logic)
     useEffect(() => {
         if (!isPrinting || planImageDataUrl !== null) return;
