@@ -1749,7 +1749,17 @@ try {
                 #pdf-cover .rp22-param-value {
                   margin-top: 1mm !important;
                 }
-                
+
+                /* Cover-only class hooks */
+                #pdf-cover .rp22-cover-card {
+                  padding-top: 6mm !important;
+                  padding-bottom: 6mm !important;
+                }
+
+                #pdf-cover .rp22-cover-stack {
+                  gap: 2mm !important;
+                }
+
                 /* Force pure white backgrounds (kill the pale side bars) */
                 html, body, #root, #__next {
                     background: #FFFFFF !important;
@@ -2721,7 +2731,7 @@ try {
                             <div
                                 style={{
                                     maxWidth: "460px",
-                                    margin: "0 auto 18mm auto",
+                                    margin: "0 auto 13mm auto",
                                     textAlign: "center",
                                 }}
                             >
@@ -2767,12 +2777,12 @@ try {
                             </div>
 
                             {/* Master stack wrapper (all 4 panels + footer) */}
-                            <div style={{ 
+                            <div className="rp22-cover-stack" style={{ 
                                 maxWidth: '185mm',
                                                                  margin: '0 auto 0',
                                                                  display: 'flex',
                                                                  flexDirection: 'column',
-                                                                 gap: '4mm',
+                                                                 gap: '2mm',
                             }}>
                                 {/* Room parameters */}
                                 <div
@@ -2783,7 +2793,7 @@ try {
                                         background: '#FBFAF8',
                                         width: '100%',
                                     }}
-                                    className="print-avoid-break"
+                                    className="print-avoid-break rp22-cover-card"
                                 >
                                     <div
                                         style={{
@@ -2814,7 +2824,7 @@ try {
                                         background: '#FBFAF8',
                                         width: '100%',
                                     }}
-                                    className="print-avoid-break"
+                                    className="print-avoid-break rp22-cover-card"
                                 >
                                     <div
                                         style={{
@@ -2858,7 +2868,7 @@ try {
                                         background: '#FBFAF8',
                                         width: '100%',
                                     }}
-                                    className="print-avoid-break"
+                                    className="print-avoid-break rp22-cover-card"
                                 >
                                     <div
                                         style={{
@@ -2962,7 +2972,7 @@ try {
                                         background: '#FBFAF8',
                                         width: '100%',
                                     }}
-                                    className="print-avoid-break"
+                                    className="print-avoid-break rp22-cover-card"
                                 >
                                     <div
                                         style={{
