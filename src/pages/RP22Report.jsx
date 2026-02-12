@@ -1871,6 +1871,8 @@ try {
                     rearSubs={rearSubsCfg?.positions || []}
                     roomElements={app?.roomElements || []}
                     exportMode="dimensions"
+                    exportWidthPx={1200}
+                    exportHeightPx={800}
                     overlays={{ ROOM_DIMS: true }}
                     showBaffle={true}
                     showScreen={true}
@@ -1927,6 +1929,8 @@ try {
                     rearSubs={rearSubsCfg?.positions || []}
                     roomElements={app?.roomElements || []}
                     exportMode="dimensions"
+                    exportWidthPx={1200}
+                    exportHeightPx={800}
                     overlays={{}}
                     showBaffle={true}
                     showScreen={true}
@@ -1983,6 +1987,8 @@ try {
                     rearSubs={rearSubsCfg?.positions || []}
                     roomElements={app?.roomElements || []}
                     exportMode="dimensions"
+                    exportWidthPx={1200}
+                    exportHeightPx={800}
                     overlays={{}}
                     showBaffle={true}
                     showScreen={true}
@@ -2024,6 +2030,8 @@ try {
                     seatingPositions={seats}
                     mlpPoint={primarySeatingPosition}
                     screen={screen}
+                    exportWidthPx={1200}
+                    exportHeightPx={800}
                     dolbyLayout={dolbyLayout}
                     frontSubs={frontSubsCfg?.positions || []}
                     rearSubs={rearSubsCfg?.positions || []}

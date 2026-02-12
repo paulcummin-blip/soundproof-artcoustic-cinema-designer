@@ -471,6 +471,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     zoomMode: zoomModeProp = 'off',
     onZoomModeChange,
     exportMode = 'default',
+    exportWidthPx,
+    exportHeightPx,
   } = props;
 
   const appState = useAppState();
@@ -1287,8 +1289,16 @@ React.useEffect(() => {
 
   const TOP_GUTTER_PX = 150; // reserved space above room for dimension lines
   
-  const availW = (Number.isFinite(containerW) ? containerW : 0) - 2 * PADDING;
-  const availH = (Number.isFinite(containerH) ? containerH : 0) - 2 * PADDING - TOP_GUTTER_PX;
+  const effectiveContainerW = Number.isFinite(Number(exportWidthPx))
+    ? Number(exportWidthPx)
+    : (Number.isFinite(containerW) ? containerW : 0);
+
+  const effectiveContainerH = Number.isFinite(Number(exportHeightPx))
+    ? Number(exportHeightPx)
+    : (Number.isFinite(containerH) ? containerH : 0);
+
+  const availW = effectiveContainerW - 2 * PADDING;
+  const availH = effectiveContainerH - 2 * PADDING - TOP_GUTTER_PX;
   const scale = useMemo(() => {
     if (!Number.isFinite(availW) || !Number.isFinite(availH)) return null;
     if (availW <= 0 || availH <= 0) return null;
