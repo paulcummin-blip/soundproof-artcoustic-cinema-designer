@@ -1940,7 +1940,7 @@ try {
                 .rp22-report .rp22-cards-grid {
                     display: grid !important;
                     grid-template-columns: 1fr 1fr !important;
-                    gap: 10mm 10mm !important;
+                    gap: 7mm 7mm !important;
                     align-items: start !important;
                     align-content: start !important;
                     grid-auto-rows: auto !important;
@@ -1980,14 +1980,13 @@ try {
                 overflow: visible;
                 break-inside: avoid;
                 page-break-inside: avoid;
-                min-height: 68mm;
                 position: relative;
                 display: flex;
                 flex-direction: column;
             }
 
             .rp22-report .rp22-param-card-inner {
-                padding: 7mm 8mm;
+                padding: 5mm 7mm;
                 flex: 1;
                 display: flex;
                 flex-direction: column;
@@ -1997,21 +1996,21 @@ try {
                 font-size: 11.5pt;
                 font-weight: 700;
                 line-height: 1.25;
-                margin: 0 0 2.5mm 0;
+                margin: 0 0 1.5mm 0;
                 color: #1B1A1A;
             }
 
             .rp22-report .rp22-param-subtitle {
                 font-size: 9pt;
                 color: #3E4349;
-                margin: 0 0 5mm 0;
+                margin: 0 0 3mm 0;
                 line-height: 1.4;
             }
 
             .rp22-report .rp22-param-divider {
                 height: 1px;
                 background: #EEEAE3;
-                margin: 5mm 0;
+                margin: 3mm 0;
             }
 
             .rp22-report .rp22-level-pill {
@@ -2031,7 +2030,7 @@ try {
             font-size: 11pt;
             font-weight: 700;
             color: #1B1A1A;
-            margin-top: 2mm;
+            margin-top: 1mm;
             }
             `}</style>
             );
@@ -2694,7 +2693,7 @@ try {
                             <div
                                 style={{
                                     maxWidth: "460px",
-                                    margin: "0 auto 28mm auto",
+                                    margin: "0 auto 18mm auto",
                                     textAlign: "center",
                                 }}
                             >
@@ -2745,7 +2744,7 @@ try {
                                 margin: '0 auto 0',
                                 display: 'flex',
                                 flexDirection: 'column',
-                                gap: '8mm',
+                                gap: '5mm',
                             }}>
                                 {/* Room parameters */}
                                 <div
