@@ -877,30 +877,44 @@ try {
 
                 stripExportViewportTransforms(svgClone);
 
-                // Prefer export-crop-bounds if it exists, otherwise export-bounds
-                let bbox = measureBboxFromClone(svgClone, '#export-crop-bounds');
-
-                // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
-                if (!bboxLooksUsable(bbox) || (bbox && (bbox.width < 200 || bbox.height < 200))) {
-                  setExportStatus(`Capturing plan: bbox invalid/too small (attempt ${attempts}/${maxAttempts})`);
+                // Read crop rectangle directly from live SVG (no getBBox)
+                const cropRect = svgElement.querySelector('#export-crop-bounds');
+                if (!cropRect) {
+                  setExportStatus(`Capturing plan: waiting for export-crop-bounds… (attempt ${attempts}/${maxAttempts})`);
                   if (attempts < maxAttempts) {
                     retryTimer = setTimeout(attemptCapture, 100);
                     return;
                   }
-                  setExportStatus("Plan skipped: continuing without plan");
+                  setExportStatus("Plan skipped: export-crop-bounds never appeared");
                   setPlanImageDataUrl('__SKIP__');
                   return;
                 }
-                
+
+                const xAttr = Number(cropRect.getAttribute('x'));
+                const yAttr = Number(cropRect.getAttribute('y'));
+                const wAttr = Number(cropRect.getAttribute('width'));
+                const hAttr = Number(cropRect.getAttribute('height'));
+
+                if (!Number.isFinite(xAttr) || !Number.isFinite(yAttr) || !(wAttr > 0) || !(hAttr > 0)) {
+                  setExportStatus(`Capturing plan: invalid crop rect (attempt ${attempts}/${maxAttempts})`);
+                  if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
+                    return;
+                  }
+                  setExportStatus("Plan skipped: invalid crop rect");
+                  setPlanImageDataUrl('__SKIP__');
+                  return;
+                }
+
                 // Clean plan: tight padding (3%, min 12)
-                const shortestSide = Math.min(bbox.width, bbox.height);
+                const shortestSide = Math.min(wAttr, hAttr);
                 const padding = Math.max(shortestSide * 0.03, 12);
-                
-                const viewBoxX = bbox.x - padding;
-                const viewBoxY = bbox.y - padding;
-                const viewBoxW = bbox.width + (2 * padding);
-                const viewBoxH = bbox.height + (2 * padding);
-                
+
+                const viewBoxX = xAttr - padding;
+                const viewBoxY = yAttr - padding;
+                const viewBoxW = wAttr + (2 * padding);
+                const viewBoxH = hAttr + (2 * padding);
+
                 // Apply the computed viewBox to the clone
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1077,30 +1091,44 @@ try {
 
                 stripExportViewportTransforms(svgClone);
 
-                // Prefer export-crop-bounds if it exists, otherwise export-bounds
-                let bbox = measureBboxFromClone(svgClone, '#export-crop-bounds');
-
-                // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
-                if (!bboxLooksUsable(bbox) || (bbox && (bbox.width < 200 || bbox.height < 200))) {
-                  setExportStatus(`Capturing dims plan: bbox invalid/too small (attempt ${attempts}/${maxAttempts})`);
+                // Read crop rectangle directly from live SVG (no getBBox)
+                const cropRect = svgElement.querySelector('#export-crop-bounds');
+                if (!cropRect) {
+                  setExportStatus(`Capturing dims plan: waiting for export-crop-bounds… (attempt ${attempts}/${maxAttempts})`);
                   if (attempts < maxAttempts) {
                     retryTimer = setTimeout(attemptCapture, 100);
                     return;
                   }
-                  setExportStatus("Dims plan skipped: continuing without dimensioned plan");
+                  setExportStatus("Dims plan skipped: export-crop-bounds never appeared");
                   setPlanDimsImageDataUrl('__SKIP__');
                   return;
                 }
-                
+
+                const xAttr = Number(cropRect.getAttribute('x'));
+                const yAttr = Number(cropRect.getAttribute('y'));
+                const wAttr = Number(cropRect.getAttribute('width'));
+                const hAttr = Number(cropRect.getAttribute('height'));
+
+                if (!Number.isFinite(xAttr) || !Number.isFinite(yAttr) || !(wAttr > 0) || !(hAttr > 0)) {
+                  setExportStatus(`Capturing dims plan: invalid crop rect (attempt ${attempts}/${maxAttempts})`);
+                  if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
+                    return;
+                  }
+                  setExportStatus("Dims plan skipped: invalid crop rect");
+                  setPlanDimsImageDataUrl('__SKIP__');
+                  return;
+                }
+
                 // Room dimensions plan: medium padding (5%, min 18)
-                const shortestSide = Math.min(bbox.width, bbox.height);
+                const shortestSide = Math.min(wAttr, hAttr);
                 const padding = Math.max(shortestSide * 0.05, 18);
-                
-                const viewBoxX = bbox.x - padding;
-                const viewBoxY = bbox.y - padding;
-                const viewBoxW = bbox.width + (2 * padding);
-                const viewBoxH = bbox.height + (2 * padding);
-                
+
+                const viewBoxX = xAttr - padding;
+                const viewBoxY = yAttr - padding;
+                const viewBoxW = wAttr + (2 * padding);
+                const viewBoxH = hAttr + (2 * padding);
+
                 // Apply the computed viewBox to the clone
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1277,30 +1305,44 @@ try {
 
                 stripExportViewportTransforms(svgClone);
 
-                // Prefer export-crop-bounds if it exists, otherwise export-bounds
-                let bbox = measureBboxFromClone(svgClone, '#export-crop-bounds');
-
-                // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
-                if (!bboxLooksUsable(bbox) || (bbox && (bbox.width < 200 || bbox.height < 200))) {
-                  setExportStatus(`Capturing plan: bbox invalid/too small (attempt ${attempts}/${maxAttempts})`);
+                // Read crop rectangle directly from live SVG (no getBBox)
+                const cropRect = svgElement.querySelector('#export-crop-bounds');
+                if (!cropRect) {
+                  setExportStatus(`Capturing speaker positions: waiting for export-crop-bounds… (attempt ${attempts}/${maxAttempts})`);
                   if (attempts < maxAttempts) {
                     retryTimer = setTimeout(attemptCapture, 100);
                     return;
                   }
-                  setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
+                  setExportStatus("Speaker positions plan skipped: export-crop-bounds never appeared");
+                  setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                  return;
+                }
+
+                const xAttr = Number(cropRect.getAttribute('x'));
+                const yAttr = Number(cropRect.getAttribute('y'));
+                const wAttr = Number(cropRect.getAttribute('width'));
+                const hAttr = Number(cropRect.getAttribute('height'));
+
+                if (!Number.isFinite(xAttr) || !Number.isFinite(yAttr) || !(wAttr > 0) || !(hAttr > 0)) {
+                  setExportStatus(`Capturing speaker positions: invalid crop rect (attempt ${attempts}/${maxAttempts})`);
+                  if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
+                    return;
+                  }
+                  setExportStatus("Speaker positions plan skipped: invalid crop rect");
                   setPlanSpeakerDimsImageDataUrl('__SKIP__');
                   return;
                 }
 
                 // Speaker positions plan: larger padding to accommodate measurement leaders/labels
-                const shortestSide = Math.min(bbox.width, bbox.height);
+                const shortestSide = Math.min(wAttr, hAttr);
                 const padding = Math.max(shortestSide * 0.05, 24);
-                
-                const viewBoxX = bbox.x - padding;
-                const viewBoxY = bbox.y - padding;
-                const viewBoxW = bbox.width + (2 * padding);
-                const viewBoxH = bbox.height + (2 * padding);
-                
+
+                const viewBoxX = xAttr - padding;
+                const viewBoxY = yAttr - padding;
+                const viewBoxW = wAttr + (2 * padding);
+                const viewBoxH = hAttr + (2 * padding);
+
                 // Apply the computed viewBox to the clone
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
