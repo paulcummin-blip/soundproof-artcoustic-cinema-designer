@@ -1836,7 +1836,7 @@ try {
         <div className="min-h-screen bg-[#F9F8F6] p-6">
             <PrintStyles />
             
-
+            <div className="screen-only">
             {/* Hidden plan capture element (CLEAN) - MUST be in DOM (not display:none) for SVG capture */}
             <div 
                 data-plan-capture 
@@ -2468,6 +2468,7 @@ try {
                                                             </div>
                     </CardContent>
                 </Card>
+            </div>
             </div>
 
             {/* Print-only layout */}
