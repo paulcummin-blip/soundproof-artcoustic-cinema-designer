@@ -1172,26 +1172,16 @@ try {
                     measureBboxFromClone(svgClone, '#export-crop-bounds') ||
                     measureBboxFromClone(svgClone, '#export-bounds');
 
-                // If still missing, fall back to the clone's viewBox (last resort)
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    const viewBoxAttr = svgClone.getAttribute('viewBox');
-                    if (viewBoxAttr) {
-                        const parts = viewBoxAttr.split(/\s+/).map(Number);
-                        if (parts.length === 4 && parts[2] > 0 && parts[3] > 0) {
-                            bbox = { x: parts[0], y: parts[1], width: parts[2], height: parts[3] };
-                        }
-                    }
-                }
-
-                if (!bbox || bbox.width <= 0 || bbox.height <= 0) {
-                    setExportStatus(`Capturing speaker positions: SVG bbox invalid (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
-                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
+                if (!bboxLooksUsable(bbox)) {
+                  setExportStatus(`Capturing plan: bbox not ready (attempt ${attempts}/${maxAttempts})`);
+                  if (attempts < maxAttempts) {
+                    retryTimer = setTimeout(attemptCapture, 100);
                     return;
+                  }
+                  setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
+                  setPlanSpeakerDimsImageDataUrl('__SKIP__');
+                  return;
                 }
 
                 // Speaker positions plan: larger padding to accommodate measurement leaders/labels
