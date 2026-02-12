@@ -756,15 +756,6 @@ function stripExportViewportTransforms(svgClone) {
 
 
         
-        let attempts = 0;
-        const maxAttempts = 20;
-        let retryTimer = null;
-        
-        const attemptCapture = async () => {
-            attempts++;
-            
-            try {
-                const planElement = document.querySelector('[data-plan-capture]');
                 if (!planElement) {
                     setExportStatus(`Capturing plan: plan container not found (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
