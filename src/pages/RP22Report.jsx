@@ -1086,7 +1086,7 @@ try {
 
                 // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
                 if (!bboxLooksUsable(bbox) || (bbox && (bbox.width < 200 || bbox.height < 200))) {
-                  setExportStatus(`Capturing plan: bbox invalid/too small (attempt ${attempts}/${maxAttempts})`);
+                  setExportStatus(`Capturing dims plan: bbox invalid/too small (attempt ${attempts}/${maxAttempts})`);
                   if (attempts < maxAttempts) {
                     retryTimer = setTimeout(attemptCapture, 100);
                     return;
