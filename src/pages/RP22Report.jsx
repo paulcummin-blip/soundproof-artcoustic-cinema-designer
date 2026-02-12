@@ -948,7 +948,7 @@ try {
         return () => {
             if (retryTimer) clearTimeout(retryTimer);
         };
-    }, [isPrinting, planImageDataUrl]);
+/* end legacy capture block removed */
 
 
         
@@ -1144,15 +1144,11 @@ try {
         return () => {
             if (retryTimer) clearTimeout(retryTimer);
         };
-    }, [isPrinting, planDimsImageDataUrl]);
+/* end legacy capture block removed */
 
 
 
-        let attempts = 0;
-        const maxAttempts = 20;
-        let retryTimer = null;
-
-        const attemptCapture = async () => {
+/* removed legacy PNG capture: speaker positions plan */
             attempts++;
 
             try {
@@ -1339,7 +1335,7 @@ try {
         return () => {
             if (retryTimer) clearTimeout(retryTimer);
         };
-    }, [isPrinting, planSpeakerDimsImageDataUrl]);
+/* end legacy capture block removed */
 
     // System summary: group speakers by role and model
     const systemSummary = React.useMemo(() => {
