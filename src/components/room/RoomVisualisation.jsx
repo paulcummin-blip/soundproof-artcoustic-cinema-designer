@@ -7445,7 +7445,7 @@ return (
               <rect
                 id="export-crop-bounds"
                 x={roomRect.x}
-                y={roomRect.y - TOP_GUTTER_PX}
+                y={roomRect.y - (overlaysForRendering?.ROOM_DIMS ? TOP_GUTTER_PX : 0)}
                 width={roomRect.width}
                 height={
                   roomRect.height
