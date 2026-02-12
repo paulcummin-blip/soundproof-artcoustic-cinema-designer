@@ -1721,6 +1721,34 @@ try {
                     height: auto !important;              /* keep correct aspect ratio */
                     max-height: 240mm !important;         /* safety cap so it can’t run off the page */
                 }
+
+                /* COVER PAGE ONLY — tighten vertical spacing so it fits at 100% scale */
+                #pdf-cover .rp22-param-card,
+                #pdf-cover .rp22-seat-card {
+                  min-height: 0 !important;
+                  height: auto !important;
+                }
+
+                #pdf-cover .rp22-param-card-inner {
+                  padding-top: 5mm !important;
+                  padding-bottom: 5mm !important;
+                }
+
+                #pdf-cover .rp22-param-title {
+                  margin-bottom: 1.5mm !important;
+                }
+
+                #pdf-cover .rp22-param-subtitle {
+                  margin-bottom: 3mm !important;
+                }
+
+                #pdf-cover .rp22-param-divider {
+                  margin: 3mm 0 !important;
+                }
+
+                #pdf-cover .rp22-param-value {
+                  margin-top: 1mm !important;
+                }
                 
                 /* Force pure white backgrounds (kill the pale side bars) */
                 html, body, #root, #__next {
@@ -2741,10 +2769,10 @@ try {
                             {/* Master stack wrapper (all 4 panels + footer) */}
                             <div style={{ 
                                 maxWidth: '185mm',
-                                margin: '0 auto 0',
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: '5mm',
+                                                                 margin: '0 auto 0',
+                                                                 display: 'flex',
+                                                                 flexDirection: 'column',
+                                                                 gap: '4mm',
                             }}>
                                 {/* Room parameters */}
                                 <div
