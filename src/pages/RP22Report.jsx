@@ -950,11 +950,7 @@ try {
         };
     }, [isPrinting, planImageDataUrl]);
 
-    // Capture dimensioned plan when printing starts (with retry logic)
-    useEffect(() => {
-        if (!isPrinting || planDimsImageDataUrl !== null) return;
-        
-        setExportStatus("Capturing dimensioned plan: waiting for SVG…");
+
         
         let attempts = 0;
         const maxAttempts = 20;
