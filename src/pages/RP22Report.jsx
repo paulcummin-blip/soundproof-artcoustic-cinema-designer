@@ -28,9 +28,6 @@ function RP22ReportInner() {
     const app = useAppState();
     
     const [isPrinting, setIsPrinting] = useState(false);
-    const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
-    const [planDimsImageDataUrl, setPlanDimsImageDataUrl] = useState(null);
-    const [planSpeakerDimsImageDataUrl, setPlanSpeakerDimsImageDataUrl] = useState(null);
     const [hasPrintedOnce, setHasPrintedOnce] = useState(false);
     const [exportStatus, setExportStatus] = useState("Idle");
     const [exportDebug, setExportDebug] = useState({ isPrinting: false, planLen: 0, printReady: false });
@@ -44,16 +41,13 @@ function RP22ReportInner() {
     const exportGuardRef = React.useRef({ active: false, startedAt: 0 });
     const exportTimeoutRef = React.useRef(null);
     
-    const EXPORT_TIMEOUT_MS = 60000; // allow enough time for 3 SVG→PNG captures on slower machines
+    const EXPORT_TIMEOUT_MS = 60000; // allow enough time for print dialog to open
 
     useEffect(() => {
         const cleanup = () => {
             setExportStatus("Done");
             setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
             setIsPrinting(false);
-            setPlanImageDataUrl(null);
-            setPlanDimsImageDataUrl(null);
-            setPlanSpeakerDimsImageDataUrl(null);
             printLockRef.current = false;
             if (cleanupTimeoutRef.current) {
                 clearTimeout(cleanupTimeoutRef.current);
@@ -657,9 +651,6 @@ function RP22ReportInner() {
                     setExportStatus("Done (timeout)");
                     setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
                     setIsPrinting(false);
-                    setPlanImageDataUrl(null);
-                    setPlanDimsImageDataUrl(null);
-                    setPlanSpeakerDimsImageDataUrl(null);
                     printLockRef.current = false;
                 }
             }, 2000);
@@ -753,580 +744,13 @@ function stripExportViewportTransforms(svgClone) {
             } catch (e2) {}
         }
     }
+/* removed legacy PNG capture: clean plan *//* end legacy capture block removed */
 
 
-        
-                if (!planElement) {
-                    setExportStatus(`Capturing plan: plan container not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Plan skipped: continuing without plan");
-                    setPlanImageDataUrl('__SKIP__');
-                    return;
-                }
-                
-                const svgElement = planElement.querySelector('svg');
-                if (!svgElement) {
-                    setExportStatus(`Capturing plan: SVG not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Plan skipped: continuing without plan");
-                    setPlanImageDataUrl('__SKIP__');
-                    return;
-                }
-
-                // --- Wait until RoomVisualisation has actually rendered export-bounds (not the placeholder) ---
-                let liveAnchor = null;
-                try {
-                  liveAnchor =
-                    svgElement.querySelector('#export-crop-bounds') ||
-                    svgElement.querySelector('#export-bounds');
-                } catch (e) {
-                  liveAnchor = null;
-                }
-
-                if (!liveAnchor) {
-                  setExportStatus(`Capturing plan: waiting for export-bounds… (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Plan skipped: export-bounds never appeared");
-                  setPlanImageDataUrl('__SKIP__');
-                  return;
-                }
-
-                // Optional but important: reject “microscopic but >0” layouts
-                try {
-                  const b = liveAnchor.getBBox?.();
-                  if (b && Number.isFinite(b.width) && Number.isFinite(b.height) && (b.width < 200 || b.height < 200)) {
-                    setExportStatus(`Capturing plan: export-bounds too small (${Math.round(b.width)}×${Math.round(b.height)}) (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                      retryTimer = setTimeout(attemptCapture, 100);
-                      return;
-                    }
-                    setExportStatus("Plan skipped: export-bounds stayed too small");
-                    setPlanImageDataUrl('__SKIP__');
-                    return;
-                  }
-                } catch (e) {
-                  // if getBBox fails, just continue to retry logic below by treating as not ready
-                }
-                
-                // IMPORTANT: RoomVisualisation always renders an <svg>, even when it's still "Loading plan…".
-                // Only proceed once the real export group exists.
-                if (!hasRvExportBounds(svgElement)) {
-                  setExportStatus(`Capturing plan: waiting for plan render (#export-bounds) (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Plan skipped: continuing without plan");
-                  setPlanImageDataUrl('__SKIP__');
-                  return;
-                }
-                
-                // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
-                const svgClone = svgElement.cloneNode(true);
-// Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
-try {
-  const anchor =
-    svgClone.querySelector('#export-crop-bounds') ||
-    svgClone.querySelector('#export-bounds');
-
-  if (anchor) {
-    let node = anchor.parentNode;
-    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
-      if (node.nodeName.toLowerCase() === 'g') {
-        node.removeAttribute('transform');
-        node.removeAttribute('clipPath');
-        node.removeAttribute('clip-path');
-        if (node.style) node.style.transform = 'none';
-      }
-      node = node.parentNode;
-    }
-  }
-} catch (e) {}
-
-                stripExportViewportTransforms(svgClone);
-
-                // Prefer export-crop-bounds if it exists, otherwise export-bounds
-                let bbox = measureBboxFromClone(svgClone, '#export-crop-bounds');
-
-                // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
-                if (!bboxLooksUsable(bbox) || (bbox && (bbox.width < 200 || bbox.height < 200))) {
-                  setExportStatus(`Capturing plan: bbox invalid/too small (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Plan skipped: continuing without plan");
-                  setPlanImageDataUrl('__SKIP__');
-                  return;
-                }
-                
-                // Clean plan: tight padding (3%, min 12)
-                const shortestSide = Math.min(bbox.width, bbox.height);
-                const padding = Math.max(shortestSide * 0.03, 12);
-                
-                const viewBoxX = bbox.x - padding;
-                const viewBoxY = bbox.y - padding;
-                const viewBoxW = bbox.width + (2 * padding);
-                const viewBoxH = bbox.height + (2 * padding);
-                
-                // Apply the computed viewBox to the clone
-                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
-                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.setAttribute('width', String(viewBoxW));
-                svgClone.setAttribute('height', String(viewBoxH));
-                
-                const svgString = new XMLSerializer().serializeToString(svgClone);
-                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-                
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    
-                    // Keep exact aspect ratio from the cropped viewBox
-                    const targetW = 3000;
-                    const ratio = viewBoxH / viewBoxW;
-                    
-                    canvas.width = targetW;
-                    canvas.height = Math.round(targetW * ratio);
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    const dataUrl = canvas.toDataURL('image/png');
-                    setExportStatus("Plan captured: image ready");
-                    setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
-                    setPlanImageDataUrl(dataUrl);
-                    URL.revokeObjectURL(url);
-                };
-                img.onerror = () => {
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                    } else {
-                        setExportStatus("Plan skipped: continuing without plan");
-                        setPlanImageDataUrl('__SKIP__');
-                    }
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
-            } catch (err) {
-                console.warn('Failed to capture plan image (attempt ' + attempts + '):', err);
-                if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                } else {
-                    setExportStatus("Plan capture failed — opening Print fallback…");
-                    if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
-                    exportTimeoutRef.current = null;
-                    exportGuardRef.current.active = false;
-                    setIsPrinting(false);
-                    setTimeout(() => window.print(), 250);
-                }
-            }
-        };
-        
-        attemptCapture();
-        
-        return () => {
-            if (retryTimer) clearTimeout(retryTimer);
-        };
-/* end legacy capture block removed */
+/* removed legacy PNG capture: dims plan *//* end legacy capture block removed */
 
 
-        
-        let attempts = 0;
-        const maxAttempts = 20;
-        let retryTimer = null;
-        
-        const attemptCapture = async () => {
-            attempts++;
-            
-            try {
-                const planElement = document.querySelector('[data-plan-capture-dims]');
-                if (!planElement) {
-                    setExportStatus(`Capturing dims plan: container not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                    setPlanDimsImageDataUrl('__SKIP__');
-                    return;
-                }
-                
-                const svgElement = planElement.querySelector('svg');
-                if (!svgElement) {
-                    setExportStatus(`Capturing dims plan: SVG not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                    setPlanDimsImageDataUrl('__SKIP__');
-                    return;
-                }
-
-                // --- Wait until RoomVisualisation has actually rendered export-bounds (not the placeholder) ---
-                let liveAnchor = null;
-                try {
-                  liveAnchor =
-                    svgElement.querySelector('#export-crop-bounds') ||
-                    svgElement.querySelector('#export-bounds');
-                } catch (e) {
-                  liveAnchor = null;
-                }
-
-                if (!liveAnchor) {
-                  setExportStatus(`Capturing dims plan: waiting for export-bounds… (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Dims plan skipped: export-bounds never appeared");
-                  setPlanDimsImageDataUrl('__SKIP__');
-                  return;
-                }
-
-                // Optional but important: reject “microscopic but >0” layouts
-                try {
-                  const b = liveAnchor.getBBox?.();
-                  if (b && Number.isFinite(b.width) && Number.isFinite(b.height) && (b.width < 200 || b.height < 200)) {
-                    setExportStatus(`Capturing dims plan: export-bounds too small (${Math.round(b.width)}×${Math.round(b.height)}) (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                      retryTimer = setTimeout(attemptCapture, 100);
-                      return;
-                    }
-                    setExportStatus("Dims plan skipped: export-bounds stayed too small");
-                    setPlanDimsImageDataUrl('__SKIP__');
-                    return;
-                  }
-                } catch (e) {
-                  // if getBBox fails, just continue to retry logic below by treating as not ready
-                }
-                
-                // IMPORTANT: RoomVisualisation always renders an <svg>, even when it's still "Loading plan…".
-                // Only proceed once the real export group exists.
-                if (!hasRvExportBounds(svgElement)) {
-                  setExportStatus(`Capturing plan: waiting for plan render (#export-bounds) (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                  setPlanDimsImageDataUrl('__SKIP__');
-                  return;
-                }
-                
-                // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
-                const svgClone = svgElement.cloneNode(true);
-// Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
-try {
-  const anchor =
-    svgClone.querySelector('#export-crop-bounds') ||
-    svgClone.querySelector('#export-bounds');
-
-  if (anchor) {
-    let node = anchor.parentNode;
-    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
-      if (node.nodeName.toLowerCase() === 'g') {
-        node.removeAttribute('transform');
-        node.removeAttribute('clipPath');
-        node.removeAttribute('clip-path');
-        if (node.style) node.style.transform = 'none';
-      }
-      node = node.parentNode;
-    }
-  }
-} catch (e) {}
-
-                stripExportViewportTransforms(svgClone);
-
-                // Prefer export-crop-bounds if it exists, otherwise export-bounds
-                let bbox = measureBboxFromClone(svgClone, '#export-crop-bounds');
-
-                // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
-                if (!bboxLooksUsable(bbox) || (bbox && (bbox.width < 200 || bbox.height < 200))) {
-                  setExportStatus(`Capturing dims plan: bbox invalid/too small (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                  setPlanDimsImageDataUrl('__SKIP__');
-                  return;
-                }
-                
-                // Room dimensions plan: medium padding (5%, min 18)
-                const shortestSide = Math.min(bbox.width, bbox.height);
-                const padding = Math.max(shortestSide * 0.05, 18);
-                
-                const viewBoxX = bbox.x - padding;
-                const viewBoxY = bbox.y - padding;
-                const viewBoxW = bbox.width + (2 * padding);
-                const viewBoxH = bbox.height + (2 * padding);
-                
-                // Apply the computed viewBox to the clone
-                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
-                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.setAttribute('width', String(viewBoxW));
-                svgClone.setAttribute('height', String(viewBoxH));
-                
-                const svgString = new XMLSerializer().serializeToString(svgClone);
-                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-                
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    
-                    // Keep exact aspect ratio from the cropped viewBox
-                    const targetW = 3000;
-                    const ratio = viewBoxH / viewBoxW;
-                    
-                    canvas.width = targetW;
-                    canvas.height = Math.round(targetW * ratio);
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    const dataUrl = canvas.toDataURL('image/png');
-                    setExportStatus("Dimensioned plan captured: image ready");
-                    setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
-                    setPlanDimsImageDataUrl(dataUrl);
-                    URL.revokeObjectURL(url);
-                };
-                img.onerror = () => {
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                    } else {
-                        setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                        setPlanDimsImageDataUrl('__SKIP__');
-                    }
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
-            } catch (err) {
-                console.warn('Failed to capture dimensioned plan (attempt ' + attempts + '):', err);
-                if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                } else {
-                    setExportStatus("Dims plan capture failed — opening Print fallback…");
-                    if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
-                    exportTimeoutRef.current = null;
-                    exportGuardRef.current.active = false;
-                    setIsPrinting(false);
-                    setTimeout(() => window.print(), 250);
-                }
-            }
-        };
-        
-        attemptCapture();
-        
-        return () => {
-            if (retryTimer) clearTimeout(retryTimer);
-        };
-/* end legacy capture block removed */
-
-
-
-/* removed legacy PNG capture: speaker positions plan */
-            attempts++;
-
-            try {
-                const planElement = document.querySelector('[data-plan-capture-speaker-dims]');
-                if (!planElement) {
-                    setExportStatus(`Capturing speaker positions: container not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
-                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                    return;
-                }
-
-                const svgElement = planElement.querySelector('svg');
-                if (!svgElement) {
-                    setExportStatus(`Capturing speaker positions: SVG not found (attempt ${attempts}/${maxAttempts})`);
-                                        if (attempts < maxAttempts) {
-                                            retryTimer = setTimeout(attemptCapture, 100);
-                                            return;
-                                        }
-                                        setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
-                                        setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                                        return;
-                                    }
-
-                                    // --- Wait until RoomVisualisation has actually rendered export-bounds (not the placeholder) ---
-                                    let liveAnchor = null;
-                                    try {
-                                      liveAnchor =
-                                        svgElement.querySelector('#export-crop-bounds') ||
-                                        svgElement.querySelector('#export-bounds');
-                                    } catch (e) {
-                                      liveAnchor = null;
-                                    }
-
-                                    if (!liveAnchor) {
-                                      setExportStatus(`Capturing speaker positions: waiting for export-bounds… (attempt ${attempts}/${maxAttempts})`);
-                                      if (attempts < maxAttempts) {
-                                        retryTimer = setTimeout(attemptCapture, 100);
-                                        return;
-                                      }
-                                      setExportStatus("Speaker positions plan skipped: export-bounds never appeared");
-                                      setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                                      return;
-                                    }
-
-                                    // Optional but important: reject “microscopic but >0” layouts
-                                    try {
-                                      const b = liveAnchor.getBBox?.();
-                                      if (b && Number.isFinite(b.width) && Number.isFinite(b.height) && (b.width < 200 || b.height < 200)) {
-                                        setExportStatus(`Capturing speaker positions: export-bounds too small (${Math.round(b.width)}×${Math.round(b.height)}) (attempt ${attempts}/${maxAttempts})`);
-                                        if (attempts < maxAttempts) {
-                                          retryTimer = setTimeout(attemptCapture, 100);
-                                          return;
-                                        }
-                                        setExportStatus("Speaker positions plan skipped: export-bounds stayed too small");
-                                        setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                                        return;
-                                      }
-                                    } catch (e) {
-                                      // if getBBox fails, just continue to retry logic below by treating as not ready
-                                    }
-
-                                    // IMPORTANT: RoomVisualisation always renders an <svg>, even when it's still "Loading plan…".
-                                    // Only proceed once the real export group exists.
-                                    if (!hasRvExportBounds(svgElement)) {
-                                      setExportStatus(`Capturing plan: waiting for plan render (#export-bounds) (attempt ${attempts}/${maxAttempts})`);
-                                      if (attempts < maxAttempts) {
-                                        retryTimer = setTimeout(attemptCapture, 100);
-                                        return;
-                                      }
-                                      setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
-                                      setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                                      return;
-                                    }
-
-                                    // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
-                const svgClone = svgElement.cloneNode(true);
-// Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
-try {
-  const anchor =
-    svgClone.querySelector('#export-crop-bounds') ||
-    svgClone.querySelector('#export-bounds');
-
-  if (anchor) {
-    let node = anchor.parentNode;
-    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
-      if (node.nodeName.toLowerCase() === 'g') {
-        node.removeAttribute('transform');
-        node.removeAttribute('clipPath');
-        node.removeAttribute('clip-path');
-        if (node.style) node.style.transform = 'none';
-      }
-      node = node.parentNode;
-    }
-  }
-} catch (e) {}
-
-                stripExportViewportTransforms(svgClone);
-
-                // Prefer export-crop-bounds if it exists, otherwise export-bounds
-                let bbox = measureBboxFromClone(svgClone, '#export-crop-bounds');
-
-                // If bbox is missing or tiny, treat as "not ready" and retry (DO NOT accept viewBox-only success)
-                if (!bboxLooksUsable(bbox) || (bbox && (bbox.width < 200 || bbox.height < 200))) {
-                  setExportStatus(`Capturing plan: bbox invalid/too small (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
-                  setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                  return;
-                }
-
-                // Speaker positions plan: larger padding to accommodate measurement leaders/labels
-                const shortestSide = Math.min(bbox.width, bbox.height);
-                const padding = Math.max(shortestSide * 0.05, 24);
-                
-                const viewBoxX = bbox.x - padding;
-                const viewBoxY = bbox.y - padding;
-                const viewBoxW = bbox.width + (2 * padding);
-                const viewBoxH = bbox.height + (2 * padding);
-                
-                // Apply the computed viewBox to the clone
-                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
-                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.setAttribute('width', String(viewBoxW));
-                svgClone.setAttribute('height', String(viewBoxH));
-                
-                const svgString = new XMLSerializer().serializeToString(svgClone);
-                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-                
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    
-                    const targetW = 3000;
-                    const ratio = viewBoxH / viewBoxW;
-                    
-                    canvas.width = targetW;
-                    canvas.height = Math.round(targetW * ratio);
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    const dataUrl = canvas.toDataURL('image/png');
-                    setExportStatus("Speaker dimensions plan captured: image ready");
-                    setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
-                    setPlanSpeakerDimsImageDataUrl(dataUrl);
-                    URL.revokeObjectURL(url);
-                };
-                img.onerror = () => {
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                    } else {
-                        setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
-                        setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                    }
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
-            } catch (err) {
-                console.warn('Failed to capture speaker dims plan (attempt ' + attempts + '):', err);
-                if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                } else {
-                    setExportStatus("Speaker dims capture failed — opening Print fallback…");
-                    if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
-                    exportTimeoutRef.current = null;
-                    exportGuardRef.current.active = false;
-                    setIsPrinting(false);
-                    setTimeout(() => window.print(), 250);
-                }
-            }
-        };
-        
-        attemptCapture();
-        
-        return () => {
-            if (retryTimer) clearTimeout(retryTimer);
-        };
-/* end legacy capture block removed */
+/* removed legacy PNG capture: speaker positions plan *//* end legacy capture block removed */
 
     // System summary: group speakers by role and model
     const systemSummary = React.useMemo(() => {
@@ -2188,15 +1612,10 @@ try {
                                     setScreenMetricsStatus("Error");
                                 }
 
-                                // Reset export pipeline state (your existing behaviour)
-                                setExportStatus("Capturing plan images…");
+                                // Start the print pipeline directly
+                                setExportStatus("Preparing print…");
                                 setExportDebug({ isPrinting: true, planLen: 0, printReady: false });
                                 setHasPrintedOnce(false);
-                                setPlanImageDataUrl(null);
-                                setPlanDimsImageDataUrl(null);
-                                setPlanSpeakerDimsImageDataUrl(null);
-
-                                // Start the capture/print pipeline
                                 setIsPrinting(true);
 
                                 // SAFETY NET: if nothing finishes, fallback to browser print
@@ -2551,7 +1970,7 @@ try {
                                                                         Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
                                                                     </div>
                                                                 )}
-                                                            </div>
+                                                                </div>
                                                             );
                                                             })}
                                                             </CardContent>
@@ -3207,15 +2626,15 @@ try {
                                                                     </div>
                                                                 )}
                                                                 </div>
-                                                                );
-                                                                })}
-                                                                </CardContent>
-                                                                </Card>
-                                                                </div>
-                                                                </div>
-                                                                );
-                                                                }).filter(Boolean);
-                                                                })()}
+                                                            );
+                                                            })}
+                                                            </CardContent>
+                                                            </Card>
+                                                            </div>
+                                                            </div>
+                                                            );
+                                                            }).filter(Boolean);
+                                                            })()}
                                                 </div>
                         <div className="grid grid-cols-3 gap-4 mt-6 print-avoid-break">
                             <SeatComplianceSummary position="left" />
