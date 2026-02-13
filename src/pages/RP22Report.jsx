@@ -25,6 +25,15 @@ import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 
 function RP22ReportInner() {
+const unionRects = (rectA, rectB) => {
+    if (!rectA || !Number.isFinite(rectA.x)) return rectB;
+    if (!rectB || !Number.isFinite(rectB.x)) return rectA;
+    const x = Math.min(rectA.x, rectB.x);
+    const y = Math.min(rectA.y, rectB.y);
+    const w = Math.max(rectA.x + rectA.width, rectB.x + rectB.width) - x;
+    const h = Math.max(rectA.y + rectA.height, rectB.y + rectB.height) - y;
+    return { x, y, width: w, height: h };
+};
     const app = useAppState();
     
     const [isPrinting, setIsPrinting] = useState(false);
@@ -886,72 +895,44 @@ function flattenExportTransforms(svgClone) {
                 
                 // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
-                flattenExportTransforms(svgClone);
-// Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
-try {
-  const anchor =
-    svgClone.querySelector('#export-crop-bounds') ||
-    svgClone.querySelector('#export-bounds');
-
-  if (anchor) {
-    let node = anchor.parentNode;
-    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
-      if (node.nodeName.toLowerCase() === 'g') {
-        node.removeAttribute('transform');
-        node.removeAttribute('clipPath');
-        node.removeAttribute('clip-path');
-        if (node.style) node.style.transform = 'none';
-      }
-      node = node.parentNode;
-    }
-  }
-} catch (e) {}
-
+                svgClone.style.opacity = '1';
                 stripExportViewportTransforms(svgClone);
 
-                // Read crop rectangle directly from live SVG (no getBBox)
-                const cropRect = svgElement.querySelector('#export-crop-bounds');
-                if (!cropRect) {
-                  setExportStatus(`Capturing plan: waiting for export-crop-bounds… (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
+                const cropRectEl = svgClone.querySelector('#export-crop-bounds');
+                const rectFromExportCropBounds = cropRectEl ? {
+                    x: Number(cropRectEl.getAttribute('x')),
+                    y: Number(cropRectEl.getAttribute('y')),
+                    width: Number(cropRectEl.getAttribute('width')),
+                    height: Number(cropRectEl.getAttribute('height')),
+                } : null;
+
+                const bboxFromContent = measureBboxFromClone(svgClone, '#export-content-bounds');
+
+                const union = unionRects(rectFromExportCropBounds, bboxFromContent);
+
+                if (!union || !Number.isFinite(union.width) || union.width <= 0) {
+                    setExportStatus(`Capturing plan: invalid content bounds (attempt ${attempts}/${maxAttempts})`);
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
+                    setExportStatus("Plan skipped: invalid content bounds");
+                    setPlanImageDataUrl('__SKIP__');
                     return;
-                  }
-                  setExportStatus("Plan skipped: export-crop-bounds never appeared");
-                  setPlanImageDataUrl('__SKIP__');
-                  return;
                 }
 
-                const xAttr = Number(cropRect.getAttribute('x'));
-                const yAttr = Number(cropRect.getAttribute('y'));
-                const wAttr = Number(cropRect.getAttribute('width'));
-                const hAttr = Number(cropRect.getAttribute('height'));
-
-                if (!Number.isFinite(xAttr) || !Number.isFinite(yAttr) || !(wAttr > 0) || !(hAttr > 0)) {
-                  setExportStatus(`Capturing plan: invalid crop rect (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Plan skipped: invalid crop rect");
-                  setPlanImageDataUrl('__SKIP__');
-                  return;
-                }
-
-                // Clean plan: tight padding (3%, min 12)
-                const shortestSide = Math.min(wAttr, hAttr);
+                const shortestSide = Math.min(union.width, union.height);
                 const padding = Math.max(shortestSide * 0.03, 12);
 
-                const viewBoxX = xAttr - padding;
-                const viewBoxY = yAttr - padding;
-                const viewBoxW = wAttr + (2 * padding);
-                const viewBoxH = hAttr + (2 * padding);
-
-                // Apply the computed viewBox to the clone
+                const viewBoxX = union.x - padding;
+                const viewBoxY = union.y - padding;
+                const viewBoxW = union.width + (2 * padding);
+                const viewBoxH = union.height + (2 * padding);
+                
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.setAttribute('width', String(viewBoxW));
-                svgClone.setAttribute('height', String(viewBoxH));
+                svgClone.removeAttribute('width');
+                svgClone.removeAttribute('height');
                 
                 const svgString = new XMLSerializer().serializeToString(svgClone);
                 const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -1101,72 +1082,44 @@ try {
                 
                 // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
-                flattenExportTransforms(svgClone);
-// Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
-try {
-  const anchor =
-    svgClone.querySelector('#export-crop-bounds') ||
-    svgClone.querySelector('#export-bounds');
-
-  if (anchor) {
-    let node = anchor.parentNode;
-    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
-      if (node.nodeName.toLowerCase() === 'g') {
-        node.removeAttribute('transform');
-        node.removeAttribute('clipPath');
-        node.removeAttribute('clip-path');
-        if (node.style) node.style.transform = 'none';
-      }
-      node = node.parentNode;
-    }
-  }
-} catch (e) {}
-
+                svgClone.style.opacity = '1';
                 stripExportViewportTransforms(svgClone);
 
-                // Read crop rectangle directly from live SVG (no getBBox)
-                const cropRect = svgElement.querySelector('#export-crop-bounds');
-                if (!cropRect) {
-                  setExportStatus(`Capturing dims plan: waiting for export-crop-bounds… (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
+                const cropRectEl = svgClone.querySelector('#export-crop-bounds');
+                const rectFromExportCropBounds = cropRectEl ? {
+                    x: Number(cropRectEl.getAttribute('x')),
+                    y: Number(cropRectEl.getAttribute('y')),
+                    width: Number(cropRectEl.getAttribute('width')),
+                    height: Number(cropRectEl.getAttribute('height')),
+                } : null;
+
+                const bboxFromContent = measureBboxFromClone(svgClone, '#export-content-bounds');
+
+                const union = unionRects(rectFromExportCropBounds, bboxFromContent);
+
+                if (!union || !Number.isFinite(union.width) || union.width <= 0) {
+                    setExportStatus(`Capturing dims plan: invalid content bounds (attempt ${attempts}/${maxAttempts})`);
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
+                    setExportStatus("Dims plan skipped: invalid content bounds");
+                    setPlanDimsImageDataUrl('__SKIP__');
                     return;
-                  }
-                  setExportStatus("Dims plan skipped: export-crop-bounds never appeared");
-                  setPlanDimsImageDataUrl('__SKIP__');
-                  return;
                 }
 
-                const xAttr = Number(cropRect.getAttribute('x'));
-                const yAttr = Number(cropRect.getAttribute('y'));
-                const wAttr = Number(cropRect.getAttribute('width'));
-                const hAttr = Number(cropRect.getAttribute('height'));
-
-                if (!Number.isFinite(xAttr) || !Number.isFinite(yAttr) || !(wAttr > 0) || !(hAttr > 0)) {
-                  setExportStatus(`Capturing dims plan: invalid crop rect (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Dims plan skipped: invalid crop rect");
-                  setPlanDimsImageDataUrl('__SKIP__');
-                  return;
-                }
-
-                // Room dimensions plan: medium padding (5%, min 18)
-                const shortestSide = Math.min(wAttr, hAttr);
+                const shortestSide = Math.min(union.width, union.height);
                 const padding = Math.max(shortestSide * 0.05, 18);
+                
+                const viewBoxX = union.x - padding;
+                const viewBoxY = union.y - padding;
+                const viewBoxW = union.width + (2 * padding);
+                const viewBoxH = union.height + (2 * padding);
 
-                const viewBoxX = xAttr - padding;
-                const viewBoxY = yAttr - padding;
-                const viewBoxW = wAttr + (2 * padding);
-                const viewBoxH = hAttr + (2 * padding);
-
-                // Apply the computed viewBox to the clone
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.setAttribute('width', String(viewBoxW));
-                svgClone.setAttribute('height', String(viewBoxH));
+                svgClone.removeAttribute('width');
+                svgClone.removeAttribute('height');
                 
                 const svgString = new XMLSerializer().serializeToString(svgClone);
                 const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -1316,72 +1269,44 @@ try {
 
                                     // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
                 const svgClone = svgElement.cloneNode(true);
-                flattenExportTransforms(svgClone);
-// Remove RoomVisualisation zoom/pan wrapper + clipping from the clone
-try {
-  const anchor =
-    svgClone.querySelector('#export-crop-bounds') ||
-    svgClone.querySelector('#export-bounds');
-
-  if (anchor) {
-    let node = anchor.parentNode;
-    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
-      if (node.nodeName.toLowerCase() === 'g') {
-        node.removeAttribute('transform');
-        node.removeAttribute('clipPath');
-        node.removeAttribute('clip-path');
-        if (node.style) node.style.transform = 'none';
-      }
-      node = node.parentNode;
-    }
-  }
-} catch (e) {}
-
+                svgClone.style.opacity = '1';
                 stripExportViewportTransforms(svgClone);
 
-                // Read crop rectangle directly from live SVG (no getBBox)
-                const cropRect = svgClone.querySelector('#export-crop-bounds');
-                if (!cropRect) {
-                  setExportStatus(`Capturing speaker positions: waiting for export-crop-bounds… (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
+                const cropRectEl = svgClone.querySelector('#export-crop-bounds');
+                const rectFromExportCropBounds = cropRectEl ? {
+                    x: Number(cropRectEl.getAttribute('x')),
+                    y: Number(cropRectEl.getAttribute('y')),
+                    width: Number(cropRectEl.getAttribute('width')),
+                    height: Number(cropRectEl.getAttribute('height')),
+                } : null;
+
+                const bboxFromContent = measureBboxFromClone(svgClone, '#export-content-bounds');
+                
+                const union = unionRects(rectFromExportCropBounds, bboxFromContent);
+
+                if (!union || !Number.isFinite(union.width) || union.width <= 0) {
+                    setExportStatus(`Capturing speaker positions: invalid content bounds (attempt ${attempts}/${maxAttempts})`);
+                    if (attempts < maxAttempts) {
+                        retryTimer = setTimeout(attemptCapture, 100);
+                        return;
+                    }
+                    setExportStatus("Speaker positions plan skipped: invalid content bounds");
+                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
                     return;
-                  }
-                  setExportStatus("Speaker positions plan skipped: export-crop-bounds never appeared");
-                  setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                  return;
                 }
 
-                const xAttr = Number(cropRect.getAttribute('x'));
-                const yAttr = Number(cropRect.getAttribute('y'));
-                const wAttr = Number(cropRect.getAttribute('width'));
-                const hAttr = Number(cropRect.getAttribute('height'));
-
-                if (!Number.isFinite(xAttr) || !Number.isFinite(yAttr) || !(wAttr > 0) || !(hAttr > 0)) {
-                  setExportStatus(`Capturing speaker positions: invalid crop rect (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Speaker positions plan skipped: invalid crop rect");
-                  setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                  return;
-                }
-
-                // Speaker positions plan: larger padding to accommodate measurement leaders/labels
-                const shortestSide = Math.min(wAttr, hAttr);
+                const shortestSide = Math.min(union.width, union.height);
                 const padding = Math.max(shortestSide * 0.05, 24);
 
-                const viewBoxX = xAttr - padding;
-                const viewBoxY = yAttr - padding;
-                const viewBoxW = wAttr + (2 * padding);
-                const viewBoxH = hAttr + (2 * padding);
+                const viewBoxX = union.x - padding;
+                const viewBoxY = union.y - padding;
+                const viewBoxW = union.width + (2 * padding);
+                const viewBoxH = union.height + (2 * padding);
 
-                // Apply the computed viewBox to the clone
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.setAttribute('width', String(viewBoxW));
-                svgClone.setAttribute('height', String(viewBoxH));
+                svgClone.removeAttribute('width');
+                svgClone.removeAttribute('height');
                 
                 const svgString = new XMLSerializer().serializeToString(svgClone);
                 const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
@@ -1707,32 +1632,21 @@ try {
                 }
 
                 .plan-fitbox {
-                    width: 186mm !important;              /* full printable width (A4 portrait with 12mm margins) */
+                    display: flex !important;
+                    justify-content: center !important;
+                    align-items: center !important;
+                    width: 186mm !important;
+                    height: 240mm !important;
                     margin: 0 auto !important;
-                    padding: 0 !important;
-                    overflow: visible !important;         /* don’t crop */
-                    display: block !important;            /* stop centring shrink behaviour */
-                    height: auto !important;              /* let content define height */
+                    overflow: hidden !important;
                 }
 
                 .plan-fitbox > img {
-                    display: block !important;
-                    width: 100% !important;               /* ALWAYS fill the page width */
-                    height: auto !important;              /* keep correct aspect ratio */
-                    max-height: 240mm !important;         /* safety cap so it can’t run off the page */
-                }
-
-                /* Fix: speaker positions plan can be taller, so allow proportional shrink (no squashing) */
-                #pdf-room-plan-positions .plan-fitbox { 
-                  text-align: center !important; 
-                }
-
-                #pdf-room-plan-positions .plan-fitbox > img {
-                  width: auto !important;
-                  max-width: 100% !important;
-                  height: auto !important;
-                  max-height: 240mm !important;
-                  display: inline-block !important;
+                    max-width: 100% !important;
+                    max-height: 100% !important;
+                    width: auto !important;
+                    height: auto !important;
+                    object-fit: contain !important;
                 }
 
                 /* COVER PAGE ONLY — tighten vertical spacing so it fits at 100% scale */

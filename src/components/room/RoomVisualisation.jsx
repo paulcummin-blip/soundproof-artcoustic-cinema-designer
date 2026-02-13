@@ -7458,7 +7458,8 @@ return (
               />
             )}
             {/* Wrapper for export bounds */}
-            <g id="export-bounds">
+            <g id="export-content-bounds">
+              <g id="export-bounds">
               {/* Layer 2: Room Outline and Furniture */}
               <rect
                 x={(roomRect?.x ?? 0)}
@@ -7877,6 +7878,7 @@ return (
             )}
 
             </g>{/* End export-bounds wrapper */}
+            </g>
 
 {exportMode !== 'clean' && (
   <PlanMessages
