@@ -25,7 +25,7 @@ import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 
 function RP22ReportInner() {
-const PLAN_EXPORT_BUFFER_MM = 30;
+const BUFFER_RATIO = 0.06;
 const unionRects = (rectA, rectB) => {
     if (!rectA || !Number.isFinite(rectA.x)) return rectB;
     if (!rectB || !Number.isFinite(rectB.x)) return rectA;
@@ -922,16 +922,19 @@ function flattenExportTransforms(svgClone) {
                     return;
                 }
 
-                const pixelsPerMm = union.width / 186;
-                const bufferPx = PLAN_EXPORT_BUFFER_MM * pixelsPerMm;
+                const baseRect = rectFromExportCropBounds || union;
+                const xAttr = baseRect.x;
+                const yAttr = baseRect.y;
+                const wAttr = baseRect.width;
+                const hAttr = baseRect.height;
 
-                const shortestSide = Math.min(union.width, union.height);
-                const padding = Math.max(shortestSide * 0.03, 12);
+                const bufferX = wAttr * BUFFER_RATIO;
+                const bufferY = hAttr * BUFFER_RATIO;
 
-                const viewBoxX = union.x - padding - bufferPx;
-                const viewBoxY = union.y - padding - bufferPx;
-                const viewBoxW = union.width + (2 * padding) + (2 * bufferPx);
-                const viewBoxH = union.height + (2 * padding) + (2 * bufferPx);
+                const viewBoxX = xAttr - bufferX;
+                const viewBoxY = yAttr - bufferY;
+                const viewBoxW = wAttr + (2 * bufferX);
+                const viewBoxH = hAttr + (2 * bufferY);
                 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1112,16 +1115,19 @@ function flattenExportTransforms(svgClone) {
                     return;
                 }
 
-                const pixelsPerMm = union.width / 186;
-                const bufferPx = PLAN_EXPORT_BUFFER_MM * pixelsPerMm;
+                const baseRect = rectFromExportCropBounds || union;
+                const xAttr = baseRect.x;
+                const yAttr = baseRect.y;
+                const wAttr = baseRect.width;
+                const hAttr = baseRect.height;
 
-                const shortestSide = Math.min(union.width, union.height);
-                const padding = Math.max(shortestSide * 0.05, 18);
+                const bufferX = wAttr * BUFFER_RATIO;
+                const bufferY = hAttr * BUFFER_RATIO;
                 
-                const viewBoxX = union.x - padding - bufferPx;
-                const viewBoxY = union.y - padding - bufferPx;
-                const viewBoxW = union.width + (2 * padding) + (2 * bufferPx);
-                const viewBoxH = union.height + (2 * padding) + (2 * bufferPx);
+                const viewBoxX = xAttr - bufferX;
+                const viewBoxY = yAttr - bufferY;
+                const viewBoxW = wAttr + (2 * bufferX);
+                const viewBoxH = hAttr + (2 * bufferY);
 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1302,16 +1308,19 @@ function flattenExportTransforms(svgClone) {
                     return;
                 }
 
-                const pixelsPerMm = union.width / 186;
-                const bufferPx = PLAN_EXPORT_BUFFER_MM * pixelsPerMm;
+                const baseRect = rectFromExportCropBounds || union;
+                const xAttr = baseRect.x;
+                const yAttr = baseRect.y;
+                const wAttr = baseRect.width;
+                const hAttr = baseRect.height;
 
-                const shortestSide = Math.min(union.width, union.height);
-                const padding = Math.max(shortestSide * 0.05, 24);
+                const bufferX = wAttr * BUFFER_RATIO;
+                const bufferY = hAttr * BUFFER_RATIO;
 
-                const viewBoxX = union.x - padding - bufferPx;
-                const viewBoxY = union.y - padding - bufferPx;
-                const viewBoxW = union.width + (2 * padding) + (2 * bufferPx);
-                const viewBoxH = union.height + (2 * padding) + (2 * bufferPx);
+                const viewBoxX = xAttr - bufferX;
+                const viewBoxY = yAttr - bufferY;
+                const viewBoxW = wAttr + (2 * bufferX);
+                const viewBoxH = hAttr + (2 * bufferY);
 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1641,36 +1650,16 @@ function flattenExportTransforms(svgClone) {
                     max-height: none !important;
                 }
 
-                /* --- PLAN PAGES: fixed plan area + contain fit (never crop, never distort) --- */
-
-                :root{
-                  --planBoxH: 240mm;        /* base plan area height */
-                  --planBoxH-dims: 255mm;   /* dims page gets a larger budget so it can scale up */
-                }
-
-                /* Plan box */
+                /* --- PLAN PAGES: natural scaling (no cropping, no distortion) --- */
                 .plan-fitbox{
                   width: 186mm !important;
-                  height: var(--planBoxH) !important;
                   margin: 0 auto !important;
-                  padding: 0 !important;
-                  overflow: visible !important;           /* IMPORTANT: never crop */
-                  display: block !important;
-                  position: relative !important;
                 }
 
-                /* Image fits inside plan box */
                 .plan-fitbox > img{
-                  width: 100% !important;
-                  height: 100% !important;
                   display: block !important;
-                  object-fit: contain !important;         /* preserve ratio, never crop */
-                  object-position: center !important;     /* centre inside the box */
-                }
-
-                /* Dimensions plan gets a larger box so it scales up (not smaller than the others) */
-                #pdf-room-plan-dims .plan-fitbox{
-                  height: var(--planBoxH-dims) !important;
+                  width: 100% !important;
+                  height: auto !important;
                 }
 
                 /* COVER PAGE ONLY — tighten vertical spacing so it fits at 100% scale */
