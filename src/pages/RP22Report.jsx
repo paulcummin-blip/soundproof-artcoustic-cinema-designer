@@ -1631,22 +1631,36 @@ function flattenExportTransforms(svgClone) {
                     max-height: none !important;
                 }
 
-                .plan-fitbox {
-                    display: flex !important;
-                    justify-content: center !important;
-                    align-items: center !important;
-                    width: 186mm !important;
-                    height: 240mm !important;
-                    margin: 0 auto !important;
-                    overflow: hidden !important;
+                /* --- PLAN PAGES: fixed plan area + contain fit (never crop, never distort) --- */
+
+                :root{
+                  --planBoxH: 240mm;        /* base plan area height */
+                  --planBoxH-dims: 255mm;   /* dims page gets a larger budget so it can scale up */
                 }
 
-                .plan-fitbox > img {
-                    max-width: 100% !important;
-                    max-height: 100% !important;
-                    width: auto !important;
-                    height: auto !important;
-                    object-fit: contain !important;
+                /* Plan box */
+                .plan-fitbox{
+                  width: 186mm !important;
+                  height: var(--planBoxH) !important;
+                  margin: 0 auto !important;
+                  padding: 0 !important;
+                  overflow: visible !important;           /* IMPORTANT: never crop */
+                  display: block !important;
+                  position: relative !important;
+                }
+
+                /* Image fits inside plan box */
+                .plan-fitbox > img{
+                  width: 100% !important;
+                  height: 100% !important;
+                  display: block !important;
+                  object-fit: contain !important;         /* preserve ratio, never crop */
+                  object-position: center !important;     /* centre inside the box */
+                }
+
+                /* Dimensions plan gets a larger box so it scales up (not smaller than the others) */
+                #pdf-room-plan-dims .plan-fitbox{
+                  height: var(--planBoxH-dims) !important;
                 }
 
                 /* COVER PAGE ONLY — tighten vertical spacing so it fits at 100% scale */
