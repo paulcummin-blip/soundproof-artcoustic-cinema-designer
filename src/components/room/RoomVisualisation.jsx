@@ -7548,8 +7548,8 @@ return (
 
                     return (
                       <text
-                        x={px + 10}
-                        y={py + 4}
+                        x={px + 18}
+                        y={py + 5}
                         textAnchor="start"
                         fontFamily="Century Gothic, sans-serif"
                         fontSize={12}
