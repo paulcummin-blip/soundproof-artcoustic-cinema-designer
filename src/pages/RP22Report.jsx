@@ -2198,8 +2198,8 @@ function flattenExportTransforms(svgClone) {
                         : undefined
                     }
                     dolbyLayout={dolbyLayout}
-                    frontSubs={frontSubsCfg?.positions || []}
-                    rearSubs={rearSubsCfg?.positions || []}
+                    frontSubs={app?.frontSubsCfg?.positions || []}
+                    rearSubs={app?.rearSubsCfg?.positions || []}
                     roomElements={app?.roomElements || []}
                     exportMode="clean"
                     exportWidthPx={1200}
@@ -2256,8 +2256,8 @@ function flattenExportTransforms(svgClone) {
                         : undefined
                     }
                     dolbyLayout={dolbyLayout}
-                    frontSubs={frontSubsCfg?.positions || []}
-                    rearSubs={rearSubsCfg?.positions || []}
+                    frontSubs={app?.frontSubsCfg?.positions || []}
+                    rearSubs={app?.rearSubsCfg?.positions || []}
                     roomElements={app?.roomElements || []}
                     exportMode="dimensions"
                     exportWidthPx={1200}
@@ -2314,8 +2314,8 @@ function flattenExportTransforms(svgClone) {
                         : undefined
                     }
                     dolbyLayout={dolbyLayout}
-                    frontSubs={frontSubsCfg?.positions || []}
-                    rearSubs={rearSubsCfg?.positions || []}
+                    frontSubs={app?.frontSubsCfg?.positions || []}
+                    rearSubs={app?.rearSubsCfg?.positions || []}
                     roomElements={app?.roomElements || []}
                     exportMode="dimensions"
                     exportWidthPx={1200}
