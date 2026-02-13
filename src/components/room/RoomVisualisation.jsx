@@ -7523,7 +7523,7 @@ return (
               {exportMode !== 'clean' && overlaysForRendering?.EXPORT_CEILING_LABEL && (
                 <g data-layer="export-ceiling-label" pointerEvents="none">
                   <text
-                    x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) / 2}
+                    x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) * (2 / 3)}
                     y={(roomRect?.y ?? 0) - 48}
                     textAnchor="middle"
                     fontFamily="Century Gothic, sans-serif"
