@@ -25,6 +25,7 @@ import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 
 function RP22ReportInner() {
+const DEBUG_PLAN_CAPTURE = false; // Toggle to burn debug geometry onto plan PNGs
 const BUFFER_RATIO = 0.06;
 const unionRects = (rectA, rectB) => {
     if (!rectA || !Number.isFinite(rectA.x)) return rectB;
@@ -35,6 +36,47 @@ const unionRects = (rectA, rectB) => {
     const h = Math.max(rectA.y + rectA.height, rectB.y + rectB.height) - y;
     return { x, y, width: w, height: h };
 };
+
+// Helper to draw debug overlay onto canvas (burns into PNG)
+const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo) => {
+    if (!DEBUG_PLAN_CAPTURE) return;
+    
+    const lines = [
+        `PLAN: ${debugInfo.planLabel || '?'}`,
+        `SRC: ${debugInfo.baseRectSource || '?'}`,
+        `crop: x${Math.round(debugInfo.cropRect?.x || 0)} y${Math.round(debugInfo.cropRect?.y || 0)} w${Math.round(debugInfo.cropRect?.width || 0)} h${Math.round(debugInfo.cropRect?.height || 0)}`,
+        `bbox: x${Math.round(debugInfo.contentBbox?.x || 0)} y${Math.round(debugInfo.contentBbox?.y || 0)} w${Math.round(debugInfo.contentBbox?.width || 0)} h${Math.round(debugInfo.contentBbox?.height || 0)}`,
+        `base: x${Math.round(debugInfo.baseRect?.x || 0)} y${Math.round(debugInfo.baseRect?.y || 0)} w${Math.round(debugInfo.baseRect?.width || 0)} h${Math.round(debugInfo.baseRect?.height || 0)}`,
+        `vb  : X${Math.round(debugInfo.viewBoxX || 0)} Y${Math.round(debugInfo.viewBoxY || 0)} W${Math.round(debugInfo.viewBoxW || 0)} H${Math.round(debugInfo.viewBoxH || 0)}`,
+        `ratio: ${(debugInfo.ratio || 0).toFixed(3)}`,
+        `png : ${debugInfo.canvasW || 0} x ${debugInfo.canvasH || 0}`,
+        `buf : ${debugInfo.BUFFER_PX || 0}`,
+    ];
+    
+    const fontSize = 12;
+    const lineHeight = 16;
+    const padding = 10;
+    const margin = 20;
+    
+    ctx.font = `${fontSize}px monospace`;
+    
+    const textW = Math.max(...lines.map(l => ctx.measureText(l).width));
+    const boxW = textW + padding * 2;
+    const boxH = lines.length * lineHeight + padding * 2;
+    
+    const boxX = margin;
+    const boxY = canvasH - boxH - margin;
+    
+    ctx.fillStyle = 'rgba(0,0,0,0.65)';
+    ctx.fillRect(boxX, boxY, boxW, boxH);
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.textBaseline = 'top';
+    lines.forEach((line, i) => {
+        ctx.fillText(line, boxX + padding, boxY + padding + i * lineHeight);
+    });
+};
+
     const app = useAppState();
     
     const [isPrinting, setIsPrinting] = useState(false);
@@ -969,6 +1011,24 @@ function flattenExportTransforms(svgClone) {
                     ctx.fillStyle = '#FFFFFF';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Draw debug overlay before converting to PNG
+                    drawDebugOverlay(ctx, canvas.width, canvas.height, {
+                        planLabel: 'CLEAN',
+                        baseRectSource: union ? 'union' : (tightRect ? 'tightRect' : 'cropRect'),
+                        cropRect: rectFromExportCropBounds,
+                        contentBbox: bboxFromContent,
+                        baseRect: baseRect,
+                        viewBoxX,
+                        viewBoxY,
+                        viewBoxW,
+                        viewBoxH,
+                        ratio,
+                        canvasW: canvas.width,
+                        canvasH: canvas.height,
+                        BUFFER_PX,
+                    });
+                    
                     const dataUrl = canvas.toDataURL('image/png');
                     setExportStatus("Plan captured: image ready");
                     setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
@@ -1171,6 +1231,24 @@ function flattenExportTransforms(svgClone) {
                     ctx.fillStyle = '#FFFFFF';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Draw debug overlay before converting to PNG
+                    drawDebugOverlay(ctx, canvas.width, canvas.height, {
+                        planLabel: 'DIMS',
+                        baseRectSource: union ? 'union' : (tightRect ? 'tightRect' : 'cropRect'),
+                        cropRect: rectFromExportCropBounds,
+                        contentBbox: bboxFromContent,
+                        baseRect: baseRect,
+                        viewBoxX,
+                        viewBoxY,
+                        viewBoxW,
+                        viewBoxH,
+                        ratio,
+                        canvasW: canvas.width,
+                        canvasH: canvas.height,
+                        BUFFER_PX,
+                    });
+                    
                     const dataUrl = canvas.toDataURL('image/png');
                     setExportStatus("Dimensioned plan captured: image ready");
                     setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
@@ -1372,6 +1450,24 @@ function flattenExportTransforms(svgClone) {
                     ctx.fillStyle = '#FFFFFF';
                     ctx.fillRect(0, 0, canvas.width, canvas.height);
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Draw debug overlay before converting to PNG
+                    drawDebugOverlay(ctx, canvas.width, canvas.height, {
+                        planLabel: 'SPEAKER',
+                        baseRectSource: union ? 'union' : (tightRect ? 'tightRect' : 'cropRect'),
+                        cropRect: rectFromExportCropBounds,
+                        contentBbox: bboxFromContent,
+                        baseRect: baseRect,
+                        viewBoxX,
+                        viewBoxY,
+                        viewBoxW,
+                        viewBoxH,
+                        ratio,
+                        canvasW: canvas.width,
+                        canvasH: canvas.height,
+                        BUFFER_PX,
+                    });
+                    
                     const dataUrl = canvas.toDataURL('image/png');
                     setExportStatus("Speaker dimensions plan captured: image ready");
                     setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
