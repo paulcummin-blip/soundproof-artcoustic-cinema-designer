@@ -25,6 +25,7 @@ import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 
 function RP22ReportInner() {
+const PLAN_EXPORT_BUFFER_MM = 30;
 const unionRects = (rectA, rectB) => {
     if (!rectA || !Number.isFinite(rectA.x)) return rectB;
     if (!rectB || !Number.isFinite(rectB.x)) return rectA;
@@ -921,13 +922,16 @@ function flattenExportTransforms(svgClone) {
                     return;
                 }
 
+                const pixelsPerMm = union.width / 186;
+                const bufferPx = PLAN_EXPORT_BUFFER_MM * pixelsPerMm;
+
                 const shortestSide = Math.min(union.width, union.height);
                 const padding = Math.max(shortestSide * 0.03, 12);
 
-                const viewBoxX = union.x - padding;
-                const viewBoxY = union.y - padding;
-                const viewBoxW = union.width + (2 * padding);
-                const viewBoxH = union.height + (2 * padding);
+                const viewBoxX = union.x - padding - bufferPx;
+                const viewBoxY = union.y - padding - bufferPx;
+                const viewBoxW = union.width + (2 * padding) + (2 * bufferPx);
+                const viewBoxH = union.height + (2 * padding) + (2 * bufferPx);
                 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1108,13 +1112,16 @@ function flattenExportTransforms(svgClone) {
                     return;
                 }
 
+                const pixelsPerMm = union.width / 186;
+                const bufferPx = PLAN_EXPORT_BUFFER_MM * pixelsPerMm;
+
                 const shortestSide = Math.min(union.width, union.height);
                 const padding = Math.max(shortestSide * 0.05, 18);
                 
-                const viewBoxX = union.x - padding;
-                const viewBoxY = union.y - padding;
-                const viewBoxW = union.width + (2 * padding);
-                const viewBoxH = union.height + (2 * padding);
+                const viewBoxX = union.x - padding - bufferPx;
+                const viewBoxY = union.y - padding - bufferPx;
+                const viewBoxW = union.width + (2 * padding) + (2 * bufferPx);
+                const viewBoxH = union.height + (2 * padding) + (2 * bufferPx);
 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1295,13 +1302,16 @@ function flattenExportTransforms(svgClone) {
                     return;
                 }
 
+                const pixelsPerMm = union.width / 186;
+                const bufferPx = PLAN_EXPORT_BUFFER_MM * pixelsPerMm;
+
                 const shortestSide = Math.min(union.width, union.height);
                 const padding = Math.max(shortestSide * 0.05, 24);
 
-                const viewBoxX = union.x - padding;
-                const viewBoxY = union.y - padding;
-                const viewBoxW = union.width + (2 * padding);
-                const viewBoxH = union.height + (2 * padding);
+                const viewBoxX = union.x - padding - bufferPx;
+                const viewBoxY = union.y - padding - bufferPx;
+                const viewBoxW = union.width + (2 * padding) + (2 * bufferPx);
+                const viewBoxH = union.height + (2 * padding) + (2 * bufferPx);
 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
