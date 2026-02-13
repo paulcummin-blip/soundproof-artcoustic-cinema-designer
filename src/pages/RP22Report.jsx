@@ -2182,24 +2182,46 @@ function flattenExportTransforms(svgClone) {
                     zIndex: -1
                 }}
             >
-                <RoomVisualisation
-                    placedSpeakers={placedSpeakers}
-                    seatingPositions={seats}
-                    mlpPoint={primarySeatingPosition}
-                    screen={{
-                      ...(screen || {}),
-                      floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
-                        ? Number(app.screenFrontPlaneM)
-                        : Number(screen?.floatDepthM) || 0
-                    }}
-                    screenFrontPlaneM={
-                      Number.isFinite(Number(app?.screenFrontPlaneM))
-                        ? Number(app.screenFrontPlaneM)
-                        : undefined
-                    }
-                    dolbyLayout={dolbyLayout}
-                    frontSubs={app?.frontSubsCfg?.positions || []}
-                    rearSubs={app?.rearSubsCfg?.positions || []}
+                {(() => {
+                    const frontSubsForExport = (Array.isArray(app?.frontSubsCfg?.positions) ? app.frontSubsCfg.positions : []).map((p, i) => {
+                        if (p?.position?.x != null && p?.position?.y != null) {
+                            return { ...p, id: p.id || `front-sub-${i}`, model: p.model || app?.frontSubsCfg?.model || '' };
+                        }
+                        if (p?.x != null && p?.y != null) {
+                            return { ...p, id: p.id || `front-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.frontSubsCfg?.model || '' };
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    
+                    const rearSubsForExport = (Array.isArray(app?.rearSubsCfg?.positions) ? app.rearSubsCfg.positions : []).map((p, i) => {
+                        if (p?.position?.x != null && p?.position?.y != null) {
+                            return { ...p, id: p.id || `rear-sub-${i}`, model: p.model || app?.rearSubsCfg?.model || '' };
+                        }
+                        if (p?.x != null && p?.y != null) {
+                            return { ...p, id: p.id || `rear-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.rearSubsCfg?.model || '' };
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    
+                    return (
+                        <RoomVisualisation
+                            placedSpeakers={placedSpeakers}
+                            seatingPositions={seats}
+                            mlpPoint={primarySeatingPosition}
+                            screen={{
+                              ...(screen || {}),
+                              floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
+                                ? Number(app.screenFrontPlaneM)
+                                : Number(screen?.floatDepthM) || 0
+                            }}
+                            screenFrontPlaneM={
+                              Number.isFinite(Number(app?.screenFrontPlaneM))
+                                ? Number(app.screenFrontPlaneM)
+                                : undefined
+                            }
+                            dolbyLayout={dolbyLayout}
+                            frontSubs={frontSubsForExport}
+                            rearSubs={rearSubsForExport}
                     roomElements={app?.roomElements || []}
                     exportMode="clean"
                     exportWidthPx={1200}
@@ -2224,6 +2246,8 @@ function flattenExportTransforms(svgClone) {
                     onSetRoomDims={rvNoops.onSetRoomDims}
                     onSetMlpPoint={rvNoops.onSetMlpPoint}
                 />
+                    );
+                })()}
             </div>
             
             {/* Hidden plan capture element (ROOM DIMENSIONS) */}
@@ -2240,24 +2264,46 @@ function flattenExportTransforms(svgClone) {
                     zIndex: -1
                 }}
             >
-                <RoomVisualisation
-                    placedSpeakers={placedSpeakers}
-                    seatingPositions={seats}
-                    mlpPoint={primarySeatingPosition}
-                    screen={{
-                      ...(screen || {}),
-                      floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
-                        ? Number(app.screenFrontPlaneM)
-                        : Number(screen?.floatDepthM) || 0
-                    }}
-                    screenFrontPlaneM={
-                      Number.isFinite(Number(app?.screenFrontPlaneM))
-                        ? Number(app.screenFrontPlaneM)
-                        : undefined
-                    }
-                    dolbyLayout={dolbyLayout}
-                    frontSubs={app?.frontSubsCfg?.positions || []}
-                    rearSubs={app?.rearSubsCfg?.positions || []}
+                {(() => {
+                    const frontSubsForExport = (Array.isArray(app?.frontSubsCfg?.positions) ? app.frontSubsCfg.positions : []).map((p, i) => {
+                        if (p?.position?.x != null && p?.position?.y != null) {
+                            return { ...p, id: p.id || `front-sub-${i}`, model: p.model || app?.frontSubsCfg?.model || '' };
+                        }
+                        if (p?.x != null && p?.y != null) {
+                            return { ...p, id: p.id || `front-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.frontSubsCfg?.model || '' };
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    
+                    const rearSubsForExport = (Array.isArray(app?.rearSubsCfg?.positions) ? app.rearSubsCfg.positions : []).map((p, i) => {
+                        if (p?.position?.x != null && p?.position?.y != null) {
+                            return { ...p, id: p.id || `rear-sub-${i}`, model: p.model || app?.rearSubsCfg?.model || '' };
+                        }
+                        if (p?.x != null && p?.y != null) {
+                            return { ...p, id: p.id || `rear-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.rearSubsCfg?.model || '' };
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    
+                    return (
+                        <RoomVisualisation
+                            placedSpeakers={placedSpeakers}
+                            seatingPositions={seats}
+                            mlpPoint={primarySeatingPosition}
+                            screen={{
+                              ...(screen || {}),
+                              floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
+                                ? Number(app.screenFrontPlaneM)
+                                : Number(screen?.floatDepthM) || 0
+                            }}
+                            screenFrontPlaneM={
+                              Number.isFinite(Number(app?.screenFrontPlaneM))
+                                ? Number(app.screenFrontPlaneM)
+                                : undefined
+                            }
+                            dolbyLayout={dolbyLayout}
+                            frontSubs={frontSubsForExport}
+                            rearSubs={rearSubsForExport}
                     roomElements={app?.roomElements || []}
                     exportMode="dimensions"
                     exportWidthPx={1200}
@@ -2282,6 +2328,8 @@ function flattenExportTransforms(svgClone) {
                     onSetRoomDims={rvNoops.onSetRoomDims}
                     onSetMlpPoint={rvNoops.onSetMlpPoint}
                 />
+                    );
+                })()}
             </div>
             
             {/* Hidden plan capture element (SPEAKER POSITIONS) */}
@@ -2298,24 +2346,46 @@ function flattenExportTransforms(svgClone) {
                     zIndex: -1
                 }}
             >
-                <RoomVisualisation
-                    placedSpeakers={placedSpeakers}
-                    seatingPositions={seats}
-                    mlpPoint={primarySeatingPosition}
-                    screen={{
-                      ...(screen || {}),
-                      floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
-                        ? Number(app.screenFrontPlaneM)
-                        : Number(screen?.floatDepthM) || 0
-                    }}
-                    screenFrontPlaneM={
-                      Number.isFinite(Number(app?.screenFrontPlaneM))
-                        ? Number(app.screenFrontPlaneM)
-                        : undefined
-                    }
-                    dolbyLayout={dolbyLayout}
-                    frontSubs={app?.frontSubsCfg?.positions || []}
-                    rearSubs={app?.rearSubsCfg?.positions || []}
+                {(() => {
+                    const frontSubsForExport = (Array.isArray(app?.frontSubsCfg?.positions) ? app.frontSubsCfg.positions : []).map((p, i) => {
+                        if (p?.position?.x != null && p?.position?.y != null) {
+                            return { ...p, id: p.id || `front-sub-${i}`, model: p.model || app?.frontSubsCfg?.model || '' };
+                        }
+                        if (p?.x != null && p?.y != null) {
+                            return { ...p, id: p.id || `front-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.frontSubsCfg?.model || '' };
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    
+                    const rearSubsForExport = (Array.isArray(app?.rearSubsCfg?.positions) ? app.rearSubsCfg.positions : []).map((p, i) => {
+                        if (p?.position?.x != null && p?.position?.y != null) {
+                            return { ...p, id: p.id || `rear-sub-${i}`, model: p.model || app?.rearSubsCfg?.model || '' };
+                        }
+                        if (p?.x != null && p?.y != null) {
+                            return { ...p, id: p.id || `rear-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.rearSubsCfg?.model || '' };
+                        }
+                        return null;
+                    }).filter(Boolean);
+                    
+                    return (
+                        <RoomVisualisation
+                            placedSpeakers={placedSpeakers}
+                            seatingPositions={seats}
+                            mlpPoint={primarySeatingPosition}
+                            screen={{
+                              ...(screen || {}),
+                              floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
+                                ? Number(app.screenFrontPlaneM)
+                                : Number(screen?.floatDepthM) || 0
+                            }}
+                            screenFrontPlaneM={
+                              Number.isFinite(Number(app?.screenFrontPlaneM))
+                                ? Number(app.screenFrontPlaneM)
+                                : undefined
+                            }
+                            dolbyLayout={dolbyLayout}
+                            frontSubs={frontSubsForExport}
+                            rearSubs={rearSubsForExport}
                     roomElements={app?.roomElements || []}
                     exportMode="dimensions"
                     exportWidthPx={1200}
@@ -2340,6 +2410,8 @@ function flattenExportTransforms(svgClone) {
                     onSetRoomDims={rvNoops.onSetRoomDims}
                     onSetMlpPoint={rvNoops.onSetMlpPoint}
                 />
+                    );
+                })()}
             </div>
 
             {/* Hidden seat-metrics builder (NOT for export): keeps app.seatMetricsById live for Report + HUD */}
