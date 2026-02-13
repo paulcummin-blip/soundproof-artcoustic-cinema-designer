@@ -6909,6 +6909,49 @@ return {
     return <g data-layer="speaker-labels"></g>;
   }, []);
 
+  // --- Row front-wall distance labels (only for Speaker Positions plan) ---
+  const rowFrontWallLabelSeatIds = useMemo(() => {
+    if (speakerPositionsView !== 'plan') return new Set();
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return new Set();
+    
+    // Cluster seats into rows (same logic as SpeakerPositionsOverlay)
+    const allSeatsWithY = seatingPositions
+      .map(s => ({ seat: s, y: Number(s?.y ?? s?.position?.y ?? 0) }))
+      .filter(item => Number.isFinite(item.y))
+      .sort((a, b) => a.y - b.y);
+    
+    const rows = [];
+    for (const item of allSeatsWithY) {
+      const lastRow = rows[rows.length - 1];
+      if (!lastRow || Math.abs(item.y - lastRow.y) > 0.20) {
+        rows.push({ y: item.y, seats: [item.seat] });
+      } else {
+        lastRow.seats.push(item.seat);
+      }
+    }
+    
+    // For each row, pick one seat to label (center or left-of-center)
+    const labeledSeatIds = new Set();
+    for (const row of rows) {
+      const sortedByX = row.seats
+        .map(s => ({ seat: s, x: Number(s?.x ?? s?.position?.x ?? 0) }))
+        .filter(item => Number.isFinite(item.x))
+        .sort((a, b) => a.x - b.x);
+      
+      if (sortedByX.length === 0) continue;
+      
+      const count = sortedByX.length;
+      const chosenIndex = count % 2 === 1 
+        ? Math.floor(count / 2) 
+        : (count / 2 - 1);
+      
+      const chosenSeat = sortedByX[chosenIndex]?.seat;
+      if (chosenSeat?.id) labeledSeatIds.add(chosenSeat.id);
+    }
+    
+    return labeledSeatIds;
+  }, [speakerPositionsView, seatingPositions]);
+
   // --- Seats: always render from the latest seatingPositions prop ---
   const renderSeatingPositions = () => {
     if (!hasRoomRect) return null;
@@ -6980,6 +7023,22 @@ return {
                 strokeDasharray={isPinned ? '4 2' : 'none'}
                 aria-label="Seat — hover for RP23 and P1 analysis"
               />
+              
+              {/* Front wall distance label (Speaker Positions plan only) */}
+              {speakerPositionsView === 'plan' && rowFrontWallLabelSeatIds.has(seat.id) && (
+                <text
+                  x={seatX}
+                  y={seatY + (RY_M * scale) + 18}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                  fill="#1B1A1A"
+                  fontWeight={600}
+                  pointerEvents="none"
+                >
+                  Front: {yM.toFixed(2)}m
+                </text>
+              )}
             </g>
           );
         })}
