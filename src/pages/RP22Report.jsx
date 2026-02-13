@@ -1706,34 +1706,32 @@ try {
                     max-height: none !important;
                 }
 
+                /* Plan pages: define a fixed plan area box; image must fit inside it */
                 .plan-fitbox {
-                    width: 186mm !important;              /* full printable width (A4 portrait with 12mm margins) */
-                    margin: 0 auto !important;
-                    padding: 0 !important;
-                    overflow: visible !important;         /* don’t crop */
-                    display: block !important;            /* stop centring shrink behaviour */
-                    height: auto !important;              /* let content define height */
+                  width: 186mm !important;
+                  margin: 0 auto !important;
+                  padding: 0 !important;
+                  overflow: hidden !important;            /* prevents any bleed */
+                  display: flex !important;
+                  align-items: center !important;
+                  justify-content: center !important;
+
+                  /* Height budget for the plan area on an A4 page at 100% scale.
+                     Must account for the page margins + the H2 title + spacing.
+                     Use a single conservative value that works for all 3 plan pages. */
+                  height: 240mm !important;               /* start here; adjust only if needed */
+                  max-height: 240mm !important;
                 }
 
                 .plan-fitbox > img {
-                    display: block !important;
-                    width: 100% !important;               /* ALWAYS fill the page width */
-                    height: auto !important;              /* keep correct aspect ratio */
-                    max-height: 240mm !important;         /* safety cap so it can’t run off the page */
+                  display: block !important;
+                  width: 100% !important;
+                  height: 100% !important;                /* image takes the box */
+                  object-fit: contain !important;         /* never crop; preserve ratio */
+                  object-position: center !important;     /* always centre */
                 }
 
-                /* Fix: speaker positions plan can be taller, so allow proportional shrink (no squashing) */
-                #pdf-room-plan-positions .plan-fitbox { 
-                  text-align: center !important; 
-                }
 
-                #pdf-room-plan-positions .plan-fitbox > img {
-                  width: auto !important;
-                  max-width: 100% !important;
-                  height: auto !important;
-                  max-height: 240mm !important;
-                  display: inline-block !important;
-                }
 
                 /* COVER PAGE ONLY — tighten vertical spacing so it fits at 100% scale */
                 #pdf-cover .rp22-param-card,
