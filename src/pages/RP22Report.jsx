@@ -1115,19 +1115,28 @@ function flattenExportTransforms(svgClone) {
                     return;
                 }
 
-                const baseRect = rectFromExportCropBounds || union;
+                // STEP 1: Prefer tight content bounds if available
+                // rectFromExportCropBounds may include large empty margins,
+                // so only use it if it truly represents tight content.
+
+                const tightRect = union; // union should represent true content bounds
+
+                const baseRect = tightRect || rectFromExportCropBounds;
+
                 const xAttr = baseRect.x;
                 const yAttr = baseRect.y;
                 const wAttr = baseRect.width;
                 const hAttr = baseRect.height;
 
-                const bufferX = wAttr * BUFFER_RATIO;
-                const bufferY = hAttr * BUFFER_RATIO;
+                // STEP 2: Use fixed buffer (NOT ratio-based)
+                // This guarantees consistent visual margin regardless of room size
+
+                const BUFFER_PX = 80; // adjust slightly if needed (60–100 range)
                 
-                const viewBoxX = xAttr - bufferX;
-                const viewBoxY = yAttr - bufferY;
-                const viewBoxW = wAttr + (2 * bufferX);
-                const viewBoxH = hAttr + (2 * bufferY);
+                const viewBoxX = xAttr - BUFFER_PX;
+                const viewBoxY = yAttr - BUFFER_PX;
+                const viewBoxW = wAttr + (2 * BUFFER_PX);
+                const viewBoxH = hAttr + (2 * BUFFER_PX);
 
                 svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
                 svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1652,8 +1661,17 @@ function flattenExportTransforms(svgClone) {
 
                 /* --- PLAN PAGES: natural scaling (no cropping, no distortion) --- */
                 .plan-fitbox{
+                  break-inside: avoid !important;
+                  page-break-inside: avoid !important;
                   width: 186mm !important;
                   margin: 0 auto !important;
+                }
+
+                #pdf-room-plan,
+                #pdf-room-plan-dims,
+                #pdf-room-plan-positions {
+                  break-inside: avoid !important;
+                  page-break-inside: avoid !important;
                 }
 
                 .plan-fitbox > img{
