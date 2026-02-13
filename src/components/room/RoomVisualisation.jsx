@@ -7523,15 +7523,14 @@ return (
               {exportMode !== 'clean' && overlaysForRendering?.EXPORT_CEILING_LABEL && (
                 <g data-layer="export-ceiling-label" pointerEvents="none">
                   <text
-                    x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) - 6}
-                    y={(roomRect?.y ?? 0) + 16}
-                    textAnchor="end"
+                    x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) / 2}
+                    y={(roomRect?.y ?? 0) - 48}
+                    textAnchor="middle"
                     fontFamily="Century Gothic, sans-serif"
                     fontSize={11}
                     fill="#1B1A1A"
-                    opacity={0.85}
                   >
-                    {`Ceiling: ${(heightM ?? 0).toFixed(2)} m`}
+                    {`Ceiling height: ${(heightM ?? 0).toFixed(2)} m`}
                   </text>
                 </g>
               )}
