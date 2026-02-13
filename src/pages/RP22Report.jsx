@@ -1723,11 +1723,16 @@ try {
                 }
 
                 /* Fix: speaker positions plan can be taller, so allow proportional shrink (no squashing) */
+                #pdf-room-plan-positions .plan-fitbox { 
+                  text-align: center !important; 
+                }
+
                 #pdf-room-plan-positions .plan-fitbox > img {
                   width: auto !important;
                   max-width: 100% !important;
                   height: auto !important;
                   max-height: 240mm !important;
+                  display: inline-block !important;
                 }
 
                 /* COVER PAGE ONLY — tighten vertical spacing so it fits at 100% scale */
