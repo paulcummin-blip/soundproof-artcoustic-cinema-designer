@@ -1288,6 +1288,9 @@ React.useEffect(() => {
 }, [actualScreenFrontY, props.onScreenPlaneYChange]);
 
   const TOP_GUTTER_PX = 150; // reserved space above room for dimension lines
+  const SPEAKER_PLAN_TOP_GUTTER_PX = 90;
+  const SPEAKER_PLAN_BOTTOM_GUTTER_PX = 120;
+  const SPEAKER_PLAN_SIDE_GUTTER_PX = 90;
   
   const effectiveContainerW = Number.isFinite(Number(exportWidthPx))
     ? Number(exportWidthPx)
@@ -7444,14 +7447,10 @@ return (
             {Number.isFinite(scale) && roomRect && (
               <rect
                 id="export-crop-bounds"
-                x={roomRect.x}
-                y={roomRect.y - (overlaysForRendering?.ROOM_DIMS ? TOP_GUTTER_PX : 0)}
-                width={roomRect.width}
-                height={
-                  roomRect.height
-                  + (overlaysForRendering?.ROOM_DIMS ? TOP_GUTTER_PX : 0)
-                  + (speakerPositionsView === "plan" ? BOTTOM_GUTTER_PX : 0)
-                }
+                x={speakerPositionsView === "plan" ? (roomRect.x - SPEAKER_PLAN_SIDE_GUTTER_PX) : roomRect.x}
+                y={speakerPositionsView === "plan" ? (roomRect.y - TOP_GUTTER_PX - SPEAKER_PLAN_TOP_GUTTER_PX) : (roomRect.y - TOP_GUTTER_PX)}
+                width={speakerPositionsView === "plan" ? (roomRect.width + (2 * SPEAKER_PLAN_SIDE_GUTTER_PX)) : roomRect.width}
+                height={roomRect.height + (overlaysForRendering?.ROOM_DIMS ? TOP_GUTTER_PX : 0) + (speakerPositionsView === "plan" ? (BOTTOM_GUTTER_PX + SPEAKER_PLAN_TOP_GUTTER_PX + SPEAKER_PLAN_BOTTOM_GUTTER_PX) : 0)}
                 fill="none"
                 stroke="none"
                 opacity={0}
