@@ -3223,21 +3223,6 @@ function flattenExportTransforms(svgClone) {
 
                         {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
                             <section id="pdf-room-plan" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
-                                <h2
-                                    style={{
-                                        fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                        fontSize: '20pt',
-                                        fontWeight: 500,
-                                        letterSpacing: '0.3px',
-                                        color: '#1B1A1A',
-                                        margin: '0 0 6mm 0',
-                                        background: 'transparent',
-                                        padding: 0,
-                                    }}
-                                >
-                                    Room plan
-                                </h2>
-
                                 <div className="plan-fitbox">
                                     <img
                                         src={planImageDataUrl}
@@ -3252,21 +3237,6 @@ function flattenExportTransforms(svgClone) {
 
                         {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
                             <section id="pdf-room-plan-dims" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
-                                <h2
-                                    style={{
-                                        fontFamily: 'Futura PT Light, Century Gothic, sans-serif',
-                                        fontSize: '20pt',
-                                        fontWeight: 500,
-                                        letterSpacing: '0.3px',
-                                        color: '#1B1A1A',
-                                        margin: '0 0 6mm 0',
-                                        background: 'transparent',
-                                        padding: 0,
-                                    }}
-                                >
-                                    Room plan (dimensions)
-                                </h2>
-
                                 <div className="plan-fitbox">
                                     <img
                                         src={planDimsImageDataUrl}
@@ -3285,21 +3255,6 @@ function flattenExportTransforms(svgClone) {
                                 className="print-page-break-after"
                                 style={{ background: "transparent", padding: 0, margin: 0 }}
                             >
-                                <h2
-                                    style={{
-                                        fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-                                        fontSize: "20pt",
-                                        fontWeight: 500,
-                                        letterSpacing: "0.3px",
-                                        color: "#1B1A1A",
-                                        margin: "0 0 6mm 0",
-                                        background: "transparent",
-                                        padding: 0,
-                                    }}
-                                >
-                                    Room plan (speaker positions)
-                                </h2>
-
                                 <div className="plan-fitbox">
                                     <img
                                         src={planSpeakerDimsImageDataUrl}
