@@ -7519,6 +7519,111 @@ return (
             {/* Wrapper for export bounds */}
             <g id="export-content-bounds">
               <g id="export-bounds">
+              {/* --- Export-only report labels (clean-plan page enhancements) --- */}
+              {exportMode !== 'clean' && overlaysForRendering?.EXPORT_CEILING_LABEL && (
+                <g data-layer="export-ceiling-label" pointerEvents="none">
+                  <text
+                    x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) - 6}
+                    y={(roomRect?.y ?? 0) + 16}
+                    textAnchor="end"
+                    fontFamily="Century Gothic, sans-serif"
+                    fontSize={11}
+                    fill="#1B1A1A"
+                    opacity={0.85}
+                  >
+                    {`Ceiling: ${(heightM ?? 0).toFixed(2)} m`}
+                  </text>
+                </g>
+              )}
+
+              {exportMode !== 'clean' && overlaysForRendering?.EXPORT_RSP_LABEL && (
+                <g data-layer="export-rsp-label" pointerEvents="none">
+                  {(() => {
+                    const mlpX = mlp?.x ?? mlpPoint?.x;
+                    const mlpY = mlp?.y ?? mlpPoint?.y;
+                    if (!Number.isFinite(mlpX) || !Number.isFinite(mlpY)) return null;
+
+                    const [px, py] = toPx(mlpX, mlpY);
+                    const green = "#6BBF59";
+
+                    return (
+                      <text
+                        x={px + 10}
+                        y={py + 4}
+                        textAnchor="start"
+                        fontFamily="Century Gothic, sans-serif"
+                        fontSize={12}
+                        fill={green}
+                        fontWeight={600}
+                      >
+                        RSP
+                      </text>
+                    );
+                  })()}
+                </g>
+              )}
+
+              {exportMode !== 'clean' && overlaysForRendering?.EXPORT_ROW_FRONT_DIST && (
+                <g data-layer="export-row-front-distance" pointerEvents="none">
+                  {(() => {
+                    const seatsArr = Array.isArray(seatingPositions) ? seatingPositions : [];
+                    if (seatsArr.length === 0) return null;
+
+                    const isNum = (v) => Number.isFinite(Number(v));
+
+                    const sorted = seatsArr
+                      .filter(s => s && isNum(s.x) && isNum(s.y))
+                      .slice()
+                      .sort((a, b) => (a.y - b.y) || (a.x - b.x));
+
+                    const rowBuckets = [];
+                    for (const s of sorted) {
+                      const last = rowBuckets[rowBuckets.length - 1];
+                      if (!last || Math.abs(s.y - last.y) > 0.20) {
+                        rowBuckets.push({ y: s.y, seats: [s] });
+                      } else {
+                        last.seats.push(s);
+                      }
+                    }
+
+                    const pickSeatForRow = (row) => {
+                      const seats = row.seats.slice().sort((a, b) => a.x - b.x);
+                      const n = seats.length;
+                      if (n === 1) return seats[0];
+                      const idx = n % 2 === 1 ? Math.floor(n / 2) : (n / 2 - 1);
+                      return seats[Math.max(0, Math.min(n - 1, idx))];
+                    };
+
+                    return rowBuckets.map((row, i) => {
+                      const seat = pickSeatForRow(row);
+                      if (!seat) return null;
+
+                      const sx = Number(seat.x);
+                      const sy = Number(seat.y);
+
+                      const [px, py] = toPx(sx, sy);
+
+                      const labelY = py + 26;
+
+                      return (
+                        <text
+                          key={`row-frontdist-${i}`}
+                          x={px}
+                          y={labelY}
+                          textAnchor="middle"
+                          fontFamily="Century Gothic, sans-serif"
+                          fontSize={12}
+                          fill="#1B1A1A"
+                          opacity={0.9}
+                        >
+                          {`to front wall - ${sy.toFixed(2)} m`}
+                        </text>
+                      );
+                    });
+                  })()}
+                </g>
+              )}
+
               {/* Layer 2: Room Outline and Furniture */}
               <rect
                 x={(roomRect?.x ?? 0)}

@@ -2222,11 +2222,11 @@ function flattenExportTransforms(svgClone) {
                             dolbyLayout={dolbyLayout}
                             frontSubs={frontSubsForExport}
                             rearSubs={rearSubsForExport}
-                    roomElements={app?.roomElements || []}
-                    exportMode="clean"
-                    exportWidthPx={1200}
-                    exportHeightPx={800}
-                    overlays={{}}
+                            roomElements={app?.roomElements || []}
+                            exportMode="dimensions"
+                            exportWidthPx={1200}
+                            exportHeightPx={800}
+                            overlays={{ ROOM_DIMS: true, EXPORT_ROW_FRONT_DIST: true, EXPORT_RSP_LABEL: true, EXPORT_CEILING_LABEL: true }}
                     showBaffle={true}
                     showScreen={true}
                     speakerPositionsView="off"
