@@ -7606,18 +7606,30 @@ return (
                       const labelY = py + 26;
 
                       return (
-                        <text
-                          key={`row-frontdist-${i}`}
-                          x={px}
-                          y={labelY}
-                          textAnchor="middle"
-                          fontFamily="Century Gothic, sans-serif"
-                          fontSize={12}
-                          fill="#1B1A1A"
-                          opacity={0.9}
-                        >
-                          {`to front wall - ${sy.toFixed(2)} m`}
-                        </text>
+                        <g key={`row-frontdist-${i}`}>
+                          <text
+                            x={px}
+                            y={py + 26}
+                            textAnchor="middle"
+                            fontFamily="Century Gothic, sans-serif"
+                            fontSize={11}
+                            fill="#1B1A1A"
+                          >
+                            to front wall
+                          </text>
+
+                          <text
+                            x={px}
+                            y={py + 40}
+                            textAnchor="middle"
+                            fontFamily="Century Gothic, sans-serif"
+                            fontSize={12}
+                            fontWeight={600}
+                            fill="#1B1A1A"
+                          >
+                            {`${sy.toFixed(2)} m`}
+                          </text>
+                        </g>
                       );
                     });
                   })()}
