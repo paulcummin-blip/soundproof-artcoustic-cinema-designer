@@ -1722,6 +1722,14 @@ try {
                     max-height: 240mm !important;         /* safety cap so it can’t run off the page */
                 }
 
+                /* Fix: speaker positions plan can be taller, so allow proportional shrink (no squashing) */
+                #pdf-room-plan-positions .plan-fitbox > img {
+                  width: auto !important;
+                  max-width: 100% !important;
+                  height: auto !important;
+                  max-height: 240mm !important;
+                }
+
                 /* COVER PAGE ONLY — tighten vertical spacing so it fits at 100% scale */
                 #pdf-cover .rp22-param-card,
                 #pdf-cover .rp22-seat-card {
