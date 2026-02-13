@@ -25,7 +25,6 @@ import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 
 function RP22ReportInner() {
-const DEBUG_PLAN_CAPTURE = false; // Toggle to burn debug geometry onto plan PNGs
 const BUFFER_RATIO = 0.06;
 const unionRects = (rectA, rectB) => {
     if (!rectA || !Number.isFinite(rectA.x)) return rectB;
@@ -38,8 +37,8 @@ const unionRects = (rectA, rectB) => {
 };
 
 // Helper to draw debug overlay onto canvas (burns into PNG)
-const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo) => {
-    if (!DEBUG_PLAN_CAPTURE) return;
+const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo, enabled) => {
+    if (!enabled) return;
     
     const lines = [
         `PLAN: ${debugInfo.planLabel || '?'}`,
@@ -91,6 +90,7 @@ const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo) => {
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
     const [printReady, setPrintReady] = useState(false);
+    const [debugPlanCapture, setDebugPlanCapture] = useState(false);
     const printLockRef = React.useRef(false);
     const cleanupTimeoutRef = React.useRef(null);
     const exportGuardRef = React.useRef({ active: false, startedAt: 0 });
@@ -1027,7 +1027,7 @@ function flattenExportTransforms(svgClone) {
                         canvasW: canvas.width,
                         canvasH: canvas.height,
                         BUFFER_PX,
-                    });
+                    }, debugPlanCapture);
                     
                     const dataUrl = canvas.toDataURL('image/png');
                     setExportStatus("Plan captured: image ready");
@@ -1247,7 +1247,7 @@ function flattenExportTransforms(svgClone) {
                         canvasW: canvas.width,
                         canvasH: canvas.height,
                         BUFFER_PX,
-                    });
+                    }, debugPlanCapture);
                     
                     const dataUrl = canvas.toDataURL('image/png');
                     setExportStatus("Dimensioned plan captured: image ready");
@@ -1466,7 +1466,7 @@ function flattenExportTransforms(svgClone) {
                         canvasW: canvas.width,
                         canvasH: canvas.height,
                         BUFFER_PX,
-                    });
+                    }, debugPlanCapture);
                     
                     const dataUrl = canvas.toDataURL('image/png');
                     setExportStatus("Speaker dimensions plan captured: image ready");
@@ -2428,7 +2428,19 @@ function flattenExportTransforms(svgClone) {
                             })()}
                         </div>
                     </div>
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 items-center">
+                        <label className="flex items-center gap-2 text-sm text-[#3E4349] cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={debugPlanCapture}
+                                onChange={(e) => setDebugPlanCapture(e.target.checked)}
+                                className="w-4 h-4 cursor-pointer"
+                            />
+                            <span style={{ fontFamily: "Futura PT Light, Century Gothic, sans-serif" }}>
+                                Plan debug overlay
+                            </span>
+                        </label>
+                        
                         <Button
                             type="button"
                             onClick={() => {
