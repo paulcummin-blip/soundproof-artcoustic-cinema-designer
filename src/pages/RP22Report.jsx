@@ -1340,7 +1340,7 @@ try {
                 stripExportViewportTransforms(svgClone);
 
                 // Read crop rectangle directly from live SVG (no getBBox)
-                const cropRect = svgElement.querySelector('#export-crop-bounds');
+                const cropRect = svgClone.querySelector('#export-crop-bounds');
                 if (!cropRect) {
                   setExportStatus(`Capturing speaker positions: waiting for export-crop-bounds… (attempt ${attempts}/${maxAttempts})`);
                   if (attempts < maxAttempts) {
