@@ -9,6 +9,39 @@
 
 import { artcousticSpeakers } from "@/components/data/speakerData";
 
+// Quasi-line distance benefit (small, capped) for selected models only.
+// Purpose: allow a modest (0–2 dB) reduction in distance loss for quasi-line behaviour,
+// without changing general RP22 anechoic baseline for normal point sources.
+function isQuasiLineEligibleSpeaker(speaker) {
+  const id = String(speaker?.id ?? '').toLowerCase();
+  const model = String(speaker?.model ?? '').toLowerCase();
+
+  const isQSeries = id.startsWith('spitfire-q-') || model.includes('spitfire q');
+  const isEvolve63 = id === 'evolve-6-3' || model.includes('evolve 6-3');
+  const isEvolve84 = id === 'evolve-8-4' || model.includes('evolve 8-4');
+
+  return Boolean(speaker?.isLineSource) && (isQSeries || isEvolve63 || isEvolve84);
+}
+
+// Returns 0..2 dB benefit based on distance vs speaker height (as a proxy for line length).
+// Ramps from 0 dB at ~2x height to 2 dB at ~8x height (clamped).
+function quasiLineBenefitDb(distanceM, speaker) {
+  if (!isQuasiLineEligibleSpeaker(speaker)) return 0;
+
+  const L = Number(speaker?.heightM);
+  if (!Number.isFinite(L) || L <= 0) return 0;
+
+  const d = Math.max(1, Number(distanceM) || 0); // keep same 1m floor behaviour
+  const start = 2 * L;
+  const end = 8 * L;
+
+  if (d <= start) return 0;
+  if (d >= end) return 2;
+
+  const t = (d - start) / (end - start); // 0..1
+  return 2 * t; // 0..2 dB
+}
+
 // Helper to find speaker data from speakerData.js by model name
 function findSpeakerData(modelName) {
   if (!modelName || !Array.isArray(artcousticSpeakers)) return null;
@@ -182,7 +215,10 @@ function calculateSplAtPoint({
   const dz = spz - sez;
   
   const distance = Math.max(0.10, Math.hypot(dx, dy, dz)); // 10cm floor
-  const distanceLoss = 20 * Math.log10(Math.max(1, distance)); // Floor at 1m for log
+  const d = Math.max(1, distance); // Floor at 1m for log
+  const speakerForBenefit = { id: speakerModel, model: speakerModel, isLineSource: resolvedMeta?.isLineSource, heightM: resolvedMeta?.heightM };
+  const lineBenefit = quasiLineBenefitDb(d, speakerForBenefit); // 0..2 dB, only for Q + Evolve 6-3/8-4
+  const distanceLoss = (20 * Math.log10(d)) - lineBenefit;
 
   // ─────────────────────────────────────────────────────────────────────────
   // Step 5: Apply all losses to the CAPPED 1m capability
@@ -449,9 +485,10 @@ export function computeSingleSeatSplAtDistance({
   }
 
   // 5. Distance loss (simple 1D for calculator context)
-  const distanceLoss = Number.isFinite(distance_m) && distance_m > 0 
-    ? 20 * Math.log10(distance_m) 
-    : 0;
+  const d = (Number.isFinite(distance_m) && distance_m > 0) ? distance_m : 0;
+  const speakerForBenefit = { id: speakerModelId, model: speakerModelId, isLineSource: resolvedMeta?.isLineSource, heightM: resolvedMeta?.heightM };
+  const lineBenefit = quasiLineBenefitDb(d, speakerForBenefit); // 0..2 dB, only for Q + Evolve 6-3/8-4
+  const distanceLoss = (d > 0 ? (20 * Math.log10(d)) : 0) - lineBenefit;
 
   // 6. Apply losses to continuous SPL
   const spl_continuous_db_at_seat = Number.isFinite(spl1m_cont)
