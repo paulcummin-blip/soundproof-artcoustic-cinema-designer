@@ -942,18 +942,19 @@ function flattenExportTransforms(svgClone) {
                 stripExportViewportTransforms(svgClone);
 
                 const cropRectEl = svgClone.querySelector('#export-crop-bounds');
-                const rectFromExportCropBounds = cropRectEl ? {
+                const cropRect = cropRectEl ? {
                     x: Number(cropRectEl.getAttribute('x')),
                     y: Number(cropRectEl.getAttribute('y')),
                     width: Number(cropRectEl.getAttribute('width')),
                     height: Number(cropRectEl.getAttribute('height')),
                 } : null;
 
-                const bboxFromContent = measureBboxFromClone(svgClone, '#export-content-bounds');
+                const bbox = measureBboxFromClone(svgClone, '#export-content-bounds');
 
-                const union = unionRects(rectFromExportCropBounds, bboxFromContent);
+                // Prefer ink bounds (bbox) if valid; fallback to cropRect only if bbox fails
+                const baseRect = (bbox && bbox.width > 0 && bbox.height > 0) ? bbox : cropRect;
 
-                if (!union || !Number.isFinite(union.width) || union.width <= 0) {
+                if (!baseRect || !Number.isFinite(baseRect.width) || baseRect.width <= 0) {
                     setExportStatus(`Capturing plan: invalid content bounds (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
@@ -963,14 +964,6 @@ function flattenExportTransforms(svgClone) {
                     setPlanImageDataUrl('__SKIP__');
                     return;
                 }
-
-                // STEP 1: Prefer tight content bounds if available
-                // rectFromExportCropBounds may include large empty margins,
-                // so only use it if it truly represents tight content.
-
-                const tightRect = union; // union should represent true content bounds
-
-                const baseRect = tightRect || rectFromExportCropBounds;
 
                 const xAttr = baseRect.x;
                 const yAttr = baseRect.y;
@@ -1015,9 +1008,9 @@ function flattenExportTransforms(svgClone) {
                     // Draw debug overlay before converting to PNG
                     drawDebugOverlay(ctx, canvas.width, canvas.height, {
                         planLabel: 'CLEAN',
-                        baseRectSource: union ? 'union' : (tightRect ? 'tightRect' : 'cropRect'),
-                        cropRect: rectFromExportCropBounds,
-                        contentBbox: bboxFromContent,
+                        baseRectSource: (bbox && bbox.width > 0 && bbox.height > 0) ? 'bbox' : 'cropRect',
+                        cropRect: cropRect,
+                        contentBbox: bbox,
                         baseRect: baseRect,
                         viewBoxX,
                         viewBoxY,
@@ -1162,18 +1155,19 @@ function flattenExportTransforms(svgClone) {
                 stripExportViewportTransforms(svgClone);
 
                 const cropRectEl = svgClone.querySelector('#export-crop-bounds');
-                const rectFromExportCropBounds = cropRectEl ? {
+                const cropRect = cropRectEl ? {
                     x: Number(cropRectEl.getAttribute('x')),
                     y: Number(cropRectEl.getAttribute('y')),
                     width: Number(cropRectEl.getAttribute('width')),
                     height: Number(cropRectEl.getAttribute('height')),
                 } : null;
 
-                const bboxFromContent = measureBboxFromClone(svgClone, '#export-content-bounds');
+                const bbox = measureBboxFromClone(svgClone, '#export-content-bounds');
 
-                const union = unionRects(rectFromExportCropBounds, bboxFromContent);
+                // Prefer ink bounds (bbox) if valid; fallback to cropRect only if bbox fails
+                const baseRect = (bbox && bbox.width > 0 && bbox.height > 0) ? bbox : cropRect;
 
-                if (!union || !Number.isFinite(union.width) || union.width <= 0) {
+                if (!baseRect || !Number.isFinite(baseRect.width) || baseRect.width <= 0) {
                     setExportStatus(`Capturing dims plan: invalid content bounds (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
@@ -1183,14 +1177,6 @@ function flattenExportTransforms(svgClone) {
                     setPlanDimsImageDataUrl('__SKIP__');
                     return;
                 }
-
-                // STEP 1: Prefer tight content bounds if available
-                // rectFromExportCropBounds may include large empty margins,
-                // so only use it if it truly represents tight content.
-
-                const tightRect = union; // union should represent true content bounds
-
-                const baseRect = tightRect || rectFromExportCropBounds;
 
                 const xAttr = baseRect.x;
                 const yAttr = baseRect.y;
@@ -1235,9 +1221,9 @@ function flattenExportTransforms(svgClone) {
                     // Draw debug overlay before converting to PNG
                     drawDebugOverlay(ctx, canvas.width, canvas.height, {
                         planLabel: 'DIMS',
-                        baseRectSource: union ? 'union' : (tightRect ? 'tightRect' : 'cropRect'),
-                        cropRect: rectFromExportCropBounds,
-                        contentBbox: bboxFromContent,
+                        baseRectSource: (bbox && bbox.width > 0 && bbox.height > 0) ? 'bbox' : 'cropRect',
+                        cropRect: cropRect,
+                        contentBbox: bbox,
                         baseRect: baseRect,
                         viewBoxX,
                         viewBoxY,
@@ -1382,18 +1368,19 @@ function flattenExportTransforms(svgClone) {
                 stripExportViewportTransforms(svgClone);
 
                 const cropRectEl = svgClone.querySelector('#export-crop-bounds');
-                const rectFromExportCropBounds = cropRectEl ? {
+                const cropRect = cropRectEl ? {
                     x: Number(cropRectEl.getAttribute('x')),
                     y: Number(cropRectEl.getAttribute('y')),
                     width: Number(cropRectEl.getAttribute('width')),
                     height: Number(cropRectEl.getAttribute('height')),
                 } : null;
 
-                const bboxFromContent = measureBboxFromClone(svgClone, '#export-content-bounds');
-                
-                const union = unionRects(rectFromExportCropBounds, bboxFromContent);
+                const bbox = measureBboxFromClone(svgClone, '#export-content-bounds');
 
-                if (!union || !Number.isFinite(union.width) || union.width <= 0) {
+                // Prefer ink bounds (bbox) if valid; fallback to cropRect only if bbox fails
+                const baseRect = (bbox && bbox.width > 0 && bbox.height > 0) ? bbox : cropRect;
+
+                if (!baseRect || !Number.isFinite(baseRect.width) || baseRect.width <= 0) {
                     setExportStatus(`Capturing speaker positions: invalid content bounds (attempt ${attempts}/${maxAttempts})`);
                     if (attempts < maxAttempts) {
                         retryTimer = setTimeout(attemptCapture, 100);
@@ -1403,14 +1390,6 @@ function flattenExportTransforms(svgClone) {
                     setPlanSpeakerDimsImageDataUrl('__SKIP__');
                     return;
                 }
-
-                // STEP 1: Prefer tight content bounds if available
-                // rectFromExportCropBounds may include large empty margins,
-                // so only use it if it truly represents tight content.
-
-                const tightRect = union; // union should represent true content bounds
-
-                const baseRect = tightRect || rectFromExportCropBounds;
 
                 const xAttr = baseRect.x;
                 const yAttr = baseRect.y;
@@ -1454,9 +1433,9 @@ function flattenExportTransforms(svgClone) {
                     // Draw debug overlay before converting to PNG
                     drawDebugOverlay(ctx, canvas.width, canvas.height, {
                         planLabel: 'SPEAKER',
-                        baseRectSource: union ? 'union' : (tightRect ? 'tightRect' : 'cropRect'),
-                        cropRect: rectFromExportCropBounds,
-                        contentBbox: bboxFromContent,
+                        baseRectSource: (bbox && bbox.width > 0 && bbox.height > 0) ? 'bbox' : 'cropRect',
+                        cropRect: cropRect,
+                        contentBbox: bbox,
                         baseRect: baseRect,
                         viewBoxX,
                         viewBoxY,
