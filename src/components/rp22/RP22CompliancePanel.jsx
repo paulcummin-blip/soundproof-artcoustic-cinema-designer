@@ -523,6 +523,61 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     return "—";
   }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey]);
 
+  const getHudValueForParam = React.useCallback((paramId) => {
+    const pid = Number(paramId);
+
+    // RP23 uses the seat snapshot's rp23 value
+    if (reportSource === "rp23") {
+      const seatKey = defaultSeatKey.startsWith("seat:") ? defaultSeatKey.split(":")[1] : "mlp";
+      const snap = seatSnapshotsById[seatKey] || seatSnapshotsById["mlp"] || null;
+      return snap?.rp23?.formatted || snap?.rp23?.displayDeg ? `${snap.rp23.displayDeg}°` : "—";
+    }
+
+    // Room-level: prefer explicit room snapshot if provided
+    if (reportSource === "room") {
+      const roomSnap = roomHudSnapshot || analysisResult?.roomHudSnapshot || null;
+      const key = `p${pid}`;
+      const metric = roomSnap?.rp22?.[key];
+      if (!metric) return "—";
+      
+      // Priority: formatted > hudLabel > value+unit
+      if (metric.formatted) return metric.formatted;
+      if (metric.hudLabel) return metric.hudLabel;
+      if (Number.isFinite(metric.value)) {
+        const param = RP22_PARAMS.find(p => p.id === pid);
+        const unit = param?.unit || "";
+        return `${metric.value.toFixed(1)} ${unit}`.trim();
+      }
+      return "—";
+    }
+
+    // Seat-level
+    if (String(reportSource).startsWith("seat:")) {
+      const seatId = String(reportSource).split(":")[1];
+      const snap =
+        seatSnapshotsById?.[seatId] ||
+        seatSnapshotsById?.["mlp"] ||
+        (mlpSeatId ? seatSnapshotsById?.[mlpSeatId] : null) ||
+        null;
+
+      const key = `p${pid}`;
+      const metric = snap?.rp22?.[key];
+      if (!metric) return "—";
+      
+      // Priority: formatted > hudLabel > value+unit
+      if (metric.formatted) return metric.formatted;
+      if (metric.hudLabel) return metric.hudLabel;
+      if (Number.isFinite(metric.value)) {
+        const param = RP22_PARAMS.find(p => p.id === pid);
+        const unit = param?.unit || "";
+        return `${metric.value.toFixed(1)} ${unit}`.trim();
+      }
+      return "—";
+    }
+
+    return "—";
+  }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey]);
+
   return (
     <div>
       {/* Report Source */}
@@ -580,6 +635,8 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
       <div style={{ display: "grid", gap: 12 }}>
         {RP22_PARAMS.map((p) => {
           const lvl = getHudLevelForParam(p.id);
+          const achievedValue = getHudValueForParam(p.id);
+          const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
 
           return (
             <div key={p.id} style={card}>
@@ -593,18 +650,21 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
                     SCOPE: <strong>{p.scope.toUpperCase()}</strong>
                   </span>
                 </div>
+                {/* Achieved value line */}
+                <div style={{ fontSize: 11, color: "#1B1A1A", marginTop: 6, fontWeight: 600 }}>
+                  {isSeatScope ? "Achieved (RSP): " : "Achieved: "}
+                  <span style={{ color: "#213428" }}>{achievedValue}</span>
+                </div>
               </div>
 
               <div style={body}>
                 <div style={{ ...row, marginTop: 0 }}>
                   <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
                     <span style={{ fontSize: 12, color: "#625143" }}>
-                      {String(p.scope || "").toLowerCase() === "seat" ? "Per-seat levels" : "Achieved"}
+                      {isSeatScope ? "Per-seat levels" : "Level"}
                     </span>
                   </div>
                   {(() => {
-                    const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
-
                     // ROOM scope: keep existing single pill behaviour
                     if (!isSeatScope) {
                       return <span style={pillStyle(lvl)}>{levelText(lvl)}</span>;
