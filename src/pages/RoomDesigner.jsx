@@ -2609,12 +2609,15 @@ function RoomDesignerWithState() {
 
   // ✅ analysisResult uses internal overlay calculation (no props needed)
   const analysisResult = useRP22AnalysisEngine({
-    placedSpeakers: analysisSpeakers,
+    placedSpeakers: placedSpeakers,
     visiblePlanSpeakers: analysisSpeakers,
     seatingPositions: _seatingPositions,
     primarySeatingPosition: primarySeatingPosition,
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
     mlpBasis: _mlpBasis,
+    sevenBedLayoutType: appState?.sevenBedLayoutType,
+    extraSurroundCount: appState?.extraSurroundCount,
+    p15ConstructionLevel: appState?.p15ConstructionLevel,
     mlpPointOverride: mlpAnchorEffective, // Use same MLP as FW overlay (green dot)
     seatSplMetrics: allSeatSplMetrics,
     overheadState: {
