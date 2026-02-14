@@ -1630,6 +1630,8 @@ function useDesignerState() {
     extraSurroundCount,
     setExtraSurroundCount,
     mlp,
+    seatSnapshotBySeatId,
+    setSeatSnapshotBySeatId,
     };
   }, [
     dimensions, setDimensions,
@@ -1706,6 +1708,7 @@ function useDesignerState() {
     clearMlpOverride,
     extraSurroundCount,
     setExtraSurroundCount,
+    seatSnapshotBySeatId,
   ]);
 
   // Export p21 setter as convenience (same pattern as p15)
