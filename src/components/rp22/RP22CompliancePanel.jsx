@@ -459,24 +459,7 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     return byId;
   }, [seatHudSnapshots]);
 
-  const sourceOptions = React.useMemo(() => {
-    const seatIds = Object.keys(seatSnapshotsById);
 
-    // Prefer showing "mlp" first if present
-    const ordered = [
-      ...(seatIds.includes("mlp") ? ["mlp"] : []),
-      ...seatIds.filter((k) => k !== "mlp"),
-    ];
-
-    const seats = ordered.map((seatId) => ({
-      value: `seat:${seatId}`,
-      label: seatId === "mlp" ? "Seat: RSP (green dot)" : `Seat: ${seatId}`,
-    }));
-
-    const room = [{ value: "room", label: "Room (room-level results)" }];
-
-    return [...seats, ...room];
-  }, [seatSnapshotsById]);
 
   const defaultSeatKey = React.useMemo(() => {
     // Always prefer synthetic mlp if present
@@ -486,12 +469,7 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     return first ? `seat:${first}` : "room";
   }, [seatSnapshotsById, mlpSeatId]);
 
-  const [reportSource, setReportSource] = React.useState(defaultSeatKey);
-
-  React.useEffect(() => {
-    // If seats load later, keep the default stable and sensible
-    setReportSource((prev) => prev || defaultSeatKey);
-  }, [defaultSeatKey]);
+  const reportSource = defaultSeatKey;
 
   // Pull a usable numeric value out of HUD metric objects.
   // Metrics often store numbers as valueM/valueDb/valueDeg/etc (not metric.value).
@@ -618,35 +596,6 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
 
   return (
     <div>
-      {/* Report Source */}
-      <div style={{ ...card, marginBottom: 12 }}>
-        <div style={head}>
-          <div style={title}>Report Source</div>
-          <div style={sub}>Choose what the level pills reflect</div>
-        </div>
-        <div style={body}>
-          <select
-            value={reportSource}
-            onChange={(e) => setReportSource(e.target.value)}
-            style={{
-              width: "100%",
-              height: 40,
-              borderRadius: 10,
-              border: "1px solid #DCDBD6",
-              padding: "0 12px",
-              background: "#FFFFFF",
-              color: "#1B1A1A",
-              fontSize: 14,
-              outline: "none",
-            }}
-          >
-            {sourceOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
       {/* RP23 Screen Size Guide */}
       <div style={{ ...card, marginBottom: 12 }}>
         <div style={head}>
