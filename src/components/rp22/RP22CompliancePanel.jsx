@@ -52,6 +52,12 @@ const levelText = (lvl) => {
   return str; // Return as-is for "—", "N/A", etc.
 };
 
+// Format inequality symbols for display (replace ASCII with proper symbols)
+const fmtIneq = (s) =>
+  String(s ?? "")
+    .replaceAll(">=", "≥")
+    .replaceAll("<=", "≤");
+
 const pillStyle = (lvl) => {
   const base = {
     border: "1px solid #C1B6AD",
@@ -639,7 +645,7 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
                               ? "–"
                               : isEq
                               ? String(trg)
-                              : `${p.thresholds.direction} ${trg}${
+                              : `${fmtIneq(p.thresholds.direction)} ${trg}${
                                   p.unit === "°"
                                     ? "°"
                                     : p.unit === "Hz"
