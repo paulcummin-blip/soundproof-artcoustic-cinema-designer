@@ -52,11 +52,15 @@ const levelText = (lvl) => {
   return str; // Return as-is for "—", "N/A", etc.
 };
 
-// Format inequality symbols for display (replace ASCII with proper symbols)
-const fmtIneq = (s) =>
-  String(s ?? "")
-    .replaceAll(">=", "≥")
-    .replaceAll("<=", "≤");
+// Format inequality symbols for display (proper Unicode glyphs)
+const fmtIneq = (dir) => {
+  if (dir === ">=") return "≥";
+  if (dir === "<=") return "≤";
+  if (dir === ">") return ">";
+  if (dir === "<") return "<";
+  if (dir === "=") return "=";
+  return String(dir || "");
+};
 
 const pillStyle = (lvl) => {
   const base = {
@@ -490,6 +494,51 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     setReportSource((prev) => prev || defaultSeatKey);
   }, [defaultSeatKey]);
 
+  // Pull a usable numeric value out of HUD metric objects.
+  // Metrics often store numbers as valueM/valueDb/valueDeg/etc (not metric.value).
+  const getMetricNumericValue = (metric) => {
+    if (!metric || typeof metric !== "object") return null;
+
+    const candidates = [
+      metric.value,          // generic (rare in this app)
+      metric.valueM,
+      metric.valueDb,
+      metric.valueDeg,
+      metric.valueHz,
+      metric.valueMs,
+      metric.valueS,
+      metric.valuePct,
+      metric.valuePercent,
+      metric.valueRatio,
+    ];
+
+    for (const v of candidates) {
+      if (Number.isFinite(v)) return v;
+    }
+
+    // Last resort: first finite numeric in an object key starting with "value"
+    for (const [k, v] of Object.entries(metric)) {
+      if (k.startsWith("value") && Number.isFinite(v)) return v;
+    }
+
+    return null;
+  };
+
+  // Format fallback numeric values when formatted/hudLabel are missing.
+  const formatMetricFallback = (n, unit) => {
+    if (!Number.isFinite(n)) return "—";
+    const u = String(unit || "").trim();
+
+    if (u === "m") return `${n.toFixed(2)}m`;
+    if (u === "dB" || u === "± dB") return `${n.toFixed(1)} dB`;
+    if (u === "Hz") return `${Math.round(n)} Hz`;
+    if (u === "°") return `${Math.round(n)}°`;
+    if (u === "%") return `${Math.round(n)}%`;
+
+    // Default: keep a sensible precision without inventing meaning
+    return `${n.toFixed(2)} ${u}`.trim();
+  };
+
   const getHudLevelForParam = React.useCallback((paramId) => {
     const pid = Number(paramId);
 
@@ -543,11 +592,13 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
       // Priority: formatted > hudLabel > value+unit
       if (metric.formatted) return metric.formatted;
       if (metric.hudLabel) return metric.hudLabel;
-      if (Number.isFinite(metric.value)) {
-        const param = RP22_PARAMS.find(p => p.id === pid);
-        const unit = param?.unit || "";
-        return `${metric.value.toFixed(1)} ${unit}`.trim();
-      }
+      
+      const param = RP22_PARAMS.find(p => p.id === pid);
+      const unit = param?.unit || "";
+
+      const n = getMetricNumericValue(metric);
+      if (Number.isFinite(n)) return formatMetricFallback(n, unit);
+      
       return "—";
     }
 
@@ -567,11 +618,13 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
       // Priority: formatted > hudLabel > value+unit
       if (metric.formatted) return metric.formatted;
       if (metric.hudLabel) return metric.hudLabel;
-      if (Number.isFinite(metric.value)) {
-        const param = RP22_PARAMS.find(p => p.id === pid);
-        const unit = param?.unit || "";
-        return `${metric.value.toFixed(1)} ${unit}`.trim();
-      }
+      
+      const param = RP22_PARAMS.find(p => p.id === pid);
+      const unit = param?.unit || "";
+
+      const n = getMetricNumericValue(metric);
+      if (Number.isFinite(n)) return formatMetricFallback(n, unit);
+      
       return "—";
     }
 
