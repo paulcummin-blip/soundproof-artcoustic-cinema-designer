@@ -138,6 +138,7 @@ export function buildSeatHudSnapshot({
   splConfig = {},
   sevenBedMode = '',
   dolbyLayout = '5.1',
+  overlaysForRendering = {},
 }) {
   if (!seat) return null;
 
@@ -399,6 +400,14 @@ export function buildSeatHudSnapshot({
   {
     const extraSurroundPattern = /^(SL|SR)\d+$/;
 
+    // Front Wides are only valid if they are actually enabled by the current layout/toggles.
+    // If this is false, LW/RW must be ignored everywhere (no ghost wides in P17).
+    const frontWidesOn =
+      Boolean(overlaysForRendering?.enableFrontWides) ||
+      Boolean(overlaysForRendering?.FRONT_WIDE) ||
+      /^9\./.test(String(dolbyLayout || "")) ||
+      /^11\./.test(String(dolbyLayout || ""));
+
     const groupForRole = (role) => {
       const roleUpper = String(role || '').toUpperCase();
       if (extraSurroundPattern.test(roleUpper)) return 'Extra Surrounds';
@@ -424,10 +433,12 @@ export function buildSeatHudSnapshot({
       // Extra surrounds count as surrounds
       if (extraSurroundPattern.test(rawRoleUpper)) return true;
 
-      // Bed surrounds + wides
+      // Bed surrounds
       if (canon === "SL" || canon === "SR" ||
-          canon === "SBL" || canon === "SBR" ||
-          canon === "LW" || canon === "RW") return true;
+          canon === "SBL" || canon === "SBR") return true;
+
+      // Front Wides: ONLY if actually enabled
+      if ((canon === "LW" || canon === "RW") && frontWidesOn) return true;
 
       // Overheads (include any T* or U* just in case)
       if (String(canon).startsWith("T") || String(canon).startsWith("U")) return true;
@@ -649,7 +660,8 @@ export function buildSeatHudSnapshot({
       // P17 MUST BE N/A UNTIL REAL SL + SR SPEAKERS EXIST (NO GHOSTS)
       const _p17Candidates = (placedSpeakers || [])
         .filter(hasXY)
-        .filter(hasRealModel);
+        .filter(hasRealModel)
+        .filter((s) => isP17EligibleRole(getCanonicalRole(s.role), String(s.role || "").toUpperCase()));
 
       const _p17HasSL = _p17Candidates.some(s => getCanonicalRole(s.role) === "SL");
       const _p17HasSR = _p17Candidates.some(s => getCanonicalRole(s.role) === "SR");
