@@ -4267,7 +4267,7 @@ React.useEffect(() => {
   const lcrR = Number.isFinite(Number(lcrAngleInfo?.R)) ? Number(lcrAngleInfo.R) : 0;
 
   useEffect(() => {
-    if (!appState?.setSeatMetricsById) return;
+    if (!appState?.setSeatMetricsById && !appState?.setSeatSnapshotBySeatId) return;
     
     // CRITICAL: Freeze during print/export to prevent update loops
     if (exportMode === 'dimensions' || props.isPrinting) {
@@ -4285,7 +4285,8 @@ React.useEffect(() => {
     
     // Guard: if no seats, clear cache and exit
     if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
-      appState.setSeatMetricsById({});
+      if (appState?.setSeatMetricsById) appState.setSeatMetricsById({});
+      if (appState?.setSeatSnapshotBySeatId) appState.setSeatSnapshotBySeatId({});
       lastCacheSignatureRef.current = null;
       return;
     }
@@ -4439,6 +4440,7 @@ React.useEffect(() => {
     aimRearSurroundsAtMLP,
     dolbyLayout,
     appState?.setSeatMetricsById,
+    appState?.setSeatSnapshotBySeatId,
     appState?.splConfig,
     exportMode,
     props.isPrinting,
