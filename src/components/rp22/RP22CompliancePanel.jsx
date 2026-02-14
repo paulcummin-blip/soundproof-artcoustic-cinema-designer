@@ -544,11 +544,12 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     const scope = String(param?.scope || "").toLowerCase();
     const isRoomScope = scope === "room";
 
-    // Room-level: prefer explicit room snapshot if provided
+    // Room-level: read from RP22 engine (same source as RP22 Report page)
     if (isRoomScope) {
-      const roomSnap = roomHudSnapshot || analysisResult?.roomHudSnapshot || null;
-      const key = `p${pid}`;
-      return roomSnap?.rp22?.[key]?.level || "—";
+      // ROOM levels come from the RP22 engine (same source as the RP22 Report page)
+      const roomResult = analysisResult?.gradedParameters?.primary?.[pid] || null;
+      if (!roomResult || roomResult.status === "no_data") return "—";
+      return roomResult.level || "—";
     }
 
     // Seat-level
@@ -572,24 +573,26 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     const scope = String(param?.scope || "").toLowerCase();
     const isRoomScope = scope === "room";
 
-    // Room-level: prefer explicit room snapshot if provided
+    // Room-level: read from RP22 engine (same source as RP22 Report page)
     if (isRoomScope) {
-      const roomSnap = roomHudSnapshot || analysisResult?.roomHudSnapshot || null;
-      const key = `p${pid}`;
-      const metric = roomSnap?.rp22?.[key];
-      if (!metric) return "—";
-      
-      // Priority: formatted > hudLabel > value+unit
-      if (metric.formatted) return metric.formatted;
-      if (metric.hudLabel) return metric.hudLabel;
-      
-      const paramDef = RP22_PARAMS.find(p => p.id === pid);
-      const unit = paramDef?.unit || "";
+      // ROOM results come from the RP22 engine (same source as the RP22 Report page)
+      const roomResult = analysisResult?.gradedParameters?.primary?.[pid] || null;
+      if (!roomResult || roomResult.status === "no_data") return "—";
 
-      const n = getMetricNumericValue(metric);
-      if (Number.isFinite(n)) return formatMetricFallback(n, unit);
-      
-      return "—";
+      // Priority: formatted > value (+ unit)
+      if (roomResult.formatted) return roomResult.formatted;
+
+      const v = roomResult.value;
+      if (v === null || v === undefined) return "—";
+
+      // Match ParameterCard formatting behaviour
+      if (typeof v === "number" && Number.isFinite(v)) {
+        const paramDef = RP22_PARAMS.find(p => p.id === pid);
+        const unit = paramDef?.unit || "";
+        return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
+      }
+
+      return String(v);
     }
 
     // Seat-level
