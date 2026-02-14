@@ -474,9 +474,8 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     }));
 
     const room = [{ value: "room", label: "Room (room-level results)" }];
-    const rp23Seat = [{ value: "rp23", label: "RP23 (selected seat)" }];
 
-    return [...seats, ...room, ...rp23Seat];
+    return [...seats, ...room];
   }, [seatSnapshotsById]);
 
   const defaultSeatKey = React.useMemo(() => {
@@ -542,13 +541,6 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
   const getHudLevelForParam = React.useCallback((paramId) => {
     const pid = Number(paramId);
 
-    // RP23 uses the seat snapshot's rp23.level
-    if (reportSource === "rp23") {
-      const seatKey = defaultSeatKey.startsWith("seat:") ? defaultSeatKey.split(":")[1] : "mlp";
-      const snap = seatSnapshotsById[seatKey] || seatSnapshotsById["mlp"] || null;
-      return snap?.rp23?.level || "—";
-    }
-
     // Room-level: prefer explicit room snapshot if provided
     if (reportSource === "room") {
       const roomSnap = roomHudSnapshot || analysisResult?.roomHudSnapshot || null;
@@ -574,13 +566,6 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
 
   const getHudValueForParam = React.useCallback((paramId) => {
     const pid = Number(paramId);
-
-    // RP23 uses the seat snapshot's rp23 value
-    if (reportSource === "rp23") {
-      const seatKey = defaultSeatKey.startsWith("seat:") ? defaultSeatKey.split(":")[1] : "mlp";
-      const snap = seatSnapshotsById[seatKey] || seatSnapshotsById["mlp"] || null;
-      return snap?.rp23?.formatted || snap?.rp23?.displayDeg ? `${snap.rp23.displayDeg}°` : "—";
-    }
 
     // Room-level: prefer explicit room snapshot if provided
     if (reportSource === "room") {
