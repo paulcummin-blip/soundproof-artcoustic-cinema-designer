@@ -469,7 +469,30 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     return first ? `seat:${first}` : "room";
   }, [seatSnapshotsById, mlpSeatId]);
 
-  const reportSource = defaultSeatKey;
+  // Always drive Compliance Report from the RSP/primary seat snapshot.
+  // Priority:
+  // 1) mlpSeatId (passed from RoomDesigner)
+  // 2) any seat flagged isPrimary in seatingPositions
+  // 3) "mlp" if present in cache
+  // 4) first available seat in cache
+  const lockedSeatId = React.useMemo(() => {
+    const fromProp = String(mlpSeatId || "").trim();
+    if (fromProp && seatSnapshotsById?.[fromProp]) return fromProp;
+
+    const primaryFromSeats = (Array.isArray(seatingPositions) ? seatingPositions : [])
+      .find(s => s?.isPrimary && s?.id);
+    const primaryId = String(primaryFromSeats?.id || "").trim();
+    if (primaryId && seatSnapshotsById?.[primaryId]) return primaryId;
+
+    if (seatSnapshotsById?.["mlp"]) return "mlp";
+
+    const first = Object.keys(seatSnapshotsById || {})[0];
+    return first || "";
+  }, [mlpSeatId, seatingPositions, seatSnapshotsById]);
+
+  const reportSource = React.useMemo(() => {
+    return lockedSeatId ? `seat:${lockedSeatId}` : "room";
+  }, [lockedSeatId]);
 
   // Pull a usable numeric value out of HUD metric objects.
   // Metrics often store numbers as valueM/valueDb/valueDeg/etc (not metric.value).
