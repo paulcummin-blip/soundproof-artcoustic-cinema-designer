@@ -4350,10 +4350,12 @@ React.useEffect(() => {
     }
 
     // Compute for all seats with per-seat error isolation
-    const nextMetrics = {};
+    const nextByCacheKey = {};
+    const nextBySeatId = {};
+
     for (const seat of seatingPositions) {
       if (!seat?.id) continue;
-      
+
       try {
         const snapshot = buildSeatHudSnapshot({
           seat,
@@ -4376,21 +4378,44 @@ React.useEffect(() => {
           sevenBedMode,
           dolbyLayout,
         });
-        
+
         if (snapshot) {
-          nextMetrics[String(seat.id)] = { ...snapshot };
+          // Cache map (with signature for invalidation)
+          const cacheKey = `${seat.id}|${signature}`;
+          nextByCacheKey[cacheKey] = { ...snapshot };
+
+          // Plain seat id map (NEW - always available for Compliance Report)
+          nextBySeatId[String(seat.id)] = { ...snapshot };
         }
       } catch (err) {
         console.warn(`[SeatMetrics] failed seat ${seat.id}:`, err);
         // Keep previous value on error (don't replace with dashes)
-        const prev = appState?.seatMetricsById?.[seat.id];
-        if (prev) {
-          nextMetrics[seat.id] = prev;
+        const cacheKey = `${seat.id}|${signature}`;
+        const prevCache = appState?.seatMetricsById?.[cacheKey];
+        const prevPlain = appState?.seatSnapshotBySeatId?.[seat.id];
+
+        if (prevCache) {
+          nextByCacheKey[cacheKey] = prevCache;
+        }
+        if (prevPlain) {
+          nextBySeatId[seat.id] = prevPlain;
         }
       }
     }
 
-    appState.setSeatMetricsById(nextMetrics);
+    // Commit both maps (safe, idempotent)
+    if (appState?.setSeatMetricsById) {
+      const prev = appState.seatMetricsById || {};
+      const shouldWrite = JSON.stringify(prev) !== JSON.stringify(nextByCacheKey);
+      if (shouldWrite) appState.setSeatMetricsById(nextByCacheKey);
+    }
+
+    if (appState?.setSeatSnapshotBySeatId) {
+      const prev = appState.seatSnapshotBySeatId || {};
+      const shouldWrite = JSON.stringify(prev) !== JSON.stringify(nextBySeatId);
+      if (shouldWrite) appState.setSeatSnapshotBySeatId(nextBySeatId);
+    }
+
     lastCacheSignatureRef.current = signature;
     
   }, [

@@ -5104,7 +5104,13 @@ function RoomDesignerWithState() {
                         analysisResult={analysisResult} 
                         screen={_screen}
                         seatingPositions={_seatingPositions}
-                        seatHudSnapshots={(appState?.seatMetricsById && Object.keys(appState.seatMetricsById).length > 0) ? appState.seatMetricsById : (appState?.perSeatMetrics || {})}
+                        seatHudSnapshots={
+                          (appState?.seatSnapshotBySeatId && Object.keys(appState.seatSnapshotBySeatId).length > 0)
+                            ? appState.seatSnapshotBySeatId
+                            : ((appState?.seatMetricsById && Object.keys(appState.seatMetricsById).length > 0)
+                                ? appState.seatMetricsById
+                                : {})
+                        }
                         mlpSeatId={primarySeatingPosition?.id || "mlp"} />
                   </Suspense>
               </CollapsiblePanel>
