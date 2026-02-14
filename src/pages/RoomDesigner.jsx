@@ -5111,6 +5111,7 @@ function RoomDesignerWithState() {
                                 ? appState.seatMetricsById
                                 : {})
                         }
+                        roomHudSnapshot={appState?.roomHudSnapshot || analysisResult?.roomHudSnapshot || null}
                         mlpSeatId={primarySeatingPosition?.id || "mlp"} />
                   </Suspense>
               </CollapsiblePanel>

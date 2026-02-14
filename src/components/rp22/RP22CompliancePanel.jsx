@@ -539,11 +539,13 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     return `${n.toFixed(2)} ${u}`.trim();
   };
 
-  const getHudLevelForParam = React.useCallback((paramId) => {
-    const pid = Number(paramId);
+  const getHudLevelForParam = React.useCallback((param) => {
+    const pid = Number(param?.id);
+    const scope = String(param?.scope || "").toLowerCase();
+    const isRoomScope = scope === "room";
 
     // Room-level: prefer explicit room snapshot if provided
-    if (reportSource === "room") {
+    if (isRoomScope) {
       const roomSnap = roomHudSnapshot || analysisResult?.roomHudSnapshot || null;
       const key = `p${pid}`;
       return roomSnap?.rp22?.[key]?.level || "—";
@@ -565,11 +567,13 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     return "—";
   }, [reportSource, seatSnapshotsById, roomHudSnapshot, analysisResult, mlpSeatId, defaultSeatKey]);
 
-  const getHudValueForParam = React.useCallback((paramId) => {
-    const pid = Number(paramId);
+  const getHudValueForParam = React.useCallback((param) => {
+    const pid = Number(param?.id);
+    const scope = String(param?.scope || "").toLowerCase();
+    const isRoomScope = scope === "room";
 
     // Room-level: prefer explicit room snapshot if provided
-    if (reportSource === "room") {
+    if (isRoomScope) {
       const roomSnap = roomHudSnapshot || analysisResult?.roomHudSnapshot || null;
       const key = `p${pid}`;
       const metric = roomSnap?.rp22?.[key];
@@ -579,8 +583,8 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
       if (metric.formatted) return metric.formatted;
       if (metric.hudLabel) return metric.hudLabel;
       
-      const param = RP22_PARAMS.find(p => p.id === pid);
-      const unit = param?.unit || "";
+      const paramDef = RP22_PARAMS.find(p => p.id === pid);
+      const unit = paramDef?.unit || "";
 
       const n = getMetricNumericValue(metric);
       if (Number.isFinite(n)) return formatMetricFallback(n, unit);
@@ -644,8 +648,8 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
       {/* RP22 Parameters (1–21) */}
       <div style={{ display: "grid", gap: 12 }}>
         {RP22_PARAMS.map((p) => {
-          const lvl = getHudLevelForParam(p.id);
-          const achievedValue = getHudValueForParam(p.id);
+          const lvl = getHudLevelForParam(p);
+          const achievedValue = getHudValueForParam(p);
           const isSeatScope = String(p.scope || "").toLowerCase() === "seat";
 
           return (
