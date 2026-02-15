@@ -2688,8 +2688,13 @@ function RoomDesignerWithState() {
       const depthM = Number(subDims.depthM);
       const heightM = Number(subDims.heightM);
 
+      // Only warn if this is a real config problem (not just "off" state)
       if (isNaN(widthM) || isNaN(depthM) || isNaN(heightM) || widthM <= 0 || depthM <= 0 || heightM <= 0) {
-        warnings.push("Invalid subwoofer model dimensions.");
+        if (!subDims.notFound) {
+          warnings.push("Invalid subwoofer model dimensions.");
+        } else {
+          warnings.push(`No dimensions found for ${model}.`);
+        }
         setSubWarnings((prev) => ({ ...prev, front: warnings }));
         return [];
       }
@@ -2807,7 +2812,14 @@ function RoomDesignerWithState() {
       const depthM = Number(subDims.depthM);
       const heightM = Number(subDims.heightM);
 
-      if (!widthM || !depthM || !heightM) return [];
+      // Only warn if this is a real config problem (not just "off" state)
+      if (!widthM || !depthM || !heightM) {
+        if (subDims.notFound) {
+          warnings.push(`No dimensions found for ${model}.`);
+          setSubWarnings((prev) => ({ ...prev, rear: warnings }));
+        }
+        return [];
+      }
 
       const leftRefX = (FL.position.x + FC.position.x) / 2;
       const rightRefX = (FC.position.x + FR.position.x) / 2;
