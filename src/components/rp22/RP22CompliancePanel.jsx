@@ -781,9 +781,9 @@ export default function RP22CompliancePanel({
                     </span>
                   </div>
                   {(() => {
-                    // ROOM scope: keep existing single pill behaviour
+                    // ROOM scope: use same pill as HUD + RP22 Report
                     if (!isSeatScope) {
-                      return <span style={pillStyle(lvl)}>{levelText(lvl)}</span>;
+                      return <RP22GradingPill level={lvl} />;
                     }
 
                     // SEAT scope: NO overall pill, only per-seat pill grid
