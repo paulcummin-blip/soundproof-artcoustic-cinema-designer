@@ -539,6 +539,34 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     return `${n.toFixed(2)} ${u}`.trim();
   };
 
+  // Grade a value against RP22 thresholds (returns "L1".."L4" or "—")
+  const gradeByThresholds = (thresholds, v) => {
+    if (!thresholds || !Number.isFinite(v)) return "—";
+
+    const dir = String(thresholds.direction || "").trim();
+    const L1 = Number(thresholds.L1);
+    const L2 = Number(thresholds.L2);
+    const L3 = Number(thresholds.L3);
+    const L4 = Number(thresholds.L4);
+
+    const okNum = (n) => typeof n === "number" && Number.isFinite(n);
+
+    if (dir === "<=") {
+      if (okNum(L4) && v <= L4) return "L4";
+      if (okNum(L3) && v <= L3) return "L3";
+      if (okNum(L2) && v <= L2) return "L2";
+      if (okNum(L1) && v <= L1) return "L1";
+      return "—";
+    }
+
+    // default >=
+    if (okNum(L4) && v >= L4) return "L4";
+    if (okNum(L3) && v >= L3) return "L3";
+    if (okNum(L2) && v >= L2) return "L2";
+    if (okNum(L1) && v >= L1) return "L1";
+    return "—";
+  };
+
   const getHudLevelForParam = React.useCallback((param) => {
     const pid = Number(param?.id);
     const scope = String(param?.scope || "").toLowerCase();
@@ -546,10 +574,22 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
 
     // Room-level: read from RP22 engine (same source as RP22 Report page)
     if (isRoomScope) {
-      // ROOM levels come from the RP22 engine (same source as the RP22 Report page)
       const roomResult = analysisResult?.gradedParameters?.primary?.[pid] || null;
-      if (!roomResult || roomResult.status === "no_data") return "—";
-      return roomResult.level || "—";
+
+      // Preferred: engine-provided level
+      if (roomResult && roomResult.status !== "no_data") {
+        return roomResult.level || "—";
+      }
+
+      // Fallback: derive level from thresholds using valueFromAnalysis
+      const paramDef = RP22_PARAMS.find(p => p.id === pid);
+      const raw = typeof paramDef?.valueFromAnalysis === "function"
+        ? paramDef.valueFromAnalysis(analysisResult)
+        : null;
+
+      if (!(typeof raw === "number" && Number.isFinite(raw))) return "—";
+
+      return gradeByThresholds(paramDef?.thresholds, raw);
     }
 
     // Seat-level
@@ -575,24 +615,38 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
 
     // Room-level: read from RP22 engine (same source as RP22 Report page)
     if (isRoomScope) {
-      // ROOM results come from the RP22 engine (same source as the RP22 Report page)
       const roomResult = analysisResult?.gradedParameters?.primary?.[pid] || null;
-      if (!roomResult || roomResult.status === "no_data") return "—";
 
-      // Priority: formatted > value (+ unit)
-      if (roomResult.formatted) return roomResult.formatted;
+      // Preferred: engine-provided room result (same as RP22 Report)
+      if (roomResult && roomResult.status !== "no_data") {
+        if (roomResult.formatted) return roomResult.formatted;
 
-      const v = roomResult.value;
-      if (v === null || v === undefined) return "—";
+        const v = roomResult.value;
+        if (v === null || v === undefined) return "—";
 
-      // Match ParameterCard formatting behaviour
-      if (typeof v === "number" && Number.isFinite(v)) {
-        const paramDef = RP22_PARAMS.find(p => p.id === pid);
-        const unit = paramDef?.unit || "";
-        return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
+        if (typeof v === "number" && Number.isFinite(v)) {
+          const paramDef = RP22_PARAMS.find(p => p.id === pid);
+          const unit = paramDef?.unit || "";
+          return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
+        }
+
+        return String(v);
       }
 
-      return String(v);
+      // Fallback: compute value straight from analysisResult (so ROOM never shows blank)
+      const paramDef = RP22_PARAMS.find(p => p.id === pid);
+      const raw = typeof paramDef?.valueFromAnalysis === "function"
+        ? paramDef.valueFromAnalysis(analysisResult)
+        : null;
+
+      if (raw === null || raw === undefined) return "—";
+
+      if (typeof raw === "number" && Number.isFinite(raw)) {
+        const unit = paramDef?.unit || "";
+        return unit ? `${raw.toFixed(1)} ${unit}` : raw.toFixed(1);
+      }
+
+      return String(raw);
     }
 
     // Seat-level
