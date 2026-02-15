@@ -34,6 +34,15 @@ function statusColor(s) {
   return BRAND.border;
 }
 
+function statusBorderAndTint(s) {
+  const v = (s || "").toLowerCase();
+  if (v === "live") return { border: "#213428", tint: "#F1F0EE" };
+  if (v === "prospective") return { border: "#625143", tint: "#F8F8F7" };
+  if (v === "lost") return { border: "#4A230F", tint: "#F1F0EE" };
+  if (v === "completed") return { border: "#3E4349", tint: "#F8F8F7" };
+  return { border: BRAND.border, tint: BRAND.card };
+}
+
 function matchesStatus(p, filter) {
   if (!filter || filter === "All Statuses") return true;
   return (p.status || "").toLowerCase() === filter.toLowerCase();
@@ -482,13 +491,13 @@ export default function ProjectsPage() {
       }
     }
 
-    const borderColour = statusColor(localStatus);
+    const { border: borderColour, tint: tintColour } = statusBorderAndTint(localStatus);
 
     return (
       <div
         style={{
-          background: BRAND.card,
-          border: `2px solid ${borderColour}`,
+          background: tintColour,
+          border: `3px solid ${borderColour}`,
           borderRadius: 12,
           padding: 16,
           display: "flex",
