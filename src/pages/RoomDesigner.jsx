@@ -1807,6 +1807,10 @@ function RoomDesignerWithState() {
   const _baselineSeatingPositions = appState?.baselineSeatingPositions;
   const _setBaselineSeatingPositions = appState?.setBaselineSeatingPositions;
   const _seatingRows = appState?.seatingRows;
+
+  // Match RP22Report: always pass arrays into the RP22 engine
+  const seats = Array.isArray(_seatingPositions) ? _seatingPositions : [];
+  const engineSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
   const _seatsPerRow = appState?.seatsPerRow;
   const _seatsPerRowByRow = appState?.seatsPerRowByRow; // NEW
   const _setSeatsPerRowByRow = appState?.setSeatsPerRowByRow; // NEW
@@ -2516,7 +2520,7 @@ function RoomDesignerWithState() {
   // Derive primarySeatingPosition for backwards compatibility with existing code
   const primarySeatingPosition = useMemo(() => {
     const { primary } = computeMLPAndPrimary(
-      _seatingPositions || [],
+      seats,
       stableDimensions.width,
       stableDimensions.length,
       _mlpBasis
