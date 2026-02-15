@@ -27,8 +27,8 @@ const STATUS = ["Live", "Prospective", "Lost", "Completed"];
 
 const STATUS_COLORS = {
   live: "#213428",
-  prospective: "#C1B6AD",
-  lost: "#4A230F",
+  prospective: "#4A230F",
+  lost: "#C1B6AD",
   completed: "#3E4349",
 };
 
