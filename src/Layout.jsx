@@ -138,23 +138,24 @@ export default function Layout({ children, currentPageName }) {
                       href={item.url}
                       className={`
                         group flex items-center gap-3 px-3 py-2 rounded-md text-sm
-                        border border-transparent
-                        transition-all duration-150 ease-out
-                        hover:-translate-y-[1px] hover:shadow-sm
-                        active:translate-y-0 active:shadow-none
+                        border transition-all duration-200 ease-out
+                        cursor-pointer select-none
                         ${
                           currentPageName === item.title.replace(/\s+/g, '')
-                            ? 'bg-brand-menu-active text-brand-primary border-brand-primary shadow-sm'
-                            : 'text-brand-text-muted hover:bg-brand-background hover:text-brand-text-label'
+                            ? 'bg-brand-menu-active text-brand-primary border-brand-primary shadow-md'
+                            : 'text-brand-text-muted border-transparent bg-transparent'
                         }
+                        hover:bg-white hover:border-[#D9D5CE] hover:text-brand-text-label
+                        hover:shadow-md hover:-translate-y-[2px]
+                        active:translate-y-0 active:shadow-sm
                       `}
                     >
                       <item.icon
-                        className={`w-4 h-4 transition-colors ${
+                        className={`w-4 h-4 transition-all duration-200 ${
                           currentPageName === item.title.replace(/\s+/g, '')
                             ? 'text-brand-primary'
                             : 'text-brand-text-muted group-hover:text-brand-text-label'
-                        }`}
+                        } group-hover:-translate-y-[1px]`}
                       />
                       <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
                         {item.title}

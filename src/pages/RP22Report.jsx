@@ -1600,11 +1600,18 @@ function flattenExportTransforms(svgClone) {
 
     // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
     // Total is always 10 (RP23 + 9 RP22 params: P1, P4, P5, P6, P9, P10, P16, P17, P20)
+    const lastSeatIdsRef = React.useRef([]);
+    const lastSeatLevelCountsRef = React.useRef([]);
+    
     const seatLevelCounts = React.useMemo(() => {
-        // Always iterate real seats (so cards never disappear)
-        const seatIds = (safeArray(seats).map(s => s?.id).filter(Boolean)).sort();
+        const seatIdsNow = (safeArray(seats).map(s => s?.id).filter(Boolean)).sort();
         
-        return seatIds.map(seatId => {
+        // If seats briefly resolves to [], keep the last known seat list so cards don't vanish
+        const seatIds = seatIdsNow.length ? seatIdsNow : lastSeatIdsRef.current;
+        
+        if (seatIdsNow.length) lastSeatIdsRef.current = seatIdsNow;
+        
+        const next = seatIds.map(seatId => {
             const counts = { L1: 0, L2: 0, L3: 0, L4: 0 };
             
             // SINGLE SOURCE OF TRUTH: use latest seat snapshot (matches HUD exactly)
@@ -1655,7 +1662,15 @@ function flattenExportTransforms(svgClone) {
             
             return { seatId, counts, total };
         });
-    }, [reportSeatHudById, app?.seatMetricsById, seats]);
+        
+        // If we somehow computed nothing, keep last good result
+        if (!next.length && lastSeatLevelCountsRef.current.length) {
+            return lastSeatLevelCountsRef.current;
+        }
+        
+        lastSeatLevelCountsRef.current = next;
+        return next;
+    }, [reportSeatHudById, app?.seatSnapshotBySeatId, app?.seatMetricsById, seats]);
 
     // Group seat counts by row, sorted by seat number within each row
     const seatCountsByRow = React.useMemo(() => {
