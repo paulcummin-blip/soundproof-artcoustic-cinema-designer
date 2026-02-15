@@ -2704,12 +2704,33 @@ function flattenExportTransforms(svgClone) {
                                                     {formatSeatLabel(seatId)}
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                <RP22GradingPill level="L4" count={counts.L4} />
-                                                <RP22GradingPill level="L3" count={counts.L3} />
-                                                <RP22GradingPill level="L2" count={counts.L2} />
-                                                <RP22GradingPill level="L1" count={counts.L1} />
-                                            </div>
+                                            {(() => {
+                                              const maxSeat = Math.max(
+                                                Number(counts?.L4 ?? 0),
+                                                Number(counts?.L3 ?? 0),
+                                                Number(counts?.L2 ?? 0),
+                                                Number(counts?.L1 ?? 0)
+                                              );
+
+                                              const seatIsMax = (k) => Number(counts?.[k] ?? 0) === maxSeat;
+
+                                              return (
+                                                <div className="flex gap-2">
+                                                  <div style={{ transform: seatIsMax('L4') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
+                                                    <RP22GradingPill level="L4" count={counts.L4} />
+                                                  </div>
+                                                  <div style={{ transform: seatIsMax('L3') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
+                                                    <RP22GradingPill level="L3" count={counts.L3} />
+                                                  </div>
+                                                  <div style={{ transform: seatIsMax('L2') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
+                                                    <RP22GradingPill level="L2" count={counts.L2} />
+                                                  </div>
+                                                  <div style={{ transform: seatIsMax('L1') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
+                                                    <RP22GradingPill level="L1" count={counts.L1} />
+                                                  </div>
+                                                </div>
+                                              );
+                                            })()}
                                             </div>
                                             );
                                             })}
@@ -2981,12 +3002,33 @@ function flattenExportTransforms(svgClone) {
                                         Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                     </div>
 
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
-                                        <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
-                                        <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
-                                        <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
-                                        <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
-                                    </div>
+                                    {(() => {
+                                      const maxRoom = Math.max(
+                                        Number(roomLevelCounts?.L4 ?? 0),
+                                        Number(roomLevelCounts?.L3 ?? 0),
+                                        Number(roomLevelCounts?.L2 ?? 0),
+                                        Number(roomLevelCounts?.L1 ?? 0)
+                                      );
+
+                                      const roomIsMax = (k) => Number(roomLevelCounts?.[k] ?? 0) === maxRoom;
+
+                                      return (
+                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
+                                          <div style={{ transform: roomIsMax('L4') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
+                                            <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
+                                          </div>
+                                          <div style={{ transform: roomIsMax('L3') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
+                                            <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
+                                          </div>
+                                          <div style={{ transform: roomIsMax('L2') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
+                                            <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
+                                          </div>
+                                          <div style={{ transform: roomIsMax('L1') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
+                                            <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
+                                          </div>
+                                        </div>
+                                      );
+                                    })()}
                                 </div>
 
                                 {/* Seat parameters */}
