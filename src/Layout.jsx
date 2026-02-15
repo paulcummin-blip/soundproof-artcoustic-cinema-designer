@@ -137,14 +137,25 @@ export default function Layout({ children, currentPageName }) {
                       key={item.title}
                       href={item.url}
                       className={`
-                        flex items-center gap-3 px-3 py-2 rounded-md text-sm
-                        ${currentPageName === item.title.replace(/\s+/g, '') ? 
-                          'bg-brand-menu-active text-brand-primary border-l-2 border-brand-primary' : 
-                          'text-brand-text-muted hover:bg-brand-background hover:text-brand-text-label'
+                        group flex items-center gap-3 px-3 py-2 rounded-md text-sm
+                        border border-transparent
+                        transition-all duration-150 ease-out
+                        hover:-translate-y-[1px] hover:shadow-sm
+                        active:translate-y-0 active:shadow-none
+                        ${
+                          currentPageName === item.title.replace(/\s+/g, '')
+                            ? 'bg-brand-menu-active text-brand-primary border-brand-primary shadow-sm'
+                            : 'text-brand-text-muted hover:bg-brand-background hover:text-brand-text-label'
                         }
                       `}
                     >
-                      <item.icon className="w-4 h-4" />
+                      <item.icon
+                        className={`w-4 h-4 transition-colors ${
+                          currentPageName === item.title.replace(/\s+/g, '')
+                            ? 'text-brand-primary'
+                            : 'text-brand-text-muted group-hover:text-brand-text-label'
+                        }`}
+                      />
                       <span style={{ fontFamily: 'Didact Gothic, sans-serif' }}>
                         {item.title}
                       </span>
