@@ -2671,12 +2671,41 @@ function flattenExportTransforms(svgClone) {
                                     Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                 </div>
                             </div>
-                            <div className="flex gap-2">
-                                <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
-                                <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
-                                <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
-                                <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
-                            </div>
+                            {(() => {
+                              const maxRoom = Math.max(
+                                Number(roomLevelCounts?.L4 ?? 0),
+                                Number(roomLevelCounts?.L3 ?? 0),
+                                Number(roomLevelCounts?.L2 ?? 0),
+                                Number(roomLevelCounts?.L1 ?? 0)
+                              );
+
+                              const isMax = (k) => Number(roomLevelCounts?.[k] ?? 0) === maxRoom;
+
+                              const wrap = (flag, child) => (
+                                <div style={{ transform: flag ? "scale(1.25)" : "none", transformOrigin: "center" }}>
+                                  {child}
+                                </div>
+                              );
+
+                              return (
+                                <div
+                                  style={{
+                                    display: "flex",
+                                    justifyContent: "center",
+                                    alignItems: "center",
+                                    gap: "12px",
+                                    paddingTop: "4px",
+                                    paddingBottom: "4px",
+                                    minHeight: "44px",
+                                  }}
+                                >
+                                  {wrap(isMax("L4"), <RP22GradingPill level="L4" count={roomLevelCounts.L4} />)}
+                                  {wrap(isMax("L3"), <RP22GradingPill level="L3" count={roomLevelCounts.L3} />)}
+                                  {wrap(isMax("L2"), <RP22GradingPill level="L2" count={roomLevelCounts.L2} />)}
+                                  {wrap(isMax("L1"), <RP22GradingPill level="L1" count={roomLevelCounts.L1} />)}
+                                </div>
+                              );
+                            })()}
                         </div>
                     </div>
 
@@ -2698,7 +2727,7 @@ function flattenExportTransforms(svgClone) {
                                     {seats.map(({ seatId, counts, total }) => {
                                         const isPrimary = analysisResult?.perSeatRp22?.[seatId]?.isPrimary === true;
                                         return (
-                                        <div key={seatId} className={`rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px] ${isPrimary ? 'border-[3px] border-[#213428]' : 'border-2 border-[#213428]'}`}>
+                                        <div key={seatId} className={`rounded-lg px-4 py-4 bg-white w-[280px] min-h-[88px] ${isPrimary ? 'border-[3px] border-[#213428]' : 'border-2 border-[#213428]'}`}>
                                             <div className="flex items-center gap-2 mb-2">
                                                 <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                                     {formatSeatLabel(seatId)}
@@ -3065,25 +3094,50 @@ function flattenExportTransforms(svgClone) {
                                         Seat parameters ({seats?.length || 0} seats)
                                     </div>
 
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
-                                        {(() => {
-                                            const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
-                                            (seatLevelCounts || []).forEach(s => {
-                                                agg.L4 += s.counts?.L4 || 0;
-                                                agg.L3 += s.counts?.L3 || 0;
-                                                agg.L2 += s.counts?.L2 || 0;
-                                                agg.L1 += s.counts?.L1 || 0;
-                                            });
-                                            return (
-                                                <>
-                                                    <RP22GradingPill level="L4" count={agg.L4} />
-                                                    <RP22GradingPill level="L3" count={agg.L3} />
-                                                    <RP22GradingPill level="L2" count={agg.L2} />
-                                                    <RP22GradingPill level="L1" count={agg.L1} />
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
+                                    {(() => {
+                                        const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
+                                        (seatLevelCounts || []).forEach(s => {
+                                            agg.L4 += s.counts?.L4 || 0;
+                                            agg.L3 += s.counts?.L3 || 0;
+                                            agg.L2 += s.counts?.L2 || 0;
+                                            agg.L1 += s.counts?.L1 || 0;
+                                        });
+
+                                        const maxAgg = Math.max(
+                                            Number(agg?.L4 ?? 0),
+                                            Number(agg?.L3 ?? 0),
+                                            Number(agg?.L2 ?? 0),
+                                            Number(agg?.L1 ?? 0)
+                                        );
+
+                                        const isMax = (k) => Number(agg?.[k] ?? 0) === maxAgg;
+
+                                        const wrap = (flag, child) => (
+                                            <div style={{ transform: flag ? "scale(1.25)" : "none", transformOrigin: "center" }}>
+                                                {child}
+                                            </div>
+                                        );
+
+                                        return (
+                                            <div
+                                                style={{
+                                                    display: "flex",
+                                                    justifyContent: "center",
+                                                    alignItems: "center",
+                                                    gap: "7mm",
+                                                    paddingTop: "2mm",
+                                                    paddingBottom: "2mm",
+                                                    minHeight: "16mm",
+                                                    fontSize: "110%",
+                                                }}
+                                            >
+                                                {wrap(isMax("L4"), <RP22GradingPill level="L4" count={agg.L4} />)}
+                                                {wrap(isMax("L3"), <RP22GradingPill level="L3" count={agg.L3} />)}
+                                                {wrap(isMax("L2"), <RP22GradingPill level="L2" count={agg.L2} />)}
+                                                {wrap(isMax("L1"), <RP22GradingPill level="L1" count={agg.L1} />)}
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* Screen & Viewing Geometry */}
