@@ -2528,7 +2528,7 @@ function RoomDesignerWithState() {
     // Lock MLP X to centerline for analysis purposes
     const roomWidth = stableDimensions.width;
     return primary ? { ...primary, x: roomWidth / 2 } : null;
-  }, [_seatingPositions, stableDimensions.width, stableDimensions.length, _mlpBasis]);
+  }, [seats, stableDimensions.width, stableDimensions.length, _mlpBasis]);
 
   // ✅ Compute frontWideZones BEFORE analysisResult to avoid TDZ
   const enableFrontWides = _enableFrontWides;
@@ -2613,9 +2613,9 @@ function RoomDesignerWithState() {
 
   // ✅ analysisResult uses internal overlay calculation (no props needed)
   const analysisResult = useRP22AnalysisEngine({
-    placedSpeakers: placedSpeakers,
+    placedSpeakers: engineSpeakers,
     visiblePlanSpeakers: analysisSpeakers,
-    seatingPositions: _seatingPositions,
+    seatingPositions: seats,
     primarySeatingPosition: primarySeatingPosition,
     dimensions: stableDimensions, // Use stableDimensions (derived from appState.roomDims)
     mlpBasis: _mlpBasis,
