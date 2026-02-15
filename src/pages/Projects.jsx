@@ -26,10 +26,10 @@ const BRAND = {
 const STATUS = ["Live", "Prospective", "Lost", "Completed"];
 
 const STATUS_BORDER_COLOURS = {
-  Live: "#213428",
-  Prospective: "#625143",
-  Completed: "#3E4349",
-  Lost: "#4A230F"
+  live: "#213428",
+  prospective: "#625143",
+  completed: "#3E4349",
+  lost: "#4A230F"
 };
 
 function statusColor(s) {
@@ -489,11 +489,14 @@ export default function ProjectsPage() {
       }
     }
 
+    const statusKey = String(localStatus || p?.status || "").trim().toLowerCase();
+    const borderColour = STATUS_BORDER_COLOURS[statusKey] || BRAND.border;
+
     return (
       <div
         style={{
           background: BRAND.card,
-          border: `2px solid ${STATUS_BORDER_COLOURS[localStatus] || BRAND.border}`,
+          border: `2px solid ${borderColour}`,
           borderRadius: 12,
           padding: 16,
           display: "flex",
