@@ -572,24 +572,42 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     const scope = String(param?.scope || "").toLowerCase();
     const isRoomScope = scope === "room";
 
-    // Room-level: read from RP22 engine (same source as RP22 Report page)
+    // Room-level: prefer RP22 engine result; fallback to valueFromAnalysis + thresholds
     if (isRoomScope) {
       const roomResult = analysisResult?.gradedParameters?.primary?.[pid] || null;
 
-      // Preferred: engine-provided level
+      // 1) Preferred: gradedParameters (RP22 Report path)
       if (roomResult && roomResult.status !== "no_data") {
-        return roomResult.level || "—";
+        const lvlRaw = roomResult.level;
+
+        // normalise "L3" -> 3 (panel UI expects 0–4)
+        if (typeof lvlRaw === "string" && /^L[1-4]$/i.test(lvlRaw)) {
+          return Number(String(lvlRaw).slice(1));
+        }
+        if (typeof lvlRaw === "number" && Number.isFinite(lvlRaw)) {
+          return lvlRaw;
+        }
+        // If it's something unexpected, treat as unknown
+        return 0;
       }
 
-      // Fallback: derive level from thresholds using valueFromAnalysis
+      // 2) Fallback: compute from analysisResult directly
       const paramDef = RP22_PARAMS.find(p => p.id === pid);
       const raw = typeof paramDef?.valueFromAnalysis === "function"
         ? paramDef.valueFromAnalysis(analysisResult)
         : null;
 
-      if (!(typeof raw === "number" && Number.isFinite(raw))) return "—";
+      if (raw === null || raw === undefined) return 0;
 
-      return gradeByThresholds(paramDef?.thresholds, raw);
+      // If it's an exact-match threshold (Yes/No etc), compare as strings
+      if (paramDef?.thresholds?.direction === "=") {
+        return levelFor(String(raw), paramDef.thresholds);
+      }
+
+      // Numeric thresholds
+      const n = Number(raw);
+      if (!Number.isFinite(n)) return 0;
+      return levelFor(n, paramDef.thresholds);
     }
 
     // Seat-level
@@ -613,11 +631,11 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
     const scope = String(param?.scope || "").toLowerCase();
     const isRoomScope = scope === "room";
 
-    // Room-level: read from RP22 engine (same source as RP22 Report page)
+    // Room-level: prefer RP22 engine result; fallback to valueFromAnalysis
     if (isRoomScope) {
       const roomResult = analysisResult?.gradedParameters?.primary?.[pid] || null;
 
-      // Preferred: engine-provided room result (same as RP22 Report)
+      // 1) Preferred: gradedParameters (RP22 Report path)
       if (roomResult && roomResult.status !== "no_data") {
         if (roomResult.formatted) return roomResult.formatted;
 
@@ -629,11 +647,10 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
           const unit = paramDef?.unit || "";
           return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
         }
-
         return String(v);
       }
 
-      // Fallback: compute value straight from analysisResult (so ROOM never shows blank)
+      // 2) Fallback: valueFromAnalysis (many ROOM params are exposed directly on analysisResult)
       const paramDef = RP22_PARAMS.find(p => p.id === pid);
       const raw = typeof paramDef?.valueFromAnalysis === "function"
         ? paramDef.valueFromAnalysis(analysisResult)
@@ -641,11 +658,11 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
 
       if (raw === null || raw === undefined) return "—";
 
+      // keep formatting consistent with the panel / ParameterCard style
       if (typeof raw === "number" && Number.isFinite(raw)) {
         const unit = paramDef?.unit || "";
         return unit ? `${raw.toFixed(1)} ${unit}` : raw.toFixed(1);
       }
-
       return String(raw);
     }
 
