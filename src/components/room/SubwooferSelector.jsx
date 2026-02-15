@@ -33,6 +33,11 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
     onChange({ count, items: baseItems.slice(0, 4) });
   };
 
+  // When count is 0, show one disabled model dropdown (preserves selected model)
+  const displayItems = safeCount === 0 
+    ? [{ model: cfg?.model || cfg?.items?.[0]?.model || "SUB2-12" }] 
+    : items;
+
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -56,13 +61,15 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
         </div>
       </div>
 
-      {items.map((it, idx) => (
+      {displayItems.map((it, idx) => (
         <div key={idx} className="grid grid-cols-2 gap-3">
           <div className="col-span-2">
-            <Label className="text-xs">Position {idx + 1} — Model</Label>
+            <Label className="text-xs">
+              {safeCount === 0 ? "Model (disabled — set quantity first)" : `Position ${idx + 1} — Model`}
+            </Label>
             <Select
               value={it?.model ?? "SUB2-12"}
-              disabled={disabled}
+              disabled={disabled || safeCount === 0}
               onValueChange={(val) => {
                 const nextItems = items.map((s, i) => (i === idx ? { model: val } : s));
                 commit({ items: nextItems });
@@ -80,12 +87,6 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
           </div>
         </div>
       ))}
-
-      {safeCount === 0 && (
-        <div className="text-xs text-muted-foreground">
-          None selected. Choose a quantity to configure models.
-        </div>
-      )}
     </div>
   );
 }
