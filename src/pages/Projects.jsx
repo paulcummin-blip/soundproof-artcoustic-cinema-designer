@@ -25,22 +25,25 @@ const BRAND = {
 // ---- Status helpers ----
 const STATUS = ["Live", "Prospective", "Lost", "Completed"];
 
-function statusColor(s) {
-  const v = (s || "").toLowerCase();
-  if (v === "live") return "#213428";         // Live
-  if (v === "prospective") return "#625143";  // Prospective
-  if (v === "lost") return "#4A230F";         // Lost
-  if (v === "completed") return "#3E4349";    // Completed
-  return BRAND.border;
+const STATUS_BORDER_COLORS = {
+  live: "#213428",
+  prospective: "#625143",
+  lost: "#4A230F",
+  completed: "#3E4349",
+};
+
+function getStatusBorderColor(status) {
+  const key = String(status || "").trim().toLowerCase();
+  return STATUS_BORDER_COLORS[key] || "#DCDBD6";
 }
 
-function statusBorderAndTint(s) {
+function statusColor(s) {
   const v = (s || "").toLowerCase();
-  if (v === "live") return { border: "#213428", tint: "#F1F0EE" };
-  if (v === "prospective") return { border: "#625143", tint: "#F8F8F7" };
-  if (v === "lost") return { border: "#4A230F", tint: "#F1F0EE" };
-  if (v === "completed") return { border: "#3E4349", tint: "#F8F8F7" };
-  return { border: BRAND.border, tint: BRAND.card };
+  if (v === "live") return "#213428";
+  if (v === "prospective") return "#625143";
+  if (v === "lost") return "#4A230F";
+  if (v === "completed") return "#3E4349";
+  return BRAND.border;
 }
 
 function matchesStatus(p, filter) {
@@ -491,13 +494,13 @@ export default function ProjectsPage() {
       }
     }
 
-    const { border: borderColour, tint: tintColour } = statusBorderAndTint(localStatus);
+    const borderColour = getStatusBorderColor(localStatus);
 
     return (
       <div
         style={{
-          background: tintColour,
-          border: `3px solid ${borderColour}`,
+          background: BRAND.card,
+          border: `4px solid ${borderColour}`,
           borderRadius: 12,
           padding: 16,
           display: "flex",
