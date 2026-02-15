@@ -694,38 +694,21 @@ export default function ProjectsPage() {
         }}
       >
         <h1 style={{ margin: 0, fontSize: 28, color: BRAND.text }}>Projects</h1>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            onClick={bulkDeleteUntitled}
-            style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: `1px solid ${BRAND.border}`,
-              background: BRAND.card,
-              color: BRAND.red,
-              cursor: "pointer",
-              fontSize: 13,
-            }}
-          >
-            Delete all "Untitled"
-          </button>
-          <button
-            type="button"
-            onClick={openDialog}
-            style={{
-              padding: "10px 16px",
-              borderRadius: 10,
-              border: `1px solid ${BRAND.border}`,
-              background: BRAND.btn,
-              color: BRAND.btnText,
-              cursor: "pointer",
-              fontSize: 14,
-            }}
-          >
-            + New Project
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={openDialog}
+          style={{
+            padding: "13px 20px",
+            borderRadius: 10,
+            border: `1px solid ${BRAND.border}`,
+            background: BRAND.btn,
+            color: BRAND.btnText,
+            cursor: "pointer",
+            fontSize: 18,
+          }}
+        >
+          + New Project
+        </button>
       </div>
 
       {/* Controls */}
