@@ -5215,6 +5215,12 @@ function RoomDesignerWithState() {
 
 export default function RoomDesignerPage() {
   const disabled = typeof window !== "undefined" && window.__DISABLE_ROOM_DESIGNER === true;
+  
+  // Calculate project ID at page level to use as remount key
+  const sessionActiveProjectId = useActiveProjectId();
+  const { projectId: initialProjectIdFromUrl } = useUrlQuery();
+  const resolvedProjectId = sessionActiveProjectId || initialProjectIdFromUrl || null;
+  
   if (disabled) {
     return <div className="p-6 text-sm">Room Designer is temporarily disabled.</div>;
   }
@@ -5222,7 +5228,7 @@ export default function RoomDesignerPage() {
   return (
     <SidebarInset>
       <div className="flex flex-col gap-4 px-4 md:px-6">
-        <AppStateProvider>
+        <AppStateProvider key={resolvedProjectId || "new"}>
           <Suspense fallback={<div className="p-6">Loading…</div>}>
             <ErrorBoundary fallback={<div className="p-6">Failed to mount Room Designer.</div>}>
               <RoomDesignerWithState />
