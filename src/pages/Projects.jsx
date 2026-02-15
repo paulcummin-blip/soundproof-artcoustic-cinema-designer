@@ -25,25 +25,26 @@ const BRAND = {
 // ---- Status helpers ----
 const STATUS = ["Live", "Prospective", "Lost", "Completed"];
 
-const STATUS_BORDER_COLORS = {
+const STATUS_COLORS = {
   live: "#213428",
   prospective: "#625143",
   lost: "#4A230F",
   completed: "#3E4349",
 };
 
-function getStatusBorderColor(status) {
-  const key = String(status || "").trim().toLowerCase();
-  return STATUS_BORDER_COLORS[key] || "#DCDBD6";
+function hexToRgba(hex, alpha) {
+  const h = hex.replace("#", "");
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-function statusColor(s) {
-  const v = (s || "").toLowerCase();
-  if (v === "live") return "#213428";
-  if (v === "prospective") return "#625143";
-  if (v === "lost") return "#4A230F";
-  if (v === "completed") return "#3E4349";
-  return BRAND.border;
+function getStatusStyle(status) {
+  const key = String(status || "").trim().toLowerCase();
+  const color = STATUS_COLORS[key] || "#DCDBD6";
+  const tint = hexToRgba(color, 0.06);
+  return { color, tint };
 }
 
 function matchesStatus(p, filter) {
@@ -494,13 +495,14 @@ export default function ProjectsPage() {
       }
     }
 
-    const borderColour = getStatusBorderColor(localStatus);
+    const { color: statusColor, tint: statusTint } = getStatusStyle(localStatus);
 
     return (
       <div
         style={{
           background: BRAND.card,
-          border: `4px solid ${borderColour}`,
+          boxShadow: `inset 0 0 0 9999px ${statusTint}`,
+          border: `4px solid ${statusColor}`,
           borderRadius: 12,
           padding: 16,
           display: "flex",
@@ -509,14 +511,14 @@ export default function ProjectsPage() {
           transition: "box-shadow 0.2s ease",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+          e.currentTarget.style.boxShadow = `inset 0 0 0 9999px ${statusTint}, 0 4px 12px rgba(0,0,0,0.08)`;
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = "none";
+          e.currentTarget.style.boxShadow = `inset 0 0 0 9999px ${statusTint}`;
         }}
       >
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.text }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: statusColor }}>
             {p.name || "Untitled Project"}
           </div>
           <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 2 }}>
@@ -546,11 +548,11 @@ export default function ProjectsPage() {
                 background: BRAND.card,
                 fontSize: 14,
                 fontWeight: 600,
-                color: statusColor(localStatus),
+                color: statusColor,
                 cursor: "pointer",
                 appearance: "none",
                 WebkitAppearance: "none",
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23${statusColor(localStatus).slice(1)}' d='M6 8L2 4h8z'/%3E%3C/svg%3E")`,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23${statusColor.slice(1)}' d='M6 8L2 4h8z'/%3E%3C/svg%3E")`,
                 backgroundRepeat: "no-repeat",
                 backgroundPosition: "right 10px center",
                 paddingRight: 30,
