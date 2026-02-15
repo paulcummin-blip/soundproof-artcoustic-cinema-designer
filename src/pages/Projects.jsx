@@ -515,7 +515,7 @@ export default function ProjectsPage() {
       >
         <div
           style={{
-            height: 8,
+            height: 6,
             width: "100%",
             background: statusColor,
           }}
@@ -529,7 +529,7 @@ export default function ProjectsPage() {
           }}
         >
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: statusColor }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.text }}>
             {p.name || "Untitled Project"}
           </div>
           <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 2 }}>
