@@ -28,8 +28,15 @@ const STATUS = ["Live", "Prospective", "Lost", "Completed"];
 const STATUS_COLORS = {
   live: "#213428",
   prospective: "#625143",
-  lost: "#C1B6AD",
-  completed: "#1B1A1A",
+  lost: "#4A230F",
+  completed: "#C1B6AD",
+};
+
+const STATUS_ALPHA = {
+  live: 0.22,
+  prospective: 0.16,
+  lost: 0.18,
+  completed: 0.14,
 };
 
 function hexToRgba(hex, alpha) {
@@ -43,7 +50,8 @@ function hexToRgba(hex, alpha) {
 function getStatusStyle(status) {
   const key = String(status || "").trim().toLowerCase();
   const color = STATUS_COLORS[key] || "#DCDBD6";
-  const tint = hexToRgba(color, 0.10);
+  const alpha = STATUS_ALPHA[key] || 0.10;
+  const tint = hexToRgba(color, alpha);
   return { color, tint };
 }
 
