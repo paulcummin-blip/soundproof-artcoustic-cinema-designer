@@ -726,15 +726,20 @@ appState, // Pass appState directly for setters
     //
     if (typeof setFrontSubsCfg === "function") {
       const frontCfg = parseMaybe(p?.front_subs_cfg, null);
-      setFrontSubsCfg(
-        frontCfg || { count: 1, model: "SUB2-12" }
-      );
+
+      // Only hydrate if the project explicitly has a saved sub config.
+      // If missing/null, do NOT invent a sub (leave current defaults alone).
+      if (frontCfg != null) {
+        setFrontSubsCfg(frontCfg);
+      }
     }
     if (typeof setRearSubsCfg === "function") {
       const rearCfg = parseMaybe(p?.rear_subs_cfg, null);
-      setRearSubsCfg(
-        rearCfg || { count: 0, model: null }
-      );
+
+      // Only hydrate if explicitly saved in the project record.
+      if (rearCfg != null) {
+        setRearSubsCfg(rearCfg);
+      }
     }
 
     //
