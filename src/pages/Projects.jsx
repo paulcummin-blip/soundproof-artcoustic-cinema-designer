@@ -27,9 +27,9 @@ const STATUS = ["Live", "Prospective", "Lost", "Completed"];
 
 const STATUS_COLORS = {
   live: "#213428",
-  prospective: "#4A230F",
+  prospective: "#625143",
   lost: "#C1B6AD",
-  completed: "#3E4349",
+  completed: "#1B1A1A",
 };
 
 function hexToRgba(hex, alpha) {
