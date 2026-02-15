@@ -2664,51 +2664,19 @@ function flattenExportTransforms(svgClone) {
                 <div className="grid grid-cols-[auto_1fr] gap-6 items-start mt-8">
                     {/* Left: Room count box */}
                     <div className="justify-self-start">
-                        <div className="border-2 border-[#213428] rounded-lg px-5 py-4 bg-white w-[280px] min-h-[96px]">
+                        <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px]">
                             <div className="flex items-center gap-2 mb-2">
                                 <Home className="w-4 h-4 text-[#213428]" />
                                 <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                     Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                 </div>
                             </div>
-                            {(() => {
-                              const maxRoom = Math.max(
-                                Number(roomLevelCounts?.L4 ?? 0),
-                                Number(roomLevelCounts?.L3 ?? 0),
-                                Number(roomLevelCounts?.L2 ?? 0),
-                                Number(roomLevelCounts?.L1 ?? 0)
-                              );
-
-                              const roomIsMax = (k) => Number(roomLevelCounts?.[k] ?? 0) === maxRoom;
-
-                              const wrap = (isMax, child) => (
-                                <div
-                                  style={{
-                                    transform: isMax ? "scale(1.25)" : "none",
-                                    transformOrigin: "center",
-                                  }}
-                                >
-                                  {child}
-                                </div>
-                              );
-
-                              return (
-                                <div
-                                  className="flex justify-center items-center"
-                                  style={{
-                                    gap: "12px",
-                                    paddingTop: "2px",
-                                    paddingBottom: "2px",
-                                    minHeight: "44px",
-                                  }}
-                                >
-                                  {wrap(roomIsMax("L4"), <RP22GradingPill level="L4" count={roomLevelCounts.L4} />)}
-                                  {wrap(roomIsMax("L3"), <RP22GradingPill level="L3" count={roomLevelCounts.L3} />)}
-                                  {wrap(roomIsMax("L2"), <RP22GradingPill level="L2" count={roomLevelCounts.L2} />)}
-                                  {wrap(roomIsMax("L1"), <RP22GradingPill level="L1" count={roomLevelCounts.L1} />)}
-                                </div>
-                              );
-                            })()}
+                            <div className="flex gap-2">
+                                <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
+                                <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
+                                <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
+                                <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
+                            </div>
                         </div>
                     </div>
 
@@ -2747,7 +2715,7 @@ function flattenExportTransforms(svgClone) {
                                               const seatIsMax = (k) => Number(counts?.[k] ?? 0) === maxSeat;
 
                                               return (
-                                                <div className="flex gap-3 items-center" style={{ minHeight: "40px" }}>
+                                                <div className="flex gap-3 items-center">
                                                   <div style={{ transform: seatIsMax('L4') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
                                                     <RP22GradingPill level="L4" count={counts.L4} />
                                                   </div>
