@@ -5118,7 +5118,12 @@ function RoomDesignerWithState() {
                                 : {})
                         }
                         roomHudSnapshot={appState?.roomHudSnapshot || analysisResult?.roomHudSnapshot || null}
-                        mlpSeatId={primarySeatingPosition?.id || "mlp"} />
+                        mlpSeatId={primarySeatingPosition?.id || "mlp"}
+                        dolbyLayout={appState?.dolbyLayout}
+                        frontSubsCount={appState?.frontSubsCfg?.count}
+                        rearSubsCount={appState?.rearSubsCfg?.count}
+                        p15ConstructionLevel={appState?.p15ConstructionLevel}
+                        p21EarlyReflectionPreset={appState?.p21EarlyReflectionPreset} />
                   </Suspense>
               </CollapsiblePanel>
               

@@ -301,7 +301,47 @@ const RP22_PARAMS = [
 
 /* ---------- Panel ---------- */
 
-export default function RP22CompliancePanel({ analysisResult, screen, seatingPositions, seatHudSnapshots, roomHudSnapshot, mlpSeatId }) {
+export default function RP22CompliancePanel({
+  analysisResult,
+  screen,
+  seatingPositions,
+  seatHudSnapshots,
+  roomHudSnapshot,
+  mlpSeatId,
+  dolbyLayout,
+  frontSubsCount,
+  rearSubsCount,
+  p15ConstructionLevel,
+  p21EarlyReflectionPreset,
+}) {
+  // Match pages/RP22Report.jsx fallback for P2
+  const p2SystemConfig = React.useMemo(() => {
+    const preset = dolbyLayout || "5.1";
+    const base = String(preset).split(" ")[0];
+    const parts = base.split(".");
+    const bed = parts[0] || "5";
+    const heights = parts[2] || "";
+
+    const frontCount = Number(frontSubsCount ?? 0);
+    const rearCount = Number(rearSubsCount ?? 0);
+    const totalSubs = frontCount + rearCount;
+
+    const systemConfigStr = heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+
+    const p = systemConfigStr.split(".");
+    const bedCount = parseInt(p[0], 10) || 5;
+    const overheadCount = parseInt(p[2], 10) || 0;
+
+    const discreteCount = bedCount + overheadCount;
+
+    let p2Level = "L1";
+    if (discreteCount >= 15) p2Level = "L4";
+    else if (discreteCount >= 11) p2Level = "L2";
+    else p2Level = "L1";
+
+    return { discreteSpeakerCount: discreteCount, p2Level };
+  }, [dolbyLayout, frontSubsCount, rearSubsCount]);
+
   // RP23 range (50–65°)
   const rp23 = React.useMemo(() => {
     const { viewWm } = computeScreenMetrics(
@@ -574,40 +614,30 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
 
     // Room-level: prefer RP22 engine result; fallback to valueFromAnalysis + thresholds
     if (isRoomScope) {
-      const roomResult = analysisResult?.gradedParameters?.primary?.[pid] || null;
+      const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
 
-      // 1) Preferred: gradedParameters (RP22 Report path)
-      if (roomResult && roomResult.status !== "no_data") {
-        const lvlRaw = roomResult.level;
-
-        // normalise "L3" -> 3 (panel UI expects 0–4)
-        if (typeof lvlRaw === "string" && /^L[1-4]$/i.test(lvlRaw)) {
-          return Number(String(lvlRaw).slice(1));
-        }
-        if (typeof lvlRaw === "number" && Number.isFinite(lvlRaw)) {
-          return lvlRaw;
-        }
-        // If it's something unexpected, treat as unknown
-        return 0;
+      // If engine gave a usable level, use it
+      if (res && res.status !== "no_data" && res.status !== "fail" && res.level != null) {
+        return res.level; // may be "L1".."L4" or numeric
       }
 
-      // 2) Fallback: compute from analysisResult directly
-      const paramDef = RP22_PARAMS.find(p => p.id === pid);
-      const raw = typeof paramDef?.valueFromAnalysis === "function"
-        ? paramDef.valueFromAnalysis(analysisResult)
-        : null;
+      // Report-page fallback rules
+      if (pid === 2 && p2SystemConfig) return p2SystemConfig.p2Level; // "L1".."L4"
+      if (pid === 3) return "L4";
+      if (pid === 8) return "L4";
+      if (pid === 11) return "L4";
 
-      if (raw === null || raw === undefined) return 0;
-
-      // If it's an exact-match threshold (Yes/No etc), compare as strings
-      if (paramDef?.thresholds?.direction === "=") {
-        return levelFor(String(raw), paramDef.thresholds);
+      if (pid === 15) {
+        const MAP = { standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" };
+        return MAP[p15ConstructionLevel || "standard"] || "—";
       }
 
-      // Numeric thresholds
-      const n = Number(raw);
-      if (!Number.isFinite(n)) return 0;
-      return levelFor(n, paramDef.thresholds);
+      if (pid === 21) {
+        const MAP = { l1: "L1", l2: "L2", l3: "L3", l4: "L4" };
+        return MAP[p21EarlyReflectionPreset || "l2"] || "—";
+      }
+
+      return "—";
     }
 
     // Seat-level
@@ -633,37 +663,44 @@ export default function RP22CompliancePanel({ analysisResult, screen, seatingPos
 
     // Room-level: prefer RP22 engine result; fallback to valueFromAnalysis
     if (isRoomScope) {
-      const roomResult = analysisResult?.gradedParameters?.primary?.[pid] || null;
+      const res = analysisResult?.gradedParameters?.primary?.[pid] || null;
 
-      // 1) Preferred: gradedParameters (RP22 Report path)
-      if (roomResult && roomResult.status !== "no_data") {
-        if (roomResult.formatted) return roomResult.formatted;
-
-        const v = roomResult.value;
-        if (v === null || v === undefined) return "—";
-
-        if (typeof v === "number" && Number.isFinite(v)) {
-          const paramDef = RP22_PARAMS.find(p => p.id === pid);
-          const unit = paramDef?.unit || "";
-          return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
+      // Engine value if present
+      if (res && res.status !== "no_data" && res.status !== "fail") {
+        if (res.formatted) return res.formatted;
+        const v = res.value;
+        if (v !== null && v !== undefined) {
+          if (typeof v === "number" && Number.isFinite(v)) {
+            const paramDef = RP22_PARAMS.find(p => p.id === pid);
+            const unit = paramDef?.unit || "";
+            return unit ? `${v.toFixed(1)} ${unit}` : v.toFixed(1);
+          }
+          return String(v);
         }
-        return String(v);
       }
 
-      // 2) Fallback: valueFromAnalysis (many ROOM params are exposed directly on analysisResult)
-      const paramDef = RP22_PARAMS.find(p => p.id === pid);
-      const raw = typeof paramDef?.valueFromAnalysis === "function"
-        ? paramDef.valueFromAnalysis(analysisResult)
-        : null;
+      // Report-page fallback values where needed
+      if (pid === 2 && p2SystemConfig) return `${p2SystemConfig.discreteSpeakerCount} speakers`;
+      if (pid === 3) return "0";
+      if (pid === 8) return "No";
+      if (pid === 11) return "0";
 
-      if (raw === null || raw === undefined) return "—";
-
-      // keep formatting consistent with the panel / ParameterCard style
-      if (typeof raw === "number" && Number.isFinite(raw)) {
-        const unit = paramDef?.unit || "";
-        return unit ? `${raw.toFixed(1)} ${unit}` : raw.toFixed(1);
+      // P15 / P21 are effectively "selection-driven" on the report page; show their chosen value
+      if (pid === 15) {
+        const LABEL = {
+          standard: "NCB 26 (standard)",
+          "purpose-built": "NCB 22 (purpose-built)",
+          reference: "NCB 18 (reference)",
+          studio: "NCB 15 (studio)",
+        };
+        return LABEL[p15ConstructionLevel || "standard"] || "—";
       }
-      return String(raw);
+
+      if (pid === 21) {
+        return String(p21EarlyReflectionPreset || "l2").toUpperCase();
+      }
+
+      return "—";
     }
 
     // Seat-level
