@@ -2661,22 +2661,45 @@ function flattenExportTransforms(svgClone) {
                 <div className="border-b border-[#E6E4DD]" />
 
                 {/* Counts Dashboard */}
-                <div className="grid grid-cols-[auto_1fr] gap-6 items-start mt-8">
+                <div className="grid grid-cols-[auto_1fr] gap-10 items-start mt-8">
                     {/* Left: Room count box */}
                     <div className="justify-self-start">
-                        <div className="border-2 border-[#213428] rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px]">
+                        <div className="border-2 border-[#213428] rounded-lg px-5 py-3 bg-white w-[320px] min-h-[88px]">
                             <div className="flex items-center gap-2 mb-2">
                                 <Home className="w-4 h-4 text-[#213428]" />
                                 <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                     Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                 </div>
                             </div>
-                            <div className="flex gap-2">
-                                <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
-                                <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
-                                <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
-                                <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
-                            </div>
+                            {(() => {
+  const l4 = Number(roomLevelCounts?.L4 ?? 0);
+  const l3 = Number(roomLevelCounts?.L3 ?? 0);
+  const l2 = Number(roomLevelCounts?.L2 ?? 0);
+  const l1 = Number(roomLevelCounts?.L1 ?? 0);
+
+  const maxRoom = Math.max(l4, l3, l2, l1);
+  const isMax = (v) => v === maxRoom;
+
+  const Wrap = ({ big, children }) => (
+    <div
+      style={{
+        transform: big ? 'scale(1.25)' : 'scale(1)',
+        transformOrigin: 'center',
+      }}
+    >
+      {children}
+    </div>
+  );
+
+  return (
+    <div className="flex gap-3 items-center">
+      <Wrap big={isMax(l4)}><RP22GradingPill level="L4" count={roomLevelCounts.L4} /></Wrap>
+      <Wrap big={isMax(l3)}><RP22GradingPill level="L3" count={roomLevelCounts.L3} /></Wrap>
+      <Wrap big={isMax(l2)}><RP22GradingPill level="L2" count={roomLevelCounts.L2} /></Wrap>
+      <Wrap big={isMax(l1)}><RP22GradingPill level="L1" count={roomLevelCounts.L1} /></Wrap>
+    </div>
+  );
+})()}
                         </div>
                     </div>
 
