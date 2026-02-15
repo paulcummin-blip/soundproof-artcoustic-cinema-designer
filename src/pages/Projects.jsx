@@ -25,6 +25,13 @@ const BRAND = {
 // ---- Status helpers ----
 const STATUS = ["Live", "Prospective", "Lost", "Completed"];
 
+const STATUS_BORDER_COLOURS = {
+  Live: "#213428",
+  Prospective: "#625143",
+  Completed: "#3E4349",
+  Lost: "#4A230F"
+};
+
 function statusColor(s) {
   const v = (s || "").toLowerCase();
   if (v === "live") return "#213428";         // Live
@@ -487,11 +494,19 @@ export default function ProjectsPage() {
         style={{
           background: BRAND.card,
           border: `1px solid ${BRAND.border}`,
+          borderLeft: `4px solid ${STATUS_BORDER_COLOURS[localStatus] || BRAND.border}`,
           borderRadius: 12,
           padding: 16,
           display: "flex",
           flexDirection: "column",
           gap: 12,
+          transition: "box-shadow 0.2s ease",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = "none";
         }}
       >
         <div>
