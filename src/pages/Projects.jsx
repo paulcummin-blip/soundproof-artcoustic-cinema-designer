@@ -97,6 +97,19 @@ export default function ProjectsPage() {
         setLoadError(null);
         const projectList = await base44.entities.Project.list('-created_date', 100);
         
+        const safeJson = (v) => {
+          if (v == null) return null;
+          // If Base44 already returns an object/array, use it directly
+          if (typeof v === "object") return v;
+          // If it's a string, try to parse
+          if (typeof v === "string") {
+            const s = v.trim();
+            if (!s) return null;
+            try { return JSON.parse(s); } catch { return null; }
+          }
+          return null;
+        };
+        
         if (mounted) {
           // Map to the format expected by the UI
           const mapped = (projectList || []).map(p => ({
@@ -107,15 +120,24 @@ export default function ProjectsPage() {
             roomLength: p.room_length || null,
             roomWidth: p.room_width || null,
             roomHeight: p.room_height || null,
-            createdAt: new Date(p.created_date).getTime() || Date.now(),
+            createdAt: Number.isFinite(new Date(p.created_date).getTime())
+              ? new Date(p.created_date).getTime()
+              : Date.now(),
             // Optional fields for display
-            lcrModel: p.selected_speakers_by_role ? JSON.parse(p.selected_speakers_by_role)?.L?.model : null,
+            lcrModel: (() => {
+              const obj = safeJson(p.selected_speakers_by_role);
+              // Support either { L: {...} } or { FL: {...} } depending on your schema
+              return obj?.L?.model ?? obj?.FL?.model ?? null;
+            })(),
             surroundModel: null,
             heightModel: null,
             subModel: null,
             subCount: null,
             screenSizeInches: p.screen_size || null,
-            seats: p.seating_positions ? JSON.parse(p.seating_positions).length : null,
+            seats: (() => {
+              const arr = safeJson(p.seating_positions);
+              return Array.isArray(arr) ? arr.length : null;
+            })(),
           }));
           
           setProjects(mapped);
