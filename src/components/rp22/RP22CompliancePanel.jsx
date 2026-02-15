@@ -2,6 +2,7 @@
 import React from "react";
 import { computeScreenMetrics } from "@/components/utils/screenMetrics";
 import { renderPrimitive } from "@/components/utils/renderSafe";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
 
 /* ---------- Helpers ---------- */
 
@@ -426,16 +427,6 @@ export default function RP22CompliancePanel({
     });
   }, [seats]);
 
-  const seatLevelText = (lvl) => {
-    if (!lvl) return "—";
-    const up = String(lvl).toUpperCase();
-    if (up === "L4" || up === "L3" || up === "L2" || up === "L1") return up;
-    if (up === "FAIL") return "Fail";
-    if (up === "N/A" || up === "NA") return "N/A";
-    if (up === "—") return "—";
-    return up;
-  };
-
   const renderSeatPillGridForParam = (pId) => {
     if (!rows.length) return null;
 
@@ -457,24 +448,24 @@ export default function RP22CompliancePanel({
             {rowObj.seats.map((seat) => {
               const snap = getSnapshotForSeat(seat);
               const lvl = snap?.rp22?.[pKey]?.level || "—";
-              const text = seatLevelText(lvl);
               const isPrimary = !!seat?.isPrimary;
 
               return (
                 <span
                   key={`seat-${seat?.id || `${rowObj.row}-${seat?.indexInRow || ""}`}`}
+                  title={`${seat?.id || ""}  Row ${seat?.row || seat?.rowNumber || 1} Seat ${
+                    seat?.indexInRow || ""
+                  }${isPrimary ? " (RSP)" : ""}`}
                   style={{
-                    ...pillStyle(String(lvl).toUpperCase() === "FAIL" ? "FAIL" : String(lvl).toUpperCase()),
-                    minWidth: 34,
-                    textAlign: "center",
-                    borderWidth: isPrimary ? 2 : 1,
-                    borderStyle: "solid",
-                    borderColor: isPrimary ? "#213428" : (pillStyle(String(lvl).toUpperCase())?.borderColor || "#DCDBD6"),
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    // Primary seat highlight (keep your existing idea, just applied around the standard pill)
                     boxShadow: isPrimary ? "0 0 0 2px rgba(33,52,40,0.10)" : "none",
+                    borderRadius: 6,
                   }}
-                  title={`${seat?.id || ""}  Row ${seat?.row || seat?.rowNumber || 1} Seat ${seat?.indexInRow || ""}${isPrimary ? " (RSP)" : ""}`}
                 >
-                  {text}
+                  <RP22GradingPill level={lvl} />
                 </span>
               );
             })}
