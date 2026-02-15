@@ -1807,10 +1807,6 @@ function RoomDesignerWithState() {
   const _baselineSeatingPositions = appState?.baselineSeatingPositions;
   const _setBaselineSeatingPositions = appState?.setBaselineSeatingPositions;
   const _seatingRows = appState?.seatingRows;
-
-  // Match RP22Report: always pass arrays into the RP22 engine
-  const seats = Array.isArray(_seatingPositions) ? _seatingPositions : [];
-  const engineSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
   const _seatsPerRow = appState?.seatsPerRow;
   const _seatsPerRowByRow = appState?.seatsPerRowByRow; // NEW
   const _setSeatsPerRowByRow = appState?.setSeatsPerRowByRow; // NEW
@@ -2103,6 +2099,10 @@ function RoomDesignerWithState() {
   }, [appState?.mlpY_m, appState?.seatingPositions, stableDimensions?.width]);
 
   const placedSpeakers = appState?.speakerSystem?.placedSpeakers || [];
+
+  // Match RP22Report: always pass arrays into the RP22 engine
+  const seats = Array.isArray(_seatingPositions) ? _seatingPositions : [];
+  const engineSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
   // ANALYSIS MUST ONLY USE SPEAKERS THAT ARE ACTUALLY "IN THE DRAWING"
   // (VALID POSITION + REAL MODEL + VISIBLE BY LAYOUT RULES)
