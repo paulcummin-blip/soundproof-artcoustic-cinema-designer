@@ -448,6 +448,40 @@ export default function ProjectsPage() {
         ? BRAND.red
         : BRAND.blue;
 
+    const [localStatus, setLocalStatus] = useState(p.status);
+    const [statusError, setStatusError] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Update local status when prop changes
+    useEffect(() => {
+      setLocalStatus(p.status);
+    }, [p.status]);
+
+    async function handleStatusChange(newStatus) {
+      const prevStatus = localStatus;
+      setLocalStatus(newStatus);
+      setStatusError(null);
+      setIsSaving(true);
+
+      try {
+        await base44.entities.Project.update(p.id, { project_status: newStatus });
+        
+        // Update parent state
+        setProjects((arr) =>
+          arr.map((proj) =>
+            proj.id === p.id ? { ...proj, status: newStatus } : proj
+          )
+        );
+      } catch (err) {
+        console.error('[Projects] Failed to update status:', err);
+        setLocalStatus(prevStatus);
+        setStatusError("Failed to update status");
+        setTimeout(() => setStatusError(null), 3000);
+      } finally {
+        setIsSaving(false);
+      }
+    }
+
     return (
       <div
         style={{
@@ -474,9 +508,45 @@ export default function ProjectsPage() {
               display: "flex",
               gap: 10,
               alignItems: "center",
+              flexDirection: "column",
+              alignItems: "flex-start",
             }}
           >
-            <StatusPill value={p.status} />
+            <select
+              value={localStatus}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              disabled={isSaving}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                padding: "6px 10px 6px 14px",
+                borderRadius: 999,
+                border: `1px solid ${BRAND.border}`,
+                background: BRAND.card,
+                fontSize: 14,
+                fontWeight: 600,
+                color: statusColor(localStatus),
+                cursor: "pointer",
+                appearance: "none",
+                WebkitAppearance: "none",
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23${statusColor(localStatus).slice(1)}' d='M6 8L2 4h8z'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 10px center",
+                paddingRight: 30,
+                opacity: isSaving ? 0.6 : 1,
+              }}
+            >
+              {STATUS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            {statusError && (
+              <div style={{ fontSize: 11, color: BRAND.red, marginTop: 4 }}>
+                {statusError}
+              </div>
+            )}
           </div>
         </div>
 
