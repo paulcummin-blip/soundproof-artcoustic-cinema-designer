@@ -27,7 +27,7 @@ const STATUS = ["Live", "Prospective", "Lost", "Completed"];
 
 const STATUS_COLORS = {
   live: "#213428",
-  prospective: "#625143",
+  prospective: "#C1B6AD",
   lost: "#4A230F",
   completed: "#3E4349",
 };
@@ -43,7 +43,7 @@ function hexToRgba(hex, alpha) {
 function getStatusStyle(status) {
   const key = String(status || "").trim().toLowerCase();
   const color = STATUS_COLORS[key] || "#DCDBD6";
-  const tint = hexToRgba(color, 0.06);
+  const tint = hexToRgba(color, 0.10);
   return { color, tint };
 }
 
@@ -501,16 +501,17 @@ export default function ProjectsPage() {
       <div
         style={{
           background: BRAND.card,
+          boxShadow: `inset 0 0 0 9999px ${statusTint}`,
           border: `2px solid ${BRAND.border}`,
           borderRadius: 12,
           overflow: "hidden",
           transition: "box-shadow 0.2s ease",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
+          e.currentTarget.style.boxShadow = `inset 0 0 0 9999px ${statusTint}, 0 4px 12px rgba(0,0,0,0.08)`;
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = "none";
+          e.currentTarget.style.boxShadow = `inset 0 0 0 9999px ${statusTint}`;
         }}
       >
         <div
@@ -529,7 +530,7 @@ export default function ProjectsPage() {
           }}
         >
         <div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: BRAND.text }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: statusColor }}>
             {p.name || "Untitled Project"}
           </div>
           <div style={{ fontSize: 13, color: BRAND.subtext, marginTop: 2 }}>
