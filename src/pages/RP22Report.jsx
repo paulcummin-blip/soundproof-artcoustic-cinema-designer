@@ -2715,7 +2715,7 @@ function flattenExportTransforms(svgClone) {
                                               const seatIsMax = (k) => Number(counts?.[k] ?? 0) === maxSeat;
 
                                               return (
-                                                <div className="flex gap-2">
+                                                <div className="flex gap-3 items-center">
                                                   <div style={{ transform: seatIsMax('L4') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
                                                     <RP22GradingPill level="L4" count={counts.L4} />
                                                   </div>
@@ -2984,9 +2984,10 @@ function flattenExportTransforms(svgClone) {
                                     style={{
                                         border: '1.5px solid #D9D5CE',
                                         borderRadius: '10px',
-                                        padding: '8mm 10mm',
+                                        padding: '9mm 12mm',
                                         background: '#FBFAF8',
                                         width: '100%',
+                                        minHeight: '34mm',
                                     }}
                                     className="print-avoid-break rp22-cover-card"
                                 >
@@ -3013,7 +3014,17 @@ function flattenExportTransforms(svgClone) {
                                       const roomIsMax = (k) => Number(roomLevelCounts?.[k] ?? 0) === maxRoom;
 
                                       return (
-                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
+                                        <div
+                                          style={{
+                                            display: 'flex',
+                                            justifyContent: 'center',
+                                            alignItems: 'center',
+                                            gap: '6mm',
+                                            paddingTop: '1mm',
+                                            paddingBottom: '1mm',
+                                            fontSize: '110%',
+                                          }}
+                                        >
                                           <div style={{ transform: roomIsMax('L4') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
                                             <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
                                           </div>
