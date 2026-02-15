@@ -493,8 +493,7 @@ export default function ProjectsPage() {
       <div
         style={{
           background: BRAND.card,
-          border: `1px solid ${BRAND.border}`,
-          borderLeft: `4px solid ${STATUS_BORDER_COLOURS[localStatus] || BRAND.border}`,
+          border: `2px solid ${STATUS_BORDER_COLOURS[localStatus] || BRAND.border}`,
           borderRadius: 12,
           padding: 16,
           display: "flex",
