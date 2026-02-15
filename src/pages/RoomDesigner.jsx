@@ -2660,7 +2660,15 @@ function RoomDesignerWithState() {
       const subsToRender = [];
       const warnings = [];
 
-      if (!model || qty < 1) {
+      // UI GUARD: Do not attempt dimension lookup if sub config is inactive
+      const isCfgActive = (
+        !!_frontSubsCfg &&
+        Number(qty || 0) > 0 &&
+        typeof model === "string" &&
+        model.trim().length > 0
+      );
+
+      if (!isCfgActive) {
         setSubWarnings((prev) => ({ ...prev, front: [] }));
         return [];
       }
@@ -2771,7 +2779,15 @@ function RoomDesignerWithState() {
       const subsToRender = [];
       const warnings = [];
 
-      if (!model || qty < 1) {
+      // UI GUARD: Do not attempt dimension lookup if sub config is inactive
+      const isCfgActive = (
+        !!_rearSubsCfg &&
+        Number(qty || 0) > 0 &&
+        typeof model === "string" &&
+        model.trim().length > 0
+      );
+
+      if (!isCfgActive) {
         setSubWarnings((prev) => ({ ...prev, rear: [] }));
         return [];
       }
