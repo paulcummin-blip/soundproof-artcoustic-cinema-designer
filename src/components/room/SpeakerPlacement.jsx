@@ -3332,7 +3332,8 @@ function SpeakerPlacementImpl(props) {
 
                 <div className="col-span-7">
                   <Select
-                    value={frontSubsCfg?.model ?? ""}
+                    value={frontSubsCfg?.model ?? "SUB2-12"}
+                    disabled={disabled || (frontSubsCfg?.count ?? 0) === 0}
                     onValueChange={(model) => {
                       if (appState?.setFrontSubsCfg) {
                         appState.setFrontSubsCfg(prev => ({ ...prev, model }))
@@ -3343,7 +3344,6 @@ function SpeakerPlacementImpl(props) {
                       <SelectValue placeholder="Select model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={null}>No Subwoofer</SelectItem>
                       <SelectItem value="SUB2-12">SUB2-12</SelectItem>
                       <SelectItem value="SUB3-12">SUB3-12</SelectItem>
                       <SelectItem value="SUB4-12">SUB4-12</SelectItem>
@@ -3388,7 +3388,8 @@ function SpeakerPlacementImpl(props) {
 
                 <div className="col-span-7">
                   <Select
-                    value={rearSubsCfg?.model ?? ""}
+                    value={rearSubsCfg?.model ?? "SUB2-12"}
+                    disabled={disabled || (rearSubsCfg?.count ?? 0) === 0}
                     onValueChange={(model) => {
                       if (appState?.setRearSubsCfg) {
                         appState.setRearSubsCfg(prev => ({ ...prev, model }))
@@ -3399,7 +3400,6 @@ function SpeakerPlacementImpl(props) {
                       <SelectValue placeholder="Select model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={null}>No Subwoofer</SelectItem>
                       <SelectItem value="SUB2-12">SUB2-12</SelectItem>
                       <SelectItem value="SUB3-12">SUB3-12</SelectItem>
                       <SelectItem value="SUB4-12">SUB4-12</SelectItem>
