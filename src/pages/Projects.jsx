@@ -501,22 +501,33 @@ export default function ProjectsPage() {
       <div
         style={{
           background: BRAND.card,
-          boxShadow: `inset 0 0 0 9999px ${statusTint}`,
-          border: `4px solid ${statusColor}`,
+          border: `2px solid ${BRAND.border}`,
           borderRadius: 12,
-          padding: 16,
-          display: "flex",
-          flexDirection: "column",
-          gap: 12,
+          overflow: "hidden",
           transition: "box-shadow 0.2s ease",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.boxShadow = `inset 0 0 0 9999px ${statusTint}, 0 4px 12px rgba(0,0,0,0.08)`;
+          e.currentTarget.style.boxShadow = "0 4px 12px rgba(0,0,0,0.08)";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.boxShadow = `inset 0 0 0 9999px ${statusTint}`;
+          e.currentTarget.style.boxShadow = "none";
         }}
       >
+        <div
+          style={{
+            height: 8,
+            width: "100%",
+            background: statusColor,
+          }}
+        />
+        <div
+          style={{
+            padding: 16,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+          }}
+        >
         <div>
           <div style={{ fontSize: 16, fontWeight: 700, color: statusColor }}>
             {p.name || "Untitled Project"}
@@ -647,6 +658,7 @@ export default function ProjectsPage() {
               aria-hidden
             />
           </button>
+        </div>
         </div>
       </div>
     );
