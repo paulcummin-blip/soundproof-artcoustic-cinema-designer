@@ -25,20 +25,13 @@ const BRAND = {
 // ---- Status helpers ----
 const STATUS = ["Live", "Prospective", "Lost", "Completed"];
 
-const STATUS_BORDER_COLOURS = {
-  live: "#213428",
-  prospective: "#625143",
-  completed: "#3E4349",
-  lost: "#4A230F"
-};
-
 function statusColor(s) {
   const v = (s || "").toLowerCase();
   if (v === "live") return "#213428";         // Live
   if (v === "prospective") return "#625143";  // Prospective
   if (v === "lost") return "#4A230F";         // Lost
   if (v === "completed") return "#3E4349";    // Completed
-  return BRAND.subtext;
+  return BRAND.border;
 }
 
 function matchesStatus(p, filter) {
@@ -489,8 +482,7 @@ export default function ProjectsPage() {
       }
     }
 
-    const statusKey = String(localStatus || p?.status || "").trim().toLowerCase();
-    const borderColour = STATUS_BORDER_COLOURS[statusKey] || BRAND.border;
+    const borderColour = statusColor(localStatus);
 
     return (
       <div
