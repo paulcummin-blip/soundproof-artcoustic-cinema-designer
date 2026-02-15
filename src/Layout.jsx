@@ -28,15 +28,10 @@ import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
 import PriceSummary from "@/components/pricing/PriceSummary";
 
 const menuItems = [
-  { title: "Room Designer", url: "/RoomDesigner", icon: Home },
   { title: "Projects", url: "/Projects", icon: Layers3 },
-  // { title: "Calculator", url: "/Calculator", icon: Calculator },
-  { title: "SPL Calculator", url: "/SPLCalculator", icon: Calculator },
-  // { title: "SPL Calculator V2", url: "/SPLCalculatorV2", icon: Calculator },
-  // { title: "Speaker Database", url: "/SpeakerDatabase", icon: Database },
-  // { title: "Cinema Agent", url: "/CinemaAgent", icon: Settings },
+  { title: "Room Designer", url: "/RoomDesigner", icon: Home },
   { title: "RP22 Report", url: "/RP22Report", icon: FileText },
-  { title: "Printable Report", url: "/PrintableReport", icon: FileText },
+  { title: "SPL Calculator", url: "/SPLCalculator", icon: Calculator },
 ];
 
 export default function Layout({ children, currentPageName }) {
@@ -133,7 +128,7 @@ export default function Layout({ children, currentPageName }) {
 
             <nav className="flex-1 px-3 py-2">
               <div className="mb-4">
-                <div className="text-xs font-medium text-brand-text-label mb-2 px-3">
+                <div className="text-xl font-bold text-[#1B1A1A] mb-4 px-3">
                   Design Tools
                 </div>
                 <div className="space-y-1">
