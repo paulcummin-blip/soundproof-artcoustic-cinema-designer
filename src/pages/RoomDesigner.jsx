@@ -632,11 +632,8 @@ appState, // Pass appState directly for setters
     }
 
     const seatsPerRowByRowData = parseMaybe(p?.seats_per_row_by_row, []);
-    if (
-    Array.isArray(seatsPerRowByRowData) &&
-    seatsPerRowByRowData.length > 0 &&
-    typeof setSeatsPerRowByRow === "function")
-    {
+    // CRITICAL: Always set seats per row, even if empty array
+    if (Array.isArray(seatsPerRowByRowData) && typeof setSeatsPerRowByRow === "function") {
       setSeatsPerRowByRow(seatsPerRowByRowData);
     }
 
@@ -705,11 +702,8 @@ appState, // Pass appState directly for setters
     // 7) SEATING
     //
     const sp = parseMaybe(p?.seating_positions, []);
-    if (
-    Array.isArray(sp) &&
-    sp.length > 0 &&
-    typeof setSeatingPositions === "function")
-    {
+    // CRITICAL: Always set seating positions, even if empty array
+    if (Array.isArray(sp) && typeof setSeatingPositions === "function") {
       setSeatingPositions(sp);
     }
 
@@ -717,8 +711,9 @@ appState, // Pass appState directly for setters
     // 8) ROOM ELEMENTS
     //
     const re = parseMaybe(p?.room_elements, []);
-    if (Array.isArray(re) && typeof setRoomElements === "function") {
-      setRoomElements(re);
+    // CRITICAL: Always set room elements, ensuring it's always an array (even if empty)
+    if (typeof setRoomElements === "function") {
+      setRoomElements(Array.isArray(re) ? re : []);
     }
 
     //
@@ -726,20 +721,17 @@ appState, // Pass appState directly for setters
     //
     if (typeof setFrontSubsCfg === "function") {
       const frontCfg = parseMaybe(p?.front_subs_cfg, null);
-
-      // Only hydrate if the project explicitly has a saved sub config.
-      // If missing/null, do NOT invent a sub (leave current defaults alone).
-      if (frontCfg != null) {
-        setFrontSubsCfg(frontCfg);
-      }
+      // CRITICAL: Always set front subs config to explicit default if missing
+      // Default inactive state: { model: null, count: 0, positions: [], tuning: [] }
+      const defaultInactive = { model: null, count: 0, positions: [], tuning: [] };
+      setFrontSubsCfg(frontCfg != null ? frontCfg : defaultInactive);
     }
     if (typeof setRearSubsCfg === "function") {
       const rearCfg = parseMaybe(p?.rear_subs_cfg, null);
-
-      // Only hydrate if explicitly saved in the project record.
-      if (rearCfg != null) {
-        setRearSubsCfg(rearCfg);
-      }
+      // CRITICAL: Always set rear subs config to explicit default if missing
+      // Default inactive state: { model: null, count: 0, positions: [], tuning: [] }
+      const defaultInactive = { model: null, count: 0, positions: [], tuning: [] };
+      setRearSubsCfg(rearCfg != null ? rearCfg : defaultInactive);
     }
 
     //
@@ -760,9 +752,18 @@ appState, // Pass appState directly for setters
     //
     if (typeof appState?.setSplConfig === "function") {
       const splCfg = parseMaybe(p?.spl_config, null);
-      if (splCfg) {
-        appState.setSplConfig(splCfg);
-      }
+      // CRITICAL: Always set splConfig to explicit default if missing
+      const defaultSplConfig = {
+        lcrW: 100,
+        surroundsW: 100,
+        overheadsW: 100,
+        globalPowerW: 100,
+        globalEqHeadroomDb: 0,
+        radiationMode: 'half-space',
+        p13Mode: 'minimum',
+        perRole: {}
+      };
+      appState.setSplConfig(splCfg || defaultSplConfig);
     }
 
     //
@@ -778,17 +779,15 @@ appState, // Pass appState directly for setters
 
     if (typeof setSpeakerSystem === "function") {
       setSpeakerSystem((prev) => {
-        // Prefer speakers stored with the Project entity when present.
-        if (Array.isArray(loadedSpeakers) && loadedSpeakers.length > 0) {
-          return {
-            ...(prev || {}),
-            placedSpeakers: loadedSpeakers
-          };
-        }
-
-        // If nothing was stored, keep whatever we already had in memory
-        // (e.g. brand-new design that hasn't been saved yet).
-        return prev || {};
+        // CRITICAL: Always set placedSpeakers from loaded data, even if empty.
+        // If loadedSpeakers is an array (even []), use it directly.
+        // If loadedSpeakers is null/missing, explicitly set to [] to clear state.
+        const speakers = Array.isArray(loadedSpeakers) ? loadedSpeakers : [];
+        
+        return {
+          ...(prev || {}),
+          placedSpeakers: speakers
+        };
       });
     }
   }, [
@@ -3583,22 +3582,23 @@ function RoomDesignerWithState() {
     // CRITICAL: Wait for autosave hydration before applying defaults
     if (!appState?.isHydrated) return;
 
-    // Skip on initial project load (let project hydration complete first)
-    if (loadState?.phase === "loaded" && !lastPresetRef.current) {
+    // STRICT GUARD: If we've just loaded a real project with an ID, NEVER auto-seed speakers
+    // unless the user explicitly changed the Dolby preset or triggered a reset.
+    const hasProjectId = resolvedProjectId || projectIdState;
+    const presetChanged = lastPresetRef.current !== dolbyPreset;
+    const resetEpochChanged = appState?.roomResetEpoch !== undefined && appState.roomResetEpoch > 0;
+
+    if (
+      loadState?.phase === "loaded" &&
+      hasProjectId &&
+      !presetChanged &&
+      !didUserRequestResetRef.current &&
+      !resetEpochChanged
+    ) {
       return;
     }
 
     if (!dolbyPreset || _isFrozen && _isFrozen('speakers')) return;
-    
-    // GUARD: Don't auto-reset if room already configured (unless user requested reset OR reset epoch changed)
-    const hasExistingSpeakers = Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
-    const hasExistingSeats = Array.isArray(_seatingPositions) && _seatingPositions.length > 0;
-    const presetChanged = lastPresetRef.current !== dolbyPreset;
-    const resetEpochChanged = appState?.roomResetEpoch !== undefined && appState.roomResetEpoch > 0;
-    
-    if (hasExistingSpeakers && hasExistingSeats && !presetChanged && !didUserRequestResetRef.current && !resetEpochChanged) {
-      return;
-    }
 
     // --- DEBUG: reconciliation entry ---
     const normalizedPreset = dolbyPreset ?
@@ -4091,6 +4091,14 @@ function RoomDesignerWithState() {
     if (!dolbyPreset || !_overheadGlobalModel) return;
     if (_isFrozen && _isFrozen("speakers")) return;
 
+    // STRICT GUARD: Do not auto-seed overheads for loaded projects with explicit empty state
+    const hasProjectId = resolvedProjectId || projectIdState;
+    if (loadState?.phase === "loaded" && hasProjectId) {
+      // Only seed overheads if the user explicitly changed the overhead model
+      // (do not seed just because a loaded project has no overheads saved)
+      return;
+    }
+
     // Normalise preset string, e.g. "5.1.4 Dolby Atmos" -> "5.1.4"
     const normalized = String(dolbyPreset).split(" ")[0].split("_")[0];
     const parts = normalized.split(".");
@@ -4142,16 +4150,18 @@ function RoomDesignerWithState() {
     // CRITICAL: Wait for autosave hydration
     if (!appState?.isHydrated) return;
 
-    // If we've just loaded a real project, don't overwrite its seating layout (UNLESS reset was triggered).
-    // BUT: if the seats are auto-generated (seat-rX-cY), we DO allow a rebuild so first-load row-centre/MLP sync works.
+    // STRICT GUARD: If we've just loaded a real project, NEVER auto-rebuild seats unless:
+    // 1. User explicitly triggered reset (didUserRequestResetRef.current), OR
+    // 2. Room reset epoch changed (appState.roomResetEpoch > 0)
+    // This prevents empty saved seats from being auto-filled.
     const currentSeats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
-    const seatsAreAuto = areAutoGeneratedSeats(currentSeats);
+    const hasProjectId = resolvedProjectId || projectIdState;
 
     if (
       loadState?.phase === "loaded" &&
+      hasProjectId &&
       !didUserRequestResetRef.current &&
-      !(appState?.roomResetEpoch > 0) &&
-      !seatsAreAuto
+      !(appState?.roomResetEpoch > 0)
     ) {
       return;
     }
