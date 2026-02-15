@@ -610,16 +610,13 @@ appState, // Pass appState directly for setters
       setSevenBedLayoutType(p?.seven_bed_layout_type || "rears");
     }
 
-    const didHydrateLcrAimModeRef = React.useRef(false);
-    
+    // Hydrate LCR aim mode (safe/idempotent; no hooks here)
     const hydratedLcrAimMode = p?.lcr_aim_mode;
-    
+
     if (
-      !didHydrateLcrAimModeRef.current &&
       (hydratedLcrAimMode === "flat" || hydratedLcrAimMode === "angled") &&
       typeof setLcrAimMode === "function"
     ) {
-      didHydrateLcrAimModeRef.current = true;
       setLcrAimMode(hydratedLcrAimMode);
     }
 
