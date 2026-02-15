@@ -2721,7 +2721,14 @@ function flattenExportTransforms(svgClone) {
                                     {seats.map(({ seatId, counts, total }) => {
                                         const isPrimary = analysisResult?.perSeatRp22?.[seatId]?.isPrimary === true;
                                         return (
-                                        <div key={seatId} className={`rounded-lg px-4 py-3 bg-white w-[280px] min-h-[88px] ${isPrimary ? 'border-[3px] border-[#213428]' : 'border-2 border-[#213428]'}`}>
+                                        <div
+  key={seatId}
+  className={`rounded-lg px-5 py-4 bg-white w-[340px] min-h-[100px] flex flex-col justify-center ${
+    isPrimary
+      ? 'border-[3px] border-[#213428]'
+      : 'border-2 border-[#213428]'
+  }`}
+>
                                             <div className="flex items-center gap-2 mb-2">
                                                 <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
                                                     {formatSeatLabel(seatId)}
@@ -2738,7 +2745,7 @@ function flattenExportTransforms(svgClone) {
                                               const seatIsMax = (k) => Number(counts?.[k] ?? 0) === maxSeat;
 
                                               return (
-                                                <div className="flex gap-3 items-center">
+                                                <div className="flex justify-center items-center gap-3 mt-1 px-1">
                                                   <div style={{ transform: seatIsMax('L4') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
                                                     <RP22GradingPill level="L4" count={counts.L4} />
                                                   </div>
