@@ -38,6 +38,54 @@ export default function RoomElements({ elements = [], onChange }) {
     onChange([...(elements || []), newElement]);
   };
 
+  const addProjector = () => {
+    const elementCount = (elements || []).length;
+
+    // Try to centre on the rear wall, with 0.10m buffer from the wall (rear wall),
+    // and store a ceiling mount height with 0.05m buffer from ceiling.
+    // If room dims aren't available here, fall back safely.
+    const roomW = Number(widthM ?? roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
+    const roomL = Number(lengthM ?? roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
+    const roomH = Number(heightM ?? roomDims?.heightM ?? roomDims?.height ?? 2.4) || 2.4;
+
+    const projW = 0.460; // along wall (m)
+    const projD = 0.517; // depth into room (m)
+    const projH = 0.210; // height (m)
+
+    // Rear-wall placement uses "pos along wall" logic in RV.
+    // We'll store x_m/y_m as well (keeps consistency with existing elements),
+    // but the renderer clamps to the wall.
+    const centredX = roomW > projW ? (roomW - projW) / 2 : 0;
+
+    const newElement = {
+      id: makeId(),
+      type: 'projector',
+
+      // Placement (start on rear wall)
+      wall: 'rear',
+
+      // Plan footprint (top-down rectangle)
+      length_m: projW,
+      thickness_m: projD,
+
+      // Position along the wall
+      x_m: centredX,
+      y_m: roomL > 0 ? Math.max(0, roomL - 0.10) : 0,
+
+      // Vertical placement (store bottom height from floor)
+      // Ceiling buffer 0.05m: bottom = ceiling - buffer - projector height
+      z_m: Math.max(0, roomH - 0.05 - projH),
+
+      // Keep the physical height stored for later sightline work
+      height_m: projH,
+
+      // UI
+      label: 'Projector',
+    };
+
+    onChange([...(elements || []), newElement]);
+  };
+
   const updateElement = (id, field, value) => {
     const numberFields = new Set(['length_m', 'x_m', 'y_m', 'z_m']);
     const parsed = numberFields.has(field) ? parseFloat(value) : value;
@@ -87,21 +135,44 @@ export default function RoomElements({ elements = [], onChange }) {
             CREATE ROOM ELEMENT
           </div>
 
-          <button
-            type="button"
-            onClick={addDoor}
-            className="inline-flex items-center justify-center rounded-md"
-            style={{
-              width: 34,
-              height: 34,
-              border: '1px solid #DCDBD6',
-              background: '#FFFFFF',
-              color: '#213428',
-            }}
-            aria-label="Add Element"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-8">
+            <button
+              type="button"
+              onClick={addDoor}
+              className="inline-flex items-center justify-center rounded-md"
+              style={{
+                width: 34,
+                height: 34,
+                border: '1px solid #DCDBD6',
+                background: '#FFFFFF',
+                color: '#213428',
+              }}
+              aria-label="Add Door"
+              title="Add Door"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={addProjector}
+              className="inline-flex items-center justify-center rounded-md"
+              style={{
+                height: 34,
+                padding: '0 12px',
+                border: '1px solid #DCDBD6',
+                background: '#FFFFFF',
+                color: '#1B1A1A',
+                fontSize: 12,
+                fontWeight: 600,
+                letterSpacing: 0.2,
+              }}
+              aria-label="Add Projector"
+              title="Add Projector"
+            >
+              Projector
+            </button>
+          </div>
         </div>
       </div>
 
