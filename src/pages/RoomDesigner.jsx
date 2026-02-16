@@ -3119,23 +3119,26 @@ function RoomDesignerWithState() {
   const setSeatsPerRowByRowGuarded = useGuardedSetter(appState?.setSeatsPerRowByRow, 'seating');
   
   // Epoch-aware seating setters (bump epoch on user change)
+  // Guarded setters MUST be created at top-level (hooks rule)
+  const seatSpacingSetterGuarded = useGuardedSetter(appState?.setSeatSpacing, 'seating');
+  const rowSpacingSetterGuarded = useGuardedSetter(_setRowSpacingM, 'seating');
+  const seatingBlockOffsetSetterGuarded = useGuardedSetter(appState?.setSeatingBlockOffset, 'seating');
+
+  // Wrapped callbacks that also bump the seating epoch
   const setSeatSpacingGuarded = React.useCallback((next) => {
     setSeatingConfigEpoch((n) => n + 1);
-    const setter = useGuardedSetter(appState?.setSeatSpacing, 'seating');
-    setter(next);
-  }, [appState?.setSeatSpacing]);
+    seatSpacingSetterGuarded?.(next);
+  }, [seatSpacingSetterGuarded]);
 
   const setRowSpacingGuarded = React.useCallback((next) => {
     setSeatingConfigEpoch((n) => n + 1);
-    const setter = useGuardedSetter(_setRowSpacingM, 'seating');
-    setter(next);
-  }, [_setRowSpacingM]);
+    rowSpacingSetterGuarded?.(next);
+  }, [rowSpacingSetterGuarded]);
 
   const setSeatingBlockOffsetGuarded = React.useCallback((next) => {
     setSeatingConfigEpoch((n) => n + 1);
-    const setter = useGuardedSetter(appState?.setSeatingBlockOffset, 'seating');
-    setter(next);
-  }, [appState?.setSeatingBlockOffset]);
+    seatingBlockOffsetSetterGuarded?.(next);
+  }, [seatingBlockOffsetSetterGuarded]);
 
   const setMlpBasisGuarded = useGuardedSetter(appState?.setMlpBasis, 'seating');
   const setRoomElementsGuarded = useGuardedSetter((next) => {
