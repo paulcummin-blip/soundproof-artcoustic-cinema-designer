@@ -834,6 +834,7 @@ appState, // Pass appState directly for setters
         hydrateFromProject(p);
         setProjectNameState(p?.name || "Project"); // Update internal projectName state
         setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
+        seatingLoadedEpochRef.current = seatingConfigEpoch;
       } else {
         // Project not found in cloud; keeping id so user can still save into it
         if (globalThis.__B44_LOGS) console.log('[RoomDesigner] Project not found in cloud; keeping id so user can continue working.');
@@ -1852,6 +1853,10 @@ function RoomDesignerWithState() {
   const visualisationRef = React.useRef(null);
   const didUserRequestResetRef = useRef(false);
   const didInitialSeatSyncRef = useRef(false);
+
+  // NEW: Seating config epoch tracking for loaded projects
+  const [seatingConfigEpoch, setSeatingConfigEpoch] = useState(0);
+  const seatingLoadedEpochRef = useRef(0);
 
   // Seats are "auto-generated" if they follow the standard ID pattern we create (seat-rX-cY).
   // We allow rebuilds for auto seats even when loadState.phase === "loaded" so first-load sync works.
@@ -3112,9 +3117,26 @@ function RoomDesignerWithState() {
   const setSeatingRowsGuarded = useGuardedSetter(appState?.setSeatingRows, 'seating');
   const setSeatsPerRowGuarded = useGuardedSetter(appState?.setSeatsPerRow, 'seating');
   const setSeatsPerRowByRowGuarded = useGuardedSetter(appState?.setSeatsPerRowByRow, 'seating');
-  const setSeatSpacingGuarded = useGuardedSetter(appState?.setSeatSpacing, 'seating');
-  const setRowSpacingGuarded = useGuardedSetter(_setRowSpacingM, 'seating');
-  const setSeatingBlockOffsetGuarded = useGuardedSetter(appState?.setSeatingBlockOffset, 'seating');
+  
+  // Epoch-aware seating setters (bump epoch on user change)
+  const setSeatSpacingGuarded = React.useCallback((next) => {
+    setSeatingConfigEpoch((n) => n + 1);
+    const setter = useGuardedSetter(appState?.setSeatSpacing, 'seating');
+    setter(next);
+  }, [appState?.setSeatSpacing]);
+
+  const setRowSpacingGuarded = React.useCallback((next) => {
+    setSeatingConfigEpoch((n) => n + 1);
+    const setter = useGuardedSetter(_setRowSpacingM, 'seating');
+    setter(next);
+  }, [_setRowSpacingM]);
+
+  const setSeatingBlockOffsetGuarded = React.useCallback((next) => {
+    setSeatingConfigEpoch((n) => n + 1);
+    const setter = useGuardedSetter(appState?.setSeatingBlockOffset, 'seating');
+    setter(next);
+  }, [appState?.setSeatingBlockOffset]);
+
   const setMlpBasisGuarded = useGuardedSetter(appState?.setMlpBasis, 'seating');
   const setRoomElementsGuarded = useGuardedSetter((next) => {
     const widthM = Number(appState?.roomDims?.widthM ?? appState?.dimensions?.widthM);
@@ -4242,15 +4264,22 @@ function RoomDesignerWithState() {
     if (!appState?.isHydrated) return;
 
     // STRICT GUARD: If we've just loaded a real project, NEVER auto-rebuild seats unless:
-    // 1. User explicitly triggered reset (didUserRequestResetRef.current), OR
-    // 2. Room reset epoch changed (appState.roomResetEpoch > 0)
+    // 1. User explicitly changed seating controls (epoch != loaded epoch), OR
+    // 2. User explicitly triggered reset (didUserRequestResetRef.current), OR
+    // 3. Room reset epoch changed (appState.roomResetEpoch > 0)
     // This prevents empty saved seats from being auto-filled.
     const currentSeats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
     const hasProjectId = resolvedProjectId || projectIdState;
 
+    const isLoadedProject =
+      loadState?.phase === "loaded" && !!hasProjectId;
+
+    const userHasChangedSeatingSinceLoad =
+      seatingConfigEpoch !== seatingLoadedEpochRef.current;
+
     if (
-      loadState?.phase === "loaded" &&
-      hasProjectId &&
+      isLoadedProject &&
+      !userHasChangedSeatingSinceLoad &&
       !didUserRequestResetRef.current &&
       !(appState?.roomResetEpoch > 0)
     ) {
@@ -4361,13 +4390,17 @@ function RoomDesignerWithState() {
   appState?.rowCentersM,
   stableDimensions?.width,
   appState?.roomResetEpoch,
-  loadState?.phase]
+  loadState?.phase,
+  seatingConfigEpoch]
   );
 
   // Manual seating generation - single source of truth
   const handleGenerateSeating = React.useCallback((overrides = {}) => {
     // If the seating tab is locked, do nothing
     if (_isFrozen && _isFrozen('seating')) return;
+
+    // Bump epoch to mark user-driven change
+    setSeatingConfigEpoch((n) => n + 1);
 
     // 1. Spacing (use override if given, otherwise keep current)
     const seatSpacingVal =
