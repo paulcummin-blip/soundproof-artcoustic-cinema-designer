@@ -6693,6 +6693,9 @@ return {
         Number(el?.thicknessM) ||
         0.05;
 
+      // Wall offset (distance from wall into room)
+      const offsetM = Math.max(0, Number(el?.wall_offset_m) || 0);
+
       // Position along the wall (metres):
       // IMPORTANT: for LEFT/RIGHT walls, position is measured DOWN from the FRONT wall (so use Y fields first).
       // For FRONT/REAR walls, position is measured RIGHT from the LEFT wall (so use X fields first).
@@ -6724,6 +6727,7 @@ return {
         __lengthM: lengthM,
         __thicknessM: thicknessM,
         __posM: posM,
+        __offsetM: offsetM,
         __label: label,
       };
     };
@@ -6797,6 +6801,7 @@ return {
           // Build element rectangle in METRES (then convert via scale/toPx)
           const L = Math.max(0.01, Number(e.__lengthM) || 0.9);
           const T = Math.max(0.01, Number(e.__thicknessM) || 0.05);
+          const offset = Math.max(0, Number(e.__offsetM) || 0);
           
           // Position along the wall (clamped so the element always stays on that wall)
           const rawP = Number(e.__posM) || 0;
@@ -6815,13 +6820,13 @@ return {
           let rectM = { x: 0, y: 0, w: 0, h: 0 };
 
           if (e.wall === 'front') {
-            rectM = { x: p, y: 0, w: L, h: T };
+            rectM = { x: p, y: offset, w: L, h: T };
           } else if (e.wall === 'rear') {
-            rectM = { x: p, y: lengthM - T, w: L, h: T };
+            rectM = { x: p, y: lengthM - T - offset, w: L, h: T };
           } else if (e.wall === 'left') {
-            rectM = { x: 0, y: p, w: T, h: L };
+            rectM = { x: offset, y: p, w: T, h: L };
           } else if (e.wall === 'right') {
-            rectM = { x: widthM - T, y: p, w: T, h: L };
+            rectM = { x: widthM - T - offset, y: p, w: T, h: L };
           }
 
           // 5cm warning buffer

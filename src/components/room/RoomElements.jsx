@@ -73,6 +73,9 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
       // Position along the wall (front/rear => distance from LEFT wall)
       pos_m: centredX,
 
+      // Distance from wall (metres)
+      wall_offset_m: 0.10,
+
       // Vertical placement (store bottom height from floor)
       // Ceiling buffer 0.05m: bottom = ceiling - buffer - projector height
       z_m: Math.max(0, roomH - 0.05 - projH),
