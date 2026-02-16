@@ -4618,15 +4618,6 @@ function RoomDesignerWithState() {
               <RotateCcw className="w-4 h-4 mr-2" />
               Reset
             </Button>
-            
-            <Button
-              size="sm"
-              className="brand-btn"
-              onClick={handleOptimiseAll}
-              disabled={isFrozen('speakers') || placedSpeakers.length < 2}>
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Optimise
-            </Button>
 
             <Button size="sm" className="brand-btn" onClick={handleSaveProject}>
               <Save className="w-4 h-4 mr-2" />
