@@ -44,18 +44,19 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
     // Try to centre on the rear wall, with 0.10m buffer from the wall (rear wall),
     // and store a ceiling mount height with 0.05m buffer from ceiling.
     // If room dims aren't available here, fall back safely.
-    const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
     const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
     const roomH = Number(roomDims?.heightM ?? roomDims?.height ?? 2.4) || 2.4;
 
-    const projW = 0.460; // along wall (m)
     const projD = 0.517; // depth into room (m)
     const projH = 0.210; // height (m)
 
-    // Rear-wall placement uses "pos along wall" logic in RV.
-    // We'll store x_m/y_m as well (keeps consistency with existing elements),
-    // but the renderer clamps to the wall.
-    const centredX = roomW > projW ? (roomW - projW) / 2 : 0;
+    // Centre the projector block on the room width
+    const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
+    const projW = 0.46;
+
+    const centredX = roomW > 0
+      ? Math.max(0, (roomW / 2) - (projW / 2))
+      : 0;
 
     const newElement = {
       id: makeId(),
