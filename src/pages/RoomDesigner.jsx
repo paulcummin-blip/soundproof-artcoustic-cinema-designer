@@ -821,7 +821,7 @@ appState, // Pass appState directly for setters
 
 
   const loadProject = useCallback(async (signal, idOverride) => {
-    const id = idOverride || projectIdState;
+    const id = idOverride || projectIdFromUrl || projectIdState;
     if (!id) return;
     setLoadState({ phase: "loading", error: null, name: null });
     try {
