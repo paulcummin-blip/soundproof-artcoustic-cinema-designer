@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
 
-export default function RoomElements({ elements = [], onChange }) {
+export default function RoomElements({ elements = [], onChange, roomDims }) {
   // Create a stable next id that won't collide if you add quickly
   const makeId = () => `${Date.now()}-${Math.floor(Math.random() * 100000)}`;
 
@@ -44,9 +44,9 @@ export default function RoomElements({ elements = [], onChange }) {
     // Try to centre on the rear wall, with 0.10m buffer from the wall (rear wall),
     // and store a ceiling mount height with 0.05m buffer from ceiling.
     // If room dims aren't available here, fall back safely.
-    const roomW = Number(widthM ?? roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
-    const roomL = Number(lengthM ?? roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
-    const roomH = Number(heightM ?? roomDims?.heightM ?? roomDims?.height ?? 2.4) || 2.4;
+    const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
+    const roomL = Number(roomDims?.lengthM ?? roomDims?.length ?? 0) || 0;
+    const roomH = Number(roomDims?.heightM ?? roomDims?.height ?? 2.4) || 2.4;
 
     const projW = 0.460; // along wall (m)
     const projD = 0.517; // depth into room (m)
@@ -135,44 +135,53 @@ export default function RoomElements({ elements = [], onChange }) {
             CREATE ROOM ELEMENT
           </div>
 
-          <div className="flex items-center gap-8">
-            <button
-              type="button"
-              onClick={addDoor}
-              className="inline-flex items-center justify-center rounded-md"
-              style={{
-                width: 34,
-                height: 34,
-                border: '1px solid #DCDBD6',
-                background: '#FFFFFF',
-                color: '#213428',
-              }}
-              aria-label="Add Door"
-              title="Add Door"
-            >
-              <Plus className="w-4 h-4" />
-            </button>
+          <button
+            type="button"
+            onClick={addDoor}
+            className="inline-flex items-center justify-center rounded-md"
+            style={{
+              width: 34,
+              height: 34,
+              border: '1px solid #DCDBD6',
+              background: '#FFFFFF',
+              color: '#213428',
+            }}
+            aria-label="Add Element"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
 
-            <button
-              type="button"
-              onClick={addProjector}
-              className="inline-flex items-center justify-center rounded-md"
-              style={{
-                height: 34,
-                padding: '0 12px',
-                border: '1px solid #DCDBD6',
-                background: '#FFFFFF',
-                color: '#1B1A1A',
-                fontSize: 12,
-                fontWeight: 600,
-                letterSpacing: 0.2,
-              }}
-              aria-label="Add Projector"
-              title="Add Projector"
-            >
-              Projector
-            </button>
+      {/* CREATE PROJECTOR */}
+      <div
+        className="rounded-lg border p-3 mt-3"
+        style={{
+          borderColor: '#DCDBD6',
+          background: 'rgba(27, 26, 26, 0.04)',
+        }}
+      >
+        <div className="flex items-center justify-between">
+          <div className="text-xs font-semibold" style={{ color: '#1B1A1A', letterSpacing: 0.3 }}>
+            CREATE PROJECTOR
           </div>
+
+          <button
+            type="button"
+            onClick={addProjector}
+            className="inline-flex items-center justify-center rounded-md"
+            style={{
+              width: 34,
+              height: 34,
+              border: '1px solid #DCDBD6',
+              background: '#FFFFFF',
+              color: '#213428',
+            }}
+            aria-label="Add Projector"
+            title="Add Projector"
+          >
+            <Plus className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
