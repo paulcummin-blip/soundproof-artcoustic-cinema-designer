@@ -213,11 +213,6 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                   <div className="text-sm font-medium" style={{ color: '#1B1A1A' }}>
                     {element?.label || 'Element'}
                   </div>
-
-                  {/* Keep a simple read-only wall hint (no selector) */}
-                  <div className="text-xs" style={{ color: '#625143' }}>
-                    {wallLabel(wall)}
-                  </div>
                 </div>
 
                 <button
