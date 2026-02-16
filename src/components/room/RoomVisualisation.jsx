@@ -7748,47 +7748,63 @@ return (
                     }
                   }
 
-                  // Convert rows to label positions (x aligned to furthest-right seat, y is fixed near front wall)
+                  // UI placement:
+                  // - RSP: tied to the MLP dot, just below the seat oval (outside the head icon)
+                  // - Row distances: tied to each row, placed just to the right of the furthest-right seat in that row
+
+                  const GREEN = "#22c55e";
+
+                  // RSP position: use MLP dot pixel position, then push label down so it sits outside the oval
+                  let rspLabel = null;
+                  if (Number.isFinite(mlpDotX_m) && Number.isFinite(mlpDotY_m)) {
+                    const [mx, my] = toPx(mlpDotX_m, mlpDotY_m);
+
+                    // Use same geometry constants as seat drawing if available, otherwise a safe fallback
+                    const seatRyPx = (typeof RY_M !== "undefined" ? (RY_M * scale) : (10 * scale));
+                    const rspY = my + seatRyPx + 14; // outside the oval, with a bit of air
+
+                    rspLabel = { x: mx, y: rspY };
+                  }
+
+                  // Row labels: compute anchor at each row's furthest-right seat, then place label to the right of that seat
                   const rowLabels = Array.from(rows.values())
                     .sort((a, b) => a.yM - b.yM)
                     .map((r) => {
-                      const [xPx] = toPx(r.xMmax, r.yM);
+                      const [sx, sy] = toPx(r.xMmax, r.yM);
+
+                      const seatRxPx = (typeof RX_M !== "undefined" ? (RX_M * scale) : (16 * scale));
                       return {
-                        x: xPx,
+                        x: sx + seatRxPx + 12,   // to the right of the seat
+                        y: sy + 4,               // vertically centred-ish on the row
                         text: `⬆️ ${r.yM.toFixed(2)} m`,
                       };
                     });
 
-                  // UI placement:
-                  // - Put labels just under the top dimension line, but still "at the front wall"
-                  // - Keep a bit of breathing room from the dimension line.
-                  const labelY = frontWallY + 14;
-
                   return (
                     <g pointerEvents="none">
-                      {/* RSP */}
-                      {Number.isFinite(rspX) && (
+                      {/* RSP (near MLP dot) */}
+                      {rspLabel && (
                         <text
-                          x={rspX}
-                          y={labelY}
+                          x={rspLabel.x}
+                          y={rspLabel.y}
                           textAnchor="middle"
-                          fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                          fontFamily={exportMode === "dimensions" ? "Century Gothic, sans-serif" : "system-ui, sans-serif"}
                           fontSize={12}
                           fontWeight={700}
-                          fill="#22c55e"
+                          fill={GREEN}
                         >
                           RSP
                         </text>
                       )}
 
-                      {/* Row distances */}
+                      {/* Row distances (next to each row) */}
                       {rowLabels.map((rl, i) => (
                         <text
-                          key={`row-front-${i}`}
+                          key={`row-distance-${i}`}
                           x={rl.x}
-                          y={labelY + 16}   // sits just below RSP line so they don't collide
-                          textAnchor="middle"
-                          fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                          y={rl.y}
+                          textAnchor="start"
+                          fontFamily={exportMode === "dimensions" ? "Century Gothic, sans-serif" : "system-ui, sans-serif"}
                           fontSize={11}
                           fontWeight={600}
                           fill="#1B1A1A"
