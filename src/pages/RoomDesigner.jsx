@@ -892,9 +892,8 @@ appState, // Pass appState directly for setters
 
 
   // Auto-save ONLY for an existing project.
-  // If there is no real project id yet, do nothing (local / demo mode).
+  // Quiet autosave: mark dirty on changes, then commit at most every 10s (and also on short pauses).
   useEffect(() => {
-    // Work out a stable project id for this session.
     const effectiveProjectId = projectIdState || projectIdFromUrl || null;
     if (!effectiveProjectId) return; // never create via autosave
 
@@ -904,65 +903,154 @@ appState, // Pass appState directly for setters
       return;
     }
 
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
+    const AUTOSAVE_INTERVAL_MS = 10_000;
+    const AUTOSAVE_DEBOUNCE_MS = 1_200;
+
+    // --- refs (created once) ---
+    if (!globalThis.__rdAutosaveRefs) {
+      globalThis.__rdAutosaveRefs = {
+        dirty: false,
+        inFlight: false,
+        lastSavedSig: "",
+        lastSaveAt: 0,
+        intervalId: null,
+        debounceId: null,
+      };
     }
+    const r = globalThis.__rdAutosaveRefs;
 
-    setAutosaveStatus("dirty");
+    const buildProjectData = () => {
+      const projectData = serializeProject({
+        name: projectNameState,
+        roomDims: appState.roomDims,
+        dimensions: appState.roomDims, // legacy fields
+        screen,
+        seatingPositions: appState?.seatingPositions || seatingPositions || [],
+        seatsPerRowByRow,
+        rowSpacingM,
+        placedSpeakers: appState?.speakerSystem?.placedSpeakers || placedSpeakers || [],
+        roomElements,
+        selectedSpeakersByRole: appState.selectedSpeakersByRole,
+        speakerNodes: appState.speakerNodes,
+        dolbyLayout: dolbyPreset,
+        overlays,
+        frozenTabs,
+        sevenBedLayoutType,
+        frontSubsCfg,
+        rearSubsCfg,
+        lcrAimMode,
+        enableFrontWides,
+        overheadGlobalModel,
+        overheadFrontOverride,
+        overheadMidOverride,
+        overheadRearOverride,
+        useFrontGlobal,
+        useMidGlobal,
+        useRearGlobal,
+        screenFrontPlaneM: appState.screenFrontPlaneM,
+        splConfig: appState.splConfig
+      });
 
-    debounceTimeoutRef.current = setTimeout(async () => {
+      // IMPORTANT: autosave must never rename a project
+      delete projectData.name;
+      delete projectData.client_name;
+
+      return projectData;
+    };
+
+    const computeSig = (data) => {
       try {
-        const projectData = serializeProject({
-          name: projectNameState,
-          roomDims: appState.roomDims,
-          dimensions: appState.roomDims, // Use appState.roomDims directly (serializeProject needs legacy fields)
-          screen,
-          seatingPositions: appState?.seatingPositions || seatingPositions || [],
-          seatsPerRowByRow,
-          rowSpacingM,
-          placedSpeakers: appState?.speakerSystem?.placedSpeakers || placedSpeakers || [],
-          roomElements,
-          selectedSpeakersByRole: appState.selectedSpeakersByRole,
-          speakerNodes: appState.speakerNodes,
-          dolbyLayout: dolbyPreset,
-          overlays,
-          frozenTabs,
-          sevenBedLayoutType,
-          frontSubsCfg,
-          rearSubsCfg,
-          lcrAimMode,
-          enableFrontWides,
-          overheadGlobalModel,
-          overheadFrontOverride,
-          overheadMidOverride,
-          overheadRearOverride,
-          useFrontGlobal,
-          useMidGlobal,
-          useRearGlobal,
-          screenFrontPlaneM: appState.screenFrontPlaneM,
-          splConfig: appState.splConfig
-        });
+        return JSON.stringify(data);
+      } catch {
+        // If something non-serialisable ever slips in, treat as "changed"
+        return String(Date.now());
+      }
+    };
 
-        // IMPORTANT: autosave must never rename a project
-        delete projectData.name;
-        delete projectData.client_name;
+    const trySaveNow = async () => {
+      if (!effectiveProjectId) return;
+      if (isHydratingRef.current) return;
 
-        await Project.update(effectiveProjectId, projectData);
+      // Only save when dirty, and avoid overlapping writes
+      if (!r.dirty || r.inFlight) return;
+
+      // Enforce "no-noise" cadence
+      const now = Date.now();
+      if (r.lastSaveAt && (now - r.lastSaveAt) < AUTOSAVE_INTERVAL_MS) {
+        return;
+      }
+
+      r.inFlight = true;
+      setAutosaveStatus("saving");
+
+      try {
+        const data = buildProjectData();
+        const sig = computeSig(data);
+
+        // If nothing really changed since last commit, clear dirty and stop
+        if (sig === r.lastSavedSig) {
+          r.dirty = false;
+          setAutosaveStatus("saved");
+          r.inFlight = false;
+          return;
+        }
+
+        await Project.update(effectiveProjectId, data);
+
         // Ensure our local state keeps the id we just wrote to
         if (!projectIdState) {
           setProjectIdState(effectiveProjectId);
         }
+
+        r.lastSavedSig = sig;
+        r.lastSaveAt = Date.now();
+        r.dirty = false;
         setAutosaveStatus("saved");
       } catch (e) {
         if (globalThis.__B44_LOGS) console.error("Error during autosave:", e);
         setAutosaveStatus("error");
+      } finally {
+        r.inFlight = false;
       }
-    }, 800);
+    };
+
+    // Mark dirty (but only if the serialised payload changed)
+    try {
+      const sig = computeSig(buildProjectData());
+      if (sig !== r.lastSavedSig) {
+        r.dirty = true;
+        setAutosaveStatus("dirty");
+      } else {
+        // If we're already in sync, keep it calm
+        if (!r.inFlight) setAutosaveStatus("saved");
+        r.dirty = false;
+      }
+    } catch {
+      // If build fails for any reason, stay dirty (but do not crash)
+      r.dirty = true;
+      setAutosaveStatus("dirty");
+    }
+
+    // Debounce: save soon after a pause, but still obey the 10s cadence inside trySaveNow()
+    if (r.debounceId) clearTimeout(r.debounceId);
+    r.debounceId = setTimeout(() => {
+      void trySaveNow();
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    // Interval: ensure we commit at least every 10 seconds while dirty
+    if (!r.intervalId) {
+      r.intervalId = setInterval(() => {
+        void trySaveNow();
+      }, AUTOSAVE_INTERVAL_MS);
+    }
 
     return () => {
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
+      if (r.debounceId) {
+        clearTimeout(r.debounceId);
+        r.debounceId = null;
       }
+      // NOTE: we intentionally keep the interval alive for this mounted RoomDesigner instance
+      // It will be naturally cleared when the page unmounts (full navigation / remount).
     };
   }, [
   projectIdState,
