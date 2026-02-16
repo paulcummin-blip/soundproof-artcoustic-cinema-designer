@@ -91,7 +91,7 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
   };
 
   const updateElement = (id, field, value) => {
-    const numberFields = new Set(['length_m', 'x_m', 'y_m', 'z_m']);
+    const numberFields = new Set(['length_m', 'thickness_m', 'height_m', 'wall_offset_m', 'x_m', 'y_m', 'z_m', 'pos_m']);
     const parsed = numberFields.has(field) ? parseFloat(value) : value;
 
     const next = (elements || []).map(el => {
@@ -305,6 +305,94 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                     Origin is top-left (0,0). Position is measured from the Left wall (for X) or Front wall (for Y).
                   </div>
                 </div>
+
+                {/* PROJECTOR-SPECIFIC CONTROLS */}
+                {element?.type === 'projector' && (
+                  <>
+                    {/* Y POSITION (wall offset) */}
+                    <div>
+                      <Label className="text-[#3E4349]">Y Position (m)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={
+                          Number.isFinite(element?.wall_offset_m) ? element.wall_offset_m : 0.10
+                        }
+                        onChange={(e) =>
+                          updateElement(
+                            element.id,
+                            'wall_offset_m',
+                            e.target.value
+                          )
+                        }
+                        className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                      />
+                      <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
+                        Distance from the wall into the room.
+                      </div>
+                    </div>
+
+                    {/* WIDTH */}
+                    <div>
+                      <Label className="text-[#3E4349]">Width (m)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={
+                          Number.isFinite(element?.length_m) ? element.length_m : 0.46
+                        }
+                        onChange={(e) =>
+                          updateElement(
+                            element.id,
+                            'length_m',
+                            e.target.value
+                          )
+                        }
+                        className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                      />
+                    </div>
+
+                    {/* HEIGHT */}
+                    <div>
+                      <Label className="text-[#3E4349]">Height (m)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={
+                          Number.isFinite(element?.height_m) ? element.height_m : 0.21
+                        }
+                        onChange={(e) =>
+                          updateElement(
+                            element.id,
+                            'height_m',
+                            e.target.value
+                          )
+                        }
+                        className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                      />
+                    </div>
+
+                    {/* DEPTH */}
+                    <div>
+                      <Label className="text-[#3E4349]">Depth (m)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={
+                          Number.isFinite(element?.thickness_m) ? element.thickness_m : 0.517
+                        }
+                        onChange={(e) =>
+                          updateElement(
+                            element.id,
+                            'thickness_m',
+                            e.target.value
+                          )
+                        }
+                        className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           );

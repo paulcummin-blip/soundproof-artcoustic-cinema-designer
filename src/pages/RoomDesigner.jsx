@@ -3066,6 +3066,9 @@ function RoomDesignerWithState() {
         length_m: L,
         thickness_m: T,
         pos_m: p,
+        // preserve projector-specific fields
+        wall_offset_m: Number.isFinite(Number(e?.wall_offset_m)) ? Number(e.wall_offset_m) : undefined,
+        height_m: Number.isFinite(Number(e?.height_m)) ? Number(e.height_m) : undefined,
         __label: String(e?.label || e?.__label || `Element ${idx + 1}`),
       };
     });
