@@ -7148,7 +7148,7 @@ return {
         {_overlays?.ROOM_DIMS && (
           <text
             x={x}
-            y={y + 28}
+            y={y + 36}
             textAnchor="middle"
             fontSize={12}
             fontWeight={600}
