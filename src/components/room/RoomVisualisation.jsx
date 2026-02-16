@@ -6979,6 +6979,44 @@ return {
     return labeledSeatIds;
   }, [speakerPositionsView, seatingPositions]);
 
+  // --- Row distance labels (ROOM_DIMS overlay) - furthest-right seat per row ---
+  const rowDistanceLabelSeatIds = useMemo(() => {
+    if (!_overlays?.ROOM_DIMS) return new Set();
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return new Set();
+    
+    // Cluster seats into rows
+    const allSeatsWithY = seatingPositions
+      .map(s => ({ seat: s, y: Number(s?.y ?? s?.position?.y ?? 0) }))
+      .filter(item => Number.isFinite(item.y))
+      .sort((a, b) => a.y - b.y);
+    
+    const rows = [];
+    for (const item of allSeatsWithY) {
+      const lastRow = rows[rows.length - 1];
+      if (!lastRow || Math.abs(item.y - lastRow.y) > 0.20) {
+        rows.push({ y: item.y, seats: [item.seat] });
+      } else {
+        lastRow.seats.push(item.seat);
+      }
+    }
+    
+    // For each row, pick the furthest-right seat
+    const labeledSeatIds = new Set();
+    for (const row of rows) {
+      const sortedByX = row.seats
+        .map(s => ({ seat: s, x: Number(s?.x ?? s?.position?.x ?? 0) }))
+        .filter(item => Number.isFinite(item.x))
+        .sort((a, b) => b.x - a.x); // Descending - furthest right first
+      
+      if (sortedByX.length === 0) continue;
+      
+      const furthestRight = sortedByX[0]?.seat;
+      if (furthestRight?.id) labeledSeatIds.add(furthestRight.id);
+    }
+    
+    return labeledSeatIds;
+  }, [_overlays?.ROOM_DIMS, seatingPositions]);
+
   // --- Seats: always render from the latest seatingPositions prop ---
   const renderSeatingPositions = () => {
     if (!hasRoomRect) return null;
@@ -7066,6 +7104,21 @@ return {
                   Front: {yM.toFixed(2)}m
                 </text>
               )}
+              
+              {/* Row distance label (ROOM_DIMS overlay only) */}
+              {_overlays?.ROOM_DIMS && rowDistanceLabelSeatIds.has(seat.id) && (
+                <text
+                  x={seatX + 22}
+                  y={seatY}
+                  textAnchor="start"
+                  fontSize={11}
+                  fontWeight={600}
+                  fill="#22c55e"
+                  pointerEvents="none"
+                >
+                  ⬆️ {yM.toFixed(2)}m
+                </text>
+              )}
             </g>
           );
         })}
@@ -7093,9 +7146,22 @@ return {
           strokeWidth={2}
           opacity={0.9}
         />
+        {_overlays?.ROOM_DIMS && (
+          <text
+            x={x}
+            y={y + 16}
+            textAnchor="middle"
+            fontSize={12}
+            fontWeight={600}
+            fill="#22c55e"
+            pointerEvents="none"
+          >
+            RSP
+          </text>
+        )}
       </g>
     );
-  }, [toPx, mlpDotX_m, mlpDotY_m]);
+  }, [toPx, mlpDotX_m, mlpDotY_m, _overlays?.ROOM_DIMS]);
 
 
   const containerStyle = {
