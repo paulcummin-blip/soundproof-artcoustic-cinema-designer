@@ -5122,7 +5122,12 @@ function RoomDesignerWithState() {
                     </div>
               }
                   <Suspense fallback={<div>Loading...</div>}>
-                      <RoomElements elements={roomElements} onChange={setRoomElementsGuarded} disabled={isFrozen('elements')} />
+                      <RoomElements 
+                        elements={roomElements} 
+                        onChange={setRoomElementsGuarded} 
+                        disabled={isFrozen('elements')}
+                        roomDims={appState?.roomDims}
+                      />
                   </Suspense>
               </CollapsiblePanel>
               
