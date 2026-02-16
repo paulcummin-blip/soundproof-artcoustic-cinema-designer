@@ -7111,9 +7111,8 @@ return {
                   x={seatX + 22}
                   y={seatY}
                   textAnchor="start"
-                  fontSize={11}
-                  fontWeight={600}
-                  fill="#22c55e"
+                  fontSize={22}
+                  fill="#1B1A1A"
                   pointerEvents="none"
                 >
                   ⬆️ {yM.toFixed(2)}m
@@ -7149,7 +7148,7 @@ return {
         {_overlays?.ROOM_DIMS && (
           <text
             x={x}
-            y={y + 16}
+            y={y + 28}
             textAnchor="middle"
             fontSize={12}
             fontWeight={600}
