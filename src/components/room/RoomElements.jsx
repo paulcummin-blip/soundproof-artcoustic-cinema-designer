@@ -213,6 +213,8 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                   <div className="text-sm font-medium" style={{ color: '#1B1A1A' }}>
                     {element?.label || 'Element'}
                   </div>
+
+                  {/* Keep a simple read-only wall hint (no selector) */}
                   <div className="text-xs" style={{ color: '#625143' }}>
                     {wallLabel(wall)}
                   </div>
@@ -233,167 +235,156 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                {/* WALL */}
-                <div>
-                  <Label className="text-[#3E4349]">Wall</Label>
-                  <Select
-                    value={wall}
-                    onValueChange={(value) => updateElement(element.id, 'wall', value)}
-                    modal={false}
-                  >
-                    <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A]">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent position="popper" sideOffset={6} className="z-[70]">
-                      <SelectItem value="front">Front</SelectItem>
-                      <SelectItem value="rear">Rear</SelectItem>
-                      <SelectItem value="left">Left</SelectItem>
-                      <SelectItem value="right">Right</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
-                    Screen is always on the Front wall.
+              {/* PROJECTOR LAYOUT */}
+              {element?.type === 'projector' ? (
+                <>
+                  {/* Row 1: Label only */}
+                  <div className="mb-3">
+                    <Label className="text-[#3E4349]">Label</Label>
+                    <Input
+                      type="text"
+                      value={element?.label ?? ''}
+                      onChange={(e) => updateElement(element.id, 'label', e.target.value)}
+                      className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                      placeholder="Projector"
+                    />
                   </div>
-                </div>
 
-                {/* LENGTH */}
-                <div>
-                  <Label className="text-[#3E4349]">Length (m)</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={Number.isFinite(element?.length_m) ? element.length_m : 0.9}
-                    onChange={(e) => updateElement(element.id, 'length_m', e.target.value)}
-                    className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
-                  />
-                </div>
+                  {/* Row 2: X + Y */}
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <div>
+                      <Label className="text-[#3E4349]">X Position (m)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={Number.isFinite(element?.pos_m) ? element.pos_m : 0}
+                        onChange={(e) => updateElement(element.id, 'pos_m', e.target.value)}
+                        className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                      />
+                      <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
+                        Measured from Left wall.
+                      </div>
+                    </div>
 
-                {/* LABEL */}
-                <div>
-                  <Label className="text-[#3E4349]">Label</Label>
-                  <Input
-                    type="text"
-                    value={element?.label ?? ''}
-                    onChange={(e) => updateElement(element.id, 'label', e.target.value)}
-                    className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
-                    placeholder="e.g. Entrance door"
-                  />
-                </div>
-
-                {/* POSITION */}
-                <div>
-                  <Label className="text-[#3E4349]">
-                    {isFrontOrRear ? 'X Position (m)' : 'Y Position (m)'}
-                  </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={
-                      Number.isFinite(element?.pos_m) ? element.pos_m : 0
-                    }
-                    onChange={(e) =>
-                      updateElement(
-                        element.id,
-                        'pos_m',
-                        e.target.value
-                      )
-                    }
-                    className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
-                  />
-                  <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
-                    Origin is top-left (0,0). Position is measured from the Left wall (for X) or Front wall (for Y).
-                  </div>
-                </div>
-
-                {/* PROJECTOR-SPECIFIC CONTROLS */}
-                {element?.type === 'projector' && (
-                  <>
-                    {/* Y POSITION (wall offset) */}
                     <div>
                       <Label className="text-[#3E4349]">Y Position (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
-                        value={
-                          Number.isFinite(element?.wall_offset_m) ? element.wall_offset_m : 0.10
-                        }
-                        onChange={(e) =>
-                          updateElement(
-                            element.id,
-                            'wall_offset_m',
-                            e.target.value
-                          )
-                        }
+                        value={Number.isFinite(element?.wall_offset_m) ? element.wall_offset_m : 0.10}
+                        onChange={(e) => updateElement(element.id, 'wall_offset_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                       />
                       <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
-                        Distance from the wall into the room.
+                        Distance from rear wall into the room.
                       </div>
                     </div>
+                  </div>
 
-                    {/* WIDTH */}
+                  {/* Row 3: Width / Depth / Height on one line */}
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
                       <Label className="text-[#3E4349]">Width (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
-                        value={
-                          Number.isFinite(element?.length_m) ? element.length_m : 0.46
-                        }
-                        onChange={(e) =>
-                          updateElement(
-                            element.id,
-                            'length_m',
-                            e.target.value
-                          )
-                        }
+                        value={Number.isFinite(element?.length_m) ? element.length_m : 0.46}
+                        onChange={(e) => updateElement(element.id, 'length_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                       />
                     </div>
 
-                    {/* HEIGHT */}
-                    <div>
-                      <Label className="text-[#3E4349]">Height (m)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        value={
-                          Number.isFinite(element?.height_m) ? element.height_m : 0.21
-                        }
-                        onChange={(e) =>
-                          updateElement(
-                            element.id,
-                            'height_m',
-                            e.target.value
-                          )
-                        }
-                        className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
-                      />
-                    </div>
-
-                    {/* DEPTH */}
                     <div>
                       <Label className="text-[#3E4349]">Depth (m)</Label>
                       <Input
                         type="number"
                         step="0.01"
-                        value={
-                          Number.isFinite(element?.thickness_m) ? element.thickness_m : 0.517
-                        }
-                        onChange={(e) =>
-                          updateElement(
-                            element.id,
-                            'thickness_m',
-                            e.target.value
-                          )
-                        }
+                        value={Number.isFinite(element?.thickness_m) ? element.thickness_m : 0.517}
+                        onChange={(e) => updateElement(element.id, 'thickness_m', e.target.value)}
                         className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
                       />
                     </div>
-                  </>
-                )}
-              </div>
+
+                    <div>
+                      <Label className="text-[#3E4349]">Height (m)</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        value={Number.isFinite(element?.height_m) ? element.height_m : 0.21}
+                        onChange={(e) => updateElement(element.id, 'height_m', e.target.value)}
+                        className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* NON-PROJECTOR layout stays as before (including Wall selector etc.) */
+                <div className="grid grid-cols-2 gap-3">
+                  {/* WALL */}
+                  <div>
+                    <Label className="text-[#3E4349]">Wall</Label>
+                    <Select
+                      value={wall}
+                      onValueChange={(value) => updateElement(element.id, 'wall', value)}
+                      modal={false}
+                    >
+                      <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A]">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent position="popper" sideOffset={6} className="z-[70]">
+                        <SelectItem value="front">Front</SelectItem>
+                        <SelectItem value="rear">Rear</SelectItem>
+                        <SelectItem value="left">Left</SelectItem>
+                        <SelectItem value="right">Right</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
+                      Screen is always on the Front wall.
+                    </div>
+                  </div>
+
+                  {/* LENGTH */}
+                  <div>
+                    <Label className="text-[#3E4349]">Length (m)</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={Number.isFinite(element?.length_m) ? element.length_m : 0.9}
+                      onChange={(e) => updateElement(element.id, 'length_m', e.target.value)}
+                      className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                    />
+                  </div>
+
+                  {/* LABEL */}
+                  <div>
+                    <Label className="text-[#3E4349]">Label</Label>
+                    <Input
+                      type="text"
+                      value={element?.label ?? ''}
+                      onChange={(e) => updateElement(element.id, 'label', e.target.value)}
+                      className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                      placeholder="e.g. Entrance door"
+                    />
+                  </div>
+
+                  {/* POSITION */}
+                  <div>
+                    <Label className="text-[#3E4349]">
+                      {isFrontOrRear ? 'X Position (m)' : 'Y Position (m)'}
+                    </Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      value={Number.isFinite(element?.pos_m) ? element.pos_m : 0}
+                      onChange={(e) => updateElement(element.id, 'pos_m', e.target.value)}
+                      className="bg-white border-[#DCDBD6] text-[#1B1A1A]"
+                    />
+                    <div className="text-[10px] mt-1" style={{ color: '#625143' }}>
+                      Origin is top-left (0,0). Position is measured from the Left wall (for X) or Front wall (for Y).
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })
