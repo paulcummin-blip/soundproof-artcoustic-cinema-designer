@@ -4399,7 +4399,82 @@ function RoomDesignerWithState() {
     }, 100);
   }, [_isFrozen, appState]);
 
+  const handleOptimiseAll = React.useCallback(() => {
+    if (_isFrozen && _isFrozen('speakers')) return;
+    try {
+      const spks = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+      if (spks.length < 2) return;
 
+      const bedRoles = new Set(["FWL", "FWR", "LW", "RW", "SL", "SR", "LS", "RS", "LRS", "RRS", "SBL", "SBR", "LR", "RR"]);
+      const bedSpeakers = spks.
+      filter((s) => bedRoles.has(String(s.role).toUpperCase())).
+      map((s) => ({ id: String(s.id || s.role), role: String(s.role).toUpperCase(), position: { x: Number(s.position?.x) || 0, y: Number(s.position?.y) || 0 } }));
+
+      if (bedSpeakers.length < 2) return;
+
+      const pads = getBedPads({ dimensions: stableDimensions, seatingPositions: _seatingPositions });
+      // Use the fixed mlpAnchorEffective if available, otherwise fallback to computing from seats for optimization
+      const mlpForOptimization = mlpAnchorEffective || computeMLPAndPrimary(_seatingPositions, stableDimensions.width, stableDimensions.length, _mlpBasis).mlp;
+
+      const eq = equalizeBedAngles({
+        dimensions: { width: stableDimensions.width, length: stableDimensions.length }, // Use stableDimensions
+        mlp: mlpForOptimization, // Use mlpAnchorEffective here for consistency
+        speakers: bedSpeakers,
+        pads,
+        targets: [50, 60, 80],
+        weights: { evenness: 1.0, pad: 5.0, target: 0.6 },
+        steps: 250
+      });
+
+      const byId = new Map(eq.map((s) => [s.id, s]));
+      const surRoles = new Set(["FWL", "FWR", "LW", "RW", "SL", "SR", "LS", "RS", "LRS", "RRS", "SBL", "SBR", "LR", "RR"]);
+      const surrogate = spks.
+      filter((s) => surRoles.has(String(s.role).toUpperCase())).
+      map((s) => ({
+        position: {
+          x: byId.get(String(s.id || s.role))?.position?.x ?? s.position?.x ?? 0,
+          y: byId.get(String(s.id || s.role))?.position?.y ?? s.position?.y ?? 0
+        }
+      }));
+
+      const gaps = surrogate.length ? surrogate.length === 2 ?
+      [backSweepGap2(mlpForOptimization, surrogate[0].position, surrogate[1].position)] :
+      backSweepGaps(mlpForOptimization, surrogate.map((p) => ({ position: p.position }))) :
+      [];
+
+      let maxGap = gaps.length ? Math.max(...gaps) : 0;
+
+      if (maxGap < 80) {
+        for (const item of eq) {
+          const pad = pads[item.role];
+          if (!pad) continue;
+          const EPS = 0.03;
+          if (pad.axis === "y") {
+            const mid = (pad.min + pad.max) / 2;
+            item.position.y += item.position.y >= mid ? EPS : -EPS;
+            item.position.y = Math.max(pad.min, Math.min(pad.max, item.position.y));
+          } else {
+            const mid = (pad.min + pad.max) / 2;
+            item.position.x += item.position.x >= mid ? EPS : -EPS;
+            item.position.x = Math.max(pad.min, Math.min(pad.max, item.position.x));
+          }
+        }
+      }
+
+      const byIdAfter = new Map(eq.map((s) => [s.id, s]));
+      const merged = spks.map((s) => {
+        const k = String(s.id || s.role);
+        const u = byIdAfter.get(k);
+        if (!u) return s;
+        return { ...s, position: { ...(s.position || {}), x: u.position.x, y: u.position.y } };
+      });
+
+      if (globalThis.__B44_LOGS) console.log('[RD] optimiseAll -> roles', merged.map((s) => safeCanon(s.role)));
+      setSpeakers((prev) => mergePreserveOverheads(prev, merged, dolbyPreset));
+    } catch (e) {
+      if (globalThis.__B44_LOGS) console.error("[OptimiseAll] failed:", e);
+    }
+  }, [placedSpeakers, stableDimensions, _seatingPositions, _mlpBasis, _isFrozen, setSpeakers, mlpAnchorEffective]);
 
   // Manual Save Project function now just calls the one from useProjectLoader
   const handleSaveProject = React.useCallback(async () => {
@@ -4542,6 +4617,15 @@ function RoomDesignerWithState() {
               disabled={isFrozen('speakers')}>
               <RotateCcw className="w-4 h-4 mr-2" />
               Reset
+            </Button>
+            
+            <Button
+              size="sm"
+              className="brand-btn"
+              onClick={handleOptimiseAll}
+              disabled={isFrozen('speakers') || placedSpeakers.length < 2}>
+              <RotateCcw className="w-4 h-4 mr-2" />
+              Optimise
             </Button>
 
             <Button size="sm" className="brand-btn" onClick={handleSaveProject}>
