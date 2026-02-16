@@ -52,10 +52,11 @@ export default function RoomElements({ elements = [], onChange, roomDims }) {
 
     // Centre the projector block on the room width
     const roomW = Number(roomDims?.widthM ?? roomDims?.width ?? 0) || 0;
-    const projW = 0.46;
+    const projW = 0.46; // 460mm
 
+    // Ensure centre of block sits on room centreline
     const centredX = roomW > 0
-      ? Math.max(0, (roomW / 2) - (projW / 2))
+      ? (roomW / 2) - (projW / 2)
       : 0;
 
     const newElement = {
