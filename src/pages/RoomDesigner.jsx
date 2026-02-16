@@ -1013,7 +1013,7 @@ appState, // Pass appState directly for setters
         if (idToLoad) {
           hasBootstrappedRef.current = true;
           setProjectIdState(idToLoad);
-          loadProject(controller.signal);
+          loadProject(controller.signal, idToLoad);
         }
       } else {
         // No project at all – this is a fresh, local-only design.
