@@ -3534,10 +3534,6 @@ React.useEffect(() => {
           dolbyLayout,
         });
         
-        if (snapshot && seatId && appState?.setSeatSnapshotBySeatId) {
-          appState.setSeatSnapshotBySeatId(prev => ({ ...prev, [seatId]: snapshot }));
-        }
-        
         if (snapshot) return snapshot;
       } catch (err) {
         console.warn('[HUD] Failed to compute pinned seat snapshot:', err);
@@ -3579,29 +3575,6 @@ React.useEffect(() => {
     });
     
     if (data) {
-      // Write to latest seat snapshot map (no signature, just seat.id)
-      if (seatId && appState?.setSeatSnapshotBySeatId) {
-        appState.setSeatSnapshotBySeatId(prev => ({ ...prev, [seatId]: data }));
-      }
-      
-      // IMPORTANT: seed the shared cache so RP22Report can render seat cards
-      // Keep this very conservative: only write if missing or different.
-      if (appState?.setSeatMetricsById) {
-        const prevAll = appState?.seatMetricsById || {};
-        const prevSeat = prevAll?.[cacheKey];
-
-        const nextSeat = { ...data };
-
-        const shouldWrite = !prevSeat || JSON.stringify(prevSeat) !== JSON.stringify(nextSeat);
-
-        if (shouldWrite) {
-          appState.setSeatMetricsById({
-            ...prevAll,
-            [cacheKey]: nextSeat,
-          });
-        }
-      }
-
       return data;
     }
     
@@ -4242,10 +4215,73 @@ React.useEffect(() => {
     analysisResult,
     seatingPositions,
     appState?.splConfig,
-    appState?.seatMetricsById,
     appState?.sevenBedLayoutType,
     appState?.speakerSystem?.sevenBedLayoutType,
     appState?.speakerSystem?.useWidesInsteadOfRears,
+  ]);
+
+  // ---- HUD cache writes MUST be in an effect (never inside useMemo/render) ----
+  const lastHudWriteRef = useRef({});
+
+  useEffect(() => {
+    const seat = effectiveHoveredSeat;
+    if (!seat?.id) return;
+
+    // Only write if we actually have computed data
+    if (!tooltipData) return;
+
+    // Build same cacheKey used in tooltipData logic
+    const seatId = String(seat.id);
+
+    // Rebuild the same signature parts used above (cheap version is OK here)
+    const seatIds = (seatingPositions || []).map(s => s.id).join(',');
+    const seatPosFingerprint = (seatingPositions || [])
+      .map(s => `${s.id}:${Math.round((s.x || 0) * 1000)}:${Math.round((s.y || 0) * 1000)}`)
+      .join(',');
+
+    const cacheKey = `${seatId}|${seatIds}|${seatPosFingerprint}`;
+
+    // Hash the payload so we don't write the same thing repeatedly
+    let nextHash = '';
+    try {
+      nextHash = JSON.stringify(tooltipData);
+    } catch {
+      nextHash = String(Date.now()); // fallback: allow write
+    }
+
+    if (lastHudWriteRef.current[cacheKey] === nextHash) return;
+    lastHudWriteRef.current[cacheKey] = nextHash;
+
+    // 1) Seat snapshot map (keyed by seatId)
+    if (appState?.setSeatSnapshotBySeatId) {
+      appState.setSeatSnapshotBySeatId(prev => {
+        const cur = prev?.[seatId];
+        // Avoid needless writes
+        try {
+          if (cur && JSON.stringify(cur) === nextHash) return prev;
+        } catch {}
+        return { ...(prev || {}), [seatId]: tooltipData };
+      });
+    }
+
+    // 2) Shared cache (keyed by cacheKey)
+    if (appState?.setSeatMetricsById) {
+      appState.setSeatMetricsById(prevAll => {
+        const prevObj = prevAll || {};
+        const cur = prevObj[cacheKey];
+        // Avoid needless writes
+        try {
+          if (cur && JSON.stringify(cur) === nextHash) return prevObj;
+        } catch {}
+        return { ...prevObj, [cacheKey]: tooltipData };
+      });
+    }
+  }, [
+    tooltipData,
+    effectiveHoveredSeat,
+    seatingPositions,
+    appState?.setSeatSnapshotBySeatId,
+    appState?.setSeatMetricsById,
   ]);
 
   // AUTOMATIC SEAT METRICS CACHE - SOLE WRITER for seatMetricsById (powers both HUD and Report)
