@@ -3012,82 +3012,7 @@ function RoomDesignerWithState() {
   // REMOVED: Duplicate frontWideZones declaration (moved earlier to avoid TDZ)
 
 
-  // Keep placed subwoofers in sync with front/rear sub config.
-  // Single source of truth: frontSubsCfg + rearSubsCfg.
-  // IMPORTANT: never merge subs into placedSpeakers.
-  useEffect(() => {
-    const setPlacedSubs = appState?.setSubwoofers;
-    if (typeof setPlacedSubs !== 'function') return;
 
-    const widthM = Number(appState?.roomDims?.widthM) || Number(stableDimensions?.width) || 4.5;
-    const lengthM = Number(appState?.roomDims?.lengthM) || Number(stableDimensions?.length) || 6.0;
-
-    const normQty = (q) => Math.max(0, Math.min(8, Number(q?.count ?? q?.qty ?? q) || 0));
-    const normModel = (m) => String(m || '').trim();
-
-    const frontModel = normModel(frontSubsCfg?.model);
-    const rearModel  = normModel(rearSubsCfg?.model);
-
-    const frontQty = normQty(frontSubsCfg);
-    const rearQty  = normQty(rearSubsCfg);
-
-    // If nothing selected, clear placed subs (but do not touch speakers)
-    if ((!frontModel || frontQty === 0) && (!rearModel || rearQty === 0)) {
-      setPlacedSubs([]);
-      return;
-    }
-
-    // Simple, stable default placement rules (plan only):
-    // - front subs: along front wall area (y = 0.30m)
-    // - rear subs: along rear wall area (y = length - 0.30m)
-    const yFront = 0.30;
-    const yRear  = Math.max(0.30, lengthM - 0.30);
-
-    const makeLine = (qty, y, tag) => {
-      if (qty <= 0) return [];
-      if (qty === 1) {
-        return [{ x: widthM * 0.5, y, tag }];
-      }
-      // evenly spaced across width with margins
-      const margin = widthM * 0.15;
-      const span = Math.max(0.01, widthM - margin * 2);
-      return Array.from({ length: qty }, (_, i) => ({
-        x: margin + (span * (i / (qty - 1))),
-        y,
-        tag,
-      }));
-    };
-
-    const frontPositions = frontModel && frontQty > 0 ? makeLine(frontQty, yFront, 'front') : [];
-    const rearPositions  = rearModel && rearQty > 0 ? makeLine(rearQty,  yRear,  'rear') : [];
-
-    const next = [
-      ...frontPositions.map((p, i) => ({
-        id: `sub-front-${i + 1}`,
-        role: `SUBF${i + 1}`,
-        group: 'front',
-        model: frontModel,
-        position: { x: p.x, y: p.y, z: 0 },
-      })),
-      ...rearPositions.map((p, i) => ({
-        id: `sub-rear-${i + 1}`,
-        role: `SUBR${i + 1}`,
-        group: 'rear',
-        model: rearModel,
-        position: { x: p.x, y: p.y, z: 0 },
-      })),
-    ];
-
-    setPlacedSubs(next);
-  }, [
-    appState?.setSubwoofers,
-    appState?.roomDims?.widthM,
-    appState?.roomDims?.lengthM,
-    stableDimensions?.width,
-    stableDimensions?.length,
-    frontSubsCfg,
-    rearSubsCfg,
-  ]);
 
 
   const initWithDefaultsAndRules = React.useMemo(
@@ -4743,6 +4668,84 @@ function RoomDesignerWithState() {
     useRearGlobal: useRearGlobalFromState,
     setUseRearGlobal: setUseRearGlobalFromState
   } = appState;
+
+  // Keep placed subwoofers in sync with front/rear sub config.
+  // Single source of truth: frontSubsCfg + rearSubsCfg.
+  // IMPORTANT: subs stay separate from speakerSystem.placedSpeakers.
+  useEffect(() => {
+    const setSubwoofers = appState?.setSubwoofers;
+    if (typeof setSubwoofers !== "function") return;
+
+    const widthM =
+      Number(appState?.roomDims?.widthM) ||
+      Number(stableDimensions?.width) ||
+      4.5;
+
+    const lengthM =
+      Number(appState?.roomDims?.lengthM) ||
+      Number(stableDimensions?.length) ||
+      6.0;
+
+    const normQty = (q) => Math.max(0, Math.min(8, Number(q?.count ?? q?.qty ?? q) || 0));
+    const normModel = (m) => String(m || "").trim();
+
+    const frontModel = normModel(frontSubsCfg?.model);
+    const rearModel = normModel(rearSubsCfg?.model);
+
+    const frontQty = normQty(frontSubsCfg);
+    const rearQty = normQty(rearSubsCfg);
+
+    // If nothing selected, clear placed subs
+    if ((!frontModel || frontQty === 0) && (!rearModel || rearQty === 0)) {
+      setSubwoofers([]);
+      return;
+    }
+
+    // Default placement rules (plan only)
+    const yFront = 0.30;
+    const yRear = Math.max(0.30, lengthM - 0.30);
+
+    const makeLine = (qty, y) => {
+      if (qty <= 0) return [];
+      if (qty === 1) return [{ x: widthM * 0.5, y }];
+      const margin = widthM * 0.15;
+      const span = Math.max(0.01, widthM - margin * 2);
+      return Array.from({ length: qty }, (_, i) => ({
+        x: margin + span * (i / (qty - 1)),
+        y,
+      }));
+    };
+
+    const frontPositions = makeLine(frontQty, yFront);
+    const rearPositions = makeLine(rearQty, yRear);
+
+    const next = [
+      ...frontPositions.map((p, i) => ({
+        id: `sub-front-${i + 1}`,
+        role: `SUBF${i + 1}`,
+        group: "front",
+        model: frontModel,
+        position: { x: p.x, y: p.y, z: 0 },
+      })),
+      ...rearPositions.map((p, i) => ({
+        id: `sub-rear-${i + 1}`,
+        role: `SUBR${i + 1}`,
+        group: "rear",
+        model: rearModel,
+        position: { x: p.x, y: p.y, z: 0 },
+      })),
+    ];
+
+    setSubwoofers(next);
+  }, [
+    appState?.setSubwoofers,
+    appState?.roomDims?.widthM,
+    appState?.roomDims?.lengthM,
+    stableDimensions?.width,
+    stableDimensions?.length,
+    frontSubsCfg,
+    rearSubsCfg,
+  ]);
 
   return (
     <>
