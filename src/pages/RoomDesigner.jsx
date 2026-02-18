@@ -834,7 +834,6 @@ appState, // Pass appState directly for setters
         hydrateFromProject(p);
         setProjectNameState(p?.name || "Project"); // Update internal projectName state
         setLoadState({ phase: "loaded", error: null, name: p?.name || "Project" });
-        seatingLoadedEpochRef.current = seatingConfigEpoch;
       } else {
         // Project not found in cloud; keeping id so user can still save into it
         if (globalThis.__B44_LOGS) console.log('[RoomDesigner] Project not found in cloud; keeping id so user can continue working.');
@@ -4278,7 +4277,7 @@ function RoomDesignerWithState() {
       loadState?.phase === "loaded" && !!hasProjectId;
 
     const userHasChangedSeatingSinceLoad =
-      seatingConfigEpoch !== seatingLoadedEpochRef.current;
+      false; // seatingConfigEpoch !== seatingLoadedEpochRef.current;
 
     if (
       isLoadedProject &&
