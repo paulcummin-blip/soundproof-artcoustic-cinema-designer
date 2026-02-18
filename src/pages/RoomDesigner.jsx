@@ -2103,16 +2103,35 @@ function RoomDesignerWithState() {
       appState.setRowCentersM(centers);
     }
 
-    // 5. Store the FIXED MLP position (for green dot and speaker placement)
-    const mlpRounded = Math.round(fixedMlpY * 1000) / 1000;
+    // 5. Store the MLP position derived from the CLAMPED row centres.
+    // This keeps the green dot locked to the seating reference (no drift when clamping occurs).
+    let mlpIndex = 0;
 
-    if (!Number.isFinite(mlpRounded)) {
+    // Match the intended reference behaviour
+    if (String(mlpReference).toLowerCase() === 'back') {
+      mlpIndex = Math.max(0, rows - 1);
+    } else if (String(mlpReference).toLowerCase() === 'all') {
+      // Middle row as the reference point
+      mlpIndex = Math.max(0, Math.min(rows - 1, Math.round((rows - 1) / 2)));
+    } else {
+      // 'front' (default)
+      mlpIndex = 0;
+    }
+
+    // Safety: clamp index to available centres length
+    mlpIndex = Math.max(0, Math.min((centers.length - 1), mlpIndex));
+
+    const mlpFromCenters = Number(centers?.[mlpIndex]);
+
+    if (!Number.isFinite(mlpFromCenters)) {
       return;
     }
 
+    const mlpRounded = Math.round(mlpFromCenters * 1000) / 1000;
+
     if (typeof appState?.setMlpY_m === 'function') {
       appState.setMlpY_m((prev) => {
-        const prevRounded = prev ? Math.round(prev * 1000) : null;
+        const prevRounded = Number.isFinite(prev) ? Math.round(prev * 1000) : null;
         const newRounded = Math.round(mlpRounded * 1000);
         return prevRounded === newRounded ? prev : mlpRounded;
       });
@@ -2993,70 +3012,82 @@ function RoomDesignerWithState() {
   // REMOVED: Duplicate frontWideZones declaration (moved earlier to avoid TDZ)
 
 
-  // Effect for subwoofer placement
+  // Keep placed subwoofers in sync with front/rear sub config.
+  // Single source of truth: frontSubsCfg + rearSubsCfg.
+  // IMPORTANT: never merge subs into placedSpeakers.
   useEffect(() => {
-    if (!placedSpeakers.length || !_roomDims || !_screen || _isFrozen && _isFrozen('bass')) return;
+    const setPlacedSubs = appState?.setSubwoofers;
+    if (typeof setPlacedSubs !== 'function') return;
 
-    const room = { width_m: _roomDims.widthM, length_m: _roomDims.lengthM, height_m: _roomDims.heightM };
+    const widthM = Number(appState?.roomDims?.widthM) || Number(stableDimensions?.width) || 4.5;
+    const lengthM = Number(appState?.roomDims?.lengthM) || Number(stableDimensions?.length) || 6.0;
 
-    const byRole = new Map(placedSpeakers.map((s) => [s.role, s]));
-    const getDims = (model) => {
-      const meta = getSpeakerModelMeta(model);
-      return { w_m: meta?.widthM ?? 0.27, d_m: meta?.depthM ?? 0.082 };
-    };
+    const normQty = (q) => Math.max(0, Math.min(8, Number(q?.count ?? q?.qty ?? q) || 0));
+    const normModel = (m) => String(m || '').trim();
 
-    const leftSpeaker = byRole.get("FL");
-    const centreSpeaker = byRole.get("FC");
-    const rightSpeaker = byRole.get("FR");
+    const frontModel = normModel(frontSubsCfg?.model);
+    const rearModel  = normModel(rearSubsCfg?.model);
 
-    if (!leftSpeaker || !centreSpeaker || !rightSpeaker) {
-      if (typeof setSubwoofers === 'function') setSubwoofers([]);
+    const frontQty = normQty(frontSubsCfg);
+    const rearQty  = normQty(rearSubsCfg);
+
+    // If nothing selected, clear placed subs (but do not touch speakers)
+    if ((!frontModel || frontQty === 0) && (!rearModel || rearQty === 0)) {
+      setPlacedSubs([]);
       return;
     }
 
-    const lcr = {
-      L: { x_m: leftSpeaker.position.x, dims: getDims(leftSpeaker.model) },
-      C: { x_m: centreSpeaker.position.x, dims: getDims(centreSpeaker.model) },
-      R: { x_m: rightSpeaker.position.x, dims: getDims(rightSpeaker.model) }
+    // Simple, stable default placement rules (plan only):
+    // - front subs: along front wall area (y = 0.30m)
+    // - rear subs: along rear wall area (y = length - 0.30m)
+    const yFront = 0.30;
+    const yRear  = Math.max(0.30, lengthM - 0.30);
+
+    const makeLine = (qty, y, tag) => {
+      if (qty <= 0) return [];
+      if (qty === 1) {
+        return [{ x: widthM * 0.5, y, tag }];
+      }
+      // evenly spaced across width with margins
+      const margin = widthM * 0.15;
+      const span = Math.max(0.01, widthM - margin * 2);
+      return Array.from({ length: qty }, (_, i) => ({
+        x: margin + (span * (i / (qty - 1))),
+        y,
+        tag,
+      }));
     };
 
-    const screenDepth_m = _screen.floatDepthM || 0.2;
+    const frontPositions = frontModel && frontQty > 0 ? makeLine(frontQty, yFront, 'front') : [];
+    const rearPositions  = rearModel && rearQty > 0 ? makeLine(rearQty,  yRear,  'rear') : [];
 
-    const front = placeSubwoofers({
-      room,
-      wallY_m: 0,
-      screenPlaneY_m: screenDepth_m,
-      lcr,
-      group: "front",
-      cfg: { ..._frontSubsCfg, qty: _frontSubsCfg?.qty ?? _frontSubsCfg?.count ?? 0 }
-    });
+    const next = [
+      ...frontPositions.map((p, i) => ({
+        id: `sub-front-${i + 1}`,
+        role: `SUBF${i + 1}`,
+        group: 'front',
+        model: frontModel,
+        position: { x: p.x, y: p.y, z: 0 },
+      })),
+      ...rearPositions.map((p, i) => ({
+        id: `sub-rear-${i + 1}`,
+        role: `SUBR${i + 1}`,
+        group: 'rear',
+        model: rearModel,
+        position: { x: p.x, y: p.y, z: 0 },
+      })),
+    ];
 
-    const rear = placeSubwoofers({
-      room,
-      wallY_m: 0,
-      screenPlaneY_m: stableDimensions.length,
-      lcr,
-      group: "rear",
-      cfg: { ..._rearSubsCfg, qty: _rearSubsCfg?.qty ?? _rearSubsCfg?.count ?? 0 }
-    });
-
-    if (typeof setSubwoofers === 'function') {
-      const newSubs = [...front.placed, ...rear.placed];
-      if (!speakersEqual(appState.subwoofers || [], newSubs)) {
-        setSubwoofers(newSubs);
-      }
-    }
-
-    setSubWarnings((prev) => ({ ...prev, rear: rear.warnings }));
-
-    const currentMinFromLcr_m = _screen.floatDepthM || 0;
-    const needed_m = Math.max(front.neededScreenDepth_m || 0, currentMinFromLcr_m);
-
-    if (needed_m > currentMinFromLcr_m && Math.abs(needed_m - currentMinFromLcr_m) > 0.001) {
-      _setScreen((s) => ({ ...s, floatDepthM: needed_m }));
-    }
-
-  }, [_roomDims?.widthM, _roomDims?.lengthM, _roomDims?.heightM, placedSpeakers, _frontSubsCfg, _rearSubsCfg, _screen, stableDimensions.length, _isFrozen, setSubwoofers, setSubWarnings, _setScreen]);
+    setPlacedSubs(next);
+  }, [
+    appState?.setSubwoofers,
+    appState?.roomDims?.widthM,
+    appState?.roomDims?.lengthM,
+    stableDimensions?.width,
+    stableDimensions?.length,
+    frontSubsCfg,
+    rearSubsCfg,
+  ]);
 
 
   const initWithDefaultsAndRules = React.useMemo(
