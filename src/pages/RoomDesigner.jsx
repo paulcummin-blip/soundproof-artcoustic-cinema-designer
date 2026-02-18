@@ -4273,17 +4273,14 @@ function RoomDesignerWithState() {
     const currentSeats = Array.isArray(appState?.seatingPositions) ? appState.seatingPositions : [];
     const hasProjectId = resolvedProjectId || projectIdState;
 
-    const isLoadedProject =
-      loadState?.phase === "loaded" && !!hasProjectId;
-
-    const userHasChangedSeatingSinceLoad =
-      false; // seatingConfigEpoch !== seatingLoadedEpochRef.current;
-
+    // If a saved project is loaded, we normally avoid auto-rebuilds.
+    // But: if there are *no seats*, we MUST allow a rebuild (otherwise seats can vanish forever).
     if (
-      isLoadedProject &&
-      !userHasChangedSeatingSinceLoad &&
+      loadState?.phase === "loaded" &&
+      hasProjectId &&
       !didUserRequestResetRef.current &&
-      !(appState?.roomResetEpoch > 0)
+      !(appState?.roomResetEpoch > 0) &&
+      currentSeats.length > 0
     ) {
       return;
     }
