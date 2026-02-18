@@ -3134,10 +3134,21 @@ function RoomDesignerWithState() {
     rowSpacingSetterGuarded?.(next);
   }, [rowSpacingSetterGuarded]);
 
+  // IMPORTANT: do not depend on the guarded setter identity (it can change)
+  // and always fall back to the raw setter if needed.
   const setSeatingBlockOffsetGuarded = React.useCallback((next) => {
     setSeatingConfigEpoch((n) => n + 1);
-    seatingBlockOffsetSetterGuarded?.(next);
-  }, [seatingBlockOffsetSetterGuarded]);
+
+    // Prefer guarded setter, but never let a missing/changed ref block updates
+    if (typeof seatingBlockOffsetSetterGuarded === 'function') {
+      seatingBlockOffsetSetterGuarded(next);
+      return;
+    }
+
+    if (typeof appState?.setSeatingBlockOffset === 'function') {
+      appState.setSeatingBlockOffset(next);
+    }
+  }, [appState]);
 
   const setMlpBasisGuarded = useGuardedSetter(appState?.setMlpBasis, 'seating');
   const setRoomElementsGuarded = useGuardedSetter((next) => {
