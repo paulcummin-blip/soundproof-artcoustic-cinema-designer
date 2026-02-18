@@ -175,17 +175,17 @@ export default function Layout({ children, currentPageName }) {
               </div>
 
               <div className="mb-4">
-                <div className="text-xs font-medium text-brand-text-label mb-2 px-3">
+                <div className="text-xs font-medium text-brand-text-label mb-2 px-3" style={{ letterSpacing: '0.3px' }}>
                   Active Project
                 </div>
                 <div className="px-3 py-2 text-xs text-brand-text-muted">
                   {activeProjectSummary.id ? (
                     <>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: "#1B1A1A" }}>
+                      <div style={{ fontWeight: 600, fontSize: 18, color: "#213428", marginTop: 6 }}>
                         {activeProjectSummary.name}
                       </div>
                       {activeProjectSummary.client_name && (
-                        <div style={{ fontSize: 12, color: "#3E4349", marginTop: 2 }}>
+                        <div style={{ fontSize: 14, color: "#625143", marginTop: 2, lineHeight: 1.5 }}>
                           Client: {activeProjectSummary.client_name}
                         </div>
                       )}
