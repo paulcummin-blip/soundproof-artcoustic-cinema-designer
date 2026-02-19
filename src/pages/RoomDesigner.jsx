@@ -1084,7 +1084,8 @@ appState, // Pass appState directly for setters
   rowSpacingM,
   appState.screenFrontPlaneM,
   seatsPerRowByRow,
-  appState.splConfig]
+  appState.splConfig,
+  freeMoveLcr]
   );
 
   // Boot logic: run ONCE – either load a project or initialise defaults
@@ -1305,7 +1306,8 @@ appState, // Pass appState directly for setters
   rowSpacingM,
   appState.screenFrontPlaneM,
   seatsPerRowByRow,
-  appState.splConfig]
+  appState.splConfig,
+  freeMoveLcr]
   );
 
   return {
