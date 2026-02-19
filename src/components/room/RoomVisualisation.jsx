@@ -7167,7 +7167,7 @@ return {
               )}
               
               {/* Row distance label (ROOM_DIMS overlay only) */}
-              {_overlays?.ROOM_DIMS && rowDistanceLabelSeatIds.has(seat.id) && (
+              {_overlays?.ROOM_DIMS && exportMode !== 'dimensions' && rowDistanceLabelSeatIds.has(seat.id) && (
                 <text
                   x={seatX + 22}
                   y={seatY}
@@ -7206,7 +7206,7 @@ return {
           strokeWidth={2}
           opacity={0.9}
         />
-        {_overlays?.ROOM_DIMS && (
+        {_overlays?.ROOM_DIMS && exportMode !== 'dimensions' && (
           <text
             x={x}
             y={y + 36}
@@ -7715,7 +7715,7 @@ return (
                 </g>
               )}
 
-              {exportMode !== 'clean' && overlaysForRendering?.EXPORT_ROW_FRONT_DIST && (
+              {exportMode !== 'clean' && exportMode !== 'dimensions' && overlaysForRendering?.EXPORT_ROW_FRONT_DIST && (
                 <g data-layer="export-row-front-distance" pointerEvents="none">
                   {(() => {
                     const seatsArr = Array.isArray(seatingPositions) ? seatingPositions : [];
