@@ -4484,7 +4484,7 @@ function RoomDesignerWithState() {
       return;
     }
 
-    // Default placement rules (plan only)
+    // Wall-locked Y positions (buffered)
     const yFront = 0.30;
     const yRear = Math.max(0.30, lengthM - 0.30);
 
@@ -4502,26 +4502,77 @@ function RoomDesignerWithState() {
     const frontPositions = makeLine(frontQty, yFront);
     const rearPositions = makeLine(rearQty, yRear);
 
-    const next = [
-      ...frontPositions.map((p, i) => ({
-        id: `sub-front-${i + 1}`,
-        role: `SUBF${i + 1}`,
-        group: "front",
-        model: frontModel,
-        position: { x: p.x, y: p.y, z: 0 },
-      })),
-      ...rearPositions.map((p, i) => ({
-        id: `sub-rear-${i + 1}`,
-        role: `SUBR${i + 1}`,
-        group: "rear",
-        model: rearModel,
-        position: { x: p.x, y: p.y, z: 0 },
-      })),
-    ];
+    // Build desired subs (with buffered wall Y)
+    const desiredFront = frontPositions.map((p, i) => ({
+      id: `sub-front-${i + 1}`,
+      role: `SUBF${i + 1}`,
+      group: "front",
+      model: frontModel,
+      position: { x: p.x, y: p.y, z: 0 },
+    }));
+
+    const desiredRear = rearPositions.map((p, i) => ({
+      id: `sub-rear-${i + 1}`,
+      role: `SUBR${i + 1}`,
+      group: "rear",
+      model: rearModel,
+      position: { x: p.x, y: p.y, z: 0 },
+    }));
+
+    // Get existing subs from current state
+    const existing = appState?.subwoofers || [];
+    const existingFront = existing.filter(s => s?.group === 'front');
+    const existingRear = existing.filter(s => s?.group === 'rear');
+
+    // Merge: preserve user X, force wall-locked Y
+    const mergedFront = desiredFront.map((d, i) => {
+      const prev = existingFront[i];
+
+      // If we have a previous sub with a valid dragged position,
+      // preserve ONLY x (along the wall) and force y to the buffered wall line.
+      if (prev?.position && Number.isFinite(prev.position.x) && Number.isFinite(prev.position.y)) {
+        return {
+          ...prev, // keep id, model, phase, etc
+          ...d,    // keep role/side defaults + buffered y
+          position: {
+            x: prev.position.x,     // user drag wins
+            y: d.position.y,        // wall lock wins
+            z: Number.isFinite(prev.position?.z) ? prev.position.z : 0,
+          },
+        };
+      }
+
+      // No previous position => use desired default (already wall-locked)
+      return { ...d };
+    });
+
+    const mergedRear = desiredRear.map((d, i) => {
+      const prev = existingRear[i];
+
+      // If we have a previous sub with a valid dragged position,
+      // preserve ONLY x (along the wall) and force y to the buffered wall line.
+      if (prev?.position && Number.isFinite(prev.position.x) && Number.isFinite(prev.position.y)) {
+        return {
+          ...prev, // keep id, model, phase, etc
+          ...d,    // keep role/side defaults + buffered y
+          position: {
+            x: prev.position.x,     // user drag wins
+            y: d.position.y,        // wall lock wins
+            z: Number.isFinite(prev.position?.z) ? prev.position.z : 0,
+          },
+        };
+      }
+
+      // No previous position => use desired default (already wall-locked)
+      return { ...d };
+    });
+
+    const next = [...mergedFront, ...mergedRear];
 
     setSubwoofers(next);
   }, [
     appState?.setSubwoofers,
+    appState?.subwoofers,
     appState?.roomDims?.widthM,
     appState?.roomDims?.lengthM,
     stableDimensions?.width,
