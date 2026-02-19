@@ -501,7 +501,10 @@ appState, // Pass appState directly for setters
   setRowSpacingM,
   // NEW: Seats Per Row By Row
   seatsPerRowByRow,
-  setSeatsPerRowByRow
+  setSeatsPerRowByRow,
+  // NEW: Free Move LCR
+  freeMoveLcr,
+  setFreeMoveLcr
 }) {
   const [projectIdState, setProjectIdState] = useState(projectIdFromUrl);
   const [projectNameState, setProjectNameState] = useState("Untitled Room"); // Internal projectName for loader
@@ -625,7 +628,9 @@ appState, // Pass appState directly for setters
       setEnableFrontWides(hydratedEnableFrontWides);
     }
 
-    setFreeMoveLcr(!!p?.free_move_lcr);
+    if (typeof setFreeMoveLcr === "function") {
+      setFreeMoveLcr(!!p?.free_move_lcr);
+    }
 
     // Row spacing + seats per row (correct field names)
     const rowSpacing = Number(p?.row_spacing_m) || 1.8;
@@ -2999,7 +3004,9 @@ function RoomDesignerWithState() {
       rowSpacingM: _rowSpacingM,
       setRowSpacingM: _setRowSpacingM,
       seatsPerRowByRow: _seatsPerRowByRow,
-      setSeatsPerRowByRow: _setSeatsPerRowByRow
+      setSeatsPerRowByRow: _setSeatsPerRowByRow,
+      freeMoveLcr: freeMoveLcr,
+      setFreeMoveLcr: setFreeMoveLcr
     });
 
   useEffect(() => {
