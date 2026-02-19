@@ -3245,7 +3245,7 @@ React.useEffect(() => {
   const commitDraftSubPositions = useCallback(() => {
     // Commit front subs
     if (draftFrontSubsRef.current && onSetFrontSubs) {
-      const positions = draftFrontSubsRef.current.map(s => ({ x: s.position.x, y: s.position.y }));
+      const positions = draftFrontSubsRef.current.map(s => ({ x: s.position.x }));
       onSetFrontSubs(prev => ({
         ...prev,
         positions
@@ -3254,7 +3254,7 @@ React.useEffect(() => {
     
     // Commit rear subs
     if (draftRearSubsRef.current && onSetRearSubs) {
-      const positions = draftRearSubsRef.current.map(s => ({ x: s.position.x, y: s.position.y }));
+      const positions = draftRearSubsRef.current.map(s => ({ x: s.position.x }));
       onSetRearSubs(prev => ({
         ...prev,
         positions
