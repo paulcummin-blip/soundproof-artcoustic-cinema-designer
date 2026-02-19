@@ -314,6 +314,7 @@ export default function RP22CompliancePanel({
   rearSubsCount,
   p15ConstructionLevel,
   p21EarlyReflectionPreset,
+  freeMoveLcr = false,
 }) {
   // Match pages/RP22Report.jsx fallback for P2
   const p2SystemConfig = React.useMemo(() => {
@@ -614,7 +615,7 @@ export default function RP22CompliancePanel({
 
       // Report-page fallback rules
       if (pid === 2 && p2SystemConfig) return p2SystemConfig.p2Level; // "L1".."L4"
-      if (pid === 3) return "L4";
+      if (pid === 3) return freeMoveLcr ? "FAIL" : "L4";
       if (pid === 8) return "L4";
       if (pid === 11) return "L4";
 
@@ -672,7 +673,7 @@ export default function RP22CompliancePanel({
 
       // Report-page fallback values where needed
       if (pid === 2 && p2SystemConfig) return `${p2SystemConfig.discreteSpeakerCount} speakers`;
-      if (pid === 3) return "0";
+      if (pid === 3) return freeMoveLcr ? "Override" : "0";
       if (pid === 8) return "No";
       if (pid === 11) return "0";
 

@@ -942,6 +942,7 @@ appState, // Pass appState directly for setters
         rearSubsCfg,
         lcrAimMode,
         enableFrontWides,
+        free_move_lcr: !!freeMoveLcr,
         overheadGlobalModel,
         overheadFrontOverride,
         overheadMidOverride,

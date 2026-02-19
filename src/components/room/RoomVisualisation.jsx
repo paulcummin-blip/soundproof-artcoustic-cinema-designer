@@ -473,6 +473,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     exportMode = 'default',
     exportWidthPx,
     exportHeightPx,
+    freeMoveLcr = false,
   } = props;
 
   const appState = useAppState();
@@ -2316,12 +2317,31 @@ React.useEffect(() => {
         const desiredX = rawRoomPos.x;
         const isLeft = canonicalRole === 'FL';
 
+        // Determine clamp zones based on freeMoveLcr toggle
+        let leftClamp, rightClamp;
+        
+        if (freeMoveLcr) {
+          // Free Move ON: use room-safe clamps (still inside room + symmetric)
+          const dims = getModelDimsM(spk.model);
+          const halfW = (Number(dims?.widthM) || 0.20) / 2;
+          const EPS = 0.01;
+          const minX = halfW + EPS;
+          const maxLeftX = (screenCenterX_m || (widthM/2)) - halfW - EPS;
+          
+          leftClamp = { xMin: minX, xMax: Math.max(minX, maxLeftX) };
+          rightClamp = { xMin: (screenCenterX_m + EPS), xMax: (widthM - halfW - EPS) };
+        } else {
+          // Free Move OFF: use RP22 zone clamps (existing behavior)
+          leftClamp = constraintZones.FL.clamp;
+          rightClamp = constraintZones.FR.clamp;
+        }
+
         const { finalLeftX, finalRightX } = resolveSymmetricLCR({
           desiredX: desiredX,
           isLeft: isLeft,
           screenCenterX: screenCenterX_m,
-          leftZone: constraintZones.FL.clamp,
-          rightZone: constraintZones.FR.clamp,
+          leftZone: leftClamp,
+          rightZone: rightClamp,
         });
 
         // Only update if meaningful movement
