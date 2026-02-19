@@ -625,6 +625,8 @@ appState, // Pass appState directly for setters
       setEnableFrontWides(hydratedEnableFrontWides);
     }
 
+    setFreeMoveLcr(!!p?.free_move_lcr);
+
     // Row spacing + seats per row (correct field names)
     const rowSpacing = Number(p?.row_spacing_m) || 1.8;
     if (typeof setRowSpacingM === "function") {
@@ -1967,6 +1969,7 @@ function RoomDesignerWithState() {
   const [showMlpRuler, setShowMlpRuler] = useState(false); // MLP Position Ruler toggle
   const [zoomMode, setZoomMode] = useState('off'); // 'off' | 'in' | 'out'
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [freeMoveLcr, setFreeMoveLcr] = useState(false); // Free Move (LCR) toggle
 
   // Layout emphasis: controls how wide the left plan vs right menu are.
   // "balanced" keeps your current look.
@@ -4786,6 +4789,15 @@ function RoomDesignerWithState() {
               }
             </div>
             
+            {/* Free Move (LCR) toggle */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '2px solid #213428', paddingLeft: 12 }}>
+              <label htmlFor="free-move-lcr" style={{ fontSize: 12, color: '#3E4349' }}>Free Move (LCR)</label>
+              <Switch
+                id="free-move-lcr"
+                checked={freeMoveLcr}
+                onCheckedChange={setFreeMoveLcr} />
+            </div>
+
             {/* NEW: 3-state zoom toggle */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderLeft: '1px solid #DCDBD6', paddingLeft: 12 }}>
               <span style={{ fontSize: 12, color: '#3E4349', fontWeight: 500 }}>Zoom</span>
@@ -4856,7 +4868,8 @@ function RoomDesignerWithState() {
                   zoomMode={zoomMode}
                   onZoomModeChange={setZoomMode}
                   isDraggingRef={isDraggingRef}
-                  extraSurroundCount={appState?.extraSurroundCount ?? 0} />
+                  extraSurroundCount={appState?.extraSurroundCount ?? 0}
+                  freeMoveLcr={freeMoveLcr} />
 
               </Suspense>
             </ErrorBoundary>
@@ -5167,7 +5180,8 @@ function RoomDesignerWithState() {
                         frontSubsCount={appState?.frontSubsCfg?.count}
                         rearSubsCount={appState?.rearSubsCfg?.count}
                         p15ConstructionLevel={appState?.p15ConstructionLevel}
-                        p21EarlyReflectionPreset={appState?.p21EarlyReflectionPreset} />
+                        p21EarlyReflectionPreset={appState?.p21EarlyReflectionPreset}
+                        freeMoveLcr={freeMoveLcr} />
                   </Suspense>
               </CollapsiblePanel>
               
