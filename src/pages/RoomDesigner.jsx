@@ -2114,31 +2114,9 @@ function RoomDesignerWithState() {
       appState.setRowCentersM(centers);
     }
 
-    // 5. Store the MLP position derived from the CLAMPED row centres.
-    // This keeps the green dot locked to the seating reference (no drift when clamping occurs).
-    let mlpIndex = 0;
-
-    // Match the intended reference behaviour
-    if (String(mlpReference).toLowerCase() === 'back') {
-      mlpIndex = Math.max(0, rows - 1);
-    } else if (String(mlpReference).toLowerCase() === 'all') {
-      // Middle row as the reference point
-      mlpIndex = Math.max(0, Math.min(rows - 1, Math.round((rows - 1) / 2)));
-    } else {
-      // 'front' (default)
-      mlpIndex = 0;
-    }
-
-    // Safety: clamp index to available centres length
-    mlpIndex = Math.max(0, Math.min((centers.length - 1), mlpIndex));
-
-    const mlpFromCenters = Number(centers?.[mlpIndex]);
-
-    if (!Number.isFinite(mlpFromCenters)) {
-      return;
-    }
-
-    const mlpRounded = Math.round(mlpFromCenters * 1000) / 1000;
+    // 5. Store the FIXED MLP position (green dot).
+    // This is always derived from the 57.5° distance + viewing offset, never from row centres.
+    const mlpRounded = Math.round(fixedMlpY * 1000) / 1000;
 
     if (typeof appState?.setMlpY_m === 'function') {
       appState.setMlpY_m((prev) => {
