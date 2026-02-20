@@ -4864,8 +4864,6 @@ function RoomDesignerWithState() {
                   placedSpeakers={placedSpeakers}
                   frontSubs={frontSubsForRendering}
                   rearSubs={rearSubsForRendering}
-                  frontSubsCfg={frontSubsCfg}
-                  rearSubsCfg={rearSubsCfg}
                   dimensions={stableDimensions}
                   seatingPositions={_seatingPositions}
                   screen={_screen}
