@@ -451,6 +451,8 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     roomElements = [],
     frontSubs = [],
     rearSubs = [],
+    frontSubsCfg,
+    rearSubsCfg,
     dolbyLayout = "5.1",
     aimAtMLP = false,
     rowTarget,
@@ -8088,9 +8090,40 @@ return (
 
 
             {/* Layer 8: Subwoofers */}
-            {Array.isArray(frontSubs) && frontSubs.length > 0 && (
-              <FrontSubsLayer
-                frontSubs={isDraggingSubRef.current && draftFrontSubsRef.current ? draftFrontSubsRef.current : frontSubs}
+            {(() => {
+              const exportFrontSubs = React.useMemo(() => {
+                if (exportMode !== 'dimensions') return frontSubs;
+                if (Array.isArray(frontSubs) && frontSubs.length > 0) return frontSubs;
+
+                const qty = Number(frontSubsCfg?.count) || 0;
+                const model = frontSubsCfg?.model;
+                if (!model || qty <= 0) return [];
+
+                const widthM = Number(appState?.roomDims?.widthM) || 4.5;
+                const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
+                const depthM = getModelDimsM?.(model)?.depthM || 0.30;
+                const halfD = depthM / 2;
+                const y = halfD + 0.01;
+
+                const margin = widthM * 0.15;
+                const span = Math.max(0.01, widthM - margin * 2);
+
+                return Array.from({ length: qty }, (_, i) => ({
+                  id: `export-sub-front-${i + 1}`,
+                  model,
+                  position: {
+                    x: qty === 1 ? widthM * 0.5 : margin + span * (i / (qty - 1)),
+                    y,
+                    z: 0,
+                  }
+                }));
+              }, [exportMode, frontSubs, frontSubsCfg, appState?.roomDims, getModelDimsM]);
+
+              const subsForRender = exportMode === 'dimensions' ? exportFrontSubs : (isDraggingSubRef.current && draftFrontSubsRef.current ? draftFrontSubsRef.current : frontSubs);
+
+              return Array.isArray(subsForRender) && subsForRender.length > 0 && (
+                <FrontSubsLayer
+                  frontSubs={subsForRender}
                 toPx={toPx}
                 getModelDimsM={getModelDimsM}
                 scale={scale}
@@ -8099,11 +8132,40 @@ return (
                 onSubPointerUp={handleMouseUp}
                 dragging={dragging}
                 draggedItemId={draggedItemId}
-              />
-            )}
-            {(() => {
-              const subsToRender = isDraggingSubRef.current && draftRearSubsRef.current ? draftRearSubsRef.current : rearSubs;
-              return Array.isArray(subsToRender) && subsToRender.length > 0 ? (
+                />
+                );
+                })()}
+                {(() => {
+                const exportRearSubs = React.useMemo(() => {
+                if (exportMode !== 'dimensions') return rearSubs;
+                if (Array.isArray(rearSubs) && rearSubs.length > 0) return rearSubs;
+
+                const qty = Number(rearSubsCfg?.count) || 0;
+                const model = rearSubsCfg?.model;
+                if (!model || qty <= 0) return [];
+
+                const widthM = Number(appState?.roomDims?.widthM) || 4.5;
+                const lengthM = Number(appState?.roomDims?.lengthM) || 6.0;
+                const depthM = getModelDimsM?.(model)?.depthM || 0.30;
+                const halfD = depthM / 2;
+                const y = Math.max(halfD + 0.01, lengthM - halfD - 0.01);
+
+                const margin = widthM * 0.15;
+                const span = Math.max(0.01, widthM - margin * 2);
+
+                return Array.from({ length: qty }, (_, i) => ({
+                id: `export-sub-rear-${i + 1}`,
+                model,
+                position: {
+                  x: qty === 1 ? widthM * 0.5 : margin + span * (i / (qty - 1)),
+                  y,
+                  z: 0,
+                }
+                }));
+                }, [exportMode, rearSubs, rearSubsCfg, appState?.roomDims, getModelDimsM]);
+
+                const subsToRender = exportMode === 'dimensions' ? exportRearSubs : (isDraggingSubRef.current && draftRearSubsRef.current ? draftRearSubsRef.current : rearSubs);
+                return Array.isArray(subsToRender) && subsToRender.length > 0 ? (
                 <g data-layer="rear-subwoofers">
                   {subsToRender.map((sub, i) => {
                     if (!hasPos(sub)) return null;
