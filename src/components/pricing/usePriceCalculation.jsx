@@ -1,37 +1,27 @@
 // components/pricing/usePriceCalculation.jsx
 import { useMemo } from 'react';
-import { artcousticSpeakers } from '@/components/data/speakerData';
+import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 
 /**
- * Lookup speaker price from speakerData by model ID.
+ * Lookup speaker price from speaker registry by model ID.
  * Returns 0 if price is missing (with console warning).
  */
 function getSpeakerPrice(modelId) {
-  if (!modelId || modelId === 'off' || modelId === 'OFF') return 0;
-  
-  const normalized = String(modelId).toLowerCase().replace(/[-_\s]/g, '');
-  
-  const speaker = artcousticSpeakers.find(s => {
-    const entryNorm = String(s.model || s.id || '').toLowerCase().replace(/[-_\s]/g, '');
-    return entryNorm === normalized || s.id === modelId;
-  });
-  
-  if (!speaker) {
-    const _missingWarned = globalThis.__missingSpeakerWarned || (globalThis.__missingSpeakerWarned = new Set());
-    if (!_missingWarned.has(modelId)) {
-      _missingWarned.add(modelId);
-      console.warn(`[Pricing] Speaker not found in database: ${modelId}`);
-    }
-    return 0;
-  }
-  
-  const price = Number(speaker.price);
-  if (!Number.isFinite(price) || price <= 0) {
-    console.warn(`[Pricing] Missing or invalid price for ${modelId}`);
-    return 0;
-  }
-  
-  return price;
+  if (!modelId || modelId === "off" || modelId === "OFF") return 0;
+
+  const meta = getSpeakerModelMeta(modelId);
+
+  // Your database currently stores retail prices as VAT-inclusive in retailPriceGBP.
+  // Do NOT apply VAT maths here.
+  const p =
+    Number(meta?.retailPriceGBP) ||
+    Number(meta?.price_gbp_incVat) ||
+    Number(meta?.price_gbp_incVAT) ||
+    Number(meta?.price_gbp_exVat) || // fallback only (currently also inc VAT in your data)
+    0;
+
+  if (!Number.isFinite(p) || p <= 0) return 0;
+  return p;
 }
 
 /**
