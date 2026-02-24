@@ -2323,15 +2323,15 @@ React.useEffect(() => {
         let leftClamp, rightClamp;
         
         if (freeMoveLcr) {
-          // Free Move ON: use room-safe clamps (still inside room + symmetric)
+          // Free Move ON: use room-safe clamps (wall buffer only, allows movement outside RP22 zones)
           const dims = getModelDimsM(spk.model);
           const halfW = (Number(dims?.widthM) || 0.20) / 2;
           const EPS = 0.01;
           const minX = halfW + EPS;
-          const maxLeftX = (screenCenterX_m || (widthM/2)) - halfW - EPS;
+          const maxX = widthM - halfW - EPS;
           
-          leftClamp = { xMin: minX, xMax: Math.max(minX, maxLeftX) };
-          rightClamp = { xMin: (screenCenterX_m + EPS), xMax: (widthM - halfW - EPS) };
+          leftClamp = { xMin: minX, xMax: screenCenterX_m - EPS };
+          rightClamp = { xMin: screenCenterX_m + EPS, xMax: maxX };
         } else {
           // Free Move OFF: use RP22 zone clamps (existing behavior)
           leftClamp = constraintZones.FL.clamp;
