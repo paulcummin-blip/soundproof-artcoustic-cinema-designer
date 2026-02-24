@@ -10,6 +10,11 @@ function getSpeakerPrice(modelId) {
   if (!modelId || modelId === "off" || modelId === "OFF") return 0;
 
   const meta = getSpeakerModelMeta(modelId);
+  
+  // DEV-ONLY: Warn if model not found in registry
+  if (meta?.notFound && typeof console !== 'undefined') {
+    console.warn("[Pricing] Model not found:", modelId, "->", meta?.key);
+  }
 
   // Your database currently stores retail prices as VAT-inclusive in retailPriceGBP.
   // Do NOT apply VAT maths here.
