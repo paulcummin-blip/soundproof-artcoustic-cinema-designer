@@ -64,53 +64,8 @@ export default function MedianAngleReset({
   const handleReset = () => {
     if (!canReset) return;
 
-    // NEW: Use overlay truth for median positions
-    // Check if overlay data is ready
-    if (!frontWideOverlay || frontWideOverlay.status !== 'ok' || 
-        !frontWideOverlay.left || frontWideOverlay.left.status !== 'ok' ||
-        !frontWideOverlay.right || frontWideOverlay.right.status !== 'ok') {
-      console.warn('[Median Reset] FW overlay not ready:', frontWideOverlay?.status);
-      return;
-    }
-
-    // Get median Y positions from overlay truth (already in meters)
-    const leftMedianY = frontWideOverlay.left.medianY;
-    const rightMedianY = frontWideOverlay.right.medianY;
-
-    // Validate medianY values
-    if (!Number.isFinite(leftMedianY) || !Number.isFinite(rightMedianY)) {
-      console.warn('[Median Reset] Invalid medianY values:', { leftMedianY, rightMedianY });
-      return;
-    }
-
-    // Use the same wall inset as the overlay calculation (0.01m)
-    const WALL_INSET = 0.01;
-    const W = roomDims.widthM;
-
-    // Place LW and RW at the exact overlay median lines
-    const newLwPos = {
-      x: WALL_INSET,
-      y: leftMedianY
-    };
-
-    const newRwPos = {
-      x: W - WALL_INSET,
-      y: rightMedianY
-    };
-
-    // Update speakers
-    const updated = (placedSpeakers || []).map(s => {
-      const canon = normalizeRole(s.role);
-      if (canon === 'LW') {
-        return { ...s, position: { ...s.position, x: newLwPos.x, y: newLwPos.y } };
-      }
-      if (canon === 'RW') {
-        return { ...s, position: { ...s.position, x: newRwPos.x, y: newRwPos.y } };
-      }
-      return s;
-    });
-
-    setSpeakers(updated);
+    // Fire the reset event (RoomVisualisation handles all positioning logic)
+    window.dispatchEvent(new CustomEvent('b44:fw:resetToMedian'));
 
     // Show "Done" state briefly
     setJustReset(true);
