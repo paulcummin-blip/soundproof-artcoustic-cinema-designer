@@ -1158,8 +1158,19 @@ function useDesignerState() {
       dimensions,
       seatingPositions,
       speakerSystem,
-      frontSubsCfg,
-      rearSubsCfg,
+      // Ensure sub configs are always serialised explicitly
+      frontSubsCfg: {
+        model: frontSubsCfg?.model || "SUB2-12",
+        count: Number(frontSubsCfg?.count) || 0,
+        positions: Array.isArray(frontSubsCfg?.positions) ? frontSubsCfg.positions : [],
+        tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : []
+      },
+      rearSubsCfg: {
+        model: rearSubsCfg?.model || "SUB2-12",
+        count: Number(rearSubsCfg?.count) || 0,
+        positions: Array.isArray(rearSubsCfg?.positions) ? rearSubsCfg.positions : [],
+        tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : []
+      },
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
       screen,
@@ -1251,8 +1262,19 @@ function useDesignerState() {
       dimensions,
       seatingPositions,
       speakerSystem,
-      frontSubsCfg,
-      rearSubsCfg,
+      // Ensure sub configs are always serialised explicitly
+      frontSubsCfg: {
+        model: frontSubsCfg?.model || "SUB2-12",
+        count: Number(frontSubsCfg?.count) || 0,
+        positions: Array.isArray(frontSubsCfg?.positions) ? frontSubsCfg.positions : [],
+        tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : []
+      },
+      rearSubsCfg: {
+        model: rearSubsCfg?.model || "SUB2-12",
+        count: Number(rearSubsCfg?.count) || 0,
+        positions: Array.isArray(rearSubsCfg?.positions) ? rearSubsCfg.positions : [],
+        tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : []
+      },
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
       screen,
@@ -1342,8 +1364,24 @@ function useDesignerState() {
       if (p.dimensions) setDimensions(p.dimensions);
       if (p.seatingPositions) setSeatingPositions(normaliseSeatingPositions(p.seatingPositions, p.roomDims || p.roomDimensions || roomDims || null));
       if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
-      if (p.frontSubsCfg) setFrontSubsCfg(p.frontSubsCfg);
-      if (p.rearSubsCfg) setRearSubsCfg(p.rearSubsCfg);
+      // Restore sub configs explicitly (even if count = 0)
+      if (Object.prototype.hasOwnProperty.call(p, "frontSubsCfg")) {
+        setFrontSubsCfg(p.frontSubsCfg || {
+          model: "SUB2-12",
+          count: 0,
+          positions: [],
+          tuning: []
+        });
+      }
+
+      if (Object.prototype.hasOwnProperty.call(p, "rearSubsCfg")) {
+        setRearSubsCfg(p.rearSubsCfg || {
+          model: "SUB2-12",
+          count: 0,
+          positions: [],
+          tuning: []
+        });
+      }
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
       if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
       if (p.screen) setScreen(p.screen);
