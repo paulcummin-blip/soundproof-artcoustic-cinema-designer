@@ -616,7 +616,7 @@ const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo, enabled) => {
                 reference: "L3",
                 studio: "L4",
             };
-            return P15_MAP[app?.p15ConstructionLevel || 'standard'] || null;
+            return P15_MAP[app?.p15ConstructionLevel || 'purpose-built'] || null;
         }
         
         if (paramId === 21) {
@@ -627,7 +627,7 @@ const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo, enabled) => {
                 l3: "L3",
                 l4: "L4",
             };
-            return P21_MAP[app?.p21EarlyReflectionPreset || 'l2'] || null;
+            return P21_MAP[app?.p21EarlyReflectionPreset || 'l3'] || null;
         }
 
         return null;
