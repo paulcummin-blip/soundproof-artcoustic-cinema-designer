@@ -1114,8 +1114,24 @@ function useDesignerState() {
       if (p.dimensions) setDimensions(p.dimensions);
       if (p.seatingPositions) setSeatingPositions(normaliseSeatingPositions(p.seatingPositions, p.roomDims || p.roomDimensions || roomDims || null));
       if (p.speakerSystem) setSpeakerSystem(p.speakerSystem);
-      if (p.frontSubsCfg) setFrontSubsCfg(p.frontSubsCfg);
-      if (p.rearSubsCfg) setRearSubsCfg(p.rearSubsCfg);
+      // Restore sub configs explicitly (even if count = 0)
+      if (Object.prototype.hasOwnProperty.call(p, "frontSubsCfg")) {
+        setFrontSubsCfg(p.frontSubsCfg || {
+          model: "SUB2-12",
+          count: 0,
+          positions: [],
+          tuning: []
+        });
+      }
+
+      if (Object.prototype.hasOwnProperty.call(p, "rearSubsCfg")) {
+        setRearSubsCfg(p.rearSubsCfg || {
+          model: "SUB2-12",
+          count: 0,
+          positions: [],
+          tuning: []
+        });
+      }
       if (typeof p.dolbyLayout === "string") setDolbyLayout(p.dolbyLayout);
       if (p.dolbyConfig) setDolbyConfig(p.dolbyConfig);
       if (p.screen) setScreen(p.screen);
