@@ -537,7 +537,7 @@ function useDesignerState() {
   const [seatSnapshotBySeatId, setSeatSnapshotBySeatId] = useState({});
 
   const [p15ConstructionLevel, setP15ConstructionLevel] = useState(() => (
-    (__autosavePayload && __autosavePayload.p15ConstructionLevel) ? __autosavePayload.p15ConstructionLevel : 'standard'
+    (__autosavePayload && __autosavePayload.p15ConstructionLevel) ? __autosavePayload.p15ConstructionLevel : 'purpose-built'
   ));
 
   const setP15ConstructionLevelSafe = useCallback((next) => {
@@ -547,7 +547,7 @@ function useDesignerState() {
   }, []);
 
   const [p21EarlyReflectionPreset, setP21EarlyReflectionPreset] = useState(() => (
-    (__autosavePayload && __autosavePayload.p21EarlyReflectionPreset) ? __autosavePayload.p21EarlyReflectionPreset : 'l2'
+    (__autosavePayload && __autosavePayload.p21EarlyReflectionPreset) ? __autosavePayload.p21EarlyReflectionPreset : 'l3'
   ));
 
   const setP21EarlyReflectionPresetSafe = useCallback((next) => {
