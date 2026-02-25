@@ -4933,6 +4933,26 @@ function RoomDesignerWithState() {
               </CollapsiblePanel>
 
               <CollapsiblePanel
+              title="Room Elements"
+              icon={<Box className="w-5 h-5" />}
+              defaultOpen={false}>
+
+                  {isFrozen('elements') &&
+              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+                      This tab is frozen. Unlock to make changes.
+                    </div>
+              }
+                  <Suspense fallback={<div>Loading...</div>}>
+                      <RoomElements 
+                        elements={roomElements} 
+                        onChange={setRoomElementsGuarded} 
+                        disabled={isFrozen('elements')}
+                        roomDims={appState?.roomDims}
+                      />
+                  </Suspense>
+              </CollapsiblePanel>
+
+              <CollapsiblePanel
               title="Screen Size"
               icon={<Monitor className="w-5 h-5" />}
               defaultOpen={false}>
@@ -5150,26 +5170,6 @@ function RoomDesignerWithState() {
                 frontSubsLive={frontSubsForRendering}
                 rearSubsLive={rearSubsForRendering} />
 
-                  </Suspense>
-              </CollapsiblePanel>
-
-              <CollapsiblePanel
-              title="Room Elements"
-              icon={<Box className="w-5 h-5" />}
-              defaultOpen={false}>
-
-                  {isFrozen('elements') &&
-              <div className="mb-3 text-xs px-3 py-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
-                      This tab is frozen. Unlock to make changes.
-                    </div>
-              }
-                  <Suspense fallback={<div>Loading...</div>}>
-                      <RoomElements 
-                        elements={roomElements} 
-                        onChange={setRoomElementsGuarded} 
-                        disabled={isFrozen('elements')}
-                        roomDims={appState?.roomDims}
-                      />
                   </Suspense>
               </CollapsiblePanel>
               
