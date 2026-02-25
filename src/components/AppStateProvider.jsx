@@ -1430,8 +1430,19 @@ function useDesignerState() {
       dimensions,
       seatingPositions,
       speakerSystem,
-      frontSubsCfg,
-      rearSubsCfg,
+      // Ensure sub configs are always serialised explicitly
+      frontSubsCfg: {
+        model: frontSubsCfg?.model || "SUB2-12",
+        count: Number(frontSubsCfg?.count) || 0,
+        positions: Array.isArray(frontSubsCfg?.positions) ? frontSubsCfg.positions : [],
+        tuning: Array.isArray(frontSubsCfg?.tuning) ? frontSubsCfg.tuning : []
+      },
+      rearSubsCfg: {
+        model: rearSubsCfg?.model || "SUB2-12",
+        count: Number(rearSubsCfg?.count) || 0,
+        positions: Array.isArray(rearSubsCfg?.positions) ? rearSubsCfg.positions : [],
+        tuning: Array.isArray(rearSubsCfg?.tuning) ? rearSubsCfg.tuning : []
+      },
       dolbyLayout: typeof dolbyLayout === "string" ? dolbyLayout : undefined,
       dolbyConfig,
       screen,
