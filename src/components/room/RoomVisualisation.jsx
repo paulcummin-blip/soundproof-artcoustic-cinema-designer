@@ -199,7 +199,7 @@ import { computeAllSeatSplMetrics, getSeatSplMetrics, getMlpSeat } from "@/compo
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { buildSeatHudSnapshot } from "@/components/utils/buildSeatHudSnapshot";
 import { getLevelColors } from '@/components/utils/rp22Colors';
-
+import { useTooltipData } from '@/components/room/hooks/useTooltipData';
 
 import {
   SIDE_ALLOW_OVERHANG,
