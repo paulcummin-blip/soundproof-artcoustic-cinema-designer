@@ -4539,16 +4539,12 @@ function RoomDesignerWithState() {
         const finalX = clamp(pickedX, minX, maxX);
 
         return {
+          // keep any prev fields (phase, delay etc) if they exist, but never let them override id/role/group/model/position
+          ...(prev ? { ...prev } : {}),
           id: `sub-${group}-${i + 1}`,
           role: group === 'front' ? `SUBF${i + 1}` : `SUBR${i + 1}`,
           group,
           model,
-          // keep any prev fields (phase, delay etc) if they exist, but never let them override id/role/group/model/position
-          ...(prev ? { ...prev } : {}),
-          model, // re-assert
-          group, // re-assert
-          role: group === 'front' ? `SUBF${i + 1}` : `SUBR${i + 1}`,
-          id: `sub-${group}-${i + 1}`,
           position: {
             x: finalX,
             y: yPinned,
