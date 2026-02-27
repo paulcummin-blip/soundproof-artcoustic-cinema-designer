@@ -6727,19 +6727,8 @@ return {
     return <g data-layer="speaker-labels"></g>;
   }, []);
 
-  // Seating layer is extracted to SeatingLayer component (see components/room/plan/SeatingLayer.jsx)
-  // Import is inlined here to avoid increasing line count at the top of this file.
-  const { default: SeatingLayerComponent } = React.useMemo(() => {
-    // Lazy static import workaround — component is resolved at build time via bundler.
-    // The actual import is at the top of this file (see SeatingLayer import below).
-    return { default: null };
-  }, []);
-
-  const renderSeatingPositions = () => {
-    if (!hasRoomRect) return null;
-    // Rendered by SeatingLayer (see JSX below in Layer 9)
-    return null;
-  };
+  // SeatingLayer is in components/room/plan/SeatingLayer.jsx
+  const renderSeatingPositions = () => null;
 
 
   const containerStyle = {
