@@ -4692,19 +4692,8 @@ useEffect(() => {
     // Otherwise continue with existing auto-adjustment logic
     return; // Early exit - effect is now a no-op
     
-    /* ORIGINAL LOGIC DISABLED:
-    if (isDraggingRearRef.current > 0) {
-      return;
-    }
-
-    if (timeNowMs() - (lastInteractionEpoch?.current || 0) < 500) return;
-    if (!onSetSpeakers) return;
-
-    rsLastLiveResetEpoch.current = timeNowMs();
-
-    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
-    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
-    if (!sbl || !sbr) return;
+    /* ORIGINAL SBL/SBR LOGIC DISABLED */
+    /* const _sbl = null;
 
     const W = widthM || 0;
     const L = lengthM || 0;
