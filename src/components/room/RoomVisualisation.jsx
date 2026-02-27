@@ -2927,98 +2927,73 @@ React.useEffect(() => {
         }
       }
 
-      // Original logic for other overhead layouts (5.1.2, 7.1.6, etc.)
-      // Discover current Y positions from placedSpeakers
-      let frontY = null;
-      let midY = null;
-      let rearY = null;
+      // When Free Move ON: pair-locked only (TFL↔TFR, TML↔TMR, TRL↔TRR).
+      // Dragging one pair must NOT move any other overhead pair's Y.
+      if (freeMoveLcr) {
+        const partnerRole = OVERHEAD_PAIR_MAP[canonicalRole];
+        const newY = primaryClamped.y;
+        onSetSpeakers(prev => {
+          if (!Array.isArray(prev)) return prev;
+          return prev.map(s => {
+            const r = getCanonicalRole(s.role);
+            if (!r || !r.startsWith('T')) return s;
+            const cur = { ...(s.position || {}) };
+            if (isLeftRole(r) && leftColumnX != null) cur.x = leftColumnX;
+            if (isRightRole(r) && rightColumnX != null) cur.x = rightColumnX;
+            if (r === canonicalRole || (partnerRole && r === partnerRole)) cur.y = newY;
+            return { ...s, position: cur };
+          });
+        });
+        lastInteractionEpoch.current = timeNowMs();
+        return;
+      }
 
+      // Free Move OFF: existing globally-linked Y behaviour (all pairs move together).
+      let frontY = null, midY = null, rearY = null;
       for (const s of placedSpeakers) {
         const role = getCanonicalRole(s.role);
         const posY = s?.position?.y;
         if (!Number.isFinite(posY)) continue;
-
         if (isFrontRole(role)) frontY = posY;
         if (isMidRole(role)) midY = posY;
         if (isRearRole(role)) rearY = posY;
       }
+      if (!Number.isFinite(midY)) midY = primaryClamped.y;
 
-      // Fallback: use dragged Y as mid anchor if missing
-      if (!Number.isFinite(midY)) {
-        midY = primaryClamped.y;
-      }
-
-      // Compute symmetric Y around mid
-      let newFrontY = frontY;
-      let newMidY = midY;
-      let newRearY = rearY;
-
+      let newFrontY = frontY, newMidY = midY, newRearY = rearY;
       if (isMidRole(canonicalRole)) {
-        // Dragging mid: move front and rear in parallel
         const dFront = Number.isFinite(frontY) ? midY - frontY : 0;
         const dRear = Number.isFinite(rearY) ? rearY - midY : 0;
-
         newMidY = primaryClamped.y;
         newFrontY = newMidY - dFront;
         newRearY = newMidY + dRear;
       }
-
       if (isFrontRole(canonicalRole)) {
-        // Dragging front: enforce symmetry around mid
         newFrontY = primaryClamped.y;
         const d = midY - newFrontY;
         newRearY = midY + d;
       }
-
       if (isRearRole(canonicalRole)) {
-        // Dragging rear: enforce symmetry around mid
         newRearY = primaryClamped.y;
         const d = newRearY - midY;
         newFrontY = midY - d;
       }
+      if (Number.isFinite(newFrontY) && overheadZones.front) newFrontY = Math.min(Math.max(newFrontY, overheadZones.front.yMin), overheadZones.front.yMax);
+      if (Number.isFinite(newMidY) && overheadZones.mid) newMidY = Math.min(Math.max(newMidY, overheadZones.mid.yMin), overheadZones.mid.yMax);
+      if (Number.isFinite(newRearY) && overheadZones.rear) newRearY = Math.min(Math.max(newRearY, overheadZones.rear.yMin), overheadZones.rear.yMax);
 
-      // Clamp Y for each row to RP22 zones
-      if (Number.isFinite(newFrontY) && overheadZones.front) {
-        newFrontY = Math.min(Math.max(newFrontY, overheadZones.front.yMin), overheadZones.front.yMax);
-      }
-      if (Number.isFinite(newMidY) && overheadZones.mid) {
-        newMidY = Math.min(Math.max(newMidY, overheadZones.mid.yMin), overheadZones.mid.yMax);
-      }
-      if (Number.isFinite(newRearY) && overheadZones.rear) {
-        newRearY = Math.min(Math.max(newRearY, overheadZones.rear.yMin), overheadZones.rear.yMax);
-      }
-
-      // Write positions for all six overheads
       if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
       onSetSpeakers(prev => {
         if (!Array.isArray(prev)) return prev;
-
         return prev.map(spk => {
           const role = getCanonicalRole(spk.role);
           if (!role || !role.startsWith('T')) return spk;
-
           const current = { ...(spk.position || {}) };
-
-          const isLeft = isLeftRole(role);
-          const isRight = isRightRole(role);
-
-          if (isLeft && leftColumnX != null) {
-            current.x = leftColumnX;
-          }
-          if (isRight && rightColumnX != null) {
-            current.x = rightColumnX;
-          }
-
-          if (isFrontRole(role) && Number.isFinite(newFrontY)) {
-            current.y = newFrontY;
-          }
-          if (isMidRole(role) && Number.isFinite(newMidY)) {
-            current.y = newMidY;
-          }
-          if (isRearRole(role) && Number.isFinite(newRearY)) {
-            current.y = newRearY;
-          }
-
+          if (isLeftRole(role) && leftColumnX != null) current.x = leftColumnX;
+          if (isRightRole(role) && rightColumnX != null) current.x = rightColumnX;
+          if (isFrontRole(role) && Number.isFinite(newFrontY)) current.y = newFrontY;
+          if (isMidRole(role) && Number.isFinite(newMidY)) current.y = newMidY;
+          if (isRearRole(role) && Number.isFinite(newRearY)) current.y = newRearY;
           return { ...spk, position: current };
         });
       });
