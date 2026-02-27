@@ -76,7 +76,7 @@ export const PAGES = {
 }
 
 export const pagesConfig = {
-    mainPage: "RoomDesigner",
+    mainPage: "Projects",
     Pages: PAGES,
     Layout: __Layout,
 };
