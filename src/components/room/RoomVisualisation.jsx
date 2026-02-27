@@ -3576,13 +3576,8 @@ React.useEffect(() => {
     
     return null;
 
-    /* ORIGINAL INLINE LOGIC REMOVED */
-
-    // Screen front plane position
-    // const screenFrontPlaneM = finite(actualScreenFrontY, 0); // This was previously used but is now globally available as a prop
-
-    // Distance to screen (from screen plane)
-    const distanceToScreen = Math.abs(seatY - screenFrontPlaneM);
+    /* ORIGINAL INLINE LOGIC REMOVED - truncated */
+    /* const distanceToScreen = 0;
 
     // Distance to MLP
     let distanceToMLP = null;
