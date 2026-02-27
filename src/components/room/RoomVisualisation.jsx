@@ -6057,7 +6057,7 @@ OVERHEADS: (() => {
   FRONT_WIDE: renderFrontWideZones(),
   // DOLBY removed
 };
-  }, [seatingPositions, widthM, lengthM, scale, toPx, roomRect, mlpY_m, placedSpeakers, heightM, screen?.mountMode, lcrZoneBlocks, ZONE_DEPTH_M, frontWideZones, renderFrontWideZones, mlp, getCanonicalRole, overheadCount, overheadZones]); // Added overheadZones to dependencies
+  }, [seatingPositions, widthM, lengthM, scale, toPx, roomRect, mlpY_m, placedSpeakers, heightM, screen?.mountMode, lcrZoneBlocks, ZONE_DEPTH_M, frontWideZones, renderFrontWideZones, mlp, getCanonicalRole, overheadCount, overheadZones, overlaysForRendering]); // Added overheadZones to dependencies
 
 
   // constants for seating block shift
