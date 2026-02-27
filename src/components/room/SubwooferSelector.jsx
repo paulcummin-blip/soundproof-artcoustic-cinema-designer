@@ -14,29 +14,17 @@ const SUB_MODELS = ["SUB2-12", "SUB3-12", "SUB4-12"];
  */
 export default function SubwooferSelector({ title, cfg, onChange, disabled = false }) {
   const safeCount = Math.max(0, Math.min(4, Number(cfg?.count ?? 0)));
-  const safeItems = React.useMemo(() =>
-    (Array.isArray(cfg?.items) ? cfg.items.slice(0, 4) : []),
-    [cfg?.items]
-  );
-
-  // Ensure items array matches count, fill new slots with a sensible default
-  const items = React.useMemo(() => {
-    const next = [...safeItems];
-    while (next.length < safeCount) next.push({ model: "SUB2-12" });
-    return next.slice(0, safeCount);
-  }, [safeItems, safeCount]);
+  const safeModel = cfg?.model || "SUB2-12";
 
   const commit = (next) => {
     if (typeof onChange !== "function") return;
-    const count = Math.max(0, Math.min(4, Number(next?.count ?? safeCount)));
-    const baseItems = Array.isArray(next?.items) ? next.items : items;
-    onChange({ count, items: baseItems.slice(0, 4) });
+    onChange({
+      model: next?.model ?? safeModel,
+      count: Math.max(0, Math.min(4, Number(next?.count ?? safeCount))),
+      positions: Array.isArray(cfg?.positions) ? cfg.positions : [],
+      tuning: Array.isArray(cfg?.tuning) ? cfg.tuning : [],
+    });
   };
-
-  // When count is 0, show one disabled model dropdown (preserves selected model)
-  const displayItems = safeCount === 0 
-    ? [{ model: cfg?.model || cfg?.items?.[0]?.model || "SUB2-12" }] 
-    : items;
 
   return (
     <div className="space-y-3">
@@ -61,32 +49,25 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
         </div>
       </div>
 
-      {displayItems.map((it, idx) => (
-        <div key={idx} className="grid grid-cols-2 gap-3">
-          <div className="col-span-2">
-            <Label className="text-xs">
-              {safeCount === 0 ? "Model (disabled — set quantity first)" : `Position ${idx + 1} — Model`}
-            </Label>
-            <Select
-              value={it?.model ?? "SUB2-12"}
-              disabled={disabled || safeCount === 0}
-              onValueChange={(val) => {
-                const nextItems = items.map((s, i) => (i === idx ? { model: val } : s));
-                commit({ items: nextItems });
-              }}
-            >
-              <SelectTrigger className="h-10 bg-white border-[#DCDBD6] text-2xl font-semibold text-[#213428]">
-                <SelectValue placeholder="Choose model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
-              </SelectTrigger>
-              <SelectContent>
-                {SUB_MODELS.map(m => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      ))}
+      <div>
+        <Label className="text-xs">
+          {safeCount === 0 ? "Model (disabled — set quantity first)" : "Model"}
+        </Label>
+        <Select
+          value={safeModel}
+          disabled={disabled || safeCount === 0}
+          onValueChange={(val) => commit({ model: val })}
+        >
+          <SelectTrigger className="h-10 bg-white border-[#DCDBD6] text-2xl font-semibold text-[#213428]">
+            <SelectValue placeholder="Choose model" className="text-2xl font-semibold" style={{ color: "#213428" }} />
+          </SelectTrigger>
+          <SelectContent>
+            {SUB_MODELS.map(m => (
+              <SelectItem key={m} value={m}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   );
 }
