@@ -126,7 +126,7 @@ export default function ProjectsPage() {
           if (typeof v === "string") {
             const s = v.trim();
             if (!s) return null;
-            try { return JSON.parse(s); } catch { return null; }
+            try { return JSON.parse(s); } catch (_e) { return null; }
           }
           return null;
         };
