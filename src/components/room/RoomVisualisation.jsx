@@ -6144,7 +6144,7 @@ return {
   placedSpeakers,
 ]);
 
-  // renderRoomElements extracted to RoomElementsLayer component below in JSX
+  // renderRoomElements: moved to RoomElementsLayer sub-component
 
   // Renders speaker labels. Not implemented in the original code, so a placeholder.
   const renderSpeakerLabels = useCallback(() => {
