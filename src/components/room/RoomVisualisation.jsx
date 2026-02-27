@@ -6727,7 +6727,231 @@ return {
     return <g data-layer="speaker-labels"></g>;
   }, []);
 
-  // SeatingLayer extracted to components/room/plan/SeatingLayer.jsx
+  // --- Row front-wall distance labels (only for Speaker Positions plan) ---
+  const rowFrontWallLabelSeatIds = useMemo(() => {
+    if (speakerPositionsView !== 'plan') return new Set();
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return new Set();
+    
+    // Cluster seats into rows (same logic as SpeakerPositionsOverlay)
+    const allSeatsWithY = seatingPositions
+      .map(s => ({ seat: s, y: Number(s?.y ?? s?.position?.y ?? 0) }))
+      .filter(item => Number.isFinite(item.y))
+      .sort((a, b) => a.y - b.y);
+    
+    const rows = [];
+    for (const item of allSeatsWithY) {
+      const lastRow = rows[rows.length - 1];
+      if (!lastRow || Math.abs(item.y - lastRow.y) > 0.20) {
+        rows.push({ y: item.y, seats: [item.seat] });
+      } else {
+        lastRow.seats.push(item.seat);
+      }
+    }
+    
+    // For each row, pick one seat to label (center or left-of-center)
+    const labeledSeatIds = new Set();
+    for (const row of rows) {
+      const sortedByX = row.seats
+        .map(s => ({ seat: s, x: Number(s?.x ?? s?.position?.x ?? 0) }))
+        .filter(item => Number.isFinite(item.x))
+        .sort((a, b) => a.x - b.x);
+      
+      if (sortedByX.length === 0) continue;
+      
+      const count = sortedByX.length;
+      const chosenIndex = count % 2 === 1 
+        ? Math.floor(count / 2) 
+        : (count / 2 - 1);
+      
+      const chosenSeat = sortedByX[chosenIndex]?.seat;
+      if (chosenSeat?.id) labeledSeatIds.add(chosenSeat.id);
+    }
+    
+    return labeledSeatIds;
+  }, [speakerPositionsView, seatingPositions]);
+
+  // --- Row distance labels (ROOM_DIMS overlay) - furthest-right seat per row ---
+  const rowDistanceLabelSeatIds = useMemo(() => {
+    if (!_overlays?.ROOM_DIMS) return new Set();
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) return new Set();
+    
+    // Cluster seats into rows
+    const allSeatsWithY = seatingPositions
+      .map(s => ({ seat: s, y: Number(s?.y ?? s?.position?.y ?? 0) }))
+      .filter(item => Number.isFinite(item.y))
+      .sort((a, b) => a.y - b.y);
+    
+    const rows = [];
+    for (const item of allSeatsWithY) {
+      const lastRow = rows[rows.length - 1];
+      if (!lastRow || Math.abs(item.y - lastRow.y) > 0.20) {
+        rows.push({ y: item.y, seats: [item.seat] });
+      } else {
+        lastRow.seats.push(item.seat);
+      }
+    }
+    
+    // For each row, pick the furthest-right seat
+    const labeledSeatIds = new Set();
+    for (const row of rows) {
+      const sortedByX = row.seats
+        .map(s => ({ seat: s, x: Number(s?.x ?? s?.position?.x ?? 0) }))
+        .filter(item => Number.isFinite(item.x))
+        .sort((a, b) => b.x - a.x); // Descending - furthest right first
+      
+      if (sortedByX.length === 0) continue;
+      
+      const furthestRight = sortedByX[0]?.seat;
+      if (furthestRight?.id) labeledSeatIds.add(furthestRight.id);
+    }
+    
+    return labeledSeatIds;
+  }, [_overlays?.ROOM_DIMS, seatingPositions]);
+
+  // --- Seats: always render from the latest seatingPositions prop ---
+  const renderSeatingPositions = () => {
+    if (!hasRoomRect) return null;
+    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
+      if (globalThis.__B44_LOGS) console.log('RoomVisualisation: rendering seats = 0');
+      return null;
+    }
+
+    const RX_M = 0.10;
+    const RY_M = 0.125;
+
+    if (globalThis.__B44_LOGS) console.log('RoomVisualisation: rendering seats =', seatingPositions.length);
+
+    return (
+      <g className="seats-layer" style={{ pointerEvents: 'auto' }}>
+        {/* MLP marker MUST live in the same layer as seats to prevent transform drift */}
+        {MLPMarker}
+
+        {seatingPositions.map((seat) => {
+          // accept either { x, y } or { position: { x, y } }
+          const xM = Number(
+            seat.x ??
+            seat.position?.x ??
+            0
+          );
+          const yM_raw = Number(
+            seat.y ??
+            seat.position?.y ??
+            0
+          );
+
+          // IMPORTANT: match the MLP clamping so the green dot and seat oval
+          // cannot diverge on first load / legacy autosave data.
+          const yM = clampMlpY(yM_raw);
+
+          const [seatX, seatY] = toPx(xM, yM);
+          const isPinned = hudPinnedSeatId === seat.id;
+
+          return (
+            <g key={seat.id}>
+              {/* Invisible hit target (2× larger for easier hover) */}
+              <ellipse
+                cx={seatX}
+                cy={seatY}
+                rx={RX_M * scale * 2}
+                ry={RY_M * scale * 2}
+                fill="transparent"
+                pointerEvents="all"
+                style={{ cursor: 'pointer' }}
+                onMouseDown={(e) => handleMouseDown(e, seat.id, 'seat')}
+                onMouseEnter={() => handleSeatMouseEnter(seat)}
+                onMouseLeave={handleSeatMouseLeave}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSeatClick(seat);
+                }}
+              />
+              
+              {/* Visual seat oval */}
+              <ellipse
+                cx={seatX}
+                cy={seatY}
+                rx={RX_M * scale}
+                ry={RY_M * scale}
+                fill="rgba(0,0,0,0)"
+                pointerEvents="none"
+                stroke="#213428"
+                strokeWidth={seat.isPrimary ? 2.5 : isPinned ? 2 : 1}
+                strokeDasharray={isPinned ? '4 2' : 'none'}
+                aria-label="Seat — hover for RP23 and P1 analysis"
+              />
+              
+              {/* Front wall distance label (Speaker Positions plan only) */}
+              {speakerPositionsView === 'plan' && rowFrontWallLabelSeatIds.has(seat.id) && (
+                <text
+                  x={seatX}
+                  y={seatY + (RY_M * scale) + 18}
+                  textAnchor="middle"
+                  fontSize={11}
+                  fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                  fill="#1B1A1A"
+                  fontWeight={600}
+                  pointerEvents="none"
+                >
+                  Front: {yM.toFixed(2)}m
+                </text>
+              )}
+              
+              {/* Row distance label (ROOM_DIMS overlay only) */}
+              {_overlays?.ROOM_DIMS && exportMode !== 'dimensions' && rowDistanceLabelSeatIds.has(seat.id) && (
+                <text
+                  x={seatX + 22}
+                  y={seatY}
+                  textAnchor="start"
+                  fontSize={22}
+                  fill="#1B1A1A"
+                  pointerEvents="none"
+                >
+                  ⬆️ {yM.toFixed(2)}m
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </g>
+    );
+  };
+  
+  // MLP marker: always draw at computed MLP (mlpDotX_m, mlpDotY_m),
+  // never snap horizontally to a specific seat.
+  const MLPMarker = useMemo(() => {
+    if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) {
+      return null;
+    }
+
+    const [x, y] = toPx(mlpDotX_m, mlpDotY_m);
+
+    return (
+      <g data-testid="mlp-marker">
+        <circle
+          cx={x}
+          cy={y}
+          r={4}
+          fill="#22c55e"
+          stroke="#ffffff"
+          strokeWidth={2}
+          opacity={0.9}
+        />
+        {_overlays?.ROOM_DIMS && exportMode !== 'dimensions' && (
+          <text
+            x={x}
+            y={y + 36}
+            textAnchor="middle"
+            fontSize={12}
+            fontWeight={600}
+            fill="#22c55e"
+            pointerEvents="none"
+          >
+            RSP
+          </text>
+        )}
+      </g>
+    );
+  }, [toPx, mlpDotX_m, mlpDotY_m, _overlays?.ROOM_DIMS]);
 
 
   const containerStyle = {
@@ -7405,31 +7629,184 @@ return (
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
             {renderRoomElements()}
 
-            {/* Layer 7.5: MLP Position Ruler – extracted to components/room/plan/MlpRuler.jsx */}
-            {exportMode !== 'clean' && showMlpRuler && (() => { const { default: MlpRulerComp } = { default: null }; return null; })()}
-            {exportMode !== 'clean' && showMlpRuler && Number.isFinite(mlpDotX_m) && Number.isFinite(mlpDotY_m) && (() => {
+            {/* Layer 7.5: MLP Position Ruler (when enabled) */}
+            {exportMode !== 'clean' && showMlpRuler && (() => {
+              // Render MLP position ruler using the same visual style as speaker rulers
+              if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) return null;
+
               const [mlpX_px, mlpY_px] = toPx(mlpDotX_m, mlpDotY_m);
+              
+              // Screen position (for screen → MLP distance)
               const screenY_px = (roomRect?.y ?? 0) + (screenFrontPlaneM * scale);
-              const rc = '#625143'; const rs = 1.5; const dr = 3; const fs = 11; const lo = 16;
-              const dL = mlpDotX_m; const dR = widthM - mlpDotX_m; const dS = mlpDotY_m - screenFrontPlaneM; const dB = lengthM - mlpDotY_m; const dF = mlpDotY_m;
-              const srX = (roomRect?.x ?? 0) + 0.20 * (mlpX_px - (roomRect?.x ?? 0));
-              const ff = exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif';
-              const rx = (roomRect?.x ?? 0); const rw = (roomRect?.width ?? 0); const ry = (roomRect?.y ?? 0); const rh = (roomRect?.height ?? 0);
+              
+              // Ruler styling (match speaker rulers)
+              const rulerColor = '#625143';
+              const rulerStroke = 1.5;
+              const dotRadius = 3;
+              const fontSize = 11;
+              const labelOffset = 16; // pixels from the line
+
+              // Calculate distances
+              const distLeftWall = mlpDotX_m; // Distance from left wall (x=0)
+              const distRightWall = widthM - mlpDotX_m; // Distance from right wall
+              const distScreen = mlpDotY_m - screenFrontPlaneM; // Distance from screen
+              const distBackWall = lengthM - mlpDotY_m; // Distance from back wall
+              const distFrontWall = mlpDotY_m; // Distance from front wall (y=0)
+
+              // Secondary ruler X position: 20% from left wall toward MLP centerline
+              // Formula: x = leftWallX + 0.20 * (mlpCenterX - leftWallX)
+              const secondaryRulerX_px = (roomRect?.x ?? 0) + 0.20 * (mlpX_px - (roomRect?.x ?? 0));
+
               return (
                 <g data-layer="mlp-ruler" pointerEvents="none">
-                  <line x1={rx} y1={mlpY_px} x2={rx+rw} y2={mlpY_px} stroke={rc} strokeWidth={rs} opacity={0.6}/>
-                  <circle cx={rx} cy={mlpY_px} r={dr} fill={rc} opacity={0.8}/>
-                  <circle cx={rx+rw} cy={mlpY_px} r={dr} fill={rc} opacity={0.8}/>
-                  <text x={(rx+mlpX_px)/2} y={mlpY_px-lo} textAnchor="middle" fontSize={fs} fill={rc} fontFamily={ff}>{dL.toFixed(2)}m</text>
-                  <text x={(mlpX_px+rx+rw)/2} y={mlpY_px-lo} textAnchor="middle" fontSize={fs} fill={rc} fontFamily={ff}>{dR.toFixed(2)}m</text>
-                  <line x1={mlpX_px} y1={screenY_px} x2={mlpX_px} y2={ry+rh} stroke={rc} strokeWidth={rs} opacity={0.6}/>
-                  <circle cx={mlpX_px} cy={screenY_px} r={dr} fill={rc} opacity={0.8}/>
-                  <circle cx={mlpX_px} cy={ry+rh} r={dr} fill={rc} opacity={0.8}/>
-                  <text x={mlpX_px-lo} y={(screenY_px+mlpY_px)/2} textAnchor="middle" fontSize={fs} fill={rc} fontFamily={ff} transform={`rotate(-90 ${mlpX_px-lo} ${(screenY_px+mlpY_px)/2})`}>{dS.toFixed(2)}m</text>
-                  <text x={mlpX_px+lo} y={(mlpY_px+ry+rh)/2} textAnchor="middle" fontSize={fs} fill={rc} fontFamily={ff} transform={`rotate(-90 ${mlpX_px+lo} ${(mlpY_px+ry+rh)/2})`}>{dB.toFixed(2)}m</text>
-                  <defs><marker id="mlp-depth-arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill={rc}/></marker></defs>
-                  <line x1={srX} y1={ry} x2={srX} y2={mlpY_px} stroke={rc} strokeWidth={rs} opacity={0.6} markerStart="url(#mlp-depth-arrow)" markerEnd="url(#mlp-depth-arrow)"/>
-                  <text x={srX+lo} y={(ry+mlpY_px)/2} textAnchor="middle" fontSize={fs} fill={rc} fontFamily={ff} transform={`rotate(-90 ${srX+lo} ${(ry+mlpY_px)/2})`}>{dF.toFixed(2)}m</text>
+                  {/* Horizontal ruler (left wall ↔ MLP ↔ right wall) */}
+                  <line
+                    x1={(roomRect?.x ?? 0)}
+                    y1={mlpY_px}
+                    x2={(roomRect?.x ?? 0) + (roomRect?.width ?? 0)}
+                    y2={mlpY_px}
+                    stroke={rulerColor}
+                    strokeWidth={rulerStroke}
+                    opacity={0.6}
+                  />
+                  
+                  {/* Left wall dot */}
+                  <circle
+                    cx={(roomRect?.x ?? 0)}
+                    cy={mlpY_px}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Right wall dot */}
+                  <circle
+                    cx={(roomRect?.x ?? 0) + (roomRect?.width ?? 0)}
+                    cy={mlpY_px}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Left wall → MLP distance label */}
+                  <text
+                    x={((roomRect?.x ?? 0) + mlpX_px) / 2}
+                    y={mlpY_px - labelOffset}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                  >
+                    {distLeftWall.toFixed(2)}m
+                  </text>
+                  
+                  {/* MLP → Right wall distance label */}
+                  <text
+                    x={(mlpX_px + (roomRect?.x ?? 0) + (roomRect?.width ?? 0)) / 2}
+                    y={mlpY_px - labelOffset}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                  >
+                    {distRightWall.toFixed(2)}m
+                  </text>
+
+                  {/* Vertical ruler (screen ↔ MLP ↔ back wall) */}
+                  <line
+                    x1={mlpX_px}
+                    y1={screenY_px}
+                    x2={mlpX_px}
+                    y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
+                    stroke={rulerColor}
+                    strokeWidth={rulerStroke}
+                    opacity={0.6}
+                  />
+                  
+                  {/* Screen plane dot */}
+                  <circle
+                    cx={mlpX_px}
+                    cy={screenY_px}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Back wall dot */}
+                  <circle
+                    cx={mlpX_px}
+                    cy={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Screen → MLP distance label (rotated, left side) */}
+                  <text
+                    x={mlpX_px - labelOffset}
+                    y={(screenY_px + mlpY_px) / 2}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                    transform={`rotate(-90 ${mlpX_px - labelOffset} ${(screenY_px + mlpY_px) / 2})`}
+                  >
+                    {distScreen.toFixed(2)}m
+                  </text>
+                  
+                  {/* MLP → Back wall distance label (rotated, right side) */}
+                  <text
+                    x={mlpX_px + labelOffset}
+                    y={(mlpY_px + (roomRect?.y ?? 0) + (roomRect?.height ?? 0)) / 2}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                    transform={`rotate(-90 ${mlpX_px + labelOffset} ${(mlpY_px + (roomRect?.y ?? 0) + (roomRect?.height ?? 0)) / 2})`}
+                  >
+                    {distBackWall.toFixed(2)}m
+                  </text>
+
+                  {/* SECONDARY RULER: MLP → Front Wall depth */}
+                  <defs>
+                    <marker
+                      id="mlp-depth-arrow"
+                      viewBox="0 0 10 10"
+                      refX="5"
+                      refY="5"
+                      markerWidth="4"
+                      markerHeight="4"
+                      orient="auto"
+                    >
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill={rulerColor} />
+                    </marker>
+                  </defs>
+
+                  {/* Vertical line from front wall to MLP horizontal ruler */}
+                  <line
+                    x1={secondaryRulerX_px}
+                    y1={(roomRect?.y ?? 0)}
+                    x2={secondaryRulerX_px}
+                    y2={mlpY_px}
+                    stroke={rulerColor}
+                    strokeWidth={rulerStroke}
+                    opacity={0.6}
+                    markerStart="url(#mlp-depth-arrow)"
+                    markerEnd="url(#mlp-depth-arrow)"
+                  />
+                  
+                  {/* MLP → Front wall distance label (rotated, reading bottom to top) */}
+                  <text
+                    x={secondaryRulerX_px + labelOffset}
+                    y={((roomRect?.y ?? 0) + mlpY_px) / 2}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                    transform={`rotate(-90 ${secondaryRulerX_px + labelOffset} ${((roomRect?.y ?? 0) + mlpY_px) / 2})`}
+                  >
+                    {distFrontWall.toFixed(2)}m
+                  </text>
                 </g>
               );
             })()}
