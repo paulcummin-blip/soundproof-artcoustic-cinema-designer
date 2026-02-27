@@ -6022,28 +6022,28 @@ return {
   ),
   REAR_SURROUND: <RearSurroundZoneComponent />,
 
- OVERHEADS: (() => {
-  // Use overheadCount from layout state — NOT placedSpeakers
-  const config =
-    overheadCount === 2 ? ".2" :
-    overheadCount === 4 ? ".4" :
-    overheadCount === 6 ? ".6" :
-    "off";
+  OVERHEADS: (() => {
+    // Use overheadCount from layout state — NOT placedSpeakers
+    const config =
+      overheadCount === 2 ? ".2" :
+      overheadCount === 4 ? ".4" :
+      overheadCount === 6 ? ".6" :
+      "off";
 
-  // If no overheads selected, do not render overlay
-  if (config === "off") return null;
+    // If no overheads selected, do not render overlay
+    if (config === "off") return null;
 
-  return renderOverheadBandsSVG({
-    zones: overheadZones,
-    config,
-    toPx,
-    scale,
-    roomRect,
-    placedSpeakers,
-    getCanonicalRole,
-    widthM,
-  });
-})(),
+    return renderOverheadBandsSVG({
+      zones: overheadZones,
+      config,
+      toPx,
+      scale,
+      roomRect,
+      placedSpeakers,
+      getCanonicalRole,
+      widthM,
+    });
+  })(),
 
   FRONT_WIDE: renderFrontWideZones(),
   // DOLBY removed
