@@ -4596,26 +4596,11 @@ useEffect(() => {
   }, [placedSpeakers, onSetSpeakers, centerX_m, getCanonicalRole]);
 
   // [B44] DISABLED: SL/SR positions now come from SpeakerPlacement only
-  // This effect has been disabled to prevent RV from overwriting state-driven positions
   useEffect(() => {
-    // [B44] Legacy corridor/constraint logic for SL/SR disabled.
-    // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
-    return; // Early exit - effect is now a no-op
-    
-    /* ORIGINAL LOGIC DISABLED:
-    if (!onSetSpeakers) return;
-    if (isDraggingRearRef.current > 0) return;
-    if (timeNowMs() - lastInteractionEpoch.current < 500) return;
-
-    const W = widthM || 0;
-    const L = lengthM || 0;
-    if (!(W > 0 && L > 0)) return;
-
+    return; // no-op
+    /* ORIGINAL LOGIC DISABLED (kept for reference):
     const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
     const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
-    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
-    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
-
     if (!sl || !sr) return;
 
     const dimsL = getSpeakerDims(sl.model);
