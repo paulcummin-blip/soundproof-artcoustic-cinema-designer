@@ -4769,39 +4769,13 @@ useEffect(() => {
     */
   }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
 
-  // [B44] Auto-adjust SBL/SBR only if positionSource !== 'user'
+  // [B44] Auto-adjust SBL/SBR - disabled (no-op)
   React.useEffect(() => {
-    // Skip if user has manually placed these speakers
-    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
-    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
-    
-    if ((sbl?.positionSource === 'user') || (sbr?.positionSource === 'user')) {
-      return; // User has taken control - don't auto-adjust
-    }
-    
-    // Otherwise continue with existing auto-adjustment logic
-    return; // Early exit - effect is now a no-op
-    
-    /* ORIGINAL LOGIC DISABLED:
-    if (isDraggingRearRef.current > 0) {
-      return;
-    }
-
-    if (timeNowMs() - (lastInteractionEpoch?.current || 0) < 500) return;
-    if (!onSetSpeakers) return;
-
-    rsLastLiveResetEpoch.current = timeNowMs();
-
+    return; // no-op
+    /* ORIGINAL LOGIC DISABLED (kept for reference):
     const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
     const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
     if (!sbl || !sbr) return;
-
-    const W = widthM || 0;
-    const L = lengthM || 0;
-    if (!(W > 0 && L > 0)) return;
-
-    const dimsL = getSpeakerDims(sbl.model);
-    const dimsR = getSpeakerDims(sbr.model);
     const yL_sbl_cur = Number(sbl?.position?.y);
     const yR_sbr_cur = Number(sbr?.position?.y);
 
