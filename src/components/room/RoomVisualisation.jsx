@@ -3485,7 +3485,7 @@ React.useEffect(() => {
   });
 
   // STUB: kept for reference – original inline logic is in buildSeatHudSnapshot.js
-  void (false && /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
+  void (false); /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
 
     // Helper for safe number extraction
     const finite = (v, fallback) => {
