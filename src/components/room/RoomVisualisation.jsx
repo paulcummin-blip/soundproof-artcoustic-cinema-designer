@@ -4100,30 +4100,6 @@ React.useEffect(() => {
     }
 
     END ORIGINAL INLINE LOGIC */
-  }, [
-    effectiveHoveredSeat,
-    appState?.hudPinnedSeatId,
-    hudPinnedSeatId,
-    placedSpeakers,
-    widthM,
-    lengthM,
-    heightM,
-    screenFrontPlaneM,
-    screen,
-    mlp,
-    allSeatSplMetrics,
-    aimAtMLP,
-    aimFrontWidesAtMLP,
-    aimSideSurroundsAtMLP,
-    aimRearSurroundsAtMLP,
-    lcrAngleInfo,
-    analysisResult,
-    seatingPositions,
-    appState?.splConfig,
-    appState?.sevenBedLayoutType,
-    appState?.speakerSystem?.sevenBedLayoutType,
-    appState?.speakerSystem?.useWidesInsteadOfRears,
-  ]);
 
   // ---- HUD cache writes MUST be in an effect (never inside useMemo/render) ----
   const lastHudWriteRef = useRef({});
