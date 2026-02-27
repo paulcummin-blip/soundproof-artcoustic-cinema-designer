@@ -4134,7 +4134,7 @@ React.useEffect(() => {
       }
     }
 
-    END ORIGINAL INLINE LOGIC */
+    END_PLACEHOLDER */
   }, [
     effectiveHoveredSeat,
     appState?.hudPinnedSeatId,
