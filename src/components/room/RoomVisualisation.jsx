@@ -3576,8 +3576,7 @@ React.useEffect(() => {
     
     return null;
 
-    /* ORIGINAL INLINE LOGIC - REMOVED */
-    /* placeholder */
+    /* ORIGINAL INLINE LOGIC REMOVED */
 
     // Screen front plane position
     // const screenFrontPlaneM = finite(actualScreenFrontY, 0); // This was previously used but is now globally available as a prop
