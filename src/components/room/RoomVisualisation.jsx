@@ -2748,21 +2748,21 @@ React.useEffect(() => {
         // Proceed with basic movement using canvasToRoom conversion
         const rawRoomPos = canvasToRoom(newCanvasPos);
         
-        if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
-        onSetSpeakers(prev => prev.map(s => {
-          if (s.id === speakerId) {
-            return { 
-              ...s, 
-              position: { 
-                ...s.position, 
-                x: rawRoomPos.x, 
-                y: rawRoomPos.y 
-              } 
-            };
-          }
-          return s;
-        }));
-        
+        const pRole = OVERHEAD_PAIR_MAP[canonicalRole];
+        const ctrX = widthM / 2;
+        const lxPos = rawRoomPos.x;
+        const rxPos = ctrX + (ctrX - lxPos);
+        onSetSpeakers(prev => {
+          if (!Array.isArray(prev)) return prev;
+          return prev.map(s => {
+            const sRole = getCanonicalRole(s.role);
+            if (s.id === speakerId) return { ...s, position: { ...(s.position || {}), x: rawRoomPos.x, y: rawRoomPos.y } };
+            if (freeMoveLcr && pRole && sRole === pRole) {
+              return { ...s, position: { ...(s.position || {}), x: (['TFR','TMR','TRR'].includes(sRole) ? rxPos : lxPos), y: rawRoomPos.y } };
+            }
+            return s;
+          });
+        });
         lastInteractionEpoch.current = timeNowMs();
         if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: overhead drag without zones complete");
         return;
