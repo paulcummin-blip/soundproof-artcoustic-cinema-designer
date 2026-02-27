@@ -2742,29 +2742,27 @@ React.useEffect(() => {
 
       // [B44 PROMPT] Allow overhead drag even when zones are missing/invalid
       // RP22 zones constrain final placement (on mouse up), not interaction.
-      // Same-row L/R mate lookup
-      const mateRoleFor = (r) => ({ TFL:'TFR',TFR:'TFL',TML:'TMR',TMR:'TML',TRL:'TRR',TRR:'TRL' })[r] ?? null;
-
       if (!overheadZones || overheadZones.status !== "ok") {
         if (globalThis.__B44_LOGS) console.log("[DRAG] overhead bypass: zone missing/invalid, allowing drag");
+        
+        // Proceed with basic movement using canvasToRoom conversion
         const rawRoomPos = canvasToRoom(newCanvasPos);
-        const mateRole = mateRoleFor(canonicalRole);
+        
         if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
-        onSetSpeakers(prev => {
-          if (!Array.isArray(prev)) return prev;
-          const centerX = widthM / 2;
-          const leftX = rawRoomPos.x;
-          const rightX = centerX + (centerX - leftX);
-          return prev.map(s => {
-            const r = getCanonicalRole(s.role);
-            if (s.id === speakerId) return { ...s, position: { ...(s.position || {}), x: rawRoomPos.x, y: rawRoomPos.y } };
-            if (freeMoveLcr && mateRole && r === mateRole) {
-              const mateIsRight = ['TFR','TMR','TRR'].includes(r);
-              return { ...s, position: { ...(s.position || {}), x: mateIsRight ? rightX : leftX, y: rawRoomPos.y } };
-            }
-            return s;
-          });
-        });
+        onSetSpeakers(prev => prev.map(s => {
+          if (s.id === speakerId) {
+            return { 
+              ...s, 
+              position: { 
+                ...s.position, 
+                x: rawRoomPos.x, 
+                y: rawRoomPos.y 
+              } 
+            };
+          }
+          return s;
+        }));
+        
         lastInteractionEpoch.current = timeNowMs();
         if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: overhead drag without zones complete");
         return;
@@ -2772,19 +2770,32 @@ React.useEffect(() => {
 
       // Determine which RP22 zone this role belongs to
       let zoneKey = null;
-      if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) { zoneKey = 'front'; }
-      else if (['TML', 'TMR'].includes(canonicalRole)) { zoneKey = 'mid'; }
-      else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) { zoneKey = 'rear'; }
+      if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
+        zoneKey = 'front';
+      } else if (['TML', 'TMR'].includes(canonicalRole)) {
+        zoneKey = 'mid';
+      } else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) {
+        zoneKey = 'rear';
+      }
 
       let zone = zoneKey && overheadZones[zoneKey];
       if (!zone) {
         if (globalThis.__B44_LOGS) console.log("[DRAG] overhead bypass: zone missing/invalid, allowing drag");
-        zone = { xMin: 0, xMax: widthM, yMin: 0, yMax: lengthM };
+        // Create fallback zone using full room bounds (no clamping)
+        zone = {
+          xMin: 0,
+          xMax: widthM,
+          yMin: 0,
+          yMax: lengthM
+        };
       }
 
       // Check if this is a 5.1.4 layout (exactly 4 overheads: TFL, TFR, TRL, TRR)
-      const overheadSpeakers = placedSpeakers.filter(s => { const r = getCanonicalRole(s.role); return r && r.startsWith('T'); });
-      const is514Layout = overheadSpeakers.length === 4 &&
+      const overheadSpeakers = placedSpeakers.filter(s => {
+        const r = getCanonicalRole(s.role);
+        return r && r.startsWith('T');
+      });
+      const is514Layout = overheadSpeakers.length === 4 && 
                           overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TFL') &&
                           overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TFR') &&
                           overheadSpeakers.some(s => getCanonicalRole(s.role) === 'TRL') &&
@@ -2793,8 +2804,10 @@ React.useEffect(() => {
       // Role group helpers
       const LEFT_ROLES = ['TFL', 'TML', 'TRL'];
       const RIGHT_ROLES = ['TFR', 'TMR', 'TRR'];
+
       const isLeftRole = (role) => LEFT_ROLES.includes(role);
       const isRightRole = (role) => RIGHT_ROLES.includes(role);
+
       const isFrontRole = (role) => role === 'TFL' || role === 'TFR';
       const isMidRole = (role) => role === 'TML' || role === 'TMR';
       const isRearRole = (role) => role === 'TRL' || role === 'TRR';
