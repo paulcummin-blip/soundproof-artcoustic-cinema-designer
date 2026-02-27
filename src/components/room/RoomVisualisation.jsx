@@ -6727,8 +6727,7 @@ return {
     return <g data-layer="speaker-labels"></g>;
   }, []);
 
-  // SeatingLayer is in components/room/plan/SeatingLayer.jsx
-  const renderSeatingPositions = () => null;
+  // SeatingLayer extracted to components/room/plan/SeatingLayer.jsx
 
 
   const containerStyle = {
