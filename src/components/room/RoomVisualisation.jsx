@@ -7620,7 +7620,7 @@ return (
             {exportMode !== 'clean' && !!overlaysForRendering?.LCR && ZoneComponents.LCR}
             {exportMode !== 'clean' && !!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
             {exportMode !== 'clean' && !!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {exportMode !== 'clean' && overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
+            {exportMode !== 'clean' && overheadCorridorsOn && overheadZones?.status === 'ok' && (_overlays?.OVERHEADS_2 || _overlays?.OVERHEADS_4 || _overlays?.OVERHEADS_6) && ZoneComponents.OVERHEADS}
             {exportMode !== 'clean' && overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
             
             {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
