@@ -2982,25 +2982,24 @@ React.useEffect(() => {
       if (Number.isFinite(newMidY) && overheadZones.mid) newMidY = Math.min(Math.max(newMidY, overheadZones.mid.yMin), overheadZones.mid.yMax);
       if (Number.isFinite(newRearY) && overheadZones.rear) newRearY = Math.min(Math.max(newRearY, overheadZones.rear.yMin), overheadZones.rear.yMax);
 
-      if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
-      onSetSpeakers(prev => {
-        if (!Array.isArray(prev)) return prev;
-        return prev.map(spk => {
-          const role = getCanonicalRole(spk.role);
-          if (!role || !role.startsWith('T')) return spk;
-          const current = { ...(spk.position || {}) };
-          if (isLeftRole(role) && leftColumnX != null) current.x = leftColumnX;
-          if (isRightRole(role) && rightColumnX != null) current.x = rightColumnX;
-          if (isFrontRole(role) && Number.isFinite(newFrontY)) current.y = newFrontY;
-          if (isMidRole(role) && Number.isFinite(newMidY)) current.y = newMidY;
-          if (isRearRole(role) && Number.isFinite(newRearY)) current.y = newRearY;
-          return { ...spk, position: current };
+      if (!freeMoveLcr) {
+        onSetSpeakers(prev => {
+          if (!Array.isArray(prev)) return prev;
+          return prev.map(spk => {
+            const role = getCanonicalRole(spk.role);
+            if (!role || !role.startsWith('T')) return spk;
+            const current = { ...(spk.position || {}) };
+            if (isLeftRole(role) && leftColumnX != null) current.x = leftColumnX;
+            if (isRightRole(role) && rightColumnX != null) current.x = rightColumnX;
+            if (isFrontRole(role) && Number.isFinite(newFrontY)) current.y = newFrontY;
+            if (isMidRole(role) && Number.isFinite(newMidY)) current.y = newMidY;
+            if (isRearRole(role) && Number.isFinite(newRearY)) current.y = newRearY;
+            return { ...spk, position: current };
+          });
         });
-      });
-
-      lastInteractionEpoch.current = timeNowMs();
-      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: overhead general complete");
-      return;
+        lastInteractionEpoch.current = timeNowMs();
+        return;
+      }
     }
 
     // Generic fallback for any other speakers
