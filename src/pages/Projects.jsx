@@ -550,7 +550,6 @@ export default function ProjectsPage() {
               marginTop: 10,
               display: "flex",
               gap: 10,
-              alignItems: "center",
               flexDirection: "column",
               alignItems: "flex-start",
             }}
