@@ -3576,39 +3576,8 @@ React.useEffect(() => {
     
     return null;
 
-    /* ORIGINAL INLINE LOGIC REMOVED - truncated */
-    /* const distanceToScreen = 0;
-
-    // Distance to MLP
-    let distanceToMLP = null;
-    if (mlp && Number.isFinite(mlp.x) && Number.isFinite(mlp.y)) {
-      const dx = seatX - mlp.x;
-      const dy = seatY - mlp.y;
-      distanceToMLP = Math.hypot(dx, dy);
-    }
-
-    // RP23 horizontal viewing angle
-    let rp23AngleDeg = null;
-    let rp23Level = null;
-    if (screen?.visibleWidthInches && distanceToScreen > 0.1) {
-      const screenWidthM = (screen.visibleWidthInches * 0.0254) || 0;
-      if (screenWidthM > 0) {
-        rp23AngleDeg = 2 * Math.atan((screenWidthM / 2) / distanceToScreen) * (180 / Math.PI);
-        
-        if (rp23AngleDeg >= 48 && rp23AngleDeg <= 67) rp23Level = 'L4';
-        else if (rp23AngleDeg >= 45 && rp23AngleDeg <= 70) rp23Level = 'L3';
-        else if (rp23AngleDeg >= 40 && rp23AngleDeg <= 75) rp23Level = 'L2';
-        else if (rp23AngleDeg >= 35 && rp23AngleDeg <= 80) rp23Level = 'L1';
-        else rp23Level = 'N/A';
-      }
-    }
-
-    // Compute directional arrows and distance to nearest wall
-    const distLeft = seatX;
-    const distRight = roomWidth - seatX;
-    const xNearest = Math.min(distLeft, distRight);
-    const xArrow = distLeft <= distRight ? '⬅️' : '➡️';
-    const yArrow = '⬆️';
+    /* ORIGINAL INLINE LOGIC REMOVED */
+    /* TRUNCATED_PLACEHOLDER
     
     // Build base tooltip data
     const data = {
