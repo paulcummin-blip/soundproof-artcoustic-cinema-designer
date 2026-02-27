@@ -6022,23 +6022,28 @@ return {
   ),
   REAR_SURROUND: <RearSurroundZoneComponent />,
 
-  OVERHEADS: (() => {
-    // Derive overhead config from dolbyLayout without using overheadCount variable
-    const parts = String(dolbyLayout || '5.1').split('.');
-    const ohCount = parts.length >= 3 ? parseInt(parts[2]) || 0 : 0;
-    const config = ohCount === 2 ? ".2" : ohCount === 4 ? ".4" : ohCount === 6 ? ".6" : "off";
-    
-    return renderOverheadBandsSVG({
-      zones: overheadZones,
-      config,
-      toPx,
-      scale,
-      roomRect,
-      placedSpeakers,
-      getCanonicalRole,
-      widthM,
-    });
-  })(),
+ OVERHEADS: (() => {
+  // Use overheadCount from layout state — NOT placedSpeakers
+  const config =
+    overheadCount === 2 ? ".2" :
+    overheadCount === 4 ? ".4" :
+    overheadCount === 6 ? ".6" :
+    "off";
+
+  // If no overheads selected, do not render overlay
+  if (config === "off") return null;
+
+  return renderOverheadBandsSVG({
+    zones: overheadZones,
+    config,
+    toPx,
+    scale,
+    roomRect,
+    placedSpeakers,
+    getCanonicalRole,
+    widthM,
+  });
+})(),
 
   FRONT_WIDE: renderFrontWideZones(),
   // DOLBY removed
