@@ -3459,125 +3459,33 @@ React.useEffect(() => {
   const allSeatSplMetrics = allSeatSplMetricsProp || allSeatSplMetricsLocal;
 
 
-  // Build tooltip data: READ from cache (single source of truth)
-  const tooltipData = useMemo(() => {
-    if (!effectiveHoveredSeat) return null;
-    
-    const pinnedSeatId = appState?.hudPinnedSeatId || hudPinnedSeatId || null;
-    
-    // Build current signature (same logic as cache-writing effect)
-    const seatIds = seatingPositions.map(s => s.id).join(',');
-    const seatPosFingerprint = seatingPositions
-      .map(s => `${s.id}:${Math.round((s.x || 0) * 1000)}:${Math.round((s.y || 0) * 1000)}`)
-      .join(',');
-    
-    const extraSurroundPattern = /^(SL|SR)\d+$/;
-    const speakerRevision = (placedSpeakers || [])
-      .filter(s => {
-        if (!s?.id || !s?.position) return false;
-        const r = getCanonicalRole(s.role);
-        const roleUpper = String(s.role || '').toUpperCase();
-        const isOverhead = String(r || '').startsWith('T');
-        return (
-          ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) ||
-          isOverhead ||
-          extraSurroundPattern.test(roleUpper) ||
-          String(r || '').startsWith('U')
-        );
-      })
-      .map(s => {
-        const p = s.position || {};
-        return `${s.id}:${getCanonicalRole(s.role)}:${(p.x || 0).toFixed(4)}:${(p.y || 0).toFixed(4)}:${(p.z || 0).toFixed(4)}:${String(s.model || '')}`;
-      })
-      .join('|');
-    
-    const layout = dolbyLayout || '5.1';
-    const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
-    const mlpRp23 = mlp ? Math.round((mlp.y || 0) * 1000) : 0;
-    const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
-    const sevenBedMode = String(
-      appState?.sevenBedLayoutType
-      || appState?.sevenBedLayoutType
-      || (appState?.speakerSystem?.useWidesInsteadOfRears ? 'wides' : '')
-      || 'rears'
-    ).toLowerCase();
-    const signature = `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|${mlpRp23}|${screenRounded}|${sevenBedMode}`;
-    
-    // FORCE LIVE: Pinned HUD always recomputes (bypasses cache for instant updates)
-    const seatId = effectiveHoveredSeat?.id;
-    const isPinnedSeat = !!seatId && !!pinnedSeatId && String(seatId) === String(pinnedSeatId);
-    
-    if (isPinnedSeat) {
-      try {
-        const snapshot = buildSeatHudSnapshot({
-          seat: effectiveHoveredSeat,
-          placedSpeakers,
-          widthM,
-          lengthM,
-          heightM,
-          screenFrontPlaneM,
-          screen,
-          mlp: mlp || { x: widthM / 2, y: lengthM * 0.58, z: 1.2 },
-          allSeatSplMetrics,
-          aimAtMLP,
-          aimFrontWidesAtMLP,
-          aimSideSurroundsAtMLP,
-          aimRearSurroundsAtMLP,
-          lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 },
-          analysisResult: analysisResult || {},
-          seatingPositions,
-          splConfig: appState?.splConfig || {},
-          sevenBedMode,
-          dolbyLayout,
-        });
-        
-        if (snapshot) return snapshot;
-      } catch (err) {
-        console.warn('[HUD] Failed to compute pinned seat snapshot:', err);
-      }
-    }
-    
-    // Non-pinned hover: try cache first (MUST include signature so toggles invalidate)
-    const cacheKey = `${seatId}|${signature}`;
-    const cached = seatId ? appState?.seatMetricsById?.[cacheKey] : null;
-    
-    const cachedHasLayout = !!cached?.dolbyLayout;
-    
-    if (cached && cachedHasLayout) {
-      return cached;
-    }
-    // If cached exists but has no dolbyLayout, treat it as stale and recompute live.
-    
-    // If cache is stale or missing, compute live snapshot for hover
-    const data = buildSeatHudSnapshot({
-      seat: effectiveHoveredSeat,
-      placedSpeakers,
-      widthM,
-      lengthM,
-      heightM,
-      screenFrontPlaneM,
-      screen,
-      mlp: mlp || { x: widthM / 2, y: lengthM * 0.58, z: 1.2 },
-      allSeatSplMetrics,
-      aimAtMLP,
-      aimFrontWidesAtMLP,
-      aimSideSurroundsAtMLP,
-      aimRearSurroundsAtMLP,
-      lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 },
-      analysisResult: analysisResult || {},
-      seatingPositions,
-      splConfig: appState?.splConfig || {},
-      sevenBedMode,
-      dolbyLayout,
-    });
-    
-    if (data) {
-      return data;
-    }
-    
-    return null;
+  // Build tooltip data: delegated to useTooltipData hook (extracted for size)
+  // NOTE: the large commented-out original logic block is preserved below.
+  const tooltipData = useTooltipData({
+    effectiveHoveredSeat,
+    hudPinnedSeatId,
+    appState,
+    placedSpeakers,
+    widthM,
+    lengthM,
+    heightM,
+    screenFrontPlaneM,
+    screen,
+    mlp,
+    allSeatSplMetrics,
+    aimAtMLP,
+    aimFrontWidesAtMLP,
+    aimSideSurroundsAtMLP,
+    aimRearSurroundsAtMLP,
+    lcrAngleInfo,
+    analysisResult,
+    seatingPositions,
+    dolbyLayout,
+    getCanonicalRole,
+  });
 
-    /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
+  // STUB: kept for reference – original inline logic is in buildSeatHudSnapshot.js
+  void (false && /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
 
     // Helper for safe number extraction
     const finite = (v, fallback) => {
