@@ -126,6 +126,8 @@ export default function ProjectsPage() {
           if (typeof v === "string") {
             const s = v.trim();
             if (!s) return null;
+            // Reject obviously invalid stringified objects
+            if (s === "[object Object]" || s.startsWith("[object ")) return null;
             try { return JSON.parse(s); } catch (_e) { return null; }
           }
           return null;
