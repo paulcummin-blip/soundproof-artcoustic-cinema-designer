@@ -4632,9 +4632,6 @@ useEffect(() => {
 
   // [B44] DISABLED: SL/SR and SBL/SBR auto-adjust effects removed (no-op stubs deleted)
 
-  // A) Hard-gate the legacy front-wide ribbon generation
-  const ENABLE_LEGACY_FRONT_WIDE_RIBBON = false;
-
   // ADDED: Step 1 & 3: Confirm missing keys and create a temporary adapter for LCR
   const { augmentedZones, zoneKeysLabel } = useMemo(() => {
     const newZones = analysisResult?.zones ? { ...analysisResult.zones } : {};
