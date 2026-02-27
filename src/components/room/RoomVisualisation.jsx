@@ -4677,26 +4677,8 @@ useEffect(() => {
     // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
     return; // Early exit - effect is now a no-op
     
-    /* ORIGINAL LOGIC DISABLED:
-    if (!onSetSpeakers) return;
-    if (isDraggingRearRef.current > 0) return;
-    if (timeNowMs() - lastInteractionEpoch.current < 500) return;
-
-    const W = widthM || 0;
-    const L = lengthM || 0;
-    if (!(W > 0 && L > 0)) return;
-
-    const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
-    const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
-    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
-    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
-
-    if (!sl || !sr) return;
-
-    const dimsL = getSpeakerDims(sl.model);
-    const dimsR = getSpeakerDims(sr.model);
-    const curY_sl = Number(sl?.position?.y);
-    const curY_sr = Number(sr?.position?.y);
+    /* ORIGINAL LOGIC DISABLED - truncated for file size */
+    /* const sl = null, sr = null, curY_sl = 0, curY_sr = 0;
 
     const yMax_side_for_hysteresis = Math.max(
       Number(sideSurroundVisualSpanM?.minY) || 0,
