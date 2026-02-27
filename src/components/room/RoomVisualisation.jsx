@@ -3577,13 +3577,9 @@ React.useEffect(() => {
     
     return null;
 
-    /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
+    /* ORIGINAL INLINE LOGIC - REMOVED (moved to buildSeatHudSnapshot.js)
 
-    // Helper for safe number extraction
-    const finite = (v, fallback) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : fallback;
-    };
+    const finite = (v, fallback) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
 
     // Extract seat coordinates
     const seatX = finite(effectiveHoveredSeat?.x ?? effectiveHoveredSeat?.position?.x, 0);
