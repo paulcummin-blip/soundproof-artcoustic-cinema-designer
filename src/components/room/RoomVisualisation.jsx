@@ -3577,9 +3577,7 @@ React.useEffect(() => {
     return null;
 
     /* ORIGINAL INLINE LOGIC - REMOVED */
-    /* const finite = (v, fallback) => { const n = Number(v); return Number.isFinite(n) ? n : fallback; };
-    const roomHeight = finite(heightM, 2.4);
-    const halfW = roomWidth / 2;
+    /* placeholder */
 
     // Screen front plane position
     // const screenFrontPlaneM = finite(actualScreenFrontY, 0); // This was previously used but is now globally available as a prop
