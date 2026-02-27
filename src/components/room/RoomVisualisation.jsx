@@ -4630,7 +4630,236 @@ useEffect(() => {
     if (needsFix) onSetSpeakers(next);
   }, [placedSpeakers, onSetSpeakers, centerX_m, getCanonicalRole]);
 
-  // [B44] DISABLED: SL/SR and SBL/SBR auto-adjust effects removed (no-op stubs deleted)
+  // [B44] DISABLED: SL/SR positions now come from SpeakerPlacement only
+  // This effect has been disabled to prevent RV from overwriting state-driven positions
+  useEffect(() => {
+    // [B44] Legacy corridor/constraint logic for SL/SR disabled.
+    // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
+    return; // Early exit - effect is now a no-op
+    
+    /* ORIGINAL SS LOGIC DISABLED */
+  }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
+
+  // [B44] Auto-adjust SBL/SBR only if positionSource !== 'user'
+  React.useEffect(() => {
+    // Skip if user has manually placed these speakers
+    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
+    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
+    
+    if ((sbl?.positionSource === 'user') || (sbr?.positionSource === 'user')) {
+      return; // User has taken control - don't auto-adjust
+    }
+    
+    // Otherwise continue with existing auto-adjustment logic
+    return; // Early exit - effect is now a no-op
+    
+    /* ORIGINAL SBL/SBR LOGIC DISABLED */
+    /* const _sbl = null;
+
+    const W = widthM || 0;
+    const L = lengthM || 0;
+    if (!(W > 0 && L > 0)) return;
+
+    const dimsL = getSpeakerDims(sbl.model);
+    const dimsR = getSpeakerDims(sbr.model);
+    const yL_sbl_cur = Number(sbl?.position?.y);
+    const yR_sbr_cur = Number(sbr?.position?.y);
+
+    const yMax_side_for_hysteresis = Math.max(
+      Number(sideSurroundVisualSpanM?.minY) || 0,
+      Math.min(Number(sideSurroundVisualSpanM?.maxY) || 0, L - CORNER_CLEAR_M)
+    );
+
+    let currentRefMode = rearModeRef.current;
+    let nextModeBasedOnPosition = currentRefMode;
+
+    if (currentRefMode === 'back') {
+        if (yL_sbl_cur < (yMax_side_for_hysteresis - BACKWALL_HYSTERESIS_M)) {
+            nextModeBasedOnPosition = 'side';
+            if (DBG_RS) if (globalThis.__B44_LOGS) console.log('[RS live] position implies side mode: back -> side');
+        }
+    } else if (currentRefMode === 'side') {
+        if (yL_sbl_cur > (yMax_side_for_hysteresis + BACKWALL_HYSTERESIS_M)) {
+            nextModeBasedOnPosition = 'back';
+            if (DBG_RS) if (globalThis.__B44_LOGS) console.log('[RS live] position implies back mode: side -> back');
+        }
+    }
+
+    rearModeRef.current = nextModeBasedOnPosition;
+
+    if (DBG_RS) {
+      try {
+        const yMax_side_live = Number(sideSurroundVisualSpanM?.maxY) || 0;
+        const onBackCheck = isOnBackWall(yL_sbl_cur, dimsL, L);
+
+        if (globalThis.__B44_LOGS) console.log('[RS live] snapshot', {
+          currentRefMode: currentRefMode,
+          nextModeBasedOnPosition: nextModeBasedOnPosition,
+          ySBL: yL_sbl_cur?.toFixed?.(3), ySBR: yR_sbr_cur?.toFixed?.(3),
+          yMax_side_live: yMax_side_live?.toFixed?.(3),
+          onBackCheck,
+          lanes: rearSurroundVisualLanes
+        });
+      } catch (_) {}
+    }
+
+    if (rearModeRef.current === 'side') {
+      const xL_side = fixedSideX(W, dimsL, 'L');
+      const xR_side = fixedSideX(W, dimsR, 'R');
+
+      const yMin_side_calc = Number(sideSurroundVisualSpanM?.minY) || 0;
+      const yMax_visual_calc = Number(sideSurroundVisualSpanM?.maxY) || 0;
+      const yMax_clamp_calc = Math.max(yMin_side_calc, Math.min(yMax_visual_calc, L - CORNER_CLEAR_M));
+
+      const yMin = yMin_side_calc;
+      const yMax = yMax_clamp_calc;
+
+      let yStar = Math.min(yMax, Math.max(yMin, yL_sbl_cur));
+
+      const RS_SIDE_EPS = 0.02;
+      if (yStar >= (yMax - RS_SIDE_EPS)) {
+        yStar = Math.max(yMin, yMax - RS_SIDE_EPS);
+      }
+
+      const slSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
+      const srSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+
+      if (slSpeaker && isOnSideWall('L', slSpeaker, W)) {
+        const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbl.model)) || 0) / 2;
+        const halfSS = (speakerOnWallYFootprint(getModelDimsM(slSpeaker.model)) || 0) / 2;
+        const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
+        const yObstacle = Number(slSpeaker?.position?.y)||0;
+        const yPrevSBL = Number(sbl?.position?.y); // Use SBL's previous Y
+        const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
+        if (overlap) {
+          yStar = nonCrossingClampDirectional(yPrevSBL, yStar, yObstacle, minSep);
+          yStar = Math.min(Math.max(yStar, yMin), yMax);
+        }
+      }
+
+      if (srSpeaker && isOnSideWall('R', srSpeaker, W)) {
+        const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbr.model)) || 0) / 2;
+        const halfSS = (speakerOnWallYFootprint(getModelDimsM(srSpeaker.model)) || 0) / 2;
+        const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
+        const yObstacle = Number(srSpeaker?.position?.y)||0;
+        const yPrevSBR = Number(sbr?.position?.y); // Use SBR's previous Y
+        const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
+        if (overlap) {
+          yStar = nonCrossingClampDirectional(yPrevSBR, yStar, yObstacle, minSep);
+          yStar = Math.min(Math.max(yStar, yMin), yMax);
+        }
+      }
+
+      const curXL = Number(sbl?.position?.x);
+      const curXR = Number(sbr?.position?.x);
+      const xL_target = fixedSideX(W, dimsL, 'L');
+      const xR_target = fixedSideX(W, dimsR, 'R');
+
+      const need = Math.abs(curXL - xL_target) > RS_EPS ||
+                   Math.abs(curXR - xR_target) > RS_EPS ||
+                   Math.abs(yL_sbl_cur - yStar) > RS_EPS ||
+                   Math.abs(yR_sbr_cur - yStar) > RS_EPS;
+
+      if (DBG_RS && need) {
+        if (globalThis.__B44_LOGS) console.log('[RS live] side-wall auto-correct:', {
+          curXL: curXL?.toFixed?.(3), xL_target: xL_target?.toFixed?.(3),
+          curXR: curXR?.toFixed?.(3), xR_target: xR_target?.toFixed?.(3),
+          curYL: yL_sbl_cur?.toFixed?.(3), curYR: yR_sbr_cur?.toFixed?.(3),
+          yStar: yStar?.toFixed?.(3),
+          need
+        });
+      }
+
+      if (!need) {
+        return;
+      }
+
+      onSetSpeakers(prev => prev.map(s => {
+        const r = getCanonicalRole(s.role);
+        if (r === 'SBL') return { ...s, position: { ...(s.position||{}), x: xL_side, y: yStar } };
+        if (r === 'SBR') return { ...s, position: { ...(s.position||{}), x: xR_side, y: yStar } };
+        return s;
+      }));
+
+      return;
+    }
+
+    // BACK-WALL MODE MAINTENANCE for rears (keep existing logic)
+    const yBackL = backWallYForDims(dimsL, L, WALL_BUFFER_M);
+    const yBackR = backWallYForDims(dimsR, L, WALL_BUFFER_M);
+    const yBack = Math.max(yBackL, yBackR);
+
+    const lanes = rearSurroundVisualLanes ?? {};
+    const leftLane  = lanes.left  ?? { minX: 0, maxX: W };
+    const rightLane = lanes.right ?? { minX: 0, maxX: W };
+
+    let baseMin = Number(leftLane.minX ?? 0);
+    let baseMax = Number(leftLane.maxX ?? W);
+
+    if (!(baseMax > baseMin)) {
+      baseMin = 0;
+      baseMax = W;
+    }
+
+    const halfRS = Math.max(halfWidthOnWall(dimsL), halfWidthOnWall(dimsR));
+    baseMin += halfRS;
+    baseMax -= halfRS;
+
+    const exclusions = [];
+    if (sideSurroundsOnBackWall(placedSpeakers, L)) {
+      const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
+      const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+      function addEx(ss) {
+        if (!ss) return;
+        const d = getSpeakerDims(ss.model);
+        if (!isOnBackWall(ss?.position?.y, d, L)) return;
+        const halfSS = halfWidthOnWall(d);
+        const cx = Number(ss?.position?.x) || 0;
+        const pad = halfSS + halfRS + RS_CLEAR_M;
+        exclusions.push([cx - pad, cx + pad]);
+      }
+      addEx(sl);
+      addEx(sr);
+    }
+
+    const curXL = Number(sbl?.position?.x);
+    if (!Number.isFinite(curXL)) {
+      return;
+    }
+    const xL_star = clampToAllowedWithExclusions(curXL, baseMin, baseMax, exclusions);
+    const xR_star = computeSymmetricXR(W, xL_star);
+
+    const need = Math.abs(curXL - xL_star) > RS_EPS ||
+                 Math.abs((sbr?.position?.x||0) - xR_star) > RS_EPS ||
+                 Math.abs(yL_sbl_cur - yBack) > RS_EPS ||
+                 Math.abs(yR_sbr_cur - yBack) > RS_EPS;
+
+    if (DBG_RS && need) {
+      if (globalThis.__B44_LOGS) console.log('[RS live] back-wall auto-correct:', {
+        curXL: curXL?.toFixed?.(3), xL_star: xL_star?.toFixed?.(3),
+        curXR: (sbr?.position?.x||0)?.toFixed?.(3), xR_star: xR_star?.toFixed?.(3),
+        curYL: yL_sbl_cur?.toFixed?.(3), yBackL: yBackL?.toFixed?.(3),
+        curYR: yR_sbr_cur?.toFixed?.(3), yBackR: yBackR?.toFixed?.(3),
+        need
+      });
+    }
+
+
+    if (!need) {
+      return;
+    }
+
+    onSetSpeakers(prev => prev.map(s => {
+      const r = getCanonicalRole(s.role);
+      if (r === 'SBL') return { ...s, position: { ...(s.position||{}), x: xL_star, y: yBack } };
+      if (r === 'SBR') return { ...s, position: { ...(s.position||{}), x: xR_star, y: yBack } };
+      return s;
+    }));
+    */
+  }, [placedSpeakers, onSetSpeakers, widthM, lengthM, sideSurroundVisualSpanM, rearSurroundVisualLanes, rearModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
+
+  // A) Hard-gate the legacy front-wide ribbon generation
+  const ENABLE_LEGACY_FRONT_WIDE_RIBBON = false;
 
   // ADDED: Step 1 & 3: Confirm missing keys and create a temporary adapter for LCR
   const { augmentedZones, zoneKeysLabel } = useMemo(() => {
@@ -5749,6 +5978,8 @@ return {
     };
   }, [applyLcrFromDetail]);
 
+  const lastRvLogSigRef = React.useRef(null);
+
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useMemo(() => {
     const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
@@ -6144,7 +6375,352 @@ return {
   placedSpeakers,
 ]);
 
-  // renderRoomElements: moved to RoomElementsLayer sub-component
+  // Renders rear subwoofers using SpeakerRect
+  const renderSubwoofers = React.useCallback(() => {
+    if (!hasRoomRect) return null;
+
+    const subsToRender = Array.isArray(rearSubs) ? rearSubs : [];
+    if (!subsToRender.length) return null;
+    return (
+      <g data-layer="rear-subwoofers">
+        {subsToRender.map((sub, i) => {
+          if (!hasPos(sub)) return null;
+          const { widthM, depthM } = getModelDimsM(sub.model);
+          const subId = sub.id || `rear-sub-${i}`;
+          
+          const [cx, cy] = toPx(sub.position.x, sub.position.y);
+          const w = widthM * scale;
+          const d = depthM * scale;
+          
+          const handlePointerDown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch (err) {}
+            handleMouseDown(e, subId, 'sub');
+          };
+          
+          const handlePointerMove = (e) => {
+            if (!dragging || draggedItemId !== subId) return;
+            e.preventDefault();
+            e.stopPropagation();
+            handleMouseMove(e);
+          };
+          
+          const handlePointerUp = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            } catch (err) {}
+            handleMouseUp(e);
+          };
+          
+          return (
+            <g
+              key={subId}
+              style={{ cursor: dragging && draggedItemId === subId ? 'grabbing' : 'grab', pointerEvents: 'all' }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+            >
+              <rect
+                x={cx - w / 2}
+                y={cy - d / 2}
+                width={w}
+                height={d}
+                fill="transparent"
+                pointerEvents="all"
+              />
+              <SpeakerRect
+                speaker={sub}
+                widthM={widthM}
+                depthM={depthM}
+                opacity={0.8}
+                scale={scale}
+                toPx={toPx}
+                pointerEvents="none"
+              />
+            </g>
+          );
+        })}
+      </g>
+    );
+  }, [rearSubs, getModelDimsM, scale, toPx, handleMouseDown, handleMouseMove, handleMouseUp, dragging, draggedItemId]);
+
+  // Renders generic room elements. `roomElements` prop is available.
+  const renderRoomElements = useCallback(() => {
+    if (!hasRoomRect) return null;
+
+    const LABEL_INSET_M = 0.10;   // 10cm inside the room
+
+    const normalizeElement = (el) => {
+      const wallRaw = String(el?.wall || el?.side || 'front').toLowerCase();
+      const wall =
+        wallRaw === 'back' ? 'rear' :
+        wallRaw === 'rear' ? 'rear' :
+        wallRaw === 'front' ? 'front' :
+        wallRaw === 'left' ? 'left' :
+        wallRaw === 'right' ? 'right' : 'front';
+
+      // Support BOTH schemas:
+      // - old: width, height, x_position, z_position
+      // - new: length_m, thickness_m, x_m/y_m, label
+      const lengthM =
+        Number(el?.length_m) ||
+        Number(el?.lengthM) ||
+        Number(el?.width) ||          // old "door" uses width as length along wall
+        0.9;
+
+      const thicknessM =
+        Number(el?.thickness_m) ||
+        Number(el?.thicknessM) ||
+        0.05;
+
+      // Wall offset (distance from wall into room)
+      const offsetM = Math.max(0, Number(el?.wall_offset_m) || 0);
+
+      // Position along the wall (metres):
+      // IMPORTANT: for LEFT/RIGHT walls, position is measured DOWN from the FRONT wall (so use Y fields first).
+      // For FRONT/REAR walls, position is measured RIGHT from the LEFT wall (so use X fields first).
+      const n = (v) => (Number.isFinite(Number(v)) ? Number(v) : null);
+
+      const posFrontRear =
+        n(el?.pos_m) ??
+        n(el?.x_m) ??
+        n(el?.x_position) ??
+        n(el?.y_m) ??           // fallback if old saves used the wrong field
+        n(el?.y_position) ??
+        0;
+
+      const posLeftRight =
+        n(el?.pos_m) ??
+        n(el?.y_m) ??
+        n(el?.y_position) ??
+        n(el?.x_m) ??           // fallback if old saves used the wrong field
+        n(el?.x_position) ??
+        0;
+
+      const posM = (wall === 'left' || wall === 'right') ? posLeftRight : posFrontRear;
+
+      const label = String(el?.label || '').trim();
+
+      return {
+        ...el,
+        wall,
+        __lengthM: lengthM,
+        __thicknessM: thicknessM,
+        __posM: posM,
+        __offsetM: offsetM,
+        __label: label,
+      };
+    };
+
+    if (!Array.isArray(roomElements) || roomElements.length === 0) return null;
+
+    // Build a collision list that matches what is actually RENDERED.
+    // This prevents "phantom" LW/RW (front wides) from triggering warnings when FW are not enabled.
+    const rawSpeakers = Array.isArray(placedSpeakers) ? placedSpeakers : [];
+
+    // 1) Structural filter (same as renderSpeakers)
+    const afterRenderable = rawSpeakers.filter(isRenderableSpeaker);
+
+    // 2) Layout visibility filter (same idea as renderSpeakers)
+    const speakerSystem = appState?.speakerSystem;
+    const sevenBedLayoutType = appState?.sevenBedLayoutType;
+
+    const layoutRaw =
+      speakerSystem?.dolbyLayout ??
+      speakerSystem?.dolbyPreset ??
+      dolbyLayout ??
+      "5.1";
+
+    const layoutKey =
+      (typeof layoutRaw === "string" ? layoutRaw : layoutRaw?.layout || "5.1")
+        .toString()
+        .trim()
+        .split(" ")[0]
+        .split("_")[0];
+
+    const useWidesInsteadOfRears =
+      !!speakerSystem?.useWidesInsteadOfRears ||
+      speakerSystem?.sevenBedLayoutType === "wides" ||
+      sevenBedLayoutType === "wides" ||
+      false;
+
+    const allowedRoles = new Set(
+      rolesForLayout({
+        dolbyLayout: layoutKey,
+        useWidesInsteadOfRears: !!useWidesInsteadOfRears,
+      })
+    );
+
+    const speakersForCollision = afterRenderable.filter((s) => {
+      const canon = getCanonicalRole(s?.role);
+
+      // Always ignore LFE for collision
+      if (canon === "LFE") return false;
+
+      // Extra surrounds (SL2/SR2...) follow SL/SR visibility
+      const extraSurroundPattern = /^(SL|SR)\d+$/;
+      const isExtraSurround = extraSurroundPattern.test(canon);
+      if (isExtraSurround) {
+        return allowedRoles.has("SL") || allowedRoles.has("SR");
+      }
+
+      // Bed surrounds + wides are controlled by the layout roles
+      if (["SL","SR","SBL","SBR","LW","RW"].includes(canon)) {
+        return allowedRoles.has(canon);
+      }
+
+      // Everything else keeps existing behaviour (includes overheads)
+      return getSpeakerVisibility(s.role, s.model);
+    });
+
+    return (
+      <g data-layer="room-elements" pointerEvents="none">
+        {roomElements.map((element, idx) => {
+          const e = normalizeElement(element);
+
+          // Build element rectangle in METRES (then convert via scale/toPx)
+          const L = Math.max(0.01, Number(e.__lengthM) || 0.9);
+          const T = Math.max(0.01, Number(e.__thicknessM) || 0.05);
+          const offset = Math.max(0, Number(e.__offsetM) || 0);
+          
+          // Position along the wall (clamped so the element always stays on that wall)
+          const rawP = Number(e.__posM) || 0;
+
+          const maxP =
+            (e.wall === 'left' || e.wall === 'right')
+              ? Math.max(0, lengthM - L)
+              : Math.max(0, widthM - L);
+
+          const p = Math.max(0, Math.min(rawP, maxP));
+
+          // NOTE: origin is top-left (0,0). Position is measured from the FRONT wall for Y, and LEFT wall for X.
+          // So for LEFT/RIGHT walls, p is distance DOWN from front wall.
+          // For FRONT/REAR walls, p is distance RIGHT from left wall.
+
+          let rectM = { x: 0, y: 0, w: 0, h: 0 };
+
+          if (e.wall === 'front') {
+            rectM = { x: p, y: offset, w: L, h: T };
+          } else if (e.wall === 'rear') {
+            rectM = { x: p, y: lengthM - T - offset, w: L, h: T };
+          } else if (e.wall === 'left') {
+            rectM = { x: offset, y: p, w: T, h: L };
+          } else if (e.wall === 'right') {
+            rectM = { x: widthM - T - offset, y: p, w: T, h: L };
+          }
+
+          // 5cm warning buffer
+          const WARN_M = 0.05;
+          const warnRectM = {
+            x: rectM.x - WARN_M,
+            y: rectM.y - WARN_M,
+            w: rectM.w + 2 * WARN_M,
+            h: rectM.h + 2 * WARN_M,
+          };
+
+          // AABB intersect (metres)
+          const intersects = (a, b) =>
+            a.x < b.x + b.w &&
+            a.x + a.w > b.x &&
+            a.y < b.y + b.h &&
+            a.y + a.h > b.y;
+
+          const getSpeakerAabbM = (sp) => {
+            if (!sp?.position) return null;
+            const x = Number(sp.position.x);
+            const y = Number(sp.position.y);
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+
+            const dims = getModelDimsM?.(sp.model) || {};
+            const w = Math.max(0.01, Number(dims.widthM) || 0.2);
+            const d = Math.max(0.01, Number(dims.depthM) || 0.2);
+
+            return { x: x - w / 2, y: y - d / 2, w, h: d };
+          };
+
+          const isNearSpeaker = speakersForCollision
+            .map(getSpeakerAabbM)
+            .filter(Boolean)
+            .some((aabb) => intersects(warnRectM, aabb));
+
+          // Colours (consistent for ALL element types)
+          const NORMAL_FILL = 'rgba(220,219,214,0.45)';   // based on #DCDBD6
+          const NORMAL_STROKE = 'rgba(27,26,26,0.55)';    // based on #1B1A1A
+
+          // warning dark orange
+          const WARN_FILL = 'rgba(199,106,27,0.28)';
+          const WARN_STROKE = '#C76A1B';
+
+          const fill = isNearSpeaker ? WARN_FILL : NORMAL_FILL;
+          const stroke = isNearSpeaker ? WARN_STROKE : NORMAL_STROKE;
+
+          // Label anchor point (in metres)
+          let labelXM = 0;
+          let labelYM = 0;
+
+          if (e.wall === 'front') {
+            labelXM = rectM.x + 0.02; // tiny nudge
+            labelYM = rectM.y + T + LABEL_INSET_M;
+          } else if (e.wall === 'rear') {
+            labelXM = rectM.x + 0.02;
+            labelYM = rectM.y - LABEL_INSET_M; // inside the room (upwards)
+          } else if (e.wall === 'left') {
+            labelXM = rectM.x + T + LABEL_INSET_M;
+            labelYM = rectM.y + 0.18; // slight down so it doesn't sit on the top edge
+          } else if (e.wall === 'right') {
+            // 10 cm extra inset so the last letter stays inside the room
+            labelXM = rectM.x - LABEL_INSET_M - 0.10;
+            labelYM = rectM.y + 0.18;
+          }
+
+          // Convert to canvas pixels
+          const xPx = meterToCanvasX(rectM.x);
+          const yPx = meterToCanvasY(rectM.y);
+          const wPx = rectM.w * scale;
+          const hPx = rectM.h * scale;
+
+          const labelXpx = meterToCanvasX(labelXM);
+          const labelYpx = meterToCanvasY(labelYM);
+
+          const label = String(e.__label || `Element ${idx + 1}`);
+
+          return (
+            <g key={String(element?.id ?? `el-${idx}`)}>
+              <rect
+                x={xPx}
+                y={yPx}
+                width={Math.max(0, wPx)}
+                height={Math.max(0, hPx)}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={2}
+                vectorEffect="non-scaling-stroke"
+              />
+              <text
+                x={labelXpx}
+                y={labelYpx}
+                fill="#1B1A1A"
+                fillOpacity={0.9}
+                fontSize={11}
+                fontWeight={700}
+                style={{ userSelect: 'none' }}
+                textAnchor="end"
+                dominantBaseline="hanging"
+              >
+                {label}
+              </text>
+            </g>
+          );
+        })}
+      </g>
+    );
+  }, [roomElements, widthM, lengthM, scale, meterToCanvasX, meterToCanvasY, placedSpeakers, getModelDimsM]);
 
   // Renders speaker labels. Not implemented in the original code, so a placeholder.
   const renderSpeakerLabels = useCallback(() => {
@@ -6378,6 +6954,17 @@ return {
   }, [toPx, mlpDotX_m, mlpDotY_m, _overlays?.ROOM_DIMS]);
 
 
+  const containerStyle = {
+    position: 'relative',
+    width: '100%',
+    aspectRatio: aspect,
+    maxHeight: 'none',
+    border: '1px solid #DCDBD6',
+    borderRadius: '88px',
+    backgroundColor: '#F8F8F7',
+    overflow: 'hidden',
+  };
+
   const canvasStyle = {
     margin: '0 auto',
     padding: '24px',
@@ -6387,23 +6974,35 @@ return {
     position: 'relative'
   };
 
+  const containerRect = planBoundsRef.current?.getBoundingClientRect(); // Changed from containerRef
+
   const svgW = containerW;
   const svgH = containerH;
 
+// Helper to render level badge
 const renderLevelBadge = useCallback((level) => {
+  // Match the report pill behaviour and colours exactly
   const str = String(level || '—').toUpperCase();
+
+  // Neutral / missing
   if (!level || str === 'N/A' || str === '—' || str === '-' || str === 'BELOW L1') {
     return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
   }
+
+  // PASS THROUGH L1–L4 / FAIL exactly
   if (str === 'FAIL') return <RP22GradingPill level="FAIL" />;
+
   if (str === 'L1' || str === 'L2' || str === 'L3' || str === 'L4') {
     return <RP22GradingPill level={str} />;
   }
+
+  // If some old numeric sneaks in
   const n = Number(level);
   if (Number.isFinite(n)) {
     if (n >= 1 && n <= 4) return <RP22GradingPill level={`L${n}`} />;
     return <span style={{ fontSize: 10, color: '#999' }}>—</span>;
   }
+
   return <span style={{ fontSize: 10, color: '#999' }}>—</span>;
 }, []);
 
@@ -6689,14 +7288,97 @@ return (
                 onPointerCancel={onPanPointerUp}
               />
             )}
-            {/* Layer 1: Grid Backdrop */}
-            <RoomGrid
-              widthM={widthM}
-              lengthM={lengthM}
-              roomRect={roomRect}
-              meterToCanvasX={meterToCanvasX}
-              meterToCanvasY={meterToCanvasY}
-            />
+            {/* Layer 1: Grid Backdrop (Bottom Layer) - Now centre-anchored */}
+            <g data-layer="grid">
+              {/* Draw vertical grid lines (centre-anchored) */}
+              {(() => {
+                const GRID_STEP_M = 0.5;
+                const centreXM = widthM / 2;
+                const verticalLines = [];
+
+                // Centre line
+                const centreXCanvas = meterToCanvasX(centreXM);
+                verticalLines.push(
+                  <line
+                    key="grid-x-centre"
+                    x1={centreXCanvas}
+                    y1={(roomRect?.y ?? 0)}
+                    x2={centreXCanvas}
+                    y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
+                    stroke="#E6E4DD"
+                    strokeWidth="0.5"
+                  />
+                );
+
+                // Step outwards from centre
+                let offsetIndex = 1;
+                while (true) {
+                  const leftXM = centreXM - offsetIndex * GRID_STEP_M;
+                  const rightXM = centreXM + offsetIndex * GRID_STEP_M;
+                  let anyDrawn = false;
+
+                  if (leftXM >= 0) {
+                    const xCanvas = meterToCanvasX(leftXM);
+                    verticalLines.push(
+                      <line
+                        key={`grid-x-left-${offsetIndex}`}
+                        x1={xCanvas}
+                        y1={(roomRect?.y ?? 0)}
+                        x2={xCanvas}
+                        y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
+                        stroke="#E6E4DD"
+                        strokeWidth="0.5"
+                      />
+                    );
+                    anyDrawn = true;
+                  }
+
+                  if (rightXM <= widthM) {
+                    const xCanvas = meterToCanvasX(rightXM);
+                    verticalLines.push(
+                      <line
+                        key={`grid-x-right-${offsetIndex}`}
+                        x1={xCanvas}
+                        y1={(roomRect?.y ?? 0)}
+                        x2={xCanvas}
+                        y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
+                        stroke="#E6E4DD"
+                        strokeWidth="0.5"
+                      />
+                    );
+                    anyDrawn = true;
+                  }
+
+                  if (!anyDrawn) break;
+                  offsetIndex += 1;
+                }
+
+                return verticalLines;
+              })()}
+
+              {/* Draw horizontal grid lines (front-anchored, unchanged) */}
+              {(() => {
+                const GRID_STEP_M = 0.5;
+                const horizontalLines = [];
+
+                for (let yM = 0; yM <= lengthM + 1e-6; yM += GRID_STEP_M) {
+                  const yCanvas = meterToCanvasY(yM);
+                  horizontalLines.push(
+                    <line
+                      key={`grid-y-${yM}`}
+                      x1={(roomRect?.x ?? 0)}
+                      y1={yCanvas}
+                      x2={(roomRect?.x ?? 0) + (roomRect?.width ?? 0)}
+                      y2={yCanvas}
+                      stroke="#E6E4DD"
+                      strokeWidth="0.5"
+                    />
+                  );
+                }
+
+                return horizontalLines;
+              })()}
+            </g>
 
             {/* Deterministic crop area for exports */}
             {Number.isFinite(scale) && roomRect && (
@@ -6844,12 +7526,70 @@ return (
 
             {/* Room Dimensions Overlay */}
             {exportMode !== 'clean' && overlaysForRendering?.ROOM_DIMS && (
-              <RoomDimensionsOverlay
-                roomRect={roomRect}
-                widthM={widthM}
-                lengthM={lengthM}
-                exportMode={exportMode}
-              />
+              <g data-layer="room-dimensions">
+                {/* Arrow markers */}
+                <defs>
+                  <marker
+                    id="dim-arrow"
+                    viewBox="0 0 10 10"
+                    refX="5"
+                    refY="5"
+                    markerWidth="6"
+                    markerHeight="6"
+                    orient="auto"
+                  >
+                    <path
+                      d="M 0 0 L 10 5 L 0 10 z"
+                      fill="#DCDBD6"
+                    />
+                  </marker>
+                </defs>
+
+                {/* Horizontal (width) line – top of the room (screen wall) */}
+                <line
+                  x1={(roomRect?.x ?? 0)}
+                  y1={(roomRect?.y ?? 0) - 20}
+                  x2={(roomRect?.x ?? 0) + (roomRect?.width ?? 0)}
+                  y2={(roomRect?.y ?? 0) - 20}
+                  stroke="#DCDBD6"
+                  strokeWidth={2}
+                  markerStart="url(#dim-arrow)"
+                  markerEnd="url(#dim-arrow)"
+                />
+                <text
+                  x={(roomRect?.x ?? 0) + (roomRect?.width ?? 0) / 2}
+                  y={(roomRect?.y ?? 0) - 28}
+                  textAnchor="middle"
+                  fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                  fontSize={12}
+                  fill="#1B1A1A"
+                >
+                  {`${(widthM ?? 0).toFixed(2)} m`}
+                </text>
+
+                {/* Vertical (length) line – left side of the room */}
+                <line
+                  x1={(roomRect?.x ?? 0) - 20}
+                  y1={(roomRect?.y ?? 0)}
+                  x2={(roomRect?.x ?? 0) - 20}
+                  y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
+                  stroke="#DCDBD6"
+                  strokeWidth={2}
+                  markerStart="url(#dim-arrow)"
+                  markerEnd="url(#dim-arrow)"
+                />
+                <text
+                  x={(roomRect?.x ?? 0) - 28}
+                  y={(roomRect?.y ?? 0) + (roomRect?.height ?? 0) / 2}
+                  textAnchor="middle"
+                  transform={`rotate(-90 ${(roomRect?.x ?? 0) - 28} ${(roomRect?.y ?? 0) + (roomRect?.height ?? 0) / 2})`}
+                  fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                  fontSize={12}
+                  fill="#1B1A1A"
+                >
+                  {`${(lengthM ?? 0).toFixed(2)} m`}
+                </text>
+              </g>
             )}
 
             {/* Screen and baffle - Layer 3: Visual representation of the screen and baffle */}
@@ -6880,7 +7620,7 @@ return (
             {exportMode !== 'clean' && !!overlaysForRendering?.LCR && ZoneComponents.LCR}
             {exportMode !== 'clean' && !!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
             {exportMode !== 'clean' && !!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {exportMode !== 'clean' && overheadCorridorsOn && overheadZones?.status === 'ok' && (_overlays?.OVERHEADS_2 || _overlays?.OVERHEADS_4 || _overlays?.OVERHEADS_6) && ZoneComponents.OVERHEADS}
+            {exportMode !== 'clean' && overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
             {exportMode !== 'clean' && overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
             
             {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
@@ -6890,19 +7630,186 @@ return (
             {renderRoomElements()}
 
             {/* Layer 7.5: MLP Position Ruler (when enabled) */}
-            {exportMode !== 'clean' && showMlpRuler && (
-              <MlpRuler
-                mlpDotX_m={mlpDotX_m}
-                mlpDotY_m={mlpDotY_m}
-                roomRect={roomRect}
-                widthM={widthM}
-                lengthM={lengthM}
-                screenFrontPlaneM={screenFrontPlaneM}
-                scale={scale}
-                toPx={toPx}
-                exportMode={exportMode}
-              />
-            )}
+            {exportMode !== 'clean' && showMlpRuler && (() => {
+              // Render MLP position ruler using the same visual style as speaker rulers
+              if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) return null;
+
+              const [mlpX_px, mlpY_px] = toPx(mlpDotX_m, mlpDotY_m);
+              
+              // Screen position (for screen → MLP distance)
+              const screenY_px = (roomRect?.y ?? 0) + (screenFrontPlaneM * scale);
+              
+              // Ruler styling (match speaker rulers)
+              const rulerColor = '#625143';
+              const rulerStroke = 1.5;
+              const dotRadius = 3;
+              const fontSize = 11;
+              const labelOffset = 16; // pixels from the line
+
+              // Calculate distances
+              const distLeftWall = mlpDotX_m; // Distance from left wall (x=0)
+              const distRightWall = widthM - mlpDotX_m; // Distance from right wall
+              const distScreen = mlpDotY_m - screenFrontPlaneM; // Distance from screen
+              const distBackWall = lengthM - mlpDotY_m; // Distance from back wall
+              const distFrontWall = mlpDotY_m; // Distance from front wall (y=0)
+
+              // Secondary ruler X position: 20% from left wall toward MLP centerline
+              // Formula: x = leftWallX + 0.20 * (mlpCenterX - leftWallX)
+              const secondaryRulerX_px = (roomRect?.x ?? 0) + 0.20 * (mlpX_px - (roomRect?.x ?? 0));
+
+              return (
+                <g data-layer="mlp-ruler" pointerEvents="none">
+                  {/* Horizontal ruler (left wall ↔ MLP ↔ right wall) */}
+                  <line
+                    x1={(roomRect?.x ?? 0)}
+                    y1={mlpY_px}
+                    x2={(roomRect?.x ?? 0) + (roomRect?.width ?? 0)}
+                    y2={mlpY_px}
+                    stroke={rulerColor}
+                    strokeWidth={rulerStroke}
+                    opacity={0.6}
+                  />
+                  
+                  {/* Left wall dot */}
+                  <circle
+                    cx={(roomRect?.x ?? 0)}
+                    cy={mlpY_px}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Right wall dot */}
+                  <circle
+                    cx={(roomRect?.x ?? 0) + (roomRect?.width ?? 0)}
+                    cy={mlpY_px}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Left wall → MLP distance label */}
+                  <text
+                    x={((roomRect?.x ?? 0) + mlpX_px) / 2}
+                    y={mlpY_px - labelOffset}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                  >
+                    {distLeftWall.toFixed(2)}m
+                  </text>
+                  
+                  {/* MLP → Right wall distance label */}
+                  <text
+                    x={(mlpX_px + (roomRect?.x ?? 0) + (roomRect?.width ?? 0)) / 2}
+                    y={mlpY_px - labelOffset}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                  >
+                    {distRightWall.toFixed(2)}m
+                  </text>
+
+                  {/* Vertical ruler (screen ↔ MLP ↔ back wall) */}
+                  <line
+                    x1={mlpX_px}
+                    y1={screenY_px}
+                    x2={mlpX_px}
+                    y2={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
+                    stroke={rulerColor}
+                    strokeWidth={rulerStroke}
+                    opacity={0.6}
+                  />
+                  
+                  {/* Screen plane dot */}
+                  <circle
+                    cx={mlpX_px}
+                    cy={screenY_px}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Back wall dot */}
+                  <circle
+                    cx={mlpX_px}
+                    cy={(roomRect?.y ?? 0) + (roomRect?.height ?? 0)}
+                    r={dotRadius}
+                    fill={rulerColor}
+                    opacity={0.8}
+                  />
+                  
+                  {/* Screen → MLP distance label (rotated, left side) */}
+                  <text
+                    x={mlpX_px - labelOffset}
+                    y={(screenY_px + mlpY_px) / 2}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                    transform={`rotate(-90 ${mlpX_px - labelOffset} ${(screenY_px + mlpY_px) / 2})`}
+                  >
+                    {distScreen.toFixed(2)}m
+                  </text>
+                  
+                  {/* MLP → Back wall distance label (rotated, right side) */}
+                  <text
+                    x={mlpX_px + labelOffset}
+                    y={(mlpY_px + (roomRect?.y ?? 0) + (roomRect?.height ?? 0)) / 2}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                    transform={`rotate(-90 ${mlpX_px + labelOffset} ${(mlpY_px + (roomRect?.y ?? 0) + (roomRect?.height ?? 0)) / 2})`}
+                  >
+                    {distBackWall.toFixed(2)}m
+                  </text>
+
+                  {/* SECONDARY RULER: MLP → Front Wall depth */}
+                  <defs>
+                    <marker
+                      id="mlp-depth-arrow"
+                      viewBox="0 0 10 10"
+                      refX="5"
+                      refY="5"
+                      markerWidth="4"
+                      markerHeight="4"
+                      orient="auto"
+                    >
+                      <path d="M 0 0 L 10 5 L 0 10 z" fill={rulerColor} />
+                    </marker>
+                  </defs>
+
+                  {/* Vertical line from front wall to MLP horizontal ruler */}
+                  <line
+                    x1={secondaryRulerX_px}
+                    y1={(roomRect?.y ?? 0)}
+                    x2={secondaryRulerX_px}
+                    y2={mlpY_px}
+                    stroke={rulerColor}
+                    strokeWidth={rulerStroke}
+                    opacity={0.6}
+                    markerStart="url(#mlp-depth-arrow)"
+                    markerEnd="url(#mlp-depth-arrow)"
+                  />
+                  
+                  {/* MLP → Front wall distance label (rotated, reading bottom to top) */}
+                  <text
+                    x={secondaryRulerX_px + labelOffset}
+                    y={((roomRect?.y ?? 0) + mlpY_px) / 2}
+                    textAnchor="middle"
+                    fontSize={fontSize}
+                    fill={rulerColor}
+                    fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
+                    transform={`rotate(-90 ${secondaryRulerX_px + labelOffset} ${((roomRect?.y ?? 0) + mlpY_px) / 2})`}
+                  >
+                    {distFrontWall.toFixed(2)}m
+                  </text>
+                </g>
+              );
+            })()}
 
 
             {/* Layer 8: Subwoofers */}
