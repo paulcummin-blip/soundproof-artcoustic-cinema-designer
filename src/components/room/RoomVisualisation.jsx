@@ -2856,7 +2856,7 @@ React.useEffect(() => {
       }
 
       // NEW: For 5.1.4, mirror front/rear around MLP Y
-      if (is514Layout) {
+      if (is514Layout && !freeMoveLcr) {
         const mlpY = mlpDotY_m || (lengthM / 2);
         
         // Determine if dragged speaker is front or rear
