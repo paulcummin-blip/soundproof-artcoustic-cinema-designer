@@ -3576,11 +3576,8 @@ React.useEffect(() => {
     
     return null;
 
-    /* ORIGINAL INLINE LOGIC REMOVED */
-    /* TRUNCATED_PLACEHOLDER
-    
-    // Build base tooltip data
-    const data = {
+    /* ORIGINAL INLINE LOGIC REMOVED
+    const data_x = {
       seatId: effectiveHoveredSeat.id || 'Seat',
       isPrimary: effectiveHoveredSeat.isPrimary || false,
       position: `(${xArrow} ${xNearest.toFixed(2)}m, ${yArrow} ${seatY.toFixed(2)}m)`,
