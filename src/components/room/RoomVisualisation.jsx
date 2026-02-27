@@ -2748,21 +2748,21 @@ React.useEffect(() => {
         // Proceed with basic movement using canvasToRoom conversion
         const rawRoomPos = canvasToRoom(newCanvasPos);
         
-        const pRole = OVERHEAD_PAIR_MAP[canonicalRole];
-        const ctrX = widthM / 2;
-        const lxPos = rawRoomPos.x;
-        const rxPos = ctrX + (ctrX - lxPos);
-        onSetSpeakers(prev => {
-          if (!Array.isArray(prev)) return prev;
-          return prev.map(s => {
-            const sRole = getCanonicalRole(s.role);
-            if (s.id === speakerId) return { ...s, position: { ...(s.position || {}), x: rawRoomPos.x, y: rawRoomPos.y } };
-            if (freeMoveLcr && pRole && sRole === pRole) {
-              return { ...s, position: { ...(s.position || {}), x: (['TFR','TMR','TRR'].includes(sRole) ? rxPos : lxPos), y: rawRoomPos.y } };
-            }
-            return s;
-          });
-        });
+        if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+        onSetSpeakers(prev => prev.map(s => {
+          if (s.id === speakerId) {
+            return { 
+              ...s, 
+              position: { 
+                ...s.position, 
+                x: rawRoomPos.x, 
+                y: rawRoomPos.y 
+              } 
+            };
+          }
+          return s;
+        }));
+        
         lastInteractionEpoch.current = timeNowMs();
         if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: overhead drag without zones complete");
         return;
@@ -2856,7 +2856,7 @@ React.useEffect(() => {
       }
 
       // NEW: For 5.1.4, mirror front/rear around MLP Y
-      if (is514Layout && !freeMoveLcr) {
+      if (is514Layout) {
         const mlpY = mlpDotY_m || (lengthM / 2);
         
         // Determine if dragged speaker is front or rear
@@ -2982,24 +2982,25 @@ React.useEffect(() => {
       if (Number.isFinite(newMidY) && overheadZones.mid) newMidY = Math.min(Math.max(newMidY, overheadZones.mid.yMin), overheadZones.mid.yMax);
       if (Number.isFinite(newRearY) && overheadZones.rear) newRearY = Math.min(Math.max(newRearY, overheadZones.rear.yMin), overheadZones.rear.yMax);
 
-      if (!freeMoveLcr) {
-        onSetSpeakers(prev => {
-          if (!Array.isArray(prev)) return prev;
-          return prev.map(spk => {
-            const role = getCanonicalRole(spk.role);
-            if (!role || !role.startsWith('T')) return spk;
-            const current = { ...(spk.position || {}) };
-            if (isLeftRole(role) && leftColumnX != null) current.x = leftColumnX;
-            if (isRightRole(role) && rightColumnX != null) current.x = rightColumnX;
-            if (isFrontRole(role) && Number.isFinite(newFrontY)) current.y = newFrontY;
-            if (isMidRole(role) && Number.isFinite(newMidY)) current.y = newMidY;
-            if (isRearRole(role) && Number.isFinite(newRearY)) current.y = newRearY;
-            return { ...spk, position: current };
-          });
+      if (globalThis.__B44_LOGS) console.log("[DRAG] APPLY: calling onSetSpeakers", { speakerId, role: spk?.role });
+      onSetSpeakers(prev => {
+        if (!Array.isArray(prev)) return prev;
+        return prev.map(spk => {
+          const role = getCanonicalRole(spk.role);
+          if (!role || !role.startsWith('T')) return spk;
+          const current = { ...(spk.position || {}) };
+          if (isLeftRole(role) && leftColumnX != null) current.x = leftColumnX;
+          if (isRightRole(role) && rightColumnX != null) current.x = rightColumnX;
+          if (isFrontRole(role) && Number.isFinite(newFrontY)) current.y = newFrontY;
+          if (isMidRole(role) && Number.isFinite(newMidY)) current.y = newMidY;
+          if (isRearRole(role) && Number.isFinite(newRearY)) current.y = newRearY;
+          return { ...spk, position: current };
         });
-        lastInteractionEpoch.current = timeNowMs();
-        return;
-      }
+      });
+
+      lastInteractionEpoch.current = timeNowMs();
+      if (globalThis.__B44_LOGS) console.log("[DRAG] STOP: overhead general complete");
+      return;
     }
 
     // Generic fallback for any other speakers
@@ -3576,8 +3577,64 @@ React.useEffect(() => {
     
     return null;
 
-    /* ORIGINAL INLINE LOGIC REMOVED
-    const data_x = {
+    /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
+
+    // Helper for safe number extraction
+    const finite = (v, fallback) => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    // Extract seat coordinates
+    const seatX = finite(effectiveHoveredSeat?.x ?? effectiveHoveredSeat?.position?.x, 0);
+    const seatY = finite(effectiveHoveredSeat?.y ?? effectiveHoveredSeat?.position?.y, 0);
+    const seatZ = finite(effectiveHoveredSeat?.z, 1.2);
+
+    // Room dimensions with fallbacks
+    const roomWidth = finite(widthM, 4.5);
+    const roomLength = finite(lengthM, 6.0);
+    const roomHeight = finite(heightM, 2.4);
+    const halfW = roomWidth / 2;
+
+    // Screen front plane position
+    // const screenFrontPlaneM = finite(actualScreenFrontY, 0); // This was previously used but is now globally available as a prop
+
+    // Distance to screen (from screen plane)
+    const distanceToScreen = Math.abs(seatY - screenFrontPlaneM);
+
+    // Distance to MLP
+    let distanceToMLP = null;
+    if (mlp && Number.isFinite(mlp.x) && Number.isFinite(mlp.y)) {
+      const dx = seatX - mlp.x;
+      const dy = seatY - mlp.y;
+      distanceToMLP = Math.hypot(dx, dy);
+    }
+
+    // RP23 horizontal viewing angle
+    let rp23AngleDeg = null;
+    let rp23Level = null;
+    if (screen?.visibleWidthInches && distanceToScreen > 0.1) {
+      const screenWidthM = (screen.visibleWidthInches * 0.0254) || 0;
+      if (screenWidthM > 0) {
+        rp23AngleDeg = 2 * Math.atan((screenWidthM / 2) / distanceToScreen) * (180 / Math.PI);
+        
+        if (rp23AngleDeg >= 48 && rp23AngleDeg <= 67) rp23Level = 'L4';
+        else if (rp23AngleDeg >= 45 && rp23AngleDeg <= 70) rp23Level = 'L3';
+        else if (rp23AngleDeg >= 40 && rp23AngleDeg <= 75) rp23Level = 'L2';
+        else if (rp23AngleDeg >= 35 && rp23AngleDeg <= 80) rp23Level = 'L1';
+        else rp23Level = 'N/A';
+      }
+    }
+
+    // Compute directional arrows and distance to nearest wall
+    const distLeft = seatX;
+    const distRight = roomWidth - seatX;
+    const xNearest = Math.min(distLeft, distRight);
+    const xArrow = distLeft <= distRight ? '⬅️' : '➡️';
+    const yArrow = '⬆️';
+    
+    // Build base tooltip data
+    const data = {
       seatId: effectiveHoveredSeat.id || 'Seat',
       isPrimary: effectiveHoveredSeat.isPrimary || false,
       position: `(${xArrow} ${xNearest.toFixed(2)}m, ${yArrow} ${seatY.toFixed(2)}m)`,
@@ -4134,7 +4191,7 @@ React.useEffect(() => {
       }
     }
 
-    END_PLACEHOLDER */
+    END ORIGINAL INLINE LOGIC */
   }, [
     effectiveHoveredSeat,
     appState?.hudPinnedSeatId,
@@ -4637,7 +4694,186 @@ useEffect(() => {
     // Bed-layer geometry is fully handled by SpeakerPlacement / resetSurroundPositions.
     return; // Early exit - effect is now a no-op
     
-    /* ORIGINAL SS LOGIC DISABLED */
+    /* ORIGINAL LOGIC DISABLED:
+    if (!onSetSpeakers) return;
+    if (isDraggingRearRef.current > 0) return;
+    if (timeNowMs() - lastInteractionEpoch.current < 500) return;
+
+    const W = widthM || 0;
+    const L = lengthM || 0;
+    if (!(W > 0 && L > 0)) return;
+
+    const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
+    const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
+    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
+    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
+
+    if (!sl || !sr) return;
+
+    const dimsL = getSpeakerDims(sl.model);
+    const dimsR = getSpeakerDims(sr.model);
+    const curY_sl = Number(sl?.position?.y);
+    const curY_sr = Number(sr?.position?.y);
+
+    const yMax_side_for_hysteresis = Math.max(
+      Number(sideSurroundVisualSpanM?.minY) || 0,
+      Math.min(Number(sideSurroundVisualSpanM?.maxY) || 0, L - CORNER_CLEAR_M)
+    );
+
+    let currentRefMode = slsrModeRef.current;
+    let nextModeBasedOnPosition = currentRefMode;
+
+    if (currentRefMode === 'back') {
+      if (curY_sl < (yMax_side_for_hysteresis - BACKWALL_HYSTERESIS_M)) {
+        nextModeBasedOnPosition = 'side';
+        if (DBG_SS) if (globalThis.__B44_LOGS) console.log('[SS live] position implies side mode: back -> side');
+      }
+    } else if (currentRefMode === 'side') {
+      if (curY_sl > (yMax_side_for_hysteresis + BACKWALL_HYSTERESIS_M)) {
+        nextModeBasedOnPosition = 'back';
+        if (DBG_SS) if (globalThis.__B44_LOGS) console.log('[SS live] position implies back mode: side -> back');
+      }
+    }
+    slsrModeRef.current = nextModeBasedOnPosition;
+
+    if (DBG_SS) {
+      try {
+        const yMax_side_live = Number(sideSurroundVisualSpanM?.maxY) || 0;
+        const onBackCheck = isOnBackWall(curY_sl, dimsL, L);
+
+        if (globalThis.__B44_LOGS) console.log('[SS live] snapshot', {
+          currentRefMode: currentRefMode,
+          nextModeBasedOnPosition: nextModeBasedOnPosition,
+          ySL: curY_sl?.toFixed?.(3), ySR: curY_sr?.toFixed?.(3),
+          yMax_side_live: yMax_side_live?.toFixed?.(3),
+          onBackCheck,
+        });
+      } catch (_) {}
+    }
+
+    if (slsrModeRef.current === 'side') {
+      const xL_side = fixedSideX(W, dimsL, 'L');
+      const xR_side = fixedSideX(W, dimsR, 'R');
+
+      const segL = sideSegmentAtX(_overlays?.sideSurroundZone, xL_side, L);
+      const segR = sideSegmentAtX(_overlays?.sideSurroundZone, xR_side, L);
+
+      const yMin_side_calc = Number(sideSurroundVisualSpanM?.minY) || 0;
+      const yMax_visual_calc = Number(sideSurroundVisualSpanM?.maxY) || 0;
+      const yMax_clamp_calc = Math.max(yMin_side_calc, Math.min(yMax_visual_calc, L - CORNER_CLEAR_M));
+
+      const yMin = yMin_side_calc;
+      const yMax = yMax_clamp_calc;
+
+      let yStar = resolveSymmetricY(curY_sl, segL, segR);
+
+      const RS_SIDE_EPS = 0.02;
+      if (yStar >= (yMax - RS_SIDE_EPS)) {
+        yStar = Math.max(yMin, yMax - RS_SIDE_EPS);
+      }
+
+      try {
+        // Check SBL vs SL - only adjust if actual overlap exists
+        if (sbl && isOnSideWall('L', sbl, W)) {
+          const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbl.model)) || 0) / 2;
+          const halfSS = (speakerOnWallYFootprint(getModelDimsM(sl.model)) || 0) / 2;
+          const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
+          const yObstacle = Number(sbl?.position?.y)||0;
+          const yPrevSBL = Number(sbl?.position?.y); // Use SBL's previous Y
+          const yPrevSL = Number(sl?.position?.y); // Use SL's previous Y
+          const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
+          if (overlap) {
+            yStar = nonCrossingClampDirectional(yPrevSL, yStar, yObstacle, minSep);
+            yStar = Math.min(Math.max(yStar, yMin), yMax);
+          }
+        }
+
+        // Check SBR vs SR - only adjust if actual overlap exists
+        if (sbr && isOnSideWall('R', sbr, W)) {
+          const halfRS = (speakerOnWallYFootprint(getModelDimsM(sbr.model)) || 0) / 2;
+          const halfSS = (speakerOnWallYFootprint(getModelDimsM(sr.model)) || 0) / 2;
+          const minSep = halfRS + halfSS + SS_RS_BUFFER_M;
+          const yObstacle = Number(sbr?.position?.y)||0;
+          const yPrevSBR = Number(sbr?.position?.y); // Use SBR's previous Y
+          const yPrevSR = Number(sr?.position?.y); // Use SR's previous Y
+          const overlap = (Math.abs(yStar - yObstacle) < (minSep - 0.005));
+          if (overlap) {
+            yStar = nonCrossingClampDirectional(yPrevSR, yStar, yObstacle, minSep);
+            yStar = Math.min(Math.max(yStar, yMin), yMax);
+          }
+        }
+
+        if (DBG_SS) {
+          if (globalThis.__B44_LOGS) console.log('[SS live] yStar with clearance', { yStar: yStar?.toFixed?.(3) });
+        }
+
+      } catch (_e) {
+        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn("Error applying SL/SR vs SBL/SBR clearance during auto-adjust:", _e);
+      }
+
+      const xL_cur = Number(sl?.position?.x);
+      const xR_cur = Number(sr?.position?.x);
+      const needsUpdate = Math.abs(yStar - curY_sl) > RS_EPS ||
+                          Math.abs(xL_cur - xL_side) > RS_EPS ||
+                          Math.abs(xR_cur - xR_side) > RS_EPS;
+
+      if (!needsUpdate) return;
+
+      onSetSpeakers(prev => prev.map(s => {
+        const role = getCanonicalRole(s.role);
+        if (role === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_side, y: yStar } };
+        if (role === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_side, y: yStar } };
+        return s;
+      }));
+
+      return;
+    }
+
+    // back-wall enforcement
+    const roomWidth = widthM || 0;
+    const lanes = rearSurroundVisualLanes ?? {};
+    const leftLane = lanes.left ?? { minX: 0, maxX: roomWidth };
+    const leftLaneMin = leftLane.minX;
+    const leftLaneMax = leftLane.maxX;
+
+    const curXL = Number(sl?.position?.x);
+    if (!Number.isFinite(curXL)) {
+      return;
+    }
+    const xL_star = clamp(curXL, leftLaneMin, leftLaneMax);
+    const xR_star = roomWidth - xL_star;
+
+    const yL = backWallYForDims(getSpeakerDims(sl.model), L, WALL_BUFFER_M);
+    const yR = backWallYForDims(getSpeakerDims(sr.model), L, WALL_BUFFER_M);
+
+    const xL_cur = Number(sl?.position?.x);
+    const yL_cur = Number(sl?.position?.y);
+    const xR_cur = Number(sr?.position?.x);
+    const yR_cur = Number(sr?.position?.y);
+
+    const needsUpdate = Math.abs(xL_cur - xL_star) > RS_EPS ||
+                          Math.abs(yL_cur - yL) > RS_EPS ||
+                          Math.abs(xR_cur - xR_star) > RS_EPS ||
+                          Math.abs(yR_cur - yR) > RS_EPS;
+
+    if (DBG_SS) {
+      if (globalThis.__B44_LOGS) console.log('[SS live] back-wall enforcement', {
+        curXL: curXL?.toFixed?.(3), xL_star: xL_star?.toFixed?.(3),
+        curYL: yL_cur?.toFixed?.(3), yL: yL?.toFixed?.(3),
+        curXR: xR_cur?.toFixed?.(3), yR: yR?.toFixed?.(3),
+        needsUpdate
+      });
+    }
+
+    if (!needsUpdate) return;
+
+    onSetSpeakers(prev => prev.map(s => {
+      const r = getCanonicalRole(s.role);
+      if (r === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_star, y: yL } };
+      if (r === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_star, y: yR } };
+      return s;
+    }));
+    */
   }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
 
   // [B44] Auto-adjust SBL/SBR only if positionSource !== 'user'
@@ -4653,8 +4889,19 @@ useEffect(() => {
     // Otherwise continue with existing auto-adjustment logic
     return; // Early exit - effect is now a no-op
     
-    /* ORIGINAL SBL/SBR LOGIC DISABLED */
-    /* const _sbl = null;
+    /* ORIGINAL LOGIC DISABLED:
+    if (isDraggingRearRef.current > 0) {
+      return;
+    }
+
+    if (timeNowMs() - (lastInteractionEpoch?.current || 0) < 500) return;
+    if (!onSetSpeakers) return;
+
+    rsLastLiveResetEpoch.current = timeNowMs();
+
+    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
+    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
+    if (!sbl || !sbr) return;
 
     const W = widthM || 0;
     const L = lengthM || 0;
