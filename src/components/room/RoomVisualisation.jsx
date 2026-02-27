@@ -5776,21 +5776,10 @@ return {
   REAR_SURROUND: <RearSurroundZoneComponent />,
 
   OVERHEADS: (() => {
-    // Derive overhead config from dolbyLayout without using overheadCount variable
-    const parts = String(dolbyLayout || '5.1').split('.');
-    const ohCount = parts.length >= 3 ? parseInt(parts[2]) || 0 : 0;
-    const config = ohCount === 2 ? ".2" : ohCount === 4 ? ".4" : ohCount === 6 ? ".6" : "off";
-    
-    return renderOverheadBandsSVG({
-      zones: overheadZones,
-      config,
-      toPx,
-      scale,
-      roomRect,
-      placedSpeakers,
-      getCanonicalRole,
-      widthM,
-    });
+    const ohRoles = new Set((placedSpeakers || []).map(s => getCanonicalRole(s?.role)).filter(r => r && String(r).startsWith("T")));
+    const ohCount = ohRoles.size;
+    const config = ohCount >= 6 ? ".6" : ohCount >= 4 ? ".4" : ohCount >= 2 ? ".2" : "off";
+    return renderOverheadBandsSVG({ zones: overheadZones, config, toPx, scale, roomRect, placedSpeakers, getCanonicalRole, widthM });
   })(),
 
   FRONT_WIDE: renderFrontWideZones(),
