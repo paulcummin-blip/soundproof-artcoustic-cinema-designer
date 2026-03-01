@@ -2,82 +2,217 @@ import React, { useEffect, useState } from 'react';
 import { useAppState } from '../components/AppStateProvider';
 import { useRP22AnalysisEngine } from '../components/hooks/useRP22AnalysisEngine';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { BarChart4, Home, User, FileText } from 'lucide-react';
+import { BarChart4 } from 'lucide-react';
 import { rp22Parameters } from '../components/data/rp22Parameters';
-import { RP22_CATALOG } from "@/components/data/rp22Catalog";
 import ParameterCard from '../components/report/ParameterCard';
 import SeatComplianceSummary from '../components/report/SeatComplianceSummary';
 import RP22GradingPill from '../components/ui/RP22GradingPill';
-import { computeMLPAndPrimary } from '../components/utils/computeMLPAndPrimary';
 import { computeAllSeatSplMetrics } from '../components/utils/spl/centralSplEngine';
 import { getSpeakerModelMeta } from '../components/models/speakers/registry';
 import { buildSeatHudSnapshot } from '../components/utils/buildSeatHudSnapshot';
 import { formatSeatLabel } from '../components/utils/seatLabel';
-import { Button } from '@/components/ui/button';
-import RoomVisualisation from '@/components/room/RoomVisualisation';
-import { generateSVG, generateDXF, downloadTextFile } from '../components/utils/cadExport';
-import { Download } from 'lucide-react';
-import html2canvas from 'html2canvas';
 import { computeScreenMetrics } from '../components/utils/screenMetrics';
 import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
 
-function RP22ReportInner() {
-const BUFFER_RATIO = 0.06;
-const unionRects = (rectA, rectB) => {
-    if (!rectA || !Number.isFinite(rectA.x)) return rectB;
-    if (!rectB || !Number.isFinite(rectB.x)) return rectA;
-    const x = Math.min(rectA.x, rectB.x);
-    const y = Math.min(rectA.y, rectB.y);
-    const w = Math.max(rectA.x + rectA.width, rectB.x + rectB.width) - x;
-    const h = Math.max(rectA.y + rectA.height, rectB.y + rectB.height) - y;
-    return { x, y, width: w, height: h };
-};
+// Extracted child components
+import ReportPrintStyles from '../components/report/ReportPrintStyles';
+import ReportHeader from '../components/report/ReportHeader';
+import ReportCountsDashboard from '../components/report/ReportCountsDashboard';
+import ReportSeatParametersCard from '../components/report/ReportSeatParametersCard';
+import ReportHiddenCaptures from '../components/report/ReportHiddenCaptures';
 
-// Helper to draw debug overlay onto canvas (burns into PNG)
-const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo, enabled) => {
+// --- Plan capture helpers (kept here since they close over state setters) ---
+const MIN_EXPORT_BBOX_PX = 200;
+
+function hasRvExportBounds(svgEl) {
+    try { return !!(svgEl && svgEl.querySelector && svgEl.querySelector('#export-bounds')); } catch { return false; }
+}
+
+function stripExportViewportTransforms(svgClone) {
+    try {
+        const anchor = svgClone.querySelector('#export-crop-bounds') || svgClone.querySelector('#export-bounds');
+        if (!anchor) return;
+        let node = anchor.parentNode;
+        while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
+            if (node.nodeName.toLowerCase() === 'g') {
+                node.removeAttribute('transform');
+                node.removeAttribute('clip-path');
+                node.removeAttribute('clipPath');
+                if (node.style) { node.style.transform = 'none'; node.style.transformOrigin = '0 0'; }
+            }
+            node = node.parentNode;
+        }
+    } catch { }
+}
+
+function measureBboxFromClone(svgClone, selector) {
+    let host = null;
+    try {
+        const el = svgClone.querySelector(selector);
+        if (!el) return null;
+        host = document.createElement('div');
+        host.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;overflow:hidden;pointer-events:none;opacity:0;';
+        document.body.appendChild(host);
+        host.appendChild(svgClone);
+        const b = el.getBBox();
+        if (!b || !(b.width > 0) || !(b.height > 0)) return null;
+        return { x: b.x, y: b.y, width: b.width, height: b.height };
+    } catch { return null; }
+    finally {
+        try { if (host && host.parentNode) host.parentNode.removeChild(host); } catch { }
+    }
+}
+
+function drawDebugOverlay(ctx, canvasW, canvasH, debugInfo, enabled) {
     if (!enabled) return;
-    
     const lines = [
         `PLAN: ${debugInfo.planLabel || '?'}`,
         `SRC: ${debugInfo.baseRectSource || '?'}`,
         `crop: x${Math.round(debugInfo.cropRect?.x || 0)} y${Math.round(debugInfo.cropRect?.y || 0)} w${Math.round(debugInfo.cropRect?.width || 0)} h${Math.round(debugInfo.cropRect?.height || 0)}`,
         `bbox: x${Math.round(debugInfo.contentBbox?.x || 0)} y${Math.round(debugInfo.contentBbox?.y || 0)} w${Math.round(debugInfo.contentBbox?.width || 0)} h${Math.round(debugInfo.contentBbox?.height || 0)}`,
-        `base: x${Math.round(debugInfo.baseRect?.x || 0)} y${Math.round(debugInfo.baseRect?.y || 0)} w${Math.round(debugInfo.baseRect?.width || 0)} h${Math.round(debugInfo.baseRect?.height || 0)}`,
         `vb  : X${Math.round(debugInfo.viewBoxX || 0)} Y${Math.round(debugInfo.viewBoxY || 0)} W${Math.round(debugInfo.viewBoxW || 0)} H${Math.round(debugInfo.viewBoxH || 0)}`,
         `ratio: ${(debugInfo.ratio || 0).toFixed(3)}`,
         `png : ${debugInfo.canvasW || 0} x ${debugInfo.canvasH || 0}`,
-        `buf : ${debugInfo.BUFFER_PX || 0}`,
     ];
-    
-    const fontSize = 12;
-    const lineHeight = 16;
-    const padding = 10;
-    const margin = 20;
-    
+    const fontSize = 12; const lineHeight = 16; const padding = 10; const margin = 20;
     ctx.font = `${fontSize}px monospace`;
-    
     const textW = Math.max(...lines.map(l => ctx.measureText(l).width));
     const boxW = textW + padding * 2;
     const boxH = lines.length * lineHeight + padding * 2;
-    
     const boxX = margin;
     const boxY = canvasH - boxH - margin;
-    
     ctx.fillStyle = 'rgba(0,0,0,0.65)';
     ctx.fillRect(boxX, boxY, boxW, boxH);
-    
     ctx.fillStyle = '#FFFFFF';
     ctx.textBaseline = 'top';
-    lines.forEach((line, i) => {
-        ctx.fillText(line, boxX + padding, boxY + padding + i * lineHeight);
-    });
-};
+    lines.forEach((line, i) => ctx.fillText(line, boxX + padding, boxY + padding + i * lineHeight));
+}
 
+// Generic SVG-to-PNG capture effect factory
+function usePlanCapture({ isPrinting, imageDataUrl, setImageDataUrl, selector, planLabel, debugPlanCapture, exportTimeoutRef, exportGuardRef, setExportStatus, setIsPrinting, setExportDebug }) {
+    useEffect(() => {
+        if (!isPrinting || imageDataUrl !== null) return;
+        setExportStatus(`Capturing ${planLabel}: waiting for SVG…`);
+        let attempts = 0;
+        const maxAttempts = 20;
+        let retryTimer = null;
+
+        const attemptCapture = async () => {
+            attempts++;
+            try {
+                const planElement = document.querySelector(selector);
+                if (!planElement) {
+                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
+                    setImageDataUrl('__SKIP__'); return;
+                }
+                const svgElement = planElement.querySelector('svg');
+                if (!svgElement) {
+                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
+                    setImageDataUrl('__SKIP__'); return;
+                }
+
+                let liveAnchor = null;
+                try { liveAnchor = svgElement.querySelector('#export-crop-bounds') || svgElement.querySelector('#export-bounds'); } catch { }
+                if (!liveAnchor) {
+                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
+                    setImageDataUrl('__SKIP__'); return;
+                }
+
+                try {
+                    const b = liveAnchor.getBBox?.();
+                    if (b && Number.isFinite(b.width) && Number.isFinite(b.height) && (b.width < MIN_EXPORT_BBOX_PX || b.height < MIN_EXPORT_BBOX_PX)) {
+                        if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
+                        setImageDataUrl('__SKIP__'); return;
+                    }
+                } catch { }
+
+                if (!hasRvExportBounds(svgElement)) {
+                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
+                    setImageDataUrl('__SKIP__'); return;
+                }
+
+                const svgClone = svgElement.cloneNode(true);
+                svgClone.style.opacity = '1';
+                stripExportViewportTransforms(svgClone);
+
+                const cropRectEl = svgClone.querySelector('#export-crop-bounds');
+                const cropRect = cropRectEl ? {
+                    x: Number(cropRectEl.getAttribute('x')),
+                    y: Number(cropRectEl.getAttribute('y')),
+                    width: Number(cropRectEl.getAttribute('width')),
+                    height: Number(cropRectEl.getAttribute('height')),
+                } : null;
+
+                const bbox = measureBboxFromClone(svgClone, '#export-content-bounds');
+                const baseRect = (bbox && bbox.width > 0 && bbox.height > 0) ? bbox : cropRect;
+
+                if (!baseRect || !Number.isFinite(baseRect.width) || baseRect.width <= 0) {
+                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); return; }
+                    setImageDataUrl('__SKIP__'); return;
+                }
+
+                const BUFFER_PX = 80;
+                const viewBoxX = baseRect.x - BUFFER_PX;
+                const viewBoxY = baseRect.y - BUFFER_PX;
+                const viewBoxW = baseRect.width + (2 * BUFFER_PX);
+                const viewBoxH = baseRect.height + (2 * BUFFER_PX);
+
+                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
+                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+                svgClone.removeAttribute('width');
+                svgClone.removeAttribute('height');
+
+                const svgString = new XMLSerializer().serializeToString(svgClone);
+                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const targetW = 3000;
+                    const ratio = viewBoxH / viewBoxW;
+                    canvas.width = targetW;
+                    canvas.height = Math.round(targetW * ratio);
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    drawDebugOverlay(ctx, canvas.width, canvas.height, {
+                        planLabel, baseRectSource: (bbox && bbox.width > 0) ? 'bbox' : 'cropRect',
+                        cropRect, contentBbox: bbox, baseRect, viewBoxX, viewBoxY, viewBoxW, viewBoxH,
+                        ratio, canvasW: canvas.width, canvasH: canvas.height, BUFFER_PX,
+                    }, debugPlanCapture);
+                    setImageDataUrl(canvas.toDataURL('image/png'));
+                    setExportStatus(`${planLabel} captured`);
+                    URL.revokeObjectURL(url);
+                };
+                img.onerror = () => {
+                    if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); }
+                    else { setImageDataUrl('__SKIP__'); }
+                    URL.revokeObjectURL(url);
+                };
+                img.src = url;
+            } catch (err) {
+                if (attempts < maxAttempts) { retryTimer = setTimeout(attemptCapture, 100); }
+                else {
+                    exportGuardRef.current.active = false;
+                    setIsPrinting(false);
+                    setTimeout(() => window.print(), 250);
+                }
+            }
+        };
+
+        attemptCapture();
+        return () => { if (retryTimer) clearTimeout(retryTimer); };
+    }, [isPrinting, imageDataUrl]);
+}
+
+// --- Main component ---
+function RP22ReportInner() {
     const app = useAppState();
-    
+
     const [isPrinting, setIsPrinting] = useState(false);
     const [planImageDataUrl, setPlanImageDataUrl] = useState(null);
     const [planDimsImageDataUrl, setPlanDimsImageDataUrl] = useState(null);
@@ -85,7 +220,6 @@ const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo, enabled) => {
     const [hasPrintedOnce, setHasPrintedOnce] = useState(false);
     const [exportStatus, setExportStatus] = useState("Idle");
     const [exportDebug, setExportDebug] = useState({ isPrinting: false, planLen: 0, printReady: false });
-    const planEnabled = true;
     const [screenMetricsForPrint, setScreenMetricsForPrint] = useState(null);
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
@@ -95,9 +229,9 @@ const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo, enabled) => {
     const cleanupTimeoutRef = React.useRef(null);
     const exportGuardRef = React.useRef({ active: false, startedAt: 0 });
     const exportTimeoutRef = React.useRef(null);
-    
-    const EXPORT_TIMEOUT_MS = 60000; // allow enough time for 3 SVG→PNG captures on slower machines
+    const EXPORT_TIMEOUT_MS = 60000;
 
+    // Cleanup on afterprint
     useEffect(() => {
         const cleanup = () => {
             setExportStatus("Done");
@@ -107,33 +241,59 @@ const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo, enabled) => {
             setPlanDimsImageDataUrl(null);
             setPlanSpeakerDimsImageDataUrl(null);
             printLockRef.current = false;
-            if (cleanupTimeoutRef.current) {
-                clearTimeout(cleanupTimeoutRef.current);
-                cleanupTimeoutRef.current = null;
-            }
-            if (exportTimeoutRef.current) {
-                clearTimeout(exportTimeoutRef.current);
-                exportTimeoutRef.current = null;
-            }
+            if (cleanupTimeoutRef.current) { clearTimeout(cleanupTimeoutRef.current); cleanupTimeoutRef.current = null; }
+            if (exportTimeoutRef.current) { clearTimeout(exportTimeoutRef.current); exportTimeoutRef.current = null; }
             exportGuardRef.current.active = false;
         };
-        
-        const onAfterPrint = () => {
-            cleanup();
-        };
-        
-        window.addEventListener('afterprint', onAfterPrint);
+        window.addEventListener('afterprint', cleanup);
         return () => {
-            window.removeEventListener('afterprint', onAfterPrint);
-            if (cleanupTimeoutRef.current) {
-                clearTimeout(cleanupTimeoutRef.current);
-            }
-            if (exportTimeoutRef.current) {
-                clearTimeout(exportTimeoutRef.current);
-            }
+            window.removeEventListener('afterprint', cleanup);
+            if (cleanupTimeoutRef.current) clearTimeout(cleanupTimeoutRef.current);
+            if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
         };
     }, []);
-    
+
+    // Plan capture hooks
+    usePlanCapture({ isPrinting, imageDataUrl: planImageDataUrl, setImageDataUrl: setPlanImageDataUrl, selector: '[data-plan-capture]', planLabel: 'CLEAN', debugPlanCapture, exportTimeoutRef, exportGuardRef, setExportStatus, setIsPrinting, setExportDebug });
+    usePlanCapture({ isPrinting, imageDataUrl: planDimsImageDataUrl, setImageDataUrl: setPlanDimsImageDataUrl, selector: '[data-plan-capture-dims]', planLabel: 'DIMS', debugPlanCapture, exportTimeoutRef, exportGuardRef, setExportStatus, setIsPrinting, setExportDebug });
+    usePlanCapture({ isPrinting, imageDataUrl: planSpeakerDimsImageDataUrl, setImageDataUrl: setPlanSpeakerDimsImageDataUrl, selector: '[data-plan-capture-speaker-dims]', planLabel: 'SPEAKER', debugPlanCapture, exportTimeoutRef, exportGuardRef, setExportStatus, setIsPrinting, setExportDebug });
+
+    // Mark printReady when all captures are done
+    useEffect(() => {
+        if (!isPrinting) return;
+        if (planImageDataUrl !== null && planDimsImageDataUrl !== null && planSpeakerDimsImageDataUrl !== null) {
+            setExportDebug(d => ({ ...d, printReady: true }));
+            setPrintReady(true);
+            setExportStatus("Capture complete — preparing print…");
+            if (exportTimeoutRef.current) { clearTimeout(exportTimeoutRef.current); exportTimeoutRef.current = null; }
+        }
+    }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl]);
+
+    // Trigger print when ready
+    useEffect(() => {
+        if (!isPrinting) { setHasPrintedOnce(false); printLockRef.current = false; setPrintReady(false); return; }
+        if (!printReady || hasPrintedOnce || printLockRef.current) return;
+        const t = setTimeout(() => {
+            setExportStatus("Opening PDF preview…");
+            setHasPrintedOnce(true);
+            printLockRef.current = true;
+            if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
+            exportTimeoutRef.current = null;
+            exportGuardRef.current.active = false;
+            window.print();
+            cleanupTimeoutRef.current = setTimeout(() => {
+                if (isPrinting) {
+                    setIsPrinting(false); setPlanImageDataUrl(null);
+                    setPlanDimsImageDataUrl(null); setPlanSpeakerDimsImageDataUrl(null);
+                    printLockRef.current = false;
+                }
+            }, 2000);
+        }, 250);
+        return () => clearTimeout(t);
+    }, [isPrinting, printReady, hasPrintedOnce]);
+
+    useEffect(() => { setExportDebug(d => ({ ...d, isPrinting, printReady })); }, [isPrinting, printReady]);
+
     if (!app) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
@@ -145,74 +305,26 @@ const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo, enabled) => {
         );
     }
 
-    // --- SAFE READERS (do not assume Map / do not crash) ---
     const safeArray = (v) => (Array.isArray(v) ? v : []);
     const safeObj = (v) => (v && typeof v === "object" && !Array.isArray(v) ? v : null);
 
-    // No-op callbacks for RoomVisualisation capture render
-    const noop = () => {};
-    const rvNoops = {
-        onSetSpeakers: noop,
-        onSetSeatingPositions: noop,
-        onSetScreen: noop,
-        onSetFrontSubsCfg: noop,
-        onSetRearSubsCfg: noop,
-        onSetElements: noop,
-        onSetOverheadState: noop,
-        onSetAimState: noop,
-        onSetRoomDims: noop,
-        onSetMlpPoint: noop,
-    };
-
-    // Room Designer source-of-truth keys (these must match AppStateProvider)
     const seats = safeArray(app?.seatingPositions);
     const placedSpeakers = safeArray(app?.speakerSystem?.placedSpeakers);
-
-    // Compute RSP seat (closest to green dot within 5cm)
-    const rspSeatId = React.useMemo(() => {
-        const greenDot = app?.mlp;
-        if (!greenDot || !Number.isFinite(greenDot.x) || !Number.isFinite(greenDot.y)) return null;
-        
-        let closestSeat = null;
-        let minDist = Infinity;
-        
-        seats.forEach(s => {
-            if (!Number.isFinite(s?.x) || !Number.isFinite(s?.y)) return;
-            const d = Math.hypot(s.x - greenDot.x, s.y - greenDot.y);
-            if (d < minDist) {
-                minDist = d;
-                closestSeat = s.id;
-            }
-        });
-        
-        return (minDist <= 0.05) ? closestSeat : null;
-    }, [seats, app?.mlp]);
-
     const roomDims = app?.roomDims || {};
     const screen = app?.screen || {};
     const dolbyLayout = app?.dolbyLayout || "5.1";
     const mlpBasis = app?.mlpBasis || "front";
+    const frontSubsCfg = safeObj(app?.frontSubsCfg);
+    const rearSubsCfg = safeObj(app?.rearSubsCfg);
+    const hasSeats = seats.length > 0;
+    const hasSpeakers = placedSpeakers.length > 0;
 
-    // Match RoomVisualisation: layout + sevenBedMode must be passed into buildSeatHudSnapshot
-    const reportDolbyLayout =
-      app?.dolbyLayout ??
-      app?.dolbyConfig ??
-      app?.speakerSystem?.dolbyLayout ??
-      app?.speakerSystem?.dolbyPreset ??
-      "5.1";
+    const reportDolbyLayout = app?.dolbyLayout ?? app?.dolbyConfig ?? app?.speakerSystem?.dolbyLayout ?? app?.speakerSystem?.dolbyPreset ?? "5.1";
+    const reportSevenBedMode = String(app?.sevenBedLayoutType || app?.speakerSystem?.sevenBedLayoutType || (app?.speakerSystem?.useWidesInsteadOfRears ? "wides" : "") || "rears").toLowerCase();
 
-    const reportSevenBedMode = String(
-      app?.sevenBedLayoutType
-      || app?.speakerSystem?.sevenBedLayoutType
-      || (app?.speakerSystem?.useWidesInsteadOfRears ? "wides" : "")
-      || "rears"
-    ).toLowerCase();
-
-    // --- Screen label helpers (print) ---
     const cleanAspectLabel = (v) => {
         const s = String(v ?? "").trim();
         if (!s) return "";
-        // normalise common forms
         if (s === "16x9" || s === "16/9") return "16:9";
         if (s === "235" || s === "2.35" || s === "2.35/1" || s === "2.35:1") return "2.35:1";
         if (s === "239" || s === "2.39" || s === "2.39/1" || s === "2.39:1") return "2.39:1";
@@ -224,1498 +336,276 @@ const drawDebugOverlay = (ctx, canvasW, canvasH, debugInfo, enabled) => {
         const ratio = cleanAspectLabel(scr?.aspectRatio);
         const inchesTxt = Number.isFinite(inches) && inches > 0 ? `${Math.round(inches)}"` : "";
         const ratioTxt = ratio ? ratio : "";
-        const joined = [inchesTxt, ratioTxt].filter(Boolean).join(" ");
-        return joined || "Not specified";
+        return [inchesTxt, ratioTxt].filter(Boolean).join(" ") || "Not specified";
     };
 
-    // Optional subs (won't break if missing)
-    const frontSubsCfg = safeObj(app?.frontSubsCfg);
-    const rearSubsCfg = safeObj(app?.rearSubsCfg);
-
-    // Validation flags
-    const hasSeats = seats.length > 0;
-    const hasSpeakers = placedSpeakers.length > 0;
-
-    // Compute stable dimensions for analysis
     const stableDimensions = React.useMemo(() => ({
         width: Number(roomDims?.widthM) || 4.5,
         length: Number(roomDims?.lengthM) || 6.0,
         height: Number(roomDims?.heightM) || 2.4
     }), [roomDims?.widthM, roomDims?.lengthM, roomDims?.heightM]);
 
-    // Get MLP from AppState context (same as Room Designer uses)
     const primarySeatingPosition = app?.mlp || null;
 
-    // Resolver: compute screen metrics using same logic as Room Designer Live Metrics
+    const rspSeatId = React.useMemo(() => {
+        const greenDot = app?.mlp;
+        if (!greenDot || !Number.isFinite(greenDot.x) || !Number.isFinite(greenDot.y)) return null;
+        let closestSeat = null; let minDist = Infinity;
+        seats.forEach(s => {
+            if (!Number.isFinite(s?.x) || !Number.isFinite(s?.y)) return;
+            const d = Math.hypot(s.x - greenDot.x, s.y - greenDot.y);
+            if (d < minDist) { minDist = d; closestSeat = s.id; }
+        });
+        return (minDist <= 0.05) ? closestSeat : null;
+    }, [seats, app?.mlp]);
+
     const resolveScreenMetricsSnapshot = React.useCallback(() => {
         try {
-            // Inputs (same as ViewingAnglePanel)
             const mlpY_m = app?.mlp?.y ?? stableDimensions.length * 0.58;
             const screenFrontPlaneM = app?.screenFrontPlaneM ?? app?.screen?.frontPlaneYm ?? null;
             const visibleWidthInches = Number(app?.screen?.visibleWidthInches);
             const aspectRatio = app?.screen?.aspectRatio ?? "16:9";
-
-            // Check if we have the minimum required data
             if (!Number.isFinite(screenFrontPlaneM) || !Number.isFinite(visibleWidthInches) || visibleWidthInches <= 0) {
-                return {
-                    ok: true, // allow export to continue
-                    viewWm: null,
-                    viewHm: null,
-                    overallWm: null,
-                    overallHm: null,
-                    horizontalDeg: null,
-                    verticalDeg: null,
-                    wallDistM: null,
-                    wallCm: null,
-                    wallIn: null,
-                    screenChoiceLabel: formatScreenChoiceLabel(app?.screen),
-                };
+                return { ok: true, viewWm: null, viewHm: null, overallWm: null, overallHm: null, horizontalDeg: null, verticalDeg: null, wallDistM: null, wallCm: null, wallIn: null, screenChoiceLabel: formatScreenChoiceLabel(app?.screen) };
             }
-
-            // Use computeScreenMetrics to get dimensions in meters
             const { viewWm, viewHm, overallWm, overallHm } = computeScreenMetrics(visibleWidthInches, aspectRatio);
-
-            // Calculate horizontal viewing angle (same as ViewingAnglePanel)
-            const horizDeg = calculateViewingAngle(
-                { y: mlpY_m },
-                visibleWidthInches,
-                aspectRatio,
-                { y: screenFrontPlaneM }
-            );
-
-            // Calculate vertical viewing angle
+            const horizDeg = calculateViewingAngle({ y: mlpY_m }, visibleWidthInches, aspectRatio, { y: screenFrontPlaneM });
             const viewerDistance = Math.abs(mlpY_m - screenFrontPlaneM);
-            const verticalDeg = viewerDistance > 0
-                ? (2 * Math.atan(viewHm / (2 * viewerDistance)) * (180 / Math.PI))
-                : 0;
-
-            // Wall distance (screenFrontPlaneM is already the distance from front wall)
-            const wallDistM = screenFrontPlaneM;
-            const wallCm = (screenFrontPlaneM * 100).toFixed(0);
-            const wallIn = (screenFrontPlaneM * 39.3701).toFixed(1);
-
+            const verticalDeg = viewerDistance > 0 ? (2 * Math.atan(viewHm / (2 * viewerDistance)) * (180 / Math.PI)) : 0;
             return {
-                ok: true,
-                viewWm,
-                viewHm,
-                overallWm,
-                overallHm,
-                horizontalDeg: horizDeg ?? 0,
-                verticalDeg,
-                wallDistM,
-                wallCm,
-                wallIn,
+                ok: true, viewWm, viewHm, overallWm, overallHm,
+                horizontalDeg: horizDeg ?? 0, verticalDeg,
+                wallDistM: screenFrontPlaneM,
+                wallCm: (screenFrontPlaneM * 100).toFixed(0),
+                wallIn: (screenFrontPlaneM * 39.3701).toFixed(1),
                 screenChoiceLabel: formatScreenChoiceLabel(app?.screen)
             };
-        } catch (e) {
-            return {
-                ok: true, // allow export to continue even on error
-                viewWm: null,
-                viewHm: null,
-                overallWm: null,
-                overallHm: null,
-                horizontalDeg: null,
-                verticalDeg: null,
-                wallDistM: null,
-                wallCm: null,
-                wallIn: null,
-                screenChoiceLabel: formatScreenChoiceLabel(app?.screen),
-            };
+        } catch {
+            return { ok: true, viewWm: null, viewHm: null, overallWm: null, overallHm: null, horizontalDeg: null, verticalDeg: null, wallDistM: null, wallCm: null, wallIn: null, screenChoiceLabel: formatScreenChoiceLabel(app?.screen) };
         }
-    }, [app?.mlp?.y, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.visibleWidthIn, app?.screen?.aspectRatio, stableDimensions.length]);
+    }, [app?.mlp?.y, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.screen?.visibleWidthInches, app?.screen?.aspectRatio, stableDimensions.length]);
 
-    // Compute SPL metrics for all seats (needed by analysis engine)
     const allSeatSplMetrics = React.useMemo(() => {
         if (!hasSeats || !hasSpeakers) return [];
-
         const getCanonicalRole = (role) => {
-            const map = { 
-                SL: 'SL', LS: 'SL', SR: 'SR', RS: 'SR', 
-                SBL: 'SBL', SBR: 'SBR', LW: 'LW', RW: 'RW',
-                FL: 'FL', L: 'FL', FC: 'FC', C: 'FC', FR: 'FR', R: 'FR',
-                TFL: 'TFL', TFR: 'TFR', TML: 'TML', TMR: 'TMR', TRL: 'TRL', TRR: 'TRR'
-            };
-            const r = String(role || '').toUpperCase();
-            return map[r] || r;
+            const map = { SL: 'SL', LS: 'SL', SR: 'SR', RS: 'SR', SBL: 'SBL', SBR: 'SBR', LW: 'LW', RW: 'RW', FL: 'FL', L: 'FL', FC: 'FC', C: 'FC', FR: 'FR', R: 'FR', TFL: 'TFL', TFR: 'TFR', TML: 'TML', TMR: 'TMR', TRL: 'TRL', TRR: 'TRR' };
+            return map[String(role || '').toUpperCase()] || String(role || '').toUpperCase();
         };
-
-        const splConfig = app?.splConfig || {};
-        const mlpPoint = primarySeatingPosition;
-
         return computeAllSeatSplMetrics({
-            seats: seats,
-            placedSpeakers: placedSpeakers,
-            getCanonicalRole,
+            seats, placedSpeakers, getCanonicalRole,
             getEffectiveSplInputs: app?.getEffectiveSplInputs || (() => ({ powerW: 100, eqHeadroomDb: 0 })),
             getModelDimsM: (model) => {
                 const meta = getSpeakerModelMeta(model);
-                if (meta && !meta.notFound) {
-                    return {
-                        ...meta,
-                        sensitivity_db_1w_1m: meta.sensitivity_dB_1w1m || 87,
-                        power_handling_w: meta.max_power || Infinity,
-                        max_spl_cont_db_1m: meta.max_spl || null
-                    };
-                }
+                if (meta && !meta.notFound) return { ...meta, sensitivity_db_1w_1m: meta.sensitivity_dB_1w1m || 87, power_handling_w: meta.max_power || Infinity, max_spl_cont_db_1m: meta.max_spl || null };
                 return { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 };
             },
-            screenLoss_dB: Number(splConfig.screenLossDb) || 0,
-            eqHeadroom_dB: Number(splConfig.globalEqHeadroomDb) || 0,
-            mlpPoint
+            screenLoss_dB: Number(app?.splConfig?.screenLossDb) || 0,
+            eqHeadroom_dB: Number(app?.splConfig?.globalEqHeadroomDb) || 0,
+            mlpPoint: primarySeatingPosition
         });
     }, [seats, placedSpeakers, primarySeatingPosition, app?.splConfig, app?.getEffectiveSplInputs, hasSeats, hasSpeakers]);
 
-    // Call analysis engine with proper inputs (same as Room Designer)
     const analysisResult = useRP22AnalysisEngine({
-        placedSpeakers,
-        seatingPositions: seats,
-        primarySeatingPosition,
-        dimensions: stableDimensions,
-        mlpBasis,
+        placedSpeakers, seatingPositions: seats, primarySeatingPosition,
+        dimensions: stableDimensions, mlpBasis,
         sevenBedLayoutType: app?.sevenBedLayoutType,
         extraSurroundCount: app?.extraSurroundCount,
         seatSplMetrics: allSeatSplMetrics,
-        overheadState: {
-            globalModel: app?.overheadGlobalModel,
-            frontOverride: app?.overheadFrontOverride,
-            midOverride: app?.overheadMidOverride,
-            rearOverride: app?.overheadRearOverride,
-            useFrontGlobal: app?.useFrontGlobal ?? true,
-            useMidGlobal: app?.useMidGlobal ?? true,
-            useRearGlobal: app?.useRearGlobal ?? true,
-            aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,
-            aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP,
-            aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP,
-        },
-        aimState: {
-            aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP,
-            aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP,
-            aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP,
-        },
+        overheadState: { globalModel: app?.overheadGlobalModel, frontOverride: app?.overheadFrontOverride, midOverride: app?.overheadMidOverride, rearOverride: app?.overheadRearOverride, useFrontGlobal: app?.useFrontGlobal ?? true, useMidGlobal: app?.useMidGlobal ?? true, useRearGlobal: app?.useRearGlobal ?? true, aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
+        aimState: { aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP, aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP, aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP },
         p15ConstructionLevel: app?.p15ConstructionLevel
     });
 
-    // Build local HUD snapshots for all seats (same logic as Room Designer)
     const reportSeatHudById = React.useMemo(() => {
         const out = {};
         const list = safeArray(seats);
-
-        // Compute LCR angle info for buildSeatHudSnapshot
-        // IMPORTANT: Must match RoomVisualisation yaw convention (safeYawToMLP), otherwise P16 won't match HUD
         const aimAtMLP = app?.aimAtMLP ?? false;
         const lcrAngleInfo = { L: 0, R: 0, averageAngle: 0, maxAbs: 0 };
-        
         if (aimAtMLP && primarySeatingPosition) {
             const mlpTarget = { x: primarySeatingPosition.x, y: primarySeatingPosition.y };
-
-            const flSpeaker = placedSpeakers?.find(s => {
-                const canon = String(s?.role || '').toUpperCase();
-                return (canon === 'FL' || canon === 'L') && s?.position;
-            });
-
-            const frSpeaker = placedSpeakers?.find(s => {
-                const canon = String(s?.role || '').toUpperCase();
-                return (canon === 'FR' || canon === 'R') && s?.position;
-            });
-
-            // Use the SAME yaw convention as the live HUD
-            if (flSpeaker?.position && Number.isFinite(mlpTarget.x) && Number.isFinite(mlpTarget.y)) {
-                lcrAngleInfo.L = safeYawToMLP(flSpeaker.position, mlpTarget);
-            }
-
-            if (frSpeaker?.position && Number.isFinite(mlpTarget.x) && Number.isFinite(mlpTarget.y)) {
-                lcrAngleInfo.R = safeYawToMLP(frSpeaker.position, mlpTarget);
-            }
-
+            const flSpeaker = placedSpeakers?.find(s => { const c = String(s?.role || '').toUpperCase(); return (c === 'FL' || c === 'L') && s?.position; });
+            const frSpeaker = placedSpeakers?.find(s => { const c = String(s?.role || '').toUpperCase(); return (c === 'FR' || c === 'R') && s?.position; });
+            if (flSpeaker?.position && Number.isFinite(mlpTarget.x)) lcrAngleInfo.L = safeYawToMLP(flSpeaker.position, mlpTarget);
+            if (frSpeaker?.position && Number.isFinite(mlpTarget.x)) lcrAngleInfo.R = safeYawToMLP(frSpeaker.position, mlpTarget);
             const avg = (Math.abs(lcrAngleInfo.L) + Math.abs(lcrAngleInfo.R)) / 2;
             lcrAngleInfo.averageAngle = Number.isFinite(avg) ? avg : 0;
             lcrAngleInfo.maxAbs = Math.max(Math.abs(lcrAngleInfo.L), Math.abs(lcrAngleInfo.R));
         }
-
         for (let i = 0; i < list.length; i++) {
             const seat = list[i];
-            const seatId = seat?.id;
-            if (!seatId) continue;
-
+            if (!seat?.id) continue;
             try {
                 const snapshot = buildSeatHudSnapshot({
-                    seat: seat,
-                    placedSpeakers: placedSpeakers,
-                    widthM: stableDimensions.width,
-                    lengthM: stableDimensions.length,
-                    heightM: stableDimensions.height,
+                    seat, placedSpeakers, widthM: stableDimensions.width, lengthM: stableDimensions.length, heightM: stableDimensions.height,
                     screenFrontPlaneM: app?.screenFrontPlaneM ?? (app?.screen?.frontPlaneYm || 0),
-                    screen: screen,
-                    mlp: primarySeatingPosition || { 
-                        x: stableDimensions.width / 2, 
-                        y: stableDimensions.length * 0.58, 
-                        z: 1.2 
-                    },
-                    allSeatSplMetrics: allSeatSplMetrics,
-                    aimAtMLP: aimAtMLP,
+                    screen, mlp: primarySeatingPosition || { x: stableDimensions.width / 2, y: stableDimensions.length * 0.58, z: 1.2 },
+                    allSeatSplMetrics, aimAtMLP,
                     aimFrontWidesAtMLP: app?.aimFrontWidesAtMLP ?? false,
                     aimSideSurroundsAtMLP: app?.aimSideSurroundsAtMLP ?? false,
                     aimRearSurroundsAtMLP: app?.aimRearSurroundsAtMLP ?? false,
-                    lcrAngleInfo: lcrAngleInfo,
-                    analysisResult: analysisResult || {},
-                    seatingPositions: seats,
-                    splConfig: app?.splConfig || {},
-                    sevenBedMode: reportSevenBedMode,
-                    dolbyLayout: reportDolbyLayout,
+                    lcrAngleInfo, analysisResult: analysisResult || {},
+                    seatingPositions: seats, splConfig: app?.splConfig || {},
+                    sevenBedMode: reportSevenBedMode, dolbyLayout: reportDolbyLayout,
                 });
-
-                if (snapshot) out[seatId] = snapshot;
-            } catch (e) {
-                // Keep seat missing rather than crashing the whole report
-                if (typeof console !== 'undefined' && console.warn) {
-                    console.warn(`[RP22Report] Failed to build HUD for seat ${seatId}:`, e);
-                }
-            }
+                if (snapshot) out[seat.id] = snapshot;
+            } catch (e) { console.warn(`[RP22Report] HUD failed for seat ${seat.id}:`, e); }
         }
-
         return out;
-    }, [
-        seats,
-        placedSpeakers,
-        stableDimensions.width,
-        stableDimensions.length,
-        stableDimensions.height,
-        screen,
-        primarySeatingPosition,
-        allSeatSplMetrics,
-        app?.aimAtMLP,
-        app?.aimFrontWidesAtMLP,
-        app?.aimSideSurroundsAtMLP,
-        app?.aimRearSurroundsAtMLP,
-        app?.screenFrontPlaneM,
-        app?.screen?.frontPlaneYm,
-        app?.splConfig,
-        analysisResult,
-        reportSevenBedMode,
-        reportDolbyLayout,
-    ]);
+    }, [seats, placedSpeakers, stableDimensions.width, stableDimensions.length, stableDimensions.height, screen, primarySeatingPosition, allSeatSplMetrics, app?.aimAtMLP, app?.aimFrontWidesAtMLP, app?.aimSideSurroundsAtMLP, app?.aimRearSurroundsAtMLP, app?.screenFrontPlaneM, app?.screen?.frontPlaneYm, app?.splConfig, analysisResult, reportSevenBedMode, reportDolbyLayout]);
 
-
-
-    // Build ordered parameters list (1-21)
-    // Exclude per-seat parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20) from overall grid
     const orderedParams = React.useMemo(() => {
         const perSeatParams = new Set([1, 4, 5, 6, 9, 10, 16, 17, 20]);
-        return [...rp22Parameters]
-            .filter(p => !perSeatParams.has(p.number))
-            .sort((a, b) => a.id - b.id);
+        return [...rp22Parameters].filter(p => !perSeatParams.has(p.number)).sort((a, b) => a.id - b.id);
     }, []);
 
-    // Compute P2: Discrete speaker count (excluding subwoofers)
     const p2SystemConfig = React.useMemo(() => {
-        // Parse current system configuration string
-        const systemConfigStr = (() => {
-            const dolbyPreset = app?.dolbyLayout || "5.1";
-            const base = String(dolbyPreset).split(" ")[0];
-            const parts = base.split(".");
-            const bed = parts[0] || "5";
-            const heights = parts[2] || "";
-            
-            const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
-            const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
-            const totalSubs = frontCount + rearCount;
-            
-            return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-        })();
-        
-        // Parse bed.overhead configuration
-        const parts = systemConfigStr.split('.');
+        const dolbyPreset = app?.dolbyLayout || "5.1";
+        const base = String(dolbyPreset).split(" ")[0];
+        const parts = base.split(".");
         const bedCount = parseInt(parts[0]) || 5;
         const overheadCount = parseInt(parts[2]) || 0;
-        
         const discreteCount = bedCount + overheadCount;
-        
-        // Apply P2 level mapping (never L3)
         let p2Level = 'L1';
-        if (discreteCount >= 15) {
-            p2Level = 'L4';
-        } else if (discreteCount >= 11) {
-            p2Level = 'L2';
-        } else {
-            p2Level = 'L1';
-        }
-        
-        return {
-            discreteSpeakerCount: discreteCount,
-            p2Level,
-        };
+        if (discreteCount >= 15) p2Level = 'L4';
+        else if (discreteCount >= 11) p2Level = 'L2';
+        return { discreteSpeakerCount: discreteCount, p2Level };
     }, [app?.dolbyLayout, app?.frontSubsCfg?.count, app?.rearSubsCfg?.count]);
 
+    const getRoomResult = React.useCallback((paramId) => analysisResult?.gradedParameters?.primary?.[paramId] ?? null, [analysisResult]);
 
-
-    // Helper: get room-level result for a parameter
-    const getRoomResult = React.useCallback((paramId) => {
-        return analysisResult?.gradedParameters?.primary?.[paramId] ?? null;
-    }, [analysisResult]);
-
-    // Single helper that returns the final displayed pill level for each room parameter
     const getDisplayedRoomLevel = React.useCallback((paramId) => {
-        // Normalise level into "L1".."L4" string (or null if not countable)
         const normaliseLvl = (rawLevel) => {
             if (rawLevel == null) return null;
-            
-            // Numeric 1..4
-            if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) {
-                if (rawLevel >= 1 && rawLevel <= 4) return `L${rawLevel}`;
-                return null;
-            }
-            
-            // Strings like "L4"
-            if (typeof rawLevel === "string") {
-                const m = rawLevel.trim().match(/^L([1-4])$/i);
-                if (m) return `L${m[1]}`;
-            }
-            
+            if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) { if (rawLevel >= 1 && rawLevel <= 4) return `L${rawLevel}`; return null; }
+            if (typeof rawLevel === "string") { const m = rawLevel.trim().match(/^L([1-4])$/i); if (m) return `L${m[1]}`; }
             return null;
         };
-
-        // First try to pull from getRoomResult (same as cards)
         const res = getRoomResult(paramId);
         if (res) {
-            // Check for explicit no-data / fail states
-            if (res.status && typeof res.status === "string") {
-                const s = res.status.toLowerCase();
-                if (s === "no_data" || s === "fail") return null;
-            }
-            
+            if (res.status && typeof res.status === "string") { const s = res.status.toLowerCase(); if (s === "no_data" || s === "fail") return null; }
             const lvl = normaliseLvl(res.level);
             if (lvl) return lvl;
         }
-
-        // Apply report-page fallback rules for specific params
-        if (paramId === 2 && p2SystemConfig) {
-            // P2 uses systemConfig.p2Level
-            return normaliseLvl(p2SystemConfig.p2Level);
-        }
-        
-        if (paramId === 3) {
-            // P3 is always L4 (no screen wall speakers outside zones)
-            return "L4";
-        }
-        
-        if (paramId === 8) {
-            // P8 is always L4 (no upfiring)
-            return "L4";
-        }
-        
-        if (paramId === 11) {
-            // P11 is always L4 (app enforces zone compliance)
-            return "L4";
-        }
-        
-        if (paramId === 15) {
-            // P15 uses construction level dropdown
-            const P15_MAP = {
-                standard: "L1",
-                "purpose-built": "L2",
-                reference: "L3",
-                studio: "L4",
-            };
-            return P15_MAP[app?.p15ConstructionLevel || 'standard'] || null;
-        }
-        
-        if (paramId === 21) {
-            // P21 uses early reflection preset dropdown from app state
-            const P21_MAP = {
-                l1: "L1",
-                l2: "L2",
-                l3: "L3",
-                l4: "L4",
-            };
-            return P21_MAP[app?.p21EarlyReflectionPreset || 'l2'] || null;
-        }
-
+        if (paramId === 2 && p2SystemConfig) return normaliseLvl(p2SystemConfig.p2Level);
+        if (paramId === 3) return "L4";
+        if (paramId === 8) return "L4";
+        if (paramId === 11) return "L4";
+        if (paramId === 15) return ({ standard: "L1", "purpose-built": "L2", reference: "L3", studio: "L4" })[app?.p15ConstructionLevel || 'standard'] || null;
+        if (paramId === 21) return ({ l1: "L1", l2: "L2", l3: "L3", l4: "L4" })[app?.p21EarlyReflectionPreset || 'l2'] || null;
         return null;
     }, [analysisResult, getRoomResult, p2SystemConfig, app?.p15ConstructionLevel, app?.p21EarlyReflectionPreset]);
 
-    // Helper: get seat results for a parameter
     const getSeatResults = React.useCallback((paramId) => {
         if (!analysisResult?.perSeatRp22) return [];
-        
         const results = [];
         for (const [seatId, seatData] of Object.entries(analysisResult.perSeatRp22)) {
             const metric = seatData.rp22?.[paramId];
-            if (metric) {
-                results.push({
-                    seatId,
-                    isPrimary: seatData.isPrimary,
-                    metric
-                });
-            }
+            if (metric) results.push({ seatId, isPrimary: seatData.isPrimary, metric });
         }
         return results;
     }, [analysisResult]);
 
-    // Count ONLY the 12 room parameters with valid L1–L4 pills,
-    // using the shared getDisplayedRoomLevel helper.
     const roomLevelCounts = React.useMemo(() => {
         const counts = { L4: 0, L3: 0, L2: 0, L1: 0 };
-        const roomParamIds = [2, 3, 7, 8, 11, 12, 13, 14, 15, 18, 19, 21];
-
-        for (const id of roomParamIds) {
+        for (const id of [2, 3, 7, 8, 11, 12, 13, 14, 15, 18, 19, 21]) {
             const lvl = getDisplayedRoomLevel(id);
-            if (lvl && lvl.match(/^L[1-4]$/)) {
-                counts[lvl] += 1;
-            }
+            if (lvl && lvl.match(/^L[1-4]$/)) counts[lvl] += 1;
         }
-
         return counts;
     }, [getDisplayedRoomLevel]);
 
-    // Mark printReady when all plan captures have finished (image or __SKIP__)
-    useEffect(() => {
-        if (!isPrinting) return;
-
-        const hasPlan = planImageDataUrl !== null;
-        const hasDims = planDimsImageDataUrl !== null;
-        const hasSpeakerDims = planSpeakerDimsImageDataUrl !== null;
-
-        if (hasPlan && hasDims && hasSpeakerDims) {
-            // Only flip once
-            setExportDebug(d => ({ ...d, printReady: true }));
-            setPrintReady(true);
-            setExportStatus("Capture complete — preparing print…");
-
-            // Once we're ready, do not allow the stall timeout to fire
-            if (exportTimeoutRef.current) {
-                clearTimeout(exportTimeoutRef.current);
-                exportTimeoutRef.current = null;
-            }
-        }
-    }, [isPrinting, planImageDataUrl, planDimsImageDataUrl, planSpeakerDimsImageDataUrl]);
-
-    // Trigger print when ready (with print-once guard + re-entry protection)
-    useEffect(() => {
-        if (!isPrinting) {
-            setHasPrintedOnce(false);
-            printLockRef.current = false;
-            setPrintReady(false);
-            return;
-        }
-        if (!printReady) return;
-        if (hasPrintedOnce) return;
-        if (printLockRef.current) return; // Re-entry guard
-
-        const t = setTimeout(() => {
-            setExportStatus("Opening PDF preview…");
-            setHasPrintedOnce(true);
-            printLockRef.current = true; // Lock before calling print
-            
-            // Clear export guard on success
-            if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
-            exportTimeoutRef.current = null;
-            exportGuardRef.current.active = false;
-            
-            window.print();
-            
-            // Safety timeout: cleanup after 2s if afterprint doesn't fire
-            cleanupTimeoutRef.current = setTimeout(() => {
-                if (isPrinting) {
-                    setExportStatus("Done (timeout)");
-                    setExportDebug(d => ({ ...d, isPrinting: false, printReady: false }));
-                    setIsPrinting(false);
-                    setPlanImageDataUrl(null);
-                    setPlanDimsImageDataUrl(null);
-                    setPlanSpeakerDimsImageDataUrl(null);
-                    printLockRef.current = false;
-                }
-            }, 2000);
-        }, 250);
-
-        return () => clearTimeout(t);
-    }, [isPrinting, printReady, hasPrintedOnce]);
-
-    // Mirror printReady state to debug
-    useEffect(() => {
-        setExportDebug(d => ({ ...d, isPrinting, printReady }));
-    }, [isPrinting, printReady]);
-
-    // Helper to strip zoom/pan transforms from cloned SVG for export
-    // --- Export readiness + sanity thresholds (prevents tiny/placeholder captures) ---
-const MIN_EXPORT_BBOX_PX = 200; // anything smaller is almost certainly "not ready" or hidden
-
-function hasRvExportBounds(svgEl) {
-  try {
-    return !!(svgEl && svgEl.querySelector && svgEl.querySelector('#export-bounds'));
-  } catch (e) {
-    return false;
-  }
-}
-
-function bboxLooksUsable(b) {
-  return !!(b && Number.isFinite(b.width) && Number.isFinite(b.height) && b.width >= MIN_EXPORT_BBOX_PX && b.height >= MIN_EXPORT_BBOX_PX);
-}
-
-function stripExportViewportTransforms(svgClone) {
-        try {
-            const anchor =
-                svgClone.querySelector('#export-crop-bounds') ||
-                svgClone.querySelector('#export-bounds');
-
-            if (!anchor) return;
-
-            // Walk up from export group to the root SVG, removing any viewport transforms
-            let node = anchor.parentNode;
-            while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
-                if (node.nodeName.toLowerCase() === 'g') {
-                    // Kill SVG transform + clipping that affects getBBox/viewBox math
-                    node.removeAttribute('transform');
-                    node.removeAttribute('clip-path');
-                    node.removeAttribute('clipPath');
-
-                    // Kill CSS transforms if any
-                    if (node.style) {
-                        node.style.transform = 'none';
-                        node.style.transformOrigin = '0 0';
-                    }
-                }
-                node = node.parentNode;
-            }
-        } catch (e) {
-            // ignore, capture still proceeds
-        }
-    }
-
-    // Helper to measure bbox from a clone (temporary mount for reliable getBBox)
-    function measureBboxFromClone(svgClone, selector) {
-        // getBBox() is unreliable on detached SVG in some browsers, so temporarily mount it off-screen.
-        let host = null;
-        try {
-            const el = svgClone.querySelector(selector);
-            if (!el) return null;
-
-            host = document.createElement('div');
-            host.setAttribute('data-export-measure-host', '1');
-            host.style.position = 'fixed';
-            host.style.left = '-10000px';
-            host.style.top = '-10000px';
-            host.style.width = '1px';
-            host.style.height = '1px';
-            host.style.overflow = 'hidden';
-            host.style.pointerEvents = 'none';
-            host.style.opacity = '0';
-
-            document.body.appendChild(host);
-            host.appendChild(svgClone);
-
-            const b = el.getBBox();
-            if (!b || !(b.width > 0) || !(b.height > 0)) return null;
-
-            return { x: b.x, y: b.y, width: b.width, height: b.height };
-        } catch (e) {
-            return null;
-        } finally {
-            try {
-                if (host && host.parentNode) host.parentNode.removeChild(host);
-            } catch (e2) {}
-        }
-    }
-
-function flattenExportTransforms(svgClone) {
-  try {
-    const anchor =
-      svgClone.querySelector('#export-bounds') ||
-      svgClone.querySelector('#export-crop-bounds');
-
-    if (!anchor) return;
-
-    // Walk up to <svg>, removing transforms + clip paths that can shrink/offset the drawing
-    let node = anchor;
-    while (node && node.nodeName && node.nodeName.toLowerCase() !== 'svg') {
-      if (node.nodeName.toLowerCase() === 'g') {
-        node.removeAttribute('transform');
-        node.removeAttribute('clipPath');
-        node.removeAttribute('clip-path');
-        if (node.style) {
-          node.style.transform = 'none';
-          node.style.clipPath = 'none';
-        }
-      }
-      node = node.parentNode;
-    }
-
-    // Also ensure the root SVG isn't clipping unexpectedly
-    const rootSvg = svgClone.querySelector('svg') || svgClone;
-    if (rootSvg && rootSvg.style) {
-      rootSvg.style.overflow = 'visible';
-    }
-  } catch (e) {}
-}
-
-    // Capture plan when printing starts (with retry logic)
-    useEffect(() => {
-        if (!isPrinting || planImageDataUrl !== null) return;
-        
-        setExportStatus("Capturing plan: waiting for SVG…");
-        
-        let attempts = 0;
-        const maxAttempts = 20;
-        let retryTimer = null;
-        
-        const attemptCapture = async () => {
-            attempts++;
-            
-            try {
-                const planElement = document.querySelector('[data-plan-capture]');
-                if (!planElement) {
-                    setExportStatus(`Capturing plan: plan container not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Plan skipped: continuing without plan");
-                    setPlanImageDataUrl('__SKIP__');
-                    return;
-                }
-                
-                const svgElement = planElement.querySelector('svg');
-                if (!svgElement) {
-                    setExportStatus(`Capturing plan: SVG not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Plan skipped: continuing without plan");
-                    setPlanImageDataUrl('__SKIP__');
-                    return;
-                }
-
-                // --- Wait until RoomVisualisation has actually rendered export-bounds (not the placeholder) ---
-                let liveAnchor = null;
-                try {
-                  liveAnchor =
-                    svgElement.querySelector('#export-crop-bounds') ||
-                    svgElement.querySelector('#export-bounds');
-                } catch (e) {
-                  liveAnchor = null;
-                }
-
-                if (!liveAnchor) {
-                  setExportStatus(`Capturing plan: waiting for export-bounds… (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Plan skipped: export-bounds never appeared");
-                  setPlanImageDataUrl('__SKIP__');
-                  return;
-                }
-
-                // Optional but important: reject “microscopic but >0” layouts
-                try {
-                  const b = liveAnchor.getBBox?.();
-                  if (b && Number.isFinite(b.width) && Number.isFinite(b.height) && (b.width < 200 || b.height < 200)) {
-                    setExportStatus(`Capturing plan: export-bounds too small (${Math.round(b.width)}×${Math.round(b.height)}) (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                      retryTimer = setTimeout(attemptCapture, 100);
-                      return;
-                    }
-                    setExportStatus("Plan skipped: export-bounds stayed too small");
-                    setPlanImageDataUrl('__SKIP__');
-                    return;
-                  }
-                } catch (e) {
-                  // if getBBox fails, just continue to retry logic below by treating as not ready
-                }
-                
-                // IMPORTANT: RoomVisualisation always renders an <svg>, even when it's still "Loading plan…".
-                // Only proceed once the real export group exists.
-                if (!hasRvExportBounds(svgElement)) {
-                  setExportStatus(`Capturing plan: waiting for plan render (#export-bounds) (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Plan skipped: continuing without plan");
-                  setPlanImageDataUrl('__SKIP__');
-                  return;
-                }
-                
-                // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
-                const svgClone = svgElement.cloneNode(true);
-                svgClone.style.opacity = '1';
-                stripExportViewportTransforms(svgClone);
-
-                const cropRectEl = svgClone.querySelector('#export-crop-bounds');
-                const cropRect = cropRectEl ? {
-                    x: Number(cropRectEl.getAttribute('x')),
-                    y: Number(cropRectEl.getAttribute('y')),
-                    width: Number(cropRectEl.getAttribute('width')),
-                    height: Number(cropRectEl.getAttribute('height')),
-                } : null;
-
-                const bbox = measureBboxFromClone(svgClone, '#export-content-bounds');
-
-                // Prefer ink bounds (bbox) if valid; fallback to cropRect only if bbox fails
-                const baseRect = (bbox && bbox.width > 0 && bbox.height > 0) ? bbox : cropRect;
-
-                if (!baseRect || !Number.isFinite(baseRect.width) || baseRect.width <= 0) {
-                    setExportStatus(`Capturing plan: invalid content bounds (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Plan skipped: invalid content bounds");
-                    setPlanImageDataUrl('__SKIP__');
-                    return;
-                }
-
-                const xAttr = baseRect.x;
-                const yAttr = baseRect.y;
-                const wAttr = baseRect.width;
-                const hAttr = baseRect.height;
-
-                // STEP 2: Use fixed buffer (NOT ratio-based)
-                // This guarantees consistent visual margin regardless of room size
-
-                const BUFFER_PX = 80; // adjust slightly if needed (60–100 range)
-
-                const viewBoxX = xAttr - BUFFER_PX;
-                const viewBoxY = yAttr - BUFFER_PX;
-                const viewBoxW = wAttr + (2 * BUFFER_PX);
-                const viewBoxH = hAttr + (2 * BUFFER_PX);
-                
-                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
-                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.removeAttribute('width');
-                svgClone.removeAttribute('height');
-                
-                const svgString = new XMLSerializer().serializeToString(svgClone);
-                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-                
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    
-                    // Keep exact aspect ratio from the cropped viewBox
-                    const targetW = 3000;
-                    const ratio = viewBoxH / viewBoxW;
-                    
-                    canvas.width = targetW;
-                    canvas.height = Math.round(targetW * ratio);
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    
-                    // Draw debug overlay before converting to PNG
-                    drawDebugOverlay(ctx, canvas.width, canvas.height, {
-                        planLabel: 'CLEAN',
-                        baseRectSource: (bbox && bbox.width > 0 && bbox.height > 0) ? 'bbox' : 'cropRect',
-                        cropRect: cropRect,
-                        contentBbox: bbox,
-                        baseRect: baseRect,
-                        viewBoxX,
-                        viewBoxY,
-                        viewBoxW,
-                        viewBoxH,
-                        ratio,
-                        canvasW: canvas.width,
-                        canvasH: canvas.height,
-                        BUFFER_PX,
-                    }, debugPlanCapture);
-                    
-                    const dataUrl = canvas.toDataURL('image/png');
-                    setExportStatus("Plan captured: image ready");
-                    setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
-                    setPlanImageDataUrl(dataUrl);
-                    URL.revokeObjectURL(url);
-                };
-                img.onerror = () => {
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                    } else {
-                        setExportStatus("Plan skipped: continuing without plan");
-                        setPlanImageDataUrl('__SKIP__');
-                    }
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
-            } catch (err) {
-                console.warn('Failed to capture plan image (attempt ' + attempts + '):', err);
-                if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                } else {
-                    setExportStatus("Plan capture failed — opening Print fallback…");
-                    if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
-                    exportTimeoutRef.current = null;
-                    exportGuardRef.current.active = false;
-                    setIsPrinting(false);
-                    setTimeout(() => window.print(), 250);
-                }
-            }
-        };
-        
-        attemptCapture();
-        
-        return () => {
-            if (retryTimer) clearTimeout(retryTimer);
-        };
-    }, [isPrinting, planImageDataUrl]);
-
-    // Capture dimensioned plan when printing starts (with retry logic)
-    useEffect(() => {
-        if (!isPrinting || planDimsImageDataUrl !== null) return;
-        
-        setExportStatus("Capturing dimensioned plan: waiting for SVG…");
-        
-        let attempts = 0;
-        const maxAttempts = 20;
-        let retryTimer = null;
-        
-        const attemptCapture = async () => {
-            attempts++;
-            
-            try {
-                const planElement = document.querySelector('[data-plan-capture-dims]');
-                if (!planElement) {
-                    setExportStatus(`Capturing dims plan: container not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                    setPlanDimsImageDataUrl('__SKIP__');
-                    return;
-                }
-                
-                const svgElement = planElement.querySelector('svg');
-                if (!svgElement) {
-                    setExportStatus(`Capturing dims plan: SVG not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                    setPlanDimsImageDataUrl('__SKIP__');
-                    return;
-                }
-
-                // --- Wait until RoomVisualisation has actually rendered export-bounds (not the placeholder) ---
-                let liveAnchor = null;
-                try {
-                  liveAnchor =
-                    svgElement.querySelector('#export-crop-bounds') ||
-                    svgElement.querySelector('#export-bounds');
-                } catch (e) {
-                  liveAnchor = null;
-                }
-
-                if (!liveAnchor) {
-                  setExportStatus(`Capturing dims plan: waiting for export-bounds… (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Dims plan skipped: export-bounds never appeared");
-                  setPlanDimsImageDataUrl('__SKIP__');
-                  return;
-                }
-
-                // Optional but important: reject “microscopic but >0” layouts
-                try {
-                  const b = liveAnchor.getBBox?.();
-                  if (b && Number.isFinite(b.width) && Number.isFinite(b.height) && (b.width < 200 || b.height < 200)) {
-                    setExportStatus(`Capturing dims plan: export-bounds too small (${Math.round(b.width)}×${Math.round(b.height)}) (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                      retryTimer = setTimeout(attemptCapture, 100);
-                      return;
-                    }
-                    setExportStatus("Dims plan skipped: export-bounds stayed too small");
-                    setPlanDimsImageDataUrl('__SKIP__');
-                    return;
-                  }
-                } catch (e) {
-                  // if getBBox fails, just continue to retry logic below by treating as not ready
-                }
-                
-                // IMPORTANT: RoomVisualisation always renders an <svg>, even when it's still "Loading plan…".
-                // Only proceed once the real export group exists.
-                if (!hasRvExportBounds(svgElement)) {
-                  setExportStatus(`Capturing plan: waiting for plan render (#export-bounds) (attempt ${attempts}/${maxAttempts})`);
-                  if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                    return;
-                  }
-                  setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                  setPlanDimsImageDataUrl('__SKIP__');
-                  return;
-                }
-                
-                // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
-                const svgClone = svgElement.cloneNode(true);
-                svgClone.style.opacity = '1';
-                stripExportViewportTransforms(svgClone);
-
-                const cropRectEl = svgClone.querySelector('#export-crop-bounds');
-                const cropRect = cropRectEl ? {
-                    x: Number(cropRectEl.getAttribute('x')),
-                    y: Number(cropRectEl.getAttribute('y')),
-                    width: Number(cropRectEl.getAttribute('width')),
-                    height: Number(cropRectEl.getAttribute('height')),
-                } : null;
-
-                const bbox = measureBboxFromClone(svgClone, '#export-content-bounds');
-
-                // Prefer ink bounds (bbox) if valid; fallback to cropRect only if bbox fails
-                const baseRect = (bbox && bbox.width > 0 && bbox.height > 0) ? bbox : cropRect;
-
-                if (!baseRect || !Number.isFinite(baseRect.width) || baseRect.width <= 0) {
-                    setExportStatus(`Capturing dims plan: invalid content bounds (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Dims plan skipped: invalid content bounds");
-                    setPlanDimsImageDataUrl('__SKIP__');
-                    return;
-                }
-
-                const xAttr = baseRect.x;
-                const yAttr = baseRect.y;
-                const wAttr = baseRect.width;
-                const hAttr = baseRect.height;
-
-                // STEP 2: Use fixed buffer (NOT ratio-based)
-                // This guarantees consistent visual margin regardless of room size
-
-                const BUFFER_PX = 80; // adjust slightly if needed (60–100 range)
-                
-                const viewBoxX = xAttr - BUFFER_PX;
-                const viewBoxY = yAttr - BUFFER_PX;
-                const viewBoxW = wAttr + (2 * BUFFER_PX);
-                const viewBoxH = hAttr + (2 * BUFFER_PX);
-
-                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
-                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.removeAttribute('width');
-                svgClone.removeAttribute('height');
-                
-                const svgString = new XMLSerializer().serializeToString(svgClone);
-                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-                
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    
-                    // Keep exact aspect ratio from the cropped viewBox
-                    const targetW = 3000;
-                    const ratio = viewBoxH / viewBoxW;
-                    
-                    canvas.width = targetW;
-                    canvas.height = Math.round(targetW * ratio);
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    
-                    // Draw debug overlay before converting to PNG
-                    drawDebugOverlay(ctx, canvas.width, canvas.height, {
-                        planLabel: 'DIMS',
-                        baseRectSource: (bbox && bbox.width > 0 && bbox.height > 0) ? 'bbox' : 'cropRect',
-                        cropRect: cropRect,
-                        contentBbox: bbox,
-                        baseRect: baseRect,
-                        viewBoxX,
-                        viewBoxY,
-                        viewBoxW,
-                        viewBoxH,
-                        ratio,
-                        canvasW: canvas.width,
-                        canvasH: canvas.height,
-                        BUFFER_PX,
-                    }, debugPlanCapture);
-                    
-                    const dataUrl = canvas.toDataURL('image/png');
-                    setExportStatus("Dimensioned plan captured: image ready");
-                    setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
-                    setPlanDimsImageDataUrl(dataUrl);
-                    URL.revokeObjectURL(url);
-                };
-                img.onerror = () => {
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                    } else {
-                        setExportStatus("Dims plan skipped: continuing without dimensioned plan");
-                        setPlanDimsImageDataUrl('__SKIP__');
-                    }
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
-            } catch (err) {
-                console.warn('Failed to capture dimensioned plan (attempt ' + attempts + '):', err);
-                if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                } else {
-                    setExportStatus("Dims plan capture failed — opening Print fallback…");
-                    if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
-                    exportTimeoutRef.current = null;
-                    exportGuardRef.current.active = false;
-                    setIsPrinting(false);
-                    setTimeout(() => window.print(), 250);
-                }
-            }
-        };
-        
-        attemptCapture();
-        
-        return () => {
-            if (retryTimer) clearTimeout(retryTimer);
-        };
-    }, [isPrinting, planDimsImageDataUrl]);
-
-    // Capture speaker positions plan when printing starts (with retry logic)
-    useEffect(() => {
-        if (!isPrinting || planSpeakerDimsImageDataUrl !== null) return;
-
-        setExportStatus("Capturing speaker positions plan: waiting for SVG…");
-
-        let attempts = 0;
-        const maxAttempts = 20;
-        let retryTimer = null;
-
-        const attemptCapture = async () => {
-            attempts++;
-
-            try {
-                const planElement = document.querySelector('[data-plan-capture-speaker-dims]');
-                if (!planElement) {
-                    setExportStatus(`Capturing speaker positions: container not found (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
-                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                    return;
-                }
-
-                const svgElement = planElement.querySelector('svg');
-                if (!svgElement) {
-                    setExportStatus(`Capturing speaker positions: SVG not found (attempt ${attempts}/${maxAttempts})`);
-                                        if (attempts < maxAttempts) {
-                                            retryTimer = setTimeout(attemptCapture, 100);
-                                            return;
-                                        }
-                                        setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
-                                        setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                                        return;
-                                    }
-
-                                    // --- Wait until RoomVisualisation has actually rendered export-bounds (not the placeholder) ---
-                                    let liveAnchor = null;
-                                    try {
-                                      liveAnchor =
-                                        svgElement.querySelector('#export-crop-bounds') ||
-                                        svgElement.querySelector('#export-bounds');
-                                    } catch (e) {
-                                      liveAnchor = null;
-                                    }
-
-                                    if (!liveAnchor) {
-                                      setExportStatus(`Capturing speaker positions: waiting for export-bounds… (attempt ${attempts}/${maxAttempts})`);
-                                      if (attempts < maxAttempts) {
-                                        retryTimer = setTimeout(attemptCapture, 100);
-                                        return;
-                                      }
-                                      setExportStatus("Speaker positions plan skipped: export-bounds never appeared");
-                                      setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                                      return;
-                                    }
-
-                                    // Optional but important: reject “microscopic but >0” layouts
-                                    try {
-                                      const b = liveAnchor.getBBox?.();
-                                      if (b && Number.isFinite(b.width) && Number.isFinite(b.height) && (b.width < 200 || b.height < 200)) {
-                                        setExportStatus(`Capturing speaker positions: export-bounds too small (${Math.round(b.width)}×${Math.round(b.height)}) (attempt ${attempts}/${maxAttempts})`);
-                                        if (attempts < maxAttempts) {
-                                          retryTimer = setTimeout(attemptCapture, 100);
-                                          return;
-                                        }
-                                        setExportStatus("Speaker positions plan skipped: export-bounds stayed too small");
-                                        setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                                        return;
-                                      }
-                                    } catch (e) {
-                                      // if getBBox fails, just continue to retry logic below by treating as not ready
-                                    }
-
-                                    // IMPORTANT: RoomVisualisation always renders an <svg>, even when it's still "Loading plan…".
-                                    // Only proceed once the real export group exists.
-                                    if (!hasRvExportBounds(svgElement)) {
-                                      setExportStatus(`Capturing plan: waiting for plan render (#export-bounds) (attempt ${attempts}/${maxAttempts})`);
-                                      if (attempts < maxAttempts) {
-                                        retryTimer = setTimeout(attemptCapture, 100);
-                                        return;
-                                      }
-                                      setExportStatus("Speaker positions plan skipped: continuing without speaker positions");
-                                      setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                                      return;
-                                    }
-
-                                    // --- Clone first, strip viewport transforms, then measure bbox from the clone ---
-                const svgClone = svgElement.cloneNode(true);
-                svgClone.style.opacity = '1';
-                stripExportViewportTransforms(svgClone);
-
-                const cropRectEl = svgClone.querySelector('#export-crop-bounds');
-                const cropRect = cropRectEl ? {
-                    x: Number(cropRectEl.getAttribute('x')),
-                    y: Number(cropRectEl.getAttribute('y')),
-                    width: Number(cropRectEl.getAttribute('width')),
-                    height: Number(cropRectEl.getAttribute('height')),
-                } : null;
-
-                const bbox = measureBboxFromClone(svgClone, '#export-content-bounds');
-
-                // Prefer ink bounds (bbox) if valid; fallback to cropRect only if bbox fails
-                const baseRect = (bbox && bbox.width > 0 && bbox.height > 0) ? bbox : cropRect;
-
-                if (!baseRect || !Number.isFinite(baseRect.width) || baseRect.width <= 0) {
-                    setExportStatus(`Capturing speaker positions: invalid content bounds (attempt ${attempts}/${maxAttempts})`);
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                        return;
-                    }
-                    setExportStatus("Speaker positions plan skipped: invalid content bounds");
-                    setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                    return;
-                }
-
-                const xAttr = baseRect.x;
-                const yAttr = baseRect.y;
-                const wAttr = baseRect.width;
-                const hAttr = baseRect.height;
-
-                // STEP 2: Use fixed buffer (NOT ratio-based)
-                // This guarantees consistent visual margin regardless of room size
-
-                const BUFFER_PX = 80; // adjust slightly if needed (60–100 range)
-
-                const viewBoxX = xAttr - BUFFER_PX;
-                const viewBoxY = yAttr - BUFFER_PX;
-                const viewBoxW = wAttr + (2 * BUFFER_PX);
-                const viewBoxH = hAttr + (2 * BUFFER_PX);
-
-                svgClone.setAttribute('viewBox', `${viewBoxX} ${viewBoxY} ${viewBoxW} ${viewBoxH}`);
-                svgClone.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                svgClone.removeAttribute('width');
-                svgClone.removeAttribute('height');
-                
-                const svgString = new XMLSerializer().serializeToString(svgClone);
-                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-                
-                const img = new Image();
-                img.crossOrigin = 'anonymous';
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    
-                    const targetW = 3000;
-                    const ratio = viewBoxH / viewBoxW;
-                    
-                    canvas.width = targetW;
-                    canvas.height = Math.round(targetW * ratio);
-                    const ctx = canvas.getContext('2d');
-                    ctx.fillStyle = '#FFFFFF';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    
-                    // Draw debug overlay before converting to PNG
-                    drawDebugOverlay(ctx, canvas.width, canvas.height, {
-                        planLabel: 'SPEAKER',
-                        baseRectSource: (bbox && bbox.width > 0 && bbox.height > 0) ? 'bbox' : 'cropRect',
-                        cropRect: cropRect,
-                        contentBbox: bbox,
-                        baseRect: baseRect,
-                        viewBoxX,
-                        viewBoxY,
-                        viewBoxW,
-                        viewBoxH,
-                        ratio,
-                        canvasW: canvas.width,
-                        canvasH: canvas.height,
-                        BUFFER_PX,
-                    }, debugPlanCapture);
-                    
-                    const dataUrl = canvas.toDataURL('image/png');
-                    setExportStatus("Speaker dimensions plan captured: image ready");
-                    setExportDebug(d => ({ ...d, planLen: dataUrl.length }));
-                    setPlanSpeakerDimsImageDataUrl(dataUrl);
-                    URL.revokeObjectURL(url);
-                };
-                img.onerror = () => {
-                    if (attempts < maxAttempts) {
-                        retryTimer = setTimeout(attemptCapture, 100);
-                    } else {
-                        setExportStatus("Speaker dims plan skipped: continuing without speaker dimensions");
-                        setPlanSpeakerDimsImageDataUrl('__SKIP__');
-                    }
-                    URL.revokeObjectURL(url);
-                };
-                img.src = url;
-            } catch (err) {
-                console.warn('Failed to capture speaker dims plan (attempt ' + attempts + '):', err);
-                if (attempts < maxAttempts) {
-                    retryTimer = setTimeout(attemptCapture, 100);
-                } else {
-                    setExportStatus("Speaker dims capture failed — opening Print fallback…");
-                    if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
-                    exportTimeoutRef.current = null;
-                    exportGuardRef.current.active = false;
-                    setIsPrinting(false);
-                    setTimeout(() => window.print(), 250);
-                }
-            }
-        };
-        
-        attemptCapture();
-        
-        return () => {
-            if (retryTimer) clearTimeout(retryTimer);
-        };
-    }, [isPrinting, planSpeakerDimsImageDataUrl]);
-
-    // System summary: group speakers by role and model
-    const systemSummary = React.useMemo(() => {
-        const summary = {
-            lcr: [],
-            surrounds: [],
-            overheads: [],
-            subs: []
-        };
-
-        // Helper to normalize model name to display format (strips suffixes, proper capitalisation)
-        const normalizeModel = (model) => {
-            if (!model || model === 'off' || model === 'none') return null;
-            return String(model).trim();
-        };
-
-        // Filter speakers to only those active in current layout (prevents counting ghost speakers in 7.x wides mode)
-        const activeSpeakers = placedSpeakers.filter(spk => {
-            // Always use getSpeakerVisibility to filter (same as Room Designer and RoomVisualisation)
-            return app?.getSpeakerVisibility?.(spk?.role, spk?.model) ?? true;
-        });
-
-        // Helper to get display-ready speaker name (matches Room Designer UI)
-        const getDisplayName = (modelKey) => {
-            if (!modelKey) return null;
-            
-            // Get metadata from registry
-            const meta = getSpeakerModelMeta(modelKey);
-            
-            // Use registry label if available (most reliable)
-            if (meta?.label && !meta.notFound) {
-                return meta.label;
-            }
-            
-            // Fallback: manual cleanup
-            let name = String(modelKey).trim();
-            
-            // Strip any trailing variant suffix (_s, _m, _l, etc.)
-            name = name.replace(/[_-][sml]$/i, '');
-            
-            // Convert kebab-case to spaces and title case
-            name = name
-                .split(/[-_]+/)
-                .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                .join(' ');
-            
-            // Final defensive check: strip any remaining underscores
-            if (name.includes('_')) {
-                name = name.split('_')[0];
-                if (typeof console !== 'undefined' && console.warn) {
-                    console.warn('[RP22Report] Model name still contains underscore after normalisation:', modelKey);
-                }
-            }
-            
-            return name;
-        };
-
-        // Group speakers by category and model
-        const speakersByCategory = {
-            lcr: {},
-            surrounds: {},
-            overheads: {}
-        };
-
-        activeSpeakers.forEach(spk => {
-            const role = String(spk?.role || '').toUpperCase();
-            const model = normalizeModel(spk?.model);
-            if (!model) return;
-
-            let category = null;
-            if (['FL', 'FC', 'FR', 'L', 'C', 'R'].includes(role)) {
-                category = 'lcr';
-            } else if (['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'LS', 'RS', 'LR', 'RR', 'FWL', 'FWR'].includes(role)) {
-                category = 'surrounds';
-            } else if (role.startsWith('T') || role.startsWith('U')) {
-                category = 'overheads';
-            }
-
-            if (category) {
-                speakersByCategory[category][model] = (speakersByCategory[category][model] || 0) + 1;
-            }
-        });
-
-        // Format speaker lists with display names
-        Object.keys(speakersByCategory).forEach(cat => {
-            const models = Object.entries(speakersByCategory[cat])
-                .map(([modelKey, count]) => {
-                    const displayName = getDisplayName(modelKey) || modelKey;
-                    return count > 1 ? `${displayName} × ${count}` : displayName;
-                })
-                .sort();
-            summary[cat] = models.length > 0 ? models : ['None specified'];
-        });
-
-        // Subwoofers with display names
-        const frontSubs = frontSubsCfg?.count || 0;
-        const rearSubs = rearSubsCfg?.count || 0;
-        const frontModel = normalizeModel(frontSubsCfg?.model);
-        const rearModel = normalizeModel(rearSubsCfg?.model);
-
-        const subList = [];
-        if (frontSubs > 0 && frontModel) {
-            const displayName = getDisplayName(frontModel) || frontModel;
-            subList.push(frontSubs > 1 ? `${displayName} × ${frontSubs} (front)` : `${displayName} (front)`);
-        }
-        if (rearSubs > 0 && rearModel) {
-            const displayName = getDisplayName(rearModel) || rearModel;
-            subList.push(rearSubs > 1 ? `${displayName} × ${rearSubs} (rear)` : `${displayName} (rear)`);
-        }
-        summary.subs = subList.length > 0 ? subList : ['None specified'];
-
-        return summary;
-    }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility]);
-
-    // Count per-seat parameters (L1-L4 only, exclude null/FAIL/no_data)
-    // Total is always 10 (RP23 + 9 RP22 params: P1, P4, P5, P6, P9, P10, P16, P17, P20)
     const lastSeatIdsRef = React.useRef([]);
     const lastSeatLevelCountsRef = React.useRef([]);
-    
+
     const seatLevelCounts = React.useMemo(() => {
         const seatIdsNow = (safeArray(seats).map(s => s?.id).filter(Boolean)).sort();
-        
-        // If seats briefly resolves to [], keep the last known seat list so cards don't vanish
         const seatIds = seatIdsNow.length ? seatIdsNow : lastSeatIdsRef.current;
-        
         if (seatIdsNow.length) lastSeatIdsRef.current = seatIdsNow;
-        
+        const normalizeLvl = (rawLevel) => {
+            if (rawLevel == null) return null;
+            if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) { if (rawLevel >= 1 && rawLevel <= 4) return `L${rawLevel}`; return null; }
+            if (typeof rawLevel === "string") { const m = rawLevel.trim().match(/^L([1-4])$/i); if (m) return `L${m[1]}`; }
+            return null;
+        };
         const next = seatIds.map(seatId => {
             const counts = { L1: 0, L2: 0, L3: 0, L4: 0 };
-            
-            // SINGLE SOURCE OF TRUTH: use latest seat snapshot (matches HUD exactly)
-            const tooltipData =
-                app?.seatSnapshotBySeatId?.[seatId] ??
-                reportSeatHudById?.[seatId] ??
-                app?.seatMetricsById?.[seatId] ??
-                null;
+            const tooltipData = app?.seatSnapshotBySeatId?.[seatId] ?? reportSeatHudById?.[seatId] ?? app?.seatMetricsById?.[seatId] ?? null;
             const rp23 = tooltipData?.rp23 || {};
             const rp22Hud = tooltipData?.rp22 || {};
-
             const getRp22Metric = (key) => {
                 const n = parseInt(String(key).replace("p", ""), 10);
                 if (!Number.isFinite(n)) return null;
-
-                // Support both formats (HUD historically used p9, engine used 9)
                 return rp22Hud[key] ?? rp22Hud[`p${n}`] ?? rp22Hud[n] ?? rp22Hud[String(n)] ?? null;
             };
-            
-            // Normalize level helper (same as room count logic)
-            const normalizeLvl = (rawLevel) => {
-                if (rawLevel == null) return null;
-                if (typeof rawLevel === "number" && Number.isFinite(rawLevel)) {
-                    if (rawLevel >= 1 && rawLevel <= 4) return `L${rawLevel}`;
-                    return null;
-                }
-                if (typeof rawLevel === "string") {
-                    const m = rawLevel.trim().match(/^L([1-4])$/i);
-                    if (m) return `L${m[1]}`;
-                }
-                return null;
-            };
-            
-            // Count RP23 Horizontal
             const lvl23 = normalizeLvl(rp23?.level);
             if (lvl23) counts[lvl23] += 1;
-            
-            // Count RP22 parameters (P1, P4, P5, P6, P9, P10, P16, P17, P20)
             ['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].forEach(key => {
                 const metric = getRp22Metric(key);
                 if (!metric) return;
                 const lvl = normalizeLvl(metric.level);
                 if (lvl) counts[lvl] += 1;
             });
-            
-            // Total is always 10 rows (RP23 + 9 RP22 params)
-            const total = 10;
-            
-            return { seatId, counts, total };
+            return { seatId, counts, total: 10 };
         });
-        
-        // If we somehow computed nothing, keep last good result
-        if (!next.length && lastSeatLevelCountsRef.current.length) {
-            return lastSeatLevelCountsRef.current;
-        }
-        
+        if (!next.length && lastSeatLevelCountsRef.current.length) return lastSeatLevelCountsRef.current;
         lastSeatLevelCountsRef.current = next;
         return next;
     }, [reportSeatHudById, app?.seatSnapshotBySeatId, app?.seatMetricsById, seats]);
 
-    // Group seat counts by row, sorted by seat number within each row
     const seatCountsByRow = React.useMemo(() => {
         const rows = {};
-
         seatLevelCounts.forEach(({ seatId, counts, total }) => {
-            // Parse seat-r{row}-c{col}
             const match = seatId.match(/^seat-r(\d+)-c(\d+)$/);
-
-            let rowNum;
-            let seatNum;
-
-            if (match) {
-                // Normal case: structured seat IDs
-                rowNum = parseInt(match[1], 10);
-                seatNum = parseInt(match[2], 10);
-            } else {
-                // Fallback: keep seat, group under row 0, preserve stable order
-                rowNum = 0;
-                seatNum = Number.MAX_SAFE_INTEGER;
-            }
-
+            const rowNum = match ? parseInt(match[1], 10) : 0;
+            const seatNum = match ? parseInt(match[2], 10) : Number.MAX_SAFE_INTEGER;
             if (!rows[rowNum]) rows[rowNum] = [];
             rows[rowNum].push({ seatId, counts, total, seatNum });
         });
-
-        // Sort each row's seats by seat number
-        Object.keys(rows).forEach(rowNum => {
-            rows[rowNum].sort((a, b) => a.seatNum - b.seatNum);
-        });
-
-        // Return sorted row numbers
-        return Object.keys(rows)
-            .map(Number)
-            .sort((a, b) => a - b)
-            .map(rowNum => ({ rowNum, seats: rows[rowNum] }));
+        Object.keys(rows).forEach(rowNum => { rows[rowNum].sort((a, b) => a.seatNum - b.seatNum); });
+        return Object.keys(rows).map(Number).sort((a, b) => a - b).map(rowNum => ({ rowNum, seats: rows[rowNum] }));
     }, [seatLevelCounts]);
+
+    const systemSummary = React.useMemo(() => {
+        const summary = { lcr: [], surrounds: [], overheads: [], subs: [] };
+        const normalizeModel = (model) => (!model || model === 'off' || model === 'none') ? null : String(model).trim();
+        const activeSpeakers = placedSpeakers.filter(spk => app?.getSpeakerVisibility?.(spk?.role, spk?.model) ?? true);
+        const getDisplayName = (modelKey) => {
+            if (!modelKey) return null;
+            const meta = getSpeakerModelMeta(modelKey);
+            if (meta?.label && !meta.notFound) return meta.label;
+            return String(modelKey).trim().replace(/[_-][sml]$/i, '').split(/[-_]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ');
+        };
+        const byCategory = { lcr: {}, surrounds: {}, overheads: {} };
+        activeSpeakers.forEach(spk => {
+            const role = String(spk?.role || '').toUpperCase();
+            const model = normalizeModel(spk?.model);
+            if (!model) return;
+            let cat = null;
+            if (['FL', 'FC', 'FR', 'L', 'C', 'R'].includes(role)) cat = 'lcr';
+            else if (['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'LS', 'RS', 'LR', 'RR', 'FWL', 'FWR'].includes(role)) cat = 'surrounds';
+            else if (role.startsWith('T') || role.startsWith('U')) cat = 'overheads';
+            if (cat) byCategory[cat][model] = (byCategory[cat][model] || 0) + 1;
+        });
+        Object.keys(byCategory).forEach(cat => {
+            const models = Object.entries(byCategory[cat]).map(([k, count]) => { const name = getDisplayName(k) || k; return count > 1 ? `${name} × ${count}` : name; }).sort();
+            summary[cat] = models.length > 0 ? models : ['None specified'];
+        });
+        const frontSubs = frontSubsCfg?.count || 0;
+        const rearSubs = rearSubsCfg?.count || 0;
+        const frontModel = normalizeModel(frontSubsCfg?.model);
+        const rearModel = normalizeModel(rearSubsCfg?.model);
+        const subList = [];
+        if (frontSubs > 0 && frontModel) { const name = getDisplayName(frontModel) || frontModel; subList.push(frontSubs > 1 ? `${name} × ${frontSubs} (front)` : `${name} (front)`); }
+        if (rearSubs > 0 && rearModel) { const name = getDisplayName(rearModel) || rearModel; subList.push(rearSubs > 1 ? `${name} × ${rearSubs} (rear)` : `${name} (rear)`); }
+        summary.subs = subList.length > 0 ? subList : ['None specified'];
+        return summary;
+    }, [placedSpeakers, frontSubsCfg, rearSubsCfg, app?.getSpeakerVisibility]);
 
     if (!analysisResult || !analysisResult.gradedParameters) {
         return (
             <div className="min-h-screen bg-[#F9F8F6] p-6 flex items-center justify-center">
                 <Card className="max-w-xl mx-auto w-full">
-                    <CardHeader>
-                        <CardTitle className="text-[#1B1A1A] font-header">RP22 Compliance Report</CardTitle>
-                    </CardHeader>
+                    <CardHeader><CardTitle className="text-[#1B1A1A] font-header">RP22 Compliance Report</CardTitle></CardHeader>
                     <CardContent className="text-center py-10">
                         <BarChart4 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                         <p className="text-[#3E4349]">Run an analysis in the Room Designer to see the report.</p>
@@ -1725,1667 +615,67 @@ function flattenExportTransforms(svgClone) {
         );
     }
 
-    const PrintStyles = () => (
-        <style>{`
-            @media print {
-                /* Global typography: Century Gothic everywhere */
-                * {
-                    font-family: 'Century Gothic', 'Futura PT Light', 'Didact Gothic', sans-serif !important;
-                }
-                
-                /* 1) Kill anything that can clip/stop the print flow */
-                html, body {
-                    height: auto !important;
-                    overflow: visible !important;
-                }
-                
-                /* PRINT: neutralise app shell clipping (main/layout wrappers) */
-                main,
-                main * {
-                    overflow: visible !important;
-                    max-height: none !important;
-                }
-
-                /* These are common Base44/Tailwind shell wrappers that clip print flow */
-                main {
-                    display: block !important;
-                    height: auto !important;
-                    min-height: 0 !important;
-                }
-
-                /* Safety: if any shell wrapper still carries overflow-hidden, defeat it in print */
-                .overflow-hidden,
-                [class~="overflow-hidden"] {
-                    overflow: visible !important;
-                }
-
-                /* Some shells constrain height via flex growth */
-                .flex-1,
-                [class~="flex-1"] {
-                    height: auto !important;
-                    min-height: 0 !important;
-                    max-height: none !important;
-                }
-
-                /* --- PLAN PAGES: natural scaling (no cropping, no distortion) --- */
-                .plan-fitbox{
-                  break-inside: avoid !important;
-                  page-break-inside: avoid !important;
-                  width: 186mm !important;
-                  margin: 0 auto !important;
-                }
-
-                #pdf-room-plan,
-                #pdf-room-plan-dims,
-                #pdf-room-plan-positions {
-                  break-inside: avoid !important;
-                  page-break-inside: avoid !important;
-                }
-
-                .plan-fitbox > img{
-                  display: block !important;
-                  width: 100% !important;
-                  height: auto !important;
-                }
-
-                /* COVER PAGE ONLY — tighten vertical spacing so it fits at 100% scale */
-                #pdf-cover .rp22-param-card,
-                #pdf-cover .rp22-seat-card {
-                  min-height: 0 !important;
-                  height: auto !important;
-                }
-
-                #pdf-cover .rp22-param-card-inner {
-                  padding-top: 5mm !important;
-                  padding-bottom: 5mm !important;
-                }
-
-                #pdf-cover .rp22-param-title {
-                  margin-bottom: 1.5mm !important;
-                }
-
-                #pdf-cover .rp22-param-subtitle {
-                  margin-bottom: 3mm !important;
-                }
-
-                #pdf-cover .rp22-param-divider {
-                  margin: 3mm 0 !important;
-                }
-
-                #pdf-cover .rp22-param-value {
-                  margin-top: 1mm !important;
-                }
-
-                /* Cover-only class hooks */
-                #pdf-cover .rp22-cover-card {
-                  padding-top: 6mm !important;
-                  padding-bottom: 6mm !important;
-                }
-
-                #pdf-cover .rp22-cover-stack {
-                  gap: 2mm !important;
-                }
-
-                /* Force pure white backgrounds (kill the pale side bars) */
-                html, body, #root, #__next {
-                    background: #FFFFFF !important;
-                }
-                
-                /* Outer wrapper is bg-[#F9F8F6] p-6 — force white + no padding in print */
-                .min-h-screen {
-                    background: #FFFFFF !important;
-                    padding: 0 !important;
-                }
-                
-                /* Ensure print layout is pure white */
-                .print-root, .print-container, .print-only, section {
-                    background: #FFFFFF !important;
-                    box-shadow: none !important;
-                    border: none !important;
-                }
-                
-                /* Kill gutters on plan pages */
-                #pdf-room-plan, #pdf-room-plan-dims {
-                    background: #FFFFFF !important;
-                    padding-left: 0 !important;
-                    padding-right: 0 !important;
-                    margin-left: 0 !important;
-                    margin-right: 0 !important;
-                }
-
-                /* Base44 / app wrappers sometimes clamp height */
-                #root, #__next, .min-h-screen, .screen-only, .print-only {
-                    height: auto !important;
-                    min-height: 0 !important;
-                    overflow: visible !important;
-                }
-
-                /* 2) Ensure background colours + borders print */
-                body {
-                    -webkit-print-color-adjust: exact;
-                    print-color-adjust: exact;
-                }
-
-                /* 4) Page size + margins */
-                @page {
-                    size: A4 portrait;
-                    margin: 12mm;
-                }
-
-                /* 5) Reliable page-break helpers */
-                .print-page-break-after {
-                    break-after: page;
-                    page-break-after: always;
-                }
-                .print-page-break-before {
-                    break-before: page;
-                    page-break-before: always;
-                }
-                
-                /* IMPORTANT: Chrome PDF preview can truncate if large cards are "unbreakable".
-                   So we do NOT force avoid-break on all cards. */
-                .print-avoid-break {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
-                }
-                
-                /* Keep the top summary blocks intact (safe + small) */
-                .print-summary .print-avoid-break {
-                    break-inside: avoid !important;
-                    page-break-inside: avoid !important;
-                }
-                
-
-                
-                /* Make sure Card content can flow */
-                .print-only .rounded-xl,
-                .print-only .rounded-xl * {
-                    overflow: visible !important;
-                    max-height: none !important;
-                }
-
-                /* 6) Print grid uses standard CSS grid (removed column-count approach) */
-
-                /* Hide anything that isn't the print layout */
-                .screen-only,
-                .no-print,
-                nav,
-                header,
-                aside,
-                footer,
-                .b44-sidebar,
-                .b44-topbar,
-                [class*="sidebar"],
-                [class*="SideBar"],
-                [class*="TopBar"],
-                [class*="navbar"],
-                [class*="NavBar"],
-                [class*="toolbar"],
-                [class*="ToolBar"],
-                [class*="api"],
-                [class*="Api"],
-                #root > div > div:first-child {
-                    display: none !important;
-                }
-
-                /* Ensure print layout uses full width */
-                .print-only {
-                    display: block !important;
-                    width: 100% !important;
-                }
-
-                .print-root {
-                    width: 100% !important;
-                    margin: 0 !important;
-                    padding: 0 !important;
-                }
-                
-                /* extra safety: Card internals must not clip */
-                .print-only .card,
-                .print-only .card * {
-                    overflow: visible !important;
-                    max-height: none !important;
-                }
-            }
-
-            @media screen {
-                .print-only { display: none !important; }
-            }
-
-            .screen-only { display: block; }
-
-            .print-root {
-                background: #FFFFFF;
-            }
-
-            .print-container {
-                width: 100%;
-                max-width: 100%;
-                margin: 0;
-                padding: 0;
-                font-family: 'Didact Gothic', 'Century Gothic', sans-serif;
-            }
-
-            /* Export-only parameter cards styling (scoped to report) */
-            .rp22-report .rp22-params-grid {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 10mm;
-                align-items: start;
-            }
-
-            @media print {
-                /* Force all containers to allow pagination */
-                html, body {
-                    height: auto !important;
-                    overflow: visible !important;
-                }
-
-                /* Export report: ensure nothing clips pagination */
-                .rp22-report,
-                .rp22-report * {
-                    overflow: visible !important;
-                    max-height: none !important;
-                }
-
-                /* Neutralise app shell constraints */
-                .rp22-report,
-                .rp22-report .print-summary,
-                .rp22-report .print-root,
-                .rp22-report .print-pages,
-                .rp22-report [class*="scroll"],
-                .rp22-report [class*="Scroll"],
-                .rp22-report [class*="container"],
-                .rp22-report [class*="Container"] {
-                    height: auto !important;
-                    min-height: 0 !important;
-                    max-height: none !important;
-                    overflow: visible !important;
-                    position: static !important;
-                }
-
-                .rp22-report .rp22-params-grid {
-                    break-inside: auto;
-                    page-break-inside: auto;
-                }
-
-                .rp22-report {
-                    padding-bottom: 12mm;
-                }
-
-                /* Critical: Remove fixed heights from seat cards in print */
-                .rp22-report .rp22-seat-card,
-                .rp22-report .rp22-param-card {
-                    height: auto !important;
-                    min-height: 0 !important;
-                    max-height: none !important;
-                }
-
-                /* Remove height constraints from card internals */
-                .rp22-report .rp22-seat-card *,
-                .rp22-report .rp22-param-card * {
-                    max-height: none !important;
-                }
-
-                /* Ensure wrappers auto-size */
-                .rp22-report .card-content,
-                .rp22-report .CardContent,
-                .rp22-report [class*="CardContent"] {
-                    height: auto !important;
-                    min-height: 0 !important;
-                }
-
-                /* Report grid: stable 2-column layout for print */
-                .rp22-report .rp22-cards-grid {
-                    display: grid !important;
-                    grid-template-columns: 1fr 1fr !important;
-                    gap: 7mm 7mm !important;
-                    align-items: start !important;
-                    align-content: start !important;
-                    grid-auto-rows: auto !important;
-                }
-
-                /* Card wrappers and cards prevent breaking */
-                .rp22-report .rp22-card-wrap {
-                    break-inside: avoid !important;
-                    page-break-inside: avoid !important;
-                }
-
-                /* CRITICAL: Do NOT make the card itself "unbreakable" in print.
-                   Keep the wrapper as avoid, but allow the card to break if the engine needs it. */
-                .rp22-report .rp22-param-card,
-                .rp22-report .rp22-seat-card {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
-                }
-
-                /* Safe breakpoints inside cards */
-                .rp22-report .rp22-break-avoid {
-                    break-inside: avoid !important;
-                    page-break-inside: avoid !important;
-                }
-
-                .rp22-report .rp22-break-ok {
-                    break-inside: auto !important;
-                    page-break-inside: auto !important;
-                }
-            }
-
-            .rp22-report .rp22-param-card {
-                border: 1.5px solid #D9D5CE;
-                border-radius: 10px;
-                background: #FFFFFF;
-                box-shadow: none;
-                overflow: visible;
-                break-inside: avoid;
-                page-break-inside: avoid;
-                position: relative;
-                display: flex;
-                flex-direction: column;
-            }
-
-            .rp22-report .rp22-param-card-inner {
-                padding: 5mm 7mm;
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-            }
-
-            .rp22-report .rp22-param-title {
-                font-size: 11.5pt;
-                font-weight: 700;
-                line-height: 1.25;
-                margin: 0 0 1.5mm 0;
-                color: #1B1A1A;
-            }
-
-            .rp22-report .rp22-param-subtitle {
-                font-size: 9pt;
-                color: #3E4349;
-                margin: 0 0 3mm 0;
-                line-height: 1.4;
-            }
-
-            .rp22-report .rp22-param-divider {
-                height: 1px;
-                background: #EEEAE3;
-                margin: 3mm 0;
-            }
-
-            .rp22-report .rp22-level-pill {
-                position: absolute;
-                right: 7mm;
-                bottom: 7mm;
-            }
-
-            .rp22-report .rp22-param-content {
-                flex: 1;
-                font-size: 9.5pt;
-                color: #3E4349;
-                line-height: 1.5;
-            }
-
-            .rp22-report .rp22-param-value {
-            font-size: 11pt;
-            font-weight: 700;
-            color: #1B1A1A;
-            margin-top: 1mm;
-            }
-
-            /* --- PRINT SCALE CONTROL (non-plan pages 75%, plan pages 100%) --- */
-            @media print {
-              /* Non-plan pages: shrink everything by 75% */
-              #pdf-cover,
-              #pdf-room-parameters,
-              #pdf-seat-parameters {
-                zoom: 0.75 !important;
-              }
-
-              /* Plan pages: MUST remain full size */
-              #pdf-room-plan,
-              #pdf-room-plan-dims,
-              #pdf-room-plan-positions {
-                zoom: 1 !important;
-              }
-            }
-
-            /* --- NEVER split cards across pages --- */
-            @media print {
-
-              /* Make the grid items (wrappers) unbreakable */
-              .rp22-report .rp22-card-wrap,
-              .rp22-report .print-avoid-break {
-                break-inside: avoid !important;
-                page-break-inside: avoid !important;
-              }
-
-              /* Also protect the actual card containers (belt + braces) */
-              .rp22-report .rp22-param-card,
-              .rp22-report .rp22-seat-card {
-                break-inside: avoid !important;
-                page-break-inside: avoid !important;
-              }
-
-              /* IMPORTANT: allow normal flow (don’t clip) */
-              .rp22-report .rp22-param-card,
-              .rp22-report .rp22-seat-card,
-              .rp22-report .rp22-param-card *,
-              .rp22-report .rp22-seat-card * {
-                overflow: visible !important;
-                max-height: none !important;
-              }
-            }
-            `}</style>
-            );
+    const planEnabled = true;
 
     return (
         <div className="min-h-screen bg-[#F9F8F6] p-6">
-            <PrintStyles />
-            
+            <ReportPrintStyles />
+
             <div className="screen-only">
-            {/* Hidden plan capture element (CLEAN) - MUST be in DOM (not display:none) for SVG capture */}
-            <div 
-                data-plan-capture 
-                style={{ 
-                    position: 'fixed',
-                    left: 0,
-                    top: 0,
-                    width: '1200px',
-                    height: '800px',
-                    opacity: 0,
-                    pointerEvents: 'none',
-                    zIndex: -1
-                }}
-            >
-                {(() => {
-                    const frontSubsForExport = (Array.isArray(app?.frontSubsCfg?.positions) ? app.frontSubsCfg.positions : []).map((p, i) => {
-                        if (p?.position?.x != null && p?.position?.y != null) {
-                            return { ...p, id: p.id || `front-sub-${i}`, model: p.model || app?.frontSubsCfg?.model || '' };
-                        }
-                        if (p?.x != null && p?.y != null) {
-                            return { ...p, id: p.id || `front-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.frontSubsCfg?.model || '' };
-                        }
-                        return null;
-                    }).filter(Boolean);
-                    
-                    const rearSubsForExport = (Array.isArray(app?.rearSubsCfg?.positions) ? app.rearSubsCfg.positions : []).map((p, i) => {
-                        if (p?.position?.x != null && p?.position?.y != null) {
-                            return { ...p, id: p.id || `rear-sub-${i}`, model: p.model || app?.rearSubsCfg?.model || '' };
-                        }
-                        if (p?.x != null && p?.y != null) {
-                            return { ...p, id: p.id || `rear-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.rearSubsCfg?.model || '' };
-                        }
-                        return null;
-                    }).filter(Boolean);
-                    
-                    return (
-                        <RoomVisualisation
-                            placedSpeakers={placedSpeakers}
-                            seatingPositions={seats}
-                            mlpPoint={primarySeatingPosition}
-                            screen={{
-                              ...(screen || {}),
-                              floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
-                                ? Number(app.screenFrontPlaneM)
-                                : Number(screen?.floatDepthM) || 0
-                            }}
-                            screenFrontPlaneM={
-                              Number.isFinite(Number(app?.screenFrontPlaneM))
-                                ? Number(app.screenFrontPlaneM)
-                                : undefined
-                            }
-                            dolbyLayout={dolbyLayout}
-                            frontSubs={frontSubsForExport}
-                            rearSubs={rearSubsForExport}
-                            roomElements={app?.roomElements || []}
-                            exportMode="dimensions"
-                            exportWidthPx={1200}
-                            exportHeightPx={800}
-                            overlays={{ ROOM_DIMS: true, EXPORT_ROW_FRONT_DIST: true, EXPORT_RSP_LABEL: true, EXPORT_CEILING_LABEL: true }}
-                    showBaffle={true}
-                    showScreen={true}
-                    speakerPositionsView="off"
-                    showMlpRuler={false}
-                    zoomMode="off"
-                    screenPlaneMode="fixed"
-                    lcrAimMode={app?.lcrAimMode || "flat"}
-                    aimAtMLP={app?.aimAtMLP ?? false}
-                    onSetSpeakers={rvNoops.onSetSpeakers}
-                    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
-                    onSetScreen={rvNoops.onSetScreen}
-                    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
-                    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
-                    onSetElements={rvNoops.onSetElements}
-                    onSetOverheadState={rvNoops.onSetOverheadState}
-                    onSetAimState={rvNoops.onSetAimState}
-                    onSetRoomDims={rvNoops.onSetRoomDims}
-                    onSetMlpPoint={rvNoops.onSetMlpPoint}
-                />
-                    );
-                })()}
-            </div>
-            
-            {/* Hidden plan capture element (ROOM DIMENSIONS) */}
-            <div 
-                data-plan-capture-dims
-                style={{ 
-                    position: 'fixed',
-                    left: 0,
-                    top: 0,
-                    width: '1200px',
-                    height: '800px',
-                    opacity: 0,
-                    pointerEvents: 'none',
-                    zIndex: -1
-                }}
-            >
-                {(() => {
-                    const frontSubsForExport = (Array.isArray(app?.frontSubsCfg?.positions) ? app.frontSubsCfg.positions : []).map((p, i) => {
-                        if (p?.position?.x != null && p?.position?.y != null) {
-                            return { ...p, id: p.id || `front-sub-${i}`, model: p.model || app?.frontSubsCfg?.model || '' };
-                        }
-                        if (p?.x != null && p?.y != null) {
-                            return { ...p, id: p.id || `front-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.frontSubsCfg?.model || '' };
-                        }
-                        return null;
-                    }).filter(Boolean);
-                    
-                    const rearSubsForExport = (Array.isArray(app?.rearSubsCfg?.positions) ? app.rearSubsCfg.positions : []).map((p, i) => {
-                        if (p?.position?.x != null && p?.position?.y != null) {
-                            return { ...p, id: p.id || `rear-sub-${i}`, model: p.model || app?.rearSubsCfg?.model || '' };
-                        }
-                        if (p?.x != null && p?.y != null) {
-                            return { ...p, id: p.id || `rear-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.rearSubsCfg?.model || '' };
-                        }
-                        return null;
-                    }).filter(Boolean);
-                    
-                    return (
-                        <RoomVisualisation
-                            placedSpeakers={placedSpeakers}
-                            seatingPositions={seats}
-                            mlpPoint={primarySeatingPosition}
-                            screen={{
-                              ...(screen || {}),
-                              floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
-                                ? Number(app.screenFrontPlaneM)
-                                : Number(screen?.floatDepthM) || 0
-                            }}
-                            screenFrontPlaneM={
-                              Number.isFinite(Number(app?.screenFrontPlaneM))
-                                ? Number(app.screenFrontPlaneM)
-                                : undefined
-                            }
-                            dolbyLayout={dolbyLayout}
-                            frontSubs={frontSubsForExport}
-                            rearSubs={rearSubsForExport}
-                    roomElements={app?.roomElements || []}
-                    exportMode="dimensions"
-                    exportWidthPx={1200}
-                    exportHeightPx={800}
-                    overlays={{}}
-                    showBaffle={true}
-                    showScreen={true}
-                    speakerPositionsView="off"
-                    showMlpRuler={true}
-                    zoomMode="off"
-                    screenPlaneMode="fixed"
-                    lcrAimMode={app?.lcrAimMode || "flat"}
-                    aimAtMLP={app?.aimAtMLP ?? false}
-                    onSetSpeakers={rvNoops.onSetSpeakers}
-                    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
-                    onSetScreen={rvNoops.onSetScreen}
-                    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
-                    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
-                    onSetElements={rvNoops.onSetElements}
-                    onSetOverheadState={rvNoops.onSetOverheadState}
-                    onSetAimState={rvNoops.onSetAimState}
-                    onSetRoomDims={rvNoops.onSetRoomDims}
-                    onSetMlpPoint={rvNoops.onSetMlpPoint}
-                />
-                    );
-                })()}
-            </div>
-            
-            {/* Hidden plan capture element (SPEAKER POSITIONS) */}
-            <div 
-                data-plan-capture-speaker-dims
-                style={{ 
-                    position: 'fixed',
-                    left: 0,
-                    top: 0,
-                    width: '1200px',
-                    height: '800px',
-                    opacity: 0,
-                    pointerEvents: 'none',
-                    zIndex: -1
-                }}
-            >
-                {(() => {
-                    const frontSubsForExport = (Array.isArray(app?.frontSubsCfg?.positions) ? app.frontSubsCfg.positions : []).map((p, i) => {
-                        if (p?.position?.x != null && p?.position?.y != null) {
-                            return { ...p, id: p.id || `front-sub-${i}`, model: p.model || app?.frontSubsCfg?.model || '' };
-                        }
-                        if (p?.x != null && p?.y != null) {
-                            return { ...p, id: p.id || `front-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.frontSubsCfg?.model || '' };
-                        }
-                        return null;
-                    }).filter(Boolean);
-                    
-                    const rearSubsForExport = (Array.isArray(app?.rearSubsCfg?.positions) ? app.rearSubsCfg.positions : []).map((p, i) => {
-                        if (p?.position?.x != null && p?.position?.y != null) {
-                            return { ...p, id: p.id || `rear-sub-${i}`, model: p.model || app?.rearSubsCfg?.model || '' };
-                        }
-                        if (p?.x != null && p?.y != null) {
-                            return { ...p, id: p.id || `rear-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || app?.rearSubsCfg?.model || '' };
-                        }
-                        return null;
-                    }).filter(Boolean);
-                    
-                    return (
-                        <RoomVisualisation
-                            placedSpeakers={placedSpeakers}
-                            seatingPositions={seats}
-                            mlpPoint={primarySeatingPosition}
-                            screen={{
-                              ...(screen || {}),
-                              floatDepthM: Number.isFinite(Number(app?.screenFrontPlaneM))
-                                ? Number(app.screenFrontPlaneM)
-                                : Number(screen?.floatDepthM) || 0
-                            }}
-                            screenFrontPlaneM={
-                              Number.isFinite(Number(app?.screenFrontPlaneM))
-                                ? Number(app.screenFrontPlaneM)
-                                : undefined
-                            }
-                            dolbyLayout={dolbyLayout}
-                            frontSubs={frontSubsForExport}
-                            rearSubs={rearSubsForExport}
-                    roomElements={app?.roomElements || []}
-                    exportMode="dimensions"
-                    exportWidthPx={1200}
-                    exportHeightPx={800}
-                    overlays={{}}
-                    showBaffle={true}
-                    showScreen={true}
-                    speakerPositionsView="plan"
-                    showMlpRuler={false}
-                    zoomMode="off"
-                    screenPlaneMode="fixed"
-                    lcrAimMode={app?.lcrAimMode || "flat"}
-                    aimAtMLP={app?.aimAtMLP ?? false}
-                    onSetSpeakers={rvNoops.onSetSpeakers}
-                    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
-                    onSetScreen={rvNoops.onSetScreen}
-                    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
-                    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
-                    onSetElements={rvNoops.onSetElements}
-                    onSetOverheadState={rvNoops.onSetOverheadState}
-                    onSetAimState={rvNoops.onSetAimState}
-                    onSetRoomDims={rvNoops.onSetRoomDims}
-                    onSetMlpPoint={rvNoops.onSetMlpPoint}
-                />
-                    );
-                })()}
-            </div>
-
-            {/* Hidden seat-metrics builder (NOT for export): keeps app.seatMetricsById live for Report + HUD */}
-            <div
-                data-seat-metrics-builder
-                style={{
-                    position: "fixed",
-                    left: 0,
-                    top: 0,
-                    width: "1200px",
-                    height: "800px",
-                    opacity: 0,
-                    pointerEvents: "none",
-                    zIndex: -1,
-                }}
-            >
-                <RoomVisualisation
+                <ReportHiddenCaptures
+                    app={app}
                     placedSpeakers={placedSpeakers}
-                    seatingPositions={seats}
-                    mlpPoint={primarySeatingPosition}
+                    seats={seats}
+                    primarySeatingPosition={primarySeatingPosition}
                     screen={screen}
-                    exportWidthPx={1200}
-                    exportHeightPx={800}
                     dolbyLayout={dolbyLayout}
-                    frontSubs={frontSubsCfg?.positions || []}
-                    rearSubs={rearSubsCfg?.positions || []}
-                    overlays={{}}
-                    showBaffle={true}
-                    showScreen={true}
-                    speakerPositionsView="off"
-                    showMlpRuler={false}
-                    zoomMode="off"
-                    aimAtMLP={app?.aimAtMLP ?? false}
-                    onSetSpeakers={rvNoops.onSetSpeakers}
-                    onSetSeatingPositions={rvNoops.onSetSeatingPositions}
-                    onSetScreen={rvNoops.onSetScreen}
-                    onSetFrontSubsCfg={rvNoops.onSetFrontSubsCfg}
-                    onSetRearSubsCfg={rvNoops.onSetRearSubsCfg}
-                    onSetElements={rvNoops.onSetElements}
-                    onSetOverheadState={rvNoops.onSetOverheadState}
-                    onSetAimState={rvNoops.onSetAimState}
-                    onSetRoomDims={rvNoops.onSetRoomDims}
-                    onSetMlpPoint={rvNoops.onSetMlpPoint}
                 />
-            </div>
-            
-            <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-4 mb-6">
-                    <div className="flex-1">
-                        <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
-                        <div className="text-base text-[#3E4349] mt-1">
-                            System: {(() => {
-                                const dolbyPreset = app?.dolbyLayout || "5.1";
-                                const base = String(dolbyPreset).split(" ")[0];
-                                const parts = base.split(".");
-                                const bed = parts[0] || "5";
-                                const heights = parts[2] || "";
-                                
-                                const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
-                                const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
-                                const totalSubs = frontCount + rearCount;
-                                
-                                return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-                            })()}
-                        </div>
-                    </div>
-                    <div className="flex gap-3 items-center">
-                        <label className="flex items-center gap-2 text-sm text-[#3E4349] cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={debugPlanCapture}
-                                onChange={(e) => setDebugPlanCapture(e.target.checked)}
-                                className="w-4 h-4 cursor-pointer"
-                            />
-                            <span style={{ fontFamily: "Futura PT Light, Century Gothic, sans-serif" }}>
-                                Plan debug overlay
-                            </span>
-                        </label>
-                        
-                        <Button
-                            type="button"
-                            onClick={() => {
-                                // Prevent double-click / overlapping exports
-                                if (exportGuardRef.current.active) return;
 
-                                exportGuardRef.current = { active: true, startedAt: Date.now() };
+                <div className="max-w-7xl mx-auto space-y-6">
+                    <ReportHeader
+                        app={app}
+                        seats={seats}
+                        placedSpeakers={placedSpeakers}
+                        roomDims={roomDims}
+                        primarySeatingPosition={primarySeatingPosition}
+                        frontSubsCfg={frontSubsCfg}
+                        rearSubsCfg={rearSubsCfg}
+                        debugPlanCapture={debugPlanCapture}
+                        setDebugPlanCapture={setDebugPlanCapture}
+                        showCadExportMenu={showCadExportMenu}
+                        setShowCadExportMenu={setShowCadExportMenu}
+                        exportGuardRef={exportGuardRef}
+                        exportTimeoutRef={exportTimeoutRef}
+                        EXPORT_TIMEOUT_MS={EXPORT_TIMEOUT_MS}
+                        resolveScreenMetricsSnapshot={resolveScreenMetricsSnapshot}
+                        setScreenMetricsForPrint={setScreenMetricsForPrint}
+                        setScreenMetricsStatus={setScreenMetricsStatus}
+                        setExportStatus={setExportStatus}
+                        setExportDebug={setExportDebug}
+                        setHasPrintedOnce={setHasPrintedOnce}
+                        setPlanImageDataUrl={setPlanImageDataUrl}
+                        setPlanDimsImageDataUrl={setPlanDimsImageDataUrl}
+                        setPlanSpeakerDimsImageDataUrl={setPlanSpeakerDimsImageDataUrl}
+                        setIsPrinting={setIsPrinting}
+                    />
 
-                                // Resolve screen metrics immediately (synchronously)
-                                try {
-                                    setScreenMetricsForPrint(resolveScreenMetricsSnapshot());
-                                    setScreenMetricsStatus("Ready");
-                                } catch (e) {
-                                    // If this fails, we still allow Print fallback
-                                    setScreenMetricsStatus("Error");
-                                }
+                    <div className="border-b border-[#E6E4DD]" />
 
-                                // Reset export pipeline state (your existing behaviour)
-                                setExportStatus("Capturing plan images…");
-                                setExportDebug({ isPrinting: true, planLen: 0, printReady: false });
-                                setHasPrintedOnce(false);
-                                setPlanImageDataUrl(null);
-                                setPlanDimsImageDataUrl(null);
-                                setPlanSpeakerDimsImageDataUrl(null);
+                    <ReportCountsDashboard
+                        roomLevelCounts={roomLevelCounts}
+                        seatCountsByRow={seatCountsByRow}
+                        analysisResult={analysisResult}
+                    />
 
-                                // Start the capture/print pipeline
-                                setIsPrinting(true);
-
-                                // SAFETY NET: if nothing finishes, fallback to browser print
-                                if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
-                                exportTimeoutRef.current = setTimeout(() => {
-                                    // If export is still active after timeout, fallback
-                                    if (!exportGuardRef.current.active) return;
-
-                                    exportGuardRef.current.active = false;
-                                    setIsPrinting(false);
-
-                                    setExportStatus("Export stalled — opening Print fallback…");
-                                    try {
-                                        alert(
-                                            "PDF export stalled. We'll open Print instead. In the print window choose 'Save as PDF'."
-                                        );
-                                        setTimeout(() => window.print(), 250);
-                                    } catch (err) {
-                                        alert("Export stalled and Print fallback couldn't open. Please try again.");
-                                    }
-                                }, EXPORT_TIMEOUT_MS);
-                            }}
-                            className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
-                            style={{
-                                fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-                                backgroundColor: "#FFFFFF",
-                                borderColor: "#625143",
-                                color: "#625143",
-                                opacity: 1,
-                            }}
-                        >
-                            <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
-                            Export PDF
-                        </Button>
-                        
-                        <div style={{ position: 'relative' }}>
-                            <Button
-                                type="button"
-                                onClick={() => setShowCadExportMenu(!showCadExportMenu)}
-                                className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
-                                style={{
-                                    fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-                                    backgroundColor: "#FFFFFF",
-                                    borderColor: "#625143",
-                                    color: "#625143",
-                                    opacity: 1,
-                                }}
-                            >
-                                <Download className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
-                                Export CAD overlay
-                            </Button>
-                            
-                            {showCadExportMenu && (
-                                <div 
-                                    style={{
-                                        position: 'absolute',
-                                        top: '100%',
-                                        right: 0,
-                                        marginTop: '8px',
-                                        backgroundColor: '#FFFFFF',
-                                        border: '1px solid #E6E4DD',
-                                        borderRadius: '8px',
-                                        padding: '12px',
-                                        minWidth: '240px',
-                                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
-                                        zIndex: 1000,
-                                    }}
-                                >
-                                    <div style={{ fontSize: '11px', color: '#3E4349', marginBottom: '10px' }}>
-                                        Plan view only • true scale • overlay use
-                                    </div>
-                                    
-                                    <Button
-                                        type="button"
-                                        onClick={() => {
-                                            const projectName = 'RP22Report';
-                                            const date = new Date().toISOString().split('T')[0];
-                                            const filename = `RP22_CAD_Overlay_${projectName}_${date}.svg`;
-                                            
-                                            const svgContent = generateSVG({
-                                                roomDims,
-                                                seatingPositions: seats,
-                                                placedSpeakers,
-                                                screenFrontPlaneM: app?.screenFrontPlaneM,
-                                                mlp: primarySeatingPosition,
-                                                frontSubsCfg,
-                                                rearSubsCfg,
-                                            });
-                                            
-                                            downloadTextFile(svgContent, filename, 'image/svg+xml');
-                                            setShowCadExportMenu(false);
-                                        }}
-                                        className="w-full mb-2 px-4 py-2 text-sm hover:bg-[#F9F8F6]"
-                                        style={{
-                                            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-                                            backgroundColor: "#FFFFFF",
-                                            border: '1px solid #E6E4DD',
-                                            color: "#1B1A1A",
-                                            justifyContent: 'flex-start',
-                                        }}
-                                    >
-                                        Download SVG
-                                    </Button>
-                                    
-                                    <Button
-                                        type="button"
-                                        onClick={() => {
-                                            const projectName = 'RP22Report';
-                                            const date = new Date().toISOString().split('T')[0];
-                                            const filename = `RP22_CAD_Overlay_${projectName}_${date}.dxf`;
-                                            
-                                            const dxfContent = generateDXF({
-                                                roomDims,
-                                                seatingPositions: seats,
-                                                placedSpeakers,
-                                                screenFrontPlaneM: app?.screenFrontPlaneM,
-                                                mlp: primarySeatingPosition,
-                                                frontSubsCfg,
-                                                rearSubsCfg,
-                                            });
-                                            
-                                            downloadTextFile(dxfContent, filename, 'application/dxf');
-                                            setShowCadExportMenu(false);
-                                        }}
-                                        className="w-full px-4 py-2 text-sm hover:bg-[#F9F8F6]"
-                                        style={{
-                                            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
-                                            backgroundColor: "#FFFFFF",
-                                            border: '1px solid #E6E4DD',
-                                            color: "#1B1A1A",
-                                            justifyContent: 'flex-start',
-                                        }}
-                                    >
-                                        Download DXF
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-                <div className="border-b border-[#E6E4DD]" />
-
-                {/* Counts Dashboard */}
-                <div className="grid grid-cols-[auto_1fr] gap-10 items-start mt-8">
-{/* Left: Room count box */}
-<div className="justify-self-start">
-  <div className="border-2 border-[#213428] rounded-lg px-5 py-4 bg-white w-[340px] min-h-[100px] flex flex-col justify-center">
-    <div className="flex items-center gap-2 mb-2">
-      <Home className="w-4 h-4 text-[#213428]" />
-      <div
-        className="text-sm font-semibold text-[#1B1A1A]"
-        style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}
-      >
-        Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
-      </div>
-    </div>
-
-    {/* Pills (match seat cards layout) */}
-    <div className="flex justify-center items-center mt-1 px-1">
-      {(() => {
-        const l4 = Number(roomLevelCounts?.L4 ?? 0);
-        const l3 = Number(roomLevelCounts?.L3 ?? 0);
-        const l2 = Number(roomLevelCounts?.L2 ?? 0);
-        const l1 = Number(roomLevelCounts?.L1 ?? 0);
-
-        const maxRoom = Math.max(l4, l3, l2, l1);
-        const isMax = (v) => v === maxRoom;
-
-        const Wrap = ({ big, children }) => (
-          <div
-            style={{
-              transform: big ? 'scale(1.25)' : 'scale(1)',
-              transformOrigin: 'center',
-            }}
-          >
-            {children}
-          </div>
-        );
-
-        return (
-          <div className="flex gap-3 items-center justify-center">
-            <Wrap big={isMax(l4)}><RP22GradingPill level="L4" count={roomLevelCounts.L4} /></Wrap>
-            <Wrap big={isMax(l3)}><RP22GradingPill level="L3" count={roomLevelCounts.L3} /></Wrap>
-            <Wrap big={isMax(l2)}><RP22GradingPill level="L2" count={roomLevelCounts.L2} /></Wrap>
-            <Wrap big={isMax(l1)}><RP22GradingPill level="L1" count={roomLevelCounts.L1} /></Wrap>
-          </div>
-        );
-      })()}
-    </div>
-  </div>
-</div>
-
-                    {/* Right: Seat parameters section */}
-                    <div className="justify-self-end">
-                        {/* Seat parameters heading */}
-                        <div className="flex items-center gap-2 mb-3">
-                            <User className="w-4 h-4 text-[#213428]" />
-                            <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                Seat parameters
-                            </div>
-                            <span className="text-sm text-gray-500">(10)</span>
-                        </div>
-                        
-                        {/* Seat boxes grouped by row into columns */}
-                        <div className="flex gap-4">
-                            {seatCountsByRow.map(({ rowNum, seats }) => (
-                                <div key={rowNum} className="flex flex-col gap-4">
-                                    {seats.map(({ seatId, counts, total }) => {
-                                        const isPrimary = analysisResult?.perSeatRp22?.[seatId]?.isPrimary === true;
-                                        return (
-                                        <div
-  key={seatId}
-  className={`rounded-lg px-5 py-4 bg-white w-[340px] min-h-[100px] flex flex-col justify-center ${
-    isPrimary
-      ? 'border-[3px] border-[#213428]'
-      : 'border-2 border-[#213428]'
-  }`}
->
-                                            <div className="flex items-center gap-2 mb-2">
-                                                <div className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                    {formatSeatLabel(seatId)}
-                                                </div>
-                                            </div>
-                                            {(() => {
-                                              const maxSeat = Math.max(
-                                                Number(counts?.L4 ?? 0),
-                                                Number(counts?.L3 ?? 0),
-                                                Number(counts?.L2 ?? 0),
-                                                Number(counts?.L1 ?? 0)
-                                              );
-
-                                              const seatIsMax = (k) => Number(counts?.[k] ?? 0) === maxSeat;
-
-                                              return (
-                                                <div className="flex justify-center items-center gap-3 mt-1 px-1">
-                                                  <div style={{ transform: seatIsMax('L4') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                                    <RP22GradingPill level="L4" count={counts.L4} />
-                                                  </div>
-                                                  <div style={{ transform: seatIsMax('L3') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                                    <RP22GradingPill level="L3" count={counts.L3} />
-                                                  </div>
-                                                  <div style={{ transform: seatIsMax('L2') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                                    <RP22GradingPill level="L2" count={counts.L2} />
-                                                  </div>
-                                                  <div style={{ transform: seatIsMax('L1') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                                    <RP22GradingPill level="L1" count={counts.L1} />
-                                                  </div>
-                                                </div>
-                                              );
-                                            })()}
-                                            </div>
-                                            );
-                                            })}
-                                            </div>
-                                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
-                    <CardHeader>
-                        <CardTitle className="text-[#1B1A1A] font-header">
-                            RP22 Parameters (Room)
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
-                            {orderedParams.map(param => (
-                                <ParameterCard
-                                    key={param.id}
-                                    parameter={param}
-                                    roomResult={getRoomResult(param.id)}
-                                    seatResults={getSeatResults(param.id)}
-                                    systemConfig={param.id === 2 ? p2SystemConfig : null}
-                                    p15ConstructionLevel={app?.p15ConstructionLevel}
-                                    onP15ConstructionLevelChange={app?.setP15ConstructionLevel}
-                                    p21EarlyReflectionPreset={app?.p21EarlyReflectionPreset}
-                                    onP21EarlyReflectionPresetChange={app?.setP21EarlyReflectionPreset}
-                                    displayedLevel={getDisplayedRoomLevel(param.id)}
-                                />
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Seat Reports Section */}
-                <Card className="bg-[#FFFFFF] border-[#DCDBD6] mt-6">
-                    <CardHeader>
-                        <CardTitle className="text-[#1B1A1A] font-header">
-                            RP22 Parameters (Seat)
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-stretch">
-                            {(() => {
-                                // Check state before rendering
-                                if (!hasSeats) {
-                                    return (
-                                        <p className="text-sm text-[#3E4349]">
-                                            No seats defined yet. Configure seating in Room Designer.
-                                        </p>
-                                    );
-                                }
-
-                                return seats.map((seat, seatIdx) => {
-                                    const seatId = seat?.id || '—';
-                                    
-                                    // SINGLE SOURCE OF TRUTH: always use the local buildSeatHudSnapshot result first
-                                    // (this is the only way to guarantee the Report matches the live HUD logic)
-                                    const tooltipData =
-                                        reportSeatHudById?.[seatId] ??
-                                        app?.seatMetricsById?.[seatId] ??
-                                        null;
-                                    const rp23 = tooltipData?.rp23 || {};
-                                    const rp22Hud = tooltipData?.rp22 || {};
-
-                                    const getRp22Metric = (key) => {
-                                      const n = parseInt(String(key).replace("p", ""), 10);
-                                      if (!Number.isFinite(n)) return null;
-
-                                      // Support both formats (HUD historically used p9, engine used 9)
-                                      return rp22Hud[key] ?? rp22Hud[`p${n}`] ?? rp22Hud[n] ?? rp22Hud[String(n)] ?? null;
-                                    };
-                                    
-                                    // Primary-seat badge (leave unchanged)
-                                    const isPrimary = tooltipData?.isPrimary || false;
-                                    
-                                    // Determine suffix label and colour
-                                    const isRsp = seatId === rspSeatId;
-                                    const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '(Secondary)');
-                                    const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
-                                    
-                                    return (
-                                        <div key={seatId} className="flex flex-col h-full" data-seat-index={seatIdx}>
-                                            <Card className="border-[#E6E4DD]">
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-sm font-semibold text-[#1B1A1A] flex items-center gap-2" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                        {formatSeatLabel(seatId)} <span className="text-xs font-semibold" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', color: suffixColor }}>{suffix}</span>
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-2.5 text-xs">
-                                                    {/* RP23 Horizontal Viewing */}
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="flex items-baseline gap-2">
-                                                            <span className="font-normal text-[#3E4349]">RP23 Horizontal:</span>
-                                                            <span className="text-sm font-bold text-[#1B1A1A]">
-                                                                {rp23?.formatted && rp23.formatted !== '—' ? rp23.formatted : '—'}
-                                                            </span>
-                                                        </div>
-                                                        <RP22GradingPill level={rp23?.level || '—'} />
-                                                    </div>
-
-                                                    {/* RP22 Per-Seat Parameters */}
-                                                    {/* Position and distances (from HUD) */}
-                                                    <div className="mt-4 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1">
-                                                        {tooltipData?.position && (
-                                                            <div>
-                                                                <span className="font-medium">Position: </span>
-                                                                {tooltipData.position}
-                                                            </div>
-                                                        )}
-                                                        {tooltipData?.distanceToScreen && (
-                                                            <div>Distance to Screen: {tooltipData.distanceToScreen}</div>
-                                                        )}
-                                                        {tooltipData?.distanceToMLP && (
-                                                            <div>Distance to RSP: {tooltipData.distanceToMLP}</div>
-                                                        )}
-                                                    </div>
-
-                                                    {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
-                                                        const metric = getRp22Metric(key);
-                                                        const paramNum = parseInt(key.substring(1));
-
-                                                        return (
-                                                            <div key={key}>
-                                                                <div className="flex items-baseline justify-between">
-                                                                    {/* Left: P#: value (Room-result typography) */}
-                                                                    <div className="flex items-baseline gap-2">
-                                                                        <span className="font-normal text-[#3E4349]">
-                                                                            P{paramNum}:
-                                                                        </span>
-
-                                                                        <span className="text-sm font-bold text-[#1B1A1A]">
-                                                                            {metric ? (metric.formatted || metric.hudLabel || '—') : '—'}
-                                                                        </span>
-                                                                    </div>
-
-                                                                    {/* Right: Level pill */}
-                                                                    <RP22GradingPill
-                                                                        level={
-                                                                            metric
-                                                                                ? (typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—'))
-                                                                                : '—'
-                                                                        }
-                                                                    />
-                                                                </div>
-
-                                                                {/* P16 breakdown */}
-                                                                {metric && key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
-                                                                    <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                                        {metric.perSpeaker.map(s => 
-                                                                            `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`
-                                                                        ).join(', ')}
-                                                                    </div>
-                                                                )}
-
-                                                                {/* P17 breakdown */}
-                                                                {metric && key === 'p17' && metric.worstRole && (
-                                                                    <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                                        Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                            );
-                                                            })}
-                                                            </CardContent>
-                                                            </Card>
-                                                            </div>
-                                                            );
-                                                            }).filter(Boolean); // Remove any null cards
-                                                            })()}
-                                                            </div>
-
-                                                            {/* Explanatory Footer - render once after all seat cards */}
-                                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                                                            <SeatComplianceSummary position='left' />
-                                                            <SeatComplianceSummary position='middle' />
-                                                            <SeatComplianceSummary position='right' />
-                                                            </div>
-                    </CardContent>
-                </Card>
-            </div>
-            </div>
-
-            {/* Print-only layout */}
-            <div className="print-only print-keep-layout">
-                <div className="print-root">
-                    <div className="print-container rp22-report">
-                        <section id="pdf-cover">
-                        {/* PAGE 1: Headline + counts only */}
-                        <div className="print-page-break-after print-summary">
-                            {/* Top: centred logo + title */}
-                            <div
-                                style={{
-                                    maxWidth: "460px",
-                                    margin: "0 auto 13mm auto",
-                                    textAlign: "center",
-                                }}
-                            >
-                                <img
-                                    src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
-                                    alt="SoundProof"
-                                    style={{
-                                        width: "100%",
-                                        height: "auto",
-                                        marginBottom: "8mm",
-                                    }}
-                                />
-
-                                <div
-                                    style={{
-                                        fontSize: '26pt',
-                                        fontWeight: 700,
-                                        color: '#1B1A1A',
-                                        lineHeight: 1.2,
-                                        marginBottom: '3mm',
-                                    }}
-                                >
-                                    RP22 Compliance Report
-                                </div>
-
-                                <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.4 }}>
-                                    {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
-                                    <span style={{ margin: '0 8px', color: '#DCDBD6' }}>•</span>
-                                    <span style={{ color: '#625143' }}>
-                                        System: {(() => {
-                                            const dolbyPreset = app?.dolbyLayout || "5.1";
-                                            const base = String(dolbyPreset).split(" ")[0];
-                                            const parts = base.split(".");
-                                            const bed = parts[0] || "5";
-                                            const heights = parts[2] || "";
-                                            const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
-                                            const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
-                                            const totalSubs = frontCount + rearCount;
-                                            return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
-                                        })()}
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Master stack wrapper (all 4 panels + footer) */}
-                            <div className="rp22-cover-stack" style={{ 
-                                maxWidth: '185mm',
-                                                                 margin: '0 auto 0',
-                                                                 display: 'flex',
-                                                                 flexDirection: 'column',
-                                                                 gap: '2mm',
-                            }}>
-                                {/* Room parameters */}
-                                <div
-                                    style={{
-                                        border: '1.5px solid #D9D5CE',
-                                        borderRadius: '10px',
-                                        padding: '9mm 12mm',
-                                        background: '#FBFAF8',
-                                        width: '100%',
-                                        minHeight: '34mm',
-                                    }}
-                                    className="print-avoid-break rp22-cover-card"
-                                >
-                                    <div
-                                        style={{
-                                            fontSize: '15pt',
-                                            fontWeight: 700,
-                                            color: '#1B1A1A',
-                                            marginBottom: '4mm',
-                                            textAlign: 'center',
-                                        }}
-                                    >
-                                        Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
-                                    </div>
-
-                                    {(() => {
-                                      const maxRoom = Math.max(
-                                        Number(roomLevelCounts?.L4 ?? 0),
-                                        Number(roomLevelCounts?.L3 ?? 0),
-                                        Number(roomLevelCounts?.L2 ?? 0),
-                                        Number(roomLevelCounts?.L1 ?? 0)
-                                      );
-
-                                      const roomIsMax = (k) => Number(roomLevelCounts?.[k] ?? 0) === maxRoom;
-
-                                      return (
-                                        <div
-                                          style={{
-                                            display: 'flex',
-                                            justifyContent: 'center',
-                                            alignItems: 'center',
-                                            gap: '6mm',
-                                            paddingTop: '1mm',
-                                            paddingBottom: '1mm',
-                                            fontSize: '110%',
-                                          }}
-                                        >
-                                          <div style={{ transform: roomIsMax('L4') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                            <RP22GradingPill level="L4" count={roomLevelCounts.L4} />
-                                          </div>
-                                          <div style={{ transform: roomIsMax('L3') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                            <RP22GradingPill level="L3" count={roomLevelCounts.L3} />
-                                          </div>
-                                          <div style={{ transform: roomIsMax('L2') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                            <RP22GradingPill level="L2" count={roomLevelCounts.L2} />
-                                          </div>
-                                          <div style={{ transform: roomIsMax('L1') ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}>
-                                            <RP22GradingPill level="L1" count={roomLevelCounts.L1} />
-                                          </div>
-                                        </div>
-                                      );
-                                    })()}
-                                </div>
-
-                                {/* Seat parameters */}
-                                <div
-                                    style={{
-                                        border: '1.5px solid #D9D5CE',
-                                        borderRadius: '10px',
-                                        padding: '8mm 10mm',
-                                        background: '#FBFAF8',
-                                        width: '100%',
-                                    }}
-                                    className="print-avoid-break rp22-cover-card"
-                                >
-                                    <div
-                                        style={{
-                                            fontSize: '15pt',
-                                            fontWeight: 700,
-                                            color: '#1B1A1A',
-                                            marginBottom: '4mm',
-                                            textAlign: 'center',
-                                        }}
-                                    >
-                                        Seat parameters ({seats?.length || 0} seats)
-                                    </div>
-
-                                    <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
-                                        {(() => {
-                                            const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
-                                            (seatLevelCounts || []).forEach(s => {
-                                                agg.L4 += s.counts?.L4 || 0;
-                                                agg.L3 += s.counts?.L3 || 0;
-                                                agg.L2 += s.counts?.L2 || 0;
-                                                agg.L1 += s.counts?.L1 || 0;
-                                            });
-                                            return (
-                                                <>
-                                                    <RP22GradingPill level="L4" count={agg.L4} />
-                                                    <RP22GradingPill level="L3" count={agg.L3} />
-                                                    <RP22GradingPill level="L2" count={agg.L2} />
-                                                    <RP22GradingPill level="L1" count={agg.L1} />
-                                                </>
-                                            );
-                                        })()}
-                                    </div>
-                                </div>
-
-                                {/* Screen & Viewing Geometry */}
-                                <div
-                                    style={{
-                                        border: '1.5px solid #D9D5CE',
-                                        borderRadius: '10px',
-                                        padding: '8mm 10mm',
-                                        background: '#FBFAF8',
-                                        width: '100%',
-                                    }}
-                                    className="print-avoid-break rp22-cover-card"
-                                >
-                                    <div
-                                        style={{
-                                            fontSize: '15pt',
-                                            fontWeight: 700,
-                                            color: '#1B1A1A',
-                                            marginBottom: '4mm',
-                                            textAlign: 'center',
-                                        }}
-                                    >
-                                        Screen &amp; Viewing Geometry
-                                    </div>
-
-                                    {(() => {
-                                        // Prefer the resolved snapshot created before export
-                                        const snap = screenMetricsForPrint;
-
-                                        const viewWm = Number(snap?.viewWm);
-                                        const viewHm = Number(snap?.viewHm);
-                                        const overallWm = Number(snap?.overallWm);
-                                        const overallHm = Number(snap?.overallHm);
-
-                                        const horizontalDeg = Number(snap?.horizontalDeg);
-                                        const verticalDeg = Number(snap?.verticalDeg);
-                                        const wallDistM = Number(snap?.wallDistM);
-
-                                        const choiceLabel = String(snap?.screenChoiceLabel || formatScreenChoiceLabel(screen) || "Not specified");
-
-                                        const hasViewable = Number.isFinite(viewWm) && viewWm > 0 && Number.isFinite(viewHm) && viewHm > 0;
-                                        const hasOverall = Number.isFinite(overallWm) && overallWm > 0 && Number.isFinite(overallHm) && overallHm > 0;
-                                        const hasAngles = Number.isFinite(horizontalDeg) && Number.isFinite(verticalDeg);
-                                        const hasWallDist = Number.isFinite(wallDistM) && wallDistM >= 0;
-
-                                        const fmtCm = (m) => `${Math.round(m * 100)}`;
-                                        const fmtIn = (m) => `${(m * 39.3701).toFixed(1)}`;
-
-                                        return (
-                                            <div style={{ display: 'flex', gap: '8mm' }}>
-                                                {/* Left: Screen size */}
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>
-                                                        Screen size — {choiceLabel}
-                                                    </div>
-
-                                                         <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.7 }}>
-                                                         <div><strong>Viewable area</strong></div>
-                                                    {hasViewable ? (
-                                                        <div>
-                                                            {fmtCm(viewWm)} × {fmtCm(viewHm)} cm ({fmtIn(viewWm)}" × {fmtIn(viewHm)}")
-                                                        </div>
-                                                    ) : (
-                                                        <div>Not specified</div>
-                                                    )}
-
-                                                    <div style={{ marginTop: '2.5mm' }}><strong>Overall with border</strong></div>
-                                                    {hasOverall ? (
-                                                        <div>
-                                                            {fmtCm(overallWm)} × {fmtCm(overallHm)} cm ({fmtIn(overallWm)}" × {fmtIn(overallHm)}")
-                                                        </div>
-                                                    ) : (
-                                                        <div>Not specified</div>
-                                                    )}
-                                                    </div>
-                                                    </div>
-
-                                                    {/* Right: Viewing geometry */}
-                                                    <div style={{ flex: 1 }}>
-                                                        <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>
-                                                            Viewing geometry
-                                                        </div>
-
-                                                        <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.7 }}>
-                                                    <div>
-                                                        <strong>Horizontal viewing angle:</strong>{" "}
-                                                        {hasAngles ? `${horizontalDeg.toFixed(1)}°` : "Not specified"}
-                                                    </div>
-                                                    <div>
-                                                        <strong>Vertical viewing angle:</strong>{" "}
-                                                        {hasAngles ? `${verticalDeg.toFixed(1)}°` : "Not specified"}
-                                                    </div>
-
-                                                    <div style={{ marginTop: '2.5mm' }}><strong>Distance from front wall</strong></div>
-                                                    {hasWallDist ? (
-                                                        <div>{Math.round(wallDistM * 100)} cm ({(wallDistM * 39.3701).toFixed(1)}")</div>
-                                                    ) : (
-                                                        <div>Not specified</div>
-                                                    )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-
-                                {/* System Summary */}
-                                <div
-                                    style={{
-                                        border: '1.5px solid #D9D5CE',
-                                        borderRadius: '10px',
-                                        padding: '8mm 10mm',
-                                        background: '#FBFAF8',
-                                        width: '100%',
-                                    }}
-                                    className="print-avoid-break rp22-cover-card"
-                                >
-                                    <div
-                                        style={{
-                                            fontSize: '15pt',
-                                            fontWeight: 700,
-                                            color: '#1B1A1A',
-                                            marginBottom: '4mm',
-                                            textAlign: 'center',
-                                        }}
-                                    >
-                                        System summary
-                                    </div>
-                                    <div
-                                        style={{
-                                            fontSize: '10pt',
-                                            color: '#3E4349',
-                                            marginBottom: '5mm',
-                                            textAlign: 'center',
-                                        }}
-                                    >
-                                        Selected loudspeaker models
-                                    </div>
-
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4mm' }}>
-                                        {/* LCR */}
-                                        <div style={{ display: 'flex', paddingBottom: '4mm', borderBottom: '1px solid #EEEAE3' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A' }}>
-                                                LCR
-                                            </div>
-                                            <div style={{ width: '70%', fontSize: '11.5pt', color: '#3E4349' }}>
-                                                {systemSummary.lcr.join(', ')}
-                                            </div>
-                                        </div>
-
-                                        {/* Surrounds */}
-                                        <div style={{ display: 'flex', paddingBottom: '4mm', borderBottom: '1px solid #EEEAE3' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A' }}>
-                                                Surrounds
-                                            </div>
-                                            <div style={{ width: '70%', fontSize: '11.5pt', color: '#3E4349' }}>
-                                                {systemSummary.surrounds.join(', ')}
-                                            </div>
-                                        </div>
-
-                                        {/* Overheads */}
-                                        <div style={{ display: 'flex', paddingBottom: '4mm', borderBottom: '1px solid #EEEAE3' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A' }}>
-                                                Overheads
-                                            </div>
-                                            <div style={{ width: '70%', fontSize: '11.5pt', color: '#3E4349' }}>
-                                                {systemSummary.overheads.join(', ')}
-                                            </div>
-                                        </div>
-
-                                        {/* Subwoofers */}
-                                        <div style={{ display: 'flex' }}>
-                                            <div style={{ width: '30%', fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A' }}>
-                                                Subwoofers
-                                            </div>
-                                            <div style={{ width: '70%', fontSize: '11.5pt', color: '#3E4349' }}>
-                                                {systemSummary.subs.join(', ')}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Optional small note at bottom of page 1 */}
-                                <div style={{ marginTop: '2mm', fontSize: '8.5pt', color: '#625143', textAlign: 'center' }}>
-                                    Generated from current Room Designer configuration and live analysis state.
-                                </div>
-                            </div>
-                        </div>
-                        </section>
-
-                        {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
-                                <div className="plan-fitbox">
-                                    <img
-                                        src={planImageDataUrl}
-                                        alt="Room plan"
-                                        style={{
-                                            background: 'transparent',
-                                        }}
-                                    />
-                                </div>
-                            </section>
-                        )}
-
-                        {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
-                            <section id="pdf-room-plan-dims" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
-                                <div className="plan-fitbox">
-                                    <img
-                                        src={planDimsImageDataUrl}
-                                        alt="Room plan (dimensions)"
-                                        style={{
-                                            background: 'transparent',
-                                        }}
-                                    />
-                                </div>
-                            </section>
-                        )}
-
-                        {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
-                            <section
-                                id="pdf-room-plan-positions"
-                                className="print-page-break-after"
-                                style={{ background: "transparent", padding: 0, margin: 0 }}
-                            >
-                                <div className="plan-fitbox">
-                                    <img
-                                        src={planSpeakerDimsImageDataUrl}
-                                        alt="Room plan (speaker positions)"
-                                        style={{
-                                            background: "transparent",
-                                        }}
-                                    />
-                                </div>
-                            </section>
-                        )}
-
-                        <section id="pdf-room-parameters">
-                        {/* ROOM PARAMETERS */}
-                        <div>
-                        <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
-                            RP22 Parameters (Room)
-                        </div>
-                        <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>
-                            Room-wide compliance parameters (non seat-specific).
-                        </div>
-                        <div className="rp22-params-grid rp22-cards-grid">
-                            {orderedParams.map(param => (
-                                <div key={param.id} className="rp22-card-wrap">
-                                    <div className="rp22-param-card">
+                    <Card className="bg-[#FFFFFF] border-[#DCDBD6]">
+                        <CardHeader>
+                            <CardTitle className="text-[#1B1A1A] font-header">RP22 Parameters (Room)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+                                {orderedParams.map(param => (
                                     <ParameterCard
+                                        key={param.id}
                                         parameter={param}
                                         roomResult={getRoomResult(param.id)}
                                         seatResults={getSeatResults(param.id)}
@@ -3395,137 +685,260 @@ function flattenExportTransforms(svgClone) {
                                         p21EarlyReflectionPreset={app?.p21EarlyReflectionPreset}
                                         onP21EarlyReflectionPresetChange={app?.setP21EarlyReflectionPreset}
                                         displayedLevel={getDisplayedRoomLevel(param.id)}
-                                        />
+                                    />
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <ReportSeatParametersCard
+                        seats={seats}
+                        hasSeats={hasSeats}
+                        reportSeatHudById={reportSeatHudById}
+                        app={app}
+                        rspSeatId={rspSeatId}
+                        analysisResult={analysisResult}
+                    />
+                </div>
+            </div>
+
+            {/* Print-only layout */}
+            <div className="print-only print-keep-layout">
+                <div className="print-root">
+                    <div className="print-container rp22-report">
+                        <section id="pdf-cover">
+                            <div className="print-page-break-after print-summary">
+                                <div style={{ maxWidth: "460px", margin: "0 auto 13mm auto", textAlign: "center" }}>
+                                    <img
+                                        src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/a8e555dac_Screenshot2025-08-31at135313.jpg"
+                                        alt="SoundProof"
+                                        style={{ width: "100%", height: "auto", marginBottom: "8mm" }}
+                                    />
+                                    <div style={{ fontSize: '26pt', fontWeight: 700, color: '#1B1A1A', lineHeight: 1.2, marginBottom: '3mm' }}>
+                                        RP22 Compliance Report
+                                    </div>
+                                    <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.4 }}>
+                                        {new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                        <span style={{ margin: '0 8px', color: '#DCDBD6' }}>•</span>
+                                        <span style={{ color: '#625143' }}>
+                                            System: {(() => {
+                                                const dolbyPreset = app?.dolbyLayout || "5.1";
+                                                const base = String(dolbyPreset).split(" ")[0];
+                                                const parts = base.split(".");
+                                                const bed = parts[0] || "5";
+                                                const heights = parts[2] || "";
+                                                const totalSubs = Number(app?.frontSubsCfg?.count ?? 0) + Number(app?.rearSubsCfg?.count ?? 0);
+                                                return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+                                            })()}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <div className="rp22-cover-stack" style={{ maxWidth: '185mm', margin: '0 auto 0', display: 'flex', flexDirection: 'column', gap: '2mm' }}>
+                                    {/* Room parameters */}
+                                    <div style={{ border: '1.5px solid #D9D5CE', borderRadius: '10px', padding: '9mm 12mm', background: '#FBFAF8', width: '100%', minHeight: '34mm' }} className="print-avoid-break rp22-cover-card">
+                                        <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>
+                                            Room parameters ({roomLevelCounts.L4 + roomLevelCounts.L3 + roomLevelCounts.L2 + roomLevelCounts.L1})
                                         </div>
+                                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '6mm', paddingTop: '1mm', paddingBottom: '1mm', fontSize: '110%' }}>
+                                            {['L4', 'L3', 'L2', 'L1'].map(lvl => {
+                                                const maxRoom = Math.max(roomLevelCounts.L4, roomLevelCounts.L3, roomLevelCounts.L2, roomLevelCounts.L1);
+                                                return <div key={lvl} style={{ transform: roomLevelCounts[lvl] === maxRoom ? 'scale(1.25)' : 'none', transformOrigin: 'center' }}><RP22GradingPill level={lvl} count={roomLevelCounts[lvl]} /></div>;
+                                            })}
                                         </div>
-                                        ))}
+                                    </div>
+
+                                    {/* Seat parameters */}
+                                    <div style={{ border: '1.5px solid #D9D5CE', borderRadius: '10px', padding: '8mm 10mm', background: '#FBFAF8', width: '100%' }} className="print-avoid-break rp22-cover-card">
+                                        <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>
+                                            Seat parameters ({seats?.length || 0} seats)
                                         </div>
-                        </div>
-                        </section>
-                        
-                        <section id="pdf-seat-parameters">
-                        {/* SEAT PARAMETERS */}
-                        <div className="print-page-break-before" style={{ marginTop: 18 }}>
-                        <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>
-                            RP22 Parameters (Seat)
-                        </div>
-                        <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>
-                            Seat-by-seat compliance parameters including RP23 horizontal viewing.
-                        </div>
-                        <div className="rp22-params-grid rp22-cards-grid">
-                            {(() => {
-                                const greenDot = app?.mlp;
-                                let rspSeatId = null;
-                                if (greenDot && Number.isFinite(greenDot.x) && Number.isFinite(greenDot.y)) {
-                                    let closestSeat = null;
-                                    let minDist = Infinity;
-                                    seats.forEach(s => {
-                                        if (!Number.isFinite(s?.x) || !Number.isFinite(s?.y)) return;
-                                        const d = Math.hypot(s.x - greenDot.x, s.y - greenDot.y);
-                                        if (d < minDist) { minDist = d; closestSeat = s.id; }
-                                    });
-                                    if (minDist <= 0.05) rspSeatId = closestSeat;
-                                }
+                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '5mm', fontSize: '110%' }}>
+                                            {(() => {
+                                                const agg = { L4: 0, L3: 0, L2: 0, L1: 0 };
+                                                (seatLevelCounts || []).forEach(s => { agg.L4 += s.counts?.L4 || 0; agg.L3 += s.counts?.L3 || 0; agg.L2 += s.counts?.L2 || 0; agg.L1 += s.counts?.L1 || 0; });
+                                                return ['L4', 'L3', 'L2', 'L1'].map(lvl => <RP22GradingPill key={lvl} level={lvl} count={agg[lvl]} />);
+                                            })()}
+                                        </div>
+                                    </div>
 
-                                return seats.map((seat, seatIdx) => {
-                                    const seatId = seat?.id || '—';
-
-                                    // SINGLE SOURCE OF TRUTH: use latest seat snapshot (matches HUD exactly)
-                                    const tooltipData =
-                                        app?.seatSnapshotBySeatId?.[seatId] ??
-                                        reportSeatHudById?.[seatId] ??
-                                        app?.seatMetricsById?.[seatId] ??
-                                        null;
-                                    const rp23 = tooltipData?.rp23 || {};
-                                    const rp22Hud = tooltipData?.rp22 || {};
-
-                                    const getRp22Metric = (key) => {
-                                      const n = parseInt(String(key).replace("p", ""), 10);
-                                      if (!Number.isFinite(n)) return null;
-
-                                      // Support both formats (HUD historically used p9, engine used 9)
-                                      return rp22Hud[key] ?? rp22Hud[`p${n}`] ?? rp22Hud[n] ?? rp22Hud[String(n)] ?? null;
-                                    };
-                                    
-                                    // Primary-seat badge (leave unchanged)
-                                    const isPrimary = tooltipData?.isPrimary || false;
-                                    
-                                    const isRsp = seatId === rspSeatId;
-                                    const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '(Secondary)');
-                                    const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
-                                    const seatLabel = formatSeatLabel(seatId);
-
-                                    return (
-                                        <div 
-                                            key={seatId} 
-                                            className="rp22-card-wrap"
-                                            data-print-seat={seatLabel}
-                                            data-print-index={seatIdx}
-                                        >
-                                        <div className="rp22-param-card rp22-seat-card">
-                                            <Card className="border-[#E6E4DD]">
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
-                                                        {formatSeatLabel(seatId)}{' '}
-                                                        <span style={{ fontSize: 11, fontWeight: 700, color: suffixColor }}>{suffix}</span>
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-2.5 text-xs">
-                                                    <div className="flex justify-between items-center">
-                                                        <div className="flex items-baseline gap-2">
-                                                            <span className="font-normal text-[#3E4349]">RP23 Horizontal:</span>
-                                                            <span className="text-sm font-bold text-[#1B1A1A]">
-                                                                {rp23?.formatted && rp23.formatted !== '—' ? rp23.formatted : '—'}
-                                                            </span>
+                                    {/* Screen & Viewing Geometry */}
+                                    <div style={{ border: '1.5px solid #D9D5CE', borderRadius: '10px', padding: '8mm 10mm', background: '#FBFAF8', width: '100%' }} className="print-avoid-break rp22-cover-card">
+                                        <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>Screen &amp; Viewing Geometry</div>
+                                        {(() => {
+                                            const snap = screenMetricsForPrint;
+                                            const viewWm = Number(snap?.viewWm); const viewHm = Number(snap?.viewHm);
+                                            const overallWm = Number(snap?.overallWm); const overallHm = Number(snap?.overallHm);
+                                            const horizontalDeg = Number(snap?.horizontalDeg); const verticalDeg = Number(snap?.verticalDeg);
+                                            const wallDistM = Number(snap?.wallDistM);
+                                            const choiceLabel = String(snap?.screenChoiceLabel || formatScreenChoiceLabel(screen) || "Not specified");
+                                            const hasViewable = Number.isFinite(viewWm) && viewWm > 0 && Number.isFinite(viewHm) && viewHm > 0;
+                                            const hasOverall = Number.isFinite(overallWm) && overallWm > 0 && Number.isFinite(overallHm) && overallHm > 0;
+                                            const hasAngles = Number.isFinite(horizontalDeg) && Number.isFinite(verticalDeg);
+                                            const hasWallDist = Number.isFinite(wallDistM) && wallDistM >= 0;
+                                            const fmtCm = (m) => `${Math.round(m * 100)}`; const fmtIn = (m) => `${(m * 39.3701).toFixed(1)}`;
+                                            return (
+                                                <div style={{ display: 'flex', gap: '8mm' }}>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>Screen size — {choiceLabel}</div>
+                                                        <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.7 }}>
+                                                            <div><strong>Viewable area</strong></div>
+                                                            {hasViewable ? <div>{fmtCm(viewWm)} × {fmtCm(viewHm)} cm ({fmtIn(viewWm)}" × {fmtIn(viewHm)}")</div> : <div>Not specified</div>}
+                                                            <div style={{ marginTop: '2.5mm' }}><strong>Overall with border</strong></div>
+                                                            {hasOverall ? <div>{fmtCm(overallWm)} × {fmtCm(overallHm)} cm ({fmtIn(overallWm)}" × {fmtIn(overallHm)}")</div> : <div>Not specified</div>}
                                                         </div>
-                                                        <RP22GradingPill level={rp23?.level || '—'} />
                                                     </div>
-                                                    <div className="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1">
-                                                        {tooltipData?.position && <div><span className="font-medium">Position: </span>{tooltipData.position}</div>}
-                                                        {tooltipData?.distanceToScreen && <div>Distance to Screen: {tooltipData.distanceToScreen}</div>}
-                                                        {tooltipData?.distanceToMLP && <div>Distance to RSP: {tooltipData.distanceToMLP}</div>}
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: 600, fontSize: '11pt', color: '#1B1A1A', marginBottom: '3mm' }}>Viewing geometry</div>
+                                                        <div style={{ fontSize: '10pt', color: '#3E4349', lineHeight: 1.7 }}>
+                                                            <div><strong>Horizontal viewing angle:</strong> {hasAngles ? `${horizontalDeg.toFixed(1)}°` : "Not specified"}</div>
+                                                            <div><strong>Vertical viewing angle:</strong> {hasAngles ? `${verticalDeg.toFixed(1)}°` : "Not specified"}</div>
+                                                            <div style={{ marginTop: '2.5mm' }}><strong>Distance from front wall</strong></div>
+                                                            {hasWallDist ? <div>{Math.round(wallDistM * 100)} cm ({(wallDistM * 39.3701).toFixed(1)}")</div> : <div>Not specified</div>}
+                                                        </div>
                                                     </div>
-                                                    {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
-                                                        const metric = getRp22Metric(key);
-                                                        const paramNum = parseInt(key.substring(1), 10);
-                                                        return (
-                                                            <div key={key}>
-                                                                <div className="flex items-baseline justify-between">
-                                                                    <div className="flex items-baseline gap-2">
-                                                                        <span className="font-normal text-[#3E4349]">P{paramNum}:</span>
-                                                                        <span className="text-sm font-bold text-[#1B1A1A]">
-                                                                            {metric ? (metric.formatted || metric.hudLabel || '—') : '—'}
-                                                                        </span>
-                                                                    </div>
-                                                                    <RP22GradingPill level={metric ? (typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—')) : '—'} />
-                                                                </div>
-                                                                {metric && key === 'p16' && metric.perSpeaker && metric.perSpeaker.length > 0 && (
-                                                                    <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                                        {metric.perSpeaker.map(s => `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`).join(', ')}
-                                                                    </div>
-                                                                )}
-                                                                {metric && key === 'p17' && metric.worstRole && (
-                                                                    <div className="text-[10px] text-gray-500 pl-2 mt-0.5">
-                                                                        Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)
-                                                                    </div>
-                                                                )}
-                                                                </div>
-                                                                );
-                                                                })}
-                                                                </CardContent>
-                                                                </Card>
-                                                                </div>
-                                                                </div>
-                                                                );
-                                                                }).filter(Boolean);
-                                                                })()}
                                                 </div>
-                        <div className="grid grid-cols-3 gap-4 mt-6 print-avoid-break">
-                            <SeatComplianceSummary position="left" />
-                            <SeatComplianceSummary position="middle" />
-                            <SeatComplianceSummary position="right" />
-                        </div>
-                        </div>
+                                            );
+                                        })()}
+                                    </div>
+
+                                    {/* System Summary */}
+                                    <div style={{ border: '1.5px solid #D9D5CE', borderRadius: '10px', padding: '8mm 10mm', background: '#FBFAF8', width: '100%' }} className="print-avoid-break rp22-cover-card">
+                                        <div style={{ fontSize: '15pt', fontWeight: 700, color: '#1B1A1A', marginBottom: '4mm', textAlign: 'center' }}>System summary</div>
+                                        <div style={{ fontSize: '10pt', color: '#3E4349', marginBottom: '5mm', textAlign: 'center' }}>Selected loudspeaker models</div>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4mm' }}>
+                                            {[['LCR', systemSummary.lcr], ['Surrounds', systemSummary.surrounds], ['Overheads', systemSummary.overheads], ['Subwoofers', systemSummary.subs]].map(([label, models], i, arr) => (
+                                                <div key={label} style={{ display: 'flex', paddingBottom: i < arr.length - 1 ? '4mm' : 0, borderBottom: i < arr.length - 1 ? '1px solid #EEEAE3' : 'none' }}>
+                                                    <div style={{ width: '30%', fontWeight: 600, fontSize: '11.5pt', color: '#1B1A1A' }}>{label}</div>
+                                                    <div style={{ width: '70%', fontSize: '11.5pt', color: '#3E4349' }}>{models.join(', ')}</div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div style={{ marginTop: '2mm', fontSize: '8.5pt', color: '#625143', textAlign: 'center' }}>
+                                        Generated from current Room Designer configuration and live analysis state.
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+
+                        {planEnabled && typeof planImageDataUrl === 'string' && planImageDataUrl.length > 0 && planImageDataUrl !== '__SKIP__' && (
+                            <section id="pdf-room-plan" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                                <div className="plan-fitbox"><img src={planImageDataUrl} alt="Room plan" style={{ background: 'transparent' }} /></div>
+                            </section>
+                        )}
+
+                        {planEnabled && typeof planDimsImageDataUrl === 'string' && planDimsImageDataUrl.length > 0 && planDimsImageDataUrl !== '__SKIP__' && (
+                            <section id="pdf-room-plan-dims" className="print-page-break-after" style={{ background: 'transparent', padding: 0, margin: 0 }}>
+                                <div className="plan-fitbox"><img src={planDimsImageDataUrl} alt="Room plan (dimensions)" style={{ background: 'transparent' }} /></div>
+                            </section>
+                        )}
+
+                        {planEnabled && typeof planSpeakerDimsImageDataUrl === 'string' && planSpeakerDimsImageDataUrl.length > 0 && planSpeakerDimsImageDataUrl !== '__SKIP__' && (
+                            <section id="pdf-room-plan-positions" className="print-page-break-after" style={{ background: "transparent", padding: 0, margin: 0 }}>
+                                <div className="plan-fitbox"><img src={planSpeakerDimsImageDataUrl} alt="Room plan (speaker positions)" style={{ background: "transparent" }} /></div>
+                            </section>
+                        )}
+
+                        <section id="pdf-room-parameters">
+                            <div>
+                                <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters (Room)</div>
+                                <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Room-wide compliance parameters (non seat-specific).</div>
+                                <div className="rp22-params-grid rp22-cards-grid">
+                                    {orderedParams.map(param => (
+                                        <div key={param.id} className="rp22-card-wrap">
+                                            <div className="rp22-param-card">
+                                                <ParameterCard
+                                                    parameter={param}
+                                                    roomResult={getRoomResult(param.id)}
+                                                    seatResults={getSeatResults(param.id)}
+                                                    systemConfig={param.id === 2 ? p2SystemConfig : null}
+                                                    p15ConstructionLevel={app?.p15ConstructionLevel}
+                                                    onP15ConstructionLevelChange={app?.setP15ConstructionLevel}
+                                                    p21EarlyReflectionPreset={app?.p21EarlyReflectionPreset}
+                                                    onP21EarlyReflectionPresetChange={app?.setP21EarlyReflectionPreset}
+                                                    displayedLevel={getDisplayedRoomLevel(param.id)}
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </section>
+
+                        <section id="pdf-seat-parameters">
+                            <div className="print-page-break-before" style={{ marginTop: 18 }}>
+                                <div style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif', fontSize: 18, fontWeight: 700, color: '#1B1A1A', marginBottom: 14 }}>RP22 Parameters (Seat)</div>
+                                <div style={{ color: '#3E4349', fontSize: 11, marginBottom: 10 }}>Seat-by-seat compliance parameters including RP23 horizontal viewing.</div>
+                                <div className="rp22-params-grid rp22-cards-grid">
+                                    {seats.map((seat, seatIdx) => {
+                                        const seatId = seat?.id || '—';
+                                        const tooltipData = app?.seatSnapshotBySeatId?.[seatId] ?? reportSeatHudById?.[seatId] ?? app?.seatMetricsById?.[seatId] ?? null;
+                                        const rp23 = tooltipData?.rp23 || {};
+                                        const rp22Hud = tooltipData?.rp22 || {};
+                                        const getRp22Metric = (key) => { const n = parseInt(String(key).replace("p", ""), 10); if (!Number.isFinite(n)) return null; return rp22Hud[key] ?? rp22Hud[`p${n}`] ?? rp22Hud[n] ?? rp22Hud[String(n)] ?? null; };
+                                        const isPrimary = tooltipData?.isPrimary || false;
+                                        const isRsp = seatId === rspSeatId;
+                                        const suffix = isRsp ? '(RSP)' : (isPrimary ? '(Primary)' : '(Secondary)');
+                                        const suffixColor = isRsp ? '#213428' : (isPrimary ? '#625143' : '#3E4349');
+                                        const seatLabel = formatSeatLabel(seatId);
+                                        return (
+                                            <div key={seatId} className="rp22-card-wrap" data-print-seat={seatLabel} data-print-index={seatIdx}>
+                                                <div className="rp22-param-card rp22-seat-card">
+                                                    <Card className="border-[#E6E4DD]">
+                                                        <CardHeader className="pb-2">
+                                                            <CardTitle className="text-sm font-semibold text-[#1B1A1A]" style={{ fontFamily: 'Futura PT Light, Century Gothic, sans-serif' }}>
+                                                                {seatLabel}{' '}<span style={{ fontSize: 11, fontWeight: 700, color: suffixColor }}>{suffix}</span>
+                                                            </CardTitle>
+                                                        </CardHeader>
+                                                        <CardContent className="space-y-2.5 text-xs">
+                                                            <div className="flex justify-between items-center">
+                                                                <div className="flex items-baseline gap-2">
+                                                                    <span className="font-normal text-[#3E4349]">RP23 Horizontal:</span>
+                                                                    <span className="text-sm font-bold text-[#1B1A1A]">{rp23?.formatted && rp23.formatted !== '—' ? rp23.formatted : '—'}</span>
+                                                                </div>
+                                                                <RP22GradingPill level={rp23?.level || '—'} />
+                                                            </div>
+                                                            <div className="mt-3 pt-3 border-t border-gray-200 text-xs text-gray-600 space-y-1">
+                                                                {tooltipData?.position && <div><span className="font-medium">Position: </span>{tooltipData.position}</div>}
+                                                                {tooltipData?.distanceToScreen && <div>Distance to Screen: {tooltipData.distanceToScreen}</div>}
+                                                                {tooltipData?.distanceToMLP && <div>Distance to RSP: {tooltipData.distanceToMLP}</div>}
+                                                            </div>
+                                                            {['p1', 'p4', 'p5', 'p6', 'p9', 'p10', 'p16', 'p17', 'p20'].map((key) => {
+                                                                const metric = getRp22Metric(key);
+                                                                const paramNum = parseInt(key.substring(1), 10);
+                                                                return (
+                                                                    <div key={key}>
+                                                                        <div className="flex items-baseline justify-between">
+                                                                            <div className="flex items-baseline gap-2">
+                                                                                <span className="font-normal text-[#3E4349]">P{paramNum}:</span>
+                                                                                <span className="text-sm font-bold text-[#1B1A1A]">{metric ? (metric.formatted || metric.hudLabel || '—') : '—'}</span>
+                                                                            </div>
+                                                                            <RP22GradingPill level={metric ? (typeof metric.level === 'number' ? `L${metric.level}` : (metric.level || '—')) : '—'} />
+                                                                        </div>
+                                                                        {metric && key === 'p16' && metric.perSpeaker?.length > 0 && (
+                                                                            <div className="text-[10px] text-gray-500 pl-2 mt-0.5">{metric.perSpeaker.map(s => `${s.role} ${Math.floor(s.angleDeg || 0)}° / ${s.lossLabel || '—'}`).join(', ')}</div>
+                                                                        )}
+                                                                        {metric && key === 'p17' && metric.worstRole && (
+                                                                            <div className="text-[10px] text-gray-500 pl-2 mt-0.5">Worst: {metric.worstRole} ({Math.floor(metric.worstAngleDeg || 0)}° / {metric.worstLossDb?.toFixed(1) || '—'} dB)</div>
+                                                                        )}
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </CardContent>
+                                                    </Card>
+                                                </div>
+                                            </div>
+                                        );
+                                    }).filter(Boolean)}
+                                </div>
+                                <div className="grid grid-cols-3 gap-4 mt-6 print-avoid-break">
+                                    <SeatComplianceSummary position="left" />
+                                    <SeatComplianceSummary position="middle" />
+                                    <SeatComplianceSummary position="right" />
+                                </div>
+                            </div>
                         </section>
                     </div>
                 </div>
