@@ -727,7 +727,7 @@ appState, // Pass appState directly for setters
     // 9) SUB CONFIG (front/rear groups – config, not positions)
     //
     if (typeof setFrontSubsCfg === "function") {
-      const frontCfg = parseMaybe(p?.front_subs_cfg, null);
+     const frontCfg = parseMaybe((p?.front_subs_cfg ?? p?.frontSubsCfg), null);
       // CRITICAL: Always set front subs config to explicit default if missing
       // Default inactive state: { model: null, count: 0, positions: [], tuning: [] }
       const defaultInactive = { model: null, count: 0, positions: [], tuning: [] };
