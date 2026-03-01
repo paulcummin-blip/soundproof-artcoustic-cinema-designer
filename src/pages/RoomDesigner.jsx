@@ -734,7 +734,7 @@ appState, // Pass appState directly for setters
       setFrontSubsCfg(frontCfg != null ? frontCfg : defaultInactive);
     }
     if (typeof setRearSubsCfg === "function") {
-      const rearCfg = parseMaybe(p?.rear_subs_cfg, null);
+      const rearCfg = parseMaybe((p?.rear_subs_cfg ?? p?.rearSubsCfg), null);
       // CRITICAL: Always set rear subs config to explicit default if missing
       // Default inactive state: { model: null, count: 0, positions: [], tuning: [] }
       const defaultInactive = { model: null, count: 0, positions: [], tuning: [] };
