@@ -945,6 +945,7 @@ appState, // Pass appState directly for setters
         sevenBedLayoutType,
         frontSubsCfg,
         rearSubsCfg,
+        subwoofers: appState?.subwoofers || [],
         lcrAimMode,
         enableFrontWides,
         free_move_lcr: !!freeMoveLcr,
