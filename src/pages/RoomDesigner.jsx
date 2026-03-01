@@ -723,23 +723,64 @@ appState, // Pass appState directly for setters
       setRoomElements(Array.isArray(re) ? re : []);
     }
 
-    //
-    // 9) SUB CONFIG (front/rear groups – config, not positions)
-    //
-    if (typeof setFrontSubsCfg === "function") {
-     const frontCfg = parseProjectJson((p?.front_subs_cfg ?? p?.frontSubsCfg), null);
-      // CRITICAL: Always set front subs config to explicit default if missing
-      // Default inactive state: { model: null, count: 0, positions: [], tuning: [] }
-      const defaultInactive = { model: null, count: 0, positions: [], tuning: [] };
-      setFrontSubsCfg(frontCfg != null ? frontCfg : defaultInactive);
-    }
-    if (typeof setRearSubsCfg === "function") {
-      const rearCfg = parseProjectJson((p?.rear_subs_cfg ?? p?.rearSubsCfg), null);
-      // CRITICAL: Always set rear subs config to explicit default if missing
-      // Default inactive state: { model: null, count: 0, positions: [], tuning: [] }
-      const defaultInactive = { model: null, count: 0, positions: [], tuning: [] };
-      setRearSubsCfg(rearCfg != null ? rearCfg : defaultInactive);
-    }
+ //
+// 9) SUB CONFIG (front/rear groups – config, not positions)
+//
+if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function") {
+  const defaultInactive = { model: null, count: 0, positions: [], tuning: [] };
+
+  const frontCfgRaw = parseProjectJson((p?.front_subs_cfg ?? p?.frontSubsCfg), null);
+  const rearCfgRaw  = parseProjectJson((p?.rear_subs_cfg ?? p?.rearSubsCfg), null);
+
+  // Also look for a persisted sub list
+  const loadedSubs = parseProjectJson(p?.subwoofers, []);
+  const subsList = Array.isArray(loadedSubs) ? loadedSubs : [];
+
+  const frontSubs = subsList.filter(s => (s?.group === "front") || String(s?.role || "").startsWith("SUBF"));
+  const rearSubs  = subsList.filter(s => (s?.group === "rear")  || String(s?.role || "").startsWith("SUBR"));
+
+  const isCfgUsable = (cfg) => {
+    if (!cfg || typeof cfg !== "object") return false;
+    const hasModel = typeof cfg.model === "string" && cfg.model.trim().length > 0;
+    const hasCount = Number.isFinite(Number(cfg.count)) && Number(cfg.count) > 0;
+    return hasModel || hasCount;
+  };
+
+  const deriveCfgFromSubs = (subs) => {
+    if (!subs.length) return null;
+    const model = String(subs?.[0]?.model || "SUB2-12").trim() || "SUB2-12";
+    const positions = subs.map(s => ({ x: Number(s?.position?.x) })).filter(p => Number.isFinite(p.x));
+    return {
+      model,
+      count: subs.length,
+      positions,
+      tuning: []
+    };
+  };
+
+  const frontCfg = isCfgUsable(frontCfgRaw) ? frontCfgRaw : (deriveCfgFromSubs(frontSubs) || defaultInactive);
+  const rearCfg  = isCfgUsable(rearCfgRaw)  ? rearCfgRaw  : (deriveCfgFromSubs(rearSubs)  || defaultInactive);
+
+  setFrontSubsCfg(frontCfg);
+  setRearSubsCfg(rearCfg);
+
+  // Optional but usually helpful: restore the sub list immediately if present
+  if (typeof appState?.setSubwoofers === "function" && subsList.length) {
+    appState.setSubwoofers(subsList);
+  }
+} else {
+  // Fallback to previous behaviour if setters not present
+  if (typeof setFrontSubsCfg === "function") {
+    const frontCfg = parseProjectJson((p?.front_subs_cfg ?? p?.frontSubsCfg), null);
+    const defaultInactive = { model: null, count: 0, positions: [], tuning: [] };
+    setFrontSubsCfg(frontCfg != null ? frontCfg : defaultInactive);
+  }
+  if (typeof setRearSubsCfg === "function") {
+    const rearCfg = parseProjectJson((p?.rear_subs_cfg ?? p?.rearSubsCfg), null);
+    const defaultInactive = { model: null, count: 0, positions: [], tuning: [] };
+    setRearSubsCfg(rearCfg != null ? rearCfg : defaultInactive);
+  }
+}
 
     //
     // 10) SPEAKER ROLES + SPL NODES
