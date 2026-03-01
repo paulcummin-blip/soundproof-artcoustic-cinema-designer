@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AppStateProvider, useAppState } from '../components/AppStateProvider';
+import { useAppState } from '../components/AppStateProvider';
 import { useRP22AnalysisEngine } from '../components/hooks/useRP22AnalysisEngine';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
