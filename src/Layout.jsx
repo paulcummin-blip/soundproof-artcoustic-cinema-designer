@@ -266,6 +266,7 @@ export default function Layout({ children, currentPageName }) {
             </div>
           </main>
         </div>
+        </AppStateProvider>
       </ToastProvider>
     </SafeBootErrorBoundary>
   );
