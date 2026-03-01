@@ -1,0 +1,217 @@
+import React from 'react';
+import { Button } from '@/components/ui/button';
+import { FileText, Download } from 'lucide-react';
+import { generateSVG, generateDXF, downloadTextFile } from '../utils/cadExport';
+
+export default function ReportHeader({
+    app,
+    seats,
+    placedSpeakers,
+    roomDims,
+    primarySeatingPosition,
+    frontSubsCfg,
+    rearSubsCfg,
+    debugPlanCapture,
+    setDebugPlanCapture,
+    showCadExportMenu,
+    setShowCadExportMenu,
+    exportGuardRef,
+    exportTimeoutRef,
+    EXPORT_TIMEOUT_MS,
+    resolveScreenMetricsSnapshot,
+    setScreenMetricsForPrint,
+    setScreenMetricsStatus,
+    setExportStatus,
+    setExportDebug,
+    setHasPrintedOnce,
+    setPlanImageDataUrl,
+    setPlanDimsImageDataUrl,
+    setPlanSpeakerDimsImageDataUrl,
+    setIsPrinting,
+}) {
+    const systemConfigLabel = (() => {
+        const dolbyPreset = app?.dolbyLayout || "5.1";
+        const base = String(dolbyPreset).split(" ")[0];
+        const parts = base.split(".");
+        const bed = parts[0] || "5";
+        const heights = parts[2] || "";
+        const frontCount = Number(app?.frontSubsCfg?.count ?? 0);
+        const rearCount = Number(app?.rearSubsCfg?.count ?? 0);
+        const totalSubs = frontCount + rearCount;
+        return heights ? `${bed}.${totalSubs}.${heights}` : `${bed}.${totalSubs}`;
+    })();
+
+    const handleExportPDF = () => {
+        if (exportGuardRef.current.active) return;
+        exportGuardRef.current = { active: true, startedAt: Date.now() };
+
+        try {
+            setScreenMetricsForPrint(resolveScreenMetricsSnapshot());
+            setScreenMetricsStatus("Ready");
+        } catch (e) {
+            setScreenMetricsStatus("Error");
+        }
+
+        setExportStatus("Capturing plan images…");
+        setExportDebug({ isPrinting: true, planLen: 0, printReady: false });
+        setHasPrintedOnce(false);
+        setPlanImageDataUrl(null);
+        setPlanDimsImageDataUrl(null);
+        setPlanSpeakerDimsImageDataUrl(null);
+        setIsPrinting(true);
+
+        if (exportTimeoutRef.current) clearTimeout(exportTimeoutRef.current);
+        exportTimeoutRef.current = setTimeout(() => {
+            if (!exportGuardRef.current.active) return;
+            exportGuardRef.current.active = false;
+            setIsPrinting(false);
+            setExportStatus("Export stalled — opening Print fallback…");
+            try {
+                alert("PDF export stalled. We'll open Print instead. In the print window choose 'Save as PDF'.");
+                setTimeout(() => window.print(), 250);
+            } catch (err) {
+                alert("Export stalled and Print fallback couldn't open. Please try again.");
+            }
+        }, EXPORT_TIMEOUT_MS);
+    };
+
+    const handleExportSVG = () => {
+        const date = new Date().toISOString().split('T')[0];
+        const filename = `RP22_CAD_Overlay_RP22Report_${date}.svg`;
+        const svgContent = generateSVG({
+            roomDims,
+            seatingPositions: seats,
+            placedSpeakers,
+            screenFrontPlaneM: app?.screenFrontPlaneM,
+            mlp: primarySeatingPosition,
+            frontSubsCfg,
+            rearSubsCfg,
+        });
+        downloadTextFile(svgContent, filename, 'image/svg+xml');
+        setShowCadExportMenu(false);
+    };
+
+    const handleExportDXF = () => {
+        const date = new Date().toISOString().split('T')[0];
+        const filename = `RP22_CAD_Overlay_RP22Report_${date}.dxf`;
+        const dxfContent = generateDXF({
+            roomDims,
+            seatingPositions: seats,
+            placedSpeakers,
+            screenFrontPlaneM: app?.screenFrontPlaneM,
+            mlp: primarySeatingPosition,
+            frontSubsCfg,
+            rearSubsCfg,
+        });
+        downloadTextFile(dxfContent, filename, 'application/dxf');
+        setShowCadExportMenu(false);
+    };
+
+    return (
+        <div className="flex items-start justify-between gap-4 mb-6">
+            <div className="flex-1">
+                <h1 className="text-3xl font-bold text-[#1B1A1A] font-header">RP22 Compliance Report</h1>
+                <div className="text-base text-[#3E4349] mt-1">
+                    System: {systemConfigLabel}
+                </div>
+            </div>
+            <div className="flex gap-3 items-center">
+                <label className="flex items-center gap-2 text-sm text-[#3E4349] cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={debugPlanCapture}
+                        onChange={(e) => setDebugPlanCapture(e.target.checked)}
+                        className="w-4 h-4 cursor-pointer"
+                    />
+                    <span style={{ fontFamily: "Futura PT Light, Century Gothic, sans-serif" }}>
+                        Plan debug overlay
+                    </span>
+                </label>
+
+                <Button
+                    type="button"
+                    onClick={handleExportPDF}
+                    className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
+                    style={{
+                        fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                        backgroundColor: "#FFFFFF",
+                        borderColor: "#625143",
+                        color: "#625143",
+                        opacity: 1,
+                    }}
+                >
+                    <FileText className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
+                    Export PDF
+                </Button>
+
+                <div style={{ position: 'relative' }}>
+                    <Button
+                        type="button"
+                        onClick={() => setShowCadExportMenu(!showCadExportMenu)}
+                        className="px-5 py-2.5 border shadow-sm hover:bg-[#F1F0EE]"
+                        style={{
+                            fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                            backgroundColor: "#FFFFFF",
+                            borderColor: "#625143",
+                            color: "#625143",
+                            opacity: 1,
+                        }}
+                    >
+                        <Download className="w-4 h-4 mr-2" style={{ color: "#625143" }} />
+                        Export CAD overlay
+                    </Button>
+
+                    {showCadExportMenu && (
+                        <div
+                            style={{
+                                position: 'absolute',
+                                top: '100%',
+                                right: 0,
+                                marginTop: '8px',
+                                backgroundColor: '#FFFFFF',
+                                border: '1px solid #E6E4DD',
+                                borderRadius: '8px',
+                                padding: '12px',
+                                minWidth: '240px',
+                                boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+                                zIndex: 1000,
+                            }}
+                        >
+                            <div style={{ fontSize: '11px', color: '#3E4349', marginBottom: '10px' }}>
+                                Plan view only • true scale • overlay use
+                            </div>
+                            <Button
+                                type="button"
+                                onClick={handleExportSVG}
+                                className="w-full mb-2 px-4 py-2 text-sm hover:bg-[#F9F8F6]"
+                                style={{
+                                    fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                                    backgroundColor: "#FFFFFF",
+                                    border: '1px solid #E6E4DD',
+                                    color: "#1B1A1A",
+                                    justifyContent: 'flex-start',
+                                }}
+                            >
+                                Download SVG
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={handleExportDXF}
+                                className="w-full px-4 py-2 text-sm hover:bg-[#F9F8F6]"
+                                style={{
+                                    fontFamily: "Futura PT Light, Century Gothic, sans-serif",
+                                    backgroundColor: "#FFFFFF",
+                                    border: '1px solid #E6E4DD',
+                                    color: "#1B1A1A",
+                                    justifyContent: 'flex-start',
+                                }}
+                            >
+                                Download DXF
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
