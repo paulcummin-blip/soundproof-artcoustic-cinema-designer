@@ -113,6 +113,7 @@ export default function Layout({ children, currentPageName }) {
   return (
     <SafeBootErrorBoundary>
       <ToastProvider>
+        <AppStateProvider>
         <div className="flex min-h-screen w-full bg-brand-background">
           <aside className="w-64 border-r border-brand-border bg-brand-sidebar-bg flex flex-col">
             <div className="p-4">
