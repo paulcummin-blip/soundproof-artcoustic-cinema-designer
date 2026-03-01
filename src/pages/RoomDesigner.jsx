@@ -4513,20 +4513,24 @@ function RoomDesignerWithState() {
     const frontQty = normQty(frontSubsCfg);
     const rearQty = normQty(rearSubsCfg);
 
-   // Only clear placed subs if the user has explicitly set both configs to "no model + zero count"
-// AND there are no already-placed subs (e.g. loaded from project). This prevents post-hydration wipes.
-const hasPlacedSubs = Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0;
-const cfgExplicitNone =
-  (frontSubsCfg && Object.prototype.hasOwnProperty.call(frontSubsCfg, "model") &&
-   Object.prototype.hasOwnProperty.call(frontSubsCfg, "count") &&
-   !String(frontSubsCfg.model || "").trim() && Number(frontSubsCfg.count) === 0) &&
-  (rearSubsCfg && Object.prototype.hasOwnProperty.call(rearSubsCfg, "model") &&
-   Object.prototype.hasOwnProperty.call(rearSubsCfg, "count") &&
-   !String(rearSubsCfg.model || "").trim() && Number(rearSubsCfg.count) === 0);
+   // If nothing selected, clear placed subs
+// IMPORTANT: do not clear if cfg is not explicitly populated yet (prevents post-load wipe)
+const hasExplicitFrontCfg =
+  frontSubsCfg && (Object.prototype.hasOwnProperty.call(frontSubsCfg, "count") ||
+  Object.prototype.hasOwnProperty.call(frontSubsCfg, "qty") ||
+  Object.prototype.hasOwnProperty.call(frontSubsCfg, "model"));
+
+const hasExplicitRearCfg =
+  rearSubsCfg && (Object.prototype.hasOwnProperty.call(rearSubsCfg, "count") ||
+  Object.prototype.hasOwnProperty.call(rearSubsCfg, "qty") ||
+  Object.prototype.hasOwnProperty.call(rearSubsCfg, "model"));
+
+const cfgIsExplicit = hasExplicitFrontCfg || hasExplicitRearCfg;
 
 if ((!frontModel || frontQty === 0) && (!rearModel || rearQty === 0)) {
-  if (hasPlacedSubs) return;
-  if (!cfgExplicitNone) return;
+  // If we don't yet have explicit cfg, do nothing (avoid wiping loaded subs)
+  if (!cfgIsExplicit) return;
+
   setSubwoofers((prev) => (Array.isArray(prev) && prev.length ? [] : prev));
   return;
 }
