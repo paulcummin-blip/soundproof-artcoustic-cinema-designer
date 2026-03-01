@@ -5349,13 +5349,11 @@ export default function RoomDesignerPage() {
   return (
     <SidebarInset>
       <div className="flex flex-col gap-4 px-4 md:px-6">
-        <AppStateProvider key={resolvedProjectId || "new"}>
-          <Suspense fallback={<div className="p-6">Loading…</div>}>
-            <ErrorBoundary fallback={<div className="p-6">Failed to mount Room Designer.</div>}>
-              <RoomDesignerWithState />
-            </ErrorBoundary>
-          </Suspense>
-        </AppStateProvider>
+        <Suspense fallback={<div className="p-6">Loading…</div>}>
+          <ErrorBoundary fallback={<div className="p-6">Failed to mount Room Designer.</div>}>
+            <RoomDesignerWithState />
+          </ErrorBoundary>
+        </Suspense>
       </div>
     </SidebarInset>);
 
