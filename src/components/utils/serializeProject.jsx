@@ -177,8 +177,8 @@ export function serializeProject(input = {}) {
     subwoofers: asArray(subwoofers),
 
     // Sub configs stored as JSON blobs for now
-    front_subs_cfg: asObject(frontSubsCfg),
-    rear_subs_cfg: asObject(rearSubsCfg),
+    front_subs_cfg: j(frontSubsCfg, null),
+    rear_subs_cfg: j(rearSubsCfg, null),
 
     // Overlays / UI state
     overlays: asObject(overlays),
