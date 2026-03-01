@@ -51,7 +51,7 @@ export default function ReportHiddenCaptures({
 
     const screenWithDepth = {
         ...(screen || {}),
-        floatDepthM: screenFrontPlaneM ?? Number(screen?.floatDepthM) || 0,
+        floatDepthM: screenFrontPlaneM ?? (Number(screen?.floatDepthM) || 0),
     };
 
     const frontSubsForExport = buildSubsForExport(app?.frontSubsCfg, 'front');
