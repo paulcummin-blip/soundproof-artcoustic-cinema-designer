@@ -9,6 +9,7 @@ import log from "@/components/utils/logger";
 import { ToastProvider } from "@/components/ui/ToastProvider";
 import { Project } from "@/api/entities/Project";
 import { base44 } from "@/api/base44Client";
+import { AppStateProvider } from "@/components/AppStateProvider";
 import {
   Home,
   Calculator,
