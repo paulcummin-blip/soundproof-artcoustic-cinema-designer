@@ -4527,9 +4527,26 @@ const hasExplicitRearCfg =
 
 const cfgIsExplicit = hasExplicitFrontCfg || hasExplicitRearCfg;
 
+// If cfg looks "inactive", do NOT wipe if we already have placed subs (e.g. just hydrated from project)
+const hasPlacedSubs =
+  Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0;
+
+// Only consider cfg "explicitly set to none" if the user has a model key AND count key
+// AND they are intentionally empty/zero (not just present as defaults)
+const cfgExplicitNone =
+  (frontSubsCfg && Object.prototype.hasOwnProperty.call(frontSubsCfg, "model") &&
+   Object.prototype.hasOwnProperty.call(frontSubsCfg, "count") &&
+   !String(frontSubsCfg.model || "").trim() && Number(frontSubsCfg.count) === 0) &&
+  (rearSubsCfg && Object.prototype.hasOwnProperty.call(rearSubsCfg, "model") &&
+   Object.prototype.hasOwnProperty.call(rearSubsCfg, "count") &&
+   !String(rearSubsCfg.model || "").trim() && Number(rearSubsCfg.count) === 0);
+
 if ((!frontModel || frontQty === 0) && (!rearModel || rearQty === 0)) {
-  // If we don't yet have explicit cfg, do nothing (avoid wiping loaded subs)
-  if (!cfgIsExplicit) return;
+  // If we already have placed subs (loaded from the project), do nothing.
+  if (hasPlacedSubs) return;
+
+  // Only clear when config is explicitly "none" (user intent), not just temporarily inactive.
+  if (!cfgExplicitNone) return;
 
   setSubwoofers((prev) => (Array.isArray(prev) && prev.length ? [] : prev));
   return;
