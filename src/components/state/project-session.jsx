@@ -29,12 +29,17 @@ let state = {
 
 const listeners = new Set();
 
+// Synchronous read of persisted active project id
+export function getActiveProjectId() {
+  if (typeof window === "undefined") return null;
+  try { return window.localStorage.getItem(ACTIVE_PROJECT_KEY) || null; } catch { return null; }
+}
+
 // Persistence helpers
 function load() {
-  // Never restore an "active project" across a fresh page load.
-  // The user must explicitly Open Project in this session.
+  const persistedId = getActiveProjectId();
   const empty = {
-    activeProjectId: null,
+    activeProjectId: persistedId,
     byProject: {},
     spec: { dolbyLayout: undefined, targetSPL_LCR_dB: null },
   };
@@ -49,12 +54,11 @@ function load() {
 
     const parsed = JSON.parse(raw) || {};
     return {
-      activeProjectId: null,               // ← key line: always start with none
+      activeProjectId: persistedId,   // always restore from dedicated key
       byProject: parsed.byProject || {},
       spec: parsed.spec || { dolbyLayout: undefined, targetSPL_LCR_dB: null },
     };
-  } catch (err) {
-    console.warn("[project-session] Failed to load state, starting empty.", err);
+  } catch {
     return empty;
   }
 }
