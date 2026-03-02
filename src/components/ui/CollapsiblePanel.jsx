@@ -10,7 +10,7 @@ const HEADER_BG_MAP = {
   "Speakers":          "rgba(33,52,40,0.16)",
   "Bass Simulation":   "#C1B6AD",
   "Compliance Report": "#F1F0EE",
-  "Options":           "#F8F8F7",
+  "Options":           "rgba(62,67,73,0.08)",
 };
 
 export function CollapsiblePanel({ 
