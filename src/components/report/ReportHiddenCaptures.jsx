@@ -144,8 +144,8 @@ export default function ReportHiddenCaptures({
                     exportWidthPx={1200}
                     exportHeightPx={800}
                     dolbyLayout={dolbyLayout}
-                    frontSubs={app?.frontSubsCfg?.positions || []}
-                    rearSubs={app?.rearSubsCfg?.positions || []}
+                    frontSubs={frontSubsForExport}
+                    rearSubs={rearSubsForExport}
                     overlays={{}}
                     showBaffle={true}
                     showScreen={true}
