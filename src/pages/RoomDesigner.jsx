@@ -990,7 +990,7 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
         subwoofers:
   (Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0)
     ? appState.subwoofers
-    : deriveSubwoofersFromCfg(frontSubsCfg, rearSubsCfg, appState?.roomDims, stableDimensions),
+    : deriveSubwoofersFromCfg(liveFrontSubsCfg, liveRearSubsCfg, appState?.roomDims, stableDimensions),
         lcrAimMode,
         enableFrontWides,
         free_move_lcr: !!freeMoveLcr,
@@ -1118,8 +1118,8 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
   overlays,
   frozenTabs,
   sevenBedLayoutType,
-  frontSubsCfg,
-  rearSubsCfg,
+  appState.frontSubsCfg,
+  appState.rearSubsCfg,
   lcrAimMode,
   enableFrontWides,
   appState.roomDims,
@@ -1207,7 +1207,8 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
         seatingCount: Array.isArray(seatingPositions) ? seatingPositions.length : null,
         placedSpeakerCount: Array.isArray(placedSpeakers) ? placedSpeakers.length : null
       };
-
+const liveFrontSubsCfg = appState?.frontSubsCfg ?? frontSubsCfg;
+const liveRearSubsCfg  = appState?.rearSubsCfg  ?? rearSubsCfg;
       const projectData = serializeProject({
         name: projectNameState,
         roomDims: appState.roomDims,
@@ -1224,12 +1225,12 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
         overlays,
         frozenTabs,
         sevenBedLayoutType,
-        frontSubsCfg,
-        rearSubsCfg,
+        frontSubsCfg: liveFrontSubsCfg,
+        rearSubsCfg: liveRearSubsCfg,
         subwoofers:
   (Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0)
     ? appState.subwoofers
-    : deriveSubwoofersFromCfg(frontSubsCfg, rearSubsCfg, appState?.roomDims, stableDimensions),
+    : deriveSubwoofersFromCfg(liveFrontSubsCfg, liveRearSubsCfg, appState?.roomDims, stableDimensions),
         lcrAimMode,
         enableFrontWides,
         overheadGlobalModel,
