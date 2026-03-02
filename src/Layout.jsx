@@ -59,7 +59,15 @@ export default function Layout({ children, currentPageName }) {
 
     try {
       const url = new URL(window.location.href);
-      const projectId = url.searchParams.get("project");
+      // Extract project id from URL: ?projectId=, ?id=, or UUID in pathname
+      let projectId = url.searchParams.get("projectId") || url.searchParams.get("project") || url.searchParams.get("id");
+      if (!projectId) {
+        const uuidMatch = url.pathname.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i);
+        if (uuidMatch) projectId = uuidMatch[0];
+      }
+      if (projectId) {
+        setActiveProjectId(projectId);
+      }
 
       if (!projectId) {
         setActiveProjectSummary({ id: null, name: null, client_name: null });
