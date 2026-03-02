@@ -232,24 +232,56 @@ function RP22ReportInner() {
     const [dbSnapshot, setDbSnapshot] = useState(null);
     const [dbSnapshotErr, setDbSnapshotErr] = useState(null);
 
+    // Parse a JSON string or return native value; fallback on failure
+    const parseJson = (value, fallback) => {
+        if (value == null) return fallback;
+        if (typeof value === 'string') { try { return JSON.parse(value); } catch { return fallback; } }
+        return value;
+    };
+
+    // Hydration effect: fetch project and populate app state if cfg is missing
+    useEffect(() => {
+        if (!activeProjectId) return;
+        const frontMissing = !app?.frontSubsCfg?.model && !app?.frontSubsCfg?.count;
+        const rearMissing = !app?.rearSubsCfg?.model && !app?.rearSubsCfg?.count;
+        if (!frontMissing && !rearMissing) return;
+
+        fetchProjectById(activeProjectId).then((p) => {
+            if (!p) return;
+            const frontCfg = parseJson(p?.front_subs_cfg ?? p?.frontSubsCfg, null);
+            const rearCfg  = parseJson(p?.rear_subs_cfg  ?? p?.rearSubsCfg,  null);
+            const subs     = parseJson(p?.subwoofers, []);
+            if (frontCfg && app?.setFrontSubsCfg) app.setFrontSubsCfg(frontCfg);
+            if (rearCfg  && app?.setRearSubsCfg)  app.setRearSubsCfg(rearCfg);
+            if (Array.isArray(subs) && subs.length > 0 && app?.setSubwoofers) app.setSubwoofers(subs);
+        }).catch(() => {});
+    }, [activeProjectId]);
+
     useEffect(() => {
         if (!activeProjectId) {
             setDbSnapshot({ status: "no active project id" });
             return;
         }
         fetchProjectById(activeProjectId).then((p) => {
+            const frontCfg = parseJson(p?.front_subs_cfg ?? p?.frontSubsCfg, null);
+            const rearCfg  = parseJson(p?.rear_subs_cfg  ?? p?.rearSubsCfg,  null);
             const snapshot = {
                 id: p?.id ?? null,
                 name: p?.name ?? null,
-                client_name: p?.client_name ?? null,
                 hasSubwoofersField: p ? Object.prototype.hasOwnProperty.call(p, "subwoofers") : false,
                 subwoofersType: Array.isArray(p?.subwoofers) ? "array" : typeof p?.subwoofers,
                 subwoofersLength: Array.isArray(p?.subwoofers) ? p.subwoofers.length : null,
                 subFirst: Array.isArray(p?.subwoofers) && p.subwoofers.length > 0
-                    ? { keys: Object.keys(p.subwoofers[0] || {}), model: p.subwoofers[0]?.model, group: p.subwoofers[0]?.group, role: p.subwoofers[0]?.role }
+                    ? { model: p.subwoofers[0]?.model, group: p.subwoofers[0]?.group, role: p.subwoofers[0]?.role }
                     : null,
                 front_subs_cfg_present: Object.prototype.hasOwnProperty.call(p || {}, "front_subs_cfg"),
                 rear_subs_cfg_present: Object.prototype.hasOwnProperty.call(p || {}, "rear_subs_cfg"),
+                frontCfgModel: frontCfg?.model ?? null,
+                frontCfgCount: frontCfg?.count ?? null,
+                frontCfgPositionsLen: Array.isArray(frontCfg?.positions) ? frontCfg.positions.length : null,
+                rearCfgModel: rearCfg?.model ?? null,
+                rearCfgCount: rearCfg?.count ?? null,
+                rearCfgPositionsLen: Array.isArray(rearCfg?.positions) ? rearCfg.positions.length : null,
             };
             setDbSnapshot(snapshot);
         }).catch((e) => {
