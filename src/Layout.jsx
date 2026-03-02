@@ -67,9 +67,7 @@ export default function Layout({ children, currentPageName }) {
       }
       if (projectId) {
         setActiveProjectId(projectId);
-      }
-
-      if (!projectId) {
+      } else {
         setActiveProjectSummary({ id: null, name: null, client_name: null });
         return;
       }
