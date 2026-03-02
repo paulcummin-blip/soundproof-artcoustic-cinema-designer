@@ -703,7 +703,13 @@ function RP22ReportInner() {
                                 <li>first sub — model: <strong>{dbSnapshot.subFirst.model}</strong>, group: <strong>{dbSnapshot.subFirst.group}</strong>, role: <strong>{dbSnapshot.subFirst.role}</strong></li>
                             )}
                             <li>front_subs_cfg present: <strong>{dbSnapshot.front_subs_cfg_present ? "yes" : "no"}</strong></li>
+                            <li>front_subs_cfg model: <strong>{dbSnapshot.frontCfgModel ?? "—"}</strong></li>
+                            <li>front_subs_cfg count: <strong>{dbSnapshot.frontCfgCount ?? "—"}</strong></li>
+                            <li>front_subs_cfg positions length: <strong>{dbSnapshot.frontCfgPositionsLen ?? "—"}</strong></li>
                             <li>rear_subs_cfg present: <strong>{dbSnapshot.rear_subs_cfg_present ? "yes" : "no"}</strong></li>
+                            <li>rear_subs_cfg model: <strong>{dbSnapshot.rearCfgModel ?? "—"}</strong></li>
+                            <li>rear_subs_cfg count: <strong>{dbSnapshot.rearCfgCount ?? "—"}</strong></li>
+                            <li>rear_subs_cfg positions length: <strong>{dbSnapshot.rearCfgPositionsLen ?? "—"}</strong></li>
                             {dbSnapshot.status && <li>status: <strong>{dbSnapshot.status}</strong></li>}
                         </ul>
                     ) : !dbSnapshotErr ? (
