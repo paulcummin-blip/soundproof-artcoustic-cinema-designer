@@ -148,9 +148,11 @@ export default function ProjectsPage() {
               : Date.now(),
             // Optional fields for display
             lcrModel: (() => {
-              const obj = safeJson(p.selected_speakers_by_role);
-              // Support either { L: {...} } or { FL: {...} } depending on your schema
-              return obj?.L?.model ?? obj?.FL?.model ?? null;
+              try {
+                const obj = safeJson(p.selected_speakers_by_role);
+                if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+                return obj?.L?.model ?? obj?.FL?.model ?? null;
+              } catch (_) { return null; }
             })(),
             surroundModel: null,
             heightModel: null,
