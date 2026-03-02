@@ -1,5 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAppState } from '../components/AppStateProvider';
+// TEMP DEBUG: remove after sub persistence proven
+import { useActiveProjectId, fetchProjectById } from '@/components/state/project-session';
+// END TEMP DEBUG
 import { useRP22AnalysisEngine } from '../components/hooks/useRP22AnalysisEngine';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart4 } from 'lucide-react';

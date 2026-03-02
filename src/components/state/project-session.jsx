@@ -208,3 +208,17 @@ if (typeof window !== "undefined") {
 
 // Optional raw accessor
 export const ProjectSession = { getState, setActiveProject, setActiveProjectId, clearActiveProject, mergeSummary, resetSummary, setSummaryFor, setSpec };
+
+// TEMP DEBUG: remove after sub persistence proven
+import { base44 } from "@/api/base44Client";
+export async function fetchProjectById(projectId) {
+  if (!projectId) return null;
+  try {
+    const results = await base44.entities.Project.filter({ id: projectId }, "-updated_date", 1);
+    return Array.isArray(results) && results.length > 0 ? results[0] : null;
+  } catch (e) {
+    console.warn("[fetchProjectById] error:", e);
+    return null;
+  }
+}
+// END TEMP DEBUG
