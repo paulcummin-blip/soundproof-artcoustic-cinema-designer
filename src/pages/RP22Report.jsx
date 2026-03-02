@@ -17,6 +17,7 @@ import { formatSeatLabel } from '../components/utils/seatLabel';
 import { computeScreenMetrics } from '../components/utils/screenMetrics';
 import { calculateViewingAngle } from '../components/utils/viewingAngleUtils';
 import { safeYawToMLP } from '@/components/room/rv/RenderPrimitives';
+import { deriveSubwoofersFromCfg } from '@/components/utils/deriveSubwoofersFromCfg';
 
 // Extracted child components
 import ReportPrintStyles from '../components/report/ReportPrintStyles';
