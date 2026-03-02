@@ -3,8 +3,8 @@ import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const HEADER_BG_MAP = {
-  "Room Dimensions":   "#FFFFFF",
-  "Room Elements":     "#F8F8F7",
+  "Room Dimensions":   "#F3F2F0",
+  "Room Elements":     "rgba(74,35,15,0.06)",
   "Screen Size":       "#F1F0EE",
   "Seating Layout":    "#DCDBD6",
   "Speakers":          "rgba(33,52,40,0.16)",
