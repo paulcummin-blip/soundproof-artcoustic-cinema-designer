@@ -474,7 +474,7 @@ const SidebarMenuButton = React.forwardRef(function SidebarMenuButtonInner(props
       data-size={size}
       data-active={isActive}
       className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
-      {...props} />
+      {...rest} />
   )
 
   if (!tooltip) {
