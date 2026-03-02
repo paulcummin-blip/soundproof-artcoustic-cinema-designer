@@ -3,7 +3,7 @@ import { ProjectBus } from "@/components/state/bus";
 
 // Persistent project session with per-project summary + legacy spec (for backward compatibility)
 const STORAGE_KEY = "project-session";
-const ACTIVE_PROJECT_KEY = "b44_activeProjectId";
+const ACTIVE_PROJECT_KEY = "activeProjectId";
 
 // Summary model (per acceptance)
 const emptySummary = {
