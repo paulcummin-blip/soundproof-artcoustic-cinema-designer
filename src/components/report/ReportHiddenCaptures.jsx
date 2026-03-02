@@ -1,16 +1,39 @@
 import React from 'react';
 import RoomVisualisation from '../room/RoomVisualisation';
 
-function buildSubsForExport(subsCfg, prefix) {
-    return (Array.isArray(subsCfg?.positions) ? subsCfg.positions : []).map((p, i) => {
-        if (p?.position?.x != null && p?.position?.y != null) {
-            return { ...p, id: p.id || `${prefix}-sub-${i}`, model: p.model || subsCfg?.model || '' };
+function buildSubsForExport(cfg, group, roomDims) {
+    const count = Math.max(0, Number(cfg?.count ?? cfg?.qty ?? 0) || 0);
+    const model = cfg?.model || '';
+    if (count === 0 || !model) return [];
+
+    const width = Number(roomDims?.widthM) || 4.5;
+    const length = Number(roomDims?.lengthM) || 6.0;
+    const y = group === 'front' ? 0.16 : length - 0.16;
+
+    const positions = Array.isArray(cfg?.positions) ? cfg.positions : [];
+
+    return Array.from({ length: count }, (_, i) => {
+        const savedX = positions[i]?.x;
+        let x;
+        if (Number.isFinite(savedX)) {
+            x = savedX;
+        } else if (count === 1) {
+            x = width * 0.5;
+        } else {
+            const margin = width * 0.15;
+            const span = width - 2 * margin;
+            x = margin + (span / (count - 1)) * i;
         }
-        if (p?.x != null && p?.y != null) {
-            return { ...p, id: p.id || `${prefix}-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || subsCfg?.model || '' };
-        }
-        return null;
-    }).filter(Boolean);
+        const num = i + 1;
+        return {
+            id: `sub-${group}-${num}`,
+            group,
+            role: group === 'front' ? `SUBF${num}` : `SUBR${num}`,
+            model,
+            isSub: true,
+            position: { x, y, z: 0 },
+        };
+    });
 }
 
 const HIDDEN_STYLE = {
