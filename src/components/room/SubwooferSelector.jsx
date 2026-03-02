@@ -18,13 +18,41 @@ export default function SubwooferSelector({ title, cfg, onChange, disabled = fal
 
   const commit = (next) => {
     if (typeof onChange !== "function") return;
+    const newCount = Math.max(0, Math.min(4, Number(next?.count ?? safeCount)));
+    const existingPositions = Array.isArray(cfg?.positions) ? cfg.positions : [];
+
+    // Build new positions: preserve existing slots, only add/remove as needed
+    let newPositions;
+    if (newCount <= existingPositions.length) {
+      // Shrink: keep first N
+      newPositions = existingPositions.slice(0, newCount);
+    } else {
+      // Grow: keep existing, append defaults for new slots only
+      const roomW = cfg?.roomWidthM ?? 4.5;
+      const defaults = buildDefaultPositions(newCount, roomW);
+      newPositions = [
+        ...existingPositions,
+        ...defaults.slice(existingPositions.length, newCount),
+      ];
+    }
+
     onChange({
       model: next?.model ?? safeModel,
-      count: Math.max(0, Math.min(4, Number(next?.count ?? safeCount))),
-      positions: Array.isArray(cfg?.positions) ? cfg.positions : [],
+      count: newCount,
+      positions: newPositions,
       tuning: Array.isArray(cfg?.tuning) ? cfg.tuning : [],
     });
   };
+
+  // Generate evenly-spaced default positions for N subs across room width
+  function buildDefaultPositions(count, roomW) {
+    if (count === 0) return [];
+    if (count === 1) return [{ x: roomW / 2, y: 0.3 }];
+    return Array.from({ length: count }, (_, i) => ({
+      x: (roomW / (count + 1)) * (i + 1),
+      y: 0.3,
+    }));
+  }
 
   return (
     <div className="space-y-3">
