@@ -324,7 +324,7 @@ function useDesignerState() {
 
   const setRoomWidthM = useCallback((v) => {
     const newVal = Number(v);
-    if (!Number.isFinite(newVal)) return;
+    if (!Number.isFinite(newVal) || newVal === 0) return;
     setRoomDims(d => {
       if (Math.abs((d?.widthM ?? 0) - newVal) < 0.001) return d;
       return { ...d, widthM: newVal };
