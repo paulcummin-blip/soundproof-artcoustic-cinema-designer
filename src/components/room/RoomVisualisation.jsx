@@ -1956,8 +1956,40 @@ if (!target) return;
         
         // Initialize draft positions from current real positions
         isDraggingSubRef.current = true;
-        draftFrontSubsRef.current = frontSubs ? [...frontSubs.map(s => ({ ...s, position: { ...s.position } }))] : [];
-        draftRearSubsRef.current = rearSubs ? [...rearSubs.map(s => ({ ...s, position: { ...s.position } }))] : [];
+        // Build a "seed" list for dragging.
+// If live arrays are empty (common when only fallback is drawn), seed from cfg.
+const seedFront =
+  (Array.isArray(frontSubs) && frontSubs.length > 0)
+    ? frontSubs
+    : Array.from({ length: Number(frontSubsCfg?.count || 0) }, (_, idx) => {
+        const xFromCfg = frontSubsCfg?.positions?.[idx]?.x;
+        const x = Number.isFinite(xFromCfg) ? xFromCfg : (widthM / 2);
+        return {
+          id: `front-sub-${idx}`,
+          model: frontSubsCfg?.model || "SUB2-12",
+          role: `SUBF${idx + 1}`,
+          position: { x, y: 0, z: 0 },
+          _subType: "front",
+        };
+      });
+
+const seedRear =
+  (Array.isArray(rearSubs) && rearSubs.length > 0)
+    ? rearSubs
+    : Array.from({ length: Number(rearSubsCfg?.count || 0) }, (_, idx) => {
+        const xFromCfg = rearSubsCfg?.positions?.[idx]?.x;
+        const x = Number.isFinite(xFromCfg) ? xFromCfg : (widthM / 2);
+        return {
+          id: `rear-sub-${idx}`,
+          model: rearSubsCfg?.model || "SUB2-12",
+          role: `SUBR${idx + 1}`,
+          position: { x, y: lengthM, z: 0 },
+          _subType: "rear",
+        };
+      });
+
+draftFrontSubsRef.current = seedFront.map(s => ({ ...s, position: { ...s.position } }));
+draftRearSubsRef.current = seedRear.map(s => ({ ...s, position: { ...s.position } }));
         
         // Signal BassResponse that dragging started
         if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {
