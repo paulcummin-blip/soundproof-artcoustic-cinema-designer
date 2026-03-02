@@ -22,7 +22,7 @@ import {
 import ApiBadge from "@/components/ui/ApiBadge";
 import SafeBootErrorBoundary from "@/components/dev/SafeBootErrorBoundary";
 import BookDemoBanner from "@/components/ui/BookDemoBanner";
-import { useProjectActions, useActiveProjectId } from "@/components/state/project-session";
+import { useProjectActions, useActiveProjectId, setActiveProjectId } from "@/components/state/project-session";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import PageHeaderActions from "@/components/ui/PageHeaderActions";
 import { SHOW_DEBUG_PANEL } from "@/components/utils/diagnostics";
