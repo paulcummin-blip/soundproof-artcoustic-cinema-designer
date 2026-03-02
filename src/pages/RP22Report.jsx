@@ -226,6 +226,37 @@ function RP22ReportInner() {
     const [screenMetricsForPrint, setScreenMetricsForPrint] = useState(null);
     const [screenMetricsStatus, setScreenMetricsStatus] = useState("");
     const [showCadExportMenu, setShowCadExportMenu] = useState(false);
+
+    // TEMP DEBUG: remove after sub persistence proven
+    const activeProjectId = useActiveProjectId();
+    const [dbSnapshot, setDbSnapshot] = useState(null);
+    const [dbSnapshotErr, setDbSnapshotErr] = useState(null);
+
+    useEffect(() => {
+        if (!activeProjectId) {
+            setDbSnapshot({ status: "no active project id" });
+            return;
+        }
+        fetchProjectById(activeProjectId).then((p) => {
+            const snapshot = {
+                id: p?.id ?? null,
+                name: p?.name ?? null,
+                client_name: p?.client_name ?? null,
+                hasSubwoofersField: p ? Object.prototype.hasOwnProperty.call(p, "subwoofers") : false,
+                subwoofersType: Array.isArray(p?.subwoofers) ? "array" : typeof p?.subwoofers,
+                subwoofersLength: Array.isArray(p?.subwoofers) ? p.subwoofers.length : null,
+                subFirst: Array.isArray(p?.subwoofers) && p.subwoofers.length > 0
+                    ? { keys: Object.keys(p.subwoofers[0] || {}), model: p.subwoofers[0]?.model, group: p.subwoofers[0]?.group, role: p.subwoofers[0]?.role }
+                    : null,
+                front_subs_cfg_present: Object.prototype.hasOwnProperty.call(p || {}, "front_subs_cfg"),
+                rear_subs_cfg_present: Object.prototype.hasOwnProperty.call(p || {}, "rear_subs_cfg"),
+            };
+            setDbSnapshot(snapshot);
+        }).catch((e) => {
+            setDbSnapshotErr(String(e?.message || e));
+        });
+    }, [activeProjectId]);
+    // END TEMP DEBUG
     const [printReady, setPrintReady] = useState(false);
     const [debugPlanCapture, setDebugPlanCapture] = useState(false);
     const printLockRef = React.useRef(false);
