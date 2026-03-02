@@ -719,6 +719,37 @@ function RP22ReportInner() {
                 </div>
                 {/* END TEMP DEBUG */}
 
+                {/* TEMP DEBUG: Live AppState snapshot */}
+                <div className="print:hidden mb-4 p-3 border border-blue-300 rounded text-xs text-gray-600 bg-blue-50 max-w-2xl font-mono">
+                    <div className="font-bold text-blue-700 mb-1">Live State Snapshot (AppState)</div>
+                    {(() => {
+                        const fCfg = app?.frontSubsCfg;
+                        const rCfg = app?.rearSubsCfg;
+                        const derivedSubs = (() => {
+                            try {
+                                const result = deriveSubwoofersFromCfg(fCfg, rCfg, app?.roomDims, null);
+                                return Array.isArray(result) ? result.length : "not array";
+                            } catch { return "error"; }
+                        })();
+                        return (
+                            <ul className="space-y-0.5">
+                                <li>activeProjectId: <strong>{activeProjectId || "—"}</strong></li>
+                                <li>frontSubsCfg present: <strong>{fCfg ? "yes" : "no"}</strong></li>
+                                <li>frontSubsCfg model: <strong>{fCfg?.model ?? "—"}</strong></li>
+                                <li>frontSubsCfg count: <strong>{fCfg?.count ?? "—"}</strong></li>
+                                <li>frontSubsCfg positions length: <strong>{Array.isArray(fCfg?.positions) ? fCfg.positions.length : "—"}</strong></li>
+                                <li>rearSubsCfg present: <strong>{rCfg ? "yes" : "no"}</strong></li>
+                                <li>rearSubsCfg model: <strong>{rCfg?.model ?? "—"}</strong></li>
+                                <li>rearSubsCfg count: <strong>{rCfg?.count ?? "—"}</strong></li>
+                                <li>rearSubsCfg positions length: <strong>{Array.isArray(rCfg?.positions) ? rCfg.positions.length : "—"}</strong></li>
+                                <li>app.subwoofers length: <strong>{Array.isArray(app?.subwoofers) ? app.subwoofers.length : "not array"}</strong></li>
+                                <li>derived subs from cfg length: <strong>{derivedSubs}</strong></li>
+                            </ul>
+                        );
+                    })()}
+                </div>
+                {/* END TEMP DEBUG: Live AppState snapshot */}
+
                 <ReportHiddenCaptures
                     app={app}
                     placedSpeakers={placedSpeakers}
