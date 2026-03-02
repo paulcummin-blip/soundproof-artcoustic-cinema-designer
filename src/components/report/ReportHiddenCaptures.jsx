@@ -1,16 +1,43 @@
 import React from 'react';
 import RoomVisualisation from '../room/RoomVisualisation';
 
-function buildSubsForExport(subsCfg, prefix) {
-    return (Array.isArray(subsCfg?.positions) ? subsCfg.positions : []).map((p, i) => {
-        if (p?.position?.x != null && p?.position?.y != null) {
-            return { ...p, id: p.id || `${prefix}-sub-${i}`, model: p.model || subsCfg?.model || '' };
-        }
-        if (p?.x != null && p?.y != null) {
-            return { ...p, id: p.id || `${prefix}-sub-${i}`, position: { x: p.x, y: p.y }, model: p.model || subsCfg?.model || '' };
-        }
-        return null;
-    }).filter(Boolean);
+function buildSubsForExport(cfg, group, roomDims) {
+    const count = Number(cfg?.count) || 0;
+    const model = cfg?.model || '';
+    if (count === 0 || !model) return [];
+
+    const widthM = Number(roomDims?.widthM) || 4.5;
+    const lengthM = Number(roomDims?.lengthM) || 6.0;
+    const isFront = group === 'front';
+    const rolePrefix = isFront ? 'SUBF' : 'SUBR';
+    const yPos = isFront ? 0.16 : lengthM - 0.16;
+    const margin = 0.3;
+
+    // Try to use stored positions if they have valid numeric x values
+    const stored = Array.isArray(cfg?.positions) ? cfg.positions : [];
+    const validStored = stored.filter(p => {
+        const x = p?.position?.x ?? p?.x;
+        return Number.isFinite(Number(x));
+    });
+
+    if (validStored.length === count) {
+        return validStored.map((p, i) => {
+            const x = Number(p?.position?.x ?? p?.x);
+            const y = Number(p?.position?.y ?? p?.y ?? yPos);
+            return { id: p.id || `${group}-sub-${i}`, group, role: `${rolePrefix}${i + 1}`, model, isSub: true, position: { x, y, z: 0 } };
+        });
+    }
+
+    // Generate evenly spaced positions
+    const step = count > 1 ? (widthM - 2 * margin) / (count - 1) : 0;
+    return Array.from({ length: count }, (_, i) => ({
+        id: `${group}-sub-${i}`,
+        group,
+        role: `${rolePrefix}${i + 1}`,
+        model,
+        isSub: true,
+        position: { x: count === 1 ? widthM / 2 : margin + i * step, y: yPos, z: 0 },
+    }));
 }
 
 const HIDDEN_STYLE = {
