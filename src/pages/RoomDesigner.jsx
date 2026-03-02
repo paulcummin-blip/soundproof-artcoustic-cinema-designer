@@ -511,6 +511,7 @@ appState, // Pass appState directly for setters
   const [projectNameState, setProjectNameState] = useState("Untitled Room"); // Internal projectName for loader
   const [loadState, setLoadState] = useState({ phase: "idle", error: null, name: null });
   const [autosaveStatus, setAutosaveStatus] = useState("idle");
+  const hydratedRoomDimsProjectIdRef = useRef(null);
 
   const parseMaybe = useCallback((val, fallback) => {
     if (Array.isArray(val)) return val;
@@ -538,9 +539,14 @@ appState, // Pass appState directly for setters
 
     //
     // 1) ROOM DIMS (single source of truth)
-    //
-    if (appState?.setRoomDims && appState?.roomDims) {
-      let nextWidthM, nextLengthM, nextHeightM;
+//
+if (appState?.setRoomDims && appState?.roomDims) {
+
+  const pid = p?.id || null;
+  if (pid && hydratedRoomDimsProjectIdRef.current === pid) return;
+  if (pid) hydratedRoomDimsProjectIdRef.current = pid;
+
+  let nextWidthM, nextLengthM, nextHeightM;
 
       if (p.roomDims) {
         try {
