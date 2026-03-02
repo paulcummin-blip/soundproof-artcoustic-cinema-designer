@@ -77,8 +77,8 @@ export default function ReportHiddenCaptures({
         floatDepthM: screenFrontPlaneM ?? (Number(screen?.floatDepthM) || 0),
     };
 
-    const frontSubsForExport = buildSubsForExport(app?.frontSubsCfg, 'front');
-    const rearSubsForExport = buildSubsForExport(app?.rearSubsCfg, 'rear');
+    const frontSubsForExport = buildSubsForExport(app?.frontSubsCfg, 'front', app?.roomDims);
+    const rearSubsForExport = buildSubsForExport(app?.rearSubsCfg, 'rear', app?.roomDims);
 
     const commonProps = {
         placedSpeakers,
