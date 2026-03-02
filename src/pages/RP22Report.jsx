@@ -656,6 +656,30 @@ function RP22ReportInner() {
             <ReportPrintStyles />
 
             <div className="screen-only">
+                {/* TEMP DEBUG: remove after sub persistence proven */}
+                <div className="print:hidden mb-4 p-3 border border-gray-300 rounded text-xs text-gray-600 bg-gray-50 max-w-2xl font-mono">
+                    <div className="font-bold text-gray-700 mb-1">DB Snapshot</div>
+                    {dbSnapshotErr && <div className="text-red-500">Error: {dbSnapshotErr}</div>}
+                    {dbSnapshot ? (
+                        <ul className="space-y-0.5">
+                            <li>Active project id: <strong>{activeProjectId || "—"}</strong></li>
+                            <li>Project name: <strong>{dbSnapshot.name ?? "—"}</strong></li>
+                            <li>subwoofers field: <strong>{dbSnapshot.hasSubwoofersField ? "present" : "missing"}</strong></li>
+                            <li>subwoofers type: <strong>{dbSnapshot.subwoofersType ?? "—"}</strong></li>
+                            <li>subwoofers length: <strong>{dbSnapshot.subwoofersLength ?? "—"}</strong></li>
+                            {dbSnapshot.subFirst && (
+                                <li>first sub — model: <strong>{dbSnapshot.subFirst.model}</strong>, group: <strong>{dbSnapshot.subFirst.group}</strong>, role: <strong>{dbSnapshot.subFirst.role}</strong></li>
+                            )}
+                            <li>front_subs_cfg present: <strong>{dbSnapshot.front_subs_cfg_present ? "yes" : "no"}</strong></li>
+                            <li>rear_subs_cfg present: <strong>{dbSnapshot.rear_subs_cfg_present ? "yes" : "no"}</strong></li>
+                            {dbSnapshot.status && <li>status: <strong>{dbSnapshot.status}</strong></li>}
+                        </ul>
+                    ) : !dbSnapshotErr ? (
+                        <div>Loading…</div>
+                    ) : null}
+                </div>
+                {/* END TEMP DEBUG */}
+
                 <ReportHiddenCaptures
                     app={app}
                     placedSpeakers={placedSpeakers}
