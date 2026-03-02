@@ -1184,13 +1184,13 @@ import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
 
 import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 
-// Re-export for backwards compatibility (other files import DOLBY_PRESETS from here)
-export { DOLBY_PRESETS, seedSpeakersFromPreset } from "@/components/room/utils/dolbyHelpers";
-
 // DEBUG: log the available preset keys once at module load
 if (typeof window !== "undefined" && window.console) {
   if (globalThis.__B44_LOGS) console.log("[RD PRESETS] keys:", Object.keys(DOLBY_PRESETS || {}));
 }
+
+// Re-export for backwards compat (other files import DOLBY_PRESETS from this page path)
+export { DOLBY_PRESETS, seedSpeakersFromPreset };
 
 // Thin store wrapper over AppStateProvider so the page can read/write speakers
 export function useSpeakerSystemStore() {
