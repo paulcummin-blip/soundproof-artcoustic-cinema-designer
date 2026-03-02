@@ -614,6 +614,7 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [hoveredSpeaker, setHoveredSpeaker] = useState(null);
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
   const [dragState, setDragState] = useState({ dragging: false, draggedItemId: null, dragType: null });
+  const [subDragTick, setSubDragTick] = useState(0);
   const [speakerTooltip, setSpeakerTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
   const rvWrapRef = useRef(null);
   const { dragging, draggedItemId, dragType } = dragState;
@@ -3157,12 +3158,15 @@ draftRearSubsRef.current = seedRear.map(s => ({ ...s, position: { ...s.position 
     }
     
     // Update ONLY draft positions (no state setter during drag)
-    const subIndex = subId === 'front-sub-left' || subId === 'rear-sub-left' ? 0 : 1;
-    const subInDraft = draftArray[subIndex];
+    const m = String(subId).match(/-(\d+)$/);
+const subIndex = m ? Number(m[1]) : 0;
+const subInDraft = draftArray[subIndex];
     
     if (subInDraft) {
       subInDraft.position.x = finalX;
       subInDraft.position.y = finalY;
+      
+      setSubDragTick((n) => n + 1);
       
       // Paired mirror drag: when exactly 2 subs on same wall, mirror the other
       if (draftArray.length === 2) {
@@ -8024,10 +8028,17 @@ return (
               };
 
               // FRONT: prefer live/dragged data. If export and empty, fall back to cfg.
-              const frontLive =
-                (isDraggingSubRef.current && draftFrontSubsRef.current)
-                  ? draftFrontSubsRef.current
-                  : frontSubs;
+              // FRONT: while dragging, always render from the draft array (so movement is visible)
+const frontLive =
+  (dragging && Array.isArray(draftFrontSubsRef.current))
+    ? draftFrontSubsRef.current
+    : frontSubs;
+
+// REAR: while dragging, always render from the draft array (so movement is visible)
+const rearLive =
+  (dragging && Array.isArray(draftRearSubsRef.current))
+    ? draftRearSubsRef.current
+    : rearSubs;
 
               const frontFallback =
                 isExportDims && (!Array.isArray(frontLive) || frontLive.length === 0)
@@ -8035,11 +8046,7 @@ return (
                   : frontLive;
 
               // REAR: prefer live/dragged data. If export and empty, fall back to cfg.
-              const rearLive =
-                (isDraggingSubRef.current && draftRearSubsRef.current)
-                  ? draftRearSubsRef.current
-                  : rearSubs;
-
+            
               const rearFallback =
                 isExportDims && (!Array.isArray(rearLive) || rearLive.length === 0)
                   ? buildFallbackLine(rearSubsCfg?.count, rearSubsCfg?.model, "rear")
