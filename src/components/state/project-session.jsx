@@ -166,7 +166,7 @@ export function useActiveProjectId() {
   return React.useSyncExternalStore(
     subscribe,
     () => getState().activeProjectId,
-    () => null
+    () => getActiveProjectId()
   );
 }
 export function useProjectSummary() {
