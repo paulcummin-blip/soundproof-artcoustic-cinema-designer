@@ -7,7 +7,7 @@ const HEADER_BG_MAP = {
   "Room Elements":     "#F8F8F7",
   "Screen Size":       "#F1F0EE",
   "Seating Layout":    "#DCDBD6",
-  "Speakers":          "rgba(33,52,40,0.08)",
+  "Speakers":          "rgba(33,52,40,0.16)",
   "Bass Simulation":   "#C1B6AD",
   "Compliance Report": "#F1F0EE",
   "Options":           "#F8F8F7",
