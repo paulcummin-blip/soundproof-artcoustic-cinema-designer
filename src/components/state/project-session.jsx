@@ -103,7 +103,7 @@ function subscribe(listener) {
 function setActiveProject(id) {
   setState({ activeProjectId: id || null });
 }
-function setActiveProjectId(id) {
+export function setActiveProjectId(id) {
   setActiveProject(id);
 }
 function clearActiveProject() {
