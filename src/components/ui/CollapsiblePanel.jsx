@@ -2,20 +2,41 @@ import React, { useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const HEADER_BG_MAP = {
+  "Room Dimensions":   "#FFFFFF",
+  "Room Elements":     "#F8F8F7",
+  "Screen Size":       "#F1F0EE",
+  "Seating Layout":    "#DCDBD6",
+  "Speakers":          "rgba(33,52,40,0.08)",
+  "Bass Simulation":   "#C1B6AD",
+  "Compliance Report": "#F1F0EE",
+  "Options":           "#F8F8F7",
+};
+
 export function CollapsiblePanel({ 
   title, 
   icon, 
   children, 
   defaultOpen = false, 
-  className 
+  className,
+  headerBg,
 }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [hovered, setHovered] = useState(false);
+
+  const resolvedBg = headerBg ?? HEADER_BG_MAP[title] ?? "#FFFFFF";
 
   return (
     <div className={cn("bg-white border border-[#DCDBD6] rounded-lg overflow-visible", className)}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-[#F8F8F7] transition-colors"
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        className="w-full px-4 py-3 flex items-center justify-between text-left transition-colors"
+        style={{
+          backgroundColor: resolvedBg,
+          filter: hovered ? "brightness(0.96)" : "none",
+        }}
       >
         <div className="flex items-center gap-2">
           {icon}
