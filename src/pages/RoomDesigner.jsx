@@ -73,33 +73,6 @@ function useUrlQuery() {
   return { projectId };
 }
 
-import {
-  preserveSurroundModels,
-  CANON_MAP,
-  canon,
-  safeCanon,
-  speakersEqual,
-  carryModel,
-  isOverheadRole,
-  mergePreserveOverheads,
-  cloneRoleWithModel,
-  logPlacedSpeakers,
-  isFiniteNum,
-  degToRad,
-  halfNormalExtentM,
-  inRoomDepthM,
-  rotatedHalfExtentToWall,
-  yawDegToMLP,
-} from "@/components/room/utils/speakerHelpers";
-
-import {
-  DOLBY_PRESETS,
-  OVERHEAD_IDS_BY_LAYOUT,
-  getTargetOverheadIds,
-  ensureAtmosOverheads,
-  seedSpeakersFromPreset,
-} from "@/components/room/utils/dolbyHelpers";
-
 function useSurroundGroupDepths() {
   const {
     placedSpeakers,
