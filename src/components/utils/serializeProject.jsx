@@ -176,9 +176,10 @@ export function serializeProject(input = {}) {
     room_elements: asArray(roomElements),
     subwoofers: asArray(subwoofers),
 
-    // Sub configs stored as JSON blobs for now
-    front_subs_cfg: j(frontSubsCfg, null),
-    rear_subs_cfg: j(rearSubsCfg, null),
+    // Sub configs must be objects to match Project schema.
+    // Do not stringify. Do not inject defaults. If unset/null, omit entirely.
+    ...(frontSubsCfg && typeof frontSubsCfg === "object" ? { front_subs_cfg: frontSubsCfg } : {}),
+    ...(rearSubsCfg && typeof rearSubsCfg === "object" ? { rear_subs_cfg: rearSubsCfg } : {}),
 
     // Overlays / UI state
     overlays: asObject(overlays),
