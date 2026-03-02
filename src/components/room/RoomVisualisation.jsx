@@ -3280,9 +3280,10 @@ draftRearSubsRef.current = seedRear.map(s => ({ ...s, position: { ...s.position 
       handleSpeakerDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
     } else if (dragType === 'seat') {
       handleSeatDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
-    } else if (dragType === 'sub') {
-      handleSubDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
-    }
+   } else if (dragType === 'sub') {
+  handleSubDrag(draggedItemId, { x: clampedCanvasX, y: clampedCanvasY });
+  setDragState(s => (s && s.dragging ? { ...s } : s));
+}
   }, [dragging, draggedItemId, dragType, roomRect, handleSpeakerDrag, handleSeatDrag, handleSubDrag, placedSpeakers, onSetSpeakers, constraintZones, svgRef, canvasToRoom, roomToCanvas, setDragWarning, screenCenterX_m, getCanonicalRole, centerX_m, dragOffsetRoomRef]);
 
   // Helper to commit draft sub positions to real state
