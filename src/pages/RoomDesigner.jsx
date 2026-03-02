@@ -44,6 +44,7 @@ import { computeAllSeatSplMetrics, getMlpSeat } from "@/components/utils/spl/cen
 import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
+import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
 
 // B44 shim: some older logic expects getModelDimsM()
 const getModelDimsM = (model) => {
@@ -986,7 +987,10 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
         sevenBedLayoutType,
         frontSubsCfg,
         rearSubsCfg,
-        subwoofers: appState?.subwoofers || [],
+        subwoofers:
+  (Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0)
+    ? appState.subwoofers
+    : deriveSubwoofersFromCfg(frontSubsCfg, rearSubsCfg, appState?.roomDims, stableDimensions),
         lcrAimMode,
         enableFrontWides,
         free_move_lcr: !!freeMoveLcr,
@@ -1222,7 +1226,10 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
         sevenBedLayoutType,
         frontSubsCfg,
         rearSubsCfg,
-        subwoofers: appState?.subwoofers || [],
+        subwoofers:
+  (Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0)
+    ? appState.subwoofers
+    : deriveSubwoofersFromCfg(frontSubsCfg, rearSubsCfg, appState?.roomDims, stableDimensions),
         lcrAimMode,
         enableFrontWides,
         overheadGlobalModel,
