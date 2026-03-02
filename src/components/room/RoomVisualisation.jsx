@@ -1834,8 +1834,43 @@ React.useEffect(() => {
       e.preventDefault();
       e.stopPropagation();
 
-      const target = byId.get(id);
-      if (!target) return;
+     let target = byId.get(id);
+
+// If it's a sub id like "rear-sub-0" / "front-sub-0", it might only exist
+// in the fallback rendering list, so byId will not contain it.
+// In that case, build a minimal target from the cfg so dragging can work.
+if (!target && typeof id === "string") {
+  const mRear = id.match(/^rear-sub-(\d+)$/);
+  const mFront = id.match(/^front-sub-(\d+)$/);
+
+  if (mRear) {
+    const idx = Number(mRear[1] || 0);
+    const xFromCfg = rearSubsCfg?.positions?.[idx]?.x;
+    const x = Number.isFinite(xFromCfg) ? xFromCfg : (widthM / 2);
+
+    target = {
+      id,
+      model: rearSubsCfg?.model || "SUB2-12",
+      role: `SUBR${idx + 1}`,
+      position: { x, y: lengthM, z: 0 },
+      _subType: "rear",
+    };
+  } else if (mFront) {
+    const idx = Number(mFront[1] || 0);
+    const xFromCfg = frontSubsCfg?.positions?.[idx]?.x;
+    const x = Number.isFinite(xFromCfg) ? xFromCfg : (widthM / 2);
+
+    target = {
+      id,
+      model: frontSubsCfg?.model || "SUB2-12",
+      role: `SUBF${idx + 1}`,
+      position: { x, y: 0, z: 0 },
+      _subType: "front",
+    };
+  }
+}
+
+if (!target) return;
 
       const canonicalRole = getCanonicalRole(target.role);
       const isOverhead =
