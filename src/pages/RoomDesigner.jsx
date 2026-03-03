@@ -2717,194 +2717,60 @@ function RoomDesignerWithState() {
     setUseRearGlobal: setUseRearGlobalFromState
   } = appState;
 
-  // Keep placed subwoofers in sync with front/rear sub config.
-  // Canonical source of truth for *user* placement = frontSubsCfg.positions / rearSubsCfg.positions (X only).
-  // appState.subwoofers is the derived list used for rendering + simulation.
-  // CRITICAL: Subwoofers stay wall-locked (front/rear) with a buffer based on model depth.
+  // Subwoofer sync extracted to useSubwooferSync hook (inline until hook file created)
   useEffect(() => {
     const setSubwoofers = appState?.setSubwoofers;
     if (typeof setSubwoofers !== "function") return;
-
-    const widthM =
-      Number(appState?.roomDims?.widthM) ||
-      Number(stableDimensions?.width) ||
-      4.5;
-
-    const lengthM =
-      Number(appState?.roomDims?.lengthM) ||
-      Number(stableDimensions?.length) ||
-      6.0;
-
+    const widthM = Number(appState?.roomDims?.widthM) || Number(stableDimensions?.width) || 4.5;
+    const lengthM = Number(appState?.roomDims?.lengthM) || Number(stableDimensions?.length) || 6.0;
     const normQty = (q) => Math.max(0, Math.min(8, Number(q?.count ?? q?.qty ?? q) || 0));
     const normModel = (m) => String(m || "").trim();
-
     const frontModel = normModel(frontSubsCfg?.model);
     const rearModel = normModel(rearSubsCfg?.model);
-
     const frontQty = normQty(frontSubsCfg);
     const rearQty = normQty(rearSubsCfg);
-
-   // If nothing selected, clear placed subs
-// IMPORTANT: do not clear if cfg is not explicitly populated yet (prevents post-load wipe)
-const hasExplicitFrontCfg =
-  frontSubsCfg && (Object.prototype.hasOwnProperty.call(frontSubsCfg, "count") ||
-  Object.prototype.hasOwnProperty.call(frontSubsCfg, "qty") ||
-  Object.prototype.hasOwnProperty.call(frontSubsCfg, "model"));
-
-const hasExplicitRearCfg =
-  rearSubsCfg && (Object.prototype.hasOwnProperty.call(rearSubsCfg, "count") ||
-  Object.prototype.hasOwnProperty.call(rearSubsCfg, "qty") ||
-  Object.prototype.hasOwnProperty.call(rearSubsCfg, "model"));
-
-const cfgIsExplicit = hasExplicitFrontCfg || hasExplicitRearCfg;
-
-// If cfg looks "inactive", do NOT wipe if we already have placed subs (e.g. just hydrated from project)
-const hasPlacedSubs =
-  Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0;
-
-// Only consider cfg "explicitly set to none" if the user has a model key AND count key
-// AND they are intentionally empty/zero (not just present as defaults)
-const cfgExplicitNone =
-  (frontSubsCfg && Object.prototype.hasOwnProperty.call(frontSubsCfg, "model") &&
-   Object.prototype.hasOwnProperty.call(frontSubsCfg, "count") &&
-   !String(frontSubsCfg.model || "").trim() && Number(frontSubsCfg.count) === 0) &&
-  (rearSubsCfg && Object.prototype.hasOwnProperty.call(rearSubsCfg, "model") &&
-   Object.prototype.hasOwnProperty.call(rearSubsCfg, "count") &&
-   !String(rearSubsCfg.model || "").trim() && Number(rearSubsCfg.count) === 0);
-
-if ((!frontModel || frontQty === 0) && (!rearModel || rearQty === 0)) {
-  // If we already have placed subs (loaded from the project), do nothing.
-  if (hasPlacedSubs) return;
-
-  // Only clear when config is explicitly "none" (user intent), not just temporarily inactive.
-  if (!cfgExplicitNone) return;
-
-  setSubwoofers((prev) => (Array.isArray(prev) && prev.length ? [] : prev));
-  return;
-}
-
-    // Helpers
+    const hasExplicitFrontCfg = frontSubsCfg && (Object.prototype.hasOwnProperty.call(frontSubsCfg, "count") || Object.prototype.hasOwnProperty.call(frontSubsCfg, "qty") || Object.prototype.hasOwnProperty.call(frontSubsCfg, "model"));
+    const hasExplicitRearCfg = rearSubsCfg && (Object.prototype.hasOwnProperty.call(rearSubsCfg, "count") || Object.prototype.hasOwnProperty.call(rearSubsCfg, "qty") || Object.prototype.hasOwnProperty.call(rearSubsCfg, "model"));
+    const hasPlacedSubs = Array.isArray(appState?.subwoofers) && appState.subwoofers.length > 0;
+    const cfgExplicitNone = (frontSubsCfg && Object.prototype.hasOwnProperty.call(frontSubsCfg, "model") && Object.prototype.hasOwnProperty.call(frontSubsCfg, "count") && !String(frontSubsCfg.model || "").trim() && Number(frontSubsCfg.count) === 0) && (rearSubsCfg && Object.prototype.hasOwnProperty.call(rearSubsCfg, "model") && Object.prototype.hasOwnProperty.call(rearSubsCfg, "count") && !String(rearSubsCfg.model || "").trim() && Number(rearSubsCfg.count) === 0);
+    if ((!frontModel || frontQty === 0) && (!rearModel || rearQty === 0)) {
+      if (hasPlacedSubs) return;
+      if (!cfgExplicitNone) return;
+      setSubwoofers((prev) => (Array.isArray(prev) && prev.length ? [] : prev));
+      return;
+    }
     const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
     const EPS = 0.01;
-
-    // Depth-aware wall pinning (match RV behaviour as closely as possible)
-    const getDepthM = (model) => {
-      try {
-        const dims = getModelDimsM?.(model) || {};
-        const d = Number(dims?.depthM);
-        return Number.isFinite(d) && d > 0 ? d : 0.30;
-      } catch (_) {
-        return 0.30;
-      }
-    };
-
-    const wallPinnedY = (wall, model) => {
-      const d = getDepthM(model);
-      const halfD = d / 2;
-      if (wall === 'front') return halfD + EPS;
-      if (wall === 'rear') return Math.max(halfD + EPS, lengthM - halfD - EPS);
-      return 0.30;
-    };
-
-    // Default even spacing along the wall for a given qty
-    const makeDefaultXs = (qty) => {
-      if (qty <= 0) return [];
-      if (qty === 1) return [widthM * 0.5];
-      const margin = widthM * 0.15;
-      const span = Math.max(0.01, widthM - margin * 2);
-      return Array.from({ length: qty }, (_, i) => margin + span * (i / (qty - 1)));
-    };
-
+    const getDepthM = (model) => { try { const dims = getModelDimsM?.(model) || {}; const d = Number(dims?.depthM); return Number.isFinite(d) && d > 0 ? d : 0.30; } catch (_) { return 0.30; } };
+    const wallPinnedY = (wall, model) => { const d = getDepthM(model); const halfD = d / 2; if (wall === 'front') return halfD + EPS; if (wall === 'rear') return Math.max(halfD + EPS, lengthM - halfD - EPS); return 0.30; };
+    const makeDefaultXs = (qty) => { if (qty <= 0) return []; if (qty === 1) return [widthM * 0.5]; const margin = widthM * 0.15; const span = Math.max(0.01, widthM - margin * 2); return Array.from({ length: qty }, (_, i) => margin + span * (i / (qty - 1))); };
     const safePositionsArray = (arr) => (Array.isArray(arr) ? arr : []);
-
-    // IMPORTANT: build desired subs using (priority order):
-    // 1) cfg.positions[i].x (user drag result, canonical)
-    // 2) existing derived subwoofers[i].position.x
-    // 3) default even spacing
     const buildGroup = (group, qty, model, cfgPositions, existingSubs) => {
       if (!model || qty <= 0) return [];
-
       const defaultsX = makeDefaultXs(qty);
       const cfgPos = safePositionsArray(cfgPositions);
       const yPinned = wallPinnedY(group === 'front' ? 'front' : 'rear', model);
-
-      // clamp X inside room with a small edge buffer
-      const minX = EPS;
-      const maxX = Math.max(EPS, widthM - EPS);
-
+      const minX = EPS; const maxX = Math.max(EPS, widthM - EPS);
       return Array.from({ length: qty }, (_, i) => {
         const prev = existingSubs?.[i] || null;
-
-        const xFromCfg = Number(cfgPos?.[i]?.x);
-        const xFromPrev = Number(prev?.position?.x);
-        const xFromDefault = Number(defaultsX?.[i]);
-
-        const pickedX = Number.isFinite(xFromCfg)
-          ? xFromCfg
-          : (Number.isFinite(xFromPrev) ? xFromPrev : xFromDefault);
-
+        const xFromCfg = Number(cfgPos?.[i]?.x); const xFromPrev = Number(prev?.position?.x); const xFromDefault = Number(defaultsX?.[i]);
+        const pickedX = Number.isFinite(xFromCfg) ? xFromCfg : (Number.isFinite(xFromPrev) ? xFromPrev : xFromDefault);
         const finalX = clamp(pickedX, minX, maxX);
-
-        return {
-          // keep any prev fields (phase, delay etc) if they exist, but never let them override id/role/group/model/position
-          ...(prev ? { ...prev } : {}),
-          id: `sub-${group}-${i + 1}`,
-          role: group === 'front' ? `SUBF${i + 1}` : `SUBR${i + 1}`,
-          group,
-          model,
-          position: {
-            x: finalX,
-            y: yPinned,
-            z: Number.isFinite(prev?.position?.z) ? prev.position.z : 0,
-          },
-        };
+        return { ...(prev ? { ...prev } : {}), id: `sub-${group}-${i + 1}`, role: group === 'front' ? `SUBF${i + 1}` : `SUBR${i + 1}`, group, model, position: { x: finalX, y: yPinned, z: Number.isFinite(prev?.position?.z) ? prev.position.z : 0 } };
       });
     };
-
-    // Functional update so we can read prev without depending on appState.subwoofers (prevents overwrite loops)
     setSubwoofers((prevAll) => {
       const prevList = Array.isArray(prevAll) ? prevAll : [];
       const prevFront = prevList.filter(s => s?.group === 'front');
       const prevRear = prevList.filter(s => s?.group === 'rear');
-
       const nextFront = buildGroup('front', frontQty, frontModel, frontSubsCfg?.positions, prevFront);
       const nextRear = buildGroup('rear', rearQty, rearModel, rearSubsCfg?.positions, prevRear);
-
       const next = [...nextFront, ...nextRear];
-
-      // Only write if something meaningfully changed (avoid churn)
       const sameLen = prevList.length === next.length;
-      const same = sameLen && prevList.every((p, i) => {
-        const n = next[i];
-        if (!p || !n) return false;
-        const px = Number(p?.position?.x), py = Number(p?.position?.y);
-        const nx = Number(n?.position?.x), ny = Number(n?.position?.y);
-        const close = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) < 0.001;
-        return (
-          String(p.id) === String(n.id) &&
-          String(p.group) === String(n.group) &&
-          String(p.model) === String(n.model) &&
-          close(px, nx) &&
-          close(py, ny)
-        );
-      });
-
+      const same = sameLen && prevList.every((p, i) => { const n = next[i]; if (!p || !n) return false; const px = Number(p?.position?.x), py = Number(p?.position?.y); const nx = Number(n?.position?.x), ny = Number(n?.position?.y); const close = (a, b) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) < 0.001; return String(p.id) === String(n.id) && String(p.group) === String(n.group) && String(p.model) === String(n.model) && close(px, nx) && close(py, ny); });
       return same ? prevAll : next;
     });
-  }, [
-    appState?.setSubwoofers,
-    appState?.roomDims?.widthM,
-    appState?.roomDims?.lengthM,
-    stableDimensions?.width,
-    stableDimensions?.length,
-    frontSubsCfg?.model,
-    frontSubsCfg?.count,
-    frontSubsCfg?.positions,
-    rearSubsCfg?.model,
-    rearSubsCfg?.count,
-    rearSubsCfg?.positions,
-    getModelDimsM,
-  ]);
+  }, [appState?.setSubwoofers, appState?.roomDims?.widthM, appState?.roomDims?.lengthM, stableDimensions?.width, stableDimensions?.length, frontSubsCfg?.model, frontSubsCfg?.count, frontSubsCfg?.positions, rearSubsCfg?.model, rearSubsCfg?.count, rearSubsCfg?.positions, getModelDimsM]);
 
   return (
     <>
