@@ -1190,7 +1190,7 @@ if (typeof window !== "undefined" && window.console) {
 }
 
 // Re-export for backwards compat (other files import DOLBY_PRESETS from this page path)
-export { DOLBY_PRESETS, seedSpeakersFromPreset };
+export { DOLBY_PRESETS, seedSpeakersFromPreset } from "@/components/room/utils/dolbyHelpers";
 
 // Thin store wrapper over AppStateProvider so the page can read/write speakers
 export function useSpeakerSystemStore() {
