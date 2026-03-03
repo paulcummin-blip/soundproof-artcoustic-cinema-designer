@@ -57,11 +57,10 @@ import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore"
 // and useProjectLoader (for speaker handoff data).
 
 
-// useProjectLoader is imported from @/components/hooks/useProjectLoader
-// The inline body below is intentionally removed - it was a duplicate that caused build errors.
-// This comment block replaces ~930 lines of duplicate code.
-function _useProjectLoader_INLINE_REMOVED() {
-  const [projectIdState, setProjectIdState] = useState(projectIdFromUrl);
+// useProjectLoader and useSpeakerSystemStore are imported from external files (see imports above).
+// The duplicate inline bodies have been removed to fix the build errors.
+
+function _PLACEHOLDER_REMOVED() {
   const [projectNameState, setProjectNameState] = useState("Untitled Room"); // Internal projectName for loader
   const [loadState, setLoadState] = useState({ phase: "idle", error: null, name: null });
   const [autosaveStatus, setAutosaveStatus] = useState("idle");
