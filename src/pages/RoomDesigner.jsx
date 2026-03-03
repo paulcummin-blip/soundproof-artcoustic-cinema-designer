@@ -663,175 +663,42 @@ function RoomDesignerWithState() {
       .join("|");
   }, [placedSpeakersForAim]);
 
-  // NEW: In-room depth calculation (placed AFTER mlpAnchorEffective)
-  // CRITICAL: Uses placedSpeakersForAim to only measure speakers active in current layout
+  // In-room depth calculation (compacted)
   const inRoomDepthsCm = React.useMemo(() => {
-    if (!Array.isArray(placedSpeakersForAim) || placedSpeakersForAim.length === 0) {
-      return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
-    }
-
-    const widthM = stableDimensions.width;
-    const lengthM = stableDimensions.length;
-
-    if (!_isNum(widthM) || !_isNum(lengthM) || widthM <= 0 || lengthM <= 0) {
-      return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
-    }
-
-    const aimFW = appState?.aimFrontWidesAtMLP || false;
-    const aimSide = appState?.aimSideSurroundsAtMLP || false;
-    const aimRear = appState?.aimRearSurroundsAtMLP || false;
-
-    // Wall-hinge depth helpers (for FW, Side, Rear surrounds only)
-    
-    // Given a wall, return the wall normal yaw (direction pointing INTO the room)
-    const _wallNormalYawDeg = (wall) => {
-      // LEFT wall points rightwards -> +90
-      // RIGHT wall points leftwards -> -90
-      // BACK wall points forward -> 0
-      if (wall === "LEFT") return 90;
-      if (wall === "RIGHT") return -90;
-      if (wall === "BACK") return 0;
-      return 0;
-    };
-
-    // Hinge angle = smallest cabinet rotation away from wall normal (0..90)
-    // IMPORTANT: yaw and yaw+180 represent the same cabinet orientation for clearance,
-    // so we must fold the angle into an acute 0..90 range.
-    const _hingeAngleDegFromWall = (wall, yawDeg) => {
-      const normal = _wallNormalYawDeg(wall);
-
-      // -180..+180 difference between yaw and wall normal
-      const delta = _wrap180((Number(yawDeg) || 0) - normal);
-
-      // Use cabinet orientation (mod 180): pick the acute equivalent
-      // Example: 152° becomes 28°
-      const abs = Math.abs(delta);
-      const acute = Math.min(abs, 180 - abs);
-
-      // Clamp to 0..90
-      return Math.min(90, acute);
-    };
-
-    // Wall-hinge intrusion (metres) = D*cos(a) + W*sin(a)
-    // where a is "away from flat-to-wall" in radians
-    const _hingeIntrusionM = (widthM, depthM, hingeAngleDeg) => {
-      const a = _degToRad(hingeAngleDeg);
-      const c = Math.abs(Math.cos(a));
-      const s = Math.abs(Math.sin(a));
-      return depthM * c + widthM * s;
-    };
-
-    const computeGroupDepthCm = ({ roles, getYawDegForRole, speakersToProcess, widthM, lengthM, getModelMeta }) => {
-      if (!Array.isArray(speakersToProcess) || speakersToProcess.length === 0) return null;
-      const W = widthM;
-      const L = lengthM;
-      if (!(_isNum(W) && W > 0 && _isNum(L) && L > 0)) return null;
-
-      let maxDepthM = null;
-
-      for (const sp of speakersToProcess) {
-        const role = safeCanon(sp?.role);
-        if (!role || !roles.includes(role)) continue;
-
-        const pos = sp?.position || {};
-        if (!_isNum(pos.x) || !_isNum(pos.y)) continue;
-
-        const meta = getModelMeta?.(sp) || null;
-        const { widthM: wM, depthM: dM } = _getDimsM(meta);
-
-        // Yaw for clearance must match the plan icon convention:
-        // - Aim OFF: flat to wall (wall normal)
-        // - Aim ON: aim to MLP using the existing getYawDegForRole(sp)
-        const yawDeg = getYawDegForRole?.(sp) ?? 0;
-
-        // Determine wall based on role
-        let wall = null;
-        if (role === "LW" || role === "SL") wall = "LEFT";
-        else if (role === "RW" || role === "SR") wall = "RIGHT";
-        else if (role === "SBL" || role === "SBR") wall = "BACK";
-
-        if (!wall) continue;
-
-        // Wall-hinge model: report how far the cabinet extends into room from wall plane
-        const hingeAngleDeg = _hingeAngleDegFromWall(wall, yawDeg);
-        const depthM_fromWall = _hingeIntrusionM(wM, dM, hingeAngleDeg);
-
-        if (!_isNum(depthM_fromWall)) continue;
-        if (maxDepthM === null || depthM_fromWall > maxDepthM) maxDepthM = depthM_fromWall;
-      }
-
-      if (maxDepthM === null) return null;
-      return Math.round(maxDepthM * 100);
-    };
-
-    const getModelMeta = (sp) => {
-      const meta = getSpeakerModelMeta(sp?.model);
-      return meta && !meta.notFound ? meta : null;
-    };
-
+    if (!Array.isArray(placedSpeakersForAim) || placedSpeakersForAim.length === 0) return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
+    const widthM = stableDimensions.width; const lengthM = stableDimensions.length;
+    if (!_isNum(widthM) || !_isNum(lengthM) || widthM <= 0 || lengthM <= 0) return { frontWides: null, sideSurrounds: null, rearSurrounds: null };
+    const aimFW = appState?.aimFrontWidesAtMLP || false; const aimSide = appState?.aimSideSurroundsAtMLP || false; const aimRear = appState?.aimRearSurroundsAtMLP || false;
+    const _wallNormalYawDeg = (wall) => wall === "LEFT" ? 90 : wall === "RIGHT" ? -90 : 0;
+    const _hingeAngleDegFromWall = (wall, yawDeg) => { const normal = _wallNormalYawDeg(wall); const delta = _wrap180((Number(yawDeg) || 0) - normal); const abs = Math.abs(delta); return Math.min(90, Math.min(abs, 180 - abs)); };
+    const _hingeIntrusionM = (wM, dM, hDeg) => { const a = _degToRad(hDeg); return dM * Math.abs(Math.cos(a)) + wM * Math.abs(Math.sin(a)); };
+    const getModelMeta = (sp) => { const meta = getSpeakerModelMeta(sp?.model); return meta && !meta.notFound ? meta : null; };
     const getYawDegForRole = (sp) => {
       const r = safeCanon(sp?.role);
-
-      const aimToMLP = () => {
-        if (!sp?.position || !mlpAnchorEffective) return 0;
-        const dx = mlpAnchorEffective.x - sp.position.x;
-        const dy = mlpAnchorEffective.y - sp.position.y;
-        const yaw = -Math.atan2(dx, dy) * (180 / Math.PI);
-        return _wrap180(yaw);
-      };
-
-      // Aim ON: compute yaw to MLP
-      if ((r === "LW" || r === "RW") && aimFW) return aimToMLP();
-      if ((r === "SL" || r === "SR") && aimSide) return aimToMLP();
-      if ((r === "SBL" || r === "SBR") && aimRear) return aimToMLP();
-
-      // Aim OFF: flat to wall (wall normal convention)
-      if (r === "LW" || r === "SL") return 90;
-      if (r === "RW" || r === "SR") return -90;
-      if (r === "SBL" || r === "SBR") return 0;
-
-      return 0;
+      const aimToMLP = () => { if (!sp?.position || !mlpAnchorEffective) return 0; return _wrap180(-Math.atan2(mlpAnchorEffective.x - sp.position.x, mlpAnchorEffective.y - sp.position.y) * (180 / Math.PI)); };
+      if ((r === "LW" || r === "RW") && aimFW) return aimToMLP(); if ((r === "SL" || r === "SR") && aimSide) return aimToMLP(); if ((r === "SBL" || r === "SBR") && aimRear) return aimToMLP();
+      if (r === "LW" || r === "SL") return 90; if (r === "RW" || r === "SR") return -90; return 0;
     };
-
-    const frontWides = computeGroupDepthCm({
-      roles: ["LW", "RW"],
-      getYawDegForRole,
-      speakersToProcess: placedSpeakersForAim,
-      widthM,
-      lengthM,
-      getModelMeta,
-    });
-
-    const sideSurrounds = computeGroupDepthCm({
-      roles: ["SL", "SR"],
-      getYawDegForRole,
-      speakersToProcess: placedSpeakersForAim,
-      widthM,
-      lengthM,
-      getModelMeta,
-    });
-
-    const rearSurrounds = computeGroupDepthCm({
-      roles: ["SBL", "SBR"],
-      getYawDegForRole,
-      speakersToProcess: placedSpeakersForAim,
-      widthM,
-      lengthM,
-      getModelMeta,
-    });
-
-    return { frontWides, sideSurrounds, rearSurrounds };
-  }, [
-    placedSpeakersForAim,
-    _posSig,
-    _yawSig,
-    stableDimensions.width, 
-    stableDimensions.length,
-    mlpAnchorEffective,
-    appState?.aimFrontWidesAtMLP,
-    appState?.aimSideSurroundsAtMLP,
-    appState?.aimRearSurroundsAtMLP
-  ]);
+    const computeGroupDepthCm = ({ roles, speakersToProcess }) => {
+      if (!Array.isArray(speakersToProcess) || speakersToProcess.length === 0) return null;
+      let maxDepthM = null;
+      for (const sp of speakersToProcess) {
+        const role = safeCanon(sp?.role); if (!role || !roles.includes(role)) continue;
+        const pos = sp?.position || {}; if (!_isNum(pos.x) || !_isNum(pos.y)) continue;
+        const { widthM: wM, depthM: dM } = _getDimsM(getModelMeta(sp));
+        const wall = (role === "LW" || role === "SL") ? "LEFT" : (role === "RW" || role === "SR") ? "RIGHT" : (role === "SBL" || role === "SBR") ? "BACK" : null;
+        if (!wall) continue;
+        const d = _hingeIntrusionM(wM, dM, _hingeAngleDegFromWall(wall, getYawDegForRole(sp)));
+        if (_isNum(d) && (maxDepthM === null || d > maxDepthM)) maxDepthM = d;
+      }
+      return maxDepthM === null ? null : Math.round(maxDepthM * 100);
+    };
+    return {
+      frontWides: computeGroupDepthCm({ roles: ["LW", "RW"], speakersToProcess: placedSpeakersForAim }),
+      sideSurrounds: computeGroupDepthCm({ roles: ["SL", "SR"], speakersToProcess: placedSpeakersForAim }),
+      rearSurrounds: computeGroupDepthCm({ roles: ["SBL", "SBR"], speakersToProcess: placedSpeakersForAim }),
+    };
+  }, [placedSpeakersForAim, _posSig, _yawSig, stableDimensions.width, stableDimensions.length, mlpAnchorEffective, appState?.aimFrontWidesAtMLP, appState?.aimSideSurroundsAtMLP, appState?.aimRearSurroundsAtMLP]);
 
   // NEW: Compute centralized SPL data for all seats (powers sidebar SPL cards AND HUD)
   // Uses unified SPL logic with max_spl_cont_db_1m cap from speakerData.js
