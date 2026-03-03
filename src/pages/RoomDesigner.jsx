@@ -48,31 +48,12 @@ import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFrom
 import { safeCanon, mergePreserveOverheads, cloneRoleWithModel, speakersEqual, preserveSurroundModels } from "@/components/room/utils/speakerHelpers";
 import { DOLBY_PRESETS, seedSpeakersFromPreset, getTargetOverheadIds, ensureAtmosOverheads } from "@/components/room/utils/dolbyHelpers";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
-// NEW: Helper hook for URL query parameters - SSR Safe
-function useUrlQuery() {
-  const [projectId, setProjectId] = React.useState(null);
+import { useUrlQuery, useSurroundGroupDepths, parseProjectJson, getMlpPoint } from "@/components/roomdesigner/RoomDesignerHelpers";
+import { useProjectLoader } from "@/components/hooks/useProjectLoader";
+import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore";
 
-  React.useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      setProjectId(params.get("project"));
-    } catch {
-      setProjectId(null);
-    }
-  }, []);
-
-  return { projectId };
-}
-
-function useSurroundGroupDepths() {
-  const {
-    placedSpeakers,
-    roomDims,
-    mlpY_m,
-    aimFrontWidesAtMLP,
-    aimSideSurroundsAtMLP,
-    aimRearSurroundsAtMLP,
-  } = useAppState() || {};
+// PLACEHOLDER to keep refs valid — useSurroundGroupDepths moved to RoomDesignerHelpers
+function _useSurroundGroupDepthsPlaceholder() {
 
   const mlp = useMemo(() => ({ x: (roomDims?.widthM || 0) / 2, y: mlpY_m, z: 1.2 }), [roomDims?.widthM, mlpY_m]);
 
