@@ -1134,50 +1134,16 @@ function RoomDesignerWithState() {
     }
   }, [subWarnings, appState]);
 
-  // NEW: Effect to re-clamp LCR speakers if their position becomes invalid after a model change
+  // LCR re-clamp (compacted)
   useEffect(() => {
     if (loadState.phase !== 'loaded' || !placedSpeakers.length || !analysisResult?.zones) return;
-
     try {
-      // Helper to get model dimensions
       const getModelDims = (modelId) => getSpeakerModelMeta(modelId) || {};
-
-      const constraints = calculateLcrConstraints({
-        placedSpeakers,
-        zones: analysisResult.zones,
-        room: stableDimensions, // Uses stableDimensions
-        screen: stableScreen,
-        getModelDims
-      });
-
+      const constraints = calculateLcrConstraints({ placedSpeakers, zones: analysisResult.zones, room: stableDimensions, screen: stableScreen, getModelDims });
       let needsUpdate = false;
-      const updatedSpeakers = placedSpeakers.map((speaker) => {
-        const constraint = constraints[speaker.role];
-        if (!constraint) return speaker;
-
-        const currentX = speaker.position.x;
-        const { minX, maxX } = constraint.clamp;
-
-        // If current position is outside the new valid corridor
-        if (currentX < minX || currentX > maxX) {
-          needsUpdate = true;
-          const newX = Math.max(minX, Math.min(maxX, currentX));
-          if (globalThis.__B44_LOGS) debug(`[Resize Re-clamp] Clamping ${speaker.role} X from ${currentX} to ${newX} (range: [${minX}, ${maxX}]).`);
-          return { ...speaker, position: { ...speaker.position, x: newX } };
-        }
-
-        return speaker;
-      });
-
-      if (needsUpdate) {
-        if (globalThis.__B44_LOGS) debug('[Resize Re-clamp] Adjusting LCR positions due to model change or constraint violation.');
-        setSpeakers((prev) => mergePreserveOverheads(prev, updatedSpeakers, dolbyPreset));
-      }
-    } catch (error) {
-      if (typeof console !== 'undefined' && typeof console.warn === 'function') {
-        if (globalThis.__B44_LOGS) console.warn('[Resize Re-clamp] Error during re-clamping:', error);
-      }
-    }
+      const updatedSpeakers = placedSpeakers.map((speaker) => { const constraint = constraints[speaker.role]; if (!constraint) return speaker; const currentX = speaker.position.x; const { minX, maxX } = constraint.clamp; if (currentX < minX || currentX > maxX) { needsUpdate = true; const newX = Math.max(minX, Math.min(maxX, currentX)); if (globalThis.__B44_LOGS) debug(`[Resize Re-clamp] Clamping ${speaker.role} X from ${currentX} to ${newX}`); return { ...speaker, position: { ...speaker.position, x: newX } }; } return speaker; });
+      if (needsUpdate) { if (globalThis.__B44_LOGS) debug('[Resize Re-clamp] Adjusting LCR positions.'); setSpeakers((prev) => mergePreserveOverheads(prev, updatedSpeakers, dolbyPreset)); }
+    } catch (error) { if (globalThis.__B44_LOGS) console.warn('[Resize Re-clamp] Error:', error); }
   }, [placedSpeakers, analysisResult?.zones, stableDimensions, stableScreen, setSpeakers, loadState.phase]);
 
   // NEW: Rescue speakers that end up outside room bounds after resize
