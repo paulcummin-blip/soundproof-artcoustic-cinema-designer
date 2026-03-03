@@ -46,16 +46,7 @@ import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics"
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
 
-// B44 shim: some older logic expects getModelDimsM()
-const getModelDimsM = (model) => {
-  const meta = getSpeakerModelMeta(model) || {};
-  return {
-    widthM: meta.widthM,
-    depthM: meta.depthM,
-    diameterM: meta.diameterM,
-    round: meta.round
-  };
-};
+import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 
 // NEW: Helper hook for URL query parameters - SSR Safe
 function useUrlQuery() {
