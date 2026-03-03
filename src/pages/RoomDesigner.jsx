@@ -60,7 +60,7 @@ import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore"
 // useProjectLoader and useSpeakerSystemStore are imported from external files (see imports above).
 // The duplicate inline bodies have been removed to fix the build errors.
 
-function _PLACEHOLDER_REMOVED() {
+function _PLACEHOLDER_REMOVED_NOOP() {
   const [projectNameState, setProjectNameState] = useState("Untitled Room"); // Internal projectName for loader
   const [loadState, setLoadState] = useState({ phase: "idle", error: null, name: null });
   const [autosaveStatus, setAutosaveStatus] = useState("idle");
