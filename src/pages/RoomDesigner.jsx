@@ -46,7 +46,7 @@ import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics"
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
 import { safeCanon, mergePreserveOverheads, cloneRoleWithModel, speakersEqual, preserveSurroundModels } from "@/components/room/utils/speakerHelpers";
-import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
+import { DOLBY_PRESETS, seedSpeakersFromPreset, getTargetOverheadIds, ensureAtmosOverheads } from "@/components/room/utils/dolbyHelpers"; import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 
 // NEW: Helper hook for URL query parameters - SSR Safe
 function useUrlQuery() {
