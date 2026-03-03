@@ -45,7 +45,7 @@ import { usePriceCalculation } from "@/components/pricing/usePriceCalculation";
 import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics";
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
-
+import { safeCanon, mergePreserveOverheads, cloneRoleWithModel, speakersEqual, preserveSurroundModels } from "@/components/room/utils/speakerHelpers";
 import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 
 // NEW: Helper hook for URL query parameters - SSR Safe
