@@ -1403,65 +1403,20 @@ function RoomDesignerWithState() {
     loadState, resolvedProjectId, projectIdState, didUserRequestResetRef,
   });
 
-  // Ensure Atmos overheads exist as soon as an Atmos preset AND a
-  // global overhead model are selected – WITHOUT relying on surrounds.
+  // Overhead seeding (compacted)
   useEffect(() => {
     if (!dolbyPreset || !_overheadGlobalModel) return;
     if (_isFrozen && _isFrozen("speakers")) return;
-
-    // STRICT GUARD: Do not auto-seed overheads for loaded projects with explicit empty state
     const hasProjectId = resolvedProjectId || projectIdState;
-    if (loadState?.phase === "loaded" && hasProjectId) {
-      // Only seed overheads if the user explicitly changed the overhead model
-      // (do not seed just because a loaded project has no overheads saved)
-      return;
-    }
-
-    // Normalise preset string, e.g. "5.1.4 Dolby Atmos" -> "5.1.4"
+    if (loadState?.phase === "loaded" && hasProjectId) return;
     const normalized = String(dolbyPreset).split(" ")[0].split("_")[0];
     const parts = normalized.split(".");
     const heights = parts.length >= 3 ? parseInt(parts[2], 10) || 0 : 0;
-
-    // If layout has no height layer, do nothing
     if (!heights) return;
-
-    // If we already have any T* roles, do nothing
-    const hasAnyOverheads =
-    Array.isArray(placedSpeakers) &&
-    placedSpeakers.some((spk) =>
-    safeCanon(spk.role || "").startsWith("T")
-    );
-
+    const hasAnyOverheads = Array.isArray(placedSpeakers) && placedSpeakers.some((spk) => safeCanon(spk.role || "").startsWith("T"));
     if (hasAnyOverheads) return;
-
-    // Seed / fix overheads using the existing helper
-    setSpeakers((prev) =>
-    ensureAtmosOverheads({
-      placedSpeakers: prev,
-      dolbyPreset,
-      roomDimensions: stableDimensions,
-      overheadGlobalModel: _overheadGlobalModel,
-      overheadFrontOverride: _overheadFrontOverride,
-      overheadMidOverride: _overheadMidOverride,
-      overheadRearOverride: _overheadRearOverride,
-      useFrontGlobal: _useFrontGlobal,
-      useMidGlobal: _useMidGlobal,
-      useRearGlobal: _useRearGlobal
-    })
-    );
-  }, [
-  dolbyPreset,
-  placedSpeakers,
-  _overheadGlobalModel,
-  _overheadFrontOverride,
-  _overheadMidOverride,
-  _overheadRearOverride,
-  _useFrontGlobal,
-  _useMidGlobal,
-  _useRearGlobal,
-  setSpeakers,
-  _isFrozen]
-  );
+    setSpeakers((prev) => ensureAtmosOverheads({ placedSpeakers: prev, dolbyPreset, roomDimensions: stableDimensions, overheadGlobalModel: _overheadGlobalModel, overheadFrontOverride: _overheadFrontOverride, overheadMidOverride: _overheadMidOverride, overheadRearOverride: _overheadRearOverride, useFrontGlobal: _useFrontGlobal, useMidGlobal: _useMidGlobal, useRearGlobal: _useRearGlobal }));
+  }, [dolbyPreset, placedSpeakers, _overheadGlobalModel, _overheadFrontOverride, _overheadMidOverride, _overheadRearOverride, _useFrontGlobal, _useMidGlobal, _useRearGlobal, setSpeakers, _isFrozen]);
 
   // Seating rebuild extracted to useSeatingRebuild hook
   useSeatingRebuild({
