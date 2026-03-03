@@ -1146,64 +1146,18 @@ function RoomDesignerWithState() {
     } catch (error) { if (globalThis.__B44_LOGS) console.warn('[Resize Re-clamp] Error:', error); }
   }, [placedSpeakers, analysisResult?.zones, stableDimensions, stableScreen, setSpeakers, loadState.phase]);
 
-  // NEW: Rescue speakers that end up outside room bounds after resize
+  // Speaker rescue on room resize (compacted)
   useEffect(() => {
-    // Skip if dragging
-    if (isDraggingRef.current) return;
-
-    // Skip if frozen
-    if (_isFrozen && _isFrozen('speakers')) return;
-
-    const W = stableDimensions.width;
-    const L = stableDimensions.length;
-
-    // Skip if no valid dimensions
+    if (isDraggingRef.current) return; if (_isFrozen && _isFrozen('speakers')) return;
+    const W = stableDimensions.width; const L = stableDimensions.length;
     if (!(W > 0 && L > 0)) return;
-
-    // Only run if dimensions actually changed
     const prev = prevRoomDimsRef.current;
     if (prev && prev.width === W && prev.length === L) return;
-
-    // Update previous dimensions
     prevRoomDimsRef.current = { width: W, length: L };
-
-    // If this is the first run, don't rescue (nothing to rescue from)
     if (!prev) return;
-
-    // Check if any speakers are out of bounds
-    const INSET = 0.01; // 1cm safety margin
-    let anyOutOfBounds = false;
-
-    const rescued = placedSpeakers.map((spk) => {
-      if (!spk.position || !Number.isFinite(spk.position.x) || !Number.isFinite(spk.position.y)) {
-        return spk;
-      }
-
-      const x = spk.position.x;
-      const y = spk.position.y;
-
-      // Test if out of bounds (strict 0...W and 0...L test)
-      const outOfBounds = x < 0 || x > W || y < 0 || y > L;
-
-      if (!outOfBounds) return spk;
-
-      // Clamp to safe inset
-      anyOutOfBounds = true;
-      const clampedX = Math.max(INSET, Math.min(W - INSET, x));
-      const clampedY = Math.max(INSET, Math.min(L - INSET, y));
-
-      if (globalThis.__B44_LOGS) debug(`[Rescue] ${spk.role} was outside bounds (${x.toFixed(3)}, ${y.toFixed(3)}), clamped to (${clampedX.toFixed(3)}, ${clampedY.toFixed(3)})`);
-
-      return {
-        ...spk,
-        position: { ...spk.position, x: clampedX, y: clampedY }
-      };
-    });
-
-    // Only update if at least one speaker was rescued
-    if (anyOutOfBounds) {
-      setSpeakers((prev) => preserveSurroundModels(prev, rescued, appState));
-    }
+    const INSET = 0.01; let anyOutOfBounds = false;
+    const rescued = placedSpeakers.map((spk) => { if (!spk.position || !Number.isFinite(spk.position.x) || !Number.isFinite(spk.position.y)) return spk; const x = spk.position.x; const y = spk.position.y; if (!(x < 0 || x > W || y < 0 || y > L)) return spk; anyOutOfBounds = true; return { ...spk, position: { ...spk.position, x: Math.max(INSET, Math.min(W - INSET, x)), y: Math.max(INSET, Math.min(L - INSET, y)) } }; });
+    if (anyOutOfBounds) setSpeakers((prev) => preserveSurroundModels(prev, rescued, appState));
   }, [stableDimensions.width, stableDimensions.length, placedSpeakers, _isFrozen, setSpeakers]);
 
   // Effect to lock LCR to front wall + z=1.2
