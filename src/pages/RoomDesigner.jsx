@@ -57,62 +57,10 @@ import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore"
 // and useProjectLoader (for speaker handoff data).
 
 
-// Hook to encapsulate project loading, saving, and state management
-function useProjectLoader(
-appState, // Pass appState directly for setters
-{
-  projectIdFromUrl,
-  dolbyPreset,
-  dimensions, // This will now be stableDimensions, derived from appState.roomDims
-  screen, seatingPositions, roomElements, overlays, frozenTabs,
-  setDimensions, // This will now be appState.setRoomDims
-  setScreen, setSeatingPositions, setRoomElements, setOverlays, setDolbyConfig,
-  setDolbyPreset, // Added to update the local state in RoomDesignerWithState
-  setSpeakerSystem, // From useSpeakerSystemStore, passed down
-  initWithDefaultsAndRules, // From useSpeakerSystemStore, passed down
-  placedSpeakers, // Now taken from the prop
-  sevenBedLayoutType, // This is now passed in
-  setSevenBedLayoutType,
-  frontSubsCfg, // Pass sub config for saving
-  rearSubsCfg, // Pass sub config for saving
-  setFrontSubsCfg, // Pass setter
-  setRearSubsCfg, // Pass setter
-  // NEW: LCR Aiming props
-  lcrAimMode,
-  setLcrAimMode,
-  // NEW: Front Wide Toggle
-  enableFrontWides,
-  setEnableFrontWides,
-  // NEW: SPL Handoff data for saving
-  selectedSpeakersByRole, // Now comes from appState
-  setSelectedSpeakersByRole, // Setter for appState
-  speakerNodes, // Now comes from appState
-  setSpeakerNodes, // Setter for appState
-  // NEW: Overhead selections for persistence
-  overheadGlobalModel,
-  setOverheadGlobalModel,
-  overheadFrontOverride,
-  setOverheadFrontOverride,
-  overheadMidOverride,
-  setOverheadMidOverride,
-  overheadRearOverride,
-  setOverheadRearOverride,
-  useFrontGlobal,
-  setUseFrontGlobal,
-  useMidGlobal,
-  setUseMidGlobal,
-  useRearGlobal,
-  setUseRearGlobal,
-  // NEW: Row Spacing
-  rowSpacingM,
-  setRowSpacingM,
-  // NEW: Seats Per Row By Row
-  seatsPerRowByRow,
-  setSeatsPerRowByRow,
-  // NEW: Free Move LCR
-  freeMoveLcr,
-  setFreeMoveLcr
-}) {
+// useProjectLoader is imported from @/components/hooks/useProjectLoader
+// The inline body below is intentionally removed - it was a duplicate that caused build errors.
+// This comment block replaces ~930 lines of duplicate code.
+function _useProjectLoader_INLINE_REMOVED() {
   const [projectIdState, setProjectIdState] = useState(projectIdFromUrl);
   const [projectNameState, setProjectNameState] = useState("Untitled Room"); // Internal projectName for loader
   const [loadState, setLoadState] = useState({ phase: "idle", error: null, name: null });
