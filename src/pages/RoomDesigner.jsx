@@ -1181,7 +1181,6 @@ if (typeof window !== "undefined" && window.console) {
 }
 
 export { DOLBY_PRESETS, seedSpeakersFromPreset, getTargetOverheadIds, ensureAtmosOverheads } from "@/components/room/utils/dolbyHelpers";
-import { DOLBY_PRESETS, seedSpeakersFromPreset, getTargetOverheadIds, ensureAtmosOverheads } from "@/components/room/utils/dolbyHelpers";
 
 // Thin store wrapper over AppStateProvider so the page can read/write speakers
 export function useSpeakerSystemStore() {
