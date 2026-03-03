@@ -46,8 +46,8 @@ import { computeSeatHudMetrics } from "@/components/utils/computeSeatHudMetrics"
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { deriveSubwoofersFromCfg } from "@/components/utils/deriveSubwoofersFromCfg";
 import { safeCanon, mergePreserveOverheads, cloneRoleWithModel, speakersEqual, preserveSurroundModels } from "@/components/room/utils/speakerHelpers";
-import { DOLBY_PRESETS, seedSpeakersFromPreset, getTargetOverheadIds, ensureAtmosOverheads } from "@/components/room/utils/dolbyHelpers"; import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
-
+import { DOLBY_PRESETS, seedSpeakersFromPreset, getTargetOverheadIds, ensureAtmosOverheads } from "@/components/room/utils/dolbyHelpers";
+import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 // NEW: Helper hook for URL query parameters - SSR Safe
 function useUrlQuery() {
   const [projectId, setProjectId] = React.useState(null);
@@ -1179,8 +1179,6 @@ import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 if (typeof window !== "undefined" && window.console) {
   if (globalThis.__B44_LOGS) console.log("[RD PRESETS] keys:", Object.keys(DOLBY_PRESETS || {}));
 }
-
-export { DOLBY_PRESETS, seedSpeakersFromPreset } from "@/components/room/utils/dolbyHelpers";
 
 // Thin store wrapper over AppStateProvider so the page can read/write speakers
 export function useSpeakerSystemStore() {
