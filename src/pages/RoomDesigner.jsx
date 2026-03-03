@@ -1180,7 +1180,7 @@ if (typeof window !== "undefined" && window.console) {
   if (globalThis.__B44_LOGS) console.log("[RD PRESETS] keys:", Object.keys(DOLBY_PRESETS || {}));
 }
 
-export { DOLBY_PRESETS, seedSpeakersFromPreset, getTargetOverheadIds, ensureAtmosOverheads } from "@/components/room/utils/dolbyHelpers";
+export { DOLBY_PRESETS, seedSpeakersFromPreset } from "@/components/room/utils/dolbyHelpers";
 
 // Thin store wrapper over AppStateProvider so the page can read/write speakers
 export function useSpeakerSystemStore() {
