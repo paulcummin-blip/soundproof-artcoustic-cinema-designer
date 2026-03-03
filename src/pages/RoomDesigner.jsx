@@ -1579,131 +1579,52 @@ function RoomDesignerWithState() {
   );
 
 
-  // Effect to swap between Rear Surrounds and Front Wides for 7.x layouts
+  // 7.x bed layout swap: inline (kept compact)
   useEffect(() => {
     if (isDraggingRef.current) return;
-    
-    // If we've just loaded a real project, don't overwrite its speaker layout
-    if (loadState?.phase === "loaded") {
-      return;
-    }
-
-    if (!dolbyPreset || _isFrozen && _isFrozen('speakers')) {
-      return;
-    }
-
-    // Parse preset to extract height count
-    const rawPreset = String(dolbyPreset || '').split(' ')[0].split('_')[0]; // "7.1.4 Dolby Atmos" → "7.1.4"
+    if (loadState?.phase === "loaded") return;
+    if (!dolbyPreset || _isFrozen && _isFrozen('speakers')) return;
+    const rawPreset = String(dolbyPreset || '').split(' ')[0].split('_')[0];
     const parts = rawPreset.split('.');
-    const heights = parseInt(parts[2], 10) || 0; // 7.1.4 → 4, 7.1 → 0
-
-    // Never run this 7.x bed swap logic for Atmos layouts (heights > 0)
-    // For 7.1.2/7.1.4/7.1.6 we let the Dolby reconciliation effect handle everything
-    if (heights > 0) {
-      return;
-    }
-
+    const heights = parseInt(parts[2], 10) || 0;
+    if (heights > 0) return;
     const is7ChannelBed = dolbyPreset && (dolbyPreset.startsWith('7.1') || dolbyPreset.startsWith('7.2'));
-    if (!is7ChannelBed) {
-      return;
-    }
-
+    if (!is7ChannelBed) return;
     const currentSpeakers = placedSpeakers || [];
     const hasWides = currentSpeakers.some((s) => s.role === 'LW' || s.role === 'RW');
     const hasRears = currentSpeakers.some((s) => s.role === 'SBL' || s.role === 'SBR');
-
-    const earZ = 1.1; // Standard ear height for bed speakers
-
-    // CRITICAL: Model preservation - use globalSurroundModel as primary source
+    const earZ = 1.1;
     const globalSurroundModel = appState?.globalSurroundModel;
     const hint = typeof window !== "undefined" && window.__SURROUND_MODEL_HINT_ || null;
     const byRole = new Map(currentSpeakers.map((s) => [s.role, s]));
-
+    const applyGlobalModelToRoles = (list, roles) => {
+      if (!globalSurroundModel) return list;
+      const ms = String(globalSurroundModel).trim().toLowerCase();
+      if (!ms || ms === 'off' || ms === 'none') return list;
+      return list.map((spk) => {
+        const canon = safeCanon(spk.role);
+        if (!roles.includes(canon)) return spk;
+        const cm = String(spk.model || '').trim().toLowerCase();
+        if (!cm || cm === 'off' || cm === 'none') return { ...spk, model: globalSurroundModel };
+        return spk;
+      });
+    };
     if (_sevenBedLayoutType === 'wides' && !hasWides && hasRears) {
-      if (globalThis.__B44_LOGS) debug('[Speakers] Switching from Rear Surrounds (SBL/SBR) to Front Wides (LW/RW).');
-
-      // Use globalSurroundModel as primary fallback for new wides
+      if (globalThis.__B44_LOGS) debug('[Speakers] Switching SBL/SBR -> LW/RW');
       const lw = cloneRoleWithModel(byRole, 'SBL', 'LW', globalSurroundModel || hint);
       lw.position = { x: stableDimensions.width * 0.15, y: stableDimensions.length * 0.4, z: earZ };
-
       const rw = cloneRoleWithModel(byRole, 'SBR', 'RW', globalSurroundModel || hint);
       rw.position = { x: stableDimensions.width * 0.85, y: stableDimensions.length * 0.4, z: earZ };
-
-      const nextList = currentSpeakers.
-      filter((s) => s.role !== 'SBL' && s.role !== 'SBR').
-      concat([lw, rw]);
-
-      if (globalThis.__B44_LOGS) safeGroup('[Speakers] swap/reseed merge check (wides)', () => {
-        if (globalThis.__B44_LOGS) safeTable(nextList.map((s) => ({ role: s.role, model: s.model ?? '(none)' })));
-      });
-      if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map((s) => safeCanon(s.role)));
-      setSpeakers((prev) => {
-        let merged = mergePreserveOverheads(prev, nextList, dolbyPreset);
-
-        // CRITICAL: Ensure wides inherit globalSurroundModel if they have no model
-        const globalSurroundModel = appState?.globalSurroundModel;
-        if (globalSurroundModel) {
-          const modelStr = String(globalSurroundModel).trim().toLowerCase();
-          if (modelStr && modelStr !== 'off' && modelStr !== 'none') {
-            merged = merged.map((spk) => {
-              const canon = safeCanon(spk.role);
-              if (canon !== 'LW' && canon !== 'RW') return spk;
-
-              const currentModel = String(spk.model || '').trim().toLowerCase();
-              if (!currentModel || currentModel === 'off' || currentModel === 'none') {
-                return { ...spk, model: globalSurroundModel };
-              }
-              return spk;
-            });
-          }
-        }
-
-        if (speakersEqual(prev, merged)) return prev;
-        return merged;
-      });
-
+      const nextList = currentSpeakers.filter((s) => s.role !== 'SBL' && s.role !== 'SBR').concat([lw, rw]);
+      setSpeakers((prev) => { let merged = mergePreserveOverheads(prev, nextList, dolbyPreset); merged = applyGlobalModelToRoles(merged, ['LW', 'RW']); if (speakersEqual(prev, merged)) return prev; return merged; });
     } else if (_sevenBedLayoutType === 'rears' && hasWides && !hasRears) {
-      if (globalThis.__B44_LOGS) debug('[Speakers] Switching from Front Wides (LW/RW) to Rear Surrounds (SBL/SBR).');
-
-      // Use globalSurroundModel as primary fallback for new rears
+      if (globalThis.__B44_LOGS) debug('[Speakers] Switching LW/RW -> SBL/SBR');
       const sbl = cloneRoleWithModel(byRole, 'LW', 'SBL', globalSurroundModel || hint);
       sbl.position = { x: stableDimensions.width * 0.25, y: stableDimensions.length - 0.1, z: earZ };
-
       const sbr = cloneRoleWithModel(byRole, 'RW', 'SBR', globalSurroundModel || hint);
       sbr.position = { x: stableDimensions.width * 0.75, y: stableDimensions.length - 0.1, z: earZ };
-
-      const nextList = currentSpeakers.
-      filter((s) => s.role !== 'LW' && s.role !== 'RW').
-      concat([sbl, sbr]);
-
-      if (globalThis.__B44_LOGS) safeGroup('[Speakers] swap/reseed merge check (rears)', () => {
-        if (globalThis.__B44_LOGS) safeTable(nextList.map((s) => ({ role: s.role, model: s.model ?? '(none)' })));
-      });
-      if (globalThis.__B44_LOGS) console.log('[RD] 7.x swap -> nextList roles', nextList.map((s) => safeCanon(s.role)));
-      setSpeakers((prev) => {
-        let merged = mergePreserveOverheads(prev, nextList, dolbyPreset);
-
-        // CRITICAL: Ensure rears inherit globalSurroundModel if they have no model
-        const globalSurroundModel = appState?.globalSurroundModel;
-        if (globalSurroundModel) {
-          const modelStr = String(globalSurroundModel).trim().toLowerCase();
-          if (modelStr && modelStr !== 'off' && modelStr !== 'none') {
-            merged = merged.map((spk) => {
-              const canon = safeCanon(spk.role);
-              if (canon !== 'SBL' && canon !== 'SBR') return spk;
-
-              const currentModel = String(spk.model || '').trim().toLowerCase();
-              if (!currentModel || currentModel === 'off' || currentModel === 'none') {
-                return { ...spk, model: globalSurroundModel };
-              }
-              return spk;
-            });
-          }
-        }
-
-        if (speakersEqual(prev, merged)) return prev;
-        return merged;
-      });
+      const nextList = currentSpeakers.filter((s) => s.role !== 'LW' && s.role !== 'RW').concat([sbl, sbr]);
+      setSpeakers((prev) => { let merged = mergePreserveOverheads(prev, nextList, dolbyPreset); merged = applyGlobalModelToRoles(merged, ['SBL', 'SBR']); if (speakersEqual(prev, merged)) return prev; return merged; });
     }
   }, [_sevenBedLayoutType, dolbyPreset, placedSpeakers, setSpeakers, stableDimensions.width, stableDimensions.length, _isFrozen]);
 
