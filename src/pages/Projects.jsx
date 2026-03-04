@@ -131,24 +131,6 @@ export default function ProjectsPage() {
         setLoadError(null);
         const projectList = await base44.entities.Project.list('-created_date', 100);
         
-        const safeJson = (v) => {
-          try {
-            if (v == null) return null;
-            // If Base44 already returns an object/array, use it directly
-            if (typeof v === "object" && !Array.isArray(v) && v !== null) return v;
-            if (Array.isArray(v)) return v;
-            // If it's a string, try to parse
-            if (typeof v === "string") {
-              const s = v.trim();
-              if (!s) return null;
-              // Reject obviously invalid stringified objects
-              if (s === "[object Object]" || s.startsWith("[object ")) return null;
-              return JSON.parse(s);
-            }
-            return null;
-          } catch (_e) { return null; }
-        };
-        
         if (mounted) {
           // Map to the format expected by the UI
           const mapped = (projectList || []).map(p => ({
