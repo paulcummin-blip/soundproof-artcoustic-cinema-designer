@@ -1755,7 +1755,6 @@ export function computeRoomModesResponse({
       cMpsUsed: cActual,
       roomDimsUsed: { widthM, lengthM, heightM },
       axialFundamentals,
-      lowestAxialHz,
       schroederHz: Number.isFinite(schroederHz) ? schroederHz : 0,
       modeMarkersHz,
       modeMarkersAllHz,
