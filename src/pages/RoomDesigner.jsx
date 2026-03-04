@@ -126,7 +126,6 @@ function RoomDesignerWithState() {
   const isDraggingRef = useRef(false);
   const visualisationRef = React.useRef(null);
   const didUserRequestResetRef = useRef(false);
-  const didInitialSeatSyncRef = useRef(false);
 
   // NEW: Seating config epoch tracking for loaded projects
   const [seatingConfigEpoch, setSeatingConfigEpoch] = useState(0);
