@@ -5551,8 +5551,6 @@ useEffect(() => {
     );
   }, [rearSubs, getModelDimsM, scale, toPx, handleMouseDown, handleMouseMove, handleMouseUp, dragging, draggedItemId]);
 
-  // Import RvRoomElementsLayer for room element rendering
-
   // Renders speaker labels. Not implemented in the original code, so a placeholder.
   const renderSpeakerLabels = useCallback(() => {
     return <g data-layer="speaker-labels"></g>;
