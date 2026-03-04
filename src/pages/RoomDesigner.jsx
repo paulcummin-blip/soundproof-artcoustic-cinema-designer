@@ -579,52 +579,6 @@ function RoomDesignerWithState() {
     });
   }, [placedSpeakers, _allowedBedRoles]);
 
-  // Helper functions for in-room depth calculation
-  const _isNum = (v) => typeof v === "number" && Number.isFinite(v);
-  
-  const _degToRad = (deg) => (deg * Math.PI) / 180;
-  
-  const _wrap180 = (deg) => {
-    let a = (Number(deg) || 0) % 360;
-    if (a > 180) a -= 360;
-    if (a < -180) a += 360;
-    return a;
-  };
-  
-  const _projectHalfExtent = (yawDeg, halfW, halfD, normalAxis) => {
-    const a = _degToRad(_isNum(yawDeg) ? yawDeg : 0);
-    const c = Math.abs(Math.cos(a));
-    const s = Math.abs(Math.sin(a));
-    if (normalAxis === "x") return halfW * c + halfD * s;
-    return halfW * s + halfD * c;
-  };
-  
-  const _getDimsM = (modelMeta) => {
-    // Accept BOTH formats:
-    // 1) meta.widthM / meta.depthM (metres)
-    // 2) meta.widthMm / meta.depthMm (millimetres)
-    // 3) meta.dims.widthM/depthM or meta.dimensions.widthM/depthM (older)
-    const m = modelMeta || {};
-    const d = m.dims || m.dimensions || {};
-
-    const widthM =
-      (_isNum(m.widthM) ? m.widthM : null) ??
-      (_isNum(d.widthM) ? d.widthM : null) ??
-      (_isNum(m.widthMm) ? m.widthMm / 1000 : null) ??
-      (_isNum(d.widthMm) ? d.widthMm / 1000 : null) ??
-      (_isNum(d.width) ? d.width : null) ??
-      0.18;
-
-    const depthM =
-      (_isNum(m.depthM) ? m.depthM : null) ??
-      (_isNum(d.depthM) ? d.depthM : null) ??
-      (_isNum(m.depthMm) ? m.depthMm / 1000 : null) ??
-      (_isNum(d.depthMm) ? d.depthMm / 1000 : null) ??
-      (_isNum(d.depth) ? d.depth : null) ??
-      0.10;
-
-    return { widthM, depthM };
-  };
 
   // Position signature for live updates when speaker positions change
   const _posSig = React.useMemo(() => {
