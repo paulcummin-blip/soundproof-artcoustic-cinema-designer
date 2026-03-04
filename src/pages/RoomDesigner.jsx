@@ -901,10 +901,6 @@ function RoomDesignerWithState() {
     }
   }, [showPrices, priceData.baseTotal, priceData.finalTotal, difficultyMultiplier]);
 
-  // REMOVED: Duplicate frontWideZones declaration (moved earlier to avoid TDZ)
-
-
-
 
 
   const initWithDefaultsAndRules = React.useMemo(
