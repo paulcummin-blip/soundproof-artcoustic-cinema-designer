@@ -6057,7 +6057,7 @@ return (
             {exportMode !== 'clean' && overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
-            <RvRoomElementsLayer hasRoomRect={hasRoomRect} roomElements={roomElements} widthM={widthM} lengthM={lengthM} scale={scale} meterToCanvasX={meterToCanvasX} meterToCanvasY={meterToCanvasY} placedSpeakers={placedSpeakers} getModelDimsM={getModelDimsM} />
+            <RvRoomElementsLayer hasRoomRect={hasRoomRect} roomElements={roomElements} widthM={widthM} lengthM={lengthM} scale={scale} meterToCanvasX={meterToCanvasX} meterToCanvasY={meterToCanvasY} placedSpeakers={placedSpeakers} getModelDimsM={getModelDimsM} getSpeakerVisibility={getSpeakerVisibility} getCanonicalRole={getCanonicalRole} appState={appState} rolesForLayout={rolesForLayout} />
 
             {/* Layer 7.5: MLP Position Ruler (when enabled) */}
             <RvMlpRuler
