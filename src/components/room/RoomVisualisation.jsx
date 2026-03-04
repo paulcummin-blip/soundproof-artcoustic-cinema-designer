@@ -6598,28 +6598,18 @@ return (
 {/* Removed debug label (zoneKeysLabel) */}
 
           {/* ZOOM GROUP — CLIPPED TO VIEWPORT, WITH ZOOM-TO-CURSOR */}
-          <g
-              clipPath={`url(#${idsClip})`}
-              transform={`translate(${panX + viewOffsetPx.x}, ${panY + viewOffsetPx.y}) scale(${zoom})`}
+          <RvZoomGroup
+            idsClip={idsClip}
+            panX={panX}
+            panY={panY}
+            viewOffsetPx={viewOffsetPx}
+            zoom={zoom}
+            roomRect={roomRect}
+            isPanning={isPanningRef.current}
+            onPanPointerDown={onPanPointerDown}
+            onPanPointerMove={onPanPointerMove}
+            onPanPointerUp={onPanPointerUp}
           >
-            {/* Background hit area for pan (must be FIRST child, behind everything) */}
-            {Number.isFinite(roomRect?.x) && Number.isFinite(roomRect?.y) && (
-              <rect
-                x={(roomRect?.x ?? 0) - 1000}
-                y={(roomRect?.y ?? 0) - 1000}
-                width={(roomRect?.width ?? 0) + 2000}
-                height={(roomRect?.height ?? 0) + 2000}
-                fill="transparent"
-                pointerEvents={zoom > 1 ? "auto" : "none"}
-                style={{ 
-                  cursor: zoom > 1 ? (isPanningRef.current ? "grabbing" : "grab") : "default" 
-                }}
-                onPointerDown={onPanPointerDown}
-                onPointerMove={onPanPointerMove}
-                onPointerUp={onPanPointerUp}
-                onPointerCancel={onPanPointerUp}
-              />
-            )}
             <RvRoomBaseLayers
               roomRect={roomRect}
               widthM={widthM}
@@ -7022,7 +7012,7 @@ return (
   />
 )}
 
-          </g>
+           </RvZoomGroup>
           </>
         )}
         </svg>
