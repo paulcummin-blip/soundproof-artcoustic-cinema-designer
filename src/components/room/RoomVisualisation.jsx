@@ -19,9 +19,7 @@ import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import BackSweepOverlay from "./BackSweepOverlay";
 import { useAppState } from "@/components/AppStateProvider";
 import { timeNowMs } from "@/components/utils/timeNow";
-import { computeFrontWideZonesStrict } from '@/components/utils/frontWideZones';
-import { computeMLPAndPrimary } from '@/components/utils/computeMLPAndPrimary';
-import { pickMLP } from '@/components/utils/seatingUtils';
+
 import { calculateViewingAngle, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 import CanvasMessages from '@/components/room/CanvasMessages';
 
