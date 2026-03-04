@@ -2,7 +2,7 @@ import React from "react";
 import { Button } from "@/components/ui/button";
 import { Save, RotateCcw } from "lucide-react";
 
-export function RoomDesignerHeader({
+export default function RoomDesignerHeader({
   showResetConfirm,
   setShowResetConfirm,
   isFrozen,
