@@ -9,7 +9,7 @@ import {
   rp23HorizontalAngleForSeat,
   verticalViewingAngleDeg,
 } from '@/components/utils/seatHover';
-import { buildRoleMap, isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils";
+import { isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils";
 import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
 import { rolesForLayout, getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from '../room/constraints/lcrConstraints';
