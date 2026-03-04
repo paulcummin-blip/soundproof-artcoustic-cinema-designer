@@ -57,6 +57,10 @@ import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore"
 import { useSpeakerReconciliation } from "@/components/hooks/useSpeakerReconciliation";
 import { useSeatingRebuild } from "@/components/hooks/useSeatingRebuild";
 import { useSubwooferSync } from "@/components/hooks/useSubwooferSync";
+import RoomDesignerHeader from "@/components/roomdesigner/RoomDesignerHeader";
+import RoomDesignerPlanToolbar from "@/components/roomdesigner/RoomDesignerPlanToolbar";
+import AimLoudspeakerPanel from "@/components/roomdesigner/AimLoudspeakerPanel";
+import OptionsPanel from "@/components/roomdesigner/OptionsPanel";
 
 
 
