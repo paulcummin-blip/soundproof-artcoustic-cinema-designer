@@ -26,6 +26,8 @@ import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
 import PlanMessages from "@/components/room/PlanMessages";
 import SvgDefs from "@/components/room/SvgDefs";
 import SpeakerPositionsOverlay from "@/components/room/overlays/SpeakerPositionsOverlay";
+import RvRoomBaseLayers from "@/components/room/rv/render/RvRoomBaseLayers";
+import RvZonesAndOverlays from "@/components/room/rv/render/RvZonesAndOverlays";
 
 import { SURROUND_WALL_GAP_M, sideWallX, rearWallY, fixedSideX, OVERHEAD_PAIR_MAP, floorDeg, mirrorX, clampToSegment, resolveSymmetricLCR, computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
 import { getAimingYawDeg, getPlanAimDeg, getYawForObject } from "@/components/room/rv/utils/rvAiming";
@@ -7092,33 +7094,39 @@ return (
               seatingPositions={seatingPositions}
             />
 
-            {/* RP22 Zones Overlay - UNCONDITIONAL MOUNT */}
-            {exportMode !== 'clean' && (
-              <g className="rp22-zones-layer" pointerEvents="none">
-                <RP22ZonesOverlay
-                  overlays={overlaysForRendering}
-                  zones={augmentedZones}
-                  toPx={toPx}
-                  lcrOnly={false}
-                  placedSpeakers={placedSpeakers}
-                  mlpPoint={mlp}
-                  dimensions={{ width: widthM, length: lengthM, height: heightM }} // Pass room dims object
-                  getModelDimsM={getModelDimsM}
-                  WALL_BUFFER_M={WALL_BUFFER_M}
-                  roomRect={roomRect}
-                />
-              </g>
-            )}
+            <RvZonesAndOverlays
+              exportMode={exportMode}
+              overlaysForRendering={overlaysForRendering}
+              augmentedZones={augmentedZones}
+              toPx={toPx}
+              placedSpeakers={placedSpeakers}
+              mlp={mlp}
+              widthM={widthM}
+              lengthM={lengthM}
+              heightM={heightM}
+              getModelDimsM={getModelDimsM}
+              roomRect={roomRect}
+              WALL_BUFFER_M={WALL_BUFFER_M}
+              dolbyLayout={dolbyLayout}
+              overheadZones={overheadZones}
+              getCanonicalRole={getCanonicalRole}
+              scale={scale}
+              frontFallback={frontFallback}
+              handleMouseDown={handleMouseDown}
+              handleMouseMove={handleMouseMove}
+              handleMouseUp={handleMouseUp}
+              dragging={dragging}
+              draggedItemId={draggedItemId}
+              frontWideZones={frontWideZones}
+              meterToCanvasX={meterToCanvasX}
+              meterToCanvasY={meterToCanvasY}
+            />
 
             {/* Layer 5: Other Informational Zone Overlays */}
             {exportMode !== 'clean' && !!overlaysForRendering?.LCR && ZoneComponents.LCR}
             {exportMode !== 'clean' && !!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
             {exportMode !== 'clean' && !!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {exportMode !== 'clean' && overheadCorridorsOn && overheadZones?.status === 'ok' && ZoneComponents.OVERHEADS}
             {exportMode !== 'clean' && overlaysForRendering?.enableDolbyZones && renderDolbyZones()}
-            
-            {/* NEW: Front Wide Zones - Rendered conditionally based on overlaysForRendering.enableFrontWides */}
-            {exportMode !== 'clean' && overlaysForRendering?.enableFrontWides && ZoneComponents.FRONT_WIDE}
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
             {renderRoomElements()}
@@ -7306,7 +7314,7 @@ return (
             })()}
 
 
-            {/* Layer 8: Subwoofers */}
+            {/* Layer 8: Rear Subwoofers (live + export fallback) */}
             {(() => {
               const isExportDims = exportMode === "dimensions";
 
@@ -7345,114 +7353,82 @@ return (
                 }));
               };
 
-              // FRONT: prefer live/dragged data. If export and empty, fall back to cfg.
-              // FRONT: while dragging, always render from the draft array (so movement is visible)
-const frontLive =
-  (dragging && Array.isArray(draftFrontSubsRef.current))
-    ? draftFrontSubsRef.current
-    : frontSubs;
+              const frontLive = (dragging && Array.isArray(draftFrontSubsRef.current)) ? draftFrontSubsRef.current : frontSubs;
+              const rearLive = (dragging && Array.isArray(draftRearSubsRef.current)) ? draftRearSubsRef.current : rearSubs;
 
-// REAR: while dragging, always render from the draft array (so movement is visible)
-const rearLive =
-  (dragging && Array.isArray(draftRearSubsRef.current))
-    ? draftRearSubsRef.current
-    : rearSubs;
+              const frontFallback = isExportDims && (!Array.isArray(frontLive) || frontLive.length === 0)
+                ? buildFallbackLine(frontSubsCfg?.count, frontSubsCfg?.model, "front")
+                : frontLive;
 
-              const frontFallback =
-                isExportDims && (!Array.isArray(frontLive) || frontLive.length === 0)
-                  ? buildFallbackLine(frontSubsCfg?.count, frontSubsCfg?.model, "front")
-                  : frontLive;
+              const rearFallback = isExportDims && (!Array.isArray(rearLive) || rearLive.length === 0)
+                ? buildFallbackLine(rearSubsCfg?.count, rearSubsCfg?.model, "rear")
+                : rearLive;
 
-              // REAR: prefer live/dragged data. If export and empty, fall back to cfg.
-            
-              const rearFallback =
-                isExportDims && (!Array.isArray(rearLive) || rearLive.length === 0)
-                  ? buildFallbackLine(rearSubsCfg?.count, rearSubsCfg?.model, "rear")
-                  : rearLive;
+              return Array.isArray(rearFallback) && rearFallback.length > 0 ? (
+                <g data-layer="rear-subwoofers">
+                  {rearFallback.map((sub, i) => {
+                    if (!hasPos(sub)) return null;
+                    const { widthM: subWm, depthM: subDm } = getModelDimsM(sub.model);
+                    const subId = sub.id || `rear-sub-${i}`;
+                    const [cx, cy] = toPx(sub.position.x, sub.position.y);
+                    const w = subWm * scale;
+                    const d = subDm * scale;
 
-              return (
-                <>
-                  {Array.isArray(frontFallback) && frontFallback.length > 0 && (
-                    <FrontSubsLayer
-                      frontSubs={frontFallback}
-                      toPx={toPx}
-                      getModelDimsM={getModelDimsM}
-                      scale={scale}
-                      onSubPointerDown={(e, id) => handleMouseDown(e, id, "sub")}
-                      onSubPointerMove={handleMouseMove}
-                      onSubPointerUp={handleMouseUp}
-                      dragging={dragging}
-                      draggedItemId={draggedItemId}
-                    />
-                  )}
+                    const handlePointerDown = (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+                      handleMouseDown(e, subId, "sub");
+                    };
 
-                  {Array.isArray(rearFallback) && rearFallback.length > 0 ? (
-                    <g data-layer="rear-subwoofers">
-                      {rearFallback.map((sub, i) => {
-                        if (!hasPos(sub)) return null;
-                        const { widthM: subWm, depthM: subDm } = getModelDimsM(sub.model);
-                        const subId = sub.id || `rear-sub-${i}`;
-                        const [cx, cy] = toPx(sub.position.x, sub.position.y);
-                        const w = subWm * scale;
-                        const d = subDm * scale;
+                    const handlePointerMove = (e) => {
+                      if (!dragging || draggedItemId !== subId) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleMouseMove(e);
+                    };
 
-                        const handlePointerDown = (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
-                          handleMouseDown(e, subId, "sub");
-                        };
+                    const handlePointerUp = (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+                      handleMouseUp(e);
+                    };
 
-                        const handlePointerMove = (e) => {
-                          if (!dragging || draggedItemId !== subId) return;
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleMouseMove(e);
-                        };
-
-                        const handlePointerUp = (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
-                          handleMouseUp(e);
-                        };
-
-                        return (
-                          <g
-                            key={subId}
-                            style={{
-                              cursor: dragging && draggedItemId === subId ? "grabbing" : "grab",
-                              pointerEvents: "all"
-                            }}
-                            onPointerDown={handlePointerDown}
-                            onPointerMove={handlePointerMove}
-                            onPointerUp={handlePointerUp}
-                            onPointerCancel={handlePointerUp}
-                          >
-                            <rect
-                              x={cx - w / 2}
-                              y={cy - d / 2}
-                              width={w}
-                              height={d}
-                              fill="transparent"
-                              pointerEvents="all"
-                            />
-                            <SpeakerRect
-                              speaker={sub}
-                              widthM={subWm}
-                              depthM={subDm}
-                              opacity={0.8}
-                              scale={scale}
-                              toPx={toPx}
-                              pointerEvents="none"
-                            />
-                          </g>
-                        );
-                      })}
-                    </g>
-                  ) : null}
-                </>
-              );
+                    return (
+                      <g
+                        key={subId}
+                        style={{
+                          cursor: dragging && draggedItemId === subId ? "grabbing" : "grab",
+                          pointerEvents: "all"
+                        }}
+                        onPointerDown={handlePointerDown}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onPointerCancel={handlePointerUp}
+                      >
+                        <rect
+                          x={cx - w / 2}
+                          y={cy - d / 2}
+                          width={w}
+                          height={d}
+                          fill="transparent"
+                          pointerEvents="all"
+                        />
+                        <SpeakerRect
+                          speaker={sub}
+                          widthM={subWm}
+                          depthM={subDm}
+                          opacity={0.8}
+                          scale={scale}
+                          toPx={toPx}
+                          pointerEvents="none"
+                        />
+                      </g>
+                    );
+                  })}
+                </g>
+              ) : null;
             })()}
 
             {/* Layer 9: Draggable Seating Positions */}
