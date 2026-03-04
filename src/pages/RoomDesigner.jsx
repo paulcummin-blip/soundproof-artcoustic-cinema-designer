@@ -869,7 +869,6 @@ function RoomDesignerWithState() {
     }
   });
 
-  // REMOVED: Duplicate seat metrics writer (RoomVisualisation is now the sole writer)
 
   const frontSubsForRendering = React.useMemo(() => {
     const subs = appState?.subwoofers || [];
