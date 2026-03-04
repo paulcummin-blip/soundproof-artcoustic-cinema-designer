@@ -51,6 +51,7 @@ import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { useUrlQuery, useSurroundGroupDepths, parseProjectJson, getMlpPoint } from "@/components/roomdesigner/RoomDesignerHelpers";
 import { _isNum, _degToRad, _wrap180, _projectHalfExtent, _getDimsM } from "@/components/roomdesigner/utils/speakerDepthHelpers";
 import { useFrontWideZones } from "@/components/hooks/useFrontWideZones";
+import { useAllSeatSplMetrics } from "@/components/hooks/useAllSeatSplMetrics";
 import { useProjectLoader } from "@/components/hooks/useProjectLoader";
 import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore";
 import { useSpeakerReconciliation } from "@/components/hooks/useSpeakerReconciliation";
