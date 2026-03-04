@@ -1,36 +1,42 @@
 "use client";
 
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
-import { Layers3, Compass } from 'lucide-react';
+import { Layers3, Compass } from "lucide-react";
 import SeatHud from "@/components/room/SeatHud";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { getSpeakerModelMeta, normaliseModelKey as registryNormaliseModelKey } from "@/components/models/speakers/registry";
-import {
-  rp23HorizontalAngleForSeat,
-  verticalViewingAngleDeg,
-} from '@/components/utils/seatHover';
+import { rp23HorizontalAngleForSeat, verticalViewingAngleDeg } from "@/components/utils/seatHover";
 import { isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils";
 import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
 import { rolesForLayout, getCanonicalRole } from "@/components/utils/surroundRoleMap";
-import { calculateLcrConstraints } from '../room/constraints/lcrConstraints';
+import { calculateLcrConstraints } from "../room/constraints/lcrConstraints";
 import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
-import RP22ZonesOverlay from '@/components/room/RP22ZonesOverlay';
+import RP22ZonesOverlay from "@/components/room/RP22ZonesOverlay";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import BackSweepOverlay from "./BackSweepOverlay";
 import { useAppState } from "@/components/AppStateProvider";
 import { timeNowMs } from "@/components/utils/timeNow";
-
-import { calculateViewingAngle, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
-import CanvasMessages from '@/components/room/CanvasMessages';
-
-import { renderOverheadBandsSVG } from '@/components/room/overlays/OverheadZones';
-import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from '@/components/utils/overheadDragClamping';
-import { useOverheadAutoPlacement } from '@/components/hooks/useOverheadAutoPlacement';
-import { useEnsureOverheadPairs } from '@/components/hooks/useEnsureOverheadPairs';
+import { calculateViewingAngle, rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
+import CanvasMessages from "@/components/room/CanvasMessages";
+import { renderOverheadBandsSVG } from "@/components/room/overlays/OverheadZones";
+import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from "@/components/utils/overheadDragClamping";
+import { useOverheadAutoPlacement } from "@/components/hooks/useOverheadAutoPlacement";
+import { useEnsureOverheadPairs } from "@/components/hooks/useEnsureOverheadPairs";
 import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
-import PlanMessages from '@/components/room/PlanMessages';
-import SvgDefs from '@/components/room/SvgDefs';
-import SpeakerPositionsOverlay from '@/components/room/overlays/SpeakerPositionsOverlay';
+import PlanMessages from "@/components/room/PlanMessages";
+import SvgDefs from "@/components/room/SvgDefs";
+import SpeakerPositionsOverlay from "@/components/room/overlays/SpeakerPositionsOverlay";
+
+import { SURROUND_WALL_GAP_M, sideWallX, rearWallY, fixedSideX, OVERHEAD_PAIR_MAP, floorDeg, mirrorX, clampToSegment, resolveSymmetricLCR, computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
+import { getAimingYawDeg, getPlanAimDeg, getYawForObject } from "@/components/room/rv/utils/rvAiming";
+import { useMlpCalculation } from "@/components/room/rv/hooks/useMlpCalculation";
+import { useSpeakersByRole } from "@/components/room/rv/hooks/useSpeakersByRole";
+import { useEntitiesById } from "@/components/room/rv/hooks/useEntitiesById";
+import { useExportMinScreenDepth } from "@/components/room/rv/hooks/useExportMinScreenDepth";
+import { useActualScreenFrontY } from "@/components/room/rv/hooks/useActualScreenFrontY";
+import { useRoomCoordinateConverters } from "@/components/room/rv/hooks/useRoomCoordinateConverters";
+import { useFrontWideZonesComputed } from "@/components/room/rv/hooks/useFrontWideZonesComputed";
+import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
 
 
 
