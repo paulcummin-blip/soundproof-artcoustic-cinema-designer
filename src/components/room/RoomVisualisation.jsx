@@ -871,40 +871,16 @@ const byId = useEntitiesById({
     getCanonicalRole
   ]);
 
-  // EXPORT-ONLY: compute min screen depth synchronously so PDF capture doesn't grab the default state value
-  const exportMinScreenDepthM = React.useMemo(() => {
-    if (exportMode !== 'dimensions') return null;
-
-    // Same front-object selection rule as the live effect
-    const frontObjectsToCalculate = [...(placedSpeakers || []), ...(frontSubs || [])]
-      .filter(s => {
-        const r = getCanonicalRole?.(s?.role);
-        return r === 'FL' || r === 'FC' || r === 'FR' || isSubRole(r);
-      });
-
-    try {
-      const value = computeMinimumScreenDepthM({
-        frontObjects: frontObjectsToCalculate,
-        getDims: getModelDimsM,
-        lcrAngles: { L: lcrAngleInfo?.L ?? 0, R: lcrAngleInfo?.R ?? 0 },
-        aimAtMLP: !!aimAtMLP,
-      });
-
-      return Number.isFinite(value) ? value : null;
-    } catch (e) {
-      return null;
-    }
-  }, [
+  const exportMinScreenDepthM = useExportMinScreenDepth({
     exportMode,
     placedSpeakers,
     frontSubs,
     aimAtMLP,
-    lcrAngleInfo?.L,
-    lcrAngleInfo?.R,
-    screen?.visibleWidthInches,
+    lcrAngleInfo,
+    screenVisibleWidthInches: screen?.visibleWidthInches,
     getModelDimsM,
     getCanonicalRole
-  ]);
+  });
 
   // Effective min depth: export uses sync value (if available), live uses state (effect-driven)
   const effectiveMinScreenDepthM =
