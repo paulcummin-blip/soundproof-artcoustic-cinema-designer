@@ -1226,61 +1226,17 @@ React.useEffect(() => {
   }, [seatingPositions, widthM, lengthM]);
 
   // --- FRONT-WIDE ZONES (must be declared before any use) ---
-  const frontWideZones = useMemo(() => {
-    // Zones are now computed independently of the overlay toggle.
-
-    if (!mlp) return { status: 'loading' };
-
-    const W = widthM || 0;
-    const L = lengthM || 0;
-    if (!(W > 0 && L > 0)) {
-      return { status: 'invalid-geom', reason: 'room dims' };
-    }
-
-    const sl = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SL');
-    const sr = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'SR');
-
-    if (!sl || !sr) {
-      return { status: 'no-sides' };
-    }
-
-    let result;
-    try {
-      result = computeFrontWideZonesStrict({
-        mlpPoint: mlp,
-        dimensions: { width: widthM, length: lengthM, height: heightM }, // Pass as object
-        placedSpeakers,
-        getModelDimsM: getModelDimsM,
-        rp22BoundDeg: 10,
-      }) || { status: 'invalid-geom', reason: 'empty result' };
-    } catch (e) {
-      result = { status: 'error', reason: 'exception', error: e.message };
-      if (appState_DBG_FW) {
-        if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.warn('[FW zones] compute failed', e);
-      }
-    }
-
-    // Debug hook: expose computed zones
-    if (typeof window !== 'undefined') {
-      window.FW_DBG = result;
-      if (appState_DBG_FW) {
-        if (globalThis.__B44_LOGS) console.log('[FW] zones ->', result);
-        if (result.status === 'ok') {
-          if (globalThis.__B44_LOGS) console.log('[FW] L =', result.left, 'R =', result.right);
-        }
-      }
-    }
-
-    return result;
-  }, [
-    mlp?.x, mlp?.y,
-    widthM, lengthM, heightM, // Use the new dimension variables
+  const frontWideZones = useFrontWideZonesComputed({
+    mlp,
+    widthM,
+    lengthM,
+    heightM,
     placedSpeakers,
     speakersEpoch,
     getModelDimsM,
     appState_DBG_FW,
     getCanonicalRole
-  ]);
+  });
 
   // [DISABLED] Auto-seed FW speakers when enabled
   // Reason: RoomDesigner already creates LW/RW via 7.x swap logic.
