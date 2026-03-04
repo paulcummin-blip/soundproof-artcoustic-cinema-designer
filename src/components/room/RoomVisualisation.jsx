@@ -7488,9 +7488,6 @@ const rearLive =
               />
             )}
 
-            </g>{/* End export-bounds wrapper */}
-            </g>
-
 {exportMode !== 'clean' && (
   <PlanMessages
     dragWarning={dragWarning}
