@@ -1815,7 +1815,6 @@ export function computeRoomModesResponse({
       sealedBoostEnabled,
       sealedBoostKDbPerOct,
       sealedBoostMaxGainDb,
-      lowestAxialHz: Number.isFinite(lowestAxial) ? lowestAxial.toFixed(1) : 'N/A',
       lfDeltaDb_20_30: Number.isFinite(lfDeltaDb_20_30) ? lfDeltaDb_20_30.toFixed(2) : 'N/A',
       lfDelta_25_69,
       upperBassDelta_69_120,
