@@ -40,6 +40,7 @@ import { useActualScreenFrontY } from "@/components/room/rv/hooks/useActualScree
 import { useRoomCoordinateConverters } from "@/components/room/rv/hooks/useRoomCoordinateConverters";
 import { useFrontWideZonesComputed } from "@/components/room/rv/hooks/useFrontWideZonesComputed";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
+import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
 
 
 
@@ -1705,7 +1706,15 @@ draftRearSubsRef.current = seedRear.map(s => ({ ...s, position: { ...s.position 
     zoomAtPoint(newZoom, e.clientX, e.clientY);
   }, [zoomMode, zoom, zoomAtPoint]);
 
-  // Pan handlers for background rect only
+  // Pan handlers - extracted to hook
+  const { onPanPointerDown: hookOnPanDown, onPanPointerMove: hookOnPanMove, onPanPointerUp: hookOnPanUp } = usePanZoomHandlers({
+    zoom,
+    panStartRef,
+    isPanningRef,
+    setViewOffsetPx,
+  });
+
+  // Wrap hook handlers with additional context guards (speaker drag, etc.)
   const onPanPointerDown = useCallback((e) => {
     // Never pan if event was already handled (sub/speaker drag)
     if (e.defaultPrevented) return;
@@ -1726,44 +1735,16 @@ draftRearSubsRef.current = seedRear.map(s => ({ ...s, position: { ...s.position 
     // Only proceed if clicking the rect itself (not a child element)
     if (e.currentTarget !== e.target) return;
     
-    isPanningRef.current = true;
-    panStartRef.current = {
-      x: e.clientX,
-      y: e.clientY,
-      ox: viewOffsetPx.x,
-      oy: viewOffsetPx.y
-    };
-    
-    try {
-      e.currentTarget.setPointerCapture(e.pointerId);
-    } catch (err) {
-      // Ignore capture errors
-    }
-  }, [zoom, viewOffsetPx]);
+    hookOnPanDown(e);
+  }, [zoom, hookOnPanDown, isDraggingSpeakerRef, dragging]);
 
   const onPanPointerMove = useCallback((e) => {
-    if (!isPanningRef.current) return;
-    
-    const dx = e.clientX - panStartRef.current.x;
-    const dy = e.clientY - panStartRef.current.y;
-    
-    setViewOffsetPx({
-      x: panStartRef.current.ox + dx,
-      y: panStartRef.current.oy + dy
-    });
-  }, []);
+    hookOnPanMove(e);
+  }, [hookOnPanMove]);
 
   const onPanPointerUp = useCallback((e) => {
-    if (!isPanningRef.current) return;
-    
-    isPanningRef.current = false;
-    
-    try {
-      e.currentTarget.releasePointerCapture(e.pointerId);
-    } catch (err) {
-      // Ignore release errors
-    }
-  }, []);
+    hookOnPanUp(e);
+  }, [hookOnPanUp]);
 
   // Memoize baffle and screen calculations for performance
   const { BaffleAndScreen, screenPlaneY, screenCenterX_m, visibleWidthM } = useMemo(() => {
