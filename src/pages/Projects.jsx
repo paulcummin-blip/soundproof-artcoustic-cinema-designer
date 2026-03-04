@@ -151,18 +151,9 @@ export default function ProjectsPage() {
               : Date.now(),
             // Optional fields for display
             lcrModel: (() => {
-              try {
-                const raw = p.selected_speakers_by_role;
-                if (!raw) return null;
-                // API returns plain object — use directly; only parse if it's a non-object string
-                const obj = (typeof raw === "object" && !Array.isArray(raw))
-                  ? raw
-                  : (typeof raw === "string" && raw.trim().startsWith("{"))
-                    ? JSON.parse(raw)
-                    : null;
-                if (!obj) return null;
-                return (obj.L && obj.L.model) || (obj.FL && obj.FL.model) || null;
-              } catch (_) { return null; }
+              const obj = safeJson(p.selected_speakers_by_role);
+              if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
+              return (obj.L && obj.L.model) || (obj.FL && obj.FL.model) || null;
             })(),
             surroundModel: null,
             heightModel: null,
