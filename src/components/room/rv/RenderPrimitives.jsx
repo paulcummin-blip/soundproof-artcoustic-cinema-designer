@@ -1,5 +1,3 @@
-"use client";
-
 import React from "react";
 import { getSpeakerModelMeta } from "@/components/models/speakers/registry";
 import { getCanonicalRole } from "@/components/utils/surroundRoleMap";
