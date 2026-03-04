@@ -217,50 +217,7 @@ const isFrontObject = (role = "") => {
   return r === "FL" || r === "FC" || r === "FR" || String(role).toUpperCase().includes("SUB");
 };
 
-// New mirror-lock helpers for LCR
-const mirrorX = (x, cx) => 2 * cx - x;
-const clampToSegment = (x, seg) => Math.max(seg.minX, seg.maxX === undefined ? x : Math.min(seg.maxX, x));
 
-/**
- * Orchestrates the symmetrical clamping of LCR speakers.
- * Takes a desired position for one speaker and returns the final,
- * valid, and symmetrical positions for both.
-*/
-function resolveSymmetricLCR({ desiredX, isLeft, screenCenterX, leftZone, rightZone }) {
-  if (!leftZone || !rightZone) {
-    // If zones are not defined, perform basic mirroring without clamping
-    const finalLeftX = isLeft ? desiredX : mirrorX(desiredX, screenCenterX);
-    const finalRightX = isLeft ? mirrorX(desiredX, screenCenterX) : desiredX;
-    return { finalLeftX, finalRightX };
-  }
-
-  // Determine which position is for which zone based on the dragged speaker
-  const desiredLeftX = isLeft ? desiredX : mirrorX(desiredX, screenCenterX);
-  const desiredRightX = isLeft ? mirrorX(desiredX, screenCenterX) : desiredX;
-
-  // Tentatively clamp both to their zones
-  let finalLeftX = clampToSegment(desiredLeftX, leftZone);
-  let finalRightX = clampToSegment(desiredRightX, rightZone);
-
-  // If clamping occurred on either side, we must re-enforce symmetry
-  const leftClamped = finalLeftX !== desiredLeftX;
-  const rightClamped = finalRightX !== desiredRightX;
-
-  if (leftClamped || rightClamped) {
-    // Determine the offset from the center for each clamped position
-    const leftOffset = Math.abs(screenCenterX - finalLeftX);
-    const rightOffset = Math.abs(finalRightX - screenCenterX);
-
-    // The final offset must be the smaller of the two to keep both speakers inside their zones
-    const finalOffset = Math.min(leftOffset, rightOffset);
-
-    // Recalculate final positions based on the smallest valid offset
-    finalLeftX = screenCenterX - finalOffset;
-    finalRightX = screenCenterX + finalOffset;
-  }
-
-  return { finalLeftX: finalLeftX, finalRightX: finalRightX };
-}
 
 
 import {
