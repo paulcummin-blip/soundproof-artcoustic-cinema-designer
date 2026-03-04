@@ -215,10 +215,7 @@ function RoomDesignerWithState() {
   // Don't block render - allow local-only mode
   const showLocalHint = !activeProjectId;
 
-  // REMOVED: useRoomDimensions hook call and its related state
-  // const { dims: sharedDims, setDims: setSharedDims, loadDims, loaded: dimsLoaded,
-  //   selectedSpeakersByRole, loadSelectedSpeakers, speakerNodes, loadSpeakerNodes,
-  // } = useRoomDimensions(activeProjectId);
+
 
   // Use AppState dolbyLayout directly (no local state override)
   const dolbyPreset = appState?.dolbyLayout || "5.1";
