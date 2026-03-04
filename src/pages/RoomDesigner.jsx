@@ -635,56 +635,13 @@ function RoomDesignerWithState() {
   }, [placedSpeakersForAim, _posSig, _yawSig, stableDimensions.width, stableDimensions.length, mlpAnchorEffective, appState?.aimFrontWidesAtMLP, appState?.aimSideSurroundsAtMLP, appState?.aimRearSurroundsAtMLP]);
 
   // NEW: Compute centralized SPL data for all seats (powers sidebar SPL cards AND HUD)
-  // Uses unified SPL logic with max_spl_cont_db_1m cap from speakerData.js
-  const allSeatSplMetrics = useMemo(() => {
-    const getCanonicalRoleLocal = (role) => {
-      const map = { SL: 'SL', LS: 'SL', SR: 'SR', RS: 'SR', SBL: 'SBL', SBR: 'SBR', LW: 'LW', RW: 'RW',
-        FL: 'FL', L: 'FL', FC: 'FC', C: 'FC', FR: 'FR', R: 'FR',
-        TFL: 'TFL', TFR: 'TFR', TL: 'TL', TML: 'TL', TR: 'TR', TMR: 'TR', TBL: 'TBL', TBR: 'TBR' };
-      const r = String(role || '').toUpperCase();
-      return map[r] || r;
-    };
-
-    // Get global SPL config from appState (same values used by HUD)
-    const splConfig = appState?.splConfig || {};
-    const screenLoss = Number(splConfig.screenLossDb) || 0;
-    const eqHeadroom = Number(splConfig.globalEqHeadroomDb) || 0;
-    const roomHeightM = Number(appState?.roomDims?.heightM) || 2.4;
-
-    return computeAllSeatSplMetrics({
-      seats: _seatingPositions || [],
-      placedSpeakers: analysisSpeakers || [],
-      heightM: roomHeightM,
-      getCanonicalRole: getCanonicalRoleLocal,
-      getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
-      getModelDimsM: (model) => {
-        const meta = getSpeakerModelMeta(model);
-        if (meta && !meta.notFound) {
-          // Return full metadata including SPL-critical fields
-          return {
-            ...meta,
-            // Ensure these critical SPL fields are present
-            sensitivity_db_1w_1m: meta.sensitivity_dB_1w1m || meta.sensitivity || 87,
-            power_handling_w: meta.max_power || Infinity,
-            max_spl_cont_db_1m: meta.max_spl || null
-          };
-        }
-        // Fallback for unknown models
-        return { widthM: 0.27, depthM: 0.082, sensitivity_dB_1w1m: 87 };
-      },
-      // Pass screen loss and EQ headroom from global splConfig
-      screenLoss_dB: screenLoss,
-      eqHeadroom_dB: eqHeadroom,
-      mlpPoint: mlpAnchorEffective // NEW: Pass green dot MLP for synthetic "mlp" seat
-    });
-  }, [
-  _seatingPositions,
-  analysisSpeakers,
-  appState?.getEffectiveSplInputs,
-  appState?.splConfig,
-  mlpAnchorEffective,
-  appState?.roomDims?.heightM
-]);
+  const allSeatSplMetrics = useAllSeatSplMetrics({
+    _seatingPositions,
+    analysisSpeakers,
+    appState,
+    mlpAnchorEffective,
+    getSpeakerModelMeta,
+  });
 
   // Compute diagnostic values
   const widthM =
