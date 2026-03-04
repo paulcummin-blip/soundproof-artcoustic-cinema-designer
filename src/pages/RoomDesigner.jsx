@@ -165,8 +165,7 @@ function RoomDesignerWithState() {
   const _seatingPositions = appState?.seatingPositions;
   const seats = Array.isArray(_seatingPositions) ? _seatingPositions : [];
 
-  const _baselineSeatingPositions = appState?.baselineSeatingPositions;
-  const _setBaselineSeatingPositions = appState?.setBaselineSeatingPositions;
+
   const _seatingRows = appState?.seatingRows;
   const _seatsPerRow = appState?.seatsPerRow;
   const _seatsPerRowByRow = appState?.seatsPerRowByRow; // NEW
