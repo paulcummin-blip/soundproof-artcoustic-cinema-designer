@@ -6248,8 +6248,6 @@ OVERHEADS: (() => {
     return labeledSeatIds;
   }, [_overlays?.ROOM_DIMS, seatingPositions]);
 
-  // Removed: renderSeatingPositions function (now RvSeatLayer component)
-  
   // MLP marker: always draw at computed MLP (mlpDotX_m, mlpDotY_m),
   // never snap horizontally to a specific seat.
   const MLPMarker = useMemo(() => {
@@ -6983,7 +6981,7 @@ return (
             })()}
 
             {/* Layer 9: Draggable Seating Positions */}
-            {renderSeatingPositions()}
+            <RvSeatLayer seatingPositions={seatingPositions} toPx={toPx} scale={scale} exportMode={exportMode} speakerPositionsView={speakerPositionsView} rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds} rowDistanceLabelSeatIds={rowDistanceLabelSeatIds} _overlays={_overlays} hudPinnedSeatId={hudPinnedSeatId} handleMouseDown={handleMouseDown} handleSeatMouseEnter={handleSeatMouseEnter} handleSeatMouseLeave={handleSeatMouseLeave} handleSeatClick={handleSeatClick} clampMlpY={clampMlpY} MLPMarker={MLPMarker} />
 
             {/* NEW: Render overhead icons */}
             {overheadIconElements}
