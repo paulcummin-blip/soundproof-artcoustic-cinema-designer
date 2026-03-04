@@ -64,6 +64,19 @@ function safeContains(hay, needle) {
   return (hay || "").toLowerCase().includes((needle || "").toLowerCase());
 }
 
+function safeJson(v) {
+  try {
+    if (v == null) return null;
+    if (typeof v === "object") return v; // already parsed
+    if (typeof v === "string") {
+      const s = v.trim();
+      if (!s || s === "[object Object]" || s.startsWith("[object ")) return null;
+      return JSON.parse(s);
+    }
+    return null;
+  } catch (_e) { return null; }
+}
+
 // Small helper to reuse input/select styling
 function fieldStyle() {
   return {
