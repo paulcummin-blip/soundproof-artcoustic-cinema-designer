@@ -684,26 +684,10 @@ const onHudHeaderMouseDown = useCallback((event) => {
     return out;
   };
 
-  // NEW: Memo for speakers by canonical role, with safety checks
-  const byRole = useMemo(() => {
-    try {
-      const speakersToMap = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-      // Check if the imported buildRoleMap is a function before calling
-      if (typeof buildRoleMap === 'function') {
-        const m = buildRoleMap(speakersToMap);
-        // Ensure it returned a valid Map
-        if (m instanceof Map) {
-          return m;
-        }
-      }
-      // If buildRoleMap is not a function or returned a non-Map, use the safe fallback.
-      return _safeBuildRoleMapFallback(speakersToMap);
-    } catch (e) {
-      if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) if (globalThis.__B44_LOGS) console.error("Error in buildRoleMap:", e);
-      // If any error occurs during the call, use the fallback.
-      return _safeBuildRoleMapFallback(Array.isArray(placedSpeakers) ? placedSpeakers : []);
-    }
-  }, [placedSpeakers, getCanonicalRole]);
+  const byRole = useSpeakersByRole({
+    placedSpeakers,
+    getCanonicalRole
+  });
 
   // NEW: Memo for LCR speakers, for P4 calculation
   const lcrSpeakers = useMemo(() => {
