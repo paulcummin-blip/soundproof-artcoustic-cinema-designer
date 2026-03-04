@@ -32,42 +32,7 @@ import PlanMessages from '@/components/room/PlanMessages';
 import SvgDefs from '@/components/room/SvgDefs';
 import SpeakerPositionsOverlay from '@/components/room/overlays/SpeakerPositionsOverlay';
 
-// CRITICAL: Single constant for visible wall gap (icon edge to wall)
-const SURROUND_WALL_GAP_M = 0.01;
 
-// Helper: compute X position for side-wall speakers (icon edge 1cm from wall)
-const sideWallX = (roomWidth, dims, side) => {
-  const halfDepth = (dims?.depthM ?? 0.082) / 2;
-  if (side === 'L') return SURROUND_WALL_GAP_M + halfDepth;
-  if (side === 'R') return roomWidth - (SURROUND_WALL_GAP_M + halfDepth);
-  return 0;
-};
-
-// Helper: compute Y position for rear-wall speakers (icon edge 1cm from wall)
-const rearWallY = (roomLength, dims) => {
-  const halfDepth = (dims?.depthM ?? 0.082) / 2;
-  return roomLength - (SURROUND_WALL_GAP_M + halfDepth);
-};
-
-// Legacy alias for backward compatibility
-const fixedSideX = sideWallX;
-
-// Overhead speaker L/R pair map
-const OVERHEAD_PAIR_MAP = {
-  TFL: 'TFR',
-  TFR: 'TFL',
-  TML: 'TMR',
-  TMR: 'TML',
-  TRL: 'TRR',
-  TRR: 'TRL',
-};
-
-// Angle display helper - whole degrees only (floor), no decimals
-const floorDeg = (deg) => {
-  if (deg === null || deg === undefined) return null;
-  const n = Number(deg);
-  return Number.isFinite(n) ? Math.floor(n + 1e-9) : null;
-};
 
 // --- OVERHEAD HELPERS (RoomVisualisation) ---
 const rvSafeCanonRole = (role) => String(role || '').toUpperCase();
