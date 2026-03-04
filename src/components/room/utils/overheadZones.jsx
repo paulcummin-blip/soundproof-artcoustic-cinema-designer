@@ -1,6 +1,5 @@
+// Shim re-export.
+// Some hooks import computeOverheadZones from "@/components/room/utils/overheadZones"
+// but the real implementation lives in "@/components/room/overlays/OverheadZones.jsx"
 
-/**
- * components/room/utils/overheadZones.js
- * Re-exports computeOverheadZones from the canonical location.
- */
-export { computeOverheadZones, renderOverheadBandsSVG } from '@/components/room/overlays/OverheadZones';
+export { computeOverheadZones, renderOverheadBandsSVG } from "@/components/room/overlays/OverheadZones";
