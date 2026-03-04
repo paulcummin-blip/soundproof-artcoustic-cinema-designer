@@ -999,43 +999,17 @@ React.useEffect(() => {
 
   const hasRoomRect = !!roomRect && Number.isFinite((roomRect?.x ?? 0)) && Number.isFinite((roomRect?.y ?? 0));
 
-  // Update toPx for pixel-perfect rendering
-  const toPx = useCallback((x_m, y_m) => {
-    if (!roomRect || !Number.isFinite(scale)) return [0, 0];
-    const x = (roomRect?.x ?? 0) + x_m * scale;
-    const y = (roomRect?.y ?? 0) + y_m * scale;
-    return [Math.round(x) + 0.5, Math.round(y) + 0.5];
-  }, [roomRect, scale]);
-
-  // New helper functions for single-axis meter to pixel conversion
-  const meterToCanvasX = useCallback((xM) => {
-    if (!roomRect || !Number.isFinite(scale)) return 0;
-    const x = (roomRect?.x ?? 0) + (xM * scale);
-    return Math.round(x) + 0.5;
-  }, [roomRect, scale]);
-
-  const meterToCanvasY = useCallback((yM) => {
-    if (!roomRect || !Number.isFinite(scale)) return 0;
-    const y = (roomRect?.y ?? 0) + (yM * scale);
-    return Math.round(y) + 0.5;
-  }, [roomRect, scale]);
-
-  const canvasToRoom = useCallback((posPx) => {
-    if (!posPx) return { x: 0, y: 0 };
-    if (!roomRect || !Number.isFinite(scale)) return { x: 0, y: 0 };
-    // Account for view offset from pan
-    const xM = (posPx.x - (roomRect?.x ?? 0) - viewOffsetPx.x) / scale;
-    const yM = (posPx.y - (roomRect?.y ?? 0) - viewOffsetPx.y) / scale;
-    return { x: xM, y: yM };
-  }, [roomRect, scale, viewOffsetPx]);
-
-  const roomToCanvas = useCallback((posM) => {
-    if (!posM) return { x: 0, y: 0 };
-    if (!roomRect || !Number.isFinite(scale)) return { x: 0, y: 0 };
-    const xPx = (roomRect?.x ?? 0) + (posM.x * scale);
-    const yPx = (roomRect?.y ?? 0) + (posM.y * scale);
-    return { x: Math.round(xPx) + 0.5, y: Math.round(yPx) + 0.5 };
-  }, [roomRect, scale]);
+  const {
+    toPx,
+    meterToCanvasX,
+    meterToCanvasY,
+    canvasToRoom,
+    roomToCanvas
+  } = useRoomCoordinateConverters({
+    roomRect,
+    scale,
+    viewOffsetPx
+  });
 
 
   // Calculate MLP position for use in zones, now from the internally derived MLP
