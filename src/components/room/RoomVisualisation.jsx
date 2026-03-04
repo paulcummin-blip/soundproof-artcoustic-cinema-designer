@@ -245,41 +245,7 @@ const _yHalfExtentM_physical = (depthM, widthM, yawDeg = 0) => {
          (widthM * 0.5) * Math.abs(Math.sin(t));
 };
 
-// NEW: pure function to compute the minimum screen depth in meters
-function computeMinimumScreenDepthM({
-  frontObjects = [],
-  getDims,
-  lcrAngles = { L: 0, R: 0 },
-  aimAtMLP = false,
-}) {
-  const SCREEN_GAP_M = 0.01; // 1cm gap between speaker and screen
-  if (!frontObjects.length) return WALL_BUFFER_M + SCREEN_GAP_M;
 
-  const neededEach = frontObjects.map((s) => {
-    // resolveSurroundModel is called inside getYawForObject. Here, just pass s.model
-    const dims = getDims(s.model) || {};
-    const widthM = Number(dims.widthM) || 0;
-    const depthM = Number(dims.depthM) || 0;
-
-    // subs are drawn round / not yawed; FC stays 0°
-    const canonicalRole = getCanonicalRoleGlobal(s.role);
-    const yawDeg = (canonicalRole === "FL")
-      ? lcrAngles.L
-      : (canonicalRole === "FR")
-        ? lcrAngles.R
-        : 0; // FC and subs remain 0 yaw for depth calculation
-
-    // CRITICAL: Use stroke-aware calculation to match LCR positioning logic
-    const half = yHalfExtentM(depthM, widthM, yawDeg);
-    const projectedY = 2 * half;
-
-    // hard planes: wall (y=0) + screen plane
-    return WALL_BUFFER_M + projectedY + SCREEN_GAP_M;
-  });
-
-  // the screen must clear the *deepest* front object
-  return Math.max(...neededEach, WALL_BUFFER_M + SCREEN_GAP_M);
-}
 
 export default forwardRef(function RoomVisualisation(props, ref) {
   const {
