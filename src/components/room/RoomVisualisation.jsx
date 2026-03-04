@@ -888,23 +888,11 @@ const byId = useEntitiesById({
       ? exportMinScreenDepthM
       : calculatedMinScreenDepthM;
 
-  // actualScreenFrontY declaration and calculation
-  const actualScreenFrontY = React.useMemo(() => {
-    const floatDepthM = Number(screen?.floatDepthM) || 0.0;
-
-    // effectiveMinScreenDepthM already includes the 1cm gap, don't add it again
-    const minDepthForSpeakersToClear = effectiveMinScreenDepthM;
-
-    if (screenPlaneMode === 'autoTight') {
-      return minDepthForSpeakersToClear;
-    } else {
-      return Math.max(floatDepthM, minDepthForSpeakersToClear);
-    }
-  }, [
+  const actualScreenFrontY = useActualScreenFrontY({
     effectiveMinScreenDepthM,
-    screen?.floatDepthM,
+    screenFloatDepthM: screen?.floatDepthM,
     screenPlaneMode
-  ]);
+  });
 
   // Publish screen front plane to AppState with guards (rounded to mm + change detection)
   const lastScreenFrontPlaneRef = React.useRef(null);
