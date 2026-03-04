@@ -354,70 +354,13 @@ export default forwardRef(function RoomVisualisation(props, ref) {
     return Math.max(minY, Math.min(maxY, y));
   };
 
-  const MLP_calculated = React.useMemo(() => {
-    // 1. If RoomDesigner sends an mlpPoint, trust it.
-    //    That is your 57.5° / screen-based ideal.
-    if (
-      mlpPoint &&
-      Number.isFinite(mlpPoint.x) &&
-      Number.isFinite(mlpPoint.y)
-    ) {
-      return {
-        x: Number(mlpPoint.x), // Use mlpPoint.x directly
-        y: clampMlpY(Number(mlpPoint.y)),
-        z: Number.isFinite(mlpPoint.z) ? Number(mlpPoint.z) : 1.2,
-      };
-    }
-
-    // 2. If no mlpPoint, FALL BACK to seats — but make it STABLE.
-    //    Priority: primary seat → first seat → then generic room fallback.
-    if (Array.isArray(seatingPositions) && seatingPositions.length > 0) {
-      // Prefer an explicitly marked primary seat (most stable + matches user expectation)
-      const primary =
-        seatingPositions.find(s => s?.isPrimary) ||
-        seatingPositions.find(s => String(s?.id || '') === 'primary') ||
-        null;
-
-      const pickedSeat = primary || seatingPositions[0];
-
-      const sx = Number(pickedSeat?.x ?? pickedSeat?.position?.x);
-      const sy = Number(pickedSeat?.y ?? pickedSeat?.position?.y);
-      const sz = Number(pickedSeat?.z ?? pickedSeat?.position?.z);
-
-      if (Number.isFinite(sx) && Number.isFinite(sy)) {
-        return {
-          x: sx,
-          y: clampMlpY(sy),
-          z: Number.isFinite(sz) ? sz : 1.2,
-        };
-      }
-
-      // If seat objects are present but malformed, try the older pickMLP route as a backup
-      let picked = null;
-      try {
-        if (typeof pickMLP === 'function') {
-          picked = pickMLP(mlpBasis || 'all', seatingPositions);
-        }
-      } catch (err) {
-        picked = null;
-      }
-
-      if (picked && Number.isFinite(picked.x) && Number.isFinite(picked.y)) {
-        return {
-          x: Number(picked.x),
-          y: clampMlpY(Number(picked.y)),
-          z: Number.isFinite(picked.z) ? Number(picked.z) : 1.2,
-        };
-      }
-    }
-
-    // 3. Last-resort fallback: middle of room, ~60% back
-    const cx = roomWidthM > 0 ? roomWidthM / 2 : 0;
-    const fy = clampMlpY(roomLengthM > 0 ? roomLengthM * 0.58 : 3);
-    return { x: cx, y: fy, z: 1.2 };
-  }, [mlpPoint, seatingPositions, mlpBasis, roomWidthM, roomLengthM]);
-
-  const mlp = MLP_calculated;
+  const mlp = useMlpCalculation({
+    mlpPoint,
+    seatingPositions,
+    mlpBasis,
+    roomWidthM: widthM,
+    roomLengthM: lengthM
+  });
   const mlpDotX_m = mlp.x;
   const mlpDotY_m = mlp.y;
   const mlpDotZ_m = mlp.z;
