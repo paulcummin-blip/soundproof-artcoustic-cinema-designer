@@ -100,10 +100,7 @@ import SpeakerPositionsReadout from "@/components/room/SpeakerPositionsReadout";
 
 import RP22CompliancePanel from "@/components/rp22/RP22CompliancePanel";
 
-// DEBUG: log the available preset keys once at module load
-if (typeof window !== "undefined" && window.console) {
-  if (globalThis.__B44_LOGS) console.log("[RD PRESETS] keys:", Object.keys(DOLBY_PRESETS || {}));
-}
+// (debug log removed to save space)
 
 // NEW: Guarded setter hook
 function useGuardedSetter(setter, tabName) {
