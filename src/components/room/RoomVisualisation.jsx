@@ -694,41 +694,12 @@ const onHudHeaderMouseDown = useCallback((event) => {
     return ['FL', 'FC', 'FR'].flatMap(role => getByRoleArray(byRole, role)).filter(Boolean);
   }, [byRole]);
 
-const byId = useMemo(() => {
-  const map = new Map();
-
-  // Index speakers (including extra surrounds with canonical roles SL2/SR2/...)
-  (placedSpeakers || []).forEach((spk) => {
-    if (!spk) return;
-
-    // 1) Primary key: id (if present)
-    if (spk.id) map.set(spk.id, spk);
-
-    // 2) Fallback key: role (needed for overheads and extras when id is missing/unstable)
-    if (spk.role) map.set(String(spk.role).toUpperCase(), spk);
-  });
-
-  // Index seats (keep existing behaviour)
-  (seatingPositions || []).forEach((seat) => {
-    if (!seat) return;
-    if (seat.id) map.set(seat.id, seat);
-  });
-
-  // Index subwoofers
-  (frontSubs || []).forEach((sub, idx) => {
-    if (!sub) return;
-    const id = sub.id || `front-sub-${idx}`;
-    map.set(id, { ...sub, _subType: 'front' });
-  });
-  
-  (rearSubs || []).forEach((sub, idx) => {
-    if (!sub) return;
-    const id = sub.id || `rear-sub-${idx}`;
-    map.set(id, { ...sub, _subType: 'rear' });
-  });
-
-  return map;
-}, [placedSpeakers, seatingPositions, frontSubs, rearSubs]);
+const byId = useEntitiesById({
+  placedSpeakers,
+  seatingPositions,
+  frontSubs,
+  rearSubs
+});
 
   // Removed seatBandXBounds - computed after overheadZones is defined
 
