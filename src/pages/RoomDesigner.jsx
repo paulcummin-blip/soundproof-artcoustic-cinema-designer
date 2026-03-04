@@ -56,6 +56,7 @@ import { useProjectLoader } from "@/components/hooks/useProjectLoader";
 import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore";
 import { useSpeakerReconciliation } from "@/components/hooks/useSpeakerReconciliation";
 import { useSeatingRebuild } from "@/components/hooks/useSeatingRebuild";
+import { useSubwooferSync } from "@/components/hooks/useSubwooferSync";
 
 
 
