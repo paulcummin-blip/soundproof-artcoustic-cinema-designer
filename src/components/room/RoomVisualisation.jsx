@@ -23,7 +23,7 @@ import { timeNowMs } from "@/components/utils/timeNow";
 import { calculateViewingAngle, rp23LevelForAngleDeg } from '@/components/utils/viewingAngleUtils';
 import CanvasMessages from '@/components/room/CanvasMessages';
 
-import { computeOverheadZones, renderOverheadBandsSVG } from '@/components/room/overlays/OverheadZones';
+import { renderOverheadBandsSVG } from '@/components/room/overlays/OverheadZones';
 import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from '@/components/utils/overheadDragClamping';
 import { useOverheadAutoPlacement } from '@/components/hooks/useOverheadAutoPlacement';
 import { useEnsureOverheadPairs } from '@/components/hooks/useEnsureOverheadPairs';
