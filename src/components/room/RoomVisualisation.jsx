@@ -1243,20 +1243,16 @@ React.useEffect(() => {
   // This auto-seed introduces duplicate creation / re-creation timing issues.
 
   // --- OVERHEAD ZONES (must be declared EARLY, before handleSpeakerDrag) ---
-  const overheadZones = useMemo(
-    () =>
-      computeOverheadZones({
-        seatingPositions,
-        heightM,
-        widthM,
-        lengthM,
-        mlpY_m,
-        mlpPoint: mlp,
-        placedSpeakers,
-        getCanonicalRole,
-      }),
-    [seatingPositions, heightM, widthM, lengthM, mlpY_m, mlp, placedSpeakers, getCanonicalRole]
-  );
+  const overheadZones = useOverheadZonesComputed({
+    seatingPositions,
+    heightM,
+    widthM,
+    lengthM,
+    mlpY_m,
+    mlp,
+    placedSpeakers,
+    getCanonicalRole
+  });
 
   // Overheads must never come further inboard than the outermost seat on that side.
   // We allow a tiny margin (tweeter centred in the baffle), but no more.
