@@ -51,14 +51,8 @@ import { getModelDimsM } from "@/components/roomdesigner/utils/getModelDimsM";
 import { useUrlQuery, useSurroundGroupDepths, parseProjectJson, getMlpPoint } from "@/components/roomdesigner/RoomDesignerHelpers";
 import { useProjectLoader } from "@/components/hooks/useProjectLoader";
 import { useSpeakerSystemStore } from "@/components/hooks/useSpeakerSystemStore";
-
-// REMOVED: useRoomDimensions hook - now expanded to load SPL speaker data
-// The functionalities of useRoomDimensions are now absorbed into AppStateProvider (for dimensions)
-// and useProjectLoader (for speaker handoff data).
-
-
-// useProjectLoader and useSpeakerSystemStore are imported from external files (see imports above).
-// The duplicate inline bodies have been removed to fix the build errors.
+import { useSpeakerReconciliation } from "@/components/hooks/useSpeakerReconciliation";
+import { useSeatingRebuild } from "@/components/hooks/useSeatingRebuild";
 
 
 
