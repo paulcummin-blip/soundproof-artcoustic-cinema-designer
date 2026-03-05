@@ -2612,10 +2612,8 @@ useEffect(() => {
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
-  // Renders speaker labels. Not implemented in the original code, so a placeholder.
-  const renderSpeakerLabels = useCallback(() => {
-    return <g data-layer="speaker-labels"></g>;
-  }, []);
+  // Renders speaker labels placeholder.
+  const renderSpeakerLabels = useCallback(() => <g data-layer="speaker-labels" />, []);
 
   // --- Row front-wall distance labels (only for Speaker Positions plan) ---
   const rowFrontWallLabelSeatIds = useMemo(() => {
