@@ -1027,46 +1027,8 @@ React.useEffect(() => {
     return { mlpPxX: _mlpPxX, mlpPxY: _mlpPxY, midX_m: mlp.x, mlpY_m: mlp.y };
   }, [mlp, toPx]);
 
-  // Memo for the valid Y-range for the *center* of SL/SR speakers, incorporating overhang.
-  const sideSurroundVisualSpanM = useMemo(() => {
-    const roomLength = lengthM || 6.0;
-    
-    // Determine FRONT ROW anchor (minimum seat Y)
-    const seatYs = seatingPositions
-      ?.map(s => Number(s.y))
-      .filter(Number.isFinite) || [];
-
-    const frontRowY_m =
-      seatYs.length > 0
-        ? Math.min(...seatYs)
-        : mlpY_m; // fallback for single-row or no-seat case
-    
-    // These `zoneMinY_meters` and `zoneMaxY_meters` represent the visual extent of the zone polygon.
-    const zoneMinY_meters = Math.max(0, frontRowY_m - FADE_LEN_M);
-    const zoneMaxY_meters = roomLength;
-
-    // Determine an effective speaker height for calculating the valid center range.
-    // We use the SL speaker if available, otherwise a reasonable default.
-    const slSpeaker = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
-    const representativeHeightM = slSpeaker ? (getModelDimsM(slSpeaker.model)?.heightM || 0.2) : 0.2;
-
-    const speakerHalfHeight = representativeHeightM / 2;
-    const allowedOverhangDistance = SIDE_ALLOW_OVERHANG * representativeHeightM;
-
-    // The speaker's center can be placed such that its bottom edge is at `zoneMinY_meters - allowedOverhangDistance`
-    // So, the center's minimum Y position is `zoneMinY_meters - allowedOverhangDistance + speakerHalfHeight`
-    const effectiveMinY_forCenter = zoneMinY_meters - allowedOverhangDistance + speakerHalfHeight;
-
-    // The speaker's center can be placed such that its top edge is at `zoneMaxY_meters + allowedOverhangDistance`
-    // So, the center's maximum Y position is `zoneMaxY_meters + allowedOverhangDistance - speakerHalfHeight`
-    const effectiveMaxY_forCenter = zoneMaxY_meters + allowedOverhangDistance - speakerHalfHeight;
-
-    // Ensure these bounds are within the overall room length (0 to roomLength) for safety
-    return {
-      minY: Math.max(0, effectiveMinY_forCenter),
-      maxY: Math.min(roomLength, effectiveMaxY_forCenter)
-    };
-  }, [mlpY_m, seatingPositions, placedSpeakers, getModelDimsM, lengthM, getCanonicalRole]);
+  // Memo for the valid Y-range for the *center* of SL/SR speakers — extracted to hook
+  const sideSurroundVisualSpanM = useSideSurroundVisualSpanM({ mlpY_m, seatingPositions, placedSpeakers, getModelDimsM, lengthM, getCanonicalRole });
 
   // Initialize rear mode once (safe guard on mount or when speakers appear)
   React.useEffect(() => {
