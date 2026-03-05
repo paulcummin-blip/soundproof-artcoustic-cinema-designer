@@ -380,7 +380,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const [tooltip, setTooltip] = useState({ show: false, text: '' });
   const [dragState, setDragState] = useState({ dragging: false, draggedItemId: null, dragType: null });
   const [subDragTick, setSubDragTick] = useState(0);
-  const [speakerTooltip, setSpeakerTooltip] = useState({ visible: false, text: '', x: 0, y: 0 });
   const rvWrapRef = useRef(null);
   const { dragging, draggedItemId, dragType } = dragState;
   const [draggingRole, setDraggingRole] = useState(null);
