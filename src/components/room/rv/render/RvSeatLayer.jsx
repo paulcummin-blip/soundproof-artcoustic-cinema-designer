@@ -1,4 +1,5 @@
 import React from "react";
+import RvSeatRowLabels from "@/components/room/rv/render/RvSeatRowLabels";
 
 export default function RvSeatLayer({
   seatingPositions,
@@ -85,39 +86,21 @@ export default function RvSeatLayer({
               strokeDasharray={isPinned ? '4 2' : 'none'}
               aria-label="Seat — hover for RP23 and P1 analysis"
             />
-            
-            {/* Front wall distance label (Speaker Positions plan only) */}
-            {speakerPositionsView === 'plan' && rowFrontWallLabelSeatIds.has(seat.id) && (
-              <text
-                x={seatX}
-                y={seatY + (RY_M * scale) + 18}
-                textAnchor="middle"
-                fontSize={11}
-                fontFamily={exportMode === 'dimensions' ? 'Century Gothic, sans-serif' : 'system-ui, sans-serif'}
-                fill="#1B1A1A"
-                fontWeight={600}
-                pointerEvents="none"
-              >
-                Front: {yM.toFixed(2)}m
-              </text>
-            )}
-            
-            {/* Row distance label (ROOM_DIMS overlay only) */}
-            {_overlays?.ROOM_DIMS && exportMode !== 'dimensions' && rowDistanceLabelSeatIds.has(seat.id) && (
-              <text
-                x={seatX + 22}
-                y={seatY}
-                textAnchor="start"
-                fontSize={22}
-                fill="#1B1A1A"
-                pointerEvents="none"
-              >
-                ⬆️ {yM.toFixed(2)}m
-              </text>
-            )}
           </g>
         );
       })}
+
+      {/* Seat row labels extracted to component */}
+      <RvSeatRowLabels
+        rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds}
+        rowDistanceLabelSeatIds={rowDistanceLabelSeatIds}
+        seats={seatingPositions}
+        scale={scale}
+        speakerPositionsView={speakerPositionsView}
+        exportMode={exportMode}
+        _overlays={_overlays}
+        toPx={toPx}
+      />
     </g>
   );
 }
