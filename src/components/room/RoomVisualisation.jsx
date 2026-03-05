@@ -4260,8 +4260,6 @@ useEffect(() => {
 
   // SBL/SBR auto-adjust (disabled) removed — was a no-op (early return) and only added noise/size.
 
-    if (!sbl || !sbr) return;
-    const yL_sbl_cur = Number(sbl?.position?.y);
     const yR_sbr_cur = Number(sbr?.position?.y);
 
     const yMax_side_for_hysteresis = Math.max(
