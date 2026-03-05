@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
@@ -46,6 +47,7 @@ import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandler
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
 import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs"; import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers"; import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements"; import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM"; import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMetricsCacheEffect"; import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler"; import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler"; import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate"; import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove"; import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler"; import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler"; import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement"; import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls"; import { usePlanResizeObserver } from "@/components/room/rv/hooks/usePlanResizeObserver";
+import { useHudComputation } from "@/components/room/hooks/useHudComputation";
 const rvSafeCanonRole = (role) => String(role || '').toUpperCase();
 
 const rvIsOverheadRole = (role) => {
@@ -2474,18 +2476,7 @@ useEffect(() => {
   const svgH = containerH;
 
 
-  // Build HUD style safely
-  const hudDynamicStyle = useMemo(() => {
-    const s = {};
-    if (isHudPinned && hudPinnedOffsetPx) {
-      s.transform = `translate3d(${hudPinnedOffsetPx.x}px, ${hudPinnedOffsetPx.y}px, 0)`;
-    }
-    if (isHudPinned && hudHiddenWhenPinned) {
-      s.visibility = 'hidden';
-      s.pointerEvents = 'none';
-    }
-    return s;
-  }, [isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned]);
+  const { renderLevelBadge, hudDynamicStyle } = useHudComputation({ isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned });
 
   // RP22 overhead corridors: shown whenever overheads are present in the layout
   const overheadCorridorsOn = overheadCount > 0;
