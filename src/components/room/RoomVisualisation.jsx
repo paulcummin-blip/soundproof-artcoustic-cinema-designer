@@ -1928,8 +1928,8 @@ const subInDraft = draftArray[subIndex];
     getCanonicalRole,
   });
 
-  // STUB: kept for reference – original inline logic is in buildSeatHudSnapshot.js
-  void (false); /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
+  // (original inline logic extracted to buildSeatHudSnapshot.js)
+  void (false); /* STUB - see buildSeatHudSnapshot.js
 
     // Helper for safe number extraction
     const finite = (v, fallback) => {
