@@ -591,7 +591,7 @@ const onHudHeaderMouseDown = useCallback((event) => {
 
   // Safe value formatter for HUD
   const safeVal = useCallback((v, unit = '') => {
-    return Number.isFinite(v) ? `${v.toFixed(1)}${unit}` : '—';
+    return Number.isFinite(v) ? `${v.toFixed(1)}${unit}` : '-';
   }, []);
 
   // 4. HOOKS AND DERIVED STATE
