@@ -1856,12 +1856,7 @@ useEffect(() => {
       pts.push(`${i === 0 ? 'M' : 'L'}${cx},${cy}`);
     }
     return pts.join(' ');
-  }, []);
-
-
-
-
-  // Memoize individual zone components with unique IDs
+  }, []);  // Memoize individual zone components with unique IDs
   const ZoneComponents = useZoneComponents({
     seatingPositions,
     widthM,
