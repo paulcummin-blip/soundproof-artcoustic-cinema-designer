@@ -1260,94 +1260,22 @@ React.useEffect(() => {
     return xRoom;
   }
 
-  // [B44] Auto-positioning of FW based on zones (active for auto-positioned speakers only)
-  // Keeps BOTH FWL+FWR paired when zones change (e.g., when SL/SR move)
-  // Skip any speaker marked positionSource='user' to preserve manual placement
-  useEffect(() => {
-    if (isAnyDraggingRef.current) return;
-    if (!onSetSpeakers) return;
-    if (isDraggingFW.current) return;
-
-    const lwSpeaker = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'LW');
-    const rwSpeaker = placedSpeakers?.find(s => getCanonicalRole(s.role) === 'RW');
-
-    // Only attempt FW positioning when LW/RW are actually present
-    if (!lwSpeaker && !rwSpeaker) return;
-
-    // Only proceed when both have real models (not off/none)
-    const lwModel = String(lwSpeaker?.model || '').toLowerCase();
-    const rwModel = String(rwSpeaker?.model || '').toLowerCase();
-    if (!lwModel || lwModel === 'off' || lwModel === 'none') return;
-    if (!rwModel || rwModel === 'off' || rwModel === 'none') return;
-
-    if (frontWideZones?.status !== 'ok') return;
-
-    const W = widthM || 4.5;
-    const L = lengthM || 6.0;
-    const WALL_BUFFER_FW = 0.02;
-
-    // [FIX] Settle tolerance to prevent flicker (1mm)
-    const POS_TOL = 0.001;
-    const roundMm = (v) => Math.round((Number(v) || 0) * 1000) / 1000;
-
-    onSetSpeakers((prev) => {
-      const list = Array.isArray(prev) ? prev : [];
-
-      let changed = false;
-
-      const next = list.map((s) => {
-        const role = getCanonicalRole(s?.role);
-        if (role !== "LW" && role !== "RW") return s;
-
-        if (s.positionSource === "user") return s;
-
-        const zone = role === "LW" ? frontWideZones.left : frontWideZones.right;
-        if (!zone || !zone.medianY) return s;
-
-        const dims = getModelDimsM(s.model);
-        const halfDepth = (Number(dims?.depthM) || 0.082) / 2;
-        const halfWidth = (Number(dims?.widthM) || 0.20) / 2;
-
-        const xAtWall = role === "LW"
-          ? (WALL_BUFFER_FW + halfDepth)
-          : (W - WALL_BUFFER_FW - halfDepth);
-
-        const sideOffsetKey = role === "LW" ? "L" : "R";
-        const currentOffset = fwOffsetRef.current[sideOffsetKey] || 0;
-
-        const targetYWithOffset = zone.medianY + currentOffset;
-        const yMinClamped = (zone.yMin || 0) + (halfWidth * SIDE_ALLOW_OVERHANG);
-        const yMaxClamped = (zone.yMax || L) - (halfWidth * SIDE_ALLOW_OVERHANG);
-
-        const yClamped = roundMm(clamp(targetYWithOffset, yMinClamped, yMaxClamped));
-        const xAtWallRounded = roundMm(xAtWall);
-
-        const currentY = s.position?.y ?? 0;
-        const currentX = s.position?.x ?? 0;
-
-        if (Math.abs(currentY - yClamped) > POS_TOL || Math.abs(currentX - xAtWallRounded) > POS_TOL) {
-          changed = true;
-          return {
-            ...s,
-            position: { ...(s.position || {}), x: xAtWallRounded, y: yClamped, z: s.position?.z ?? 1.1 }
-          };
-        }
-
-        return s;
-      });
-
-      return changed ? next : prev;
-    });
-    
-  }, [
-    frontWideZones,
+  // [B44] Auto-positioning of FW based on zones (delegated to hook)
+  useFrontWideAutoPlacement({
+    isAnyDraggingRef,
+    isDraggingFW,
+    placedSpeakers,
     widthM,
     lengthM,
+    frontWideZones,
     speakersEpoch,
-    getModelDimsM,
+    fwOffsetRef,
     onSetSpeakers,
-    getCanonicalRole
-  ]);
+    getModelDimsM,
+    getCanonicalRole,
+    clamp,
+    SIDE_ALLOW_OVERHANG,
+  });
 
   // Listen for reset-to-median event
   useEffect(() => {
