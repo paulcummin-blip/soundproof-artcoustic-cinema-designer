@@ -2183,7 +2183,6 @@ useEffect(() => {
     );
   }, [toPx, mlpDotX_m, mlpDotY_m, _overlays?.ROOM_DIMS]);
 
-
   const containerStyle = {
     position: 'relative',
     width: '100%',
