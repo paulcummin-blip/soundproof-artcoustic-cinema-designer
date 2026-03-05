@@ -1,0 +1,256 @@
+"use client";
+
+import { useCallback } from "react";
+
+export function useMouseDownHandler({
+  byId,
+  setDragState,
+  setDragWarning,
+  setTooltip,
+  rsDragLockRef,
+  getCanonicalRole,
+  widthM,
+  lengthM,
+  canvasToRoom,
+  svgRef,
+  isAnyDraggingRef,
+  isDraggingSpeakerRef,
+  isDraggingRearRef,
+  isDraggingFW,
+  isDraggingSubRef,
+  dragOffsetRoomRef,
+  draggedSubWallRef,
+  draggedSubTypeRef,
+  draftFrontSubsRef,
+  draftRearSubsRef,
+  idleCommitTimerRef,
+  frontSubs,
+  rearSubs,
+  frontSubsCfg,
+  rearSubsCfg,
+  isRenderableSpeaker,
+  isDraggable,
+}) {
+  const handleMouseDown = useCallback(
+    (e, id, type) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      let target = byId.get(id);
+
+      // If it's a sub id like "rear-sub-0" / "front-sub-0", it might only exist
+      // in the fallback rendering list, so byId will not contain it.
+      // In that case, build a minimal target from the cfg so dragging can work.
+      if (!target && typeof id === "string") {
+        const mRear = id.match(/^rear-sub-(\d+)$/);
+        const mFront = id.match(/^front-sub-(\d+)$/);
+
+        if (mRear) {
+          const idx = Number(mRear[1] || 0);
+          const xFromCfg = rearSubsCfg?.positions?.[idx]?.x;
+          const x = Number.isFinite(xFromCfg) ? xFromCfg : (widthM / 2);
+
+          target = {
+            id,
+            model: rearSubsCfg?.model || "SUB2-12",
+            role: `SUBR${idx + 1}`,
+            position: { x, y: lengthM, z: 0 },
+            _subType: "rear",
+          };
+        } else if (mFront) {
+          const idx = Number(mFront[1] || 0);
+          const xFromCfg = frontSubsCfg?.positions?.[idx]?.x;
+          const x = Number.isFinite(xFromCfg) ? xFromCfg : (widthM / 2);
+
+          target = {
+            id,
+            model: frontSubsCfg?.model || "SUB2-12",
+            role: `SUBF${idx + 1}`,
+            position: { x, y: 0, z: 0 },
+            _subType: "front",
+          };
+        }
+      }
+
+      if (!target) return;
+
+      const canonicalRole = getCanonicalRole(target.role);
+      const isOverhead =
+        typeof canonicalRole === "string" && canonicalRole.startsWith("T");
+
+      // 1) For non-overhead speakers, keep the existing "renderable" guard.
+      if (type === "speaker" && !isOverhead && !isRenderableSpeaker(target)) {
+        return;
+      }
+
+      // 2) For non-overhead speakers, keep the existing "locked" behaviour.
+      //    Overheads bypass this, so they never show "Position is locked".
+      if (type === "speaker" && !isOverhead && !isDraggable(target)) {
+        setTooltip({ show: true, text: "Position is locked" });
+        setTimeout(() => {
+          setTooltip((t) =>
+            t.text === "Position is locked" ? { show: false } : t
+          );
+        }, 1500);
+        return;
+      }
+
+      if (globalThis.__B44_LOGS) console.log("[DRAG] START", { id, type, role: target?.role, hasTarget: !!target });
+
+      // Get SVG point for offset calculation
+      if (!svgRef.current) return;
+      const svgElement = svgRef.current;
+      const point = svgElement.createSVGPoint();
+      point.x = e.clientX;
+      point.y = e.clientY;
+      const ctm = svgElement.getScreenCTM();
+      if (!ctm) return;
+      const inverseCTM = ctm.inverse();
+      const svgPoint = point.matrixTransform(inverseCTM);
+
+      // Convert cursor position to room coords
+      const cursorRoom = canvasToRoom({ x: svgPoint.x, y: svgPoint.y });
+
+      // Store offset between speaker center and cursor
+      if (type === "speaker" && target.position) {
+        dragOffsetRoomRef.current = {
+          x: target.position.x - cursorRoom.x,
+          y: target.position.y - cursorRoom.y
+        };
+      } else if (type === "seat" && (target.x || target.position?.x)) {
+        const seatX = target.x ?? target.position?.x ?? 0;
+        const seatY = target.y ?? target.position?.y ?? 0;
+        dragOffsetRoomRef.current = {
+          x: seatX - cursorRoom.x,
+          y: seatY - cursorRoom.y
+        };
+      } else if (type === "sub" && target.position) {
+        dragOffsetRoomRef.current = {
+          x: target.position.x - cursorRoom.x,
+          y: target.position.y - cursorRoom.y
+        };
+        // Detect and store which wall this sub is on
+        const x = target.position.x;
+        const y = target.position.y;
+        const threshold = 0.05;
+
+        let wall = null;
+        if (Math.abs(y) < threshold) wall = 'front';
+        else if (Math.abs(y - lengthM) < threshold) wall = 'rear';
+        else if (Math.abs(x) < threshold) wall = 'left';
+        else if (Math.abs(x - widthM) < threshold) wall = 'right';
+        else {
+          // Default to closest wall
+          const distFront = y;
+          const distRear = lengthM - y;
+          const distLeft = x;
+          const distRight = widthM - x;
+          const minDist = Math.min(distFront, distRear, distLeft, distRight);
+
+          if (minDist === distFront) wall = 'front';
+          else if (minDist === distRear) wall = 'rear';
+          else if (minDist === distLeft) wall = 'left';
+          else wall = 'right';
+        }
+
+        draggedSubWallRef.current = wall;
+        draggedSubTypeRef.current = target._subType;
+
+        // Initialize draft positions from current real positions
+        isDraggingSubRef.current = true;
+        // Build a "seed" list for dragging.
+        // If live arrays are empty (common when only fallback is drawn), seed from cfg.
+        const seedFront =
+          (Array.isArray(frontSubs) && frontSubs.length > 0)
+            ? frontSubs
+            : Array.from({ length: Number(frontSubsCfg?.count || 0) }, (_, idx) => {
+                const xFromCfg = frontSubsCfg?.positions?.[idx]?.x;
+                const x = Number.isFinite(xFromCfg) ? xFromCfg : (widthM / 2);
+                return {
+                  id: `front-sub-${idx}`,
+                  model: frontSubsCfg?.model || "SUB2-12",
+                  role: `SUBF${idx + 1}`,
+                  position: { x, y: 0, z: 0 },
+                  _subType: "front",
+                };
+              });
+
+        const seedRear =
+          (Array.isArray(rearSubs) && rearSubs.length > 0)
+            ? rearSubs
+            : Array.from({ length: Number(rearSubsCfg?.count || 0) }, (_, idx) => {
+                const xFromCfg = rearSubsCfg?.positions?.[idx]?.x;
+                const x = Number.isFinite(xFromCfg) ? xFromCfg : (widthM / 2);
+                return {
+                  id: `rear-sub-${idx}`,
+                  model: rearSubsCfg?.model || "SUB2-12",
+                  role: `SUBR${idx + 1}`,
+                  position: { x, y: lengthM, z: 0 },
+                  _subType: "rear",
+                };
+              });
+
+        draftFrontSubsRef.current = seedFront.map(s => ({ ...s, position: { ...s.position } }));
+        draftRearSubsRef.current = seedRear.map(s => ({ ...s, position: { ...s.position } }));
+
+        // Signal BassResponse that dragging started
+        if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {
+          window.__B44_setIsDraggingSub(true);
+        }
+
+        // Clear any pending idle timer
+        if (idleCommitTimerRef.current) {
+          clearTimeout(idleCommitTimerRef.current);
+          idleCommitTimerRef.current = null;
+        }
+      }
+
+      isAnyDraggingRef.current = true;
+
+      setDragState({
+        dragging: true,
+        draggedItemId: id,
+        dragType: type,
+      });
+      setDragWarning({ show: false });
+      rsDragLockRef.current = null;
+
+      if (type === "speaker") {
+        isDraggingSpeakerRef.current = true;
+        const speakerBeingDragged = byId.get(id);
+        const canonRole = getCanonicalRole(speakerBeingDragged.role);
+        if (canonRole === "SBL" || canonRole === "SBR") {
+          isDraggingRearRef.current++;
+        }
+        if (canonRole === "LW" || canonRole === "RW") {
+          isDraggingFW.current = true;
+        }
+
+        // Capture pointer on the target element
+        try {
+          if (e.target && typeof e.target.setPointerCapture === 'function') {
+            e.target.setPointerCapture(e.pointerId);
+          }
+        } catch (err) {
+          // Ignore capture errors
+        }
+      }
+
+      if (type === "sub") {
+        isDraggingSpeakerRef.current = true;
+
+        // Capture pointer on the target element
+        try {
+          if (e.target && typeof e.target.setPointerCapture === 'function') {
+            e.target.setPointerCapture(e.pointerId);
+          }
+        } catch (err) {
+          // Ignore capture errors
+        }
+      }
+    },
+    [byId, setDragState, setDragWarning, setTooltip, rsDragLockRef, getCanonicalRole, widthM, lengthM, canvasToRoom, svgRef]
+  );
+
+  return { handleMouseDown };
+}
