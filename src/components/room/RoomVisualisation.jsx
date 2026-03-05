@@ -1765,7 +1765,7 @@ React.useEffect(() => {
     getCanonicalRole,
   });
 
-  // STUB: kept for reference – original inline logic is in buildSeatHudSnapshot.js
+  // STUB: original inline logic has been moved to buildSeatHudSnapshot.js
   void (false); /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
 
     // Helper for safe number extraction
