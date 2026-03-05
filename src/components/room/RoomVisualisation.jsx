@@ -42,7 +42,7 @@ import { useFrontWideZonesComputed } from "@/components/room/rv/hooks/useFrontWi
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
 import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
-
+import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
 
 // --- OVERHEAD HELPERS (RoomVisualisation) ---
 const rvSafeCanonRole = (role) => String(role || '').toUpperCase();
