@@ -112,7 +112,7 @@ import {
   SCREEN_BAR_PX, SCREEN_BAR_HALF_PX,
   SCREEN_THICKNESS_M, toCmCeil,
   SPEAKER_STROKE_PX, STROKE_HALF_M,
-  yHalfExtentM, yHalfExtentM_physical,
+  yHalfExtentM,
   targetMlpY57_5,
   SpeakerIcon,
   SpeakerRect,
