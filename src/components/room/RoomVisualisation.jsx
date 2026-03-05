@@ -1575,7 +1575,7 @@ React.useEffect(() => {
 
   useSeatMetricsCacheEffect({
     seatingPositions, placedSpeakers, widthM, lengthM, heightM,
-    screenFrontPlaneM, screen, mlp, allSeatSplMetrics,
+    screenFrontPlaneM, screen, mlp, allSeatSplMetrics: allSeatSplMetricsProp,
     aimAtMLP, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP,
     lcrAngleInfo, analysisResult, dolbyLayout, appState,
     exportMode, isPrinting: props.isPrinting,
