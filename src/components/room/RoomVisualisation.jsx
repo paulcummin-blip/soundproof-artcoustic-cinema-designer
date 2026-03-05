@@ -4247,17 +4247,6 @@ useEffect(() => {
       });
     }
 
-    if (!needsUpdate) return;
-
-    onSetSpeakers(prev => prev.map(s => {
-      const r = getCanonicalRole(s.role);
-      if (r === 'SL') return { ...s, position: { ...(s.position || {}), x: xL_star, y: yL } };
-      if (r === 'SR') return { ...s, position: { ...(s.position || {}), x: xR_star, y: yR } };
-      return s;
-    }));
-    */
-  }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
-
   // SBL/SBR auto-adjust (disabled) removed — was a no-op (early return) and only added noise/size.
 
   // A) Hard-gate the legacy front-wide ribbon generation
