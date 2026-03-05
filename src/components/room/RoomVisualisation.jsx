@@ -43,8 +43,7 @@ import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverhead
 import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
-
-// --- OVERHEAD HELPERS (RoomVisualisation) ---
+import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs";
 const rvSafeCanonRole = (role) => String(role || '').toUpperCase();
 
 const rvIsOverheadRole = (role) => {
