@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
@@ -3298,18 +3297,12 @@ useEffect(() => {
       }
     }
     
-    // For each row, pick the furthest-right seat
-    const sortedByX = row.seats
-        .map(s => ({ seat: s, x: Number(s?.x ?? s?.position?.x ?? 0) }))
-        .filter(item => Number.isFinite(item.x))
-        .sort((a, b) => b.x - a.x); // Descending - furthest right first
-      
-      if (sortedByX.length === 0) continue;
-      
-      const furthestRight = sortedByX[0]?.seat;
-      if (furthestRight?.id) labeledSeatIds.add(furthestRight.id);
+    const labeledSeatIds = new Set();
+    for (const row of rows) {
+      const sorted = row.seats.map(s => ({ seat: s, x: Number(s?.x ?? s?.position?.x ?? 0) })).filter(i => Number.isFinite(i.x)).sort((a, b) => b.x - a.x);
+      if (sorted.length === 0) continue;
+      if (sorted[0]?.seat?.id) labeledSeatIds.add(sorted[0].seat.id);
     }
-    
     return labeledSeatIds;
   }, [_overlays?.ROOM_DIMS, seatingPositions]);
 
