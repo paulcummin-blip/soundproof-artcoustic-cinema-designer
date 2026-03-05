@@ -1845,7 +1845,6 @@ useEffect(() => {
     const a0 = Number(minDeg);
     const a1 = Number(maxDeg);
     if (!Number.isFinite(a0) || !Number.isFinite(a1) || a1 <= a0) return null;
-
     const steps = 24;
     const pts = [];
     for (let i = 0; i <= steps; i++) {
