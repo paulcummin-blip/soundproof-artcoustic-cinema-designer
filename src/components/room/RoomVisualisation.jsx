@@ -40,6 +40,7 @@ import { useEntitiesById } from "@/components/room/rv/hooks/useEntitiesById";
 import { useExportMinScreenDepth } from "@/components/room/rv/hooks/useExportMinScreenDepth";
 import { useActualScreenFrontY } from "@/components/room/rv/hooks/useActualScreenFrontY";
 import { useRoomGeometry } from "@/components/room/rv/hooks/useRoomGeometry";
+import { useScreenPlane } from "@/components/room/rv/hooks/useScreenPlane";
 import { useRoomCoordinateConverters } from "@/components/room/rv/hooks/useRoomCoordinateConverters";
 import { useFrontWideZonesComputed } from "@/components/room/rv/hooks/useFrontWideZonesComputed";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
@@ -641,144 +642,22 @@ const byId = useEntitiesById({
     onLcrAngleComputed(rounded);
   }, [lcrAngleInfo.averageAngle, onLcrAngleComputed]);
 
-  // LIVE EMIT: recompute minimum screen depth whenever anything relevant changes
-  useEffect(() => {
-    // Filter and map front objects for the pure calculation function
-    // Only include placedSpeakers (LCR) and frontSubs for screen depth calculation
-    const frontObjectsToCalculate = [...(placedSpeakers || []), ...(frontSubs || [])]
-      .filter(s => {
-        const r = getCanonicalRole(s.role);
-        return r === 'FL' || r === 'FC' || r === 'FR' || isSubRole(r);
-      })
-      .map(s => ({ // Map to relevant properties for the pure function
-        model: s.model,
-        role: s.role,
-        position: s.position
-      }));
-
-    const calculatedValue = computeMinimumScreenDepthM({
-      frontObjects: frontObjectsToCalculate,
-      getDims: getModelDimsM,
-      lcrAngles: { L: lcrAngleInfo.L, R: lcrAngleInfo.R },
-      aimAtMLP: aimAtMLP,
-    });
-
-    // Guard: only update if value actually changed (prevent loops)
-    const prev = lastCalcMinScreenDepthRef.current;
-    if (typeof calculatedValue === "number" && typeof prev === "number") {
-      const nextR = Math.round(calculatedValue * 1000) / 1000;
-      const prevR = Math.round(prev * 1000) / 1000;
-      if (nextR === prevR) return;
-    }
-
-    lastCalcMinScreenDepthRef.current = calculatedValue;
-    setCalculatedMinScreenDepthM(calculatedValue);
-
-  }, [
-    placedSpeakers,
-    frontSubs,
-    aimAtMLP,
-    lcrAngleInfo.L,
-    lcrAngleInfo.R,
-    screen?.visibleWidthInches,
-    screen?.floatDepthM,
-    getModelDimsM,
-    mlpDotY_m,
-    getCanonicalRole
-  ]);
-
-  const exportMinScreenDepthM = useExportMinScreenDepth({
-    exportMode,
+  const { screenPlaneY, minScreenDepth, ZONE_DEPTH_M } = useScreenPlane({
     placedSpeakers,
     frontSubs,
     aimAtMLP,
     lcrAngleInfo,
-    screenVisibleWidthInches: screen?.visibleWidthInches,
+    screen,
     getModelDimsM,
-    getCanonicalRole
+    getCanonicalRole,
+    mlpDotY_m,
+    appState,
+    onScreenPlaneChange,
+    onScreenPlaneYChange: props.onScreenPlaneYChange
   });
 
-  // Effective min depth: export uses sync value (if available), live uses state (effect-driven)
-  const effectiveMinScreenDepthM =
-    (exportMode === 'dimensions' && Number.isFinite(exportMinScreenDepthM))
-      ? exportMinScreenDepthM
-      : calculatedMinScreenDepthM;
-
-  const actualScreenFrontY = useActualScreenFrontY({
-    effectiveMinScreenDepthM,
-    screenFloatDepthM: screen?.floatDepthM,
-    screenPlaneMode
-  });
-
-  // Publish screen front plane to AppState with guards (rounded to mm + change detection)
-  const lastScreenFrontPlaneRef = React.useRef(null);
-  
-  useEffect(() => {
-    if (!appState?.setScreenFrontPlaneM) return;
-    if (!Number.isFinite(actualScreenFrontY)) return;
-
-    // Round to mm to avoid jitter/loops
-    const v = Math.round(actualScreenFrontY * 1000) / 1000;
-    
-    // Only update if value actually changed
-    if (lastScreenFrontPlaneRef.current === v) return;
-    lastScreenFrontPlaneRef.current = v;
-    
-    appState.setScreenFrontPlaneM(v);
-  }, [actualScreenFrontY, appState?.setScreenFrontPlaneM]);
-
-
-  // Define ZONE_DEPTH_M from live screen plane (component scope)
-  const ZONE_DEPTH_M = useMemo(() => {
-    const y = Number(actualScreenFrontY);
-    const fallback = 0.30;
-    const raw = Number.isFinite(y) ? y : fallback;
-    // clamp between 0.10 m and 0.60 m to avoid absurd values but keep existing visuals
-    return Math.max(0.10, Math.min(0.60, raw));
-  }, [actualScreenFrontY]);
-
-  // Push live plane up to RoomDesigner when it changes (debounced + change guard)
-const screenSendTimerRef = React.useRef(null);
-const lastSentScreenPlaneRef = React.useRef(null);
-
-React.useEffect(() => {
-  if (typeof onScreenPlaneChange !== 'function') return;
-  if (!Number.isFinite(actualScreenFrontY)) return;
-
-  // Round to 0.1mm to prevent float jitter
-  const rounded = Math.round(actualScreenFrontY * 10000) / 10000;
-
-  // If unchanged, skip update
-  if (lastSentRef.current === rounded) return;
-
-  // Debounce updates to prevent API overload (1 second)
-  clearTimeout(screenSendTimerRef.current);
-  screenSendTimerRef.current = setTimeout(() => {
-    if (lastSentRef.current !== rounded) {
-      lastSentRef.current = rounded;
-      onScreenPlaneChange(rounded);
-    }
-  }, 1000);
-
-  return () => clearTimeout(screenSendTimerRef.current);
-}, [actualScreenFrontY, onScreenPlaneChange]);
-
-// NEW: Publish live screen plane Y to screen object for Live Metrics (immediate, no debounce)
-const lastSentScreenPlaneYRef = React.useRef(null);
-
-React.useEffect(() => {
-  if (typeof props.onScreenPlaneYChange !== 'function') return;
-  if (!Number.isFinite(actualScreenFrontY)) return;
-
-  // Round to mm to prevent jitter
-  const rounded = Math.round(actualScreenFrontY * 1000) / 1000;
-  
-  // Only call if value actually changed
-  if (lastSentScreenPlaneYRef.current === rounded) return;
-  lastSentScreenPlaneYRef.current = rounded;
-  
-  props.onScreenPlaneYChange(rounded);
-}, [actualScreenFrontY, props.onScreenPlaneYChange]);
+  // Alias for backward compatibility with rest of component
+  const actualScreenFrontY = screenPlaneY;
 
   const TOP_GUTTER_PX = 150; // reserved space above room for dimension lines
   const SPEAKER_PLAN_TOP_GUTTER_PX = 90;
