@@ -2341,26 +2341,6 @@ useEffect(() => {
     return parseInt(parts[2]) || 0;
   }, [dolbyLayout]);
 
-  // [DISABLED] Legacy overhead creation hooks - no longer needed
-  // Overheads are now created immediately when layout changes in RoomDesigner
-  // These hooks were creating speakers on drag/zones toggle, which is no longer desired
-  
-  // useEnsureOverheadPairs - DISABLED
-  // useOverheadAutoPlacement - DISABLED
-
-  // Determine which overhead positions are visible
-  const visibleOverheadPositions = useMemo(() => {
-    const positions = [];
-    if (overheadCount === 2) {
-      positions.push('mid');
-    } else if (overheadCount === 4) {
-      positions.push('front', 'rear');
-    } else if (overheadCount === 6) {
-      positions.push('front', 'mid', 'rear');
-    }
-    return positions;
-  }, [overheadCount]);
-
   // Overhead speaker icons — extracted to hook
   const overheadIconElements = useOverheadIconElements({ placedSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride, bedLayerSpeakerMouseDownHandler, handleIconEnter, handleIconMove, handleIconLeave });
 
