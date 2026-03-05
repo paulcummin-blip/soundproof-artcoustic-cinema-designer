@@ -41,7 +41,7 @@ import { useRoomCoordinateConverters } from "@/components/room/rv/hooks/useRoomC
 import { useFrontWideZonesComputed } from "@/components/room/rv/hooks/useFrontWideZonesComputed";
 import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverheadZonesComputed";
 import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
-import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
+import { useZoneComponents, useRenderFrontWideZones } from "@/components/room/rv/hooks/useZoneComponents";
 
 
 // --- OVERHEAD HELPERS (RoomVisualisation) ---
