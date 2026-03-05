@@ -3299,9 +3299,7 @@ useEffect(() => {
     }
     
     // For each row, pick the furthest-right seat
-    const labeledSeatIds = new Set();
-    for (const row of rows) {
-      const sortedByX = row.seats
+    const sortedByX = row.seats
         .map(s => ({ seat: s, x: Number(s?.x ?? s?.position?.x ?? 0) }))
         .filter(item => Number.isFinite(item.x))
         .sort((a, b) => b.x - a.x); // Descending - furthest right first
@@ -3378,31 +3376,26 @@ useEffect(() => {
   const svgW = containerW;
   const svgH = containerH;
 
-// Helper to render level badge
 const renderLevelBadge = useCallback((level) => {
-  // Match the report pill behaviour and colours exactly
-  const str = String(level || '—').toUpperCase();
+  const str = String(level || '-').toUpperCase();
 
-  // Neutral / missing
-  if (!level || str === 'N/A' || str === '—' || str === '-' || str === 'BELOW L1') {
-    return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
+  if (!level || str === 'N/A' || str === '-' || str === 'BELOW L1') {
+    return <span style={{ fontSize: 10, color: '#999' }}>{level || '-'}</span>;
   }
 
-  // PASS THROUGH L1–L4 / FAIL exactly
   if (str === 'FAIL') return <RP22GradingPill level="FAIL" />;
 
   if (str === 'L1' || str === 'L2' || str === 'L3' || str === 'L4') {
     return <RP22GradingPill level={str} />;
   }
 
-  // If some old numeric sneaks in
   const n = Number(level);
   if (Number.isFinite(n)) {
     if (n >= 1 && n <= 4) return <RP22GradingPill level={`L${n}`} />;
-    return <span style={{ fontSize: 10, color: '#999' }>—</span>;
+    return <span style={{ fontSize: 10, color: '#999' }}>-</span>;
   }
 
-  return <span style={{ fontSize: 10, color: '#999' }}>—</span>;
+  return <span style={{ fontSize: 10, color: '#999' }}>-</span>;
 }, []);
 
 
