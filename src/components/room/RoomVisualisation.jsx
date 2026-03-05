@@ -22,6 +22,7 @@ import RvRoomElementsLayer from "@/components/room/rv/render/RvRoomElementsLayer
 import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from "@/components/utils/overheadDragClamping";
 import RvDolbyZones from "@/components/room/rv/render/RvDolbyZones";
 import RvBaffleAndScreen from "@/components/room/rv/render/RvBaffleAndScreen";
+import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
 import { useOverheadAutoPlacement } from "@/components/hooks/useOverheadAutoPlacement";
 import { useEnsureOverheadPairs } from "@/components/hooks/useEnsureOverheadPairs";
 import PlanMessages from "@/components/room/PlanMessages";
@@ -2885,28 +2886,7 @@ return (
         )}
 
         {/* SPEAKER TOOLTIP - Light style, non-interfering */}
-        {speakerTooltip.visible && (
-          <div
-            style={{
-              position: 'absolute',
-              left: speakerTooltip.x,
-              top: speakerTooltip.y,
-              pointerEvents: 'none',
-              background: '#F5F5F5',
-              color: '#111',
-              border: '1px solid rgba(0,0,0,0.12)',
-              borderRadius: 8,
-              padding: '6px 10px',
-              fontSize: 12,
-              fontFamily: 'system-ui, sans-serif',
-              zIndex: 9999,
-              boxShadow: '0 6px 18px rgba(0,0,0,0.12)',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            {speakerTooltip.text}
-          </div>
-        )}
+        <RvSpeakerTooltip speakerTooltip={speakerTooltip} />
 
       </div>
     </div>
