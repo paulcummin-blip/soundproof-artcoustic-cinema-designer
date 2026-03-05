@@ -5660,7 +5660,7 @@ return (
               SPEAKER_PLAN_TOP_GUTTER_PX={SPEAKER_PLAN_TOP_GUTTER_PX}
               BOTTOM_GUTTER_PX={BOTTOM_GUTTER_PX}
               SPEAKER_PLAN_BOTTOM_GUTTER_PX={SPEAKER_PLAN_BOTTOM_GUTTER_PX}
-              BaffleAndScreen={BaffleAndScreen}
+              BaffleAndScreen={<RvBaffleAndScreen screen={screen} roomRect={roomRect} scale={scale} actualScreenFrontY={actualScreenFrontY} showBaffle={showBaffle} showScreen={showScreen} widthM={widthM} SCREEN_THICKNESS_M={SCREEN_THICKNESS_M} meterToCanvasX={meterToCanvasX} exportMode={exportMode} screenFrontPlaneM={screenFrontPlaneM} screenPlaneMode={screenPlaneMode} />}
               mlp={mlp}
               mlpPoint={mlpPoint}
               seatingPositions={seatingPositions}
