@@ -1595,9 +1595,6 @@ React.useEffect(() => {
     );
   }, [onSetSeatingPositions, canvasToRoom]);
 
-  // Sub drag — delegated to extracted hook
-  // NOTE: commitDraftSubPositions is defined below; hook is instantiated after it.
-
   // Mouse handling — delegated to extracted hook
   const { handleMouseMove } = useRoomCanvasMouseMove({
     dragging,
