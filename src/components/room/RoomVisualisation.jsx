@@ -2627,7 +2627,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       tooltip={tooltip}
       hoveredSpeaker={hoveredSpeaker}
       tooltipData={tooltipData}
-      isHudPinned={isHudPinned}
       hudDynamicStyle={hudDynamicStyle}
       onHudHeaderMouseDown={onHudHeaderMouseDown}
       hudElRef={hudElRef}
