@@ -4259,9 +4259,7 @@ useEffect(() => {
   }, [placedSpeakers, widthM, lengthM, sideSurroundVisualSpanM, onSetSpeakers, rearSurroundVisualLanes, _overlays?.sideSurroundZone, slsrModeRef, getModelDimsM, getCanonicalRole]); // Use new dimension variables
 
   // SBL/SBR auto-adjust (disabled) removed — was a no-op (early return) and only added noise/size.
-  /* ORIGINAL LOGIC DISABLED (kept for reference):
-    const sbl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBL');
-    const sbr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SBR');
+
     if (!sbl || !sbr) return;
     const yL_sbl_cur = Number(sbl?.position?.y);
     const yR_sbr_cur = Number(sbr?.position?.y);
