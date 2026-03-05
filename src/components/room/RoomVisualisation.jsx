@@ -1622,25 +1622,23 @@ React.useEffect(() => {
 
   // Helper to commit draft sub positions to real state
   const commitDraftSubPositions = useCallback(() => {
-    // Commit front subs
     if (draftFrontSubsRef.current && onSetFrontSubs) {
       const positions = draftFrontSubsRef.current.map(s => ({ x: s.position.x }));
-      onSetFrontSubs(prev => ({
-        ...prev,
-        positions
-      }));
+      onSetFrontSubs(prev => ({ ...prev, positions }));
     }
-    
-    // Commit rear subs
     if (draftRearSubsRef.current && onSetRearSubs) {
       const positions = draftRearSubsRef.current.map(s => ({ x: s.position.x }));
-      onSetRearSubs(prev => ({
-        ...prev,
-        positions
-      }));
+      onSetRearSubs(prev => ({ ...prev, positions }));
     }
   }, [onSetFrontSubs, onSetRearSubs]);
-  
+
+  // Sub drag — delegated to hook (instantiated here so commitDraftSubPositions is in scope)
+  const { handleSubDrag } = useSubDragHandler({
+    byId, canvasToRoom, widthM, lengthM, getModelDimsM,
+    draggedSubTypeRef, draggedSubWallRef, draftFrontSubsRef, draftRearSubsRef,
+    setSubDragTick, idleCommitTimerRef, commitDraftSubPositions,
+  });
+
   const { handleMouseUp } = useMouseUpHandler({
     dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers,
     setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW,
