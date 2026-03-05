@@ -2752,135 +2752,14 @@ const subInDraft = draftArray[subIndex];
     }
   }, [onSetFrontSubs, onSetRearSubs]);
   
-  const handleMouseUp = useCallback((e) => {
-    // Signal to RoomDesigner that dragging ended
-    if (props.isDraggingRef) {
-      props.isDraggingRef.current = false;
-    }
-    
-    // Commit draft sub positions if sub was being dragged
-    if (isDraggingSubRef.current) {
-      // Cancel idle timer
-      if (idleCommitTimerRef.current) {
-        clearTimeout(idleCommitTimerRef.current);
-        idleCommitTimerRef.current = null;
-      }
-      
-      // Commit final positions
-      commitDraftSubPositions();
-      
-      // Signal BassResponse that dragging ended
-      if (typeof window !== 'undefined' && typeof window.__B44_setIsDraggingSub === 'function') {
-        window.__B44_setIsDraggingSub(false);
-      }
-      
-      isDraggingSubRef.current = false;
-      draftFrontSubsRef.current = null;
-      draftRearSubsRef.current = null;
-    }
-    
-    // Release pointer capture
-    if (dragType === 'speaker' && e?.target) {
-      try {
-        if (typeof e.target.releasePointerCapture === 'function' && e.pointerId) {
-          e.target.releasePointerCapture(e.pointerId);
-        }
-      } catch (err) {
-        // Ignore release errors
-      }
-    }
-
-    // [B44 PROMPT 4] Clamp overheads to RP22 zones after drag ends
-    // CRITICAL: Overheads must be draggable. RP22 constrains placement, not interaction.
-    // During drag = free movement. After release = snap to compliance.
-    if (dragType === 'speaker' && draggedItemId) {
-      const spk = byId.get(draggedItemId);
-      if (spk) {
-        const canonicalRole = getCanonicalRole(spk.role);
-        const isOverhead = typeof canonicalRole === "string" && canonicalRole.startsWith("T");
-        const isFrontWide = canonicalRole === 'LW' || canonicalRole === 'RW';
-        
-        if (isOverhead && overheadZones?.status === 'ok') {
-          // Determine which zone this overhead belongs to
-          let zone = null;
-          if (['TFL', 'TFR', 'TFC'].includes(canonicalRole)) {
-            zone = overheadZones.front;
-          } else if (['TML', 'TMR'].includes(canonicalRole)) {
-            zone = overheadZones.mid;
-          } else if (['TRL', 'TRR', 'TRC'].includes(canonicalRole)) {
-            zone = overheadZones.rear;
-          }
-          
-          if (zone && Number.isFinite(spk.position?.x) && Number.isFinite(spk.position?.y)) {
-            // Clamp position to zone bounds
-            const clampedX = Math.min(Math.max(spk.position.x, zone.xMin), zone.xMax);
-            const clampedY = Math.min(Math.max(spk.position.y, zone.yMin), zone.yMax);
-            
-            // Only update if clamping occurred
-            if (Math.abs(clampedX - spk.position.x) > 0.001 || Math.abs(clampedY - spk.position.y) > 0.001) {
-              onSetSpeakers(prev => prev.map(s => 
-                s.id === draggedItemId 
-                  ? { ...s, position: { ...s.position, x: clampedX, y: clampedY }, positionSource: 'user' }
-                  : s
-              ));
-            } else {
-              // No clamping needed, just mark as user-positioned
-              onSetSpeakers(prev => prev.map(s => 
-                s.id === draggedItemId 
-                  ? { ...s, positionSource: 'user' }
-                  : s
-              ));
-            }
-          } else {
-            // No zone or invalid position, still mark as user-positioned
-            onSetSpeakers(prev => prev.map(s => 
-              s.id === draggedItemId 
-                ? { ...s, positionSource: 'user' }
-                : s
-            ));
-          }
-        } else if (isFrontWide) {
-          // CRITICAL: Lock LW/RW to wall after drag (icon edge 1cm from wall)
-          const W = widthM || 0;
-          const dims = getModelDimsM(spk.model);
-          
-          const targetX = sideWallX(W, dims, canonicalRole === 'LW' ? 'L' : 'R');
-          
-          // Force X to wall, keep Y from drag
-          onSetSpeakers(prev => prev.map(s => 
-            s.id === draggedItemId 
-              ? { ...s, position: { ...s.position, x: targetX }, positionSource: 'user' }
-              : s
-          ));
-        } else {
-          // Non-overhead speaker: mark as user-positioned
-          onSetSpeakers(prev => prev.map(s => 
-            s.id === draggedItemId 
-              ? { ...s, positionSource: 'user' }
-              : s
-          ));
-        }
-      }
-    }
-    
-    isAnyDraggingRef.current = false;
-    
-    setDragState({
-      dragging: false,
-      draggedItemId: null,
-      dragType: null,
-    });
-    setDragWarning({ show: false });
-    setTooltip({ show: false });
-    rsDragLockRef.current = null;
-    isDraggingRearRef.current = 0;
-    isDraggingFW.current = false;
-    isDraggingSpeakerRef.current = false;
-    dragOffsetRoomRef.current = { x: 0, y: 0 };
-    draggedSubWallRef.current = null;
-    draggedSubTypeRef.current = null;
-
-  }, [dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers, setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW, props.isDraggingRef, widthM, getModelDimsM, commitDraftSubPositions]);
+  const { handleMouseUp } = useMouseUpHandler({
+    dragType, draggedItemId, byId, getCanonicalRole, overheadZones, onSetSpeakers,
+    setDragState, setDragWarning, setTooltip, rsDragLockRef, isDraggingRearRef, isDraggingFW,
+    isDraggingSubRef, isAnyDraggingRef, isDraggingSpeakerRef, dragOffsetRoomRef,
+    draggedSubWallRef, draggedSubTypeRef, draftFrontSubsRef, draftRearSubsRef, idleCommitTimerRef,
+    isDraggingRef: props.isDraggingRef,
+    widthM, getModelDimsM, commitDraftSubPositions,
+  });
 
   const handleSpeakerDragEnd = useCallback((role, newPosition) => {
     onSetSpeakers(prev => prev.map(s => (s.role === role ? { ...s, position: newPosition } : s)));
