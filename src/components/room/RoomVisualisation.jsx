@@ -4755,7 +4755,6 @@ useEffect(() => {
   ]);
 
   // Front-wide zone rendering helper — extracted to hook
-  // import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
   const renderFrontWideZones = useRenderFrontWideZones({
     hasRoomRect,
     frontWideZones,
