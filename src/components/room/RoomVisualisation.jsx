@@ -6063,7 +6063,7 @@ return (
             {renderSpeakerLabels()}
 
             {/* RP22 Surround Angles Overlay */}
-            {exportMode !== 'clean' && renderRp22AnglesOverlay()}
+            {exportMode !== 'clean' && <RvRp22AnglesOverlay hasRoomRect={hasRoomRect} scale={scale} effectiveHoveredSeat={effectiveHoveredSeat} visiblePlanSpeakers={visiblePlanSpeakers} getCanonicalRole={getCanonicalRole} toPx={toPx} floorDeg={floorDeg} />}
 
             {/* Speaker Positions Overlay */}
             {exportMode !== 'clean' && (
