@@ -126,6 +126,7 @@ export default function RvPlanCanvas({
   hudHiddenWhenPinned,
   renderLevelBadge,
   speakerTooltip,
+  hudPosition,
 }) {
   return (
     <div
