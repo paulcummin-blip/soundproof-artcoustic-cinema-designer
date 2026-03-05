@@ -2474,9 +2474,6 @@ useEffect(() => {
   const svgH = containerH;
 
 
-
-
-
   // Build HUD style safely
   const hudDynamicStyle = useMemo(() => {
     const s = {};
