@@ -1765,28 +1765,8 @@ React.useEffect(() => {
     getCanonicalRole,
   });
 
-  // STUB: original inline logic has been moved to buildSeatHudSnapshot.js
+  // Original inline logic removed — now lives in buildSeatHudSnapshot.js
   void (false); /* ORIGINAL INLINE LOGIC - NOW IN buildSeatHudSnapshot.js
-
-    // Helper for safe number extraction
-    const finite = (v, fallback) => {
-      const n = Number(v);
-      return Number.isFinite(n) ? n : fallback;
-    };
-
-    // Extract seat coordinates
-    const seatX = finite(effectiveHoveredSeat?.x ?? effectiveHoveredSeat?.position?.x, 0);
-    const seatY = finite(effectiveHoveredSeat?.y ?? effectiveHoveredSeat?.position?.y, 0);
-    const seatZ = finite(effectiveHoveredSeat?.z, 1.2);
-
-    // Room dimensions with fallbacks
-    const roomWidth = finite(widthM, 4.5);
-    const roomLength = finite(lengthM, 6.0);
-    const roomHeight = finite(heightM, 2.4);
-    const halfW = roomWidth / 2;
-
-    // Screen front plane position
-    // const screenFrontPlaneM = finite(actualScreenFrontY, 0); // This was previously used but is now globally available as a prop
 
     // Distance to screen (from screen plane)
     const distanceToScreen = Math.abs(seatY - screenFrontPlaneM);
