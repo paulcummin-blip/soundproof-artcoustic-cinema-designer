@@ -30,9 +30,6 @@ import SpeakerPositionsOverlay from "@/components/room/overlays/SpeakerPositions
 import RvRoomBaseLayers from "@/components/room/rv/render/RvRoomBaseLayers";
 import RvZonesAndOverlays from "@/components/room/rv/render/RvZonesAndOverlays";
 import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
-import RvSubwooferLayer from "@/components/room/rv/render/RvSubwooferLayer"; // Added new import
-import RvSeatLayer from "@/components/room/rv/render/RvSeatLayer";
-import RvSpeakerLayer from "@/components/room/rv/render/RvSpeakerLayer";
 import { SURROUND_WALL_GAP_M, sideWallX, rearWallY, fixedSideX, OVERHEAD_PAIR_MAP, floorDeg, mirrorX, clampToSegment, resolveSymmetricLCR, computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
 import { getAimingYawDeg, getPlanAimDeg, getYawForObject } from "@/components/room/rv/utils/rvAiming";
 import { useMlpCalculation } from "@/components/room/rv/hooks/useMlpCalculation";
@@ -1442,7 +1439,7 @@ React.useEffect(() => {
     const minPanY = -rect.height + MIN_VISIBLE;
     
     setPanX(Math.max(minPanX, Math.min(maxPanX, newPanX)));
-    setPanY(Math.max(minPanY, Math.min(maxY, newPanY)));
+    setPanY(Math.max(minPanY, Math.min(maxPanY, newPanY)));
     setZoom(Math.max(0.5, Math.min(2.0, newZoom)));
   }, [zoom, panX, panY]);
 
@@ -2134,7 +2131,7 @@ const subInDraft = draftArray[subIndex];
 
     // ALWAYS compute P17 locally using LIVE plan-view yaw logic (matches icon rotation)
     {
-      const surroundAndOverheadRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR', 'TFC', 'TRC']);
+      const surroundAndOverheadRoles = new Set(['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW', 'TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR']);
       
       const groupForRole = (role) => {
         if (role === 'LW' || role === 'RW') return 'Front Wides';
@@ -2941,7 +2938,11 @@ useEffect(() => {
     }
 
     return withoutLfe;
-  }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);         
+  }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
+
+
+
+
 
 
   // Light diagnostics (temporary)
@@ -3228,6 +3229,83 @@ useEffect(() => {
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
+  // Removed: renderSpeakers function (now RvSpeakerLayer component)
+
+  // Renders rear subwoofers using SpeakerRect
+  const renderSubwoofers = React.useCallback(() => {
+    if (!hasRoomRect) return null;
+
+    const subsToRender = Array.isArray(rearSubs) ? rearSubs : [];
+    if (!subsToRender.length) return null;
+    return (
+      <g data-layer="rear-subwoofers">
+        {subsToRender.map((sub, i) => {
+          if (!hasPos(sub)) return null;
+          const { widthM, depthM } = getModelDimsM(sub.model);
+          const subId = sub.id || `rear-sub-${i}`;
+          
+          const [cx, cy] = toPx(sub.position.x, sub.position.y);
+          const w = widthM * scale;
+          const d = depthM * scale;
+          
+          const handlePointerDown = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch (err) {}
+            handleMouseDown(e, subId, 'sub');
+          };
+          
+          const handlePointerMove = (e) => {
+            if (!dragging || draggedItemId !== subId) return;
+            e.preventDefault();
+            e.stopPropagation();
+            handleMouseMove(e);
+          };
+          
+          const handlePointerUp = (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            try {
+              e.currentTarget.releasePointerCapture(e.pointerId);
+            } catch (err) {}
+            handleMouseUp(e);
+          };
+          
+          return (
+            <g
+              key={subId}
+              style={{ cursor: dragging && draggedItemId === subId ? 'grabbing' : 'grab', pointerEvents: 'all' }}
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+            >
+              <rect
+                x={cx - w / 2}
+                y={cy - d / 2}
+                width={w}
+                height={d}
+                fill="transparent"
+                pointerEvents="all"
+              />
+              <SpeakerRect
+                speaker={sub}
+                widthM={widthM}
+                depthM={depthM}
+                opacity={0.8}
+                scale={scale}
+                toPx={toPx}
+                pointerEvents="none"
+              />
+            </g>
+          );
+        })}
+      </g>
+    );
+  }, [rearSubs, getModelDimsM, scale, toPx, handleMouseDown, handleMouseMove, handleMouseUp, dragging, draggedItemId]);
+
   // Renders speaker labels. Not implemented in the original code, so a placeholder.
   const renderSpeakerLabels = useCallback(() => {
     return <g data-layer="speaker-labels"></g>;
@@ -3297,12 +3375,20 @@ useEffect(() => {
       }
     }
     
+    // For each row, pick the furthest-right seat
     const labeledSeatIds = new Set();
     for (const row of rows) {
-      const sorted = row.seats.map(s => ({ seat: s, x: Number(s?.x ?? s?.position?.x ?? 0) })).filter(i => Number.isFinite(i.x)).sort((a, b) => b.x - a.x);
-      if (sorted.length === 0) continue;
-      if (sorted[0]?.seat?.id) labeledSeatIds.add(sorted[0].seat.id);
+      const sortedByX = row.seats
+        .map(s => ({ seat: s, x: Number(s?.x ?? s?.position?.x ?? 0) }))
+        .filter(item => Number.isFinite(item.x))
+        .sort((a, b) => b.x - a.x); // Descending - furthest right first
+      
+      if (sortedByX.length === 0) continue;
+      
+      const furthestRight = sortedByX[0]?.seat;
+      if (furthestRight?.id) labeledSeatIds.add(furthestRight.id);
     }
+    
     return labeledSeatIds;
   }, [_overlays?.ROOM_DIMS, seatingPositions]);
 
@@ -3369,26 +3455,31 @@ useEffect(() => {
   const svgW = containerW;
   const svgH = containerH;
 
+// Helper to render level badge
 const renderLevelBadge = useCallback((level) => {
-  const str = String(level || '-').toUpperCase();
+  // Match the report pill behaviour and colours exactly
+  const str = String(level || '—').toUpperCase();
 
-  if (!level || str === 'N/A' || str === '-' || str === 'BELOW L1') {
-    return <span style={{ fontSize: 10, color: '#999' }}>{level || '-'}</span>;
+  // Neutral / missing
+  if (!level || str === 'N/A' || str === '—' || str === '-' || str === 'BELOW L1') {
+    return <span style={{ fontSize: 10, color: '#999' }}>{level || '—'}</span>;
   }
 
+  // PASS THROUGH L1–L4 / FAIL exactly
   if (str === 'FAIL') return <RP22GradingPill level="FAIL" />;
 
   if (str === 'L1' || str === 'L2' || str === 'L3' || str === 'L4') {
     return <RP22GradingPill level={str} />;
   }
 
+  // If some old numeric sneaks in
   const n = Number(level);
   if (Number.isFinite(n)) {
     if (n >= 1 && n <= 4) return <RP22GradingPill level={`L${n}`} />;
-    return <span style={{ fontSize: 10, color: '#999' }}>-</span>;
+    return <span style={{ fontSize: 10, color: '#999' }}>—</span>;
   }
 
-  return <span style={{ fontSize: 10, color: '#999' }}>-</span>;
+  return <span style={{ fontSize: 10, color: '#999' }}>—</span>;
 }, []);
 
 
@@ -3596,25 +3687,121 @@ return (
 
 
             {/* Layer 8: Rear Subwoofers (live + export fallback) */}
-            <RvSubwooferLayer
-              widthM={widthM}
-              lengthM={lengthM}
-              scale={scale}
-              toPx={toPx}
-              getModelDimsM={getModelDimsM}
-              exportMode={exportMode}
-              dragging={dragging}
-              draggedItemId={draggedItemId}
-              draftFrontSubsRef={draftFrontSubsRef}
-              draftRearSubsRef={draftRearSubsRef}
-              frontSubs={frontSubs}
-              rearSubs={rearSubs}
-              frontSubsCfg={frontSubsCfg}
-              rearSubsCfg={rearSubsCfg}
-              handleMouseDown={handleMouseDown}
-              handleMouseMove={handleMouseMove}
-              handleMouseUp={handleMouseUp}
-            />
+            {(() => {
+              const isExportDims = exportMode === "dimensions";
+
+              const getPinnedY = (wall, model) => {
+                const EPS = 0.01;
+                const lengthM_safe = Number(lengthM) || 6.0;
+                let d = 0.30;
+                try {
+                  const dims = getModelDimsM?.(model) || {};
+                  const dd = Number(dims?.depthM);
+                  if (Number.isFinite(dd) && dd > 0) d = dd;
+                } catch (_) {}
+                const halfD = d / 2;
+                if (wall === "front") return halfD + EPS;
+                if (wall === "rear") return Math.max(halfD + EPS, lengthM_safe - halfD - EPS);
+                return halfD + EPS;
+              };
+
+              const buildFallbackLine = (qty, model, wall) => {
+                const W = Number(widthM) || 4.5;
+                const qtyN = Math.max(0, Math.min(8, Number(qty) || 0));
+                if (!model || qtyN <= 0) return [];
+                const y = getPinnedY(wall, model);
+
+                const margin = W * 0.15;
+                const span = Math.max(0.01, W - margin * 2);
+
+                return Array.from({ length: qtyN }, (_, i) => ({
+                  id: `export-sub-${wall}-${i + 1}`,
+                  model,
+                  position: {
+                    x: qtyN === 1 ? W * 0.5 : margin + span * (i / (qtyN - 1)),
+                    y,
+                    z: 0
+                  }
+                }));
+              };
+
+              const frontLive = (dragging && Array.isArray(draftFrontSubsRef.current)) ? draftFrontSubsRef.current : frontSubs;
+              const rearLive = (dragging && Array.isArray(draftRearSubsRef.current)) ? draftRearSubsRef.current : rearSubs;
+
+              const frontFallback = isExportDims && (!Array.isArray(frontLive) || frontLive.length === 0)
+                ? buildFallbackLine(frontSubsCfg?.count, frontSubsCfg?.model, "front")
+                : frontLive;
+
+              const rearFallback = isExportDims && (!Array.isArray(rearLive) || rearLive.length === 0)
+                ? buildFallbackLine(rearSubsCfg?.count, rearSubsCfg?.model, "rear")
+                : rearLive;
+
+              return Array.isArray(rearFallback) && rearFallback.length > 0 ? (
+                <g data-layer="rear-subwoofers">
+                  {rearFallback.map((sub, i) => {
+                    if (!hasPos(sub)) return null;
+                    const { widthM: subWm, depthM: subDm } = getModelDimsM(sub.model);
+                    const subId = sub.id || `rear-sub-${i}`;
+                    const [cx, cy] = toPx(sub.position.x, sub.position.y);
+                    const w = subWm * scale;
+                    const d = subDm * scale;
+
+                    const handlePointerDown = (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+                      handleMouseDown(e, subId, "sub");
+                    };
+
+                    const handlePointerMove = (e) => {
+                      if (!dragging || draggedItemId !== subId) return;
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleMouseMove(e);
+                    };
+
+                    const handlePointerUp = (e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (_) {}
+                      handleMouseUp(e);
+                    };
+
+                    return (
+                      <g
+                        key={subId}
+                        style={{
+                          cursor: dragging && draggedItemId === subId ? "grabbing" : "grab",
+                          pointerEvents: "all"
+                        }}
+                        onPointerDown={handlePointerDown}
+                        onPointerMove={handlePointerMove}
+                        onPointerUp={handlePointerUp}
+                        onPointerCancel={handlePointerUp}
+                      >
+                        <rect
+                          x={cx - w / 2}
+                          y={cy - d / 2}
+                          width={w}
+                          height={d}
+                          fill="transparent"
+                          pointerEvents="all"
+                        />
+                        <SpeakerRect
+                          speaker={sub}
+                          widthM={subWm}
+                          depthM={subDm}
+                          opacity={0.8}
+                          scale={scale}
+                          toPx={toPx}
+                          pointerEvents="none"
+                        />
+                      </g>
+                    );
+                  })}
+                </g>
+              ) : null;
+            })()}
 
             {/* Layer 9: Draggable Seating Positions */}
             <RvSeatLayer seatingPositions={seatingPositions} toPx={toPx} scale={scale} exportMode={exportMode} speakerPositionsView={speakerPositionsView} rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds} rowDistanceLabelSeatIds={rowDistanceLabelSeatIds} _overlays={_overlays} hudPinnedSeatId={hudPinnedSeatId} handleMouseDown={handleMouseDown} handleSeatMouseEnter={handleSeatMouseEnter} handleSeatMouseLeave={handleSeatMouseLeave} handleSeatClick={handleSeatClick} clampMlpY={clampMlpY} MLPMarker={MLPMarker} />
@@ -3623,32 +3810,9 @@ return (
             {overheadIconElements}
 
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
-            <RvSpeakerLayer
-              speakersToRender={speakersToRender}
-              getCanonicalRole={getCanonicalRole}
-              isRenderableSpeaker={isRenderableSpeaker}
-              speakerPositionsView={speakerPositionsView}
-              getSpeakerVisibility={getSpeakerVisibility}
-              toPx={toPx}
-              scale={scale}
-              getModelDimsM={getModelDimsM}
-              mlp={mlp}
-              widthM={widthM}
-              lengthM={lengthM}
-              aimAtMLP={aimAtMLP}
-              aimFrontWidesAtMLP={aimFrontWidesAtMLP}
-              aimSideSurroundsAtMLP={aimSideSurroundsAtMLP}
-              aimRearSurroundsAtMLP={aimRearSurroundsAtMLP}
-              lcrAngleInfo={lcrAngleInfo}
-              setHoveredSpeaker={setHoveredSpeaker}
-              bedLayerSpeakerMouseDownHandler={bedLayerSpeakerMouseDownHandler}
-              handleIconEnter={handleIconEnter}
-              handleIconMove={handleIconMove}
-              handleIconLeave={handleIconLeave}
-              draggedItemId={draggedItemId}
-              dragging={dragging}
-              isOverheadRole={rvIsOverheadRole} // Use local helper
-            />
+            {renderSpeakers()}
+
+
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
             {renderSpeakerLabels()}
