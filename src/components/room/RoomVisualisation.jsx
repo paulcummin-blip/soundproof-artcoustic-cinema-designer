@@ -2146,11 +2146,7 @@ useEffect(() => {
   // Renders speaker labels. Not implemented in the original code, so a placeholder.
   const renderSpeakerLabels = useCallback(() => {
     return <g data-layer="speaker-labels"></g>;
-  }, []);
-
-
-
-  // MLP marker: always draw at computed MLP (mlpDotX_m, mlpDotY_m),
+  }, []);  // MLP marker: always draw at computed MLP (mlpDotX_m, mlpDotY_m),
   // never snap horizontally to a specific seat.
   const MLPMarker = useMemo(() => {
     if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) {
