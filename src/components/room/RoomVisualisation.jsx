@@ -481,9 +481,6 @@ const [hudBasePosPx, setHudBasePosPx] = useState(null);
     }
   }, [isHudPinned, hudPinnedOffsetPx]);
 
-  /* …rest of the component continues below… */
-
-
   // ---------------------------------------------------------------------------
   // HELPER FUNCTIONS (declare early to avoid TDZ)
   // ---------------------------------------------------------------------------
