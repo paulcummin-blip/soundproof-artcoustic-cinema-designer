@@ -451,22 +451,18 @@ export default function RvPlanCanvas({
         </svg>
 
         {/* SEAT HOVER HUD - updated with drag and hide/show */}
-        {exportMode !== 'clean' && (
-          <SeatHud
-            tooltipData={tooltipData}
-            effectiveHoveredSeat={effectiveHoveredSeat}
-            hudPosition={hudPosition}
-            isHudPinned={isHudPinned}
-            hudDynamicStyle={hudDynamicStyle}
-            onHudHeaderMouseDown={onHudHeaderMouseDown}
-            hudElRef={hudElRef}
-            setHudHiddenWhenPinned={setHudHiddenWhenPinned}
-            hudHiddenWhenPinned={hudHiddenWhenPinned}
-            renderLevelBadge={renderLevelBadge}
-            splPowerW={tooltipData?.splAtSeatMeta?.powerW}
-            splRadiationMode={tooltipData?.splAtSeatMeta?.radiationMode}
-          />
-        )}
+        <RvSeatHudLayer
+          exportMode={exportMode}
+          tooltipData={tooltipData}
+          effectiveHoveredSeat={effectiveHoveredSeat}
+          hudPosition={hudPosition}
+          hudDynamicStyle={hudDynamicStyle}
+          onHudHeaderMouseDown={onHudHeaderMouseDown}
+          hudElRef={hudElRef}
+          setHudHiddenWhenPinned={setHudHiddenWhenPinned}
+          hudHiddenWhenPinned={hudHiddenWhenPinned}
+          renderLevelBadge={renderLevelBadge}
+        />
 
         {/* SPEAKER TOOLTIP - Light style, non-interfering */}
         <RvSpeakerTooltip speakerTooltip={speakerTooltip} />
