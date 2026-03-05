@@ -1818,11 +1818,6 @@ useEffect(() => {
     return withoutLfe;
   }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
 
-
-
-
-
-
   // Light diagnostics (temporary)
   if (appState_DBG_FW) {
     if (typeof console !== 'undefined') if (globalThis.__B44_LOGS) console.log(`[FrontWides] dolbyLayout: "${dolbyLayout}", enableFrontWides: ${enableFrontWides}, zones:`, frontWideZones);
