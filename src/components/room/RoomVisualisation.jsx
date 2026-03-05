@@ -1928,8 +1928,6 @@ const subInDraft = draftArray[subIndex];
     getCanonicalRole,
   });
 
-  // (All original inline logic extracted to buildSeatHudSnapshot.js — see that file)
-
   // ---- HUD cache writes MUST be in an effect (never inside useMemo/render) ----
   const lastHudWriteRef = useRef({});
 
