@@ -1585,15 +1585,7 @@ React.useEffect(() => {
     handleSpeakerDragUpdate(speakerId, newCanvasPos);
   }, [handleSpeakerDragUpdate]);
 
-  const handleSeatDrag = useCallback((seatId, newCanvasPos) => {
-    if (!onSetSeatingPositions) return;
-    const { x: roomX, y: roomY } = canvasToRoom(newCanvasPos);
-    onSetSeatingPositions(prev =>
-        prev.map(seat =>
-            seat.id === seatId ? { ...seat, x: roomX, y: roomY } : seat
-        )
-    );
-  }, [onSetSeatingPositions, canvasToRoom]);
+  const { handleSeatDrag } = useSeatDragHandler({ onSetSeatingPositions, canvasToRoom });
 
   // Mouse handling — delegated to extracted hook
   const { handleMouseMove } = useRoomCanvasMouseMove({
