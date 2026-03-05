@@ -4642,7 +4642,6 @@ useEffect(() => {
   }, [overheadCount]);
 
   // Overhead speaker icons — extracted to hook
-  // import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements";
   const overheadIconElements = useOverheadIconElements({ placedSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride, bedLayerSpeakerMouseDownHandler, handleIconEnter, handleIconMove, handleIconLeave });
 
   // Front-wide zone rendering helper — extracted to hook
