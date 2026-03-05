@@ -43,7 +43,7 @@ import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverhead
 import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
-import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs";
+import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs"; import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers";
 const rvSafeCanonRole = (role) => String(role || '').toUpperCase();
 
 const rvIsOverheadRole = (role) => {
