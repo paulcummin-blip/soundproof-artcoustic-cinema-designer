@@ -15,6 +15,9 @@ export default function RvSeatHudLayer({
 }) {
   if (exportMode === 'clean') return null;
 
+  const splPowerW = tooltipData?.splAtSeatMeta?.powerW;
+  const splRadiationMode = tooltipData?.splAtSeatMeta?.radiationMode;
+
   return (
     <SeatHud
       tooltipData={tooltipData}
@@ -26,6 +29,8 @@ export default function RvSeatHudLayer({
       setHudHiddenWhenPinned={setHudHiddenWhenPinned}
       hudHiddenWhenPinned={hudHiddenWhenPinned}
       renderLevelBadge={renderLevelBadge}
+      splPowerW={splPowerW}
+      splRadiationMode={splRadiationMode}
     />
   );
 }
