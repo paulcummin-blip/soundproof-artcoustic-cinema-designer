@@ -43,7 +43,7 @@ import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverhead
 import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
-import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs"; import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers"; import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements"; import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM"; import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMetricsCacheEffect"; import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler";
+import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs"; import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers"; import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements"; import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM"; import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMetricsCacheEffect"; import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler"; import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler";
 const rvSafeCanonRole = (role) => String(role || '').toUpperCase();
 
 const rvIsOverheadRole = (role) => {
