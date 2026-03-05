@@ -4993,7 +4993,6 @@ useEffect(() => {
   const lastRvLogSigRef = React.useRef(null);
 
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
-  // import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers";
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
   // Removed: renderSpeakers function (now RvSpeakerLayer component)
