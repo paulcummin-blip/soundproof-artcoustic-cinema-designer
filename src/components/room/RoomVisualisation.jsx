@@ -1523,96 +1523,24 @@ React.useEffect(() => {
   }, [onSetSpeakers]);
 
 
-  // NEW: Seat hover handlers
-  const handleSeatClick = useCallback((seat) => {
-    setHudPinnedSeatId(prev => (prev === seat.id ? null : seat.id));
-  }, []);
-
-  const handleSeatMouseEnter = useCallback((seat) => {
-    if (!hudPinnedSeatId) setHoveredSeat(seat);
-  }, [hudPinnedSeatId]);
-
-  const handleSeatMouseLeave = useCallback(() => {
-    if (!hudPinnedSeatId) setHoveredSeat(null);
-  }, [hudPinnedSeatId]);
-
-  // Helper to get friendly speaker model name
-  const getSpeakerModelDisplayName = useCallback((modelKey) => {
-    if (!modelKey || modelKey === 'off' || modelKey === 'none') return 'Unknown model';
-    const normalized = registryNormaliseModelKey(modelKey);
-    const meta = getSpeakerModelMeta(normalized);
-    if (meta?.label) return meta.label;
-    return 'Unknown model';
-  }, []);
-
-  // Speaker icon tooltip handlers
-  const handleIconEnter = useCallback((e, speaker) => {
-    if (!speaker) return;
-    const role = getCanonicalRole(speaker.role);
-    const displayName = getSpeakerModelDisplayName(speaker.model);
-    const text = `${role} — ${displayName}`;
-    
-    setSpeakerTooltip({ visible: true, text, x: 0, y: 0 });
-    // Position immediately via move handler
-    handleIconMove(e, speaker);
-  }, [getSpeakerModelDisplayName]);
-
-  const handleIconMove = useCallback((e, speaker) => {
-    const rect = rvWrapRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    
-    setSpeakerTooltip(prev => ({
-      ...prev,
-      x: e.clientX - rect.left + 12,
-      y: e.clientY - rect.top + 12
-    }));
-  }, []);
-
-  const handleIconLeave = useCallback(() => {
-    setSpeakerTooltip({ visible: false, text: '', x: 0, y: 0 });
-  }, []);
-
   const mlpAnchorEffective = mlp;
 
-  // Combine hoveredSeat and pinnedSeat for effective display
-  const effectiveHoveredSeat = useMemo(() => {
-    // Try to resolve pinned seat from seatingPositions (by id)
-    const pinnedSeatId = appState?.hudPinnedSeatId || hudPinnedSeatId || null;
-    const pinnedSeat = pinnedSeatId && Array.isArray(seatingPositions)
-      ? seatingPositions.find(s => String(s?.id) === String(pinnedSeatId)) || null
-      : null;
-    
-    // If not pinned, fall back to hovered seat
-    return pinnedSeat || hoveredSeat || null;
-  }, [appState?.hudPinnedSeatId, hudPinnedSeatId, hoveredSeat, seatingPositions]);
-
-  // SPL metrics: Use prop from RoomDesigner if available (single source of truth)
-  // Only compute locally if prop not provided (fallback for standalone use)
-  const allSeatSplMetricsLocal = useMemo(() => {
-    // If prop is provided, don't compute locally
-    if (allSeatSplMetricsProp) return null;
-    
-    return computeAllSeatSplMetrics({
-      seats: seatingPositions,
-      placedSpeakers,
-      getCanonicalRole,
-      getEffectiveSplInputs: appState?.getEffectiveSplInputs || (() => ({ powerW: 100, sensitivity_dB_1w1m: 87 })),
-      getModelDimsM,
-      mlpPoint: mlp, // NEW: Pass green dot MLP for synthetic "mlp" seat
-      heightM, // NEW: Pass room height for overhead z-fix
-    });
-  }, [allSeatSplMetricsProp, seatingPositions, placedSpeakers, getCanonicalRole, appState?.getEffectiveSplInputs, getModelDimsM, mlp]);
-
-  // Use prop if available, otherwise use local computation
-  const allSeatSplMetrics = allSeatSplMetricsProp || allSeatSplMetricsLocal;
-
-
-  // Build tooltip data: delegated to useTooltipData hook (extracted for size)
-  // NOTE: the large commented-out original logic block is preserved below.
-  const tooltipData = useTooltipData({
+  // Seat hover logic — delegated to hook
+  const {
+    hoveredSeat: _unused_hoveredSeat,
     effectiveHoveredSeat,
-    hudPinnedSeatId,
+    tooltipData,
+    speakerTooltip,
+    handleSeatClick,
+    handleSeatMouseEnter,
+    handleSeatMouseLeave,
+    handleIconEnter,
+    handleIconMove,
+    handleIconLeave,
+  } = useSeatHoverLogic({
+    seatingPositions,
     appState,
+    hudPinnedSeatId,
     placedSpeakers,
     widthM,
     lengthM,
@@ -1620,83 +1548,20 @@ React.useEffect(() => {
     screenFrontPlaneM,
     screen,
     mlp,
-    allSeatSplMetrics,
+    allSeatSplMetricsProp,
     aimAtMLP,
     aimFrontWidesAtMLP,
     aimSideSurroundsAtMLP,
     aimRearSurroundsAtMLP,
     lcrAngleInfo,
     analysisResult,
-    seatingPositions,
     dolbyLayout,
     getCanonicalRole,
+    registryNormaliseModelKey,
+    getSpeakerModelMeta,
+    rvWrapRef,
+    computeAllSeatSplMetrics,
   });
-
-
-
-  // ---- HUD cache writes MUST be in an effect (never inside useMemo/render) ----
-  const lastHudWriteRef = useRef({});
-
-  useEffect(() => {
-    const seat = effectiveHoveredSeat;
-    if (!seat?.id) return;
-
-    // Only write if we actually have computed data
-    if (!tooltipData) return;
-
-    // Build same cacheKey used in tooltipData logic
-    const seatId = String(seat.id);
-
-    // Rebuild the same signature parts used above (cheap version is OK here)
-    const seatIds = (seatingPositions || []).map(s => s.id).join(',');
-    const seatPosFingerprint = (seatingPositions || [])
-      .map(s => `${s.id}:${Math.round((s.x || 0) * 1000)}:${Math.round((s.y || 0) * 1000)}`)
-      .join(',');
-
-    const cacheKey = `${seatId}|${seatIds}|${seatPosFingerprint}`;
-
-    // Hash the payload so we don't write the same thing repeatedly
-    let nextHash = '';
-    try {
-      nextHash = JSON.stringify(tooltipData);
-    } catch {
-      nextHash = String(Date.now()); // fallback: allow write
-    }
-
-    if (lastHudWriteRef.current[cacheKey] === nextHash) return;
-    lastHudWriteRef.current[cacheKey] = nextHash;
-
-    // 1) Seat snapshot map (keyed by seatId)
-    if (appState?.setSeatSnapshotBySeatId) {
-      appState.setSeatSnapshotBySeatId(prev => {
-        const cur = prev?.[seatId];
-        // Avoid needless writes
-        try {
-          if (cur && JSON.stringify(cur) === nextHash) return prev;
-        } catch {}
-        return { ...(prev || {}), [seatId]: tooltipData };
-      });
-    }
-
-    // 2) Shared cache (keyed by cacheKey)
-    if (appState?.setSeatMetricsById) {
-      appState.setSeatMetricsById(prevAll => {
-        const prevObj = prevAll || {};
-        const cur = prevObj[cacheKey];
-        // Avoid needless writes
-        try {
-          if (cur && JSON.stringify(cur) === nextHash) return prevObj;
-        } catch {}
-        return { ...prevObj, [cacheKey]: tooltipData };
-      });
-    }
-  }, [
-    tooltipData,
-    effectiveHoveredSeat,
-    seatingPositions,
-    appState?.setSeatSnapshotBySeatId,
-    appState?.setSeatMetricsById,
-  ]);
 
   // AUTOMATIC SEAT METRICS CACHE — extracted to hook
   // ---- Stable primitive revision inputs (avoid update loops) ----
