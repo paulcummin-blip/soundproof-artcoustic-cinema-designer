@@ -2222,12 +2222,6 @@ useEffect(() => {
     if (needsFix) onSetSpeakers(next);
   }, [placedSpeakers, onSetSpeakers, centerX_m, getCanonicalRole]);
 
-  // [B44] DISABLED: SL/SR auto-adjust removed — was a no-op (early return).
-  // SBL/SBR auto-adjust (disabled) removed — was a no-op (early return) and only added noise/size.
-
-  // A) Hard-gate the legacy front-wide ribbon generation
-  const ENABLE_LEGACY_FRONT_WIDE_RIBBON = false;
-
   // ADDED: Step 1 & 3: Confirm missing keys and create a temporary adapter for LCR
   const { augmentedZones, zoneKeysLabel } = useMemo(() => {
     const newZones = analysisResult?.zones ? { ...analysisResult.zones } : {};
