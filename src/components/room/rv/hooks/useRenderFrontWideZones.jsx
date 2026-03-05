@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import React from "react";
 
 export function useRenderFrontWideZones({
   hasRoomRect,
