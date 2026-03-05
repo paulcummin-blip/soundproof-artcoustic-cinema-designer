@@ -11,7 +11,7 @@ import RvRp22AnglesOverlay from "@/components/room/rv/render/RvRp22AnglesOverlay
 import SpeakerPositionsOverlay from "@/components/room/overlays/SpeakerPositionsOverlay";
 import RvSeatLayer from "@/components/room/rv/render/RvSeatLayer";
 import PlanMessages from "@/components/room/PlanMessages";
-import SeatHud from "@/components/room/SeatHud";
+import RvSeatHudLayer from "@/components/room/rv/render/RvSeatHudLayer";
 import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
 
 export default function RvPlanCanvas({
