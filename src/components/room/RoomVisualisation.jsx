@@ -1566,7 +1566,7 @@ React.useEffect(() => {
   const analysisRev =
     Number.isFinite(Number(analysisResult?.__rev)) ? Number(analysisResult.__rev) : 0;
   const splRev =
-    Number.isFinite(Number(allSeatSplMetrics?.__rev)) ? Number(allSeatSplMetrics.__rev) : 0;
+    Number.isFinite(Number(allSeatSplMetricsProp?.__rev)) ? Number(allSeatSplMetricsProp.__rev) : 0;
   const mlpX = Number.isFinite(Number(mlp?.x)) ? Number(mlp.x) : NaN;
   const mlpY = Number.isFinite(Number(mlp?.y)) ? Number(mlp.y) : NaN;
   const mlpZ = Number.isFinite(Number(mlp?.z)) ? Number(mlp.z) : NaN;
