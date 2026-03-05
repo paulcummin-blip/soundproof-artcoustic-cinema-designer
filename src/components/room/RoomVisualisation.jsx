@@ -19,7 +19,7 @@ import { timeNowMs } from "@/components/utils/timeNow";
 import { calculateViewingAngle, rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import CanvasMessages from "@/components/room/CanvasMessages";
 import RvRoomElementsLayer from "@/components/room/rv/render/RvRoomElementsLayer";
-import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from "@/components/utils/overheadDragClamping";
+import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from "@/components/utils/overheadDragClamping"; import RvDolbyZones from "@/components/room/rv/render/RvDolbyZones";
 import { useOverheadAutoPlacement } from "@/components/hooks/useOverheadAutoPlacement";
 import { useEnsureOverheadPairs } from "@/components/hooks/useEnsureOverheadPairs";
 import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
