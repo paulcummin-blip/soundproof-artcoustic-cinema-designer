@@ -19,7 +19,8 @@ import { timeNowMs } from "@/components/utils/timeNow";
 import { calculateViewingAngle, rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
 import CanvasMessages from "@/components/room/CanvasMessages";
 import RvRoomElementsLayer from "@/components/room/rv/render/RvRoomElementsLayer";
-import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from "@/components/utils/overheadDragClamping"; import RvDolbyZones from "@/components/room/rv/render/RvDolbyZones";
+import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from "@/components/utils/overheadDragClamping";
+import RvDolbyZones from "@/components/room/rv/render/RvDolbyZones";
 import { useOverheadAutoPlacement } from "@/components/hooks/useOverheadAutoPlacement";
 import { useEnsureOverheadPairs } from "@/components/hooks/useEnsureOverheadPairs";
 import FrontSubsLayer from "@/components/room/overlays/FrontSubsLayer";
@@ -29,7 +30,6 @@ import SpeakerPositionsOverlay from "@/components/room/overlays/SpeakerPositions
 import RvRoomBaseLayers from "@/components/room/rv/render/RvRoomBaseLayers";
 import RvZonesAndOverlays from "@/components/room/rv/render/RvZonesAndOverlays";
 import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
-
 import { SURROUND_WALL_GAP_M, sideWallX, rearWallY, fixedSideX, OVERHEAD_PAIR_MAP, floorDeg, mirrorX, clampToSegment, resolveSymmetricLCR, computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
 import { getAimingYawDeg, getPlanAimDeg, getYawForObject } from "@/components/room/rv/utils/rvAiming";
 import { useMlpCalculation } from "@/components/room/rv/hooks/useMlpCalculation";
