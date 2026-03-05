@@ -418,7 +418,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
       return prev === next ? prev : next;
     });
   }, []);
-  const [hoveredSeat, setHoveredSeat] = useState(null);
   const [hudPinnedSeatId, setHudPinnedSeatId] = useState(null);
   const [hudHiddenWhenPinned, setHudHiddenWhenPinned] = useState(false);
   const [hudPinnedOffsetPx, setHudPinnedOffsetPx] = useState(null);
