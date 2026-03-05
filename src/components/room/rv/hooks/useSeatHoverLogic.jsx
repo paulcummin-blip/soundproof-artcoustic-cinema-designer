@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
-import { useTooltipData } from '@/components/room/hooks/useTooltipData';
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import { useTooltipData } from "@/components/room/hooks/useTooltipData";
 
 export function useSeatHoverLogic({
   seatingPositions,
