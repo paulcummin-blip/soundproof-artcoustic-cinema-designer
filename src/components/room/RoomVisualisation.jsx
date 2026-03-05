@@ -102,27 +102,6 @@ import {
   resolveSymmetricY,
 } from "@/components/room/rvPlanHelpers";
 
-
-// SAFE ROLE ACCESSOR – works with Map or plain object; always returns an array
-function getByRoleArray(mapOrObj, role) {
-  if (!mapOrObj || !role) return [];
-  // If it's a Map, use .get()
-  if (typeof mapOrObj.get === 'function') {
-    return mapOrObj.get(role) || [];
-  }
-  // If it's a plain object (fallback in some cases), use direct property access
-  return mapOrObj[role] || [];
-};
-
-// Front-channel role check (LCR + subs)
-const isFrontObject = (role = "") => {
-  const r = getCanonicalRoleGlobal(role);
-  return r === "FL" || r === "FC" || r === "FR" || String(role).toUpperCase().includes("SUB");
-};
-
-
-
-
 import {
   isSubRole,
   hasPos,
@@ -138,15 +117,6 @@ import {
   SpeakerIcon,
   SpeakerRect,
 } from "@/components/room/rv/RenderPrimitives";
-
-
-
-// Physical (no stroke) half-extent along +/-Y for a rotated rectangle
-const _yHalfExtentM_physical = (depthM, widthM, yawDeg = 0) => {
-  const t = Math.abs((yawDeg || 0) * Math.PI / 180);
-  return (depthM * 0.5) * Math.abs(Math.cos(t)) +
-         (widthM * 0.5) * Math.abs(Math.sin(t));
-};
 
 
 
