@@ -3678,203 +3678,27 @@ const subInDraft = draftArray[subIndex];
     appState?.setSeatMetricsById,
   ]);
 
-  // AUTOMATIC SEAT METRICS CACHE - SOLE WRITER for seatMetricsById (powers both HUD and Report)
-  const lastCacheSignatureRef = useRef(null);
-  const captureDoneRef = React.useRef(false);
-  
+  // AUTOMATIC SEAT METRICS CACHE — extracted to hook
   // ---- Stable primitive revision inputs (avoid update loops) ----
   const analysisRev =
     Number.isFinite(Number(analysisResult?.__rev)) ? Number(analysisResult.__rev) : 0;
-
   const splRev =
     Number.isFinite(Number(allSeatSplMetrics?.__rev)) ? Number(allSeatSplMetrics.__rev) : 0;
-
   const mlpX = Number.isFinite(Number(mlp?.x)) ? Number(mlp.x) : NaN;
   const mlpY = Number.isFinite(Number(mlp?.y)) ? Number(mlp.y) : NaN;
   const mlpZ = Number.isFinite(Number(mlp?.z)) ? Number(mlp.z) : NaN;
-
   const lcrL = Number.isFinite(Number(lcrAngleInfo?.L)) ? Number(lcrAngleInfo.L) : 0;
   const lcrR = Number.isFinite(Number(lcrAngleInfo?.R)) ? Number(lcrAngleInfo.R) : 0;
 
-  useEffect(() => {
-    if (!appState?.setSeatMetricsById && !appState?.setSeatSnapshotBySeatId) return;
-    
-    // CRITICAL: Freeze during print/export to prevent update loops
-    if (exportMode === 'dimensions' || props.isPrinting) {
-      // One-shot capture on first print render
-      if (!captureDoneRef.current) {
-        captureDoneRef.current = true;
-        // Allow this render to compute, but block subsequent ones
-      } else {
-        return; // Block all subsequent updates during print
-      }
-    } else {
-      // Reset capture flag when not printing
-      captureDoneRef.current = false;
-    }
-    
-    // Guard: if no seats, clear cache and exit
-    if (!Array.isArray(seatingPositions) || seatingPositions.length === 0) {
-      if (appState?.setSeatMetricsById) appState.setSeatMetricsById({});
-      if (appState?.setSeatSnapshotBySeatId) appState.setSeatSnapshotBySeatId({});
-      lastCacheSignatureRef.current = null;
-      return;
-    }
-
-    // Skip if critical dependencies are missing (but don't crash)
-    if (!Number.isFinite(widthM) || !Number.isFinite(lengthM)) {
-      return;
-    }
-
-    // Build cheap signature to detect actual changes (prevents spam updates)
-    const seatIds = seatingPositions.map(s => s.id).join(',');
-    const seatPosFingerprint = seatingPositions
-      .map(s => `${s.id}:${Math.round((s.x || 0) * 1000)}:${Math.round((s.y || 0) * 1000)}`)
-      .join(',');
-    
-    // P5-relevant speaker positions fingerprint (ALL surrounds including extras)
-    // CRITICAL: Include speaker ID + position to invalidate cache when ANY speaker moves
-    const extraSurroundPattern = /^(SL|SR)\d+$/;
-    const speakerRevision = (placedSpeakers || [])
-      .filter(s => {
-        if (!s?.id || !s?.position) return false;
-        const r = getCanonicalRole(s.role);
-        const roleUpper = String(s.role || '').toUpperCase();
-        const isOverhead = String(r || '').startsWith('T');
-        return (
-          ['SL', 'SR', 'SBL', 'SBR', 'LW', 'RW'].includes(r) ||
-          isOverhead ||
-          extraSurroundPattern.test(roleUpper) ||
-          String(r || '').startsWith('U')
-        );
-      })
-      .slice()
-      .sort((a, b) => String(a.id).localeCompare(String(b.id)))
-      .map(s => {
-        const p = s.position || {};
-        return `${s.id}:${getCanonicalRole(s.role)}:${(p.x || 0).toFixed(4)}:${(p.y || 0).toFixed(4)}:${(p.z || 0).toFixed(4)}:${String(s.model || '')}`;
-      })
-      .join('|');
-    
-    const layout = dolbyLayout || '5.1';
-    const aimFlags = `${!!aimAtMLP}-${!!aimFrontWidesAtMLP}-${!!aimSideSurroundsAtMLP}-${!!aimRearSurroundsAtMLP}`;
-    const sevenBedMode = String(
-      appState?.sevenBedLayoutType
-      || appState?.speakerSystem?.sevenBedLayoutType
-      || (appState?.speakerSystem?.useWidesInsteadOfRears ? 'wides' : '')
-      || 'rears'
-    ).toLowerCase();
-
-    const mlpFingerprint =
-      Number.isFinite(mlpX) && Number.isFinite(mlpY)
-        ? `${Math.round(mlpX * 1000)}:${Math.round(mlpY * 1000)}:${Math.round((Number.isFinite(mlpZ) ? mlpZ : 1.2) * 1000)}`
-        : "na";
-
-    const screenRounded = Math.round((screenFrontPlaneM || 0) * 1000);
-
-    const signature =
-      `${seatIds}|${seatPosFingerprint}|${speakerRevision}|${layout}|${aimFlags}|MLP${mlpFingerprint}|SCR${screenRounded}|7B${sevenBedMode}|A${analysisRev}|S${splRev}|LCR${Math.round(lcrL*10)}:${Math.round(lcrR*10)}`;
-    
-    // Skip if nothing changed
-    if (lastCacheSignatureRef.current === signature) {
-      return;
-    }
-
-    // Compute for all seats with per-seat error isolation
-    const nextByCacheKey = {};
-    const nextBySeatId = {};
-
-    for (const seat of seatingPositions) {
-      if (!seat?.id) continue;
-
-      try {
-        const snapshot = buildSeatHudSnapshot({
-          seat,
-          placedSpeakers,
-          widthM,
-          lengthM,
-          heightM,
-          screenFrontPlaneM,
-          screen,
-          mlp: mlp || { x: widthM / 2, y: lengthM * 0.58, z: 1.2 },
-          allSeatSplMetrics,
-          aimAtMLP,
-          aimFrontWidesAtMLP,
-          aimSideSurroundsAtMLP,
-          aimRearSurroundsAtMLP,
-          lcrAngleInfo: lcrAngleInfo || { L: 0, R: 0 }, // Safe default
-          analysisResult: analysisResult || {},
-          seatingPositions,
-          splConfig: appState?.splConfig || {},
-          sevenBedMode,
-          dolbyLayout,
-        });
-
-        if (snapshot) {
-          // Cache map (with signature for invalidation)
-          const cacheKey = `${seat.id}|${signature}`;
-          nextByCacheKey[cacheKey] = { ...snapshot };
-
-          // Plain seat id map (NEW - always available for Compliance Report)
-          nextBySeatId[String(seat.id)] = { ...snapshot };
-        }
-      } catch (err) {
-        console.warn(`[SeatMetrics] failed seat ${seat.id}:`, err);
-        // Keep previous value on error (don't replace with dashes)
-        const cacheKey = `${seat.id}|${signature}`;
-        const prevCache = appState?.seatMetricsById?.[cacheKey];
-        const prevPlain = appState?.seatSnapshotBySeatId?.[seat.id];
-
-        if (prevCache) {
-          nextByCacheKey[cacheKey] = prevCache;
-        }
-        if (prevPlain) {
-          nextBySeatId[seat.id] = prevPlain;
-        }
-      }
-    }
-
-    // Commit both maps (safe, idempotent)
-    if (appState?.setSeatMetricsById) {
-      const prev = appState.seatMetricsById || {};
-      const shouldWrite = JSON.stringify(prev) !== JSON.stringify(nextByCacheKey);
-      if (shouldWrite) appState.setSeatMetricsById(nextByCacheKey);
-    }
-
-    if (appState?.setSeatSnapshotBySeatId) {
-      const prev = appState.seatSnapshotBySeatId || {};
-      const shouldWrite = JSON.stringify(prev) !== JSON.stringify(nextBySeatId);
-      if (shouldWrite) appState.setSeatSnapshotBySeatId(nextBySeatId);
-    }
-
-    lastCacheSignatureRef.current = signature;
-    
-  }, [
-    seatingPositions,
-    placedSpeakers,
-    widthM,
-    lengthM,
-    heightM,
-    screenFrontPlaneM,
-    screen?.visibleWidthInches,
-    analysisRev,
-    splRev,
-    mlpX,
-    mlpY,
-    mlpZ,
-    lcrL,
-    lcrR,
-    aimAtMLP,
-    aimFrontWidesAtMLP,
-    aimSideSurroundsAtMLP,
-    aimRearSurroundsAtMLP,
-    dolbyLayout,
-    appState?.setSeatMetricsById,
-    appState?.setSeatSnapshotBySeatId,
-    appState?.splConfig,
-    exportMode,
-    props.isPrinting,
-  ]);
+  useSeatMetricsCacheEffect({
+    seatingPositions, placedSpeakers, widthM, lengthM, heightM,
+    screenFrontPlaneM, screen, mlp, allSeatSplMetrics,
+    aimAtMLP, aimFrontWidesAtMLP, aimSideSurroundsAtMLP, aimRearSurroundsAtMLP,
+    lcrAngleInfo, analysisResult, dolbyLayout, appState,
+    exportMode, isPrinting: props.isPrinting,
+    analysisRev, splRev, mlpX, mlpY, mlpZ, lcrL, lcrR,
+    getCanonicalRole,
+  });
 
 // 1) Auto-position HUD near the currently hovered/pinned seat
 //    BUT only when there is no manual position yet.
