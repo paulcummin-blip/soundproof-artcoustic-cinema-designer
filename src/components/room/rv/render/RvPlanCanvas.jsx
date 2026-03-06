@@ -254,7 +254,7 @@ export default function RvPlanCanvas({
               getModelDimsM={getModelDimsM}
               roomRect={roomRect}
               WALL_BUFFER_M={WALL_BUFFER_M}
-              dolbyLayout={dolbyLayoutProp}
+              dolbyLayout={dolbyLayout}
               overheadZones={overheadZones}
               getCanonicalRole={getCanonicalRole}
               scale={scale}
