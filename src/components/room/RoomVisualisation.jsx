@@ -1007,6 +1007,25 @@ const byId = useEntitiesById({
 
   const { handleSeatDrag } = useSeatDragHandler({ onSetSeatingPositions, canvasToRoom });
 
+  // Helper to commit draft sub positions to real state
+  const commitDraftSubPositions = useCallback(() => {
+    if (draftFrontSubsRef.current && onSetFrontSubs) {
+      const positions = draftFrontSubsRef.current.map(s => ({ x: s.position.x }));
+      onSetFrontSubs(prev => ({ ...prev, positions }));
+    }
+    if (draftRearSubsRef.current && onSetRearSubs) {
+      const positions = draftRearSubsRef.current.map(s => ({ x: s.position.x }));
+      onSetRearSubs(prev => ({ ...prev, positions }));
+    }
+  }, [onSetFrontSubs, onSetRearSubs]);
+
+  // Sub drag — delegated to hook (instantiated here so commitDraftSubPositions is in scope)
+  const { handleSubDrag } = useSubDragHandler({
+    byId, canvasToRoom, widthM, lengthM, getModelDimsM,
+    draggedSubTypeRef, draggedSubWallRef, draftFrontSubsRef, draftRearSubsRef,
+    setSubDragTick, idleCommitTimerRef, commitDraftSubPositions,
+  });
+
   // Mouse handling — delegated to extracted hook
   const { handleMouseMove } = useRoomCanvasMouseMove({
     dragging,
@@ -1030,25 +1049,6 @@ const byId = useEntitiesById({
     handleSpeakerDrag,
     handleSeatDrag,
     handleSubDrag,
-  });
-
-  // Helper to commit draft sub positions to real state
-  const commitDraftSubPositions = useCallback(() => {
-    if (draftFrontSubsRef.current && onSetFrontSubs) {
-      const positions = draftFrontSubsRef.current.map(s => ({ x: s.position.x }));
-      onSetFrontSubs(prev => ({ ...prev, positions }));
-    }
-    if (draftRearSubsRef.current && onSetRearSubs) {
-      const positions = draftRearSubsRef.current.map(s => ({ x: s.position.x }));
-      onSetRearSubs(prev => ({ ...prev, positions }));
-    }
-  }, [onSetFrontSubs, onSetRearSubs]);
-
-  // Sub drag — delegated to hook (instantiated here so commitDraftSubPositions is in scope)
-  const { handleSubDrag } = useSubDragHandler({
-    byId, canvasToRoom, widthM, lengthM, getModelDimsM,
-    draggedSubTypeRef, draggedSubWallRef, draftFrontSubsRef, draftRearSubsRef,
-    setSubDragTick, idleCommitTimerRef, commitDraftSubPositions,
   });
 
   const { handleMouseUp } = useMouseUpHandler({
