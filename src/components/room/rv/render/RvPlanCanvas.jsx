@@ -78,6 +78,7 @@ export default function RvPlanCanvas({
   dragging,
   draggedItemId,
   frontWideZones,
+  frontFallback,
   hasRoomRect,
   ZoneComponents,
   getDolbyZoneSpecs,
