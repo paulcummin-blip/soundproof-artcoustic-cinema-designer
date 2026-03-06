@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
-import { Layers3, Compass } from "lucide-react";
+
 import SeatHud from "@/components/room/SeatHud";
 import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { getSpeakerModelMeta, normaliseModelKey as registryNormaliseModelKey } from "@/components/models/speakers/registry";
