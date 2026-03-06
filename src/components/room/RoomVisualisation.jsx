@@ -1323,11 +1323,6 @@ useEffect(() => {
     const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
     // Always skip LFE – it’s not drawn as a normal speaker
-    const withoutLfe = base.filter((spk) => {
-      const canonicalRole = getCanonicalRole(spk.role);
-      return canonicalRole !== "LFE";
-    });
-
   // Overhead speaker icons — extracted to hook
   const overheadIconElements = useOverheadIconElements({ placedSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride, bedLayerSpeakerMouseDownHandler, handleIconEnter, handleIconMove, handleIconLeave });
 
