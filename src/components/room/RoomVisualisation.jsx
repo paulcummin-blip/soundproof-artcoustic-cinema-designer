@@ -640,6 +640,14 @@ const byId = useEntitiesById({
   // Alias for backward compatibility with rest of component
   const actualScreenFrontY = screenPlaneY;
 
+  // ZONE_DEPTH_M: derived from screenPlaneY (matches useScreenPlane's internal computation)
+  const ZONE_DEPTH_M = useMemo(() => {
+    const y = Number(screenPlaneY);
+    const fallback = 0.30;
+    const raw = Number.isFinite(y) ? y : fallback;
+    return Math.max(0.10, Math.min(0.60, raw));
+  }, [screenPlaneY]);
+
   const TOP_GUTTER_PX = 150; // reserved space above room for dimension lines
   const SPEAKER_PLAN_TOP_GUTTER_PX = 90;
   const SPEAKER_PLAN_BOTTOM_GUTTER_PX = 120;
