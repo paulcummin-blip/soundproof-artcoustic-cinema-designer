@@ -3,7 +3,8 @@ import { isRenderableSpeaker, SpeakerIcon, getSpeakerDims } from "@/components/r
 import { rvIsOverheadRole } from "@/components/room/rv/utils/roomVisualisationUtils";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
-import { getAimingYawDeg, safeYawToMLP } from "@/components/room/rv/utils/rvAiming";
+import { getAimingYawDeg } from "@/components/room/rv/utils/rvAiming";
+import { safeYawToMLP } from "@/components/room/rv/RenderPrimitives";
 import { isDraggable } from "@/components/utils/speakerUtils";
 import { WALL_BUFFER_M } from "@/components/room/constants/screenDepth";
 
