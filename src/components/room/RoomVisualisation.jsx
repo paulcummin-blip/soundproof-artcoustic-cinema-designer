@@ -399,11 +399,11 @@ const clampHudOffset = useCallback((x, y) => {
   // Drag handlers (defined BEFORE they're used in JSX)
 const onHudHeaderMouseDown = useCallback((event) => {
   if (!planBoundsRef.current) return;
-  if (!hudBasePosPx && !hudPosition) return;
+  if (!hudBasePosPx) return;
 
   event.preventDefault();
 
-  const startBase = hudBasePosPx || hudPosition || { x: 20, y: 20 };
+  const startBase = hudBasePosPx || { x: 20, y: 20 };
   const startMouseX = event.clientX;
   const startMouseY = event.clientY;
 
