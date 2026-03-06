@@ -1319,12 +1319,6 @@ useEffect(() => {
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
 
-  // In the scope where we work with speakers, add safe aliases
-  const sl = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SL');
-  const sr = placedSpeakers.find(s => getCanonicalRole(s.role) === 'SR');
-  const slSpeaker = sl || null;
-  const srSpeaker = sr || null;
-
   // Filter and position speakers for rendering
   const speakersToRender = React.useMemo(() => {
     // Make sure we always have an array
