@@ -49,6 +49,7 @@ import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents"
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
 import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs"; import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers"; import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements"; import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM"; import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMetricsCacheEffect"; import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler"; import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler"; import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate"; import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove"; import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler"; import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler"; import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement"; import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls"; import { usePlanResizeObserver } from "@/components/room/rv/hooks/usePlanResizeObserver"; import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation"; import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic"; import { useRoomDerivedState } from "@/components/room/rv/hooks/useRoomDerivedState"; import { useCanvasZoomHandlers } from "@/components/room/rv/hooks/useCanvasZoomHandlers";
 import { rvIsOverheadRole, getByRoleArray } from "@/components/room/rv/utils/roomVisualisationUtils";
+import { useRoomDerivedState } from "@/components/room/rv/hooks/useRoomDerivedState";
 
 // New RP22 seat metrics import
 import {
@@ -399,11 +400,11 @@ const clampHudOffset = useCallback((x, y) => {
   // Drag handlers (defined BEFORE they're used in JSX)
 const onHudHeaderMouseDown = useCallback((event) => {
   if (!planBoundsRef.current) return;
-  if (!hudBasePosPx && !hudPosition) return;
+  if (!hudBasePosPx) return;
 
   event.preventDefault();
 
-  const startBase = hudBasePosPx || hudPosition || { x: 20, y: 20 };
+  const startBase = hudBasePosPx || { x: 20, y: 20 };
   const startMouseX = event.clientX;
   const startMouseY = event.clientY;
 
@@ -427,7 +428,7 @@ const onHudHeaderMouseDown = useCallback((event) => {
 
   window.addEventListener("mousemove", handleMove);
   window.addEventListener("mouseup", handleUp);
-}, [clampHudOffset, hudBasePosPx, hudPosition]);
+}, [clampHudOffset, hudBasePosPx]);
 
 
   // Helper to clamp HUD within canvas, pick side dynamically
