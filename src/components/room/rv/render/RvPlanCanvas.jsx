@@ -36,7 +36,6 @@ export default function RvPlanCanvas({
   roomRect,
   placedSpeakers,
   getCanonicalRole,
-  globalThis,
   dolbyLayout,
   onPanPointerDown,
   onPanPointerMove,
