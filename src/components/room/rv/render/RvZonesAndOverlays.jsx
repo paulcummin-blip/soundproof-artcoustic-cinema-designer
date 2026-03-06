@@ -26,7 +26,6 @@ export default function RvZonesAndOverlays({
   scale,
 
   // Front subs
-  frontFallback,
   handleMouseDown,
   handleMouseMove,
   handleMouseUp,
@@ -117,7 +116,7 @@ export default function RvZonesAndOverlays({
 
       {/* Subwoofers */}
       <FrontSubsLayer
-        frontSubs={frontFallback}
+        frontSubs={null}
         toPx={toPx}
         getModelDimsM={getModelDimsM}
         scale={scale}
