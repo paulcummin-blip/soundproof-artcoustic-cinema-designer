@@ -1319,8 +1319,8 @@ useEffect(() => {
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
 
-  if (false) { /* DELETED: old speakersToRender memo */ const _DEAD = (() => {
-    // Make sure we always have an array
+  {/* DEAD CODE BLOCK REMOVED */}
+  if (false) {
     const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
     // Always skip LFE – it’s not drawn as a normal speaker
