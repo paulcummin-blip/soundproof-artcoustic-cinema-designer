@@ -74,7 +74,7 @@ export default function RvPlanCanvas({
   augmentedZones,
   getModelDimsM,
   WALL_BUFFER_M,
-  dolbyLayout: dolbyLayoutProp,
+
   overheadZones,
   dragging,
   draggedItemId,
@@ -88,7 +88,7 @@ export default function RvPlanCanvas({
   appState,
   rolesForLayout,
   showMlpRuler,
-  getModelDimsM: getModelDimsMParam,
+
   draftFrontSubsRef,
   draftRearSubsRef,
   frontSubs,
@@ -96,7 +96,7 @@ export default function RvPlanCanvas({
   frontSubsCfg,
   rearSubsCfg,
   handleMouseDown,
-  speakerPositionsView: speakerPositionsViewProp,
+
   rowFrontWallLabelSeatIds,
   rowDistanceLabelSeatIds,
   _overlays,
@@ -107,14 +107,13 @@ export default function RvPlanCanvas({
   clampMlpY,
   MLPMarker,
   overheadIconElements,
-  renderSpeakerLabels,
   effectiveHoveredSeat,
   visiblePlanSpeakers,
   floorDeg,
   dragWarning,
   tooltip,
   hoveredSpeaker,
-  exportMode: exportModeProp,
+
   tooltipData,
   hudDynamicStyle,
   onHudHeaderMouseDown,
@@ -432,8 +431,6 @@ export default function RvPlanCanvas({
               handleIconLeave={handleIconLeave}
             />
 
-            {/* Layer 11: Speaker Labels (on top of speakers) */}
-            {renderSpeakerLabels()}
 
             {/* RP22 Surround Angles Overlay */}
             {exportMode !== 'clean' && <RvRp22AnglesOverlay hasRoomRect={hasRoomRect} scale={scale} effectiveHoveredSeat={effectiveHoveredSeat} visiblePlanSpeakers={visiblePlanSpeakers} getCanonicalRole={getCanonicalRole} toPx={toPx} floorDeg={floorDeg} />}

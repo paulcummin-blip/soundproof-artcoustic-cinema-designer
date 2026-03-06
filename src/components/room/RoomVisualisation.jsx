@@ -1596,26 +1596,7 @@ useEffect(() => {
 
   // Removed: renderSpeakers function (now RvSpeakerLayer component)
 
-  // Renders rear subwoofers — delegated to RvRenderSubwoofers component
-  const renderSubwoofers = () => (
-    <RvRenderSubwoofers
-      hasRoomRect={hasRoomRect}
-      rearSubs={rearSubs}
-      getModelDimsM={getModelDimsM}
-      toPx={toPx}
-      scale={scale}
-      dragging={dragging}
-      draggedItemId={draggedItemId}
-      handleMouseDown={handleMouseDown}
-      handleMouseMove={handleMouseMove}
-      handleMouseUp={handleMouseUp}
-    />
-  );
 
-  // Renders speaker labels. Not implemented in the original code, so a placeholder.
-  const renderSpeakerLabels = useCallback(() => {
-    return <g data-layer="speaker-labels"></g>;
-  }, []);
 
   // MLP marker: always draw at computed MLP (mlpDotX_m, mlpDotY_m),
   // never snap horizontally to a specific seat.
@@ -1782,7 +1763,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       clampMlpY={clampMlpY}
       MLPMarker={MLPMarker}
       overheadIconElements={overheadIconElements}
-      renderSpeakerLabels={renderSpeakerLabels}
       aimAtMLP={aimAtMLP}
       aimFrontWidesAtMLP={aimFrontWidesAtMLP}
       aimSideSurroundsAtMLP={aimSideSurroundsAtMLP}

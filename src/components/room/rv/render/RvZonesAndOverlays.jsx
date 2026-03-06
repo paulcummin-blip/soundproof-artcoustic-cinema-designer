@@ -116,7 +116,7 @@ export default function RvZonesAndOverlays({
 
       {/* Subwoofers */}
       <FrontSubsLayer
-        frontSubs={null}
+        frontSubs={frontSubs}
         toPx={toPx}
         getModelDimsM={getModelDimsM}
         scale={scale}
