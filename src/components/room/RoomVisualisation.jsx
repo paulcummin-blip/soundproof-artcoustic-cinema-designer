@@ -1367,6 +1367,11 @@ useEffect(() => {
     ZONE_DEPTH_M,
   });
 
+  // Derived overhead count — used by useZoneComponents and overheadCorridorsOn
+  const overheadCount = Array.isArray(placedSpeakers)
+    ? placedSpeakers.filter(s => rvIsOverheadRole(s?.role)).length
+    : 0;
+
   const arcPathForBand = useCallback((seatX, seatY, radiusM, minDeg, maxDeg, toPxFn) => {
     const a0 = Number(minDeg);
     const a1 = Number(maxDeg);
