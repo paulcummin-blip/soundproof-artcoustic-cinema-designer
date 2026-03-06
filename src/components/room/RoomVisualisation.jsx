@@ -1583,24 +1583,6 @@ useEffect(() => {
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
-  // Removed: renderSpeakers function (now RvSpeakerLayer component)
-
-  // Renders rear subwoofers — delegated to RvRenderSubwoofers component
-  const renderSubwoofers = () => (
-    <RvRenderSubwoofers
-      hasRoomRect={hasRoomRect}
-      rearSubs={rearSubs}
-      getModelDimsM={getModelDimsM}
-      toPx={toPx}
-      scale={scale}
-      dragging={dragging}
-      draggedItemId={draggedItemId}
-      handleMouseDown={handleMouseDown}
-      handleMouseMove={handleMouseMove}
-      handleMouseUp={handleMouseUp}
-    />
-  );
-
   // Renders speaker labels. Not implemented in the original code, so a placeholder.
   const renderSpeakerLabels = useCallback(() => {
     return <g data-layer="speaker-labels"></g>;
