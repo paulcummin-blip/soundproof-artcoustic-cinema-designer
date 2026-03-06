@@ -1328,8 +1328,6 @@ useEffect(() => {
       return canonicalRole !== "LFE";
     });
 
-    // CRITICAL: Speaker icons render based on system config, not overlay toggles.
-    // Debug log to confirm LW/RW roles are present
   // Overhead speaker icons — extracted to hook
   const overheadIconElements = useOverheadIconElements({ placedSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride, bedLayerSpeakerMouseDownHandler, handleIconEnter, handleIconMove, handleIconLeave });
 
