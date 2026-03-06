@@ -1703,7 +1703,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       roomRect={roomRect}
       placedSpeakers={placedSpeakers}
       getCanonicalRole={getCanonicalRole}
-      globalThis={globalThis}
       dolbyLayout={dolbyLayout}
       onPanPointerDown={onPanPointerDown}
       onPanPointerMove={onPanPointerMove}
