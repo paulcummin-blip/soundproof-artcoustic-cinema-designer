@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
+import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, useLayoutEffect, forwardRef } from "react";
 
 import { getSpeakerModelMeta, normaliseModelKey as registryNormaliseModelKey } from "@/components/models/speakers/registry";
 import { isDraggable } from "@/components/utils/speakerUtils";
