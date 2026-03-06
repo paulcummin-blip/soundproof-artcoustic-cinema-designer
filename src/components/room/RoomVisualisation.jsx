@@ -1320,8 +1320,8 @@ useEffect(() => {
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
 
-  // Filter and position speakers for rendering
-  const speakersToRender = React.useMemo(() => {
+  // speakersToRender now comes from useRoomDerivedState below
+  if (false) const speakersToRender_REMOVED = React.useMemo(() => {
     // Make sure we always have an array
     const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
