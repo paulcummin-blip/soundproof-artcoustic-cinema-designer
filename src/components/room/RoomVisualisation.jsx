@@ -1581,6 +1581,21 @@ useEffect(() => {
     };
   }, [applyLcrFromDetail]);
 
+  // Derived state: seat label sets + speakersToRender
+  const {
+    rowFrontWallLabelSeatIds,
+    rowDistanceLabelSeatIds,
+    speakersToRender,
+  } = useRoomDerivedState({
+    dolbyLayout,
+    placedSpeakers,
+    seatingPositions,
+    speakerPositionsView,
+    overlays: _overlays,
+    appState,
+    getCanonicalRole,
+  });
+
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
