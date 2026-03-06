@@ -73,7 +73,7 @@ export default function RvPlanCanvas({
   augmentedZones,
   getModelDimsM,
   WALL_BUFFER_M,
-  dolbyLayout: dolbyLayoutProp,
+  dolbyLayout,
   overheadZones,
   dragging,
   draggedItemId,
@@ -88,7 +88,6 @@ export default function RvPlanCanvas({
   appState,
   rolesForLayout,
   showMlpRuler,
-  getModelDimsM: getModelDimsMParam,
   draftFrontSubsRef,
   draftRearSubsRef,
   frontSubs,
@@ -96,7 +95,6 @@ export default function RvPlanCanvas({
   frontSubsCfg,
   rearSubsCfg,
   handleMouseDown,
-  speakerPositionsView: speakerPositionsViewProp,
   rowFrontWallLabelSeatIds,
   rowDistanceLabelSeatIds,
   _overlays,
@@ -107,7 +105,6 @@ export default function RvPlanCanvas({
   clampMlpY,
   MLPMarker,
   overheadIconElements,
-  renderSpeakers,
   renderSpeakerLabels,
   effectiveHoveredSeat,
   visiblePlanSpeakers,
@@ -115,9 +112,7 @@ export default function RvPlanCanvas({
   dragWarning,
   tooltip,
   hoveredSpeaker,
-  exportMode: exportModeProp,
   tooltipData,
-  isHudPinned,
   hudDynamicStyle,
   onHudHeaderMouseDown,
   hudElRef,
@@ -125,7 +120,7 @@ export default function RvPlanCanvas({
   hudHiddenWhenPinned,
   renderLevelBadge,
   speakerTooltip,
-  hudPosition,  // canvas-pixel position of the HUD card (hudBasePosPx from parent)
+  hudPosition,
 }) {
   return (
     <div
