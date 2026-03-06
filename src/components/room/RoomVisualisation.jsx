@@ -1320,8 +1320,8 @@ useEffect(() => {
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
 
-  // speakersToRender now comes from useRoomDerivedState below
-  if (false) const speakersToRender_REMOVED = React.useMemo(() => {
+  // REMOVED: old speakersToRender inline memo — now from useRoomDerivedState
+  if (false) const _DEAD_speakersToRender = React.useMemo(() => {
     // Make sure we always have an array
     const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
