@@ -1650,7 +1650,8 @@ useEffect(() => {
   const { renderLevelBadge, hudDynamicStyle } = useHudComputation({ isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned });
 
   // RP22 overhead corridors: shown whenever overheads are present in the layout  
-  const overheadCorridorsOn = overheadCount > 0;
+  // (referenced by overlaysForRendering consumers)
+  const overheadCorridorsOn = overheadCount > 0; // eslint-disable-line no-unused-vars
 
 
 // --- Main render ---
