@@ -1643,8 +1643,6 @@ useEffect(() => {
     position: 'relative'
   };
 
-  const containerRect = planBoundsRef.current?.getBoundingClientRect(); // Changed from containerRef
-
   const svgW = containerW;
   const svgH = containerH;
 
