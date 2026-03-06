@@ -1678,6 +1678,11 @@ useEffect(() => {
 
   const { renderLevelBadge, hudDynamicStyle } = useHudComputation({ isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned });
 
+  // Derived overhead count
+  const overheadCount = Array.isArray(placedSpeakers)
+    ? placedSpeakers.filter(s => rvIsOverheadRole(s?.role)).length
+    : 0;
+
   // RP22 overhead corridors: shown whenever overheads are present in the layout
   const overheadCorridorsOn = overheadCount > 0;
 
