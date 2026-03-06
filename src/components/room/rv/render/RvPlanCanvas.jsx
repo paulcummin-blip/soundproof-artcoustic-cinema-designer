@@ -407,7 +407,28 @@ export default function RvPlanCanvas({
             {overheadIconElements}
 
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
-            {renderSpeakers()}
+            <RvSpeakerLayer
+              placedSpeakers={placedSpeakers}
+              roomRect={roomRect}
+              scale={scale}
+              getCanonicalRole={getCanonicalRole}
+              getSpeakerVisibility={getSpeakerVisibility}
+              appState={appState}
+              dolbyLayout={dolbyLayout}
+              exportMode={exportMode}
+              aimAtMLP={false}
+              aimFrontWidesAtMLP={appState?.aimFrontWidesAtMLP ?? false}
+              aimSideSurroundsAtMLP={appState?.aimSideSurroundsAtMLP ?? false}
+              aimRearSurroundsAtMLP={appState?.aimRearSurroundsAtMLP ?? false}
+              lcrAngleInfo={null}
+              mlp={mlp}
+              widthM={widthM}
+              lengthM={lengthM}
+              bedLayerSpeakerMouseDownHandler={handleMouseDown}
+              handleIconEnter={() => {}}
+              handleIconMove={() => {}}
+              handleIconLeave={() => {}}
+            />
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
             {renderSpeakerLabels()}
