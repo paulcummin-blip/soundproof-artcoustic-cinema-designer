@@ -108,7 +108,6 @@ export default function RvPlanCanvas({
   clampMlpY,
   MLPMarker,
   overheadIconElements,
-  renderSpeakers,
   renderSpeakerLabels,
   effectiveHoveredSeat,
   visiblePlanSpeakers,
