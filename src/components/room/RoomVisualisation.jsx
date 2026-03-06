@@ -1339,9 +1339,6 @@ useEffect(() => {
     }
 
     return withoutLfe;
-  }, [placedSpeakers, appState?.visibleRoles, getCanonicalRole]);
-
-
   // Overhead speaker icons — extracted to hook
   const overheadIconElements = useOverheadIconElements({ placedSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride, bedLayerSpeakerMouseDownHandler, handleIconEnter, handleIconMove, handleIconLeave });
 
