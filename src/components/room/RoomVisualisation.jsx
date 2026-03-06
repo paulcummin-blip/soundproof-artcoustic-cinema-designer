@@ -11,7 +11,6 @@ import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance
 import { rolesForLayout, getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from "../room/constraints/lcrConstraints";
 import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
-import RP22ZonesOverlay from "@/components/room/RP22ZonesOverlay";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import RvRp22AnglesOverlay from "@/components/room/rv/render/RvRp22AnglesOverlay";
 import { useAppState } from "@/components/AppStateProvider";
