@@ -102,16 +102,10 @@ import {
   isSubRole,
   hasPos,
   isRenderableSpeaker,
-  getChannelColor,
-  RAD, rad2deg, yawDegToMLP, safeYawToMLP,
-  PADDING, DEFAULT_W, DEFAULT_H,
-  SCREEN_BAR_PX, SCREEN_BAR_HALF_PX,
-  SCREEN_THICKNESS_M, toCmCeil,
-  SPEAKER_STROKE_PX, STROKE_HALF_M,
-  yHalfExtentM,
+  safeYawToMLP,
+  PADDING,
+  SCREEN_THICKNESS_M,
   targetMlpY57_5,
-  SpeakerIcon,
-  SpeakerRect,
 } from "@/components/room/rv/RenderPrimitives";
 
 
