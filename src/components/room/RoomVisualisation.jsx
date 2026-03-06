@@ -259,8 +259,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const panStartRef = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
   const zoomMode = zoomModeProp;
   const lastPointerRef = useRef({ x: 0, y: 0 });
-  const [calculatedMinScreenDepthM, setCalculatedMinScreenDepthM] = useState(WALL_BUFFER_M + SCREEN_BUFFER_M);
-  const lastCalcMinScreenDepthRef = React.useRef(null);
   const [containerW, setContainerW] = useState(null);
   const [containerH, setContainerH] = useState(null);
 
