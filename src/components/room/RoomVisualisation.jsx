@@ -535,24 +535,6 @@ const onHudHeaderMouseDown = useCallback((event) => {
     return dx <= tolM;
   }, [getModelDimsM]);
 
-  // NEW: Add a safe local fallback for buildRoleMap to prevent crashes
-  // This local function will only be used if the external buildRoleMap fails or is not a function.
-  // It ensures that 'byRole' is always a Map, compatible with getByRoleArray.
-  const _safeBuildRoleMapFallback = (arr) => {
-    const out = new Map();
-    if (!arr) return out;
-    for (const s of arr) {
-      const canonical = getCanonicalRole(s?.role);
-      if (canonical) {
-        if (!out.has(canonical)) {
-          out.set(canonical, []);
-        }
-        out.get(canonical).push(s);
-      }
-    }
-    return out;
-  };
-
   const byRole = useSpeakersByRole({
     placedSpeakers,
     getCanonicalRole
