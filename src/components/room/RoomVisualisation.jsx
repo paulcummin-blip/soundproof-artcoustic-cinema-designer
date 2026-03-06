@@ -31,6 +31,7 @@ import SvgDefs from "@/components/room/SvgDefs";
 import SpeakerPositionsOverlay from "@/components/room/overlays/SpeakerPositionsOverlay";
 import RvRoomBaseLayers from "@/components/room/rv/render/RvRoomBaseLayers";
 import RvZonesAndOverlays from "@/components/room/rv/render/RvZonesAndOverlays";
+import RvRenderSubwoofers from "@/components/room/rv/render/RvRenderSubwoofers";
 import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
 import { SURROUND_WALL_GAP_M, sideWallX, rearWallY, fixedSideX, OVERHEAD_PAIR_MAP, floorDeg, mirrorX, clampToSegment, resolveSymmetricLCR, computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
 import { getAimingYawDeg, getPlanAimDeg, getYawForObject } from "@/components/room/rv/utils/rvAiming";
