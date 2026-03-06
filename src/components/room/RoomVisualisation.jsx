@@ -1051,7 +1051,6 @@ const byId = useEntitiesById({
 
   // Seat hover logic — delegated to hook
   const {
-    hoveredSeat: _unused_hoveredSeat,
     effectiveHoveredSeat,
     tooltipData,
     speakerTooltip,
