@@ -290,7 +290,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const idleCommitTimerRef = useRef(null);
   // Absolute HUD position in canvas pixels (top-left of the HUD card)
 const [hudBasePosPx, setHudBasePosPx] = useState(null);
-  const hudPosition = hudBasePosPx;
   const planBoundsRef = useRef(null);
   const svgRef = useRef(null);
   const slsrModeRef = React.useRef('side');
