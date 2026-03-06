@@ -1580,8 +1580,6 @@ useEffect(() => {
     };
   }, [applyLcrFromDetail]);
 
-  const lastRvLogSigRef = React.useRef(null);
-
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
