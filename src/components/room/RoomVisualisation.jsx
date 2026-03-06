@@ -623,7 +623,7 @@ const byId = useEntitiesById({
     onLcrAngleComputed(rounded);
   }, [lcrAngleInfo.averageAngle, onLcrAngleComputed]);
 
-  const { screenPlaneY, minScreenDepth, ZONE_DEPTH_M } = useScreenPlane({
+  const { screenPlaneY, minScreenDepth } = useScreenPlane({
     placedSpeakers,
     frontSubs,
     aimAtMLP,
