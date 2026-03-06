@@ -47,10 +47,25 @@ import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverhead
 import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
-import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs"; import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers"; import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements"; import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM"; import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMetricsCacheEffect"; import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler"; import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler"; import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate"; import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove"; import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler"; import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler"; import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement"; import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls"; import { usePlanResizeObserver } from "@/components/room/rv/hooks/usePlanResizeObserver"; import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation"; import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic"; import { useRoomDerivedState } from "@/components/room/rv/hooks/useRoomDerivedState"; import { useCanvasZoomHandlers } from "@/components/room/rv/hooks/useCanvasZoomHandlers";
+import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs";
+import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers";
+import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements";
+import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM";
+import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMetricsCacheEffect";
+import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler";
+import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler";
+import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate";
+import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove";
+import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler";
+import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler";
+import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement";
+import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls";
+import { usePlanResizeObserver } from "@/components/room/rv/hooks/usePlanResizeObserver";
+import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation";
+import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic";
+import { useRoomDerivedState } from "@/components/room/rv/hooks/useRoomDerivedState";
+import { useCanvasZoomHandlers } from "@/components/room/rv/hooks/useCanvasZoomHandlers";
 import { rvIsOverheadRole, getByRoleArray } from "@/components/room/rv/utils/roomVisualisationUtils";
-
-// DEAD CODE BLOCK remaining fragment removed — duplicate import resolved above.
 
 // New RP22 seat metrics import
 import {
@@ -1321,10 +1336,6 @@ useEffect(() => {
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
 
-  // DEAD CODE BLOCK START (if false)
-    const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
-
-    // Always skip LFE – it’s not drawn as a normal speaker
   // Overhead speaker icons — extracted to hook
   const overheadIconElements = useOverheadIconElements({ placedSpeakers, toPx, scale, setHoveredSpeaker, overheadGlobalModel, useFrontGlobal, useMidGlobal, useRearGlobal, overheadFrontOverride, overheadMidOverride, overheadRearOverride, bedLayerSpeakerMouseDownHandler, handleIconEnter, handleIconMove, handleIconLeave });
 
@@ -1359,7 +1370,9 @@ useEffect(() => {
       pts.push(`${i === 0 ? 'M' : 'L'}${cx},${cy}`);
     }
     return pts.join(' ');
-  }, []);  // Memoize individual zone components with unique IDs
+  }, []);
+
+  // Memoize individual zone components with unique IDs
   const ZoneComponents = useZoneComponents({
     seatingPositions,
     widthM,
@@ -1565,7 +1578,6 @@ useEffect(() => {
   }, [applyLcrFromDetail]);
 
   // Derived state: seat label sets
-  // (speakersToRender is also returned but already defined above - it will shadow the memo)
   const {
     rowFrontWallLabelSeatIds,
     rowDistanceLabelSeatIds,
@@ -1603,7 +1615,9 @@ useEffect(() => {
   // Renders speaker labels. Not implemented in the original code, so a placeholder.
   const renderSpeakerLabels = useCallback(() => {
     return <g data-layer="speaker-labels"></g>;
-  }, []);  // MLP marker: always draw at computed MLP (mlpDotX_m, mlpDotY_m),
+  }, []);
+
+  // MLP marker: always draw at computed MLP (mlpDotX_m, mlpDotY_m),
   // never snap horizontally to a specific seat.
   const MLPMarker = useMemo(() => {
     if (!Number.isFinite(mlpDotX_m) || !Number.isFinite(mlpDotY_m)) {
@@ -1660,7 +1674,7 @@ useEffect(() => {
     position: 'relative'
   };
 
-  const containerRect = planBoundsRef.current?.getBoundingClientRect(); // Changed from containerRef
+  const containerRect = planBoundsRef.current?.getBoundingClientRect();
 
   const svgW = containerW;
   const svgH = containerH;
