@@ -427,7 +427,7 @@ const onHudHeaderMouseDown = useCallback((event) => {
 
   window.addEventListener("mousemove", handleMove);
   window.addEventListener("mouseup", handleUp);
-}, [clampHudOffset, hudBasePosPx, hudPosition]);
+}, [clampHudOffset, hudBasePosPx]);
 
 
   // Helper to clamp HUD within canvas, pick side dynamically
