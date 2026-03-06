@@ -1785,6 +1785,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       hudHiddenWhenPinned={hudHiddenWhenPinned}
       renderLevelBadge={renderLevelBadge}
       speakerTooltip={speakerTooltip}
+      hudPosition={hudBasePosPx}
     />
   );
 });
