@@ -1750,7 +1750,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       getModelDimsM={getModelDimsM}
       WALL_BUFFER_M={WALL_BUFFER_M}
       overheadZones={overheadZones}
-      frontFallback={frontFallback}
       dragging={dragging}
       draggedItemId={draggedItemId}
       frontWideZones={frontWideZones}
