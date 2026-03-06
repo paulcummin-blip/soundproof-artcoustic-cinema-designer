@@ -67,8 +67,7 @@ function safeContains(hay, needle) {
 function safeJson(v) {
   try {
     if (v == null) return null;
-    if (typeof v === "object" && !Array.isArray(v)) return v; // already parsed object
-    if (Array.isArray(v)) return v; // already parsed array
+    if (typeof v === "object") return v; // already parsed
     if (typeof v === "string") {
       const s = v.trim();
       if (!s || s === "[object Object]" || s.startsWith("[object ")) return null;
@@ -76,16 +75,6 @@ function safeJson(v) {
     }
     return null;
   } catch (_e) { return null; }
-}
-
-// Safely extract a string value from a nested path, guarding against [object Object] strings
-function safeStr(v) {
-  if (v == null) return null;
-  if (typeof v === "string") {
-    const s = v.trim();
-    return (s && !s.startsWith("[object")) ? s : null;
-  }
-  return null;
 }
 
 // Small helper to reuse input/select styling
@@ -159,7 +148,7 @@ export default function ProjectsPage() {
             lcrModel: (() => {
               const obj = safeJson(p.selected_speakers_by_role);
               if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
-              return safeStr((obj.L && obj.L.model) || (obj.FL && obj.FL.model));
+              return (obj.L && obj.L.model) || (obj.FL && obj.FL.model) || null;
             })(),
             surroundModel: null,
             heightModel: null,

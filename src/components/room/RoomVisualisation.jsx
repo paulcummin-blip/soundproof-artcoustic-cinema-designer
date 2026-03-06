@@ -1,15 +1,37 @@
 "use client";
 
-import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, useLayoutEffect, forwardRef } from "react";
+import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
 
+import SeatHud from "@/components/room/SeatHud";
+import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { getSpeakerModelMeta, normaliseModelKey as registryNormaliseModelKey } from "@/components/models/speakers/registry";
-import { isDraggable } from "@/components/utils/speakerUtils";
+import { rp23HorizontalAngleForSeat, verticalViewingAngleDeg } from "@/components/utils/seatHover";
+import { isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils";
+import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
 import { rolesForLayout, getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from "../room/constraints/lcrConstraints";
 import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
+import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
+import RvRp22AnglesOverlay from "@/components/room/rv/render/RvRp22AnglesOverlay";
 import { useAppState } from "@/components/AppStateProvider";
 import { timeNowMs } from "@/components/utils/timeNow";
+import { calculateViewingAngle, rp23LevelForAngleDeg } from "@/components/utils/viewingAngleUtils";
+import CanvasMessages from "@/components/room/CanvasMessages";
+import RvRoomElementsLayer from "@/components/room/rv/render/RvRoomElementsLayer";
+import { clampOverheadToZone, clampSymmetricOverheadPair, clampOverheadPairPosition } from "@/components/utils/overheadDragClamping";
+import RvDolbyZones from "@/components/room/rv/render/RvDolbyZones";
+import RvBaffleAndScreen from "@/components/room/rv/render/RvBaffleAndScreen";
+import RvSpeakerTooltip from "@/components/room/rv/render/RvSpeakerTooltip";
 import RvPlanCanvas from "@/components/room/rv/render/RvPlanCanvas";
+import { useOverheadAutoPlacement } from "@/components/hooks/useOverheadAutoPlacement";
+import { useEnsureOverheadPairs } from "@/components/hooks/useEnsureOverheadPairs";
+import PlanMessages from "@/components/room/PlanMessages";
+import SvgDefs from "@/components/room/SvgDefs";
+import SpeakerPositionsOverlay from "@/components/room/overlays/SpeakerPositionsOverlay";
+import RvRoomBaseLayers from "@/components/room/rv/render/RvRoomBaseLayers";
+import RvZonesAndOverlays from "@/components/room/rv/render/RvZonesAndOverlays";
+import RvRenderSubwoofers from "@/components/room/rv/render/RvRenderSubwoofers";
+import RvMlpRuler from "@/components/room/rv/render/RvMlpRuler";
 import { SURROUND_WALL_GAP_M, sideWallX, rearWallY, fixedSideX, OVERHEAD_PAIR_MAP, floorDeg, mirrorX, clampToSegment, resolveSymmetricLCR, computeMinimumScreenDepthM } from "@/components/room/rv/utils/rvGeometry";
 import { getAimingYawDeg, getPlanAimDeg, getYawForObject } from "@/components/room/rv/utils/rvAiming";
 import { useMlpCalculation } from "@/components/room/rv/hooks/useMlpCalculation";
@@ -25,23 +47,7 @@ import { useOverheadZonesComputed } from "@/components/room/rv/hooks/useOverhead
 import { usePanZoomHandlers } from "@/components/room/rv/hooks/usePanZoomHandlers";
 import { useZoneComponents } from "@/components/room/rv/hooks/useZoneComponents";
 import { useRenderFrontWideZones } from "@/components/room/rv/hooks/useRenderFrontWideZones";
-import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs";
-import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers";
-import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements";
-import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM";
-import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMetricsCacheEffect";
-import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler";
-import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler";
-import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate";
-import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove";
-import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler";
-import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler";
-import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement";
-import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls";
-import { usePlanResizeObserver } from "@/components/room/rv/hooks/usePlanResizeObserver";
-import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation";
-import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic";
-import { useCanvasZoomHandlers } from "@/components/room/rv/hooks/useCanvasZoomHandlers";
+import { getDolbyZoneSpecs } from "@/components/room/rv/utils/getDolbyZoneSpecs"; import { useVisiblePlanSpeakers } from "@/components/room/rv/hooks/useVisiblePlanSpeakers"; import { useOverheadIconElements } from "@/components/room/rv/hooks/useOverheadIconElements"; import { useSideSurroundVisualSpanM } from "@/components/room/rv/hooks/useSideSurroundVisualSpanM"; import { useSeatMetricsCacheEffect } from "@/components/room/rv/hooks/useSeatMetricsCacheEffect"; import { useMouseUpHandler } from "@/components/room/rv/hooks/useMouseUpHandler"; import { useMouseDownHandler } from "@/components/room/rv/hooks/useMouseDownHandler"; import { useSpeakerDragUpdate } from "@/components/room/rv/hooks/useSpeakerDragUpdate"; import { useRoomCanvasMouseMove } from "@/components/room/rv/hooks/useRoomCanvasMouseMove"; import { useSubDragHandler } from "@/components/room/rv/hooks/useSubDragHandler"; import { useSeatDragHandler } from "@/components/room/rv/hooks/useSeatDragHandler"; import { useFrontWideAutoPlacement } from "@/components/room/rv/hooks/useFrontWideAutoPlacement"; import { useAutoHugSurroundsToWalls } from "@/components/room/rv/hooks/useAutoHugSurroundsToWalls"; import { usePlanResizeObserver } from "@/components/room/rv/hooks/usePlanResizeObserver"; import { useHudComputation } from "@/components/room/rv/hooks/useHudComputation"; import { useSeatHoverLogic } from "@/components/room/rv/hooks/useSeatHoverLogic"; import { useRoomDerivedState } from "@/components/room/rv/hooks/useRoomDerivedState"; import { useCanvasZoomHandlers } from "@/components/room/rv/hooks/useCanvasZoomHandlers";
 import { rvIsOverheadRole, getByRoleArray } from "@/components/room/rv/utils/roomVisualisationUtils";
 
 // New RP22 seat metrics import
@@ -102,10 +108,16 @@ import {
   isSubRole,
   hasPos,
   isRenderableSpeaker,
-  safeYawToMLP,
-  PADDING,
-  SCREEN_THICKNESS_M,
+  getChannelColor,
+  RAD, rad2deg, yawDegToMLP, safeYawToMLP,
+  PADDING, DEFAULT_W, DEFAULT_H,
+  SCREEN_BAR_PX, SCREEN_BAR_HALF_PX,
+  SCREEN_THICKNESS_M, toCmCeil,
+  SPEAKER_STROKE_PX, STROKE_HALF_M,
+  yHalfExtentM,
   targetMlpY57_5,
+  SpeakerIcon,
+  SpeakerRect,
 } from "@/components/room/rv/RenderPrimitives";
 
 
@@ -387,11 +399,11 @@ const clampHudOffset = useCallback((x, y) => {
   // Drag handlers (defined BEFORE they're used in JSX)
 const onHudHeaderMouseDown = useCallback((event) => {
   if (!planBoundsRef.current) return;
-  if (!hudBasePosPx) return;
+  if (!hudBasePosPx && !hudPosition) return;
 
   event.preventDefault();
 
-  const startBase = hudBasePosPx || { x: 20, y: 20 };
+  const startBase = hudBasePosPx || hudPosition || { x: 20, y: 20 };
   const startMouseX = event.clientX;
   const startMouseY = event.clientY;
 
@@ -415,7 +427,7 @@ const onHudHeaderMouseDown = useCallback((event) => {
 
   window.addEventListener("mousemove", handleMove);
   window.addEventListener("mouseup", handleUp);
-}, [clampHudOffset, hudBasePosPx]);
+}, [clampHudOffset, hudBasePosPx, hudPosition]);
 
 
   // Helper to clamp HUD within canvas, pick side dynamically
@@ -549,7 +561,7 @@ const byId = useEntitiesById({
 
   // First-paint measurement (and a second pass on the next frame) so the plan
   // doesn't wait for some unrelated UI change (like opening Screen Size) to align.
-  useLayoutEffect(() => {
+  React.useLayoutEffect(() => {
     measurePlanBoundsNow();
 
     const raf1 = requestAnimationFrame(() => {
@@ -1571,6 +1583,24 @@ useEffect(() => {
   // Memo: speakers that are actually rendered as icons (single source of truth for overlays/metrics)
   const visiblePlanSpeakers = useVisiblePlanSpeakers({ placedSpeakers, getCanonicalRole, getSpeakerVisibility, appState, dolbyLayout });
 
+  // Removed: renderSpeakers function (now RvSpeakerLayer component)
+
+  // Renders rear subwoofers — delegated to RvRenderSubwoofers component
+  const renderSubwoofers = () => (
+    <RvRenderSubwoofers
+      hasRoomRect={hasRoomRect}
+      rearSubs={rearSubs}
+      getModelDimsM={getModelDimsM}
+      toPx={toPx}
+      scale={scale}
+      dragging={dragging}
+      draggedItemId={draggedItemId}
+      handleMouseDown={handleMouseDown}
+      handleMouseMove={handleMouseMove}
+      handleMouseUp={handleMouseUp}
+    />
+  );
+
   // Renders speaker labels. Not implemented in the original code, so a placeholder.
   const renderSpeakerLabels = useCallback(() => {
     return <g data-layer="speaker-labels"></g>;
@@ -1631,6 +1661,8 @@ useEffect(() => {
     position: 'relative'
   };
 
+  const containerRect = planBoundsRef.current?.getBoundingClientRect(); // Changed from containerRef
+
   const svgW = containerW;
   const svgH = containerH;
 
@@ -1638,8 +1670,7 @@ useEffect(() => {
   const { renderLevelBadge, hudDynamicStyle } = useHudComputation({ isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned });
 
   // RP22 overhead corridors: shown whenever overheads are present in the layout  
-  // (referenced by overlaysForRendering consumers)
-  const overheadCorridorsOn = overheadCount > 0; // eslint-disable-line no-unused-vars
+  const overheadCorridorsOn = overheadCount > 0;
 
 
 // --- Main render ---
@@ -1738,15 +1769,7 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       clampMlpY={clampMlpY}
       MLPMarker={MLPMarker}
       overheadIconElements={overheadIconElements}
-      aimAtMLP={aimAtMLP}
-      aimFrontWidesAtMLP={aimFrontWidesAtMLP}
-      aimSideSurroundsAtMLP={aimSideSurroundsAtMLP}
-      aimRearSurroundsAtMLP={aimRearSurroundsAtMLP}
-      lcrAngleInfo={lcrAngleInfo}
-      bedLayerSpeakerMouseDownHandler={bedLayerSpeakerMouseDownHandler}
-      handleIconEnter={handleIconEnter}
-      handleIconMove={handleIconMove}
-      handleIconLeave={handleIconLeave}
+      renderSpeakers={renderSpeakers}
       renderSpeakerLabels={renderSpeakerLabels}
       effectiveHoveredSeat={effectiveHoveredSeat}
       visiblePlanSpeakers={visiblePlanSpeakers}

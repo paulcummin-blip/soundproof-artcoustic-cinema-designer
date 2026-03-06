@@ -1,6 +1,5 @@
 import React from "react";
 import { hasPos } from "@/components/room/rv/RenderPrimitives";
-import RvSpeakerLayer from "@/components/room/rv/render/RvSpeakerLayer";
 import SvgDefs from "@/components/room/SvgDefs";
 import RvZoomGroup from "@/components/room/rv/render/RvZoomGroup";
 import RvRoomBaseLayers from "@/components/room/rv/render/RvRoomBaseLayers";
@@ -74,7 +73,7 @@ export default function RvPlanCanvas({
   augmentedZones,
   getModelDimsM,
   WALL_BUFFER_M,
-  dolbyLayout,
+  dolbyLayout: dolbyLayoutProp,
   overheadZones,
   dragging,
   draggedItemId,
@@ -89,6 +88,7 @@ export default function RvPlanCanvas({
   appState,
   rolesForLayout,
   showMlpRuler,
+  getModelDimsM: getModelDimsMParam,
   draftFrontSubsRef,
   draftRearSubsRef,
   frontSubs,
@@ -96,6 +96,7 @@ export default function RvPlanCanvas({
   frontSubsCfg,
   rearSubsCfg,
   handleMouseDown,
+  speakerPositionsView: speakerPositionsViewProp,
   rowFrontWallLabelSeatIds,
   rowDistanceLabelSeatIds,
   _overlays,
@@ -106,15 +107,7 @@ export default function RvPlanCanvas({
   clampMlpY,
   MLPMarker,
   overheadIconElements,
-  aimAtMLP,
-  aimFrontWidesAtMLP,
-  aimSideSurroundsAtMLP,
-  aimRearSurroundsAtMLP,
-  lcrAngleInfo,
-  bedLayerSpeakerMouseDownHandler,
-  handleIconEnter,
-  handleIconMove,
-  handleIconLeave,
+  renderSpeakers,
   renderSpeakerLabels,
   effectiveHoveredSeat,
   visiblePlanSpeakers,
@@ -122,7 +115,9 @@ export default function RvPlanCanvas({
   dragWarning,
   tooltip,
   hoveredSpeaker,
+  exportMode: exportModeProp,
   tooltipData,
+  isHudPinned,
   hudDynamicStyle,
   onHudHeaderMouseDown,
   hudElRef,
@@ -130,7 +125,7 @@ export default function RvPlanCanvas({
   hudHiddenWhenPinned,
   renderLevelBadge,
   speakerTooltip,
-  hudPosition,
+  hudPosition,  // canvas-pixel position of the HUD card (hudBasePosPx from parent)
 }) {
   return (
     <div
@@ -264,7 +259,7 @@ export default function RvPlanCanvas({
               getModelDimsM={getModelDimsM}
               roomRect={roomRect}
               WALL_BUFFER_M={WALL_BUFFER_M}
-              dolbyLayout={dolbyLayout}
+              dolbyLayout={dolbyLayoutProp}
               overheadZones={overheadZones}
               getCanonicalRole={getCanonicalRole}
               scale={scale}
@@ -416,28 +411,7 @@ export default function RvPlanCanvas({
             {overheadIconElements}
 
             {/* Layer 10: Draggable Speakers (now on top of overheads) */}
-            <RvSpeakerLayer
-              placedSpeakers={placedSpeakers}
-              roomRect={roomRect}
-              scale={scale}
-              getCanonicalRole={getCanonicalRole}
-              getSpeakerVisibility={getSpeakerVisibility}
-              appState={appState}
-              dolbyLayout={dolbyLayout}
-              exportMode={exportMode}
-              aimAtMLP={aimAtMLP}
-              aimFrontWidesAtMLP={aimFrontWidesAtMLP}
-              aimSideSurroundsAtMLP={aimSideSurroundsAtMLP}
-              aimRearSurroundsAtMLP={aimRearSurroundsAtMLP}
-              lcrAngleInfo={lcrAngleInfo}
-              mlp={mlp}
-              widthM={widthM}
-              lengthM={lengthM}
-              bedLayerSpeakerMouseDownHandler={bedLayerSpeakerMouseDownHandler}
-              handleIconEnter={handleIconEnter}
-              handleIconMove={handleIconMove}
-              handleIconLeave={handleIconLeave}
-            />
+            {renderSpeakers()}
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
             {renderSpeakerLabels()}
