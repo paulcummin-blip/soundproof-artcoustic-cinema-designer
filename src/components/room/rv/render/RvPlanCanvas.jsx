@@ -117,7 +117,6 @@ export default function RvPlanCanvas({
   hoveredSpeaker,
   exportMode: exportModeProp,
   tooltipData,
-  isHudPinned,
   hudDynamicStyle,
   onHudHeaderMouseDown,
   hudElRef,
