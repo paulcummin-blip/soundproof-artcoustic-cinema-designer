@@ -1759,7 +1759,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       frontSubsCfg={frontSubsCfg}
       rearSubsCfg={rearSubsCfg}
       handleMouseDown={handleMouseDown}
-      hasPos={hasPos}
       rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds}
       rowDistanceLabelSeatIds={rowDistanceLabelSeatIds}
       _overlays={_overlays}
