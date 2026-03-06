@@ -1769,7 +1769,6 @@ const idsClip = (ids && ids.clip) ? ids.clip : 'b44_clip_fallback';
       clampMlpY={clampMlpY}
       MLPMarker={MLPMarker}
       overheadIconElements={overheadIconElements}
-      renderSpeakers={renderSpeakers}
       renderSpeakerLabels={renderSpeakerLabels}
       effectiveHoveredSeat={effectiveHoveredSeat}
       visiblePlanSpeakers={visiblePlanSpeakers}
