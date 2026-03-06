@@ -549,7 +549,7 @@ const byId = useEntitiesById({
 
   // First-paint measurement (and a second pass on the next frame) so the plan
   // doesn't wait for some unrelated UI change (like opening Screen Size) to align.
-  React.useLayoutEffect(() => {
+  useLayoutEffect(() => {
     measurePlanBoundsNow();
 
     const raf1 = requestAnimationFrame(() => {
