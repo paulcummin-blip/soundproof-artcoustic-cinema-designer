@@ -4,7 +4,6 @@ import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, use
 
 import { getSpeakerModelMeta, normaliseModelKey as registryNormaliseModelKey } from "@/components/models/speakers/registry";
 import { isDraggable } from "@/components/utils/speakerUtils";
-import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
 import { rolesForLayout, getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from "../room/constraints/lcrConstraints";
 import { SCREEN_BUFFER_M, WALL_BUFFER_M } from "./constants/screenDepth";
