@@ -1580,11 +1580,11 @@ useEffect(() => {
     };
   }, [applyLcrFromDetail]);
 
-  // Derived state: seat label sets + speakersToRender
+  // Derived state: seat label sets
+  // (speakersToRender is also returned but already defined above - it will shadow the memo)
   const {
     rowFrontWallLabelSeatIds,
     rowDistanceLabelSeatIds,
-    speakersToRender,
   } = useRoomDerivedState({
     dolbyLayout,
     placedSpeakers,
