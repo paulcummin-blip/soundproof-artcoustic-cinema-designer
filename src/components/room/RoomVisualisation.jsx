@@ -1683,7 +1683,7 @@ useEffect(() => {
 
   const { renderLevelBadge, hudDynamicStyle } = useHudComputation({ isHudPinned, hudPinnedOffsetPx, hudHiddenWhenPinned });
 
-  // RP22 overhead corridors: shown whenever overheads are present in the layout
+  // RP22 overhead corridors: shown whenever overheads are present in the layout  
   const overheadCorridorsOn = overheadCount > 0;
 
 
