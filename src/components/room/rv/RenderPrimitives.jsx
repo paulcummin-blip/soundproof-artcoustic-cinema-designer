@@ -205,6 +205,18 @@ export const SpeakerIcon = React.memo(function SpeakerIcon({
 });
 SpeakerIcon.displayName = "SpeakerIcon";
 
+// Speaker dims helper — returns physical dimensions for a model key
+export function getSpeakerDims(modelName) {
+  const meta = getSpeakerModelMeta(modelName);
+  return {
+    widthM:    Number(meta?.widthM)    || 0.27,
+    heightM:   Number(meta?.heightM)   || 0.27,
+    depthM:    Number(meta?.depthM)    || 0.082,
+    diameterM: Number(meta?.diameterM) || 0.27,
+    round:     !!meta?.round,
+  };
+}
+
 // Simple rectangle (subs etc.)
 export function SpeakerRect({ speaker, widthM, depthM, opacity = 1.0, scale = 1, toPx, pointerEvents = "auto" }) {
   if (!speaker?.position || !widthM || !depthM) return null;
