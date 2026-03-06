@@ -75,7 +75,6 @@ export default function RvPlanCanvas({
   WALL_BUFFER_M,
   dolbyLayout: dolbyLayoutProp,
   overheadZones,
-  frontFallback,
   dragging,
   draggedItemId,
   frontWideZones,
