@@ -1049,8 +1049,6 @@ const byId = useEntitiesById({
   }, [onSetSpeakers]);
 
 
-  const mlpAnchorEffective = mlp;
-
   // Seat hover logic — delegated to hook
   const {
     hoveredSeat: _unused_hoveredSeat,
