@@ -124,6 +124,16 @@ export default function RvPlanCanvas({
   renderLevelBadge,
   speakerTooltip,
   hudPosition,  // canvas-pixel position of the HUD card (hudBasePosPx from parent)
+  // Speaker layer props
+  aimAtMLP,
+  aimFrontWidesAtMLP,
+  aimSideSurroundsAtMLP,
+  aimRearSurroundsAtMLP,
+  lcrAngleInfo,
+  bedLayerSpeakerMouseDownHandler,
+  handleIconEnter,
+  handleIconMove,
+  handleIconLeave,
 }) {
   return (
     <div
@@ -407,8 +417,20 @@ export default function RvPlanCanvas({
             {/* NEW: Render overhead icons */}
             {overheadIconElements}
 
-            {/* Layer 10: Draggable Speakers (now on top of overheads) */}
-            {renderSpeakers()}
+            {/* Layer 10: Draggable Speakers */}
+            <RvSpeakerLayer
+              speakers={visiblePlanSpeakers}
+              toPx={toPx}
+              scale={scale}
+              mlp={mlp}
+              aimAtMLP={aimAtMLP}
+              lcrAngleInfo={lcrAngleInfo}
+              getCanonicalRole={getCanonicalRole}
+              bedLayerSpeakerMouseDownHandler={bedLayerSpeakerMouseDownHandler}
+              handleIconEnter={handleIconEnter}
+              handleIconMove={handleIconMove}
+              handleIconLeave={handleIconLeave}
+            />
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
             {renderSpeakerLabels()}
