@@ -95,7 +95,6 @@ export default function RvPlanCanvas({
   frontSubsCfg,
   rearSubsCfg,
   handleMouseDown,
-  hasPos,
   speakerPositionsView: speakerPositionsViewProp,
   rowFrontWallLabelSeatIds,
   rowDistanceLabelSeatIds,
