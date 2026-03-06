@@ -2,11 +2,8 @@
 
 import React, { useMemo, useCallback, useState, useRef, useImperativeHandle, useEffect, forwardRef } from "react";
 
-import SeatHud from "@/components/room/SeatHud";
-import RP22GradingPill from "@/components/ui/RP22GradingPill";
 import { getSpeakerModelMeta, normaliseModelKey as registryNormaliseModelKey } from "@/components/models/speakers/registry";
-import { rp23HorizontalAngleForSeat, verticalViewingAngleDeg } from "@/components/utils/seatHover";
-import { isDraggable, clampSideSurroundDrag, clampRearSurroundDrag } from "@/components/utils/speakerUtils";
+import { isDraggable } from "@/components/utils/speakerUtils";
 import { calibratedSplAtSeat, normalizeToRsp, p4DeltaAndLevel, euclideanDistance } from "@/components/utils/splMath";
 import { rolesForLayout, getCanonicalRole } from "@/components/utils/surroundRoleMap";
 import { calculateLcrConstraints } from "../room/constraints/lcrConstraints";
