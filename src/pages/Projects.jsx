@@ -427,7 +427,7 @@ export default function ProjectsPage() {
 
   // ---- Sub components ----
   function StatusPill({ value }) {
-    const c = statusColor(value);
+    const { color: c } = getStatusStyle(value);
     return (
       <span
         style={{
