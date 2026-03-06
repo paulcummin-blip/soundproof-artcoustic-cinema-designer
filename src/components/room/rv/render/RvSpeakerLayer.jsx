@@ -1,5 +1,6 @@
 import React from "react";
-import { isRenderableSpeaker, SpeakerIcon, rvIsOverheadRole, getSpeakerDims } from "@/components/room/rv/RenderPrimitives";
+import { isRenderableSpeaker, SpeakerIcon, getSpeakerDims } from "@/components/room/rv/RenderPrimitives";
+import { rvIsOverheadRole } from "@/components/room/rv/utils/roomVisualisationUtils";
 import { resolveSurroundModel } from "@/components/utils/speakerModelResolver";
 import { rolesForLayout } from "@/components/utils/surroundRoleMap";
 import { getAimingYawDeg, safeYawToMLP } from "@/components/room/rv/utils/rvAiming";
