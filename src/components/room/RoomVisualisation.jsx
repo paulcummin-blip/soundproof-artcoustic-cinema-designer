@@ -1320,7 +1320,7 @@ useEffect(() => {
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
 
-  if (false) { const _DEAD_speakersToRender = React.useMemo(() => {
+  if (false) { /* DELETED: old speakersToRender memo */ const _DEAD = (() => {
     // Make sure we always have an array
     const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
