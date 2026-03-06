@@ -188,7 +188,6 @@ export default forwardRef(function RoomVisualisation(props, ref) {
   const centerX_m = widthM / 2;
   const clampY = (y) => Math.max(0.05, Math.min(lengthM - 0.05, Number(y) || 0));
   const EPS_M = 0.0005;
-  const ALLOW_AUTO_DIMENSIONS = false;
   const PLAN_TOP_PAD_PX = 60; // headroom for top dimension line + labels
   const BOTTOM_GUTTER_PX = 220; // ensures bottom speaker dimension lanes never clip
 
