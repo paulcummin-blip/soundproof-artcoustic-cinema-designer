@@ -425,18 +425,18 @@ export default function RvPlanCanvas({
               appState={appState}
               dolbyLayout={dolbyLayout}
               exportMode={exportMode}
-              aimAtMLP={false}
-              aimFrontWidesAtMLP={appState?.aimFrontWidesAtMLP ?? false}
-              aimSideSurroundsAtMLP={appState?.aimSideSurroundsAtMLP ?? false}
-              aimRearSurroundsAtMLP={appState?.aimRearSurroundsAtMLP ?? false}
-              lcrAngleInfo={null}
+              aimAtMLP={aimAtMLP}
+              aimFrontWidesAtMLP={aimFrontWidesAtMLP}
+              aimSideSurroundsAtMLP={aimSideSurroundsAtMLP}
+              aimRearSurroundsAtMLP={aimRearSurroundsAtMLP}
+              lcrAngleInfo={lcrAngleInfo}
               mlp={mlp}
               widthM={widthM}
               lengthM={lengthM}
-              bedLayerSpeakerMouseDownHandler={handleMouseDown}
-              handleIconEnter={() => {}}
-              handleIconMove={() => {}}
-              handleIconLeave={() => {}}
+              bedLayerSpeakerMouseDownHandler={bedLayerSpeakerMouseDownHandler}
+              handleIconEnter={handleIconEnter}
+              handleIconMove={handleIconMove}
+              handleIconLeave={handleIconLeave}
             />
 
             {/* Layer 11: Speaker Labels (on top of speakers) */}
