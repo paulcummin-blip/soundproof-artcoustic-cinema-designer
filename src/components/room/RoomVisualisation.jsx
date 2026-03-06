@@ -1319,8 +1319,7 @@ useEffect(() => {
     return base;
   }, [_overlays, listeningAreaBounds, frontWideZones, enableFrontWides, rp22AnglesEnabled]);
 
-  {/* DEAD CODE BLOCK REMOVED */}
-  if (false) {
+  // DEAD CODE BLOCK START (if false)
     const base = Array.isArray(placedSpeakers) ? placedSpeakers : [];
 
     // Always skip LFE – it’s not drawn as a normal speaker
