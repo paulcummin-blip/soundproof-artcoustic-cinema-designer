@@ -1,4 +1,5 @@
 import React from "react";
+import { hasPos } from "@/components/room/rv/RenderPrimitives";
 import SvgDefs from "@/components/room/SvgDefs";
 import RvZoomGroup from "@/components/room/rv/render/RvZoomGroup";
 import RvRoomBaseLayers from "@/components/room/rv/render/RvRoomBaseLayers";
