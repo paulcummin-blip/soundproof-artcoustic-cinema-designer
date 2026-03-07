@@ -1465,6 +1465,7 @@ function RoomDesignerWithState() {
         autosaveStatus={autosaveStatus}
         reloadProject={reloadProject}
         projectIdState={projectIdState}
+        isProjectMode={isProjectMode}
       />
 
       <div
