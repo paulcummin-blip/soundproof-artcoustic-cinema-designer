@@ -32,6 +32,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated 
   const [formData, setFormData] = useState({
     name: "",
     client_name: "",
+    project_status: "Prospective",
     room_length: "",
     room_width: "",
     room_height: "",
