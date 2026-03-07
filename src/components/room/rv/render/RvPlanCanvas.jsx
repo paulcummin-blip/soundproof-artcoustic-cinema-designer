@@ -266,7 +266,7 @@ export default function RvPlanCanvas({
               getModelDimsM={getModelDimsM}
               roomRect={roomRect}
               WALL_BUFFER_M={WALL_BUFFER_M}
-              dolbyLayout={dolbyLayoutProp}
+              dolbyLayout={dolbyLayout}
               overheadZones={overheadZones}
               getCanonicalRole={getCanonicalRole}
               scale={scale}
@@ -411,7 +411,7 @@ export default function RvPlanCanvas({
             })()}
 
             {/* Layer 9: Draggable Seating Positions */}
-            <RvSeatLayer seatingPositions={seatingPositions} toPx={toPx} scale={scale} exportMode={exportMode} speakerPositionsView={speakerPositionsViewProp} rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds} rowDistanceLabelSeatIds={rowDistanceLabelSeatIds} _overlays={_overlays} hudPinnedSeatId={hudPinnedSeatId} handleMouseDown={handleMouseDown} handleSeatMouseEnter={handleSeatMouseEnter} handleSeatMouseLeave={handleSeatMouseLeave} handleSeatClick={handleSeatClick} clampMlpY={clampMlpY} MLPMarker={MLPMarker} />
+            <RvSeatLayer seatingPositions={seatingPositions} toPx={toPx} scale={scale} exportMode={exportMode} speakerPositionsView={speakerPositionsView} rowFrontWallLabelSeatIds={rowFrontWallLabelSeatIds} rowDistanceLabelSeatIds={rowDistanceLabelSeatIds} _overlays={_overlays} hudPinnedSeatId={hudPinnedSeatId} handleMouseDown={handleMouseDown} handleSeatMouseEnter={handleSeatMouseEnter} handleSeatMouseLeave={handleSeatMouseLeave} handleSeatClick={handleSeatClick} clampMlpY={clampMlpY} MLPMarker={MLPMarker} />
 
             {/* NEW: Render overhead icons */}
             {overheadIconElements}
