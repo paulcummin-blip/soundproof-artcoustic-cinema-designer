@@ -777,6 +777,12 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
   );
 
   const manualSaveProject = useCallback(async () => {
+    // Scratch mode: no backend write, stay local
+    if (!isProjectMode) {
+      setAutosaveStatus("local");
+      return { success: true, local: true };
+    }
+
     setAutosaveStatus("saving");
 
     // Work out which project we are saving into:
