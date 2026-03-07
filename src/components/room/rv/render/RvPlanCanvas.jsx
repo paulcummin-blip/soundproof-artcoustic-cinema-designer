@@ -441,7 +441,7 @@ export default function RvPlanCanvas({
                 speakers={placedSpeakers}
                 seatingPositions={seatingPositions}
                 dimensions={{ width: widthM, length: lengthM }}
-                view={speakerPositionsViewProp}
+                view={speakerPositionsView}
                 meterToCanvasX={meterToCanvasX}
                 meterToCanvasY={meterToCanvasY}
                 roomRect={roomRect}
