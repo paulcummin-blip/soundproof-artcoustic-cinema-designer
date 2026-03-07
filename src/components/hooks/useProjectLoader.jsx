@@ -62,11 +62,15 @@ appState, // Pass appState directly for setters
   setFreeMoveLcr,
   // stableDimensions alias (needed in save/autosave buildProjectData)
   stableDimensions,
+  // Explicit mode: true = real saved project, false = local draft
+  isProjectMode,
 }) {
   const [projectIdState, setProjectIdState] = useState(projectIdFromUrl);
   const [projectNameState, setProjectNameState] = useState("Untitled Room"); // Internal projectName for loader
-  const [loadState, setLoadState] = useState({ phase: "idle", error: null, name: null });
-  const [autosaveStatus, setAutosaveStatus] = useState("idle");
+  const [loadState, setLoadState] = useState(
+    isProjectMode ? { phase: "idle", error: null, name: null } : { phase: "scratch" }
+  );
+  const [autosaveStatus, setAutosaveStatus] = useState(isProjectMode ? "idle" : "local");
   const hydratedRoomDimsProjectIdRef = useRef(null);
 
   const parseMaybe = useCallback((val, fallback) => {
