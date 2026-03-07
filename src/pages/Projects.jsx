@@ -214,15 +214,8 @@ export default function ProjectsPage() {
 
   // ---- UI bits ----
   function openDialog() {
-    // New project
-    setEditingProject(null);
-    setDraft({
-      name: "",
-      client: "",
-      status: "Prospective",
-    });
-    setCreateError(null);
-    setDialogOpen(true);
+    // New project — use canonical NewProjectDialog
+    setNewProjectDialogOpen(true);
   }
 
   function handleEditProject(p) {
