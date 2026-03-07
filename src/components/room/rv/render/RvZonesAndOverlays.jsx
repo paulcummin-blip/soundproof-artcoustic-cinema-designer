@@ -26,6 +26,7 @@ export default function RvZonesAndOverlays({
   scale,
 
   // Front subs
+  frontSubs,
   handleMouseDown,
   handleMouseMove,
   handleMouseUp,

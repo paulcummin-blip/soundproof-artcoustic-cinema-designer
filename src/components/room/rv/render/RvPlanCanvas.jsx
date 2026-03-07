@@ -270,6 +270,7 @@ export default function RvPlanCanvas({
               overheadZones={overheadZones}
               getCanonicalRole={getCanonicalRole}
               scale={scale}
+              frontSubs={frontSubs}
               handleMouseDown={handleMouseDown}
               handleMouseMove={handleMouseMove}
               handleMouseUp={handleMouseUp}
@@ -284,7 +285,7 @@ export default function RvPlanCanvas({
             {exportMode !== 'clean' && !!overlaysForRendering?.LCR && ZoneComponents.LCR}
             {exportMode !== 'clean' && !!overlaysForRendering?.SIDE_SURROUND && ZoneComponents.SIDE_SURROUND}
             {exportMode !== 'clean' && !!overlaysForRendering?.REAR_SURROUND && ZoneComponents.REAR_SURROUND}
-            {exportMode !== 'clean' && overlaysForRendering?.enableDolbyZones && <RvDolbyZones hasRoomRect={hasRoomRect} overlaysForRendering={overlaysForRendering} mlp={mlp} toPx={toPx} widthM={widthM} lengthM={lengthM} dolbyLayout={dolbyLayoutProp} getDolbyZoneSpecs={getDolbyZoneSpecs} arcPathForBand={arcPathForBand} />}
+            {exportMode !== 'clean' && overlaysForRendering?.enableDolbyZones && <RvDolbyZones hasRoomRect={hasRoomRect} overlaysForRendering={overlaysForRendering} mlp={mlp} toPx={toPx} widthM={widthM} lengthM={lengthM} dolbyLayout={dolbyLayout} getDolbyZoneSpecs={getDolbyZoneSpecs} arcPathForBand={arcPathForBand} />}
 
             {/* Layer 6: Static Room Elements (furniture, etc.) */}
             <RvRoomElementsLayer hasRoomRect={hasRoomRect} roomElements={roomElements} widthM={widthM} lengthM={lengthM} scale={scale} meterToCanvasX={meterToCanvasX} meterToCanvasY={meterToCanvasY} placedSpeakers={placedSpeakers} getModelDimsM={getModelDimsM} getSpeakerVisibility={getSpeakerVisibility} getCanonicalRole={getCanonicalRole} appState={appState} rolesForLayout={rolesForLayout} />
