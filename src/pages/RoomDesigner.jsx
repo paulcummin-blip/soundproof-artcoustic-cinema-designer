@@ -128,7 +128,15 @@ function RoomDesignerWithState() {
   const { projectId: initialProjectIdFromUrl } = useUrlQuery();
 
   // Single source of truth for the project ID
-  const resolvedProjectId = sessionActiveProjectId || initialProjectIdFromUrl || null;
+  // userProjectOverride: null = defer to session/URL, "free" = explicit Free Use, "<id>" = explicit project choice
+  const [userProjectOverride, setUserProjectOverride] = useState(null);
+  const [existingProjects, setExistingProjects] = useState([]);
+  const [showNewProjectDialog, setShowNewProjectDialog] = useState(false);
+
+  const baseResolvedId = sessionActiveProjectId || initialProjectIdFromUrl || null;
+  const resolvedProjectId = userProjectOverride === "free"
+    ? null
+    : (userProjectOverride || baseResolvedId);
   const isProjectMode = !!resolvedProjectId;
 
   // NEW: Refs for speaker rescue on room resize
