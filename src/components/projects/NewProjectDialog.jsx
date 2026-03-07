@@ -55,6 +55,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated 
       setFormData({
         name: "",
         client_name: "",
+        project_status: "Prospective",
         room_length: "",
         room_width: "",
         room_height: "",
