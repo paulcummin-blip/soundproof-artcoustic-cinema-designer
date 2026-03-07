@@ -104,6 +104,24 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated 
             </div>
 
             <div>
+              <Label className="text-[#3E4349]">Project Status</Label>
+              <Select
+                value={formData.project_status}
+                onValueChange={(value) => setFormData({...formData, project_status: value})}
+              >
+                <SelectTrigger className="bg-white border-[#DCDBD6] text-[#1B1A1A]">
+                  <SelectValue placeholder="Select status" />
+                </SelectTrigger>
+                <SelectContent className="bg-white border-[#DCDBD6]">
+                  <SelectItem value="Prospective" className="text-[#1B1A1A]">Prospective</SelectItem>
+                  <SelectItem value="Live" className="text-[#1B1A1A]">Live</SelectItem>
+                  <SelectItem value="Completed" className="text-[#1B1A1A]">Completed</SelectItem>
+                  <SelectItem value="Lost" className="text-[#1B1A1A]">Lost</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
               <Label className="text-[#3E4349]">Dolby Configuration</Label>
               <Select 
                 value={formData.dolby_config} 
