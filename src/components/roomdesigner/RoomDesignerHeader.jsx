@@ -56,7 +56,7 @@ export default function RoomDesignerHeader({
         <AlertDialogHeader>
           <AlertDialogTitle>Overwrite existing project?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will overwrite <strong>{overwriteCandidate?.name}</strong> with the current Room Designer state. This cannot be undone.
+            This will overwrite &ldquo;{overwriteCandidate?.name}&rdquo; with the current Room Designer state. This cannot be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
