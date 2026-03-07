@@ -718,6 +718,23 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
     // Already bootstrapped for this mount? Do nothing.
     if (hasBootstrappedRef.current) return;
 
+    // Scratch mode: skip backend load entirely, ensure state reflects local draft
+    if (!isProjectMode) {
+      setLoadState({ phase: "scratch" });
+      setAutosaveStatus("local");
+      const hasSpeakers = Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
+      const hasSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0;
+      if (!hasSpeakers && !hasSeats && appState?.roomDims) {
+        hasBootstrappedRef.current = true;
+        if (typeof initWithDefaultsAndRules === "function") {
+          initWithDefaultsAndRules();
+        }
+      } else {
+        hasBootstrappedRef.current = true;
+      }
+      return;
+    }
+
     const controller = new AbortController();
 
     try {
