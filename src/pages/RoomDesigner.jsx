@@ -234,8 +234,6 @@ function RoomDesignerWithState() {
   // Fetch existing projects for the "Save to Project" dropdown (name + id only)
   useEffect(() => {
     let cancelled = false;
-    const { Project: ProjectEntity } = require("@/entities/Project") || {};
-    // Use the already-imported Project entity
     Project.list('-updated_date', 50).then((list) => {
       if (!cancelled && Array.isArray(list)) {
         setExistingProjects(list.map((p) => ({ id: p.id, name: p.name || "Untitled" })));
