@@ -103,7 +103,7 @@ appState, // Pass appState directly for setters
 if (appState?.setRoomDims && appState?.roomDims) {
 
   const pid = p?.id || null;
-  if (pid && hydratedRoomDimsProjectIdRef.current === pid) return;
+  const alreadyHydratedDims = pid && hydratedRoomDimsProjectIdRef.current === pid;
   if (pid) hydratedRoomDimsProjectIdRef.current = pid;
 
   let nextWidthM, nextLengthM, nextHeightM;
@@ -126,13 +126,14 @@ if (appState?.setRoomDims && appState?.roomDims) {
         nextHeightM = Number(p?.room_height) || 2.4;
       }
 
-      // Only update if any dimension differs by >= 0.001m (1mm)
+      // Always apply on first hydration for this project.
+      // On subsequent calls for the same project, only update if dimension differs by >= 0.001m.
       const current = appState.roomDims;
       const widthChanged = Math.abs((current?.widthM ?? 0) - nextWidthM) >= 0.001;
       const lengthChanged = Math.abs((current?.lengthM ?? 0) - nextLengthM) >= 0.001;
       const heightChanged = Math.abs((current?.heightM ?? 0) - nextHeightM) >= 0.001;
 
-      if (widthChanged || lengthChanged || heightChanged) {
+      if (!alreadyHydratedDims || widthChanged || lengthChanged || heightChanged) {
         appState.setRoomDims({
           widthM: nextWidthM,
           lengthM: nextLengthM,
