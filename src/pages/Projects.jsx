@@ -959,7 +959,7 @@ export default function ProjectsPage() {
               }}
             >
               <h2 style={{ margin: 0, fontSize: 18 }}>
-                {editingProject ? "Edit Project" : "Create Project"}
+                Edit Project
               </h2>
               <button
                 type="button"
