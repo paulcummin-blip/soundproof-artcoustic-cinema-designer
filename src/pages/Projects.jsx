@@ -920,7 +920,14 @@ export default function ProjectsPage() {
         </SegmentBoundary>
       )}
 
-      {/* Modal */}
+      {/* Canonical New Project Dialog */}
+      <NewProjectDialog
+        open={newProjectDialogOpen}
+        onOpenChange={setNewProjectDialogOpen}
+        onProjectCreated={handleNewProjectCreated}
+      />
+
+      {/* Edit Project Modal (existing projects only) */}
       {dialogOpen && (
         <div
           style={{
