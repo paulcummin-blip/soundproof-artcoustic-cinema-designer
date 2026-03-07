@@ -217,7 +217,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated 
             </Button>
             <Button 
               type="submit" 
-              className="bg-[#1B1A1A] hover:bg-[#3E4349] text-[#3E4349]"
+              className="bg-[#1B1A1A] hover:bg-[#3E4349] text-white"
               disabled={!formData.name}
             >
               Create Project
