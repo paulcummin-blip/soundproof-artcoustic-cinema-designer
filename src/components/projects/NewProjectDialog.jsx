@@ -181,14 +181,14 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated 
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-[#DCDBD6]">
-                  <SelectItem value="99" className="text-[#1B1A1A]">99 dB (Level 1 Minimum)</SelectItem>
-                  <SelectItem value="102" className="text-[#1B1A1A]">102 dB (Level 2 Minimum)</SelectItem>
-                  <SelectItem value="105" className="text-[#1B1A1A]">105 dB (Level 3 Minimum)</SelectItem>
-                  <SelectItem value="108" className="text-[#1B1A1A]">108 dB (Level 4 Minimum)</SelectItem>
-                  <SelectItem value="102" className="text-[#1B1A1A]">102 dB (Level 1 Recommended)</SelectItem>
-                  <SelectItem value="105" className="text-[#1B1A1A]">105 dB (Level 2 Recommended)</SelectItem>
-                  <SelectItem value="108" className="text-[#1B1A1A]">108 dB (Level 3 Recommended)</SelectItem>
-                  <SelectItem value="111" className="text-[#1B1A1A]">111 dB (Level 4 Recommended)</SelectItem>
+                  <SelectItem value="99" className="text-[#1B1A1A]">99 dB — P12 - L1 Minimum</SelectItem>
+                  <SelectItem value="102" className="text-[#1B1A1A]">102 dB — P12 - L2 Minimum</SelectItem>
+                  <SelectItem value="105" className="text-[#1B1A1A]">105 dB — P12 - L3 Minimum</SelectItem>
+                  <SelectItem value="108" className="text-[#1B1A1A]">108 dB — P12 - L4 Minimum</SelectItem>
+                  <SelectItem value="102" className="text-[#1B1A1A]">102 dB — P12 - L1 Recommended</SelectItem>
+                  <SelectItem value="105" className="text-[#1B1A1A]">105 dB — P12 - L2 Recommended</SelectItem>
+                  <SelectItem value="108" className="text-[#1B1A1A]">108 dB — P12 - L3 Recommended</SelectItem>
+                  <SelectItem value="111" className="text-[#1B1A1A]">111 dB — P12 - L4 Recommended</SelectItem>
                 </SelectContent>
               </Select>
             </div>
