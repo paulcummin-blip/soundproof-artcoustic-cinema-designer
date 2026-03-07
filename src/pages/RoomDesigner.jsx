@@ -1519,6 +1519,12 @@ function RoomDesignerWithState() {
           }
         `}</style>
 
+      <NewProjectDialog
+        open={showNewProjectDialog}
+        onOpenChange={setShowNewProjectDialog}
+        onProjectCreated={handleNewProjectCreated}
+      />
+
       <RoomDesignerHeader
         showResetConfirm={showResetConfirm}
         setShowResetConfirm={setShowResetConfirm}
@@ -1531,6 +1537,10 @@ function RoomDesignerWithState() {
         reloadProject={reloadProject}
         projectIdState={projectIdState}
         isProjectMode={isProjectMode}
+        onFreeUse={handleFreeUse}
+        onNewProject={handleNewProject}
+        onSaveToExistingProject={handleSaveToExistingProject}
+        existingProjects={existingProjects}
       />
 
       <div
