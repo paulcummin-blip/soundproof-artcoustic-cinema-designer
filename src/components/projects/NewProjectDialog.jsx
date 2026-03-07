@@ -204,7 +204,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated 
             </div>
           </div>
 
-          <div className="flex justify-end gap-3">
+          <div className="flex w-full shrink-0 justify-end gap-3 pt-4 pb-2">
             <Button 
               type="button" 
               variant="outline" 
