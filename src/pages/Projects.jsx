@@ -3,6 +3,7 @@ import React, { useMemo, useRef, useState, useEffect } from "react";
 import { SegmentBoundary } from "@/components/dev/SegmentBoundary";
 import { useProjectActions } from "@/components/state/project-session";
 import { base44 } from "@/api/base44Client";
+import NewProjectDialog from "@/components/projects/NewProjectDialog";
 
 // ---- Brand tokens ----
 const BRAND = {
