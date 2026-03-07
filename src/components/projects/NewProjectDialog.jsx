@@ -213,10 +213,11 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated 
             >
               Cancel
             </Button>
-            <Button 
-              type="submit" 
-              className="bg-[#1B1A1A] hover:bg-[#3E4349] text-white"
+            <Button
+              type="submit"
               disabled={!formData.name}
+              className="hover:bg-[#3E4349]"
+              style={{ backgroundColor: "#1B1A1A", color: "#FFFFFF" }}
             >
               Create Project
             </Button>
