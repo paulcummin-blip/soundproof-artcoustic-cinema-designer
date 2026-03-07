@@ -496,7 +496,9 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
   }, []);
 
   const isHydratingRef = useRef(false); // Initialize with false
-  const hasBootstrappedRef = useRef(false);
+  // Target-aware boot guard: stores the last target key booted so that
+  // switching between scratch / different projects triggers a fresh load.
+  const lastBootTargetRef = useRef(null);
 
   useEffect(() => {
     // Update the ref whenever loadState changes
