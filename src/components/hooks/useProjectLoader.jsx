@@ -496,9 +496,7 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
   }, []);
 
   const isHydratingRef = useRef(false); // Initialize with false
-  // Target-aware boot guard: stores the last target key booted so that
-  // switching between scratch / different projects triggers a fresh load.
-  const lastBootTargetRef = useRef(null);
+  const hasBootstrappedRef = useRef(false);
 
   useEffect(() => {
     // Update the ref whenever loadState changes
@@ -712,18 +710,13 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
   freeMoveLcr]
   );
 
-  // Boot logic: re-runs whenever the target (scratch vs specific project) changes.
+  // Boot logic: run ONCE – either load a project or initialise defaults
   useEffect(() => {
     // CRITICAL: Wait for AppStateProvider to finish autosave restore before applying defaults
     if (!appState?.isHydrated) return;
 
-    // Derive a stable key for the current boot target
-    const currentTargetKey = isProjectMode
-      ? `project:${projectIdFromUrl || projectIdState || ""}`
-      : "scratch";
-
-    // Already booted this exact target? Do nothing.
-    if (lastBootTargetRef.current === currentTargetKey) return;
+    // Already bootstrapped for this mount? Do nothing.
+    if (hasBootstrappedRef.current) return;
 
     // Scratch mode: skip backend load entirely, ensure state reflects local draft
     if (!isProjectMode) {
@@ -731,11 +724,13 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
       setAutosaveStatus("local");
       const hasSpeakers = Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
       const hasSeats = Array.isArray(seatingPositions) && seatingPositions.length > 0;
-      lastBootTargetRef.current = currentTargetKey;
       if (!hasSpeakers && !hasSeats && appState?.roomDims) {
+        hasBootstrappedRef.current = true;
         if (typeof initWithDefaultsAndRules === "function") {
           initWithDefaultsAndRules();
         }
+      } else {
+        hasBootstrappedRef.current = true;
       }
       return;
     }
@@ -744,22 +739,23 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
 
     try {
       if (projectIdFromUrl || projectIdState) {
-        // We have a real project (from URL or from session) – load it.
+        // We have a real project (from URL or from session) – load it once.
         const idToLoad = projectIdFromUrl || projectIdState;
         if (idToLoad) {
-          lastBootTargetRef.current = currentTargetKey;
+          hasBootstrappedRef.current = true;
           setProjectIdState(idToLoad);
           loadProject(controller.signal, idToLoad);
         }
       } else {
-        // Project mode but no id yet – initialise defaults if canvas is empty.
+        // No project at all – this is a fresh, local-only design.
+        // Only initialise defaults if nothing has been laid out yet.
         const hasSpeakers =
-          Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
+        Array.isArray(placedSpeakers) && placedSpeakers.length > 0;
         const hasSeats =
-          Array.isArray(seatingPositions) && seatingPositions.length > 0;
+        Array.isArray(seatingPositions) && seatingPositions.length > 0;
 
         if (!hasSpeakers && !hasSeats && appState?.roomDims) {
-          lastBootTargetRef.current = currentTargetKey;
+          hasBootstrappedRef.current = true;
           if (typeof initWithDefaultsAndRules === "function") {
             initWithDefaultsAndRules();
           }
@@ -772,7 +768,6 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
     return () => controller.abort();
   }, [
   appState?.isHydrated,
-  isProjectMode,
   projectIdFromUrl,
   projectIdState,
   appState?.roomDims,
