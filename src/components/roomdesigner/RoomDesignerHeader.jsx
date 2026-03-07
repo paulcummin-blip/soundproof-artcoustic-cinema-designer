@@ -144,5 +144,6 @@ export default function RoomDesignerHeader({
           )}
       </div>
     </header>
+    </>
   );
 }
