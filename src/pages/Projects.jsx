@@ -1048,7 +1048,7 @@ export default function ProjectsPage() {
                     fontSize: 14,
                   }}
                 >
-                  {editingProject ? "Save Changes" : "Save Project"}
+                  Save Changes
                 </button>
               </div>
             </div>
