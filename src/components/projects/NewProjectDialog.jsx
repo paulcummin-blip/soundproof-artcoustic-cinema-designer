@@ -13,19 +13,17 @@ import { Textarea } from "@/components/ui/textarea";
 import { Project } from "@/entities/Project";
 
 const dolbyConfigs = [
-  { value: "5.1", label: "5.1 Surround" },
-  { value: "7.1", label: "7.1 Surround" },
-  { value: "5.1.2", label: "5.1.2 Atmos" },
-  { value: "5.1.4", label: "5.1.4 Atmos" },
-  { value: "7.1.2", label: "7.1.2 Atmos" },
-  { value: "7.1.4", label: "7.1.4 Atmos" },
-  { value: "9.1.2", label: "9.1.2 Atmos" },
-  { value: "9.1.4", label: "9.1.4 Atmos" },
-  { value: "9.1.6", label: "9.1.6 Atmos" },
-  { value: "9.2.4", label: "9.2.4 Atmos" },
-  { value: "9.4.2", label: "9.4.2 Atmos" },
-  { value: "9.4.4", label: "9.4.4 Atmos" },
-  { value: "9.4.6", label: "9.4.6 Atmos" }
+  { value: "5.1", label: "5.1 Surround — P2 - L1" },
+  { value: "7.1", label: "7.1 Surround — P2 - L1" },
+  { value: "5.1.2", label: "5.1.2 Atmos — P2 - L1" },
+  { value: "5.1.4", label: "5.1.4 Atmos — P2 - L1" },
+  { value: "5.1.6", label: "5.1.6 Atmos — P2 - L2" },
+  { value: "7.1.2", label: "7.1.2 Atmos — P2 - L1" },
+  { value: "7.1.4", label: "7.1.4 Atmos — P2 - L2" },
+  { value: "7.1.6", label: "7.1.6 Atmos — P2 - L2" },
+  { value: "9.1.2", label: "9.1.2 Atmos — P2 - L2" },
+  { value: "9.1.4", label: "9.1.4 Atmos — P2 - L2" },
+  { value: "9.1.6", label: "9.1.6 Atmos — P2 - L4" },
 ];
 
 export default function NewProjectDialog({ open, onOpenChange, onProjectCreated }) {
