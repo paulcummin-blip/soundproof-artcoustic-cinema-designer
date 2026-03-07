@@ -509,7 +509,11 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
   // Quiet autosave: mark dirty on changes, then commit at most every 10s (and also on short pauses).
   useEffect(() => {
     const effectiveProjectId = projectIdState || projectIdFromUrl || null;
-    if (!effectiveProjectId) return; // never create via autosave
+    if (!effectiveProjectId || !isProjectMode) {
+      // Scratch mode: stay as "local", never touch backend
+      setAutosaveStatus("local");
+      return;
+    }
 
     // Skip if hydrating
     if (isHydratingRef.current) {
