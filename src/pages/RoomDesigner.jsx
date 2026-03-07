@@ -988,6 +988,30 @@ function RoomDesignerWithState() {
       setFreeMoveLcr: setFreeMoveLcr
     });
 
+  // Called after NewProjectDialog creates the project
+  const handleNewProjectCreated = React.useCallback(async (created) => {
+    if (!created?.id) return;
+    setUserProjectOverride(created.id);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("project", created.id);
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) { /* ignore */ }
+    setExistingProjects((prev) => [{ id: created.id, name: created.name || "Untitled" }, ...prev]);
+    setTimeout(() => { triggerSaveProject?.(); }, 100);
+  }, [triggerSaveProject]);
+
+  // Called after overwrite confirmation for an existing project
+  const handleSaveToExistingProject = React.useCallback((id) => {
+    setUserProjectOverride(id);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("project", id);
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) { /* ignore */ }
+    setTimeout(() => { triggerSaveProject?.(); }, 100);
+  }, [triggerSaveProject]);
+
   useEffect(() => {
     if (appState && typeof appState.setSubWarnings === 'function') {
       appState.setSubWarnings(subWarnings);
