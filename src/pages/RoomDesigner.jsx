@@ -231,6 +231,64 @@ function RoomDesignerWithState() {
   // Don't block render - allow local-only mode
   const showLocalHint = !activeProjectId;
 
+  // Fetch existing projects for the "Save to Project" dropdown (name + id only)
+  useEffect(() => {
+    let cancelled = false;
+    const { Project: ProjectEntity } = require("@/entities/Project") || {};
+    // Use the already-imported Project entity
+    Project.list('-updated_date', 50).then((list) => {
+      if (!cancelled && Array.isArray(list)) {
+        setExistingProjects(list.map((p) => ({ id: p.id, name: p.name || "Untitled" })));
+      }
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+
+  // Free Use: detach from any project, stay local
+  const handleFreeUse = React.useCallback(() => {
+    setUserProjectOverride("free");
+    // Remove project query param from URL without reload
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("project");
+      url.searchParams.delete("projectId");
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) { /* ignore */ }
+  }, []);
+
+  // New Project: open dialog; on creation save RD state into it and bind
+  const handleNewProject = React.useCallback(() => {
+    setShowNewProjectDialog(true);
+  }, []);
+
+  const handleNewProjectCreated = React.useCallback(async (created) => {
+    if (!created?.id) return;
+    setUserProjectOverride(created.id);
+    // Update URL
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("project", created.id);
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) { /* ignore */ }
+    // Add to local list
+    setExistingProjects((prev) => [{ id: created.id, name: created.name || "Untitled" }, ...prev]);
+    // Save current RD state into the new project (triggerSaveProject reads resolvedProjectId via closure)
+    // We call triggerSaveProject after state settles via a small timeout
+    setTimeout(() => { triggerSaveProject?.(); }, 100);
+  }, [triggerSaveProject]);
+
+  // Save to Existing Project: called after overwrite confirmation
+  const handleSaveToExistingProject = React.useCallback((id, name) => {
+    setUserProjectOverride(id);
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("project", id);
+      window.history.replaceState({}, "", url.toString());
+    } catch (e) { /* ignore */ }
+    // triggerSaveProject will use the new resolvedProjectId on next render cycle
+    setTimeout(() => { triggerSaveProject?.(); }, 100);
+  }, [triggerSaveProject]);
+
 
 
   // Use AppState dolbyLayout directly (no local state override)
