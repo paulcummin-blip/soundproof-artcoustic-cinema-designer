@@ -128,6 +128,7 @@ function RoomDesignerWithState() {
 
   // Single source of truth for the project ID
   const resolvedProjectId = sessionActiveProjectId || initialProjectIdFromUrl || null;
+  const isProjectMode = !!resolvedProjectId;
 
   // NEW: Refs for speaker rescue on room resize
   const prevRoomDimsRef = useRef(null);
@@ -902,6 +903,7 @@ function RoomDesignerWithState() {
     appState, // Pass appState here
     {
       projectIdFromUrl: resolvedProjectId,
+      isProjectMode,
       dolbyPreset,
       dimensions: stableDimensions, // Pass stableDimensions for serializeProject's old fields
       screen: _screen, seatingPositions: _seatingPositions, roomElements: _roomElements,
