@@ -31,8 +31,41 @@ export default function RoomDesignerHeader({
   reloadProject,
   projectIdState,
   isProjectMode,
+  onFreeUse,
+  onNewProject,
+  onSaveToExistingProject,
+  existingProjects,
 }) {
+  const [overwriteCandidate, setOverwriteCandidate] = useState(null); // { id, name }
+
+  const handleExistingProjectClick = (project) => {
+    setOverwriteCandidate({ id: project.id, name: project.name });
+  };
+
+  const handleOverwriteConfirm = () => {
+    if (overwriteCandidate) {
+      onSaveToExistingProject(overwriteCandidate.id, overwriteCandidate.name);
+    }
+    setOverwriteCandidate(null);
+  };
+
   return (
+    <>
+    <AlertDialog open={!!overwriteCandidate} onOpenChange={(open) => { if (!open) setOverwriteCandidate(null); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Overwrite existing project?</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will overwrite <strong>{overwriteCandidate?.name}</strong> with the current Room Designer state. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>No</AlertDialogCancel>
+          <AlertDialogAction onClick={handleOverwriteConfirm} className="bg-[#213428] hover:bg-[#3E4349] text-white">Yes, overwrite</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
     <header className="p-4 bg-white border-b border-[#DCDBD6] flex-shrink-0">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[#1B1A1A] font-header">Cinema Designer</h1>
@@ -47,10 +80,44 @@ export default function RoomDesignerHeader({
             Reset
           </Button>
 
-          <Button size="sm" className="brand-btn" onClick={handleSaveProject}>
-            <Save className="w-4 h-4 mr-2" />
-            {isProjectMode ? "Save Project" : "Save Local Draft"}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onFreeUse}
+            className={!isProjectMode ? "border-amber-400 text-amber-700 bg-amber-50" : ""}
+          >
+            Free Use
           </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button size="sm" className="brand-btn">
+                <Save className="w-4 h-4 mr-2" />
+                Save to Project
+                <ChevronDown className="w-3 h-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56 bg-white border-[#DCDBD6]">
+              <DropdownMenuItem onClick={onNewProject} className="cursor-pointer font-medium">
+                <FolderOpen className="w-4 h-4 mr-2" />
+                New Project
+              </DropdownMenuItem>
+              {existingProjects && existingProjects.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  {existingProjects.map((p) => (
+                    <DropdownMenuItem
+                      key={p.id}
+                      onClick={() => handleExistingProjectClick(p)}
+                      className="cursor-pointer"
+                    >
+                      <span className="truncate">{p.name || "Untitled"}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       <div className="mt-2 text-xs flex items-center gap-4">
