@@ -496,7 +496,7 @@ if (typeof setFrontSubsCfg === "function" && typeof setRearSubsCfg === "function
   }, []);
 
   const isHydratingRef = useRef(false); // Initialize with false
-  const hasBootstrappedRef = useRef(false);
+  const lastBootTargetRef = useRef("");
 
   useEffect(() => {
     // Update the ref whenever loadState changes
