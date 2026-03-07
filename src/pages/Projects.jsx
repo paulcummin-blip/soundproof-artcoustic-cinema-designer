@@ -103,7 +103,10 @@ export default function ProjectsPage() {
   const [statusFilter, setStatusFilter] = useState("All Statuses");
   const [sortKey, setSortKey] = useState("recent");
 
-  // New Project dialog state
+  // New Project dialog state (canonical NewProjectDialog)
+  const [newProjectDialogOpen, setNewProjectDialogOpen] = useState(false);
+
+  // Edit project dialog state (inline, for existing projects only)
   const [dialogOpen, setDialogOpen] = useState(false);
   const [draft, setDraft] = useState({
     name: "",
