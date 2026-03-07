@@ -187,7 +187,10 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated 
                   <SelectItem value="102" className="text-[#1B1A1A]">102 dB (Level 2 Minimum)</SelectItem>
                   <SelectItem value="105" className="text-[#1B1A1A]">105 dB (Level 3 Minimum)</SelectItem>
                   <SelectItem value="108" className="text-[#1B1A1A]">108 dB (Level 4 Minimum)</SelectItem>
-                  <SelectItem value="111" className="text-[#1B1A1A]">111 dB (Level 4 Recommended)</SelectItem>
+                  <SelectItem value="111" className="text-[#1B1A1A]">111 dB (Level 1 Recommended)</SelectItem>
+                  <SelectItem value="114" className="text-[#1B1A1A]">114 dB (Level 2 Recommended)</SelectItem>
+                  <SelectItem value="117" className="text-[#1B1A1A]">117 dB (Level 3 Recommended)</SelectItem>
+                  <SelectItem value="120" className="text-[#1B1A1A]">120 dB (Level 4 Recommended)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
