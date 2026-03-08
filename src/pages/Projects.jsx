@@ -151,6 +151,10 @@ export default function ProjectsPage() {
             roomLength: p.room_length || null,
             roomWidth: p.room_width || null,
             roomHeight: p.room_height || null,
+            dolby_config: p.dolby_config || null,
+            target_spl: p.target_spl ?? null,
+            amplifier_power: p.amplifier_power ?? null,
+            notes: p.notes || "",
             createdAt: Number.isFinite(new Date(p.created_date).getTime())
               ? new Date(p.created_date).getTime()
               : Date.now(),
@@ -240,6 +244,53 @@ export default function ProjectsPage() {
     setProjects((arr) => [p, ...arr]);
     setCreated(p);
     window.setTimeout(() => setCreated(null), 4000);
+  }
+
+  function handleNewProjectCreated(newProject) {
+    // This is now only the create-mode callback from NewProjectDialog
+    const p = {
+      id: newProject.id,
+      name: newProject.name || "Untitled Project",
+      client: newProject.client_name || "",
+      status: newProject.project_status || "Prospective",
+      roomLength: newProject.room_length || null,
+      roomWidth: newProject.room_width || null,
+      roomHeight: newProject.room_height || null,
+      dolby_config: newProject.dolby_config || null,
+      target_spl: newProject.target_spl ?? null,
+      amplifier_power: newProject.amplifier_power ?? null,
+      notes: newProject.notes || "",
+      createdAt: new Date(newProject.created_date).getTime(),
+      lcrModel: null, surroundModel: null, heightModel: null,
+      subModel: null, subCount: null, screenSizeInches: null, seats: null,
+    };
+    setProjects((arr) => [p, ...arr]);
+    setCreated(p);
+    window.setTimeout(() => setCreated(null), 4000);
+  }
+
+  function handleProjectUpdated(updated) {
+    setProjects((arr) =>
+      arr.map((p) =>
+        p.id === updated.id
+          ? {
+              ...p,
+              name: updated.name || p.name,
+              client: updated.client_name || "",
+              status: updated.project_status || p.status,
+              roomLength: updated.room_length ?? p.roomLength,
+              roomWidth: updated.room_width ?? p.roomWidth,
+              roomHeight: updated.room_height ?? p.roomHeight,
+              dolby_config: updated.dolby_config ?? p.dolby_config,
+              target_spl: updated.target_spl ?? p.target_spl,
+              amplifier_power: updated.amplifier_power ?? p.amplifier_power,
+              notes: updated.notes ?? p.notes,
+            }
+          : p
+      )
+    );
+    setEditingProject(null);
+    setNewProjectDialogOpen(false);
   }
 
   function handleEditProject(p) {
