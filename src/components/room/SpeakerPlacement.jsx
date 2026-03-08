@@ -1581,9 +1581,8 @@ function SpeakerPlacementImpl(props) {
 
   const subWarnings = appState?.subWarnings || { front: [], rear: [] };
 
-  const effectivePreset = (typeof dolbyPreset === "string" && dolbyPreset) 
-    || (typeof appState?.dolbyLayout === "string" && appState.dolbyLayout) 
-    || "5.1";
+  const _rawPreset = (typeof dolbyPreset === "string" && dolbyPreset) || (typeof appState?.dolbyLayout === "string" && appState.dolbyLayout);
+  const effectivePreset = _rawPreset || ((speakerSystem?.placedSpeakers?.length ?? 0) > 0 ? "5.1" : "");
 
   // Is the current bed layout a 7.x variant?
   const is7xBed = React.useMemo(() => {
