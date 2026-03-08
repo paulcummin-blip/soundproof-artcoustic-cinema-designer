@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Project } from "@/entities/Project";
 
-export const dolbyConfigs = [
+const dolbyConfigs = [
   { value: "5.1", label: "5.1 Surround — P2 - L1" },
   { value: "7.1", label: "7.1 Surround — P2 - L1" },
   { value: "5.1.2", label: "5.1.2 Atmos — P2 - L1" },
@@ -26,91 +26,48 @@ export const dolbyConfigs = [
   { value: "9.1.6", label: "9.1.6 Atmos — P2 - L4" },
 ];
 
-export const splLabels = {
-  "99_min":  "99 dB — P12 - L1 Minimum",
-  "102_min": "102 dB — P12 - L2 Minimum",
-  "105_min": "105 dB — P12 - L3 Minimum",
-  "108_min": "108 dB — P12 - L4 Minimum",
-  "102_rec": "102 dB — P12 - L1 Recommended",
-  "105_rec": "105 dB — P12 - L2 Recommended",
-  "108_rec": "108 dB — P12 - L3 Recommended",
-  "111_rec": "111 dB — P12 - L4 Recommended",
-};
-
-// SPL select options in order (value must be unique per <option>, so we use compound keys)
-export const splOptions = [
-  { value: "99",  label: "99 dB — P12 - L1 Minimum" },
-  { value: "102", label: "102 dB — P12 - L2 Minimum" },
-  { value: "105", label: "105 dB — P12 - L3 Minimum" },
-  { value: "108", label: "108 dB — P12 - L4 Minimum" },
-  { value: "102", label: "102 dB — P12 - L1 Recommended" },
-  { value: "105", label: "105 dB — P12 - L2 Recommended" },
-  { value: "108", label: "108 dB — P12 - L3 Recommended" },
-  { value: "111", label: "111 dB — P12 - L4 Recommended" },
-];
-
-const EMPTY_FORM = {
-  name: "",
-  client_name: "",
-  project_status: "Prospective",
-  room_length: "",
-  room_width: "",
-  room_height: "",
-  dolby_config: "",
-  target_spl: 105,
-  amplifier_power: "",
-  notes: ""
-};
-
-// editProject: if provided, the dialog operates in edit mode
-export default function NewProjectDialog({ open, onOpenChange, onProjectCreated, onProjectUpdated, editProject }) {
-  const isEditMode = !!editProject;
-
-  const [formData, setFormData] = useState(EMPTY_FORM);
-
-  // When editProject changes (opening edit mode), pre-fill the form
-  useEffect(() => {
-    if (editProject) {
-      setFormData({
-        name: editProject.name || "",
-        client_name: editProject.client_name || editProject.client || "",
-        project_status: editProject.project_status || editProject.status || "Prospective",
-        room_length: editProject.room_length != null ? String(editProject.room_length) : "",
-        room_width: editProject.room_width != null ? String(editProject.room_width) : "",
-        room_height: editProject.room_height != null ? String(editProject.room_height) : "",
-        dolby_config: editProject.dolby_config || "",
-        target_spl: editProject.target_spl != null ? editProject.target_spl : 105,
-        amplifier_power: editProject.amplifier_power != null ? String(editProject.amplifier_power) : "",
-        notes: editProject.notes || "",
-      });
-    } else {
-      setFormData(EMPTY_FORM);
-    }
-  }, [editProject, open]);
+export default function NewProjectDialog({ open, onOpenChange, onProjectCreated }) {
+  const [formData, setFormData] = useState({
+    name: "",
+    client_name: "",
+    project_status: "Prospective",
+    room_length: "",
+    room_width: "",
+    room_height: "",
+    dolby_config: "",
+    target_spl: 105,
+    amplifier_power: "",
+    notes: ""
+  });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const payload = {
-      ...formData,
-      room_length: formData.room_length ? parseFloat(formData.room_length) : null,
-      room_width: formData.room_width ? parseFloat(formData.room_width) : null,
-      room_height: formData.room_height ? parseFloat(formData.room_height) : null,
-      amplifier_power: formData.amplifier_power ? parseInt(formData.amplifier_power) : null,
-    };
     try {
-      if (isEditMode) {
-        const updated = await Project.update(editProject.id, payload);
-        onProjectUpdated && onProjectUpdated(updated);
-        onOpenChange(false);
-      } else {
-        const created = await Project.create(payload);
-        setFormData(EMPTY_FORM);
-        onProjectCreated && onProjectCreated(created);
-        onOpenChange(false);
-      }
+      const created = await Project.create({
+        ...formData,
+        room_length: formData.room_length ? parseFloat(formData.room_length) : null,
+        room_width: formData.room_width ? parseFloat(formData.room_width) : null,
+        room_height: formData.room_height ? parseFloat(formData.room_height) : null,
+        amplifier_power: formData.amplifier_power ? parseInt(formData.amplifier_power) : null,
+      });
+      setFormData({
+        name: "",
+        client_name: "",
+        project_status: "Prospective",
+        room_length: "",
+        room_width: "",
+        room_height: "",
+        dolby_config: "",
+        target_spl: 105,
+        amplifier_power: "",
+        notes: ""
+      });
+      // Pass created project to parent for session hydration
+      onProjectCreated && onProjectCreated(created);
+      onOpenChange(false);
     } catch (error) {
-      console.error("Failed to save project:", error);
-      alert("Failed to save project. Please try again.");
+      console.error("Failed to create project:", error);
+      alert("Failed to create project. Please try again.");
     }
   };
 
@@ -118,9 +75,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-white border-[#DCDBD6] text-[#1B1A1A] max-w-2xl overflow-y-auto max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold font-header">
-            {isEditMode ? "Edit Cinema Project" : "Create New Cinema Project"}
-          </DialogTitle>
+          <DialogTitle className="text-xl font-bold font-header">Create New Cinema Project</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6 font-body">
@@ -226,11 +181,14 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-[#DCDBD6]">
-                  {splOptions.map((opt, i) => (
-                    <SelectItem key={`${opt.value}_${i}`} value={opt.value} className="text-[#1B1A1A]">
-                      {opt.label}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="99" className="text-[#1B1A1A]">99 dB — P12 - L1 Minimum</SelectItem>
+                  <SelectItem value="102" className="text-[#1B1A1A]">102 dB — P12 - L2 Minimum</SelectItem>
+                  <SelectItem value="105" className="text-[#1B1A1A]">105 dB — P12 - L3 Minimum</SelectItem>
+                  <SelectItem value="108" className="text-[#1B1A1A]">108 dB — P12 - L4 Minimum</SelectItem>
+                  <SelectItem value="102" className="text-[#1B1A1A]">102 dB — P12 - L1 Recommended</SelectItem>
+                  <SelectItem value="105" className="text-[#1B1A1A]">105 dB — P12 - L2 Recommended</SelectItem>
+                  <SelectItem value="108" className="text-[#1B1A1A]">108 dB — P12 - L3 Recommended</SelectItem>
+                  <SelectItem value="111" className="text-[#1B1A1A]">111 dB — P12 - L4 Recommended</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -261,7 +219,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
               className="hover:bg-[#3E4349]"
               style={{ backgroundColor: "#1B1A1A", color: "#FFFFFF" }}
             >
-              {isEditMode ? "Save Changes" : "Create Project"}
+              Create Project
             </Button>
           </div>
         </form>
