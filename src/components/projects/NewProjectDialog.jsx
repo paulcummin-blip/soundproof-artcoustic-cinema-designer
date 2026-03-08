@@ -117,7 +117,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="bg-white border-[#DCDBD6] text-[#1B1A1A] max-w-2xl overflow-y-auto max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle className="text-xl font-bold font-header">Create New Cinema Project</DialogTitle>
+          <DialogTitle className="text-xl font-bold font-header">{isEditMode ? "Edit Cinema Project" : "Create New Cinema Project"}</DialogTitle>
         </DialogHeader>
         
         <form onSubmit={handleSubmit} className="space-y-6 font-body">
@@ -223,14 +223,9 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-white border-[#DCDBD6]">
-                  <SelectItem value="99" className="text-[#1B1A1A]">99 dB — P12 - L1 Minimum</SelectItem>
-                  <SelectItem value="102" className="text-[#1B1A1A]">102 dB — P12 - L2 Minimum</SelectItem>
-                  <SelectItem value="105" className="text-[#1B1A1A]">105 dB — P12 - L3 Minimum</SelectItem>
-                  <SelectItem value="108" className="text-[#1B1A1A]">108 dB — P12 - L4 Minimum</SelectItem>
-                  <SelectItem value="102" className="text-[#1B1A1A]">102 dB — P12 - L1 Recommended</SelectItem>
-                  <SelectItem value="105" className="text-[#1B1A1A]">105 dB — P12 - L2 Recommended</SelectItem>
-                  <SelectItem value="108" className="text-[#1B1A1A]">108 dB — P12 - L3 Recommended</SelectItem>
-                  <SelectItem value="111" className="text-[#1B1A1A]">111 dB — P12 - L4 Recommended</SelectItem>
+                  {splOptions.map((opt, i) => (
+                    <SelectItem key={i} value={opt.value} className="text-[#1B1A1A]">{opt.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -261,7 +256,7 @@ export default function NewProjectDialog({ open, onOpenChange, onProjectCreated,
               className="hover:bg-[#3E4349]"
               style={{ backgroundColor: "#1B1A1A", color: "#FFFFFF" }}
             >
-              Create Project
+              {isEditMode ? "Save Changes" : "Create Project"}
             </Button>
           </div>
         </form>
