@@ -143,6 +143,9 @@ export default function ProjectsPage() {
             roomLength: p.room_length || null,
             roomWidth: p.room_width || null,
             roomHeight: p.room_height || null,
+            dolby_config: p.dolby_config || null,
+            target_spl: p.target_spl != null ? p.target_spl : null,
+            notes: p.notes || "",
             createdAt: Number.isFinite(new Date(p.created_date).getTime())
               ? new Date(p.created_date).getTime()
               : Date.now(),
